@@ -6,8 +6,8 @@
  */
 import { queryOptions } from "@tanstack/react-query";
 import { isAuthenticated, hasRefreshToken } from "../auth";
-import { authFetch, request, rssApi } from "./client";
-import type { TrackedFeed } from "./client";
+import { authFetch, request, rssApi, fetchOverview } from "./client";
+import type { TrackedFeed, UserOverview } from "./client";
 import type { DashboardResponse } from "../types";
 
 // ── Query Keys ───────────────────────────────────────────────────
@@ -26,7 +26,26 @@ export const queryKeys = {
     leagues: ["fantasy", "leagues"] as const,
   },
   standings: (league: string) => ["standings", league] as const,
+  userOverview: ["userOverview"] as const,
 };
+
+// ── User Overview Query ──────────────────────────────────────────
+
+/**
+ * Aggregated account view: identity + tier + subscription summary +
+ * channel counts + fantasy summary + GDPR state. Backed by the core
+ * API's singleflight cache (~30s).
+ */
+export function userOverviewQueryOptions() {
+  return queryOptions<UserOverview>({
+    queryKey: queryKeys.userOverview,
+    queryFn: fetchOverview,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+    refetchOnWindowFocus: true,
+  });
+}
 
 // ── Dashboard Query ──────────────────────────────────────────────
 

@@ -224,6 +224,85 @@ export async function fetchSubscription(): Promise<SubscriptionInfo> {
   return authFetch<SubscriptionInfo>("/users/me/subscription");
 }
 
+// ── User Overview ───────────────────────────────────────────────
+
+/**
+ * Aggregated account view returned by `GET /users/me/overview`.
+ *
+ * The `subscription` field here is DB-only (no live Stripe enrichment) —
+ * it carries plan/status/period/lifetime flags but NOT amount/currency/
+ * interval/trial_end. Callers needing live billing detail must still hit
+ * `fetchSubscription()` against `/users/me/subscription`.
+ */
+export interface UserOverview {
+  identity: {
+    sub: string;
+    email: string;
+    name: string;
+    username: string;
+  };
+  tier: {
+    current: string;
+    is_super_user: boolean;
+    label: string;
+    limits: {
+      symbols: number;
+      feeds: number;
+      custom_feeds: number;
+      leagues: number;
+      fantasy: number;
+      max_ticker_rows: number;
+      max_ticker_customization: boolean;
+    };
+  };
+  subscription: SubscriptionInfo | null;
+  channels: {
+    total: number;
+    enabled: number;
+    by_type: Array<{ type: string; enabled: boolean; visible: boolean }>;
+  };
+  fantasy: {
+    yahoo_connected: boolean;
+    yahoo_synced: boolean;
+    league_count: number;
+  } | null;
+  gdpr: {
+    deletion_status: "none" | "pending" | "canceled" | "purged";
+    requested_at: string | null;
+    purge_at: string | null;
+  };
+  links: {
+    logto_account: string;
+  };
+}
+
+export async function fetchOverview(): Promise<UserOverview> {
+  return authFetch<UserOverview>("/users/me/overview");
+}
+
+/**
+ * Fetch the GDPR data export ZIP. Bypasses `authFetch` because that helper
+ * parses JSON; we need the raw Response to call `.blob()`.
+ */
+export async function exportUserData(): Promise<Blob> {
+  const token = await getValidToken();
+  const headers: HeadersInit = {};
+  if (token) {
+    (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetchWithTimeout(`${API_BASE}/users/me/export`, {
+    method: "GET",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new ApiError(response.status, `export failed: ${response.status}`);
+  }
+
+  return response.blob();
+}
+
 // ── RSS Types & API ─────────────────────────────────────────────
 
 export interface TrackedFeed {

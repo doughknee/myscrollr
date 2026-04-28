@@ -1,6 +1,6 @@
 {
   "name": "scrollr-desktop",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "description": "Scrollr desktop app — pinned always-on-top ticker for sports, finance, RSS, and Yahoo Fantasy. Tauri + React.",
   "author": "Brandon Ruth <brandon@myscrollr.com>",
@@ -50,6 +50,8 @@
     "@tanstack/router-plugin": "^1.166.7",
     "@tauri-apps/cli": "^2.0.0",
     "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
