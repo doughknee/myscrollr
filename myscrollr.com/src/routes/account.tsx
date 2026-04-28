@@ -13,11 +13,11 @@ import {
 } from 'lucide-react'
 import { motion } from 'motion/react'
 import type { ComponentType } from 'react'
-import type { IdTokenClaims } from '@logto/react'
+import type { UserOverview } from '@/api/client'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { pageVariants, sectionVariants } from '@/lib/animations'
-import { channelsApi } from '@/api/client'
+import { userApi } from '@/api/client'
 import { useGetToken } from '@/hooks/useGetToken'
 import SubscriptionStatus from '@/components/billing/SubscriptionStatus'
 import AccountDangerZone from '@/components/account/AccountDangerZone'
@@ -26,16 +26,6 @@ import { usePageMeta } from '@/lib/usePageMeta'
 export const Route = createFileRoute('/account')({
   component: AccountHub,
 })
-
-const LOGTO_ENDPOINT = (import.meta.env.VITE_LOGTO_ENDPOINT || '').replace(
-  /\/+$/,
-  '',
-)
-const LOGTO_APP_ID = import.meta.env.VITE_LOGTO_APP_ID || ''
-const SECURITY_NODE_HREF =
-  LOGTO_ENDPOINT && LOGTO_APP_ID
-    ? `${LOGTO_ENDPOINT}/account?${new URLSearchParams({ client_id: LOGTO_APP_ID })}`
-    : undefined
 
 // ── Signature easing (matches homepage) ────────────────────────
 const EASE = [0.22, 1, 0.36, 1] as const
@@ -90,7 +80,7 @@ const HUB_CARDS: Array<HubCardDef> = [
   {
     title: 'Security Node',
     desc: 'Manage password, MFA & linked accounts',
-    href: SECURITY_NODE_HREF,
+    // href is injected at render time from overview.links.logto_account
     Icon: Lock,
     hex: HEX.secondary,
     WatermarkIcon: Lock,
@@ -113,8 +103,7 @@ function AccountHub() {
       'Manage your Scrollr account, subscription, and connected services.',
     canonicalUrl: 'https://myscrollr.com/account',
   })
-  const { isAuthenticated, isLoading, getIdTokenClaims } = useScrollrAuth()
-  const [userClaims, setUserClaims] = useState<IdTokenClaims>()
+  const { isAuthenticated, isLoading } = useScrollrAuth()
   const navigate = useNavigate()
   const getToken = useGetToken()
 
@@ -122,18 +111,20 @@ function AccountHub() {
   const hasLoaded = useRef(false)
   const autoRedirectTriggered = useRef(false)
 
-  // ── Quick Stats state ──────────────────────────────────────────
-  const [channelCount, setChannelCount] = useState<number | null>(null)
-  const [enabledCount, setEnabledCount] = useState<number | null>(null)
+  // ── Unified overview state ────────────────────────────────────
+  // One round-trip replaces the previous claims + channels +
+  // deletion-status fan-out. SubscriptionStatus and the GDPR mutating
+  // actions still use their dedicated endpoints.
+  const [overview, setOverview] = useState<UserOverview | null>(null)
 
-  const fetchStats = useCallback(async () => {
+  const fetchOverview = useCallback(async () => {
     try {
-      const data = await channelsApi.getAll(getToken)
-      const all = data.channels
-      setChannelCount(all.length)
-      setEnabledCount(all.filter((s) => s.enabled).length)
-    } catch {
-      // Silently fail — stats are non-critical
+      const data = await userApi.overview(getToken)
+      setOverview(data)
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.warn('Failed to load account overview', err)
+      }
     }
   }, [getToken])
 
@@ -148,17 +139,9 @@ function AccountHub() {
   // ── Fetch data when authenticated ─────────────────────────────
   useEffect(() => {
     if (isAuthenticated) {
-      getIdTokenClaims()
-        .then(setUserClaims)
-        .catch((error: unknown) => {
-          if (import.meta.env.DEV) {
-            console.warn('Failed to load account identity claims', error)
-          }
-          setUserClaims(undefined)
-        })
-      fetchStats()
+      fetchOverview()
     }
-  }, [isAuthenticated, getIdTokenClaims, fetchStats])
+  }, [isAuthenticated, fetchOverview])
 
   // ── Loading / auth guards ─────────────────────────────────────
   if (isLoading && !hasLoaded.current) {
@@ -186,7 +169,9 @@ function AccountHub() {
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
               Welcome back,{' '}
               <span className="text-gradient-primary">
-                {userClaims?.name || userClaims?.username || 'User'}
+                {overview?.identity.name ||
+                  overview?.identity.username ||
+                  'User'}
               </span>
             </h1>
             <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
@@ -221,16 +206,34 @@ function AccountHub() {
               // Hide Public Profile if user has no username set —
               // /u/me would otherwise expose the raw Logto sub UUID.
               if (card.title === 'Public Profile') {
-                return Boolean(userClaims?.username)
+                return Boolean(overview?.identity.username)
+              }
+              // Hide Security Node until overview supplies the link —
+              // the href comes from overview.links.logto_account.
+              if (card.title === 'Security Node') {
+                return Boolean(overview?.links.logto_account)
               }
               return true
             })
               .map((card) => {
                 // Route Public Profile to the user's actual username
-                if (card.title === 'Public Profile' && userClaims?.username) {
+                if (
+                  card.title === 'Public Profile' &&
+                  overview?.identity.username
+                ) {
                   return {
                     ...card,
-                    params: { username: userClaims.username },
+                    params: { username: overview.identity.username },
+                  }
+                }
+                // Inject Security Node href from overview
+                if (
+                  card.title === 'Security Node' &&
+                  overview?.links.logto_account
+                ) {
+                  return {
+                    ...card,
+                    href: overview.links.logto_account,
                   }
                 }
                 return card
@@ -379,7 +382,7 @@ function AccountHub() {
                 <div className="grid grid-cols-2 gap-4 text-center">
                   <div className="p-4 bg-base-200/40 border border-base-300/25 rounded-xl">
                     <div className="text-2xl font-black text-base-content font-mono tabular-nums">
-                      {channelCount ?? '—'}
+                      {overview?.channels.total ?? '—'}
                     </div>
                     <div className="text-[10px] text-base-content/30 flex items-center justify-center gap-1 mt-1">
                       <Radio size={10} />
@@ -388,7 +391,7 @@ function AccountHub() {
                   </div>
                   <div className="p-4 bg-base-200/40 border border-base-300/25 rounded-xl">
                     <div className="text-2xl font-black text-base-content font-mono tabular-nums">
-                      {enabledCount ?? '—'}
+                      {overview?.channels.enabled ?? '—'}
                     </div>
                     <div className="text-[10px] text-base-content/30 flex items-center justify-center gap-1 mt-1">
                       <Wifi size={10} />
@@ -474,7 +477,12 @@ function AccountHub() {
       </section>
 
       {/* ── GDPR: Export + Delete ── */}
-      <AccountDangerZone getToken={getToken} />
+      <AccountDangerZone
+        getToken={getToken}
+        deletionStatus={overview?.gdpr.deletion_status ?? 'none'}
+        purgeAt={overview?.gdpr.purge_at ?? null}
+        onDeletionChange={fetchOverview}
+      />
     </motion.main>
   )
 }

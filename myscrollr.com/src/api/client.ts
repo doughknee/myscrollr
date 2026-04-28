@@ -427,6 +427,74 @@ export const billingApi = {
     ),
 }
 
+// ── User Overview API ─────────────────────────────────────────────
+//
+// Single round-trip read shape for the /account hub. Replaces the
+// fan-out across claims + channels + deletion-status. Live billing
+// detail (Amount/Interval/TrialEnd) is returned in `subscription` when
+// the DB has it cached, but components that render those exact fields
+// should keep using billingApi.getSubscription (which is Stripe-backed
+// and authoritative). Backed server-side by a 30s Redis cache and
+// invalidation hooks on every mutating endpoint that touches this shape.
+
+export interface UserOverviewIdentity {
+  sub: string
+  email: string
+  name: string
+  username: string
+}
+
+export interface UserOverviewTier {
+  current: string
+  is_super_user: boolean
+  label: string
+  limits: ChannelLimits
+}
+
+export interface UserOverviewChannelRow {
+  type: ChannelType
+  enabled: boolean
+  visible: boolean
+}
+
+export interface UserOverviewChannels {
+  total: number
+  enabled: number
+  by_type: Array<UserOverviewChannelRow>
+}
+
+export interface UserOverviewFantasy {
+  yahoo_connected: boolean
+  yahoo_synced: boolean
+  league_count: number
+}
+
+export interface UserOverviewGDPR {
+  deletion_status: 'none' | 'pending' | 'canceled' | 'purged'
+  requested_at: string | null
+  purge_at: string | null
+}
+
+export interface UserOverviewLinks {
+  logto_account: string
+}
+
+export interface UserOverview {
+  identity: UserOverviewIdentity
+  tier: UserOverviewTier
+  subscription: SubscriptionStatus | null
+  channels: UserOverviewChannels
+  fantasy: UserOverviewFantasy | null
+  gdpr: UserOverviewGDPR
+  links: UserOverviewLinks
+}
+
+export const userApi = {
+  /** Unified read for the /account hub — identity, tier, channels, GDPR, fantasy. */
+  overview: (getToken: () => Promise<string | null>) =>
+    authenticatedFetch<UserOverview>('/users/me/overview', {}, getToken),
+}
+
 // ── Invite API ───────────────────────────────────────────────────
 
 export interface CompleteInviteRequest {
