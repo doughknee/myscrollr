@@ -150,6 +150,20 @@ func ValidateAuth(c *fiber.Ctx) error {
 		c.Locals("user_email", email)
 	}
 
+	// Extract name + username (custom claims wired via Logto Custom JWT).
+	// The overview endpoint surfaces these to the client; a missing claim
+	// must coerce to empty string so callers can rely on .(string) reads.
+	if name, ok := claims["name"].(string); ok {
+		c.Locals("user_name", name)
+	} else {
+		c.Locals("user_name", "")
+	}
+	if username, ok := claims["username"].(string); ok {
+		c.Locals("user_username", username)
+	} else {
+		c.Locals("user_username", "")
+	}
+
 	return nil
 }
 

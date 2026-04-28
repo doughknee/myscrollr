@@ -194,6 +194,7 @@ func (s *Server) setupRoutes() {
 	s.App.Post("/checkout/payment-intent", LogtoAuth, HandleCreatePaymentIntent)
 	s.App.Get("/checkout/return", LogtoAuth, HandleCheckoutReturn)
 	s.App.Get("/users/me/subscription", LogtoAuth, HandleGetSubscription)
+	s.App.Get("/users/me/overview", LogtoAuth, HandleGetOverview)
 	s.App.Get("/users/me/subscription/preview", LogtoAuth, HandlePreviewPlanChange)
 	s.App.Put("/users/me/subscription/plan", LogtoAuth, HandleChangePlan)
 	s.App.Post("/users/me/subscription/cancel", LogtoAuth, HandleCancelSubscription)

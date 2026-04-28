@@ -174,6 +174,10 @@ func handleCheckoutCompleted(event stripe.Event) {
 			log.Printf("[Stripe Webhook] Failed to assign uplink role to %s: %v", logtoSub, err)
 		}
 	}
+
+	// Subscription state changed — overview's tier + subscription
+	// blocks are now stale.
+	InvalidateOverviewCache(context.Background(), logtoSub)
 }
 
 // handleSubscriptionUpdated handles subscription changes (renewals, plan changes, cancellations).
@@ -275,6 +279,9 @@ func handleSubscriptionUpdated(event stripe.Event) {
 	if newTier != "" {
 		PruneUserChannelsForTier(context.Background(), logtoSub, newTier)
 	}
+
+	// Tier and subscription fields in the overview response just changed.
+	InvalidateOverviewCache(context.Background(), logtoSub)
 }
 
 // handleSubscriptionDeleted fires when a subscription is fully cancelled (period ended).
@@ -326,6 +333,9 @@ func handleSubscriptionDeleted(event stripe.Event) {
 		// configs they accumulated while on a paid plan down to free caps.
 		PruneUserChannelsForTier(context.Background(), logtoSub, "free")
 	}
+
+	// Subscription went away (or downgraded to free) — overview is stale.
+	InvalidateOverviewCache(context.Background(), logtoSub)
 }
 
 // handleInvoicePaid confirms successful payment for a subscription renewal.
