@@ -1,7 +1,20 @@
+import { useCallback, useEffect, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Apple, Check, Download, ExternalLink, Monitor } from 'lucide-react'
-import { motion } from 'motion/react'
+import {
+  Apple,
+  Check,
+  ChevronDown,
+  Download,
+  ExternalLink,
+  Loader2,
+  Monitor,
+} from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import type { LinuxFormat } from '@/lib/getDownloadInfo'
 import { usePageMeta } from '@/lib/usePageMeta'
+import { DownloadButton } from '@/components/DownloadButton'
+import { detectIsIntelMac, detectPlatform } from '@/lib/detectPlatform'
+import { FALLBACK_RELEASES_URL, triggerDownload } from '@/lib/getDownloadInfo'
 
 export const Route = createFileRoute('/download')({
   component: DownloadPage,
@@ -10,18 +23,29 @@ export const Route = createFileRoute('/download')({
 // ── Constants ──────────────────────────────────────────────────
 
 const REPO = 'https://github.com/brandon-relentnet/myscrollr'
-const RELEASES_URL = `${REPO}/releases/latest`
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
+type PlatformId = 'macos' | 'windows' | 'linux'
+
 type Platform = {
-  id: 'macos' | 'windows' | 'linux'
+  id: PlatformId
   name: string
   arch: string
   icon: React.ReactNode
   requirements: Array<string>
   note?: string
 }
+
+const LINUX_FORMATS: ReadonlyArray<{
+  format: LinuxFormat
+  label: string
+  hint: string
+}> = [
+  { format: 'appimage', label: 'AppImage', hint: 'Universal · most distros' },
+  { format: 'deb', label: '.deb', hint: 'Debian / Ubuntu' },
+  { format: 'rpm', label: '.rpm', hint: 'Fedora / RHEL / openSUSE' },
+] as const
 
 const PLATFORMS: Array<Platform> = [
   {
@@ -49,30 +73,31 @@ const PLATFORMS: Array<Platform> = [
       </svg>
     ),
     requirements: ['Ubuntu 22.04+ or equivalent', '64-bit processor'],
-    note: 'AppImage format — works on most distributions.',
+    note: 'Choose AppImage, .deb, or .rpm to match your distro.',
   },
 ]
 
 // ── OS detection ───────────────────────────────────────────────
 
-function detectPlatform(): Platform['id'] {
-  const ua = navigator.userAgent.toLowerCase()
-  if (ua.includes('mac')) return 'macos'
-  if (ua.includes('win')) return 'windows'
-  return 'linux'
+function useDetectedPlatform(): PlatformId {
+  const [detected, setDetected] = useState<PlatformId>('linux')
+  useEffect(() => {
+    setDetected(detectPlatform().platform)
+  }, [])
+  return detected
 }
 
 // ── Component ──────────────────────────────────────────────────
 
 function DownloadPage() {
   usePageMeta({
-    title: 'Download Scrollr — Free Desktop App',
+    title: 'Download Scrollr - Free Desktop App',
     description:
       'Download Scrollr for macOS, Windows, or Linux. A quiet ticker at the edge of your screen with live sports, markets, news, and fantasy data.',
     canonicalUrl: 'https://myscrollr.com/download',
   })
 
-  const detected = detectPlatform()
+  const detected = useDetectedPlatform()
   const recommended = PLATFORMS.find((p) => p.id === detected) ?? PLATFORMS[0]
 
   return (
@@ -96,8 +121,7 @@ function DownloadPage() {
             className="mx-auto mt-6 max-w-2xl text-lg text-base-content/60"
           >
             A quiet ticker at the edge of your screen. Live scores, prices,
-            headlines, and fantasy data &mdash; always visible, never in the
-            way.
+            headlines, and fantasy data. Always visible, never in the way.
           </motion.p>
 
           {/* ── Recommended download ───────────────────────── */}
@@ -105,18 +129,10 @@ function DownloadPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: EASE, delay: 0.2 }}
-            className="mt-10"
+            className="mt-10 flex flex-col items-center gap-3"
           >
-            <a
-              href={RELEASES_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group inline-flex items-center gap-3 rounded-2xl bg-primary px-8 py-4 text-lg font-semibold text-primary-content! shadow-lg transition-all duration-200 hover:brightness-110 hover:shadow-xl active:scale-[0.98]"
-            >
-              <Download className="h-5 w-5 transition-transform duration-200 group-hover:-translate-y-0.5" />
-              Download for {recommended.name}
-            </a>
-            <p className="mt-3 text-sm text-base-content/40">
+            <DownloadButton />
+            <p className="text-sm text-base-content/40">
               {recommended.arch} &middot; Free &middot; Open source
             </p>
           </motion.div>
@@ -136,69 +152,12 @@ function DownloadPage() {
 
           <div className="mt-12 grid gap-6 sm:grid-cols-3">
             {PLATFORMS.map((platform, i) => (
-              <motion.a
+              <PlatformCard
                 key={platform.id}
-                href={RELEASES_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{
-                  duration: 0.4,
-                  ease: EASE,
-                  delay: i * 0.1,
-                }}
-                className={`group relative flex flex-col rounded-2xl border p-6 transition-all duration-200 hover:shadow-lg ${
-                  platform.id === detected
-                    ? 'border-primary/30 bg-primary/5'
-                    : 'border-base-content/10 bg-base-200/30 hover:border-base-content/20'
-                }`}
-              >
-                {platform.id === detected && (
-                  <span className="absolute -top-3 right-4 rounded-full bg-primary px-3 py-0.5 text-xs font-medium text-primary-content!">
-                    Recommended
-                  </span>
-                )}
-
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-base-content/5 text-base-content/60">
-                    {platform.icon}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-base-content">
-                      {platform.name}
-                    </h3>
-                    <p className="text-sm text-base-content/40">
-                      {platform.arch}
-                    </p>
-                  </div>
-                </div>
-
-                <ul className="mt-4 flex-1 space-y-1.5">
-                  {platform.requirements.map((req) => (
-                    <li
-                      key={req}
-                      className="flex items-start gap-2 text-sm text-base-content/50"
-                    >
-                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/60" />
-                      {req}
-                    </li>
-                  ))}
-                </ul>
-
-                {platform.note && (
-                  <p className="mt-3 text-xs text-base-content/35 italic">
-                    {platform.note}
-                  </p>
-                )}
-
-                <div className="mt-4 flex items-center gap-2 text-sm font-medium text-primary transition-colors group-hover:text-primary/80">
-                  <Download className="h-4 w-4" />
-                  Download
-                  <ExternalLink className="h-3 w-3 opacity-50" />
-                </div>
-              </motion.a>
+                platform={platform}
+                detected={detected}
+                index={i}
+              />
             ))}
           </div>
         </div>
@@ -218,7 +177,7 @@ function DownloadPage() {
                   'Live sports scores across major leagues',
                   'RSS news feeds from your favorite sources',
                   'Yahoo Fantasy Sports league tracking',
-                  'Automatic updates — always the latest version',
+                  'Automatic updates so you always have the latest version',
                 ].map((item) => (
                   <li
                     key={item}
@@ -274,5 +233,189 @@ function DownloadPage() {
         </div>
       </section>
     </div>
+  )
+}
+
+// ── PlatformCard ────────────────────────────────────────────────
+
+interface PlatformCardProps {
+  platform: Platform
+  detected: PlatformId
+  index: number
+}
+
+type CardState = 'idle' | 'loading'
+
+function PlatformCard({ platform, detected, index }: PlatformCardProps) {
+  const [state, setState] = useState<CardState>('idle')
+  const [linuxOpen, setLinuxOpen] = useState(false)
+  const [showIntelWarning, setShowIntelWarning] = useState(false)
+
+  // Intel-Mac warning is silent until we get a confident answer.
+  useEffect(() => {
+    if (platform.id !== 'macos') return
+    let cancelled = false
+    detectIsIntelMac().then((isIntel) => {
+      if (!cancelled) setShowIntelWarning(isIntel)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [platform.id])
+
+  const handleDownload = useCallback(
+    async (linuxFormat?: LinuxFormat) => {
+      if (state === 'loading') return
+      setState('loading')
+      setLinuxOpen(false)
+      try {
+        await triggerDownload(platform.id, linuxFormat)
+      } catch {
+        window.open(FALLBACK_RELEASES_URL, '_blank', 'noopener,noreferrer')
+      } finally {
+        setState('idle')
+      }
+    },
+    [platform.id, state],
+  )
+
+  const isLinux = platform.id === 'linux'
+  const isRecommended = platform.id === detected
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{
+        duration: 0.4,
+        ease: EASE,
+        delay: index * 0.1,
+      }}
+      className={`group relative flex flex-col rounded-2xl border p-6 transition-all duration-200 hover:shadow-lg ${
+        isRecommended
+          ? 'border-primary/30 bg-primary/5'
+          : 'border-base-content/10 bg-base-200/30 hover:border-base-content/20'
+      }`}
+    >
+      {isRecommended ? (
+        <span className="absolute -top-3 right-4 rounded-full bg-primary px-3 py-0.5 text-xs font-medium text-primary-content!">
+          Recommended
+        </span>
+      ) : null}
+
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-base-content/5 text-base-content/60">
+          {platform.icon}
+        </div>
+        <div>
+          <h3 className="font-semibold text-base-content">{platform.name}</h3>
+          <p className="text-sm text-base-content/40">{platform.arch}</p>
+        </div>
+      </div>
+
+      <ul className="mt-4 flex-1 space-y-1.5">
+        {platform.requirements.map((req) => (
+          <li
+            key={req}
+            className="flex items-start gap-2 text-sm text-base-content/50"
+          >
+            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/60" />
+            {req}
+          </li>
+        ))}
+      </ul>
+
+      {platform.note ? (
+        <p className="mt-3 text-xs text-base-content/35 italic">
+          {platform.note}
+        </p>
+      ) : null}
+
+      {showIntelWarning && platform.id === 'macos' ? (
+        <p className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-2.5 py-1.5 text-xs text-warning">
+          Looks like you&rsquo;re on an Intel Mac. The download will not run on
+          your machine.
+        </p>
+      ) : null}
+
+      {isLinux ? (
+        <div className="relative mt-4">
+          <div className="flex">
+            <button
+              type="button"
+              onClick={() => void handleDownload('appimage')}
+              disabled={state === 'loading'}
+              className="flex flex-1 cursor-pointer items-center gap-2 rounded-l-lg bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:cursor-wait disabled:opacity-90"
+            >
+              {state === 'loading' ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Download className="h-4 w-4" aria-hidden="true" />
+              )}
+              {state === 'loading' ? 'Preparing\u2026' : 'AppImage'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setLinuxOpen((o) => !o)}
+              disabled={state === 'loading'}
+              aria-label="Choose Linux package format"
+              aria-expanded={linuxOpen}
+              aria-haspopup="menu"
+              className="cursor-pointer rounded-r-lg border-l border-primary/15 bg-primary/10 px-2.5 text-primary transition-colors hover:bg-primary/15 disabled:cursor-wait disabled:opacity-90"
+            >
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${linuxOpen ? 'rotate-180' : ''}`}
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {linuxOpen ? (
+              <motion.div
+                initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
+                role="menu"
+                className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-xl border border-base-300 bg-base-100 shadow-xl"
+              >
+                {LINUX_FORMATS.map(({ format, label, hint }) => (
+                  <button
+                    key={format}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void handleDownload(format)}
+                    className="flex w-full cursor-pointer flex-col items-start gap-0.5 px-3 py-2.5 text-left transition-colors hover:bg-base-200"
+                  >
+                    <span className="text-sm font-semibold text-base-content">
+                      {label}
+                    </span>
+                    <span className="text-xs text-base-content/50">{hint}</span>
+                  </button>
+                ))}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void handleDownload()}
+          disabled={state === 'loading'}
+          className="mt-4 flex cursor-pointer items-center gap-2 rounded-lg bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:cursor-wait disabled:opacity-90"
+        >
+          {state === 'loading' ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <Download className="h-4 w-4" aria-hidden="true" />
+          )}
+          {state === 'loading'
+            ? 'Preparing\u2026'
+            : `Download for ${platform.name}`}
+        </button>
+      )}
+    </motion.div>
   )
 }

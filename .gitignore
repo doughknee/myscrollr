@@ -36,3 +36,9 @@ scaling-changes/
 # Ad-hoc scratch data (email lists, test payloads, etc.) that must never
 # be committed — contains PII.
 scripts/*.json
+
+# Raw hero screenshots are the SOURCE files for the optimize script.
+# Optimized WebP outputs in myscrollr.com/public/screenshots/hero/ ARE
+# committed; the raw PNGs (typically 700KB-1.4MB each, 8 files = ~7MB)
+# stay out of git. See myscrollr.com/SCREENSHOTS.md.
+scrollr_screenshots/

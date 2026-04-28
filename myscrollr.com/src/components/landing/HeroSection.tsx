@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { wrap } from 'motion'
 import HeroTextSwap, { WORDS } from '@/components/Typewriter'
-import { HeroDesktopPreview } from '@/components/landing/HeroDesktopPreview'
+import { HeroProductShowcase } from '@/components/landing/HeroProductShowcase'
 import { DownloadButton } from '@/components/DownloadButton'
 
 const CYCLE_MS = 4000
@@ -78,7 +78,7 @@ export function HeroSection() {
         <div className="flex lg:flex-row flex-col justify-center items-center gap-12 lg:gap-12 xl:gap-16">
           {/* Desktop App Preview */}
           <div className="relative order-2 lg:order-1">
-            <HeroDesktopPreview
+            <HeroProductShowcase
               activeIndex={activeWordIndex}
               onSelect={handleSelect}
             />

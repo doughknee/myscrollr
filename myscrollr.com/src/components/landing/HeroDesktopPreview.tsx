@@ -1,3 +1,19 @@
+/**
+ * @deprecated Replaced by `HeroProductShowcase` in v1.0.4 (2026-04-28).
+ *
+ * This animated SVG mockup taxed older / less powerful machines with
+ * its per-frame Motion springs and per-chip enter/exit animations.
+ * The replacement uses static WebP screenshots of the actual app for
+ * a much lower CPU/GPU cost and an authentic representation of the
+ * product. See `myscrollr.com/SCREENSHOTS.md` for the capture +
+ * optimization workflow.
+ *
+ * Kept in the codebase for one release as a quick-revert escape hatch
+ * in case the screenshot showcase needs to be rolled back. Scheduled
+ * for deletion in the next minor cleanup PR after v1.0.5.
+ *
+ * NOT imported anywhere. The site uses `HeroProductShowcase`.
+ */
 import { useEffect, useRef, useState } from 'react'
 import {
   AnimatePresence,
