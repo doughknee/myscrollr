@@ -1,18 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Apple, ChevronDown, Download, Monitor } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import type {LinuxFormat} from '@/lib/getDownloadInfo';
-import type {PlatformInfo} from '@/lib/detectPlatform';
-import {
-  
-  detectIsIntelMac,
-  detectPlatform
-} from '@/lib/detectPlatform'
-import {
-  FALLBACK_RELEASES_URL,
-  
-  triggerDownload
-} from '@/lib/getDownloadInfo'
+import type { LinuxFormat } from '@/lib/getDownloadInfo'
+import type { PlatformInfo } from '@/lib/detectPlatform'
+import { detectIsIntelMac, detectPlatform } from '@/lib/detectPlatform'
+import { FALLBACK_RELEASES_URL, triggerDownload } from '@/lib/getDownloadInfo'
 
 const LINUX_FORMATS: ReadonlyArray<{
   format: LinuxFormat

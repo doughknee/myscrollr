@@ -32,7 +32,6 @@
     "@tanstack/router-plugin": "^1.132.0",
     "lucide-react": "^0.545.0",
     "motion": "^12.23.24",
-    "motion-plus": "https://api.motion.dev/registry.tgz?package=motion-plus&version=2.11.0&token=032997dbced0702754906e3f43111740b10beaa970fd6d26423e34e43a46acfe",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwindcss": "^4.0.6"

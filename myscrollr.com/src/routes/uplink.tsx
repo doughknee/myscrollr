@@ -5,9 +5,8 @@ import {
   useInView,
   useMotionValue,
   useSpring,
-  useTransform,
 } from 'motion/react'
-import { AnimateNumber } from 'motion-plus/react'
+
 import {
   Suspense,
   lazy,
@@ -47,6 +46,8 @@ import {
 
 import type { FAQItem } from '@/components/landing/FAQSection'
 import type { SubscriptionStatus, TierLimitsResponse } from '@/api/client'
+import type { BackdropBeam } from '@/components/landing/_ConvergenceBackdrop'
+import { ConvergenceBackdrop } from '@/components/landing/_ConvergenceBackdrop'
 import { usePageMeta } from '@/lib/usePageMeta'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { useGetToken } from '@/hooks/useGetToken'
@@ -76,6 +77,35 @@ const ULTIMATE_PRICE_IDS = {
 
 type PlanKey = 'monthly' | 'annual'
 type TierKey = 'uplink' | 'pro' | 'ultimate'
+
+// Animates the displayed integer toward `value` using a spring. This
+// replaces `motion-plus`'s `<AnimateNumber>` (524 KB on disk) for the
+// only place we used it: the per-tier monthly-price flip when the
+// billing toggle changes. We lose `motion-plus`'s per-digit slot
+// animation, but the prices are 2-3 digits so the simpler counter
+// reads cleanly. Pattern mirrors `useAnimatedCounter` in CallToAction.
+function AnimatedPrice({ value }: { value: number }) {
+  const [display, setDisplay] = useState(value)
+  const motionVal = useMotionValue(value)
+  const spring = useSpring(motionVal, {
+    stiffness: 90,
+    damping: 22,
+    restSpeed: 0.5,
+  })
+
+  useEffect(() => {
+    motionVal.set(value)
+  }, [value, motionVal])
+
+  useEffect(() => {
+    const unsub = spring.on('change', (v) => {
+      setDisplay(Math.round(v))
+    })
+    return unsub
+  }, [spring])
+
+  return <>{display}</>
+}
 
 export const Route = createFileRoute('/uplink')({
   validateSearch: () => ({}),
@@ -681,13 +711,11 @@ function BottomCTA({
   const sectionRef = useRef<HTMLElement>(null)
   const isInView = useInView(sectionRef, { amount: 0.15 })
 
-  // Mouse parallax for ambient orb
+  // Mouse parallax — actual orb + spring chain rendered inside the
+  // shared `<ConvergenceBackdrop>`. We just own the raw 0-1 cursor
+  // position MotionValues here.
   const mouseX = useMotionValue(0.5)
   const mouseY = useMotionValue(0.5)
-  const orbX = useTransform(mouseX, [0, 1], [-30, 30])
-  const orbY = useTransform(mouseY, [0, 1], [-30, 30])
-  const smoothOrbX = useSpring(orbX, { stiffness: 50, damping: 30 })
-  const smoothOrbY = useSpring(orbY, { stiffness: 50, damping: 30 })
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -698,108 +726,33 @@ function BottomCTA({
     [mouseX, mouseY],
   )
 
+  // 4 beams alternating green/cyan around the section center.
+  const beams = useMemo<Array<BackdropBeam>>(
+    () => [
+      { angle: 35, color: '#34d399', delay: 0.3 },
+      { angle: 145, color: '#00b8db', delay: 0.45 },
+      { angle: 215, color: '#34d399', delay: 0.6 },
+      { angle: 325, color: '#00b8db', delay: 0.75 },
+    ],
+    [],
+  )
+
   return (
     <section
       ref={sectionRef}
       className="relative overflow-clip py-32 lg:py-44"
       onMouseMove={handleMouseMove}
     >
-      {/* ── Background layers ─────────────────────────────────────── */}
-
-      {/* Dark gradient base */}
-      <div className="absolute inset-0 bg-gradient-to-b from-base-100 via-base-200/80 to-base-100 pointer-events-none" />
-
-      {/* Mouse-following ambient orb */}
-      <motion.div
-        className="absolute pointer-events-none"
-        style={{
-          width: 600,
-          height: 600,
-          left: '50%',
-          top: '50%',
-          x: smoothOrbX,
-          y: smoothOrbY,
-          translateX: '-50%',
-          translateY: '-50%',
-          background:
-            'radial-gradient(circle, rgba(52,211,153,0.08) 0%, rgba(0,184,219,0.04) 40%, transparent 70%)',
-          filter: 'blur(60px)',
-        }}
+      {/* ── Background layers (shared with the homepage CallToAction) */}
+      <ConvergenceBackdrop
+        mouseX={mouseX}
+        mouseY={mouseY}
+        isInView={isInView}
+        particles={CTA_PARTICLES}
+        beams={beams}
+        pulseRingCount={3}
+        orbBackground="radial-gradient(circle, rgba(52,211,153,0.08) 0%, rgba(0,184,219,0.04) 40%, transparent 70%)"
       />
-
-      {/* Convergence beams — green (Unlimited) + cyan (Uplink) */}
-      <div className="absolute inset-0 pointer-events-none">
-        {[
-          { angle: 35, color: '#34d399', delay: 0.3 },
-          { angle: 145, color: '#00b8db', delay: 0.45 },
-          { angle: 215, color: '#34d399', delay: 0.6 },
-          { angle: 325, color: '#00b8db', delay: 0.75 },
-        ].map((beam) => (
-          <motion.div
-            key={beam.angle}
-            className="absolute left-1/2 top-1/2 pointer-events-none"
-            style={{
-              width: '200%',
-              height: 2,
-              transformOrigin: 'left center',
-              rotate: beam.angle,
-              x: '-50%',
-              y: '-50%',
-              background: `linear-gradient(90deg, transparent 0%, ${beam.color}00 20%, ${beam.color}40 50%, ${beam.color}00 80%, transparent 100%)`,
-              opacity: 0,
-            }}
-            initial={{ opacity: 0, scaleX: 0 }}
-            animate={
-              isInView ? { opacity: [0, 0.6, 0.3], scaleX: [0, 1, 1] } : {}
-            }
-            transition={{ delay: beam.delay, duration: 2, ease: EASE }}
-          />
-        ))}
-      </div>
-
-      {/* Floating particles */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {CTA_PARTICLES.map((p) => (
-          <motion.div
-            key={p.id}
-            className="absolute rounded-full"
-            style={{
-              left: `${p.x}%`,
-              top: `${p.y}%`,
-              width: p.size,
-              height: p.size,
-              backgroundColor: p.color,
-              opacity: 0,
-            }}
-            animate={
-              isInView ? { y: [0, -80, -160], opacity: [0, 0.5, 0] } : {}
-            }
-            transition={{
-              delay: p.delay,
-              duration: p.duration,
-              ease: 'easeInOut',
-              repeat: Infinity,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Pulse rings */}
-      {[0, 1, 2].map((i) => (
-        <motion.div
-          key={i}
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/20 pointer-events-none"
-          style={{ width: 280, height: 280, opacity: 0 }}
-          animate={isInView ? { scale: [0.8, 2.5], opacity: [0.4, 0] } : {}}
-          transition={{
-            delay: 1.2 + i,
-            duration: 3,
-            ease: 'easeOut',
-            repeat: Infinity,
-            repeatDelay: 1,
-          }}
-        />
-      ))}
 
       {/* ── Content ───────────────────────────────────────────────── */}
       <div
@@ -1488,13 +1441,13 @@ function UplinkPage() {
             transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
           />
 
-          {/* Scan line */}
-          <motion.div
-            className="absolute w-full h-px bg-gradient-to-r from-transparent via-primary/15 to-transparent"
-            initial={{ y: -100 }}
-            animate={{ y: ['-10%', '110%'] }}
-            transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
-          />
+          {/* Scan line removed during the perf pass — was animating
+              `y` from -10% to 110% over 6s on `repeat: Infinity` across
+              the full hero. Compositor-tier so cheap individually, but
+              the hero already has 4 nested ring loops + 6 floating dots
+              + 2 perpetual orb pulses; the scan line wasn't pulling
+              its weight visually and the surface area for layout
+              reads grew on resize. */}
         </div>
 
         {/* Top border accent */}
@@ -2498,18 +2451,9 @@ function UplinkPage() {
                             $
                           </span>
                           <span className="text-3xl font-black text-base-content tracking-tight font-mono tabular-nums leading-none">
-                            <AnimateNumber
-                              transition={{
-                                y: {
-                                  type: 'spring',
-                                  bounce: 0.15,
-                                  duration: 0.45,
-                                },
-                                opacity: { duration: 0.15 },
-                              }}
-                            >
-                              {PRICING.uplink[billingPeriod].perMonth}
-                            </AnimateNumber>
+                            <AnimatedPrice
+                              value={PRICING.uplink[billingPeriod].perMonth}
+                            />
                           </span>
                           <span className="text-xs font-mono text-base-content/25 ml-1 self-end mb-0.5">
                             /mo
@@ -2659,18 +2603,9 @@ function UplinkPage() {
                             $
                           </span>
                           <span className="text-3xl font-black text-base-content tracking-tight font-mono tabular-nums leading-none">
-                            <AnimateNumber
-                              transition={{
-                                y: {
-                                  type: 'spring',
-                                  bounce: 0.15,
-                                  duration: 0.45,
-                                },
-                                opacity: { duration: 0.15 },
-                              }}
-                            >
-                              {PRICING.pro[billingPeriod].perMonth}
-                            </AnimateNumber>
+                            <AnimatedPrice
+                              value={PRICING.pro[billingPeriod].perMonth}
+                            />
                           </span>
                           <span className="text-xs font-mono text-base-content/25 ml-1 self-end mb-0.5">
                             /mo
@@ -2965,18 +2900,9 @@ function UplinkPage() {
                               $
                             </span>
                             <span className="text-3xl font-black text-base-content tracking-tight font-mono tabular-nums leading-none">
-                              <AnimateNumber
-                                transition={{
-                                  y: {
-                                    type: 'spring',
-                                    bounce: 0.15,
-                                    duration: 0.45,
-                                  },
-                                  opacity: { duration: 0.15 },
-                                }}
-                              >
-                                {PRICING.ultimate[billingPeriod].perMonth}
-                              </AnimateNumber>
+                              <AnimatedPrice
+                                value={PRICING.ultimate[billingPeriod].perMonth}
+                              />
                             </span>
                             <span className="text-xs font-mono text-base-content/25 ml-1 self-end mb-0.5">
                               /mo

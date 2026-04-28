@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  AnimatePresence,
-  motion,
-  useMotionTemplate,
-  useSpring,
-  useTransform,
-  useVelocity,
-} from 'motion/react'
+import { AnimatePresence, motion, useSpring, useTransform } from 'motion/react'
 import {
   ChevronDown,
   ChevronUp,
@@ -270,6 +263,13 @@ function AnswerView({
   viewIndex: number
   activeIndex: number
 }) {
+  // Slide-and-fade only. We previously fed `useVelocity(y)` into a
+  // `filter: blur()` motion template per panel — with 8 FAQ items that's
+  // 8 simultaneous filter-paint pipelines running every frame whenever
+  // the user clicked between questions. The motion blur was barely
+  // perceptible at 200 ms transitions but cost real paint budget on
+  // integrated GPUs. Y-translate + opacity are both compositor-tier
+  // properties so the cleaned-up version is essentially free.
   const y = useSpring(
     calculateViewY(activeIndex - viewIndex, containerHeight),
     {
@@ -278,19 +278,11 @@ function AnswerView({
     },
   )
 
-  const yVelocity = useVelocity(y)
-
   const opacity = useTransform(
     y,
     [-containerHeight * 0.6, 0, containerHeight * 0.6],
     [0, 1, 0],
   )
-
-  const blur = useTransform(yVelocity, [-1000, 0, 1000], [4, 0, 4], {
-    clamp: false,
-  })
-
-  const filter = useMotionTemplate`blur(${blur}px)`
 
   useEffect(() => {
     y.set(calculateViewY(activeIndex - viewIndex, containerHeight))
@@ -303,9 +295,8 @@ function AnswerView({
         inset: 0,
         y,
         opacity,
-        filter,
         transformOrigin: 'center',
-        willChange: 'transform, filter',
+        willChange: 'transform',
         isolation: 'isolate',
       }}
     >
