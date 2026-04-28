@@ -1,6 +1,7 @@
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import { Layers, SlidersHorizontal, Smartphone, Zap } from 'lucide-react'
+import { useInViewport } from '@/hooks/useInViewport'
 
 // ── Types & Data ─────────────────────────────────────────────────
 
@@ -64,8 +65,14 @@ const EASE = [0.22, 1, 0.36, 1] as const
 
 // ── Per-benefit illustrations ────────────────────────────────────
 
+// `active` gates every `repeat: Infinity` animation in each illustration so
+// loops don't keep ticking when the section is off-screen. We pass `false`
+// for the `animate` value (Motion freezes in place); when `active` flips back
+// the loop resumes. Entry-once `motion.{...}` reveals stay untouched since
+// they don't loop — there's nothing to pause.
+
 /** Benefit 0 — "Your Phone Stays Down": phone face-down, ticker bar glowing above */
-function IllustrationPhoneDown() {
+function IllustrationPhoneDown({ active }: { active: boolean }) {
   return (
     <svg viewBox="0 0 200 200" className="w-full h-full" fill="none">
       {/* Phone body — tilted face-down */}
@@ -104,7 +111,7 @@ function IllustrationPhoneDown() {
           strokeLinejoin="round"
           transform="rotate(-12, 87, 140)"
           initial={{ opacity: 0 }}
-          animate={{ opacity: [0, 0.4, 0.15] }}
+          animate={active ? { opacity: [0, 0.4, 0.15] } : false}
           transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
         />
       </motion.g>
@@ -140,7 +147,7 @@ function IllustrationPhoneDown() {
               ][i]
             }
             initial={{ opacity: 0.3 }}
-            animate={{ opacity: [0.3, 0.9, 0.3] }}
+            animate={active ? { opacity: [0.3, 0.9, 0.3] } : false}
             transition={{
               duration: 2,
               repeat: Infinity,
@@ -162,7 +169,9 @@ function IllustrationPhoneDown() {
         className="stroke-primary/20"
         strokeWidth="1"
         initial={{ scale: 1, opacity: 0.3 }}
-        animate={{ scale: [1, 1.06, 1], opacity: [0.3, 0, 0.3] }}
+        animate={
+          active ? { scale: [1, 1.06, 1], opacity: [0.3, 0, 0.3] } : false
+        }
         transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
         style={{ transformOrigin: '100px 62px' }}
       />
@@ -171,7 +180,7 @@ function IllustrationPhoneDown() {
 }
 
 /** Benefit 1 — "You Catch Things First": live data chip appearing with pulse */
-function IllustrationCatchFirst() {
+function IllustrationCatchFirst({ active }: { active: boolean }) {
   return (
     <svg viewBox="0 0 200 200" className="w-full h-full" fill="none">
       {/* Concentric radar rings */}
@@ -200,7 +209,7 @@ function IllustrationCatchFirst() {
         strokeWidth="1.5"
         strokeLinecap="round"
         initial={{ rotate: 0 }}
-        animate={{ rotate: 360 }}
+        animate={active ? { rotate: 360 } : false}
         transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
         style={{ transformOrigin: '100px 100px' }}
       />
@@ -210,7 +219,7 @@ function IllustrationCatchFirst() {
         d="M 100 100 L 100 40 A 60 60 0 0 1 152 70 Z"
         fill="url(#sweepGrad)"
         initial={{ rotate: 0 }}
-        animate={{ rotate: 360 }}
+        animate={active ? { rotate: 360 } : false}
         transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
         style={{ transformOrigin: '100px 100px' }}
       />
@@ -232,7 +241,7 @@ function IllustrationCatchFirst() {
       {/* Live data chip popping in */}
       <motion.g
         initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: [0, 1.15, 1], opacity: [0, 1, 1] }}
+        animate={active ? { scale: [0, 1.15, 1], opacity: [0, 1, 1] } : false}
         transition={{
           delay: 0.8,
           duration: 0.5,
@@ -256,7 +265,7 @@ function IllustrationCatchFirst() {
           cy="79"
           r="3"
           fill="var(--color-secondary)"
-          animate={{ opacity: [1, 0.3, 1] }}
+          animate={active ? { opacity: [1, 0.3, 1] } : false}
           transition={{ duration: 1, repeat: Infinity }}
         />
         {/* Price text placeholder */}
@@ -277,7 +286,7 @@ function IllustrationCatchFirst() {
 }
 
 /** Benefit 2 — "Your Focus Gets Deeper": tabs converging into single view */
-function IllustrationFocusDeep() {
+function IllustrationFocusDeep({ active }: { active: boolean }) {
   const tabPositions = [
     { x: 30, y: 45, rot: -8 },
     { x: 100, y: 35, rot: 2 },
@@ -297,12 +306,16 @@ function IllustrationFocusDeep() {
             rotate: tab.rot,
             opacity: 0.6,
           }}
-          animate={{
-            x: [tab.x - 100, 0],
-            y: [tab.y - 100, 0],
-            rotate: [tab.rot, 0],
-            opacity: [0.6, 0],
-          }}
+          animate={
+            active
+              ? {
+                  x: [tab.x - 100, 0],
+                  y: [tab.y - 100, 0],
+                  rotate: [tab.rot, 0],
+                  opacity: [0.6, 0],
+                }
+              : false
+          }
           transition={{
             duration: 2,
             ease: EASE,
@@ -334,7 +347,7 @@ function IllustrationFocusDeep() {
       {/* Unified browser window — center */}
       <motion.g
         initial={{ scale: 0.85, opacity: 0 }}
-        animate={{ scale: [0.85, 1], opacity: [0, 1] }}
+        animate={active ? { scale: [0.85, 1], opacity: [0, 1] } : false}
         transition={{
           delay: 1.2,
           duration: 0.8,
@@ -406,7 +419,7 @@ function IllustrationFocusDeep() {
 }
 
 /** Benefit 3 — "It Gets Out of the Way": ticker bar minimizing/collapsing */
-function IllustrationOutOfWay() {
+function IllustrationOutOfWay({ active }: { active: boolean }) {
   return (
     <svg viewBox="0 0 200 200" className="w-full h-full" fill="none">
       {/* Browser window background */}
@@ -474,10 +487,14 @@ function IllustrationOutOfWay() {
 
       {/* Ticker bar — animates from expanded to collapsed */}
       <motion.g
-        animate={{
-          scaleY: [1, 1, 0.15, 0.15, 1],
-          opacity: [1, 1, 0.5, 0.5, 1],
-        }}
+        animate={
+          active
+            ? {
+                scaleY: [1, 1, 0.15, 0.15, 1],
+                opacity: [1, 1, 0.5, 0.5, 1],
+              }
+            : false
+        }
         transition={{
           duration: 5,
           repeat: Infinity,
@@ -510,7 +527,7 @@ function IllustrationOutOfWay() {
                 'var(--color-accent)',
               ][i]
             }
-            animate={{ opacity: [0.4, 0.8, 0.4] }}
+            animate={active ? { opacity: [0.4, 0.8, 0.4] } : false}
             transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
           />
         ))}
@@ -518,7 +535,9 @@ function IllustrationOutOfWay() {
 
       {/* Collapse/expand arrow indicator */}
       <motion.g
-        animate={{ y: [0, 0, -3, -3, 0], rotate: [0, 0, 180, 180, 0] }}
+        animate={
+          active ? { y: [0, 0, -3, -3, 0], rotate: [0, 0, 180, 180, 0] } : false
+        }
         transition={{
           duration: 5,
           repeat: Infinity,
@@ -554,11 +573,15 @@ function BenefitBlock({
   isHighlighted,
   onHighlight,
   index,
+  illustrationActive,
 }: {
   benefit: Benefit
   isHighlighted: boolean
   onHighlight: (index: number) => void
   index: number
+  /** True only while the host section is in the viewport — pauses
+   * the illustration's `repeat: Infinity` loops when scrolled away. */
+  illustrationActive: boolean
 }) {
   const Icon = benefit.icon
   const Illustration = ILLUSTRATIONS[index]
@@ -654,7 +677,7 @@ function BenefitBlock({
         transition={{ duration: 0.4, ease: EASE }}
         className="hidden lg:block w-[200px] h-[200px] shrink-0"
       >
-        <Illustration />
+        <Illustration active={illustrationActive} />
       </motion.div>
     </div>
   )
@@ -664,9 +687,13 @@ function BenefitBlock({
 
 export function BenefitsSection() {
   const [activeIndex, setActiveIndex] = useState(0)
+  // Pause the 21 `repeat: Infinity` SVG loops while the section is off-screen.
+  // The observer fires with a 200 px rootMargin so animations have already
+  // resumed by the time the user scrolls them into view.
+  const [sectionRef, sectionInView] = useInViewport<HTMLElement>()
 
   return (
-    <section className="relative overflow-clip">
+    <section ref={sectionRef} className="relative overflow-clip">
       {/* Ambient gradient orb — color-shifts per active card */}
       <div
         className="absolute pointer-events-none rounded-full blur-[120px] transition-colors duration-1000"
@@ -714,6 +741,7 @@ export function BenefitsSection() {
               index={i}
               isHighlighted={activeIndex === i}
               onHighlight={setActiveIndex}
+              illustrationActive={sectionInView}
             />
           ))}
         </motion.div>

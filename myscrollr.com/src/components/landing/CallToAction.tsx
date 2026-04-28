@@ -1,15 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  motion,
-  useInView,
-  useMotionValue,
-  useSpring,
-  useTransform,
-} from 'motion/react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { motion, useInView, useMotionValue, useSpring } from 'motion/react'
 import { GitFork, Github, Globe, MessageSquare, Star, Zap } from 'lucide-react'
+import type {
+  BackdropBeam,
+  BackdropParticle,
+} from '@/components/landing/_ConvergenceBackdrop'
 import { DownloadButton } from '@/components/DownloadButton'
 
 import { useGitHubStats } from '@/hooks/useGitHubStats'
+import { ConvergenceBackdrop } from '@/components/landing/_ConvergenceBackdrop'
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Constants                                                                */
@@ -24,8 +23,14 @@ const CHANNELS = [
   { color: '#a855f7', label: 'Fantasy' },
 ] as const
 
-/** Floating particle positions — spread across the background */
-const PARTICLES = Array.from({ length: 28 }, (_, i) => ({
+/** Floating particle positions — spread across the background.
+ *
+ * Down from 28 → 12. At 28 the section ran 28 simultaneous infinite
+ * `animate={{ y, opacity }}` loops; with the section's other 3 pulse
+ * rings + mouse-spring orb on top, that pushed integrated GPUs hard.
+ * 12 reads as visually identical at typical viewport sizes (the field
+ * was visually saturated at 28 anyway). */
+const PARTICLES = Array.from({ length: 12 }, (_, i) => ({
   id: i,
   x: Math.random() * 100,
   y: Math.random() * 100,
@@ -65,94 +70,23 @@ function useAnimatedCounter(target: number, isInView: boolean, suffix = '') {
 }
 
 /* ────────────────────────────────────────────────────────────────────────── */
-/*  Convergence Beam — a colored light ray pointing toward center            */
-/* ────────────────────────────────────────────────────────────────────────── */
-
-function ConvergenceBeam({
-  angle,
-  color,
-  delay,
-  isInView,
-}: {
-  angle: number
-  color: string
-  delay: number
-  isInView: boolean
-}) {
-  return (
-    <motion.div
-      className="absolute left-1/2 top-1/2 pointer-events-none"
-      style={{
-        width: '200%',
-        height: 2,
-        transformOrigin: 'left center',
-        rotate: angle,
-        x: '-50%',
-        y: '-50%',
-        background: `linear-gradient(90deg, transparent 0%, ${color}00 20%, ${color}40 50%, ${color}00 80%, transparent 100%)`,
-        opacity: 0,
-      }}
-      initial={{ opacity: 0, scaleX: 0 }}
-      animate={
-        isInView
-          ? {
-              opacity: [0, 0.6, 0.3],
-              scaleX: [0, 1, 1],
-            }
-          : {}
-      }
-      transition={{
-        delay,
-        duration: 2,
-        ease: EASE,
-      }}
-    />
-  )
-}
-
-/* ────────────────────────────────────────────────────────────────────────── */
-/*  Pulse Ring — expanding ring from center                                  */
-/* ────────────────────────────────────────────────────────────────────────── */
-
-function PulseRing({ delay, isInView }: { delay: number; isInView: boolean }) {
-  return (
-    <motion.div
-      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/20 pointer-events-none"
-      style={{ width: 280, height: 280, opacity: 0 }}
-      animate={
-        isInView
-          ? {
-              scale: [0.8, 2.5],
-              opacity: [0.4, 0],
-            }
-          : {}
-      }
-      transition={{
-        delay: 1.2 + delay,
-        duration: 3,
-        ease: 'easeOut',
-        repeat: Infinity,
-        repeatDelay: 1,
-      }}
-    />
-  )
-}
-
-/* ────────────────────────────────────────────────────────────────────────── */
 /*  Main CTA Component                                                       */
 /* ────────────────────────────────────────────────────────────────────────── */
+//
+// The convergence beam, pulse ring, ambient orb, and particle layers used to
+// live inline here. They moved to `_ConvergenceBackdrop.tsx` so the BottomCTA
+// in `routes/uplink.tsx` can share the same implementation. Future paint-cost
+// fixes touch one file instead of two.
 
 export function CallToAction() {
   const sectionRef = useRef<HTMLElement>(null)
   const isInView = useInView(sectionRef, { amount: 0.15 })
 
-  /* Mouse parallax for the ambient orb */
+  /* Mouse parallax for the ambient orb. The actual orb + spring chain
+   * lives inside `<ConvergenceBackdrop>`; this component just owns the
+   * raw 0-1 cursor position and forwards both MotionValues. */
   const mouseX = useMotionValue(0.5)
   const mouseY = useMotionValue(0.5)
-  const orbX = useTransform(mouseX, [0, 1], [-30, 30])
-  const orbY = useTransform(mouseY, [0, 1], [-30, 30])
-  const smoothOrbX = useSpring(orbX, { stiffness: 50, damping: 30 })
-  const smoothOrbY = useSpring(orbY, { stiffness: 50, damping: 30 })
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -161,6 +95,32 @@ export function CallToAction() {
       mouseY.set((e.clientY - rect.top) / rect.height)
     },
     [mouseX, mouseY],
+  )
+
+  /* Resolve particle colors via channelIndex once. */
+  const particles = useMemo<Array<BackdropParticle>>(
+    () =>
+      PARTICLES.map((p) => ({
+        id: p.id,
+        x: p.x,
+        y: p.y,
+        size: p.size,
+        color: CHANNELS[p.channelIndex].color,
+        delay: p.delay,
+        duration: p.duration,
+      })),
+    [],
+  )
+
+  /* 4 beams: cardinal channels at 45° offsets. */
+  const beams = useMemo<Array<BackdropBeam>>(
+    () =>
+      CHANNELS.map((channel, i) => ({
+        angle: i * 90 + 45,
+        color: channel.color,
+        delay: 0.3 + i * 0.15,
+      })),
+    [],
   )
 
   /* GitHub stats */
@@ -184,78 +144,15 @@ export function CallToAction() {
       className="relative overflow-clip py-32 lg:py-44"
       onMouseMove={handleMouseMove}
     >
-      {/* ── Background layers ───────────────────────────────────────────── */}
-
-      {/* Dark gradient base */}
-      <div className="absolute inset-0 bg-gradient-to-b from-base-100 via-base-200/80 to-base-100 pointer-events-none" />
-
-      {/* Ambient gradient orb — follows mouse */}
-      <motion.div
-        className="absolute rounded-full pointer-events-none"
-        style={{
-          width: 600,
-          height: 600,
-          left: '50%',
-          top: '50%',
-          x: smoothOrbX,
-          y: smoothOrbY,
-          translateX: '-50%',
-          translateY: '-50%',
-          background:
-            'radial-gradient(circle, rgba(52,211,153,0.08) 0%, rgba(0,212,255,0.04) 40%, transparent 70%)',
-          filter: 'blur(60px)',
-        }}
+      {/* ── Background layers (shared with BottomCTA on /uplink) ──────── */}
+      <ConvergenceBackdrop
+        mouseX={mouseX}
+        mouseY={mouseY}
+        isInView={isInView}
+        particles={particles}
+        beams={beams}
+        pulseRingCount={3}
       />
-
-      {/* Convergence beams — 4 colored light rays */}
-      <div className="absolute inset-0 pointer-events-none">
-        {CHANNELS.map((channel, i) => (
-          <ConvergenceBeam
-            key={channel.label}
-            angle={i * 90 + 45}
-            color={channel.color}
-            delay={0.3 + i * 0.15}
-            isInView={isInView}
-          />
-        ))}
-      </div>
-
-      {/* Floating particles */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {PARTICLES.map((p) => (
-          <motion.div
-            key={p.id}
-            className="absolute rounded-full"
-            style={{
-              left: `${p.x}%`,
-              top: `${p.y}%`,
-              width: p.size,
-              height: p.size,
-              backgroundColor: CHANNELS[p.channelIndex].color,
-              opacity: 0,
-            }}
-            animate={
-              isInView
-                ? {
-                    y: [0, -80, -160],
-                    opacity: [0, 0.5, 0],
-                  }
-                : {}
-            }
-            transition={{
-              delay: p.delay,
-              duration: p.duration,
-              ease: 'easeInOut',
-              repeat: Infinity,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Pulse rings from center */}
-      <PulseRing delay={0} isInView={isInView} />
-      <PulseRing delay={1} isInView={isInView} />
-      <PulseRing delay={2} isInView={isInView} />
 
       {/* ── Content ─────────────────────────────────────────────────────── */}
       <div

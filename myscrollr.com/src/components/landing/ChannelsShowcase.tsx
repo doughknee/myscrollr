@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Trophy,
 } from 'lucide-react'
+import { useInViewport } from '@/hooks/useInViewport'
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -204,11 +205,16 @@ function AnimatedTicker({
   velocity = 50,
   gap = 12,
   hoverFactor = 0.5,
+  paused = false,
 }: {
   chips: Array<TickerChip>
   velocity?: number
   gap?: number
   hoverFactor?: number
+  /** Skip the per-frame transform write while the host section is
+   * off-screen. Reset `lastTimeRef` on each pass so resuming doesn't
+   * apply a giant accumulated delta. */
+  paused?: boolean
 }) {
   const trackRef = useRef<HTMLDivElement>(null)
   const setRef = useRef<HTMLDivElement>(null)
@@ -270,6 +276,7 @@ function AnimatedTicker({
       if (
         !trackRef.current ||
         isPausedRef.current ||
+        paused ||
         setWidthRef.current === 0
       ) {
         lastTimeRef.current = time
@@ -294,7 +301,7 @@ function AnimatedTicker({
 
     rafId = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafId)
-  }, [velocity, hoverFactor])
+  }, [velocity, hoverFactor, paused])
 
   if (chips.length === 0) return null
 
@@ -316,9 +323,9 @@ function AnimatedTicker({
               <motion.div
                 key={chip.label}
                 layout="position"
-                initial={{ opacity: 0, scale: 0.8, filter: 'blur(4px)' }}
-                animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                exit={{ opacity: 0, scale: 0.8, filter: 'blur(4px)' }}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
                 transition={SPRING}
                 className="shrink-0"
               >
@@ -335,9 +342,9 @@ function AnimatedTicker({
               <motion.div
                 key={chip.label}
                 layout="position"
-                initial={{ opacity: 0, scale: 0.8, filter: 'blur(4px)' }}
-                animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                exit={{ opacity: 0, scale: 0.8, filter: 'blur(4px)' }}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
                 transition={SPRING}
                 className="shrink-0"
               >
@@ -414,7 +421,10 @@ export function ChannelsShowcase() {
   const [activeChannels, setActiveChannels] = useState<Set<ChannelKey>>(
     new Set(['finance', 'sports', 'news', 'fantasy']),
   )
-  const sectionRef = useRef<HTMLElement>(null)
+  // Pause the RAF marquee while the section is off-screen. The 200 px
+  // viewport margin (default in `useInViewport`) primes the scroll loop
+  // a touch before it appears, so users never see a frozen ticker.
+  const [sectionRef, sectionInView] = useInViewport<HTMLElement>()
 
   const handleFilterClick = (key: ChannelKey) => {
     setActiveChannels((prev) => {
@@ -512,6 +522,7 @@ export function ChannelsShowcase() {
           velocity={50}
           gap={12}
           hoverFactor={0.5}
+          paused={!sectionInView}
         />
       </motion.div>
 
@@ -552,9 +563,9 @@ export function ChannelsShowcase() {
                   <motion.div
                     key={stream.key}
                     layout
-                    initial={{ opacity: 0, scale: 0.95, filter: 'blur(4px)' }}
-                    animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                    exit={{ opacity: 0, scale: 0.95, filter: 'blur(4px)' }}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
                     transition={SPRING}
                     className="w-full md:w-[calc(50%-10px)]"
                   >
