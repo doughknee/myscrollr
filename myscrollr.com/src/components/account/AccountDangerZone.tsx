@@ -8,44 +8,37 @@
  *   3. A "Delete Account" button that opens a type-to-confirm modal and,
  *      on success, schedules purge 30 days out.
  *
+ * Deletion status is read from the parent's /users/me/overview fetch
+ * (passed in as props). Mutating actions (export, request, cancel) still
+ * hit the dedicated GDPR endpoints; on success we call onDeletionChange
+ * so the parent re-fetches overview and re-renders us with fresh state.
+ *
  * Lives at the bottom of the Account hub. Intentionally destructive
  * visual treatment so users don't click it casually.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { AlertTriangle, Download, Loader2, Trash2, X } from 'lucide-react'
 import { motion } from 'motion/react'
-import type { AccountDeletionStatus } from '@/api/client'
 import { gdprApi } from '@/api/client'
 
 interface AccountDangerZoneProps {
   getToken: () => Promise<string | null>
+  deletionStatus: 'none' | 'pending' | 'canceled' | 'purged'
+  /** ISO RFC3339 string. Drives the pending banner's countdown. Null when no pending request. */
+  purgeAt: string | null
+  /** Called after a deletion request is scheduled or canceled, so the parent can re-fetch overview. */
+  onDeletionChange?: () => void | Promise<void>
 }
 
 export default function AccountDangerZone({
   getToken,
+  deletionStatus,
+  purgeAt,
+  onDeletionChange,
 }: AccountDangerZoneProps) {
-  const [status, setStatus] = useState<AccountDeletionStatus | null>(null)
-  const [statusError, setStatusError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
-
-  // Fetch current status on mount + whenever we mutate it.
-  const refreshStatus = useCallback(async () => {
-    try {
-      const data = await gdprApi.getDeletionStatus(getToken)
-      setStatus(data)
-      setStatusError(null)
-    } catch (err) {
-      setStatusError(
-        err instanceof Error ? err.message : 'Failed to load deletion status',
-      )
-    }
-  }, [getToken])
-
-  useEffect(() => {
-    refreshStatus()
-  }, [refreshStatus])
 
   // ── Export ──────────────────────────────────────────────────
 
@@ -71,7 +64,7 @@ export default function AccountDangerZone({
     setCancelError(null)
     try {
       await gdprApi.cancelDeletion(getToken)
-      await refreshStatus()
+      await onDeletionChange?.()
     } catch (err) {
       setCancelError(
         err instanceof Error ? err.message : 'Failed to cancel deletion',
@@ -79,7 +72,7 @@ export default function AccountDangerZone({
     } finally {
       setCanceling(false)
     }
-  }, [getToken, refreshStatus])
+  }, [getToken, onDeletionChange])
 
   return (
     <section className="relative overflow-hidden">
@@ -100,9 +93,9 @@ export default function AccountDangerZone({
           </p>
         </motion.div>
 
-        {status?.status === 'pending' && (
+        {deletionStatus === 'pending' && purgeAt && (
           <PendingBanner
-            purgeAt={status.purge_at}
+            purgeAt={purgeAt}
             canceling={canceling}
             cancelError={cancelError}
             onCancel={handleCancel}
@@ -161,18 +154,15 @@ export default function AccountDangerZone({
                   first. If you have a lifetime membership, we keep an
                   anonymized purchase record for accounting.
                 </p>
-                {statusError && (
-                  <p className="mt-2 text-xs text-error">{statusError}</p>
-                )}
               </div>
               <button
                 type="button"
                 onClick={() => setModalOpen(true)}
-                disabled={status?.status === 'pending'}
+                disabled={deletionStatus === 'pending'}
                 className="shrink-0 inline-flex items-center gap-2 rounded-lg border border-error/40 bg-error/10 px-4 py-2 text-xs font-semibold text-error hover:bg-error/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Trash2 size={14} />
-                {status?.status === 'pending' ? 'Scheduled' : 'Delete…'}
+                {deletionStatus === 'pending' ? 'Scheduled' : 'Delete…'}
               </button>
             </div>
           </div>
@@ -185,7 +175,7 @@ export default function AccountDangerZone({
           onClose={() => setModalOpen(false)}
           onScheduled={async () => {
             setModalOpen(false)
-            await refreshStatus()
+            await onDeletionChange?.()
           }}
         />
       )}

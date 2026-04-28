@@ -212,6 +212,9 @@ func HandleRequestAccountDeletion(c *fiber.Ctx) error {
 
 	log.Printf("[GDPR] Account deletion scheduled: user=%s purge_at=%s", userID, purgeAt.Format(time.RFC3339))
 
+	// Overview's gdpr block flipped from "none" to "pending".
+	InvalidateOverviewCache(ctx, userID)
+
 	return c.JSON(fiber.Map{
 		"status":       "pending",
 		"requested_at": now,
@@ -252,6 +255,10 @@ func HandleCancelAccountDeletion(c *fiber.Ctx) error {
 	}
 
 	log.Printf("[GDPR] Account deletion canceled: user=%s", userID)
+
+	// Overview's gdpr block flipped back from "pending" to "canceled".
+	InvalidateOverviewCache(context.Background(), userID)
+
 	return c.JSON(fiber.Map{
 		"status":      "canceled",
 		"canceled_at": now,
@@ -468,6 +475,10 @@ func purgeUserAccount(ctx context.Context, logtoSub string) error {
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit tx: %w", err)
 	}
+
+	// User row is gone; drop any cached overview so a stale background
+	// poll doesn't briefly return data for a purged account.
+	InvalidateOverviewCache(ctx, logtoSub)
 
 	log.Printf("[GDPR Purge] Completed purge for %s", logtoSub)
 	return nil

@@ -1,12 +1,16 @@
 import { useState, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-shell";
 import { TIER_LABELS, getUserIdentity } from "../../auth";
 import { authFetch } from "../../api/client";
+import { userOverviewQueryOptions } from "../../api/queries";
 import { TIER_LIMITS, isUnlimited, type NumericLimitKey } from "../../tierLimits";
 import type { SubscriptionTier } from "../../auth";
 import type { SubscriptionInfo } from "../../api/client";
 import { Section, DisplayRow, ActionRow, ResetButton } from "./SettingsControls";
 import ConfirmDialog from "../ConfirmDialog";
+import AccountStatsRow from "./AccountStatsRow";
+import AccountExportButton from "./AccountExportButton";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -68,6 +72,13 @@ export default function AccountSettings({
   const [portalError, setPortalError] = useState<string | null>(null);
   const identity = authenticated ? getUserIdentity() : null;
   const userLabel = identity?.email ?? identity?.name ?? null;
+
+  // Aggregated overview: channels count, fantasy summary, GDPR state.
+  // Only fires when authenticated; query is cheap (cached server-side, 30s stale).
+  const { data: overview } = useQuery({
+    ...userOverviewQueryOptions(),
+    enabled: authenticated,
+  });
 
   const handleOpenPortal = useCallback(async () => {
     try {
@@ -138,6 +149,17 @@ export default function AccountSettings({
           />
         )}
       </Section>
+
+      {/* ── Quick stats ──────────────────────────────────────── */}
+      {authenticated && overview && (
+        <div className="px-3 pb-2">
+          <AccountStatsRow
+            channelsTotal={overview.channels.total}
+            channelsEnabled={overview.channels.enabled}
+            fantasy={overview.fantasy}
+          />
+        </div>
+      )}
 
       {/* ── Subscription ─────────────────────────────────────── */}
       {authenticated && hasSub && (
@@ -282,6 +304,15 @@ export default function AccountSettings({
               </button>
             </div>
           )}
+        </Section>
+      )}
+
+      {/* ── Your Data ────────────────────────────────────────── */}
+      {authenticated && (
+        <Section title="Your Data">
+          <div className="px-3 py-2">
+            <AccountExportButton />
+          </div>
         </Section>
       )}
 

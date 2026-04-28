@@ -326,6 +326,9 @@ func CreateChannel(c *fiber.Ctx) error {
 
 	// Invalidate dashboard cache so next poll gets fresh data
 	InvalidateDashboardCache(userID)
+	// Channel summary in the overview response changed — drop the
+	// per-user overview cache so the next /users/me/overview rebuilds.
+	InvalidateOverviewCache(ctx, userID)
 
 	return c.Status(fiber.StatusCreated).JSON(ch)
 }
@@ -471,6 +474,8 @@ func UpdateChannel(c *fiber.Ctx) error {
 
 	// Invalidate dashboard cache so next poll gets fresh data
 	InvalidateDashboardCache(userID)
+	// Enabled/visible toggles change the overview's by_type summary.
+	InvalidateOverviewCache(ctx, userID)
 
 	return c.JSON(ch)
 }
@@ -537,6 +542,8 @@ func DeleteChannel(c *fiber.Ctx) error {
 
 	// Invalidate dashboard cache so next poll gets fresh data
 	InvalidateDashboardCache(userID)
+	// Total/enabled counts in the overview are now stale.
+	InvalidateOverviewCache(ctx, userID)
 
 	return c.JSON(fiber.Map{"status": "ok", "message": "Channel removed"})
 }
@@ -590,6 +597,7 @@ func PruneUserChannelsForTier(ctx context.Context, logtoSub, tier string) {
 		callChannelLifecycle(ctx, ch.ChannelType, "updated", logtoSub, newConfig, ch.Config, nil)
 	}
 	InvalidateDashboardCache(logtoSub)
+	InvalidateOverviewCache(ctx, logtoSub)
 }
 
 // extractSportsLeaguesFromConfig reads the "leagues" array from a sports
