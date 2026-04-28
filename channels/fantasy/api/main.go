@@ -260,6 +260,7 @@ func main() {
 
 	// Protected routes (core gateway sets X-User-Sub header)
 	fiberApp.Get("/users/me/yahoo-status", app.GetYahooStatus)
+	fiberApp.Get("/users/me/yahoo-summary", app.GetYahooSummary)
 	fiberApp.Get("/users/me/yahoo-leagues", app.GetMyYahooLeagues)
 	fiberApp.Post("/users/me/yahoo-leagues/discover", app.DiscoverYahooLeagues)
 	fiberApp.Post("/users/me/yahoo-leagues/import", app.ImportYahooLeague)
@@ -329,6 +330,7 @@ func startRegistration(ctx context.Context, rdb *redis.Client) {
 			{Method: "GET", Path: "/yahoo/health", Auth: false},
 			// Protected (auth required)
 			{Method: "GET", Path: "/users/me/yahoo-status", Auth: true},
+			{Method: "GET", Path: "/users/me/yahoo-summary", Auth: true},
 			{Method: "GET", Path: "/users/me/yahoo-leagues", Auth: true},
 			{Method: "POST", Path: "/users/me/yahoo-leagues/discover", Auth: true},
 			{Method: "POST", Path: "/users/me/yahoo-leagues/import", Auth: true},
