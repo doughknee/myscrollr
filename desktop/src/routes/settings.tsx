@@ -1,32 +1,44 @@
 /**
  * Settings route — consolidated settings page with tabs.
  *
- * Three tabs:
- *   General  — appearance, window, startup
+ * Four tabs:
+ *   General  — appearance, window, startup, updates
  *   Ticker   — ticker presentation settings with live preview
- *   Account  — profile, billing, updates, reset
+ *   Account  — profile, billing, plan, data export
+ *   Reset    — destructive: reset all local preferences
  *
  * Tab state is persisted in the URL via ?tab= search param.
  */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { clsx } from "clsx";
+import { Settings, Sliders, User, RotateCcw } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import RouteError from "../components/RouteError";
 import { useShell } from "../shell-context";
 import GeneralSettings from "../components/settings/GeneralSettings";
 import TickerSettings from "../components/settings/TickerSettings";
 import AccountSettings from "../components/settings/AccountSettings";
+import ResetSettings from "../components/settings/ResetSettings";
 import { resetCategory, resetAll, type AppPreferences } from "../preferences";
 
 // ── Types ───────────────────────────────────────────────────────
 
-type SettingsTab = "general" | "ticker" | "account";
+type SettingsTab = "general" | "ticker" | "account" | "reset";
 
-const VALID_TABS: SettingsTab[] = ["general", "ticker", "account"];
+const VALID_TABS: SettingsTab[] = ["general", "ticker", "account", "reset"];
 
 const TAB_LABELS: Record<SettingsTab, string> = {
   general: "General",
   ticker: "Ticker",
   account: "Account",
+  reset: "Reset",
+};
+
+const TAB_ICONS: Record<SettingsTab, LucideIcon> = {
+  general: Settings,
+  ticker: Sliders,
+  account: User,
+  reset: RotateCcw,
 };
 
 // ── Route ───────────────────────────────────────────────────────
@@ -71,22 +83,28 @@ function SettingsRoute() {
       </div>
 
       {/* ── Tabs ───────────────────────────────────────────────── */}
-      <div className="flex gap-1 mb-5">
-        {VALID_TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={clsx(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer",
-              tab === t
-                ? "bg-accent/10 text-accent"
-                : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
-            )}
-          >
-            {TAB_LABELS[t]}
-          </button>
-        ))}
-      </div>
+      <nav className="flex flex-wrap gap-2 mb-6" aria-label="Settings sections">
+        {VALID_TABS.map((t) => {
+          const Icon = TAB_ICONS[t];
+          const isActive = tab === t;
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              aria-current={isActive ? "page" : undefined}
+              className={clsx(
+                "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer border",
+                isActive
+                  ? "bg-accent/15 text-accent border-accent/30"
+                  : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover border-transparent",
+              )}
+            >
+              <Icon className="w-4 h-4" aria-hidden />
+              <span>{TAB_LABELS[t]}</span>
+            </button>
+          );
+        })}
+      </nav>
 
       {/* ── Tab content ────────────────────────────────────────── */}
       <div className="max-w-2xl">
@@ -129,9 +147,10 @@ function SettingsRoute() {
             subscriptionInfo={shell.subscriptionInfo}
             onLogin={shell.onLogin}
             onLogout={shell.onLogout}
-            onResetAll={handleResetAll}
           />
         )}
+
+        {tab === "reset" && <ResetSettings onResetAll={handleResetAll} />}
       </div>
     </div>
   );
