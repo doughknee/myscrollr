@@ -532,6 +532,60 @@ export const inviteApi = {
     ),
 }
 
+// ── Support API ───────────────────────────────────────────────────
+//
+// Two endpoints, identical wire shape:
+//   - /support/ticket          (LogtoAuth required)
+//   - /support/ticket/public   (anonymous, per-IP rate-limited 5/hour)
+//
+// The marketing site contact form picks the right one based on whether
+// the visitor is signed in. Anonymous tickets MUST include `email` so
+// support can reply; authenticated tickets carry it implicitly via the
+// JWT but we send it anyway for forwards-compatibility with OS Ticket.
+
+export type SupportCategory = 'bug' | 'feature' | 'billing' | 'feedback'
+
+export interface SupportTicketPayload {
+  email: string
+  category: SupportCategory
+  subject: string
+  message: string
+  name?: string
+}
+
+export interface SupportTicketResponse {
+  status: string
+  message: string
+}
+
+export const supportApi = {
+  /** Submit a ticket as an authenticated user. Token required. */
+  submitTicket: (
+    payload: SupportTicketPayload,
+    getToken: () => Promise<string | null>,
+  ) =>
+    authenticatedFetch<SupportTicketResponse>(
+      '/support/ticket',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      getToken,
+    ),
+
+  /**
+   * Submit a ticket anonymously. Per-IP rate-limited (5/hour) on the
+   * server. Throws on validation/transport failure.
+   */
+  submitTicketPublic: (payload: SupportTicketPayload) =>
+    request<SupportTicketResponse>('/support/ticket/public', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+}
+
 // ── GDPR Account Export + Delete ──────────────────────────────────
 //
 // 30-day soft-delete grace window. Users can cancel from the Account

@@ -29,7 +29,7 @@ export default function Footer() {
       { label: 'Privacy', href: '/legal?doc=privacy' },
       { label: 'Legal', href: '/legal' },
       { label: 'License', href: '/legal?doc=license' },
-      { label: 'Contact', href: 'mailto:support@myscrollr.com' },
+      { label: 'Support', href: '/support' },
     ],
     social: [
       {
@@ -39,8 +39,8 @@ export default function Footer() {
       },
       {
         icon: Mail,
-        href: 'mailto:support@myscrollr.com',
-        label: 'Email',
+        href: '/support',
+        label: 'Contact support',
       },
     ],
   }
@@ -242,24 +242,45 @@ export default function Footer() {
 
           {/* Social Links */}
           <div className="flex items-center gap-4">
-            {links.social.map((social) => (
-              <motion.a
-                key={social.label}
-                href={social.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                whileHover={{
-                  scale: 1.1,
-                  y: -2,
-                  transition: { type: 'tween', duration: 0.2 },
-                }}
-                whileTap={{ scale: 0.95 }}
-                className="flex items-center justify-center w-10 h-10 rounded-lg bg-base-200/50 border border-base-300/30 text-base-content/40 hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-colors cursor-pointer"
-                aria-label={social.label}
-              >
-                <social.icon size={16} />
-              </motion.a>
-            ))}
+            {links.social.map((social) => {
+              const external = isExternalHref(social.href)
+              const className =
+                'flex items-center justify-center w-10 h-10 rounded-lg bg-base-200/50 border border-base-300/30 text-base-content/40 hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-colors cursor-pointer'
+              const hover = {
+                scale: 1.1,
+                y: -2,
+                transition: { type: 'tween' as const, duration: 0.2 },
+              }
+              const Icon = social.icon
+
+              if (external) {
+                return (
+                  <motion.a
+                    key={social.label}
+                    href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    whileHover={hover}
+                    whileTap={{ scale: 0.95 }}
+                    className={className}
+                    aria-label={social.label}
+                  >
+                    <Icon size={16} />
+                  </motion.a>
+                )
+              }
+
+              return (
+                <Link
+                  key={social.label}
+                  to={social.href}
+                  className={className}
+                  aria-label={social.label}
+                >
+                  <Icon size={16} />
+                </Link>
+              )
+            })}
           </div>
         </div>
       </div>

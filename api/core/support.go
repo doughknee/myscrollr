@@ -2,7 +2,9 @@ package core
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -38,7 +40,12 @@ type TicketAttachment struct {
 	Data     string `json:"data"`
 }
 
-type osTicketPayload struct {
+// OSTicketPayload is the wire shape we send to the OS Ticket REST API.
+// Exported so the anonymous public handler in handlers_support_public.go
+// can reuse the same forwarding helper as the authenticated handler —
+// keeping a single source of truth for the upstream contract. Field
+// tags are pinned by what OS Ticket expects; do not rename.
+type OSTicketPayload struct {
 	Name        string                    `json:"name"`
 	Email       string                    `json:"email"`
 	Subject     string                    `json:"subject"`
@@ -252,7 +259,7 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 	}
 
 	// Build OS Ticket payload
-	payload := osTicketPayload{
+	payload := OSTicketPayload{
 		Name:    name,
 		Email:   email,
 		Subject: subject,
@@ -272,16 +279,71 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 		})
 	}
 
-	// POST to OS Ticket — try each API key (comma-separated) until one succeeds.
-	// OS Ticket ties API keys to specific IPs, and pods can land on different nodes.
+	if err := forwardToOSTicket(c.Context(), payload); err != nil {
+		// Distinguish "not configured" so we can keep the existing 500
+		// vs. upstream rejection (502).
+		if errors.Is(err, errOSTicketNotConfigured) {
+			return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+				Status: "error",
+				Error:  "Support ticket system is not configured",
+			})
+		}
+		if errors.Is(err, errOSTicketMarshal) {
+			return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+				Status: "error",
+				Error:  "Failed to prepare ticket",
+			})
+		}
+		return c.Status(fiber.StatusBadGateway).JSON(ErrorResponse{
+			Status: "error",
+			Error:  "Failed to submit bug report — support system rejected all API keys",
+		})
+	}
+
+	log.Printf("[Support] Ticket created for user %s", userID)
+	// Only record the submission AFTER OS Ticket confirms. If the
+	// request fails upstream the user isn't trapped in a cooldown
+	// they didn't earn — see allowedBySupportRateLimit.
+	recordSupportSubmission(userID)
+	return c.JSON(fiber.Map{
+		"status":  "ok",
+		"message": "Bug report submitted successfully",
+	})
+}
+
+// ===== OS Ticket forwarding helper =====
+//
+// Single source of truth for talking to OS Ticket. Used by both the
+// authenticated HandleSubmitSupportTicket and the anonymous
+// HandleSubmitPublicSupportTicket so they can't drift on auth headers,
+// retry behaviour, or timeouts.
+//
+// Caller responsibilities (NOT done here):
+//   - All input validation (subject/body length, email format, etc.)
+//   - Rate limiting (per-user for authed, per-IP for anonymous)
+//   - Persisting any local audit trail
+//   - Recording cooldown state on success
+//
+// Returns nil on a 2xx response from OS Ticket. Returns one of the
+// sentinel errors below for known-failure modes; otherwise wraps the
+// underlying transport / status error so the caller can log it.
+
+var (
+	errOSTicketNotConfigured = errors.New("osticket: OSTICKET_URL or OSTICKET_API_KEY not configured")
+	errOSTicketMarshal       = errors.New("osticket: failed to marshal payload")
+	errOSTicketAllKeysFailed = errors.New("osticket: all API keys rejected")
+)
+
+// forwardToOSTicket POSTs the payload to OS Ticket, trying each
+// comma-separated API key in OSTICKET_API_KEY in order. OS Ticket ties
+// keys to source IPs and pods can land on different nodes, so a 401 on
+// one key just means try the next; any other non-2xx aborts the loop.
+func forwardToOSTicket(ctx context.Context, payload OSTicketPayload) error {
 	osTicketURL := os.Getenv("OSTICKET_URL")
 	apiKeysRaw := os.Getenv("OSTICKET_API_KEY")
 	if osTicketURL == "" || apiKeysRaw == "" {
 		log.Println("[Support] OSTICKET_URL or OSTICKET_API_KEY not configured")
-		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
-			Status: "error",
-			Error:  "Support ticket system is not configured",
-		})
+		return errOSTicketNotConfigured
 	}
 
 	ticketURL := strings.TrimSuffix(osTicketURL, "/") + "/api/tickets.json"
@@ -289,10 +351,7 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		log.Printf("[Support] Failed to marshal OS Ticket payload: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
-			Status: "error",
-			Error:  "Failed to prepare ticket",
-		})
+		return fmt.Errorf("%w: %v", errOSTicketMarshal, err)
 	}
 
 	apiKeys := strings.Split(apiKeysRaw, ",")
@@ -306,7 +365,7 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 			continue
 		}
 
-		httpReq, err := http.NewRequest("POST", ticketURL, bytes.NewReader(payloadBytes))
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", ticketURL, bytes.NewReader(payloadBytes))
 		if err != nil {
 			log.Printf("[Support] Failed to create OS Ticket request: %v", err)
 			continue
@@ -326,34 +385,22 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 		lastBody = string(respBody)
 
 		if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusOK {
-			log.Printf("[Support] Ticket created for user %s (key %d)", userID, i+1)
-			// Only record the submission AFTER OS Ticket confirms. If the
-			// request fails upstream the user isn't trapped in a cooldown
-			// they didn't earn — see allowedBySupportRateLimit.
-			recordSupportSubmission(userID)
-			return c.JSON(fiber.Map{
-				"status":  "ok",
-				"message": "Bug report submitted successfully",
-			})
+			return nil
 		}
 
-		// If 401 (wrong IP for this key), try the next key
+		// 401 (wrong IP for this key) — try next key.
 		if resp.StatusCode == http.StatusUnauthorized {
 			log.Printf("[Support] Key %d rejected (401), trying next...", i+1)
 			continue
 		}
 
-		// Any other error — don't retry, it's not an IP issue
+		// Any other error — don't retry, it's not an IP issue.
 		log.Printf("[Support] OS Ticket returned %d: %s", resp.StatusCode, lastBody)
 		break
 	}
 
 	log.Printf("[Support] All API keys failed. Last status: %d, body: %s", lastStatus, lastBody)
-
-	return c.Status(fiber.StatusBadGateway).JSON(ErrorResponse{
-		Status: "error",
-		Error:  "Failed to submit bug report — support system rejected all API keys",
-	})
+	return fmt.Errorf("%w: last status %d", errOSTicketAllKeysFailed, lastStatus)
 }
 
 // escapeHTML replaces < > & " with HTML entities.
