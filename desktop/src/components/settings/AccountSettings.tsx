@@ -14,7 +14,6 @@ import { TIER_LIMITS, isUnlimited, type NumericLimitKey } from "../../tierLimits
 import type { SubscriptionTier } from "../../auth";
 import type { SubscriptionInfo } from "../../api/client";
 import { Section, DisplayRow, ActionRow } from "./SettingsControls";
-import AccountStatsRow from "./AccountStatsRow";
 import AccountExportButton from "./AccountExportButton";
 import ProfileField from "./ProfileField";
 
@@ -244,17 +243,6 @@ export default function AccountSettings({
             </button>
           </div>
         </Section>
-      )}
-
-      {/* ── Quick stats ──────────────────────────────────────── */}
-      {authenticated && overview && (
-        <div className="px-3 pb-2">
-          <AccountStatsRow
-            channelsTotal={overview.channels.total}
-            channelsEnabled={overview.channels.enabled}
-            fantasy={overview.fantasy}
-          />
-        </div>
       )}
 
       {/* ── Subscription ─────────────────────────────────────── */}

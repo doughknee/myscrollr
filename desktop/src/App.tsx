@@ -492,9 +492,16 @@ export default function App() {
       // Per-source row picker — same mental model as the feed page
       // RowSelector. Each channel/widget gets its own submenu with
       // [Off, Row 1, Row 2, …] CheckMenuItems where exactly one is
-      // checked at any time. The maxRows entries reflect the user's
-      // tier (Free=1, Uplink=2, Pro/Ultimate=3).
-      const maxRows = getMaxTickerRows(tierRef.current);
+      // checked at any time. The row count is dynamic: we show only
+      // the rows the user has actually enabled in their ticker layout
+      // (clamped to tier max, with a minimum of 1). A user running a
+      // single row sees [Off, On]; a user with 3 rows sees all four
+      // entries. This keeps the menu in lockstep with what's actually
+      // visible on the ticker.
+      const tierMax = getMaxTickerRows(tierRef.current);
+      const layoutRows = prefsRef.current?.appearance?.tickerLayout?.rows
+        ?.length ?? 1;
+      const maxRows = Math.max(1, Math.min(tierMax, layoutRows));
 
       // Build one submenu of row CheckMenuItems for a source. The "Off"
       // entry is always present; row entries 1..maxRows follow.

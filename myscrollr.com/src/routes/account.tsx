@@ -10,11 +10,8 @@ import {
   Loader2,
   Lock,
   Pencil,
-  Radio,
   Settings,
-  TrendingUp,
   User,
-  Wifi,
   X,
 } from 'lucide-react'
 import { motion } from 'motion/react'
@@ -188,69 +185,6 @@ function AccountHub() {
         </div>
       </section>
 
-      {/* ── Hub Grid ── */}
-      <section className="relative overflow-hidden">
-        <div className="container py-16 lg:py-24">
-          <motion.div
-            className="text-center mb-12 sm:mb-16"
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.7, ease: EASE }}
-          >
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
-              Control <span className="text-gradient-primary">Center</span>
-            </h2>
-            <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
-              Navigate your account, channels, and subscription
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {HUB_CARDS.filter((card) => {
-              // Hide Public Profile if user has no username set —
-              // /u/me would otherwise expose the raw Logto sub UUID.
-              if (card.title === 'Public Profile') {
-                return Boolean(overview?.identity.username)
-              }
-              // Hide Security Node until overview supplies the link —
-              // the href comes from overview.links.logto_account.
-              if (card.title === 'Security Node') {
-                return Boolean(overview?.links.logto_account)
-              }
-              return true
-            })
-              .map((card) => {
-                // Route Public Profile to the user's actual username
-                if (
-                  card.title === 'Public Profile' &&
-                  overview?.identity.username
-                ) {
-                  return {
-                    ...card,
-                    params: { username: overview.identity.username },
-                  }
-                }
-                // Inject Security Node href from overview
-                if (
-                  card.title === 'Security Node' &&
-                  overview?.links.logto_account
-                ) {
-                  return {
-                    ...card,
-                    href: overview.links.logto_account,
-                  }
-                }
-                return card
-              })
-              .map((card, i) => (
-                <HubCard key={card.title} card={card} index={i} />
-              ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── Stats & Status ── */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-base-200/20 to-transparent pointer-events-none" />
@@ -390,83 +324,6 @@ function AccountHub() {
               </Link>
             </motion.div>
 
-            {/* Quick Stats Card */}
-            <motion.div
-              className="relative bg-base-200/40 border border-base-300/25 rounded-xl p-8 overflow-hidden group"
-              style={{ opacity: 0 }}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-80px' }}
-              transition={{ duration: 0.6, ease: EASE, delay: 0.1 }}
-            >
-              {/* Accent top line */}
-              <div
-                className="absolute top-0 left-0 right-0 h-px"
-                style={{
-                  background: `linear-gradient(90deg, transparent, ${HEX.secondary} 50%, transparent)`,
-                }}
-              />
-              {/* Corner dot grid */}
-              <div
-                className="absolute top-0 right-0 w-20 h-20 opacity-[0.04] text-base-content"
-                style={{
-                  backgroundImage:
-                    'radial-gradient(circle, currentColor 1px, transparent 1px)',
-                  backgroundSize: '8px 8px',
-                }}
-              />
-              {/* Hover glow orb */}
-              <div
-                className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                style={{ background: `${HEX.secondary}10` }}
-              />
-
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-6">
-                  <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center"
-                    style={{
-                      background: `${HEX.secondary}15`,
-                      boxShadow: `0 0 20px ${HEX.secondary}15, 0 0 0 1px ${HEX.secondary}20`,
-                    }}
-                  >
-                    <TrendingUp size={20} className="text-base-content/80" />
-                  </div>
-                  <h3 className="text-lg font-black tracking-tight text-base-content">
-                    Quick Stats
-                  </h3>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-center">
-                  <div className="p-4 bg-base-200/40 border border-base-300/25 rounded-xl">
-                    <div className="text-2xl font-black text-base-content font-mono tabular-nums">
-                      {overview?.channels.total ?? '—'}
-                    </div>
-                    <div className="text-[10px] text-base-content/30 flex items-center justify-center gap-1 mt-1">
-                      <Radio size={10} />
-                      Channels
-                    </div>
-                  </div>
-                  <div className="p-4 bg-base-200/40 border border-base-300/25 rounded-xl">
-                    <div className="text-2xl font-black text-base-content font-mono tabular-nums">
-                      {overview?.channels.enabled ?? '—'}
-                    </div>
-                    <div className="text-[10px] text-base-content/30 flex items-center justify-center gap-1 mt-1">
-                      <Wifi size={10} />
-                      Active
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Watermark */}
-              <BarChart3
-                size={130}
-                strokeWidth={0.4}
-                className="absolute -bottom-4 -right-4 text-base-content/[0.025] pointer-events-none"
-              />
-            </motion.div>
-
             {/* Subscription Status Card */}
             <motion.div
               className="relative bg-base-200/40 border border-base-300/25 rounded-xl p-8 overflow-hidden group lg:col-span-2"
@@ -534,6 +391,69 @@ function AccountHub() {
               />
             </motion.div>
           </div>
+        </div>
+      </section>
+
+      {/* ── Quick Links (relocated from top — secondary affordances) ── */}
+      <section className="relative overflow-hidden">
+        <div className="container py-10 lg:py-14">
+          <motion.div
+            className="text-center mb-8"
+            style={{ opacity: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-40px' }}
+            transition={{ duration: 0.5, ease: EASE }}
+          >
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-base-content/70 mb-2">
+              Quick Links
+            </h2>
+          </motion.div>
+
+          {(() => {
+            const visibleCards = HUB_CARDS.filter((card) => {
+              if (card.title === 'Public Profile') {
+                return Boolean(overview?.identity.username)
+              }
+              if (card.title === 'Security Node') {
+                return Boolean(overview?.links.logto_account)
+              }
+              return true
+            }).map((card) => {
+              if (
+                card.title === 'Public Profile' &&
+                overview?.identity.username
+              ) {
+                return {
+                  ...card,
+                  params: { username: overview.identity.username },
+                }
+              }
+              if (
+                card.title === 'Security Node' &&
+                overview?.links.logto_account
+              ) {
+                return {
+                  ...card,
+                  href: overview.links.logto_account,
+                }
+              }
+              return card
+            })
+
+            return (
+              <div className="flex flex-wrap items-stretch justify-center gap-4 max-w-5xl mx-auto">
+                {visibleCards.map((card, i) => (
+                  <div
+                    key={card.title}
+                    className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(25%-0.75rem)] min-w-[220px] max-w-sm"
+                  >
+                    <HubCard card={card} index={i} />
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
         </div>
       </section>
 
