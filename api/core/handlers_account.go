@@ -8,12 +8,57 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/mail"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
+
+// ─────────────────────────────────────────────────────────────────────
+//  Per-user password-reset rate limit
+//
+//  Mirrors the supportRateMap pattern from support.go. Cap one reset
+//  request per user per hour. Resend is paid-per-send and these emails
+//  are user-triggered — without a cap, a malicious or buggy client
+//  could rack up bills and spam an inbox. The window starts on every
+//  successful send (recorded inside the handler after the email goes
+//  out) so a transient Resend failure doesn't trap the user.
+// ─────────────────────────────────────────────────────────────────────
+
+const passwordResetRateLimitWindow = time.Hour
+
+var (
+	passwordResetRateMu  sync.Mutex
+	passwordResetRateMap = make(map[string]time.Time)
+)
+
+// allowedByPasswordResetLimit returns whether the user may request a
+// new password-reset email. If they may not, retryAfter is the
+// remaining time on the cooldown window for the Retry-After header.
+func allowedByPasswordResetLimit(userID string) (allowed bool, retryAfter time.Duration) {
+	passwordResetRateMu.Lock()
+	defer passwordResetRateMu.Unlock()
+
+	if last, ok := passwordResetRateMap[userID]; ok {
+		elapsed := time.Since(last)
+		if elapsed < passwordResetRateLimitWindow {
+			return false, passwordResetRateLimitWindow - elapsed
+		}
+	}
+	return true, 0
+}
+
+// recordPasswordResetSent marks the user's most recent reset email,
+// starting the cooldown window. Called only after the Resend API
+// accepts the message.
+func recordPasswordResetSent(userID string) {
+	passwordResetRateMu.Lock()
+	defer passwordResetRateMu.Unlock()
+	passwordResetRateMap[userID] = time.Now()
+}
 
 // ─────────────────────────────────────────────────────────────────────
 //  Account self-service handlers
@@ -80,6 +125,57 @@ func HandleUpdateProfile(c *fiber.Ctx) error {
 			Status: "error",
 			Error:  "at least one of name or email is required",
 		})
+	}
+
+	// Validate email: format, length, and control characters. We do
+	// this before contacting Logto so a malformed value gets a precise
+	// 400 instead of bouncing off the upstream API.
+	if req.Email != nil {
+		email := strings.TrimSpace(*req.Email)
+		if email == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+				Status: "error",
+				Error:  "email cannot be empty",
+			})
+		}
+		if len(email) > 254 {
+			return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+				Status: "error",
+				Error:  "email exceeds maximum length",
+			})
+		}
+		if strings.ContainsAny(email, "\n\r\x00") {
+			return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+				Status: "error",
+				Error:  "email contains invalid characters",
+			})
+		}
+		if _, err := mail.ParseAddress(email); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+				Status: "error",
+				Error:  "invalid email format",
+			})
+		}
+		// Persist the trimmed value for the Logto patch + response echo.
+		*req.Email = email
+	}
+
+	// Validate name: length cap and control-character rejection.
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if len(name) > 200 {
+			return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+				Status: "error",
+				Error:  "name exceeds maximum length",
+			})
+		}
+		if strings.ContainsAny(name, "\n\r\x00") {
+			return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+				Status: "error",
+				Error:  "name contains invalid characters",
+			})
+		}
+		*req.Name = name
 	}
 
 	cfg := getM2MConfig()
@@ -226,6 +322,14 @@ func HandleRequestPasswordReset(c *fiber.Ctx) error {
 		})
 	}
 
+	if allowed, retryAfter := allowedByPasswordResetLimit(userID); !allowed {
+		c.Set("Retry-After", fmt.Sprintf("%d", int(retryAfter.Seconds())))
+		return c.Status(fiber.StatusTooManyRequests).JSON(ErrorResponse{
+			Status: "error",
+			Error:  "Password reset already requested. Please try again later.",
+		})
+	}
+
 	signInURL := strings.TrimRight(os.Getenv("LOGTO_ENDPOINT"), "/")
 	if signInURL == "" {
 		signInURL = "https://auth.myscrollr.com"
@@ -238,6 +342,8 @@ func HandleRequestPasswordReset(c *fiber.Ctx) error {
 			Error:  "failed to send reset email",
 		})
 	}
+
+	recordPasswordResetSent(userID)
 
 	log.Printf("[PasswordReset] sent reset email to %s for user %s", email, userID)
 	return c.SendStatus(fiber.StatusNoContent)

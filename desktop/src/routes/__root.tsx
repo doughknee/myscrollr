@@ -45,6 +45,7 @@ import {
   loadPref,
   loadPrefs,
   savePrefs,
+  consumeTickerLayoutChanged,
 } from "../preferences";
 import type { AppPreferences } from "../preferences";
 
@@ -188,6 +189,18 @@ function RootLayout() {
   const [prefs, setPrefs] = useState<AppPreferences>(loadPrefs);
   const [autostartOn, setAutostartOn] = useState(false);
   const enabledWidgets = prefs.widgets.enabledWidgets;
+
+  // Surface the tier-clamp toast once when loadPrefs() dropped pinned
+  // ticker rows (e.g. user downgraded Pro→Uplink and lost rows 2/3 of
+  // their layout). Empty rows getting sliced doesn't trigger this.
+  // See `migrateTickerLayout` and `consumeTickerLayoutChanged` in
+  // preferences.ts for why we use a transient module-level signal
+  // instead of plumbing a flag through the loadPrefs return value.
+  useEffect(() => {
+    if (consumeTickerLayoutChanged()) {
+      toast.info("Your ticker layout was simplified to fit your plan.");
+    }
+  }, []);
 
   const [appVersion, setAppVersion] = useState("");
   useEffect(() => {

@@ -205,10 +205,10 @@ function AccountHub() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="flex flex-col gap-6">
             {/* Identity & Security Card */}
             <motion.div
-              className="relative bg-base-200/40 border border-base-300/25 rounded-xl p-8 overflow-hidden lg:col-span-2"
+              className="relative bg-base-200/40 border border-base-300/25 rounded-xl p-8 overflow-hidden"
               style={{ opacity: 0 }}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -326,7 +326,7 @@ function AccountHub() {
 
             {/* Subscription Status Card */}
             <motion.div
-              className="relative bg-base-200/40 border border-base-300/25 rounded-xl p-8 overflow-hidden group lg:col-span-2"
+              className="relative bg-base-200/40 border border-base-300/25 rounded-xl p-8 overflow-hidden group"
               style={{ opacity: 0 }}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -446,7 +446,7 @@ function AccountHub() {
                 {visibleCards.map((card, i) => (
                   <div
                     key={card.title}
-                    className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(25%-0.75rem)] min-w-[220px] max-w-sm"
+                    className="flex-1 min-w-[220px] max-w-sm"
                   >
                     <HubCard card={card} index={i} />
                   </div>
@@ -491,6 +491,15 @@ function IdentityEditor({
     'idle' | 'sending' | 'sent' | 'error'
   >('idle')
   const [resetError, setResetError] = useState<string | null>(null)
+
+  // Auto-reset the "sent" confirmation back to idle after 30s so the
+  // button becomes actionable again (e.g. for users who don't receive
+  // the email or want to re-trigger).
+  useEffect(() => {
+    if (resetState !== 'sent') return
+    const timer = setTimeout(() => setResetState('idle'), 30_000)
+    return () => clearTimeout(timer)
+  }, [resetState])
 
   async function handleSendReset() {
     try {
@@ -608,6 +617,10 @@ function EditableField({
     if (!trimmed || trimmed === value) {
       setEditing(false)
       setError(null)
+      return
+    }
+    if (type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setError('Please enter a valid email address')
       return
     }
     try {

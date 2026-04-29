@@ -663,6 +663,8 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 		trialEnd = &sub.TrialEnd
 	}
 
+	InvalidateOverviewCache(c.Context(), userID)
+
 	return c.JSON(SubscribeResponse{
 		SubscriptionID: sub.ID,
 		Status:         subStatus,
@@ -933,6 +935,7 @@ func HandleCancelSubscription(c *fiber.Ctx) error {
 		_ = RemoveUltimateRole(userID)
 
 		log.Printf("[Billing] Trial canceled immediately for %s", userID)
+		InvalidateOverviewCache(c.Context(), userID)
 		return c.JSON(fiber.Map{
 			"status":  "canceled",
 			"message": "Your trial has been ended",
@@ -962,6 +965,8 @@ func HandleCancelSubscription(c *fiber.Ctx) error {
 		 WHERE logto_sub = $1`,
 		userID, periodEnd,
 	)
+
+	InvalidateOverviewCache(c.Context(), userID)
 
 	return c.JSON(fiber.Map{
 		"status":             "canceling",
@@ -1072,6 +1077,8 @@ func HandleChangePlan(c *fiber.Ctx) error {
 		trialEnd := time.Unix(sub.TrialEnd, 0)
 		log.Printf("[Billing] Trial plan switched for %s: %s → %s (billing starts %s)", userID, currentPlan, newPlan, trialEnd.Format(time.RFC3339))
 
+		InvalidateOverviewCache(c.Context(), userID)
+
 		return c.JSON(SubscriptionResponse{
 			Plan:             newPlan,
 			Status:           "trialing",
@@ -1126,6 +1133,8 @@ func HandleChangePlan(c *fiber.Ctx) error {
 		)
 
 		log.Printf("[Billing] Plan upgraded for %s: %s → %s", userID, currentPlan, newPlan)
+
+		InvalidateOverviewCache(c.Context(), userID)
 
 		return c.JSON(SubscriptionResponse{
 			Plan:             newPlan,
@@ -1197,6 +1206,8 @@ func HandleChangePlan(c *fiber.Ctx) error {
 	}
 
 	log.Printf("[Billing] Downgrade scheduled for %s: %s → %s at %s", userID, currentPlan, newPlan, periodEnd.Format(time.RFC3339))
+
+	InvalidateOverviewCache(c.Context(), userID)
 
 	// Return current plan (unchanged until period end) with pending downgrade info
 	return c.JSON(SubscriptionResponse{

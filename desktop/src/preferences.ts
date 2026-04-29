@@ -691,10 +691,15 @@ function clampTickerRows(n: number): TickerRows {
  *      `tickerRows`; sources default to [] = "show all visible tabs").
  *   2. Tier-clamp the row count — if the current tier allows fewer rows
  *      than stored, drop from the BOTTOM so row 0 is preserved.
+ *
+ * Returns a `changed` flag when the user lost pinned sources due to the
+ * tier-clamp (i.e. removed rows had non-empty `sources`). The caller is
+ * expected to surface a toast so the user understands why their layout
+ * shrank — silent data loss on tier downgrade is an UX trap.
  */
 function migrateTickerLayout(
   saved: Partial<AppearancePrefs> | undefined,
-): TickerLayout {
+): { layout: TickerLayout; changed: boolean } {
   const fallbackRowCount = clampTickerRows(
     typeof saved?.tickerRows === "number" ? saved.tickerRows : 1,
   );
@@ -732,17 +737,51 @@ function migrateTickerLayout(
     maxRows = 3;
   }
 
+  let changed = false;
+
   if (rows.length > maxRows) {
-    // eslint-disable-next-line no-console
-    console.info(
-      `[prefs] tickerLayout clamped from ${rows.length} to ${maxRows} rows (tier cap)`,
-    );
+    // Inspect the rows we're about to drop. Only flag the layout as
+    // "changed" if the user actually loses pinned sources — empty rows
+    // sliced off don't warrant a toast.
+    const dropped = rows.slice(maxRows);
+    const lostSources = dropped.some((r) => r.sources.length > 0);
+
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.info(
+        `[prefs] tickerLayout clamped from ${rows.length} to ${maxRows} rows (tier cap)`,
+      );
+    }
+
     rows = rows.slice(0, maxRows);
+    changed = lostSources;
   }
 
   if (rows.length === 0) rows = [{ sources: [] }];
 
-  return { rows };
+  return { layout: { rows }, changed };
+}
+
+// ── Transient signal: tickerLayout was clamped on the most recent load ──
+//
+// `loadPrefs` runs as a `useState` initializer in two places (the ticker
+// window and the main window). Returning a tuple from `loadPrefs` would
+// force both call sites to restructure for a flag only the main window
+// cares about. Instead we stash the flag here and let the main window
+// call `consumeTickerLayoutChanged()` once mounted, which reads and
+// clears it. The ticker window simply ignores the signal.
+
+let tickerLayoutChangedSignal = false;
+
+/**
+ * Returns true exactly once if the most recent `loadPrefs()` call clamped
+ * the ticker layout AND the dropped rows held pinned sources. Subsequent
+ * calls return false until the next `loadPrefs()` triggers another clamp.
+ */
+export function consumeTickerLayoutChanged(): boolean {
+  const v = tickerLayoutChangedSignal;
+  tickerLayoutChangedSignal = false;
+  return v;
 }
 
 // ── Channel display migrations (v1.0.2 venue-enum migration) ────
@@ -875,10 +914,20 @@ export function loadPrefs(): AppPreferences {
 
     // Deep merge with defaults so new keys are always present
     const savedDisplay = source.channelDisplay as Partial<ChannelDisplayPrefs> | undefined;
+    const layoutResult = migrateTickerLayout(
+      source.appearance as Partial<AppearancePrefs> | undefined,
+    );
+    // Latch the "user lost rows" signal for the main window to read
+    // once via consumeTickerLayoutChanged(). This must come before the
+    // function returns — see the helper's docs for why we don't pipe
+    // it through the return value.
+    if (layoutResult.changed) {
+      tickerLayoutChangedSignal = true;
+    }
     const mergedAppearance: AppearancePrefs = {
       ...DEFAULT_APPEARANCE,
       ...source.appearance,
-      tickerLayout: migrateTickerLayout(source.appearance as Partial<AppearancePrefs> | undefined),
+      tickerLayout: layoutResult.layout,
     };
     // Keep the deprecated `tickerRows` in lockstep with the layout so
     // legacy consumers (window-height math) keep working.

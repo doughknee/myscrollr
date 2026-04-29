@@ -16,7 +16,6 @@ import StepChannels from "./StepChannels";
 import StepConfigureFinance from "./StepConfigureFinance";
 import StepConfigureSports from "./StepConfigureSports";
 import StepConfigureRss from "./StepConfigureRss";
-import StepConfigureFantasy from "./StepConfigureFantasy";
 import StepWidgets from "./StepWidgets";
 
 // ── Types ───────────────────────────────────────────────────────
@@ -37,7 +36,10 @@ interface OnboardingWizardProps {
 
 function buildSteps(selectedChannels: Set<ChannelType>): WizardStep[] {
   const steps: WizardStep[] = [{ kind: "channels" }];
-  const order: ChannelType[] = ["finance", "sports", "rss", "fantasy"];
+  // Note: 'fantasy' is intentionally omitted — Yahoo OAuth happens later from
+  // the Fantasy page itself. The wizard only collects the channel selection
+  // (which provisions the channel) but skips the connect step.
+  const order: ChannelType[] = ["finance", "sports", "rss"];
   for (const ch of order) {
     if (selectedChannels.has(ch)) {
       steps.push({ kind: "configure", channel: ch });
@@ -162,7 +164,6 @@ export default function OnboardingWizard({ prefs, tier, onComplete }: Onboarding
   const [financeSymbols, setFinanceSymbols] = useState<Set<string>>(new Set());
   const [sportsLeagues, setSportsLeagues] = useState<Set<string>>(new Set());
   const [rssFeeds, setRssFeeds] = useState<Set<string>>(new Set());
-  const [fantasyConnected, setFantasyConnected] = useState(false);
   const [selectedWidgets, setSelectedWidgets] = useState<Set<string>>(new Set(["weather", "clock"]));
   const [stepIndex, setStepIndex] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -355,13 +356,6 @@ export default function OnboardingWizard({ prefs, tier, onComplete }: Onboarding
             return <StepConfigureSports selected={sportsLeagues} onToggle={toggleLeague} maxItems={maxItemsFor("sports")} />;
           case "rss":
             return <StepConfigureRss selected={rssFeeds} onToggle={toggleFeed} maxItems={maxItemsFor("rss")} />;
-          case "fantasy":
-            return (
-              <StepConfigureFantasy
-                connected={fantasyConnected}
-                onConnect={() => setFantasyConnected(true)}
-              />
-            );
           default:
             return null;
         }
@@ -380,7 +374,6 @@ export default function OnboardingWizard({ prefs, tier, onComplete }: Onboarding
           case "finance": return "Set Up Finance";
           case "sports": return "Set Up Sports";
           case "rss": return "Set Up RSS Feeds";
-          case "fantasy": return "Set Up Fantasy";
           default: return "Configure";
         }
       case "widgets": return "Pick Your Widgets";
@@ -396,7 +389,6 @@ export default function OnboardingWizard({ prefs, tier, onComplete }: Onboarding
           case "finance": return "Choose stocks and crypto to track.";
           case "sports": return "Select the leagues you follow.";
           case "rss": return "Pick news and blog feeds.";
-          case "fantasy": return "Connect your Yahoo Fantasy account.";
           default: return undefined;
         }
       case "widgets": return "Add utility widgets to your ticker.";

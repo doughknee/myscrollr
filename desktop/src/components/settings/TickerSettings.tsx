@@ -896,26 +896,25 @@ function RowCard({
         )}
       </div>
 
-      {/* Customize (Ultimate) — data path wired via rowConfig overrides.
-          Full per-row scroll-mode/direction/speed/mix UI is Phase 2
-          (spec §Rollout). For now we show a locked teaser so Ultimate
-          users discover the capability exists. */}
-      <div className="mt-3 pt-3 border-t border-edge/30">
-        <div
-          className={clsx(
-            "flex items-center justify-between text-[11px] font-mono",
-            canCustomize ? "text-fg-3" : "text-fg-4/60",
-          )}
-        >
-          <span className="flex items-center gap-1.5">
-            {!canCustomize && <Lock size={11} />}
-            Customize scroll
-          </span>
-          <span className="text-[10px] uppercase tracking-wider">
-            {canCustomize ? "Coming soon" : "Ultimate"}
-          </span>
+      {/* Customize (Ultimate) upsell teaser — only shown to tiers that
+          DON'T already have customization unlocked. Showing "Coming
+          soon" to Ultimate / super_user users implies a feature gap
+          where there isn't one (the Phase 2 UI hasn't shipped yet,
+          but tease pre-launch confused testers). Free / Uplink / Pro
+          continue to see the locked Ultimate upsell here. */}
+      {!canCustomize && (
+        <div className="mt-3 pt-3 border-t border-edge/30">
+          <div className="flex items-center justify-between text-[11px] font-mono text-fg-4/60">
+            <span className="flex items-center gap-1.5">
+              <Lock size={11} />
+              Customize scroll
+            </span>
+            <span className="text-[10px] uppercase tracking-wider">
+              Ultimate
+            </span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
