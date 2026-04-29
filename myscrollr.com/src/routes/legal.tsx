@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, BookOpen, ChevronDown, Info, List } from 'lucide-react'
@@ -431,14 +431,12 @@ function DocumentContent({ doc }: { doc: LegalDocument }) {
         </div>
         <p className="mt-3 text-xs text-base-content/25 leading-relaxed max-w-2xl">
           Questions about this document? Reach out via{' '}
-          <a
-            href="https://github.com/brandon-relentnet/myscrollr"
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            to="/support"
             className="text-primary/50 hover:text-primary transition-colors"
           >
-            GitHub
-          </a>{' '}
+            Support
+          </Link>{' '}
           or{' '}
           <a
             href="https://discord.gg/85b49TcGJa"

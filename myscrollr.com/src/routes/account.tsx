@@ -63,7 +63,7 @@ const HUB_CARDS: Array<HubCardDef> = [
   {
     title: 'Desktop App',
     desc: 'Download the Scrollr desktop app',
-    href: 'https://github.com/brandon-relentnet/myscrollr/releases/latest',
+    to: '/download',
     Icon: BarChart3,
     hex: HEX.primary,
     WatermarkIcon: BarChart3,

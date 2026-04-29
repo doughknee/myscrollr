@@ -261,15 +261,13 @@ function GitHubFooter({ stats }: { stats: GitHubStats | null }) {
                     {stats.forks.toLocaleString()}
                   </span>
                 </a>
-                <a
-                  href={`https://github.com/${REPO}/discussions`}
-                  target="_blank"
-                  rel="noreferrer"
+                <Link
+                  to="/support"
                   className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-accent/50 hover:text-accent hover:bg-accent/[0.06] transition-[color,background-color] duration-200"
                 >
                   <MessageSquare className="size-3.5" />
                   <span className="font-semibold">Discuss</span>
-                </a>
+                </Link>
               </div>
             )}
 
@@ -544,10 +542,8 @@ export function TrustSection() {
                     className="opacity-0 group-hover/link:opacity-100 transition-opacity"
                   />
                 </a>
-                <a
-                  href="https://github.com/brandon-relentnet/myscrollr/discussions/categories/integration-requests"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  to="/support"
                   className="group/link inline-flex items-center gap-2 text-[11px] font-semibold text-base-content/30 hover:text-info transition-colors"
                 >
                   Propose an Idea
@@ -555,7 +551,7 @@ export function TrustSection() {
                     size={12}
                     className="opacity-0 group-hover/link:opacity-100 transition-opacity"
                   />
-                </a>
+                </Link>
               </div>
             </div>
           </motion.div>

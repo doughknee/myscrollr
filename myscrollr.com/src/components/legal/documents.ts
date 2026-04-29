@@ -127,7 +127,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
       {
         heading: 'Contact',
         content: [
-          'If you have questions about these Terms, please reach out via our GitHub repository or community channels listed on the Platform.',
+          'If you have questions about these Terms, please reach out via our Support page or community Discord server.',
         ],
       },
     ],
@@ -214,7 +214,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
       {
         heading: 'Contact',
         content: [
-          'For privacy-related inquiries, please reach out via our GitHub repository or community Discord server. Links to both are available on the Platform.',
+          'For privacy-related inquiries, please reach out via our Support page or community Discord server.',
         ],
       },
     ],
@@ -281,7 +281,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
       {
         heading: 'Data Deletion',
         content: [
-          'You can delete all locally stored data by uninstalling the application or by using the "Reset all settings" option on the Account page. Server-side data (channel configurations, account preferences) can be deleted by contacting us through our GitHub repository or community Discord.',
+          'You can delete all locally stored data by uninstalling the application or by using the "Reset all settings" option on the Account page. Server-side data (channel configurations, account preferences) can be deleted by contacting us through our Support page or community Discord server.',
         ],
       },
     ],
@@ -549,7 +549,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
       {
         heading: 'How to Request a Refund',
         content: [
-          'To request a refund, contact us through our community channels (GitHub or Discord) with your account email and the reason for your request. We will process eligible refunds within 5-10 business days to your original payment method.',
+          'To request a refund, contact us through our Support page or community Discord server with your account email and the reason for your request. We will process eligible refunds within 5-10 business days to your original payment method.',
         ],
       },
       {
@@ -766,7 +766,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
       {
         heading: 'Designated Agent',
         content: [
-          'DMCA notices should be sent to the project maintainers via the contact methods listed on the Platform (GitHub or community channels). We will designate a formal DMCA agent and update this section with their contact information.',
+          'DMCA notices should be sent to the project maintainers via our Support page or community Discord server. We will designate a formal DMCA agent and update this section with their contact information.',
         ],
       },
       {
@@ -803,7 +803,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Responsible Disclosure',
         content: [
           'If you discover a security vulnerability in Scrollr, we appreciate your help in disclosing it to us responsibly. Please do NOT publicly disclose the vulnerability until we have had a chance to address it.',
-          "To report a vulnerability, please contact us through our GitHub repository's security advisory feature, or reach out via our community Discord server with a private message to a maintainer.",
+          "To report a vulnerability, please contact us through our Support page (category: bug), our GitHub repository's security advisory feature, or reach out via our community Discord server with a private message to a maintainer.",
         ],
       },
       {
@@ -868,7 +868,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
       {
         heading: 'Feedback',
         content: [
-          'We welcome your feedback on the accessibility of the Scrollr platform. If you encounter accessibility barriers, please let us know through our GitHub repository or community Discord server. We take accessibility feedback seriously and will work to address issues promptly.',
+          'We welcome your feedback on the accessibility of the Scrollr platform. If you encounter accessibility barriers, please let us know through our Support page or community Discord server. We take accessibility feedback seriously and will work to address issues promptly.',
         ],
       },
       {

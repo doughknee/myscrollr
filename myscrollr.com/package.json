@@ -11,7 +11,7 @@
     "directory": "myscrollr.com"
   },
   "homepage": "https://myscrollr.com",
-  "bugs": "https://github.com/brandon-relentnet/myscrollr/issues",
+  "bugs": "https://myscrollr.com/support",
   "type": "module",
   "scripts": {
     "predev": "node scripts/fetch-latest-version.mjs",

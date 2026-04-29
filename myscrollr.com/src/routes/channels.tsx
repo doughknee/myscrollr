@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import {
   ArrowUpRight,
   BookOpen,
@@ -400,33 +400,34 @@ function ChannelsPage() {
             ))}
 
             {/* Suggest card */}
-            <motion.a
-              href="https://github.com/brandon-relentnet/myscrollr/discussions/categories/integration-requests"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ opacity: 0 }}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{
-                delay: COMING_SOON.length * 0.06,
-                duration: 0.5,
-                ease: EASE,
-              }}
-              className="group bg-primary/[0.03] border border-dashed border-primary/20 rounded-xl p-5 text-center hover:border-primary/40 hover:bg-primary/[0.06] transition-colors cursor-pointer"
-            >
-              <div className="h-10 w-10 rounded-lg bg-primary/8 border border-primary/15 flex items-center justify-center mx-auto mb-3 text-base-content/50 group-hover:text-base-content/70 transition-colors">
-                <Plus size={18} />
-              </div>
-              <p className="text-xs font-semibold text-primary/50 group-hover:text-primary/70 transition-colors">
-                Suggest
-              </p>
-              <p className="text-[9px] text-primary/30 mt-1">Your idea here</p>
-              <span className="inline-flex items-center gap-1 mt-3 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-primary/30 border border-primary/15 rounded-full group-hover:text-primary/50 group-hover:border-primary/25 transition-colors">
-                <Lightbulb size={8} />
-                Propose
-              </span>
-            </motion.a>
+            <Link to="/support" className="block">
+              <motion.div
+                style={{ opacity: 0 }}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{
+                  delay: COMING_SOON.length * 0.06,
+                  duration: 0.5,
+                  ease: EASE,
+                }}
+                className="group bg-primary/[0.03] border border-dashed border-primary/20 rounded-xl p-5 text-center hover:border-primary/40 hover:bg-primary/[0.06] transition-colors cursor-pointer"
+              >
+                <div className="h-10 w-10 rounded-lg bg-primary/8 border border-primary/15 flex items-center justify-center mx-auto mb-3 text-base-content/50 group-hover:text-base-content/70 transition-colors">
+                  <Plus size={18} />
+                </div>
+                <p className="text-xs font-semibold text-primary/50 group-hover:text-primary/70 transition-colors">
+                  Suggest
+                </p>
+                <p className="text-[9px] text-primary/30 mt-1">
+                  Your idea here
+                </p>
+                <span className="inline-flex items-center gap-1 mt-3 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-primary/30 border border-primary/15 rounded-full group-hover:text-primary/50 group-hover:border-primary/25 transition-colors">
+                  <Lightbulb size={8} />
+                  Propose
+                </span>
+              </motion.div>
+            </Link>
           </div>
         </div>
       </section>

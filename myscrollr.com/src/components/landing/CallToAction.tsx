@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, useInView, useMotionValue, useSpring } from 'motion/react'
+import { Link } from '@tanstack/react-router'
 import { GitFork, Github, Globe, MessageSquare, Star, Zap } from 'lucide-react'
 import type {
   BackdropBeam,
@@ -298,15 +299,13 @@ export function CallToAction() {
             </a>
 
             {/* Discussions */}
-            <a
-              href="https://github.com/brandon-relentnet/myscrollr/discussions"
-              target="_blank"
-              rel="noreferrer"
+            <Link
+              to="/support"
               className="group flex items-center gap-2 px-4 py-2.5 rounded-xl border border-base-300/20 bg-base-200/30 text-accent/50 hover:text-accent hover:border-accent/20 hover:bg-accent/[0.04] transition-[color,border-color,background-color] duration-200"
             >
               <MessageSquare className="size-4" />
               <span className="text-sm font-bold">Discuss</span>
-            </a>
+            </Link>
           </motion.div>
 
           {/* ── Bottom links ────────────────────────────────────────────── */}
