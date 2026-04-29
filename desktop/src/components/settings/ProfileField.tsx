@@ -48,6 +48,13 @@ export default function ProfileField({
       setError(null);
       return;
     }
+    // Lightweight client-side email validation. The server is the
+    // authoritative validator, but rejecting obviously malformed
+    // input here saves a round-trip and keeps the failure inline.
+    if (type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setError("Invalid email address");
+      return;
+    }
     try {
       setSaving(true);
       setError(null);

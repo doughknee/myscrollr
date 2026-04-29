@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-shell";
 import { toast } from "sonner";
@@ -113,6 +113,15 @@ export default function AccountSettings({
       );
     }
   }, []);
+
+  // Clear the "Email sent" sticky state after 30s so the user can re-trigger
+  // a reset if they didn't receive it. The button stays disabled while
+  // we're showing the confirmation, then snaps back to "Send reset email".
+  useEffect(() => {
+    if (resetState !== "sent") return;
+    const timer = setTimeout(() => setResetState("idle"), 30_000);
+    return () => clearTimeout(timer);
+  }, [resetState]);
 
   const handleOpenPortal = useCallback(async () => {
     try {

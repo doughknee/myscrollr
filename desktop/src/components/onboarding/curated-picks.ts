@@ -46,7 +46,10 @@ export const POPULAR_LEAGUES: LeaguePick[] = [
   { id: "140", name: "La Liga", sport: "Soccer" },
   { id: "78", name: "Bundesliga", sport: "Soccer" },
   { id: "135", name: "Serie A", sport: "Soccer" },
-  { id: "2", name: "Champions League", sport: "Soccer" },
+  // Note: id "5" (not "2") because Champions League's natural id collides
+  // with NBA. These ids are React keys for the picker UI; the actual
+  // sport→league mapping happens server-side via channel config.
+  { id: "5", name: "Champions League", sport: "Soccer" },
   { id: "61", name: "Ligue 1", sport: "Soccer" },
 ];
 
@@ -58,7 +61,10 @@ export const RECOMMENDED_FEEDS: FeedPick[] = [
   // Business
   { url: "https://feeds.bloomberg.com/markets/news.rss", name: "Bloomberg Markets", category: "Business" },
   // News
-  { url: "https://rss.app/feeds/v1.1/tDBXCLAcqDjHBmtx.xml", name: "AP News", category: "News" },
+  // Direct AP feed instead of the rss.app proxy — the proxied URL
+  // started returning HTTP 400 ahead of launch. Same content, lower
+  // hop count, no third-party dependency.
+  { url: "https://feeds.apnews.com/rss/apf-topnews", name: "AP News", category: "News" },
   { url: "https://feeds.bbci.co.uk/news/rss.xml", name: "BBC News", category: "News" },
   { url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", name: "NY Times", category: "News" },
   { url: "https://www.theguardian.com/world/rss", name: "The Guardian", category: "News" },

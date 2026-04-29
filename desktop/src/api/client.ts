@@ -108,7 +108,7 @@ export async function authFetch<T>(
 
   if (token) {
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
-  } else {
+  } else if (import.meta.env.DEV) {
     console.debug(
       "[authFetch] Token unavailable for authed endpoint; proceeding unauthenticated (may 401):",
       path,
