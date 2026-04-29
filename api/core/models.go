@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -18,6 +19,12 @@ type UserPreferences struct {
 }
 
 // Channel represents a user's subscription to a data channel.
+//
+// The DB column and Go field stay named `Visible` to avoid a migration
+// and to keep wire compatibility with shipped v1.0.3 desktops. The
+// MarshalJSON below also emits `ticker_enabled` so v1.0.4+ clients can
+// read a clearer name. Inbound updates accept both names — see
+// channels.go:UpdateChannel.
 type Channel struct {
 	ID          int                    `json:"id"`
 	LogtoSub    string                 `json:"-"`
@@ -27,6 +34,21 @@ type Channel struct {
 	Config      map[string]interface{} `json:"config"`
 	CreatedAt   time.Time              `json:"created_at"`
 	UpdatedAt   time.Time              `json:"updated_at"`
+}
+
+// MarshalJSON emits both `visible` (legacy) and `ticker_enabled` (clearer
+// modern name) so v1.0.3 desktops and v1.0.4+ desktops both read the
+// same value. The DB column and struct field stay `visible` to avoid a
+// migration; this is wire-format backwards compatibility only.
+func (c Channel) MarshalJSON() ([]byte, error) {
+	type alias Channel
+	return json.Marshal(&struct {
+		alias
+		TickerEnabled bool `json:"ticker_enabled"`
+	}{
+		alias:         alias(c),
+		TickerEnabled: c.Visible,
+	})
 }
 
 // DashboardResponse is the aggregated response for the /dashboard endpoint.

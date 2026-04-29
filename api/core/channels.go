@@ -364,16 +364,24 @@ func UpdateChannel(c *fiber.Ctx) error {
 		})
 	}
 
+	// Both `visible` (legacy, v1.0.3 and earlier) and `ticker_enabled`
+	// (modern, v1.0.4+) are accepted. Whichever is set non-nil wins;
+	// `ticker_enabled` takes precedence if both are sent. The DB column
+	// is still `visible` — the rename is wire-format only.
 	var req struct {
-		Enabled *bool                  `json:"enabled"`
-		Visible *bool                  `json:"visible"`
-		Config  map[string]interface{} `json:"config"`
+		Enabled       *bool                  `json:"enabled"`
+		Visible       *bool                  `json:"visible"`
+		TickerEnabled *bool                  `json:"ticker_enabled"`
+		Config        map[string]interface{} `json:"config"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
 			Status: "error",
 			Error:  "Invalid request body",
 		})
+	}
+	if req.TickerEnabled != nil {
+		req.Visible = req.TickerEnabled
 	}
 
 	// Tier-gate any incoming config. We only check when config is

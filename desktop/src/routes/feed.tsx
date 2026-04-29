@@ -32,6 +32,7 @@ import {
   LS_WEATHER_UNIT,
   LS_SYSMON_DATA,
 } from "../constants";
+import { isChannelTickerEnabled } from "../api/client";
 import type { ChannelType, Channel } from "../api/client";
 import type {
   ChannelManifest,
@@ -148,11 +149,11 @@ function HomePage() {
             channel={ch}
             manifest={manifest}
             data={dashboard?.data}
-            tickerEnabled={ch.visible}
+            tickerEnabled={isChannelTickerEnabled(ch)}
             onToggleTicker={() =>
               onToggleChannelTicker(
                 ch.channel_type as ChannelType,
-                !ch.visible,
+                !isChannelTickerEnabled(ch),
               )
             }
             selectedKeys={homePreview[ch.channel_type] ?? []}

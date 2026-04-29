@@ -7,8 +7,7 @@ import { userOverviewQueryOptions } from "../../api/queries";
 import { TIER_LIMITS, isUnlimited, type NumericLimitKey } from "../../tierLimits";
 import type { SubscriptionTier } from "../../auth";
 import type { SubscriptionInfo } from "../../api/client";
-import { Section, DisplayRow, ActionRow, ResetButton } from "./SettingsControls";
-import ConfirmDialog from "../ConfirmDialog";
+import { Section, DisplayRow, ActionRow } from "./SettingsControls";
 import AccountStatsRow from "./AccountStatsRow";
 import AccountExportButton from "./AccountExportButton";
 
@@ -20,7 +19,6 @@ interface AccountSettingsProps {
   subscriptionInfo: SubscriptionInfo | null;
   onLogin: () => void;
   onLogout: () => void;
-  onResetAll: () => void;
 }
 
 // ── Status helpers ──────────────────────────────────────────────
@@ -65,9 +63,7 @@ export default function AccountSettings({
   subscriptionInfo: sub,
   onLogin,
   onLogout,
-  onResetAll,
 }: AccountSettingsProps) {
-  const [confirmReset, setConfirmReset] = useState(false);
   const [openingPortal, setOpeningPortal] = useState(false);
   const [portalError, setPortalError] = useState<string | null>(null);
   const identity = authenticated ? getUserIdentity() : null;
@@ -316,26 +312,6 @@ export default function AccountSettings({
         </Section>
       )}
 
-      {/* ── Reset ────────────────────────────────────────────── */}
-      <div className="flex items-center justify-end pt-2">
-        <ResetButton
-          label="Reset all settings"
-          onClick={() => setConfirmReset(true)}
-        />
-      </div>
-
-      <ConfirmDialog
-        open={confirmReset}
-        title="Reset all settings?"
-        description="This will set everything back to the original settings. Your account and saved content won't change."
-        confirmLabel="Reset everything"
-        destructive
-        onConfirm={() => {
-          setConfirmReset(false);
-          onResetAll();
-        }}
-        onCancel={() => setConfirmReset(false)}
-      />
     </div>
   );
 }

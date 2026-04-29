@@ -143,10 +143,31 @@ export interface Channel {
   id: number;
   channel_type: ChannelType;
   enabled: boolean;
-  visible: boolean;
+  /** Whether this channel's chips appear on the ticker. Server emits both
+   * `ticker_enabled` (preferred) and `visible` (legacy alias) — read either
+   * via {@link isChannelTickerEnabled}. */
+  ticker_enabled: boolean;
+  /** @deprecated Use {@link ticker_enabled}. Server still emits this for
+   *  v1.0.3 compatibility; will be removed in a future release. */
+  visible?: boolean;
   config: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Read the ticker-enabled flag, tolerant of both the new
+ * (`ticker_enabled`) and legacy (`visible`) field names. Returns `true`
+ * by default if neither is set so freshly-added channels appear on the
+ * ticker.
+ */
+export function isChannelTickerEnabled(ch: {
+  ticker_enabled?: boolean;
+  visible?: boolean;
+}): boolean {
+  if (typeof ch.ticker_enabled === "boolean") return ch.ticker_enabled;
+  if (typeof ch.visible === "boolean") return ch.visible;
+  return true;
 }
 
 export interface RssChannelConfig {
@@ -170,7 +191,7 @@ export const channelsApi = {
     channelType: ChannelType,
     data: {
       enabled?: boolean;
-      visible?: boolean;
+      ticker_enabled?: boolean;
       config?: Record<string, unknown>;
     },
   ) =>
@@ -187,19 +208,25 @@ export const channelsApi = {
     ),
 };
 
-// ── Channel visibility toggle ───────────────────────────────────
+// ── Channel ticker toggle ───────────────────────────────────────
 
 /**
- * Toggle a channel's visibility (and optionally mark it enabled).
- * Returns a promise that resolves when the API call completes.
- * Callers are responsible for invalidating queries afterward.
+ * Toggle whether a channel's chips appear on the ticker (and optionally
+ * mark the channel itself enabled). Returns a promise that resolves
+ * when the API call completes. Callers are responsible for invalidating
+ * queries afterward.
+ *
+ * The wire field is `ticker_enabled` (v1.0.4+); the server also accepts
+ * the legacy `visible` field for older clients.
  */
 export async function toggleChannelVisibility(
   channelType: ChannelType,
-  visible: boolean,
+  tickerEnabled: boolean,
   enabled?: boolean,
 ): Promise<void> {
-  const payload: { visible: boolean; enabled?: boolean } = { visible };
+  const payload: { ticker_enabled: boolean; enabled?: boolean } = {
+    ticker_enabled: tickerEnabled,
+  };
   if (enabled !== undefined) payload.enabled = enabled;
   await channelsApi.update(channelType, payload);
 }
@@ -259,7 +286,11 @@ export interface UserOverview {
   channels: {
     total: number;
     enabled: number;
-    by_type: Array<{ type: string; enabled: boolean; visible: boolean }>;
+    by_type: Array<{
+      type: string;
+      enabled: boolean;
+      ticker_enabled: boolean;
+    }>;
   };
   fantasy: {
     yahoo_connected: boolean;

@@ -15,7 +15,11 @@ import {
   isAuthenticated as checkAuth,
   getTier,
 } from "./auth";
-import { channelsApi, toggleChannelVisibility } from "./api/client";
+import {
+  channelsApi,
+  isChannelTickerEnabled,
+  toggleChannelVisibility,
+} from "./api/client";
 import {
   loadPref,
   savePref,
@@ -92,7 +96,7 @@ export default function App() {
       return loadPref("activeFeedTabs", ["finance", "sports"]);
     }
     return channels
-      .filter((ch) => ch.enabled && ch.visible)
+      .filter((ch) => ch.enabled && isChannelTickerEnabled(ch))
       .map((ch) => ch.channel_type);
   }, [channels]);
 
@@ -477,7 +481,7 @@ export default function App() {
         const channelItems: CheckMenuItem[] = [];
         for (const ch of chs) {
           const channelType = ch.channel_type;
-          const isVisible = ch.enabled && ch.visible;
+          const isVisible = ch.enabled && isChannelTickerEnabled(ch);
           const label =
             channelType.charAt(0).toUpperCase() + channelType.slice(1);
           channelItems.push(
@@ -490,7 +494,7 @@ export default function App() {
                 const target = channelsRef.current.find(
                   (c) => c.channel_type === channelType,
                 );
-                if (target) target.visible = !isVisible;
+                if (target) target.ticker_enabled = !isVisible;
                 handleChannelToggle(channelType, !isVisible);
               },
             }),

@@ -181,6 +181,10 @@ func (s *Server) setupRoutes() {
 
 	// Support
 	s.App.Post("/support/ticket", LogtoAuth, HandleSubmitSupportTicket)
+	// Anonymous support endpoint for the marketing /support page. NOT
+	// added to coreExemptPaths — the IP rate limiter + the per-IP
+	// hourly Redis counter inside the handler both protect this route.
+	s.App.Post("/support/ticket/public", HandleSubmitPublicSupportTicket)
 
 	// Invite (no auth — user isn't logged in yet, token-verified server-side)
 	s.App.Post("/invite/complete", HandleCompleteInvite)

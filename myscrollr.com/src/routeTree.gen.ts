@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UplinkRouteImport } from './routes/uplink'
+import { Route as SupportRouteImport } from './routes/support'
 import { Route as StatusRouteImport } from './routes/status'
 import { Route as LegalRouteImport } from './routes/legal'
 import { Route as InviteRouteImport } from './routes/invite'
@@ -25,6 +26,11 @@ import { Route as UUsernameRouteImport } from './routes/u.$username'
 const UplinkRoute = UplinkRouteImport.update({
   id: '/uplink',
   path: '/uplink',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StatusRoute = StatusRouteImport.update({
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/invite': typeof InviteRoute
   '/legal': typeof LegalRoute
   '/status': typeof StatusRoute
+  '/support': typeof SupportRoute
   '/uplink': typeof UplinkRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink/lifetime': typeof UplinkLifetimeRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByTo {
   '/invite': typeof InviteRoute
   '/legal': typeof LegalRoute
   '/status': typeof StatusRoute
+  '/support': typeof SupportRoute
   '/uplink': typeof UplinkRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink/lifetime': typeof UplinkLifetimeRoute
@@ -122,6 +130,7 @@ export interface FileRoutesById {
   '/invite': typeof InviteRoute
   '/legal': typeof LegalRoute
   '/status': typeof StatusRoute
+  '/support': typeof SupportRoute
   '/uplink': typeof UplinkRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink_/lifetime': typeof UplinkLifetimeRoute
@@ -138,6 +147,7 @@ export interface FileRouteTypes {
     | '/invite'
     | '/legal'
     | '/status'
+    | '/support'
     | '/uplink'
     | '/u/$username'
     | '/uplink/lifetime'
@@ -152,6 +162,7 @@ export interface FileRouteTypes {
     | '/invite'
     | '/legal'
     | '/status'
+    | '/support'
     | '/uplink'
     | '/u/$username'
     | '/uplink/lifetime'
@@ -166,6 +177,7 @@ export interface FileRouteTypes {
     | '/invite'
     | '/legal'
     | '/status'
+    | '/support'
     | '/uplink'
     | '/u/$username'
     | '/uplink_/lifetime'
@@ -181,6 +193,7 @@ export interface RootRouteChildren {
   InviteRoute: typeof InviteRoute
   LegalRoute: typeof LegalRoute
   StatusRoute: typeof StatusRoute
+  SupportRoute: typeof SupportRoute
   UplinkRoute: typeof UplinkRoute
   UUsernameRoute: typeof UUsernameRoute
   UplinkLifetimeRoute: typeof UplinkLifetimeRoute
@@ -193,6 +206,13 @@ declare module '@tanstack/react-router' {
       path: '/uplink'
       fullPath: '/uplink'
       preLoaderRoute: typeof UplinkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/status': {
@@ -285,6 +305,7 @@ const rootRouteChildren: RootRouteChildren = {
   InviteRoute: InviteRoute,
   LegalRoute: LegalRoute,
   StatusRoute: StatusRoute,
+  SupportRoute: SupportRoute,
   UplinkRoute: UplinkRoute,
   UUsernameRoute: UUsernameRoute,
   UplinkLifetimeRoute: UplinkLifetimeRoute,

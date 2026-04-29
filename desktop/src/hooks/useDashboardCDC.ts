@@ -91,10 +91,14 @@ function mergeChannelRecords(
     if (cdc.action === "delete") {
       if (idx !== -1) updated.splice(idx, 1);
     } else if (idx !== -1) {
+      // CDC payload comes straight from Postgres replication, so the
+      // raw column name is still `visible` (the DB column wasn't
+      // renamed). The Channel type's canonical field is now
+      // `ticker_enabled` — map between them here.
       updated[idx] = {
         ...updated[idx],
         enabled: cdc.record.enabled as boolean,
-        visible: cdc.record.visible as boolean,
+        ticker_enabled: cdc.record.visible as boolean,
       };
     }
   }

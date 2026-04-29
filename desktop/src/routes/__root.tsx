@@ -379,8 +379,9 @@ function RootLayout() {
   // (filtered to `enabled === true`); widgets come from
   // `prefs.widgets.enabledWidgets`. Both are sorted via the shared
   // CANONICAL_ORDER so the sidebar matches the catalog grid order.
-  // `Channel.visible` is intentionally NOT consulted here — visibility
-  // is a feed-level filter, not a navigation gate.
+  // `Channel.ticker_enabled` is intentionally NOT consulted here — that
+  // flag controls whether chips appear on the ticker, not whether the
+  // channel appears in navigation.
   const sidebarSources = useMemo(() => {
     const enabledChannelIds = new Set<string>(
       (dashboard?.channels ?? [])

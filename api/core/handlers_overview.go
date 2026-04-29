@@ -66,9 +66,9 @@ type OverviewChannels struct {
 }
 
 type OverviewChannelRow struct {
-	Type    string `json:"type"`
-	Enabled bool   `json:"enabled"`
-	Visible bool   `json:"visible"`
+	Type          string `json:"type"`
+	Enabled       bool   `json:"enabled"`
+	TickerEnabled bool   `json:"ticker_enabled"`
 }
 
 // OverviewFantasy is the optional fan-out result from the fantasy
@@ -174,7 +174,7 @@ func getChannelSummary(ctx context.Context, userID string) (OverviewChannels, er
 			COALESCE(json_agg(json_build_object(
 				'type', channel_type,
 				'enabled', enabled,
-				'visible', visible
+				'ticker_enabled', visible
 			) ORDER BY channel_type) FILTER (WHERE channel_type IS NOT NULL), '[]'::json) AS by_type
 		FROM user_channels
 		WHERE logto_sub = $1
