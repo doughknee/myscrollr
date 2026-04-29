@@ -73,7 +73,18 @@ function HomePage() {
 
   const enabledWidgets = shell.prefs.widgets.enabledWidgets;
   const homePreview = shell.prefs.homePreview;
-  const maxRows = getMaxTickerRows(shell.tier);
+  // Dynamic row count: show only as many rows as the user has actively
+  // configured in their tickerLayout. The tier max is still respected
+  // upstream (loadPrefs clamps on tier downgrade), but a user with 1
+  // row enabled sees only [Off][On], not all four [Off][1][2][3] slots.
+  // This keeps the picker grounded in what's actually visible on the
+  // ticker right now.
+  const tierMax = getMaxTickerRows(shell.tier);
+  const enabledRows = Math.max(
+    1,
+    Math.min(tierMax, shell.prefs.appearance.tickerLayout.rows.length),
+  );
+  const maxRows = enabledRows;
 
   const setHomePreview = useCallback(
     (channelType: string, keys: string[]) => {

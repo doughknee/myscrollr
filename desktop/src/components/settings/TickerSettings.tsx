@@ -168,11 +168,29 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
 
   const toggleRowSource = useCallback((index: number, sourceId: string) => {
     const row = rows[index];
-    const next = row.sources.includes(sourceId)
-      ? row.sources.filter((s) => s !== sourceId)
-      : [...row.sources, sourceId];
-    updateRow(index, { sources: next });
-  }, [rows, updateRow]);
+    const isInTarget = row.sources.includes(sourceId);
+    // Single-row enforcement: a source can live in at most one row at
+    // any given time. The home-feed RowSelector and tray menus already
+    // enforce this; this picker now matches so users can't accidentally
+    // create overlapping data via the bulk editor. Toggling ON in row
+    // N also strips the source from any other row's sources[].
+    if (isInTarget) {
+      // Toggle OFF: just drop from this row.
+      updateRow(index, { sources: row.sources.filter((s) => s !== sourceId) });
+      return;
+    }
+    // Toggle ON in this row + remove from every other row.
+    const nextRows = rows.map((r, i) => {
+      if (i === index) {
+        return { ...r, sources: [...r.sources, sourceId] };
+      }
+      if (r.sources.includes(sourceId)) {
+        return { ...r, sources: r.sources.filter((s) => s !== sourceId) };
+      }
+      return r;
+    });
+    onPrefsChange(setTickerLayout(prefs, { rows: nextRows }));
+  }, [rows, updateRow, onPrefsChange, prefs]);
 
   const deleteRow = useCallback((index: number) => {
     onPrefsChange(removeTickerRow(prefs, index));
