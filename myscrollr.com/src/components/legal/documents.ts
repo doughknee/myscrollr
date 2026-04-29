@@ -917,7 +917,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         content: [
           'For as long as you remain in good standing under these Super User Terms and the general Terms of Service, your account will receive complimentary access at the Ultimate tier (or its equivalent successor tier, if Scrollr renames or restructures its tier system in the future).',
           'Tier access means access at the tier level. Specific features, limits, providers, and capabilities included in the Ultimate tier may change over time as the Platform evolves. We may add, remove, replace, or modify the features delivered at the Ultimate tier without prior notice. Your continued benefit is the equivalent tier-level access offered to paying Ultimate subscribers from time to time, not any specific feature or quota that exists at the moment of your invite.',
-          'This benefit is provided at no cost to you and is not refundable, exchangeable, or convertible to monetary value. Taxes, if any apply in your jurisdiction, are your responsibility.',
+          'This benefit is provided at no cost to you and is not refundable, exchangeable, or convertible to monetary value. This benefit is non-refundable; any separate paid purchase is governed by the standard Refund Policy. Taxes, if any apply in your jurisdiction, are your responsibility.',
         ],
       },
       {
