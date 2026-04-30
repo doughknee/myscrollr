@@ -165,6 +165,7 @@ func (s *Server) setupRoutes() {
 	s.App.Get("/events/count", GetActiveViewers)
 	s.App.Post("/webhooks/sequin", HandleSequinWebhook)
 	s.App.Post("/webhooks/stripe", HandleStripeWebhook)
+	s.App.Post("/webhooks/resend", HandleResendWebhook)
 
 	// Extension auth proxy
 	s.App.Options("/extension/token", HandleExtensionAuthPreflight)
