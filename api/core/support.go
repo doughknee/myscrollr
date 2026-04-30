@@ -51,6 +51,7 @@ type OSTicketPayload struct {
 	Subject     string                    `json:"subject"`
 	Message     string                    `json:"message"`
 	TopicID     string                    `json:"topicId,omitempty"`
+	PriorityID  string                    `json:"priorityId,omitempty"`
 	Attachments []osTicketAttachmentEntry `json:"attachments,omitempty"`
 }
 
@@ -233,9 +234,109 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 		}
 	}
 
-	// Resolve topic ID (per-category env vars override the default)
+	// Run AI triage BEFORE building the final OS Ticket payload so
+	// high-confidence categorization can override the user's pick (and
+	// thus route to a different osTicket topic). Triage is best-effort:
+	// nil result falls through to the legacy flow.
+	originalBody := body.String()
+	recentSummaries := FetchRecentTicketSummaries(c.Context())
+	triage := triageTicket(c.Context(), TriageInput{
+		UserCategory:    req.Category,
+		UserEmail:       email,
+		UserName:        name,
+		Subject:         subject,
+		Body:            originalBody,
+		RecentSummaries: recentSummaries,
+		Channel:         req.Channel,
+	})
+
+	// Resolve effective category — use AI's pick only on high confidence.
+	effectiveCategory := req.Category
+	if triage != nil && strings.EqualFold(triage.Confidence, "high") && triage.Category != "" {
+		effectiveCategory = triage.Category
+	}
+
+	topicID := resolveOSTicketTopicID(effectiveCategory)
+
+	// Augment body with triage summary / dupe hint / suggested reply
+	finalBody := applyTriageToBody(originalBody, triage)
+
+	// Build OS Ticket payload
+	payload := OSTicketPayload{
+		Name:    name,
+		Email:   email,
+		Subject: subject,
+		Message: fmt.Sprintf("data:text/html;charset=utf-8,%s", finalBody),
+	}
+
+	if topicID != "" {
+		payload.TopicID = topicID
+	}
+	if triage != nil {
+		if pid := mapTriagePriorityToOSTicket(triage.Priority); pid != "" {
+			payload.PriorityID = pid
+		}
+	}
+
+	// Forward attachments
+	for _, att := range req.Attachments {
+		payload.Attachments = append(payload.Attachments, osTicketAttachmentEntry{
+			Filename: att.Filename,
+			MimeType: att.MimeType,
+			Data:     att.Data,
+		})
+	}
+
+	ticketNumber, err := forwardToOSTicket(c.Context(), payload)
+	if err != nil {
+		// Distinguish "not configured" so we can keep the existing 500
+		// vs. upstream rejection (502).
+		if errors.Is(err, errOSTicketNotConfigured) {
+			return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+				Status: "error",
+				Error:  "Support ticket system is not configured",
+			})
+		}
+		if errors.Is(err, errOSTicketMarshal) {
+			return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+				Status: "error",
+				Error:  "Failed to prepare ticket",
+			})
+		}
+		return c.Status(fiber.StatusBadGateway).JSON(ErrorResponse{
+			Status: "error",
+			Error:  "Failed to submit bug report — support system rejected all API keys",
+		})
+	}
+
+	log.Printf("[Support] Ticket created for user %s (osTicket=%s)", userID, ticketNumber)
+	// Only record the submission AFTER OS Ticket confirms. If the
+	// request fails upstream the user isn't trapped in a cooldown
+	// they didn't earn — see allowedBySupportRateLimit.
+	recordSupportSubmission(userID)
+
+	// Side effects after successful ticket creation: persist the AI
+	// draft for partner approval, push to the recent-tickets sliding
+	// window, and notify the partner. All best-effort — failures here
+	// must not surface to the user, who has already gotten their
+	// success response logically.
+	if triage != nil && ticketNumber != "" {
+		persistTriageSideEffects(ticketNumber, email, name, subject, originalBody, triage)
+	}
+
+	return c.JSON(fiber.Map{
+		"status":  "ok",
+		"message": "Bug report submitted successfully",
+	})
+}
+
+// resolveOSTicketTopicID maps a category string to its osTicket topic
+// ID, honoring per-category env var overrides. Default falls back to
+// OSTICKET_TOPIC_ID. Extracted as a helper so both authenticated and
+// public handlers (and the AI override path) use one source of truth.
+func resolveOSTicketTopicID(category string) string {
 	topicID := os.Getenv("OSTICKET_TOPIC_ID")
-	switch req.Category {
+	switch category {
 	case "feature":
 		if id := os.Getenv("OSTICKET_TOPIC_ID_FEATURE"); id != "" {
 			topicID = id
@@ -257,58 +358,53 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 			topicID = id
 		}
 	}
+	return topicID
+}
 
-	// Build OS Ticket payload
-	payload := OSTicketPayload{
-		Name:    name,
-		Email:   email,
-		Subject: subject,
-		Message: fmt.Sprintf("data:text/html;charset=utf-8,%s", body.String()),
-	}
+// persistTriageSideEffects fans out the post-submit AI bookkeeping:
+// persists the draft, pushes a recent-summary entry to the sliding
+// window, and (in Phase 1D) fires the partner notification email.
+// Each step is logged on failure but never surfaced to the user.
+//
+// Runs in a background goroutine so it doesn't block the user's
+// response — the user has already had their ticket accepted by
+// osTicket at this point.
+func persistTriageSideEffects(ticketNumber, userEmail, userName, subject, originalBody string, triage *TriageResult) {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 
-	if topicID != "" {
-		payload.TopicID = topicID
-	}
-
-	// Forward attachments
-	for _, att := range req.Attachments {
-		payload.Attachments = append(payload.Attachments, osTicketAttachmentEntry{
-			Filename: att.Filename,
-			MimeType: att.MimeType,
-			Data:     att.Data,
+		// Save the draft (even if we don't end up notifying — useful for audit).
+		draft, err := createSupportDraft(ctx, &SupportDraft{
+			TicketNumber:    ticketNumber,
+			UserEmail:       userEmail,
+			UserName:        userName,
+			OriginalSubject: subject,
+			DraftBodyHTML:   triage.DraftReplyHTML,
+			AISummary:       triage.Summary,
+			AICategory:      triage.Category,
+			AIPriority:      triage.Priority,
+			AIChannel:       triage.Channel,
+			AIDuplicateOf:   triage.DuplicateOf,
+			AIConfidence:    triage.Confidence,
 		})
-	}
+		if err != nil {
+			log.Printf("[Support] createSupportDraft failed for ticket %s: %v", ticketNumber, err)
+		}
 
-	if err := forwardToOSTicket(c.Context(), payload); err != nil {
-		// Distinguish "not configured" so we can keep the existing 500
-		// vs. upstream rejection (502).
-		if errors.Is(err, errOSTicketNotConfigured) {
-			return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
-				Status: "error",
-				Error:  "Support ticket system is not configured",
-			})
-		}
-		if errors.Is(err, errOSTicketMarshal) {
-			return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
-				Status: "error",
-				Error:  "Failed to prepare ticket",
-			})
-		}
-		return c.Status(fiber.StatusBadGateway).JSON(ErrorResponse{
-			Status: "error",
-			Error:  "Failed to submit bug report — support system rejected all API keys",
+		// Recent-tickets sliding window for dupe detection on subsequent submissions.
+		PushRecentTicketSummary(ctx, RecentTicketSummary{
+			TicketNumber: ticketNumber,
+			Category:     triage.Category,
+			Summary:      triage.Summary,
+			CreatedAt:    time.Now().UTC().Format(time.RFC3339),
 		})
-	}
 
-	log.Printf("[Support] Ticket created for user %s", userID)
-	// Only record the submission AFTER OS Ticket confirms. If the
-	// request fails upstream the user isn't trapped in a cooldown
-	// they didn't earn — see allowedBySupportRateLimit.
-	recordSupportSubmission(userID)
-	return c.JSON(fiber.Map{
-		"status":  "ok",
-		"message": "Bug report submitted successfully",
-	})
+		// Partner notification — wired in Phase 1D once SendPartnerNotification exists.
+		if draft != nil {
+			notifyPartnerAfterDraft(ctx, draft)
+		}
+	}()
 }
 
 // ===== OS Ticket forwarding helper =====
@@ -338,12 +434,20 @@ var (
 // comma-separated API key in OSTICKET_API_KEY in order. OS Ticket ties
 // keys to source IPs and pods can land on different nodes, so a 401 on
 // one key just means try the next; any other non-2xx aborts the loop.
-func forwardToOSTicket(ctx context.Context, payload OSTicketPayload) error {
+//
+// Returns the ticket number on success along with nil error. osTicket's
+// REST API returns the bare ticket number as the response body on a
+// 201 Created (it is a plain string, not JSON, in default installs).
+// We trim whitespace and surrounding quotes defensively to tolerate
+// either form. Empty string + nil error is acceptable when osTicket
+// answers 201 with no body — caller treats missing ticket numbers as
+// non-fatal (no draft will be created, but the ticket itself succeeded).
+func forwardToOSTicket(ctx context.Context, payload OSTicketPayload) (string, error) {
 	osTicketURL := os.Getenv("OSTICKET_URL")
 	apiKeysRaw := os.Getenv("OSTICKET_API_KEY")
 	if osTicketURL == "" || apiKeysRaw == "" {
 		log.Println("[Support] OSTICKET_URL or OSTICKET_API_KEY not configured")
-		return errOSTicketNotConfigured
+		return "", errOSTicketNotConfigured
 	}
 
 	ticketURL := strings.TrimSuffix(osTicketURL, "/") + "/api/tickets.json"
@@ -351,7 +455,7 @@ func forwardToOSTicket(ctx context.Context, payload OSTicketPayload) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		log.Printf("[Support] Failed to marshal OS Ticket payload: %v", err)
-		return fmt.Errorf("%w: %v", errOSTicketMarshal, err)
+		return "", fmt.Errorf("%w: %v", errOSTicketMarshal, err)
 	}
 
 	apiKeys := strings.Split(apiKeysRaw, ",")
@@ -385,7 +489,7 @@ func forwardToOSTicket(ctx context.Context, payload OSTicketPayload) error {
 		lastBody = string(respBody)
 
 		if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusOK {
-			return nil
+			return parseOSTicketNumber(respBody), nil
 		}
 
 		// 401 (wrong IP for this key) — try next key.
@@ -400,7 +504,50 @@ func forwardToOSTicket(ctx context.Context, payload OSTicketPayload) error {
 	}
 
 	log.Printf("[Support] All API keys failed. Last status: %d, body: %s", lastStatus, lastBody)
-	return fmt.Errorf("%w: last status %d", errOSTicketAllKeysFailed, lastStatus)
+	return "", fmt.Errorf("%w: last status %d", errOSTicketAllKeysFailed, lastStatus)
+}
+
+// parseOSTicketNumber returns the ticket number from a successful
+// osTicket create response. Default osTicket installs return the bare
+// number as plain text; some versions / themes wrap it in JSON like
+// `{"id":1247}` or `{"number":"TKT-1247"}`. We try plain first, fall
+// back to JSON parsing on failure. Returns "" if neither yields a
+// usable value — caller is expected to treat that as non-fatal.
+func parseOSTicketNumber(body []byte) string {
+	s := strings.TrimSpace(string(body))
+	s = strings.Trim(s, "\"")
+	if s == "" {
+		return ""
+	}
+	// If it parses as a JSON object, extract id/number/ticket_number.
+	if strings.HasPrefix(s, "{") {
+		var obj map[string]interface{}
+		if err := json.Unmarshal([]byte(s), &obj); err == nil {
+			for _, k := range []string{"number", "ticket_number", "id"} {
+				if v, ok := obj[k]; ok {
+					switch t := v.(type) {
+					case string:
+						return strings.TrimSpace(t)
+					case float64:
+						return fmt.Sprintf("%d", int64(t))
+					}
+				}
+			}
+		}
+		return ""
+	}
+	return s
+}
+
+// notifyPartnerAfterDraft is the seam wired up in Phase 1D once
+// SendPartnerNotification exists. Defined here as an indirection so
+// support.go can compile through the phase boundary without referencing
+// a function that doesn't exist yet. Phase 1D replaces the body to
+// call SendPartnerNotification.
+var notifyPartnerAfterDraft = func(ctx context.Context, draft *SupportDraft) {
+	// no-op until Phase 1D wires in the email send
+	_ = ctx
+	_ = draft
 }
 
 // escapeHTML replaces < > & " with HTML entities.

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
 
@@ -157,4 +158,53 @@ func RemoveSubscriberMulti(ctx context.Context, setKeys []string, userSub string
 	}
 	_, err := pipe.Exec(ctx)
 	return err
+}
+
+// --- AI Triage: Recent Ticket Summaries ---
+// Sliding window of the last N ticket summaries, used as context when
+// asking Claude to dupe-detect against recent submissions. Keyed by a
+// single global list; entries are LPUSHed and trimmed to the cap.
+
+const (
+	RedisRecentTicketsKey   = "support:recent_tickets"
+	RedisRecentTicketsLimit = 50
+)
+
+// PushRecentTicketSummary adds a summary to the head of the sliding
+// window. Atomic — uses LPUSH+LTRIM in a pipeline.
+func PushRecentTicketSummary(ctx context.Context, summary RecentTicketSummary) {
+	if Rdb == nil {
+		return
+	}
+	bytes, err := json.Marshal(summary)
+	if err != nil {
+		log.Printf("[Redis] marshal recent ticket: %v", err)
+		return
+	}
+	pipe := Rdb.Pipeline()
+	pipe.LPush(ctx, RedisRecentTicketsKey, string(bytes))
+	pipe.LTrim(ctx, RedisRecentTicketsKey, 0, int64(RedisRecentTicketsLimit-1))
+	if _, err := pipe.Exec(ctx); err != nil {
+		log.Printf("[Redis] push recent ticket: %v", err)
+	}
+}
+
+// FetchRecentTicketSummaries returns the last N summaries (most recent first).
+func FetchRecentTicketSummaries(ctx context.Context) []RecentTicketSummary {
+	if Rdb == nil {
+		return nil
+	}
+	rawList, err := Rdb.LRange(ctx, RedisRecentTicketsKey, 0, int64(RedisRecentTicketsLimit-1)).Result()
+	if err != nil {
+		log.Printf("[Redis] fetch recent tickets: %v", err)
+		return nil
+	}
+	out := make([]RecentTicketSummary, 0, len(rawList))
+	for _, s := range rawList {
+		var sum RecentTicketSummary
+		if err := json.Unmarshal([]byte(s), &sum); err == nil {
+			out = append(out, sum)
+		}
+	}
+	return out
 }

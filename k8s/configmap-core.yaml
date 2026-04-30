@@ -53,3 +53,15 @@ data:
   OSTICKET_TOPIC_ID_BILLING: "15"  # Billing & Subscriptions
   OSTICKET_TOPIC_ID_ACCOUNT: "16"  # Account Issues
   OSTICKET_TOPIC_ID_CHANNEL: "17"  # Channel Data Issues
+
+  # AI Triage (Phase: ai-support-triage)
+  #
+  # The following secrets MUST be added manually to k8s/secrets.yaml:
+  #   - ANTHROPIC_API_KEY              (Claude Haiku for triage; sk-ant-...)
+  #   - RESEND_WEBHOOK_SECRET          (Svix-style secret from Resend → Webhooks)
+  #   - SUPPORT_APPROVAL_HMAC_SECRET   (any high-entropy string ≥32 chars)
+  AI_TRIAGE_ENABLED: "true"                       # set "false" to bypass triage and fall back to legacy flow
+  SUPPORT_AGENT_EMAIL: "phil@myscrollr.com"       # CHANGEME — partner's email for approval notifications
+  APPROVAL_BASE_URL: "https://api.myscrollr.com"  # base URL embedded in Send/Edit/Skip links
+  OSTICKET_BCC_EMAIL: "support@myscrollr.com"     # the inbox osTicket polls for inbound piping
+  SUPPORT_REPLY_FROM_EMAIL: "support@myscrollr.com"

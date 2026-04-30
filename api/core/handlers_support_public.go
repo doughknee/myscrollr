@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"strings"
 	"time"
 
@@ -118,46 +117,54 @@ func HandleSubmitPublicSupportTicket(c *fiber.Ctx) error {
 		}
 	}
 
-	// Resolve topic ID — reuse the per-category overrides the
-	// authenticated handler honors, so anonymous tickets land in the
-	// same OS Ticket queues as their authenticated equivalents.
-	topicID := os.Getenv("OSTICKET_TOPIC_ID")
-	switch req.Category {
-	case "feature":
-		if id := os.Getenv("OSTICKET_TOPIC_ID_FEATURE"); id != "" {
-			topicID = id
-		}
-	case "feedback":
-		if id := os.Getenv("OSTICKET_TOPIC_ID_FEEDBACK"); id != "" {
-			topicID = id
-		}
-	case "billing":
-		if id := os.Getenv("OSTICKET_TOPIC_ID_BILLING"); id != "" {
-			topicID = id
-		}
-	}
-
-	// Build OS Ticket payload. Match the same Message format the
-	// authenticated handler uses (data: URL with HTML body) so OS
-	// Ticket renders both submission types consistently.
-	bodyHTML := fmt.Sprintf(
+	// Run AI triage BEFORE building the final OS Ticket payload so
+	// high-confidence categorization can override the user's pick.
+	subjectFull := fmt.Sprintf("[%s] %s", categoryLabel, req.Subject)
+	originalBody := fmt.Sprintf(
 		"<h3>%s</h3><p>%s</p><hr/><p><em>Submitted anonymously from the marketing site (IP %s).</em></p>",
 		escapeHTML(categoryLabel),
 		escapeHTML(req.Message),
 		escapeHTML(redactIP(ip)),
 	)
 
+	recentSummaries := FetchRecentTicketSummaries(c.Context())
+	triage := triageTicket(c.Context(), TriageInput{
+		UserCategory:    req.Category,
+		UserEmail:       req.Email,
+		UserName:        fallbackName(req.Name, req.Email),
+		Subject:         subjectFull,
+		Body:            req.Message,
+		RecentSummaries: recentSummaries,
+	})
+
+	effectiveCategory := req.Category
+	if triage != nil && strings.EqualFold(triage.Confidence, "high") && triage.Category != "" {
+		effectiveCategory = triage.Category
+	}
+	topicID := resolveOSTicketTopicID(effectiveCategory)
+
+	// Build OS Ticket payload. Match the same Message format the
+	// authenticated handler uses (data: URL with HTML body) so OS
+	// Ticket renders both submission types consistently.
+	finalBody := applyTriageToBody(originalBody, triage)
+
 	payload := OSTicketPayload{
 		Name:    fallbackName(req.Name, req.Email),
 		Email:   req.Email,
-		Subject: fmt.Sprintf("[%s] %s", categoryLabel, req.Subject),
-		Message: fmt.Sprintf("data:text/html;charset=utf-8,%s", bodyHTML),
+		Subject: subjectFull,
+		Message: fmt.Sprintf("data:text/html;charset=utf-8,%s", finalBody),
 	}
 	if topicID != "" {
 		payload.TopicID = topicID
 	}
+	if triage != nil {
+		if pid := mapTriagePriorityToOSTicket(triage.Priority); pid != "" {
+			payload.PriorityID = pid
+		}
+	}
 
-	if err := forwardToOSTicket(c.Context(), payload); err != nil {
+	ticketNumber, err := forwardToOSTicket(c.Context(), payload)
+	if err != nil {
 		log.Printf("[PublicSupport] forwardToOSTicket failed for ip=%s email=%s: %v",
 			redactIP(ip), redactEmail(req.Email), err)
 		return c.Status(fiber.StatusBadGateway).JSON(ErrorResponse{
@@ -166,8 +173,12 @@ func HandleSubmitPublicSupportTicket(c *fiber.Ctx) error {
 		})
 	}
 
-	log.Printf("[PublicSupport] Ticket created from ip=%s email=%s category=%s",
-		redactIP(ip), redactEmail(req.Email), req.Category)
+	log.Printf("[PublicSupport] Ticket created from ip=%s email=%s category=%s osTicket=%s",
+		redactIP(ip), redactEmail(req.Email), req.Category, ticketNumber)
+
+	if triage != nil && ticketNumber != "" {
+		persistTriageSideEffects(ticketNumber, req.Email, fallbackName(req.Name, req.Email), subjectFull, originalBody, triage)
+	}
 
 	return c.JSON(fiber.Map{
 		"status":  "ok",
