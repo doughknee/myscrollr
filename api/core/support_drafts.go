@@ -36,6 +36,7 @@ type SupportDraft struct {
 	UserEmail             string
 	UserName              string
 	OriginalSubject       string
+	UserMessageHTML       string // The user's actual message body (for partner-email context). Separate from DraftBodyHTML which is the AI-drafted reply.
 	DraftBodyHTML         string
 	AISummary             string
 	AICategory            string
@@ -67,10 +68,11 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 	const q = `
 		INSERT INTO support_drafts
 			(ticket_number, user_email, user_name, original_subject,
+			 user_message_html,
 			 draft_body_html, ai_summary, ai_category, ai_priority,
 			 ai_channel, ai_duplicate_of, ai_confidence, status,
 			 osticket_thread_entry_id, should_close)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending',$12,$13)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',$13,$14)
 		RETURNING id, created_at
 	`
 	// 0 → NULL via NULLIF so the partial unique index doesn't reject
@@ -79,11 +81,20 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 	if draft.OSTicketThreadEntryID > 0 {
 		entryID = &draft.OSTicketThreadEntryID
 	}
+	// user_message_html is nullable for back-compat with old rows; we
+	// always populate it on new writes but use NULL when the field is
+	// empty so the column reads as the absence of a message rather
+	// than an empty string.
+	var userMsg *string
+	if draft.UserMessageHTML != "" {
+		userMsg = &draft.UserMessageHTML
+	}
 	err := DBPool.QueryRow(ctx, q,
 		draft.TicketNumber,
 		draft.UserEmail,
 		draft.UserName,
 		draft.OriginalSubject,
+		userMsg,
 		draft.DraftBodyHTML,
 		draft.AISummary,
 		draft.AICategory,
@@ -107,6 +118,7 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 	const q = `
 		SELECT id, ticket_number, user_email, user_name, original_subject,
+			   user_message_html,
 			   draft_body_html, ai_summary, ai_category, ai_priority,
 			   ai_channel, ai_duplicate_of, ai_confidence, status,
 			   edited_body_html, decided_at, sent_at, created_at,
@@ -114,9 +126,10 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 		FROM support_drafts WHERE id = $1
 	`
 	var d SupportDraft
-	var userName, summary, category, priority, channel, dupOf, confidence, editedBody *string
+	var userName, userMsg, summary, category, priority, channel, dupOf, confidence, editedBody *string
 	err := DBPool.QueryRow(ctx, q, id).Scan(
 		&d.ID, &d.TicketNumber, &d.UserEmail, &userName, &d.OriginalSubject,
+		&userMsg,
 		&d.DraftBodyHTML, &summary, &category, &priority, &channel,
 		&dupOf, &confidence, &d.Status,
 		&editedBody, &d.DecidedAt, &d.SentAt, &d.CreatedAt,
@@ -130,6 +143,9 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 	}
 	if userName != nil {
 		d.UserName = *userName
+	}
+	if userMsg != nil {
+		d.UserMessageHTML = *userMsg
 	}
 	if summary != nil {
 		d.AISummary = *summary
@@ -324,6 +340,22 @@ func SendPartnerNotification(ctx context.Context, draft *SupportDraft) error {
 		return fmt.Errorf("build approval URLs: %w", err)
 	}
 
+	// Build the "what the user wrote" block. Hidden when we don't have
+	// the body (legacy rows). User-supplied HTML is rendered verbatim
+	// inside a styled container; the upstream Contact Us form already
+	// goes through escapeHTML when triage builds the prompt, so what's
+	// in user_message_html is safe-ish HTML already. We still wrap it
+	// so it's visually distinct from the AI's draft.
+	userMessageBlock := ""
+	if draft.UserMessageHTML != "" {
+		userMessageBlock = fmt.Sprintf(`<div style="padding:0 24px 20px;">
+  <p style="margin:0 0 6px;font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;">What the user wrote</p>
+  <div style="background:#fafafa;padding:12px;border-radius:6px;font-size:13px;color:#444;border-left:3px solid #6b7280;line-height:1.5;">
+    %s
+  </div>
+</div>`, draft.UserMessageHTML)
+	}
+
 	// Local var name `htmlBody` to avoid shadowing the imported `html` package.
 	htmlBody := fmt.Sprintf(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
@@ -336,7 +368,11 @@ func SendPartnerNotification(ctx context.Context, draft *SupportDraft) error {
 <div style="padding:20px 24px;">
   <p style="margin:0 0 8px;font-size:14px;color:#333;"><strong>AI summary:</strong> %s</p>
   <p style="margin:0 0 16px;font-size:11px;color:#666;">Category: %s · Priority: %s · Confidence: %s</p>
-  <div style="background:#f9f9f9;padding:12px;border-radius:6px;font-size:13px;color:#333;border-left:3px solid #10b981;">
+</div>
+%s
+<div style="padding:0 24px 20px;">
+  <p style="margin:0 0 6px;font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;">AI-drafted reply</p>
+  <div style="background:#f9f9f9;padding:12px;border-radius:6px;font-size:13px;color:#333;border-left:3px solid #10b981;line-height:1.5;">
     %s
   </div>
 </div>
@@ -361,6 +397,7 @@ func SendPartnerNotification(ctx context.Context, draft *SupportDraft) error {
 		html.EscapeString(draft.AICategory),
 		html.EscapeString(draft.AIPriority),
 		html.EscapeString(draft.AIConfidence),
+		userMessageBlock,    // empty string when no user message available; otherwise the styled block
 		draft.DraftBodyHTML, // already HTML, don't double-escape
 		sendURL, editURL, skipURL,
 		html.EscapeString(draft.OriginalSubject),

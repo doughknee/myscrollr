@@ -180,6 +180,7 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 		UserEmail:             ev.UserEmail,
 		UserName:              userName,
 		OriginalSubject:       ev.Subject,
+		UserMessageHTML:       ev.MessageHTML,
 		DraftBodyHTML:         triage.DraftReplyHTML,
 		AISummary:             triage.Summary,
 		AICategory:            triage.Category,

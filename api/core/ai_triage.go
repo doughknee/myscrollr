@@ -338,73 +338,20 @@ Body:
 	)
 }
 
-// faqContextForTriage returns a short FAQ snippet to ground Claude's
-// reply suggestions. Keep this small (<2000 chars) — it's sent on every
-// triage call. Update when the FAQ content evolves significantly.
+// faqContextForTriage delegates to the canonical knowledge base in
+// support_kb.go. Kept as a wrapper so the prompt-building call site
+// doesn't need to change every time the KB structure evolves.
 func faqContextForTriage() string {
-	return `# Scrollr FAQ (quick reference for triage replies)
-
-## Connecting Yahoo Fantasy
-Open the Fantasy channel page in the desktop app, click "Connect Yahoo," walk through the OAuth flow. Leagues import automatically once connected.
-
-## Updating the desktop app
-Settings → General → Updates → Check for Updates. Auto-updates are also available; v1.0.4 is the latest as of April 2026.
-
-## Subscription & billing
-Manage all subscriptions through the Stripe portal: Account page → "Manage Subscription". Cancellation, payment-method updates, and invoices are all there. Super-users have permanent free Ultimate access (per the early-access program).
-
-## Resetting password
-Account page, click "Send password reset email", and Logto handles the rest.
-
-## Reporting bugs
-The Contact Us form in the desktop app collects diagnostics automatically. Always include OS + Scrollr version (Settings → General → About).
-
-## Channel issues
-Finance: stocks/crypto via TwelveData. Sports: api-sports.io. News: RSS pull-based ingestion. Fantasy: Yahoo OAuth + cached league data.
-
-## Multi-row ticker
-Available on Pro (2 rows), Ultimate (3 rows), and super_user. Configure in Settings → Ticker → Rows. Per-channel row assignment in the Settings → Ticker source picker, or right-click the tray menu.
-
-## Channel.ticker_enabled / "missing channel"
-If a channel disappears from the ticker, it's likely the per-channel ticker toggle is off. Check the Home/Feed page → channel header → ticker icon.
-`
+	return supportKnowledgeBase()
 }
 
-// applyTriageToBody prepends the AI summary and appends the duplicate
-// hint to the ticket body HTML. The drafted reply is appended as a
-// collapsible <details> block so the partner can copy it inside
-// osTicket. Returns the modified body.
-func applyTriageToBody(originalBody string, triage *TriageResult) string {
-	if triage == nil {
-		return originalBody
-	}
-
-	var prefix strings.Builder
-	prefix.WriteString(`<div style="background:#0f3a2c;border-left:4px solid #10b981;padding:12px;margin-bottom:16px;color:#a7f3d0;border-radius:4px;">`)
-	prefix.WriteString(fmt.Sprintf(`<strong>🤖 AI summary:</strong> %s`, escapeHTML(triage.Summary)))
-	prefix.WriteString(fmt.Sprintf(`<br><span style="font-size:11px;opacity:0.8;">priority=%s · category=%s · confidence=%s`,
-		escapeHTML(triage.Priority),
-		escapeHTML(triage.Category),
-		escapeHTML(triage.Confidence)))
-	if triage.Channel != "" {
-		prefix.WriteString(fmt.Sprintf(` · channel=%s`, escapeHTML(triage.Channel)))
-	}
-	prefix.WriteString(`</span></div>`)
-
-	body := prefix.String() + originalBody
-
-	if triage.DuplicateOf != "" {
-		body += fmt.Sprintf(`<div style="background:#3a2c0f;border-left:4px solid #f59e0b;padding:8px;margin-top:16px;color:#fde68a;border-radius:4px;font-size:13px;">🔗 <strong>Possibly related:</strong> ticket %s</div>`,
-			escapeHTML(triage.DuplicateOf))
-	}
-
-	if triage.DraftReplyHTML != "" {
-		body += fmt.Sprintf(`<details style="margin-top:16px;background:#1a1a2e;border:1px solid #2a2a3e;padding:12px;border-radius:4px;"><summary style="cursor:pointer;color:#10b981;font-weight:600;">💡 AI suggested reply (click to expand)</summary><div style="margin-top:8px;padding:8px;background:#0a0a1a;border-radius:4px;color:#e2e8f0;">%s</div></details>`,
-			triage.DraftReplyHTML)
-	}
-
-	return body
-}
+// applyTriageToBody was removed in 2026-05-01 — it used to prepend an
+// "AI summary" banner and append the drafted reply as a <details> block
+// to the ticket body, but those decorations were visible to users when
+// they viewed the ticket via the portal. AI metadata now lives in the
+// support_drafts row and the partner-notification email only. The
+// user-visible thread is whatever the user wrote and whatever the
+// agent answers — nothing else.
 
 // mapTriagePriorityToOSTicket converts AI priority strings to osTicket's
 // expected priority IDs. osTicket's default priority IDs are 1=Low, 2=Normal,
