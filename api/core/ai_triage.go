@@ -194,11 +194,12 @@ YOUR TASKS:
 4. Generate a one-line summary (10 words max, no period at the end)
 5. If the ticket looks like a duplicate of one in RECENT TICKETS, output its ticket_number
 6. Draft a reply matching this voice:
-   - Warm, direct, lowercase first letter is fine, no corporate-speak
-   - Lead with brief acknowledgment, then action
-   - Reference FAQ if relevant; never make up fix steps
+   - Warm, direct, normal sentence-case capitalization (start every sentence with a capital letter), no corporate-speak
+   - NEVER use em dashes (—) or en dashes (–) anywhere in the reply. Use commas, periods, parentheses, or simple hyphens (-) instead. This is a hard rule.
+   - Lead with a brief acknowledgment, then action
+   - Reference the FAQ if relevant; never make up fix steps
    - 2-4 short paragraphs max
-   - Sign off "— the scrollr team"
+   - Sign off as: "the scrollr team" on its own line, with nothing before it
 7. Output confidence: "high" if you're very sure of category/priority, "medium" if some ambiguity, "low" if you'd want a human to double-check
 
 OUTPUT EXACTLY THIS JSON (no markdown fences, no commentary):
@@ -241,7 +242,7 @@ Body:
 // reply suggestions. Keep this small (<2000 chars) — it's sent on every
 // triage call. Update when the FAQ content evolves significantly.
 func faqContextForTriage() string {
-	return `# Scrollr FAQ — quick reference for triage replies
+	return `# Scrollr FAQ (quick reference for triage replies)
 
 ## Connecting Yahoo Fantasy
 Open the Fantasy channel page in the desktop app, click "Connect Yahoo," walk through the OAuth flow. Leagues import automatically once connected.
@@ -253,7 +254,7 @@ Settings → General → Updates → Check for Updates. Auto-updates are also av
 Manage all subscriptions through the Stripe portal: Account page → "Manage Subscription". Cancellation, payment-method updates, and invoices are all there. Super-users have permanent free Ultimate access (per the early-access program).
 
 ## Resetting password
-Account page → "Send password reset email" — Logto handles the rest.
+Account page, click "Send password reset email", and Logto handles the rest.
 
 ## Reporting bugs
 The Contact Us form in the desktop app collects diagnostics automatically. Always include OS + Scrollr version (Settings → General → About).

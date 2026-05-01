@@ -364,9 +364,18 @@ func SendPartnerNotification(ctx context.Context, draft *SupportDraft) error {
 	if resendKey == "" {
 		return fmt.Errorf("RESEND_API_KEY not set")
 	}
-	from := os.Getenv("RESEND_FROM_EMAIL")
+	// Partner approval emails are sent FROM the support address so they
+	// match the rest of the support pipeline (osTicket auto-responses,
+	// AI replies, etc.) instead of the marketing/invites address. Reuse
+	// SUPPORT_REPLY_FROM_EMAIL since it already exists and points at
+	// support@. Fall back to the legacy RESEND_FROM_EMAIL only if the
+	// support-specific one is unset.
+	from := os.Getenv("SUPPORT_REPLY_FROM_EMAIL")
 	if from == "" {
-		from = "noreply@myscrollr.com"
+		from = os.Getenv("RESEND_FROM_EMAIL")
+	}
+	if from == "" {
+		from = "support@myscrollr.com"
 	}
 
 	payload := map[string]interface{}{

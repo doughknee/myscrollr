@@ -143,17 +143,14 @@ func HandleResendWebhook(c *fiber.Ctx) error {
 		recipient = ev.Data.To[0]
 	}
 
-	// Determine direction: if From contains the support address, it's
-	// outbound from osTicket (our partner's helpdesk). Anything else is
-	// flagged but still recorded for visibility.
-	direction := "outbound_osticket" // default — osTicket emails dominate
-	supportFrom := os.Getenv("OSTICKET_BCC_EMAIL")
-	if supportFrom == "" {
-		supportFrom = "support@myscrollr.com"
-	}
-	if !strings.Contains(strings.ToLower(ev.Data.From), strings.ToLower(supportFrom)) {
-		log.Printf("[ResendWebhook] unexpected from address: %s for ticket %s", ev.Data.From, ticketNumber)
-	}
+	// Determine direction by inspecting the From address. osTicket's
+	// outbound mail comes from the support address; partner notifications
+	// and AI replies come from one of our own send addresses. Tagging
+	// these correctly matters because fetchOSTicketMessageIDForReply
+	// filters by direction='outbound_osticket' to find the In-Reply-To
+	// target. If we tag a partner notification as outbound_osticket, the
+	// AI reply ends up threaded against the wrong message.
+	direction := classifyMessageDirection(ev.Data.From)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -166,6 +163,65 @@ func HandleResendWebhook(c *fiber.Ctx) error {
 	log.Printf("[ResendWebhook] captured ticket=%s msg-id=%s recipient=%s",
 		ticketNumber, messageID, recipient)
 	return c.SendStatus(fiber.StatusOK)
+}
+
+// classifyMessageDirection inspects the from-address on a Resend
+// webhook event and decides which direction tag to store with the
+// captured Message-ID.
+//
+// Direction values:
+//
+//   - outbound_osticket: osTicket sent the email (auto-response or
+//     status update to the user). These are the only ones we want to
+//     pull when computing In-Reply-To headers for AI replies, so we
+//     can thread cleanly into the existing osTicket conversation.
+//   - outbound_partner_notification: our backend sent an internal
+//     notification to the support agent (the partner approval email).
+//     Recorded for visibility but excluded from In-Reply-To lookups.
+//   - outbound_ai: our backend sent an AI-drafted reply to the user.
+//     Recorded so we can still match if the user replies to that
+//     specific message.
+//   - unknown: anything we cannot classify. Recorded for diagnostic
+//     visibility but never used for threading.
+//
+// The set of "ours" addresses is read from env vars at runtime so the
+// classifier stays in sync with whatever Resend addresses we are
+// actually configured to send from.
+func classifyMessageDirection(fromAddress string) string {
+	from := strings.ToLower(fromAddress)
+
+	supportFrom := strings.ToLower(getenvOr("OSTICKET_BCC_EMAIL", "support@myscrollr.com"))
+	replyFrom := strings.ToLower(getenvOr("SUPPORT_REPLY_FROM_EMAIL", "support@myscrollr.com"))
+	notificationFrom := strings.ToLower(os.Getenv("RESEND_FROM_EMAIL"))
+
+	// AI reply check first because the reply-from address typically
+	// equals the support inbox address; we want the AI reply tag to
+	// win when both match (ours, going to user).
+	if replyFrom != "" && strings.Contains(from, replyFrom) && replyFrom != supportFrom {
+		return "outbound_ai"
+	}
+
+	// Partner notification: from address matches the global RESEND_FROM_EMAIL
+	// (commonly invites@myscrollr.com or similar) and is NOT the support inbox.
+	if notificationFrom != "" && strings.Contains(from, notificationFrom) && notificationFrom != supportFrom {
+		return "outbound_partner_notification"
+	}
+
+	// osTicket-originated email: from-address contains the support inbox.
+	if supportFrom != "" && strings.Contains(from, supportFrom) {
+		return "outbound_osticket"
+	}
+
+	log.Printf("[ResendWebhook] could not classify from address: %s", fromAddress)
+	return "unknown"
+}
+
+// getenvOr returns the value of env var key, or fallback if unset/empty.
+func getenvOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
 
 // verifySvixSignature validates the Svix HMAC-SHA256 signature header
