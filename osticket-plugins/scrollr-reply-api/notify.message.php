@@ -81,12 +81,23 @@ class ScrollrReplyNotify {
             return;
         }
 
-        // 3. Skip the FIRST message of a thread. The initial message
-        //    was already triaged via the /support/ticket flow on the
-        //    Scrollr API (or arrived via IMAP-only intake, which we
-        //    don't auto-triage today).
-        if (self::isFirstMessage($thread, $entry)) {
-            return;
+        // 3. Skip the FIRST message of a thread. We can't trust
+        //    $thread->getNumMessages() — at signal-fire time it
+        //    sometimes returns 1 even for a follow-up reply (cached
+        //    or just-saved entry not yet counted). Instead, compare
+        //    the ticket's creation time to NOW: if the ticket was
+        //    created within the last 60 seconds, treat this entry as
+        //    the initial message (already handled by /support/ticket).
+        //    The 60s window is generous — an actual human won't reply
+        //    to their own ticket that fast.
+        $ticketCreated = method_exists($ticket, 'getCreateDate') ? $ticket->getCreateDate() : null;
+        if ($ticketCreated) {
+            $ticketAgeSec = time() - strtotime($ticketCreated);
+            if ($ticketAgeSec < 60) {
+                // Ticket created less than a minute ago — this is the
+                // initial message, already triaged at /support/ticket.
+                return;
+            }
         }
 
         // Build payload. Field shape mirrors the /support/ticket

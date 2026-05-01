@@ -14,7 +14,8 @@
  *     "staff_email":  "support@...",        // optional, alternative to staff_id
  *     "signal_alert": true,                 // optional, default true — send user notification
  *     "claim":        false,                // optional, default false — assign ticket to staff
- *     "title":        "Re: subject"         // optional, override the subject
+ *     "title":        "Re: subject",        // optional, override the subject
+ *     "close_ticket": false                 // optional, default false — close ticket after reply
  *   }
  *
  * One of {staff_id, staff_email} must resolve to a valid staff agent.
@@ -24,12 +25,20 @@
  *
  * Response on success (200):
  *   {
- *     "status":         "ok",
- *     "ticket_number":  "239171",
- *     "ticket_id":      1247,
- *     "entry_id":       45822,
- *     "alert_sent":     true
+ *     "status":          "ok",
+ *     "ticket_number":   "239171",
+ *     "ticket_id":       1247,
+ *     "entry_id":        45822,
+ *     "alert_sent":      true,
+ *     "staff_id":        1,
+ *     "staff_name":      "Support",
+ *     "close_requested": false,
+ *     "closed":          false
  *   }
+ *
+ * When close_ticket=true is requested but the close fails (no closed
+ * status configured, etc.), the reply still succeeds and the response
+ * includes "close_error": "<reason>" so the caller knows.
  *
  * Response on failure (4xx/5xx) is the standard osTicket ApiController
  * error envelope: { "error": "message" } with appropriate status.
@@ -52,7 +61,7 @@ class ScrollrReplyController extends ApiController {
     function getRequestStructure($format, $data = null) {
         $supported = array(
             'reply_html', 'staff_id', 'staff_email', 'signal_alert',
-            'claim', 'title',
+            'claim', 'title', 'close_ticket',
         );
 
         if ($format !== 'json') {
@@ -167,7 +176,26 @@ class ScrollrReplyController extends ApiController {
             return $this->exerr(500, sprintf(__('Failed to post reply: %s'), $errMsg));
         }
 
-        // 7. Success.
+        // 7. Optional auto-close. When close_ticket=true, flip the
+        //    ticket to its configured "closed" status. The reply has
+        //    already posted at this point so a close-failure is
+        //    non-fatal; we report it back to the caller in the
+        //    response payload as close_status without erroring.
+        $closeRequested = isset($data['close_ticket']) && (bool) $data['close_ticket'];
+        $closed = false;
+        $closeError = null;
+        if ($closeRequested) {
+            list($closed, $closeError) = $this->closeTicket($ticket, $staff);
+            if (!$closed) {
+                $this->logWarning(sprintf(
+                    'scrollr-reply-api: close_ticket=true requested but close failed for ticket=%s: %s',
+                    $ticket->getNumber(),
+                    $closeError ?: 'unknown error'
+                ));
+            }
+        }
+
+        // 8. Success.
         $payload = array(
             'status'         => 'ok',
             'ticket_number'  => $ticket->getNumber(),
@@ -176,9 +204,68 @@ class ScrollrReplyController extends ApiController {
             'alert_sent'     => $alert,
             'staff_id'       => $staff->getId(),
             'staff_name'     => $staff->getName()->asVar(),
+            'close_requested'=> $closeRequested,
+            'closed'         => $closed,
         );
+        if ($closeRequested && !$closed && $closeError) {
+            $payload['close_error'] = $closeError;
+        }
 
         $this->response(200, json_encode($payload), 'application/json');
+    }
+
+    /**
+     * Close the ticket via the same path the agent UI uses.
+     *
+     * Strategy: look up the configured "closed" status by name (the
+     * built-in default in tiredofit/osticket is named "Closed"; some
+     * installs add custom closed statuses but we always go for the
+     * canonical one first). Then call $ticket->setStatus($status,
+     * $reason, $errors) — this is the same method the agent web UI
+     * uses on the close action. It updates ost_ticket.status_id +
+     * closed/lastupdate timestamps, fires Signal::send for any
+     * listeners, and skips outbound notifications (we already sent
+     * the reply notification on this same call).
+     *
+     * Returns array($closed_bool, $error_msg_or_null).
+     */
+    private function closeTicket($ticket, $staff) {
+        // 1. Locate the closed status. TicketStatus::lookup accepts
+        //    either an id or a name keyword.
+        $status = TicketStatus::lookup(array('name' => 'Closed'));
+        if (!$status) {
+            // Fall back: scan for the first status flagged as closed-state.
+            $list = TicketStatusList::load();
+            if ($list && method_exists($list, 'getItems')) {
+                foreach ($list->getItems() as $s) {
+                    if (method_exists($s, 'getState') && $s->getState() === 'closed') {
+                        $status = $s;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!$status) {
+            return array(false, 'No closed-state ticket status found in this osTicket install');
+        }
+
+        // 2. Apply. setStatus persists immediately and fires signals.
+        //    Some osTicket versions take ($status, $reason, &$errors);
+        //    others take ($status_id, &$errors). We try the modern
+        //    signature first.
+        $errors = array();
+        $reason = 'Auto-closed via Scrollr Reply API after partner-approved resolution reply';
+        try {
+            $ok = $ticket->setStatus($status, $reason, $errors);
+        } catch (Exception $e) {
+            return array(false, 'setStatus exception: ' . $e->getMessage());
+        }
+
+        if (!$ok) {
+            $msg = !empty($errors) ? implode('; ', array_map('strval', $errors)) : 'setStatus returned false';
+            return array(false, $msg);
+        }
+        return array(true, null);
     }
 
     /**

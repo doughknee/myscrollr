@@ -43,6 +43,12 @@ type TriageResult struct {
 	DuplicateOf    string `json:"duplicate_of,omitempty"`
 	DraftReplyHTML string `json:"draft_reply_html"`
 	Confidence     string `json:"confidence"`
+	// ShouldClose is true when the user clearly indicates the issue
+	// is resolved (thanks/that worked/resolved/done). When set, the
+	// approval handler passes close_ticket=true to the osTicket
+	// plugin so the reply also closes the ticket. Conservative —
+	// Claude is instructed to set this only on unambiguous resolution.
+	ShouldClose bool `json:"should_close,omitempty"`
 }
 
 // TriageInput is what we pass to triageTicket. Builds the prompt
@@ -272,6 +278,21 @@ YOUR TASKS:
 
 6. Output confidence: "high" if you're very sure of category/priority, "medium" if some ambiguity, "low" if you'd want a human to double-check
 
+7. Set "should_close" to true ONLY when the user's message contains an unambiguous resolution signal:
+   - "thanks, that worked"
+   - "issue is resolved"
+   - "you can close the ticket"
+   - "we're good now"
+   - similar clear indicators that the user is done
+
+   Otherwise leave should_close as false. Do NOT set it true on:
+   - Vague thanks ("thanks for your help" — could be a polite intro to a follow-up)
+   - Ambiguous responses
+   - The initial ticket message (set false there too)
+   - User asking another question, even after partial thanks
+
+   When should_close is true, your draft_reply_html should ALSO acknowledge the resolution and indicate the ticket is being closed (1-2 sentences). Don't propose new troubleshooting steps when closing.
+
 OUTPUT FORMAT — STRICT:
 - Output ONLY a single JSON object. Nothing before it. Nothing after it.
 - Do NOT wrap in markdown code fences (no triple-backtick blocks, no "json" language tags).
@@ -287,7 +308,8 @@ JSON SCHEMA:
   "summary": "...",
   "duplicate_of": "ticket-number" or null,
   "draft_reply_html": "<p>...</p>",
-  "confidence": "high|medium|low"
+  "confidence": "high|medium|low",
+  "should_close": false
 }
 
 RECENT TICKETS (for dupe-detection only):

@@ -36,7 +36,7 @@
 
 return array(
     'id'             => 'scrollr:reply-api',
-    'version'        => '0.1.0',
+    'version'        => '0.2.0',
     'name'           => 'Scrollr Reply API',
     'author'         => 'Scrollr',
     'description'    => /* @trans */ 'Adds a REST endpoint for posting agent replies to existing tickets via the standard X-API-Key auth.',

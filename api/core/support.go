@@ -387,6 +387,7 @@ func persistTriageSideEffects(ticketNumber, userEmail, userName, subject, origin
 			AIChannel:       triage.Channel,
 			AIDuplicateOf:   triage.DuplicateOf,
 			AIConfidence:    triage.Confidence,
+			ShouldClose:     triage.ShouldClose,
 		})
 		if err != nil {
 			log.Printf("[Support] createSupportDraft failed for ticket %s: %v", ticketNumber, err)

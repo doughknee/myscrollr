@@ -188,6 +188,7 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 		AIDuplicateOf:         triage.DuplicateOf,
 		AIConfidence:          triage.Confidence,
 		OSTicketThreadEntryID: ev.ThreadEntryID,
+		ShouldClose:           triage.ShouldClose,
 	})
 	if err != nil {
 		log.Printf("[OSTicketWebhook] createSupportDraft for ticket %s entry=%d: %v", ev.TicketNumber, ev.ThreadEntryID, err)

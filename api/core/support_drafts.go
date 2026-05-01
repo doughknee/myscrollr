@@ -46,6 +46,7 @@ type SupportDraft struct {
 	Status                string
 	EditedBodyHTML        string
 	OSTicketThreadEntryID int64 // 0 = unknown (legacy rows + initial /support/ticket flow)
+	ShouldClose           bool  // AI-detected resolution signal — when true, send-time also closes the ticket
 	DecidedAt             *time.Time
 	SentAt                *time.Time
 	CreatedAt             time.Time
@@ -68,8 +69,8 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 			(ticket_number, user_email, user_name, original_subject,
 			 draft_body_html, ai_summary, ai_category, ai_priority,
 			 ai_channel, ai_duplicate_of, ai_confidence, status,
-			 osticket_thread_entry_id)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending',$12)
+			 osticket_thread_entry_id, should_close)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending',$12,$13)
 		RETURNING id, created_at
 	`
 	// 0 → NULL via NULLIF so the partial unique index doesn't reject
@@ -91,6 +92,7 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 		draft.AIDuplicateOf,
 		draft.AIConfidence,
 		entryID,
+		draft.ShouldClose,
 	).Scan(&draft.ID, &draft.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("createSupportDraft: %w", err)
@@ -107,7 +109,8 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 		SELECT id, ticket_number, user_email, user_name, original_subject,
 			   draft_body_html, ai_summary, ai_category, ai_priority,
 			   ai_channel, ai_duplicate_of, ai_confidence, status,
-			   edited_body_html, decided_at, sent_at, created_at
+			   edited_body_html, decided_at, sent_at, created_at,
+			   should_close
 		FROM support_drafts WHERE id = $1
 	`
 	var d SupportDraft
@@ -117,6 +120,7 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 		&d.DraftBodyHTML, &summary, &category, &priority, &channel,
 		&dupOf, &confidence, &d.Status,
 		&editedBody, &d.DecidedAt, &d.SentAt, &d.CreatedAt,
+		&d.ShouldClose,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -254,8 +258,15 @@ func hasDraftForThreadEntry(ctx context.Context, threadEntryID int64) bool {
 // agent reply with a real outbound email through osTicket's mailer.
 // See osticket-plugins/scrollr-reply-api/README.md for the rationale.
 func doSendApprovedReply(ctx context.Context, draft *SupportDraft, body string) error {
+	// Decorate the AI-drafted body with a small CTA footer that gives
+	// users a clear path to either continue the conversation or signal
+	// resolution (which the AI will detect on the reply and mark the
+	// ticket should_close=true). osTicket's email template wraps this
+	// further; our footer lives inside that wrapper.
+	decoratedBody := decorateUserReplyHTML(body, draft.ShouldClose)
+
 	payload := map[string]interface{}{
-		"reply_html":   body,
+		"reply_html":   decoratedBody,
 		"signal_alert": true, // ALWAYS true — that's the whole point of this path
 	}
 
@@ -268,6 +279,15 @@ func doSendApprovedReply(ctx context.Context, draft *SupportDraft, body string) 
 		} else {
 			log.Printf("[Drafts] SUPPORT_AGENT_STAFF_ID=%q is not a positive integer; falling back to ticket assignee", staffIDStr)
 		}
+	}
+
+	// Auto-close: when the AI flagged this as a resolution-style reply,
+	// pass close_ticket=true so the plugin closes the ticket after
+	// posting. The partner already approved by clicking Send, which
+	// is the human-in-the-loop confirmation that the close is correct.
+	if draft.ShouldClose {
+		payload["close_ticket"] = true
+		log.Printf("[Drafts] reply for ticket=%s will close ticket (should_close=true)", draft.TicketNumber)
 	}
 
 	payloadBytes, err := json.Marshal(payload)
