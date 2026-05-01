@@ -70,8 +70,10 @@ data:
   SUPPORT_AGENT_EMAIL: "doni@myscrollr.com"       # partner's email for approval notifications
   APPROVAL_BASE_URL: "https://api.myscrollr.com"  # base URL embedded in Send/Edit/Skip links
   SUPPORT_REPLY_FROM_EMAIL: "support@myscrollr.com"  # FROM address for partner-notification emails (Resend)
-  # Optional: pin the staff agent who posts AI replies via the plugin.
-  # When unset, the plugin falls back to the ticket's currently-assigned
-  # agent. Use the staff_id you can see in osTicket admin → Agents.
-  # Example: SUPPORT_AGENT_STAFF_ID: "1"
-  # SUPPORT_AGENT_STAFF_ID: ""
+  # Pin the staff agent who posts AI replies via the plugin.
+  # The plugin's "fallback to ticket assignee" path returns 400 when a
+  # ticket has no assignee (osTicket doesn't auto-assign new tickets in
+  # this configuration), so this MUST be set. staff_id=1 is the
+  # default Admin agent in the tiredofit/osticket image. Look up other
+  # agent IDs in osTicket admin → Agents if you want a dedicated AI bot.
+  SUPPORT_AGENT_STAFF_ID: "1"
