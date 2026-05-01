@@ -143,16 +143,15 @@ func HandleSubmitPublicSupportTicket(c *fiber.Ctx) error {
 	}
 	topicID := resolveOSTicketTopicID(effectiveCategory)
 
-	// Build OS Ticket payload. Match the same Message format the
-	// authenticated handler uses (data: URL with HTML body) so OS
-	// Ticket renders both submission types consistently.
-	finalBody := applyTriageToBody(originalBody, triage)
-
+	// Post the user's CLEAN body to osTicket. AI metadata (summary,
+	// drafted reply, confidence, etc.) lives in the support_drafts row
+	// and the partner-notification email — never in the user-visible
+	// thread. See support.go for the rationale.
 	payload := OSTicketPayload{
 		Name:    fallbackName(req.Name, req.Email),
 		Email:   req.Email,
 		Subject: subjectFull,
-		Message: fmt.Sprintf("data:text/html;charset=utf-8,%s", finalBody),
+		Message: fmt.Sprintf("data:text/html;charset=utf-8,%s", originalBody),
 	}
 	if topicID != "" {
 		payload.TopicID = topicID

@@ -258,15 +258,19 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 
 	topicID := resolveOSTicketTopicID(effectiveCategory)
 
-	// Augment body with triage summary / dupe hint / suggested reply
-	finalBody := applyTriageToBody(originalBody, triage)
-
-	// Build OS Ticket payload
+	// Post the user's CLEAN body to osTicket. AI metadata (summary,
+	// drafted reply, confidence, etc.) lives in the support_drafts row
+	// and the partner-notification email — never in the user-visible
+	// thread. Earlier versions decorated the body with an "AI summary"
+	// banner + a <details> block containing the drafted reply, but
+	// that was visible to users when they viewed the ticket via the
+	// portal. Cleaner architecture: thread is what the user wrote and
+	// what the agent answered, nothing else.
 	payload := OSTicketPayload{
 		Name:    name,
 		Email:   email,
 		Subject: subject,
-		Message: fmt.Sprintf("data:text/html;charset=utf-8,%s", finalBody),
+		Message: fmt.Sprintf("data:text/html;charset=utf-8,%s", originalBody),
 	}
 
 	if topicID != "" {
@@ -380,6 +384,7 @@ func persistTriageSideEffects(ticketNumber, userEmail, userName, subject, origin
 			UserEmail:       userEmail,
 			UserName:        userName,
 			OriginalSubject: subject,
+			UserMessageHTML: originalBody,
 			DraftBodyHTML:   triage.DraftReplyHTML,
 			AISummary:       triage.Summary,
 			AICategory:      triage.Category,
