@@ -9,27 +9,37 @@ package core
 // Editing rules (for whoever owns this file next):
 //
 //  1. Tier names are CANONICAL: "Free", "Uplink", "Uplink Pro",
-//     "Uplink Ultimate", "Super User". Never use "Premium", "Plus",
-//     "Pro Max", or any other variant.
-//  2. List ALL FOUR tier-tiers (Free, Uplink, Pro, Ultimate) any time
-//     pricing or limits come up — do NOT skip Uplink Ultimate. The AI
-//     has skipped it in past replies because it inferred "Pro" was the
-//     top tier from incomplete context. The KB is now explicit.
-//  3. Never quote prices the AI wouldn't be confident about. If pricing
+//     "Uplink Ultimate". Never use "Premium", "Plus", "Pro Max",
+//     "four paid tiers", or any other variant. There are FOUR
+//     user-facing tiers in total: ONE free (Free) and THREE paid
+//     (Uplink, Uplink Pro, Uplink Ultimate). Never call them
+//     "four paid tiers" — three are paid; one is free.
+//  2. List all four user-facing tiers (Free, Uplink, Uplink Pro,
+//     Uplink Ultimate) any time pricing or limits come up — do NOT
+//     skip Uplink Ultimate. The AI has skipped it in past replies
+//     because it inferred "Pro" was the top tier from incomplete
+//     context. The KB is now explicit.
+//  3. The "Super User" early-access program is INTERNAL CONTEXT ONLY.
+//     It is invite-only and must NEVER be mentioned in user-facing
+//     replies, including draft replies that the partner sees first.
+//     If a Super User submits a ticket, treat them as Uplink Ultimate
+//     when drafting the reply. The dedicated section at the bottom of
+//     the KB instructs Claude on this.
+//  4. Never quote prices the AI wouldn't be confident about. If pricing
 //     drift is a concern, point users at /uplink on the marketing site
 //     instead of citing dollar amounts directly.
-//  4. Channel-specific troubleshooting goes in its own section so the
+//  5. Channel-specific troubleshooting goes in its own section so the
 //     AI can quote the relevant block when triaging that category.
-//  5. When you add new product features, add them HERE in the same edit
+//  6. When you add new product features, add them HERE in the same edit
 //     as the feature ships. The KB drift between ship and update is
 //     where wrong-answer replies come from.
 //
-// Size budget: keep this under ~6 KB to leave room for recent-ticket
+// Size budget: keep this under ~8 KB to leave room for recent-ticket
 // context + the user's actual ticket body in Claude's context window.
-// At ~6 KB this is sent verbatim on every triage call (~thousands per
+// At ~7 KB this is sent verbatim on every triage call (~thousands per
 // month at scale); at 20 KB it would noticeably impact token cost.
 //
-// Last updated: 2026-05-01
+// Last updated: 2026-05-01 (tier-count + Super User confidentiality)
 func supportKnowledgeBase() string {
 	return `# Scrollr Knowledge Base — authoritative reference for support replies
 
@@ -43,8 +53,14 @@ Scrollr-hosted infrastructure (auth, billing, channel APIs) is the
 product users pay for.
 
 ## Tiers — canonical names + limits
-There are FOUR paid tier-tiers and one early-access program tier.
-ALWAYS list all four when discussing pricing or limits:
+
+Scrollr has FOUR user-facing tiers in total: one free tier (Free) and
+THREE paid tiers (Uplink, Uplink Pro, Uplink Ultimate). When discussing
+pricing or upgrade options with a user, ALWAYS list all four
+(Free, Uplink, Uplink Pro, Uplink Ultimate). Do NOT skip Uplink
+Ultimate — it is the highest paid tier and is the most common upgrade
+target. Do NOT call it "four paid tiers" — three of them are paid;
+Free is free.
 
 ### Free
 - 5 finance symbols
@@ -75,14 +91,6 @@ ALWAYS list all four when discussing pricing or limits:
 - 3 ticker rows + per-row scroll customisation
 - REAL-TIME SSE streaming (no polling — instant data)
 - Priority support
-
-### Super User (early-access program)
-- Same caps as Uplink Ultimate (unlimited everything, real-time SSE,
-  3 rows + customisation).
-- Permanent and free for life as part of the early-access program.
-- Granted by invite only via the Scrollr team.
-- Not refundable, transferable, or convertible to monetary value
-  (per the Super User Early Access Terms).
 
 When users ask "what tier am I on" or "what do I get", refer them to
 the Account page → Subscription card. When users ask "how do I upgrade"
@@ -117,8 +125,7 @@ shifts; the marketing page is the source of truth).
   Desktop sends users to the Stripe portal — no in-app cancel on
   desktop by design.
 - Refund policy: 7-day refund window for monthly + annual paid plans
-  (per Refund Policy doc). Lifetime is non-refundable. Super User is
-  free → not refundable.
+  (per Refund Policy doc). Lifetime is non-refundable.
 - Trial: 7-day free trial for new paid plans. During trial the user
   has full Ultimate-tier access regardless of which plan they trial.
 - Payment method updates / invoice history: Stripe portal → linked
@@ -165,8 +172,7 @@ shifts; the marketing page is the source of truth).
   through OAuth in the browser. Leagues import automatically once
   connected. Token refreshed every ~30 days; if expired, the channel
   shows a "Reconnect" prompt.
-- League limits: Free 0, Uplink 1, Pro 3, Ultimate 10. Super User
-  unlimited.
+- League limits: Free 0, Uplink 1, Pro 3, Ultimate 10.
 - "Leagues not showing up" → check (1) Yahoo session not expired,
   (2) leagues are visible to the connected Yahoo account, (3) league
   is for a sport we support (NFL primarily; NBA/MLB/NHL also work).
@@ -174,12 +180,12 @@ shifts; the marketing page is the source of truth).
 ## Multi-row ticker (the visual layout feature)
 - Free: 1 row only.
 - Uplink: 2 rows.
-- Pro + Ultimate + Super User: 3 rows.
+- Pro and Ultimate: 3 rows.
 - Per-row source assignment: tray right-click → channel name → row
   picker. Or Settings → Ticker → multi-row source picker.
-- Ultimate + Super User additionally get per-row scroll customisation
-  (different speeds / directions per row). Lower tiers see a
-  "Customize scroll — Ultimate only" teaser.
+- Ultimate additionally gets per-row scroll customisation (different
+  speeds / directions per row). Lower tiers see a "Customize scroll —
+  Ultimate only" teaser.
 
 ## "Channel disappeared from the ticker"
 By far the most common confusion. The per-channel "ticker_enabled"
@@ -218,7 +224,37 @@ If a user asks something that isn't covered by this KB:
 - Promised feature delivery dates (we don't commit to dates publicly).
 - Internal infrastructure details (Logto, Sequin, Coolify, K8s — all
   opaque to users).
+- The "Super User" tier or "early-access program" — see internal
+  context section below. This is invite-only and not user-facing.
+  Treat the user as if they are on Free / Uplink / Uplink Pro /
+  Uplink Ultimate, even if they happen to be on Super User. NEVER
+  bring it up.
+- The fact that other tiers exist that the user could be downgraded
+  to — only mention upgrades, never downgrades.
 - Anything contradicting this KB. If your training data and this KB
   disagree, the KB wins.
+
+## INTERNAL CONTEXT — DO NOT MENTION TO USERS
+
+The following is reserved for internal partner notes and should NEVER
+appear in a draft user-facing reply. If you find yourself drafting a
+reply that references any of this, rewrite the reply without it.
+
+### Super User program (INTERNAL ONLY)
+There is an invite-only early-access program called "Super User" that
+grants the same caps as Uplink Ultimate (unlimited finance symbols,
+unlimited RSS feeds, 10 fantasy leagues, 3 rows, real-time SSE,
+per-row scroll customisation) at zero cost, permanently. It is
+granted by Scrollr team invitation only and is not publicly listed
+anywhere. A small number of users currently have it. Treat anyone on
+this tier as if they are an Uplink Ultimate user when drafting
+replies — do not reference the Super User program by name, do not
+explain it, do not say it exists, and do not offer it as an
+alternative to upgrading.
+
+If a user appears to already know about Super User (e.g. mentions
+their invite or refers to the early-access program by name), keep
+the reply factual and brief and let the partner handle any program-
+specific follow-up. Do not volunteer additional details.
 `
 }
