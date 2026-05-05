@@ -101,15 +101,21 @@ class ScrollrListController extends ApiController {
         }
 
         if ($topics !== null) {
-            $placeholders = [];
+            // Case-insensitive substring match against ht.topic. This
+            // means `topic=bug` matches any help topic containing "bug"
+            // in its name (e.g. "Bug Report", "Bugs / Critical").
+            // Multiple values OR'd together.
+            //
+            // We use SUBSTRING(...) LIKE comparisons against the leaf
+            // name (last segment after "/") so hierarchical topics
+            // like "Engineering/Bug Report" match `topic=bug` as well.
+            $conditions = [];
             foreach ($topics as $i => $t) {
                 $placeholders[] = ":topic{$i}";
-                $params[":topic{$i}"] = $t;
+                $params[":topic{$i}"] = '%' . strtolower($t) . '%';
+                $conditions[] = "LOWER(ht.topic) LIKE :topic{$i}";
             }
-            // ost_help_topic.topic stores hierarchical topics as
-            // "Parent / Child" — match either the leaf name or full path.
-            $where[] = '(ht.topic IN (' . implode(',', $placeholders) . ')'
-                   . ' OR SUBSTRING_INDEX(ht.topic, "/", -1) IN (' . implode(',', $placeholders) . '))';
+            $where[] = '(' . implode(' OR ', $conditions) . ')';
         }
 
         if ($since !== null) {
@@ -124,6 +130,12 @@ class ScrollrListController extends ApiController {
 
         $whereClause = implode(' AND ', $where);
 
+        // Priority lives on ost_ticket__cdata (custom-data shadow table).
+        // It's a foreign key to ost_ticket_priority. Some tickets may
+        // not have a cdata row (older imports, race conditions); we
+        // LEFT JOIN and default to "normal" in the response.
+        $cdataTable = TABLE_PREFIX . 'ticket__cdata';
+
         $sql = "
             SELECT
                 t.ticket_id,
@@ -135,20 +147,20 @@ class ScrollrListController extends ApiController {
                 ht.topic AS topic_path,
                 ts.name AS status_name,
                 ts.state AS status_state,
-                COALESCE(p.priority_urgency, 2) AS priority_urgency,
                 COALESCE(p.priority, 'normal') AS priority_name,
                 u.name AS user_name,
                 ue.address AS user_email,
                 CONCAT_WS(' ', s.firstname, s.lastname) AS staff_name,
-                (SELECT COUNT(*) FROM " . TICKET_THREAD_ENTRY_TABLE . " te
-                  INNER JOIN " . TICKET_THREAD_TABLE . " th2 ON te.thread_id = th2.id
+                (SELECT COUNT(*) FROM " . THREAD_ENTRY_TABLE . " te
+                  INNER JOIN " . THREAD_TABLE . " th2 ON te.thread_id = th2.id
                   WHERE th2.object_id = t.ticket_id
                     AND th2.object_type = 'T'
                     AND te.flags & 1 = 0) AS thread_count
             FROM " . TICKET_TABLE . " t
             LEFT JOIN " . TOPIC_TABLE . " ht ON t.topic_id = ht.topic_id
             LEFT JOIN " . TICKET_STATUS_TABLE . " ts ON t.status_id = ts.id
-            LEFT JOIN " . TICKET_PRIORITY_TABLE . " p ON p.priority_id = ts.priority_id
+            LEFT JOIN " . $cdataTable . " cd ON cd.ticket_id = t.ticket_id
+            LEFT JOIN " . TICKET_PRIORITY_TABLE . " p ON p.priority_id = cd.priority
             LEFT JOIN " . USER_TABLE . " u ON t.user_id = u.id
             LEFT JOIN " . USER_EMAIL_TABLE . " ue ON ue.user_id = u.id
               AND ue.address IS NOT NULL
