@@ -134,24 +134,39 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    // Run the app loop. We intercept RunEvent::Reopen (macOS only —
+    // Run the app loop. We intercept RunEvent::Reopen on macOS/iOS —
     // fires when the user clicks the dock icon while no Scrollr windows
-    // are visible, e.g. after closing the main window via the red-X).
+    // are visible, e.g. after closing the main window via the red-X.
     // This is what makes "click Scrollr in the dock = main window
-    // appears" Just Work on Mac. Windows/Linux equivalent is the
-    // tauri-plugin-single-instance handler registered above (a second
-    // launch attempt while the app is already running shows the main
-    // window).
+    // appears" Just Work on Mac.
+    //
+    // RunEvent::Reopen does NOT exist on non-Apple platforms — it's
+    // gated behind `#[cfg(any(target_os = "macos", target_os = "ios"))]`
+    // upstream in tauri. We must gate our match arm the same way or
+    // the Windows/Linux build fails with E0599 ("no variant named
+    // Reopen found for enum RunEvent"). Windows/Linux equivalent
+    // re-activation is handled by tauri-plugin-single-instance
+    // (handler registered above): a second launch attempt while the
+    // app is already running shows the main window.
     app.run(|app_handle, event| {
-        if let tauri::RunEvent::Reopen {
-            has_visible_windows: false,
-            ..
-        } = event
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
         {
-            if let Some(w) = app_handle.get_webview_window("main") {
-                let _ = w.show();
-                let _ = w.set_focus();
+            if let tauri::RunEvent::Reopen {
+                has_visible_windows: false,
+                ..
+            } = event
+            {
+                if let Some(w) = app_handle.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
             }
+        }
+        // Silence unused-variable warnings on non-Apple platforms.
+        #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+        {
+            let _ = &app_handle;
+            let _ = &event;
         }
     });
 }
