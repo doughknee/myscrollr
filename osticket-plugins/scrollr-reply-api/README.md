@@ -1,6 +1,6 @@
 # Scrollr Reply API plugin for osTicket
 
-A small osTicket plugin that does two things:
+A small osTicket plugin that does three things:
 
 **1. REST endpoint for posting agent replies** — fixes osTicket's missing reply API, used by the Scrollr core API to deliver AI-drafted replies into existing tickets:
 
@@ -33,6 +33,21 @@ Body:
     "created":          "2026-05-01 04:48:00"
   }
 ```
+
+**3. Read-only ticket listing + detail endpoints** (v0.3.0+) — fills the gap where osTicket has no documented HTTP API to LIST or READ existing tickets. Used by the local `bugs`/`bug` CLI tools in `scripts/bug-tools/` for a developer todo-list view of osTicket without leaving the terminal.
+
+```
+GET /api/tickets.json
+  ?status=open|closed|all       (default: open)
+  ?topic=bug,feature             (default: bug,feature; comma-separated; "all" = no filter)
+  ?limit=50                      (default: 50, max: 100)
+  ?since=2026-04-01T00:00:00Z    (optional ISO-8601, filters by lastupdate)
+  ?assigned_to=<staff_id>        (optional)
+
+GET /api/tickets/{number}.json
+```
+
+Both authenticated with the same X-API-Key header used by the reply endpoint. Subjects, priorities, statuses, full thread bodies (HTML stripped to plain text) — everything you'd see in osTicket's admin UI but as JSON. See `scripts/bug-tools/` in this repo for the canonical consumer.
 
 ## Why this exists
 

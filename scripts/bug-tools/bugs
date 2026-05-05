@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# bugs — list open bug + feature tickets from osTicket as a TODO list
+#
+# Usage:
+#   bugs                       # open bug+feature, oldest first (default)
+#   bugs all                   # open tickets across all topics
+#   bugs bug                   # open bugs only
+#   bugs feature               # open features only
+#   bugs <topic> closed        # closed tickets in that topic
+#   bugs <topic> all           # any status in that topic
+#
+# Requires:
+#   OSTICKET_TODO_API_KEY     # X-API-Key bound to your laptop's IP
+#   OSTICKET_URL              # https://support.myscrollr.com (default)
+#   curl, jq                  # standard tools
+
+set -euo pipefail
+
+: "${OSTICKET_TODO_API_KEY:?Set OSTICKET_TODO_API_KEY in your env (osTicket admin → Manage → API Keys → bind to your laptop IP)}"
+OSTICKET_URL="${OSTICKET_URL:-https://support.myscrollr.com}"
+
+# Positional args
+TOPIC="${1:-bug,feature}"
+STATUS="${2:-open}"
+
+# Validate
+case "$STATUS" in
+    open|closed|all) ;;
+    *) echo "bugs: status must be open|closed|all (got: $STATUS)" >&2; exit 2 ;;
+esac
+
+# URL-encode the topic param (commas need to survive)
+TOPIC_ENC=$(printf '%s' "$TOPIC" | sed 's/,/%2C/g')
+
+URL="${OSTICKET_URL}/api/tickets.json?status=${STATUS}&topic=${TOPIC_ENC}&limit=100"
+
+# Pretty-print as one-line-per-ticket. Format:
+#   [number] PRIORITY topic  subject (user, updated)
+# Where PRIORITY is the first letter (E/H/N/L) and topic is truncated to 4 chars.
+RESPONSE=$(curl -fsS \
+    -H "X-API-Key: $OSTICKET_TODO_API_KEY" \
+    -H "Accept: application/json" \
+    "$URL")
+
+COUNT=$(echo "$RESPONSE" | jq -r '.count // 0')
+
+if [ "$COUNT" = "0" ]; then
+    echo "No tickets matching topic=$TOPIC status=$STATUS."
+    exit 0
+fi
+
+echo "$RESPONSE" | jq -r --arg total "$COUNT" '
+    .tickets[] |
+    "[\(.number)] \(
+        if (.priority // "normal") == "emergency" then "EMRG"
+        elif (.priority // "normal") == "high" then "HIGH"
+        elif (.priority // "normal") == "low"  then "LOW "
+        else "NORM" end
+    ) \(
+        ((.topic // "general") | .[0:8] | (. + "        ") | .[0:8])
+    ) \(
+        ((.subject // "(no subject)") | if length > 60 then .[0:57] + "..." else . end)
+    )  (\(
+        ((.user_email // "?") | split("@")[0])
+    ), updated \(
+        ((.updated // "") | split("T")[0])
+    ))"
+'
+
+echo "─── $COUNT ticket(s) — topic=$TOPIC status=$STATUS — oldest first ───"

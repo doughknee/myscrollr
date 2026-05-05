@@ -28,15 +28,37 @@ class ScrollrReplyPlugin extends Plugin {
         // cleanly across versions — safer to require_once explicitly
         // here.
         require_once dirname(__FILE__) . '/api.reply.php';
+        require_once dirname(__FILE__) . '/api.list.php';
         require_once dirname(__FILE__) . '/notify.message.php';
 
         // The 'api' signal in api/http.php fires once with the global
         // dispatcher. Plugins append their own routes here.
         Signal::connect('api', function ($dispatcher) {
+            // POST /api/tickets/{number}/reply.json — post agent reply
             $dispatcher->append(
                 url_post(
                     "^/tickets/(?P<number>[\w-]+)/reply\.json$",
                     array('ScrollrReplyController', 'reply')
+                )
+            );
+
+            // GET /api/tickets.json — list tickets (filter by status,
+            // topic, etc.). Used by the local `bugs` CLI tool and any
+            // future tooling that needs read-only access to tickets.
+            $dispatcher->append(
+                url_get(
+                    "^/tickets\.json$",
+                    array('ScrollrListController', 'listTickets')
+                )
+            );
+
+            // GET /api/tickets/{number}.json — ticket detail with full
+            // thread (messages, responses, notes — HTML stripped).
+            // Used by the local `bug <number>` CLI tool.
+            $dispatcher->append(
+                url_get(
+                    "^/tickets/(?P<number>[\w-]+)\.json$",
+                    array('ScrollrListController', 'getTicket')
                 )
             );
         });

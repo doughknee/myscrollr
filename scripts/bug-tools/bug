@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# bug NNNNNN — show full ticket detail with thread, formatted for terminal
+#
+# Usage:
+#   bug 239171
+#
+# Requires:
+#   OSTICKET_TODO_API_KEY     # X-API-Key bound to your laptop's IP
+#   OSTICKET_URL              # https://support.myscrollr.com (default)
+#   curl, jq                  # standard tools
+#
+# Output is designed to copy-paste cleanly into chat with the AI:
+#   metadata header → thread entries with type, author, timestamp, body.
+
+set -euo pipefail
+
+if [ $# -eq 0 ] || [ -z "${1:-}" ]; then
+    echo "Usage: bug <ticket-number>" >&2
+    echo "Example: bug 239171" >&2
+    exit 2
+fi
+
+NUMBER="$1"
+case "$NUMBER" in
+    *[!a-zA-Z0-9_-]*)
+        echo "bug: ticket number contains invalid characters: $NUMBER" >&2
+        exit 2
+        ;;
+esac
+
+: "${OSTICKET_TODO_API_KEY:?Set OSTICKET_TODO_API_KEY in your env}"
+OSTICKET_URL="${OSTICKET_URL:-https://support.myscrollr.com}"
+
+URL="${OSTICKET_URL}/api/tickets/${NUMBER}.json"
+
+RESPONSE=$(curl -fsS \
+    -H "X-API-Key: $OSTICKET_TODO_API_KEY" \
+    -H "Accept: application/json" \
+    "$URL")
+
+# Render metadata + thread
+echo "$RESPONSE" | jq -r '
+    "─── Ticket #\(.number) ───",
+    "Subject:  \(.subject // "(no subject)")",
+    "Topic:    \(.topic // "general") | Priority: \(.priority // "normal") | Status: \(.status // "?") (\(.status_state // "?"))",
+    "From:     \(.user_name // "?") <\(.user_email // "?")>",
+    "Assigned: \(.assigned_to_name // "(unassigned)")",
+    "Created:  \(.created // "?")",
+    "Updated:  \(.updated // "?")",
+    "URL:      \(.url // "?")",
+    "",
+    "─── Thread (\(.thread | length) entries) ───",
+    (
+        if (.thread | length) == 0 then
+            "(no entries)"
+        else
+            (.thread[] |
+                "[\(.created // "?")] \(.type_label // "Entry") by \(.poster // "?"):",
+                .body_plain,
+                ""
+            )
+        end
+    )
+'
