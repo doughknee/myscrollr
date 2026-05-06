@@ -1,5 +1,40 @@
 use crate::state::{GpuDynamic, StaticSystemInfo, SysInfoInner, SysInfoState};
 
+/// Build a `std::process::Command` for `name` that won't pop a
+/// console window on Windows. No-op on every other platform.
+///
+/// Why this exists: on Windows, `std::process::Command::new(...)`
+/// inherits its parent's console handle (or creates one if the parent
+/// has none, e.g. a GUI app like ours). Every spawn briefly flashes a
+/// `cmd.exe` window. The System Monitor widget polls GPU stats via
+/// `nvidia-smi` on a 1-2 second cadence, so users on Windows with an
+/// NVIDIA GPU saw the console flash open and close constantly
+/// (Daniel reported this as ticket #484052).
+///
+/// `CREATE_NO_WINDOW = 0x08000000` is a Windows-specific creation flag
+/// that suppresses the console window. The `creation_flags` method
+/// only exists in `std::os::windows::process::CommandExt` so the
+/// import + call is gated on `cfg(windows)`. On macOS/Linux the
+/// returned Command is identical to `Command::new(name)`.
+fn quiet_command(name: &str) -> std::process::Command {
+    // The `mut` is only needed on Windows where we call
+    // `cmd.creation_flags(...)` below. The `#[allow(unused_mut)]`
+    // silences the harmless warning on macOS/Linux without breaking
+    // Windows builds.
+    #[allow(unused_mut)]
+    let mut cmd = std::process::Command::new(name);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // CREATE_NO_WINDOW: prevents the spawned process from
+        // creating/inheriting a console window. See:
+        // https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
+}
+
 /// Probe GPU once: find the sysfs device path, resolve the name and
 /// VRAM total, and check whether nvidia-smi is available.  Called only
 /// on the first poll; the results are cached in `StaticSystemInfo`.
@@ -33,7 +68,7 @@ fn probe_gpu_static() -> (Option<std::path::PathBuf>, Option<String>, Option<u64
     }
 
     // Fallback: try nvidia-smi once for static values
-    if let Ok(out) = std::process::Command::new("nvidia-smi")
+    if let Ok(out) = quiet_command("nvidia-smi")
         .args(["--query-gpu=name,memory.total", "--format=csv,noheader,nounits"])
         .output()
     {
@@ -62,8 +97,13 @@ fn read_gpu_dynamic_sysfs(dev: &std::path::Path) -> GpuDynamic {
 }
 
 /// Read dynamic GPU values from nvidia-smi.
+///
+/// This is the hot path called on every System Monitor poll. On
+/// Windows, each spawn was creating a console window (the bug behind
+/// ticket #484052). `quiet_command` adds CREATE_NO_WINDOW to suppress
+/// that on Windows; behavior is unchanged on Linux/macOS.
 fn read_gpu_dynamic_nvidia() -> GpuDynamic {
-    if let Ok(out) = std::process::Command::new("nvidia-smi")
+    if let Ok(out) = quiet_command("nvidia-smi")
         .args([
             "--query-gpu=utilization.gpu,memory.used,power.draw,power.limit,clocks.current.graphics",
             "--format=csv,noheader,nounits",
@@ -164,7 +204,9 @@ fn gpu_name_from_lspci(dev_path: &std::path::Path) -> Option<String> {
         .lines()
         .find_map(|l| l.strip_prefix("PCI_SLOT_NAME="))?;
 
-    let out = std::process::Command::new("lspci")
+    // lspci is Linux-only and won't be reached on Windows (no PCI sysfs),
+    // but use quiet_command for consistency / future-proofing.
+    let out = quiet_command("lspci")
         .args(["-vmms", slot])
         .output()
         .ok()?;
