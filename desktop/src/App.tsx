@@ -355,13 +355,22 @@ export default function App() {
   const handleChipClick = useCallback(
     (channelType: string, _itemId: string | number, url?: string) => {
       if (url) {
-        open(url).catch((err) => {
-          console.error("[Scrollr] Failed to open external URL:", err);
-        });
+        // Try to open the URL in the system browser. If the shell IPC
+        // rejects (e.g. capability not granted, malformed URL), fall
+        // back to opening the desktop app so the user always gets SOME
+        // observable response to the click — earlier behavior silently
+        // logged to console where the user couldn't see it.
+        open(url)
+          .catch((err) => {
+            console.error("[Scrollr] Failed to open external URL:", err);
+            // Fallback: bring the main app window forward.
+            savePref("activeItem", channelType);
+            invoke("show_app_window").catch(() => {});
+          });
         return;
       }
-      // No URL (widget chip, missing data) — fall back to opening
-      // the desktop app on the relevant channel/widget page.
+      // No URL provided (widget chip, missing data) — open the desktop
+      // app on the relevant channel/widget page.
       savePref("activeItem", channelType);
       invoke("show_app_window").catch(() => {});
     },
