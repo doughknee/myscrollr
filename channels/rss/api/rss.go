@@ -61,16 +61,47 @@ type App struct {
 // Public Routes (proxied by core gateway)
 // =============================================================================
 
-// getRSSFeedCatalog returns all enabled tracked feeds for the dashboard
-// catalog browser.
+// getRSSFeedCatalog returns the per-user feed catalog used by the
+// desktop UI's "add feeds" picker.
+//
+// The catalog is the union of:
+//   - Curated default feeds (tracked_feeds.is_default = true) — same for
+//     every user
+//   - The requesting user's own custom feeds (user_custom_feeds.logto_sub
+//     = X-User-Sub) — joined to tracked_feeds for health metadata
+//
+// User A's custom feeds are NOT included in user B's catalog. This is
+// the multi-tenancy guarantee that the pre-isolation catalog endpoint
+// (which returned ALL tracked_feeds rows globally) violated.
+//
+// Health filters in default mode:
+//   - is_enabled = true (operator-disabled curated feeds are hidden)
+//   - consecutive_failures < MaxConsecutiveFailures (3, ~15 min of failures)
+//   - last_success_at within 7 days OR feed was added < 24 hours ago (grace
+//     for newly-added custom feeds whose first poll hasn't completed)
+//
+// include_failing=true bypasses the health filters so the desktop's My
+// Feeds view can compute health badges for already-subscribed feeds.
+//
+// X-User-Sub is required (the route is now Auth: true on the gateway —
+// see main.go discovery payload). Returns 401 if absent.
 func (a *App) getRSSFeedCatalog(c *fiber.Ctx) error {
 	ctx := c.Context()
 	includeFailing := c.Query("include_failing") == "true"
 
-	// Use separate cache keys so the two variants don't collide
-	cacheKey := CacheKeyRSSCatalog
+	userSub := c.Get("X-User-Sub")
+	if userSub == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
+			Status: "unauthorized",
+			Error:  "Authentication required",
+		})
+	}
+
+	// Per-user cache key. The catalog content depends on which custom
+	// feeds the user owns, so user A and user B can't share an entry.
+	cacheKey := CacheKeyRSSCatalog + ":" + userSub
 	if includeFailing {
-		cacheKey = CacheKeyRSSCatalog + ":all"
+		cacheKey += ":all"
 	}
 
 	var catalog []TrackedFeed
@@ -81,27 +112,9 @@ func (a *App) getRSSFeedCatalog(c *fiber.Ctx) error {
 
 	// Singleflight: collapse concurrent cache-miss requests into one DB query
 	result, err, _ := a.sfGroup.Do(cacheKey, func() (interface{}, error) {
-		query := "SELECT url, name, category, is_default, consecutive_failures, last_error, last_success_at FROM tracked_feeds WHERE is_enabled = true"
-		var rows pgx.Rows
-		var qErr error
-		if includeFailing {
-			rows, qErr = a.db.Query(ctx, query+" ORDER BY category, name")
-		} else {
-			rows, qErr = a.db.Query(ctx, query+" AND consecutive_failures < $1 ORDER BY category, name", MaxConsecutiveFailures)
-		}
+		feeds, qErr := a.queryUserCatalog(ctx, userSub, includeFailing)
 		if qErr != nil {
 			return nil, qErr
-		}
-		defer rows.Close()
-
-		var feeds []TrackedFeed
-		for rows.Next() {
-			var f TrackedFeed
-			if err := rows.Scan(&f.URL, &f.Name, &f.Category, &f.IsDefault, &f.ConsecutiveFailures, &f.LastError, &f.LastSuccessAt); err != nil {
-				log.Printf("[RSS] Catalog scan error: %v", err)
-				continue
-			}
-			feeds = append(feeds, f)
 		}
 		return feeds, nil
 	})
@@ -122,9 +135,147 @@ func (a *App) getRSSFeedCatalog(c *fiber.Ctx) error {
 	return c.JSON(catalog)
 }
 
-// deleteCustomFeed removes a non-default feed from the catalog.
+// queryUserCatalog runs the actual UNION query that backs the catalog
+// endpoint. Split out so it's testable independent of the HTTP wrapper.
+//
+// The query is a UNION ALL of two halves:
+//
+//  1. Curated defaults — pulled by every user identically. Health
+//     filters apply (when !includeFailing).
+//
+//  2. The requesting user's custom feeds — joined to tracked_feeds for
+//     health metadata via LEFT JOIN. Some custom feeds may not yet
+//     have a tracked_feeds row at the moment of the query (rare race
+//     between user_custom_feeds insert and tracked_feeds insert in
+//     syncRSSFeedsToTracked); in that case the LEFT JOIN yields NULL
+//     health columns, treated as healthy by the COALESCE logic below.
+//
+// Both halves apply the same staleness threshold:
+//
+//	last_success_at IS NULL  -- never polled OR
+//	last_success_at > NOW() - 7 days  -- recently successful OR
+//	created_at > NOW() - 24 hours  -- 24h grace for newly-added
+//
+// This filters out feeds that "look healthy" (consecutive_failures = 0)
+// but haven't actually returned valid content in weeks (e.g. a feed that
+// returns 200 with empty body — the failure counter resets on each
+// "successful" empty response).
+func (a *App) queryUserCatalog(ctx context.Context, userSub string, includeFailing bool) ([]TrackedFeed, error) {
+	const healthFilter = `
+		AND consecutive_failures < $2
+		AND (
+			last_success_at IS NULL
+			OR last_success_at > NOW() - INTERVAL '7 days'
+			OR created_at > NOW() - INTERVAL '24 hours'
+		)
+	`
+	const customFeedHealthFilter = `
+		AND (tf.consecutive_failures IS NULL OR tf.consecutive_failures < $2)
+		AND (
+			tf.last_success_at IS NULL
+			OR tf.last_success_at > NOW() - INTERVAL '7 days'
+			OR ucf.created_at > NOW() - INTERVAL '24 hours'
+		)
+	`
+
+	curatedClauses := "WHERE is_default = true AND is_enabled = true"
+	customClauses := "WHERE ucf.logto_sub = $1 AND (tf.is_enabled IS NULL OR tf.is_enabled = true)"
+	if !includeFailing {
+		curatedClauses += healthFilter
+		customClauses += customFeedHealthFilter
+	}
+
+	// $1 = userSub (used in the custom-feeds half)
+	// $2 = MaxConsecutiveFailures (used by both halves when !includeFailing)
+	query := `
+		SELECT url, name, category, is_default, consecutive_failures, last_error, last_success_at
+		FROM tracked_feeds
+		` + curatedClauses + `
+
+		UNION ALL
+
+		SELECT
+			ucf.url,
+			ucf.name,
+			ucf.category,
+			false AS is_default,
+			COALESCE(tf.consecutive_failures, 0) AS consecutive_failures,
+			tf.last_error,
+			tf.last_success_at
+		FROM user_custom_feeds ucf
+		LEFT JOIN tracked_feeds tf ON tf.url = ucf.url
+		` + customClauses + `
+
+		ORDER BY is_default DESC, category, name
+	`
+
+	var rows pgx.Rows
+	var qErr error
+	if includeFailing {
+		rows, qErr = a.db.Query(ctx, query, userSub, MaxConsecutiveFailures)
+	} else {
+		rows, qErr = a.db.Query(ctx, query, userSub, MaxConsecutiveFailures)
+	}
+	if qErr != nil {
+		return nil, qErr
+	}
+	defer rows.Close()
+
+	var feeds []TrackedFeed
+	for rows.Next() {
+		var f TrackedFeed
+		if err := rows.Scan(&f.URL, &f.Name, &f.Category, &f.IsDefault, &f.ConsecutiveFailures, &f.LastError, &f.LastSuccessAt); err != nil {
+			log.Printf("[RSS] Catalog scan error: %v", err)
+			continue
+		}
+		feeds = append(feeds, f)
+	}
+	return feeds, nil
+}
+
+// invalidateUserCatalogCache drops the per-user catalog cache entries so
+// the next read sees fresh data. Called after any operation that mutates
+// the user's custom-feed set (add, delete, janitor cleanup).
+func (a *App) invalidateUserCatalogCache(ctx context.Context, userSub string) {
+	if userSub == "" {
+		return
+	}
+	a.rdb.Del(ctx, CacheKeyRSSCatalog+":"+userSub)
+	a.rdb.Del(ctx, CacheKeyRSSCatalog+":"+userSub+":all")
+}
+
+// invalidateAllCatalogCaches drops every per-user cache entry. Used on
+// curated-feed mutations (rare — operator action) or the broad janitor
+// cleanup. Implemented as a SCAN+DEL so we don't rely on knowing which
+// users currently have cached entries.
+func (a *App) invalidateAllCatalogCaches(ctx context.Context) {
+	prefix := CacheKeyRSSCatalog + ":"
+	// SCAN with a match pattern. Cursor-based to avoid blocking Redis.
+	iter := a.rdb.Scan(ctx, 0, prefix+"*", 0).Iterator()
+	for iter.Next(ctx) {
+		a.rdb.Del(ctx, iter.Val())
+	}
+	if err := iter.Err(); err != nil {
+		log.Printf("[RSS] catalog cache scan-delete failed: %v", err)
+	}
+}
+
+// deleteCustomFeed removes a custom feed for the requesting user.
 // The core gateway sets X-User-Sub header for authenticated requests.
-// Only the user who added the feed (added_by) can delete it.
+//
+// Behavior:
+//   - Drops the (logto_sub, url) row from user_custom_feeds. After this
+//     the feed no longer appears in the user's catalog.
+//   - If no other user still subscribes to this URL via user_custom_feeds
+//     AND the URL is not a curated default, also drops the tracked_feeds
+//     row and the rss_items it owned. Rust ingestion stops polling.
+//   - If other users still subscribe (or it's a curated default), the
+//     tracked_feeds row stays — only the requesting user's tenancy row
+//     is removed.
+//
+// This is the architecturally-correct multi-tenant deletion: per-user
+// removal of the user's own subscription, with global cleanup only when
+// the last subscriber is gone.
 func (a *App) deleteCustomFeed(c *fiber.Ctx) error {
 	ctx := c.Context()
 
@@ -146,33 +297,21 @@ func (a *App) deleteCustomFeed(c *fiber.Ctx) error {
 		})
 	}
 
+	// Don't allow deletion of curated defaults — those are operator-owned.
 	var isDefault bool
-	var addedBy *string
-	err := a.db.QueryRow(ctx,
-		"SELECT is_default, added_by FROM tracked_feeds WHERE url = $1", req.URL).Scan(&isDefault, &addedBy)
-	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(ErrorResponse{
-			Status: "error",
-			Error:  "Feed not found in catalog",
-		})
+	if err := a.db.QueryRow(ctx,
+		"SELECT is_default FROM tracked_feeds WHERE url = $1", req.URL).Scan(&isDefault); err == nil {
+		if isDefault {
+			return c.Status(fiber.StatusForbidden).JSON(ErrorResponse{
+				Status: "error",
+				Error:  "Cannot delete a built-in default feed",
+			})
+		}
 	}
-	if isDefault {
-		return c.Status(fiber.StatusForbidden).JSON(ErrorResponse{
-			Status: "error",
-			Error:  "Cannot delete a built-in default feed",
-		})
-	}
-	// Only the user who added the feed can delete it
-	if addedBy != nil && *addedBy != userSub {
-		return c.Status(fiber.StatusForbidden).JSON(ErrorResponse{
-			Status: "error",
-			Error:  "You can only delete feeds that you added",
-		})
-	}
+	// Note: we don't 404 if the URL isn't in tracked_feeds — the user_custom_feeds
+	// row could exist without a corresponding tracked_feeds row in rare race
+	// scenarios. Proceed to the user-scoped delete.
 
-	// Wrap both deletes in a transaction so a failure partway through
-	// cannot leave rss_items gone while tracked_feeds still points at a
-	// now-empty feed row. Rollback is always safe to call after Commit.
 	tx, err := a.db.Begin(ctx)
 	if err != nil {
 		log.Printf("[RSS] Failed to begin delete transaction for feed %s: %v", req.URL, err)
@@ -183,20 +322,49 @@ func (a *App) deleteCustomFeed(c *fiber.Ctx) error {
 	}
 	defer tx.Rollback(ctx)
 
-	if _, err := tx.Exec(ctx, "DELETE FROM rss_items WHERE feed_url = $1", req.URL); err != nil {
-		log.Printf("[RSS] Failed to delete items for feed %s: %v", req.URL, err)
-		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
-			Status: "error",
-			Error:  "Failed to delete feed items",
-		})
-	}
-
-	if _, err := tx.Exec(ctx, "DELETE FROM tracked_feeds WHERE url = $1 AND is_default = false", req.URL); err != nil {
-		log.Printf("[RSS] Failed to delete custom feed %s: %v", req.URL, err)
+	// 1. Remove the requesting user's tenancy row. If the user wasn't
+	//    subscribed in the first place, this is a no-op (0 rows affected,
+	//    not an error — caller may be retrying).
+	cmd, err := tx.Exec(ctx,
+		"DELETE FROM user_custom_feeds WHERE logto_sub = $1 AND url = $2",
+		userSub, req.URL)
+	if err != nil {
+		log.Printf("[RSS] Failed to delete user_custom_feeds row (%s, %s): %v", userSub, req.URL, err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
 			Status: "error",
 			Error:  "Failed to delete feed",
 		})
+	}
+	rowsAffected := cmd.RowsAffected()
+
+	// 2. Check whether ANY user still subscribes to this URL. If yes,
+	//    keep tracked_feeds + rss_items intact (some other user is
+	//    reading this feed). If no, this URL is now orphaned — drop
+	//    tracked_feeds (which cascades to rss_items via FK).
+	var otherSubscribers int
+	if err := tx.QueryRow(ctx,
+		"SELECT COUNT(*) FROM user_custom_feeds WHERE url = $1",
+		req.URL).Scan(&otherSubscribers); err != nil {
+		log.Printf("[RSS] Failed to count remaining subscribers for %s: %v", req.URL, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+			Status: "error",
+			Error:  "Failed to delete feed",
+		})
+	}
+
+	orphaned := otherSubscribers == 0
+	if orphaned {
+		// rss_items has FK on tracked_feeds.url with ON DELETE CASCADE,
+		// so dropping tracked_feeds cleans up rss_items in the same statement.
+		if _, err := tx.Exec(ctx,
+			"DELETE FROM tracked_feeds WHERE url = $1 AND is_default = false",
+			req.URL); err != nil {
+			log.Printf("[RSS] Failed to delete orphaned tracked_feeds row %s: %v", req.URL, err)
+			return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+				Status: "error",
+				Error:  "Failed to delete feed",
+			})
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -207,12 +375,20 @@ func (a *App) deleteCustomFeed(c *fiber.Ctx) error {
 		})
 	}
 
-	a.rdb.Del(ctx, RedisRSSSubscribersPrefix+req.URL)
-	a.rdb.Del(ctx, CacheKeyRSSCatalog)
-	a.rdb.Del(ctx, CacheKeyRSSCatalog+":all")
+	// Cache invalidation: drop the requesting user's catalog cache, and
+	// drop the per-feed-URL subscriber set if the URL was orphaned.
+	a.invalidateUserCatalogCache(ctx, userSub)
+	if orphaned {
+		a.rdb.Del(ctx, RedisRSSSubscribersPrefix+req.URL)
+	}
 
-	log.Printf("[RSS] User %s deleted custom feed: %s", userSub, req.URL)
-	return c.JSON(fiber.Map{"status": "ok", "message": "Custom feed deleted"})
+	log.Printf("[RSS] User %s deleted custom feed %s (rows=%d, orphaned=%t)",
+		userSub, req.URL, rowsAffected, orphaned)
+	return c.JSON(fiber.Map{
+		"status":   "ok",
+		"message":  "Custom feed deleted",
+		"orphaned": orphaned,
+	})
 }
 
 // healthHandler proxies a health check to the internal Rust RSS ingestion service.
@@ -562,6 +738,13 @@ func (a *App) syncRSSFeedsToTracked(userSub string, config map[string]interface{
 			name = feed.URL
 		}
 
+		// Insert into the global tracked_feeds (the polling-target
+		// table). We deduplicate on URL — two users adding the same
+		// URL still get one row here, which is correct: the Rust
+		// service polls each unique URL once. The added_by column
+		// records whoever was first, kept for backwards-compat with
+		// the legacy DELETE auth check; the user-tenancy concern is
+		// now solved by the user_custom_feeds row below.
 		_, err := a.db.Exec(ctx, `
 			INSERT INTO tracked_feeds (url, name, category, is_default, is_enabled, added_by)
 			VALUES ($1, $2, 'Custom', false, true, $3)
@@ -569,12 +752,30 @@ func (a *App) syncRSSFeedsToTracked(userSub string, config map[string]interface{
 		`, feed.URL, name, userSub)
 		if err != nil {
 			log.Printf("[RSS] Failed to sync feed %s to tracked_feeds: %v", feed.URL, err)
+			continue
+		}
+
+		// Insert into the per-user user_custom_feeds. This is the
+		// per-user-visibility row that the catalog endpoint reads.
+		// Each user owns their own (name, category) for a given URL —
+		// user A and user B can have different display names for the
+		// same URL. ON CONFLICT updates the name to handle the case
+		// where the user is renaming a feed they already added.
+		_, err = a.db.Exec(ctx, `
+			INSERT INTO user_custom_feeds (logto_sub, url, name, category)
+			VALUES ($1, $2, $3, 'Custom')
+			ON CONFLICT (logto_sub, url) DO UPDATE SET name = EXCLUDED.name
+		`, userSub, feed.URL, name)
+		if err != nil {
+			log.Printf("[RSS] Failed to sync feed %s to user_custom_feeds for %s: %v", feed.URL, userSub, err)
 		}
 	}
 
-	// Invalidate the catalog cache so new custom feeds appear
-	a.rdb.Del(ctx, CacheKeyRSSCatalog)
-	a.rdb.Del(ctx, CacheKeyRSSCatalog+":all")
+	// Invalidate this user's catalog cache so their new custom feeds
+	// appear immediately. Other users' caches are untouched (they
+	// shouldn't have been seeing this user's feeds anyway after the
+	// per-user split).
+	a.invalidateUserCatalogCache(ctx, userSub)
 }
 
 // =============================================================================

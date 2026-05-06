@@ -146,6 +146,14 @@ func main() {
 	fiberApp.Get("/rss/health", app.healthHandler)
 
 	// -------------------------------------------------------------------------
+	// Start the auto-cleanup janitor (background goroutine)
+	// -------------------------------------------------------------------------
+	// Removes definitively-broken custom feeds (and prunes them from
+	// each subscriber's user_channels.config), and disables broken
+	// curated feeds for operator follow-up. See janitor.go.
+	app.startJanitor(ctx)
+
+	// -------------------------------------------------------------------------
 	// Start server with graceful shutdown
 	// -------------------------------------------------------------------------
 	port := os.Getenv("PORT")
@@ -194,7 +202,11 @@ func startRegistration(ctx context.Context, rdb *redis.Client) {
 		Capabilities: []string{"cdc_handler", "dashboard_provider", "channel_lifecycle", "health_checker"},
 		CDCTables:    []string{"rss_items"},
 		Routes: []registrationRoute{
-			{Method: "GET", Path: "/rss/feeds", Auth: false},
+			// /rss/feeds is now Auth: true — the catalog is per-user
+			// (curated defaults + the requesting user's own custom feeds
+			// only). The pre-isolation public endpoint leaked custom
+			// feeds across users.
+			{Method: "GET", Path: "/rss/feeds", Auth: true},
 			{Method: "DELETE", Path: "/rss/feeds", Auth: true},
 			{Method: "GET", Path: "/rss/health", Auth: false},
 		},

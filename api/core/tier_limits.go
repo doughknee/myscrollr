@@ -140,15 +140,24 @@ func ValidateChannelConfig(tier, channelType string, config map[string]any) erro
 		// RSS caps both total feeds and user-added ("custom") feeds.
 		// The custom cap is tighter than the total cap, so the natural
 		// error mode is custom-first when both are breached.
+		//
+		// `is_custom` is determined SERVER-SIDE in production: a URL is
+		// considered custom iff it's NOT in the curated catalog
+		// (tracked_feeds.is_default = true). Falling back to the
+		// client-asserted `is_custom` flag when the curated set is
+		// unavailable (e.g. running without DB in unit tests) keeps
+		// tests deterministic without weakening prod safety.
 		feedsRaw, _ := config["feeds"].([]any)
 		totalFeeds := len(feedsRaw)
+		curated := getCuratedFeedURLs() // nil when DB unavailable / test mode
 		customCount := 0
 		for _, item := range feedsRaw {
 			m, ok := item.(map[string]any)
 			if !ok {
 				continue
 			}
-			if isCustom, _ := m["is_custom"].(bool); isCustom {
+			isCustom := isCustomFeed(m, curated)
+			if isCustom {
 				customCount++
 			}
 		}
@@ -172,6 +181,30 @@ func ValidateChannelConfig(tier, channelType string, config map[string]any) erro
 		}
 	}
 	return nil
+}
+
+// isCustomFeed decides whether a feeds[] item is a user-added (custom)
+// feed.
+//
+// Resolution order:
+//
+//  1. If a curated URL set is provided AND the item has a non-empty
+//     URL, the answer is server-derived: custom iff URL not in curated.
+//     This is the production path.
+//
+//  2. Otherwise, fall back to the client-asserted `is_custom` flag.
+//     This is the test path (no DBPool, so no curated set) and the
+//     graceful-degradation path (DB query failed, so we trust the
+//     client; this is no worse than the pre-derivation behavior).
+//
+// Returning true means "counts against the custom_feeds tier cap".
+func isCustomFeed(item map[string]any, curated map[string]bool) bool {
+	urlStr, _ := item["url"].(string)
+	if curated != nil && urlStr != "" {
+		return !curated[urlStr]
+	}
+	flag, _ := item["is_custom"].(bool)
+	return flag
 }
 
 // validateArrayCap counts entries in an array-shaped JSONB value and

@@ -397,10 +397,19 @@ export interface TrackedFeed {
 }
 
 export const rssApi = {
-  /** Fetch the public feed catalog. Pass includeFailing to see quarantined feeds. */
+  /**
+   * Fetch the per-user feed catalog. The catalog returns curated
+   * default feeds plus the requesting user's own custom feeds — never
+   * other users' custom feeds.
+   *
+   * Endpoint is now Auth: true on the gateway (was Auth: false before
+   * the multi-tenant fix); use authFetch so the X-User-Sub header is
+   * applied. Pass includeFailing to see broken feeds (used by My
+   * Feeds for health badges on already-subscribed feeds).
+   */
   getCatalog: (opts?: { includeFailing?: boolean }) => {
     const params = opts?.includeFailing ? "?include_failing=true" : "";
-    return request<Array<TrackedFeed>>(`/rss/feeds${params}`);
+    return authFetch<Array<TrackedFeed>>(`/rss/feeds${params}`);
   },
 
   /** Delete a custom (non-default) feed from the catalog */
