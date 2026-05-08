@@ -179,6 +179,15 @@ jobs:
       # the GitHub release, and assembles latest.json across all platforms.
       # Logto desktop app must allow callback http://127.0.0.1:19284/callback
       # and API resource https://api.myscrollr.com for production releases.
+      #
+      # Apple secrets (APPLE_*) are only consumed by macOS builds. tauri-action
+      # imports the .p12 into a temporary keychain, codesigns the .app bundle,
+      # then submits to notarytool for Apple notarization. Other matrix targets
+      # (Windows, Linux) ignore them. If any APPLE_* secret is missing on a
+      # macOS build, tauri-action skips signing and produces an unsigned bundle
+      # (the build still succeeds, just without notarization). We don't fail
+      # the workflow on missing Apple secrets so the Linux/Windows builds keep
+      # working during initial rollout / cert renewal.
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -187,6 +196,13 @@ jobs:
           VITE_API_URL: ${{ secrets.DESKTOP_VITE_API_URL }}
           VITE_AUTH_ENDPOINT: ${{ secrets.DESKTOP_VITE_AUTH_ENDPOINT }}
           VITE_LOGTO_APP_ID: ${{ secrets.DESKTOP_VITE_LOGTO_APP_ID }}
+          # Apple code-signing + notarization (macOS only; ignored on other runners)
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           projectPath: desktop
           tauriScript: npx tauri
