@@ -385,8 +385,6 @@ export interface AppPreferences {
   channelDisplay: ChannelDisplayPrefs;
   /** Per-channel homepage preview selections (up to 5 group keys). */
   homePreview: HomePreview;
-  /** Show the setup wizard when signing in. Users can disable this. */
-  showSetupOnLogin: boolean;
   /**
    * IDs of one-time discovery tips the user has already seen.
    *
@@ -409,7 +407,7 @@ const DEFAULT_TICKER_LAYOUT: TickerLayout = {
 };
 
 const DEFAULT_APPEARANCE: AppearancePrefs = {
-  theme: "dark",
+  theme: "system",
   uiScale: 100,
   tickerLayout: { rows: [{ sources: [] }] },
   fontWeight: "normal",
@@ -568,7 +566,6 @@ const DEFAULT_PREFS: AppPreferences = {
   widgets: DEFAULT_WIDGETS,
   channelDisplay: DEFAULT_CHANNEL_DISPLAY,
   homePreview: {},
-  showSetupOnLogin: true,
   tipsShown: [],
 };
 
@@ -1026,7 +1023,6 @@ export function loadPrefs(): AppPreferences {
         source.homePreview && typeof source.homePreview === "object" && !Array.isArray(source.homePreview)
           ? (source.homePreview as HomePreview)
           : {},
-      showSetupOnLogin: typeof source.showSetupOnLogin === "boolean" ? source.showSetupOnLogin : true,
       // Tolerate older builds that didn't have `tipsShown`. Treat
       // missing/invalid as "no tips shown yet" so the user gets a
       // proper first-run experience after upgrading.
@@ -1093,7 +1089,6 @@ export function resetAll(): AppPreferences {
     widgets: { ...DEFAULT_WIDGETS },
     channelDisplay: { ...DEFAULT_CHANNEL_DISPLAY },
     homePreview: {},
-    showSetupOnLogin: true,
     // Reset clears tipsShown — the user explicitly asked for a clean
     // slate, so they'll re-experience first-run discovery hints.
     tipsShown: [],

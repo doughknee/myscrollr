@@ -37,6 +37,19 @@ export function useTheme({
     const resolved = resolveTheme(theme);
     shell.classList.add("theme-transition");
     shell.dataset.theme = resolved;
+    // Mirror the user's pref to localStorage so the pre-paint script
+    // in app.html can read it synchronously on next launch and avoid
+    // the dark-flash for light-system users. Stores the *unresolved*
+    // pref so "system" stays responsive to OS changes between launches.
+    try {
+      localStorage.setItem("scrollr:theme-mirror", theme);
+    } catch {
+      // localStorage may be unavailable in some webview contexts —
+      // pre-paint will fall back to OS preference.
+    }
+    // Also ensure <html> stays in sync with the shell so the pre-paint
+    // background colors don't fight us once the React tree has mounted.
+    document.documentElement.setAttribute("data-theme", resolved);
     const timer = setTimeout(
       () => shell.classList.remove("theme-transition"),
       350,
@@ -45,7 +58,9 @@ export function useTheme({
     if (theme === "system") {
       const mq = window.matchMedia("(prefers-color-scheme: dark)");
       const handler = (e: MediaQueryListEvent) => {
-        shell.dataset.theme = e.matches ? "dark" : "light";
+        const next = e.matches ? "dark" : "light";
+        shell.dataset.theme = next;
+        document.documentElement.setAttribute("data-theme", next);
       };
       mq.addEventListener("change", handler);
       return () => {

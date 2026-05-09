@@ -22,7 +22,10 @@ import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import clsx from "clsx";
 import { Toaster, toast } from "sonner";
-import "sonner/dist/styles.css";
+// Note: sonner CSS is imported in src/app-main.tsx so it ships in the
+// entry bundle. Importing it here would put it in this route's
+// code-split chunk, causing toasts to appear unstyled until the chunk
+// CSS arrives (the original "unstyled until first Undo click" bug).
 
 // Shell components
 import TitleBar from "../components/TitleBar";
@@ -32,7 +35,6 @@ import ConnectionIndicator from "../components/ConnectionIndicator";
 
 // Onboarding
 import AuthGate from "../components/onboarding/AuthGate";
-import OnboardingWizard from "../components/onboarding/OnboardingWizard";
 
 // Registries
 import { getAllChannels } from "../channels/registry";
@@ -48,6 +50,7 @@ import {
   loadPrefs,
   savePrefs,
   consumeTickerLayoutChanged,
+  resolveTheme,
 } from "../preferences";
 import type { AppPreferences } from "../preferences";
 import {
@@ -357,18 +360,11 @@ function RootLayout() {
   );
   const [billingBannerDismissed, setBillingBannerDismissed] = useState(false);
 
-  // ── Onboarding state ────────────────────────────────────────
-  // Session-local: once dismissed (skip or finish), stays dismissed until next sign-out.
-  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
-
-  // Reset on sign-out so the wizard shows again on next sign-in.
-  useEffect(() => {
-    if (!auth.authenticated) setOnboardingDismissed(false);
-  }, [auth.authenticated]);
-
+  // ── App / auth state ────────────────────────────────────────
+  // The wizard was removed in the IA refactor (2026-05-09). New
+  // users land directly on /feed which renders an empty hero card.
   const showAuthGate = !auth.authenticated;
-  const showOnboarding = auth.authenticated && prefs.showSetupOnLogin && !onboardingDismissed;
-  const showApp = auth.authenticated && !showOnboarding;
+  const showApp = auth.authenticated;
 
   // ── SSE status tracking ─────────────────────────────────────
   // Listen directly for SSE status events from the Rust backend.
@@ -659,12 +655,6 @@ function RootLayout() {
   // shell-context wiring further down continues to read naturally.
   const handlePrefsChange = persistPrefs;
 
-  const handleOnboardingComplete = useCallback((nextPrefs: AppPreferences) => {
-    setPrefs(nextPrefs);
-    savePrefs(nextPrefs);
-    setOnboardingDismissed(true);
-  }, []);
-
   const handleAutostartChange = useCallback(async (enabled: boolean) => {
     try {
       if (enabled) await enableAutostart();
@@ -716,10 +706,13 @@ function RootLayout() {
 
   // ── Render ──────────────────────────────────────────────────
 
+  // Resolve theme for portal-based components (Toaster) that don't
+  // inherit the shell's data-theme attribute.
+  const resolvedToasterTheme = resolveTheme(prefs.appearance.theme);
+
   return (
     <div
       id="app-shell"
-      data-theme="dark"
       className={clsx(
         "flex flex-col h-screen w-screen overflow-hidden bg-surface text-fg",
         !IS_MACOS && "custom-chrome",
@@ -728,12 +721,7 @@ function RootLayout() {
       {/* ── Auth gate: unauthenticated users ── */}
       {showAuthGate && <AuthGate onLogin={auth.handleLogin} />}
 
-      {/* ── Onboarding wizard: authenticated, not yet onboarded ── */}
-      {showOnboarding && (
-        <OnboardingWizard prefs={prefs} tier={auth.tier} onComplete={handleOnboardingComplete} />
-      )}
-
-      {/* ── Main app shell: authenticated + onboarded ── */}
+      {/* ── Main app shell: authenticated ── */}
       {showApp && (
         <>
           {!IS_MACOS && <TitleBar />}
@@ -886,7 +874,7 @@ function RootLayout() {
                 </ShellContext.Provider>
               </div>
 
-              <Toaster theme="dark" richColors position="bottom-right" />
+              <Toaster theme={resolvedToasterTheme} richColors position="bottom-right" />
             </main>
           </div>
         </>
@@ -919,7 +907,7 @@ function RootLayout() {
       )}
 
       {/* Toaster must be available in all states */}
-      {!showApp && <Toaster theme="dark" richColors position="bottom-right" />}
+      {!showApp && <Toaster theme={resolvedToasterTheme} richColors position="bottom-right" />}
     </div>
   );
 }

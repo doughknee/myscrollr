@@ -8,6 +8,9 @@ import { initStore } from "./lib/store";
 import { createQueryClient } from "./query";
 import { createAppRouter } from "./router";
 import "./style.css";
+// Sonner CSS must ship in the entry bundle, not a code-split route chunk,
+// so toasts fired during/right after first paint are styled correctly.
+import "sonner/dist/styles.css";
 
 const queryClient = createQueryClient();
 

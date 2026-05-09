@@ -4,9 +4,37 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Scrollr</title>
+    <script>
+      // Pre-paint theme resolution to prevent dark-flash on light-system users.
+      //
+      // Reads a tiny mirror of the user's theme preference written to
+      // localStorage by useTheme on every theme change. Falls back to
+      // OS preference (system) if no mirror exists yet (first launch).
+      // Sets data-theme on <html> before React or any stylesheet paints.
+      (function () {
+        var resolved = "dark";
+        try {
+          var saved = localStorage.getItem("scrollr:theme-mirror");
+          // saved is "light" | "dark" | "system" | null
+          if (saved === "light" || saved === "dark") {
+            resolved = saved;
+          } else {
+            // saved === "system" or null -> use OS preference
+            resolved = window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+          }
+        } catch (e) {
+          // Defensive: any failure -> dark default (matches legacy behavior)
+        }
+        document.documentElement.setAttribute("data-theme", resolved);
+      })();
+    </script>
     <style>
-      /* Prevent white flash on load */
-      html, body { background: #141420; margin: 0; padding: 0; }
+      /* Prevent flash on load — match the resolved data-theme above */
+      html, body { margin: 0; padding: 0; }
+      html[data-theme="dark"], html[data-theme="dark"] body { background: #141420; }
+      html[data-theme="light"], html[data-theme="light"] body { background: #ffffff; }
     </style>
   </head>
   <body>
