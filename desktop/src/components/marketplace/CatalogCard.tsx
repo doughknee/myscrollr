@@ -5,16 +5,8 @@ import { open } from "@tauri-apps/plugin-shell";
 import type { CatalogItem, CatalogCategory } from "../../marketplace";
 import type { SubscriptionTier } from "../../auth";
 import { TIER_LABELS } from "../../auth";
-import ConfirmDialog from "../ConfirmDialog";
 
-// ── Confirm-dialog nouns per channel ────────────────────────────
-
-const CHANNEL_NOUNS: Record<string, string> = {
-  finance: "symbols",
-  sports: "leagues",
-  rss: "feeds",
-  fantasy: "leagues",
-};
+// ── Category badge ──────────────────────────────────────────────
 
 const CATEGORY_BADGE: Record<CatalogCategory, string> = {
   channel: "Channel",
@@ -31,7 +23,6 @@ interface CatalogCardProps {
   /** Disable Add button while dashboard is loading (channels enabled state unknown). */
   dashboardLoading: boolean;
   onAdd: (item: CatalogItem) => Promise<void>;
-  onRemove: (item: CatalogItem) => Promise<void>;
   onLogin: () => void;
   /** Navigate to the channel/widget page when already added. */
   onOpen?: (item: CatalogItem) => void;
@@ -46,12 +37,10 @@ export default function CatalogCard({
   authenticated,
   dashboardLoading,
   onAdd,
-  onRemove,
   onLogin,
   onOpen,
 }: CatalogCardProps) {
   const [loading, setLoading] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const tierLocked =
     authenticated && item.requiredTier !== "free" && !tierMeetsRequirement(tier, item.requiredTier);
@@ -73,24 +62,6 @@ export default function CatalogCard({
     }
   }
 
-  function handleRemoveClick() {
-    if (item.kind === "channel") {
-      setConfirmOpen(true);
-    } else {
-      doRemove();
-    }
-  }
-
-  async function doRemove() {
-    setConfirmOpen(false);
-    setLoading(true);
-    try {
-      await onRemove(item);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   // ── Render ────────────────────────────────────────────────────
 
   const Icon = item.icon;
@@ -100,9 +71,13 @@ export default function CatalogCard({
       <div
         className={clsx(
           "rounded-lg border p-4 transition-colors",
+          // Visual hierarchy: not-added cards lead the eye; added cards
+          // visually de-emphasized so power users can still navigate to
+          // their sources but new content stays prominent.
           enabled
-            ? "bg-base-200/70 border-success/20"
+            ? "bg-base-200/30 border-edge/15 opacity-70 hover:opacity-100 hover:bg-base-200/50"
             : "bg-base-200/40 border-edge/20 hover:bg-base-200/60",
+          tierLocked && "opacity-80",
         )}
       >
         {/* Header row: icon + name + category badge */}
@@ -157,22 +132,17 @@ export default function CatalogCard({
           {loading ? (
             <Loader2 size={14} className="animate-spin text-fg-4" />
           ) : enabled ? (
-            <div className="flex items-center gap-3">
+            // Already added: only "Open" — removal happens on the
+            // source page (see Source page Trash + Undo). One canonical
+            // home per verb.
+            onOpen && (
               <button
-                onClick={handleRemoveClick}
-                className="text-xs font-medium text-fg-4 hover:text-error transition-colors"
+                onClick={() => onOpen(item)}
+                className="flex items-center gap-0.5 text-xs font-semibold text-accent hover:text-accent/80 transition-colors"
               >
-                Remove
+                Open <ChevronRight size={12} />
               </button>
-              {onOpen && (
-                <button
-                  onClick={() => onOpen(item)}
-                  className="flex items-center gap-0.5 text-xs font-semibold text-accent hover:text-accent/80 transition-colors"
-                >
-                  Open <ChevronRight size={12} />
-                </button>
-              )}
-            </div>
+            )
           ) : tierLocked ? (
             <button
               onClick={() => open("https://myscrollr.com/uplink")}
@@ -203,17 +173,6 @@ export default function CatalogCard({
           )}
         </div>
       </div>
-
-      {/* Channel removal confirmation */}
-      <ConfirmDialog
-        open={confirmOpen}
-        title={`Remove ${item.name}?`}
-        description={`Your saved ${CHANNEL_NOUNS[item.id] ?? "data"} and configuration will be deleted.`}
-        confirmLabel="Remove"
-        destructive
-        onConfirm={doRemove}
-        onCancel={() => setConfirmOpen(false)}
-      />
     </>
   );
 }

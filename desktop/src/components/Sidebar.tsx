@@ -6,7 +6,7 @@
  * Collapses to a 48px icon-only rail with tooltips.
  */
 import { useState } from "react";
-import { Home, LayoutGrid, Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Home, LayoutGrid, Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
 import clsx from "clsx";
 import Tooltip from "./Tooltip";
 import type { DeliveryMode, ChannelManifest, WidgetManifest } from "../types";
@@ -174,6 +174,28 @@ export default function Sidebar({
           collapsed ? "px-1" : "px-2",
         )}
       >
+        {/* Add source — primary, persistent affordance. Catalog is the
+            canonical "add" surface; this just makes the action visible
+            from anywhere in the app, in chrome. */}
+        <Tooltip content={collapsed ? "Add source" : undefined} side="right">
+          <button
+            onClick={onNavigateToMarketplace}
+            aria-label="Add source"
+            className={clsx(
+              "flex items-center w-full rounded-lg font-semibold transition-colors mb-2",
+              "bg-accent/10 text-accent hover:bg-accent/15 hover:text-accent",
+              collapsed
+                ? "justify-center py-1.5 px-0"
+                : "gap-2.5 px-2.5 py-1.5 text-[13px]",
+            )}
+          >
+            <span className="shrink-0 flex items-center justify-center w-5 h-5">
+              <Plus size={15} strokeWidth={2.5} />
+            </span>
+            {!collapsed && <span className="truncate">Add source</span>}
+          </button>
+        </Tooltip>
+
         <NavItem
           icon={<Home size={15} />}
           label="Home"

@@ -12,6 +12,8 @@ import {
   Check,
   ChevronRight,
   Settings,
+  Plus,
+  Sparkles,
 } from "lucide-react";
 import clsx from "clsx";
 import RouteError from "../components/RouteError";
@@ -189,31 +191,41 @@ function HomePage() {
         <p className="text-xs text-fg-4">Your live feed at a glance</p>
       </div>
 
-      {/* Empty state */}
+      {/* Empty state — hero card.
+          Shown when the user has no channels and no enabled widgets.
+          Disappears the moment they add their first source. This is
+          the post-wizard first-run experience: a single primary CTA
+          to discover and add what they want, no opinionated defaults. */}
       {!hasAnySources && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <h2 className="text-base font-semibold text-fg mb-2">
-            Welcome to Scrollr
-          </h2>
-          <p className="text-sm text-fg-3 mb-4 max-w-sm">
-            Add channels like Finance, Sports, or RSS from the Catalog, then
-            configure what you want to track.
-          </p>
-          {authenticated ? (
-            <button
-              onClick={() => navigate({ to: "/catalog" })}
-              className="px-4 py-2 rounded-lg text-xs font-semibold bg-accent text-surface hover:bg-accent/90 transition-colors"
-            >
-              Browse Catalog
-            </button>
-          ) : (
-            <button
-              onClick={onLogin}
-              className="px-4 py-2 rounded-lg text-xs font-semibold bg-accent text-surface hover:bg-accent/90 transition-colors"
-            >
-              Sign in to get started
-            </button>
-          )}
+        <div className="mt-8 mx-auto max-w-xl">
+          <div className="rounded-xl border border-edge/30 bg-base-200/40 px-8 py-12 text-center">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent/10 text-accent mb-5">
+              <Sparkles size={22} />
+            </div>
+            <h2 className="text-lg font-semibold text-fg mb-2">
+              Welcome to Scrollr
+            </h2>
+            <p className="text-sm text-fg-3 mb-6 max-w-sm mx-auto leading-relaxed">
+              Your radar is empty. Add channels and widgets from the Catalog
+              to start tracking what matters to you.
+            </p>
+            {authenticated ? (
+              <button
+                onClick={() => navigate({ to: "/catalog" })}
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-surface hover:bg-accent/90 transition-colors"
+              >
+                <Plus size={15} strokeWidth={2.5} />
+                Browse the Catalog
+              </button>
+            ) : (
+              <button
+                onClick={onLogin}
+                className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-surface hover:bg-accent/90 transition-colors"
+              >
+                Sign in to get started
+              </button>
+            )}
+          </div>
         </div>
       )}
 

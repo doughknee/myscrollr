@@ -102,26 +102,9 @@ function CatalogPage() {
     [navigate, queryClient, prefs, onPrefsChange],
   );
 
-  // ── Remove handler ──────────────────────────────────────────
-
-  const handleRemove = useCallback(
-    async (item: CatalogItem) => {
-      if (item.kind === "channel") {
-        await channelsApi.delete(item.id as ChannelType);
-        await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
-        toast.success(`${item.name} removed`);
-      } else {
-        const nextEnabled = prefs.widgets.enabledWidgets.filter((id) => id !== item.id);
-        const nextOnTicker = prefs.widgets.widgetsOnTicker.filter((id) => id !== item.id);
-        onPrefsChange({
-          ...prefs,
-          widgets: { ...prefs.widgets, enabledWidgets: nextEnabled, widgetsOnTicker: nextOnTicker },
-        });
-        toast.success(`${item.name} removed`);
-      }
-    },
-    [queryClient, prefs, onPrefsChange],
-  );
+  // Note: removal is no longer a Catalog action. Source removal lives
+  // on the source page header (Trash + Undo toast) — single canonical
+  // home per verb. See spec 2026-05-09-desktop-ia-refactor-design.md.
 
   // ── Render ──────────────────────────────────────────────────
 
@@ -173,7 +156,6 @@ function CatalogPage() {
             authenticated={authenticated}
             dashboardLoading={isLoading}
             onAdd={handleAdd}
-            onRemove={handleRemove}
             onLogin={onLogin}
             onOpen={(it) => {
               if (it.kind === "channel") {
