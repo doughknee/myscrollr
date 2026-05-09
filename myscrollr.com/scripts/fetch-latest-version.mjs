@@ -15,55 +15,99 @@
  * at build time (one fetch per deploy, no CORS at all because Node
  * is not a browser) is the simplest correct path.
  *
- * The generated file is gitignored. Build pipelines that need
- * deterministic output without a network call can set
- * SCROLLR_LATEST_VERSION=1.0.3 in the environment to skip the fetch.
+ * Cache-busting: the marketing site is rebuilt automatically when a
+ * desktop release is *published* (see .github/workflows/deploy.yml,
+ * `release: types: [published]` trigger). That is what keeps the
+ * download button current without manual intervention.
+ *
+ * Failure modes:
+ *   - SCROLLR_LATEST_VERSION env var set -> use it, no network call.
+ *   - CI=true and API call fails -> hard fail. We refuse to ship a
+ *     production build advertising a stale FALLBACK_VERSION; better
+ *     to fail the deploy and retry than silently ship a bad link.
+ *   - Local dev (CI unset) and API call fails -> warn and use
+ *     FALLBACK_VERSION so `npm run dev` works offline.
+ *
+ * The generated file is gitignored.
  */
 
 import { writeFile, mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 const REPO = 'brandon-relentnet/myscrollr'
-const FALLBACK_VERSION = '1.0.3'
+// Updated whenever we bump in production. Used only as a last-resort
+// fallback for local dev when the network is unavailable; CI builds
+// hard-fail instead of falling back.
+const FALLBACK_VERSION = '1.0.9'
 const OUTPUT_PATH = new URL(
   '../src/lib/latestVersion.generated.ts',
   import.meta.url,
 )
+// Treat any standard CI signal as "production build, fail loudly".
+const IS_CI = process.env.CI === 'true' || process.env.CI === '1'
 
-let version = process.env.SCROLLR_LATEST_VERSION ?? FALLBACK_VERSION
-let source = process.env.SCROLLR_LATEST_VERSION ? 'env' : 'fallback'
-
-if (!process.env.SCROLLR_LATEST_VERSION) {
-  try {
-    const res = await fetch(
-      `https://api.github.com/repos/${REPO}/releases/latest`,
-      {
-        headers: { 'User-Agent': 'myscrollr.com prebuild' },
-        signal: AbortSignal.timeout(10_000),
-      },
+async function fetchLatestVersionFromGitHub() {
+  const res = await fetch(
+    `https://api.github.com/repos/${REPO}/releases/latest`,
+    {
+      headers: { 'User-Agent': 'myscrollr.com prebuild' },
+      signal: AbortSignal.timeout(10_000),
+    },
+  )
+  if (!res.ok) {
+    throw new Error(`GitHub API returned ${res.status} ${res.statusText}`)
+  }
+  const data = await res.json()
+  if (
+    typeof data.tag_name !== 'string' ||
+    !data.tag_name.startsWith('desktop-v')
+  ) {
+    throw new Error(
+      `release tag_name not in expected form, got "${data.tag_name}"`,
     )
-    if (res.ok) {
-      const data = await res.json()
-      if (
-        typeof data.tag_name === 'string' &&
-        data.tag_name.startsWith('desktop-v')
-      ) {
-        version = data.tag_name.slice('desktop-v'.length)
-        source = 'github-api'
-      } else {
-        console.warn(
-          `[prebuild] release tag_name not in expected form, got "${data.tag_name}"; using fallback ${FALLBACK_VERSION}`,
-        )
-      }
-    } else {
+  }
+  return data.tag_name.slice('desktop-v'.length)
+}
+
+let version
+let source
+
+if (process.env.SCROLLR_LATEST_VERSION) {
+  version = process.env.SCROLLR_LATEST_VERSION
+  source = 'env'
+} else {
+  // One retry on transient failure (rate-limit window, brief network
+  // hiccup). Two attempts total, ~10s timeout each.
+  let lastErr
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      version = await fetchLatestVersionFromGitHub()
+      source = 'github-api'
+      break
+    } catch (err) {
+      lastErr = err
       console.warn(
-        `[prebuild] GitHub API returned ${res.status}; using fallback ${FALLBACK_VERSION}`,
+        `[prebuild] attempt ${attempt}/2 failed: ${err?.message ?? err}`,
       )
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 1500))
     }
-  } catch (err) {
+  }
+
+  if (!version) {
+    if (IS_CI) {
+      console.error(
+        `[prebuild] FATAL: could not resolve latest version from GitHub in CI. ` +
+          `Refusing to ship a build that would advertise the fallback (${FALLBACK_VERSION}). ` +
+          `Last error: ${lastErr?.message ?? lastErr}. ` +
+          `If you need to force a specific version, set SCROLLR_LATEST_VERSION.`,
+      )
+      process.exit(1)
+    }
     console.warn(
-      `[prebuild] failed to reach GitHub API (${err?.message ?? err}); using fallback ${FALLBACK_VERSION}`,
+      `[prebuild] using fallback ${FALLBACK_VERSION} (local dev only; CI would have failed)`,
     )
+    version = FALLBACK_VERSION
+    source = 'fallback'
   }
 }
 

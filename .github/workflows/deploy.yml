@@ -9,6 +9,16 @@ on:
       - "myscrollr.com/**"
       - "k8s/**"
       - ".github/workflows/deploy.yml"
+  # When a desktop release is published (drafts -> published), rebuild the
+  # website so the download button picks up the new version. The site bakes
+  # `LATEST_DESKTOP_VERSION` at build time from `releases/latest` (see
+  # myscrollr.com/scripts/fetch-latest-version.mjs). Without this trigger,
+  # a desktop-only release would leave the marketing site advertising the
+  # previous version until the next unrelated commit to myscrollr.com/**.
+  # Filtered to desktop-v* tags inside the manual step so non-desktop
+  # releases (if any are added later) don't trigger pointless rebuilds.
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       services:
@@ -39,7 +49,29 @@ jobs:
 
       - name: Resolve manual service selection
         id: manual
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
+          # The `release: types: [published]` trigger rebuilds only the
+          # website, and only for `desktop-v*` tags. Other releases (none
+          # exist today, but future-proof) are ignored.
+          if [ "${{ github.event_name }}" = "release" ]; then
+            for svc in core-api website finance-api finance-service sports-api sports-service rss-api rss-service fantasy-api k8s; do
+              echo "${svc}=false" >> $GITHUB_OUTPUT
+            done
+
+            case "$RELEASE_TAG" in
+              desktop-v*)
+                echo "Desktop release $RELEASE_TAG published; rebuilding website to refresh LATEST_DESKTOP_VERSION"
+                echo "website=true" >> $GITHUB_OUTPUT
+                ;;
+              *)
+                echo "Release $RELEASE_TAG is not a desktop release; skipping rebuild"
+                ;;
+            esac
+            exit 0
+          fi
+
           if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
             exit 0
           fi
@@ -72,7 +104,7 @@ jobs:
 
       - uses: dorny/paths-filter@v3
         id: changes
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name == 'push'
         with:
           filters: |
             core-api:
