@@ -19,6 +19,7 @@ import GeneralSettings from "../components/settings/GeneralSettings";
 import TickerSettings from "../components/settings/TickerSettings";
 import AccountSettings from "../components/settings/AccountSettings";
 import ResetSettings from "../components/settings/ResetSettings";
+import Tooltip from "../components/Tooltip";
 import { resetCategory, resetAll, type AppPreferences } from "../preferences";
 
 // ── Types ───────────────────────────────────────────────────────
@@ -32,6 +33,18 @@ const TAB_LABELS: Record<SettingsTab, string> = {
   ticker: "Ticker",
   account: "Account",
   reset: "Reset",
+};
+
+/**
+ * Per-tab one-liner used as the tooltip when hovering a tab. Keeps
+ * tabs themselves short while still explaining what each does to
+ * first-time users — Phase 2 (Apr 26) tooltip-coverage audit.
+ */
+const TAB_DESCRIPTIONS: Record<SettingsTab, string> = {
+  general: "Appearance, window, startup, and updates",
+  ticker: "Ticker layout, style, and live preview",
+  account: "Profile, subscription, plan, and data",
+  reset: "Restore all preferences to defaults",
 };
 
 const TAB_ICONS: Record<SettingsTab, LucideIcon> = {
@@ -88,20 +101,21 @@ function SettingsRoute() {
           const Icon = TAB_ICONS[t];
           const isActive = tab === t;
           return (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              aria-current={isActive ? "page" : undefined}
-              className={clsx(
-                "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer border",
-                isActive
-                  ? "bg-accent/15 text-accent border-accent/30"
-                  : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover border-transparent",
-              )}
-            >
-              <Icon className="w-4 h-4" aria-hidden />
-              <span>{TAB_LABELS[t]}</span>
-            </button>
+            <Tooltip key={t} content={TAB_DESCRIPTIONS[t]} side="bottom">
+              <button
+                onClick={() => setTab(t)}
+                aria-current={isActive ? "page" : undefined}
+                className={clsx(
+                  "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer border",
+                  isActive
+                    ? "bg-accent/15 text-accent border-accent/30"
+                    : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover border-transparent",
+                )}
+              >
+                <Icon className="w-4 h-4" aria-hidden />
+                <span>{TAB_LABELS[t]}</span>
+              </button>
+            </Tooltip>
           );
         })}
       </nav>

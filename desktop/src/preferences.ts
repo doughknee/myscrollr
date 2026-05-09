@@ -13,7 +13,6 @@ type TaskbarHeight = "compact" | "default" | "comfortable";
 export type TickerGap = "tight" | "normal" | "spacious";
 export type TickerMode = "compact" | "comfort";
 type DefaultView = "feed" | "dashboard" | "last";
-export type TickerRows = 1 | 2 | 3;
 export type MixMode = "grouped" | "weave";
 export type ChipColorMode = "channel" | "accent" | "muted";
 export type TickerDirection = "left" | "right";
@@ -46,9 +45,15 @@ export interface TickerLayout {
 export interface AppearancePrefs {
   theme: Theme;
   uiScale: number; // 75–150, default 100
-  /** @deprecated derived from tickerLayout.rows.length. Kept in sync during the deprecation window. */
-  tickerRows: TickerRows;
-  /** Source of truth for the multi-deck ticker layout. */
+  /**
+   * Source of truth for the multi-row ticker layout. The number of
+   * rows visible on the ticker is `tickerLayout.rows.length`; per-row
+   * source assignments live on `rows[i].sources[]`.
+   *
+   * Window-height math (App.tsx) and the row pickers on Home / Settings
+   * / tray all read directly from this single field — no derived
+   * scalars, no mirror values.
+   */
   tickerLayout: TickerLayout;
   fontWeight: FontWeight;
   highContrast: boolean;
@@ -382,6 +387,19 @@ export interface AppPreferences {
   homePreview: HomePreview;
   /** Show the setup wizard when signing in. Users can disable this. */
   showSetupOnLogin: boolean;
+  /**
+   * IDs of one-time discovery tips the user has already seen.
+   *
+   * Phase 2 (Apr 26): the desktop app introduces a `showTipOnce(id)`
+   * pattern (see `lib/tips.ts`) for "did you know you can right-click
+   * the ticker?"-style nudges that should fire exactly once per user
+   * across the lifetime of their install. We store ids (not booleans)
+   * so we can add new tips later without a schema migration — every
+   * fresh tip id is implicitly "not shown yet" until the user sees it.
+   *
+   * Storing as an array (not Set) for JSON-roundtrip cleanliness.
+   */
+  tipsShown: string[];
 }
 
 // ── Defaults ────────────────────────────────────────────────────
@@ -393,7 +411,6 @@ const DEFAULT_TICKER_LAYOUT: TickerLayout = {
 const DEFAULT_APPEARANCE: AppearancePrefs = {
   theme: "dark",
   uiScale: 100,
-  tickerRows: 1,
   tickerLayout: { rows: [{ sources: [] }] },
   fontWeight: "normal",
   highContrast: false,
@@ -552,6 +569,7 @@ const DEFAULT_PREFS: AppPreferences = {
   channelDisplay: DEFAULT_CHANNEL_DISPLAY,
   homePreview: {},
   showSetupOnLogin: true,
+  tipsShown: [],
 };
 
 // ── Storage helpers ─────────────────────────────────────────────
@@ -676,19 +694,22 @@ function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
 
 // ── Ticker layout migration ─────────────────────────────────────
 
-/** Narrow any number to the TickerRows union (1|2|3). */
-function clampTickerRows(n: number): TickerRows {
+/** Clamp any number to the inclusive 1..3 range used for row counts. */
+function clampRowCount(n: number): number {
+  if (!Number.isFinite(n)) return 1;
   if (n <= 1) return 1;
   if (n >= 3) return 3;
-  return 2;
+  return Math.round(n);
 }
 
 /**
  * Build or migrate `tickerLayout` from a saved AppearancePrefs fragment.
  *
  * Responsibilities:
- *   1. Synthesize a layout when none exists (derive length from legacy
- *      `tickerRows`; sources default to [] = "show all visible tabs").
+ *   1. Synthesize a layout when none exists. We derive the row count
+ *      from the legacy `tickerRows` field if present (some users still
+ *      have it on disk from pre-multi-row builds); sources default to
+ *      [] = "show all visible tabs".
  *   2. Tier-clamp the row count — if the current tier allows fewer rows
  *      than stored, drop from the BOTTOM so row 0 is preserved.
  *
@@ -698,11 +719,22 @@ function clampTickerRows(n: number): TickerRows {
  * shrank — silent data loss on tier downgrade is an UX trap.
  */
 function migrateTickerLayout(
-  saved: Partial<AppearancePrefs> | undefined,
-): { layout: TickerLayout; changed: boolean } {
-  const fallbackRowCount = clampTickerRows(
-    typeof saved?.tickerRows === "number" ? saved.tickerRows : 1,
-  );
+  saved: (Partial<AppearancePrefs> & { tickerRows?: unknown }) | undefined,
+): {
+  layout: TickerLayout;
+  changed: boolean;
+  /** Pre-clamp rows, populated only when `changed === true`. */
+  preClampRows?: TickerRowConfig[];
+  /** Sources from dropped rows, populated only when `changed === true`. */
+  droppedSources?: string[];
+} {
+  // Legacy path: pre-multi-row builds persisted a `tickerRows: 1|2|3`
+  // scalar but no `tickerLayout`. We accept it on read so existing users
+  // upgrade cleanly, but we never write it back — the layout is the
+  // authoritative shape.
+  const legacyRows =
+    typeof saved?.tickerRows === "number" ? saved.tickerRows : 1;
+  const fallbackRowCount = clampRowCount(legacyRows);
 
   const savedLayout = saved?.tickerLayout;
   let rows: TickerRowConfig[];
@@ -738,6 +770,8 @@ function migrateTickerLayout(
   }
 
   let changed = false;
+  let preClampRows: TickerRowConfig[] | undefined;
+  let droppedSources: string[] | undefined;
 
   if (rows.length > maxRows) {
     // Inspect the rows we're about to drop. Only flag the layout as
@@ -753,13 +787,21 @@ function migrateTickerLayout(
       );
     }
 
+    if (lostSources) {
+      // Snapshot the unclamped rows so the shell can offer Undo via
+      // the tier-downgrade toast. This is a deep copy already (we
+      // cloned each row's sources above on line ~734).
+      preClampRows = rows.map((r) => ({ ...r, sources: [...r.sources] }));
+      droppedSources = dropped.flatMap((r) => r.sources);
+    }
+
     rows = rows.slice(0, maxRows);
     changed = lostSources;
   }
 
   if (rows.length === 0) rows = [{ sources: [] }];
 
-  return { layout: { rows }, changed };
+  return { layout: { rows }, changed, preClampRows, droppedSources };
 }
 
 // ── Transient signal: tickerLayout was clamped on the most recent load ──
@@ -771,16 +813,34 @@ function migrateTickerLayout(
 // call `consumeTickerLayoutChanged()` once mounted, which reads and
 // clears it. The ticker window simply ignores the signal.
 
-let tickerLayoutChangedSignal = false;
+/**
+ * Details captured the last time `loadPrefs` had to drop rows due to a
+ * tier downgrade. `null` means the most recent load did not lose any
+ * pinned sources.
+ */
+export interface TickerLayoutChangedDetails {
+  /** The pre-clamp row layout — used to power the toast's Undo. */
+  preClampRows: TickerRowConfig[];
+  /** Sources that were on rows that got dropped. Surfaced in toast copy. */
+  droppedSources: string[];
+}
+
+let tickerLayoutChangedSignal: TickerLayoutChangedDetails | null = null;
 
 /**
- * Returns true exactly once if the most recent `loadPrefs()` call clamped
- * the ticker layout AND the dropped rows held pinned sources. Subsequent
- * calls return false until the next `loadPrefs()` triggers another clamp.
+ * Consume the tier-clamp signal exactly once.
+ *
+ * Returns the change details (pre-clamp rows + dropped source ids) if
+ * the most recent `loadPrefs()` call clamped the ticker layout AND the
+ * dropped rows held pinned sources. Returns `null` otherwise.
+ *
+ * Subsequent calls return `null` until the next `loadPrefs()` triggers
+ * another clamp. The shell's `useEffect` reads this once on mount and
+ * pipes the details into a toast with an Undo button (Phase 1, Apr 26).
  */
-export function consumeTickerLayoutChanged(): boolean {
+export function consumeTickerLayoutChanged(): TickerLayoutChangedDetails | null {
   const v = tickerLayoutChangedSignal;
-  tickerLayoutChangedSignal = false;
+  tickerLayoutChangedSignal = null;
   return v;
 }
 
@@ -920,18 +980,36 @@ export function loadPrefs(): AppPreferences {
     // Latch the "user lost rows" signal for the main window to read
     // once via consumeTickerLayoutChanged(). This must come before the
     // function returns — see the helper's docs for why we don't pipe
-    // it through the return value.
-    if (layoutResult.changed) {
-      tickerLayoutChangedSignal = true;
+    // it through the return value. We carry the pre-clamp rows + the
+    // dropped source ids alongside the flag so the shell's toast can
+    // offer Undo (Phase 1, Apr 26) AND tell the user which sources
+    // were affected, instead of the previous generic "your layout
+    // was simplified" wording.
+    if (
+      layoutResult.changed &&
+      layoutResult.preClampRows &&
+      layoutResult.droppedSources
+    ) {
+      tickerLayoutChangedSignal = {
+        preClampRows: layoutResult.preClampRows,
+        droppedSources: layoutResult.droppedSources,
+      };
     }
+    // Strip any legacy `tickerRows` field that might still be sitting
+    // on disk from pre-multi-row builds. The layout is the source of
+    // truth; persisting a derived scalar alongside it caused the
+    // Home/Settings drift this refactor was written to kill.
+    const savedAppearance = source.appearance as
+      | (Partial<AppearancePrefs> & { tickerRows?: unknown })
+      | undefined;
+    const { tickerRows: _legacyTickerRows, ...appearanceRest } =
+      savedAppearance ?? {};
+    void _legacyTickerRows; // intentionally discarded
     const mergedAppearance: AppearancePrefs = {
       ...DEFAULT_APPEARANCE,
-      ...source.appearance,
+      ...appearanceRest,
       tickerLayout: layoutResult.layout,
     };
-    // Keep the deprecated `tickerRows` in lockstep with the layout so
-    // legacy consumers (window-height math) keep working.
-    mergedAppearance.tickerRows = clampTickerRows(mergedAppearance.tickerLayout.rows.length);
     const merged: AppPreferences = {
       appearance: mergedAppearance,
       ticker: { ...DEFAULT_TICKER, ...source.ticker },
@@ -949,6 +1027,12 @@ export function loadPrefs(): AppPreferences {
           ? (source.homePreview as HomePreview)
           : {},
       showSetupOnLogin: typeof source.showSetupOnLogin === "boolean" ? source.showSetupOnLogin : true,
+      // Tolerate older builds that didn't have `tipsShown`. Treat
+      // missing/invalid as "no tips shown yet" so the user gets a
+      // proper first-run experience after upgrading.
+      tipsShown: Array.isArray(source.tipsShown)
+        ? (source.tipsShown.filter((id) => typeof id === "string") as string[])
+        : [],
     };
 
     // Clamp any widget pin rows that reference rows above the current
@@ -1010,6 +1094,9 @@ export function resetAll(): AppPreferences {
     channelDisplay: { ...DEFAULT_CHANNEL_DISPLAY },
     homePreview: {},
     showSetupOnLogin: true,
+    // Reset clears tipsShown — the user explicitly asked for a clean
+    // slate, so they'll re-experience first-run discovery hints.
+    tipsShown: [],
   };
   savePrefs(defaults);
   return defaults;
@@ -1050,9 +1137,12 @@ export const TICKER_HEIGHTS: Record<TickerMode, number> = {
 // ── Ticker layout helpers ───────────────────────────────────────
 
 /**
- * Write a new `tickerLayout` while keeping the deprecated `tickerRows`
- * field in sync. Use this everywhere instead of mutating the layout
- * in-place so both fields never drift.
+ * Replace the ticker layout. The only sanctioned writer for
+ * `appearance.tickerLayout` — call this from any helper that needs to
+ * mutate rows so the empty-row fallback stays consistent.
+ *
+ * Always preserves at least one row: callers cannot end up with a
+ * zero-row layout via this helper.
  */
 export function setTickerLayout(
   prefs: AppPreferences,
@@ -1064,7 +1154,6 @@ export function setTickerLayout(
     appearance: {
       ...prefs.appearance,
       tickerLayout: { rows },
-      tickerRows: clampTickerRows(rows.length),
     },
   };
 }
@@ -1120,6 +1209,31 @@ export function toggleWidgetOnTicker(prefs: AppPreferences, widgetId: string): A
   return {
     ...prefs,
     widgets: { ...prefs.widgets, widgetsOnTicker: next },
+  };
+}
+
+/**
+ * Remove a widget from the user's enabled set AND the ticker. Pure
+ * counterpart to `useWidgetActions.handleToggleWidget`'s "currently
+ * enabled" branch — extracted so the widget route can route the Trash
+ * button through `useUndoableAction` (Phase 1, Apr 26) and recover
+ * with a single snapshot restore.
+ *
+ * No-op if the widget wasn't enabled in the first place — returns the
+ * same `prefs` reference so the undoable hook can short-circuit and
+ * avoid showing a phantom "Removed ___" toast for a click that did
+ * nothing.
+ */
+export function disableWidget(prefs: AppPreferences, widgetId: string): AppPreferences {
+  const enabledWidgets = prefs.widgets.enabledWidgets;
+  if (!enabledWidgets.includes(widgetId)) return prefs;
+  return {
+    ...prefs,
+    widgets: {
+      ...prefs.widgets,
+      enabledWidgets: enabledWidgets.filter((id) => id !== widgetId),
+      widgetsOnTicker: prefs.widgets.widgetsOnTicker.filter((id) => id !== widgetId),
+    },
   };
 }
 
@@ -1255,8 +1369,6 @@ export function getWidgetTickerRow(
  * Pure: returns a new AppPreferences. Does NOT issue any API calls;
  * channel-level callers must additionally invoke `channelsApi.update`
  * to flip `ticker_enabled` server-side (true if row !== null).
- *
- * `tickerRows` is kept in sync via `setTickerLayout`.
  */
 export function setSourceTickerRow(
   prefs: AppPreferences,

@@ -354,7 +354,6 @@ function makePrefs(rows: { sources: string[] }[]): AppPreferences {
   return {
     appearance: {
       tickerLayout: { rows },
-      tickerRows: Math.max(1, Math.min(3, rows.length)),
     },
   } as unknown as AppPreferences;
 }
@@ -464,12 +463,13 @@ describe("setSourceTickerRow / setChannelTickerRow / setWidgetTickerRow", () => 
     expect(JSON.stringify(prefs)).toBe(before);
   });
 
-  it("keeps the deprecated tickerRows field in sync after row mutations", () => {
-    // setTickerLayout (which setSourceTickerRow funnels through) clamps
-    // tickerRows to the row count. Round-tripping through the helper
-    // shouldn't drift this value.
-    const prefs = makePrefs([{ sources: [] }, { sources: [] }]);
-    const next = setSourceTickerRow(prefs, "finance", 1);
-    expect(next.appearance.tickerRows).toBe(2);
+  it("never produces a zero-row layout (preserves the trailing fallback)", () => {
+    // The layout is the single source of truth for row count. Edge cases
+    // that would otherwise empty `rows` (no-op edits, defensive callers)
+    // must always leave at least one row so the ticker has somewhere to
+    // render and the height math doesn't blow up.
+    const prefs = makePrefs([{ sources: ["finance"] }]);
+    const next = setSourceTickerRow(prefs, "finance", null);
+    expect(next.appearance.tickerLayout.rows.length).toBe(1);
   });
 });

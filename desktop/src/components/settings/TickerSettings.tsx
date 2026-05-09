@@ -11,13 +11,14 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { Ticker } from "motion-plus/react";
 import { motion, AnimatePresence, useMotionValue, animate } from "motion/react";
 import { clsx } from "clsx";
-import { ChevronDown, Plus, Trash2, Lock } from "lucide-react";
-import { resetCategory, setTickerLayout, removeTickerRow } from "../../preferences";
+import { ChevronDown, Plus, Trash2, Lock, Info } from "lucide-react";
+import { resetCategory, removeTickerRow } from "../../preferences";
 import { ResetButton } from "./SettingsControls";
 import { getTier } from "../../auth";
-import { getMaxTickerRows, canCustomizeTickerRows } from "../../tierLimits";
 import { getAllChannels } from "../../channels/registry";
 import { getAllWidgets } from "../../widgets/registry";
+import { useTickerLayout } from "../../hooks/useTickerLayout";
+import { useUndoableAction } from "../../hooks/useUndoableAction";
 import type {
   AppPreferences,
   TickerPrefs,
@@ -135,66 +136,89 @@ const MIX_OPTIONS: { value: MixMode; label: string }[] = [
 // ── Component ───────────────────────────────────────────────────
 
 export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsProps) {
-  const { appearance, ticker } = prefs;
+  const { ticker } = prefs;
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const tier = getTier();
-  const maxRows = getMaxTickerRows(tier);
-  const canCustomize = canCustomizeTickerRows(tier);
+
+  // Single source of truth for layout state, shared with the Home page
+  // RowSelectors and the tray submenus. `rowCount`, `tierMaxRows`,
+  // `canAddRow`, etc. all flow from this hook so this surface and Home
+  // can never drift on what's possible vs what currently exists.
+  const tickerLayout = useTickerLayout(prefs, onPrefsChange, tier);
+  const {
+    rows,
+    rowCount,
+    tierMaxRows: maxRows,
+    canAddRow,
+    canCustomize,
+    addRow: addRowFromHook,
+    setSourceRow,
+  } = tickerLayout;
+
+  // Undoable destructive-action wrapper. Every "the user might regret
+  // this" mutation in this file routes through `undoable` instead of
+  // `onPrefsChange` directly so a 5-second toast with Undo appears.
+  // See `hooks/useUndoableAction.ts` for the contract.
+  const undoable = useUndoableAction();
 
   const setTicker = useCallback(<K extends keyof TickerPrefs>(key: K, value: TickerPrefs[K]) => {
     onPrefsChange({ ...prefs, ticker: { ...ticker, [key]: value } });
   }, [prefs, ticker, onPrefsChange]);
 
+  // Resetting all ticker prefs is destructive (overwrites speed,
+  // colors, mode, etc.) but trivially reversible — we snapshot the
+  // current category and toast Undo.
   const handleReset = useCallback(() => {
-    const next = resetCategory(prefs, "ticker");
-    onPrefsChange(next);
-  }, [prefs, onPrefsChange]);
-
-  const layout = appearance.tickerLayout;
-  const rows = layout.rows;
+    undoable(
+      { label: "Reset ticker style", description: "Restored all ticker style defaults." },
+      (current) => resetCategory(current, "ticker"),
+    );
+  }, [undoable]);
 
   // ── Row mutations ─────────────────────────────────────────────
+  // Thin wrappers around the hook so the JSX below stays readable.
+  // Note: the toggle is now `setSourceRow(id, row | null)` — moving a
+  // source into a row implicitly removes it from any other row, which
+  // matches the Home-page RowSelector semantics. Pre-refactor the
+  // Settings checkbox grid had its own custom multi-row toggle logic
+  // that duplicated `setSourceTickerRow`; collapsing them removes a
+  // class of "Settings says X, Home says Y" bugs.
   const addRow = useCallback(() => {
-    if (rows.length >= maxRows) return;
-    onPrefsChange(setTickerLayout(prefs, {
-      rows: [...rows, { sources: [] }],
-    }));
-  }, [prefs, rows, maxRows, onPrefsChange]);
+    addRowFromHook();
+  }, [addRowFromHook]);
 
-  const updateRow = useCallback((index: number, patch: Partial<TickerRowConfig>) => {
-    const nextRows = rows.map((r, i) => (i === index ? { ...r, ...patch } : r));
-    onPrefsChange(setTickerLayout(prefs, { rows: nextRows }));
-  }, [prefs, rows, onPrefsChange]);
+  const toggleRowSource = useCallback(
+    (rowIndex: number, sourceId: string) => {
+      const row = rows[rowIndex];
+      const isInTarget = row.sources.includes(sourceId);
+      // Toggling ON in row N moves the source there (and out of any
+      // other row). Toggling OFF removes it entirely (Off everywhere).
+      // This mirrors Home's [Off][Row 1]…[Row N] semantics exactly.
+      setSourceRow(sourceId, isInTarget ? null : rowIndex);
+    },
+    [rows, setSourceRow],
+  );
 
-  const toggleRowSource = useCallback((index: number, sourceId: string) => {
-    const row = rows[index];
-    const isInTarget = row.sources.includes(sourceId);
-    // Single-row enforcement: a source can live in at most one row at
-    // any given time. The home-feed RowSelector and tray menus already
-    // enforce this; this picker now matches so users can't accidentally
-    // create overlapping data via the bulk editor. Toggling ON in row
-    // N also strips the source from any other row's sources[].
-    if (isInTarget) {
-      // Toggle OFF: just drop from this row.
-      updateRow(index, { sources: row.sources.filter((s) => s !== sourceId) });
-      return;
-    }
-    // Toggle ON in this row + remove from every other row.
-    const nextRows = rows.map((r, i) => {
-      if (i === index) {
-        return { ...r, sources: [...r.sources, sourceId] };
-      }
-      if (r.sources.includes(sourceId)) {
-        return { ...r, sources: r.sources.filter((s) => s !== sourceId) };
-      }
-      return r;
-    });
-    onPrefsChange(setTickerLayout(prefs, { rows: nextRows }));
-  }, [rows, updateRow, onPrefsChange, prefs]);
-
-  const deleteRow = useCallback((index: number) => {
-    onPrefsChange(removeTickerRow(prefs, index));
-  }, [prefs, onPrefsChange]);
+  const deleteRow = useCallback(
+    (index: number) => {
+      // Build the toast description from the row's actual contents so
+      // the user knows what they just lost. Empty rows ("shows all
+      // sources") get a generic label instead of the noisy "Removed:
+      // (nothing)" string.
+      const row = rows[index];
+      const sources = row?.sources ?? [];
+      const sourceLabel = sources.length === 0
+        ? undefined
+        : sources.length <= 3
+          ? `Removed: ${sources.join(", ")}.`
+          : `Removed: ${sources.slice(0, 3).join(", ")} +${sources.length - 3} more.`;
+      undoable(
+        { label: `Removed Row ${index + 1}`, description: sourceLabel },
+        (current) => removeTickerRow(current, index),
+      );
+    },
+    [rows, undoable],
+  );
 
   // ── Available sources (channels + enabled widgets) ────────────
   const availableSources = useMemo(() => {
@@ -242,68 +266,82 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
       </div>
 
       {/* ── Live Preview ──────────────────────────────────────── */}
+      {/* Animation strategy:
+           - Outer wrapper uses `layout` (not `layout="size"`) and a
+             gentle spring so the preview grows/shrinks smoothly when
+             rows are added/removed instead of snapping or compounding
+             with inner chip layouts.
+           - Each row is keyed by its stable index ONLY (no `rows.length`
+             baked in) so adding a row doesn't remount the existing
+             rows mid-scroll. AnimatePresence handles enter/exit for
+             rows that are actually appearing/disappearing.
+           - PreviewRow itself owns the scroll-mode swap internally
+             via a crossfade, so changing scrollMode/direction/mixMode
+             never tears down the row container. */}
       <div className="pb-5">
         <motion.div
-          layout="size"
-          transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+          layout
+          transition={{ type: "spring", stiffness: 320, damping: 30, mass: 0.7 }}
           className={clsx(
             "rounded-xl border border-edge/50 bg-base-150 overflow-hidden relative py-1",
             !ticker.showTicker && "opacity-30 pointer-events-none",
           )}
         >
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent z-10" />
-          {rows.map((row, rowIdx) => {
-            // Filter the sample chips to match the row's configured sources.
-            // Empty sources = show everything (matches runtime behaviour).
-            // Label-to-source matching is case-insensitive because the chip
-            // label ("FINANCE") differs from the source id ("finance").
-            const rowEffectiveMixMode = row.mixMode ?? ticker.mixMode;
-            const orderedChips = orderChips(SAMPLE_CHIPS, rowEffectiveMixMode);
-            const rowChips = row.sources.length === 0
-              ? orderedChips
-              : orderedChips.filter((c) =>
-                  row.sources.some((s) => s.toLowerCase() === c.label.toLowerCase()),
-                );
-            return (
-              <div
-                key={`row-${rowIdx}-${rows.length}`}
-                className={clsx(
-                  "flex items-center relative",
-                  rowIdx > 0 && "border-t border-edge/30",
-                )}
-              >
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={`${row.scrollMode ?? ticker.scrollMode}-${row.direction ?? ticker.tickerDirection}-${rowEffectiveMixMode}`}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="w-full"
-                  >
-                    {rowChips.length > 0 ? (
-                      <PreviewRow
-                        chips={rowChips}
-                        comfort={comfort}
-                        colorMode={ticker.chipColors}
-                        scrollMode={row.scrollMode ?? ticker.scrollMode}
-                        speed={row.speed ?? ticker.tickerSpeed}
-                        direction={row.direction ?? ticker.tickerDirection}
-                        stepPause={ticker.stepPause}
-                        pauseOnHover={ticker.pauseOnHover}
-                        hoverSpeed={ticker.hoverSpeed}
-                        gap={gapPx}
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center py-3 text-[11px] font-mono text-fg-4">
-                        Row {rowIdx + 1} has no sources selected
-                      </div>
-                    )}
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-            );
-          })}
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent z-10 pointer-events-none" />
+          <AnimatePresence initial={false}>
+            {rows.map((row, rowIdx) => {
+              // Filter the sample chips to match the row's configured sources.
+              // Empty sources = show everything (matches runtime behaviour).
+              // Label-to-source matching is case-insensitive because the chip
+              // label ("FINANCE") differs from the source id ("finance").
+              const rowEffectiveMixMode = row.mixMode ?? ticker.mixMode;
+              const orderedChips = orderChips(SAMPLE_CHIPS, rowEffectiveMixMode);
+              const rowChips = row.sources.length === 0
+                ? orderedChips
+                : orderedChips.filter((c) =>
+                    row.sources.some((s) => s.toLowerCase() === c.label.toLowerCase()),
+                  );
+              return (
+                <motion.div
+                  key={`row-${rowIdx}`}
+                  layout
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 340,
+                    damping: 32,
+                    mass: 0.7,
+                    opacity: { duration: 0.18, ease: [0.25, 0.1, 0.25, 1] },
+                  }}
+                  className={clsx(
+                    "flex items-center relative overflow-hidden",
+                    rowIdx > 0 && "border-t border-edge/30",
+                  )}
+                >
+                  {rowChips.length > 0 ? (
+                    <PreviewRow
+                      chips={rowChips}
+                      comfort={comfort}
+                      colorMode={ticker.chipColors}
+                      scrollMode={row.scrollMode ?? ticker.scrollMode}
+                      speed={row.speed ?? ticker.tickerSpeed}
+                      direction={row.direction ?? ticker.tickerDirection}
+                      stepPause={ticker.stepPause}
+                      pauseOnHover={ticker.pauseOnHover}
+                      hoverSpeed={ticker.hoverSpeed}
+                      gap={gapPx}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center w-full py-3 text-[11px] font-mono text-fg-4">
+                      Row {rowIdx + 1} has no sources selected
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         </motion.div>
       </div>
 
@@ -311,7 +349,24 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
       <motion.div layout="position" transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }} className="space-y-6">
 
         {/* ── Rows (multi-deck builder) ─────────────────────── */}
-        <SettingGroup label={`Rows (${rows.length}/${maxRows})`}>
+        <SettingGroup label={`Rows (${rowCount}/${maxRows})`}>
+          {/* Shared-state banner — the row count and per-source
+              assignments here are the SAME values driving the Home
+              page's RowSelectors and the system tray's submenus. We
+              call this out explicitly because pre-refactor users
+              thought they were two independent surfaces and got
+              confused when changes "leaked" between them. */}
+          <div className="mb-3 flex items-start gap-2 px-3 py-2 rounded-lg border border-edge/30 bg-base-200/40">
+            <Info size={12} className="text-fg-4 mt-0.5 shrink-0" />
+            <p className="text-[11px] text-fg-3 leading-relaxed">
+              These rows are shared with the{" "}
+              <span className="text-fg-2 font-medium">Home page</span> and the
+              system tray. Add or remove rows here to control the layout
+              everywhere; assign individual sources from Home for quick
+              changes.
+            </p>
+          </div>
+
           <div className="space-y-2">
             {rows.map((row, rowIdx) => (
               <RowCard
@@ -319,7 +374,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
                 rowIndex={rowIdx}
                 row={row}
                 sources={availableSources}
-                canRemove={rows.length > 1}
+                canRemove={rowCount > 1}
                 canCustomize={canCustomize}
                 onToggleSource={(id) => toggleRowSource(rowIdx, id)}
                 onRemove={() => deleteRow(rowIdx)}
@@ -328,20 +383,22 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
             <button
               type="button"
               onClick={addRow}
-              disabled={rows.length >= maxRows}
+              disabled={!canAddRow}
               className={clsx(
                 "w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed text-[11px] font-mono uppercase tracking-wider transition-colors",
-                rows.length >= maxRows
+                !canAddRow
                   ? "border-edge/30 text-fg-4/40 cursor-not-allowed"
                   : "border-edge/60 text-fg-3 hover:text-accent hover:border-accent/60 cursor-pointer",
               )}
             >
               <Plus size={12} />
-              {rows.length >= maxRows ? "Tier cap reached" : "Add row"}
+              {!canAddRow ? "Tier cap reached" : "Add row"}
             </button>
-            {rows.length >= maxRows && maxRows < 3 && (
+            {!canAddRow && maxRows < 3 && (
               <p className="text-[10px] font-mono text-fg-4/70 text-center pt-1">
-                Upgrade to Uplink Pro for up to 3 ticker rows.
+                {maxRows === 1
+                  ? "Upgrade to Uplink for a second ticker row."
+                  : "Upgrade to Uplink Pro for up to 3 ticker rows."}
               </p>
             )}
           </div>
@@ -517,10 +574,14 @@ function PreviewChip({ chip, comfort, colorMode }: { chip: SampleChip; comfort: 
     : colorMode === "accent" ? ACCENT_OVERRIDE
     : chip;
 
+  // Use a gentle spring for the chip's own size changes (mostly
+  // triggered by the compact↔comfort detail row appearing). Springs
+  // feel less mechanical than linear cubic-beziers when the chip
+  // grows vertically while the parent ticker is also animating.
   return (
     <motion.span
       layout
-      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+      transition={{ type: "spring", stiffness: 380, damping: 34, mass: 0.6 }}
       className={clsx(
         "ticker-chip inline-flex px-3 rounded-sm ring-1 ring-inset font-mono whitespace-nowrap",
         c.color, c.borderColor,
@@ -533,13 +594,16 @@ function PreviewChip({ chip, comfort, colorMode }: { chip: SampleChip; comfort: 
         <span className={clsx("font-semibold text-[11px] uppercase tracking-wider", c.textColor + "/60")}>{chip.label}</span>
         {chip.value && <span className={c.textColor}>{chip.value}</span>}
       </span>
-      <AnimatePresence>
+      <AnimatePresence initial={false}>
         {comfort && chip.detail && (
           <motion.span
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+            transition={{
+              height: { type: "spring", stiffness: 380, damping: 34, mass: 0.6 },
+              opacity: { duration: 0.18, ease: [0.25, 0.1, 0.25, 1] },
+            }}
             className={clsx("text-[10px] overflow-hidden", c.textColor + "/40")}
           >
             {chip.detail}
@@ -551,6 +615,32 @@ function PreviewChip({ chip, comfort, colorMode }: { chip: SampleChip; comfort: 
 }
 
 // ── Preview row — mirrors the real ScrollrTicker's mode handling ─
+//
+// Why this is structured as it is (the previous version was glitchy):
+//
+//   1. A single outer container holds ALL three render modes
+//      (continuous, step, flip) and crossfades between them. Pre-fix
+//      the parent component swapped between PreviewRow children via
+//      AnimatePresence with a key built from (scrollMode + direction +
+//      mixMode) — every change to any of those tore down the entire
+//      row, lost the motion-plus Ticker's internal scroll position,
+//      and forced a full DOM remeasure. Now the swap happens inside,
+//      so the container width / refs stay stable.
+//
+//   2. `chipItems` is memoized. The motion-plus Ticker is sensitive to
+//      identity churn on its `items` prop — building a new array per
+//      render caused brief stutters as it re-cloned children.
+//
+//   3. `visibleCount` (flip mode) uses a ResizeObserver, not a
+//      stale `containerRef.current?.clientWidth` read at render time.
+//      The previous version always read 600 on the first render and
+//      the real width on the second, which meant the flip page count
+//      jumped after the first interval tick.
+//
+//   4. `offset` (step) and `flipPage` (flip) are NOT reset when chip
+//      length changes. Previously, toggling a source mid-scroll would
+//      teleport the ticker back to position 0; now scroll continues
+//      seamlessly and just wraps over the new chip set on the next tick.
 
 function PreviewRow({
   chips,
@@ -576,17 +666,33 @@ function PreviewRow({
   gap: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const chipItems = chips.map((chip, i) => (
-    <PreviewChip key={`${chip.label}-${chip.value}-${i}`} chip={chip} comfort={comfort} colorMode={colorMode} />
-  ));
+
+  // Memoize the chip elements so the motion-plus Ticker doesn't see a
+  // fresh array on every parent re-render (every keystroke on the
+  // speed slider, every hover on a settings card, etc.). Identity
+  // stability matters because Ticker clones items into its scroll
+  // track; new identities = new clones = a 1-frame jitter.
+  const chipItems = useMemo(
+    () =>
+      chips.map((chip, i) => (
+        <PreviewChip
+          key={`${chip.label}-${chip.value}-${i}`}
+          chip={chip}
+          comfort={comfort}
+          colorMode={colorMode}
+        />
+      )),
+    [chips, comfort, colorMode],
+  );
 
   // ── Step mode: Ticker with offset-driven animation (matches real ticker) ──
   const offset = useMotionValue(0);
 
   useEffect(() => {
     if (scrollMode !== "step" || chips.length === 0) return;
-    offset.set(0);
-
+    // Don't reset offset — preserve scroll continuity if the user
+    // toggled a source mid-loop. The wrap math handles new chip sets
+    // gracefully.
     let cancelled = false;
     const transitionDuration = Math.max(0.15, 1.2 - (speed - 5) * 0.0072);
 
@@ -613,66 +719,112 @@ function PreviewRow({
 
     stepLoop();
     return () => { cancelled = true; };
-  }, [scrollMode, speed, direction, stepPause, gap, chips.length, offset]);
+    // Intentionally NOT depending on chips.length — see the comment
+    // above about scroll continuity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollMode, speed, direction, stepPause, gap, offset]);
 
   // ── Flip mode: AnimatePresence vertical slide (matches real ticker) ──
   const [flipPage, setFlipPage] = useState(0);
 
+  // Track container width via ResizeObserver so visibleCount stays
+  // accurate without remounting on every render. 600 is a reasonable
+  // first-paint fallback that matches typical settings-panel widths.
+  const [containerWidth, setContainerWidth] = useState(600);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    setContainerWidth(el.clientWidth || 600);
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w && w > 0) setContainerWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const visibleCount = useMemo(() => {
-    const w = containerRef.current?.clientWidth ?? 600;
     const avgChipWidth = comfort ? 180 : 120;
-    return Math.max(1, Math.floor(w / (avgChipWidth + gap)));
-  }, [comfort, gap, chips.length]);
+    return Math.max(1, Math.floor(containerWidth / (avgChipWidth + gap)));
+  }, [comfort, gap, containerWidth]);
 
   useEffect(() => {
     if (scrollMode !== "flip" || chips.length === 0) return;
-    setFlipPage(0);
+    // Don't reset flipPage on chip-length change — wrap math handles it.
     const timer = setInterval(() => setFlipPage((p) => p + 1), stepPause * 1000);
     return () => clearInterval(timer);
-  }, [scrollMode, stepPause, chips.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollMode, stepPause]);
 
   const flipShift = chips.length > 0 ? (flipPage * visibleCount) % chips.length : 0;
-  const flipChips = [...chips.slice(flipShift), ...chips.slice(0, flipShift)];
+  const flipChips = useMemo(
+    () => [...chips.slice(flipShift), ...chips.slice(0, flipShift)],
+    [chips, flipShift],
+  );
   const transitionDuration = Math.max(0.15, 1.2 - (speed - 5) * 0.0072);
 
-  // ── Render based on scroll mode ───────────────────────────────
+  // ── Render: single container, crossfade between mode subtrees ────
+  // Keeping all three modes inside one outer <div ref={containerRef}>
+  // means scroll-mode changes only swap the *inner* mode content. The
+  // ResizeObserver, the Ticker's internal track, and step/flip state
+  // all persist across mode-swap UI feedback.
 
-  if (scrollMode === "flip") {
-    return (
-      <div ref={containerRef} className="ticker-container w-full py-2 overflow-hidden relative">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={flipPage}
-            initial={{ y: "100%", opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: "-100%", opacity: 0 }}
-            transition={{ duration: transitionDuration, ease: [0.25, 0.1, 0.25, 1] }}
-            className="flex items-center h-full px-2"
-            style={{ gap }}
-          >
-            {flipChips.map((chip, i) => (
-              <PreviewChip key={`${chip.label}-${chip.value}-${i}`} chip={chip} comfort={comfort} colorMode={colorMode} />
-            ))}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    );
-  }
-
-  // Continuous and step both use the Ticker component (same as real ticker)
   const isStep = scrollMode === "step";
   const velocity = direction === "left" ? speed : -speed;
 
   return (
     <div ref={containerRef} className="ticker-container w-full py-2 overflow-hidden relative">
-      <Ticker
-        items={chipItems}
-        velocity={isStep ? 0 : velocity}
-        offset={isStep ? offset : undefined}
-        hoverFactor={isStep ? 1 : (pauseOnHover ? hoverSpeed : 1)}
-        gap={gap}
-        fade={40}
-      />
+      <AnimatePresence mode="popLayout" initial={false}>
+        {scrollMode === "flip" ? (
+          <motion.div
+            key="mode-flip"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+            className="w-full"
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={flipPage}
+                initial={{ y: "100%", opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: "-100%", opacity: 0 }}
+                transition={{ duration: transitionDuration, ease: [0.25, 0.1, 0.25, 1] }}
+                className="flex items-center h-full px-2"
+                style={{ gap }}
+              >
+                {flipChips.map((chip, i) => (
+                  <PreviewChip
+                    key={`${chip.label}-${chip.value}-${i}`}
+                    chip={chip}
+                    comfort={comfort}
+                    colorMode={colorMode}
+                  />
+                ))}
+              </motion.div>
+            </AnimatePresence>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="mode-scroll"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+            className="w-full"
+          >
+            <Ticker
+              items={chipItems}
+              velocity={isStep ? 0 : velocity}
+              offset={isStep ? offset : undefined}
+              hoverFactor={isStep ? 1 : (pauseOnHover ? hoverSpeed : 1)}
+              gap={gap}
+              fade={40}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

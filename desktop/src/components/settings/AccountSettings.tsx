@@ -16,6 +16,7 @@ import type { SubscriptionInfo } from "../../api/client";
 import { Section, DisplayRow, ActionRow } from "./SettingsControls";
 import AccountExportButton from "./AccountExportButton";
 import ProfileField from "./ProfileField";
+import ConfirmDialog from "../ConfirmDialog";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -75,6 +76,13 @@ export default function AccountSettings({
   const [resetState, setResetState] = useState<
     "idle" | "sending" | "sent"
   >("idle");
+  // Phase 1 (Apr 26): sign-out used to be one-click. Reset, channel
+  // delete, and other destructive actions all confirm — sign-out
+  // shouldn't be the odd one out, especially given how disruptive
+  // the post-logout state is (loses ticker SSE, drops cached data,
+  // free tier reset). We gate on a ConfirmDialog with copy that
+  // names the consequences.
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   const identity = authenticated ? getUserIdentity() : null;
   const userLabel = identity?.email ?? identity?.name ?? null;
   const queryClient = useQueryClient();
@@ -180,7 +188,7 @@ export default function AccountSettings({
               label=""
               action="Sign out"
               actionClass="text-fg-4 hover:text-error hover:bg-error/10"
-              onClick={onLogout}
+              onClick={() => setConfirmSignOut(true)}
             />
           </>
         ) : (
@@ -409,6 +417,21 @@ export default function AccountSettings({
         </Section>
       )}
 
+      {/* Sign-out confirmation. Mounted unconditionally so the close
+          animation runs even after `authenticated` flips false during
+          the logout flow. */}
+      <ConfirmDialog
+        open={confirmSignOut}
+        title="Sign out of Scrollr?"
+        description="You'll need to sign in again to access your subscription, profile, and saved data on this machine. Local preferences (ticker layout, widgets) stay intact."
+        confirmLabel="Sign out"
+        destructive
+        onConfirm={() => {
+          setConfirmSignOut(false);
+          onLogout();
+        }}
+        onCancel={() => setConfirmSignOut(false)}
+      />
     </div>
   );
 }

@@ -14,6 +14,8 @@ import SourcePageLayout, { parseSourceTab, SourceNotFound } from "../components/
 import { getWidget } from "../widgets/registry";
 import WidgetConfigPanel from "../widgets/WidgetConfigPanel";
 import { useShell } from "../shell-context";
+import { useUndoableAction } from "../hooks/useUndoableAction";
+import { disableWidget } from "../preferences";
 
 export const Route = createFileRoute("/widget/$id/$tab")({
   component: WidgetRoute,
@@ -26,7 +28,15 @@ function WidgetRoute() {
   const tab = parseSourceTab(rawTab);
 
   const widget = getWidget(id);
-  const { onToggleWidget } = useShell();
+  // Undoable wrapper for the Trash button. Pre-Phase-1 widget removal
+  // was completely silent — clicked Trash → widget gone from sidebar,
+  // ticker, and pinned slots, with no toast and no recovery. We snapshot
+  // the prefs blob, mutate via `disableWidget` (a pure helper that
+  // strips the widget from `enabledWidgets` and `widgetsOnTicker`), and
+  // sonner shows a 5-second Undo toast. Click Undo → restored prefs
+  // re-flow through the cross-window store sync so the sidebar / ticker
+  // re-add the widget without a refresh.
+  const undoable = useUndoableAction();
 
   if (!widget) {
     return <SourceNotFound kind="Widget" name={id} />;
@@ -41,7 +51,18 @@ function WidgetRoute() {
       }
       onBack={() => navigate({ to: "/feed" })}
       onRemove={() => {
-        onToggleWidget(id);
+        undoable(
+          {
+            label: `Removed ${widget.name}`,
+            description: "Widget hidden from sidebar and ticker.",
+          },
+          (current) => disableWidget(current, id),
+        );
+        // Navigate away regardless of undo state — the user explicitly
+        // asked to leave this widget's page. Clicking Undo from /feed
+        // restores the widget but keeps you on /feed, which is fine
+        // (the widget reappears in the sidebar; the user can click
+        // back into it if they want).
         navigate({ to: "/feed" });
       }}
       sourceKind="widget"

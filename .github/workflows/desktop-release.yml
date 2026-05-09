@@ -13,6 +13,11 @@ on:
           - windows
           - macos
           - linux
+      notarize:
+        description: "Apple notarization (macOS only). Off by default to keep builds fast; turn on for public releases."
+        required: false
+        default: false
+        type: boolean
   push:
     branches: [main]
     paths:
@@ -66,6 +71,14 @@ jobs:
       matrix: ${{ fromJson(needs.matrix-setup.outputs.matrix) }}
 
     runs-on: ${{ matrix.platform }}
+    # Healthy desktop builds (incl. macOS notarize) complete in ~10 min. We cap
+    # the job at 25 min so a stuck notarytool poll — e.g. when a macos-14 runner
+    # loses network mid-submission and Foundation returns NSURLErrorDomain
+    # Code=-1009 — fails fast instead of consuming the full 6h GitHub default.
+    # See run #25578604859: notarize hung for 51 min on a "No network route"
+    # error before the workflow gave up. With this cap, the same flake costs
+    # ~25 min and frees the runner for a retry.
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: desktop
@@ -183,11 +196,20 @@ jobs:
       # Apple secrets (APPLE_*) are only consumed by macOS builds. tauri-action
       # imports the .p12 into a temporary keychain, codesigns the .app bundle,
       # then submits to notarytool for Apple notarization. Other matrix targets
-      # (Windows, Linux) ignore them. If any APPLE_* secret is missing on a
-      # macOS build, tauri-action skips signing and produces an unsigned bundle
-      # (the build still succeeds, just without notarization). We don't fail
-      # the workflow on missing Apple secrets so the Linux/Windows builds keep
-      # working during initial rollout / cert renewal.
+      # (Windows, Linux) ignore them.
+      #
+      # Notarization is gated behind the `notarize` workflow_dispatch input
+      # (default: false). When off, APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID
+      # are passed empty, which causes tauri-action to codesign the .app
+      # locally but skip the notarytool submission. This keeps day-to-day
+      # macOS builds at ~10 minutes instead of ~50+ when notary or its
+      # network has issues. Enable notarize=true only when cutting a public
+      # release that needs to bypass Gatekeeper warnings on first launch.
+      #
+      # Push triggers always skip notarize because `inputs.notarize` is unset
+      # on push events (treated as false by the ternary). If any APPLE_*
+      # secret is missing on a macOS build, tauri-action falls back to an
+      # unsigned bundle and the build still succeeds.
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -196,13 +218,16 @@ jobs:
           VITE_API_URL: ${{ secrets.DESKTOP_VITE_API_URL }}
           VITE_AUTH_ENDPOINT: ${{ secrets.DESKTOP_VITE_AUTH_ENDPOINT }}
           VITE_LOGTO_APP_ID: ${{ secrets.DESKTOP_VITE_LOGTO_APP_ID }}
-          # Apple code-signing + notarization (macOS only; ignored on other runners)
+          # Apple code-signing (macOS only; ignored on other runners). Always
+          # present so the .app bundle gets a Developer ID signature.
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Apple notarization credentials — only set when notarize=true.
+          # When empty, tauri-action signs but skips the notarytool submit.
+          APPLE_ID: ${{ inputs.notarize && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ inputs.notarize && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ inputs.notarize && secrets.APPLE_TEAM_ID || '' }}
         with:
           projectPath: desktop
           tauriScript: npx tauri

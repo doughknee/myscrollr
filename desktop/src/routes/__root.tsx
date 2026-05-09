@@ -19,6 +19,7 @@ import {
   isEnabled as isAutostartEnabled,
 } from "@tauri-apps/plugin-autostart";
 import { getVersion } from "@tauri-apps/api/app";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import clsx from "clsx";
 import { Toaster, toast } from "sonner";
 import "sonner/dist/styles.css";
@@ -27,6 +28,7 @@ import "sonner/dist/styles.css";
 import TitleBar from "../components/TitleBar";
 import Sidebar from "../components/Sidebar";
 import ConnectionBanner from "../components/ConnectionBanner";
+import ConnectionIndicator from "../components/ConnectionIndicator";
 
 // Onboarding
 import AuthGate from "../components/onboarding/AuthGate";
@@ -48,6 +50,12 @@ import {
   consumeTickerLayoutChanged,
 } from "../preferences";
 import type { AppPreferences } from "../preferences";
+import {
+  gcExpired as undoStackGc,
+  pushSnapshot as pushUndoSnapshot,
+  restoreSnapshot as restoreUndoSnapshot,
+} from "../lib/undoStack";
+import { showTipOnce, TIP_IDS } from "../lib/tips";
 
 // Types
 import type { DeliveryMode } from "../types";
@@ -60,6 +68,7 @@ import { useChannelActions } from "../hooks/useChannelActions";
 import { useWidgetActions } from "../hooks/useWidgetActions";
 import { useDashboardCDC } from "../hooks/useDashboardCDC";
 import { useTauriListener } from "../hooks/useTauriListener";
+import { useDeliveryHealth } from "../hooks/useDeliveryHealth";
 import { weatherQueryOptions } from "../api/queries";
 import { fetchSubscription } from "../api/client";
 import { getValidToken } from "../auth";
@@ -196,16 +205,152 @@ function RootLayout() {
   // See `migrateTickerLayout` and `consumeTickerLayoutChanged` in
   // preferences.ts for why we use a transient module-level signal
   // instead of plumbing a flag through the loadPrefs return value.
+  //
+  // Phase 1 (Apr 26) upgrade: the toast now lists the affected
+  // sources by name and offers Undo. Clicking Undo restores the
+  // pre-clamp layout from a snapshot the migration captured before
+  // it dropped rows. The undo here is best-effort — if the user is
+  // genuinely on a lower tier the next loadPrefs will re-clamp; the
+  // user is expected to take a real action (upgrade or rearrange)
+  // within the same session for the restore to "stick".
   useEffect(() => {
-    if (consumeTickerLayoutChanged()) {
-      toast.info("Your ticker layout was simplified to fit your plan.");
-    }
+    const change = consumeTickerLayoutChanged();
+    if (!change) return;
+
+    const sourceList = change.droppedSources.slice(0, 3).join(", ");
+    const more =
+      change.droppedSources.length > 3
+        ? ` and ${change.droppedSources.length - 3} more`
+        : "";
+    const description =
+      change.droppedSources.length > 0
+        ? `Removed: ${sourceList}${more}.`
+        : undefined;
+
+    // Snapshot the *current* (post-clamp) prefs before the toast
+    // fires. If the user clicks Undo we splice the saved pre-clamp
+    // rows back into that snapshot so the rest of the prefs (theme,
+    // widgets, channels) stay current.
+    const id = pushUndoSnapshot("Tier-clamp restore", prefs);
+
+    toast.message("Your ticker layout was simplified to fit your plan.", {
+      id: "scrollr-tier-clamp",
+      description,
+      duration: 8_000,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          const base = restoreUndoSnapshot(id) ?? prefs;
+          const restored: AppPreferences = {
+            ...base,
+            appearance: {
+              ...base.appearance,
+              tickerLayout: { rows: change.preClampRows },
+            },
+          };
+          setPrefs(restored);
+          savePrefs(restored);
+          toast.success("Layout restored", {
+            id: "scrollr-tier-clamp",
+            duration: 1_500,
+          });
+        },
+      },
+    });
+    // We intentionally exclude `prefs` from the deps array. The toast
+    // and snapshot are a one-shot reaction to the migration that
+    // already happened during loadPrefs; capturing the post-clamp
+    // prefs at mount-time is correct.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [appVersion, setAppVersion] = useState("");
   useEffect(() => {
     getVersion().then(setAppVersion).catch(() => {});
   }, []);
+
+  // ── Undo snapshot GC ───────────────────────────────────────
+  // Snapshots pushed by `useUndoableAction` live in a module-level
+  // ring buffer (see lib/undoStack.ts). They auto-expire 60s after
+  // creation, but the module doesn't run its own timer to keep tests
+  // deterministic — the shell drives GC instead. A 10s cadence is
+  // generous: snapshots only need to be cleaned up roughly on the
+  // order of their lifetime, and we don't want a per-second timer
+  // adding noise to React DevTools.
+  useEffect(() => {
+    const timer = setInterval(() => undoStackGc(), 10_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Inline persist helper used by the tip-firing effects below — we
+  // can't reach `handlePrefsChange` here because it's declared further
+  // down (after Sidebar / Outlet). Tip effects live up here so they
+  // can subscribe to authentication early.
+  const persistPrefs = useCallback((next: AppPreferences) => {
+    setPrefs(next);
+    savePrefs(next);
+  }, []);
+
+  // ── First-run discovery tip: right-click the ticker ─────────
+  // Surfaces the ticker context menu (channels, widgets, position,
+  // "Customize Ticker") to users who would never know it exists.
+  // Fires exactly once per install, gated on `prefs.tipsShown`. We
+  // delay 4 seconds to let the wizard close and the dashboard paint
+  // first — the toast is meant to be a gentle nudge, not a greeting.
+  useEffect(() => {
+    if (!auth.authenticated) return;
+    if (!prefs.ticker.showTicker) return;
+    if (prefs.tipsShown.includes(TIP_IDS.TICKER_RIGHT_CLICK)) return;
+    const t = setTimeout(() => {
+      showTipOnce(TIP_IDS.TICKER_RIGHT_CLICK, prefs, persistPrefs, {
+        title: "Tip: right-click the ticker",
+        description:
+          "Quick controls for channels, widgets, position, and Customize Ticker.",
+        duration: 7_000,
+      });
+    }, 4_000);
+    return () => clearTimeout(t);
+    // We only want this to fire once per session at most. The deps
+    // are intentionally narrow.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.authenticated, prefs.ticker.showTicker]);
+
+  // ── First-run discovery tip: tray still running on close ────
+  // Triggered when the user clicks the title-bar X for the first
+  // time. Tauri's default behavior on this app is "hide, don't quit"
+  // — the tray icon keeps running. New users assume X = quit (most
+  // apps do), so when they realise the ticker is still on top they
+  // panic. This tip explicitly tells them where to find the app
+  // again.
+  //
+  // We listen for the close-requested event AND fire the tip BEFORE
+  // hiding so the toast lingers in the user's last frame of the
+  // window. It also nudges them to use the tray icon next time.
+  useEffect(() => {
+    if (!auth.authenticated) return;
+    if (prefs.tipsShown.includes(TIP_IDS.TRAY_STILL_RUNNING)) return;
+    const win = getCurrentWindow();
+    let unlisten: (() => void) | undefined;
+    win
+      .onCloseRequested(() => {
+        showTipOnce(TIP_IDS.TRAY_STILL_RUNNING, prefs, persistPrefs, {
+          title: "Scrollr is still running",
+          description:
+            "Click the tray icon (top of your screen) to bring the app back.",
+          duration: 8_000,
+        });
+        // Don't preventDefault — let Tauri's hide-on-close behavior
+        // run as configured. The toast appears, the window hides;
+        // next time the user reopens, the toast is gone but the
+        // tipsShown flag is set so it never fires again.
+      })
+      .then((u) => {
+        unlisten = u;
+      })
+      .catch(() => {});
+    return () => unlisten?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.authenticated, prefs.tipsShown.length]);
 
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>(() =>
     loadPref<DeliveryMode>("deliveryMode", "polling"),
@@ -236,6 +381,24 @@ function RootLayout() {
       setDeliveryMode(mode);
     },
   );
+
+  // ── Connection-health tick ──────────────────────────────────
+  // Drives the "X ago" age label in `ConnectionIndicator`. We tick
+  // once every 5s — the indicator only changes label visibly at the
+  // boundary between "Live" and "Stale" (60s) and at the offline
+  // threshold (5min), so a 1Hz timer would over-render. 5s is enough
+  // resolution to keep the age label feeling alive without burning
+  // a frame per second.
+  const [healthNow, setHealthNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setHealthNow(Date.now()), 5_000);
+    return () => clearInterval(t);
+  }, []);
+  const deliveryHealth = useDeliveryHealth({
+    deliveryMode,
+    tier: auth.tier,
+    now: healthNow,
+  });
 
   // ── Tray navigation (e.g. "Report a Bug" menu item) ────────
   useTauriListener<string>("navigate-to", (event) => {
@@ -491,10 +654,10 @@ function RootLayout() {
 
   // ── Settings handlers ───────────────────────────────────────
 
-  const handlePrefsChange = useCallback((next: AppPreferences) => {
-    setPrefs(next);
-    savePrefs(next);
-  }, []);
+  // Alias for the inline `persistPrefs` declared earlier in this
+  // component — kept under its original name so all the existing
+  // shell-context wiring further down continues to read naturally.
+  const handlePrefsChange = persistPrefs;
 
   const handleOnboardingComplete = useCallback((nextPrefs: AppPreferences) => {
     setPrefs(nextPrefs);
@@ -593,6 +756,16 @@ function RootLayout() {
             />
 
             <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+              {/* Connection indicator — pinned top-right so it's
+                  always visible without consuming layout. Hovers to
+                  reveal full state description. Phase 2 (Apr 26): the
+                  ConnectionBanner below still fires on actual outages,
+                  but THIS dot is the always-on signal. */}
+              <ConnectionIndicator
+                health={deliveryHealth}
+                className="absolute top-1 right-2 z-20"
+              />
+
               <ConnectionBanner deliveryMode={deliveryMode} tier={auth.tier} />
 
               {auth.sessionExpired && (

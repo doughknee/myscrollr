@@ -16,12 +16,21 @@
  * /widget header. When `maxRows === 1` (Free tier) labels collapse to
  * `[Off] [On]` since there's only one row to choose from.
  *
+ * +Add row affordance: when `canAddRow` and `onAddRow` are provided,
+ * a trailing dashed `[+ Add]` button is rendered after the row buttons.
+ * Clicking it asks the parent to create a new row and assign the
+ * current source to it (a single-click flow that previously required
+ * leaving Home, opening Settings → Ticker, clicking "Add row", going
+ * back to Home, and reassigning the source — five steps for one
+ * intent). The button hides automatically once the layout is at the
+ * tier cap.
+ *
  * Disabled state: when the channel is disabled at the catalog level,
  * the entire control fades and shows a hint to enable it from Catalog.
- *
- * See docs/superpowers/specs/2026-04-28-batch-d-…-design.md §Stream 3.
  */
 import clsx from "clsx";
+import { Plus } from "lucide-react";
+import Tooltip from "./Tooltip";
 
 interface RowSelectorProps {
   /** Currently selected row (0..maxRows-1) or null for off. */
@@ -38,6 +47,20 @@ interface RowSelectorProps {
   ariaLabel?: string;
   /** Optional className appended to the radiogroup container. */
   className?: string;
+  /**
+   * When provided alongside `canAddRow`, render a trailing dashed
+   * `[+ Add]` button after the row buttons. The handler should both
+   * create a new row in the layout AND assign this source to it (use
+   * `useTickerLayout().addRow(sourceId)` for the canonical flow).
+   */
+  onAddRow?: () => void;
+  /**
+   * Whether the layout has room for another row (i.e. the user's tier
+   * allows at least one more). When false, the +Add button hides
+   * (rather than showing as disabled — there's no useful click path
+   * from a tier cap).
+   */
+  canAddRow?: boolean;
 }
 
 interface RowButton {
@@ -54,6 +77,8 @@ export default function RowSelector({
   onChange,
   ariaLabel = "Ticker row",
   className,
+  onAddRow,
+  canAddRow = false,
 }: RowSelectorProps) {
   // Build the button list. With a single row available we use [Off]/[On]
   // because "Row 1" sounds wrong when there's nothing else.
@@ -66,6 +91,12 @@ export default function RowSelector({
       buttons.push({ key: `row-${i}`, label: `Row ${i + 1}`, row: i });
     }
   }
+
+  // Only surface the +Add affordance when both the parent says it's
+  // possible AND a handler exists. We don't render a disabled button at
+  // the tier cap — the layout summary on Home explains the cap with
+  // the upgrade copy, so a dead button here is just noise.
+  const showAdd = !disabled && canAddRow && typeof onAddRow === "function";
 
   return (
     <div className={clsx("flex flex-col gap-1", className)}>
@@ -102,6 +133,25 @@ export default function RowSelector({
             </button>
           );
         })}
+        {showAdd && (
+          <Tooltip
+            content="Create a new ticker row and put this source on it"
+            side="top"
+          >
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddRow?.();
+              }}
+              aria-label="Add a new row and assign this source to it"
+              className="flex items-center gap-0.5 px-2 py-0.5 rounded text-[11px] font-medium border border-dashed border-edge/60 text-fg-4 hover:text-accent hover:border-accent/60 transition-colors ml-0.5"
+            >
+              <Plus size={10} />
+              Add
+            </button>
+          </Tooltip>
+        )}
       </div>
       {disabled && disabledHint && (
         <p className="text-[11px] text-fg-4">{disabledHint}</p>

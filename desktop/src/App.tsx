@@ -10,6 +10,7 @@ import { dashboardQueryOptions, queryKeys } from "./api/queries";
 import { onStoreChange, setStore } from "./lib/store";
 import ScrollrTicker from "./components/ScrollrTicker";
 import TickerToolbar from "./components/TickerToolbar";
+import { useReliableHover } from "./hooks/useReliableHover";
 import {
   getValidToken,
   isAuthenticated as checkAuth,
@@ -30,6 +31,7 @@ import {
   toggleWidgetPin,
   setChannelTickerRow,
   setWidgetTickerRow,
+  setTickerLayout,
   getChannelTickerRow,
   getWidgetTickerRow,
 } from "./preferences";
@@ -122,8 +124,20 @@ export default function App() {
     loadPref("tickerPosition", "top"),
   );
 
-  // Hover state for toolbar visibility
-  const [hovered, setHovered] = useState(false);
+  // Hover state for toolbar visibility.
+  //
+  // We use a custom `useReliableHover` hook instead of plain
+  // `onMouseEnter` / `onMouseLeave` because the ticker is a
+  // borderless, always-on-top Tauri window where standard
+  // `mouseleave` sticks: alt-tabbing, switching desktops, or
+  // clicking through to a window behind the ticker leaves the
+  // hover state stuck in `true`, keeping the toolbar visible and
+  // the persistent right-click hint hidden indefinitely. The hook
+  // layers `pointerleave` + `window.blur` +
+  // `document.visibilitychange` + a grace-poll backstop so the
+  // state always settles back to `false` when the user's
+  // attention is elsewhere. See `hooks/useReliableHover.ts`.
+  const { hovered, bind: hoverBind } = useReliableHover();
 
   // Settings preferences
   const [prefs, setPrefs] = useState<AppPreferences>(loadPrefs);
@@ -276,7 +290,8 @@ export default function App() {
       if (next.window.tickerPosition !== prev.window.tickerPosition) {
         setTickerPosition(next.window.tickerPosition);
         savePref("tickerPosition", next.window.tickerPosition);
-        const h = Math.round(TICKER_HEIGHTS[next.ticker.tickerMode] * next.appearance.tickerRows * (next.appearance.uiScale / 100));
+        const rowCount = next.appearance.tickerLayout.rows.length;
+        const h = Math.round(TICKER_HEIGHTS[next.ticker.tickerMode] * rowCount * (next.appearance.uiScale / 100));
         invoke("position_ticker", { position: next.window.tickerPosition, height: h }).catch(() => {});
       }
 
@@ -301,8 +316,9 @@ export default function App() {
   // ── Initial setup ────────────────────────────────────────────
 
   useEffect(() => {
+    const rowCount = prefs.appearance.tickerLayout.rows.length;
     const tickerH = prefs.ticker.showTicker
-      ? Math.round(TICKER_HEIGHTS[prefs.ticker.tickerMode] * prefs.appearance.tickerRows * (prefs.appearance.uiScale / 100))
+      ? Math.round(TICKER_HEIGHTS[prefs.ticker.tickerMode] * rowCount * (prefs.appearance.uiScale / 100))
       : 0;
     if (tickerH > 0) {
       // position_ticker sets size + position atomically via compositor
@@ -325,15 +341,16 @@ export default function App() {
   // position calculation reads the old height.
 
   useEffect(() => {
+    const rowCount = prefs.appearance.tickerLayout.rows.length;
     const tickerH = prefs.ticker.showTicker
-      ? Math.round(TICKER_HEIGHTS[prefs.ticker.tickerMode] * prefs.appearance.tickerRows * (prefs.appearance.uiScale / 100))
+      ? Math.round(TICKER_HEIGHTS[prefs.ticker.tickerMode] * rowCount * (prefs.appearance.uiScale / 100))
       : 0;
     if (tickerH > 0) {
       invoke("position_ticker", { position: tickerPosition, height: tickerH }).catch(() => {});
     }
   }, [
     prefs.ticker.tickerMode,
-    prefs.appearance.tickerRows,
+    prefs.appearance.tickerLayout.rows.length,
     prefs.appearance.uiScale,
     prefs.ticker.showTicker,
     tickerPosition,
@@ -438,7 +455,8 @@ export default function App() {
     };
     setPrefs(updated);
     savePrefs(updated);
-    const h = Math.round(TICKER_HEIGHTS[updated.ticker.tickerMode] * updated.appearance.tickerRows * (updated.appearance.uiScale / 100));
+    const rowCount = updated.appearance.tickerLayout.rows.length;
+    const h = Math.round(TICKER_HEIGHTS[updated.ticker.tickerMode] * rowCount * (updated.appearance.uiScale / 100));
     invoke("position_ticker", { position: next, height: h }).catch(() => {});
   }, [tickerPosition]);
 
@@ -510,16 +528,24 @@ export default function App() {
       const tierMax = getMaxTickerRows(tierRef.current);
       const layoutRows = prefsRef.current?.appearance?.tickerLayout?.rows
         ?.length ?? 1;
-      const maxRows = Math.max(1, Math.min(tierMax, layoutRows));
+      const pickerRows = Math.max(1, Math.min(tierMax, layoutRows));
+      // Whether the layout has headroom for another row. When true, the
+      // submenu surfaces a "+ Add row & assign" item so the user can
+      // grow the layout without leaving the tray menu — same one-click
+      // affordance as the Home-page RowSelector's [+ Add] button.
+      const canAddRowFromTray = layoutRows < tierMax;
 
       // Build one submenu of row CheckMenuItems for a source. The "Off"
-      // entry is always present; row entries 1..maxRows follow.
+      // entry is always present; row entries 1..pickerRows follow.
+      // When `onAddNewRow` is provided AND the layout has headroom,
+      // a trailing "+ Add row & assign" MenuItem is appended.
       async function buildRowSubmenuItems(
         currentRow: number | null,
         onPick: (row: number | null) => void,
         disabled: boolean,
-      ): Promise<CheckMenuItem[]> {
-        const rowItems: CheckMenuItem[] = [];
+        onAddNewRow?: () => void,
+      ): Promise<(CheckMenuItem | MenuItem | PredefinedMenuItem)[]> {
+        const rowItems: (CheckMenuItem | MenuItem | PredefinedMenuItem)[] = [];
         rowItems.push(
           await CheckMenuItem.new({
             text: "Off",
@@ -528,7 +554,7 @@ export default function App() {
             action: () => onPick(null),
           }),
         );
-        if (maxRows === 1) {
+        if (pickerRows === 1) {
           rowItems.push(
             await CheckMenuItem.new({
               text: "On",
@@ -538,7 +564,7 @@ export default function App() {
             }),
           );
         } else {
-          for (let i = 0; i < maxRows; i++) {
+          for (let i = 0; i < pickerRows; i++) {
             rowItems.push(
               await CheckMenuItem.new({
                 text: `Row ${i + 1}`,
@@ -549,7 +575,48 @@ export default function App() {
             );
           }
         }
+        if (canAddRowFromTray && onAddNewRow && !disabled) {
+          rowItems.push(await PredefinedMenuItem.new({ item: "Separator" }));
+          rowItems.push(
+            await MenuItem.new({
+              text: "Add row & assign",
+              action: onAddNewRow,
+            }),
+          );
+        }
         return rowItems;
+      }
+
+      // Append an empty row to the layout, then optimistically assign
+      // `sourceId` to it. We do the assignment via a follow-up call to
+      // setChannelTickerRow / setWidgetTickerRow rather than seeding
+      // the layout in one step, because the channel branch also needs
+      // to flip the server-side `ticker_enabled` flag — reusing the
+      // existing handlers keeps that logic in one place.
+      function addRowAndAssign(
+        sourceId: string,
+        kind: "channel" | "widget",
+      ): void {
+        const current = prefsRef.current.appearance.tickerLayout;
+        const tier = tierRef.current;
+        const cap = getMaxTickerRows(tier);
+        if (current.rows.length >= cap) return;
+        const newIndex = current.rows.length;
+        const withRow = setTickerLayout(prefsRef.current, {
+          rows: [...current.rows, { sources: [] }],
+        });
+        // Persist the new row first so the assign helper sees a layout
+        // long enough to accept the new index.
+        prefsRef.current = withRow;
+        setPrefs(withRow);
+        savePrefs(withRow);
+        // Now thread through the existing per-kind handler (channel
+        // also flips server-side flag; widget is purely client-side).
+        if (kind === "channel") {
+          handleChannelRowChange(sourceId as ChannelType, newIndex);
+        } else {
+          handleWidgetRowChange(sourceId, newIndex);
+        }
       }
 
       // Channels submenu (only when authenticated with channels)
@@ -572,6 +639,7 @@ export default function App() {
               handleChannelRowChange(channelType, row);
             },
             !ch.enabled,
+            () => addRowAndAssign(channelType, "channel"),
           );
           channelSubmenus.push(
             await Submenu.new({ text: label, items: rowItems }),
@@ -592,6 +660,7 @@ export default function App() {
             currentRow,
             (row) => handleWidgetRowChange(widget.id, row),
             false,
+            () => addRowAndAssign(widget.id, "widget"),
           );
           widgetSubmenus.push(
             await Submenu.new({ text: widget.name, items: rowItems }),
@@ -689,11 +758,7 @@ export default function App() {
   const showTicker = prefs.ticker.showTicker;
 
   return (
-    <div
-      id="desktop-shell"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
+    <div id="desktop-shell" {...hoverBind}>
       {showTicker && (
         <>
           <TickerToolbar
