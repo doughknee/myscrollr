@@ -260,7 +260,7 @@ export default function FeedManager({
           <h3 className="text-sm font-semibold text-fg">Feeds</h3>
           <span
             className={clsx(
-              "px-1.5 py-px rounded-full text-[11px] font-medium tabular-nums",
+              "px-1.5 py-px rounded-full text-ui-chip font-medium tabular-nums",
               atFeedLimit ? "bg-warn/15 text-warn" : "bg-accent/15 text-accent",
             )}
           >
@@ -272,7 +272,7 @@ export default function FeedManager({
           <button
             onClick={() => setShowCustomForm((v) => !v)}
             className={clsx(
-              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[11px] font-medium",
+              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-ui-meta font-medium",
               "transition-all duration-150 active:scale-95",
               showCustomForm
                 ? "border-accent/50 bg-accent/10 text-accent"
@@ -307,11 +307,11 @@ export default function FeedManager({
           >
             <div className="p-3 rounded-lg border border-edge/40 bg-surface-2 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase tracking-wider font-bold text-fg-4">
+                <span className="text-ui-section uppercase tracking-wider font-bold text-fg-3">
                   Add your own feed
                 </span>
                 {maxCustomFeeds !== Infinity && (
-                  <span className="text-[10px] text-fg-4 tabular-nums">
+                  <span className="text-ui-chip text-fg-3 tabular-nums">
                     {customCount}/{maxCustomFeeds} custom
                   </span>
                 )}
@@ -331,7 +331,7 @@ export default function FeedManager({
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
                       placeholder="Feed name"
-                      className="flex-1 px-2.5 py-1.5 rounded-md bg-base-200 border border-edge/40 text-[11px] font-mono text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
+                      className="flex-1 px-2.5 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta font-mono text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
                     />
                     <input
                       type="url"
@@ -341,7 +341,7 @@ export default function FeedManager({
                         if (e.key === "Enter") handleAddCustom();
                       }}
                       placeholder="https://..."
-                      className="flex-[2] px-2.5 py-1.5 rounded-md bg-base-200 border border-edge/40 text-[11px] font-mono text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
+                      className="flex-[2] px-2.5 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta font-mono text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
                     />
                     <button
                       onClick={handleAddCustom}
@@ -349,11 +349,11 @@ export default function FeedManager({
                       className="px-2.5 py-1.5 rounded-md bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20 transition-all duration-150 active:scale-95 flex items-center gap-1 disabled:opacity-30 cursor-pointer"
                     >
                       <Plus size={11} />
-                      <span className="text-[11px] font-medium">Add</span>
+                      <span className="text-ui-meta font-medium">Add</span>
                     </button>
                   </div>
                   {urlError && (
-                    <p className="text-[11px] text-error/70">{urlError}</p>
+                    <p className="text-ui-meta text-error/80">{urlError}</p>
                   )}
                 </>
               )}
@@ -366,14 +366,14 @@ export default function FeedManager({
         <div className="relative flex-1 min-w-0">
           <SearchIcon
             size={12}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-4 pointer-events-none"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3 pointer-events-none"
           />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search feeds..."
-            className="w-full pl-7 pr-7 py-1.5 rounded-md bg-base-200 border border-edge/40 text-[11px] text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
+            className="w-full pl-7 pr-7 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
           />
           {search && (
             <button
@@ -405,7 +405,7 @@ export default function FeedManager({
             onClick={() => setTrackedOnly((v) => !v)}
             aria-pressed={trackedOnly}
             className={clsx(
-              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[11px] cursor-pointer whitespace-nowrap",
+              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-ui-meta cursor-pointer whitespace-nowrap",
               "transition-all duration-200 active:scale-95",
               trackedOnly
                 ? "border-accent/50 bg-accent/10 text-accent"
@@ -426,7 +426,7 @@ export default function FeedManager({
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as SortKey)}
-          className="px-2 py-1.5 rounded-md bg-base-200 border border-edge/40 text-[11px] text-fg-2 focus:outline-none focus:border-accent/60 transition-colors cursor-pointer appearance-none"
+          className="px-2 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta text-fg-2 focus:outline-none focus:border-accent/60 transition-colors cursor-pointer appearance-none"
           aria-label="Sort feeds"
         >
           <option value="default">Tracked first</option>
@@ -442,7 +442,7 @@ export default function FeedManager({
             <button
               key={cat}
               onClick={() => toggleCategory(cat)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-[10px] text-accent hover:bg-accent/25 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-ui-chip text-accent hover:bg-accent/25 transition-colors cursor-pointer"
             >
               {cat}
               <X size={10} className="opacity-60" />
@@ -450,7 +450,7 @@ export default function FeedManager({
           ))}
           <button
             onClick={() => setSelectedCategories(new Set())}
-            className="px-2 py-0.5 text-[10px] text-fg-4 hover:text-fg-2 transition-colors cursor-pointer"
+            className="px-2 py-0.5 text-ui-chip text-fg-3 hover:text-fg-2 transition-colors cursor-pointer"
           >
             Clear all
           </button>
@@ -459,7 +459,7 @@ export default function FeedManager({
 
       {loading ? (
         <div className="shrink-0 text-center py-8">
-          <p className="text-[11px] text-fg-4 animate-pulse">Loading catalog...</p>
+          <p className="text-ui-meta text-fg-3 animate-pulse">Loading catalog...</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="shrink-0">
@@ -560,22 +560,22 @@ function FeedRow({ feed, atLimit, saving, onToggle }: FeedRowProps) {
       </div>
 
       <div className="flex-1 min-w-0">
-        <span className="text-[12px] font-medium text-fg-2 truncate block">
+        <span className="text-ui-body font-medium text-fg-2 truncate block">
           {feed.name}
         </span>
         {feed.catalog?.last_success_at && tracked && (
-          <span className="text-[10px] text-fg-4 truncate block">
+          <span className="text-ui-meta text-fg-3 truncate block">
             {relativeTime(feed.catalog.last_success_at)}
           </span>
         )}
       </div>
 
       {feed.isCustom ? (
-        <span className="shrink-0 px-1.5 py-px rounded text-[9px] font-medium bg-amber-500/10 text-amber-500 border border-amber-500/30">
+        <span className="shrink-0 px-1.5 py-px rounded text-ui-chip font-medium bg-amber-500/10 text-amber-500 border border-amber-500/30">
           custom
         </span>
       ) : (
-        <span className="shrink-0 px-1.5 py-px rounded text-[9px] text-fg-4 bg-surface-hover whitespace-nowrap">
+        <span className="shrink-0 px-1.5 py-px rounded text-ui-chip text-fg-3 bg-surface-hover whitespace-nowrap">
           {feed.category}
         </span>
       )}

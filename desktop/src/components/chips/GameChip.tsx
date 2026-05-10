@@ -58,12 +58,12 @@ const GameChip = memo(function GameChip({
         !close && c.hoverBorder,
         comfort
           ? "flex flex-col items-start py-1.5 gap-0.5"
-          : "flex items-center gap-2 py-1 text-[13px]",
+          : "flex items-center gap-2 py-1 text-ui-body",
       )}
     >
       {/* Row 1: logos + scores */}
       <div
-        className={clsx("flex items-center gap-1.5", comfort && "text-[13px]")}
+        className={clsx("flex items-center gap-1.5", comfort && "text-ui-body")}
       >
         {/* Away team */}
         {showLogos && (
@@ -93,7 +93,7 @@ const GameChip = memo(function GameChip({
           {pre_ ? "_" : (game.away_team_score == null || game.away_team_score === "" ? "-" : String(game.away_team_score))}
         </span>
 
-        <span className="text-fg-4">-</span>
+        <span className="text-fg-3">-</span>
 
         {/* Home team */}
         <span
@@ -127,7 +127,7 @@ const GameChip = memo(function GameChip({
         {!comfort && showTimer && status && (
           <span
             className={clsx(
-              "flex items-center gap-1 text-[11px] uppercase tracking-wider ml-0.5",
+              "flex items-center gap-1 text-ui-chip uppercase tracking-wider ml-0.5",
               live ? "text-live font-semibold" : "text-fg-3",
             )}
           >
@@ -143,7 +143,7 @@ const GameChip = memo(function GameChip({
       {comfort && (
         <div
           className={clsx(
-            "flex items-center gap-1.5 text-[10px]",
+            "flex items-center gap-1.5 text-ui-chip",
             c.textFaint,
           )}
         >
@@ -152,7 +152,7 @@ const GameChip = memo(function GameChip({
           )}
           {showTimer && status && (
             <>
-              <span className="text-fg-4">&middot;</span>
+              <span className="text-fg-3">&middot;</span>
               <span
                 className={clsx(
                   "flex items-center gap-1",
@@ -168,8 +168,8 @@ const GameChip = memo(function GameChip({
           )}
           {close && (
             <>
-              <span className="text-fg-4">&middot;</span>
-              <span className="text-live/70 font-semibold">Close</span>
+              <span className="text-fg-3">&middot;</span>
+              <span className="text-live/80 font-semibold">Close</span>
             </>
           )}
         </div>

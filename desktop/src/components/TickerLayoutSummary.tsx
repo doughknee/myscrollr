@@ -71,12 +71,12 @@ export default function TickerLayoutSummary({
     >
       {/* Header row: count badge + CTAs */}
       <div className="flex items-center gap-3 mb-2">
-        <span className="text-[11px] font-mono font-semibold text-fg-4 uppercase tracking-wider">
+        <span className="text-ui-section font-mono font-semibold text-fg-3 uppercase tracking-wider">
           Ticker layout
         </span>
-        <span className="text-[11px] font-mono text-fg-3">
+        <span className="text-ui-meta font-mono text-fg-3">
           {rowCount === 1 ? "1 row" : `${rowCount} rows`}
-          <span className="text-fg-4/60"> / {tierMaxRows} max</span>
+          <span className="text-fg-3"> / {tierMaxRows} max</span>
         </span>
 
         <div className="flex-1" />
@@ -86,7 +86,7 @@ export default function TickerLayoutSummary({
             <button
               type="button"
               onClick={onAddRow}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-dashed border-edge/60 text-[11px] font-medium text-fg-3 hover:text-accent hover:border-accent/60 transition-colors"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-dashed border-edge/60 text-ui-meta font-medium text-fg-3 hover:text-accent hover:border-accent/60 transition-colors"
               aria-label="Add a new ticker row"
             >
               <Plus size={11} />
@@ -99,7 +99,7 @@ export default function TickerLayoutSummary({
           <button
             type="button"
             onClick={onOpenSettings}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-fg-3 hover:text-accent transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-ui-meta font-medium text-fg-3 hover:text-accent transition-colors"
             aria-label="Open the full ticker layout editor in Settings"
           >
             <SettingsIcon size={11} />
@@ -115,13 +115,13 @@ export default function TickerLayoutSummary({
         {rows.map((row, idx) => (
           <li
             key={idx}
-            className="flex items-center gap-2 text-[11px] font-mono text-fg-4"
+            className="flex items-center gap-2 text-ui-meta font-mono text-fg-3"
           >
-            <span className="w-12 shrink-0 text-fg-4/70">
+            <span className="w-12 shrink-0 text-fg-3">
               {rowCount === 1 ? "Row" : `Row ${idx + 1}`}
             </span>
             {row.sources.length === 0 ? (
-              <span className="italic text-fg-4/60">
+              <span className="italic text-fg-3">
                 shows all enabled sources
               </span>
             ) : (
@@ -129,7 +129,7 @@ export default function TickerLayoutSummary({
                 {row.sources.map((id) => (
                   <span
                     key={id}
-                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-ui-chip font-medium"
                     style={{
                       backgroundColor: `${sourceColor(id)}1a`,
                       color: sourceColor(id),
@@ -152,7 +152,7 @@ export default function TickerLayoutSummary({
           cap is below the absolute max. If they're on Pro/Ultimate at 3
           rows, no hint (they've already maxed out). */}
       {atTierCap && (
-        <p className={clsx("mt-2 text-[10px] font-mono text-fg-4/70")}>
+        <p className={clsx("mt-2 text-ui-chip font-mono text-fg-3")}>
           {tierMaxRows === 1
             ? "Upgrade to Uplink for a second ticker row."
             : "Upgrade to Uplink Pro for a third ticker row."}

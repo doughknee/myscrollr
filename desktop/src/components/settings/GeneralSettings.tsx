@@ -324,12 +324,12 @@ function ShortcutsList() {
     <div className="px-3 py-2 space-y-1.5">
       {SHORTCUTS.map(({ keys, label }) => (
         <div key={label} className="flex items-center justify-between py-1">
-          <span className="text-[12px] text-fg-3">{label}</span>
+          <span className="text-ui-meta">{label}</span>
           <div className="flex items-center gap-1">
             {keys.map((k, i) => (
               <span key={i} className="flex items-center gap-1">
-                {i > 0 && <span className="text-[10px] text-fg-4">+</span>}
-                <kbd className="px-1.5 py-0.5 rounded bg-base-250 border border-edge/40 text-[10px] font-mono font-medium text-fg-2 shadow-sm">
+                {i > 0 && <span className="text-ui-chip text-fg-4">+</span>}
+                <kbd className="px-1.5 py-0.5 rounded bg-base-250 border border-edge/40 text-ui-chip font-mono font-medium text-fg-2 shadow-sm">
                   {k}
                 </kbd>
               </span>
@@ -355,10 +355,10 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
     case "idle":
       return (
         <div className="flex items-center justify-between px-3 py-2.5 rounded-lg">
-          <span className="text-[12px] text-fg-3">Check for new versions</span>
+          <span className="text-ui-meta">Check for new versions</span>
           <button
             onClick={onCheck}
-            className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-base-250 text-fg-3 hover:text-fg-2 hover:bg-base-300 transition-all duration-150 active:scale-95 cursor-pointer"
+            className="text-ui-chip font-medium px-2.5 py-1 rounded-md bg-base-250 text-fg-3 hover:text-fg-2 hover:bg-base-300 transition-all duration-150 active:scale-95 cursor-pointer"
           >
             Check for updates
           </button>
@@ -368,7 +368,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
     case "checking":
       return (
         <div className="flex items-center justify-between px-3 py-2.5 rounded-lg">
-          <span className="text-[12px] text-fg-3">Checking for updates...</span>
+          <span className="text-ui-meta">Checking for updates...</span>
           <div className="w-4 h-4 border-2 border-fg-4 border-t-accent rounded-full animate-spin" />
         </div>
       );
@@ -377,13 +377,13 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
       return (
         <div className="flex items-center justify-between px-3 py-2.5 rounded-lg">
           <div className="flex flex-col gap-0.5">
-            <span className="text-[12px] text-accent leading-tight">
+            <span className="text-ui-meta text-accent leading-tight">
               You're on the latest version
             </span>
           </div>
           <button
             onClick={onCheck}
-            className="text-[11px] font-medium px-2.5 py-1 rounded-md text-fg-4 hover:text-fg-2 hover:bg-base-250/50 transition-all duration-150 active:scale-95 cursor-pointer"
+            className="text-ui-chip font-medium px-2.5 py-1 rounded-md text-fg-3 hover:text-fg-2 hover:bg-base-250/50 transition-all duration-150 active:scale-95 cursor-pointer"
           >
             Check again
           </button>
@@ -395,20 +395,20 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
         <div className="flex flex-col gap-2 px-3 py-2.5 rounded-lg">
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-0.5">
-              <span className="text-[12px] text-fg-2 leading-tight">
+              <span className="text-ui-muted leading-tight">
                 Update available: <span className="text-accent font-semibold">v{status.version}</span>
               </span>
             </div>
             <button
               onClick={onDownload}
-              className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 transition-all duration-150 active:scale-95 cursor-pointer shrink-0 ml-4"
+              className="text-ui-chip font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 transition-all duration-150 active:scale-95 cursor-pointer shrink-0 ml-4"
             >
               Download & install
             </button>
           </div>
           {status.body && (
             <div className="max-h-32 overflow-y-auto scrollbar-thin rounded-md bg-base-200/50 px-2.5 py-2">
-              <p className="text-[11px] text-fg-4 leading-relaxed whitespace-pre-wrap">
+              <p className="text-ui-meta leading-relaxed whitespace-pre-wrap">
                 {status.body}
               </p>
             </div>
@@ -423,10 +423,10 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
       return (
         <div className="flex flex-col gap-2 px-3 py-2.5 rounded-lg">
           <div className="flex items-center justify-between">
-            <span className="text-[12px] text-fg-3 leading-tight">
+            <span className="text-ui-meta leading-tight">
               Downloading update...
             </span>
-            <span className="text-[11px] text-fg-4 tabular-nums">
+            <span className="text-ui-chip tabular-nums">
               {status.total > 0 ? `${pct}%` : "..."}
             </span>
           </div>
@@ -454,16 +454,16 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
       return (
         <div className="flex items-center justify-between px-3 py-2.5 rounded-lg">
           <div className="flex flex-col gap-0.5">
-            <span className="text-[12px] text-accent leading-tight">
+            <span className="text-ui-meta text-accent leading-tight">
               Update installed
             </span>
-            <span className="text-[11px] text-fg-4 leading-tight">
+            <span className="text-ui-meta leading-tight">
               Restart to apply the update
             </span>
           </div>
           <button
             onClick={onRelaunch}
-            className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 transition-all duration-150 active:scale-95 cursor-pointer"
+            className="text-ui-chip font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 transition-all duration-150 active:scale-95 cursor-pointer"
           >
             Restart now
           </button>
@@ -474,16 +474,16 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
       return (
         <div className="flex items-center justify-between px-3 py-2.5 rounded-lg">
           <div className="flex flex-col gap-0.5">
-            <span className="text-[12px] text-error leading-tight">
+            <span className="text-ui-meta text-error leading-tight">
               Couldn't check for updates
             </span>
-            <span className="text-[11px] text-fg-4 leading-tight line-clamp-1">
+            <span className="text-ui-meta leading-tight line-clamp-1">
               {status.message}
             </span>
           </div>
           <button
             onClick={onCheck}
-            className="text-[11px] font-medium px-2.5 py-1 rounded-md text-fg-4 hover:text-fg-2 hover:bg-base-250/50 transition-all duration-150 active:scale-95 cursor-pointer"
+            className="text-ui-chip font-medium px-2.5 py-1 rounded-md text-fg-3 hover:text-fg-2 hover:bg-base-250/50 transition-all duration-150 active:scale-95 cursor-pointer"
           >
             Retry
           </button>

@@ -334,7 +334,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
                       gap={gapPx}
                     />
                   ) : (
-                    <div className="flex items-center justify-center w-full py-3 text-[11px] font-mono text-fg-4">
+                    <div className="flex items-center justify-center w-full py-3 text-ui-meta font-mono text-fg-3">
                       Row {rowIdx + 1} has no sources selected
                     </div>
                   )}
@@ -357,8 +357,8 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
               thought they were two independent surfaces and got
               confused when changes "leaked" between them. */}
           <div className="mb-3 flex items-start gap-2 px-3 py-2 rounded-lg border border-edge/30 bg-base-200/40">
-            <Info size={12} className="text-fg-4 mt-0.5 shrink-0" />
-            <p className="text-[11px] text-fg-3 leading-relaxed">
+            <Info size={12} className="text-fg-3 mt-0.5 shrink-0" />
+            <p className="text-ui-meta text-fg-3 leading-relaxed">
               These rows are shared with the{" "}
               <span className="text-fg-2 font-medium">Home page</span> and the
               system tray. Add or remove rows here to control the layout
@@ -385,9 +385,9 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
               onClick={addRow}
               disabled={!canAddRow}
               className={clsx(
-                "w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed text-[11px] font-mono uppercase tracking-wider transition-colors",
+                "w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed text-ui-section font-mono uppercase tracking-wider transition-colors",
                 !canAddRow
-                  ? "border-edge/30 text-fg-4/40 cursor-not-allowed"
+                  ? "border-edge/30 text-fg-4 cursor-not-allowed"
                   : "border-edge/60 text-fg-3 hover:text-accent hover:border-accent/60 cursor-pointer",
               )}
             >
@@ -395,7 +395,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
               {!canAddRow ? "Tier cap reached" : "Add row"}
             </button>
             {!canAddRow && maxRows < 3 && (
-              <p className="text-[10px] font-mono text-fg-4/70 text-center pt-1">
+              <p className="text-ui-chip font-mono text-fg-3 text-center pt-1">
                 {maxRows === 1
                   ? "Upgrade to Uplink for a second ticker row."
                   : "Upgrade to Uplink Pro for up to 3 ticker rows."}
@@ -413,8 +413,8 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
               label="Compact"
             >
               <div className="flex items-center gap-1.5 w-full">
-                <span className={clsx("text-[9px] font-mono font-semibold uppercase tracking-wider", ticker.tickerMode === "compact" ? "text-accent/60" : "text-fg-4/40")}>AAPL</span>
-                <span className={clsx("text-[10px] font-mono", ticker.tickerMode === "compact" ? "text-accent" : "text-fg-4/60")}>{"\u25B2"} 2.4%</span>
+                <span className={clsx("text-ui-chip font-mono font-semibold uppercase tracking-wider", ticker.tickerMode === "compact" ? "text-accent/80" : "text-fg-3")}>AAPL</span>
+                <span className={clsx("text-ui-chip font-mono", ticker.tickerMode === "compact" ? "text-accent" : "text-fg-3")}>{"\u25B2"} 2.4%</span>
               </div>
             </VisualCard>
             <VisualCard
@@ -424,10 +424,10 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
             >
               <div className="flex flex-col gap-0.5 w-full">
                 <div className="flex items-center gap-1.5">
-                  <span className={clsx("text-[9px] font-mono font-semibold uppercase tracking-wider", ticker.tickerMode === "comfort" ? "text-accent/60" : "text-fg-4/40")}>AAPL</span>
-                  <span className={clsx("text-[10px] font-mono", ticker.tickerMode === "comfort" ? "text-accent" : "text-fg-4/60")}>{"\u25B2"} 2.4%</span>
+                  <span className={clsx("text-ui-chip font-mono font-semibold uppercase tracking-wider", ticker.tickerMode === "comfort" ? "text-accent/80" : "text-fg-3")}>AAPL</span>
+                  <span className={clsx("text-ui-chip font-mono", ticker.tickerMode === "comfort" ? "text-accent" : "text-fg-3")}>{"\u25B2"} 2.4%</span>
                 </div>
-                <span className={clsx("text-[8px] font-mono", ticker.tickerMode === "comfort" ? "text-accent/40" : "text-fg-4/20")}>Tech {"\u00B7"} $182.50</span>
+                <span className={clsx("text-ui-chip font-mono", ticker.tickerMode === "comfort" ? "text-accent/70" : "text-fg-3")}>Tech {"\u00B7"} $182.50</span>
               </div>
             </VisualCard>
           </div>
@@ -515,7 +515,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
         <div className="border-t border-edge/30 pt-4">
           <button
             onClick={() => setAdvancedOpen(!advancedOpen)}
-            className="flex items-center gap-2 text-[11px] font-mono font-semibold uppercase tracking-wider text-fg-4 hover:text-fg-3 transition-colors w-full"
+            className="flex items-center gap-2 text-ui-section font-mono font-semibold uppercase tracking-wider text-fg-3 hover:text-fg-2 transition-colors w-full"
           >
             <ChevronDown
               size={12}
@@ -587,11 +587,11 @@ function PreviewChip({ chip, comfort, colorMode }: { chip: SampleChip; comfort: 
         c.color, c.borderColor,
         comfort
           ? "flex-col items-start justify-center py-1.5 gap-0"
-          : "items-center gap-1.5 py-1.5 text-[13px]",
+          : "items-center gap-1.5 py-1.5 text-ui-body",
       )}
     >
       <span className="flex items-center gap-1.5">
-        <span className={clsx("font-semibold text-[11px] uppercase tracking-wider", c.textColor + "/60")}>{chip.label}</span>
+        <span className={clsx("font-semibold text-ui-chip uppercase tracking-wider", c.textColor + "/70")}>{chip.label}</span>
         {chip.value && <span className={c.textColor}>{chip.value}</span>}
       </span>
       <AnimatePresence initial={false}>
@@ -604,7 +604,7 @@ function PreviewChip({ chip, comfort, colorMode }: { chip: SampleChip; comfort: 
               height: { type: "spring", stiffness: 380, damping: 34, mass: 0.6 },
               opacity: { duration: 0.18, ease: [0.25, 0.1, 0.25, 1] },
             }}
-            className={clsx("text-[10px] overflow-hidden", c.textColor + "/40")}
+            className={clsx("text-ui-chip overflow-hidden", c.textColor + "/60")}
           >
             {chip.detail}
           </motion.span>
@@ -839,7 +839,7 @@ function sleep(ms: number): Promise<void> {
 function SettingGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-[11px] font-mono font-semibold uppercase tracking-wider text-fg-4 mb-3">
+      <h3 className="text-ui-section font-mono font-semibold uppercase tracking-wider text-fg-3 mb-3">
         {label}
       </h3>
       {children}
@@ -872,8 +872,8 @@ function VisualCard({
     >
       <div className="w-full px-1">{children}</div>
       <span className={clsx(
-        "text-[10px] font-mono uppercase tracking-wider",
-        selected ? "text-accent" : "text-fg-4",
+        "text-ui-chip font-mono uppercase tracking-wider",
+        selected ? "text-accent" : "text-fg-3",
       )}>
         {label}
       </span>
@@ -913,7 +913,7 @@ function SpeedSlider({ value, onChange }: { value: number; onChange: (v: number)
           style={{ left: `calc(${pct}% - 8px)` }}
         />
       </div>
-      <div className="flex justify-between text-[10px] font-mono text-fg-4 uppercase tracking-wider px-0.5">
+      <div className="flex justify-between text-ui-chip font-mono text-fg-3 uppercase tracking-wider px-0.5">
         <span>Slow</span>
         <span>Fast</span>
       </div>
@@ -926,7 +926,7 @@ function SpeedSlider({ value, onChange }: { value: number; onChange: (v: number)
 function AdvancedRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[12px] font-mono text-fg-3">{label}</span>
+      <span className="text-ui-meta font-mono text-fg-3">{label}</span>
       {children}
     </div>
   );
@@ -950,7 +950,7 @@ function SegmentedPicker<T extends string>({
           key={opt.value}
           onClick={() => onChange(opt.value)}
           className={clsx(
-            "px-2.5 py-1 text-[11px] font-medium rounded-md transition-all cursor-pointer leading-none",
+            "px-2.5 py-1 text-ui-meta font-medium rounded-md transition-all cursor-pointer leading-none",
             value === opt.value
               ? "bg-base-300 text-fg shadow-sm"
               : "text-fg-3 hover:text-fg-2",
@@ -996,7 +996,7 @@ function RowCard({
     <div className="rounded-xl border border-edge/40 bg-surface-2/30 p-3">
       {/* Row header */}
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-fg-3">
+        <span className="text-ui-section font-mono font-semibold uppercase tracking-wider text-fg-3">
           Row {rowIndex + 1}
         </span>
         {canRemove && (
@@ -1013,11 +1013,11 @@ function RowCard({
 
       {/* Sources grid */}
       <div>
-        <div className="text-[10px] font-mono uppercase tracking-wider text-fg-4 mb-1.5">
-          Sources {showingAll && <span className="text-fg-4/60">(all visible)</span>}
+        <div className="text-ui-section font-mono uppercase tracking-wider text-fg-3 mb-1.5">
+          Sources {showingAll && <span className="text-fg-3">(all visible)</span>}
         </div>
         {sources.length === 0 ? (
-          <div className="text-[11px] font-mono text-fg-4/70 py-2">
+          <div className="text-ui-meta font-mono text-fg-3 py-2">
             No channels or widgets enabled. Enable some in the main settings first.
           </div>
         ) : (
@@ -1030,7 +1030,7 @@ function RowCard({
                   type="button"
                   onClick={() => onToggleSource(src.id)}
                   className={clsx(
-                    "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] font-mono transition-all cursor-pointer",
+                    "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-ui-meta font-mono transition-all cursor-pointer",
                     selected
                       ? "border-accent/60 bg-accent/10 text-fg"
                       : "border-edge/40 bg-transparent text-fg-3 hover:border-edge/60 hover:text-fg-2",
@@ -1056,12 +1056,12 @@ function RowCard({
           continue to see the locked Ultimate upsell here. */}
       {!canCustomize && (
         <div className="mt-3 pt-3 border-t border-edge/30">
-          <div className="flex items-center justify-between text-[11px] font-mono text-fg-4/60">
+          <div className="flex items-center justify-between text-ui-meta font-mono text-fg-3">
             <span className="flex items-center gap-1.5">
               <Lock size={11} />
               Customize scroll
             </span>
-            <span className="text-[10px] uppercase tracking-wider">
+            <span className="text-ui-chip uppercase tracking-wider">
               Ultimate
             </span>
           </div>

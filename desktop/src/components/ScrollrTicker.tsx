@@ -506,7 +506,7 @@ export default function ScrollrTicker({
     return (
       <div className={containerClass}>
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent z-10" />
-        <div className="flex items-center justify-center w-full h-full px-4 text-[11px] font-mono text-fg-4">
+        <div className="flex items-center justify-center w-full h-full px-4 text-ui-meta font-mono text-fg-3">
           <span>This row has no sources to show. Edit it in Settings &rarr; Ticker.</span>
         </div>
       </div>

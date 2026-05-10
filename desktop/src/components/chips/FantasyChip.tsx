@@ -39,14 +39,14 @@ export default function FantasyChip({
         onClick={onClick}
         className={chipBaseClasses(comfort, c, "font-mono whitespace-nowrap")}
       >
-        <div className={clsx("flex items-center gap-2", comfort && "text-[13px]")}>
+        <div className={clsx("flex items-center gap-2", comfort && "text-ui-body")}>
           <span aria-hidden>{SPORT_EMOJI[league.game_code] ?? "🏆"}</span>
           <span className={clsx("font-medium truncate max-w-[180px]", c.text)}>
             {league.name}
           </span>
         </div>
         {comfort && (
-          <div className={clsx("flex items-center gap-1.5 text-[10px]", c.textFaint)}>
+          <div className={clsx("flex items-center gap-1.5 text-ui-chip", c.textFaint)}>
             {league.data.is_finished ? "Finished" : "Off-week"}
           </div>
         )}
@@ -78,7 +78,7 @@ export default function FantasyChip({
       className={chipBaseClasses(comfort, c, "font-mono whitespace-nowrap")}
     >
       {/* Row 1 */}
-      <div className={clsx("flex items-center gap-2", comfort && "text-[13px]")}>
+      <div className={clsx("flex items-center gap-2", comfort && "text-ui-body")}>
         <span aria-hidden>{SPORT_EMOJI[league.game_code] ?? "🏆"}</span>
         {live && (
           <motion.span
@@ -103,7 +103,7 @@ export default function FantasyChip({
       </div>
       {/* Row 2 (comfort only) */}
       {comfort && (
-        <div className={clsx("flex items-center gap-1.5 text-[10px]", c.textFaint)}>
+        <div className={clsx("flex items-center gap-1.5 text-ui-chip", c.textFaint)}>
           <span className="uppercase tracking-wider">
             {final ? "Final" : live ? "Live" : `Wk ${ctx.matchup.week}`}
           </span>

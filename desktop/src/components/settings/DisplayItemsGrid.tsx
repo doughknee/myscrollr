@@ -125,7 +125,7 @@ export default function DisplayItemsGrid({
         >
           <h3
             role="columnheader"
-            className="text-[11px] font-mono font-semibold uppercase tracking-wider text-fg-4"
+            className="text-ui-section font-mono font-semibold uppercase tracking-wider text-fg-3"
           >
             {title}
           </h3>
@@ -156,7 +156,7 @@ export default function DisplayItemsGrid({
               >
                 <div
                   role="columnheader"
-                  className="col-span-3 text-[10px] font-mono font-semibold uppercase tracking-wider text-fg-4"
+                  className="col-span-3 text-ui-section font-mono font-semibold uppercase tracking-wider text-fg-3"
                 >
                   {section.title}
                 </div>
@@ -181,11 +181,11 @@ export default function DisplayItemsGrid({
                     role="rowheader"
                     className="flex flex-col gap-0.5 min-w-0"
                   >
-                    <span className="text-[12px] text-fg-2 leading-tight">
+                    <span className="text-ui-body text-fg-2 leading-tight">
                       {row.label}
                     </span>
                     {row.description && (
-                      <span className="text-[11px] text-fg-4 leading-tight">
+                      <span className="text-ui-meta text-fg-3 leading-tight">
                         {row.description}
                       </span>
                     )}
@@ -239,7 +239,7 @@ function ColumnHeaderToggle({
       )}
     >
       <Icon size={12} />
-      <span className="text-[10px] font-mono font-semibold uppercase tracking-wider leading-none">
+      <span className="text-ui-chip font-mono font-semibold uppercase tracking-wider leading-none">
         {label}
       </span>
     </button>

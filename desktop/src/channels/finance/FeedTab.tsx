@@ -225,7 +225,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabP
               key={opt.value}
               onClick={() => setDirectionFilter(opt.value)}
               className={clsx(
-                "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors cursor-pointer",
+                "px-2.5 py-1 rounded-full text-ui-meta font-medium transition-colors cursor-pointer",
                 directionFilter === opt.value
                   ? "bg-accent/15 text-accent"
                   : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
@@ -243,7 +243,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabP
           <select
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="bg-surface-2 border border-edge/40 rounded-md px-2 py-1.5 text-[11px] text-fg-2 cursor-pointer outline-none focus:border-accent/60"
+            className="bg-surface-2 border border-edge/40 rounded-md px-2 py-1.5 text-ui-meta text-fg-2 cursor-pointer outline-none focus:border-accent/60"
           >
             {SORT_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -270,7 +270,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabP
             <button
               key={cat}
               onClick={() => toggleCategory(cat)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-[10px] hover:bg-accent/25 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-ui-chip hover:bg-accent/25 transition-colors cursor-pointer"
             >
               <span className="truncate max-w-[120px]">{cat}</span>
               <span className="text-accent/60">&times;</span>
@@ -278,7 +278,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabP
           ))}
           <button
             onClick={clearCategories}
-            className="px-2 py-0.5 text-[10px] text-fg-3 hover:text-fg-3 transition-colors cursor-pointer"
+            className="px-2 py-0.5 text-ui-chip text-fg-3 hover:text-fg-2 transition-colors cursor-pointer"
           >
             Clear all
           </button>
@@ -287,7 +287,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabP
 
       {/* Summary bar */}
       {filtered.length > 0 && (
-        <div className="px-3 py-1 bg-surface border-b border-edge/30 font-mono text-[10px] tabular-nums flex items-center gap-1.5">
+        <div className="px-3 py-1 bg-surface border-b border-edge/30 font-mono text-ui-chip tabular-nums flex items-center gap-1.5">
           <span className="text-fg-3">{filtered.length} symbols</span>
           <span className="text-fg-3">&middot;</span>
           <span className="text-up">{upCount} up</span>
@@ -308,7 +308,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabP
           <p className="text-[12px] text-fg-3">No symbols match your filters</p>
           <button
             onClick={clearAllFilters}
-            className="px-3 py-1.5 rounded-md text-[11px] font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
+            className="px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
           >
             Clear filters
           </button>
@@ -460,12 +460,12 @@ const TradeItem = memo(function TradeItem({ trade, mode, display, category, now 
           {trade.symbol}
         </span>
         {category && (
-          <span className="bg-[#22c55e]/10 text-fg-3 text-[9px] font-medium rounded px-1.5 py-px w-fit">
+          <span className="bg-[#22c55e]/10 text-fg-3 text-ui-chip font-medium rounded px-1.5 py-px w-fit">
             {category}
           </span>
         )}
         {shouldShowOnFeed(display.showPrevClose) && trade.previous_close != null && Number(trade.previous_close) > 0 && (
-          <span className="text-[10px] font-mono text-fg-3 tabular-nums">
+          <span className="text-ui-chip font-mono text-fg-3 tabular-nums">
             Prev close {formatPrice(trade.previous_close)}
           </span>
         )}
@@ -479,7 +479,7 @@ const TradeItem = memo(function TradeItem({ trade, mode, display, category, now 
           {shouldShowOnFeed(display.showChange) && (
             <span
               className={clsx(
-                "text-[11px] font-mono font-medium tabular-nums",
+                "text-ui-meta font-mono font-medium tabular-nums",
                 dirColor,
               )}
             >
@@ -488,7 +488,7 @@ const TradeItem = memo(function TradeItem({ trade, mode, display, category, now 
           )}
           {shouldShowOnFeed(display.showLastUpdated) && trade.last_updated && (
             <span
-              className="text-[9px] font-mono text-fg-3 tabular-nums"
+              className="text-ui-chip font-mono text-fg-3 tabular-nums"
               title="Last price update"
             >
               {relativeTime(trade.last_updated, now, { includeSeconds: true })}

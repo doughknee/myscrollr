@@ -125,11 +125,11 @@ export default function ConsolidatedChip({
       )}
 
       {/* Row 1: all items inline */}
-      <div className={clsx("flex items-center", comfort && "text-[13px]")}>
+      <div className={clsx("flex items-center", comfort && "text-ui-body")}>
         {items.map((item, i) => (
           <div key={"id" in item ? item.id : i} className="flex items-center">
-            {i > 0 && <span className={clsx("mx-2 text-[10px]", c.textFaint)}>|</span>}
-            <span className={clsx("font-semibold text-[11px] uppercase tracking-wider mr-1.5", c.textDim)}>
+            {i > 0 && <span className={clsx("mx-2 text-ui-chip", c.textFaint)}>|</span>}
+            <span className={clsx("font-semibold text-ui-chip uppercase tracking-wider mr-1.5", c.textDim)}>
               {"label" in item ? item.label : ""}
             </span>
             {isGithub(item) ? (
@@ -160,7 +160,7 @@ export default function ConsolidatedChip({
 
       {/* Row 2: detail (comfort only) */}
       {comfort && (
-        <div className={clsx("flex items-center text-[10px]", type === "weather" && "min-h-4", c.textFaint)}>
+        <div className={clsx("flex items-center text-ui-chip", type === "weather" && "min-h-4", c.textFaint)}>
           {items.map((item, i) => {
             const hasDetail = item.detail || (isUptime(item) && item.heartbeats?.length);
             if (!hasDetail) return null;

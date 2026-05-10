@@ -30,21 +30,21 @@ const RssChip = memo(function RssChip({ item, comfort, colorMode = "channel", sh
       className={chipBaseClasses(comfort, c, "whitespace-nowrap")}
     >
       {/* Row 1: headline */}
-      <span className={clsx("font-medium", c.text, comfort && "text-[13px]")}>{headline}</span>
+      <span className={clsx("font-medium", c.text, comfort && "text-ui-body")}>{headline}</span>
       {/* Row 2: source + time (comfort) / inline source (compact) */}
       {comfort ? (
         (hasSource || hasTime) && (
-          <div className={clsx("flex items-center gap-1.5 text-[10px] font-mono", c.textFaint)}>
+          <div className={clsx("flex items-center gap-1.5 text-ui-chip font-mono", c.textFaint)}>
             {hasSource && <span>{item.source_name}</span>}
-            {hasSource && hasTime && <span className="text-fg-4">&middot;</span>}
+            {hasSource && hasTime && <span className="text-fg-3">&middot;</span>}
             {hasTime && <span>{timeAgo(item.published_at, { suffix: true })}</span>}
           </div>
         )
       ) : (
         hasSource && (
           <>
-            <span className="text-fg-4">&middot;</span>
-            <span className={clsx("font-mono text-[12px]", c.textDim)}>
+            <span className="text-fg-3">&middot;</span>
+            <span className={clsx("font-mono text-ui-meta", c.textDim)}>
               {item.source_name}
             </span>
           </>

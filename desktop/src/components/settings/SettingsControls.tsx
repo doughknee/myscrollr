@@ -19,7 +19,7 @@ export function Section({ title, children, action }: SectionProps) {
   return (
     <div className="mb-6 pb-5 border-b border-edge/30 last:border-b-0 last:mb-0 last:pb-0">
       <div className="flex items-center justify-between mb-3 px-3">
-        <h3 className="text-[11px] font-mono font-semibold uppercase tracking-wider text-fg-4">
+        <h3 className="text-ui-section font-mono">
           {title}
         </h3>
         {action && <div className="shrink-0">{action}</div>}
@@ -53,11 +53,11 @@ export function ToggleRow({
       className="flex items-center justify-between w-full px-3 py-2.5 rounded-lg hover:bg-base-250/50 transition-colors cursor-pointer group"
     >
       <div className="flex flex-col gap-0.5 text-left">
-        <span className="text-[12px] text-fg-2 group-hover:text-fg leading-tight">
+        <span className="text-ui-muted group-hover:text-fg leading-tight">
           {label}
         </span>
         {description && (
-          <span className="text-[11px] text-fg-4 leading-tight">
+          <span className="text-ui-meta leading-tight">
             {description}
           </span>
         )}
@@ -103,9 +103,9 @@ export function SegmentedRow<T extends string>({
   return (
     <div className="flex items-center justify-between px-3 py-2.5 rounded-lg">
       <div className="flex flex-col gap-0.5">
-        <span className="text-[12px] text-fg-2 leading-tight">{label}</span>
+        <span className="text-ui-muted leading-tight">{label}</span>
         {description && (
-          <span className="text-[11px] text-fg-4 leading-tight">
+          <span className="text-ui-meta leading-tight">
             {description}
           </span>
         )}
@@ -122,7 +122,7 @@ export function SegmentedRow<T extends string>({
             aria-checked={value === opt.value}
             onClick={() => onChange(opt.value)}
             className={clsx(
-              "px-2.5 py-1 text-[11px] font-medium rounded-md transition-all duration-200 active:scale-95 cursor-pointer leading-none",
+              "px-2.5 py-1 text-ui-chip font-medium rounded-md transition-all duration-200 active:scale-95 cursor-pointer leading-none",
               value === opt.value
                 ? "bg-base-300 text-fg shadow-sm"
                 : "text-fg-3 hover:text-fg-2",
@@ -167,9 +167,9 @@ export function VenueRow({ label, description, value, onChange }: VenueRowProps)
   return (
     <div className="flex items-center justify-between px-3 py-2.5 rounded-lg">
       <div className="flex flex-col gap-0.5">
-        <span className="text-[12px] text-fg-2 leading-tight">{label}</span>
+        <span className="text-ui-muted leading-tight">{label}</span>
         {description && (
-          <span className="text-[11px] text-fg-4 leading-tight">
+          <span className="text-ui-meta leading-tight">
             {description}
           </span>
         )}
@@ -189,7 +189,7 @@ export function VenueRow({ label, description, value, onChange }: VenueRowProps)
               aria-checked={selected}
               onClick={() => onChange(opt.value)}
               className={clsx(
-                "px-2.5 py-1 text-[11px] font-medium rounded-md transition-all duration-200 cursor-pointer leading-none",
+                "px-2.5 py-1 text-ui-chip font-medium rounded-md transition-all duration-200 cursor-pointer leading-none",
                 selected && opt.value === "off"
                   ? "bg-base-300/60 text-fg-3 shadow-sm"
                   : selected
@@ -234,9 +234,9 @@ export function SliderRow({
   return (
     <div className="flex items-center justify-between px-3 py-2.5 rounded-lg">
       <div className="flex flex-col gap-0.5">
-        <span className="text-[12px] text-fg-2 leading-tight">{label}</span>
+        <span className="text-ui-muted leading-tight">{label}</span>
         {description && (
-          <span className="text-[11px] text-fg-4 leading-tight">
+          <span className="text-ui-meta leading-tight">
             {description}
           </span>
         )}
@@ -266,7 +266,7 @@ export function SliderRow({
             style={{ left: `calc(${pct}% - 6px)` }}
           />
         </div>
-        <span className="text-[11px] text-fg-3 w-12 text-right tabular-nums font-medium">
+        <span className="text-ui-chip w-12 text-right tabular-nums font-medium">
           {displayValue ?? value}
         </span>
       </div>
@@ -285,8 +285,8 @@ interface DisplayRowProps {
 export function DisplayRow({ label, value, valueClass }: DisplayRowProps) {
   return (
     <div className="flex items-center justify-between px-3 py-2.5 rounded-lg">
-      <span className="text-[12px] text-fg-3">{label}</span>
-      <span className={valueClass ?? "text-[12px] text-fg-2"}>{value}</span>
+      <span className="text-ui-meta">{label}</span>
+      <span className={valueClass ?? "text-ui-muted"}>{value}</span>
     </div>
   );
 }
@@ -305,7 +305,7 @@ export function ResetButton({
   return (
     <button
       onClick={onClick}
-      className="text-[11px] font-medium px-3 py-1.5 rounded-lg text-fg-4 hover:text-fg-2 hover:bg-base-250/50 transition-colors cursor-pointer"
+      className="text-ui-chip font-medium px-3 py-1.5 rounded-lg text-fg-3 hover:text-fg-2 hover:bg-base-250/50 transition-colors cursor-pointer"
     >
       {label}
     </button>
@@ -332,9 +332,9 @@ export function ActionRow({
   return (
     <div className="flex items-center justify-between px-3 py-2.5 rounded-lg">
       <div className="flex flex-col gap-0.5">
-        <span className="text-[12px] text-fg-2 leading-tight">{label}</span>
+        <span className="text-ui-muted leading-tight">{label}</span>
         {description && (
-          <span className="text-[11px] text-fg-4 leading-tight">
+          <span className="text-ui-meta leading-tight">
             {description}
           </span>
         )}
@@ -342,7 +342,7 @@ export function ActionRow({
       <button
         onClick={onClick}
         className={clsx(
-          "text-[11px] font-medium px-2.5 py-1 rounded-md transition-colors cursor-pointer",
+          "text-ui-chip font-medium px-2.5 py-1 rounded-md transition-colors cursor-pointer",
           actionClass ??
             "bg-base-250 text-fg-3 hover:text-fg-2 hover:bg-base-300",
         )}

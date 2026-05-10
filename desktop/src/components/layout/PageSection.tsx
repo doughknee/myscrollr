@@ -89,7 +89,7 @@ export default function PageSection({
               </div>
             )}
             {description && (
-              <p className="text-[11px] text-fg-4 mt-0.5 leading-snug">
+              <p className="text-ui-meta text-fg-3 mt-0.5 leading-snug">
                 {description}
               </p>
             )}

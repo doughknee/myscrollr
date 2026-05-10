@@ -252,7 +252,7 @@ export default function SymbolManager({
           <h3 className="text-sm font-semibold text-fg">Symbols</h3>
           <span
             className={clsx(
-              "px-1.5 py-px rounded-full text-[11px] font-medium tabular-nums",
+              "px-1.5 py-px rounded-full text-ui-chip font-medium tabular-nums",
               atLimit
                 ? "bg-warn/15 text-warn"
                 : "bg-accent/15 text-accent",
@@ -262,7 +262,7 @@ export default function SymbolManager({
             {maxSymbols !== Infinity && ` / ${maxSymbols}`}
           </span>
         </div>
-        <p className="text-[11px] text-fg-4 truncate">
+        <p className="text-ui-meta text-fg-3 truncate">
           Click a row to add or remove
         </p>
       </div>
@@ -281,7 +281,7 @@ export default function SymbolManager({
       {/* ── Quick-add chips (only on near-empty watchlist) ────── */}
       {quickAddChips.length > 0 && (
         <div className="shrink-0 flex flex-wrap items-center gap-1.5 px-3 py-2.5 rounded-lg border border-edge/30 bg-base-200/30">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-fg-4 mr-1">
+          <span className="text-ui-section font-mono uppercase tracking-wider text-fg-3 mr-1">
             Quick add
           </span>
           {quickAddChips.map((sym) => (
@@ -290,7 +290,7 @@ export default function SymbolManager({
               onClick={() => onAdd(sym)}
               disabled={atLimit || saving}
               className={clsx(
-                "flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-mono",
+                "flex items-center gap-1 px-2 py-0.5 rounded-md border text-ui-chip font-mono",
                 "transition-all duration-150 active:scale-90",
                 "border-edge/40 text-fg-2 hover:border-accent/50 hover:bg-accent/5 hover:text-accent cursor-pointer",
                 "disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-edge/40 disabled:hover:bg-transparent disabled:hover:text-fg-2",
@@ -308,14 +308,14 @@ export default function SymbolManager({
         <div className="relative flex-1 min-w-0">
           <SearchIcon
             size={12}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-4 pointer-events-none"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3 pointer-events-none"
           />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search symbols, names, categories..."
-            className="w-full pl-7 pr-7 py-1.5 rounded-md bg-base-200 border border-edge/40 text-[11px] text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
+            className="w-full pl-7 pr-7 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
           />
           {search && (
             <button
@@ -347,7 +347,7 @@ export default function SymbolManager({
             onClick={() => setTrackedOnly((v) => !v)}
             aria-pressed={trackedOnly}
             className={clsx(
-              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[11px] cursor-pointer whitespace-nowrap",
+              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-ui-meta cursor-pointer whitespace-nowrap",
               "transition-all duration-200 active:scale-95",
               trackedOnly
                 ? "border-accent/50 bg-accent/10 text-accent"
@@ -368,7 +368,7 @@ export default function SymbolManager({
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as SortKey)}
-          className="px-2 py-1.5 rounded-md bg-base-200 border border-edge/40 text-[11px] text-fg-2 focus:outline-none focus:border-accent/60 transition-colors cursor-pointer appearance-none"
+          className="px-2 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta text-fg-2 focus:outline-none focus:border-accent/60 transition-colors cursor-pointer appearance-none"
           aria-label="Sort symbols"
         >
           <option value="default">Tracked first</option>
@@ -385,7 +385,7 @@ export default function SymbolManager({
             <button
               key={cat}
               onClick={() => toggleCategory(cat)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-[10px] text-accent hover:bg-accent/25 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-ui-chip text-accent hover:bg-accent/25 transition-colors cursor-pointer"
             >
               {cat}
               <X size={10} className="opacity-60" />
@@ -393,7 +393,7 @@ export default function SymbolManager({
           ))}
           <button
             onClick={() => setSelectedCategories(new Set())}
-            className="px-2 py-0.5 text-[10px] text-fg-4 hover:text-fg-2 transition-colors cursor-pointer"
+            className="px-2 py-0.5 text-ui-chip text-fg-3 hover:text-fg-2 transition-colors cursor-pointer"
           >
             Clear all
           </button>
@@ -403,7 +403,7 @@ export default function SymbolManager({
       {/* ── Unified list (only this region scrolls) ───────────── */}
       {loading ? (
         <div className="shrink-0 text-center py-8">
-          <p className="text-[11px] text-fg-4 animate-pulse">
+          <p className="text-ui-meta text-fg-3 animate-pulse">
             Loading catalog...
           </p>
         </div>
@@ -516,31 +516,31 @@ function SymbolRow({
 
       {/* Symbol + name */}
       <div className="flex-1 min-w-0">
-        <span className="text-[12px] font-mono font-bold text-fg-2 truncate block">
+        <span className="text-ui-body font-mono font-bold text-fg-2 truncate block">
           {entry.symbol}
         </span>
-        <span className="text-[10px] text-fg-4 truncate block">
+        <span className="text-ui-meta text-fg-3 truncate block">
           {entry.name}
         </span>
       </div>
 
       {/* Category badge */}
-      <span className="shrink-0 px-1.5 py-px rounded text-[9px] text-fg-4 bg-surface-hover whitespace-nowrap">
+      <span className="shrink-0 px-1.5 py-px rounded text-ui-chip text-fg-3 bg-surface-hover whitespace-nowrap">
         {entry.category}
       </span>
 
       {/* Live price (tracked only) */}
-      <span className="shrink-0 w-16 text-right text-[11px] font-mono tabular-nums text-fg-3">
+      <span className="shrink-0 w-16 text-right text-ui-meta font-mono tabular-nums text-fg-3">
         {trade ? formatPrice(trade.price) : "—"}
       </span>
 
       {/* % change (tracked only) */}
       <span
         className={clsx(
-          "shrink-0 w-16 text-right text-[11px] font-mono tabular-nums",
+          "shrink-0 w-16 text-right text-ui-meta font-mono tabular-nums",
           pctChange != null && pctChange > 0 && "text-up",
           pctChange != null && pctChange < 0 && "text-down",
-          (pctChange == null || pctChange === 0) && "text-fg-4",
+          (pctChange == null || pctChange === 0) && "text-fg-3",
         )}
       >
         {trade ? formatChange(trade.percentage_change) : "—"}

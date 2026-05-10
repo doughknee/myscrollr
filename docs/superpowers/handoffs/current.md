@@ -3,96 +3,88 @@
 ## Repo State
 - Branch: `main`
 - Worktree: clean
-- Last commit: `4d94862 feat(desktop): live-preview Display panels for Sports, RSS, Fantasy (v1.0.11) (#154)`
+- Last commits (most recent first):
+  - `<this PR>` — Desktop readability/contrast pass + MCP dev tooling + Yahoo OAuth desktop counterpart
+  - `4e6e804` — fix(fantasy): content-negotiate `/yahoo/start` so the desktop OAuth flow works (#155)
+  - `4d94862` — feat(desktop): live-preview Display panels for Sports, RSS, Fantasy (v1.0.11) (#154)
 - Version: **1.0.11** (`desktop/package.json`, `desktop/src-tauri/tauri.conf.json`, `desktop/src-tauri/Cargo.toml`)
 
-## Active Task
-None. PR #154 merged. Branch `refactor/desktop-display-previews` deleted.
+## What Just Shipped
 
-## What Just Shipped (v1.0.11)
+Three coherent pieces in one PR:
 
-Live-preview Display panels for the remaining three channels —
-**Sports**, **RSS**, **Fantasy** — bringing them in line with the
-v1.0.10 Finance reference. Every `/channel/{type}/display` page
-now shows a side-by-side Feed card + Ticker chip that update in
-real time as the user toggles the visibility prefs below.
+### 1. Desktop readability / contrast pass
 
-### New panels (live and ready to consume)
-- **`SportsDisplayPanel`** (`desktop/src/channels/sports/DisplayPanel.tsx`) — reuses production `<GameItem mode="compact">` and `<GameChip>` so previews are byte-identical to what users see in production. Sample game prefers a live game from the user's dashboard, then any game, then a hardcoded NBA in-progress sample.
-- **`RssDisplayPanel`** (`desktop/src/channels/rss/DisplayPanel.tsx`) — hand-rolled compact article row for the Feed preview (production `RssArticle` is too coupled to its grid container); reuses `<RssChip>` for the Ticker. Sample article falls back to a TechCrunch-style stub.
-- **`FantasyDisplayPanel`** (`desktop/src/channels/fantasy/DisplayPanel.tsx`) — the most complex of the four. 14 venue toggles in 4 groups (Score & status / Standings / Roster / Player stats), plus followed-players picker and feed-layout segments. Sample league is engineered to light up every player-stats segment at once (top scorer, worst starter, top bench, two injuries) so users can verify each toggle does something the moment they flip it.
+- New design tokens in `desktop/src/style.css`:
+  - Brightened muted text tiers (`--color-fg-2/3/4`) for the default dark theme so meaningful text stays readable at 100% UI scale.
+  - High-contrast theme tier bumped further.
+- New reusable type utilities (use these for any new desktop UI):
+  - `text-ui-title` — 14px / 600 / `var(--color-fg)`
+  - `text-ui-body` — 13px / `var(--color-fg)`
+  - `text-ui-muted` — 13px / `var(--color-fg-2)`
+  - `text-ui-meta` — 12px / `var(--color-fg-3)`
+  - `text-ui-chip` — 11px / `var(--color-fg-3)`
+  - `text-ui-section` — 11px / 600 / uppercase / 0.08em / `var(--color-fg-3)`
+- Scoped fallback inside `#desktop-shell` and `#app-shell`:
+  - Any legacy `text-[9px]` / `text-[10px]` arbitrary class is silently bumped to 11px / 16px line-height. No need to hand-patch every dense table or chip — they automatically meet the new floor.
+- ~25 desktop components migrated from `text-[Npx]` arbitrary sizes and faint `text-fg-*/40` shades to the new utilities and stronger fg tokens. Affected: chips (consolidated, fantasy, fantasy-stat, followed-player, game, rss, trade), settings (display items grid, general, controls, ticker), feeds (finance, rss, sports), managers (rss feed, sports league, finance symbol), Sidebar, TopBar, ScrollrTicker, FreshnessPill, RowSelector, TickerLayoutSummary, PageSection, fantasy ConfigPanel.
+- `chipColors.ts` — `textDim` / `textFaint` opacities raised; compact chip base text moved to `text-ui-body`.
 
-### `routes/channel.$type.$tab.tsx` cleanup
-- Inline `SportsDisplay`, `RssDisplay`, `FantasyDisplay` removed. The route now only switches on `type` and renders the per-channel panel components. ~250 lines of inline form code now live in the channel folders where they belong.
+**Verified visually via the MCP-driven dev session**: ticker compact view, settings page, fantasy configure page all render cleanly with no layout regressions.
 
-### Bonus fix shipped with Sports
-- **`GameChip` now honors `showTimer`** (default true, fully backward compatible). The persisted `showTimer.ticker` venue boolean had no visual effect prior to this — `ScrollrTicker` only read `showLogos`. Building the Sports preview surfaced the gap; closing it was a five-line change. `ScrollrTicker.tsx:286-307` now passes `showTimer` through.
+### 2. MCP dev tooling
 
-### Known asymmetry NOT addressed in this PR (future follow-up)
-- **Fantasy Feed-side venue plumbing.** All 14 fantasy venue toggles' `.ticker` boolean is honored by `FantasyStatChip` via `shouldShowOnTicker`. The `.feed` boolean is **not** honored by the Feed-side sub-views (`MatchupHero`, `OverviewView`, `StandingsView`, `RosterView`). The Display panel renders `<MatchupHero>` statically as the Feed preview and the helper text spells this out: "Display items currently affect the Ticker only." Propagating `shouldShowOnFeed` into the Fantasy Feed sub-views is the natural next refactor — likely a one-pass touch through MatchupHero, OverviewView's score panes, RosterView's per-player stat columns, and StandingsView's record/streak/rank columns.
+- New `desktop/src-tauri/tauri.mcp.conf.json` — overlays `app.withGlobalTauri = true` so the MCP bridge can call into the webview.
+- `npm run tauri:dev:mcp` updated to pass `--config src-tauri/tauri.mcp.conf.json` alongside the existing `--features dev-mcp-bridge` flag.
+- Auto-regenerated Tauri ACL / schema files now include the `mcp-bridge` plugin permissions (`allow-execute-js`, `allow-emit-event`, `allow-list-windows`, etc.) — these are normal regen output from running with the new config.
 
-### Animation vocabulary (still established, apply consistently)
-- `active:scale-[0.97]` for nav items / large surfaces
-- `active:scale-95` for standard buttons
-- `active:scale-90` for small icon buttons (≤28px)
-- `type:"spring", stiffness: 380-500, damping: 22-32` for icon swaps
-- `layoutId` for elements that move between positions
-- `0.18-0.25s ease-[0.22,0.61,0.36,1]` for content fades
-- 40-50ms stagger delays for entrance reveals
-- CSS easing tokens in `style.css`: `--ease-snap`, `--ease-pop`, `--ease-out-soft`
+To use the MCP bridge in a future session:
 
-### Lessons learned this session (do NOT re-learn)
-1. **Display previews must reflect production behavior, not aspirational behavior.** Initial draft stripped `timer/status_short/status_long` to "approximate" `showTimer = false` on the Ticker — that would have shown users a feature that didn't actually exist. The honest fix was to wire `showTimer` through `GameChip` + `ScrollrTicker` and let the production code do what the preview implied.
-2. **Reuse production chip/card components in previews when possible.** `SportsDisplayPanel` reuses `GameItem` and `GameChip`; `FantasyDisplayPanel` reuses `MatchupHero` and `FantasyStatChip`. RSS hand-rolls a Feed row only because `RssArticle` is locked to its grid container's responsive layout. Reusing keeps the preview faithful to whatever changes ship to the production component later.
-3. **Engineer hardcoded sample data to light up every toggle simultaneously.** Fantasy's "Sunday Funday" sample league has 4 starters with declining points, 1 bench player with points, 2 injured players (one OUT, one DTD) — chosen specifically so `topScorer` / `topThreeScorers` / `worstStarter` / `benchOpportunity` / `injuryCount` / `injuryDetail` ALL produce non-null output simultaneously. Otherwise the preview misleads users about what their toggles will do.
-4. **The `_typecheck/build/test` triple is fast enough to run after every channel.** ~6 seconds total. Don't batch — catching a Sports-side regression in the Sports commit is much cheaper than untangling it in the Fantasy commit.
-5. **Inherited unused-import detritus**: desktop has `noUnusedLocals: false`, so `tsc` won't catch unused imports left behind during refactors. Manually grep for the symbols you removed and prune their imports.
-6. **The `Cargo.lock` may auto-regenerate during `npm run build`** since the build chains into `cargo`. If you bump versions in `Cargo.toml`, run a build before committing so the lock change rides with the version commit instead of trailing it.
+```sh
+cd desktop && npm run tauri:dev:mcp
+# WebSocket server listens on localhost:9223
+```
 
-### Plan deviations carried forward (do NOT undo)
-- **Fantasy Feed preview intentionally does not change with toggles** — see "Known asymmetry" above. The helper copy is the contract.
-- Source page Feed view uses `noContentPadding={true}` (flush rendering); Configure/Display keep the padded narrow column.
-- Home uses `noContentPadding` + its own `space-y-5` wrapper.
-- Settings + Catalog use breadcrumb dropdowns (`menuItems` on PageLayout) — NOT in-page tab bands.
-- Channel removal still uses `ConfirmDialog`; widgets use `useUndoableAction` toast. Asymmetric on purpose (channel deletion is server-side).
-- `Channel.ticker_enabled` is still dual-tracked client+server. Deferred derivation to a follow-up — don't cut over without reasoning about other clients.
-- Sidebar has no Home or Catalog nav items (TopBar brand mark + `+ Add source` button cover those).
+Then connect from your MCP-aware client (Claude Code, opencode, etc.) and drive the running app with the standard `webview_*` / `manage_window` / `read_logs` tools.
 
-### Spec
-`docs/superpowers/specs/2026-05-09-desktop-ia-refactor-design.md` — the full IA refactor design doc. 289 lines. Mental model (Library/Source/Ticker), unified page chassis, canonical-home-per-verb table, file-level impact, implementation phases.
+### 3. Yahoo OAuth desktop counterpart
 
-## Risks / Open Questions
-- Bundle size warning persists (`style-*.js` ~580kb). Pre-existing, unchanged by this PR. Code-splitting follow-up if needed.
-- Fantasy Feed-side venue plumbing (described in "Known asymmetry") is the most natural next refactor, but it's not blocking anything user-facing today — `MatchupHero` shows a perfectly reasonable layout even when none of the venue toggles fire.
-- Fantasy sample data is verbose (~120 lines of literal `LeagueResponse`). If we ever change `LeagueResponse` shape (new required field), the sample will need updating. Acceptable cost — better than fragile fixture file imports.
+- Server-side fix already shipped to production via PR #155 (`4e6e804`).
+- Desktop side (`desktop/src/channels/fantasy/ConfigPanel.tsx`) now `authFetch`es `/yahoo/start?response=json` with `Accept: application/json` and then `shell::open`s the returned `redirect_url`. The system-browser approach (`shell::open` of the bare endpoint) was 401-ing because external nav can't carry the Bearer header — see PR #155 for full root cause.
+- `v1_checklist.md:271` toggled to `[x]`.
 
-## Next Best Action
+This change doesn't ship to users until the next desktop release tag (`desktop-vX.Y.Z`); the website auto-rebuilds via `release: types: [published]` in `.github/workflows/deploy.yml`.
 
-The Display-panel rollout is complete across all four channels. Two reasonable next directions:
+## Verification Run This Session
+- `npm run build` — clean (typecheck + vite build, only the pre-existing `style-*.js` chunk-size warning).
+- `npm test` — 15 files, 249 tests passing.
+- MCP-driven visual check — ticker + settings + fantasy configure all render correctly in the live app.
 
-**(A) Propagate `shouldShowOnFeed` into Fantasy Feed sub-views** — closes the asymmetry called out above. `MatchupHero` is the easiest target (hides win-probability bar / projected points / status pill based on the `.feed` boolean). `OverviewView` and `StandingsView` follow the same pattern. Estimated 1 session of focused work.
+## Risks / Follow-Ups
+- **Bundle size**: the `style-*.js` chunk is ~580 kB minified. Lower-priority code-splitting follow-up still open.
+- **Fantasy `.feed` venue plumbing**: `FantasyStatChip` honors `.ticker` venue booleans but `.feed` booleans are still ignored by the Fantasy Feed sub-views. Carried over from the previous handoff.
+- **Desktop release**: when ready to cut the next release, the Yahoo desktop counterpart shipped here will be in it. Tag with `desktop-v1.0.12` (or whatever the next version is) — `.github/workflows/desktop-release.yml` does the cross-platform builds and notarization.
+- **`tauri.mcp.conf.json` permissions**: dev-only by virtue of being applied via `npm run tauri:dev:mcp`. Production builds (`npm run tauri:build`) don't pull in the MCP bridge plugin (gated by `feature = "dev-mcp-bridge"` + `debug_assertions` in `lib.rs:61`).
 
-**(B) Bundle-size code-splitting pass** — the 580kb `style-*.js` chunk is the biggest unaddressed footnote from v1.0.10. Would need to identify which routes/components dominate it (likely Fantasy roster table + lucide icons), then `manualChunks` them. Lower urgency since the desktop ships native binaries, not over-the-wire.
+## Resume Prompt
 
 ```
-You're picking up the Scrollr desktop on `main` after v1.0.11 shipped (PR #154). Read `docs/superpowers/handoffs/current.md` first — it has the operational state, the foundation primitives (TopBar, PageLayout, OverflowMenu, DisplayItemsGrid, PageContext, useNavHistory), the new live-preview Display panels for all four channels, and the lessons you must NOT re-learn.
+You're picking up `/Users/doni/code/myscrollr` on `main`. Worktree is clean.
+Read `docs/superpowers/handoffs/current.md` first.
 
-**Repo**: `/Users/doni/code/myscrollr`. Desktop at `desktop/`. Branch `main`, clean. Version 1.0.11.
+Recent significant work:
+1. Yahoo OAuth desktop flow fixed end-to-end (PR #155 server-side, PR <this>
+   desktop-side). The `/yahoo/start` endpoint content-negotiates JSON when
+   `Accept: application/json` is sent.
+2. Desktop UI readability pass — new `text-ui-*` utilities live in
+   `desktop/src/style.css`. Use them for any new dense text rather than
+   `text-[Npx]` arbitrary sizes.
+3. MCP dev session is now `npm run tauri:dev:mcp` (uses `tauri.mcp.conf.json`
+   to enable `withGlobalTauri`, and the `dev-mcp-bridge` cargo feature).
+   WebSocket server on localhost:9223.
 
-**Two natural next directions** — pick whichever you have appetite for:
-
-**(A) Fantasy Feed-side venue plumbing.** The 14 venue toggles' `.ticker` boolean is honored by `FantasyStatChip`. The `.feed` boolean is currently a no-op — `MatchupHero`, `OverviewView`, `StandingsView`, `RosterView` ignore it. The v1.0.11 Fantasy Display panel calls this out in helper copy ("Display items currently affect the Ticker only") but it's an obvious gap. Touch each Feed sub-view with `shouldShowOnFeed(dp.{key})` reads, hide the corresponding visual when false. Spec lives in `docs/superpowers/specs/2026-05-09-desktop-ia-refactor-design.md`. Existing pattern in `FantasyStatChip` shows the venue-gate idiom.
-
-**(B) Bundle-size code-splitting.** The 580kb `style-*.js` chunk has been a footnote since v1.0.10. Identify the dominant contributors (likely Fantasy roster table + lucide-icons), then split via `manualChunks` in `desktop/vite.config.ts`. The desktop ships as native binaries so this is comfort, not necessity, but it would shave perceived startup time.
-
-**Workflow**: implement, typecheck (`cd desktop && npx tsc --noEmit`), build (`npm run build`), test (`npx vitest run`). Commit each unit of work separately. Bump to 1.0.12 in `desktop/package.json`, `desktop/src-tauri/tauri.conf.json`, `desktop/src-tauri/Cargo.toml` when shipping. Create a feature branch (`refactor/...` or `fix/...`); never commit directly to main. PR via `gh pr create` with a HEREDOC body, then `gh pr merge --squash --delete-branch`.
-
-**Foundations available** (don't recreate):
-- `<DisplayItemsGrid>`, `<PageLayout>`, `<TopBar>`, `<OverflowMenu>`
-- `Section`, `ToggleRow`, `SegmentedRow`, `ResetButton` from `desktop/src/components/settings/SettingsControls`
-- `enumToBools` / `boolsToEnum` / `shouldShowOnFeed` / `shouldShowOnTicker` from `desktop/src/preferences.ts`
-- `useShell` for prefs access; `useShellData` for channel data
-- Per-channel DisplayPanel components in `desktop/src/channels/{finance,sports,rss,fantasy}/DisplayPanel.tsx`
-
-**No blocking issues. Pick (A) or (B) and dive in.**
+No active task. Open backlog in `v1_checklist.md`. Possible next pickups:
+- Fantasy Feed venue plumbing (mirror what FantasyStatChip ticker side does)
+- Bundle splitting for the 580 kB style chunk
+- Cut the next desktop release once you're ready
 ```

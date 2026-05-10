@@ -268,7 +268,7 @@ All paid tiers include a 7-day free trial.
 - [ ] Fix configure page flash when adding items from catalog
 - [ ] Ticker multi-deck Phase 2: per-row scroll customization UI (Ultimate) — data path already wired, just needs the UI controls in TickerSettings
 - [ ] CSP connect-src tightening (user-configurable Kuma URL needs runtime CSP or Rust-side proxy — see `desktop/src-tauri/CSP_NOTES.md`)
-- [ ] Yahoo OAuth desktop flow needs server-side JSON redirect_url (currently 302 which loses auth header on external nav — `/yahoo/start` is Auth: true on the server)
+- [x] Yahoo OAuth desktop flow returns JSON `{redirect_url}` when `Accept: application/json` (or `?response=json`) so the desktop can authFetch it and then `shell::open` the Yahoo consent URL externally; browser callers still get the 307
 - [ ] `scrollr:navigate` payload fix so tray "Customize Ticker" opens the Ticker settings tab
 
 ### Features

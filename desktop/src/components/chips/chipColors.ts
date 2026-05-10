@@ -19,8 +19,8 @@ const PRIMARY: ChipColors = {
   border: "border-primary/25",
   hoverBorder: "hover:border-primary/40",
   text: "text-primary",
-  textDim: "text-primary/60",
-  textFaint: "text-primary/40",
+  textDim: "text-primary/70",
+  textFaint: "text-primary/55",
 };
 
 const SECONDARY: ChipColors = {
@@ -28,8 +28,8 @@ const SECONDARY: ChipColors = {
   border: "border-secondary/25",
   hoverBorder: "hover:border-secondary/40",
   text: "text-secondary",
-  textDim: "text-secondary/60",
-  textFaint: "text-secondary/40",
+  textDim: "text-secondary/70",
+  textFaint: "text-secondary/55",
 };
 
 const INFO: ChipColors = {
@@ -37,8 +37,8 @@ const INFO: ChipColors = {
   border: "border-info/25",
   hoverBorder: "hover:border-info/40",
   text: "text-info",
-  textDim: "text-info/60",
-  textFaint: "text-info/40",
+  textDim: "text-info/70",
+  textFaint: "text-info/55",
 };
 
 const PURPLE: ChipColors = {
@@ -46,8 +46,8 @@ const PURPLE: ChipColors = {
   border: "border-accent-purple/25",
   hoverBorder: "hover:border-accent-purple/40",
   text: "text-accent-purple",
-  textDim: "text-accent-purple/60",
-  textFaint: "text-accent-purple/40",
+  textDim: "text-accent-purple/70",
+  textFaint: "text-accent-purple/55",
 };
 
 const MUTED: ChipColors = {
@@ -56,7 +56,7 @@ const MUTED: ChipColors = {
   hoverBorder: "hover:border-fg-3/30",
   text: "text-fg-2",
   textDim: "text-fg-3",
-  textFaint: "text-fg-4",
+  textFaint: "text-fg-3",
 };
 
 // ── Widget color palettes ───────────────────────────────────────
@@ -66,8 +66,8 @@ const WIDGET_CLOCK: ChipColors = {
   border: "border-widget-clock/25",
   hoverBorder: "hover:border-widget-clock/40",
   text: "text-widget-clock",
-  textDim: "text-widget-clock/60",
-  textFaint: "text-widget-clock/40",
+  textDim: "text-widget-clock/70",
+  textFaint: "text-widget-clock/55",
 };
 
 const WIDGET_TIMER: ChipColors = {
@@ -75,8 +75,8 @@ const WIDGET_TIMER: ChipColors = {
   border: "border-widget-timer/25",
   hoverBorder: "hover:border-widget-timer/40",
   text: "text-widget-timer",
-  textDim: "text-widget-timer/60",
-  textFaint: "text-widget-timer/40",
+  textDim: "text-widget-timer/70",
+  textFaint: "text-widget-timer/55",
 };
 
 const WIDGET_WEATHER: ChipColors = {
@@ -84,8 +84,8 @@ const WIDGET_WEATHER: ChipColors = {
   border: "border-widget-weather/25",
   hoverBorder: "hover:border-widget-weather/40",
   text: "text-widget-weather",
-  textDim: "text-widget-weather/60",
-  textFaint: "text-widget-weather/40",
+  textDim: "text-widget-weather/70",
+  textFaint: "text-widget-weather/55",
 };
 
 const WIDGET_SYSMON: ChipColors = {
@@ -93,8 +93,8 @@ const WIDGET_SYSMON: ChipColors = {
   border: "border-widget-sysmon/25",
   hoverBorder: "hover:border-widget-sysmon/40",
   text: "text-widget-sysmon",
-  textDim: "text-widget-sysmon/60",
-  textFaint: "text-widget-sysmon/40",
+  textDim: "text-widget-sysmon/70",
+  textFaint: "text-widget-sysmon/55",
 };
 
 const WIDGET_UPTIME: ChipColors = {
@@ -102,8 +102,8 @@ const WIDGET_UPTIME: ChipColors = {
   border: "border-widget-uptime/25",
   hoverBorder: "hover:border-widget-uptime/40",
   text: "text-widget-uptime",
-  textDim: "text-widget-uptime/60",
-  textFaint: "text-widget-uptime/40",
+  textDim: "text-widget-uptime/70",
+  textFaint: "text-widget-uptime/55",
 };
 
 const WIDGET_GITHUB: ChipColors = {
@@ -111,8 +111,8 @@ const WIDGET_GITHUB: ChipColors = {
   border: "border-widget-github/25",
   hoverBorder: "hover:border-widget-github/40",
   text: "text-widget-github",
-  textDim: "text-widget-github/60",
-  textFaint: "text-widget-github/40",
+  textDim: "text-widget-github/70",
+  textFaint: "text-widget-github/55",
 };
 
 // ── Channel + widget → color mapping ────────────────────────────
@@ -155,7 +155,7 @@ export function chipBaseClasses(
     colors.hoverBorder,
     comfort
       ? "flex flex-col items-start py-1.5 gap-0.5"
-      : "flex items-center gap-2 py-1 text-[13px]",
+      : "flex items-center gap-2 py-1 text-ui-body",
     extra,
   );
 }

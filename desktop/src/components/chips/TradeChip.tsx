@@ -49,13 +49,13 @@ const TradeChip = memo(function TradeChip({
       className={chipBaseClasses(comfort, c, "font-mono whitespace-nowrap")}
     >
       {/* Row 1: symbol, price, change */}
-      <div className={clsx("flex items-center gap-2", comfort && "text-[13px]")}>
+      <div className={clsx("flex items-center gap-2", comfort && "text-ui-body")}>
         <span className={clsx("font-semibold", c.text)}>{trade.symbol}</span>
         <span className={c.textDim}>{formatPrice(trade.price)}</span>
         {changeStr && (
           <span
             className={clsx(
-              "font-medium text-[12px]",
+              "font-medium text-ui-meta",
               isUp ? "text-up" : "text-down"
             )}
           >
@@ -66,14 +66,14 @@ const TradeChip = memo(function TradeChip({
       </div>
       {/* Row 2: previous close + price change (comfort only) */}
       {comfort && (
-        <div className={clsx("flex items-center gap-1.5 text-[10px]", c.textFaint)}>
+        <div className={clsx("flex items-center gap-1.5 text-ui-chip", c.textFaint)}>
           {trade.previous_close != null && (
             <span>Prev {formatPrice(trade.previous_close)}</span>
           )}
           {trade.price_change != null && (
             <>
-              <span className="text-fg-4">&middot;</span>
-              <span className={isUp ? "text-up/60" : "text-down/60"}>
+              <span className="text-fg-3">&middot;</span>
+              <span className={isUp ? "text-up/70" : "text-down/70"}>
                 {formatPriceChange(trade.price_change)}
               </span>
             </>

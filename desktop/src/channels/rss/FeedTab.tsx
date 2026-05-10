@@ -83,7 +83,7 @@ function SourceFilter({ sources, selected, onToggle, onClearAll }: SourceFilterP
       <button
         onClick={() => setOpen(!open)}
         className={clsx(
-          "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[11px] transition-colors cursor-pointer whitespace-nowrap",
+          "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-ui-meta transition-colors cursor-pointer whitespace-nowrap",
           activeCount > 0
             ? "border-accent/50 text-accent"
             : "border-edge/40 text-fg-3 hover:text-fg-2 hover:border-edge/60",
@@ -92,7 +92,7 @@ function SourceFilter({ sources, selected, onToggle, onClearAll }: SourceFilterP
         <Rss size={12} />
         <span>Sources</span>
         {activeCount > 0 && (
-          <span className="bg-accent/20 text-accent rounded-full px-1.5 text-[10px] font-medium">
+          <span className="bg-accent/20 text-accent rounded-full px-1.5 text-ui-chip font-medium">
             {activeCount}
           </span>
         )}
@@ -107,7 +107,7 @@ function SourceFilter({ sources, selected, onToggle, onClearAll }: SourceFilterP
                 key={source}
                 onClick={() => onToggle(source)}
                 className={clsx(
-                  "flex items-center gap-2 w-full px-3 py-1.5 text-left text-[12px] transition-colors cursor-pointer",
+                  "flex items-center gap-2 w-full px-3 py-1.5 text-left text-ui-meta transition-colors cursor-pointer",
                   isActive
                     ? "text-fg-2"
                     : "text-fg-4 hover:text-fg-3",
@@ -115,7 +115,7 @@ function SourceFilter({ sources, selected, onToggle, onClearAll }: SourceFilterP
               >
                 <span
                   className={clsx(
-                    "w-3.5 h-3.5 rounded border flex items-center justify-center text-[10px] shrink-0",
+                    "w-3.5 h-3.5 rounded border flex items-center justify-center text-ui-chip shrink-0",
                     isActive
                       ? "bg-accent/25 border-accent/50 text-accent"
                       : "border-edge/50",
@@ -135,7 +135,7 @@ function SourceFilter({ sources, selected, onToggle, onClearAll }: SourceFilterP
                   onClearAll();
                   setOpen(false);
                 }}
-                className="w-full px-3 py-1.5 text-left text-[11px] text-fg-4 hover:text-fg-3 transition-colors cursor-pointer"
+                className="w-full px-3 py-1.5 text-left text-ui-meta text-fg-3 hover:text-fg-2 transition-colors cursor-pointer"
               >
                 Clear all filters
               </button>
@@ -364,7 +364,7 @@ function RssFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
               setShowAll(false);
               setExpandedSources(new Set());
             }}
-            className="bg-surface-2 border border-edge/40 rounded-md px-2 py-1.5 text-[11px] text-fg-2 cursor-pointer outline-none focus:border-accent/60"
+            className="bg-surface-2 border border-edge/40 rounded-md px-2 py-1.5 text-ui-meta text-fg-2 cursor-pointer outline-none focus:border-accent/60"
           >
             <option value="newest">Newest</option>
             <option value="oldest">Oldest</option>
@@ -380,7 +380,7 @@ function RssFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
             <button
               key={`src:${s}`}
               onClick={() => toggleSource(s)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-[10px] hover:bg-accent/25 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-ui-chip hover:bg-accent/25 transition-colors cursor-pointer"
             >
               <span className="truncate max-w-[120px]">{s}</span>
               <span className="text-accent/60">&times;</span>
@@ -390,7 +390,7 @@ function RssFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
             <button
               key={`cat:${c}`}
               onClick={() => toggleCategory(c)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400 text-[10px] hover:bg-purple-500/25 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400 text-ui-chip hover:bg-purple-500/25 transition-colors cursor-pointer"
             >
               <span className="truncate max-w-[120px]">{c}</span>
               <span className="text-purple-400/60">&times;</span>
@@ -398,7 +398,7 @@ function RssFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
           ))}
           <button
             onClick={clearAllFilters}
-            className="px-2 py-0.5 text-[10px] text-fg-4 hover:text-fg-3 transition-colors cursor-pointer"
+            className="px-2 py-0.5 text-ui-chip text-fg-3 hover:text-fg-2 transition-colors cursor-pointer"
           >
             Clear all
           </button>
@@ -407,7 +407,7 @@ function RssFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
 
       {/* Per-source limit info bar (chronological sorts only) */}
       {!isBySource && totalHidden > 0 && !showAll && (
-        <div className="flex items-center justify-between px-3 py-1.5 bg-surface-2 border-b border-edge/30 text-[10px] text-fg-3">
+        <div className="flex items-center justify-between px-3 py-1.5 bg-surface-2 border-b border-edge/30 text-ui-meta text-fg-3">
           <span>
             Showing {dp.articlesPerSource} per source &middot;{" "}
             <span className="tabular-nums">{totalHidden}</span> articles hidden
@@ -421,7 +421,7 @@ function RssFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
         </div>
       )}
       {!isBySource && showAll && totalHidden === 0 && dp.articlesPerSource > 0 && (
-        <div className="flex items-center justify-between px-3 py-1.5 bg-surface-2 border-b border-edge/30 text-[10px] text-fg-3">
+        <div className="flex items-center justify-between px-3 py-1.5 bg-surface-2 border-b border-edge/30 text-ui-meta text-fg-3">
           <span>Showing all articles</span>
           <button
             onClick={() => setShowAll(false)}
@@ -503,18 +503,18 @@ function SourceHeader({ source, category, overflow, expanded, onToggle }: Source
 
   return (
     <div className="col-span-full flex items-center gap-2 px-3 py-2 bg-surface-2 border-b border-edge/30">
-      <span className="font-mono text-[10px] font-bold text-fg-2 uppercase tracking-wider">
+      <span className="font-mono text-ui-section font-bold text-fg-2 uppercase tracking-wider">
         {source}
       </span>
       {category && (
-        <span className="px-1.5 py-px rounded text-[9px] text-fg-3 bg-accent/10">
+        <span className="px-1.5 py-px rounded text-ui-chip text-fg-3 bg-accent/10">
           {category}
         </span>
       )}
       {hasAction && (
         <button
           onClick={onToggle}
-          className="ml-auto flex items-center gap-1 text-[10px] text-accent hover:text-accent/80 transition-colors cursor-pointer"
+          className="ml-auto flex items-center gap-1 text-ui-chip text-accent hover:text-accent/80 transition-colors cursor-pointer"
         >
           {overflow > 0 ? (
             <>
@@ -551,7 +551,7 @@ const RssArticle = memo(function RssArticle({ item, mode, display, category, now
   const ago = showTimestamps ? relativeTime(item.published_at, now) : null;
 
   const categoryBadge = showSource && category ? (
-    <span className="px-1.5 py-px rounded text-[9px] text-fg-3 bg-accent/10 shrink-0 whitespace-nowrap">
+    <span className="px-1.5 py-px rounded text-ui-chip text-fg-3 bg-accent/10 shrink-0 whitespace-nowrap">
       {category}
     </span>
   ) : null;
@@ -565,14 +565,14 @@ const RssArticle = memo(function RssArticle({ item, mode, display, category, now
         className="flex items-center gap-2 px-3 py-1.5 bg-surface text-xs hover:bg-surface-hover transition-colors cursor-pointer"
       >
         {showSource && (
-          <span className="font-mono text-[9px] text-accent shrink-0 min-w-[56px] max-w-[80px] truncate uppercase tracking-wider font-bold">
+          <span className="font-mono text-ui-section text-accent shrink-0 min-w-[56px] max-w-[80px] truncate uppercase tracking-wider font-bold">
             {item.source_name}
           </span>
         )}
         {categoryBadge}
         <span className="text-fg truncate flex-1">{item.title}</span>
         {ago && (
-          <span className="text-fg-4 shrink-0 text-[9px] font-mono tabular-nums">
+          <span className="text-fg-3 shrink-0 text-ui-chip font-mono tabular-nums">
             {ago}
           </span>
         )}
@@ -599,13 +599,13 @@ const RssArticle = memo(function RssArticle({ item, mode, display, category, now
       {(showSource || ago) && (
         <div className="flex items-center gap-2 mt-1.5">
           {showSource && (
-            <span className="text-[9px] font-mono font-bold text-accent/80 uppercase tracking-wider">
+            <span className="text-ui-section font-mono font-bold text-accent uppercase tracking-wider">
               {item.source_name}
             </span>
           )}
           {categoryBadge}
           {ago && (
-            <span className="text-[9px] font-mono text-fg-4 tabular-nums">
+            <span className="text-ui-chip font-mono text-fg-3 tabular-nums">
               {ago}
             </span>
           )}

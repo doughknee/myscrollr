@@ -70,7 +70,7 @@ export default function TopBar({
         className="flex items-center gap-2 px-1.5 h-7 rounded-md hover:bg-surface-hover transition-colors shrink-0"
       >
         <ScrollLogo alive={tickerOn} size={20} />
-        <span className="text-[13px] font-semibold text-fg tracking-tight">
+        <span className="text-ui-body font-semibold tracking-tight">
           Scrollr
         </span>
       </button>
@@ -119,18 +119,18 @@ export default function TopBar({
           the trigger for the page's contextual menu when menuItems is
           provided. Breadcrumb segment IS the menu — no separate
           "Options" button competing for attention. */}
-      <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden text-[12px]">
+      <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden text-ui-meta">
         {page && (
           <>
             {page.parentLabel && page.onParentClick && (
               <>
                 <button
                   onClick={page.onParentClick}
-                  className="text-fg-4 hover:text-fg-2 transition-colors shrink-0"
+                  className="text-fg-3 hover:text-fg-2 transition-colors shrink-0"
                 >
                   {page.parentLabel}
                 </button>
-                <span className="text-fg-4/50 shrink-0" aria-hidden>
+                <span className="text-fg-4 shrink-0" aria-hidden>
                   /
                 </span>
               </>
@@ -186,7 +186,7 @@ export default function TopBar({
                   transition={{ duration: 0.22, ease: [0.22, 0.61, 0.36, 1] }}
                   className="flex items-center gap-1.5 min-w-0"
                 >
-                  <span className="text-fg-4/40 shrink-0" aria-hidden>
+                  <span className="text-fg-4 shrink-0" aria-hidden>
                     /
                   </span>
                   {page.menuItems?.length ? (
@@ -229,7 +229,7 @@ export default function TopBar({
             aria-checked={tickerOn}
             onClick={onToggleTicker}
             className={clsx(
-              "flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium transition-all duration-200 active:scale-95",
+              "flex items-center gap-1.5 h-7 px-2.5 rounded-md text-ui-chip font-medium transition-all duration-200 active:scale-95",
               tickerOn
                 ? "bg-accent/15 text-accent hover:bg-accent/20"
                 : "text-fg-4 hover:text-fg-2 hover:bg-surface-hover",
@@ -327,7 +327,7 @@ function BreadcrumbMenuTrigger({
         }}
         className={clsx(
           "shrink-0",
-          muted ? "text-fg-4" : "text-fg-3",
+          "text-fg-3",
           "group-hover:text-fg-2 transition-colors",
         )}
       />

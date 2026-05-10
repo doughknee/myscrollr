@@ -106,7 +106,7 @@ export default function Sidebar({
         )}
       >
         {!collapsed && (
-          <h2 className="px-2.5 mb-2 text-[10px] font-semibold uppercase tracking-wider text-fg-4/70">
+          <h2 className="px-2.5 mb-2 text-ui-section">
             Sources
           </h2>
         )}
@@ -130,7 +130,7 @@ export default function Sidebar({
           </div>
         ) : (
           !collapsed && (
-            <p className="px-2.5 text-[11px] text-fg-4/70 leading-snug">
+            <p className="px-2.5 text-ui-meta leading-snug">
               No sources yet. Tap{" "}
               <span className="font-medium text-accent">+ Add source</span>{" "}
               below to get started.
@@ -154,7 +154,7 @@ export default function Sidebar({
                 : "text-accent/85 hover:bg-accent/10 hover:text-accent",
               collapsed
                 ? "justify-center py-1.5 px-0"
-                : "gap-2.5 px-2.5 py-1.5 text-[13px]",
+                : "gap-2.5 px-2.5 py-1.5 text-ui-body",
             )}
           >
             <span className="shrink-0 flex items-center justify-center w-5 h-5">
@@ -197,7 +197,7 @@ export default function Sidebar({
             onClick={toggleCollapsed}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={clsx(
-              "flex items-center w-full rounded-lg text-fg-4 hover:text-fg-2 hover:bg-surface-hover",
+              "flex items-center w-full rounded-lg text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
               "transition-all duration-150 active:scale-[0.97]",
               collapsed
                 ? "justify-center py-1.5"
@@ -208,7 +208,7 @@ export default function Sidebar({
               {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
             </span>
             {!collapsed && (
-              <span className="text-[12px] font-medium">Collapse</span>
+              <span className="text-ui-meta font-medium">Collapse</span>
             )}
           </button>
         </Tooltip>
@@ -243,7 +243,7 @@ function NavItem({
           "transition-all duration-150 active:scale-[0.97]",
           collapsed
             ? "justify-center py-1.5 px-0"
-            : "gap-2.5 px-2.5 py-1.5 text-[13px]",
+            : "gap-2.5 px-2.5 py-1.5 text-ui-body",
           active
             ? "bg-accent/10 text-fg"
             : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",

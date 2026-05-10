@@ -66,10 +66,10 @@ export default function FollowedPlayerChip({
       className={chipBaseClasses(comfort, c, "font-mono whitespace-nowrap")}
       title={`${player.name.full}${teamAbbr ? ` (${teamAbbr})` : ""}`}
     >
-      <div className={clsx("flex items-center gap-2", comfort && "text-[13px]")}>
+      <div className={clsx("flex items-center gap-2", comfort && "text-ui-body")}>
         <span
           className={clsx(
-            "inline-flex items-center justify-center px-1 py-0 rounded text-[9px] font-semibold uppercase tracking-wide tabular-nums",
+            "inline-flex items-center justify-center px-1 py-0 rounded text-ui-chip font-semibold uppercase tracking-wide tabular-nums",
             "bg-fg-3/15",
             c.textDim,
           )}
@@ -80,7 +80,7 @@ export default function FollowedPlayerChip({
           {last}
         </span>
         {teamAbbr && (
-          <span className={clsx("text-[10px] uppercase tracking-wider", c.textFaint)}>
+          <span className={clsx("text-ui-chip uppercase tracking-wider", c.textFaint)}>
             {teamAbbr}
           </span>
         )}
@@ -97,7 +97,7 @@ export default function FollowedPlayerChip({
         {injured && (
           <span
             className={clsx(
-              "text-[9px] font-semibold uppercase tracking-wider px-1 rounded",
+              "text-ui-chip font-semibold uppercase tracking-wider px-1 rounded",
               "bg-down/15 text-down",
             )}
           >
@@ -111,7 +111,7 @@ export default function FollowedPlayerChip({
         // teams. Format: "OwnerTeam · LeagueName · NFL Team Full Name".
         // The position badge already lives on the top row, so the
         // bottom row's job is "where does this player come from?"
-        <div className={clsx("flex items-center gap-1.5 text-[10px]", c.textFaint)}>
+        <div className={clsx("flex items-center gap-1.5 text-ui-chip", c.textFaint)}>
           <span className="truncate max-w-[140px]" title={ownerTeamName}>
             {ownerTeamName}
           </span>

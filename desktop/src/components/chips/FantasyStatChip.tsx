@@ -248,7 +248,7 @@ export default function FantasyStatChip({
       onClick={onClick}
       className={chipBaseClasses(comfort, c, "font-mono whitespace-nowrap")}
     >
-      <div className={clsx("flex items-center gap-2", comfort && "text-[13px]")}>
+      <div className={clsx("flex items-center gap-2", comfort && "text-ui-body")}>
         <span aria-hidden>{SPORT_EMOJI[league.game_code] ?? "🏆"}</span>
         {live && (
           <motion.span
@@ -267,7 +267,7 @@ export default function FantasyStatChip({
               "tabular-nums font-medium",
               seg.tone === "up" && "text-up",
               seg.tone === "down" && "text-down",
-              seg.tone === "live" && "text-live uppercase tracking-wider text-[10px]",
+              seg.tone === "live" && "text-live uppercase tracking-wider text-ui-chip",
               !seg.tone && c.textDim,
             )}
           >
@@ -276,7 +276,7 @@ export default function FantasyStatChip({
         ))}
       </div>
       {comfort && (
-        <div className={clsx("flex items-center gap-2 text-[10px]", c.textFaint)}>
+        <div className={clsx("flex items-center gap-2 text-ui-chip", c.textFaint)}>
           {ctx && (
             <>
               <span className="uppercase tracking-wider shrink-0">

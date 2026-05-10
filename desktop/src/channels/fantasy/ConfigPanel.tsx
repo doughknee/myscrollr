@@ -5,13 +5,12 @@ import { toast } from "sonner";
 import { open } from "@tauri-apps/plugin-shell";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import UpgradePrompt from "../../components/UpgradePrompt";
-import { authFetch, API_BASE } from "../../api/client";
+import { authFetch } from "../../api/client";
 import {
   fantasyStatusOptions,
   fantasyLeaguesOptions,
   queryKeys,
 } from "../../api/queries";
-import { getValidToken, decodeJwtPayload } from "../../auth";
 import { getLimit } from "../../tierLimits";
 import { LeaguePicker } from "./LeaguePicker";
 import { ImportProgress } from "./ImportProgress";
@@ -245,32 +244,28 @@ export default function FantasyConfigPanel({
   // ── Yahoo connect / disconnect ─────────────────────────────────
 
   const handleYahooConnect = useCallback(async () => {
-    const token = await getValidToken();
-    if (!token) {
-      toast.error("Sign in to your account first");
-      return;
-    }
-
-    const payload = decodeJwtPayload(token);
-    const sub = payload?.sub as string | undefined;
-    if (!sub) {
-      toast.error("Couldn't verify your identity — try signing in again");
-      return;
-    }
-
-    // TODO(Stream 3 coordination): /yahoo/start is becoming Auth: true on the
-    // server. We need to change the server to return JSON with the Yahoo
-    // consent URL instead of 302, then use shell::open on that URL. Currently
-    // this flow will 401 after the server-side change lands because external
-    // browser navigation doesn't carry the Authorization bearer header.
-    // Passing ?logto_sub= is the v1.0 workaround; remove once the server
-    // exposes { redirect_url } as JSON.
-    const popupUrl = `${API_BASE}/yahoo/start?logto_sub=${sub}`;
+    // /yahoo/start requires the Bearer header (it's Auth: true on the
+    // gateway), but the system browser launched by shell::open cannot
+    // carry it. So we ask the server for the Yahoo consent URL via an
+    // authenticated JSON request, then open the returned URL externally.
     try {
-      await open(popupUrl);
+      const { redirect_url } = await authFetch<{ redirect_url: string }>(
+        "/yahoo/start?response=json",
+        { headers: { Accept: "application/json" } },
+      );
+      if (!redirect_url) {
+        toast.error("Couldn't start Yahoo sign-in");
+        return;
+      }
+      await open(redirect_url);
       setAwaitingYahoo(true);
-    } catch {
-      toast.error("Couldn't open Yahoo sign-in");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      if (msg.toLowerCase().includes("unauthorized") || msg.toLowerCase().includes("authentication")) {
+        toast.error("Sign in to your account first");
+      } else {
+        toast.error("Couldn't open Yahoo sign-in");
+      }
     }
   }, []);
 

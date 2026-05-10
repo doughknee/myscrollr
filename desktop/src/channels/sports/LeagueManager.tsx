@@ -182,7 +182,7 @@ export default function LeagueManager({
           <h3 className="text-sm font-semibold text-fg">Leagues</h3>
           <span
             className={clsx(
-              "px-1.5 py-px rounded-full text-[11px] font-medium tabular-nums",
+              "px-1.5 py-px rounded-full text-ui-chip font-medium tabular-nums",
               atLimit ? "bg-warn/15 text-warn" : "bg-accent/15 text-accent",
             )}
           >
@@ -190,7 +190,7 @@ export default function LeagueManager({
             {maxLeagues !== Infinity && ` / ${maxLeagues}`}
           </span>
         </div>
-        <p className="text-[11px] text-fg-4 truncate">Click a row to add or remove</p>
+        <p className="text-ui-meta text-fg-3 truncate">Click a row to add or remove</p>
       </div>
 
       {atLimit && (
@@ -208,14 +208,14 @@ export default function LeagueManager({
         <div className="relative flex-1 min-w-0">
           <SearchIcon
             size={12}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-4 pointer-events-none"
+             className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3 pointer-events-none"
           />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search leagues, sports, countries..."
-            className="w-full pl-7 pr-7 py-1.5 rounded-md bg-base-200 border border-edge/40 text-[11px] text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
+            className="w-full pl-7 pr-7 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
           />
           {search && (
             <button
@@ -247,7 +247,7 @@ export default function LeagueManager({
             onClick={() => setTrackedOnly((v) => !v)}
             aria-pressed={trackedOnly}
             className={clsx(
-              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[11px] cursor-pointer whitespace-nowrap",
+              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-ui-meta cursor-pointer whitespace-nowrap",
               "transition-all duration-200 active:scale-95",
               trackedOnly
                 ? "border-accent/50 bg-accent/10 text-accent"
@@ -268,7 +268,7 @@ export default function LeagueManager({
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as SortKey)}
-          className="px-2 py-1.5 rounded-md bg-base-200 border border-edge/40 text-[11px] text-fg-2 focus:outline-none focus:border-accent/60 transition-colors cursor-pointer appearance-none"
+          className="px-2 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta text-fg-2 focus:outline-none focus:border-accent/60 transition-colors cursor-pointer appearance-none"
           aria-label="Sort leagues"
         >
           <option value="default">Tracked first</option>
@@ -284,7 +284,7 @@ export default function LeagueManager({
             <button
               key={cat}
               onClick={() => toggleCategory(cat)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-[10px] text-accent hover:bg-accent/25 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-ui-chip text-accent hover:bg-accent/25 transition-colors cursor-pointer"
             >
               {cat}
               <X size={10} className="opacity-60" />
@@ -292,7 +292,7 @@ export default function LeagueManager({
           ))}
           <button
             onClick={() => setSelectedCategories(new Set())}
-            className="px-2 py-0.5 text-[10px] text-fg-4 hover:text-fg-2 transition-colors cursor-pointer"
+            className="px-2 py-0.5 text-ui-chip text-fg-3 hover:text-fg-2 transition-colors cursor-pointer"
           >
             Clear all
           </button>
@@ -301,7 +301,7 @@ export default function LeagueManager({
 
       {loading ? (
         <div className="shrink-0 text-center py-8">
-          <p className="text-[11px] text-fg-4 animate-pulse">Loading catalog...</p>
+          <p className="text-ui-meta text-fg-3 animate-pulse">Loading catalog...</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="shrink-0">
@@ -415,17 +415,17 @@ function LeagueRow({
         <LeagueLogo url={league.logo_url} />
 
         <div className="flex-1 min-w-0">
-          <span className="text-[12px] font-medium text-fg-2 truncate block">
+          <span className="text-ui-body font-medium text-fg-2 truncate block">
             {league.name}
           </span>
           {league.country && (
-            <span className="text-[10px] text-fg-4 truncate block">
+            <span className="text-ui-meta text-fg-3 truncate block">
               {league.country}
             </span>
           )}
         </div>
 
-        <span className="shrink-0 px-1.5 py-px rounded text-[9px] text-fg-4 bg-surface-hover whitespace-nowrap">
+        <span className="shrink-0 px-1.5 py-px rounded text-ui-chip text-fg-3 bg-surface-hover whitespace-nowrap">
           {league.category}
         </span>
 
@@ -474,7 +474,7 @@ function LeagueLogo({ url }: { url?: string }) {
 function LeagueStatus({ league }: { league: TrackedLeague }) {
   if (league.live_count > 0) {
     return (
-      <span className="flex items-center justify-end gap-1 text-[10px] text-live tabular-nums">
+      <span className="flex items-center justify-end gap-1 text-ui-chip text-live tabular-nums">
         <span className="relative flex h-1.5 w-1.5 shrink-0">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-live opacity-75" />
           <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-live" />
@@ -485,24 +485,24 @@ function LeagueStatus({ league }: { league: TrackedLeague }) {
   }
   if (league.game_count > 0) {
     return (
-      <span className="text-[10px] text-fg-3 tabular-nums">
+      <span className="text-ui-chip text-fg-3 tabular-nums">
         {league.game_count} game{league.game_count !== 1 ? "s" : ""}
       </span>
     );
   }
   if (league.is_offseason) {
-    return <span className="text-[10px] text-fg-4">Off-season</span>;
+    return <span className="text-ui-chip text-fg-3">Off-season</span>;
   }
   if (league.next_game) {
     return (
       <Tooltip content={`Next game: ${new Date(league.next_game).toLocaleString()}`}>
-        <span className="text-[10px] text-fg-3 tabular-nums">
+        <span className="text-ui-chip text-fg-3 tabular-nums">
           {formatCountdown(league.next_game)}
         </span>
       </Tooltip>
     );
   }
-  return <span className="text-[10px] text-fg-4">—</span>;
+  return <span className="text-ui-chip text-fg-3">—</span>;
 }
 
 // ── Favorite team picker ─────────────────────────────────────────
@@ -544,7 +544,7 @@ function TeamPicker({
           const team = teams.find((t) => t.external_id === id);
           if (team) onSelect({ teamId: team.external_id, teamName: team.name });
         }}
-        className="px-1.5 py-0.5 rounded bg-base-200 border border-edge/30 text-[10px] text-fg-2 focus:outline-none focus:border-accent/60 transition-colors cursor-pointer appearance-none max-w-[100px] disabled:opacity-40"
+        className="px-1.5 py-0.5 rounded bg-base-200 border border-edge/30 text-ui-chip text-fg-2 focus:outline-none focus:border-accent/60 transition-colors cursor-pointer appearance-none max-w-[100px] disabled:opacity-40"
       >
         <option value="">{isLoading ? "Loading..." : "No team"}</option>
         {teams.map((t) => (

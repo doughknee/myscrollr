@@ -84,7 +84,7 @@ function LeagueFilter({ leagues, selected, onToggle, onClearAll }: LeagueFilterP
       <button
         onClick={() => setOpen(!open)}
         className={clsx(
-          "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[11px] transition-colors cursor-pointer whitespace-nowrap",
+          "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-ui-meta transition-colors cursor-pointer whitespace-nowrap",
           activeCount > 0
             ? "border-accent/50 text-accent"
             : "border-edge/40 text-fg-3 hover:text-fg-2 hover:border-edge/60",
@@ -93,7 +93,7 @@ function LeagueFilter({ leagues, selected, onToggle, onClearAll }: LeagueFilterP
         <Filter size={12} />
         <span>Leagues</span>
         {activeCount > 0 && (
-          <span className="bg-accent/20 text-accent rounded-full px-1.5 text-[10px] font-medium">
+          <span className="bg-accent/20 text-accent rounded-full px-1.5 text-ui-chip font-medium">
             {activeCount}
           </span>
         )}
@@ -108,13 +108,13 @@ function LeagueFilter({ leagues, selected, onToggle, onClearAll }: LeagueFilterP
                 key={league}
                 onClick={() => onToggle(league)}
                 className={clsx(
-                  "flex items-center gap-2 w-full px-3 py-1.5 text-left text-[12px] transition-colors cursor-pointer",
+                    "flex items-center gap-2 w-full px-3 py-1.5 text-left text-ui-meta transition-colors cursor-pointer",
                   isActive ? "text-fg-2" : "text-fg-3 hover:text-fg-2",
                 )}
               >
                 <span
                   className={clsx(
-                    "w-3.5 h-3.5 rounded border flex items-center justify-center text-[10px] shrink-0",
+                    "w-3.5 h-3.5 rounded border flex items-center justify-center text-ui-chip shrink-0",
                     isActive
                       ? "bg-accent/25 border-accent/50 text-accent"
                       : "border-edge/50",
@@ -134,7 +134,7 @@ function LeagueFilter({ leagues, selected, onToggle, onClearAll }: LeagueFilterP
                   onClearAll();
                   setOpen(false);
                 }}
-                className="w-full px-3 py-1.5 text-left text-[11px] text-fg-3 hover:text-fg-2 transition-colors cursor-pointer"
+                className="w-full px-3 py-1.5 text-left text-ui-meta text-fg-3 hover:text-fg-2 transition-colors cursor-pointer"
               >
                 Clear all filters
               </button>
@@ -269,7 +269,7 @@ function SportsFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
                   key={opt.value}
                   onClick={() => setStatusFilter(opt.value)}
                   className={clsx(
-                    "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors cursor-pointer",
+                    "px-2.5 py-1 rounded-full text-ui-meta font-medium transition-colors cursor-pointer",
                     statusFilter === opt.value
                       ? "bg-accent/15 text-accent"
                       : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",

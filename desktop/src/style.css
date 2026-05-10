@@ -45,9 +45,9 @@
 
   /* ── Text hierarchy ───────────────────────────────────────── */
   --color-fg: #e2e2ec;
-  --color-fg-2: #9494a0;
-  --color-fg-3: #5a5a6a;
-  --color-fg-4: #3a3a48;
+  --color-fg-2: #b7b7c6;
+  --color-fg-3: #9292a4;
+  --color-fg-4: #78788a;
 
   /* ── Semantic ─────────────────────────────────────────────── */
   --color-up: #22c55e;
@@ -145,13 +145,67 @@
 /* ── High contrast text ──────────────────────────────────────── */
 /* Bumps muted text tiers to be more readable */
 .high-contrast[data-theme="dark"] {
-  --color-fg-3: #8a8a9a;
-  --color-fg-4: #6a6a7a;
+  --color-fg-2: #d0d0dc;
+  --color-fg-3: #b4b4c4;
+  --color-fg-4: #9a9aac;
 }
 
 .high-contrast[data-theme="light"] {
   --color-fg-3: #555568;
   --color-fg-4: #6a6a7e;
+}
+
+/* ── Desktop type scale ────────────────────────────────────────── */
+/* Meaningful text should stay readable at 100% UI scale. Reserve
+   10px and below for decorative marks only, not content. */
+.text-ui-title {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.text-ui-body {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--color-fg);
+}
+
+.text-ui-muted {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--color-fg-2);
+}
+
+.text-ui-meta {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--color-fg-3);
+}
+
+.text-ui-chip {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--color-fg-3);
+}
+
+.text-ui-section {
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-fg-3);
+}
+
+/* Legacy compact surfaces still use Tailwind arbitrary micro sizes. Keep
+   them readable at 100% scale without hand-patching every dense table. */
+#desktop-shell .text-\[9px\],
+#desktop-shell .text-\[10px\],
+#app-shell .text-\[9px\],
+#app-shell .text-\[10px\] {
+  font-size: 11px;
+  line-height: 16px;
 }
 
 /* Smooth theme transition */
