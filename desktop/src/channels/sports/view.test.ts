@@ -94,28 +94,42 @@ describe("gameEngagement", () => {
     expect(gameEngagement(g)).toBe(80);
   });
 
-  it("returns 60 for pre-game within 1 hour", () => {
+  it("returns 60 for any pre-game regardless of how far out it is", () => {
+    // Engagement is state-only — no time bucketing — so a pre-game's
+    // sort priority doesn't flip on dashboard refetches as it drifts
+    // across clock thresholds. Continuous time-of-day priority is
+    // applied via the start_time tie-break in selectSportsForTicker.
     expect(gameEngagement(preGame(1, 30 * 60_000))).toBe(60);
+    expect(gameEngagement(preGame(2, 6 * 3_600_000))).toBe(60);
+    expect(gameEngagement(preGame(3, 48 * 3_600_000))).toBe(60);
   });
 
-  it("returns 40 for pre-game within 24 hours", () => {
-    expect(gameEngagement(preGame(1, 6 * 3_600_000))).toBe(40);
-  });
-
-  it("returns 20 for pre-game more than 24 hours away", () => {
-    expect(gameEngagement(preGame(1, 48 * 3_600_000))).toBe(20);
-  });
-
-  it("returns 30 for final within 2 hours", () => {
+  it("returns 30 for any final game regardless of how long ago it ended", () => {
+    // Same rationale as pre-games — engagement is state-only, recency
+    // is handled by the start_time tie-break in the selector.
     expect(gameEngagement(finalGame(1, 30 * 60_000))).toBe(30);
-  });
-
-  it("returns 10 for final more than 2 hours ago", () => {
-    expect(gameEngagement(finalGame(1, 5 * 3_600_000))).toBe(10);
+    expect(gameEngagement(finalGame(2, 5 * 3_600_000))).toBe(30);
+    expect(gameEngagement(finalGame(3, 48 * 3_600_000))).toBe(30);
   });
 
   it("returns 0 for games in unknown states", () => {
     expect(gameEngagement(mk({ id: 1, state: "postponed" }))).toBe(0);
+  });
+
+  it("is stable across simulated time drift", () => {
+    // The fix's core invariant: a game's engagement must not change
+    // simply because wall-clock time has advanced. This is what the
+    // old time-bucketed implementation got wrong, producing the
+    // 4000-9000px marquee transform jumps on every dashboard refetch.
+    const upcoming = preGame(1, 90 * 60_000); // 90 minutes away
+    const recent = finalGame(2, 30 * 60_000); // finished 30 minutes ago
+    const before = { upcoming: gameEngagement(upcoming), recent: gameEngagement(recent) };
+
+    // Advance system clock past every old time-bucket boundary.
+    vi.setSystemTime(new Date(NOW.getTime() + 6 * 3_600_000)); // +6 hours
+    const after = { upcoming: gameEngagement(upcoming), recent: gameEngagement(recent) };
+
+    expect(after).toEqual(before);
   });
 });
 
@@ -181,5 +195,51 @@ describe("selectSportsForTicker", () => {
 
   it("returns [] for empty input", () => {
     expect(selectSportsForTicker([], null)).toEqual([]);
+  });
+
+  it("breaks ties between pre-games by soonest start_time first", () => {
+    // Two upcoming games at the same engagement bucket (60). The one
+    // starting sooner should sort first — same intuitive priority the
+    // old "within-1-hour > within-24h" buckets encoded discretely,
+    // now expressed continuously.
+    const games = [
+      preGame(1, 6 * 3_600_000), // starts in 6h
+      preGame(2, 30 * 60_000),   // starts in 30m
+      preGame(3, 12 * 3_600_000), // starts in 12h
+    ];
+    const result = selectSportsForTicker(games, null);
+    expect(result.map((g) => g.id)).toEqual([2, 1, 3]);
+  });
+
+  it("breaks ties between final games by most-recently-finished first", () => {
+    // Two finished games at the same engagement bucket (30). The one
+    // that ended more recently should sort first.
+    const games = [
+      finalGame(1, 5 * 3_600_000),   // finished 5h ago
+      finalGame(2, 30 * 60_000),      // finished 30m ago
+      finalGame(3, 12 * 3_600_000),   // finished 12h ago
+    ];
+    const result = selectSportsForTicker(games, null);
+    expect(result.map((g) => g.id)).toEqual([2, 1, 3]);
+  });
+
+  it("produces the same order on repeated calls (stable across refetches)", () => {
+    // Regression test for the marquee-snap bug: dashboard refetches
+    // every ~30s would re-evaluate the time-bucketed engagement and
+    // produce a different order, causing the rail to snap.
+    const games = [
+      preGame(1, 90 * 60_000),  // crosses old 1h boundary as time advances
+      preGame(2, 30 * 60_000),  // already inside old 1h boundary
+      liveGame(3),
+      finalGame(4, 90 * 60_000), // crosses old 2h boundary as time advances
+      finalGame(5, 30 * 60_000), // already inside old 2h boundary
+    ];
+    const orderAtT0 = selectSportsForTicker(games, null).map((g) => g.id);
+
+    // Advance past every old boundary.
+    vi.setSystemTime(new Date(NOW.getTime() + 3 * 3_600_000));
+    const orderAtT1 = selectSportsForTicker(games, null).map((g) => g.id);
+
+    expect(orderAtT1).toEqual(orderAtT0);
   });
 });

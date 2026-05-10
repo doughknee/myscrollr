@@ -29,19 +29,28 @@ export interface SportsDisplayConfig {
 
 // ── Pure: engagement score ──────────────────────────────────────
 
+/**
+ * Coarse priority bucket for ranking games on the ticker.
+ *
+ * **Stable across consecutive renders / refetches** — the score for any
+ * given game only changes when its `state` transitions (pre → live →
+ * final) or its `isCloseGame` status flips. It is NOT a function of
+ * `Date.now()`, so dashboard refetches that bring back the same data
+ * produce the same sort order, which keeps the ticker rail from
+ * snapping every ~30 seconds as games drift across arbitrary clock
+ * thresholds (within-1-hour, within-24-hours, within-2-hours-ago).
+ *
+ * The previous time-bucketed implementation produced 4000-9000px
+ * marquee transform jumps on every dashboard refetch when any game
+ * crossed a threshold, which the user observed as "weird movement".
+ * Continuous time-of-day priority (sooner pre-games surface, more
+ * recent finals surface) is now expressed via the secondary sort in
+ * `selectSportsForTicker` instead — same UX, no jank.
+ */
 export function gameEngagement(g: Game): number {
   if (isLive(g)) return isCloseGame(g) ? 100 : 80;
-  if (g.state === "pre") {
-    const until = new Date(g.start_time).getTime() - Date.now();
-    if (until < 3_600_000) return 60; // within 1 hour
-    if (until < 86_400_000) return 40; // within 24 hours
-    return 20;
-  }
-  if (g.state === "final") {
-    const ago = Date.now() - new Date(g.start_time).getTime();
-    if (ago < 7_200_000) return 30; // finished within 2 hours
-    return 10;
-  }
+  if (g.state === "pre") return 60;
+  if (g.state === "final") return 30;
   return 0;
 }
 
@@ -50,11 +59,22 @@ export function gameEngagement(g: Game): number {
 /**
  * Baseline pipeline used by the ticker: applies `showUpcoming`/`showFinal`
  * filters from the channel config.display blob, then sorts by engagement
- * (live/close-game games float to the top).
+ * (live games first, then upcoming, then finals) with a deterministic
+ * tie-break on `start_time` so the ticker rail stays stable across
+ * dashboard refetches.
  *
  * Filters only apply when the venue is `off` or ticker-only-excluded
  * ("feed"). `both` and `ticker` both permit the category to show on the
  * ticker.
+ *
+ * Tie-break direction is per-state:
+ *   - pre/live   → start_time ASC (sooner / more in-progress first)
+ *   - final      → start_time DESC (most recently finished first)
+ *
+ * This preserves the continuous "closer games matter more" priority the
+ * old time-bucketed engagement encoded discretely, without producing a
+ * different sort order on every refetch as games drift across clock
+ * thresholds.
  */
 export function selectSportsForTicker(
   games: Game[],
@@ -70,7 +90,16 @@ export function selectSportsForTicker(
     return true;
   });
 
-  return filtered.sort((a, b) => gameEngagement(b) - gameEngagement(a));
+  return filtered.sort((a, b) => {
+    const eDiff = gameEngagement(b) - gameEngagement(a);
+    if (eDiff !== 0) return eDiff;
+    // Same engagement bucket — break ties by start_time. Finals sort
+    // newest-first; everything else sorts soonest-first.
+    const aT = new Date(a.start_time).getTime();
+    const bT = new Date(b.start_time).getTime();
+    if (a.state === "final" && b.state === "final") return bT - aT;
+    return aT - bT;
+  });
 }
 
 /**
