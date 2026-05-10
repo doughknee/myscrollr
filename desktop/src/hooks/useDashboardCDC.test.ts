@@ -12,9 +12,10 @@
 import { describe, it, expect } from "vitest";
 import { mergeTableRecords } from "./useDashboardCDC";
 import { CDC_TABLES } from "../cdc";
-import type { Trade } from "../types";
+import type { Game, Trade } from "../types";
 
 const tradesConfig = CDC_TABLES.find((c) => c.table === "trades")!;
+const gamesConfig = CDC_TABLES.find((c) => c.table === "games")!;
 
 // Minimal CDC record shape matching what the server publishes.
 type CDCRecord = Parameters<typeof mergeTableRecords>[1][number];
@@ -25,6 +26,31 @@ function updateRecord(trade: Partial<Trade> & { symbol: string }): CDCRecord {
     record: { price: 0, previous_close: 0, ...trade } as Record<string, unknown>,
     changes: {},
     metadata: { table_name: "trades" },
+  };
+}
+
+function gameRecord(game: Partial<Game> & { id: number | string }): CDCRecord {
+  return {
+    action: "update",
+    record: {
+      league: "MLB",
+      sport: "baseball",
+      external_game_id: String(game.id),
+      link: "",
+      home_team_name: "Home",
+      home_team_logo: "",
+      home_team_score: 0,
+      home_team_code: "HOM",
+      away_team_name: "Away",
+      away_team_logo: "",
+      away_team_score: 0,
+      away_team_code: "AWY",
+      start_time: "2026-05-10T18:00:00Z",
+      state: "in",
+      ...game,
+    } as Record<string, unknown>,
+    changes: {},
+    metadata: { table_name: "games" },
   };
 }
 
@@ -145,5 +171,18 @@ describe("mergeTableRecords (trades)", () => {
 
     // trades config sorts alphabetically by symbol
     expect(merged.map((t) => t.symbol)).toEqual(["AAPL", "MSFT", "TSLA"]);
+  });
+});
+
+describe("mergeTableRecords (games)", () => {
+  it("does not insert untracked games from global CDC updates", () => {
+    const initial: Game[] = [
+      { id: 3633724, league: "MLB", home_team_name: "Texas Rangers", away_team_name: "Chicago Cubs" } as Game,
+    ];
+    const cdc = [gameRecord({ id: 3781843, home_team_name: "Texas Rangers", away_team_name: "Chicago Cubs", state: "final" })];
+
+    const merged = mergeTableRecords(initial, cdc, gamesConfig) as Game[];
+
+    expect(merged.map((g) => g.id)).toEqual([3633724]);
   });
 });

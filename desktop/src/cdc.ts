@@ -23,6 +23,8 @@ export interface CDCTableConfig {
   sort?: (a: unknown, b: unknown) => number;
   /** Max items to keep in the cache slice. Defaults to 50. */
   maxItems: number;
+  /** Whether CDC may add records that are not already in this user's slice. */
+  allowInsert?: boolean;
   /** Return false to skip a malformed CDC record. */
   validate?: (record: Record<string, unknown>) => boolean;
 }
@@ -42,6 +44,7 @@ export const CDC_TABLES: CDCTableConfig[] = [
     dataKey: "sports",
     keyOf: (item) => String((item as Game).id),
     validate: (r) => r.id != null,
+    allowInsert: false,
     maxItems: 50,
   },
   {

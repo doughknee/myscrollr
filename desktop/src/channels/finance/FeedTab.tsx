@@ -66,6 +66,7 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 ];
 
 const PAGE_SIZE = 20;
+const LOAD_MORE_INCREMENT = 20;
 
 // ── FeedTab ──────────────────────────────────────────────────────
 
@@ -143,11 +144,11 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabP
 
   const hasFilters = directionFilter !== "all" || selectedCategories.size > 0;
 
-  const [page, setPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setPage(1);
+    setVisibleCount(PAGE_SIZE);
   }, [directionFilter, selectedCategories, sortKey]);
 
   // ── Data pipeline ────────────────────────────────────────────
@@ -164,16 +165,13 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabP
     [trades, directionFilter, selectedCategories, categoryMap, sortKey],
   );
 
-  // ── Pagination ───────────────────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const pageItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-
-  useEffect(() => {
-    if (page > 1) {
-      containerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  }, [page]);
+  // ── Pagination (incremental "load more") ─────────────────────
+  // Vertical-monitor friendly: instead of paging, we render a
+  // progressively larger slice and append more on click. This keeps
+  // scroll position stable as users continue down the list.
+  const visible = Math.min(visibleCount, filtered.length);
+  const pageItems = filtered.slice(0, visible);
+  const remaining = Math.max(0, filtered.length - visible);
 
   // Most-recent update across filtered trades — drives the FreshnessPill.
   const latestUpdated = useMemo(() => {
@@ -334,35 +332,21 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabP
               />
             ))}
           </div>
-          {filtered.length > PAGE_SIZE && (
-            <div className="sticky bottom-0 flex items-center justify-center gap-3 px-3 py-2 bg-surface border-t border-edge/30">
+          {remaining > 0 && (
+            <div className="flex items-center justify-center gap-3 px-3 py-3 bg-surface border-t border-edge/30">
               <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={safePage <= 1}
-                className={clsx(
-                  "px-3 py-1 rounded text-xs font-medium transition-colors",
-                  safePage <= 1
-                    ? "text-fg-4 cursor-not-allowed"
-                    : "text-fg-2 hover:bg-surface-hover cursor-pointer",
-                )}
+                onClick={() =>
+                  setVisibleCount((c) =>
+                    Math.min(filtered.length, c + LOAD_MORE_INCREMENT),
+                  )
+                }
+                className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
               >
-                Previous
+                Load more
               </button>
               <span className="text-xs text-fg-3 tabular-nums font-mono">
-                Page {safePage} of {totalPages}
+                {visible} of {filtered.length}
               </span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={safePage >= totalPages}
-                className={clsx(
-                  "px-3 py-1 rounded text-xs font-medium transition-colors",
-                  safePage >= totalPages
-                    ? "text-fg-4 cursor-not-allowed"
-                    : "text-fg-2 hover:bg-surface-hover cursor-pointer",
-                )}
-              >
-                Next
-              </button>
             </div>
           )}
         </>

@@ -189,12 +189,12 @@ function HomePage() {
       title="Home"
       subtitle="Your live feed at a glance"
       width="wide"
-      noContentPadding
     >
-      {/* Home renders flush to the content area with no PageLayout
-          padding. The content wrapper here owns its own padding /
-          rhythm: space-y-5 between sections, no dangling margin on
-          the last child. */}
+      {/* Home uses the standard PageLayout chassis (px-5 py-5,
+          max-w-6xl) so it lines up with Catalog and every other
+          wide route. The inner wrapper just owns vertical rhythm
+          between sections (space-y-5, no dangling margin on the
+          last child). */}
       <div className="space-y-5">
       {/* Empty state — hero. Shown when the user has no channels and
           no enabled widgets. Disappears the moment they add their

@@ -61,7 +61,7 @@ export function mergeTableRecords(
       const idx = next.findIndex((item) => config.keyOf(item) === key);
       if (idx >= 0) {
         next[idx] = record;
-      } else {
+      } else if (config.allowInsert !== false) {
         next.push(record);
         if (next.length > config.maxItems) next.shift();
       }
