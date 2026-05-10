@@ -31,7 +31,7 @@ import { Toaster, toast } from "sonner";
 import TitleBar from "../components/TitleBar";
 import Sidebar from "../components/Sidebar";
 import ConnectionBanner from "../components/ConnectionBanner";
-import ConnectionIndicator from "../components/ConnectionIndicator";
+import ControlStrip from "../components/ControlStrip";
 
 // Onboarding
 import AuthGate from "../components/onboarding/AuthGate";
@@ -666,6 +666,25 @@ function RootLayout() {
     }
   }, []);
 
+  // ── ControlStrip handlers ───────────────────────────────────
+  // Two ambient toggles always visible below the title bar so users
+  // never have to dig into Settings → Ticker to toggle the entire
+  // product on/off. Same prefs as Settings → Ticker top toggle and
+  // Settings → Appearance → Always on top — single source of truth.
+  const handleTickerToggle = useCallback(() => {
+    persistPrefs({
+      ...prefs,
+      ticker: { ...prefs.ticker, showTicker: !prefs.ticker.showTicker },
+    });
+  }, [prefs, persistPrefs]);
+
+  const handlePinToggle = useCallback(() => {
+    persistPrefs({
+      ...prefs,
+      window: { ...prefs.window, pinned: !prefs.window.pinned },
+    });
+  }, [prefs, persistPrefs]);
+
   // ── Shell context values (split: stable + volatile) ────────
 
   const shellStableValue = useMemo(
@@ -726,6 +745,20 @@ function RootLayout() {
         <>
           {!IS_MACOS && <TitleBar />}
 
+          {/* Control strip — ambient ticker on/off + pin + connection
+              status. Sits between the OS title bar and the sidebar/
+              content split so it's always visible regardless of route.
+              Replaces the absolutely-positioned ConnectionIndicator
+              and gives ticker on/off a chrome-level home (was buried
+              in Settings → Ticker pre-refactor). */}
+          <ControlStrip
+            tickerOn={prefs.ticker.showTicker}
+            pinned={prefs.window.pinned}
+            health={deliveryHealth}
+            onToggleTicker={handleTickerToggle}
+            onTogglePin={handlePinToggle}
+          />
+
           <div className="flex flex-1 min-h-0 overflow-hidden">
             <Sidebar
               isFeed={route.isFeed}
@@ -734,7 +767,6 @@ function RootLayout() {
               isSupport={route.isSupport}
               activeItem={route.activeItem}
               sources={sidebarSources}
-              deliveryMode={deliveryMode}
               tickerAlive={prefs.ticker.showTicker}
               onNavigateToFeed={handleNavigateToFeed}
               onNavigateToSettings={handleNavigateToSettings}
@@ -744,16 +776,6 @@ function RootLayout() {
             />
 
             <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-              {/* Connection indicator — pinned top-right so it's
-                  always visible without consuming layout. Hovers to
-                  reveal full state description. Phase 2 (Apr 26): the
-                  ConnectionBanner below still fires on actual outages,
-                  but THIS dot is the always-on signal. */}
-              <ConnectionIndicator
-                health={deliveryHealth}
-                className="absolute top-1 right-2 z-20"
-              />
-
               <ConnectionBanner deliveryMode={deliveryMode} tier={auth.tier} />
 
               {auth.sessionExpired && (
@@ -866,7 +888,10 @@ function RootLayout() {
                 return null;
               })()}
 
-              <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ scrollbarGutter: "stable" }}>
+              {/* PageLayout (used by every route) owns its own scroll
+                  for its content area. The outer wrapper just provides
+                  the flex slot for it to fill. */}
+              <div className="flex-1 min-h-0 overflow-hidden">
                 <ShellContext.Provider value={shellStableValue}>
                   <ShellDataContext.Provider value={shellDataValue}>
                     <Outlet />

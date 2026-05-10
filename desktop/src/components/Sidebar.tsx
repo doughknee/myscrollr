@@ -9,7 +9,7 @@ import { useState } from "react";
 import { Home, LayoutGrid, Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
 import clsx from "clsx";
 import Tooltip from "./Tooltip";
-import type { DeliveryMode, ChannelManifest, WidgetManifest } from "../types";
+import type { ChannelManifest, WidgetManifest } from "../types";
 import { loadPref, savePref } from "../preferences";
 
 // ── Scroll S logo ───────────────────────────────────────────────
@@ -93,9 +93,7 @@ interface SidebarProps {
   /** Resolved enabled-source manifest data, in canonical order. */
   sources: SidebarSource[];
 
-  /** Current data delivery mode for status footer. */
-  deliveryMode: DeliveryMode;
-  /** Whether the standalone ticker window is alive. */
+  /** Whether the standalone ticker window is alive (drives logo glow). */
   tickerAlive: boolean;
 
   /** Navigate to the home dashboard. */
@@ -119,7 +117,6 @@ export default function Sidebar({
   isSupport,
   activeItem,
   sources,
-  deliveryMode,
   tickerAlive,
   onNavigateToFeed,
   onNavigateToSettings,
@@ -252,7 +249,10 @@ export default function Sidebar({
           onClick={onNavigateToSupport}
         />
 
-        {/* Collapse toggle */}
+        {/* Collapse toggle. Connection status + ticker status are now
+            in the ControlStrip (always-visible chrome below the title
+            bar) — see components/ControlStrip.tsx. The sidebar footer
+            stays minimal. */}
         <Tooltip content={collapsed ? "Expand sidebar" : "Collapse sidebar"} side="right">
           <button
             onClick={toggleCollapsed}
@@ -272,49 +272,6 @@ export default function Sidebar({
             )}
           </button>
         </Tooltip>
-
-        {/* Status footer — informational only */}
-        <div
-          className={clsx(
-            "flex items-center pt-2 mt-1 border-t border-edge/30",
-            collapsed ? "flex-col gap-1.5 px-0 justify-center" : "gap-3 px-2.5",
-          )}
-        >
-          <Tooltip content={deliveryMode === "sse" ? "Receiving updates live" : "Polling for updates"} side="right">
-            <div className="flex items-center gap-1.5">
-              <div
-                className={clsx(
-                  "w-1.5 h-1.5 rounded-full shrink-0",
-                  deliveryMode === "sse"
-                    ? "bg-info"
-                    : "bg-warn",
-                )}
-              />
-              {!collapsed && (
-                <span className="text-[10px] font-mono uppercase tracking-wider text-fg-4">
-                  {deliveryMode === "sse" ? "Live" : "Polling"}
-                </span>
-              )}
-            </div>
-          </Tooltip>
-          <Tooltip content={tickerAlive ? "Ticker is running" : "Ticker is off"} side="right">
-            <div className="flex items-center gap-1.5">
-              <div
-                className={clsx(
-                  "w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-500",
-                  tickerAlive
-                    ? "bg-accent"
-                    : "bg-fg-4/30",
-                )}
-              />
-              {!collapsed && (
-                <span className="text-[10px] font-mono uppercase tracking-wider text-fg-4">
-                  {tickerAlive ? "Ticker" : "Off"}
-                </span>
-              )}
-            </div>
-          </Tooltip>
-        </div>
       </div>
     </aside>
   );

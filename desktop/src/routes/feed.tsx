@@ -20,6 +20,9 @@ import RouteError from "../components/RouteError";
 import Tooltip from "../components/Tooltip";
 import RowSelector from "../components/RowSelector";
 import TickerLayoutSummary from "../components/TickerLayoutSummary";
+import PageLayout from "../components/layout/PageLayout";
+import PageSection from "../components/layout/PageSection";
+import EmptySection from "../components/layout/EmptySection";
 import { useShell, useShellData } from "../shell-context";
 import { CHANNEL_ORDER } from "../channels/registry";
 import { WIDGET_ORDER } from "../widgets/registry";
@@ -182,34 +185,22 @@ function HomePage() {
   const hasAnySources = orderedChannels.length > 0 || orderedWidgets.length > 0;
 
   return (
-    <div className="p-5 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-5">
-        <h1 className="text-[11px] font-mono font-semibold text-fg-4 uppercase tracking-wider mb-1">
-          Home
-        </h1>
-        <p className="text-xs text-fg-4">Your live feed at a glance</p>
-      </div>
-
-      {/* Empty state — hero card.
-          Shown when the user has no channels and no enabled widgets.
-          Disappears the moment they add their first source. This is
-          the post-wizard first-run experience: a single primary CTA
-          to discover and add what they want, no opinionated defaults. */}
+    <PageLayout
+      title="Home"
+      subtitle="Your live feed at a glance"
+      width="wide"
+    >
+      {/* Empty state — hero. Shown when the user has no channels and
+          no enabled widgets. Disappears the moment they add their
+          first source. This IS the post-wizard first-run experience —
+          a single primary CTA, no opinionated defaults. */}
       {!hasAnySources && (
-        <div className="mt-8 mx-auto max-w-xl">
-          <div className="rounded-xl border border-edge/30 bg-base-200/40 px-8 py-12 text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent/10 text-accent mb-5">
-              <Sparkles size={22} />
-            </div>
-            <h2 className="text-lg font-semibold text-fg mb-2">
-              Welcome to Scrollr
-            </h2>
-            <p className="text-sm text-fg-3 mb-6 max-w-sm mx-auto leading-relaxed">
-              Your radar is empty. Add channels and widgets from the Catalog
-              to start tracking what matters to you.
-            </p>
-            {authenticated ? (
+        <EmptySection
+          icon={Sparkles}
+          title="Welcome to Scrollr"
+          description="Your radar is empty. Add channels and widgets from the Catalog to start tracking what matters to you."
+          action={
+            authenticated ? (
               <button
                 onClick={() => navigate({ to: "/catalog" })}
                 className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-surface hover:bg-accent/90 transition-colors"
@@ -224,25 +215,39 @@ function HomePage() {
               >
                 Sign in to get started
               </button>
-            )}
-          </div>
-        </div>
+            )
+          }
+        />
       )}
 
-      {/* Layout summary — read-only diagnostic of "what does the ticker
-          look like right now" plus quick CTAs (+Add row, Manage). Hides
-          when there's nothing else on the page (welcome state) so it
-          doesn't shout at brand-new users. */}
+      {/* Ticker preview — read-only summary of "what's on your radar".
+          The full row builder lives in Settings → Ticker. Manage CTA
+          on the right is the canonical path there. */}
       {hasAnySources && (
-        <TickerLayoutSummary
-          rows={layoutRows}
-          tierMaxRows={tierMaxRows}
-          canAddRow={canAddRow}
-          onAddRow={handleAddEmptyRow}
-          onOpenSettings={openTickerSettings}
-          channelManifests={allChannelManifests}
-          widgetManifests={allWidgets}
-        />
+        <PageSection
+          title="Ticker preview"
+          description="What's currently on your ticker rows."
+          variant="card"
+          sectionAction={
+            <button
+              onClick={openTickerSettings}
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-fg-3 hover:text-fg-2 hover:bg-surface-hover rounded-md transition-colors"
+            >
+              <Settings size={12} />
+              <span>Manage</span>
+            </button>
+          }
+        >
+          <TickerLayoutSummary
+            rows={layoutRows}
+            tierMaxRows={tierMaxRows}
+            canAddRow={canAddRow}
+            onAddRow={handleAddEmptyRow}
+            onOpenSettings={openTickerSettings}
+            channelManifests={allChannelManifests}
+            widgetManifests={allWidgets}
+          />
+        </PageSection>
       )}
 
       {/* Channel sections */}
@@ -309,7 +314,7 @@ function HomePage() {
           }
         />
       )}
-    </div>
+    </PageLayout>
   );
 }
 

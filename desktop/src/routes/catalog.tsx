@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { LayoutGrid } from "lucide-react";
+import { LayoutGrid, Search } from "lucide-react";
 import clsx from "clsx";
 import { toast } from "sonner";
 
@@ -14,6 +14,9 @@ import { useShell, useShellData } from "../shell-context";
 import CatalogCard from "../components/marketplace/CatalogCard";
 import QueryErrorBanner from "../components/QueryErrorBanner";
 import RouteError from "../components/RouteError";
+import PageLayout from "../components/layout/PageLayout";
+import PageSection from "../components/layout/PageSection";
+import EmptySection from "../components/layout/EmptySection";
 
 export const Route = createFileRoute("/catalog")({
   component: CatalogPage,
@@ -109,17 +112,16 @@ function CatalogPage() {
   // ── Render ──────────────────────────────────────────────────
 
   return (
-    <div className="p-5 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-5">
-        <h1 className="text-[11px] font-mono font-semibold text-fg-4 uppercase tracking-wider mb-1">
-          Catalog
-        </h1>
-        <p className="text-xs text-fg-4">
-          Add channels and widgets to your ticker
-        </p>
-      </div>
-
+    <PageLayout
+      title="Catalog"
+      subtitle="Add channels and widgets to your feed"
+      width="wide"
+      tabs={{
+        items: FILTER_TABS.map((t) => ({ key: t.key, label: t.label })),
+        activeKey: filter,
+        onChange: (k) => setFilter(k as FilterTab),
+      }}
+    >
       {/* Dashboard error banner */}
       {dashboardError && (
         <div className="mb-4">
@@ -127,46 +129,38 @@ function CatalogPage() {
         </div>
       )}
 
-      {/* Category filter tabs */}
-      <div className="flex items-center gap-1 mb-5">
-        {FILTER_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setFilter(tab.key)}
-            className={clsx(
-              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-              filter === tab.key
-                ? "bg-accent/10 text-accent"
-                : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Card grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        {visibleItems.map((item) => (
-          <CatalogCard
-            key={item.id}
-            item={item}
-            enabled={allEnabledIds.has(item.id)}
-            tier={tier}
-            authenticated={authenticated}
-            dashboardLoading={isLoading}
-            onAdd={handleAdd}
-            onLogin={onLogin}
-            onOpen={(it) => {
-              if (it.kind === "channel") {
-                navigate({ to: "/channel/$type/$tab", params: { type: it.id, tab: "feed" } });
-              } else {
-                navigate({ to: "/widget/$id/$tab", params: { id: it.id, tab: "feed" } });
-              }
-            }}
-          />
-        ))}
-      </div>
-    </div>
+      {/* Card grid — single section, full width. */}
+      {visibleItems.length === 0 ? (
+        <EmptySection
+          icon={Search}
+          title="Nothing here"
+          description="No items match this filter. Try a different category."
+        />
+      ) : (
+        <PageSection variant="grid">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            {visibleItems.map((item) => (
+              <CatalogCard
+                key={item.id}
+                item={item}
+                enabled={allEnabledIds.has(item.id)}
+                tier={tier}
+                authenticated={authenticated}
+                dashboardLoading={isLoading}
+                onAdd={handleAdd}
+                onLogin={onLogin}
+                onOpen={(it) => {
+                  if (it.kind === "channel") {
+                    navigate({ to: "/channel/$type/$tab", params: { type: it.id, tab: "feed" } });
+                  } else {
+                    navigate({ to: "/widget/$id/$tab", params: { id: it.id, tab: "feed" } });
+                  }
+                }}
+              />
+            ))}
+          </div>
+        </PageSection>
+      )}
+    </PageLayout>
   );
 }
