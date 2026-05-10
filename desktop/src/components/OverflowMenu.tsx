@@ -204,12 +204,18 @@ export default function OverflowMenu({
                     ref={(node) => {
                       listRef.current[i] = node;
                     }}
-                    onClick={() => {
-                      if (item.disabled) return;
-                      item.onSelect();
-                      setIsOpen(false);
-                    }}
-                    {...getItemProps()}
+                    // Pass our onClick INTO getItemProps so floating-ui
+                    // merges it with its own list-navigation handlers.
+                    // Spreading {...getItemProps()} *after* a sibling
+                    // onClick would silently overwrite ours, which was
+                    // why menu items weren't doing anything.
+                    {...getItemProps({
+                      onClick() {
+                        if (item.disabled) return;
+                        item.onSelect();
+                        setIsOpen(false);
+                      },
+                    })}
                     className={clsx(
                       "flex items-center gap-2.5 w-full px-3 py-2 text-left text-[12px] transition-colors outline-none",
                       item.disabled && "opacity-40 cursor-not-allowed",
