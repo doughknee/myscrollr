@@ -1,24 +1,26 @@
 /**
- * Settings route — consolidated settings page with tabs.
+ * Settings route — consolidated settings page.
  *
- * Three tabs (post-IA-refactor 2026-05-09):
- *   General  — appearance, window, startup, keyboard shortcuts, about,
- *              updates  (URL slug stays "general" for stability of
- *              billing-banner deeplinks and existing bookmarks; the
- *              tab label is "Appearance" since that's the dominant
- *              concern)
- *   Ticker   — ticker presentation settings with live preview
- *   Account  — profile, billing, plan, data export, reset all
+ * Three tab-like areas (Appearance / Ticker / Account) but no in-page
+ * tab band — the active area's name renders as the last breadcrumb
+ * segment in the TopBar, and clicking it opens a dropdown to switch.
+ * Mirrors the source-page Options pattern so Settings, Catalog, and
+ * channel/widget pages all share one navigation idiom.
  *
- * Tab state is persisted in the URL via ?tab= search param.
+ * URL slug "general" retained for backward compat with billing
+ * banners and existing routing; the user-facing label is "Appearance".
  */
+import { useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Settings as SettingsIcon, Sliders, User } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import RouteError from "../components/RouteError";
 import { useShell } from "../shell-context";
 import GeneralSettings from "../components/settings/GeneralSettings";
 import TickerSettings from "../components/settings/TickerSettings";
 import AccountSettings from "../components/settings/AccountSettings";
 import PageLayout from "../components/layout/PageLayout";
+import type { OverflowMenuItem } from "../components/OverflowMenu";
 import { resetCategory, resetAll, type AppPreferences } from "../preferences";
 
 // ── Types ───────────────────────────────────────────────────────
@@ -27,9 +29,6 @@ type SettingsTab = "general" | "ticker" | "account";
 
 const VALID_TABS: SettingsTab[] = ["general", "ticker", "account"];
 
-// "general" slug retained for backward compatibility with billing
-// banners and existing routing. Display label is "Appearance" since
-// that's the dominant concern of the tab.
 const TAB_LABELS: Record<SettingsTab, string> = {
   general: "Appearance",
   ticker: "Ticker",
@@ -42,13 +41,17 @@ const TAB_DESCRIPTIONS: Record<SettingsTab, string> = {
   account: "Profile, subscription, plan, data, and reset",
 };
 
+const TAB_ICONS: Record<SettingsTab, LucideIcon> = {
+  general: SettingsIcon,
+  ticker: Sliders,
+  account: User,
+};
+
 // ── Route ───────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/settings")({
   validateSearch: (search: Record<string, unknown>): { tab: SettingsTab } => {
     const raw = search.tab as string | undefined;
-    // Migrate legacy ?tab=reset → account (Reset is now a section
-    // inside Account post-IA-refactor).
     if (raw === "reset") return { tab: "account" };
     return {
       tab: VALID_TABS.includes(raw as SettingsTab)
@@ -68,10 +71,10 @@ function SettingsRoute() {
   const shell = useShell();
   const { prefs, onPrefsChange } = shell;
 
-  const setTab = (next: string) => {
+  const setTab = (next: SettingsTab) => {
     navigate({
       to: "/settings",
-      search: { tab: next as SettingsTab },
+      search: { tab: next },
       replace: true,
     });
   };
@@ -81,20 +84,32 @@ function SettingsRoute() {
     onPrefsChange(next);
   };
 
+  // The dropdown menu items are the OTHER tabs — clicking one
+  // switches. The currently-active tab is hidden from the menu since
+  // its label is already rendered as the trigger itself.
+  const menuItems: OverflowMenuItem[] = useMemo(() => {
+    const items: OverflowMenuItem[] = [];
+    for (const t of VALID_TABS) {
+      if (t === tab) continue;
+      items.push({
+        key: t,
+        label: TAB_LABELS[t],
+        hint: TAB_DESCRIPTIONS[t],
+        icon: TAB_ICONS[t],
+        onSelect: () => setTab(t),
+      });
+    }
+    return items;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
   return (
     <PageLayout
       title="Settings"
-      subtitle="Appearance, ticker, and account preferences"
+      subtitle={TAB_LABELS[tab]}
       width="narrow"
-      tabs={{
-        items: VALID_TABS.map((t) => ({
-          key: t,
-          label: TAB_LABELS[t],
-          description: TAB_DESCRIPTIONS[t],
-        })),
-        activeKey: tab,
-        onChange: setTab,
-      }}
+      menuItems={menuItems}
+      menuLabel="Settings sections"
     >
       {tab === "general" && (
         <GeneralSettings

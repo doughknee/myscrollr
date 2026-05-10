@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { LayoutGrid, Search } from "lucide-react";
-import clsx from "clsx";
+import { LayoutGrid, Search, Radio, Boxes } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 
@@ -18,6 +18,7 @@ import RouteError from "../components/RouteError";
 import PageLayout from "../components/layout/PageLayout";
 import PageSection from "../components/layout/PageSection";
 import EmptySection from "../components/layout/EmptySection";
+import type { OverflowMenuItem } from "../components/OverflowMenu";
 
 export const Route = createFileRoute("/catalog")({
   component: CatalogPage,
@@ -28,15 +29,21 @@ export const Route = createFileRoute("/catalog")({
 
 type FilterTab = "all" | CatalogCategory;
 
-const FILTER_TABS: { key: FilterTab; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "channel", label: CATEGORY_LABELS["channel"] },
-  { key: "widget", label: CATEGORY_LABELS["widget"] },
+const FILTER_TABS: { key: FilterTab; label: string; icon: LucideIcon; hint: string }[] = [
+  { key: "all", label: "All", icon: LayoutGrid, hint: "Show every channel and widget" },
+  { key: "channel", label: CATEGORY_LABELS["channel"], icon: Radio, hint: "Show only data channels" },
+  { key: "widget", label: CATEGORY_LABELS["widget"], icon: Boxes, hint: "Show only utility widgets" },
 ];
 
+const TAB_BY_KEY: Record<FilterTab, (typeof FILTER_TABS)[number]> = FILTER_TABS.reduce(
+  (acc, t) => {
+    acc[t.key] = t;
+    return acc;
+  },
+  {} as Record<FilterTab, (typeof FILTER_TABS)[number]>,
+);
+
 // ── Sort order: enabled first, then canonical order ─────────────
-// (CANONICAL_ORDER is exported from marketplace.ts; we import it
-//  alongside the other catalog primitives below.)
 
 function sortItems(items: CatalogItem[], enabledIds: Set<string>): CatalogItem[] {
   return [...items].sort((a, b) => {
@@ -58,10 +65,8 @@ function CatalogPage() {
 
   const [filter, setFilter] = useState<FilterTab>("all");
 
-  // All catalog items (static, computed once)
   const allItems = useMemo(() => getCatalogItems(), []);
 
-  // Enabled IDs
   const enabledChannelIds = useMemo(
     () => new Set(channels.map((ch) => ch.channel_type)),
     [channels],
@@ -75,7 +80,6 @@ function CatalogPage() {
     [enabledChannelIds, enabledWidgetIds],
   );
 
-  // Filtered + sorted items
   const visibleItems = useMemo(() => {
     const filtered = filter === "all"
       ? allItems
@@ -106,32 +110,40 @@ function CatalogPage() {
     [navigate, queryClient, prefs, onPrefsChange],
   );
 
-  // Note: removal is no longer a Catalog action. Source removal lives
-  // on the source page header (Trash + Undo toast) — single canonical
-  // home per verb. See spec 2026-05-09-desktop-ia-refactor-design.md.
+  // ── Breadcrumb dropdown — switch the active filter ───────────
+
+  const menuItems: OverflowMenuItem[] = useMemo(() => {
+    const items: OverflowMenuItem[] = [];
+    for (const t of FILTER_TABS) {
+      if (t.key === filter) continue;
+      items.push({
+        key: t.key,
+        label: t.label,
+        hint: t.hint,
+        icon: t.icon,
+        onSelect: () => setFilter(t.key),
+      });
+    }
+    return items;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
 
   // ── Render ──────────────────────────────────────────────────
 
   return (
     <PageLayout
       title="Catalog"
-      subtitle="Add channels and widgets to your feed"
+      subtitle={TAB_BY_KEY[filter].label}
       width="wide"
-      tabs={{
-        items: FILTER_TABS.map((t) => ({ key: t.key, label: t.label })),
-        activeKey: filter,
-        onChange: (k) => setFilter(k as FilterTab),
-      }}
+      menuItems={menuItems}
+      menuLabel="Catalog filter"
     >
-      {/* Dashboard error banner */}
       {dashboardError && (
         <div className="mb-4">
           <QueryErrorBanner error={dashboardError} />
         </div>
       )}
 
-      {/* Card grid — single section, full width. Filter changes
-          stagger the grid in for a satisfying re-flow. */}
       {visibleItems.length === 0 ? (
         <EmptySection
           icon={Search}
@@ -154,8 +166,6 @@ function CatalogPage() {
                   key={item.id}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  // Slight stagger by index — capped so a 30-item
-                  // grid doesn't take a second to settle.
                   transition={{
                     duration: 0.22,
                     delay: Math.min(i * 0.018, 0.25),
