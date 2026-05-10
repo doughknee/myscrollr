@@ -236,26 +236,31 @@ export default function FinanceDisplayPanel() {
       </Section>
 
       {/* ── Display items (column grid) ────────────────────────────
-          Single CSS grid: 1fr | 56px | 56px. The two narrow columns
-          are Feed / Ticker. Their column headers double as bulk
-          toggles — pressing the header flips every cell in that
-          column. The header sits directly above the per-row cells
-          so the column relationship is visually obvious. Cells are
-          minimal indicators (no labels) since the column header
-          carries the surface name. */}
-      <Section title="Display items">
+          One bar: 'Display items' label on the left, Feed / Ticker
+          column toggles on the right. The header row IS the section
+          chrome — no separate Section title above it. The grid
+          template is shared with the row cells below so cells
+          column-align with the toggles above them.
+          Cells are minimal indicators (no labels) since the column
+          header carries the surface name. */}
+      <div className="mb-6 pb-5 border-b border-edge/30 last:border-b-0 last:mb-0 last:pb-0">
         <div className="mx-3 rounded-lg border border-edge/40 overflow-hidden">
           <div
             role="grid"
             aria-label="Where each metric appears"
             className="select-none"
           >
-            {/* Column headers — also the bulk toggles. */}
+            {/* Header bar — section title + bulk-toggle column heads. */}
             <div
               role="row"
-              className="grid items-stretch gap-x-2 px-3 py-1.5 bg-base-250/30 border-b border-edge/40 grid-cols-[1fr_56px_56px]"
+              className="grid items-center gap-x-2 px-3 py-1.5 bg-base-250/30 border-b border-edge/40 grid-cols-[1fr_56px_56px]"
             >
-              <div role="columnheader" aria-hidden />
+              <h3
+                role="columnheader"
+                className="text-[11px] font-mono font-semibold uppercase tracking-wider text-fg-4"
+              >
+                Display items
+              </h3>
               <ColumnHeaderToggle
                 icon={Eye}
                 label="Feed"
@@ -307,7 +312,7 @@ export default function FinanceDisplayPanel() {
             })}
           </div>
         </div>
-      </Section>
+      </div>
 
       {/* ── Layout & order ───────────────────────────────────────── */}
       <Section title="Layout & order">
