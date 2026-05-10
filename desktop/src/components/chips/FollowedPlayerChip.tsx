@@ -158,12 +158,21 @@ export default function FollowedPlayerChip({
           </span>
         )}
       </div>
-      {comfort && (
-        // Bottom row in comfort mode shows owner context — useful when
-        // following players from multiple leagues / multiple friends'
-        // teams. Format: "OwnerTeam · LeagueName · NFL Team Full Name".
-        // The position badge already lives on the top row, so the
-        // bottom row's job is "where does this player come from?"
+      {comfort && accent ? (
+        // Per-league player-stat chips: the league chip sits immediately
+        // before us in the rail, so league name / owner / real-team are
+        // all redundant context. Use the bottom row to label WHY this
+        // chip exists ("Top scorer", "Bench leader", etc) so the accent
+        // glyph isn't the only hint. ~70-110px instead of ~368px.
+        <div className={clsx("text-ui-chip uppercase tracking-wider", c.textFaint)}>
+          {ACCENT_LABEL[accent]}
+        </div>
+      ) : comfort ? (
+        // User-followed-players chip: no surrounding league context,
+        // so the user picked this player without that visual anchor.
+        // Show full owner / league / real-team context to disambiguate
+        // when the user follows players across multiple leagues or
+        // friends' teams. Format: "OwnerTeam · LeagueName · NFL Team Full Name".
         <div className={clsx("flex items-center gap-1.5 text-ui-chip", c.textFaint)}>
           <span className="truncate max-w-[140px]" title={ownerTeamName}>
             {ownerTeamName}
@@ -181,7 +190,7 @@ export default function FollowedPlayerChip({
             </>
           )}
         </div>
-      )}
+      ) : null}
     </button>
   );
 }
@@ -200,6 +209,18 @@ const ACCENT_TITLE: Record<FollowedPlayerAccent, string> = {
   worst: "Lowest-scoring starter",
   bench: "Bench player outscoring a starter",
   injury: "Injured / unavailable",
+};
+
+/** Short ALL-CAPS bottom-row label for per-league player-stat chips.
+ *  The accent glyph (↑ / ↓ / BN / 🚨) on the top row is the primary
+ *  signal; this label is the redundant-but-clear secondary signal so
+ *  users who haven't memorized the glyphs still know what each chip
+ *  represents. Kept terse to keep chip width tight on the rail. */
+const ACCENT_LABEL: Record<FollowedPlayerAccent, string> = {
+  top: "Top scorer",
+  worst: "Worst starter",
+  bench: "Bench leader",
+  injury: "Injured",
 };
 
 function AccentBadge({
