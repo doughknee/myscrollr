@@ -24,6 +24,12 @@ import { selectRssForTicker } from "../channels/rss/view";
 import { selectFinanceForTicker } from "../channels/finance/view";
 import { selectFantasyForTicker } from "../channels/fantasy/view";
 import { selectSportsForTicker, getSportsDisplayConfig } from "../channels/sports/view";
+import {
+  findTopN,
+  findTopBench,
+  findWorstStarter,
+  findInjuredPlayers,
+} from "../channels/fantasy/playerStats";
 import { buildYahooLeagueUrl, buildYahooPlayerUrl, chipUrlForFinance, chipUrlForSports, chipUrlForRss } from "../utils/chipUrl";
 
 // ── Module-level constants ───────────────────────────────────────
@@ -236,6 +242,8 @@ export default function ScrollrTicker({
 
         const ranked = selectFantasyForTicker(leagues, fantasyPrefs);
         for (const league of ranked) {
+          // 1. The league summary chip itself (matchup-level: score,
+          //    week, win-prob, record, standings, top scorer, etc).
           bucket.push(
             wrap(`fan-${league.league_key}`,
               <FantasyStatChip
@@ -247,6 +255,99 @@ export default function ScrollrTicker({
               />
             )
           );
+
+          // 2. Per-player chips derived from the user's roster in this
+          //    league. Each "Player stats" venue toggle that's enabled
+          //    on the ticker spawns one FollowedPlayerChip per derived
+          //    player. Render order mirrors the Display prefs grouping:
+          //    top scorers (top3), worst starter, bench leader,
+          //    injury report.
+          //
+          //    Skip this whole block if the league has no roster (rare
+          //    pre-import or partial-sync state).
+          const userTeam = league.rosters?.find((r) => r.team_key === league.team_key);
+          if (!userTeam) continue;
+          const players = userTeam.data.players;
+
+          if (shouldShowOnTicker(fantasyPrefs.topThreeScorers)) {
+            const top3 = findTopN(players, 3, { startersOnly: true });
+            // Skip top1 if topScorer is also enabled — it's already on
+            // the league chip as "★ Mahomes 32" and would duplicate.
+            const startIdx = shouldShowOnTicker(fantasyPrefs.topScorer) && top3.length > 0 ? 1 : 0;
+            for (let i = startIdx; i < top3.length; i++) {
+              const p = top3[i];
+              bucket.push(
+                wrap(`fan-${league.league_key}-top-${p.player_key}`,
+                  <FollowedPlayerChip
+                    playerKey={p.player_key}
+                    leagueKey={league.league_key}
+                    leagues={leagues}
+                    comfort={comfort}
+                    colorMode={chipColorMode}
+                    accent="top"
+                    onClick={() => onChipClick?.("fantasy", p.player_key, buildYahooPlayerUrl(p.player_key, league.game_code))}
+                  />
+                )
+              );
+            }
+          }
+
+          if (shouldShowOnTicker(fantasyPrefs.worstStarter)) {
+            const worst = findWorstStarter(players);
+            if (worst) {
+              bucket.push(
+                wrap(`fan-${league.league_key}-worst-${worst.player_key}`,
+                  <FollowedPlayerChip
+                    playerKey={worst.player_key}
+                    leagueKey={league.league_key}
+                    leagues={leagues}
+                    comfort={comfort}
+                    colorMode={chipColorMode}
+                    accent="worst"
+                    onClick={() => onChipClick?.("fantasy", worst.player_key, buildYahooPlayerUrl(worst.player_key, league.game_code))}
+                  />
+                )
+              );
+            }
+          }
+
+          if (shouldShowOnTicker(fantasyPrefs.benchOpportunity)) {
+            const topBench = findTopBench(players);
+            if (topBench) {
+              bucket.push(
+                wrap(`fan-${league.league_key}-bench-${topBench.player_key}`,
+                  <FollowedPlayerChip
+                    playerKey={topBench.player_key}
+                    leagueKey={league.league_key}
+                    leagues={leagues}
+                    comfort={comfort}
+                    colorMode={chipColorMode}
+                    accent="bench"
+                    onClick={() => onChipClick?.("fantasy", topBench.player_key, buildYahooPlayerUrl(topBench.player_key, league.game_code))}
+                  />
+                )
+              );
+            }
+          }
+
+          if (shouldShowOnTicker(fantasyPrefs.injuryDetail)) {
+            const injured = findInjuredPlayers(players);
+            for (const p of injured) {
+              bucket.push(
+                wrap(`fan-${league.league_key}-inj-${p.player_key}`,
+                  <FollowedPlayerChip
+                    playerKey={p.player_key}
+                    leagueKey={league.league_key}
+                    leagues={leagues}
+                    comfort={comfort}
+                    colorMode={chipColorMode}
+                    accent="injury"
+                    onClick={() => onChipClick?.("fantasy", p.player_key, buildYahooPlayerUrl(p.player_key, league.game_code))}
+                  />
+                )
+              );
+            }
+          }
         }
 
         // Only push the bucket when something is actually in it (no

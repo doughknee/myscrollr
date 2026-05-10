@@ -48,6 +48,14 @@ import FollowedPlayersPicker from "../../components/settings/FollowedPlayersPick
 import type { FantasyDisplayPrefs, Venue } from "../../preferences";
 import type { LeagueResponse } from "./types";
 import FantasyStatChip from "../../components/chips/FantasyStatChip";
+import FollowedPlayerChip from "../../components/chips/FollowedPlayerChip";
+import {
+  findTopN,
+  findTopBench,
+  findWorstStarter,
+  findInjuredPlayers,
+} from "./playerStats";
+import { shouldShowOnTicker } from "../../preferences";
 
 // ── Constants ────────────────────────────────────────────────────
 
@@ -372,6 +380,87 @@ export default function FantasyDisplayPanel() {
     patch(DEFAULTS);
   }
 
+  // ── Preview player chips ──────────────────────────────────────
+  // Mirrors the fantasy bucket builder in ScrollrTicker so the
+  // preview shows exactly what'll appear on the rail. Each enabled
+  // "Player stats" venue spawns one chip per derived player. Memoized
+  // on the league data + prefs so toggling a venue checkbox produces
+  // an immediate visual response without re-deriving on every render.
+
+  const previewPlayerChips = useMemo<
+    Array<{
+      key: string;
+      playerKey: string;
+      accent: "top" | "worst" | "bench" | "injury";
+    }>
+  >(() => {
+    const userTeam = previewLeague.rosters?.find(
+      (r) => r.team_key === previewLeague.team_key,
+    );
+    if (!userTeam) return [];
+    const players = userTeam.data.players;
+    const out: Array<{
+      key: string;
+      playerKey: string;
+      accent: "top" | "worst" | "bench" | "injury";
+    }> = [];
+
+    if (shouldShowOnTicker(dp.topThreeScorers)) {
+      const top3 = findTopN(players, 3, { startersOnly: true });
+      const startIdx =
+        shouldShowOnTicker(dp.topScorer) && top3.length > 0 ? 1 : 0;
+      for (let i = startIdx; i < top3.length; i++) {
+        out.push({
+          key: `top-${top3[i].player_key}`,
+          playerKey: top3[i].player_key,
+          accent: "top",
+        });
+      }
+    }
+
+    if (shouldShowOnTicker(dp.worstStarter)) {
+      const worst = findWorstStarter(players);
+      if (worst) {
+        out.push({
+          key: `worst-${worst.player_key}`,
+          playerKey: worst.player_key,
+          accent: "worst",
+        });
+      }
+    }
+
+    if (shouldShowOnTicker(dp.benchOpportunity)) {
+      const topBench = findTopBench(players);
+      if (topBench) {
+        out.push({
+          key: `bench-${topBench.player_key}`,
+          playerKey: topBench.player_key,
+          accent: "bench",
+        });
+      }
+    }
+
+    if (shouldShowOnTicker(dp.injuryDetail)) {
+      const injured = findInjuredPlayers(players);
+      for (const p of injured) {
+        out.push({
+          key: `inj-${p.player_key}`,
+          playerKey: p.player_key,
+          accent: "injury",
+        });
+      }
+    }
+
+    return out;
+  }, [
+    previewLeague,
+    dp.topThreeScorers,
+    dp.topScorer,
+    dp.worstStarter,
+    dp.benchOpportunity,
+    dp.injuryDetail,
+  ]);
+
   // ── Display-items grid model ──────────────────────────────────
 
   const sections: DisplayItemsSection[] = FANTASY_VENUE_GROUPS.map((group) => ({
@@ -389,33 +478,42 @@ export default function FantasyDisplayPanel() {
   return (
     <div className="space-y-6 pb-8">
       {/* ── Live preview ─────────────────────────────────────────── */}
-      {/* Renders the same FantasyStatChip in `comfort` mode the home
-          dashboard / channel feed uses. The previous design had a
-          side-by-side Feed + Ticker preview, but the Feed preview
-          (a MatchupHero card) didn't honor any of the 14 venue
-          toggles below — it was structurally static — and the
-          Ticker preview rendered the chip at its rail-native ~838px
-          width inside a ~340px surface, hiding the entire left half
-          (league name, week, score). Both failures made the preview
-          actively misleading. Single full-width comfort chip is
-          honest: it represents what the user actually sees in the
-          ticker rail and home dashboard, and reacts in real time to
-          every toggle below. */}
+      {/* Mirrors what ScrollrTicker actually renders for this league:
+          the league summary chip, then per-player chips for each
+          enabled "Player stats" venue. Each row of chips reacts in
+          real time as toggles flip — enabling Top 3 starters spawns
+          three chips, etc. PreviewSurface scrolls horizontally if
+          there are more chips than fit. */}
       <Section title="Live preview">
         <div className="px-3 pb-1 space-y-3">
           <p className="text-[11px] text-fg-4 leading-snug">
-            Toggle any Display item below to see it appear or disappear
-            in the chip. The Fantasy Feed view always shows the full
+            Toggle any Display item below to watch it appear on the
+            ticker. The four "Player stats" venues each spawn their own
+            chip(s) so you can scan them individually as the rail
+            scrolls. The Fantasy Feed view always shows the full
             matchup card and is unaffected by these toggles.
           </p>
 
-          <PreviewSurface label="Ticker chip" icon={Tv}>
-            <FantasyStatChip
-              league={previewLeague}
-              prefs={dp}
-              comfort
-              colorMode="channel"
-            />
+          <PreviewSurface label="Ticker chips" icon={Tv}>
+            <div className="flex items-center gap-2">
+              <FantasyStatChip
+                league={previewLeague}
+                prefs={dp}
+                comfort
+                colorMode="channel"
+              />
+              {previewPlayerChips.map(({ key, playerKey, accent }) => (
+                <FollowedPlayerChip
+                  key={key}
+                  playerKey={playerKey}
+                  leagueKey={previewLeague.league_key}
+                  leagues={[previewLeague]}
+                  comfort
+                  colorMode="channel"
+                  accent={accent}
+                />
+              ))}
+            </div>
           </PreviewSurface>
         </div>
       </Section>

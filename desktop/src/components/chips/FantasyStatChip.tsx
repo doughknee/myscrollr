@@ -8,7 +8,6 @@ import {
   countInjuries,
   estimateWinProbability,
   fmtPlayerPoints,
-  isBenchPosition,
   isMatchupFinal,
   isMatchupLive,
   streakLabel,
@@ -17,6 +16,7 @@ import {
   userRoster,
   userStanding,
 } from "../../channels/fantasy/types";
+import { findTopScorer } from "../../channels/fantasy/playerStats";
 import { getChipColors, chipBaseClasses } from "./chipColors";
 
 interface FantasyStatChipProps {
@@ -56,18 +56,21 @@ interface StatSegment {
  *   - `streak` — "W3"
  *   Roster-derived:
  *   - `injuryCount` — "2 IR"
- *   - `topScorer` — "LeBron 42.3"
- *   Player-stats (Phase 1, 2026-04-25):
- *   - `topThreeScorers` — "Mahomes 32 · Hill 18 · CMC 14"
- *   - `worstStarter` — "Worst: Andrews 0.0"
- *   - `benchOpportunity` — "Bench: Pacheco 18.0"
- *   - `injuryDetail` — "🚨 Saquon OUT, Mixon DTD"
+ *   - `topScorer` — "★ LeBron 42.3"
  *
  * Segments render only when their data is available for this league
  * (e.g. `standingsPosition` skips pre-season; `topScorer` skips rosters
  * with all-zero points). A league with ZERO ticker-enabled items
  * collapses to a name-only chip so the user still sees something
  * meaningful per-league.
+ *
+ * The 4 "Player stats" venues (`topThreeScorers`, `worstStarter`,
+ * `benchOpportunity`, `injuryDetail`) used to render here as inline
+ * segments. They are now emitted as standalone chips on the rail by
+ * `ScrollrTicker`'s fantasy bucket builder, using `FollowedPlayerChip`
+ * with an `accent` prop. This keeps the league chip focused on
+ * matchup-level context while letting per-player stats stand on their
+ * own where they're easier to scan.
  */
 export default function FantasyStatChip({
   league,
@@ -183,56 +186,10 @@ export default function FantasyStatChip({
       }
     }
 
-    // ── Phase 1 player-stats — each as its own visual segment ──
-    // Splitting top3 into 3 separate segments (rather than one
-    // "A · B · C" blob) gives each player a colored chip-within-the-
-    // chip, scannable in a scrolling ticker. Each degrades silently
-    // when its data is meaningless (pre-kickoff zeros, healthy
-    // roster, single-starter teams).
-
-    if (shouldShowOnTicker(prefs.topThreeScorers)) {
-      const top3 = findTopN(roster.data.players, 3, { startersOnly: true });
-      // Skip the FIRST entry if topScorer is also enabled — it would
-      // be a duplicate. The user opted in to both prefs but they
-      // shouldn't see "★ Mahomes 32 · Mahomes 32 · Hill 18 · CMC 14".
-      const startIdx = shouldShowOnTicker(prefs.topScorer) && top3.length > 0 ? 1 : 0;
-      for (let i = startIdx; i < top3.length; i++) {
-        const p = top3[i];
-        secondarySegments.push({
-          key: `top${i + 1}`,
-          text: `${p.name.last} ${formatPts(p.player_points!)}`,
-          tone: "up",
-        });
-      }
-    }
-
-    if (shouldShowOnTicker(prefs.worstStarter)) {
-      const worst = findWorstStarter(roster.data.players);
-      if (worst) {
-        secondarySegments.push({
-          key: "worst",
-          text: `↓ ${worst.name.last} ${formatPts(worst.player_points!)}`,
-          tone: "down",
-        });
-      }
-    }
-
-    if (shouldShowOnTicker(prefs.benchOpportunity)) {
-      const topBench = findTopBench(roster.data.players);
-      if (topBench && (topBench.player_points ?? 0) > 0) {
-        secondarySegments.push({
-          key: "bench",
-          text: `BN ${topBench.name.last} ${formatPts(topBench.player_points!)}`,
-        });
-      }
-    }
-
-    if (shouldShowOnTicker(prefs.injuryDetail)) {
-      const injuredText = formatInjuryList(roster.data.players, 2);
-      if (injuredText) {
-        secondarySegments.push({ key: "injd", text: `🚨 ${injuredText}`, tone: "down" });
-      }
-    }
+    // The four "Player stats" venues (topThreeScorers, worstStarter,
+    // benchOpportunity, injuryDetail) USED to render here as inline
+    // segments. They are now emitted as standalone chips on the rail
+    // by ScrollrTicker — see the fantasy bucket builder there.
   }
 
   // In compact mode (single-line ticker), pour everything into a
@@ -306,129 +263,12 @@ export default function FantasyStatChip({
 }
 
 // ── Helpers ──────────────────────────────────────────────────
-
-type Player = ReturnType<typeof userRoster> extends infer R
-  ? R extends null | undefined
-    ? never
-    : R extends { data: { players: infer P } }
-      ? P extends (infer Elt)[]
-        ? Elt
-        : never
-      : never
-  : never;
-
-/** Highest-`player_points` active-roster player with a non-null score. */
-function findTopScorer(players: Player[]): Player | null {
-  let best: Player | null = null;
-  let bestPoints = -Infinity;
-  for (const p of players) {
-    if (isBenchPosition(p.selected_position)) continue;
-    if (p.player_points === null || p.player_points === undefined) continue;
-    if (p.player_points > bestPoints) {
-      best = p;
-      bestPoints = p.player_points;
-    }
-  }
-  return best;
-}
-
-/** Top-N players by `player_points`, descending. Ties broken by
- *  the order they appear in the roster (Yahoo's natural sort).
- *  Filters out players with null `player_points`. When
- *  `startersOnly: true`, bench positions are excluded. */
-function findTopN(
-  players: Player[],
-  n: number,
-  opts: { startersOnly?: boolean } = {},
-): Player[] {
-  const candidates = players.filter((p) => {
-    if (p.player_points === null || p.player_points === undefined) return false;
-    if (opts.startersOnly && isBenchPosition(p.selected_position)) return false;
-    return true;
-  });
-  candidates.sort((a, b) => (b.player_points ?? 0) - (a.player_points ?? 0));
-  return candidates.slice(0, n);
-}
-
-/** Lowest-`player_points` active-roster (non-bench) player. Returns
- *  null when there are fewer than 2 starters with scores — at that
- *  point "worst" overlaps with `topScorer` and is redundant noise. */
-function findWorstStarter(players: Player[]): Player | null {
-  const starters = players.filter(
-    (p) =>
-      !isBenchPosition(p.selected_position) &&
-      p.player_points !== null &&
-      p.player_points !== undefined,
-  );
-  if (starters.length < 2) return null;
-  starters.sort((a, b) => (a.player_points ?? 0) - (b.player_points ?? 0));
-  return starters[0];
-}
-
-/** Highest-`player_points` REAL bench player (BN only — explicitly NOT
- *  IR/IL/NA). Used to surface sit/start regret: "you could have started
- *  this benched player instead." Injured-reserve slots aren't sittable
- *  in the conventional sense, so including them in the comparison
- *  would mislead. Returns null when there are no eligible bench players
- *  or none have valid scores. */
-function findTopBench(players: Player[]): Player | null {
-  let best: Player | null = null;
-  let bestPoints = -Infinity;
-  for (const p of players) {
-    if (!isStrictBench(p.selected_position)) continue;
-    if (p.player_points === null || p.player_points === undefined) continue;
-    if (p.player_points > bestPoints) {
-      best = p;
-      bestPoints = p.player_points;
-    }
-  }
-  return best;
-}
-
-/** Stricter than `isBenchPosition` — returns true only for actual bench
- *  slots ("BN"), not injured-reserve / not-active slots. Use this when
- *  the question is "could the user have started this player?" */
-function isStrictBench(pos: string): boolean {
-  return pos.toUpperCase() === "BN";
-}
-
-/** Compose a comma-separated list of injured players up to `cap` names,
- *  with "+N more" overflow when the cap is exceeded. Returns "" when
- *  no players have an injury status (so the caller can skip rendering
- *  the whole segment). */
-function formatInjuryList(players: Player[], cap: number): string {
-  const injured = players.filter((p) => isInjured(p.status));
-  if (injured.length === 0) return "";
-  const head = injured.slice(0, cap).map((p) => `${p.name.last} ${shortStatus(p.status)}`);
-  const overflow = injured.length - cap;
-  return overflow > 0 ? `${head.join(", ")}, +${overflow} more` : head.join(", ");
-}
-
-/** Yahoo injury-status strings indicating the player isn't fully
- *  available. Matches what users see in the UI: OUT, DTD, IR, IR-R,
- *  PUP, NA, SUSP, etc. Empty / null = healthy. */
-function isInjured(status: string | null | undefined): boolean {
-  if (!status) return false;
-  const s = status.trim().toUpperCase();
-  if (s === "" || s === "HEALTHY" || s === "P") return false;
-  return true;
-}
-
-/** Squash long Yahoo status codes (IR-R, IR-LT, NA, etc) into the
- *  short form users recognize. Unknown values pass through unchanged. */
-function shortStatus(status: string | null | undefined): string {
-  if (!status) return "";
-  const s = status.trim().toUpperCase();
-  if (s.startsWith("IR")) return "IR";
-  return s;
-}
-
-/** Compact one-decimal fixed-point that matches `fmtPlayerPoints` for
- *  individual-player segments. Centralized so all per-player segments
- *  format identically. */
-function formatPts(points: number): string {
-  return points.toFixed(1);
-}
+//
+// Per-player selection helpers (findTopN / findWorstStarter /
+// findTopBench / findInjuredPlayers / shortStatus / formatPts) used to
+// live here. They moved to ../../channels/fantasy/playerStats.ts when
+// the player-stat segments were extracted to standalone ticker chips
+// — both this file and ScrollrTicker now share them.
 
 function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
