@@ -32,7 +32,7 @@
  * `FantasyDisplayPrefs` legacy boolean fields untouched.
  */
 import { useMemo } from "react";
-import { Eye, Tv } from "lucide-react";
+import { Tv } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fantasyLeaguesOptions } from "../../api/queries";
 import { useShell } from "../../shell-context";
@@ -47,7 +47,6 @@ import type { DisplayItemsSection } from "../../components/settings/DisplayItems
 import FollowedPlayersPicker from "../../components/settings/FollowedPlayersPicker";
 import type { FantasyDisplayPrefs, Venue } from "../../preferences";
 import type { LeagueResponse } from "./types";
-import { MatchupHero } from "./MatchupHero";
 import FantasyStatChip from "../../components/chips/FantasyStatChip";
 
 // ── Constants ────────────────────────────────────────────────────
@@ -390,30 +389,34 @@ export default function FantasyDisplayPanel() {
   return (
     <div className="space-y-6 pb-8">
       {/* ── Live preview ─────────────────────────────────────────── */}
+      {/* Renders the same FantasyStatChip in `comfort` mode the home
+          dashboard / channel feed uses. The previous design had a
+          side-by-side Feed + Ticker preview, but the Feed preview
+          (a MatchupHero card) didn't honor any of the 14 venue
+          toggles below — it was structurally static — and the
+          Ticker preview rendered the chip at its rail-native ~838px
+          width inside a ~340px surface, hiding the entire left half
+          (league name, week, score). Both failures made the preview
+          actively misleading. Single full-width comfort chip is
+          honest: it represents what the user actually sees in the
+          ticker rail and home dashboard, and reacts in real time to
+          every toggle below. */}
       <Section title="Live preview">
         <div className="px-3 pb-1 space-y-3">
           <p className="text-[11px] text-fg-4 leading-snug">
-            The Ticker chip on the right responds in real time to every
-            Display item below — toggle a row to see it appear or
-            disappear. The Feed always shows the canonical matchup card
-            (Display items currently affect the Ticker only).
+            Toggle any Display item below to see it appear or disappear
+            in the chip. The Fantasy Feed view always shows the full
+            matchup card and is unaffected by these toggles.
           </p>
 
-          <div className="grid grid-cols-2 gap-3">
-            <PreviewSurface label="Feed" icon={Eye}>
-              <div className="w-full">
-                <MatchupHero league={previewLeague} compact />
-              </div>
-            </PreviewSurface>
-            <PreviewSurface label="Ticker" icon={Tv}>
-              <FantasyStatChip
-                league={previewLeague}
-                prefs={dp}
-                comfort={false}
-                colorMode="channel"
-              />
-            </PreviewSurface>
-          </div>
+          <PreviewSurface label="Ticker chip" icon={Tv}>
+            <FantasyStatChip
+              league={previewLeague}
+              prefs={dp}
+              comfort
+              colorMode="channel"
+            />
+          </PreviewSurface>
         </div>
       </Section>
 
@@ -483,7 +486,12 @@ function PreviewSurface({ label, icon: Icon, children }: PreviewSurfaceProps) {
           {label}
         </span>
       </div>
-      <div className="p-2.5 min-h-[120px] flex items-center justify-center overflow-hidden">
+      {/* `overflow-x-auto` instead of `overflow-hidden` so any future chip
+          that exceeds the surface width is pannable rather than silently
+          clipped (the previous bug). `justify-start` keeps the chip flush
+          left so its head segments stay visible by default. The vertical
+          padding still centers a normal-height chip nicely. */}
+      <div className="p-2.5 min-h-[64px] flex items-center justify-start overflow-x-auto scrollbar-thin">
         {children}
       </div>
     </div>
