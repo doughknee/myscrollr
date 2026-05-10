@@ -1,48 +1,41 @@
 /**
  * TopBar — the app's primary chrome row.
  *
- * Spans the full window width below the OS title bar. Contains:
- *   1. Scrollr brand mark + wordmark (left) — clickable, navigates Home.
- *      Replaces the old sidebar logo header so the sidebar can be
- *      pure navigation.
- *   2. Forward / Back navigation buttons (Spotify-style) — always
- *      visible, disabled when there's no history in that direction.
- *   3. [spacer]
- *   4. Ticker on/off pill, Pin pill — global toggles.
- *   5. Connection status — friendly Connected/Reconnecting/Offline.
+ * Layout:
+ *   [logo + Scrollr] | [←][→] | breadcrumb · subtitle    [entityAction] | [Ticker] [📌] | [●Connected]
  *
- * The TopBar is the single canonical home for ambient app-level
- * controls. Page-level actions live in PageLayout's header band.
+ * The TopBar is the single canonical home for:
+ *   - Brand mark (clickable → Home)
+ *   - Forward/back navigation (Spotify-style)
+ *   - Page identity (where am I — published via PageContext)
+ *   - Page-level entity action (Trash on source pages)
+ *   - Ambient toggles (ticker on/off, pin)
+ *   - Connection status
  *
- * IA refactor 2026-05-09 (polish pass) — see
- * docs/superpowers/specs/2026-05-09-desktop-ia-refactor-design.md
+ * Page-level chrome (title + breadcrumb) used to live inside the
+ * route's content area in a chunky 4-row header. It's now in the
+ * TopBar, freeing the entire content area for actual content.
  */
 import { ArrowLeft, ArrowRight, Pin, Radio, RadioTower } from "lucide-react";
 import clsx from "clsx";
 import Tooltip from "./Tooltip";
 import ConnectionIndicator from "./ConnectionIndicator";
 import ScrollLogo from "./ScrollLogo";
+import { usePageIdentity } from "./layout/page-context";
 import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
 
 // ── Props ───────────────────────────────────────────────────────
 
 interface TopBarProps {
-  /** Whether the standalone ticker window is alive. Drives logo glow + pill state. */
   tickerOn: boolean;
-  /** Whether the always-on-top pin is engaged. */
   pinned: boolean;
-  /** Connection-health derivation from useDeliveryHealth. */
   health: DeliveryHealth;
-  /** Forward/back navigation state. */
   canBack: boolean;
   canForward: boolean;
-  /** Click logo or back/forward to navigate. */
   onNavigateHome: () => void;
   onBack: () => void;
   onForward: () => void;
-  /** Toggle ticker visibility — same contract as Settings → Ticker top toggle. */
   onToggleTicker: () => void;
-  /** Toggle always-on-top pin. */
   onTogglePin: () => void;
 }
 
@@ -60,6 +53,8 @@ export default function TopBar({
   onToggleTicker,
   onTogglePin,
 }: TopBarProps) {
+  const page = usePageIdentity();
+
   return (
     <div
       role="toolbar"
@@ -70,7 +65,7 @@ export default function TopBar({
       <button
         onClick={onNavigateHome}
         aria-label="Scrollr — go to home"
-        className="flex items-center gap-2 px-1.5 h-7 rounded-md hover:bg-surface-hover transition-colors"
+        className="flex items-center gap-2 px-1.5 h-7 rounded-md hover:bg-surface-hover transition-colors shrink-0"
       >
         <ScrollLogo alive={tickerOn} size={20} />
         <span className="text-[13px] font-semibold text-fg tracking-tight">
@@ -78,11 +73,10 @@ export default function TopBar({
         </span>
       </button>
 
-      {/* Vertical divider */}
-      <div className="w-px h-5 bg-edge/40 mx-1" />
+      <div className="w-px h-5 bg-edge/40 mx-1 shrink-0" />
 
       {/* ── Back / Forward — Spotify-style ─────────────────── */}
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-0.5 shrink-0">
         <Tooltip content="Back" side="bottom">
           <button
             onClick={onBack}
@@ -115,15 +109,55 @@ export default function TopBar({
         </Tooltip>
       </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+      <div className="w-px h-5 bg-edge/40 mx-1 shrink-0" />
 
-      {/* ── Ambient toggles (right side) ────────────────────── */}
-      <div className="flex items-center gap-1">
+      {/* ── Page identity (breadcrumb) ──────────────────────── */}
+      <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+        {page && (
+          <>
+            <div className="flex items-center gap-1.5 min-w-0 text-[12px]">
+              {page.parentLabel && page.onParentClick && (
+                <>
+                  <button
+                    onClick={page.onParentClick}
+                    className="text-fg-4 hover:text-fg-2 transition-colors shrink-0"
+                  >
+                    {page.parentLabel}
+                  </button>
+                  <span className="text-fg-4/50 shrink-0">/</span>
+                </>
+              )}
+              <span className="font-semibold text-fg truncate">
+                {page.title}
+              </span>
+              {page.subtitle && (
+                <>
+                  <span className="text-fg-4/40 shrink-0" aria-hidden>
+                    ·
+                  </span>
+                  <span className="text-fg-4 truncate hidden lg:inline">
+                    {page.subtitle}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Entity action (e.g. Trash on source pages) sits right
+                after the page title, treated as a contextual tool that
+                belongs to this page entity. */}
+            {page.entityAction && (
+              <div className="shrink-0 flex items-center gap-1">
+                {page.entityAction}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Ambient toggles (right) ─────────────────────────── */}
+      <div className="flex items-center gap-1 shrink-0">
         <Tooltip
-          content={
-            tickerOn ? "Hide the ticker window" : "Show the ticker window"
-          }
+          content={tickerOn ? "Hide the ticker window" : "Show the ticker window"}
           side="bottom"
         >
           <button
@@ -166,7 +200,6 @@ export default function TopBar({
           </button>
         </Tooltip>
 
-        {/* Vertical divider before status */}
         <div className="w-px h-5 bg-edge/40 mx-1" />
 
         <ConnectionIndicator health={health} />

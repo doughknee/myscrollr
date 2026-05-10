@@ -82,6 +82,7 @@ import { POLL_INTERVALS } from "../cdc";
 
 // Shell context
 import { ShellContext, ShellDataContext } from "../shell-context";
+import { PageIdentityProvider } from "../components/layout/page-context";
 
 // Store
 import { onStoreChange, setStore, removeStore } from "../lib/store";
@@ -744,13 +745,14 @@ function RootLayout() {
 
       {/* ── Main app shell: authenticated ── */}
       {showApp && (
-        <>
+        <PageIdentityProvider>
           {!IS_MACOS && <TitleBar />}
 
           {/* TopBar — primary chrome row spanning the full window.
               Houses the Scrollr brand mark, Spotify-style forward/back
-              navigation, and the ambient ticker/pin/connection
-              controls. Always visible regardless of route. */}
+              navigation, page-identity breadcrumb (read from
+              PageContext), entityAction, and the ambient ticker/pin/
+              connection controls. Always visible regardless of route. */}
           <TopBar
             tickerOn={prefs.ticker.showTicker}
             pinned={prefs.window.pinned}
@@ -766,15 +768,13 @@ function RootLayout() {
 
           <div className="flex flex-1 min-h-0 overflow-hidden">
             <Sidebar
-              isFeed={route.isFeed}
               isSettings={route.isSettings}
               isMarketplace={route.isMarketplace}
               isSupport={route.isSupport}
               activeItem={route.activeItem}
               sources={sidebarSources}
-              onNavigateToFeed={handleNavigateToFeed}
-              onNavigateToSettings={handleNavigateToSettings}
               onNavigateToMarketplace={handleNavigateToMarketplace}
+              onNavigateToSettings={handleNavigateToSettings}
               onNavigateToSupport={handleNavigateToSupport}
               onSelectItem={handleSelectPinned}
             />
@@ -906,7 +906,7 @@ function RootLayout() {
               <Toaster theme={resolvedToasterTheme} richColors position="bottom-right" />
             </main>
           </div>
-        </>
+        </PageIdentityProvider>
       )}
 
       {/* Signing-in overlay — shows on ALL states (auth gate triggers login too) */}

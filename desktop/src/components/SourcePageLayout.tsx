@@ -69,10 +69,9 @@ interface SourcePageLayoutProps {
   description?: string;
   activeTab: string;
   onTabChange: (tab: string) => void;
-  /** Kept for backward compat — unused now that back navigation lives
-   *  in the TopBar. Source pages still receive it so the channel/widget
-   *  routes can call it from other places (e.g. after Trash). */
-  onBack?: () => void;
+  /** Click handler for the parent breadcrumb in the TopBar
+   *  (typically navigates back to /feed). */
+  onBack: () => void;
   children: React.ReactNode;
 
   /** Source-level remove action. */
@@ -86,6 +85,7 @@ export default function SourcePageLayout({
   description,
   activeTab,
   onTabChange,
+  onBack,
   children,
   onRemove,
   sourceKind,
@@ -117,6 +117,8 @@ export default function SourcePageLayout({
       <PageLayout
         title={name}
         subtitle={description}
+        parentLabel="Home"
+        onParentClick={onBack}
         width="narrow"
         entityAction={entityAction}
         tabs={{

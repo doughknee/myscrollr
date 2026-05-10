@@ -1,15 +1,30 @@
 /**
- * Sidebar — collapsible navigation rail.
+ * Sidebar — collapsible source rail.
  *
- * The Scrollr brand mark + wordmark moved to the TopBar (always-visible
- * chrome) post-IA-refactor polish pass. The sidebar is now pure
- * navigation: + Add source, Home, Catalog, dynamic per-source items,
- * Settings, Support, collapse toggle.
+ * Post-polish-pass the sidebar is just a list of the user's enabled
+ * sources (channels + widgets). Home navigation lives on the Scrollr
+ * brand mark in the TopBar; Catalog navigation lives in the "+ Add
+ * source" button at the bottom of the source list. Settings + Support
+ * stay in the footer.
+ *
+ * Layout:
+ *   ┌──────────┐
+ *   │ SOURCES  │
+ *   │ Finance  │
+ *   │ Sports   │
+ *   │ Weather  │
+ *   │          │
+ *   │ + Add    │  ← drilled into Catalog
+ *   ├──────────┤
+ *   │ Settings │
+ *   │ Support  │
+ *   │ Collapse │
+ *   └──────────┘
  *
  * Collapses to a 48px icon-only rail with tooltips.
  */
 import { useState } from "react";
-import { Home, LayoutGrid, Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
+import { Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
 import clsx from "clsx";
 import Tooltip from "./Tooltip";
 import type { ChannelManifest, WidgetManifest } from "../types";
@@ -26,26 +41,23 @@ interface SidebarSource {
 }
 
 interface SidebarProps {
-  /** Whether the home/dashboard page is active. */
-  isFeed: boolean;
   /** Whether the settings page is active. */
   isSettings: boolean;
-  /** Whether the catalog page is active. */
+  /** Whether the catalog page is active. Drives the "+ Add source"
+   *  button's active state. */
   isMarketplace: boolean;
   /** Whether the support page is active. */
   isSupport: boolean;
-  /** Currently active channel or widget ID (for pinned item highlighting). */
+  /** Currently active channel or widget ID (for highlighting). */
   activeItem: string;
 
   /** Resolved enabled-source manifest data, in canonical order. */
   sources: SidebarSource[];
 
-  /** Navigate to the home dashboard. */
-  onNavigateToFeed: () => void;
+  /** Navigate to the catalog page (used by "+ Add source"). */
+  onNavigateToMarketplace: () => void;
   /** Navigate to the settings page. */
   onNavigateToSettings: () => void;
-  /** Navigate to the catalog page. */
-  onNavigateToMarketplace: () => void;
   /** Navigate to the support page. */
   onNavigateToSupport: () => void;
   /** Navigate to a specific source (channel or widget) feed. */
@@ -55,15 +67,13 @@ interface SidebarProps {
 // ── Component ───────────────────────────────────────────────────
 
 export default function Sidebar({
-  isFeed,
   isSettings,
   isMarketplace,
   isSupport,
   activeItem,
   sources,
-  onNavigateToFeed,
-  onNavigateToSettings,
   onNavigateToMarketplace,
+  onNavigateToSettings,
   onNavigateToSupport,
   onSelectItem,
 }: SidebarProps) {
@@ -84,25 +94,62 @@ export default function Sidebar({
         collapsed ? "w-[48px]" : "w-[200px]",
       )}
     >
-      {/* Navigation items — sidebar starts straight into the nav now
-          that branding is up in the TopBar. */}
+      {/* Sources nav. Home is the Scrollr brand mark in the TopBar
+          (clickable). Catalog is reached via the "+ Add source" button
+          at the bottom of this list. So the sidebar is just sources. */}
       <nav
-        aria-label="Main navigation"
+        aria-label="Sources"
         className={clsx(
           "flex-1 overflow-y-auto scrollbar-thin py-3",
           collapsed ? "px-1" : "px-2",
         )}
       >
-        {/* Add source — primary, persistent affordance. Catalog is the
-            canonical "add" surface; this just makes the action visible
-            from anywhere in the app, in chrome. */}
+        {!collapsed && (
+          <h2 className="px-2.5 mb-2 text-[10px] font-semibold uppercase tracking-wider text-fg-4/70">
+            Sources
+          </h2>
+        )}
+
+        {sources.length > 0 ? (
+          <div className="space-y-0.5">
+            {sources.map((source) => (
+              <NavItem
+                key={source.id}
+                icon={
+                  <span style={{ color: source.hex }}>
+                    <source.icon size={15} />
+                  </span>
+                }
+                label={source.name}
+                active={activeItem === source.id}
+                collapsed={collapsed}
+                onClick={() => onSelectItem(source.id, source.kind)}
+              />
+            ))}
+          </div>
+        ) : (
+          !collapsed && (
+            <p className="px-2.5 text-[11px] text-fg-4/70 leading-snug">
+              No sources yet. Tap{" "}
+              <span className="font-medium text-accent">+ Add source</span>{" "}
+              below to get started.
+            </p>
+          )
+        )}
+
+        {/* Add source — sits below the source list. Drilled into the
+            Catalog. Spec-aligned: '+ Add' is grouped with the
+            collection it adds to. */}
         <Tooltip content={collapsed ? "Add source" : undefined} side="right">
           <button
             onClick={onNavigateToMarketplace}
             aria-label="Add source"
+            aria-current={isMarketplace ? "page" : undefined}
             className={clsx(
-              "flex items-center w-full rounded-lg font-semibold transition-colors mb-2",
-              "bg-accent/10 text-accent hover:bg-accent/15 hover:text-accent",
+              "flex items-center w-full rounded-lg font-medium transition-colors mt-2",
+              isMarketplace
+                ? "bg-accent/15 text-accent"
+                : "text-accent/85 hover:bg-accent/10 hover:text-accent",
               collapsed
                 ? "justify-center py-1.5 px-0"
                 : "gap-2.5 px-2.5 py-1.5 text-[13px]",
@@ -114,38 +161,6 @@ export default function Sidebar({
             {!collapsed && <span className="truncate">Add source</span>}
           </button>
         </Tooltip>
-
-        <NavItem
-          icon={<Home size={15} />}
-          label="Home"
-          active={isFeed}
-          collapsed={collapsed}
-          onClick={onNavigateToFeed}
-        />
-
-        <NavItem
-          icon={<LayoutGrid size={15} />}
-          label="Catalog"
-          active={isMarketplace}
-          collapsed={collapsed}
-          onClick={onNavigateToMarketplace}
-        />
-
-        {/* Enabled channels + widgets */}
-        {sources.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-edge/20 space-y-0.5">
-            {sources.map((source) => (
-              <NavItem
-                key={source.id}
-                icon={<span style={{ color: source.hex }}><source.icon size={15} /></span>}
-                label={source.name}
-                active={activeItem === source.id}
-                collapsed={collapsed}
-                onClick={() => onSelectItem(source.id, source.kind)}
-              />
-            ))}
-          </div>
-        )}
       </nav>
 
       {/* Footer — settings, collapse toggle, status */}

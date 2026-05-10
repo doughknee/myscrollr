@@ -41,9 +41,8 @@ function SupportPage() {
     );
   }
 
-  // Section view — back navigation handled by the TopBar's universal
-  // back button. Page-level "go back to Support hub" is also exposed
-  // via the section title (clickable, see entityAction).
+  // Section view — TopBar shows "Support / <section>" breadcrumb.
+  // Click "Support" in the breadcrumb to return to the hub.
   return (
     <PageLayout
       title={SECTION_TITLES[activeSection]}
@@ -52,15 +51,9 @@ function SupportPage() {
           ? "Report bugs, request features, or send feedback"
           : "Get help, find answers, and contact us"
       }
+      parentLabel="Support"
+      onParentClick={() => setActiveSection(null)}
       width="wide"
-      entityAction={
-        <button
-          onClick={() => setActiveSection(null)}
-          className="text-[11px] font-medium text-fg-3 hover:text-fg-2 hover:bg-surface-hover px-2 py-1 rounded-md transition-colors"
-        >
-          ← Support
-        </button>
-      }
     >
       {activeSection === "getting-started" && <GettingStartedSection />}
       {activeSection === "faq" && <FAQSection />}

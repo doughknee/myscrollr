@@ -2,21 +2,19 @@
  * useNavHistory — exposes a Spotify-style forward/back navigation
  * model on top of TanStack Router's memory history.
  *
- * Memory history doesn't expose `canGoBack` / `canGoForward` directly,
- * so we track them by maintaining a small index in our own subscriber.
+ * Uses TanStack's official `useCanGoBack()` for back, and computes
+ * canForward from the history's `__TSR_index` (current position) and
+ * `length` (total entries) — the memory-history shape exposed via
+ * @tanstack/history. We subscribe to the history directly so the
+ * forward/back state recomputes on every PUSH/BACK/FORWARD/GO.
  *
  * Behavior:
- *   - canBack: true after the user has navigated at least once
- *   - canForward: true after they've used the back button without
- *     navigating somewhere new
+ *   - canBack: true when not at index 0
+ *   - canForward: true when index < length - 1
  *   - back() / forward() are no-ops when not allowed
- *
- * The hook reuses the same memory history that powers all routing,
- * so back/forward stay in sync with sidebar clicks, internal route
- * changes, and tray deeplinks.
  */
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "@tanstack/react-router";
+import { useRouter, useCanGoBack } from "@tanstack/react-router";
 
 interface NavHistory {
   canBack: boolean;
@@ -27,40 +25,34 @@ interface NavHistory {
 
 export function useNavHistory(): NavHistory {
   const router = useRouter();
-  const [, force] = useState(0);
+  const canBack = useCanGoBack();
+  const [canForward, setCanForward] = useState(false);
 
-  // Subscribe to navigation changes to recompute can-back/can-forward.
+  // Subscribe directly to the history so we recompute on every action,
+  // not just route resolution. The router's onResolved subscriber fires
+  // AFTER the URL changes but the history index update is synchronous,
+  // so subscribing to history itself gives us the freshest answer.
   useEffect(() => {
-    const unsub = router.subscribe("onResolved", () => force((n) => n + 1));
+    const compute = () => {
+      const h = router.history;
+      const state = h.location.state as { __TSR_index?: number } | undefined;
+      const idx = state?.__TSR_index ?? 0;
+      setCanForward(idx < h.length - 1);
+    };
+    compute();
+    const unsub = router.history.subscribe(compute);
     return () => unsub();
   }, [router]);
 
-  // TanStack memory history exposes `index` on its state. The
-  // "current" index tells us whether we can go further back/forward.
-  // Defensive: fall back to false if the API shape ever changes.
-  const history = router.history as unknown as {
-    state?: { index?: number };
-    length?: number;
-    canGoBack?: () => boolean;
-    back?: () => void;
-    forward?: () => void;
-  };
-
-  const idx = history.state?.index ?? 0;
-  const length = history.length ?? 1;
-
-  const canBack = idx > 0;
-  const canForward = idx < length - 1;
-
   const back = useCallback(() => {
     if (!canBack) return;
-    history.back?.();
-  }, [canBack, history]);
+    router.history.back();
+  }, [canBack, router]);
 
   const forward = useCallback(() => {
     if (!canForward) return;
-    history.forward?.();
-  }, [canForward, history]);
+    router.history.forward();
+  }, [canForward, router]);
 
   return { canBack, canForward, back, forward };
 }
