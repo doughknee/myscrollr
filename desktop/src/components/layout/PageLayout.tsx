@@ -87,6 +87,15 @@ interface PageLayoutProps {
    * entire page.
    */
   fillHeight?: boolean;
+
+  /**
+   * When true, the inner content wrapper omits the default `px-5 py-5`
+   * padding and the `max-w-*` width clamp. The route renders flush to
+   * the scroll viewport's edges and is responsible for its own
+   * padding. Used by Home (which wants the full content area) and
+   * other dashboards that don't want a constrained reading column.
+   */
+  noContentPadding?: boolean;
 }
 
 // ── Component ───────────────────────────────────────────────────
@@ -105,6 +114,7 @@ export default function PageLayout({
   footer,
   width = "narrow",
   fillHeight = false,
+  noContentPadding = false,
 }: PageLayoutProps) {
   // Publish this page's identity to the TopBar.
   useRegisterPageIdentity({
@@ -216,7 +226,10 @@ export default function PageLayout({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.18, ease: [0.22, 0.61, 0.36, 1] }}
-              className={clsx("mx-auto px-5 py-5", widthClass)}
+              className={clsx(
+                noContentPadding ? "w-full" : "mx-auto px-5 py-5",
+                !noContentPadding && widthClass,
+              )}
             >
               {children}
             </motion.div>

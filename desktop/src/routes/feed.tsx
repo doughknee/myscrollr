@@ -189,10 +189,12 @@ function HomePage() {
       title="Home"
       subtitle="Your live feed at a glance"
       width="wide"
+      noContentPadding
     >
-      {/* All children share a single `space-y-5` rhythm — 20px between
-          sections, no dangling margin on the last child. Section
-          components themselves no longer carry mb-6. */}
+      {/* Home renders flush to the content area with no PageLayout
+          padding. The content wrapper here owns its own padding /
+          rhythm: space-y-5 between sections, no dangling margin on
+          the last child. */}
       <div className="space-y-5">
       {/* Empty state — hero. Shown when the user has no channels and
           no enabled widgets. Disappears the moment they add their
