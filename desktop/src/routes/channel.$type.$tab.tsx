@@ -151,15 +151,13 @@ function ChannelConfigTab({
   }
 
   return (
-    <div className="p-4">
-      <ChannelConfigPanel
-        channelType={type}
-        channel={channelData as unknown as Channel}
-        subscriptionTier={tier}
-        connected={deliveryMode === "sse"}
-        hex={manifest?.hex ?? "var(--color-accent)"}
-      />
-    </div>
+    <ChannelConfigPanel
+      channelType={type}
+      channel={channelData as unknown as Channel}
+      subscriptionTier={tier}
+      connected={deliveryMode === "sse"}
+      hex={manifest?.hex ?? "var(--color-accent)"}
+    />
   );
 }
 
@@ -237,7 +235,7 @@ function FinanceDisplay() {
   ];
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
+    <div>
       <Section title="Display items">
         <DisplayLocationGrid sections={sections} onChange={applyDisplayChanges} />
       </Section>
@@ -291,7 +289,7 @@ function SportsDisplay() {
   ];
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
+    <div>
       <Section title="Display items">
         <DisplayLocationGrid sections={sections} onChange={applyDisplayChanges} />
       </Section>
@@ -353,7 +351,7 @@ function RssDisplay() {
   ];
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
+    <div>
       <Section title="Display items">
         <DisplayLocationGrid sections={sections} onChange={applyDisplayChanges} />
       </Section>
@@ -540,7 +538,7 @@ function FantasyDisplay() {
   }
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
+    <div>
       <Section title="Display items">
         <DisplayLocationGrid sections={sections} onChange={applyDisplayChanges} />
       </Section>

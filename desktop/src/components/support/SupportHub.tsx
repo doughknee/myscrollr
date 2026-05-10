@@ -139,18 +139,11 @@ export default function SupportHub({ onSelectSection }: SupportHubProps) {
 
   const hasQuery = query.trim().length > 0;
 
+  // Header is provided by PageLayout in the parent route — this
+  // component just renders the search input and the result/category
+  // body.
   return (
-    <div className="p-5 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-5">
-        <h1 className="text-[11px] font-mono font-semibold text-fg-4 uppercase tracking-wider mb-1">
-          Support
-        </h1>
-        <p className="text-xs text-fg-4">
-          Get help, find answers, and contact us
-        </p>
-      </div>
-
+    <div>
       {/* Search input */}
       <div className="relative mb-5">
         <Search

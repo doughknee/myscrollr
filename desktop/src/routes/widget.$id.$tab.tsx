@@ -90,12 +90,10 @@ function WidgetConfigTab({ id }: { id: string }) {
   const shell = useShell();
 
   return (
-    <div className="p-4">
-      <WidgetConfigPanel
-        widgetId={id}
-        prefs={shell.prefs}
-        onPrefsChange={shell.onPrefsChange}
-      />
-    </div>
+    <WidgetConfigPanel
+      widgetId={id}
+      prefs={shell.prefs}
+      onPrefsChange={shell.onPrefsChange}
+    />
   );
 }
