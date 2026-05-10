@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import MyWatchlist from "./MyWatchlist";
-import SymbolCatalog from "./SymbolCatalog";
+import SymbolManager from "./SymbolManager";
 import { useChannelConfig } from "../../hooks/useChannelConfig";
 import { financeCatalogOptions, dashboardQueryOptions } from "../../api/queries";
 import { getLimit } from "../../tierLimits";
@@ -70,7 +69,7 @@ export default function FinanceConfigPanel({
   // ── Render ─────────────────────────────────────────────────────
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-6 pb-8">
+    <div className="w-full max-w-2xl mx-auto space-y-4 pb-8">
       {/* Error banner */}
       {error && (
         <div className="px-3 py-2 rounded-lg bg-error/10 border border-error/20 text-[11px] text-error flex items-center justify-between">
@@ -85,29 +84,18 @@ export default function FinanceConfigPanel({
         </div>
       )}
 
-      {/* Section 1: My Watchlist */}
-      <MyWatchlist
+      {/* Unified watchlist + catalog manager */}
+      <SymbolManager
         symbols={symbols}
         catalog={catalog}
         trades={trades}
+        onAdd={addSymbol}
         onRemove={removeSymbol}
-        symbolCount={symbols.length}
+        loading={catalogLoading}
+        error={catalogError}
         maxSymbols={maxSymbols}
         subscriptionTier={subscriptionTier}
         saving={saving}
-      />
-
-      {/* Divider */}
-      <div className="h-px bg-edge/30" />
-
-      {/* Section 2: Symbol Catalog */}
-      <SymbolCatalog
-        catalog={catalog}
-        subscribedSymbols={symbolSet}
-        onAdd={addSymbol}
-        loading={catalogLoading}
-        error={catalogError}
-        atLimit={symbols.length >= maxSymbols}
       />
     </div>
   );
