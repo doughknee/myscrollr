@@ -123,7 +123,7 @@ export default function RowSelector({
               }}
               disabled={disabled}
               className={clsx(
-                "px-2 py-0.5 rounded text-[11px] font-medium transition-colors",
+                "px-2 py-0.5 rounded text-[11px] font-medium transition-all duration-150 active:scale-90",
                 active
                   ? "bg-accent/15 text-accent"
                   : "text-fg-3 hover:text-fg-2 hover:bg-base-300",
@@ -145,7 +145,7 @@ export default function RowSelector({
                 onAddRow?.();
               }}
               aria-label="Add a new row and assign this source to it"
-              className="flex items-center gap-0.5 px-2 py-0.5 rounded text-[11px] font-medium border border-dashed border-edge/60 text-fg-4 hover:text-accent hover:border-accent/60 transition-colors ml-0.5"
+              className="flex items-center gap-0.5 px-2 py-0.5 rounded text-[11px] font-medium border border-dashed border-edge/60 text-fg-4 hover:text-accent hover:border-accent/60 transition-all duration-150 active:scale-90 ml-0.5"
             >
               <Plus size={10} />
               Add

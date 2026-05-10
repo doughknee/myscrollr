@@ -24,6 +24,7 @@ import {
   Star,
 } from "lucide-react";
 import clsx from "clsx";
+import { motion } from "motion/react";
 import Tooltip from "../../components/Tooltip";
 import UpgradePrompt from "../../components/UpgradePrompt";
 import EmptySection from "../../components/layout/EmptySection";
@@ -289,7 +290,8 @@ export default function SymbolManager({
               onClick={() => onAdd(sym)}
               disabled={atLimit || saving}
               className={clsx(
-                "flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-mono transition-colors",
+                "flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-mono",
+                "transition-all duration-150 active:scale-90",
                 "border-edge/40 text-fg-2 hover:border-accent/50 hover:bg-accent/5 hover:text-accent cursor-pointer",
                 "disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-edge/40 disabled:hover:bg-transparent disabled:hover:text-fg-2",
               )}
@@ -345,7 +347,8 @@ export default function SymbolManager({
             onClick={() => setTrackedOnly((v) => !v)}
             aria-pressed={trackedOnly}
             className={clsx(
-              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[11px] transition-colors cursor-pointer whitespace-nowrap",
+              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[11px] cursor-pointer whitespace-nowrap",
+              "transition-all duration-200 active:scale-95",
               trackedOnly
                 ? "border-accent/50 bg-accent/10 text-accent"
                 : "border-edge/40 text-fg-3 hover:text-fg-2 hover:border-edge/60",
@@ -353,7 +356,10 @@ export default function SymbolManager({
           >
             <Star
               size={11}
-              className={clsx(trackedOnly && "fill-current")}
+              className={clsx(
+                "transition-transform duration-200",
+                trackedOnly && "fill-current rotate-[20deg]",
+              )}
             />
             <span>Tracked</span>
           </button>
@@ -477,7 +483,8 @@ function SymbolRow({
             : `Add ${entry.symbol} to watchlist`
       }
       className={clsx(
-        "w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors group",
+        "w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all duration-150 group",
+        "active:scale-[0.995]",
         tracked
           ? "bg-accent/[0.04] hover:bg-accent/[0.08]"
           : blocked
@@ -486,7 +493,8 @@ function SymbolRow({
         saving && "cursor-wait",
       )}
     >
-      {/* Tracked/untracked indicator */}
+      {/* Tracked/untracked indicator. Icon swap is keyed on tracked
+          so motion can spring the new icon in instead of popping. */}
       <span
         className={clsx(
           "shrink-0 w-5 h-5 flex items-center justify-center rounded-md transition-colors",
@@ -495,7 +503,15 @@ function SymbolRow({
             : "bg-surface-hover text-fg-4 group-hover:text-fg-2",
         )}
       >
-        {tracked ? <Check size={12} strokeWidth={3} /> : <Plus size={12} />}
+        <motion.span
+          key={tracked ? "check" : "plus"}
+          initial={{ scale: 0.4, opacity: 0, rotate: tracked ? -45 : 45 }}
+          animate={{ scale: 1, opacity: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 500, damping: 24 }}
+          className="flex items-center justify-center"
+        >
+          {tracked ? <Check size={12} strokeWidth={3} /> : <Plus size={12} />}
+        </motion.span>
       </span>
 
       {/* Symbol + name */}

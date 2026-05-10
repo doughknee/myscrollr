@@ -9,6 +9,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import clsx from "clsx";
+import { motion } from "motion/react";
 import { searchSupportContent } from "./support-content";
 import { getAllChannels } from "../../channels/registry";
 import { getAllWidgets } from "../../widgets/registry";
@@ -168,7 +169,7 @@ export default function SupportHub({ onSelectSection }: SupportHubProps) {
                 <button
                   key={`${result.section}-${result.index}-${i}`}
                   onClick={() => onSelectSection(result.section as SectionId)}
-                  className="flex flex-col gap-1.5 p-3 rounded-lg text-left hover:bg-surface-2/50 transition-colors cursor-pointer"
+                  className="flex flex-col gap-1.5 p-3 rounded-lg text-left hover:bg-surface-2/50 transition-all duration-150 active:scale-[0.99] cursor-pointer"
                 >
                   <div className="flex items-center gap-2">
                     <span
@@ -196,18 +197,26 @@ export default function SupportHub({ onSelectSection }: SupportHubProps) {
           )
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            {CATEGORIES.map((cat) => {
+            {CATEGORIES.map((cat, idx) => {
               const Icon = cat.icon;
               return (
-                <button
+                <motion.button
                   key={cat.id}
                   onClick={() => onSelectSection(cat.id)}
-                  className="border border-edge/30 rounded-lg p-4 text-left hover:border-accent/40 hover:bg-surface-2/50 transition-colors cursor-pointer"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 0.25,
+                    delay: 0.04 + idx * 0.04,
+                    ease: [0.22, 0.61, 0.36, 1],
+                  }}
+                  whileHover={{ y: -2 }}
+                  className="border border-edge/30 rounded-lg p-4 text-left hover:border-accent/40 hover:bg-surface-2/50 hover:shadow-soft-sm transition-[border-color,background-color,box-shadow] duration-200 active:scale-[0.98] cursor-pointer"
                 >
                   <Icon size={18} className="text-accent mb-2.5" />
                   <h3 className="text-sm font-bold text-fg mb-1">{cat.label}</h3>
                   <p className="text-sm text-fg-3">{cat.description}</p>
-                </button>
+                </motion.button>
               );
             })}
           </div>

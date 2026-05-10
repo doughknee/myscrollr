@@ -26,6 +26,7 @@
 import { useState } from "react";
 import { Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
 import clsx from "clsx";
+import { motion } from "motion/react";
 import Tooltip from "./Tooltip";
 import type { ChannelManifest, WidgetManifest } from "../types";
 import { loadPref, savePref } from "../preferences";
@@ -146,7 +147,8 @@ export default function Sidebar({
             aria-label="Add source"
             aria-current={isMarketplace ? "page" : undefined}
             className={clsx(
-              "flex items-center w-full rounded-lg font-medium transition-colors mt-2",
+              "flex items-center w-full rounded-lg font-medium mt-2",
+              "transition-all duration-150 active:scale-[0.97]",
               isMarketplace
                 ? "bg-accent/15 text-accent"
                 : "text-accent/85 hover:bg-accent/10 hover:text-accent",
@@ -195,7 +197,8 @@ export default function Sidebar({
             onClick={toggleCollapsed}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={clsx(
-              "flex items-center w-full rounded-lg text-fg-4 hover:text-fg-2 hover:bg-surface-hover transition-colors",
+              "flex items-center w-full rounded-lg text-fg-4 hover:text-fg-2 hover:bg-surface-hover",
+              "transition-all duration-150 active:scale-[0.97]",
               collapsed
                 ? "justify-center py-1.5"
                 : "gap-2.5 px-2.5 py-1.5",
@@ -236,7 +239,8 @@ function NavItem({
         aria-current={active ? "page" : undefined}
         aria-label={collapsed ? label : undefined}
         className={clsx(
-          "relative flex items-center w-full rounded-lg font-medium transition-colors",
+          "relative flex items-center w-full rounded-lg font-medium",
+          "transition-all duration-150 active:scale-[0.97]",
           collapsed
             ? "justify-center py-1.5 px-0"
             : "gap-2.5 px-2.5 py-1.5 text-[13px]",
@@ -245,9 +249,13 @@ function NavItem({
             : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
         )}
       >
-        {/* Active indicator — left accent bar */}
+        {/* Active indicator — left accent bar. Uses motion's
+            layoutId so it slides between nav items when the active
+            page changes, instead of popping in/out. */}
         {active && (
-          <span
+          <motion.span
+            layoutId="sidebar-active-indicator"
+            transition={{ type: "spring", stiffness: 380, damping: 30 }}
             className="absolute left-0 top-1.5 bottom-1.5 w-[2.5px] rounded-full bg-accent"
           />
         )}

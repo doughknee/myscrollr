@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import clsx from "clsx";
+import { motion, AnimatePresence } from "motion/react";
 import RouteError from "../components/RouteError";
 import Tooltip from "../components/Tooltip";
 import RowSelector from "../components/RowSelector";
@@ -203,7 +204,7 @@ function HomePage() {
             authenticated ? (
               <button
                 onClick={() => navigate({ to: "/catalog" })}
-                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-surface hover:bg-accent/90 transition-colors"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-surface hover:bg-accent/90 transition-all duration-200 active:scale-95 hover:shadow-glow-sm"
               >
                 <Plus size={15} strokeWidth={2.5} />
                 Browse the Catalog
@@ -211,7 +212,7 @@ function HomePage() {
             ) : (
               <button
                 onClick={onLogin}
-                className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-surface hover:bg-accent/90 transition-colors"
+                className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-surface hover:bg-accent/90 transition-all duration-200 active:scale-95 hover:shadow-glow-sm"
               >
                 Sign in to get started
               </button>
@@ -250,69 +251,91 @@ function HomePage() {
         </PageSection>
       )}
 
-      {/* Channel sections */}
-      {orderedChannels.map(({ ch, manifest }) => {
+      {/* Channel sections — stagger in on first paint so the Home
+          page reveals its data instead of slamming everything in
+          at once. */}
+      {orderedChannels.map(({ ch, manifest }, idx) => {
         const channelData = dashboard?.data?.[ch.channel_type];
         const hasData = Array.isArray(channelData) && channelData.length > 0;
         const targetTab = hasData ? "feed" : "configuration";
         const currentRow = getChannelTickerRow(shell.prefs, ch);
         return (
-          <ChannelSection
+          <motion.div
             key={ch.channel_type}
-            channel={ch}
-            manifest={manifest}
-            data={dashboard?.data}
-            currentRow={currentRow}
-            maxRows={pickerRows}
-            canAddRow={canAddRow}
-            onAddRow={() =>
-              handleChannelAddRow(ch.channel_type as ChannelType)
-            }
-            onRowChange={(next) =>
-              handleChannelRowChange(ch.channel_type as ChannelType, next)
-            }
-            selectedKeys={homePreview[ch.channel_type] ?? []}
-            onSelectionChange={(keys) =>
-              setHomePreview(ch.channel_type, keys)
-            }
-            onViewAll={() =>
-              navigate({
-                to: "/channel/$type/$tab",
-                params: { type: ch.channel_type, tab: "feed" },
-              })
-            }
-            onRowClick={() =>
-              navigate({
-                to: "/channel/$type/$tab",
-                params: { type: ch.channel_type, tab: targetTab },
-              })
-            }
-            onConfigure={() =>
-              navigate({
-                to: "/channel/$type/$tab",
-                params: { type: ch.channel_type, tab: "configuration" },
-              })
-            }
-          />
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.28,
+              delay: 0.05 + idx * 0.05,
+              ease: [0.22, 0.61, 0.36, 1],
+            }}
+          >
+            <ChannelSection
+              channel={ch}
+              manifest={manifest}
+              data={dashboard?.data}
+              currentRow={currentRow}
+              maxRows={pickerRows}
+              canAddRow={canAddRow}
+              onAddRow={() =>
+                handleChannelAddRow(ch.channel_type as ChannelType)
+              }
+              onRowChange={(next) =>
+                handleChannelRowChange(ch.channel_type as ChannelType, next)
+              }
+              selectedKeys={homePreview[ch.channel_type] ?? []}
+              onSelectionChange={(keys) =>
+                setHomePreview(ch.channel_type, keys)
+              }
+              onViewAll={() =>
+                navigate({
+                  to: "/channel/$type/$tab",
+                  params: { type: ch.channel_type, tab: "feed" },
+                })
+              }
+              onRowClick={() =>
+                navigate({
+                  to: "/channel/$type/$tab",
+                  params: { type: ch.channel_type, tab: targetTab },
+                })
+              }
+              onConfigure={() =>
+                navigate({
+                  to: "/channel/$type/$tab",
+                  params: { type: ch.channel_type, tab: "configuration" },
+                })
+              }
+            />
+          </motion.div>
         );
       })}
 
       {/* Widget strip */}
       {orderedWidgets.length > 0 && (
-        <WidgetStrip
-          widgets={orderedWidgets}
-          maxRows={pickerRows}
-          canAddRow={canAddRow}
-          onWidgetAddRow={handleWidgetAddRow}
-          getWidgetRow={(id) => getWidgetTickerRow(shell.prefs, id)}
-          onWidgetRowChange={handleWidgetRowChange}
-          onNavigate={(id) =>
-            navigate({
-              to: "/widget/$id/$tab",
-              params: { id, tab: "feed" },
-            })
-          }
-        />
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.28,
+            delay: 0.05 + orderedChannels.length * 0.05,
+            ease: [0.22, 0.61, 0.36, 1],
+          }}
+        >
+          <WidgetStrip
+            widgets={orderedWidgets}
+            maxRows={pickerRows}
+            canAddRow={canAddRow}
+            onWidgetAddRow={handleWidgetAddRow}
+            getWidgetRow={(id) => getWidgetTickerRow(shell.prefs, id)}
+            onWidgetRowChange={handleWidgetRowChange}
+            onNavigate={(id) =>
+              navigate({
+                to: "/widget/$id/$tab",
+                params: { id, tab: "feed" },
+              })
+            }
+          />
+        </motion.div>
       )}
     </PageLayout>
   );
@@ -433,7 +456,7 @@ function ChannelSection({
               onClick={() => setEditing(!editing)}
               aria-label={editing ? "Done editing" : `Edit ${manifest.name} preview`}
               className={clsx(
-                "w-7 h-7 flex items-center justify-center rounded-lg transition-colors",
+                "w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 active:scale-90",
                 editing
                   ? "text-accent bg-accent/10"
                   : hasSelections
@@ -441,7 +464,14 @@ function ChannelSection({
                     : "text-fg-4/60 hover:text-fg-2 hover:bg-surface-hover",
               )}
             >
-              {editing ? <Check size={14} /> : <Pencil size={14} />}
+              <motion.span
+                key={editing ? "check" : "pencil"}
+                initial={{ opacity: 0, scale: 0.7, rotate: -30 }}
+                animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 380, damping: 22 }}
+              >
+                {editing ? <Check size={14} /> : <Pencil size={14} />}
+              </motion.span>
             </button>
           </Tooltip>
         )}
@@ -469,91 +499,113 @@ function ChannelSection({
         {!editing && (
           <button
             onClick={onViewAll}
-            className="flex items-center gap-1 text-[11px] font-medium text-fg-4 hover:text-fg-2 transition-colors"
+            className="group flex items-center gap-1 text-[11px] font-medium text-fg-4 hover:text-fg-2 transition-all duration-150 active:scale-95"
           >
             View all
-            <ChevronRight size={12} />
+            <ChevronRight
+              size={12}
+              className="transition-transform duration-200 group-hover:translate-x-0.5"
+            />
           </button>
         )}
       </div>
 
-      {/* Edit mode: group picker */}
-      {editing && (
-        <div className="rounded-lg border border-accent/20 bg-accent/[0.03] overflow-hidden divide-y divide-edge/10 mb-3">
-          <div className="px-4 py-2 flex items-center justify-between">
-            <span className="text-[11px] font-medium text-fg-3">
-              Choose up to {MAX_PREVIEW} to show on Home
-            </span>
-            {hasSelections && (
-              <button
-                onClick={() => onSelectionChange([])}
-                className="text-[11px] font-medium text-fg-4 hover:text-fg-2 transition-colors"
-              >
-                Clear all
-              </button>
-            )}
-          </div>
-          {groups.map((key) => {
-            const isSelected = selectedKeys.includes(key);
-            const atLimit = selectedKeys.length >= MAX_PREVIEW && !isSelected;
-            return (
-              <button
-                key={key}
-                onClick={() => toggleGroup(key)}
-                disabled={atLimit}
-                className={clsx(
-                  "flex items-center gap-3 px-4 py-2.5 w-full text-left transition-colors",
-                  atLimit
-                    ? "opacity-40 cursor-not-allowed"
-                    : "hover:bg-accent/[0.04] cursor-pointer",
-                )}
-              >
-                <span
+      {/* Edit mode picker / data rows cross-fade. Wrapped in
+          AnimatePresence with mode='wait' so toggling the Pencil/Check
+          button transitions one panel out before the other in. */}
+      <AnimatePresence mode="wait" initial={false}>
+        {editing ? (
+          <motion.div
+            key="edit"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.16, ease: [0.22, 0.61, 0.36, 1] }}
+            className="rounded-lg border border-accent/20 bg-accent/[0.03] overflow-hidden divide-y divide-edge/10 mb-3"
+          >
+            <div className="px-4 py-2 flex items-center justify-between">
+              <span className="text-[11px] font-medium text-fg-3">
+                Choose up to {MAX_PREVIEW} to show on Home
+              </span>
+              {hasSelections && (
+                <button
+                  onClick={() => onSelectionChange([])}
+                  className="text-[11px] font-medium text-fg-4 hover:text-fg-2 transition-colors active:scale-95"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+            {groups.map((key) => {
+              const isSelected = selectedKeys.includes(key);
+              const atLimit = selectedKeys.length >= MAX_PREVIEW && !isSelected;
+              return (
+                <button
+                  key={key}
+                  onClick={() => toggleGroup(key)}
+                  disabled={atLimit}
                   className={clsx(
-                    "w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors",
-                    isSelected
-                      ? "bg-accent border-accent"
-                      : "border-edge/40",
+                    "flex items-center gap-3 px-4 py-2.5 w-full text-left transition-all duration-150 active:scale-[0.99]",
+                    atLimit
+                      ? "opacity-40 cursor-not-allowed"
+                      : "hover:bg-accent/[0.04] cursor-pointer",
                   )}
                 >
-                  {isSelected && (
-                    <Check size={10} className="text-surface" strokeWidth={3} />
-                  )}
-                </span>
-                <span className="text-xs text-fg truncate flex-1">
-                  {getGroupLabel(type, key, channelData)}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Data rows */}
-      {!editing && (
-        <div
-          className="rounded-lg border border-edge/20 overflow-hidden divide-y divide-edge/10 cursor-pointer hover:bg-base-200/30 transition-colors"
-          onClick={onRowClick}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onRowClick();
-          }}
-        >
-          {type === "finance" && (
-            <FinanceRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
-          )}
-          {type === "sports" && (
-            <SportsRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
-          )}
-          {type === "rss" && (
-            <RssRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
-          )}
-          {type === "fantasy" && (
-            <FantasyRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
-          )}
-        </div>
-      )}
+                  <span
+                    className={clsx(
+                      "w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+                      isSelected
+                        ? "bg-accent border-accent"
+                        : "border-edge/40",
+                    )}
+                  >
+                    {isSelected && (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                      >
+                        <Check size={10} className="text-surface" strokeWidth={3} />
+                      </motion.span>
+                    )}
+                  </span>
+                  <span className="text-xs text-fg truncate flex-1">
+                    {getGroupLabel(type, key, channelData)}
+                  </span>
+                </button>
+              );
+            })}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="data"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 }}
+            className="rounded-lg border border-edge/20 overflow-hidden divide-y divide-edge/10 cursor-pointer hover:bg-base-200/30 transition-colors"
+            onClick={onRowClick}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onRowClick();
+            }}
+          >
+            {type === "finance" && (
+              <FinanceRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
+            )}
+            {type === "sports" && (
+              <SportsRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
+            )}
+            {type === "rss" && (
+              <RssRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
+            )}
+            {type === "fantasy" && (
+              <FantasyRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }

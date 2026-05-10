@@ -120,6 +120,13 @@ export default function PageLayout({
 
   const widthClass = width === "wide" ? "max-w-6xl" : "max-w-3xl";
 
+  // Key the content cross-fade on title+subtitle+active-tab so:
+  //  - Source pages animate when switching feed/configure/display
+  //    (subtitle changes).
+  //  - Settings/Catalog animate when switching tabs (activeKey
+  //    changes) even though title+subtitle stay the same.
+  const contentKey = `${title}::${subtitle ?? ""}::${tabs?.activeKey ?? ""}`;
+
   return (
     <div className="flex flex-col h-full">
       {/* ── Tab band (only when route has sub-tabs) ────────── */}
@@ -139,13 +146,22 @@ export default function PageLayout({
                     aria-current={isActive ? "page" : undefined}
                     title={tab.description}
                     className={clsx(
-                      "px-3 py-2.5 text-[12px] font-medium transition-colors border-b-2 -mb-px",
+                      "relative px-3 py-2.5 text-[12px] font-medium transition-colors -mb-px",
                       isActive
-                        ? "text-accent border-accent"
-                        : "text-fg-3 border-transparent hover:text-fg-2",
+                        ? "text-accent"
+                        : "text-fg-3 hover:text-fg-2",
                     )}
                   >
                     {tab.label}
+                    {/* Animated underline — slides between tabs via
+                        layoutId instead of disappearing/reappearing. */}
+                    {isActive && (
+                      <motion.span
+                        layoutId="page-tab-underline"
+                        transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                        className="absolute left-0 right-0 -bottom-px h-0.5 bg-accent rounded-full"
+                      />
+                    )}
                   </button>
                 );
               })}
@@ -169,7 +185,7 @@ export default function PageLayout({
         <div className="flex-1 min-h-0 flex flex-col">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
-              key={`${title}::${subtitle ?? ""}`}
+              key={contentKey}
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
@@ -195,7 +211,7 @@ export default function PageLayout({
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
-              key={`${title}::${subtitle ?? ""}`}
+              key={contentKey}
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}

@@ -70,7 +70,10 @@ export default function CatalogCard({
     <>
       <div
         className={clsx(
-          "rounded-lg border p-4 transition-colors",
+          "rounded-lg border p-4",
+          // Subtle 200ms hover lift gives the grid life without
+          // becoming distracting.
+          "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft-sm",
           // Visual hierarchy: not-added cards lead the eye; added cards
           // visually de-emphasized so power users can still navigate to
           // their sources but new content stays prominent.
@@ -138,22 +141,26 @@ export default function CatalogCard({
             onOpen && (
               <button
                 onClick={() => onOpen(item)}
-                className="flex items-center gap-0.5 text-xs font-semibold text-accent hover:text-accent/80 transition-colors"
+                className="group flex items-center gap-0.5 text-xs font-semibold text-accent hover:text-accent/80 transition-all duration-150 active:scale-95"
               >
-                Open <ChevronRight size={12} />
+                Open
+                <ChevronRight
+                  size={12}
+                  className="transition-transform duration-200 group-hover:translate-x-0.5"
+                />
               </button>
             )
           ) : tierLocked ? (
             <button
               onClick={() => open("https://myscrollr.com/uplink")}
-              className="flex items-center gap-1 text-xs font-medium text-warn hover:text-warn/80 transition-colors"
+              className="flex items-center gap-1 text-xs font-medium text-warn hover:text-warn/80 transition-all duration-150 active:scale-95"
             >
               Upgrade <ExternalLink size={10} />
             </button>
           ) : !authenticated && item.kind === "channel" ? (
             <button
               onClick={onLogin}
-              className="text-xs font-semibold text-accent hover:text-accent/80 transition-colors"
+              className="text-xs font-semibold text-accent hover:text-accent/80 transition-all duration-150 active:scale-95"
             >
               Sign in to add
             </button>
@@ -162,7 +169,7 @@ export default function CatalogCard({
               onClick={handleAdd}
               disabled={dashboardLoading && item.kind === "channel"}
               className={clsx(
-                "text-xs font-semibold transition-colors",
+                "text-xs font-semibold transition-all duration-150 active:scale-95",
                 dashboardLoading && item.kind === "channel"
                   ? "text-fg-4 cursor-not-allowed"
                   : "text-accent hover:text-accent/80",

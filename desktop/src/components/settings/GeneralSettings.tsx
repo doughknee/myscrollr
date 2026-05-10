@@ -358,7 +358,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
           <span className="text-[12px] text-fg-3">Check for new versions</span>
           <button
             onClick={onCheck}
-            className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-base-250 text-fg-3 hover:text-fg-2 hover:bg-base-300 transition-colors cursor-pointer"
+            className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-base-250 text-fg-3 hover:text-fg-2 hover:bg-base-300 transition-all duration-150 active:scale-95 cursor-pointer"
           >
             Check for updates
           </button>
@@ -383,7 +383,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
           </div>
           <button
             onClick={onCheck}
-            className="text-[11px] font-medium px-2.5 py-1 rounded-md text-fg-4 hover:text-fg-2 hover:bg-base-250/50 transition-colors cursor-pointer"
+            className="text-[11px] font-medium px-2.5 py-1 rounded-md text-fg-4 hover:text-fg-2 hover:bg-base-250/50 transition-all duration-150 active:scale-95 cursor-pointer"
           >
             Check again
           </button>
@@ -401,7 +401,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
             </div>
             <button
               onClick={onDownload}
-              className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 transition-colors cursor-pointer shrink-0 ml-4"
+              className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 transition-all duration-150 active:scale-95 cursor-pointer shrink-0 ml-4"
             >
               Download & install
             </button>
@@ -463,7 +463,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
           </div>
           <button
             onClick={onRelaunch}
-            className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 transition-colors cursor-pointer"
+            className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 transition-all duration-150 active:scale-95 cursor-pointer"
           >
             Restart now
           </button>
@@ -483,7 +483,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
           </div>
           <button
             onClick={onCheck}
-            className="text-[11px] font-medium px-2.5 py-1 rounded-md text-fg-4 hover:text-fg-2 hover:bg-base-250/50 transition-colors cursor-pointer"
+            className="text-[11px] font-medium px-2.5 py-1 rounded-md text-fg-4 hover:text-fg-2 hover:bg-base-250/50 transition-all duration-150 active:scale-95 cursor-pointer"
           >
             Retry
           </button>

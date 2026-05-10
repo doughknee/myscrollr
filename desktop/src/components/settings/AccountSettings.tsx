@@ -359,7 +359,7 @@ export default function AccountSettings({
                 <button
                   onClick={handleOpenPortal}
                   disabled={openingPortal}
-                  className="flex-1 py-2 text-xs font-semibold rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors disabled:opacity-50"
+                  className="flex-1 py-2 text-xs font-semibold rounded-lg bg-error/10 text-error hover:bg-error/20 transition-all duration-150 active:scale-[0.97] disabled:opacity-50"
                 >
                   {openingPortal ? "Opening..." : "Update Payment"}
                 </button>
@@ -369,7 +369,7 @@ export default function AccountSettings({
                   <button
                     onClick={handleOpenPortal}
                     disabled={openingPortal}
-                    className="flex-1 py-2 text-xs font-semibold rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                    className="flex-1 py-2 text-xs font-semibold rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-all duration-150 active:scale-[0.97] disabled:opacity-50"
                   >
                     {openingPortal
                       ? "Opening..."
@@ -381,7 +381,7 @@ export default function AccountSettings({
               {status === "canceled" && (
                 <button
                   onClick={() => open("https://myscrollr.com/uplink")}
-                  className="flex-1 py-2 text-xs font-semibold rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+                  className="flex-1 py-2 text-xs font-semibold rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-all duration-150 active:scale-[0.97]"
                 >
                   See Plans
                 </button>
@@ -405,7 +405,7 @@ export default function AccountSettings({
             <div className="px-3 pb-2">
               <button
                 onClick={() => open("https://myscrollr.com/uplink")}
-                className="w-full py-2 text-xs font-semibold rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+                className="w-full py-2 text-xs font-semibold rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-all duration-150 active:scale-[0.98]"
               >
                 {tier === "free"
                   ? "Upgrade to Uplink"
@@ -447,7 +447,7 @@ export default function AccountSettings({
             <button
               type="button"
               onClick={() => setConfirmResetAll(true)}
-              className="self-start flex items-center gap-2 px-3 py-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors cursor-pointer text-[12px] font-semibold"
+              className="self-start flex items-center gap-2 px-3 py-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-all duration-150 active:scale-[0.97] cursor-pointer text-[12px] font-semibold"
             >
               <Trash2 className="w-4 h-4" aria-hidden />
               <span>Reset all settings</span>

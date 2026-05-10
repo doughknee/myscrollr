@@ -1,4 +1,5 @@
 import { clsx } from "clsx";
+import { motion } from "motion/react";
 import type { Venue } from "../../preferences";
 
 // ── Section heading ─────────────────────────────────────────────
@@ -59,12 +60,14 @@ export function ToggleRow({
           checked ? "bg-accent" : "bg-base-350",
         )}
       >
-        <div
+        {/* Thumb springs across with a slight overshoot so the toggle
+            feels physical rather than mechanical. */}
+        <motion.div
+          animate={{ x: checked ? 14 : 0 }}
+          transition={{ type: "spring", stiffness: 500, damping: 28 }}
           className={clsx(
-            "absolute top-[3px] left-[3px] h-3 w-3 rounded-full transition-transform duration-200",
-            checked
-              ? "translate-x-[14px] bg-surface"
-              : "translate-x-0 bg-fg-3",
+            "absolute top-[3px] left-[3px] h-3 w-3 rounded-full",
+            checked ? "bg-surface" : "bg-fg-3",
           )}
         />
       </div>
@@ -111,7 +114,7 @@ export function SegmentedRow<T extends string>({
             aria-checked={value === opt.value}
             onClick={() => onChange(opt.value)}
             className={clsx(
-              "px-2.5 py-1 text-[11px] font-medium rounded-md transition-all duration-200 cursor-pointer leading-none",
+              "px-2.5 py-1 text-[11px] font-medium rounded-md transition-all duration-200 active:scale-95 cursor-pointer leading-none",
               value === opt.value
                 ? "bg-base-300 text-fg shadow-sm"
                 : "text-fg-3 hover:text-fg-2",
