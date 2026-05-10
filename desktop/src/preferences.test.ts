@@ -28,6 +28,11 @@ import {
   setSourceTickerRow,
   setChannelTickerRow,
   setWidgetTickerRow,
+  migrateAppearanceTheme,
+  resolveThemeName,
+  isThemeFamily,
+  isThemeMode,
+  THEME_FAMILIES,
 } from "./preferences";
 import type { Venue, AppPreferences } from "./preferences";
 
@@ -471,5 +476,137 @@ describe("setSourceTickerRow / setChannelTickerRow / setWidgetTickerRow", () => 
     const prefs = makePrefs([{ sources: ["finance"] }]);
     const next = setSourceTickerRow(prefs, "finance", null);
     expect(next.appearance.tickerLayout.rows.length).toBe(1);
+  });
+});
+
+// ── Theme family + mode ─────────────────────────────────────────
+//
+// The multi-theme rollout split the single `appearance.theme` field
+// into `themeFamily` (palette identity) + `themeMode` (light/dark/system).
+// These tests pin down:
+//
+//   - The 10 supported families exist and the type guard accepts them.
+//   - The legacy `theme` field migrates into `themeMode` without losing
+//     the user's prior color-mode choice (`scrollr` family is assumed).
+//   - The new explicit fields take precedence over the legacy one when
+//     both are present (an unusual but plausible state during rollout).
+//   - Unknown families fall back to "scrollr" and unknown modes to
+//     "system" so a corrupted prefs file never breaks the UI.
+//   - resolveThemeName composes data-theme strings in the expected form.
+
+describe("isThemeFamily / isThemeMode", () => {
+  it("accepts every family in THEME_FAMILIES", () => {
+    for (const family of THEME_FAMILIES) {
+      expect(isThemeFamily(family)).toBe(true);
+    }
+  });
+
+  it("rejects unknown family strings", () => {
+    expect(isThemeFamily("monokai")).toBe(false);
+    expect(isThemeFamily("synthwave")).toBe(false);
+    expect(isThemeFamily("")).toBe(false);
+    expect(isThemeFamily(null)).toBe(false);
+    expect(isThemeFamily(undefined)).toBe(false);
+    expect(isThemeFamily(42)).toBe(false);
+  });
+
+  it("accepts the three valid modes", () => {
+    expect(isThemeMode("light")).toBe(true);
+    expect(isThemeMode("dark")).toBe(true);
+    expect(isThemeMode("system")).toBe(true);
+  });
+
+  it("rejects everything else as a mode", () => {
+    expect(isThemeMode("auto")).toBe(false);
+    expect(isThemeMode("")).toBe(false);
+    expect(isThemeMode(null)).toBe(false);
+    expect(isThemeMode(undefined)).toBe(false);
+  });
+});
+
+describe("migrateAppearanceTheme", () => {
+  it("returns Scrollr + system when nothing is saved", () => {
+    expect(migrateAppearanceTheme(undefined)).toEqual({
+      themeFamily: "scrollr",
+      themeMode: "system",
+    });
+    expect(migrateAppearanceTheme({})).toEqual({
+      themeFamily: "scrollr",
+      themeMode: "system",
+    });
+  });
+
+  it("folds legacy `theme: dark` into themeMode + scrollr family", () => {
+    expect(migrateAppearanceTheme({ theme: "dark" })).toEqual({
+      themeFamily: "scrollr",
+      themeMode: "dark",
+    });
+  });
+
+  it("folds legacy `theme: light` into themeMode + scrollr family", () => {
+    expect(migrateAppearanceTheme({ theme: "light" })).toEqual({
+      themeFamily: "scrollr",
+      themeMode: "light",
+    });
+  });
+
+  it("folds legacy `theme: system` into themeMode + scrollr family", () => {
+    expect(migrateAppearanceTheme({ theme: "system" })).toEqual({
+      themeFamily: "scrollr",
+      themeMode: "system",
+    });
+  });
+
+  it("keeps an explicit themeFamily + themeMode as-is", () => {
+    expect(
+      migrateAppearanceTheme({
+        themeFamily: "catppuccin",
+        themeMode: "dark",
+      }),
+    ).toEqual({ themeFamily: "catppuccin", themeMode: "dark" });
+  });
+
+  it("prefers the new themeMode field when both new and legacy are present", () => {
+    // Legacy theme=light vs new themeMode=dark — the new field wins
+    // so a partial migration (UI saved one field but not the other)
+    // resolves cleanly.
+    expect(
+      migrateAppearanceTheme({
+        theme: "light",
+        themeMode: "dark",
+        themeFamily: "dracula",
+      }),
+    ).toEqual({ themeFamily: "dracula", themeMode: "dark" });
+  });
+
+  it("falls back to scrollr for unknown themeFamily values", () => {
+    expect(
+      migrateAppearanceTheme({ themeFamily: "monokai", themeMode: "dark" }),
+    ).toEqual({ themeFamily: "scrollr", themeMode: "dark" });
+  });
+
+  it("falls back to system for unknown themeMode values", () => {
+    expect(
+      migrateAppearanceTheme({
+        themeFamily: "nord",
+        themeMode: "midnight",
+      }),
+    ).toEqual({ themeFamily: "nord", themeMode: "system" });
+  });
+
+  it("survives corrupted shapes without throwing", () => {
+    expect(
+      migrateAppearanceTheme({ themeFamily: 42, themeMode: true }),
+    ).toEqual({ themeFamily: "scrollr", themeMode: "system" });
+  });
+});
+
+describe("resolveThemeName", () => {
+  it("composes the data-theme attribute as `<family>-<mode>`", () => {
+    expect(resolveThemeName("scrollr", "dark")).toBe("scrollr-dark");
+    expect(resolveThemeName("scrollr", "light")).toBe("scrollr-light");
+    expect(resolveThemeName("catppuccin", "dark")).toBe("catppuccin-dark");
+    expect(resolveThemeName("tokyo-night", "light")).toBe("tokyo-night-light");
+    expect(resolveThemeName("rose-pine", "dark")).toBe("rose-pine-dark");
   });
 });

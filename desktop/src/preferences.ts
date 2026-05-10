@@ -8,7 +8,74 @@ import { getMaxTickerRows } from "./tierLimits";
 
 // ── Types ────────────────────────────────────────────────────────
 
-export type Theme = "light" | "dark" | "system";
+/**
+ * Color mode controls light/dark resolution, independent of the
+ * selected theme family. "system" follows the OS preference.
+ *
+ * Historically this type was called `Theme` and lived on
+ * `appearance.theme`. As of the multi-theme refactor, the field is
+ * `appearance.themeMode` and is paired with `appearance.themeFamily`.
+ * The legacy `Theme` alias is kept as a deprecated export for any
+ * consumer that hasn't been migrated yet.
+ */
+export type ThemeMode = "light" | "dark" | "system";
+
+/** @deprecated Use `ThemeMode` instead. */
+export type Theme = ThemeMode;
+
+/**
+ * The ten built-in theme families. Each family carries its own light
+ * and dark palette in `style.css`, applied via
+ * `data-theme="<family>-<resolved-mode>"`.
+ */
+export type ThemeFamily =
+  | "scrollr"
+  | "catppuccin"
+  | "dracula"
+  | "tokyo-night"
+  | "nord"
+  | "gruvbox"
+  | "solarized"
+  | "rose-pine"
+  | "one"
+  | "everforest";
+
+export const THEME_FAMILIES: ThemeFamily[] = [
+  "scrollr",
+  "catppuccin",
+  "dracula",
+  "tokyo-night",
+  "nord",
+  "gruvbox",
+  "solarized",
+  "rose-pine",
+  "one",
+  "everforest",
+];
+
+export const THEME_MODES: ThemeMode[] = ["light", "dark", "system"];
+
+/** Display label for the theme family selector. */
+export const THEME_FAMILY_LABELS: Record<ThemeFamily, string> = {
+  scrollr: "Scrollr",
+  catppuccin: "Catppuccin",
+  dracula: "Dracula",
+  "tokyo-night": "Tokyo Night",
+  nord: "Nord",
+  gruvbox: "Gruvbox",
+  solarized: "Solarized",
+  "rose-pine": "Rose Pine",
+  one: "One",
+  everforest: "Everforest",
+};
+
+export function isThemeFamily(value: unknown): value is ThemeFamily {
+  return typeof value === "string" && (THEME_FAMILIES as string[]).includes(value);
+}
+
+export function isThemeMode(value: unknown): value is ThemeMode {
+  return value === "light" || value === "dark" || value === "system";
+}
 type TaskbarHeight = "compact" | "default" | "comfortable";
 export type TickerGap = "tight" | "normal" | "spacious";
 export type TickerMode = "compact" | "comfort";
@@ -43,7 +110,18 @@ export interface TickerLayout {
 }
 
 export interface AppearancePrefs {
-  theme: Theme;
+  /**
+   * Color mode for the active theme family. `system` follows the OS.
+   * Renamed from the legacy `theme` field; see migration in
+   * `loadPrefs` / `migrateAppearance`.
+   */
+  themeMode: ThemeMode;
+  /**
+   * Selected theme family (color palette identity). Combines with
+   * `themeMode` at runtime to form the `data-theme` attribute, e.g.
+   * `data-theme="catppuccin-dark"`.
+   */
+  themeFamily: ThemeFamily;
   uiScale: number; // 75–150, default 100
   /**
    * Source of truth for the multi-row ticker layout. The number of
@@ -421,7 +499,8 @@ const DEFAULT_TICKER_LAYOUT: TickerLayout = {
 };
 
 const DEFAULT_APPEARANCE: AppearancePrefs = {
-  theme: "system",
+  themeFamily: "scrollr",
+  themeMode: "system",
   uiScale: 100,
   tickerLayout: { rows: [{ sources: [] }] },
   fontWeight: "normal",
@@ -1025,14 +1104,34 @@ export function loadPrefs(): AppPreferences {
     // truth; persisting a derived scalar alongside it caused the
     // Home/Settings drift this refactor was written to kill.
     const savedAppearance = source.appearance as
-      | (Partial<AppearancePrefs> & { tickerRows?: unknown })
+      | (Partial<AppearancePrefs> & {
+          tickerRows?: unknown;
+          theme?: unknown;
+        })
       | undefined;
-    const { tickerRows: _legacyTickerRows, ...appearanceRest } =
-      savedAppearance ?? {};
+    // Strip legacy fields:
+    //  - `tickerRows` was a derived scalar from pre-multi-row builds.
+    //  - `theme` was the pre-multi-theme color-mode field; the
+    //    migration helper below folds it into themeMode + themeFamily.
+    const {
+      tickerRows: _legacyTickerRows,
+      theme: _legacyTheme,
+      themeFamily: _savedFamily,
+      themeMode: _savedMode,
+      ...appearanceRest
+    } = savedAppearance ?? {};
     void _legacyTickerRows; // intentionally discarded
+    void _legacyTheme; // folded into themeMode below
+    void _savedFamily; // re-applied via migrateAppearanceTheme
+    void _savedMode; // re-applied via migrateAppearanceTheme
+    const { themeFamily, themeMode } = migrateAppearanceTheme(
+      savedAppearance as Record<string, unknown> | undefined,
+    );
     const mergedAppearance: AppearancePrefs = {
       ...DEFAULT_APPEARANCE,
       ...appearanceRest,
+      themeFamily,
+      themeMode,
       tickerLayout: layoutResult.layout,
     };
     const merged: AppPreferences = {
@@ -1127,15 +1226,71 @@ export function resetAll(): AppPreferences {
 
 // ── Theme resolution ────────────────────────────────────────
 
-/** Resolve the effective theme from a Theme preference value.
+/** Resolve a `ThemeMode` to a concrete light/dark value.
  *  "system" follows the OS preference; otherwise returns as-is. */
-export function resolveTheme(theme: Theme): "light" | "dark" {
-  if (theme === "system") {
+export function resolveThemeMode(mode: ThemeMode): "light" | "dark" {
+  if (mode === "system") {
     return window.matchMedia("(prefers-color-scheme: dark)").matches
       ? "dark"
       : "light";
   }
-  return theme;
+  return mode;
+}
+
+/**
+ * Build the `data-theme` attribute value for a family + resolved mode.
+ *
+ *   resolveThemeName("catppuccin", "dark") → "catppuccin-dark"
+ *   resolveThemeName("scrollr", "light")   → "scrollr-light"
+ */
+export function resolveThemeName(
+  family: ThemeFamily,
+  resolvedMode: "light" | "dark",
+): string {
+  return `${family}-${resolvedMode}`;
+}
+
+/**
+ * @deprecated Use `resolveThemeMode` instead.
+ * Kept as a thin alias so older imports continue to compile during
+ * the multi-theme rollout. Will be removed once all call sites are
+ * migrated.
+ */
+export function resolveTheme(mode: ThemeMode): "light" | "dark" {
+  return resolveThemeMode(mode);
+}
+
+/**
+ * Migrate a saved appearance blob to the new themeFamily + themeMode
+ * shape. Existing builds wrote `{ theme: "light" | "dark" | "system" }`;
+ * the new shape splits that into `themeFamily` + `themeMode`.
+ *
+ * Rules:
+ *   - Legacy `theme` → `themeMode`, `themeFamily` defaults to "scrollr"
+ *   - Unknown / missing `themeFamily` → "scrollr"
+ *   - Unknown / missing `themeMode`   → "system"
+ *
+ * This function only normalizes the theme fields; the caller is still
+ * responsible for merging the rest of AppearancePrefs (tickerLayout,
+ * uiScale, fontWeight, highContrast) against DEFAULT_APPEARANCE.
+ */
+export function migrateAppearanceTheme(
+  saved: Record<string, unknown> | undefined,
+): { themeFamily: ThemeFamily; themeMode: ThemeMode } {
+  if (!saved) {
+    return { themeFamily: "scrollr", themeMode: "system" };
+  }
+  const family = isThemeFamily(saved.themeFamily)
+    ? saved.themeFamily
+    : "scrollr";
+  // Prefer the new field; fall back to the legacy `theme` field.
+  let mode: ThemeMode = "system";
+  if (isThemeMode(saved.themeMode)) {
+    mode = saved.themeMode;
+  } else if (isThemeMode(saved.theme)) {
+    mode = saved.theme;
+  }
+  return { themeFamily: family, themeMode: mode };
 }
 
 // ── Derived values ──────────────────────────────────────────────

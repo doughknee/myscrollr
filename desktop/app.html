@@ -5,36 +5,89 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Scrollr</title>
     <script>
-      // Pre-paint theme resolution to prevent dark-flash on light-system users.
+      // Pre-paint theme resolution to prevent dark-flash on light-system users
+      // AND to honour the user's chosen theme family (Catppuccin, Dracula, …).
       //
-      // Reads a tiny mirror of the user's theme preference written to
-      // localStorage by useTheme on every theme change. Falls back to
-      // OS preference (system) if no mirror exists yet (first launch).
-      // Sets data-theme on <html> before React or any stylesheet paints.
+      // Reads a small mirror written to localStorage by useTheme on every
+      // theme change. Two formats are tolerated:
+      //
+      //   1. Current format (multi-theme):
+      //        { family: "catppuccin", mode: "system" }
+      //   2. Legacy format (pre-multi-theme):
+      //        "light" | "dark" | "system"
+      //
+      // Falls back to Scrollr + system if no mirror exists yet (first launch).
+      // Sets data-theme on <html> before React or any stylesheet paints so
+      // the body background matches the resolved theme.
       (function () {
-        var resolved = "dark";
+        var KNOWN_FAMILIES = [
+          "scrollr",
+          "catppuccin",
+          "dracula",
+          "tokyo-night",
+          "nord",
+          "gruvbox",
+          "solarized",
+          "rose-pine",
+          "one",
+          "everforest",
+        ];
+
+        function resolveMode(mode) {
+          if (mode === "light" || mode === "dark") return mode;
+          // mode === "system" or anything else -> use OS preference
+          return window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+        }
+
+        var family = "scrollr";
+        var mode = "system";
         try {
           var saved = localStorage.getItem("scrollr:theme-mirror");
-          // saved is "light" | "dark" | "system" | null
-          if (saved === "light" || saved === "dark") {
-            resolved = saved;
-          } else {
-            // saved === "system" or null -> use OS preference
-            resolved = window.matchMedia("(prefers-color-scheme: dark)").matches
-              ? "dark"
-              : "light";
+          if (saved) {
+            if (saved.charAt(0) === "{") {
+              // New JSON format.
+              var parsed = JSON.parse(saved);
+              if (parsed && typeof parsed === "object") {
+                if (KNOWN_FAMILIES.indexOf(parsed.family) !== -1) {
+                  family = parsed.family;
+                }
+                if (
+                  parsed.mode === "light" ||
+                  parsed.mode === "dark" ||
+                  parsed.mode === "system"
+                ) {
+                  mode = parsed.mode;
+                }
+              }
+            } else if (saved === "light" || saved === "dark" || saved === "system") {
+              // Legacy format from pre-multi-theme builds.
+              mode = saved;
+            }
           }
         } catch (e) {
-          // Defensive: any failure -> dark default (matches legacy behavior)
+          // Defensive: any failure -> Scrollr + system default.
         }
-        document.documentElement.setAttribute("data-theme", resolved);
+
+        var resolvedMode = resolveMode(mode);
+        document.documentElement.setAttribute(
+          "data-theme",
+          family + "-" + resolvedMode,
+        );
+        // Also expose the resolved mode separately so the inline style
+        // block below can paint the correct background colour without
+        // having to enumerate every family.
+        document.documentElement.setAttribute("data-mode", resolvedMode);
       })();
     </script>
     <style>
-      /* Prevent flash on load — match the resolved data-theme above */
+      /* Prevent flash on load — paint a sane background that matches the
+         resolved mode. Per-family backgrounds are applied by style.css
+         once the stylesheet loads; this just covers the brief gap. */
       html, body { margin: 0; padding: 0; }
-      html[data-theme="dark"], html[data-theme="dark"] body { background: #141420; }
-      html[data-theme="light"], html[data-theme="light"] body { background: #ffffff; }
+      html[data-mode="dark"], html[data-mode="dark"] body { background: #141420; }
+      html[data-mode="light"], html[data-mode="light"] body { background: #ffffff; }
     </style>
   </head>
   <body>

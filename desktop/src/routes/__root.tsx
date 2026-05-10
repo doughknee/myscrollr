@@ -50,7 +50,7 @@ import {
   loadPrefs,
   savePrefs,
   consumeTickerLayoutChanged,
-  resolveTheme,
+  resolveThemeMode,
 } from "../preferences";
 import type { AppPreferences } from "../preferences";
 import {
@@ -468,7 +468,8 @@ function RootLayout() {
   // Apply theme + UI scale
   useTheme({
     shellId: "app-shell",
-    theme: prefs.appearance.theme,
+    themeFamily: prefs.appearance.themeFamily,
+    themeMode: prefs.appearance.themeMode,
     uiScale: prefs.appearance.uiScale,
     fontWeight: prefs.appearance.fontWeight,
     highContrast: prefs.appearance.highContrast,
@@ -611,14 +612,21 @@ function RootLayout() {
         return;
       }
 
-      // Ctrl+Shift+T → cycle theme
+      // Ctrl+Shift+T → cycle color mode (theme family stays put)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "T") {
         e.preventDefault();
-        const cycle: Record<string, string> = { dark: "light", light: "system", system: "dark" };
-        const nextTheme = cycle[prefs.appearance.theme] ?? "dark";
+        const cycle: Record<string, "light" | "dark" | "system"> = {
+          dark: "light",
+          light: "system",
+          system: "dark",
+        };
+        const nextMode = cycle[prefs.appearance.themeMode] ?? "dark";
         const next = {
           ...prefs,
-          appearance: { ...prefs.appearance, theme: nextTheme as AppPreferences["appearance"]["theme"] },
+          appearance: {
+            ...prefs.appearance,
+            themeMode: nextMode,
+          },
         };
         setPrefs(next);
         savePrefs(next);
@@ -728,9 +736,10 @@ function RootLayout() {
 
   // ── Render ──────────────────────────────────────────────────
 
-  // Resolve theme for portal-based components (Toaster) that don't
-  // inherit the shell's data-theme attribute.
-  const resolvedToasterTheme = resolveTheme(prefs.appearance.theme);
+  // Resolve color mode for portal-based components (Toaster) that
+  // don't inherit the shell's data-theme attribute. Toasts only need
+  // light/dark, not the full family — Sonner uses neutral surfaces.
+  const resolvedToasterTheme = resolveThemeMode(prefs.appearance.themeMode);
 
   return (
     <div

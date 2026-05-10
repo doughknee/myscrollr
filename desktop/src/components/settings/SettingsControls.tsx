@@ -136,6 +136,56 @@ export function SegmentedRow<T extends string>({
   );
 }
 
+// ── Select row ──────────────────────────────────────────────────
+// A labeled dropdown for picking one of many string options. Used by
+// the Appearance panel for the 10-entry theme family selector, where a
+// segmented control would overflow the row.
+
+interface SelectRowProps<T extends string> {
+  label: string;
+  description?: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+}
+
+export function SelectRow<T extends string>({
+  label,
+  description,
+  value,
+  options,
+  onChange,
+}: SelectRowProps<T>) {
+  return (
+    <div className="flex items-center justify-between px-3 py-2.5 rounded-lg">
+      <div className="flex flex-col gap-0.5">
+        <span className="text-ui-muted leading-tight">{label}</span>
+        {description && (
+          <span className="text-ui-meta leading-tight">{description}</span>
+        )}
+      </div>
+      <select
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value as T)}
+        className="shrink-0 ml-4 px-2.5 py-1 text-ui-chip font-medium rounded-md bg-base-200 border border-edge/40 text-fg focus:outline-none focus:border-accent/60 transition-colors cursor-pointer appearance-none pr-7 bg-no-repeat bg-right"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M3 4.5l3 3 3-3' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>\")",
+          backgroundPosition: "right 6px center",
+          backgroundSize: "12px",
+        }}
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 // ── Venue row ───────────────────────────────────────────────────
 // @deprecated as of 2026-04-25.
 // Use `<DisplayLocationGrid>` instead — it renders the same persisted

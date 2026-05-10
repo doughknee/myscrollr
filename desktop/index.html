@@ -4,9 +4,77 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Scrollr</title>
+    <script>
+      // Pre-paint theme resolution for the ticker window. Mirrors the
+      // pre-paint script in app.html — both windows share the same
+      // `scrollr:theme-mirror` localStorage key so the ticker picks up
+      // the same theme family + mode the main app last applied.
+      (function () {
+        var KNOWN_FAMILIES = [
+          "scrollr",
+          "catppuccin",
+          "dracula",
+          "tokyo-night",
+          "nord",
+          "gruvbox",
+          "solarized",
+          "rose-pine",
+          "one",
+          "everforest",
+        ];
+
+        function resolveMode(mode) {
+          if (mode === "light" || mode === "dark") return mode;
+          return window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+        }
+
+        var family = "scrollr";
+        var mode = "system";
+        try {
+          var saved = localStorage.getItem("scrollr:theme-mirror");
+          if (saved) {
+            if (saved.charAt(0) === "{") {
+              var parsed = JSON.parse(saved);
+              if (parsed && typeof parsed === "object") {
+                if (KNOWN_FAMILIES.indexOf(parsed.family) !== -1) {
+                  family = parsed.family;
+                }
+                if (
+                  parsed.mode === "light" ||
+                  parsed.mode === "dark" ||
+                  parsed.mode === "system"
+                ) {
+                  mode = parsed.mode;
+                }
+              }
+            } else if (saved === "light" || saved === "dark" || saved === "system") {
+              mode = saved;
+            }
+          }
+        } catch (e) {
+          // Defensive default.
+        }
+
+        var resolvedMode = resolveMode(mode);
+        document.documentElement.setAttribute(
+          "data-theme",
+          family + "-" + resolvedMode,
+        );
+        document.documentElement.setAttribute("data-mode", resolvedMode);
+      })();
+    </script>
     <style>
-      /* Prevent white flash on load */
-      html, body { background: #141420; margin: 0; padding: 0; overflow: hidden; }
+      /* Prevent white flash on load — paint a sane mode-aware background.
+         The per-family styles in style.css take over once it loads. */
+      html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      html[data-mode="dark"], html[data-mode="dark"] body { background: #141420; }
+      html[data-mode="light"], html[data-mode="light"] body { background: #ffffff; }
     </style>
   </head>
   <body>

@@ -301,7 +301,8 @@ export default function App() {
   // ── Theme + UI scale (shared hook) ────────────────────────────
   useTheme({
     shellId: "desktop-shell",
-    theme: prefs.appearance.theme,
+    themeFamily: prefs.appearance.themeFamily,
+    themeMode: prefs.appearance.themeMode,
     uiScale: prefs.appearance.uiScale,
     fontWeight: prefs.appearance.fontWeight,
     highContrast: prefs.appearance.highContrast,

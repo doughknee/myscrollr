@@ -25,12 +25,15 @@ interface PendingUpdate {
 import type {
   AppearancePrefs,
   WindowPrefs,
-  Theme,
+  ThemeMode,
+  ThemeFamily,
 } from "../../preferences";
+import { THEME_FAMILIES, THEME_FAMILY_LABELS } from "../../preferences";
 import {
   Section,
   ToggleRow,
   SegmentedRow,
+  SelectRow,
   DisplayRow,
   ResetButton,
 } from "./SettingsControls";
@@ -61,11 +64,17 @@ interface GeneralSettingsProps {
 
 // ── Options ─────────────────────────────────────────────────────
 
-const THEME_OPTIONS: { value: Theme; label: string }[] = [
+const THEME_MODE_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: "light", label: "Light" },
   { value: "dark", label: "Dark" },
   { value: "system", label: "Auto" },
 ];
+
+const THEME_FAMILY_OPTIONS: { value: ThemeFamily; label: string }[] =
+  THEME_FAMILIES.map((family) => ({
+    value: family,
+    label: THEME_FAMILY_LABELS[family],
+  }));
 
 const SCALE_PRESETS: { value: string; label: string }[] = [
   { value: "85", label: "85%" },
@@ -235,12 +244,19 @@ export default function GeneralSettings({
   return (
     <div>
       <Section title="Appearance">
+        <SelectRow
+          label="Theme"
+          description="Pick a color palette"
+          value={appearance.themeFamily}
+          options={THEME_FAMILY_OPTIONS}
+          onChange={(v) => setApp("themeFamily", v)}
+        />
         <SegmentedRow
           label="Color mode"
-          description="Choose light or dark colors"
-          value={appearance.theme}
-          options={THEME_OPTIONS}
-          onChange={(v) => setApp("theme", v)}
+          description="Light, dark, or follow the system"
+          value={appearance.themeMode}
+          options={THEME_MODE_OPTIONS}
+          onChange={(v) => setApp("themeMode", v)}
         />
         <SegmentedRow
           label="Display size"

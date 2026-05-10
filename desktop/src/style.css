@@ -86,12 +86,38 @@
   --ease-out-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-/* ── Light theme ──────────────────────────────────────────────── */
-/* Dark is the default @theme. Light overrides via data-theme attribute.
-   Color palette matches the website's light mode. */
+/* ── Theme palettes ─────────────────────────────────────────────
+   Default @theme above is the Scrollr Dark palette. Each named theme
+   family overrides the surface / fg / accent / shadow tokens via
+   `[data-theme="<family>-<mode>"]`. All palettes share the same token
+   set so components never have to know which theme is active.
 
-#desktop-shell[data-theme="light"],
-#app-shell[data-theme="light"] {
+   Naming:
+     scrollr-dark   (default, identical to @theme)
+     scrollr-light
+     catppuccin-dark   (Mocha)
+     catppuccin-light  (Latte)
+     dracula-dark      (canonical Dracula)
+     dracula-light     (Scrollr-adapted; Dracula is dark-first)
+     tokyo-night-dark  (Tokyo Night)
+     tokyo-night-light (Tokyo Night Day)
+     nord-dark
+     nord-light
+     gruvbox-dark      (Gruvbox Dark Medium)
+     gruvbox-light     (Gruvbox Light Medium)
+     solarized-dark
+     solarized-light
+     rose-pine-dark    (Rose Pine)
+     rose-pine-light   (Rose Pine Dawn)
+     one-dark          (Atom One Dark)
+     one-light         (Atom One Light)
+     everforest-dark   (Everforest Dark Medium)
+     everforest-light  (Everforest Light Medium)
+*/
+
+/* ── Scrollr Light ───────────────────────────────────────────── */
+#desktop-shell[data-theme="scrollr-light"],
+#app-shell[data-theme="scrollr-light"] {
   --color-surface: #ffffff;
   --color-surface-2: #f6f7fb;
   --color-surface-hover: #eef0f6;
@@ -124,6 +150,735 @@
   --shadow-soft-md: 0 2px 6px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
+/* ── Catppuccin Mocha (dark) ─────────────────────────────────── */
+#desktop-shell[data-theme="catppuccin-dark"],
+#app-shell[data-theme="catppuccin-dark"] {
+  --color-surface: #1e1e2e;          /* base */
+  --color-surface-2: #181825;        /* mantle */
+  --color-surface-hover: #313244;    /* surface0 */
+  --color-surface-3: #11111b;        /* crust */
+
+  --color-base-100: #1e1e2e;
+  --color-base-150: #181825;
+  --color-base-200: #313244;
+  --color-base-250: #45475a;         /* surface1 */
+  --color-base-300: #585b70;         /* surface2 */
+  --color-base-350: #6c7086;         /* overlay0 */
+  --color-base-400: #7f849c;         /* overlay1 */
+  --color-base-content: #cdd6f4;
+
+  --color-edge: #313244;
+  --color-edge-2: #45475a;
+
+  --color-primary: #a6e3a1;          /* green */
+  --color-accent: #a6e3a1;
+  --color-secondary: #f38ba8;        /* red */
+  --color-info: #89dceb;             /* sky */
+  --color-accent-purple: #cba6f7;    /* mauve */
+
+  --color-fg: #cdd6f4;               /* text */
+  --color-fg-2: #bac2de;             /* subtext1 */
+  --color-fg-3: #a6adc8;             /* subtext0 */
+  --color-fg-4: #7f849c;             /* overlay1 */
+
+  --color-up: #a6e3a1;
+  --color-down: #f38ba8;
+  --color-success: #a6e3a1;
+  --color-error: #f38ba8;
+  --color-live: #f38ba8;
+  --color-warn: #f9e2af;
+  --color-warning: #f9e2af;
+}
+
+/* ── Catppuccin Latte (light) ────────────────────────────────── */
+#desktop-shell[data-theme="catppuccin-light"],
+#app-shell[data-theme="catppuccin-light"] {
+  --color-surface: #eff1f5;          /* base */
+  --color-surface-2: #e6e9ef;        /* mantle */
+  --color-surface-hover: #ccd0da;    /* surface0 */
+  --color-surface-3: #dce0e8;        /* crust */
+
+  --color-base-100: #eff1f5;
+  --color-base-150: #e6e9ef;
+  --color-base-200: #ccd0da;
+  --color-base-250: #bcc0cc;         /* surface1 */
+  --color-base-300: #acb0be;         /* surface2 */
+  --color-base-350: #9ca0b0;         /* overlay0 */
+  --color-base-400: #8c8fa1;         /* overlay1 */
+  --color-base-content: #4c4f69;
+
+  --color-edge: #ccd0da;
+  --color-edge-2: #bcc0cc;
+
+  --color-primary: #40a02b;          /* green */
+  --color-accent: #40a02b;
+  --color-secondary: #d20f39;        /* red */
+  --color-info: #04a5e5;             /* sky */
+  --color-accent-purple: #8839ef;    /* mauve */
+
+  --color-fg: #4c4f69;               /* text */
+  --color-fg-2: #5c5f77;             /* subtext1 */
+  --color-fg-3: #6c6f85;             /* subtext0 */
+  --color-fg-4: #8c8fa1;             /* overlay1 */
+
+  --color-up: #40a02b;
+  --color-down: #d20f39;
+  --color-success: #40a02b;
+  --color-error: #d20f39;
+  --color-live: #d20f39;
+  --color-warn: #df8e1d;
+  --color-warning: #df8e1d;
+}
+
+/* ── Dracula (dark) ──────────────────────────────────────────── */
+#desktop-shell[data-theme="dracula-dark"],
+#app-shell[data-theme="dracula-dark"] {
+  --color-surface: #282a36;          /* background */
+  --color-surface-2: #21222c;
+  --color-surface-hover: #44475a;    /* current line */
+  --color-surface-3: #1e1f29;
+
+  --color-base-100: #282a36;
+  --color-base-150: #21222c;
+  --color-base-200: #44475a;
+  --color-base-250: #565973;
+  --color-base-300: #6272a4;         /* comment */
+  --color-base-350: #7783b4;
+  --color-base-400: #8c95c2;
+  --color-base-content: #f8f8f2;
+
+  --color-edge: #44475a;
+  --color-edge-2: #6272a4;
+
+  --color-primary: #50fa7b;          /* green */
+  --color-accent: #50fa7b;
+  --color-secondary: #ff5555;        /* red */
+  --color-info: #8be9fd;             /* cyan */
+  --color-accent-purple: #bd93f9;    /* purple */
+
+  --color-fg: #f8f8f2;               /* foreground */
+  --color-fg-2: #d8d8d2;
+  --color-fg-3: #a8a8a2;
+  --color-fg-4: #6272a4;             /* comment */
+
+  --color-up: #50fa7b;
+  --color-down: #ff5555;
+  --color-success: #50fa7b;
+  --color-error: #ff5555;
+  --color-live: #ff5555;
+  --color-warn: #f1fa8c;
+  --color-warning: #f1fa8c;
+}
+
+/* ── Dracula (light, Scrollr-adapted) ────────────────────────── */
+#desktop-shell[data-theme="dracula-light"],
+#app-shell[data-theme="dracula-light"] {
+  --color-surface: #f8f8f2;
+  --color-surface-2: #efefe6;
+  --color-surface-hover: #e4e4d8;
+  --color-surface-3: #ececdf;
+
+  --color-base-100: #f8f8f2;
+  --color-base-150: #efefe6;
+  --color-base-200: #e4e4d8;
+  --color-base-250: #d4d4c5;
+  --color-base-300: #c2c2b2;
+  --color-base-350: #a8a89a;
+  --color-base-400: #8e8e82;
+  --color-base-content: #282a36;
+
+  --color-edge: #c2c2b2;
+  --color-edge-2: #a8a89a;
+
+  --color-primary: #2a9d6f;
+  --color-accent: #2a9d6f;
+  --color-secondary: #c43a3a;
+  --color-info: #2a8aa5;
+  --color-accent-purple: #7a52d8;
+
+  --color-fg: #282a36;
+  --color-fg-2: #44475a;
+  --color-fg-3: #6272a4;
+  --color-fg-4: #828bbc;
+
+  --color-up: #2a9d6f;
+  --color-down: #c43a3a;
+  --color-success: #2a9d6f;
+  --color-error: #c43a3a;
+  --color-live: #c43a3a;
+  --color-warn: #b88c1a;
+  --color-warning: #b88c1a;
+}
+
+/* ── Tokyo Night (dark) ──────────────────────────────────────── */
+#desktop-shell[data-theme="tokyo-night-dark"],
+#app-shell[data-theme="tokyo-night-dark"] {
+  --color-surface: #1a1b26;
+  --color-surface-2: #16161e;
+  --color-surface-hover: #24283b;
+  --color-surface-3: #13131a;
+
+  --color-base-100: #1a1b26;
+  --color-base-150: #16161e;
+  --color-base-200: #24283b;
+  --color-base-250: #2f334d;
+  --color-base-300: #414868;
+  --color-base-350: #545c7e;
+  --color-base-400: #737aa2;
+  --color-base-content: #c0caf5;
+
+  --color-edge: #2f334d;
+  --color-edge-2: #414868;
+
+  --color-primary: #7aa2f7;          /* blue */
+  --color-accent: #7aa2f7;
+  --color-secondary: #f7768e;        /* red */
+  --color-info: #7dcfff;             /* cyan */
+  --color-accent-purple: #bb9af7;    /* magenta */
+
+  --color-fg: #c0caf5;
+  --color-fg-2: #a9b1d6;
+  --color-fg-3: #9aa5ce;
+  --color-fg-4: #565f89;
+
+  --color-up: #9ece6a;
+  --color-down: #f7768e;
+  --color-success: #9ece6a;
+  --color-error: #f7768e;
+  --color-live: #f7768e;
+  --color-warn: #e0af68;
+  --color-warning: #e0af68;
+}
+
+/* ── Tokyo Night Day (light) ─────────────────────────────────── */
+#desktop-shell[data-theme="tokyo-night-light"],
+#app-shell[data-theme="tokyo-night-light"] {
+  --color-surface: #e1e2e7;
+  --color-surface-2: #d5d6dc;
+  --color-surface-hover: #c4c8da;
+  --color-surface-3: #cbcdd4;
+
+  --color-base-100: #e1e2e7;
+  --color-base-150: #d5d6dc;
+  --color-base-200: #c4c8da;
+  --color-base-250: #b4b8cf;
+  --color-base-300: #a1a6c5;
+  --color-base-350: #8990af;
+  --color-base-400: #6c728c;
+  --color-base-content: #3760bf;
+
+  --color-edge: #c4c8da;
+  --color-edge-2: #b4b8cf;
+
+  --color-primary: #2e7de9;
+  --color-accent: #2e7de9;
+  --color-secondary: #f52a65;
+  --color-info: #007197;
+  --color-accent-purple: #9854f1;
+
+  --color-fg: #3760bf;
+  --color-fg-2: #4c5079;
+  --color-fg-3: #6172b0;
+  --color-fg-4: #848cb5;
+
+  --color-up: #587539;
+  --color-down: #f52a65;
+  --color-success: #587539;
+  --color-error: #f52a65;
+  --color-live: #f52a65;
+  --color-warn: #8c6c3e;
+  --color-warning: #8c6c3e;
+}
+
+/* ── Nord (dark) ─────────────────────────────────────────────── */
+#desktop-shell[data-theme="nord-dark"],
+#app-shell[data-theme="nord-dark"] {
+  --color-surface: #2e3440;          /* nord0 */
+  --color-surface-2: #292e39;
+  --color-surface-hover: #3b4252;    /* nord1 */
+  --color-surface-3: #242933;
+
+  --color-base-100: #2e3440;
+  --color-base-150: #292e39;
+  --color-base-200: #3b4252;
+  --color-base-250: #434c5e;         /* nord2 */
+  --color-base-300: #4c566a;         /* nord3 */
+  --color-base-350: #5e6779;
+  --color-base-400: #6f7889;
+  --color-base-content: #eceff4;
+
+  --color-edge: #3b4252;
+  --color-edge-2: #4c566a;
+
+  --color-primary: #88c0d0;          /* nord8 */
+  --color-accent: #88c0d0;
+  --color-secondary: #bf616a;        /* nord11 */
+  --color-info: #81a1c1;             /* nord9 */
+  --color-accent-purple: #b48ead;    /* nord15 */
+
+  --color-fg: #eceff4;               /* nord6 */
+  --color-fg-2: #e5e9f0;             /* nord5 */
+  --color-fg-3: #d8dee9;             /* nord4 */
+  --color-fg-4: #8d96a8;
+
+  --color-up: #a3be8c;               /* nord14 */
+  --color-down: #bf616a;
+  --color-success: #a3be8c;
+  --color-error: #bf616a;
+  --color-live: #bf616a;
+  --color-warn: #ebcb8b;             /* nord13 */
+  --color-warning: #ebcb8b;
+}
+
+/* ── Nord (light, Snow Storm) ────────────────────────────────── */
+#desktop-shell[data-theme="nord-light"],
+#app-shell[data-theme="nord-light"] {
+  --color-surface: #eceff4;          /* nord6 */
+  --color-surface-2: #e5e9f0;        /* nord5 */
+  --color-surface-hover: #d8dee9;    /* nord4 */
+  --color-surface-3: #dfe3ec;
+
+  --color-base-100: #eceff4;
+  --color-base-150: #e5e9f0;
+  --color-base-200: #d8dee9;
+  --color-base-250: #c8d0dd;
+  --color-base-300: #b6bfce;
+  --color-base-350: #9aa3b4;
+  --color-base-400: #7d8595;
+  --color-base-content: #2e3440;
+
+  --color-edge: #d8dee9;
+  --color-edge-2: #c8d0dd;
+
+  --color-primary: #5e81ac;          /* nord10 */
+  --color-accent: #5e81ac;
+  --color-secondary: #bf616a;
+  --color-info: #5d8eaf;
+  --color-accent-purple: #9c6c8d;
+
+  --color-fg: #2e3440;
+  --color-fg-2: #434c5e;
+  --color-fg-3: #4c566a;
+  --color-fg-4: #6f7889;
+
+  --color-up: #6a8857;
+  --color-down: #bf616a;
+  --color-success: #6a8857;
+  --color-error: #bf616a;
+  --color-live: #bf616a;
+  --color-warn: #b08d3b;
+  --color-warning: #b08d3b;
+}
+
+/* ── Gruvbox Dark Medium ─────────────────────────────────────── */
+#desktop-shell[data-theme="gruvbox-dark"],
+#app-shell[data-theme="gruvbox-dark"] {
+  --color-surface: #282828;          /* bg0 */
+  --color-surface-2: #1d2021;        /* bg0_h */
+  --color-surface-hover: #3c3836;    /* bg1 */
+  --color-surface-3: #1d2021;
+
+  --color-base-100: #282828;
+  --color-base-150: #32302f;
+  --color-base-200: #3c3836;
+  --color-base-250: #504945;         /* bg2 */
+  --color-base-300: #665c54;         /* bg3 */
+  --color-base-350: #7c6f64;         /* bg4 */
+  --color-base-400: #928374;         /* gray */
+  --color-base-content: #ebdbb2;
+
+  --color-edge: #3c3836;
+  --color-edge-2: #504945;
+
+  --color-primary: #b8bb26;          /* bright green */
+  --color-accent: #b8bb26;
+  --color-secondary: #fb4934;        /* bright red */
+  --color-info: #83a598;             /* bright blue */
+  --color-accent-purple: #d3869b;    /* bright purple */
+
+  --color-fg: #ebdbb2;               /* fg */
+  --color-fg-2: #d5c4a1;             /* fg2 */
+  --color-fg-3: #bdae93;             /* fg3 */
+  --color-fg-4: #a89984;             /* fg4 */
+
+  --color-up: #b8bb26;
+  --color-down: #fb4934;
+  --color-success: #b8bb26;
+  --color-error: #fb4934;
+  --color-live: #fb4934;
+  --color-warn: #fabd2f;             /* bright yellow */
+  --color-warning: #fabd2f;
+}
+
+/* ── Gruvbox Light Medium ────────────────────────────────────── */
+#desktop-shell[data-theme="gruvbox-light"],
+#app-shell[data-theme="gruvbox-light"] {
+  --color-surface: #fbf1c7;          /* bg0 */
+  --color-surface-2: #f9f5d7;        /* bg0_h */
+  --color-surface-hover: #ebdbb2;    /* bg1 */
+  --color-surface-3: #f2e5bc;
+
+  --color-base-100: #fbf1c7;
+  --color-base-150: #f2e5bc;
+  --color-base-200: #ebdbb2;
+  --color-base-250: #d5c4a1;         /* bg2 */
+  --color-base-300: #bdae93;         /* bg3 */
+  --color-base-350: #a89984;         /* bg4 */
+  --color-base-400: #928374;         /* gray */
+  --color-base-content: #3c3836;
+
+  --color-edge: #ebdbb2;
+  --color-edge-2: #d5c4a1;
+
+  --color-primary: #79740e;          /* faded green */
+  --color-accent: #79740e;
+  --color-secondary: #9d0006;        /* faded red */
+  --color-info: #076678;             /* faded blue */
+  --color-accent-purple: #8f3f71;    /* faded purple */
+
+  --color-fg: #3c3836;
+  --color-fg-2: #504945;
+  --color-fg-3: #665c54;
+  --color-fg-4: #7c6f64;
+
+  --color-up: #79740e;
+  --color-down: #9d0006;
+  --color-success: #79740e;
+  --color-error: #9d0006;
+  --color-live: #9d0006;
+  --color-warn: #b57614;             /* faded yellow */
+  --color-warning: #b57614;
+}
+
+/* ── Solarized (dark) ────────────────────────────────────────── */
+#desktop-shell[data-theme="solarized-dark"],
+#app-shell[data-theme="solarized-dark"] {
+  --color-surface: #002b36;          /* base03 */
+  --color-surface-2: #073642;        /* base02 */
+  --color-surface-hover: #094352;
+  --color-surface-3: #00212b;
+
+  --color-base-100: #002b36;
+  --color-base-150: #03303b;
+  --color-base-200: #073642;
+  --color-base-250: #0e4250;
+  --color-base-300: #586e75;         /* base01 */
+  --color-base-350: #657b83;         /* base00 */
+  --color-base-400: #839496;         /* base0 */
+  --color-base-content: #fdf6e3;
+
+  --color-edge: #073642;
+  --color-edge-2: #586e75;
+
+  --color-primary: #2aa198;          /* cyan */
+  --color-accent: #2aa198;
+  --color-secondary: #dc322f;        /* red */
+  --color-info: #268bd2;             /* blue */
+  --color-accent-purple: #6c71c4;    /* violet */
+
+  --color-fg: #93a1a1;               /* base1 */
+  --color-fg-2: #839496;             /* base0 */
+  --color-fg-3: #657b83;             /* base00 */
+  --color-fg-4: #586e75;             /* base01 */
+
+  --color-up: #859900;               /* green */
+  --color-down: #dc322f;
+  --color-success: #859900;
+  --color-error: #dc322f;
+  --color-live: #dc322f;
+  --color-warn: #b58900;             /* yellow */
+  --color-warning: #b58900;
+}
+
+/* ── Solarized (light) ───────────────────────────────────────── */
+#desktop-shell[data-theme="solarized-light"],
+#app-shell[data-theme="solarized-light"] {
+  --color-surface: #fdf6e3;          /* base3 */
+  --color-surface-2: #eee8d5;        /* base2 */
+  --color-surface-hover: #e6e0cc;
+  --color-surface-3: #f5efdc;
+
+  --color-base-100: #fdf6e3;
+  --color-base-150: #f5efdc;
+  --color-base-200: #eee8d5;
+  --color-base-250: #ddd6c1;
+  --color-base-300: #93a1a1;         /* base1 */
+  --color-base-350: #839496;         /* base0 */
+  --color-base-400: #657b83;         /* base00 */
+  --color-base-content: #002b36;
+
+  --color-edge: #eee8d5;
+  --color-edge-2: #93a1a1;
+
+  --color-primary: #2aa198;
+  --color-accent: #2aa198;
+  --color-secondary: #dc322f;
+  --color-info: #268bd2;
+  --color-accent-purple: #6c71c4;
+
+  --color-fg: #586e75;               /* base01 */
+  --color-fg-2: #657b83;             /* base00 */
+  --color-fg-3: #839496;             /* base0 */
+  --color-fg-4: #93a1a1;             /* base1 */
+
+  --color-up: #859900;
+  --color-down: #dc322f;
+  --color-success: #859900;
+  --color-error: #dc322f;
+  --color-live: #dc322f;
+  --color-warn: #b58900;
+  --color-warning: #b58900;
+}
+
+/* ── Rose Pine (dark, "main") ────────────────────────────────── */
+/* Palette verified against rose-pine/neovim lua/rose-pine/palette.lua */
+#desktop-shell[data-theme="rose-pine-dark"],
+#app-shell[data-theme="rose-pine-dark"] {
+  --color-surface: #191724;          /* base */
+  --color-surface-2: #1f1d2e;        /* surface */
+  --color-surface-hover: #26233a;    /* overlay */
+  --color-surface-3: #16141f;        /* _nc */
+
+  --color-base-100: #191724;         /* base */
+  --color-base-150: #1f1d2e;         /* surface */
+  --color-base-200: #26233a;         /* overlay */
+  --color-base-250: #21202e;         /* highlight_low */
+  --color-base-300: #403d52;         /* highlight_med */
+  --color-base-350: #524f67;         /* highlight_high */
+  --color-base-400: #6e6a86;         /* muted */
+  --color-base-content: #e0def4;     /* text */
+
+  --color-edge: #26233a;             /* overlay */
+  --color-edge-2: #403d52;           /* highlight_med */
+
+  --color-primary: #c4a7e7;          /* iris */
+  --color-accent: #c4a7e7;
+  --color-secondary: #eb6f92;        /* love */
+  --color-info: #9ccfd8;             /* foam */
+  --color-accent-purple: #c4a7e7;
+
+  --color-fg: #e0def4;               /* text */
+  --color-fg-2: #908caa;             /* subtle */
+  --color-fg-3: #6e6a86;             /* muted */
+  --color-fg-4: #524f67;             /* highlight_high */
+
+  --color-up: #31748f;               /* pine */
+  --color-down: #eb6f92;             /* love */
+  --color-success: #31748f;
+  --color-error: #eb6f92;
+  --color-live: #eb6f92;
+  --color-warn: #f6c177;             /* gold */
+  --color-warning: #f6c177;
+}
+
+/* ── Rose Pine Dawn (light) ──────────────────────────────────── */
+/* Palette verified against rose-pine/neovim lua/rose-pine/palette.lua
+   (Dawn variant). `fg` uses the website spec value #575279 rather than
+   the neovim port's darker #464261 — the lighter shade preserves our
+   fg-2/fg-3/fg-4 hierarchy. */
+#desktop-shell[data-theme="rose-pine-light"],
+#app-shell[data-theme="rose-pine-light"] {
+  --color-surface: #faf4ed;          /* base */
+  --color-surface-2: #fffaf3;        /* surface */
+  --color-surface-hover: #f2e9e1;    /* overlay */
+  --color-surface-3: #f8f0e7;        /* _nc */
+
+  --color-base-100: #faf4ed;         /* base */
+  --color-base-150: #fffaf3;         /* surface */
+  --color-base-200: #f2e9e1;         /* overlay */
+  --color-base-250: #f4ede8;         /* highlight_low */
+  --color-base-300: #dfdad9;         /* highlight_med */
+  --color-base-350: #cecacd;         /* highlight_high */
+  --color-base-400: #9893a5;         /* muted */
+  --color-base-content: #575279;     /* text */
+
+  --color-edge: #f2e9e1;             /* overlay */
+  --color-edge-2: #dfdad9;           /* highlight_med */
+
+  --color-primary: #907aa9;          /* iris */
+  --color-accent: #907aa9;
+  --color-secondary: #b4637a;        /* love */
+  --color-info: #56949f;             /* foam */
+  --color-accent-purple: #907aa9;
+
+  --color-fg: #575279;               /* text (website spec) */
+  --color-fg-2: #797593;             /* subtle */
+  --color-fg-3: #9893a5;             /* muted */
+  --color-fg-4: #b5b0c4;             /* between muted + highlight_high */
+
+  --color-up: #286983;               /* pine */
+  --color-down: #b4637a;             /* love */
+  --color-success: #286983;
+  --color-error: #b4637a;
+  --color-live: #b4637a;
+  --color-warn: #ea9d34;             /* gold */
+  --color-warning: #ea9d34;
+}
+
+/* ── One Dark (Atom) ─────────────────────────────────────────── */
+#desktop-shell[data-theme="one-dark"],
+#app-shell[data-theme="one-dark"] {
+  --color-surface: #282c34;
+  --color-surface-2: #21252b;
+  --color-surface-hover: #2c313a;
+  --color-surface-3: #1d2025;
+
+  --color-base-100: #282c34;
+  --color-base-150: #23272e;
+  --color-base-200: #2c313a;
+  --color-base-250: #353b45;
+  --color-base-300: #3e4451;
+  --color-base-350: #4b5263;
+  --color-base-400: #5c6370;
+  --color-base-content: #abb2bf;
+
+  --color-edge: #3e4451;
+  --color-edge-2: #4b5263;
+
+  --color-primary: #61afef;          /* blue */
+  --color-accent: #61afef;
+  --color-secondary: #e06c75;        /* red */
+  --color-info: #56b6c2;             /* cyan */
+  --color-accent-purple: #c678dd;    /* purple */
+
+  --color-fg: #abb2bf;
+  --color-fg-2: #9da5b4;
+  --color-fg-3: #828997;
+  --color-fg-4: #5c6370;
+
+  --color-up: #98c379;               /* green */
+  --color-down: #e06c75;
+  --color-success: #98c379;
+  --color-error: #e06c75;
+  --color-live: #e06c75;
+  --color-warn: #e5c07b;             /* yellow */
+  --color-warning: #e5c07b;
+}
+
+/* ── One Light (Atom) ────────────────────────────────────────── */
+#desktop-shell[data-theme="one-light"],
+#app-shell[data-theme="one-light"] {
+  --color-surface: #fafafa;
+  --color-surface-2: #f0f0f1;
+  --color-surface-hover: #e5e5e6;
+  --color-surface-3: #f4f4f5;
+
+  --color-base-100: #fafafa;
+  --color-base-150: #f4f4f5;
+  --color-base-200: #f0f0f1;
+  --color-base-250: #e5e5e6;
+  --color-base-300: #d4d4d6;
+  --color-base-350: #b8b8ba;
+  --color-base-400: #a0a1a7;
+  --color-base-content: #383a42;
+
+  --color-edge: #e5e5e6;
+  --color-edge-2: #d4d4d6;
+
+  --color-primary: #4078f2;          /* blue */
+  --color-accent: #4078f2;
+  --color-secondary: #e45649;        /* red */
+  --color-info: #0184bc;             /* cyan */
+  --color-accent-purple: #a626a4;    /* purple */
+
+  --color-fg: #383a42;
+  --color-fg-2: #4d4f57;
+  --color-fg-3: #696c77;
+  --color-fg-4: #a0a1a7;
+
+  --color-up: #50a14f;               /* green */
+  --color-down: #e45649;
+  --color-success: #50a14f;
+  --color-error: #e45649;
+  --color-live: #e45649;
+  --color-warn: #c18401;             /* yellow */
+  --color-warning: #c18401;
+}
+
+/* ── Everforest Dark Medium ──────────────────────────────────── */
+/* Palette verified against sainnhe/everforest autoload/everforest.vim
+   (background = 'medium'). */
+#desktop-shell[data-theme="everforest-dark"],
+#app-shell[data-theme="everforest-dark"] {
+  --color-surface: #2d353b;          /* bg0 */
+  --color-surface-2: #232a2e;        /* bg_dim */
+  --color-surface-hover: #343f44;    /* bg1 */
+  --color-surface-3: #232a2e;        /* bg_dim */
+
+  --color-base-100: #2d353b;         /* bg0 */
+  --color-base-150: #232a2e;         /* bg_dim */
+  --color-base-200: #343f44;         /* bg1 */
+  --color-base-250: #3d484d;         /* bg2 */
+  --color-base-300: #475258;         /* bg3 */
+  --color-base-350: #4f585e;         /* bg4 */
+  --color-base-400: #56635f;         /* bg5 */
+  --color-base-content: #d3c6aa;     /* fg */
+
+  --color-edge: #343f44;             /* bg1 */
+  --color-edge-2: #475258;           /* bg3 */
+
+  --color-primary: #a7c080;          /* green */
+  --color-accent: #a7c080;
+  --color-secondary: #e67e80;        /* red */
+  --color-info: #7fbbb3;             /* blue */
+  --color-accent-purple: #d699b6;    /* purple */
+
+  --color-fg: #d3c6aa;               /* fg */
+  --color-fg-2: #9da9a0;             /* grey2 (lightest grey) */
+  --color-fg-3: #859289;             /* grey1 */
+  --color-fg-4: #7a8478;             /* grey0 */
+
+  --color-up: #a7c080;               /* green */
+  --color-down: #e67e80;             /* red */
+  --color-success: #a7c080;
+  --color-error: #e67e80;
+  --color-live: #e67e80;
+  --color-warn: #dbbc7f;             /* yellow */
+  --color-warning: #dbbc7f;
+}
+
+/* ── Everforest Light Medium ─────────────────────────────────── */
+/* Palette verified against sainnhe/everforest autoload/everforest.vim
+   (background = 'medium'). */
+#desktop-shell[data-theme="everforest-light"],
+#app-shell[data-theme="everforest-light"] {
+  --color-surface: #fdf6e3;          /* bg0 */
+  --color-surface-2: #efebd4;        /* bg_dim */
+  --color-surface-hover: #f4f0d9;    /* bg1 */
+  --color-surface-3: #efebd4;        /* bg_dim */
+
+  --color-base-100: #fdf6e3;         /* bg0 */
+  --color-base-150: #efebd4;         /* bg_dim */
+  --color-base-200: #f4f0d9;         /* bg1 */
+  --color-base-250: #efebd4;         /* bg2 */
+  --color-base-300: #e6e2cc;         /* bg3 */
+  --color-base-350: #e0dcc7;         /* bg4 */
+  --color-base-400: #bdc3af;         /* bg5 */
+  --color-base-content: #5c6a72;     /* fg */
+
+  --color-edge: #e6e2cc;             /* bg3 */
+  --color-edge-2: #e0dcc7;           /* bg4 */
+
+  --color-primary: #8da101;          /* green */
+  --color-accent: #8da101;
+  --color-secondary: #f85552;        /* red */
+  --color-info: #3a94c5;             /* blue */
+  --color-accent-purple: #df69ba;    /* purple */
+
+  --color-fg: #5c6a72;               /* fg */
+  --color-fg-2: #829181;             /* grey2 */
+  --color-fg-3: #939f91;             /* grey1 */
+  --color-fg-4: #a6b0a0;             /* grey0 */
+
+  --color-up: #8da101;               /* green */
+  --color-down: #f85552;             /* red */
+  --color-success: #8da101;
+  --color-error: #f85552;
+  --color-live: #f85552;
+  --color-warn: #dfa000;             /* yellow */
+  --color-warning: #dfa000;
+}
+
 /* ── Font weight boost ────────────────────────────────────────── */
 /* Applied via useTheme hook to the shell element */
 .font-weight-medium {
@@ -143,16 +898,17 @@
 }
 
 /* ── High contrast text ──────────────────────────────────────── */
-/* Bumps muted text tiers to be more readable */
-.high-contrast[data-theme="dark"] {
-  --color-fg-2: #d0d0dc;
-  --color-fg-3: #b4b4c4;
-  --color-fg-4: #9a9aac;
+/* Bumps muted text tiers to be more readable. Matches any theme family
+   by suffix: `*-dark` for dark variants, `*-light` for light variants. */
+.high-contrast[data-theme$="-dark"] {
+  --color-fg-2: color-mix(in srgb, var(--color-fg) 92%, white);
+  --color-fg-3: color-mix(in srgb, var(--color-fg) 80%, white);
+  --color-fg-4: color-mix(in srgb, var(--color-fg) 68%, white);
 }
 
-.high-contrast[data-theme="light"] {
-  --color-fg-3: #555568;
-  --color-fg-4: #6a6a7e;
+.high-contrast[data-theme$="-light"] {
+  --color-fg-3: color-mix(in srgb, var(--color-fg) 80%, black);
+  --color-fg-4: color-mix(in srgb, var(--color-fg) 65%, black);
 }
 
 /* ── Desktop type scale ────────────────────────────────────────── */
@@ -216,21 +972,23 @@
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease !important;
 }
 
-/* Light theme scrollbar */
-#desktop-shell[data-theme="light"] ::-webkit-scrollbar-thumb,
-#app-shell[data-theme="light"] ::-webkit-scrollbar-thumb {
+/* Light-mode scrollbar — applies to every theme family's light variant.
+   Dark scrollbars are already covered by the base ::-webkit-scrollbar
+   rule further down (which reads --color-base-300). */
+#desktop-shell[data-theme$="-light"] ::-webkit-scrollbar-thumb,
+#app-shell[data-theme$="-light"] ::-webkit-scrollbar-thumb {
   background: var(--color-base-350);
 }
 
-#desktop-shell[data-theme="light"] ::-webkit-scrollbar-thumb:hover,
-#app-shell[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+#desktop-shell[data-theme$="-light"] ::-webkit-scrollbar-thumb:hover,
+#app-shell[data-theme$="-light"] ::-webkit-scrollbar-thumb:hover {
   background: var(--color-base-400);
 }
 
-/* Light theme selection */
-#desktop-shell[data-theme="light"] ::selection,
-#app-shell[data-theme="light"] ::selection {
-  background: rgba(52, 211, 153, 0.2);
+/* Light-mode selection — softer accent overlay than dark mode. */
+#desktop-shell[data-theme$="-light"] ::selection,
+#app-shell[data-theme$="-light"] ::selection {
+  background: color-mix(in srgb, var(--color-accent) 25%, transparent);
   color: var(--color-fg);
 }
 
@@ -256,13 +1014,13 @@ body {
 }
 
 ::selection {
-  background: rgba(52, 211, 153, 0.3);
+  background: color-mix(in srgb, var(--color-accent) 35%, transparent);
   color: var(--color-fg);
 }
 
 *:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.5);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 55%, transparent);
 }
 
 /* ── Desktop window layout ────────────────────────────────────── */
