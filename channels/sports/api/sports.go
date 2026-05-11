@@ -209,8 +209,13 @@ func (a *App) loadLeagueMeta(ctx context.Context, names []string) []LeagueMeta {
 		leagueRows = append(leagueRows, r)
 	}
 
-	// Pull next_game alongside in a single batched query.
-	statusMap, _ := a.loadLeagueStatus(ctx, names)
+	// Pull next_game alongside in a single batched query. Log on failure
+	// so operators see when next_game enrichment is broken; the function
+	// continues with nil statusMap (every league's next_game stays nil).
+	statusMap, statusErr := a.loadLeagueStatus(ctx, names)
+	if statusErr != nil {
+		log.Printf("[Sports] loadLeagueMeta: next_game enrichment failed: %v", statusErr)
+	}
 
 	meta := make([]LeagueMeta, 0, len(leagueRows))
 	for _, r := range leagueRows {
