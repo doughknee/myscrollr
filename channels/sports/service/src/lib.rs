@@ -176,10 +176,12 @@ pub async fn poll_live(
                 }
                 total_upserted += upserted;
                 total_failed += failed;
+                crate::database::record_poll_success(pool, &league.name).await;
             }
             Err(e) => {
                 error!("[{}] Live poll error: {}", league.name, e);
                 health_state.lock().await.record_error(e.to_string());
+                crate::database::record_poll_error(pool, &league.name, &e.to_string()).await;
             }
         }
 
@@ -197,10 +199,12 @@ pub async fn poll_live(
                     }
                     total_upserted += upserted;
                     total_failed += failed;
+                    crate::database::record_poll_success(pool, &league.name).await;
                 }
                 Err(e) => {
                     error!("[{}] Yesterday poll error: {}", league.name, e);
                     health_state.lock().await.record_error(e.to_string());
+                    crate::database::record_poll_error(pool, &league.name, &e.to_string()).await;
                 }
             }
         }
