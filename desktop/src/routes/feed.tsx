@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "motion/react";
+import SportsEmptyState from "../channels/sports/EmptyState";
 import RouteError from "../components/RouteError";
 import Tooltip from "../components/Tooltip";
 import RowSelector from "../components/RowSelector";
@@ -43,6 +44,7 @@ import {
 } from "../preferences";
 import { useTickerLayout } from "../hooks/useTickerLayout";
 import type { ChannelType, Channel } from "../api/client";
+import type { LeagueMeta } from "../api/queries";
 import type {
   ChannelManifest,
   WidgetManifest,
@@ -629,7 +631,12 @@ function ChannelSection({
               <FinanceRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
             )}
             {type === "sports" && (
-              <SportsRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
+              <SportsRows
+                data={channelData}
+                meta={(data?.sports_meta as { leagues?: LeagueMeta[] } | undefined)?.leagues}
+                filter={selectedKeys}
+                onConfigure={onConfigure}
+              />
             )}
             {type === "rss" && (
               <RssRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
@@ -700,26 +707,47 @@ function FinanceRows({ data, filter, onConfigure }: { data: unknown; filter: str
 
 // ── Sports rows ─────────────────────────────────────────────────
 
-function SportsRows({ data, filter, onConfigure }: { data: unknown; filter: string[]; onConfigure: () => void }) {
+function SportsRows({
+  data,
+  meta,
+  filter,
+  onConfigure,
+}: {
+  data: unknown;
+  meta: LeagueMeta[] | undefined;
+  filter: string[];
+  onConfigure: () => void;
+}) {
   const games = Array.isArray(data) ? (data as Game[]) : [];
-  if (games.length === 0) return <EmptyDataRow channelType="sports" onConfigure={onConfigure} />;
+  // Restrict meta to the user's filter selection so the empty-state speaks
+  // only about leagues the user has configured.
+  const visibleMeta: LeagueMeta[] = (meta ?? []).filter(
+    (m) => filter.length === 0 || filter.includes(m.name),
+  );
+
+  if (games.length === 0) {
+    return <SportsEmptyState leagues={visibleMeta} onConfigure={onConfigure} />;
+  }
 
   const filtered =
     filter.length > 0
       ? games.filter((g) => filter.includes(g.league))
       : games;
 
-  const priority: Record<string, number> = { in: 0, pre: 1, post: 2 };
+  // State priority matches the API contract: in > pre > final > postponed.
+  // Earlier versions used the legacy "post" state from the ESPN era — that
+  // never matched anything the api-sports.io ingestion produces.
+  const priority: Record<string, number> = { in: 0, pre: 1, final: 2, postponed: 3 };
   const sorted = [...filtered]
     .sort(
       (a, b) =>
-        (priority[a.state ?? "post"] ?? 3) -
-        (priority[b.state ?? "post"] ?? 3),
+        (priority[a.state ?? ""] ?? 4) - (priority[b.state ?? ""] ?? 4),
     )
     .slice(0, MAX_PREVIEW);
 
-  if (sorted.length === 0)
-    return <EmptyDataRow channelType="sports" />;
+  if (sorted.length === 0) {
+    return <SportsEmptyState leagues={visibleMeta} onConfigure={onConfigure} />;
+  }
 
   return (
     <>
