@@ -122,25 +122,40 @@ type leagueStatus struct {
 // just those leagues (LEFT JOIN semantics in spirit — leagues with no games
 // simply don't appear in the map).
 //
+// `game_count` is intentionally NOT "all rows for this league." A user
+// scanning the catalog wants to know "how many games are happening today,"
+// not "how many fixtures has the ingestion service ever stored." Without
+// this filter, MLB shows ~100 (a full week × ~15/day) while Premier League
+// shows ~10 — visually wildly out of proportion with what's relevant.
+// The today-window is:
+//   - state = 'in'                                    (live right now)
+//   - state = 'pre' AND start_time < NOW() + 24h      (starting in next 24h)
+//   - state IN ('final','postponed') AND start_time > NOW() - 12h  (just finished)
+//
 // The query is intentionally batched so we run one round-trip per call,
 // not one query per league.
 func (a *App) loadLeagueStatus(ctx context.Context, names []string) (map[string]leagueStatus, error) {
 	statusMap := make(map[string]leagueStatus)
 
+	const countFilter = `
+		COUNT(*) FILTER (
+			WHERE state = 'in'
+			   OR (state = 'pre' AND start_time < NOW() + INTERVAL '24 hours')
+			   OR (state IN ('final','postponed') AND start_time > NOW() - INTERVAL '12 hours')
+		) AS game_count`
+
 	var rows pgx.Rows
 	var err error
 	if len(names) == 0 {
 		rows, err = a.db.Query(ctx, `
-			SELECT league,
-			       COUNT(*) AS game_count,
+			SELECT league,`+countFilter+`,
 			       COUNT(*) FILTER (WHERE state = 'in') AS live_count,
 			       MIN(start_time) FILTER (WHERE state = 'pre') AS next_game
 			FROM games
 			GROUP BY league`)
 	} else {
 		rows, err = a.db.Query(ctx, `
-			SELECT league,
-			       COUNT(*) AS game_count,
+			SELECT league,`+countFilter+`,
 			       COUNT(*) FILTER (WHERE state = 'in') AS live_count,
 			       MIN(start_time) FILTER (WHERE state = 'pre') AS next_game
 			FROM games
@@ -633,8 +648,26 @@ func (a *App) queryGames(ctx context.Context, limit int, favoriteTeams map[strin
 	return games, nil
 }
 
-// queryGamesByLeagues fetches games for specific leagues.
-// If favoriteTeams is provided, those teams' games are prioritized.
+// MinPerLeagueShare is the minimum number of candidate games each selected
+// league gets before the global LIMIT applies. Prevents one high-volume
+// league (e.g. MLB with ~15 games/day) from monopolizing the response and
+// hiding leagues with fewer fixtures (e.g. Premier League, F1).
+const MinPerLeagueShare = 2
+
+// queryGamesByLeagues fetches games for specific leagues with per-league
+// fair share. Each league gets max(MinPerLeagueShare, ceil(limit/N))
+// candidate rows ranked by the same priority (live > pre > final, favorites
+// first, soonest upcoming first). The global LIMIT trims the pool.
+//
+// Without the share cap, an SQL "ORDER BY priority LIMIT 20" query against a
+// games table dominated by one league (MLB during the season) returns 20
+// rows from that league exclusively. Premier League rows score lower on the
+// global ordering and never make it into the response — they then can't
+// appear in the frontend's "edit preview" dropdown either, because the
+// dropdown's group list is built from the games array.
+//
+// If favoriteTeams is provided, those teams' games are prioritized within
+// the per-league ranking.
 func (a *App) queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favoriteTeams map[string]FavoriteTeam) ([]Game, error) {
 	if len(leagues) == 0 {
 		return make([]Game, 0), nil
@@ -642,21 +675,46 @@ func (a *App) queryGamesByLeagues(ctx context.Context, leagues []string, limit i
 
 	favNames := extractFavoriteTeamNames(favoriteTeams)
 
+	// Per-league candidate share. ceil(limit / N_leagues), capped below by
+	// MinPerLeagueShare so small leagues are always visible even when the
+	// user has many leagues selected.
+	perLeague := (limit + len(leagues) - 1) / len(leagues)
+	if perLeague < MinPerLeagueShare {
+		perLeague = MinPerLeagueShare
+	}
+
 	rows, err := a.db.Query(ctx, fmt.Sprintf(`
+		WITH ranked AS (
+			SELECT id, league, sport, external_game_id, link,
+				home_team_name, home_team_logo, home_team_score, home_team_code,
+				away_team_name, away_team_logo, away_team_score, away_team_code,
+				start_time, short_detail, state, status_short, status_long,
+				timer, venue, season,
+				ROW_NUMBER() OVER (
+					PARTITION BY league
+					ORDER BY
+						CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
+						CASE WHEN home_team_name = ANY($2) OR away_team_name = ANY($2) THEN 0 ELSE 1 END,
+						CASE WHEN state = 'pre' THEN start_time END ASC,
+						CASE WHEN state != 'pre' THEN start_time END DESC
+				) AS rn
+			FROM games
+			WHERE league = ANY($1)
+		)
 		SELECT id, league, COALESCE(sport, ''), external_game_id, COALESCE(link, ''),
 			home_team_name, COALESCE(home_team_logo, ''), COALESCE(home_team_score::text, ''), COALESCE(home_team_code, ''),
 			away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
 			start_time, COALESCE(short_detail, ''), state,
 			COALESCE(status_short, ''), COALESCE(status_long, ''),
 			COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')
-		FROM games
-		WHERE league = ANY($1)
+		FROM ranked
+		WHERE rn <= %d
 		ORDER BY
 			CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
 			CASE WHEN home_team_name = ANY($2) OR away_team_name = ANY($2) THEN 0 ELSE 1 END,
 			CASE WHEN state = 'pre' THEN start_time END ASC,
 			CASE WHEN state != 'pre' THEN start_time END DESC
-		LIMIT %d`, limit), leagues, favNames)
+		LIMIT %d`, perLeague, limit), leagues, favNames)
 	if err != nil {
 		return nil, fmt.Errorf("sports league query failed: %w", err)
 	}
