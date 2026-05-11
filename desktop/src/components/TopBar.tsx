@@ -16,13 +16,16 @@
  * route's content area in a chunky 4-row header. It's now in the
  * TopBar, freeing the entire content area for actual content.
  */
-import { ArrowLeft, ArrowRight, Pin, Radio, RadioTower } from "lucide-react";
+import { forwardRef, useLayoutEffect, useRef, useState } from "react";
+import type { ButtonHTMLAttributes, Ref } from "react";
+import { ArrowLeft, ArrowRight, ChevronDown, Pin, Radio, RadioTower } from "lucide-react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "motion/react";
 import Tooltip from "./Tooltip";
 import ConnectionIndicator from "./ConnectionIndicator";
 import ScrollLogo from "./ScrollLogo";
 import OverflowMenu from "./OverflowMenu";
+import type { OverflowMenuItem } from "./OverflowMenu";
 import { usePageIdentity, type PageTabStrip } from "./layout/page-context";
 import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
 
@@ -180,16 +183,16 @@ export default function TopBar({
 
             {/* Inline tab strip — sibling navigation as a segmented
                 pill control. Renders only when the page publishes
-                `tabs`. Scrolls horizontally if it overflows so the
-                breadcrumb on the left and ambient toggles on the
-                right stay anchored. */}
-            {page.tabs && (
+                `tabs`. The strip itself takes flex-1 so it owns all
+                available space (which is also what the adaptive
+                overflow measurement needs to decide how many pills
+                fit). When there are no tabs, an empty spacer fills
+                the gap so Options pins to the right edge. */}
+            {page.tabs ? (
               <InlineTabStrip tabs={page.tabs} />
+            ) : (
+              <div className="flex-1 min-w-0" aria-hidden />
             )}
-
-            {/* Spacer pushes Options/entityAction to the right edge
-                of the breadcrumb area regardless of tab presence. */}
-            <div className="flex-1 min-w-0" aria-hidden />
 
             {/* "Options" pill — the sole trigger for page-level menus. */}
             {page.menuItems?.length ? (
@@ -278,46 +281,228 @@ export default function TopBar({
 // Catalog: All/Channels/Widgets, Support sections, etc.). Replaces the
 // full-width content-area tab band that wasted vertical space.
 //
-// The active pill renders with an animated background via shared
-// layoutId so switching tabs slides the highlight rather than fading
-// in place.
+// Adaptive overflow: when the available width can't fit every pill,
+// the tail collapses into a "More ▾" menu. The active tab is always
+// kept visible — if it would be in the overflow slice, earlier tabs
+// are pushed into overflow instead so users always see where they
+// currently are.
+//
+// Measurement uses an off-screen ghost row to learn each pill's
+// natural width, then walks the list deciding what fits. A
+// ResizeObserver on the container re-runs the calculation when the
+// window or the breadcrumb width changes.
 
 function InlineTabStrip({ tabs }: { tabs: PageTabStrip }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const ghostRef = useRef<HTMLDivElement | null>(null);
+
+  // Number of leading items currently rendered inline. The rest go
+  // into the overflow menu. Starts at items.length so the first
+  // render shows every pill; ResizeObserver immediately corrects it
+  // if there isn't enough room.
+  const [visibleCount, setVisibleCount] = useState(tabs.items.length);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const ghost = ghostRef.current;
+    if (!container || !ghost) return;
+
+    const recompute = () => {
+      const available = container.clientWidth;
+      if (available <= 0) return;
+
+      // Measure each ghost pill + the ghost "More" trigger.
+      const pillNodes = Array.from(
+        ghost.querySelectorAll<HTMLElement>("[data-pill-index]"),
+      );
+      const widths = pillNodes.map((n) => n.offsetWidth);
+      const moreNode = ghost.querySelector<HTMLElement>("[data-pill-more]");
+      const moreWidth = moreNode?.offsetWidth ?? 0;
+
+      // Gap between pills in the rendered strip (gap-0.5 = 2px).
+      const gap = 2;
+
+      // First, can everything fit without "More"?
+      const total = widths.reduce(
+        (sum, w, i) => sum + w + (i > 0 ? gap : 0),
+        0,
+      );
+      if (total <= available) {
+        setVisibleCount(widths.length);
+        return;
+      }
+
+      // Otherwise reserve room for the "More" trigger and pack from
+      // the left until the next pill won't fit.
+      let used = moreWidth + gap;
+      let fit = 0;
+      for (let i = 0; i < widths.length; i++) {
+        const next = widths[i] + (fit > 0 ? gap : 0);
+        if (used + next > available) break;
+        used += next;
+        fit += 1;
+      }
+
+      // Guarantee at least one inline pill so the strip never
+      // collapses entirely (the More menu would still work, but the
+      // user loses the visual anchor).
+      setVisibleCount(Math.max(1, fit));
+    };
+
+    recompute();
+    const ro = new ResizeObserver(recompute);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [tabs.items]);
+
+  // If the active tab would land in the overflow slice, shift the
+  // visible window so it stays in view. We do this by re-ordering:
+  // the displayed pills are the first `visibleCount` items, BUT we
+  // swap the active tab into that slice if it isn't there.
+  const activeIndex = tabs.items.findIndex((t) => t.key === tabs.activeKey);
+  const inlineSet = (() => {
+    const visible = tabs.items.slice(0, visibleCount);
+    if (activeIndex < 0 || activeIndex < visibleCount) {
+      return { visible, overflow: tabs.items.slice(visibleCount) };
+    }
+    // Active is in overflow — swap it with the last visible slot so
+    // the active pill is always rendered inline.
+    const swapped = visible.slice(0, -1);
+    swapped.push(tabs.items[activeIndex]);
+    const overflow = tabs.items.filter((t) => !swapped.includes(t));
+    return { visible: swapped, overflow };
+  })();
+
+  const overflowMenuItems: OverflowMenuItem[] = inlineSet.overflow.map((t) => ({
+    key: t.key,
+    label: t.label,
+    hint: t.description,
+    onSelect: () => tabs.onChange(t.key),
+  }));
+
   return (
-    <nav
-      aria-label={tabs.ariaLabel ?? "Page sections"}
-      className="flex items-center gap-0.5 h-7 px-0.5 rounded-md bg-surface-1/60 border border-edge/40 shrink-0 overflow-x-auto scrollbar-none"
+    <div
+      ref={containerRef}
+      className="relative flex items-center min-w-0 flex-1"
     >
-      {tabs.items.map((tab) => {
-        const isActive = tab.key === tabs.activeKey;
-        return (
-          <button
+      {/* Visible strip. */}
+      <nav
+        aria-label={tabs.ariaLabel ?? "Page sections"}
+        className="flex items-center gap-0.5 h-7 px-0.5 rounded-md bg-surface-1/60 border border-edge/40 max-w-full"
+      >
+        {inlineSet.visible.map((tab) => (
+          <TabPill
             key={tab.key}
-            type="button"
-            onClick={() => tabs.onChange(tab.key)}
-            aria-current={isActive ? "page" : undefined}
-            title={tab.description}
-            className={clsx(
-              "relative h-6 px-2.5 rounded text-[11px] font-medium transition-colors whitespace-nowrap",
-              isActive
-                ? "text-fg"
-                : "text-fg-3 hover:text-fg-2",
-            )}
+            label={tab.label}
+            description={tab.description}
+            isActive={tab.key === tabs.activeKey}
+            onSelect={() => tabs.onChange(tab.key)}
+          />
+        ))}
+        {inlineSet.overflow.length > 0 && (
+          <OverflowMenu
+            items={overflowMenuItems}
+            triggerLabel="More sections"
+            trigger={<MoreTabsTrigger />}
+            placement="bottom-end"
+          />
+        )}
+      </nav>
+
+      {/* Ghost row — off-screen, used only for width measurement.
+          Mirrors the styles of the real pills + trigger so widths
+          match. aria-hidden so AT doesn't see duplicates. */}
+      <div
+        ref={ghostRef}
+        aria-hidden
+        className="absolute left-0 top-0 invisible pointer-events-none flex items-center gap-0.5 h-7 px-0.5"
+        style={{ visibility: "hidden" }}
+      >
+        {tabs.items.map((tab, i) => (
+          <span
+            key={tab.key}
+            data-pill-index={i}
+            className="relative h-6 px-2.5 rounded text-[11px] font-medium whitespace-nowrap"
           >
-            {/* Sliding background — shared layoutId animates the
-                highlight between pills instead of fading in place. */}
-            {isActive && (
-              <motion.span
-                layoutId="topbar-tab-active"
-                transition={{ type: "spring", stiffness: 500, damping: 38 }}
-                className="absolute inset-0 rounded bg-surface-3 shadow-sm"
-              />
-            )}
-            <span className="relative">{tab.label}</span>
-          </button>
-        );
-      })}
-    </nav>
+            {tab.label}
+          </span>
+        ))}
+        <span
+          data-pill-more
+          className="flex items-center gap-1 h-6 px-2 rounded text-[11px] font-medium whitespace-nowrap"
+        >
+          More
+          <ChevronDown size={11} />
+        </span>
+      </div>
+    </div>
   );
 }
+
+// Single pill button. Extracted so the visible strip and the ghost
+// row can share the same dimensions without duplicating className.
+function TabPill({
+  label,
+  description,
+  isActive,
+  onSelect,
+}: {
+  label: string;
+  description?: string;
+  isActive: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-current={isActive ? "page" : undefined}
+      title={description}
+      className={clsx(
+        "relative h-6 px-2.5 rounded text-[11px] font-medium transition-colors whitespace-nowrap",
+        isActive ? "text-fg" : "text-fg-3 hover:text-fg-2",
+      )}
+    >
+      {isActive && (
+        <motion.span
+          layoutId="topbar-tab-active"
+          transition={{ type: "spring", stiffness: 500, damping: 38 }}
+          className="absolute inset-0 rounded bg-surface-3 shadow-sm"
+        />
+      )}
+      <span className="relative">{label}</span>
+    </button>
+  );
+}
+
+// "More ▾" trigger styled to match TabPill so it visually belongs to
+// the same segmented control. floating-ui injects a ref + handlers
+// via cloneElement, so this is a forwardRef-compatible button.
+const MoreTabsTrigger = forwardRef(function MoreTabsTrigger(
+  props: ButtonHTMLAttributes<HTMLButtonElement>,
+  ref: Ref<HTMLButtonElement>,
+) {
+  const isOpen =
+    props["aria-expanded"] === true || props["aria-expanded"] === "true";
+  return (
+    <button
+      ref={ref}
+      type="button"
+      {...props}
+      className={clsx(
+        "flex items-center gap-1 h-6 px-2 rounded text-[11px] font-medium transition-colors whitespace-nowrap",
+        isOpen ? "bg-surface-3 text-fg" : "text-fg-3 hover:text-fg-2",
+      )}
+    >
+      More
+      <ChevronDown
+        size={11}
+        style={{
+          transition: "transform 300ms var(--ease-snap)",
+          transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+        }}
+      />
+    </button>
+  );
+});
 
