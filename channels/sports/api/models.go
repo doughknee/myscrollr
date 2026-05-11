@@ -45,6 +45,30 @@ type TrackedLeague struct {
 	OffseasonMonths   []int32    `json:"-"` // internal, not serialized
 }
 
+// LeagueMeta is the per-league summary attached to dashboard + public
+// sports responses. Lets the desktop empty-state component explain WHY a
+// league has no games right now (off-season, next game soon, polling
+// stale, or genuinely nothing scheduled).
+type LeagueMeta struct {
+	Name           string     `json:"name"`
+	IsOffseason    bool       `json:"is_offseason"`
+	NextGame       *time.Time `json:"next_game,omitempty"`
+	PollingHealthy bool       `json:"polling_healthy"`
+}
+
+// SportsResponse is the new shape returned by /sports, /sports/public,
+// and /internal/dashboard. Game array stays under "sports" for backwards
+// compatibility; per-league context lives under "meta".
+type SportsResponse struct {
+	Sports []Game     `json:"sports"`
+	Meta   SportsMeta `json:"meta"`
+}
+
+// SportsMeta wraps per-league context.
+type SportsMeta struct {
+	Leagues []LeagueMeta `json:"leagues"`
+}
+
 // CDCRecord represents a Change Data Capture record from Sequin.
 type CDCRecord struct {
 	Action   string                 `json:"action"`

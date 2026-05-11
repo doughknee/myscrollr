@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -104,6 +105,62 @@ func (a *App) getSports(c *fiber.Ctx) error {
 	return c.JSON(games)
 }
 
+// leagueStatus holds the per-league activity computed from the games table.
+// Used by both the catalog endpoint and the dashboard meta payload.
+type leagueStatus struct {
+	GameCount int
+	LiveCount int
+	NextGame  *time.Time
+}
+
+// loadLeagueStatus returns activity counts and the next upcoming game per
+// league. If `names` is empty, returns stats for every league that appears
+// in the games table. If `names` is non-empty, the result is restricted to
+// just those leagues (LEFT JOIN semantics in spirit — leagues with no games
+// simply don't appear in the map).
+//
+// The query is intentionally batched so we run one round-trip per call,
+// not one query per league.
+func (a *App) loadLeagueStatus(ctx context.Context, names []string) (map[string]leagueStatus, error) {
+	statusMap := make(map[string]leagueStatus)
+
+	var rows pgx.Rows
+	var err error
+	if len(names) == 0 {
+		rows, err = a.db.Query(ctx, `
+			SELECT league,
+			       COUNT(*) AS game_count,
+			       COUNT(*) FILTER (WHERE state = 'in') AS live_count,
+			       MIN(start_time) FILTER (WHERE state = 'pre') AS next_game
+			FROM games
+			GROUP BY league`)
+	} else {
+		rows, err = a.db.Query(ctx, `
+			SELECT league,
+			       COUNT(*) AS game_count,
+			       COUNT(*) FILTER (WHERE state = 'in') AS live_count,
+			       MIN(start_time) FILTER (WHERE state = 'pre') AS next_game
+			FROM games
+			WHERE league = ANY($1)
+			GROUP BY league`, names)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("load league status: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var league string
+		var s leagueStatus
+		if err := rows.Scan(&league, &s.GameCount, &s.LiveCount, &s.NextGame); err != nil {
+			log.Printf("[Sports] loadLeagueStatus scan error: %v", err)
+			continue
+		}
+		statusMap[league] = s
+	}
+	return statusMap, nil
+}
+
 // getLeagueCatalog returns all enabled tracked leagues for the dashboard
 // league browser, enriched with per-league game counts and activity status.
 func (a *App) getLeagueCatalog(c *fiber.Ctx) error {
@@ -149,36 +206,11 @@ func (a *App) getLeagueCatalog(c *fiber.Ctx) error {
 	}
 
 	// Enrich with per-league game activity counts.
-	type leagueStatus struct {
-		GameCount int
-		LiveCount int
-		NextGame  *time.Time
-	}
-	statusMap := make(map[string]leagueStatus)
-
-	statusRows, err := a.db.Query(ctx,
-		`SELECT league,
-		        COUNT(*) AS game_count,
-		        COUNT(*) FILTER (WHERE state = 'in') AS live_count,
-		        MIN(start_time) FILTER (WHERE state = 'pre') AS next_game
-		 FROM games
-		 GROUP BY league`)
-	if err != nil {
-		log.Printf("[Sports] League status query failed (non-fatal): %v", err)
+	statusMap, statusErr := a.loadLeagueStatus(ctx, nil)
+	if statusErr != nil {
+		log.Printf("[Sports] League status query failed (non-fatal): %v", statusErr)
 		// Continue without enrichment — the catalog is still useful.
-	} else {
-		defer statusRows.Close()
-		for statusRows.Next() {
-			var league string
-			var s leagueStatus
-			if err := statusRows.Scan(&league, &s.GameCount, &s.LiveCount, &s.NextGame); err != nil {
-				log.Printf("[Sports] League status scan error: %v", err)
-				continue
-			}
-			statusMap[league] = s
-		}
 	}
-
 	for i := range catalog {
 		if s, ok := statusMap[catalog[i].Name]; ok {
 			catalog[i].GameCount = s.GameCount
