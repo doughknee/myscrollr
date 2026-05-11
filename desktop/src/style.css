@@ -1120,6 +1120,18 @@ body {
   scrollbar-color: var(--color-base-300) transparent;
 }
 
+/* Hide native scrollbar while still allowing scroll. Used by the
+   ticker's empty-state chip row so overflowing chips can be scrolled
+   horizontally without a visible track eating vertical space in the
+   already-tight (h-11 / h-16) bar. */
+@utility scrollbar-none {
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE/legacy Edge */
+  &::-webkit-scrollbar {        /* WebKit/Blink */
+    display: none;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

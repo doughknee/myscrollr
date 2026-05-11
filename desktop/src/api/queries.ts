@@ -53,6 +53,11 @@ async function fetchDashboard(): Promise<DashboardResponse> {
   // Try authenticated path if token is valid OR a refresh token can restore the session.
   // This prevents the deadlock where an expired access token blocked the only code path
   // that could trigger a refresh via getValidToken().
+  //
+  // Signed-in users with zero channels installed deliberately receive an
+  // empty `data` payload — the ticker renders an inline "no sources yet"
+  // CTA in that state rather than teasing public-feed data. See
+  // `ScrollrTicker` empty-shell handling and `App.tsx` channelTabs logic.
   if (isAuthenticated() || hasRefreshToken()) {
     try {
       const data = await authFetch<{
@@ -60,34 +65,6 @@ async function fetchDashboard(): Promise<DashboardResponse> {
         channels?: DashboardResponse["channels"];
         preferences?: DashboardResponse["preferences"];
       }>("/dashboard");
-
-      // Signed-in user with zero channels installed: the authed response
-      // carries an empty `data` map, which leaves the ticker blank. To
-      // make the ticker feel alive (and act as a teaser for what they'll
-      // see once they install a channel), fall back to the public feed
-      // payload while preserving the authed `channels` + `preferences`.
-      // The moment they add their first channel, CDC + a refetch fill
-      // `data` and this branch stops triggering.
-      const hasAnyChannelData =
-        data.data && Object.keys(data.data).length > 0;
-      const hasInstalledChannels =
-        Array.isArray(data.channels) && data.channels.length > 0;
-
-      if (!hasAnyChannelData && !hasInstalledChannels) {
-        try {
-          const publicFeed = await request<{
-            data: DashboardResponse["data"];
-          }>("/public/feed");
-          return {
-            data: publicFeed.data,
-            channels: data.channels,
-            preferences: data.preferences,
-          } as DashboardResponse;
-        } catch {
-          // Public feed failed too — fall through with the empty authed payload.
-        }
-      }
-
       return {
         data: data.data,
         channels: data.channels,

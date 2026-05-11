@@ -1,21 +1,34 @@
 /**
  * EmptyChannelState — shared empty-state placeholder for channel FeedTabs.
  *
- * Replaces the repeated empty-state pattern in finance, sports, and RSS feeds.
+ * Replaces the repeated empty-state pattern in finance, sports, rss, and
+ * fantasy feeds.
  *
- * Copy is intentionally pointed at the in-app navigation: the user already
- * sees the sidebar (Sources rail + "+ Add source") and the breadcrumb tabs
- * in the top bar. We highlight the "Settings" tab in the breadcrumb because
- * every channel page exposes its own configure UI on that tab — that's the
- * one tap that gets them from "empty feed" to "picking what to track".
+ * Copy is pointed at the **breadcrumb dropdown in the TopBar** — the
+ * channel name + chevron at the top of the window (e.g. "Sports ▾").
+ * That dropdown is the ONLY sub-tab switcher on channel pages; there is
+ * no horizontal tab strip and no "Settings" tab in the title bar. The
+ * earlier copy said "Open the Settings tab" which was misleading — users
+ * looked for a tab that doesn't exist.
+ *
+ * The CTA button still jumps directly to the Configure sub-tab so the
+ * one-tap fix is preserved; the surrounding copy teaches the user where
+ * the dropdown lives so they can do it themselves next time.
  */
 import { clsx } from "clsx";
-import { Settings } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 interface EmptyChannelStateProps {
   icon: React.ComponentType<{ size?: number; className?: string }>;
   /** What hasn't been added yet (e.g. "stocks or crypto", "leagues", "feeds"). */
   noun: string;
+  /**
+   * Display name of the channel itself, e.g. "Finance", "Sports", "RSS",
+   * "Fantasy". Used to label the breadcrumb dropdown trigger in the
+   * teaching copy. When omitted, the copy falls back to the generic
+   * "channel name" phrase.
+   */
+  channelName?: string;
   /** Whether the channel has config (i.e. user has picked items to track). */
   hasConfig: boolean;
   /** Whether the dashboard has loaded. */
@@ -24,19 +37,27 @@ interface EmptyChannelStateProps {
   loadingNoun?: string;
   /** Hint text for the action (e.g. "choose what to track", "pick your leagues"). */
   actionHint?: string;
-  /** Navigate to the channel's Settings sub-tab. When provided, the hint becomes a button. */
+  /**
+   * Navigate to the channel's Configure sub-tab. Wired in
+   * `routes/channel.$type.$tab.tsx`. When provided, the hint becomes a
+   * one-tap button; the surrounding copy still teaches the user the
+   * dropdown path so they can do it themselves next time.
+   */
   onConfigure?: () => void;
 }
 
 export default function EmptyChannelState({
   icon: Icon,
   noun,
+  channelName,
   hasConfig,
   dashboardLoaded,
   loadingNoun,
   actionHint,
   onConfigure,
 }: EmptyChannelStateProps) {
+  const breadcrumbLabel = channelName ?? "channel name";
+
   return (
     <div
       className={clsx(
@@ -60,22 +81,30 @@ export default function EmptyChannelState({
                 "inline-flex items-center gap-1.5 rounded-md",
                 "px-2.5 py-1 text-xs font-medium",
                 "text-accent bg-accent/10 hover:bg-accent/15",
+                "border border-accent/25 hover:border-accent/40",
                 "transition-colors active:scale-[0.97]",
               )}
             >
-              <Settings size={12} aria-hidden="true" />
-              Open the Settings tab to {actionHint ?? `add ${noun}`}
+              Open Configure to {actionHint ?? `add ${noun}`}
             </button>
-          ) : (
-            <p className="text-xs text-fg-4 max-w-xs text-center leading-relaxed">
-              Tap the{" "}
-              <span className="text-fg-3 font-medium">Settings</span> tab in
-              the top bar to {actionHint ?? `add ${noun}`}.
-            </p>
-          )}
-          <p className="text-[11px] text-fg-4/70 text-center max-w-xs leading-relaxed">
-            Looking for another source? Use{" "}
-            <span className="text-fg-3 font-medium">+ Add source</span> in the
+          ) : null}
+          <p className="text-[11px] text-fg-4/80 text-center max-w-sm leading-relaxed">
+            Tip: click{" "}
+            <span
+              className={clsx(
+                "inline-flex items-center gap-0.5 align-baseline",
+                "px-1 py-px rounded",
+                "bg-fg-4/10 text-fg-2 font-semibold",
+              )}
+            >
+              {breadcrumbLabel}
+              <ChevronDown size={9} strokeWidth={2.5} aria-hidden="true" />
+            </span>{" "}
+            in the title bar to open this menu yourself next time.
+          </p>
+          <p className="text-[11px] text-fg-4/70 text-center max-w-sm leading-relaxed">
+            Looking for a different source? Use{" "}
+            <span className="text-fg-3 font-semibold">+ Add source</span> in the
             sidebar to browse the catalog.
           </p>
         </>

@@ -223,6 +223,7 @@ function SportsFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
       <EmptyChannelState
         icon={Trophy}
         noun="leagues"
+        channelName="Sports"
         hasConfig={!!feedContext.__hasConfig}
         dashboardLoaded={!!feedContext.__dashboardLoaded}
         loadingNoun="scores"

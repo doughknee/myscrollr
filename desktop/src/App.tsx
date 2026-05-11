@@ -40,6 +40,7 @@ import type { SubscriptionTier } from "./auth";
 import type { ChannelType } from "./api/client";
 import type { DeliveryMode } from "./types";
 import type { AppPreferences, TickerPosition } from "./preferences";
+import { getAllChannels } from "./channels/registry";
 import { getAllWidgets } from "./widgets/registry";
 import { useWidgetTickerData } from "./hooks/useWidgetTickerData";
 import { useTheme } from "./hooks/useTheme";
@@ -99,11 +100,42 @@ export default function App() {
 
   const channelTabs = useMemo(() => {
     if (channels.length === 0) {
-      return loadPref("activeFeedTabs", ["finance", "sports"]);
+      // Signed-out users get the finance + sports demo tabs so the
+      // public-feed teaser renders on the ticker. Signed-in users with
+      // zero channels deliberately get an empty tab list so the ticker
+      // renders its inline "no sources yet" CTA instead of pretending
+      // to have data the user never opted into.
+      return authenticated
+        ? []
+        : loadPref("activeFeedTabs", ["finance", "sports"]);
     }
     return channels
       .filter((ch) => ch.enabled && isChannelTickerEnabled(ch))
       .map((ch) => ch.channel_type);
+  }, [channels, authenticated]);
+
+  // Visual metadata for installed channels — used by the ticker's
+  // "installed but nothing ticker-enabled" empty CTA so it can render
+  // one quick-link chip per installed channel. We join the dashboard's
+  // `channels` (which gives us the truthy install state) with the
+  // build-time channel registry (which gives us the display name, icon,
+  // and brand hex). Memoized to keep referential equality stable across
+  // renders that don't change the channel set.
+  const installedChannelsMeta = useMemo(() => {
+    if (channels.length === 0) return [];
+    const manifestById = new Map(
+      getAllChannels().map((c) => [c.id, c]),
+    );
+    return channels
+      .filter((ch) => ch.enabled)
+      .map((ch) => manifestById.get(ch.channel_type))
+      .filter((m): m is NonNullable<typeof m> => Boolean(m))
+      .map((m) => ({
+        id: m.id,
+        name: m.name,
+        hex: m.hex,
+        icon: m.icon,
+      }));
   }, [channels]);
 
   // Persist active tabs when they change (side effect, not in useMemo)
@@ -393,6 +425,37 @@ export default function App() {
       invoke("show_app_window").catch(() => {});
     },
     [],
+  );
+
+  // ── Empty-ticker CTAs → open the main window on a specific route ──
+  //
+  // Both empty-ticker states (no channels installed; channels installed
+  // but none ticker-enabled) need to navigate the main window to a
+  // specific route and bring it forward. We use the existing
+  // cross-window `scrollr:navigate` store key (already listened to in
+  // __root.tsx around line 497) so the main window picks up the route
+  // hint, navigates there, and clears the key — then we bring the main
+  // window forward via the existing `show_app_window` Tauri command.
+  const navigateMainWindow = useCallback((path: string) => {
+    setStore("scrollr:navigate", path);
+    invoke("show_app_window").catch(() => {});
+  }, []);
+
+  /** Sourceless state: nothing installed → open the Catalog. */
+  const handleAddSources = useCallback(() => {
+    navigateMainWindow("/catalog");
+  }, [navigateMainWindow]);
+
+  /**
+   * Installed-but-ticker-off state: open a specific channel's
+   * Configure tab so the user can flip "Show on ticker" for that
+   * channel. Used by the per-channel quick-link chips.
+   */
+  const handleConfigureChannel = useCallback(
+    (channelId: string) => {
+      navigateMainWindow(`/channel/${channelId}/configuration`);
+    },
+    [navigateMainWindow],
   );
 
   // ── Channel quick-toggle (for context menu) ────────────────────
@@ -776,6 +839,34 @@ export default function App() {
             const rowTabs = row.sources.length > 0
               ? activeTabs.filter((tab) => row.sources.includes(tab))
               : activeTabs;
+            // Empty-state CTAs are anchored to the first row only, so
+            // multi-row layouts don't stack duplicate banners. Two
+            // mutually exclusive states:
+            //   - Sourceless:    signed in, ZERO installed channels.
+            //                    CTA → Browse catalog.
+            //   - InstalledOff:  signed in, has installed channels, but
+            //                    the ticker would otherwise render nothing
+            //                    for ANY reason — channels turned off,
+            //                    nothing picked yet (e.g. Finance on but
+            //                    no symbols), offseason, etc. The actual
+            //                    "has no chips" gate lives in the ticker
+            //                    component itself; we just pass the flag
+            //                    saying "if you have nothing, here's the
+            //                    recovery UI to use".  CTA → per-channel
+            //                    chips that jump to each Configure tab.
+            const hasAnyPinnedWidget = Object.values(prefs.widgets.pinnedWidgets ?? {})
+              .some((pin) => (pin.row ?? 0) === i);
+            const isFirstRow = i === 0;
+            const showSourcelessCTA =
+              isFirstRow &&
+              authenticated &&
+              channels.length === 0 &&
+              !hasAnyPinnedWidget;
+            const showInstalledOffCTA =
+              isFirstRow &&
+              authenticated &&
+              installedChannelsMeta.length > 0 &&
+              !hasAnyPinnedWidget;
             return (
               <ScrollrTicker
                 key={`row${i}`}
@@ -800,6 +891,11 @@ export default function App() {
                 stepPause={prefs.ticker.stepPause}
                 rowConfig={row}
                 rowHasExplicitSources={row.sources.length > 0}
+                showSourcelessCTA={showSourcelessCTA}
+                onAddSources={handleAddSources}
+                showInstalledOffCTA={showInstalledOffCTA}
+                installedChannels={installedChannelsMeta}
+                onConfigureChannel={handleConfigureChannel}
               />
             );
           })}

@@ -203,6 +203,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabP
       <EmptyChannelState
         icon={TrendingUp}
         noun="stocks or crypto"
+        channelName="Finance"
         hasConfig={!!feedContext.__hasConfig}
         dashboardLoaded={!!feedContext.__dashboardLoaded}
         loadingNoun="prices"

@@ -330,6 +330,7 @@ function RssFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
       <EmptyChannelState
         icon={Rss}
         noun="feeds"
+        channelName="RSS"
         hasConfig={!!feedContext.__hasConfig}
         dashboardLoaded={!!dashboardLoaded}
         loadingNoun="articles"
