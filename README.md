@@ -10,10 +10,24 @@ working on. Multi-monitor aware. Zero ads. Zero telemetry.
 ![Desktop](https://img.shields.io/badge/desktop-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
 ![Status](https://myscrollr.com/status)
 
+![Scrollr home view — live feed across Finance, Sports, and Fantasy](./docs/images/scrollr-home.png)
+
 - **Marketing site** — <https://myscrollr.com>
 - **Desktop download** — <https://myscrollr.com/download>
 - **Pricing / plans** — <https://myscrollr.com/uplink>
 - **Status** — <https://myscrollr.com/status>
+
+## What it looks like
+
+Pick the sources you care about — each gets a focused view, and the
+pinned ticker streams the same data across the top of your screen.
+
+| | |
+|---|---|
+| ![Sports — live scores, schedules, and standings across MLB, NBA, NHL, NFL, F1](./docs/images/scrollr-sports.png) | ![Finance — 30+ tracked symbols with live quotes and movement](./docs/images/scrollr-finance.png) |
+| **Sports.** Scores, schedules, and standings across MLB, NBA, NHL, NFL, and F1, all live. | **Finance.** Stocks, ETFs, and crypto with live quotes from TwelveData. |
+| ![Fantasy — Yahoo Fantasy matchups, standings, and roster injuries](./docs/images/scrollr-fantasy.png) | ![News — Hacker News and your custom RSS feeds, categorized and deduped](./docs/images/scrollr-news.png) |
+| **Fantasy.** Yahoo Fantasy matchups, weekly scoring, roster injuries — across every league you play. | **News.** Hacker News plus any RSS/Atom feed you throw at it. Categorized, deduped, sorted. |
 
 ## What's in this repo
 
