@@ -54,7 +54,7 @@ export default function SportsEmptyState({ leagues, onConfigure }: SportsEmptySt
     const display =
       names.length <= 3 ? names.join(", ") : `${names.slice(0, 3).join(", ")} +${names.length - 3} more`;
     return (
-      <div className="px-4 py-5 text-center">
+      <div className="px-4 py-5 text-center" role="status" aria-live="polite">
         <p className="inline-flex items-center justify-center gap-1.5 text-xs text-amber-400 font-medium mb-1">
           <AlertTriangle size={11} />
           Live data unavailable
