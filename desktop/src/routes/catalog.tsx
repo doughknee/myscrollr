@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 
+import { defaultPinForNewWidget } from "../preferences";
 import { getCatalogItems, CATEGORY_LABELS, CANONICAL_ORDER } from "../marketplace";
 import type { CatalogCategory, CatalogItem } from "../marketplace";
 import { channelsApi } from "../api/client";
@@ -19,7 +20,7 @@ import RouteError from "../components/RouteError";
 import PageLayout from "../components/layout/PageLayout";
 import PageSection from "../components/layout/PageSection";
 import EmptySection from "../components/layout/EmptySection";
-import type { OverflowMenuItem } from "../components/OverflowMenu";
+
 
 export const Route = createFileRoute("/catalog")({
   component: CatalogPage,
@@ -35,14 +36,6 @@ const FILTER_TABS: { key: FilterTab; label: string; icon: LucideIcon; hint: stri
   { key: "channel", label: CATEGORY_LABELS["channel"], icon: Radio, hint: "Show only data channels" },
   { key: "widget", label: CATEGORY_LABELS["widget"], icon: Boxes, hint: "Show only utility widgets" },
 ];
-
-const TAB_BY_KEY: Record<FilterTab, (typeof FILTER_TABS)[number]> = FILTER_TABS.reduce(
-  (acc, t) => {
-    acc[t.key] = t;
-    return acc;
-  },
-  {} as Record<FilterTab, (typeof FILTER_TABS)[number]>,
-);
 
 // ── Sort order: enabled first, then canonical order ─────────────
 
@@ -188,9 +181,23 @@ function CatalogPage() {
       } else {
         const nextEnabled = [...prefs.widgets.enabledWidgets, item.id];
         const nextOnTicker = [...prefs.widgets.widgetsOnTicker, item.id];
+        // Auto-pin newly added widgets to the right side so they land
+        // in the static pinned zone instead of disappearing into the
+        // scrolling tape. Preserve any existing pin config (re-adding
+        // a previously-removed widget honors the user's last choice).
+        // Walkthrough fix 2026-05-11 — see preferences.ts:defaultPinForNewWidget.
+        const nextPinned = { ...prefs.widgets.pinnedWidgets };
+        if (!nextPinned[item.id]) {
+          nextPinned[item.id] = defaultPinForNewWidget();
+        }
         onPrefsChange({
           ...prefs,
-          widgets: { ...prefs.widgets, enabledWidgets: nextEnabled, widgetsOnTicker: nextOnTicker },
+          widgets: {
+            ...prefs.widgets,
+            enabledWidgets: nextEnabled,
+            widgetsOnTicker: nextOnTicker,
+            pinnedWidgets: nextPinned,
+          },
         });
         toast.success(`${item.name} added`);
         navigate({ to: "/widget/$id/$tab", params: { id: item.id, tab: "feed" } });
@@ -199,33 +206,25 @@ function CatalogPage() {
     [navigate, queryClient, prefs, onPrefsChange],
   );
 
-  // ── Breadcrumb dropdown — switch the active filter ───────────
-
-  const menuItems: OverflowMenuItem[] = useMemo(() => {
-    const items: OverflowMenuItem[] = [];
-    for (const t of FILTER_TABS) {
-      if (t.key === filter) continue;
-      items.push({
-        key: t.key,
-        label: t.label,
-        hint: t.hint,
-        icon: t.icon,
-        onSelect: () => setFilter(t.key),
-      });
-    }
-    return items;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
-
   // ── Render ──────────────────────────────────────────────────
+  //
+  // Catalog uses an in-page tab band (All / Channels / Widgets) at the
+  // top of the content. Pre-2026-05-11 this lived in a hidden
+  // breadcrumb dropdown — testers couldn't find the filter switcher.
 
   return (
     <PageLayout
       title="Catalog"
-      subtitle={TAB_BY_KEY[filter].label}
       width="wide"
-      menuItems={menuItems}
-      menuLabel="Catalog filter"
+      tabs={{
+        items: FILTER_TABS.map((t) => ({
+          key: t.key,
+          label: t.label,
+          description: t.hint,
+        })),
+        activeKey: filter,
+        onChange: (key) => setFilter(key as FilterTab),
+      }}
     >
       {dashboardError && (
         <div className="mb-4">

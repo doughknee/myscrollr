@@ -1,27 +1,38 @@
 /**
  * PageContext — lets every route declare its identity (title, optional
- * subtitle, optional menu of contextual actions) so the TopBar can
- * render that identity as breadcrumb-style navigation.
+ * subtitle, optional tab strip, optional menu of contextual actions)
+ * so the TopBar can render all of it inline.
  *
- * The TopBar renders the breadcrumb as:
- *   parentLabel / title / subtitle
- * The LAST segment (subtitle if present, otherwise title) becomes the
- * trigger for the page's contextual menu when `menuItems` is provided.
- * That way the breadcrumb segment IS the menu — no separate "Options"
- * button competing with the breadcrumb for attention.
- *
- * Pre-polish-pass the page header lived inside the route's content
- * area. Now the page identity sits in the always-visible TopBar and
- * the route just publishes its title via this context.
+ * Layout in the TopBar:
+ *   [parentLabel / title]  [tab pills (if any)]  [Options pill / action]
+ * Sibling-tab navigation is rendered as a compact segmented control
+ * inside the bar itself — the breadcrumb area has plenty of slack and
+ * a separate full-width tab band wastes vertical space. Walkthrough
+ * fix 2026-05-11 round 3.
  */
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { OverflowMenuItem } from "../OverflowMenu";
 
+export interface PageTabStrip {
+  /** Tab descriptors. */
+  items: Array<{
+    key: string;
+    label: string;
+    /** Optional tooltip / aria description. */
+    description?: string;
+  }>;
+  activeKey: string;
+  onChange: (key: string) => void;
+  /** Aria label for the tab strip nav. Default: "Page sections". */
+  ariaLabel?: string;
+}
+
 export interface PageIdentity {
   /** Page title, e.g. "Sports", "Settings", "Catalog". */
   title: string;
-  /** Optional 1-line subtitle / tagline. */
+  /** Optional 1-line subtitle / tagline. Suppressed when `tabs` is
+   *  set — the active tab pill carries the same information. */
   subtitle?: string;
   /**
    * For source pages, the parent breadcrumb label (e.g. "Home"). Used
@@ -39,10 +50,17 @@ export interface PageIdentity {
    */
   onTitleClick?: () => void;
   /**
-   * Optional contextual menu items. When provided, the LAST breadcrumb
-   * segment (subtitle if present, otherwise title) becomes the menu
-   * trigger — clicking it opens an OverflowMenu with these items.
-   * Replaces the earlier separate "Options" button.
+   * Optional sibling-tab navigation rendered inline in the TopBar as a
+   * compact segmented pill group. Used by Settings, Catalog, Support
+   * sections — anywhere a route has sibling views that should be
+   * one-click reachable.
+   */
+  tabs?: PageTabStrip;
+  /**
+   * Optional contextual menu items. When provided, the TopBar renders
+   * an "Options" pill button after the breadcrumb. Clicking the pill
+   * opens an OverflowMenu of these items. The breadcrumb itself is
+   * never a menu trigger — it's always plain navigation text.
    */
   menuItems?: OverflowMenuItem[];
   /** Aria label for the menu trigger. Default: 'Page options'. */
@@ -98,12 +116,18 @@ export function useRegisterPageIdentity(identity: PageIdentity) {
         )
         .join("|")
     : "";
+  const tabsKey = identity.tabs
+    ? `${identity.tabs.activeKey}::${identity.tabs.items
+        .map((t) => `${t.key}:${t.label}`)
+        .join("|")}`
+    : "";
   const key = JSON.stringify({
     title: identity.title,
     subtitle: identity.subtitle,
     parentLabel: identity.parentLabel,
     menuLabel: identity.menuLabel,
     menuKey,
+    tabsKey,
   });
   useEffect(() => {
     ctx?.setIdentity(identity);
@@ -115,5 +139,6 @@ export function useRegisterPageIdentity(identity: PageIdentity) {
     identity.onParentClick,
     identity.onTitleClick,
     identity.menuItems,
+    identity.tabs,
   ]);
 }

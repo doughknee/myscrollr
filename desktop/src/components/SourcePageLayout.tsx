@@ -3,21 +3,29 @@
  *
  * Renders through the universal `PageLayout`. Source pages no longer
  * have a visible tab band — Feed is the single visible page. All
- * secondary actions (Configure, Display preferences, Manage on
- * ticker, Remove) live in a contextual menu whose trigger IS the
- * last breadcrumb segment in the TopBar.
+ * secondary actions (Configure, Display preferences, Remove) live in
+ * a contextual menu opened by the "Options" pill button in the
+ * TopBar. The breadcrumb segments are plain navigation text — the
+ * pill is the single, explicit menu trigger.
  *
  * The /feed, /configuration, and /display routes all still exist for
  * direct deeplinks, tray actions, and the Catalog "Open" → feed flow.
  *
  * IA refactor 2026-05-09 — see
  * docs/superpowers/specs/2026-05-09-desktop-ia-refactor-design.md
+ * Walkthrough discoverability fix 2026-05-11.
  */
 import { useState } from "react";
 import { Settings as SettingsIcon, SlidersHorizontal, Tv, Trash2 } from "lucide-react";
 import ConfirmDialog from "./ConfirmDialog";
 import PageLayout from "./layout/PageLayout";
 import { type OverflowMenuItem } from "./OverflowMenu";
+
+// Note: "Manage on ticker" used to live in this menu but was removed in
+// the 2026-05-11 walkthrough fix — it navigated users away from the
+// source they were configuring to a global Settings panel, which testers
+// found jarring. Ticker configuration is still reachable from the main
+// Settings route. See AGENTS.md or the PR description for context.
 
 // ── Shared tab constants ────────────────────────────────────────
 //
@@ -69,8 +77,6 @@ interface SourcePageLayoutProps {
   /** Click handler for the parent breadcrumb in the TopBar
    *  (typically navigates back to /feed). */
   onBack: () => void;
-  /** Click handler for "Manage on ticker" — opens Settings → Ticker. */
-  onManageTicker: () => void;
   children: React.ReactNode;
 
   /** Source-level remove action. */
@@ -89,7 +95,6 @@ export default function SourcePageLayout({
   activeTab,
   onTabChange,
   onBack,
-  onManageTicker,
   children,
   onRemove,
   sourceKind,
@@ -107,8 +112,11 @@ export default function SourcePageLayout({
 
   // Build the menu items list. Order is intentional: when away from
   // Feed, "Back to feed" goes first so the menu always offers a
-  // canonical way out. Then Configure → Display → Manage on ticker,
-  // a divider, then destructive Remove at the bottom.
+  // canonical way out. Then Configure → Display, a divider, then
+  // destructive Remove at the bottom. (Pre-2026-05-11 this also
+  // included "Manage on ticker" — removed because it navigated users
+  // away from the source page to global ticker settings, which
+  // confused testers.)
   const menuItems: OverflowMenuItem[] = [];
 
   // Always offer "Back to feed" when not on the feed already. This
@@ -148,14 +156,6 @@ export default function SourcePageLayout({
       onSelect: () => onTabChange("display"),
     });
   }
-
-  menuItems.push({
-    key: "ticker",
-    label: "Manage on ticker",
-    hint: "Set rows, speed, and style",
-    icon: Tv,
-    onSelect: onManageTicker,
-  });
 
   if (onRemove) {
     menuItems.push({ key: "div-1", divider: true });
@@ -197,9 +197,10 @@ export default function SourcePageLayout({
         // their padding. Configure / Display keep the default padded
         // narrow column.
         noContentPadding={isFeed}
-        // The TopBar renders the last breadcrumb segment as the menu
-        // trigger when menuItems are present — no separate "Options"
-        // button competing with the breadcrumb.
+        // Source pages use the "Options" pill in the TopBar as the
+        // sole menu trigger; the breadcrumb is plain navigation text.
+        // Walkthrough fix 2026-05-11 — testers preferred the explicit
+        // pill over the hidden breadcrumb dropdown.
         menuItems={menuItems}
         menuLabel={`${name} options`}
       >

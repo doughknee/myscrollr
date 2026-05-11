@@ -78,9 +78,6 @@ function ChannelRoute() {
         navigate({ to: "/channel/$type/$tab", params: { type, tab: t } })
       }
       onBack={() => navigate({ to: "/feed" })}
-      onManageTicker={() =>
-        navigate({ to: "/settings", search: { tab: "ticker" } })
-      }
       onRemove={() => {
         onDeleteChannel(type as ChannelType);
         navigate({ to: "/feed" });

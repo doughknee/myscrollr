@@ -1424,13 +1424,34 @@ export function disableWidget(prefs: AppPreferences, widgetId: string): AppPrefe
   };
 }
 
+/**
+ * Default pin config for a newly-added widget.
+ *
+ * Walkthrough fix 2026-05-11 — testers added widgets and saw nothing
+ * "happen" because the widget joined the scrolling ticker tape rather
+ * than appearing in the static pinned zone where they expected widget-
+ * style controls (clock, weather, etc.) to live. Defaulting to a
+ * right-side pin on row 0 means a newly-added widget appears in the
+ * pinned zone immediately. Users can still drag or re-pin to the left
+ * or unpin to make it scroll.
+ *
+ * Lives in one place so the catalog add path, the sidebar toggle path,
+ * and the first-time toggleWidgetPin default all stay consistent.
+ */
+export function defaultPinForNewWidget(): WidgetPinConfig {
+  return { side: "right", row: 0 };
+}
+
 /** Toggle a widget's pin state. Returns a new AppPreferences. */
 export function toggleWidgetPin(prefs: AppPreferences, widgetId: string): AppPreferences {
   const pinned = { ...prefs.widgets.pinnedWidgets };
   if (pinned[widgetId]) {
     delete pinned[widgetId];
   } else {
-    pinned[widgetId] = { side: "left" };
+    // First-time pin from the toggle uses the same default as a
+    // brand-new widget so the manual-pin path doesn't diverge from
+    // the auto-pin path.
+    pinned[widgetId] = defaultPinForNewWidget();
   }
   return {
     ...prefs,

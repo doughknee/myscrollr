@@ -16,6 +16,8 @@
  * route's content area in a chunky 4-row header. It's now in the
  * TopBar, freeing the entire content area for actual content.
  */
+import { forwardRef, useLayoutEffect, useRef, useState } from "react";
+import type { ButtonHTMLAttributes, Ref } from "react";
 import { ArrowLeft, ArrowRight, ChevronDown, Pin, Radio, RadioTower } from "lucide-react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "motion/react";
@@ -23,7 +25,8 @@ import Tooltip from "./Tooltip";
 import ConnectionIndicator from "./ConnectionIndicator";
 import ScrollLogo from "./ScrollLogo";
 import OverflowMenu from "./OverflowMenu";
-import { usePageIdentity } from "./layout/page-context";
+import type { OverflowMenuItem } from "./OverflowMenu";
+import { usePageIdentity, type PageTabStrip } from "./layout/page-context";
 import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
 
 // ── Props ───────────────────────────────────────────────────────
@@ -113,103 +116,97 @@ export default function TopBar({
 
       <div className="w-px h-5 bg-edge/40 mx-1 shrink-0" />
 
-      {/* ── Page identity (breadcrumb) ──────────────────────────
-          Layout: parentLabel / title / subtitle
-          The LAST segment (subtitle if any, otherwise title) becomes
-          the trigger for the page's contextual menu when menuItems is
-          provided. Breadcrumb segment IS the menu — no separate
-          "Options" button competing for attention. */}
-      <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden text-ui-meta">
+      {/* ── Page identity + inline tab strip ────────────────────
+          Layout in this row:
+            [parentLabel / title (/ subtitle)]  [tab pills]  [Options]
+          Breadcrumb segments are plain navigation text (sub-route
+          titles are back-link buttons via onTitleClick). Sibling-tab
+          nav is a compact segmented pill control inline in the bar
+          — no full-width tab band wasting vertical space. The
+          "Options" pill is the sole page-menu trigger. When tabs are
+          present, subtitle is suppressed (the active pill conveys the
+          same info). Walkthrough fix 2026-05-11 round 3. */}
+      <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden text-ui-meta">
         {page && (
           <>
-            {page.parentLabel && page.onParentClick && (
-              <>
-                <button
-                  onClick={page.onParentClick}
-                  className="text-fg-3 hover:text-fg-2 transition-colors shrink-0"
-                >
-                  {page.parentLabel}
-                </button>
-                <span className="text-fg-4 shrink-0" aria-hidden>
-                  /
-                </span>
-              </>
-            )}
-
-            {/* Title segment — clickable when onTitleClick is set
-                AND it's not the last segment (which is reserved for
-                the menu trigger). */}
-            {(() => {
-              const titleIsLast = !page.subtitle;
-              const titleIsMenuTrigger =
-                titleIsLast && Boolean(page.menuItems?.length);
-
-              if (titleIsMenuTrigger) {
-                // Title is the menu trigger — render via OverflowMenu
-                // with a custom trigger that looks like a breadcrumb
-                // segment with a chevron.
-                return (
-                  <OverflowMenu
-                    items={page.menuItems!}
-                    triggerLabel={page.menuLabel ?? "Page options"}
-                    trigger={<BreadcrumbMenuTrigger label={page.title} />}
-                  />
-                );
-              }
-              if (page.onTitleClick) {
-                return (
+            {/* Breadcrumb — always shrink-friendly. */}
+            <div className="flex items-center gap-1.5 min-w-0 shrink">
+              {page.parentLabel && page.onParentClick && (
+                <>
                   <button
-                    onClick={page.onTitleClick}
-                    className="font-semibold text-fg-2 hover:text-fg truncate transition-colors"
+                    onClick={page.onParentClick}
+                    className="text-fg-3 hover:text-fg-2 transition-colors shrink-0"
                   >
-                    {page.title}
+                    {page.parentLabel}
                   </button>
-                );
-              }
-              return (
-                <span className="font-semibold text-fg truncate">
-                  {page.title}
-                </span>
-              );
-            })()}
-
-            {/* Subtitle segment — slides in when entering a sub-route
-                and out when leaving. Keyed on the subtitle text so
-                switching between Configure and Display also animates. */}
-            <AnimatePresence mode="popLayout" initial={false}>
-              {page.subtitle && (
-                <motion.div
-                  key={page.subtitle}
-                  initial={{ opacity: 0, x: -6, filter: "blur(2px)" }}
-                  animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, x: -6, filter: "blur(2px)" }}
-                  transition={{ duration: 0.22, ease: [0.22, 0.61, 0.36, 1] }}
-                  className="flex items-center gap-1.5 min-w-0"
-                >
                   <span className="text-fg-4 shrink-0" aria-hidden>
                     /
                   </span>
-                  {page.menuItems?.length ? (
-                    <OverflowMenu
-                      items={page.menuItems}
-                      triggerLabel={page.menuLabel ?? "Page options"}
-                      trigger={
-                        <BreadcrumbMenuTrigger
-                          label={page.subtitle}
-                          muted
-                        />
-                      }
-                    />
-                  ) : (
-                    <span className="text-fg-3 truncate">{page.subtitle}</span>
-                  )}
-                </motion.div>
+                </>
               )}
-            </AnimatePresence>
+
+              {page.onTitleClick ? (
+                <button
+                  onClick={page.onTitleClick}
+                  className="font-semibold text-fg-2 hover:text-fg truncate transition-colors"
+                >
+                  {page.title}
+                </button>
+              ) : (
+                <span className="font-semibold text-fg truncate">
+                  {page.title}
+                </span>
+              )}
+
+              {/* Subtitle slot — suppressed when tab pills are
+                  showing (the active pill is the subtitle). */}
+              <AnimatePresence mode="popLayout" initial={false}>
+                {page.subtitle && !page.tabs && (
+                  <motion.div
+                    key={page.subtitle}
+                    initial={{ opacity: 0, x: -6, filter: "blur(2px)" }}
+                    animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, x: -6, filter: "blur(2px)" }}
+                    transition={{ duration: 0.22, ease: [0.22, 0.61, 0.36, 1] }}
+                    className="flex items-center gap-1.5 min-w-0"
+                  >
+                    <span className="text-fg-4 shrink-0" aria-hidden>
+                      /
+                    </span>
+                    <span className="text-fg-3 truncate">
+                      {page.subtitle}
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Inline tab strip — sibling navigation as a segmented
+                pill control. Renders only when the page publishes
+                `tabs`. The strip itself takes flex-1 so it owns all
+                available space (which is also what the adaptive
+                overflow measurement needs to decide how many pills
+                fit). When there are no tabs, an empty spacer fills
+                the gap so Options pins to the right edge. */}
+            {page.tabs ? (
+              <InlineTabStrip tabs={page.tabs} />
+            ) : (
+              <div className="flex-1 min-w-0" aria-hidden />
+            )}
+
+            {/* "Options" pill — the sole trigger for page-level menus. */}
+            {page.menuItems?.length ? (
+              <div className="shrink-0">
+                <OverflowMenu
+                  items={page.menuItems}
+                  triggerLabel={page.menuLabel ?? "Page options"}
+                />
+              </div>
+            ) : null}
 
             {/* Fallback non-menu action (rare). */}
             {page.entityAction && !page.menuItems?.length && (
-              <div className="shrink-0 flex items-center gap-1 ml-1">
+              <div className="shrink-0 flex items-center gap-1">
                 {page.entityAction}
               </div>
             )}
@@ -277,60 +274,235 @@ export default function TopBar({
   );
 }
 
-// ── Breadcrumb-as-menu-trigger ──────────────────────────────────
+// ── Inline tab strip ─────────────────────────────────────────────
 //
-// Renders a breadcrumb segment that doubles as the OverflowMenu
-// trigger. Clicking the segment opens the menu. Visually it looks
-// like the segment with a small chevron suffix, so the menu's
-// existence is discoverable but the segment still reads as page
-// identity rather than a separate "Options" button.
+// Compact segmented pill control that lives inline in the TopBar to
+// expose sibling-tab navigation (Settings: Appearance/Ticker/Account,
+// Catalog: All/Channels/Widgets, Support sections, etc.). Replaces the
+// full-width content-area tab band that wasted vertical space.
 //
-// React forwards arbitrary props (including the ref injected by
-// floating-ui's cloneElement) so this component must be a plain
-// element receiver — we build it as a button.
+// Adaptive overflow: when the available width can't fit every pill,
+// the tail collapses into a "More ▾" menu. The active tab is always
+// kept visible — if it would be in the overflow slice, earlier tabs
+// are pushed into overflow instead so users always see where they
+// currently are.
+//
+// Measurement uses an off-screen ghost row to learn each pill's
+// natural width, then walks the list deciding what fits. A
+// ResizeObserver on the container re-runs the calculation when the
+// window or the breadcrumb width changes.
 
-interface BreadcrumbMenuTriggerProps {
-  label: string;
-  /** When true, renders in subtitle (muted) styling instead of title. */
-  muted?: boolean;
+function InlineTabStrip({ tabs }: { tabs: PageTabStrip }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const ghostRef = useRef<HTMLDivElement | null>(null);
+
+  // Number of leading items currently rendered inline. The rest go
+  // into the overflow menu. Starts at items.length so the first
+  // render shows every pill; ResizeObserver immediately corrects it
+  // if there isn't enough room.
+  const [visibleCount, setVisibleCount] = useState(tabs.items.length);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const ghost = ghostRef.current;
+    if (!container || !ghost) return;
+
+    const recompute = () => {
+      const available = container.clientWidth;
+      if (available <= 0) return;
+
+      // Measure each ghost pill + the ghost "More" trigger.
+      const pillNodes = Array.from(
+        ghost.querySelectorAll<HTMLElement>("[data-pill-index]"),
+      );
+      const widths = pillNodes.map((n) => n.offsetWidth);
+      const moreNode = ghost.querySelector<HTMLElement>("[data-pill-more]");
+      const moreWidth = moreNode?.offsetWidth ?? 0;
+
+      // Gap between pills in the rendered strip (gap-0.5 = 2px).
+      const gap = 2;
+
+      // First, can everything fit without "More"?
+      const total = widths.reduce(
+        (sum, w, i) => sum + w + (i > 0 ? gap : 0),
+        0,
+      );
+      if (total <= available) {
+        setVisibleCount(widths.length);
+        return;
+      }
+
+      // Otherwise reserve room for the "More" trigger and pack from
+      // the left until the next pill won't fit.
+      let used = moreWidth + gap;
+      let fit = 0;
+      for (let i = 0; i < widths.length; i++) {
+        const next = widths[i] + (fit > 0 ? gap : 0);
+        if (used + next > available) break;
+        used += next;
+        fit += 1;
+      }
+
+      // Guarantee at least one inline pill so the strip never
+      // collapses entirely (the More menu would still work, but the
+      // user loses the visual anchor).
+      setVisibleCount(Math.max(1, fit));
+    };
+
+    recompute();
+    const ro = new ResizeObserver(recompute);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [tabs.items]);
+
+  // If the active tab would land in the overflow slice, shift the
+  // visible window so it stays in view. We do this by re-ordering:
+  // the displayed pills are the first `visibleCount` items, BUT we
+  // swap the active tab into that slice if it isn't there.
+  const activeIndex = tabs.items.findIndex((t) => t.key === tabs.activeKey);
+  const inlineSet = (() => {
+    const visible = tabs.items.slice(0, visibleCount);
+    if (activeIndex < 0 || activeIndex < visibleCount) {
+      return { visible, overflow: tabs.items.slice(visibleCount) };
+    }
+    // Active is in overflow — swap it with the last visible slot so
+    // the active pill is always rendered inline.
+    const swapped = visible.slice(0, -1);
+    swapped.push(tabs.items[activeIndex]);
+    const overflow = tabs.items.filter((t) => !swapped.includes(t));
+    return { visible: swapped, overflow };
+  })();
+
+  const overflowMenuItems: OverflowMenuItem[] = inlineSet.overflow.map((t) => ({
+    key: t.key,
+    label: t.label,
+    hint: t.description,
+    onSelect: () => tabs.onChange(t.key),
+  }));
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative flex items-center min-w-0 flex-1"
+    >
+      {/* Visible strip. */}
+      <nav
+        aria-label={tabs.ariaLabel ?? "Page sections"}
+        className="flex items-center gap-0.5 h-7 px-0.5 rounded-md bg-surface-1/60 border border-edge/40 max-w-full"
+      >
+        {inlineSet.visible.map((tab) => (
+          <TabPill
+            key={tab.key}
+            label={tab.label}
+            description={tab.description}
+            isActive={tab.key === tabs.activeKey}
+            onSelect={() => tabs.onChange(tab.key)}
+          />
+        ))}
+        {inlineSet.overflow.length > 0 && (
+          <OverflowMenu
+            items={overflowMenuItems}
+            triggerLabel="More sections"
+            trigger={<MoreTabsTrigger />}
+            placement="bottom-end"
+          />
+        )}
+      </nav>
+
+      {/* Ghost row — off-screen, used only for width measurement.
+          Mirrors the styles of the real pills + trigger so widths
+          match. aria-hidden so AT doesn't see duplicates. */}
+      <div
+        ref={ghostRef}
+        aria-hidden
+        className="absolute left-0 top-0 invisible pointer-events-none flex items-center gap-0.5 h-7 px-0.5"
+        style={{ visibility: "hidden" }}
+      >
+        {tabs.items.map((tab, i) => (
+          <span
+            key={tab.key}
+            data-pill-index={i}
+            className="relative h-6 px-2.5 rounded text-[11px] font-medium whitespace-nowrap"
+          >
+            {tab.label}
+          </span>
+        ))}
+        <span
+          data-pill-more
+          className="flex items-center gap-1 h-6 px-2 rounded text-[11px] font-medium whitespace-nowrap"
+        >
+          More
+          <ChevronDown size={11} />
+        </span>
+      </div>
+    </div>
+  );
 }
 
-function BreadcrumbMenuTrigger({
+// Single pill button. Extracted so the visible strip and the ghost
+// row can share the same dimensions without duplicating className.
+function TabPill({
   label,
-  muted = false,
-  ...rest
-}: BreadcrumbMenuTriggerProps & React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  // floating-ui injects aria-expanded onto the trigger; we read it
-  // here to flip the chevron orientation so the trigger feels like a
-  // proper dropdown affordance.
-  const isOpen = rest["aria-expanded"] === true || rest["aria-expanded"] === "true";
-
+  description,
+  isActive,
+  onSelect,
+}: {
+  label: string;
+  description?: string;
+  isActive: boolean;
+  onSelect: () => void;
+}) {
   return (
     <button
       type="button"
-      {...rest}
+      onClick={onSelect}
+      aria-current={isActive ? "page" : undefined}
+      title={description}
       className={clsx(
-        "group flex items-center gap-1 px-1 -mx-1 rounded-md min-w-0 transition-colors",
-        "hover:bg-surface-hover",
-        isOpen && "bg-surface-hover",
-        muted ? "text-fg-3 hover:text-fg-2" : "font-semibold text-fg-2 hover:text-fg",
+        "relative h-6 px-2.5 rounded text-[11px] font-medium transition-colors whitespace-nowrap",
+        isActive ? "text-fg" : "text-fg-3 hover:text-fg-2",
       )}
     >
-      <span className="truncate">{label}</span>
-      <ChevronDown
-        size={11}
-        // 500ms calculated duration on a snap spring — feels more
-        // satisfying than the default linear flip without dragging.
-        style={{
-          transition: "transform 500ms var(--ease-snap)",
-          transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-        }}
-        className={clsx(
-          "shrink-0",
-          "text-fg-3",
-          "group-hover:text-fg-2 transition-colors",
-        )}
-      />
+      {isActive && (
+        <motion.span
+          layoutId="topbar-tab-active"
+          transition={{ type: "spring", stiffness: 500, damping: 38 }}
+          className="absolute inset-0 rounded bg-surface-3 shadow-sm"
+        />
+      )}
+      <span className="relative">{label}</span>
     </button>
   );
 }
+
+// "More ▾" trigger styled to match TabPill so it visually belongs to
+// the same segmented control. floating-ui injects a ref + handlers
+// via cloneElement, so this is a forwardRef-compatible button.
+const MoreTabsTrigger = forwardRef(function MoreTabsTrigger(
+  props: ButtonHTMLAttributes<HTMLButtonElement>,
+  ref: Ref<HTMLButtonElement>,
+) {
+  const isOpen =
+    props["aria-expanded"] === true || props["aria-expanded"] === "true";
+  return (
+    <button
+      ref={ref}
+      type="button"
+      {...props}
+      className={clsx(
+        "flex items-center gap-1 h-6 px-2 rounded text-[11px] font-medium transition-colors whitespace-nowrap",
+        isOpen ? "bg-surface-3 text-fg" : "text-fg-3 hover:text-fg-2",
+      )}
+    >
+      More
+      <ChevronDown
+        size={11}
+        style={{
+          transition: "transform 300ms var(--ease-snap)",
+          transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+        }}
+      />
+    </button>
+  );
+});
+

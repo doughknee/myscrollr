@@ -1,26 +1,21 @@
 /**
  * Settings route — consolidated settings page.
  *
- * Three tab-like areas (Appearance / Ticker / Account) but no in-page
- * tab band — the active area's name renders as the last breadcrumb
- * segment in the TopBar, and clicking it opens a dropdown to switch.
- * Mirrors the source-page Options pattern so Settings, Catalog, and
- * channel/widget pages all share one navigation idiom.
+ * Three tab areas (Appearance / Ticker / Account) rendered as an
+ * explicit in-page tab band at the top of the content. The hidden
+ * breadcrumb-dropdown pattern was confusing to walkthrough testers
+ * (2026-05-11) — tabs are now the single, obvious navigation.
  *
  * URL slug "general" retained for backward compat with billing
  * banners and existing routing; the user-facing label is "Appearance".
  */
-import { useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Settings as SettingsIcon, Sliders, User } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import RouteError from "../components/RouteError";
 import { useShell } from "../shell-context";
 import GeneralSettings from "../components/settings/GeneralSettings";
 import TickerSettings from "../components/settings/TickerSettings";
 import AccountSettings from "../components/settings/AccountSettings";
 import PageLayout from "../components/layout/PageLayout";
-import type { OverflowMenuItem } from "../components/OverflowMenu";
 import { resetCategory, resetAll, type AppPreferences } from "../preferences";
 
 // ── Types ───────────────────────────────────────────────────────
@@ -39,12 +34,6 @@ const TAB_DESCRIPTIONS: Record<SettingsTab, string> = {
   general: "Theme, scale, window, startup, and updates",
   ticker: "Ticker layout, style, and live preview",
   account: "Profile, subscription, plan, data, and reset",
-};
-
-const TAB_ICONS: Record<SettingsTab, LucideIcon> = {
-  general: SettingsIcon,
-  ticker: Sliders,
-  account: User,
 };
 
 // ── Route ───────────────────────────────────────────────────────
@@ -84,32 +73,19 @@ function SettingsRoute() {
     onPrefsChange(next);
   };
 
-  // The dropdown menu items are the OTHER tabs — clicking one
-  // switches. The currently-active tab is hidden from the menu since
-  // its label is already rendered as the trigger itself.
-  const menuItems: OverflowMenuItem[] = useMemo(() => {
-    const items: OverflowMenuItem[] = [];
-    for (const t of VALID_TABS) {
-      if (t === tab) continue;
-      items.push({
-        key: t,
-        label: TAB_LABELS[t],
-        hint: TAB_DESCRIPTIONS[t],
-        icon: TAB_ICONS[t],
-        onSelect: () => setTab(t),
-      });
-    }
-    return items;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
-
   return (
     <PageLayout
       title="Settings"
-      subtitle={TAB_LABELS[tab]}
       width="narrow"
-      menuItems={menuItems}
-      menuLabel="Settings sections"
+      tabs={{
+        items: VALID_TABS.map((t) => ({
+          key: t,
+          label: TAB_LABELS[t],
+          description: TAB_DESCRIPTIONS[t],
+        })),
+        activeKey: tab,
+        onChange: (next) => setTab(next as SettingsTab),
+      }}
     >
       {tab === "general" && (
         <GeneralSettings

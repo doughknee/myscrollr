@@ -6,7 +6,12 @@
  */
 import { useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { savePrefs, toggleWidgetOnTicker, toggleWidgetPin } from "../preferences";
+import {
+  defaultPinForNewWidget,
+  savePrefs,
+  toggleWidgetOnTicker,
+  toggleWidgetPin,
+} from "../preferences";
 import type { AppPreferences } from "../preferences";
 
 interface WidgetActions {
@@ -41,12 +46,23 @@ export function useWidgetActions(
       const nextOnTicker = isEnabled
         ? prefs.widgets.widgetsOnTicker.filter((id) => id !== widgetId)
         : [...prefs.widgets.widgetsOnTicker, widgetId];
+      // On enable, default-pin the widget to the right of the ticker so
+      // it lands in the static pinned zone. Preserve any existing pin
+      // config so a re-enable honors the user's last side/row choice.
+      // On disable, leave pinnedWidgets alone — keeping the entry means
+      // a re-enable later remembers where it was. Walkthrough fix
+      // 2026-05-11 — see preferences.ts:defaultPinForNewWidget.
+      const nextPinned = { ...prefs.widgets.pinnedWidgets };
+      if (!isEnabled && !nextPinned[widgetId]) {
+        nextPinned[widgetId] = defaultPinForNewWidget();
+      }
       const next: AppPreferences = {
         ...prefs,
         widgets: {
           ...prefs.widgets,
           enabledWidgets: nextEnabled,
           widgetsOnTicker: nextOnTicker,
+          pinnedWidgets: nextPinned,
         },
       };
       setPrefs(next);

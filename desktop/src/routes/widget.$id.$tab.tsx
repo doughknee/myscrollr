@@ -53,9 +53,6 @@ function WidgetRoute() {
         navigate({ to: "/widget/$id/$tab", params: { id, tab: t } })
       }
       onBack={() => navigate({ to: "/feed" })}
-      onManageTicker={() =>
-        navigate({ to: "/settings", search: { tab: "ticker" } })
-      }
       onRemove={() => {
         undoable(
           {

@@ -179,7 +179,13 @@ func (a *App) queryUserCatalog(ctx context.Context, userSub string, includeFaili
 	`
 
 	curatedClauses := "WHERE is_default = true AND is_enabled = true"
-	customClauses := "WHERE ucf.logto_sub = $1 AND (tf.is_enabled IS NULL OR tf.is_enabled = true)"
+	// Safety net: even if user_custom_feeds contains a row for a URL that's
+	// also a curated default (from the pre-fix bug, or any other path), we
+	// exclude it here so the UNION never returns the same URL twice. The
+	// runtime guard in syncRSSFeedsToTracked prevents new pollution; the
+	// 130000000002 cleanup migration drops historical pollution; this filter
+	// is defense in depth.
+	customClauses := "WHERE ucf.logto_sub = $1 AND (tf.is_enabled IS NULL OR tf.is_enabled = true) AND NOT EXISTS (SELECT 1 FROM tracked_feeds tf2 WHERE tf2.url = ucf.url AND tf2.is_default = true)"
 	if !includeFailing {
 		curatedClauses += healthFilter
 		customClauses += customFeedHealthFilter
@@ -729,6 +735,25 @@ func (a *App) syncRSSFeedsToTracked(userSub string, config map[string]interface{
 		return
 	}
 
+	// Preload the set of curated default URLs so we can skip writing
+	// duplicates into user_custom_feeds. Curated feeds already live in
+	// tracked_feeds with is_default=true and are visible to every user
+	// via the catalog UNION — writing them into user_custom_feeds would
+	// re-label them under "Custom" (the bug we're fixing).
+	curatedURLs := make(map[string]struct{})
+	curatedRows, curErr := a.db.Query(ctx, `SELECT url FROM tracked_feeds WHERE is_default = true`)
+	if curErr != nil {
+		log.Printf("[RSS] Failed to load curated URLs for sync (continuing without dedup): %v", curErr)
+	} else {
+		for curatedRows.Next() {
+			var u string
+			if scanErr := curatedRows.Scan(&u); scanErr == nil {
+				curatedURLs[u] = struct{}{}
+			}
+		}
+		curatedRows.Close()
+	}
+
 	for _, feed := range parsed.Feeds {
 		if feed.URL == "" {
 			continue
@@ -752,6 +777,15 @@ func (a *App) syncRSSFeedsToTracked(userSub string, config map[string]interface{
 		`, feed.URL, name, userSub)
 		if err != nil {
 			log.Printf("[RSS] Failed to sync feed %s to tracked_feeds: %v", feed.URL, err)
+			continue
+		}
+
+		// Skip the user_custom_feeds insert for URLs that are already
+		// curated defaults. Curated feeds are surfaced to every user
+		// via the catalog's curated half of the UNION; writing them
+		// here would cause queryUserCatalog to return the URL twice
+		// and FeedTab to re-label the row as "Custom".
+		if _, isCurated := curatedURLs[feed.URL]; isCurated {
 			continue
 		}
 

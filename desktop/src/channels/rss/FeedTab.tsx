@@ -168,13 +168,24 @@ function RssFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
   );
 
   // Build category map: feed_url → category
+  //
+  // Defensive dedup: if the catalog returns the same URL twice (curated +
+  // "Custom" leftover from the pre-fix duplication bug), prefer the
+  // non-"Custom" category. The backend now filters these via
+  // queryUserCatalog's NOT EXISTS clause and the cleanup migration drops
+  // historical dupes, but this guard means a stale row anywhere upstream
+  // can never re-label a curated feed in the UI.
   const categoryMap = useMemo(() => {
     const map = new Map<string, string>();
     if (catalog) {
       for (const feed of catalog) {
-        if (feed.category) {
-          map.set(feed.url, feed.category);
+        if (!feed.category) continue;
+        const existing = map.get(feed.url);
+        // Don't overwrite a non-"Custom" category with "Custom".
+        if (existing && existing !== "Custom" && feed.category === "Custom") {
+          continue;
         }
+        map.set(feed.url, feed.category);
       }
     }
     return map;

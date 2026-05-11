@@ -1,35 +1,25 @@
 /**
  * PageLayout — universal page chassis.
  *
- * Page identity (title, subtitle, parent breadcrumb, entity action)
- * is published to the TopBar via PageContext, NOT rendered here. The
- * old in-page header band is gone — the status bar is the single
- * canonical home for "where am I" identity across the whole app.
+ * Everything except the content stack itself lives in the TopBar via
+ * PageContext: title, parent breadcrumb, sibling-tab strip, entity
+ * action, and Options menu. The route just publishes its identity and
+ * renders its content.
  *
- * What stays inside the route's content area:
- *   1. Tab band — sub-navigation within this page (Feed / Configure)
- *   2. Content stack — children
- *   3. Footer — optional destructive/peripheral page-level actions
+ * The content area renders:
+ *   1. Content stack — children, cross-faded on tab/route changes
+ *   2. Footer — optional destructive/peripheral page-level actions
  *
  * IA refactor 2026-05-09 polish pass — see
  * docs/superpowers/specs/2026-05-09-desktop-ia-refactor-design.md
+ * Tab band hoisted into the TopBar on 2026-05-11 to reclaim vertical
+ * space and consolidate page chrome.
  */
 import type { ReactNode } from "react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "motion/react";
-import { useRegisterPageIdentity } from "./page-context";
+import { useRegisterPageIdentity, type PageTabStrip } from "./page-context";
 import type { OverflowMenuItem } from "../OverflowMenu";
-
-// ── Tab type ────────────────────────────────────────────────────
-
-export interface PageTab {
-  /** URL-like identifier for the tab. */
-  key: string;
-  /** Human label rendered in the tab button. */
-  label: string;
-  /** Optional tooltip / aria description. */
-  description?: string;
-}
 
 // ── Props ───────────────────────────────────────────────────────
 
@@ -47,9 +37,8 @@ interface PageLayoutProps {
   onTitleClick?: () => void;
 
   /**
-   * Contextual menu items for this page. When present, the last
-   * breadcrumb segment in the TopBar (subtitle if any, otherwise
-   * title) becomes the menu trigger.
+   * Contextual menu items for this page. When present, the TopBar
+   * renders an "Options" pill button as the menu trigger.
    */
   menuItems?: OverflowMenuItem[];
   /** Aria label for the menu trigger. Default: 'Page options'. */
@@ -62,12 +51,13 @@ interface PageLayoutProps {
    */
   entityAction?: ReactNode;
 
-  /** Optional tab band rendered at the top of the content area. */
-  tabs?: {
-    items: PageTab[];
-    activeKey: string;
-    onChange: (key: string) => void;
-  };
+  /**
+   * Optional sibling-tab strip. Rendered as a compact segmented
+   * control inline in the TopBar (NOT a full-width band in the
+   * content area). Used by Settings, Catalog, and Support section
+   * views to expose sibling navigation.
+   */
+  tabs?: PageTabStrip;
 
   /** Page content. */
   children: ReactNode;
@@ -123,6 +113,7 @@ export default function PageLayout({
     parentLabel,
     onParentClick,
     onTitleClick,
+    tabs,
     menuItems,
     menuLabel,
     entityAction,
@@ -133,59 +124,19 @@ export default function PageLayout({
   // Key the content cross-fade on title+subtitle+active-tab so:
   //  - Source pages animate when switching feed/configure/display
   //    (subtitle changes).
-  //  - Settings/Catalog animate when switching tabs (activeKey
-  //    changes) even though title+subtitle stay the same.
+  //  - Settings/Catalog/Support animate when switching tab pills
+  //    (activeKey changes) even though title stays the same.
   const contentKey = `${title}::${subtitle ?? ""}::${tabs?.activeKey ?? ""}`;
 
   return (
     <div className="flex flex-col h-full">
-      {/* ── Tab band (only when route has sub-tabs) ────────── */}
-      {tabs && (
-        <div className="shrink-0 border-b border-edge/30 bg-surface">
-          <div className={clsx("mx-auto px-5", widthClass)}>
-            <nav
-              className="flex flex-wrap gap-0 -mb-px"
-              aria-label="Page sections"
-            >
-              {tabs.items.map((tab) => {
-                const isActive = tab.key === tabs.activeKey;
-                return (
-                  <button
-                    key={tab.key}
-                    onClick={() => tabs.onChange(tab.key)}
-                    aria-current={isActive ? "page" : undefined}
-                    title={tab.description}
-                    className={clsx(
-                      "relative px-3 py-2.5 text-[12px] font-medium transition-colors -mb-px",
-                      isActive
-                        ? "text-accent"
-                        : "text-fg-3 hover:text-fg-2",
-                    )}
-                  >
-                    {tab.label}
-                    {/* Animated underline — slides between tabs via
-                        layoutId instead of disappearing/reappearing. */}
-                    {isActive && (
-                      <motion.span
-                        layoutId="page-tab-underline"
-                        transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                        className="absolute left-0 right-0 -bottom-px h-0.5 bg-accent rounded-full"
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-        </div>
-      )}
-
       {/* ── Content stack ────────────────────────────────────
           Children are wrapped in an AnimatePresence + motion.div
-          keyed on title+subtitle so navigating between sub-routes
-          (e.g. Feed → Configure → Display on a source page) cross-
-          fades the content while the TopBar chrome and tab band
-          stay stable. The cross-fade uses 'wait' mode for a clean
+          keyed on title+subtitle+active-tab so navigating between
+          sub-routes (e.g. Feed → Configure → Display on a source
+          page) or sibling tabs (Appearance → Ticker → Account in
+          Settings) cross-fades the content while the TopBar chrome
+          stays stable. The cross-fade uses 'wait' mode for a clean
           one-at-a-time transition without overlap during route
           changes. */}
       {fillHeight ? (
