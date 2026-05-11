@@ -34,7 +34,7 @@ export const weatherWidget: WidgetManifest = {
       "Search for a city in the feed view to add it to your weather locations.",
       "Each location appears on the ticker with temperature, conditions, and an icon.",
       "Add multiple cities to track weather across different locations.",
-      "Hide specific cities from the ticker in the Settings tab.",
+      "Hide specific cities from the ticker in the Configure tab.",
     ],
   },
   FeedTab: WeatherFeedTab,

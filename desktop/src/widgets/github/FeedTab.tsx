@@ -43,7 +43,7 @@ export const githubWidget: WidgetManifest = {
       "Paste a GitHub repo URL to add it (e.g. https://github.com/org/repo).",
       "Each repo shows its latest GitHub Actions workflow run status.",
       "Click a repo row to open the workflow run on GitHub.",
-      "Hide specific repos from the ticker in the Settings tab.",
+      "Hide specific repos from the ticker in the Configure tab.",
     ],
   },
   FeedTab: GitHubFeedTab,

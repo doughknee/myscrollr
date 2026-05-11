@@ -99,7 +99,7 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
       "Ticker shows empty slots where data should be",
     ],
     steps: [
-      "Open the channel's Settings tab and verify items are configured (symbols, leagues, or feeds).",
+      "Open the channel and click Options > Configure to verify items are added (symbols, leagues, or feeds).",
       "Check that you're signed in (Settings > Account).",
       "Try switching away from and back to the feed tab.",
       "Check your internet connection.",
@@ -227,7 +227,7 @@ export const GETTING_STARTED_STEPS: GettingStartedStep[] = [
     title: "Configure Your Feeds",
     iconName: "Settings",
     description:
-      "Each channel has a Settings tab where you pick what to track. Add stock symbols, select sports leagues, subscribe to news feeds, or connect your Yahoo account.",
+      "Each channel has a Configure view where you pick what to track. Open a channel, click Options in the title bar, then Configure source — add stock symbols, select sports leagues, subscribe to news feeds, or connect your Yahoo account.",
   },
   {
     title: "Customize the Ticker",

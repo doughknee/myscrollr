@@ -39,7 +39,7 @@ export const financeChannel: ChannelManifest = {
       "Track stocks, ETFs, and cryptocurrencies with live price updates. " +
       "Prices update automatically so your feed always shows the latest.",
     usage: [
-      "Add symbols from the Settings tab to start tracking.",
+      "Open Configure to add symbols and start tracking.",
       "Prices update automatically when connected.",
       "Click any symbol to view its chart on Google Finance.",
     ],
@@ -203,7 +203,6 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabP
       <EmptyChannelState
         icon={TrendingUp}
         noun="stocks or crypto"
-        channelName="Finance"
         hasConfig={!!feedContext.__hasConfig}
         dashboardLoaded={!!feedContext.__dashboardLoaded}
         loadingNoun="prices"

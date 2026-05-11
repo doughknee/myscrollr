@@ -153,7 +153,6 @@ function FantasyFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
       <EmptyChannelState
         icon={Swords}
         noun="fantasy leagues"
-        channelName="Fantasy"
         hasConfig={!!feedContext.__hasConfig}
         dashboardLoaded={!!feedContext.__dashboardLoaded}
         loadingNoun="leagues"
