@@ -14,14 +14,14 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { clsx } from "clsx";
 import { Trophy, Filter } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { dashboardQueryOptions } from "../../api/queries";
+import { sportsFullQueryOptions } from "../../api/queries";
 import { useSportsConfig } from "../../hooks/useSportsConfig";
 import { ScoresTab } from "./ScoresTab";
 import { ScheduleTab } from "./ScheduleTab";
 import { StandingsTab } from "./StandingsTab";
 import EmptyChannelState from "../../components/EmptyChannelState";
 import FreshnessPill from "../../components/FreshnessPill";
-import type { Game, FeedTabProps, ChannelManifest } from "../../types";
+import type { FeedTabProps, ChannelManifest } from "../../types";
 import type { FavoriteTeam } from "../../hooks/useSportsConfig";
 
 // ── Channel manifest ─────────────────────────────────────────────
@@ -173,10 +173,14 @@ function SportsFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
   const [leagueFilter, setLeagueFilter] = useState<Set<string>>(new Set());
   const { leagues, display, favoriteTeams } = useSportsConfig();
 
-  const { data: dashboard } = useQuery(dashboardQueryOptions());
+  // Full channel page reads from /sports directly (not /dashboard), which
+  // returns every game for the user's selected leagues without per-league
+  // fair-share capping. The page's league + status filter chips let the
+  // user narrow down by hand — we surface all the data and let them control it.
+  const { data: sportsData } = useQuery(sportsFullQueryOptions());
   const games = useMemo(
-    () => (dashboard?.data?.sports as Game[] | undefined) ?? [],
-    [dashboard?.data?.sports],
+    () => sportsData?.sports ?? [],
+    [sportsData?.sports],
   );
 
   // Unique leagues from current games for the filter dropdown

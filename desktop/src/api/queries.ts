@@ -8,7 +8,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { isAuthenticated, hasRefreshToken } from "../auth";
 import { authFetch, request, rssApi, fetchOverview } from "./client";
 import type { TrackedFeed, UserOverview } from "./client";
-import type { DashboardResponse } from "../types";
+import type { DashboardResponse, Game } from "../types";
 
 // ── Query Keys ───────────────────────────────────────────────────
 
@@ -180,6 +180,23 @@ export function sportsCatalogOptions() {
     queryKey: queryKeys.catalogs.sports,
     queryFn: () => request<TrackedLeague[]>("/sports/leagues"),
     staleTime: 5 * 60 * 1000, // 5 min — catalogs change infrequently
+  });
+}
+
+/**
+ * Full sports games payload — every game for the user's selected leagues,
+ * no per-league fair-share cap. Used by the full channel page
+ * (`/channel/sports/feed`), where the user has filter chips to narrow down
+ * by hand.
+ *
+ * The home feed reads from `dashboardQueryOptions` instead, which serves a
+ * 20-row fair-shared preview optimized for glanceable consumption.
+ */
+export function sportsFullQueryOptions() {
+  return queryOptions({
+    queryKey: ["sports", "full"] as const,
+    queryFn: () => authFetch<{ sports: Game[]; meta: SportsMeta }>("/sports"),
+    staleTime: 10_000,
   });
 }
 

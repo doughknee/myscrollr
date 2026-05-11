@@ -46,10 +46,16 @@ const (
 	// Keys: sports:subscribers:league:{NFL}, sports:subscribers:league:{NBA}, etc.
 	SportsLeagueSubscribersPrefix = "sports:subscribers:league:"
 
-	// DefaultSportsLimit caps the number of games returned for the public route.
-	DefaultSportsLimit = 50
+	// DefaultSportsLimit caps the number of games returned for /sports
+	// (authenticated full channel page + public route). High enough to fit
+	// a week of MLB (~105 rows) plus other leagues with headroom. The full
+	// channel page disables per-league fair share at this limit so users
+	// see every game for every selected league.
+	DefaultSportsLimit = 200
 
-	// DashboardSportsLimit caps the number of games returned for dashboard.
+	// DashboardSportsLimit caps the number of games returned for the
+	// home-feed glanceable row. The fair-share allocator (MinPerLeagueShare)
+	// ensures every selected league gets visibility within this cap.
 	DashboardSportsLimit = 20
 
 	// PollingStaleThreshold is the maximum acceptable age of the last
@@ -122,40 +128,35 @@ type leagueStatus struct {
 // just those leagues (LEFT JOIN semantics in spirit — leagues with no games
 // simply don't appear in the map).
 //
-// `game_count` is intentionally NOT "all rows for this league." A user
-// scanning the catalog wants to know "how many games are happening today,"
-// not "how many fixtures has the ingestion service ever stored." Without
-// this filter, MLB shows ~100 (a full week × ~15/day) while Premier League
-// shows ~10 — visually wildly out of proportion with what's relevant.
-// The today-window is:
-//   - state = 'in'                                    (live right now)
-//   - state = 'pre' AND start_time < NOW() + 24h      (starting in next 24h)
-//   - state IN ('final','postponed') AND start_time > NOW() - 12h  (just finished)
+// `game_count` is the raw COUNT(*) over the games table — every row the
+// ingestion service has stored for this league, across all states. This
+// reflects what's actually in the database and is the truthful number to
+// surface to users. The catalog UI uses `live_count` and `next_game` as
+// the primary chips when they're meaningful; `game_count` is the fallback.
+//
+// An earlier version filtered this to a "today's window" (live + upcoming-24h
+// + just-finished-12h). That looked tidier but felt algorithmic — users
+// want to see the actual data, not our editorial summary of it.
 //
 // The query is intentionally batched so we run one round-trip per call,
 // not one query per league.
 func (a *App) loadLeagueStatus(ctx context.Context, names []string) (map[string]leagueStatus, error) {
 	statusMap := make(map[string]leagueStatus)
 
-	const countFilter = `
-		COUNT(*) FILTER (
-			WHERE state = 'in'
-			   OR (state = 'pre' AND start_time < NOW() + INTERVAL '24 hours')
-			   OR (state IN ('final','postponed') AND start_time > NOW() - INTERVAL '12 hours')
-		) AS game_count`
-
 	var rows pgx.Rows
 	var err error
 	if len(names) == 0 {
 		rows, err = a.db.Query(ctx, `
-			SELECT league,`+countFilter+`,
+			SELECT league,
+			       COUNT(*) AS game_count,
 			       COUNT(*) FILTER (WHERE state = 'in') AS live_count,
 			       MIN(start_time) FILTER (WHERE state = 'pre') AS next_game
 			FROM games
 			GROUP BY league`)
 	} else {
 		rows, err = a.db.Query(ctx, `
-			SELECT league,`+countFilter+`,
+			SELECT league,
+			       COUNT(*) AS game_count,
 			       COUNT(*) FILTER (WHERE state = 'in') AS live_count,
 			       MIN(start_time) FILTER (WHERE state = 'pre') AS next_game
 			FROM games
@@ -440,7 +441,9 @@ func (a *App) handleInternalDashboard(c *fiber.Ctx) error {
 	}
 
 	favoriteTeams := a.getUserFavoriteTeams(userSub)
-	games, err := a.queryGamesByLeagues(ctx, leagues, DashboardSportsLimit, favoriteTeams)
+	// Home dashboard uses fair-share so every selected league is visible
+	// within the 20-row glanceable preview, regardless of relative volume.
+	games, err := a.queryGamesByLeagues(ctx, leagues, DashboardSportsLimit, favoriteTeams, true)
 	if err != nil {
 		log.Printf("[Sports] Dashboard query failed: %v", err)
 		return c.JSON(fiber.Map{
@@ -649,72 +652,93 @@ func (a *App) queryGames(ctx context.Context, limit int, favoriteTeams map[strin
 }
 
 // MinPerLeagueShare is the minimum number of candidate games each selected
-// league gets before the global LIMIT applies. Prevents one high-volume
-// league (e.g. MLB with ~15 games/day) from monopolizing the response and
-// hiding leagues with fewer fixtures (e.g. Premier League, F1).
+// league gets before the global LIMIT applies. Used only in fair-share mode
+// (home dashboard). Prevents one high-volume league (e.g. MLB with ~15
+// games/day) from monopolizing the response and hiding leagues with fewer
+// fixtures (e.g. Premier League, F1).
 const MinPerLeagueShare = 2
 
-// queryGamesByLeagues fetches games for specific leagues with per-league
-// fair share. Each league gets max(MinPerLeagueShare, ceil(limit/N))
-// candidate rows ranked by the same priority (live > pre > final, favorites
-// first, soonest upcoming first). The global LIMIT trims the pool.
+// queryGamesByLeagues fetches games for specific leagues.
 //
-// Without the share cap, an SQL "ORDER BY priority LIMIT 20" query against a
-// games table dominated by one league (MLB during the season) returns 20
-// rows from that league exclusively. Premier League rows score lower on the
-// global ordering and never make it into the response — they then can't
-// appear in the frontend's "edit preview" dropdown either, because the
-// dropdown's group list is built from the games array.
+// When `fairShare` is true (used by /dashboard with limit=20): each league
+// gets max(MinPerLeagueShare, ceil(limit/N)) candidate rows via a window
+// function, ranked by the standard priority (live > pre > final, favorites
+// first, soonest upcoming first). The global LIMIT then trims. This keeps
+// every selected league visible on the glanceable home row.
 //
-// If favoriteTeams is provided, those teams' games are prioritized within
-// the per-league ranking.
-func (a *App) queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favoriteTeams map[string]FavoriteTeam) ([]Game, error) {
+// When `fairShare` is false (used by /sports with limit=200 for the full
+// channel page): a simple ORDER BY priority LIMIT query, no per-league cap.
+// Users see every game for every selected league and can filter client-side
+// with the page's league/status chips. The user-controlled experience.
+//
+// If favoriteTeams is provided, those teams' games are prioritized.
+func (a *App) queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favoriteTeams map[string]FavoriteTeam, fairShare bool) ([]Game, error) {
 	if len(leagues) == 0 {
 		return make([]Game, 0), nil
 	}
 
 	favNames := extractFavoriteTeamNames(favoriteTeams)
 
-	// Per-league candidate share. ceil(limit / N_leagues), capped below by
-	// MinPerLeagueShare so small leagues are always visible even when the
-	// user has many leagues selected.
-	perLeague := (limit + len(leagues) - 1) / len(leagues)
-	if perLeague < MinPerLeagueShare {
-		perLeague = MinPerLeagueShare
-	}
-
-	rows, err := a.db.Query(ctx, fmt.Sprintf(`
-		WITH ranked AS (
-			SELECT id, league, sport, external_game_id, link,
-				home_team_name, home_team_logo, home_team_score, home_team_code,
-				away_team_name, away_team_logo, away_team_score, away_team_code,
-				start_time, short_detail, state, status_short, status_long,
-				timer, venue, season,
-				ROW_NUMBER() OVER (
-					PARTITION BY league
-					ORDER BY
-						CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
-						CASE WHEN home_team_name = ANY($2) OR away_team_name = ANY($2) THEN 0 ELSE 1 END,
-						CASE WHEN state = 'pre' THEN start_time END ASC,
-						CASE WHEN state != 'pre' THEN start_time END DESC
-				) AS rn
+	var query string
+	if fairShare {
+		// Per-league candidate share. ceil(limit / N_leagues), floored by
+		// MinPerLeagueShare so small leagues are always visible.
+		perLeague := (limit + len(leagues) - 1) / len(leagues)
+		if perLeague < MinPerLeagueShare {
+			perLeague = MinPerLeagueShare
+		}
+		query = fmt.Sprintf(`
+			WITH ranked AS (
+				SELECT id, league, sport, external_game_id, link,
+					home_team_name, home_team_logo, home_team_score, home_team_code,
+					away_team_name, away_team_logo, away_team_score, away_team_code,
+					start_time, short_detail, state, status_short, status_long,
+					timer, venue, season,
+					ROW_NUMBER() OVER (
+						PARTITION BY league
+						ORDER BY
+							CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
+							CASE WHEN home_team_name = ANY($2) OR away_team_name = ANY($2) THEN 0 ELSE 1 END,
+							CASE WHEN state = 'pre' THEN start_time END ASC,
+							CASE WHEN state != 'pre' THEN start_time END DESC
+					) AS rn
+				FROM games
+				WHERE league = ANY($1)
+			)
+			SELECT id, league, COALESCE(sport, ''), external_game_id, COALESCE(link, ''),
+				home_team_name, COALESCE(home_team_logo, ''), COALESCE(home_team_score::text, ''), COALESCE(home_team_code, ''),
+				away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
+				start_time, COALESCE(short_detail, ''), state,
+				COALESCE(status_short, ''), COALESCE(status_long, ''),
+				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')
+			FROM ranked
+			WHERE rn <= %d
+			ORDER BY
+				CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
+				CASE WHEN home_team_name = ANY($2) OR away_team_name = ANY($2) THEN 0 ELSE 1 END,
+				CASE WHEN state = 'pre' THEN start_time END ASC,
+				CASE WHEN state != 'pre' THEN start_time END DESC
+			LIMIT %d`, perLeague, limit)
+	} else {
+		// No per-league cap. Show every game for every selected league.
+		query = fmt.Sprintf(`
+			SELECT id, league, COALESCE(sport, ''), external_game_id, COALESCE(link, ''),
+				home_team_name, COALESCE(home_team_logo, ''), COALESCE(home_team_score::text, ''), COALESCE(home_team_code, ''),
+				away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
+				start_time, COALESCE(short_detail, ''), state,
+				COALESCE(status_short, ''), COALESCE(status_long, ''),
+				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')
 			FROM games
 			WHERE league = ANY($1)
-		)
-		SELECT id, league, COALESCE(sport, ''), external_game_id, COALESCE(link, ''),
-			home_team_name, COALESCE(home_team_logo, ''), COALESCE(home_team_score::text, ''), COALESCE(home_team_code, ''),
-			away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
-			start_time, COALESCE(short_detail, ''), state,
-			COALESCE(status_short, ''), COALESCE(status_long, ''),
-			COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')
-		FROM ranked
-		WHERE rn <= %d
-		ORDER BY
-			CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
-			CASE WHEN home_team_name = ANY($2) OR away_team_name = ANY($2) THEN 0 ELSE 1 END,
-			CASE WHEN state = 'pre' THEN start_time END ASC,
-			CASE WHEN state != 'pre' THEN start_time END DESC
-		LIMIT %d`, perLeague, limit), leagues, favNames)
+			ORDER BY
+				CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
+				CASE WHEN home_team_name = ANY($2) OR away_team_name = ANY($2) THEN 0 ELSE 1 END,
+				CASE WHEN state = 'pre' THEN start_time END ASC,
+				CASE WHEN state != 'pre' THEN start_time END DESC
+			LIMIT %d`, limit)
+	}
+
+	rows, err := a.db.Query(ctx, query, leagues, favNames)
 	if err != nil {
 		return nil, fmt.Errorf("sports league query failed: %w", err)
 	}
@@ -756,7 +780,10 @@ func (a *App) getUserGames(c *fiber.Ctx, userSub string, limit int) error {
 	}
 
 	favoriteTeams := a.getUserFavoriteTeams(userSub)
-	games, err := a.queryGamesByLeagues(ctx, leagues, limit, favoriteTeams)
+	// /sports (full channel page) returns every game for every selected
+	// league. The page already has league + status filter chips for the
+	// user to narrow down — we surface all the data and let them control it.
+	games, err := a.queryGamesByLeagues(ctx, leagues, limit, favoriteTeams, false)
 	if err != nil {
 		log.Printf("[Sports] getUserGames query failed: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
