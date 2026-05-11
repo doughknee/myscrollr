@@ -258,6 +258,35 @@ async fn main() {
                 }
             }
         });
+
+        // ── Daily reset: rate budgets at UTC midnight ─────────────────────
+        let leagues_reset = leagues.clone();
+        let rl_reset = rate_limiter.clone();
+        let cancel_reset = cancel_bg.clone();
+        spawn_supervised("sports-budget-reset", async move {
+            println!("Starting daily rate-budget reset loop (UTC midnight)...");
+            loop {
+                // Sleep until next UTC midnight
+                let now = chrono::Utc::now();
+                let tomorrow = (now + chrono::Duration::days(1))
+                    .date_naive()
+                    .and_hms_opt(0, 0, 0)
+                    .expect("midnight is a valid time")
+                    .and_utc();
+                let wait_secs = (tomorrow - now).num_seconds().max(60) as u64;
+
+                tokio::select! {
+                    _ = cancel_reset.cancelled() => {
+                        println!("Budget reset loop shutting down...");
+                        break;
+                    }
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(wait_secs)) => {
+                        rl_reset.reset_daily(&leagues_reset, 7500);
+                        println!("[Rate Budget] Daily reset completed at UTC midnight");
+                    }
+                }
+            }
+        });
     });
 
     let cancel_for_shutdown = cancel.clone();
