@@ -309,9 +309,9 @@ export const sysmonWidget: WidgetManifest = {
       "The System Monitor widget shows live stats for your computer on the ticker, including CPU usage, memory, and GPU.",
     usage: [
       "CPU, memory, and GPU usage appear on the ticker.",
-      "Turn individual stats on or off in the Settings tab.",
+      "Turn individual stats on or off in the Configure tab.",
       "The feed view shows detailed real-time stats including temperatures and a full breakdown.",
-      "Keep the system monitor in a fixed spot on the ticker from the Settings tab.",
+      "Keep the system monitor in a fixed spot on the ticker from the Configure tab.",
     ],
   },
   desktopOnly: true,

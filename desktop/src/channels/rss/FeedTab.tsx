@@ -40,7 +40,7 @@ export const rssChannel: ChannelManifest = {
       "Collect articles from your favorite websites into one place. " +
       "New articles appear automatically as they are published.",
     usage: [
-      "Add news sources from the Settings tab.",
+      "Open Configure to add news sources.",
       "Articles are sorted by publish date, newest first.",
       "Click any article to open it in your browser.",
     ],
@@ -341,7 +341,6 @@ function RssFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
       <EmptyChannelState
         icon={Rss}
         noun="feeds"
-        channelName="RSS"
         hasConfig={!!feedContext.__hasConfig}
         dashboardLoaded={!!dashboardLoaded}
         loadingNoun="articles"

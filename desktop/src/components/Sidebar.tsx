@@ -189,8 +189,8 @@ export default function Sidebar({
         />
 
         {/* Collapse toggle. Connection status + ticker status are now
-            in the ControlStrip (always-visible chrome below the title
-            bar) — see components/ControlStrip.tsx. The sidebar footer
+            in the TopBar (always-visible chrome at the top of the
+            window) — see components/TopBar.tsx. The sidebar footer
             stays minimal. */}
         <Tooltip content={collapsed ? "Expand sidebar" : "Collapse sidebar"} side="right">
           <button

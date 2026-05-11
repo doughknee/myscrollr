@@ -46,7 +46,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Can I customize the feed?',
     answer:
-      "Extensively. Position the ticker at the top or bottom of your screen, adjust rows and density, pin favorite sources to the sidebar, filter and sort within each channel, and toggle individual data points on or off in each channel's Display settings.",
+      'Extensively. Move the ticker to the top or bottom of the screen by right-clicking it (or using the up/down chevron in the hover toolbar). In Settings > Ticker you can change the detail level (Compact / Detailed), add ticker rows, and adjust speed. Within each channel you can filter, sort, and toggle individual data points on or off under Options > Display preferences.',
   },
   {
     question: 'Is Scrollr open source?',
@@ -61,7 +61,12 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'How does live data work vs. polling?',
     answer:
-      'Free and Uplink tiers use polling — the app fetches fresh data at regular intervals (60s for free, 30s for Uplink, 10s for Pro). Uplink Ultimate uses a persistent SSE connection for instant live updates as data changes on the server.',
+      'Free, Uplink, and Uplink Pro tiers use polling — the app fetches fresh data at regular intervals (60s on Free, 30s on Uplink, 10s on Uplink Pro). Uplink Ultimate uses a persistent SSE connection for instant live updates as data changes on the server.',
+  },
+  {
+    question: "What's the difference between Uplink tiers?",
+    answer:
+      'Free: 5 stock/crypto symbols, 1 news feed, 1 sports league, no fantasy leagues, 60s polling. Uplink: 25 symbols, 25 feeds, 8 sports leagues, 1 fantasy league, 30s polling. Uplink Pro: 75 symbols, 100 feeds, 20 sports leagues, 3 fantasy leagues, 10s polling. Uplink Ultimate: unlimited symbols/feeds/sports leagues, 10 fantasy leagues, live SSE streaming.',
   },
 ]
 
@@ -94,7 +99,7 @@ export const TROUBLESHOOTING_ARTICLES: Array<TroubleshootingArticle> = [
       'Ticker shows empty slots where data should be',
     ],
     steps: [
-      "Open the channel's Settings tab and verify items are configured (symbols, leagues, or feeds).",
+      'Open the channel and click Options > Configure to verify items are added (symbols, leagues, or feeds).',
       "Check that you're signed in (Settings > Account).",
       'Try switching away from and back to the feed tab.',
       'Check your internet connection.',
@@ -108,8 +113,9 @@ export const TROUBLESHOOTING_ARTICLES: Array<TroubleshootingArticle> = [
     ],
     steps: [
       'Press Ctrl+T (Cmd+T on macOS) to toggle ticker visibility.',
-      'Or go to Settings > General and enable the "Show Ticker" toggle.',
-      'Right-click the system tray icon and check "Toggle Ticker".',
+      'Or go to Settings > Ticker and turn on "Enable ticker".',
+      'Or click the Ticker toggle in the title bar (next to the Pin button).',
+      'Or right-click the system tray icon and choose "Toggle Ticker".',
     ],
   },
   {
@@ -175,12 +181,12 @@ export const GETTING_STARTED_STEPS: Array<GettingStartedStep> = [
   {
     title: 'Configure Your Feeds',
     description:
-      'Each channel has a Settings tab where you pick what to track. Add stock symbols, select sports leagues, subscribe to news feeds, or connect your Yahoo account.',
+      'Each channel has a Configure view where you pick what to track. Open a channel, click Options in the title bar, then Configure source — add stock symbols, select sports leagues, subscribe to news feeds, or connect your Yahoo account.',
   },
   {
     title: 'Customize the Ticker',
     description:
-      'The ticker bar runs across your screen showing live data. Adjust its position (top/bottom), size (compact/comfort), and number of rows in Settings > Ticker.',
+      'The ticker bar runs across your screen showing live data. Open Settings > Ticker to change the detail level (Compact / Detailed), add ticker rows, and adjust speed. To move the ticker to the top or bottom of the screen, right-click it or use the up/down chevron in the hover toolbar.',
   },
 ]
 

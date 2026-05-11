@@ -143,7 +143,7 @@ function descriptionFor(
     case "polling":
       return sseEligible
         ? "Realtime stream is reconnecting. Polling every minute meanwhile."
-        : "Polling every minute. Upgrade to Uplink Pro for realtime updates.";
+        : "Polling every minute. Upgrade to Uplink Ultimate for realtime SSE updates.";
     case "stale": {
       const ago = ageMs ? formatAge(ageMs) : "a while";
       return `No update in ${ago}. Data on screen may be slightly behind.`;

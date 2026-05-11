@@ -38,7 +38,7 @@ export const sportsChannel: ChannelManifest = {
       "Follow live scores across NFL, NBA, MLB, NHL, MLS, and more. " +
       "Scores update automatically with a visual flash when they change.",
     usage: [
-      "Pick your leagues from the Settings tab.",
+      "Open Configure to pick your leagues.",
       "Live games show a pulsing indicator and scores update automatically.",
       "Final scores highlight the winning team in bold.",
     ],
@@ -223,7 +223,6 @@ function SportsFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
       <EmptyChannelState
         icon={Trophy}
         noun="leagues"
-        channelName="Sports"
         hasConfig={!!feedContext.__hasConfig}
         dashboardLoaded={!!feedContext.__dashboardLoaded}
         loadingNoun="scores"

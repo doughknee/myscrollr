@@ -685,11 +685,11 @@ function RootLayout() {
     }
   }, []);
 
-  // ── ControlStrip handlers ───────────────────────────────────
-  // Two ambient toggles always visible below the title bar so users
-  // never have to dig into Settings → Ticker to toggle the entire
-  // product on/off. Same prefs as Settings → Ticker top toggle and
-  // Settings → Appearance → Always on top — single source of truth.
+  // ── TopBar ambient-toggle handlers ──────────────────────────
+  // Two ambient toggles always visible in the TopBar so users never
+  // have to dig into Settings → Ticker to toggle the entire product
+  // on/off. Same prefs as Settings → Ticker "Enable ticker" toggle
+  // and the Pin button — single source of truth.
   const handleTickerToggle = useCallback(() => {
     persistPrefs({
       ...prefs,

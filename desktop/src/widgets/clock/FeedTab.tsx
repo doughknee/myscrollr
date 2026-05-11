@@ -42,9 +42,9 @@ export const clockWidget: WidgetManifest = {
       "countdown and stopwatch timer.",
     usage: [
       "Your local time appears on the ticker by default.",
-      "Turn on world clocks in the Settings tab to add more time zones.",
+      "Turn on world clocks in the Configure tab to add more time zones.",
       "Use the timer tab in the feed view to set countdowns or run a stopwatch.",
-      "Hide specific time zones from the ticker in the Settings tab.",
+      "Hide specific time zones from the ticker in the Configure tab.",
     ],
   },
   FeedTab: ClockFeedTab,

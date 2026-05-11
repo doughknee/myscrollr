@@ -41,7 +41,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Can I customize the feed?",
     answer:
-      "Extensively. Position the ticker at the top or bottom of your screen, adjust rows and density, pin favorite sources to the sidebar, filter and sort within each channel, and toggle individual data points on or off in each channel's Display settings.",
+      "Extensively. Move the ticker to the top or bottom of the screen by right-clicking it (or using the up/down chevron in the hover toolbar). In Settings > Ticker you can change the detail level (Compact / Detailed), add ticker rows, and adjust speed. Within each channel you can filter, sort, and toggle individual data points on or off under Options > Display preferences.",
   },
   {
     question: "Is Scrollr open source?",
@@ -56,17 +56,17 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Can I use Scrollr on multiple monitors?",
     answer:
-      "Yes. The ticker automatically spans the full width of your primary monitor. You can move it between monitors by changing the ticker position in Settings > Ticker.",
+      "Yes. The ticker spans the full width of whichever monitor the Scrollr window is currently on. To move it to a different monitor, drag the main window onto that monitor — the ticker follows. There's no monitor selector inside Settings; the ticker uses your OS's active-monitor placement.",
   },
   {
     question: "How does live data work vs. polling?",
     answer:
-      "Free and Uplink tiers use polling — the app fetches fresh data at regular intervals (60s for free, 30s for Uplink, 10s for Pro). Uplink Ultimate uses a persistent SSE connection for instant live updates as data changes on the server. You can see your current mode (Live or Polling) in the sidebar footer.",
+      "Free, Uplink, and Uplink Pro tiers use polling — the app fetches fresh data at regular intervals (60s on Free, 30s on Uplink, 10s on Uplink Pro). Uplink Ultimate uses a persistent SSE connection for instant live updates as data changes on the server. The current mode (Live or Polling) shows in the title bar next to the Pin button — a green dot means Live, a normal dot means Polling.",
   },
   {
     question: "What's the difference between Uplink tiers?",
     answer:
-      "Free: 5 symbols, 1 feed, 1 league. Uplink: 25 symbols, 25 feeds, 8 leagues, 30s polling. Uplink Pro: 75 symbols, 100 feeds, 20 leagues, 10s polling. Uplink Ultimate: unlimited everything, live streaming via SSE, priority support.",
+      "Free: 5 stock/crypto symbols, 1 news feed, 1 sports league, no fantasy leagues, 60s polling. Uplink: 25 symbols, 25 feeds, 8 sports leagues, 1 fantasy league, 30s polling. Uplink Pro: 75 symbols, 100 feeds, 20 sports leagues, 3 fantasy leagues, 10s polling. Uplink Ultimate: unlimited symbols/feeds/sports leagues, 10 fantasy leagues, live SSE streaming.",
   },
 ];
 
@@ -99,7 +99,7 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
       "Ticker shows empty slots where data should be",
     ],
     steps: [
-      "Open the channel's Settings tab and verify items are configured (symbols, leagues, or feeds).",
+      "Open the channel and click Options > Configure to verify items are added (symbols, leagues, or feeds).",
       "Check that you're signed in (Settings > Account).",
       "Try switching away from and back to the feed tab.",
       "Check your internet connection.",
@@ -113,8 +113,9 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
     ],
     steps: [
       "Press Ctrl+T (Cmd+T on macOS) to toggle ticker visibility.",
-      "Or go to Settings > General and enable the \"Show Ticker\" toggle.",
-      "Right-click the system tray icon and check \"Toggle Ticker\".",
+      "Or go to Settings > Ticker and turn on \"Enable ticker\".",
+      "Or click the Ticker toggle in the title bar (next to the Pin button).",
+      "Or right-click the system tray icon and choose \"Toggle Ticker\".",
     ],
   },
   {
@@ -148,8 +149,8 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
       "Yesterday's games still showing as live",
     ],
     steps: [
-      "Scores update via polling based on your plan tier. Free: 60s, Uplink: 30s, Pro: 10s, Ultimate: live.",
-      "Check your current delivery mode in the sidebar footer (Live vs Polling).",
+      "Scores update via polling based on your plan tier. Free: 60s, Uplink: 30s, Uplink Pro: 10s, Uplink Ultimate: live SSE.",
+      "Check your current delivery mode in the title bar (next to the Pin button) — green dot is Live, normal dot is Polling.",
       "Try switching to a different tab and back.",
     ],
   },
@@ -171,7 +172,7 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
       "Some feeds show data but others don't",
     ],
     steps: [
-      "Check the feed's health indicator in Settings — green is healthy, amber is stale, red is failing.",
+      "Open the News channel, then Options > Configure source. Each tracked feed has a colored health dot — green is healthy, amber is stale, red is failing.",
       "Some feeds may be temporarily down. Try adding a different feed to verify your connection works.",
       "Custom feeds must be valid RSS or Atom URLs.",
     ],
@@ -227,13 +228,13 @@ export const GETTING_STARTED_STEPS: GettingStartedStep[] = [
     title: "Configure Your Feeds",
     iconName: "Settings",
     description:
-      "Each channel has a Settings tab where you pick what to track. Add stock symbols, select sports leagues, subscribe to news feeds, or connect your Yahoo account.",
+      "Each channel has a Configure view where you pick what to track. Open a channel, click Options in the title bar, then Configure source — add stock symbols, select sports leagues, subscribe to news feeds, or connect your Yahoo account.",
   },
   {
     title: "Customize the Ticker",
     iconName: "Monitor",
     description:
-      "The ticker bar runs across your screen showing live data. Adjust its position (top/bottom), size (compact/comfort), and number of rows in Settings > Ticker.",
+      "The ticker bar runs across your screen showing live data. Open Settings > Ticker to change the detail level (Compact / Detailed), add ticker rows, and adjust speed. To move the ticker to the top or bottom of the screen, right-click it or use the up/down chevron in the hover toolbar.",
   },
   {
     title: "Explore Widgets",

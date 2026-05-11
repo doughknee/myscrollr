@@ -4,31 +4,25 @@
  * Replaces the repeated empty-state pattern in finance, sports, rss, and
  * fantasy feeds.
  *
- * Copy is pointed at the **breadcrumb dropdown in the TopBar** — the
- * channel name + chevron at the top of the window (e.g. "Sports ▾").
- * That dropdown is the ONLY sub-tab switcher on channel pages; there is
- * no horizontal tab strip and no "Settings" tab in the title bar. The
- * earlier copy said "Open the Settings tab" which was misleading — users
- * looked for a tab that doesn't exist.
+ * Copy is pointed at the **"Options" pill in the TopBar** — the
+ * Settings2 icon + "Options" label rendered next to the page title.
+ * That pill is the canonical menu trigger on source pages (channel +
+ * widget). The CTA button still jumps directly to the Configure sub-
+ * tab so the one-tap fix is preserved; the surrounding copy teaches
+ * the user where the menu lives so they can do it themselves next
+ * time.
  *
- * The CTA button still jumps directly to the Configure sub-tab so the
- * one-tap fix is preserved; the surrounding copy teaches the user where
- * the dropdown lives so they can do it themselves next time.
+ * Walkthrough fix 2026-05-11 — previously this tip pointed at a
+ * breadcrumb dropdown (channel name + chevron) which no longer exists
+ * after the source-page menu was consolidated under the Options pill.
  */
 import { clsx } from "clsx";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Settings2 } from "lucide-react";
 
 interface EmptyChannelStateProps {
   icon: React.ComponentType<{ size?: number; className?: string }>;
   /** What hasn't been added yet (e.g. "stocks or crypto", "leagues", "feeds"). */
   noun: string;
-  /**
-   * Display name of the channel itself, e.g. "Finance", "Sports", "RSS",
-   * "Fantasy". Used to label the breadcrumb dropdown trigger in the
-   * teaching copy. When omitted, the copy falls back to the generic
-   * "channel name" phrase.
-   */
-  channelName?: string;
   /** Whether the channel has config (i.e. user has picked items to track). */
   hasConfig: boolean;
   /** Whether the dashboard has loaded. */
@@ -41,7 +35,7 @@ interface EmptyChannelStateProps {
    * Navigate to the channel's Configure sub-tab. Wired in
    * `routes/channel.$type.$tab.tsx`. When provided, the hint becomes a
    * one-tap button; the surrounding copy still teaches the user the
-   * dropdown path so they can do it themselves next time.
+   * Options-pill path so they can do it themselves next time.
    */
   onConfigure?: () => void;
 }
@@ -49,15 +43,12 @@ interface EmptyChannelStateProps {
 export default function EmptyChannelState({
   icon: Icon,
   noun,
-  channelName,
   hasConfig,
   dashboardLoaded,
   loadingNoun,
   actionHint,
   onConfigure,
 }: EmptyChannelStateProps) {
-  const breadcrumbLabel = channelName ?? "channel name";
-
   return (
     <div
       className={clsx(
@@ -92,12 +83,13 @@ export default function EmptyChannelState({
             Tip: click{" "}
             <span
               className={clsx(
-                "inline-flex items-center gap-0.5 align-baseline",
+                "inline-flex items-center gap-1 align-baseline",
                 "px-1 py-px rounded",
                 "bg-fg-4/10 text-fg-2 font-semibold",
               )}
             >
-              {breadcrumbLabel}
+              <Settings2 size={9} strokeWidth={2.5} aria-hidden="true" />
+              Options
               <ChevronDown size={9} strokeWidth={2.5} aria-hidden="true" />
             </span>{" "}
             in the title bar to open this menu yourself next time.
