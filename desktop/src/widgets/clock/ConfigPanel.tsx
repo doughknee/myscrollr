@@ -81,19 +81,15 @@ export default function ClockConfigPanel({
       subtitle="World clocks and Pomodoro timer"
       onReset={resetAll}
     >
-      {/* Taskbar */}
-      <Section title="Toolbar Preview">
+      {/* Ticker */}
+      <Section title="Ticker">
         <SegmentedRow
           label="Time format"
-          description="Applies to the toolbar and ticker"
+          description="12-hour or 24-hour clock"
           value={format}
           options={FORMAT_OPTIONS}
           onChange={handleFormatChange}
         />
-      </Section>
-
-      {/* Ticker */}
-      <Section title="Ticker">
         <ToggleRow
           label="Local time"
           description="Show your local clock on the scrolling ticker"

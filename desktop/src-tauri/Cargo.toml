@@ -1,6 +1,6 @@
 [package]
 name = "scrollr-desktop"
-version = "1.0.14"
+version = "1.0.15"
 edition = "2021"
 description = "Scrollr desktop app — pinned live ticker for sports, finance, RSS, and Yahoo Fantasy."
 authors = ["Brandon Ruth <brandon@myscrollr.com>"]

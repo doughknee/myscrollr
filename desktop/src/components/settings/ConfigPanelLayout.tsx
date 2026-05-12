@@ -27,13 +27,23 @@ export default function ConfigPanelLayout({
   onReset,
   children,
 }: ConfigPanelLayoutProps) {
+  // The parent route shell uses `fillHeight` for configure tabs, which
+  // strips outer scroll and expects children to provide their own
+  // scroll viewport. We provide that here so every widget's
+  // configure page scrolls when its content exceeds available height
+  // (otherwise sections past the fold are silently clipped).
+  // See `components/layout/PageLayout.tsx` `fillHeight` branch.
   return (
-    <div className="w-full max-w-2xl mx-auto pb-8">
-      {children}
+    <div className="flex-1 min-h-0 flex flex-col">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+        <div className="w-full max-w-2xl mx-auto pb-8">
+          {children}
 
-      {/* Reset footer */}
-      <div className="flex items-center justify-end pt-2 px-3">
-        <ResetButton onClick={onReset} />
+          {/* Reset footer */}
+          <div className="flex items-center justify-end pt-2 px-3">
+            <ResetButton onClick={onReset} />
+          </div>
+        </div>
       </div>
     </div>
   );

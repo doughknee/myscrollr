@@ -148,7 +148,22 @@ export default function ConsolidatedChip({
                 <span className="text-[13px] leading-none ml-1">{item.icon}</span>
               </>
             ) : isSysmon(item) ? (
-              <span className={clsx(item.hot ? "text-error" : c.text)}>
+              // Reserve a fixed cell width for the value so the chip
+              // doesn't grow/shrink as percentages and wattages flip
+              // between digit counts ("5%" -> "100%", "47W" -> "450W").
+              // Without this the pinned chip jiggles every poll and
+              // forces the entire ticker row to reflow — see Bug 3
+              // notes around `pinned-zone` in `ScrollrTicker.tsx`.
+              //
+              // 5ch covers the worst case at 4 digits + suffix
+              // (e.g. "1000W" on workstation GPUs, future-proofing
+              // beyond the current 4-char "100%" / "450W" worst case).
+              <span
+                className={clsx(
+                  "inline-block min-w-[5ch] text-right tabular-nums",
+                  item.hot ? "text-error" : c.text,
+                )}
+              >
                 {item.value}
               </span>
             ) : (

@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getStore, setStore } from "../../lib/store";
+import { normalizeUpdateDate } from "../../lib/updaterDate";
 import clsx from "clsx";
 
 // ── Updater storage keys ────────────────────────────────────────
@@ -130,24 +131,49 @@ export default function GeneralSettings({
       // Same-version patch detection: when the remote version matches
       // the installed version, we suppress the "update available" UI
       // unless the remote pub_date has changed since we last recorded
-      // it. KEY_LAST_UPDATE_DATE is normally seeded by the
-      // post-downloadAndInstall reconcile loop above (lines 107-115).
-      // For users who installed via a manual download (Windows MSI in
-      // particular), that loop never runs, so the store stays empty
-      // and every check used to false-positive. The empty-store branch
-      // below seeds the date once on first check, then the existing
-      // match-suppression takes over on subsequent checks.
+      // it. KEY_LAST_UPDATE_DATE is normally seeded by the startup
+      // reconcile in `hooks/useStartupUpdateCheck.ts`. For users who
+      // installed via a manual download (Windows MSI in particular),
+      // that reconcile never has a pending row to promote, so the
+      // store stays empty and every check used to false-positive.
+      // The empty-store branch below seeds the date once on first
+      // check, then the existing match-suppression takes over on
+      // subsequent checks.
+      //
+      // Dates are normalized through `normalizeUpdateDate` before
+      // compare/store. The server emits `...Z` but the Rust updater
+      // plugin reformats to `...+00:00` — without normalization the
+      // strict equality ALWAYS fails. See `lib/updaterDate.ts`.
       if (update.version === appVersion) {
-        const storedDate = getStore<string | null>(KEY_LAST_UPDATE_DATE, null);
-        if (storedDate === null) {
-          // First in-app check on a build the in-app updater never
-          // installed. Trust the remote pub_date and seed.
-          setStore(KEY_LAST_UPDATE_DATE, update.date);
+        const normalizedRemote = normalizeUpdateDate(update.date);
+        // No usable pub_date from the server: nothing to compare
+        // against. Trust the same-version response as up-to-date.
+        if (normalizedRemote === null) {
           pendingUpdate.current = null;
           setStatus({ step: "up-to-date" });
           return;
         }
-        if (update.date === storedDate) {
+
+        const storedDate = getStore<string | null>(KEY_LAST_UPDATE_DATE, null);
+        if (storedDate === null) {
+          // First in-app check on a build the in-app updater never
+          // installed. Trust the remote pub_date and seed in
+          // normalized form.
+          setStore(KEY_LAST_UPDATE_DATE, normalizedRemote);
+          pendingUpdate.current = null;
+          setStatus({ step: "up-to-date" });
+          return;
+        }
+        // Compare normalized forms directly. `normalizedRemote` is
+        // already canonical; only the stored value needs a round-trip
+        // in case it was seeded by an older build.
+        const normalizedStored = normalizeUpdateDate(storedDate);
+        if (normalizedStored === normalizedRemote) {
+          // Heal a stored value that wasn't normalized by a prior
+          // build (e.g. seeded from the server's raw `...Z` string).
+          if (storedDate !== normalizedRemote) {
+            setStore(KEY_LAST_UPDATE_DATE, normalizedRemote);
+          }
           pendingUpdate.current = null;
           setStatus({ step: "up-to-date" });
           return;
@@ -201,13 +227,17 @@ export default function GeneralSettings({
       // The new build is downloaded but NOT YET RUNNING — the user still
       // has to relaunch. Write to `pendingUpdate` instead of `lastUpdateDate`
       // so that if the user never relaunches we don't falsely report the
-      // new build as installed on the next check. The reconcile useEffect
-      // above promotes pending → lastUpdateDate once a later session is
-      // actually running at `update.version`.
-      if (update.date && update.version) {
+      // new build as installed on the next check. The reconcile in
+      // `hooks/useStartupUpdateCheck.ts` promotes pending → lastUpdateDate
+      // once a later session is actually running at `update.version`.
+      //
+      // Date is normalized so the promoted value compares cleanly on
+      // future launches — see `lib/updaterDate.ts`.
+      const normalizedDate = normalizeUpdateDate(update.date);
+      if (normalizedDate && update.version) {
         const pending: PendingUpdate = {
           version: update.version,
-          date: update.date,
+          date: normalizedDate,
         };
         setStore(KEY_PENDING_UPDATE, pending);
       }
