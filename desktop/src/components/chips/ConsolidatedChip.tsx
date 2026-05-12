@@ -148,7 +148,19 @@ export default function ConsolidatedChip({
                 <span className="text-[13px] leading-none ml-1">{item.icon}</span>
               </>
             ) : isSysmon(item) ? (
-              <span className={clsx(item.hot ? "text-error" : c.text)}>
+              // Reserve a fixed cell width for the value so the chip
+              // doesn't grow/shrink as percentages and wattages flip
+              // between digit counts ("5%" -> "100%", "47W" -> "450W").
+              // Without this the pinned chip jiggles every poll and
+              // forces the entire ticker row to reflow — see Bug 3
+              // notes around `pinned-zone` in `ScrollrTicker.tsx`.
+              <span
+                className={clsx(
+                  "inline-block text-right tabular-nums",
+                  item.hot ? "text-error" : c.text,
+                )}
+                style={{ minWidth: "4ch" }}
+              >
                 {item.value}
               </span>
             ) : (
