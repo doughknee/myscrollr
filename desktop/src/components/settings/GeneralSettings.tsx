@@ -1,7 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { getStore, setStore, removeStore } from "../../lib/store";
+import { getStore, setStore } from "../../lib/store";
 import clsx from "clsx";
 
 // ── Updater storage keys ────────────────────────────────────────
@@ -109,20 +109,6 @@ export default function GeneralSettings({
   const [status, setStatus] = useState<UpdateStatus>({ step: "idle" });
   const pendingUpdate = useRef<Update | null>(null);
 
-  // Reconcile pending-update state: if we previously downloaded an update
-  // and the app is now running that exact version, promote the pending
-  // pub_date to `lastUpdateDate`. If versions don't match, the user never
-  // relaunched — drop the pending record so subsequent "check" calls don't
-  // falsely report up-to-date.
-  useEffect(() => {
-    if (!appVersion) return;
-    const pending = getStore<PendingUpdate | null>(KEY_PENDING_UPDATE, null);
-    if (!pending) return;
-    if (pending.version === appVersion) {
-      setStore(KEY_LAST_UPDATE_DATE, pending.date);
-    }
-    removeStore(KEY_PENDING_UPDATE);
-  }, [appVersion]);
 
   const setApp = <K extends keyof AppearancePrefs>(
     key: K,

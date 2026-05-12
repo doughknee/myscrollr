@@ -389,37 +389,6 @@ export default function App() {
     const tickerH = prefs.ticker.showTicker
       ? Math.round(TICKER_HEIGHTS[prefs.ticker.tickerMode] * rowCount * (prefs.appearance.uiScale / 100))
       : 0;
-    console.log("[Scrollr][position_ticker]",
-      "mode=", prefs.ticker.tickerMode,
-      "rowCount=", rowCount,
-      "uiScale=", prefs.appearance.uiScale,
-      "TICKER_HEIGHTS[mode]=", TICKER_HEIGHTS[prefs.ticker.tickerMode],
-      "=> tickerH=", tickerH);
-    // POC DEBUG: dump actual DOM layout after a brief delay so React rendered.
-    setTimeout(() => {
-      const shell = document.getElementById("desktop-shell");
-      const containers = document.querySelectorAll(".ticker-container");
-      const body = document.body;
-      const html = document.documentElement;
-      const dump = {
-        windowInner: `${window.innerWidth}x${window.innerHeight}`,
-        windowOuter: `${window.outerWidth}x${window.outerHeight}`,
-        htmlRect: html.getBoundingClientRect(),
-        bodyRect: body.getBoundingClientRect(),
-        bodyBg: getComputedStyle(body).backgroundColor,
-        htmlBg: getComputedStyle(html).backgroundColor,
-        shellRect: shell?.getBoundingClientRect(),
-        shellBg: shell ? getComputedStyle(shell).backgroundColor : "no-shell",
-        shellHeight: shell ? getComputedStyle(shell).height : "no-shell",
-        containerCount: containers.length,
-        firstContainerRect: containers[0]?.getBoundingClientRect(),
-        firstContainerBg: containers[0] ? getComputedStyle(containers[0]).backgroundColor : "no-container",
-        firstContainerHeight: containers[0] ? getComputedStyle(containers[0]).height : "no-container",
-        dataTheme: html.getAttribute("data-theme"),
-        dataMode: html.getAttribute("data-mode"),
-      };
-      console.log("[Scrollr][DOM-DEBUG]", JSON.stringify(dump, null, 2));
-    }, 500);
     if (tickerH > 0) {
       invoke("position_ticker", { position: tickerPosition, height: tickerH }).catch(() => {});
     }
@@ -432,14 +401,40 @@ export default function App() {
   ]);
 
   // ── Show/hide ticker window based on visibility ────────────────
+  //
+  // Also informs the Windows AppBar layer so the screen-space
+  // reservation is released when the ticker is hidden (otherwise
+  // maximized windows still respect a ticker that isn't there).
+  // The AppBar will be re-registered automatically on the next
+  // position_ticker invocation.
 
   useEffect(() => {
     const win = getCurrentWindow();
     if (prefs.ticker.showTicker) {
-      win.show().catch(() => {});
+      // Show the window first, then re-apply position. Tauri's
+      // show() restores the window's saved geometry which would
+      // otherwise stomp the position the position_ticker effect
+      // just set (effect ordering: position runs before this one).
+      win.show()
+        .then(() => {
+          const rowCount = prefsRef.current.appearance.tickerLayout.rows.length;
+          const h = Math.round(
+            TICKER_HEIGHTS[prefsRef.current.ticker.tickerMode] *
+              rowCount *
+              (prefsRef.current.appearance.uiScale / 100),
+          );
+          if (h > 0) {
+            invoke("position_ticker", {
+              position: prefsRef.current.window.tickerPosition,
+              height: h,
+            }).catch(() => {});
+          }
+        })
+        .catch(() => {});
     } else {
       win.hide().catch(() => {});
     }
+    invoke("set_ticker_visible", { visible: prefs.ticker.showTicker }).catch(() => {});
   }, [prefs.ticker.showTicker]);
 
   // ── Chip click → open external URL (or fall back to app) ───────

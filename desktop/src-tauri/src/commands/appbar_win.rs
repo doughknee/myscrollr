@@ -12,8 +12,8 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::UI::Shell::{
-    SHAppBarMessage, ABE_BOTTOM, ABE_TOP, ABM_NEW, ABM_QUERYPOS, ABM_REMOVE, ABM_SETPOS,
-    APPBARDATA,
+    SHAppBarMessage, ABE_BOTTOM, ABE_TOP, ABM_ACTIVATE, ABM_NEW, ABM_QUERYPOS, ABM_REMOVE,
+    ABM_SETPOS, ABM_WINDOWPOSCHANGED, APPBARDATA,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::WM_USER;
 
@@ -85,9 +85,39 @@ pub fn unregister(window: &tauri::Window) -> Result<(), String> {
     data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
     data.hWnd = hwnd;
 
-    unsafe { SHAppBarMessage(ABM_REMOVE, &mut data) };
+    unsafe {
+        SHAppBarMessage(ABM_REMOVE, &mut data);
+        // Force the shell to reflow now that our slot is gone. Without
+        // this, maximized windows can be slow to reclaim the space.
+        let mut wpc_data: APPBARDATA = std::mem::zeroed();
+        wpc_data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
+        wpc_data.hWnd = hwnd;
+        SHAppBarMessage(ABM_WINDOWPOSCHANGED, &mut wpc_data);
+    }
     REGISTERED.store(false, Ordering::Relaxed);
     log::info!("[AppBar] unregistered");
+    Ok(())
+}
+
+/// Defensive unregister called during app startup BEFORE any
+/// register(). Clears any stale AppBar entry left over from a
+/// previous session that crashed or was force-killed.
+///
+/// The shell tracks AppBar registrations by HWND. If a previous
+/// Scrollr process registered the same HWND and never called
+/// ABM_REMOVE, the work area stays shrunk until logoff or
+/// explorer.exe restart. This call is a harmless no-op if there's
+/// no stale entry.
+///
+/// We bypass the REGISTERED atomic (which is false at startup) and
+/// don't update it — the next register() call will set it cleanly.
+pub fn force_unregister_stale(window: &tauri::Window) -> Result<(), String> {
+    let hwnd = hwnd_of(window)?;
+    let mut data: APPBARDATA = unsafe { std::mem::zeroed() };
+    data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
+    data.hWnd = hwnd;
+    unsafe { SHAppBarMessage(ABM_REMOVE, &mut data) };
+    log::info!("[AppBar] force_unregister_stale (defensive startup cleanup)");
     Ok(())
 }
 
@@ -145,6 +175,24 @@ pub fn set_position(
     let result = unsafe { SHAppBarMessage(ABM_SETPOS, &mut data) };
     if result == 0 {
         return Err("SHAppBarMessage(ABM_SETPOS) failed".into());
+    }
+
+    // Tell the shell our window is now in its final position and it
+    // should notify other top-level windows (maximized ones especially)
+    // to recompute their bounds against the new work area. Without
+    // this, maximized windows lag a toggle cycle behind the AppBar
+    // changing — visible as a "ghost" of the previous reserved
+    // region until the next reflow event.
+    unsafe {
+        let mut activate_data: APPBARDATA = std::mem::zeroed();
+        activate_data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
+        activate_data.hWnd = hwnd;
+        SHAppBarMessage(ABM_ACTIVATE, &mut activate_data);
+
+        let mut wpc_data: APPBARDATA = std::mem::zeroed();
+        wpc_data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
+        wpc_data.hWnd = hwnd;
+        SHAppBarMessage(ABM_WINDOWPOSCHANGED, &mut wpc_data);
     }
 
     // Move the window to the rect the shell granted us. Use Win32

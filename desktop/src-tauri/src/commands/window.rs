@@ -144,3 +144,26 @@ pub fn set_hide_on_fullscreen(_value: bool) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// Inform the AppBar layer that the ticker has been shown or hidden.
+/// On hide we call ABM_REMOVE so the work area stops being reserved
+/// (otherwise turning the ticker off leaves a permanent dead zone
+/// where the ticker used to be). On show we re-register; the
+/// subsequent position_ticker call will resize the AppBar properly.
+///
+/// Windows-only. Idempotent (register/unregister both guard
+/// against double-calls internally).
+#[tauri::command]
+pub fn set_ticker_visible(_window: tauri::Window, _visible: bool) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use crate::commands::appbar_win;
+        if _visible {
+            // The next position_ticker call will register if needed.
+            // Nothing to do here proactively — registration is lazy.
+        } else {
+            let _ = appbar_win::unregister(&_window);
+        }
+    }
+    Ok(())
+}

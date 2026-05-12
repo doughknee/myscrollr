@@ -81,6 +81,7 @@ pub fn run() {
             commands::window::position_ticker,
             commands::window::pin_window,
             commands::window::set_hide_on_fullscreen,
+            commands::window::set_ticker_visible,
             commands::auth::start_auth_server,
             commands::auth::stop_auth_server,
             commands::sse::start_sse,
@@ -118,6 +119,16 @@ pub fn run() {
                 // Force WebView2 surface background to dark so the
                 // area outside the HTML body doesn't show as white.
                 let _ = ticker.set_background_color(Some(tauri::webview::Color(20, 20, 32, 255)));
+
+                // Defensive: clear any stale AppBar registration from
+                // a previous session that crashed without calling
+                // ABM_REMOVE. Harmless no-op if there's no stale entry.
+                #[cfg(target_os = "windows")]
+                {
+                    let _ = crate::commands::appbar_win::force_unregister_stale(
+                        &ticker.as_ref().window(),
+                    );
+                }
             } else {
                 log::error!("Failed to create ticker window — continuing without it");
             }

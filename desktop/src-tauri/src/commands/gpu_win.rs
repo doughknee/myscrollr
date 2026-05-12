@@ -55,13 +55,39 @@ struct Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory {
     SharedUsage: u64,
 }
 
-/// Open a fresh WMI connection. Initializes COM for the calling thread.
-/// `WMIConnection::new(com_lib)` accepts an existing COMLibrary token
-/// so we can call this from `spawn_blocking` workers without conflicting
-/// with the main thread's COM apartment.
-fn connect() -> Result<WMIConnection, String> {
-    let com = COMLibrary::new().map_err(|e| format!("COM init: {e}"))?;
-    WMIConnection::new(com).map_err(|e| format!("WMI conn: {e}"))
+// Cached WMI connection per blocking-pool thread.
+//
+// COMLibrary + WMIConnection are pinned to the thread that created
+// them (COM apartment affinity). tokio's spawn_blocking reuses a
+// small pool of threads, so we use thread-local storage to keep a
+// long-lived connection per worker — first call on a thread pays the
+// ~100-200 ms setup cost, every subsequent call on that same thread
+// reuses the existing connection.
+//
+// Wrapped in an extra Option<Result> so a failed init isn't retried
+// indefinitely (the per-thread state stays Err and we return early).
+thread_local! {
+    static WMI_CONN: std::cell::RefCell<Option<Result<WMIConnection, String>>> =
+        std::cell::RefCell::new(None);
+}
+
+/// Run `f` with a borrowed reference to the thread-local WMI connection.
+/// Initializes the connection on first call for this thread.
+fn with_conn<R>(f: impl FnOnce(&WMIConnection) -> R) -> Result<R, String> {
+    WMI_CONN.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        if slot.is_none() {
+            let result = (|| {
+                let com = COMLibrary::new().map_err(|e| format!("COM init: {e}"))?;
+                WMIConnection::new(com).map_err(|e| format!("WMI conn: {e}"))
+            })();
+            *slot = Some(result);
+        }
+        match slot.as_ref().unwrap() {
+            Ok(conn) => Ok(f(conn)),
+            Err(e) => Err(e.clone()),
+        }
+    })
 }
 
 /// Probe static GPU info on first poll. Picks the adapter with the
@@ -71,19 +97,14 @@ fn connect() -> Result<WMIConnection, String> {
 /// failed probe degrades gracefully — the dynamic side will just
 /// return all-None.
 pub fn probe_static() -> GpuStatic {
-    let con = match connect() {
-        Ok(c) => c,
-        Err(e) => {
-            log::warn!("[gpu_win] connect failed: {e}");
+    let controllers: Vec<Win32_VideoController> = match with_conn(|c| c.query()) {
+        Ok(Ok(v)) => v,
+        Ok(Err(e)) => {
+            log::warn!("[gpu_win] Win32_VideoController query: {e}");
             return GpuStatic { name: None, vram_total: None, luid: None };
         }
-    };
-
-    // 1. Find the primary GPU from Win32_VideoController.
-    let controllers: Vec<Win32_VideoController> = match con.query() {
-        Ok(v) => v,
         Err(e) => {
-            log::warn!("[gpu_win] Win32_VideoController query: {e}");
+            log::warn!("[gpu_win] connect failed: {e}");
             return GpuStatic { name: None, vram_total: None, luid: None };
         }
     };
@@ -109,7 +130,7 @@ pub fn probe_static() -> GpuStatic {
     // the one with the most DedicatedUsage right now — usually the
     // discrete card if anything is running on it.
     let adapters: Vec<Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory> =
-        con.query().unwrap_or_default();
+        with_conn(|c| c.query()).ok().and_then(|r| r.ok()).unwrap_or_default();
 
     let luid = adapters
         .into_iter()
@@ -131,18 +152,11 @@ pub fn probe_static() -> GpuStatic {
 /// Read dynamic GPU values: total utilization (% across all processes
 /// on the 3D engine) and VRAM in use.
 pub fn read_dynamic(luid: Option<&str>) -> GpuDynamic {
-    let con = match connect() {
-        Ok(c) => c,
-        Err(_) => return GpuDynamic::default(),
-    };
-
-    // Utilization: sum the UtilizationPercentage of all "3D" engine
-    // entries belonging to our adapter. Task Manager uses max here,
-    // but sum matches what users intuitively expect ("85% GPU usage")
-    // when a single app dominates, and saturates at 100% naturally
-    // when summed across many small clients. We clamp to 100.
     let engines: Vec<Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine> =
-        con.query().unwrap_or_default();
+        match with_conn(|c| c.query()) {
+            Ok(Ok(v)) => v,
+            _ => return GpuDynamic::default(),
+        };
 
     // GPU utilization matches Task Manager: pick the busiest single
     // engine across ALL engine types (3D, Compute, Copy, Video
@@ -186,7 +200,7 @@ pub fn read_dynamic(luid: Option<&str>) -> GpuDynamic {
 
     // VRAM used: look up the adapter memory counter for our LUID.
     let mems: Vec<Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory> =
-        con.query().unwrap_or_default();
+        with_conn(|c| c.query()).ok().and_then(|r| r.ok()).unwrap_or_default();
 
     let vram_used = luid.and_then(|want| {
         mems.iter()
