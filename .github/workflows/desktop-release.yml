@@ -99,6 +99,28 @@ jobs:
         with:
           targets: ${{ matrix.rust_target }}
 
+      # macOS-14 GitHub-hosted runners ship a Homebrew-installed rustup at
+      # /opt/homebrew/bin/cargo where `cargo` is actually a `rustup-init`
+      # stub with self-update disabled ("info: self-update is disabled for
+      # this build of rustup"). After dtolnay/rust-toolchain installs the
+      # real toolchain at $CARGO_HOME/bin, that path appears AFTER
+      # /opt/homebrew/bin on PATH, so `cargo metadata` (called by
+      # tauri-action's preflight) resolves to the Homebrew stub and fails
+      # with "unexpected argument 'metadata' found / Usage:
+      # rustup-init[EXE]". Writing $CARGO_HOME/bin to $GITHUB_PATH
+      # prepends it for subsequent steps, so the real cargo wins.
+      # Linux and Windows runners are unaffected because rustup is
+      # installed differently there. See run #25767628199 for the
+      # original failure.
+      - name: Prefer $CARGO_HOME/bin on PATH (macOS-14 Homebrew rustup workaround)
+        if: matrix.platform == 'macos-14'
+        shell: bash
+        working-directory: .
+        run: |
+          echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
+          echo "Before workaround, cargo resolves to: $(command -v cargo || echo 'not found')"
+          echo "Real cargo at \$CARGO_HOME/bin/cargo: $($CARGO_HOME/bin/cargo --version)"
+
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
