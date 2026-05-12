@@ -220,12 +220,9 @@ export interface WeatherTickerConfig {
 }
 
 export interface WeatherWidgetConfig {
-  /** City display name shown on the taskbar mini chip (empty = first configured city). */
-  taskbarCity: string;
   ticker: WeatherTickerConfig;
 }
 
-export type TaskbarMetric = "cpu" | "memory" | "gpu";
 export type TempUnit = "celsius" | "fahrenheit";
 
 export interface SysmonTickerConfig {
@@ -236,7 +233,6 @@ export interface SysmonTickerConfig {
 }
 
 export interface SysmonWidgetConfig {
-  taskbarMetric: TaskbarMetric;
   refreshInterval: number;
   tempUnit: TempUnit;
   ticker: SysmonTickerConfig;
@@ -649,11 +645,9 @@ const DEFAULT_WIDGETS: WidgetPrefs = {
     pomodoro: { ...DEFAULT_CLOCK_POMODORO },
   },
   weather: {
-    taskbarCity: "",
     ticker: { ...DEFAULT_WEATHER_TICKER },
   },
   sysmon: {
-    taskbarMetric: "cpu",
     refreshInterval: 2,
     tempUnit: "celsius",
     ticker: { ...DEFAULT_SYSMON_TICKER },
@@ -774,11 +768,9 @@ function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
       pomodoro: { ...DEFAULT_CLOCK_POMODORO, ...obj(clk?.pomodoro) },
     },
     weather: {
-      taskbarCity: typeof wth?.taskbarCity === "string" ? wth.taskbarCity : DEFAULT_WIDGETS.weather.taskbarCity,
       ticker: { ...DEFAULT_WEATHER_TICKER, ...obj(wth?.ticker) },
     },
     sysmon: {
-      taskbarMetric: (sys?.taskbarMetric as TaskbarMetric) ?? DEFAULT_WIDGETS.sysmon.taskbarMetric,
       refreshInterval: typeof sys?.refreshInterval === "number" ? sys.refreshInterval : DEFAULT_WIDGETS.sysmon.refreshInterval,
       tempUnit: (sys?.tempUnit as TempUnit) ?? DEFAULT_WIDGETS.sysmon.tempUnit,
       ticker: { ...DEFAULT_SYSMON_TICKER, ...obj(sys?.ticker) },

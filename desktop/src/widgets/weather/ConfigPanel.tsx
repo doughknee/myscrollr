@@ -41,14 +41,8 @@ export default function WeatherConfigPanel({
     setStore(LS_WEATHER_UNIT, v);
   }, []);
 
-  const taskbarCityOptions: { value: string; label: string }[] = [
-    { value: "", label: "Auto" },
-    ...cities.map((c) => ({ value: cityName(c), label: cityName(c) })),
-  ];
-
   const resetAll = useCallback(() => {
     update({
-      taskbarCity: "",
       ticker: { ...DEFAULT_WEATHER_TICKER },
     });
     setStore(LS_WEATHER_UNIT, "fahrenheit");
@@ -69,24 +63,6 @@ export default function WeatherConfigPanel({
       subtitle="Current conditions for your saved cities"
       onReset={resetAll}
     >
-      <Section title="Toolbar Preview">
-        {cities.length > 1 ? (
-          <SegmentedRow
-            label="City shown"
-            description="Which city to display on the toolbar"
-            value={config.taskbarCity}
-            options={taskbarCityOptions}
-            onChange={(v) => update({ taskbarCity: v })}
-          />
-        ) : (
-          <div className="px-3 py-2.5 text-[11px] text-fg-4">
-            {cities.length === 1
-              ? `Showing ${cityName(cities[0])} on the toolbar.`
-              : "Add a city in the Weather tab to see it on the toolbar."}
-          </div>
-        )}
-      </Section>
-
       <Section title="Ticker">
         {cities.map((city) => (
           <ToggleRow

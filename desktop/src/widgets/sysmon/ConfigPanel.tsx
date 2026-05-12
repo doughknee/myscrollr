@@ -8,14 +8,8 @@ import ConfigPanelLayout from "../../components/settings/ConfigPanelLayout";
 import TickerPinSection from "../../components/settings/TickerPinSection";
 import { useWidgetConfig } from "../../hooks/useWidgetConfig";
 import { DEFAULT_SYSMON_TICKER } from "../../preferences";
-import type { TaskbarMetric, TempUnit } from "../../preferences";
+import type { TempUnit } from "../../preferences";
 import type { WidgetConfigPanelProps } from "../../hooks/useWidgetConfig";
-
-const METRIC_OPTIONS: { value: TaskbarMetric; label: string }[] = [
-  { value: "cpu", label: "CPU" },
-  { value: "memory", label: "Memory" },
-  { value: "gpu", label: "GPU" },
-];
 
 const REFRESH_OPTIONS: { value: string; label: string }[] = [
   { value: "1", label: "1s" },
@@ -37,7 +31,6 @@ export default function SysmonConfigPanel({
 
   const resetAll = useCallback(() => {
     update({
-      taskbarMetric: "cpu",
       refreshInterval: 2,
       tempUnit: "celsius",
       ticker: { ...DEFAULT_SYSMON_TICKER },
@@ -63,16 +56,6 @@ export default function SysmonConfigPanel({
       subtitle="CPU, memory, GPU, and network stats"
       onReset={resetAll}
     >
-      <Section title="Toolbar Preview">
-        <SegmentedRow
-          label="What to show"
-          description="What info to show on the toolbar"
-          value={config.taskbarMetric}
-          options={METRIC_OPTIONS}
-          onChange={(v) => update({ taskbarMetric: v })}
-        />
-      </Section>
-
       <Section title="Ticker">
         <ToggleRow
           label="CPU usage"
