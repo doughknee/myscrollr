@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -55,6 +56,12 @@ type registrationRoute struct {
 func main() {
 	// Load .env (optional — don't fatal if missing)
 	_ = godotenv.Load()
+
+	// Sentry init — before any other infrastructure. No-op when
+	// SENTRY_DSN is unset.
+	if initSentry() {
+		defer sentry.Flush(2 * time.Second)
+	}
 
 	// -------------------------------------------------------------------------
 	// Connect to PostgreSQL
@@ -125,6 +132,15 @@ func main() {
 		AppName:               "Scrollr Finance API",
 		DisableStartupMessage: false,
 	})
+
+	// Sentry middleware MUST be the first middleware so panics from
+	// anything below are captured. Followed immediately by the user-hook
+	// which attaches a hashed anonymous user ID to every request scope.
+	// Both gated on SENTRY_DSN — when unset, neither is registered.
+	if os.Getenv("SENTRY_DSN") != "" {
+		fiberApp.Use(sentryMiddleware())
+		fiberApp.Use(sentryUserHook())
+	}
 
 	app := &App{db: dbPool, rdb: rdb}
 
