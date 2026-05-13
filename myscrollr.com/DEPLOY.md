@@ -7,6 +7,8 @@ The marketing site is statically prerendered via TanStack Start. The build emits
 
 The Dockerfile in this directory copies `dist/client/` to `/usr/share/nginx/html`. **Do not copy `dist/` itself** — that nests the server bundle under the web root and breaks the routing.
 
+The site is deployed via Kubernetes (see `k8s/website.yaml` and `k8s/ingress.yaml`). The Deployment runs the nginx-based image from `registry.digitalocean.com/scrollr/website` and the Ingress forwards `myscrollr.com` + `www.myscrollr.com` to the `website` Service on port 3000. The nginx config inside the container (defined in this Dockerfile) handles SPA fallback — the K8s Ingress is path-agnostic and just forwards everything.
+
 ## Prerendered marketing routes
 
 The following routes are prerendered at build time and ship as static HTML with full per-route meta, OpenGraph, Twitter card, canonical, and JSON-LD scripts:
@@ -63,7 +65,7 @@ myscrollr.com {
 
 The `try_files` directive only rewrites the URI — it must be paired with `file_server` (or another responder) to actually serve the rewritten file.
 
-For Coolify static-site presets: SPA fallback is handled automatically; the included Dockerfile is used instead.
+For the Kubernetes deploy in this repo: the nginx config baked into the Dockerfile handles SPA fallback. The Ingress (`k8s/ingress.yaml`) just forwards `myscrollr.com` → the `website` Service; no additional fallback config is needed at the K8s layer.
 
 ## Build pipeline
 
