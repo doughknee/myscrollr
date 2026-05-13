@@ -34,6 +34,7 @@ import { loadMonitors } from "../widgets/uptime/types";
 import { loadRepoData } from "../widgets/github/types";
 import {
   LS_CLOCK_FORMAT,
+  LS_TIMER_STATE,
   LS_WEATHER_CITIES,
   LS_WEATHER_UNIT,
   LS_SYSMON_DATA,
@@ -54,9 +55,40 @@ import type {
 } from "../types";
 import type { TempUnit, HomePreview } from "../preferences";
 import type { SystemInfo } from "../hooks/useSysmonData";
+import type { TimerState } from "../widgets/timer/types";
 import type { SavedCity } from "../widgets/weather/types";
 
 const MAX_PREVIEW = 5;
+
+function formatTimerDuration(ms: number): string {
+  const totalSecs = Math.floor(Math.max(0, ms) / 1000);
+  const hours = Math.floor(totalSecs / 3600);
+  const mins = Math.floor((totalSecs % 3600) / 60);
+  const secs = totalSecs % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  }
+
+  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
+function getTimerValue(): string {
+  const state = getStore<TimerState | null>(LS_TIMER_STATE, null);
+  if (!state) return "Idle";
+
+  const elapsed = state.startedAt == null
+    ? state.bankedMs
+    : state.bankedMs + (Date.now() - state.startedAt);
+
+  if (state.startedAt == null && elapsed <= 0) return "Idle";
+
+  const ms = state.mode === "stopwatch"
+    ? elapsed
+    : Math.max(0, state.targetSecs * 1000 - elapsed);
+
+  return formatTimerDuration(ms);
+}
 
 // ── Route ───────────────────────────────────────────────────────
 
@@ -1050,6 +1082,8 @@ function getWidgetValue(id: string): string {
         hour12: format === "12h",
       }).format(new Date());
     }
+    case "timer":
+      return getTimerValue();
     case "weather": {
       const cities = getStore<SavedCity[]>(LS_WEATHER_CITIES, []);
       const unit = getStore<string>(LS_WEATHER_UNIT, "fahrenheit") as TempUnit;

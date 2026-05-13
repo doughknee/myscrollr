@@ -5,14 +5,14 @@
  * window close/reopen within the same session.
  */
 import { useState, useEffect, useCallback, useRef } from "react";
+import { LS_TIMER_STATE } from "../../constants";
 import { getStore, setStore } from "../../lib/store";
+import { loadPrefs } from "../../preferences";
+import { getPomodoroTiming, reconcileIdlePomodoroTarget } from "./pomodoro";
 import type { TimerMode, TimerState } from "./types";
 
 // ── Constants ───────────────────────────────────────────────────
 
-const POMODORO_WORK = 25 * 60;
-const POMODORO_SHORT_BREAK = 5 * 60;
-const POMODORO_LONG_BREAK = 15 * 60;
 const COUNTDOWN_PRESETS = [
   { label: "1m", secs: 60 },
   { label: "5m", secs: 300 },
@@ -24,19 +24,27 @@ const COUNTDOWN_PRESETS = [
 
 // ── Storage ─────────────────────────────────────────────────────
 
-const TIMER_KEY = "scrollr:widget:timer:state";
+const TIMER_KEY = LS_TIMER_STATE;
 
-const DEFAULT_TIMER_STATE: TimerState = {
-  mode: "pomodoro",
-  startedAt: null,
-  bankedMs: 0,
-  targetSecs: POMODORO_WORK,
-  completedSessions: 0,
-};
+function loadPomodoroTiming() {
+  return getPomodoroTiming(loadPrefs().widgets.timer.pomodoro);
+}
+
+function defaultTimerState(): TimerState {
+  return {
+    mode: "pomodoro",
+    startedAt: null,
+    bankedMs: 0,
+    targetSecs: loadPomodoroTiming().workSecs,
+    completedSessions: 0,
+  };
+}
 
 function loadTimerState(): TimerState {
   const s = getStore<TimerState | null>(TIMER_KEY, null);
-  return s && typeof s.mode === "string" ? s : DEFAULT_TIMER_STATE;
+  return s && typeof s.mode === "string"
+    ? reconcileIdlePomodoroTarget(s, loadPomodoroTiming().workSecs)
+    : defaultTimerState();
 }
 
 function saveTimerState(s: TimerState): void {
@@ -253,6 +261,11 @@ export function Timer({ compact }: TimerProps) {
   const customInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    const { workSecs } = loadPomodoroTiming();
+    setState((p) => reconcileIdlePomodoroTarget(p, workSecs));
+  });
+
+  useEffect(() => {
     saveTimerState(state);
   }, [state]);
 
@@ -324,10 +337,16 @@ export function Timer({ compact }: TimerProps) {
     setState((p) => ({ ...p, startedAt: null, bankedMs: getElapsedMs(p) }));
   }, []);
   const reset = useCallback(() => {
-    setState((p) => ({ ...p, startedAt: null, bankedMs: 0 }));
+    setState((p) => ({
+      ...p,
+      startedAt: null,
+      bankedMs: 0,
+      targetSecs: p.mode === "pomodoro" ? loadPomodoroTiming().workSecs : p.targetSecs,
+    }));
   }, []);
 
   const doSwitchMode = useCallback((m: TimerMode) => {
+    const timing = loadPomodoroTiming();
     setState((p) => ({
       ...p,
       mode: m,
@@ -335,7 +354,7 @@ export function Timer({ compact }: TimerProps) {
       bankedMs: 0,
       targetSecs:
         m === "pomodoro"
-          ? POMODORO_WORK
+          ? timing.workSecs
           : m === "countdown"
             ? 300
             : 0,
@@ -367,11 +386,12 @@ export function Timer({ compact }: TimerProps) {
   }, [customMinutes, setTarget]);
 
   const startBreak = useCallback((long: boolean) => {
+    const timing = loadPomodoroTiming();
     setState((p) => ({
       ...p,
       startedAt: Date.now(),
       bankedMs: 0,
-      targetSecs: long ? POMODORO_LONG_BREAK : POMODORO_SHORT_BREAK,
+      targetSecs: long ? timing.longBreakSecs : timing.shortBreakSecs,
     }));
   }, []);
 
@@ -405,6 +425,7 @@ export function Timer({ compact }: TimerProps) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isRunning, isComplete, start, pause, reset, confirmSwitch]);
 
+  const pomodoroTiming = loadPomodoroTiming();
   const notifPermission =
     "Notification" in globalThis ? Notification.permission : "denied";
 
@@ -435,11 +456,16 @@ export function Timer({ compact }: TimerProps) {
                 }}
               />
             )}
-            <span
-              className={`text-lg font-mono font-bold tabular-nums ${isComplete ? "text-widget-timer" : "text-fg"}`}
-            >
-              {displayTime}
-            </span>
+            <div className="flex items-baseline gap-2 min-w-0">
+              <span
+                className={`text-lg font-mono font-bold tabular-nums ${isComplete ? "text-widget-timer" : "text-fg"}`}
+              >
+                {displayTime}
+              </span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-widget-timer/70">
+                {state.mode === "pomodoro" ? "Pomodoro" : state.mode === "countdown" ? "Countdown" : "Stopwatch"}
+              </span>
+            </div>
           </div>
           <div className="flex gap-1">
             {isComplete ? (
@@ -499,42 +525,44 @@ export function Timer({ compact }: TimerProps) {
       />
 
       {/* Display */}
-      <div className="flex flex-col items-center">
-        {isCountdown ? (
-          <CircularProgress
-            progress={progress}
-            size={160}
-            strokeWidth={4}
-            running={isRunning}
-          >
-            <span
-              className={`text-2xl font-mono font-bold tabular-nums ${isComplete ? "text-widget-timer" : "text-fg"}`}
+      <div className="rounded-2xl border border-widget-timer/15 bg-widget-timer/[0.04] px-4 py-5 shadow-[inset_0_1px_0_0_rgba(245,158,11,0.08)]">
+        <div className="flex flex-col items-center">
+          {isCountdown ? (
+            <CircularProgress
+              progress={progress}
+              size={160}
+              strokeWidth={4}
+              running={isRunning}
             >
-              {displayTime}
-            </span>
-            {state.mode === "pomodoro" && (
-              <span className="text-[11px] font-mono text-fg-2 mt-1">
-                Session {state.completedSessions + 1}
-              </span>
-            )}
-          </CircularProgress>
-        ) : (
-          <div className="text-center py-4">
-            <div className="flex items-center justify-center gap-2">
-              {isRunning && (
-                <div
-                  className="w-2 h-2 rounded-full bg-widget-timer"
-                  style={{
-                    animation: "widget-pulse 1.5s ease-in-out infinite",
-                  }}
-                />
-              )}
-              <span className="text-3xl font-mono font-bold text-fg tabular-nums">
+              <span
+                className={`text-2xl font-mono font-bold tabular-nums ${isComplete ? "text-widget-timer" : "text-fg"}`}
+              >
                 {displayTime}
               </span>
+              {state.mode === "pomodoro" && (
+                <span className="text-[11px] font-mono text-fg-2 mt-1">
+                  Session {state.completedSessions + 1}
+                </span>
+              )}
+            </CircularProgress>
+          ) : (
+            <div className="text-center py-4">
+              <div className="flex items-center justify-center gap-2">
+                {isRunning && (
+                  <div
+                    className="w-2 h-2 rounded-full bg-widget-timer"
+                    style={{
+                      animation: "widget-pulse 1.5s ease-in-out infinite",
+                    }}
+                  />
+                )}
+                <span className="text-3xl font-mono font-bold text-fg tabular-nums">
+                  {displayTime}
+                </span>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Controls */}
@@ -556,7 +584,7 @@ export function Timer({ compact }: TimerProps) {
                   Short Break
                 </button>
                 {state.completedSessions > 0 &&
-                  state.completedSessions % 4 === 0 && (
+                  state.completedSessions % pomodoroTiming.longBreakEvery === 0 && (
                     <button
                       onClick={() => startBreak(true)}
                       className="text-xs font-mono text-fg px-4 py-2 rounded-full bg-surface-2 border border-edge hover:border-edge-2 transition-colors"

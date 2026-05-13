@@ -28,6 +28,7 @@ import {
   setTickerLayout,
   removeTickerRow,
   setSourceTickerRow,
+  setWidgetTickerRow,
 } from "../preferences";
 import { getMaxTickerRows, canCustomizeTickerRows } from "../tierLimits";
 import type {
@@ -111,7 +112,10 @@ export function useTickerLayout(
           }))
         : rows;
       const newIndex = baseRows.length;
-      const next = setTickerLayout(prefs, { rows: [...baseRows, nextRow] });
+      const withRow = setTickerLayout(prefs, { rows: [...baseRows, nextRow] });
+      const next = initialSource && prefs.widgets.enabledWidgets.includes(initialSource)
+        ? setWidgetTickerRow(withRow, initialSource, newIndex)
+        : withRow;
       onPrefsChange(next);
       return newIndex;
     },
@@ -135,7 +139,10 @@ export function useTickerLayout(
 
   const setSourceRow = useCallback(
     (sourceId: string, row: number | null) => {
-      onPrefsChange(setSourceTickerRow(prefs, sourceId, row));
+      const next = prefs.widgets.enabledWidgets.includes(sourceId)
+        ? setWidgetTickerRow(prefs, sourceId, row)
+        : setSourceTickerRow(prefs, sourceId, row);
+      onPrefsChange(next);
     },
     [prefs, onPrefsChange],
   );

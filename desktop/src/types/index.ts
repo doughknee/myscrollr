@@ -205,6 +205,7 @@ export interface GitHubChipData {
 
 export interface WidgetTickerData {
   clock: ClockChipData[];
+  timer: ClockChipData[];
   weather: WeatherChipData[];
   sysmon: SysmonChipData[];
   uptime: UptimeChipData[];

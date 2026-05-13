@@ -12,7 +12,7 @@
  *  - unknown / corrupt values fall back to `"both"` so loadPrefs never
  *    throws or produces a bad shape
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import {
   migrateVenue,
   shouldShowOnFeed,
@@ -33,8 +33,38 @@ import {
   isThemeFamily,
   isThemeMode,
   THEME_FAMILIES,
+  mergeWidgetPrefs,
+  loadPrefs,
 } from "./preferences";
-import type { Venue, AppPreferences } from "./preferences";
+import type { Venue, AppPreferences, WidgetPrefs } from "./preferences";
+
+const storeValues = vi.hoisted(() => new Map<string, unknown>());
+
+vi.mock("./lib/store", () => ({
+  getStore: vi.fn((key: string, fallback: unknown) => (
+    storeValues.has(key) ? storeValues.get(key) : fallback
+  )),
+  setStore: vi.fn((key: string, value: unknown) => {
+    storeValues.set(key, value);
+  }),
+}));
+
+afterEach(() => {
+  storeValues.clear();
+});
+
+interface LegacyClockTimerWidgetPrefs extends Omit<Partial<WidgetPrefs>, "clock"> {
+  clock?: {
+    ticker?: Partial<WidgetPrefs["clock"]["ticker"]> & {
+      activeTimer?: boolean;
+    };
+    pomodoro?: Partial<WidgetPrefs["timer"]["pomodoro"]>;
+  };
+}
+
+function legacyWidgetPrefs(input: LegacyClockTimerWidgetPrefs): Partial<WidgetPrefs> {
+  return input as Partial<WidgetPrefs>;
+}
 
 describe("migrateVenue", () => {
   it("keeps valid venue strings as-is", () => {
@@ -360,6 +390,9 @@ function makePrefs(rows: { sources: string[] }[]): AppPreferences {
     appearance: {
       tickerLayout: { rows },
     },
+    widgets: {
+      widgetsOnTicker: [],
+    },
   } as unknown as AppPreferences;
 }
 
@@ -459,6 +492,19 @@ describe("setSourceTickerRow / setChannelTickerRow / setWidgetTickerRow", () => 
       "finance",
       "clock",
     ]);
+  });
+
+  it("setWidgetTickerRow adds assigned widgets to widgetsOnTicker", () => {
+    const prefs = makePrefs([{ sources: [] }]);
+    const next = setWidgetTickerRow(prefs, "timer", 0);
+    expect(next.widgets.widgetsOnTicker).toEqual(["timer"]);
+  });
+
+  it("setWidgetTickerRow removes unassigned widgets from widgetsOnTicker", () => {
+    const prefs = makePrefs([{ sources: ["timer"] }]);
+    prefs.widgets.widgetsOnTicker = ["clock", "timer"];
+    const next = setWidgetTickerRow(prefs, "timer", null);
+    expect(next.widgets.widgetsOnTicker).toEqual(["clock"]);
   });
 
   it("does not mutate the original prefs object", () => {
@@ -608,5 +654,306 @@ describe("resolveThemeName", () => {
     expect(resolveThemeName("catppuccin", "dark")).toBe("catppuccin-dark");
     expect(resolveThemeName("tokyo-night", "light")).toBe("tokyo-night-light");
     expect(resolveThemeName("rose-pine", "dark")).toBe("rose-pine-dark");
+  });
+});
+
+describe("widget timer preference migration", () => {
+  it("moves legacy clock timer settings into widgets.timer", () => {
+    const prefs = mergeWidgetPrefs(legacyWidgetPrefs({
+      clock: {
+        ticker: {
+          localTime: false,
+          showTimezones: true,
+          excludedTimezones: ["America/New_York"],
+          activeTimer: false,
+        },
+        pomodoro: {
+          workMins: 50,
+          shortBreakMins: 10,
+          longBreakMins: 30,
+          longBreakEvery: 3,
+        },
+      },
+    }));
+
+    expect(prefs.clock).toMatchObject({
+      ticker: {
+        localTime: false,
+        showTimezones: true,
+        excludedTimezones: ["America/New_York"],
+      },
+    });
+    expect("activeTimer" in prefs.clock.ticker).toBe(false);
+    expect(prefs.timer).toEqual({
+      ticker: { activeTimer: false },
+      pomodoro: {
+        workMins: 50,
+        shortBreakMins: 10,
+        longBreakMins: 30,
+        longBreakEvery: 3,
+      },
+    });
+  });
+
+  it("prefers saved timer settings over conflicting legacy clock timer settings", () => {
+    const prefs = mergeWidgetPrefs(legacyWidgetPrefs({
+      clock: {
+        ticker: {
+          activeTimer: false,
+        },
+        pomodoro: {
+          workMins: 50,
+          shortBreakMins: 10,
+          longBreakMins: 30,
+          longBreakEvery: 3,
+        },
+      },
+      timer: {
+        ticker: { activeTimer: true },
+        pomodoro: {
+          workMins: 20,
+          shortBreakMins: 4,
+          longBreakMins: 12,
+          longBreakEvery: 5,
+        },
+      },
+    }));
+
+    expect(prefs.timer).toEqual({
+      ticker: { activeTimer: true },
+      pomodoro: {
+        workMins: 20,
+        shortBreakMins: 4,
+        longBreakMins: 12,
+        longBreakEvery: 5,
+      },
+    });
+  });
+
+  it("keeps legacy active timer chips on the ticker after timer becomes its own widget", () => {
+    const prefs = mergeWidgetPrefs(legacyWidgetPrefs({
+      enabledWidgets: ["clock", "timer"],
+      widgetsOnTicker: ["clock", "timer"],
+      clock: {
+        ticker: {
+          activeTimer: true,
+        },
+      },
+    }));
+
+    expect(prefs.enabledWidgets).toEqual(["clock", "timer"]);
+    expect(prefs.widgetsOnTicker).toEqual(["clock", "timer"]);
+  });
+
+  it("adds timer for legacy clock-on-ticker active timer users", () => {
+    const prefs = mergeWidgetPrefs(legacyWidgetPrefs({
+      enabledWidgets: ["clock"],
+      widgetsOnTicker: ["clock"],
+      clock: {
+        ticker: {
+          activeTimer: true,
+        },
+      },
+    }));
+
+    expect(prefs.enabledWidgets).toEqual(["clock", "timer"]);
+    expect(prefs.widgetsOnTicker).toEqual(["clock", "timer"]);
+  });
+
+  it("adds timer for legacy clock-on-ticker users when activeTimer was never saved", () => {
+    const prefs = mergeWidgetPrefs(legacyWidgetPrefs({
+      enabledWidgets: ["clock"],
+      widgetsOnTicker: ["clock"],
+      clock: {
+        ticker: {},
+      },
+    }));
+
+    expect(prefs.enabledWidgets).toEqual(["clock", "timer"]);
+    expect(prefs.widgetsOnTicker).toEqual(["clock", "timer"]);
+  });
+
+  it("enables timer for legacy clock users without adding ticker visibility", () => {
+    const prefs = mergeWidgetPrefs(legacyWidgetPrefs({
+      enabledWidgets: ["clock"],
+      widgetsOnTicker: [],
+      clock: {
+        ticker: {},
+      },
+    }));
+
+    expect(prefs.enabledWidgets).toEqual(["clock", "timer"]);
+    expect(prefs.widgetsOnTicker).toEqual([]);
+  });
+
+  it("enables timer for legacy clock users who had active timer hidden", () => {
+    const prefs = mergeWidgetPrefs(legacyWidgetPrefs({
+      enabledWidgets: ["clock"],
+      widgetsOnTicker: ["clock"],
+      clock: {
+        ticker: {
+          activeTimer: false,
+        },
+      },
+    }));
+
+    expect(prefs.enabledWidgets).toEqual(["clock", "timer"]);
+    expect(prefs.widgetsOnTicker).toEqual(["clock"]);
+    expect(prefs.timer.ticker.activeTimer).toBe(false);
+  });
+
+  it("does not auto-add timer visibility when current timer prefs exist", () => {
+    const prefs = mergeWidgetPrefs(legacyWidgetPrefs({
+      enabledWidgets: ["clock"],
+      widgetsOnTicker: ["clock"],
+      clock: {
+        ticker: {},
+      },
+      timer: {
+        ticker: { activeTimer: true },
+        pomodoro: {
+          workMins: 25,
+          shortBreakMins: 5,
+          longBreakMins: 15,
+          longBreakEvery: 4,
+        },
+      },
+    }));
+
+    expect(prefs.enabledWidgets).toEqual(["clock"]);
+    expect(prefs.widgetsOnTicker).toEqual(["clock"]);
+    expect(prefs.timer.ticker.activeTimer).toBe(true);
+  });
+
+  it("does not auto-enable timer for current timer prefs", () => {
+    const prefs = mergeWidgetPrefs(legacyWidgetPrefs({
+      enabledWidgets: ["clock"],
+      widgetsOnTicker: [],
+      clock: {
+        ticker: {},
+      },
+      timer: {
+        ticker: { activeTimer: true },
+        pomodoro: {
+          workMins: 25,
+          shortBreakMins: 5,
+          longBreakMins: 15,
+          longBreakEvery: 4,
+        },
+      },
+    }));
+
+    expect(prefs.enabledWidgets).toEqual(["clock"]);
+    expect(prefs.widgetsOnTicker).toEqual([]);
+  });
+
+  it("adds timer to explicit ticker layout rows when legacy clock timer was enabled by default", () => {
+    storeValues.set("scrollr:settings", {
+      appearance: {
+        tickerLayout: {
+          rows: [{ sources: ["clock"] }],
+        },
+      },
+      widgets: legacyWidgetPrefs({
+        enabledWidgets: ["clock"],
+        widgetsOnTicker: ["clock"],
+        clock: {
+          ticker: {},
+        },
+      }),
+    });
+
+    const prefs = loadPrefs();
+
+    expect(prefs.appearance.tickerLayout.rows[0].sources).toEqual(["clock", "timer"]);
+  });
+
+  it("adds timer to explicit ticker layout rows when legacy widgetsOnTicker is absent", () => {
+    storeValues.set("scrollr:settings", {
+      appearance: {
+        tickerLayout: {
+          rows: [{ sources: ["clock"] }],
+        },
+      },
+      widgets: legacyWidgetPrefs({
+        enabledWidgets: ["clock"],
+        clock: {
+          ticker: {},
+        },
+      }),
+    });
+
+    const prefs = loadPrefs();
+
+    expect(prefs.appearance.tickerLayout.rows[0].sources).toEqual(["clock", "timer"]);
+  });
+
+  it("preserves current explicit clock and timer rows when timer was already on ticker", () => {
+    storeValues.set("scrollr:auth", {
+      accessToken: "x.eyJyb2xlcyI6WyJ1cGxpbmsiXX0.x",
+      refreshToken: null,
+      expiresAt: Date.now() + 60_000,
+      userSub: "test-user",
+    });
+    storeValues.set("scrollr:settings", {
+      appearance: {
+        tickerLayout: {
+          rows: [{ sources: ["clock"] }, { sources: ["timer"] }],
+        },
+      },
+      widgets: legacyWidgetPrefs({
+        enabledWidgets: ["clock", "timer"],
+        widgetsOnTicker: ["clock", "timer"],
+        clock: {
+          ticker: {},
+        },
+        timer: {
+          ticker: { activeTimer: true },
+          pomodoro: {
+            workMins: 25,
+            shortBreakMins: 5,
+            longBreakMins: 15,
+            longBreakEvery: 4,
+          },
+        },
+      }),
+    });
+
+    const prefs = loadPrefs();
+
+    expect(prefs.appearance.tickerLayout.rows).toEqual([
+      { sources: ["clock"] },
+      { sources: ["timer"] },
+    ]);
+  });
+
+  it("preserves current explicit clock-only rows when timer prefs exist", () => {
+    storeValues.set("scrollr:settings", {
+      appearance: {
+        tickerLayout: {
+          rows: [{ sources: ["clock"] }],
+        },
+      },
+      widgets: legacyWidgetPrefs({
+        enabledWidgets: ["clock"],
+        widgetsOnTicker: ["clock"],
+        clock: {
+          ticker: {},
+        },
+        timer: {
+          ticker: { activeTimer: true },
+          pomodoro: {
+            workMins: 25,
+            shortBreakMins: 5,
+            longBreakMins: 15,
+            longBreakEvery: 4,
+          },
+        },
+      }),
+    });
+
+    const prefs = loadPrefs();
+
+    expect(prefs.appearance.tickerLayout.rows[0].sources).toEqual(["clock"]);
   });
 });

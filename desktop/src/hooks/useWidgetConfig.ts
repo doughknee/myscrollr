@@ -9,7 +9,7 @@ import { savePrefs } from "../preferences";
 import type { AppPreferences, WidgetPrefs } from "../preferences";
 
 /** Subset of WidgetPrefs that are per-widget config objects (not arrays). */
-type WidgetConfigKey = "clock" | "weather" | "sysmon" | "uptime" | "github";
+type WidgetConfigKey = "clock" | "timer" | "weather" | "sysmon" | "uptime" | "github";
 
 /** The config object for a given widget key. */
 type WidgetConfig<K extends WidgetConfigKey> = WidgetPrefs[K];

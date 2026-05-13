@@ -206,19 +206,26 @@ export interface ClockTickerConfig {
   showTimezones: boolean;
   /** Timezone IANA IDs excluded from the ticker (empty = all configured TZs shown). */
   excludedTimezones: string[];
+}
+
+export interface ClockWidgetConfig {
+  ticker: ClockTickerConfig;
+}
+
+export interface TimerTickerConfig {
   activeTimer: boolean;
 }
 
-export interface ClockPomodoroConfig {
+export interface TimerPomodoroConfig {
   workMins: number;
   shortBreakMins: number;
   longBreakMins: number;
   longBreakEvery: number;
 }
 
-export interface ClockWidgetConfig {
-  ticker: ClockTickerConfig;
-  pomodoro: ClockPomodoroConfig;
+export interface TimerWidgetConfig {
+  ticker: TimerTickerConfig;
+  pomodoro: TimerPomodoroConfig;
 }
 
 export interface WeatherTickerConfig {
@@ -286,6 +293,7 @@ export interface WidgetPrefs {
    *  places it as a static element on the chosen side. Keyed by widget ID. */
   pinnedWidgets: Record<string, WidgetPinConfig>;
   clock: ClockWidgetConfig;
+  timer: TimerWidgetConfig;
   weather: WeatherWidgetConfig;
   sysmon: SysmonWidgetConfig;
   uptime: UptimeWidgetConfig;
@@ -569,10 +577,13 @@ export const DEFAULT_CLOCK_TICKER: ClockTickerConfig = {
   localTime: true,
   showTimezones: false,
   excludedTimezones: [],
+};
+
+export const DEFAULT_TIMER_TICKER: TimerTickerConfig = {
   activeTimer: true,
 };
 
-export const DEFAULT_CLOCK_POMODORO: ClockPomodoroConfig = {
+export const DEFAULT_TIMER_POMODORO: TimerPomodoroConfig = {
   workMins: 25,
   shortBreakMins: 5,
   longBreakMins: 15,
@@ -650,7 +661,10 @@ const DEFAULT_WIDGETS: WidgetPrefs = {
   pinnedWidgets: {},
   clock: {
     ticker: { ...DEFAULT_CLOCK_TICKER },
-    pomodoro: { ...DEFAULT_CLOCK_POMODORO },
+  },
+  timer: {
+    ticker: { ...DEFAULT_TIMER_TICKER },
+    pomodoro: { ...DEFAULT_TIMER_POMODORO },
   },
   weather: {
     ticker: { ...DEFAULT_WEATHER_TICKER },
@@ -749,7 +763,7 @@ export function savePref<T>(key: string, value: T): void {
 
 /** Deep-merge saved widget prefs with defaults.
  *  Handles migration from the old flat shape gracefully. */
-function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
+export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
   if (!saved) return { ...DEFAULT_WIDGETS };
 
   // Safe accessor for nested sub-objects that may not exist in old formats
@@ -757,23 +771,53 @@ function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
     v != null && typeof v === "object" ? (v as Record<string, unknown>) : undefined;
 
   const clk = obj(saved.clock);
+  const tmr = obj(saved.timer);
   const wth = obj(saved.weather);
   const sys = obj(saved.sysmon);
   const upt = obj(saved.uptime);
   const ghb = obj(saved.github);
+  const legacyClockTicker = obj(clk?.ticker);
+  const { activeTimer: _legacyActiveTimer, ...clockTicker } = legacyClockTicker ?? {};
+  void _legacyActiveTimer;
+  const timerTicker = obj(tmr?.ticker);
 
-  const enabledWidgets = Array.isArray(saved.enabledWidgets) ? saved.enabledWidgets : DEFAULT_WIDGETS.enabledWidgets;
+  const savedEnabledWidgets = Array.isArray(saved.enabledWidgets) ? saved.enabledWidgets : DEFAULT_WIDGETS.enabledWidgets;
+  const savedWidgetsOnTicker = Array.isArray(saved.widgetsOnTicker) ? saved.widgetsOnTicker : savedEnabledWidgets;
+  const hasLegacyTimerPrefs = !tmr;
+  const shouldEnableLegacyTimer = hasLegacyTimerPrefs && savedEnabledWidgets.includes("clock");
+  const shouldShowLegacyTimerOnTicker = hasLegacyTimerPrefs && legacyClockTicker?.activeTimer !== false && savedWidgetsOnTicker.includes("clock");
+  const enabledWidgets = shouldEnableLegacyTimer && !savedEnabledWidgets.includes("timer")
+    ? [...savedEnabledWidgets, "timer"]
+    : savedEnabledWidgets;
+  const widgetsOnTicker = shouldShowLegacyTimerOnTicker && !savedWidgetsOnTicker.includes("timer")
+    ? [...savedWidgetsOnTicker, "timer"]
+    : savedWidgetsOnTicker;
 
   return {
     enabledWidgets,
     // Migration: if widgetsOnTicker doesn't exist, default to enabledWidgets
-    widgetsOnTicker: Array.isArray(saved.widgetsOnTicker) ? saved.widgetsOnTicker : enabledWidgets,
+    widgetsOnTicker,
     pinnedWidgets: (saved.pinnedWidgets != null && typeof saved.pinnedWidgets === "object" && !Array.isArray(saved.pinnedWidgets))
       ? saved.pinnedWidgets as Record<string, WidgetPinConfig>
       : {},
     clock: {
-      ticker: { ...DEFAULT_CLOCK_TICKER, ...obj(clk?.ticker) },
-      pomodoro: { ...DEFAULT_CLOCK_POMODORO, ...obj(clk?.pomodoro) },
+      ticker: { ...DEFAULT_CLOCK_TICKER, ...clockTicker },
+    },
+    timer: {
+      ticker: {
+        ...DEFAULT_TIMER_TICKER,
+        activeTimer:
+          typeof timerTicker?.activeTimer === "boolean"
+            ? Boolean(timerTicker.activeTimer)
+            : typeof legacyClockTicker?.activeTimer === "boolean"
+              ? Boolean(legacyClockTicker.activeTimer)
+              : DEFAULT_TIMER_TICKER.activeTimer,
+      },
+      pomodoro: {
+        ...DEFAULT_TIMER_POMODORO,
+        ...obj(clk?.pomodoro),
+        ...obj(tmr?.pomodoro),
+      },
     },
     weather: {
       ticker: { ...DEFAULT_WEATHER_TICKER, ...obj(wth?.ticker) },
@@ -1184,6 +1228,40 @@ export function loadPrefs(): AppPreferences {
         : [],
     };
 
+    const savedWidgets = source.widgets as Record<string, unknown> | undefined;
+    const savedClock = savedWidgets?.clock != null && typeof savedWidgets.clock === "object"
+      ? (savedWidgets.clock as Record<string, unknown>)
+      : undefined;
+    const savedClockTicker = savedClock?.ticker != null && typeof savedClock.ticker === "object"
+      ? (savedClock.ticker as Record<string, unknown>)
+      : undefined;
+    const hasSavedTimerPrefs = savedWidgets?.timer != null && typeof savedWidgets.timer === "object";
+    const savedWidgetIdsOnTicker = Array.isArray(savedWidgets?.widgetsOnTicker)
+      ? (savedWidgets.widgetsOnTicker as unknown[]).filter((id): id is string => typeof id === "string")
+      : Array.isArray(savedWidgets?.enabledWidgets)
+        ? (savedWidgets.enabledWidgets as unknown[]).filter((id): id is string => typeof id === "string")
+        : [];
+    const shouldMigrateTimerRows =
+      !hasSavedTimerPrefs &&
+      savedClockTicker?.activeTimer !== false &&
+      savedWidgetIdsOnTicker.includes("clock") &&
+      !savedWidgetIdsOnTicker.includes("timer");
+    if (shouldMigrateTimerRows) {
+      let rowsChanged = false;
+      const rows = merged.appearance.tickerLayout.rows.map((row) => {
+        if (!row.sources.includes("clock") || row.sources.includes("timer")) return row;
+        rowsChanged = true;
+        return { ...row, sources: [...row.sources, "timer"] };
+      });
+
+      if (rowsChanged) {
+        merged.appearance = {
+          ...merged.appearance,
+          tickerLayout: { rows },
+        };
+      }
+    }
+
     // Clamp any widget pin rows that reference rows above the current
     // layout's row count (e.g. user downgraded from Pro to Uplink and
     // lost row 2). See spec §Edge Cases #2 — pins on dropped rows
@@ -1512,8 +1590,8 @@ export function updateWidgetPrefs(
 //     issue `channelsApi.update` separately; these helpers only mutate
 //     the client-side AppPreferences.
 //
-// Widgets only have the client-side layer (no server-side ticker_enabled),
-// so `setWidgetTickerRow` is just an alias to the source-id-based helper.
+// Widgets also keep `widgets.widgetsOnTicker` in sync because it is the
+// master render gate for widget ticker data.
 // See docs/superpowers/specs/2026-04-28-batch-d-…-design.md §Stream 3.
 
 /** Minimal shape of a Channel record used by `getChannelTickerRow`. */
@@ -1644,6 +1722,22 @@ export function setWidgetTickerRow(
   widgetId: string,
   row: number | null,
 ): AppPreferences {
-  return setSourceTickerRow(prefs, widgetId, row);
+  const withRow = setSourceTickerRow(prefs, widgetId, row);
+  if (withRow === prefs) return prefs;
+
+  const widgetsOnTicker = withRow.widgets.widgetsOnTicker;
+  const nextWidgetsOnTicker = row === null
+    ? widgetsOnTicker.filter((id) => id !== widgetId)
+    : widgetsOnTicker.includes(widgetId)
+      ? widgetsOnTicker
+      : [...widgetsOnTicker, widgetId];
+
+  return {
+    ...withRow,
+    widgets: {
+      ...withRow.widgets,
+      widgetsOnTicker: nextWidgetsOnTicker,
+    },
+  };
 }
 

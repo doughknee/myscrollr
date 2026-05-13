@@ -10,12 +10,12 @@ import { weatherCodeToIcon, weatherCodeToLabel, formatTemp } from "../widgets/we
 import { findCpuTemp, findGpuTemp } from "../widgets/sysmon/utils";
 import { tzLabel } from "../widgets/clock/storage";
 import type { ClockChipData, WeatherChipData, SysmonChipData, UptimeChipData, GitHubChipData, WidgetTickerData } from "../types";
-import type { TimerState } from "../widgets/clock/types";
+import type { TimerState } from "../widgets/timer/types";
 import type { SavedCity } from "../widgets/weather/types";
 import { loadMonitors } from "../widgets/uptime/types";
 import { loadRepoData, repoKey } from "../widgets/github/types";
 
-const EMPTY: WidgetTickerData = { clock: [], weather: [], sysmon: [], uptime: [], github: [] };
+const EMPTY: WidgetTickerData = { clock: [], timer: [], weather: [], sysmon: [], uptime: [], github: [] };
 
 // ── Time formatting helpers ─────────────────────────────────────
 
@@ -57,7 +57,7 @@ function tzShortLabel(tz: string): string {
 
 // ── Timer helpers ───────────────────────────────────────────────
 
-function getTimerChipData(state: TimerState): ClockChipData | null {
+function getTimerChipData(state: TimerState, longBreakEvery: number): ClockChipData | null {
   const isRunning = state.startedAt != null;
   const elapsed = isRunning
     ? state.bankedMs + (Date.now() - state.startedAt!)
@@ -75,7 +75,7 @@ function getTimerChipData(state: TimerState): ClockChipData | null {
   const mode = state.mode.charAt(0).toUpperCase() + state.mode.slice(1);
   const sessions = state.completedSessions ?? 0;
   const detail = state.mode === "pomodoro"
-    ? `${mode} \u00B7 ${sessions}/4 sessions`
+    ? `${mode} \u00B7 ${sessions}/${longBreakEvery} sessions`
     : mode;
 
   return {
@@ -100,7 +100,7 @@ export function useWidgetTickerData(
     [widgetPrefs.widgetsOnTicker],
   );
 
-  // ── Build clock + timer chips ─────────────────────────────────
+  // ── Build clock chips ─────────────────────────────────────────
   const buildClockChips = useCallback((): ClockChipData[] => {
     if (!enabledWidgets.has("clock")) return [];
     const cfg = widgetPrefs.clock;
@@ -134,17 +134,20 @@ export function useWidgetTickerData(
       }
     }
 
-    // Active timer
-    if (cfg.ticker.activeTimer) {
-      const state = getStore<TimerState | null>(LS_TIMER_STATE, null);
-      if (state) {
-        const chip = getTimerChipData(state);
-        if (chip) chips.push(chip);
-      }
-    }
-
     return chips;
   }, [widgetPrefs.clock, enabledWidgets]);
+
+  // ── Build timer chips ─────────────────────────────────────────
+  const buildTimerChips = useCallback((): ClockChipData[] => {
+    if (!enabledWidgets.has("timer")) return [];
+    if (!widgetPrefs.timer.ticker.activeTimer) return [];
+
+    const state = getStore<TimerState | null>(LS_TIMER_STATE, null);
+    if (!state) return [];
+
+    const chip = getTimerChipData(state, widgetPrefs.timer.pomodoro.longBreakEvery);
+    return chip ? [chip] : [];
+  }, [widgetPrefs.timer, enabledWidgets]);
 
   // ── Build weather chips ───────────────────────────────────────
   const buildWeatherChips = useCallback((): WeatherChipData[] => {
@@ -315,12 +318,13 @@ export function useWidgetTickerData(
 
   useEffect(() => {
     const hasClock = enabledWidgets.has("clock");
+    const hasTimer = enabledWidgets.has("timer");
     const hasWeather = enabledWidgets.has("weather");
     const hasSysmon = enabledWidgets.has("sysmon");
     const hasUptime = enabledWidgets.has("uptime");
     const hasGithub = enabledWidgets.has("github");
 
-    if (!hasClock && !hasWeather && !hasSysmon && !hasUptime && !hasGithub) {
+    if (!hasClock && !hasTimer && !hasWeather && !hasSysmon && !hasUptime && !hasGithub) {
       setData(EMPTY);
       return;
     }
@@ -329,6 +333,7 @@ export function useWidgetTickerData(
     const refresh = () => {
       setData({
         clock: buildClockChips(),
+        timer: buildTimerChips(),
         weather: buildWeatherChips(),
         sysmon: buildSysmonChips(),
         uptime: buildUptimeChips(),
@@ -336,9 +341,14 @@ export function useWidgetTickerData(
       });
     };
 
-    // Clock + timer: update every second (timer needs 1s resolution)
+    // Clock: update every second
     const clockInterval = hasClock ? setInterval(() => {
       setData((prev) => ({ ...prev, clock: buildClockChips() }));
+    }, 1000) : null;
+
+    // Timer: update every second while enabled for live elapsed time
+    const timerInterval = hasTimer ? setInterval(() => {
+      setData((prev) => ({ ...prev, timer: buildTimerChips() }));
     }, 1000) : null;
 
     // Weather: listen for store changes instead of polling
@@ -354,12 +364,14 @@ export function useWidgetTickerData(
         })
       : null;
 
-    // Clock: listen for store changes (timer state, timezones, format)
-    const unsubTimerState = hasClock
+    // Timer: listen for store changes
+    const unsubTimerState = hasTimer
       ? onStoreChange<TimerState | null>(LS_TIMER_STATE, () => {
-          setData((prev) => ({ ...prev, clock: buildClockChips() }));
+          setData((prev) => ({ ...prev, timer: buildTimerChips() }));
         })
       : null;
+
+    // Clock: listen for store changes (timezones, format)
     const unsubClockTimezones = hasClock
       ? onStoreChange<string[]>(LS_CLOCK_TIMEZONES, () => {
           setData((prev) => ({ ...prev, clock: buildClockChips() }));
@@ -418,6 +430,7 @@ export function useWidgetTickerData(
 
     return () => {
       if (clockInterval) clearInterval(clockInterval);
+      if (timerInterval) clearInterval(timerInterval);
       unsubWeatherCities?.();
       unsubWeatherUnit?.();
       unsubTimerState?.();
@@ -438,6 +451,7 @@ export function useWidgetTickerData(
     widgetPrefs.uptime.pollInterval,
     widgetPrefs.github.pollInterval,
     buildClockChips,
+    buildTimerChips,
     buildWeatherChips,
     buildSysmonChips,
     buildUptimeChips,

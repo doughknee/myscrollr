@@ -1,5 +1,6 @@
 import type { AppPreferences } from "../preferences";
 import ClockConfigPanel from "./clock/ConfigPanel";
+import TimerConfigPanel from "./timer/ConfigPanel";
 import WeatherConfigPanel from "./weather/ConfigPanel";
 import SysmonConfigPanel from "./sysmon/ConfigPanel";
 import UptimeConfigPanel from "./uptime/ConfigPanel";
@@ -21,6 +22,10 @@ export default function WidgetConfigPanel({
     case "clock":
       return (
         <ClockConfigPanel prefs={prefs} onPrefsChange={onPrefsChange} />
+      );
+    case "timer":
+      return (
+        <TimerConfigPanel prefs={prefs} onPrefsChange={onPrefsChange} />
       );
     case "weather":
       return (

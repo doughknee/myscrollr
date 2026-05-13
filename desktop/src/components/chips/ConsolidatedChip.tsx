@@ -1,5 +1,5 @@
 /**
- * ConsolidatedChip — generic ticker chip for clock, weather, sysmon, uptime, and github widgets.
+ * ConsolidatedChip — generic ticker chip for clock, timer, weather, sysmon, uptime, and github widgets.
  *
  * Replaces the three nearly-identical ClockConsolidatedChip,
  * WeatherConsolidatedChip, and SysmonConsolidatedChip components.
@@ -66,7 +66,7 @@ function HeartbeatBar({ heartbeats }: { heartbeats: number[] }) {
 // ── Props ───────────────────────────────────────────────────────
 
 interface ConsolidatedChipProps {
-  type: "clock" | "weather" | "sysmon" | "uptime" | "github";
+  type: "clock" | "timer" | "weather" | "sysmon" | "uptime" | "github";
   items: ChipItem[];
   comfort?: boolean;
   colorMode?: ChipColorMode;

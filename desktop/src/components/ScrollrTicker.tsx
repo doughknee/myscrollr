@@ -35,7 +35,7 @@ import { buildYahooLeagueUrl, buildYahooPlayerUrl, chipUrlForFinance, chipUrlFor
 
 // ── Module-level constants ───────────────────────────────────────
 
-const WIDGET_TYPES = ["clock", "weather", "sysmon", "uptime", "github"] as const;
+const WIDGET_TYPES = ["clock", "timer", "weather", "sysmon", "uptime", "github"] as const;
 type WidgetType = (typeof WIDGET_TYPES)[number];
 
 // ── Types ────────────────────────────────────────────────────────

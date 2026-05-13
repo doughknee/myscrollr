@@ -25,7 +25,11 @@ import { useTickerLayout } from "./useTickerLayout";
 import type { AppPreferences } from "../preferences";
 import type { SubscriptionTier } from "../auth";
 
-function makePrefs(rows: { sources: string[] }[]): AppPreferences {
+function makePrefs(
+  rows: { sources: string[] }[],
+  enabledWidgets: string[] = [],
+  widgetsOnTicker: string[] = [],
+): AppPreferences {
   // Include the bits of `widgets` that `removeTickerRow` reads
   // (pinnedWidgets) so the helper can re-map pins on row deletion
   // without crashing. Other fields stay undefined — the cast covers
@@ -36,6 +40,8 @@ function makePrefs(rows: { sources: string[] }[]): AppPreferences {
     },
     widgets: {
       pinnedWidgets: {},
+      enabledWidgets,
+      widgetsOnTicker,
     },
   } as unknown as AppPreferences;
 }
@@ -43,11 +49,13 @@ function makePrefs(rows: { sources: string[] }[]): AppPreferences {
 function setupHook(
   initialRows: { sources: string[] }[],
   tier: SubscriptionTier = "uplink_pro",
+  enabledWidgets: string[] = [],
+  widgetsOnTicker: string[] = [],
 ) {
   // We mimic React state: the test holds the latest prefs and the
   // hook's onPrefsChange writes back into it. Subsequent renders pick
   // up the new prefs the same way the real app would.
-  let prefs = makePrefs(initialRows);
+  let prefs = makePrefs(initialRows, enabledWidgets, widgetsOnTicker);
   const onPrefsChange = vi.fn((next: AppPreferences) => {
     prefs = next;
   });
@@ -164,6 +172,22 @@ describe("useTickerLayout — addRow", () => {
     });
     expect(returned).toBe(2);
   });
+
+  it("adds seeded enabled widgets to widgetsOnTicker", () => {
+    const harness = setupHook(
+      [{ sources: [] }],
+      "uplink",
+      ["timer"],
+      [],
+    );
+    act(() => {
+      harness.result.current.addRow("timer");
+    });
+    expect(harness.prefs.appearance.tickerLayout.rows[1].sources).toEqual([
+      "timer",
+    ]);
+    expect(harness.prefs.widgets.widgetsOnTicker).toEqual(["timer"]);
+  });
 });
 
 describe("useTickerLayout — setSourceRow / removeRow", () => {
@@ -195,6 +219,52 @@ describe("useTickerLayout — setSourceRow / removeRow", () => {
     expect(harness.prefs.appearance.tickerLayout.rows[1].sources).toEqual([
       "rss",
     ]);
+  });
+
+  it("setSourceRow adds enabled widgets to widgetsOnTicker", () => {
+    const harness = setupHook(
+      [{ sources: [] }, { sources: [] }],
+      "uplink",
+      ["timer"],
+      [],
+    );
+    act(() => {
+      harness.result.current.setSourceRow("timer", 1);
+    });
+    expect(harness.prefs.appearance.tickerLayout.rows[1].sources).toEqual([
+      "timer",
+    ]);
+    expect(harness.prefs.widgets.widgetsOnTicker).toEqual(["timer"]);
+  });
+
+  it("setSourceRow removes enabled widgets from widgetsOnTicker when row is null", () => {
+    const harness = setupHook(
+      [{ sources: ["timer"] }],
+      "uplink",
+      ["timer"],
+      ["clock", "timer"],
+    );
+    act(() => {
+      harness.result.current.setSourceRow("timer", null);
+    });
+    expect(harness.prefs.appearance.tickerLayout.rows[0].sources).toEqual([]);
+    expect(harness.prefs.widgets.widgetsOnTicker).toEqual(["clock"]);
+  });
+
+  it("setSourceRow preserves channel widgetsOnTicker behavior", () => {
+    const harness = setupHook(
+      [{ sources: [] }, { sources: [] }],
+      "uplink",
+      ["timer"],
+      ["timer"],
+    );
+    act(() => {
+      harness.result.current.setSourceRow("finance", 1);
+    });
+    expect(harness.prefs.appearance.tickerLayout.rows[1].sources).toEqual([
+      "finance",
+    ]);
+    expect(harness.prefs.widgets.widgetsOnTicker).toEqual(["timer"]);
   });
 
   it("removeRow drops a row and never collapses below 1", () => {

@@ -149,7 +149,7 @@ function ClockCard({
   if (compact) {
     return (
       <div
-        className="group flex items-center justify-between px-3 py-2 rounded-lg bg-widget-clock/[0.04] border border-widget-clock/10 hover:border-widget-clock/20 transition-all"
+        className="group flex items-center justify-between px-3 py-2 rounded-lg bg-widget-clock/[0.04] border border-widget-clock/10 hover:border-widget-clock/25 transition-colors"
         style={
           animating
             ? { animation: "widget-card-enter 200ms ease-out" }
@@ -184,10 +184,10 @@ function ClockCard({
   return (
     <div
       className={
-        "group relative px-4 py-3 rounded-xl border transition-all " +
+        "group relative overflow-hidden px-4 py-3 rounded-xl border transition-colors " +
         (isLocal
-          ? "bg-widget-clock/[0.06] border-widget-clock/20 shadow-[inset_0_1px_0_0_rgba(99,102,241,0.08)]"
-          : "bg-widget-clock/[0.04] border-widget-clock/10 hover:border-widget-clock/20")
+          ? "bg-widget-clock/[0.07] border-widget-clock/25 shadow-[inset_0_1px_0_0_rgba(99,102,241,0.12)]"
+          : "bg-surface-2/70 border-widget-clock/10 hover:border-widget-clock/25")
       }
       style={
         animating
@@ -218,7 +218,7 @@ function ClockCard({
           {offset}
         </span>
       </div>
-      <div className="text-xl font-mono font-bold text-fg tabular-nums leading-none">
+      <div className={isLocal ? "text-2xl font-mono font-bold text-fg tabular-nums leading-none" : "text-xl font-mono font-bold text-fg tabular-nums leading-none"}>
         {time}
       </div>
       <div className="text-xs font-mono text-fg-2 mt-1">{date}</div>

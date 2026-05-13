@@ -15,7 +15,7 @@ const modules = import.meta.glob<Record<string, WidgetManifest>>("./*/FeedTab.ts
 const { get, getAll, ORDER } = createRegistry<WidgetManifest>(
   modules,
   "Widget",
-  ["clock", "weather", "sysmon", "uptime", "github"],
+  ["clock", "timer", "weather", "sysmon", "uptime", "github"],
 );
 
 /** Look up a widget by id. */
