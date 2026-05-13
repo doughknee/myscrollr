@@ -1,8 +1,17 @@
 # https://www.robotstxt.org/robotstxt.html
+#
+# The wildcard group below applies to ALL crawlers (including AI bots:
+# GPTBot, ChatGPT-User, ClaudeBot, anthropic-ai, PerplexityBot, CCBot,
+# Google-Extended). Per RFC 9309, a robots.txt parser selects the single
+# most-specific matching User-agent group; rules are NOT inherited from
+# wildcards. So we deliberately do NOT add per-AI-bot groups — that would
+# silently exempt those bots from the Disallow rules below.
+
 User-agent: *
 Disallow: /account
 Disallow: /invite
 Disallow: /callback
+Disallow: /status
 Disallow: /u/
 
 Sitemap: https://myscrollr.com/sitemap.xml

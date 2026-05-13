@@ -1,0 +1,28 @@
+# Scrollr
+
+> Scrollr is a quiet desktop ticker for live finance, sports, news, and fantasy data. Open source, privacy-first, and free. Available for macOS, Windows, and Linux.
+
+Scrollr displays a thin always-on-top bar at the edge of your screen showing real-time market prices, sports scores, news headlines, and fantasy league updates. The desktop app is the primary product; this website serves marketing, account management, and billing.
+
+Core principles: zero tracking, no ads, no data brokers, source available, runs locally.
+
+## Product
+
+- [Download](https://myscrollr.com/download): Get the Scrollr desktop app for macOS, Windows, or Linux. Free.
+- [Channels](https://myscrollr.com/channels): The data sources Scrollr supports — Finance, Sports, News, Fantasy — plus Clock, Timer, Weather, and System Monitor widgets.
+- [Architecture](https://myscrollr.com/architecture): How Scrollr works under the hood — source APIs through CDC PubSub to your desktop.
+
+## Pricing
+
+- [Uplink](https://myscrollr.com/uplink): Premium subscription tiers — Uplink ($9.99/mo), Pro ($24.99/mo), Ultimate ($49.99/mo). Annual plans available with savings.
+- [Lifetime](https://myscrollr.com/uplink/lifetime): One-time payment for forever access. 128 founding member slots.
+- [Business](https://myscrollr.com/business): Branded desktop deployments for teams. From $500/mo.
+
+## Support
+
+- [Support](https://myscrollr.com/support): FAQs, troubleshooting, billing help, contact form.
+- [Legal](https://myscrollr.com/legal): Terms, Privacy, License, Cookies.
+
+## Optional
+
+- [GitHub](https://github.com/brandon-relentnet/myscrollr): Source code.
