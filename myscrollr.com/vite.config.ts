@@ -78,7 +78,7 @@ export default defineConfig({
         enabled: true,
         crawlLinks: false,
         filter: ({ path }: { path: string }) =>
-          path === '/' || path === '/legal',
+          path === '/' || path === '/legal' || path === '/uplink',
       },
     }),
     viteReact(),
