@@ -113,11 +113,16 @@ if (!existsSync(shell)) {
 // hydration time.
 //
 // Detection strategy: find the bundle chunk that contains the
-// `hydrateRoot(document,...)` call and verify its immediate argument is NOT
-// the bare `StrictMode > StartClient` pattern from Start's default entry. The
-// default entry compiles to `hydrateRoot(document,jsx(StrictMode,{children:jsx(StartClient...)}))`
-// — i.e. StrictMode's children is a SINGLE jsx call rather than nested
-// providers. Our `client.tsx` compiles to nested `jsx(LogtoProvider,{...,children:jsx(ScrollrAuthProvider,{...,children:jsx(StartClient,...)}})`.
+// `hydrateRoot(document,...)` call and count jsx() invocations in a fixed
+// character window after it. The default entry compiles to
+// `hydrateRoot(document,jsx(StrictMode,{children:jsx(StartClient...)}))` —
+// 2 jsx calls. Our `client.tsx` compiles to nested providers with 5+ jsx
+// calls (StrictMode > Sentry.ErrorBoundary > LogtoProvider > ScrollrAuthProvider > StartClient,
+// plus the ErrorBoundary's fallback prop adds one more).
+//
+// We use a fixed-window character slice rather than `[^)]{0,N}` because the
+// latter stops at the first `)`, which inside a JSX fallback prop is far
+// too early (the fallback element itself contains closing parens).
 try {
   const assetsDir = join(clientDir, 'assets')
   const jsFiles = readdirSync(assetsDir).filter(
@@ -126,30 +131,36 @@ try {
   let hydrateCall = null
   for (const f of jsFiles) {
     const content = readFileSync(join(assetsDir, f), 'utf8')
-    const match = content.match(/hydrateRoot\(document,([^)]{0,500})/)
-    if (match) {
-      hydrateCall = { file: f, snippet: match[1] }
+    const idx = content.indexOf('hydrateRoot(document,')
+    if (idx !== -1) {
+      // Take 2000 chars after the call site — enough to see all nested
+      // providers even with inline fallback components.
+      hydrateCall = { file: f, snippet: content.slice(idx, idx + 2000) }
       break
     }
   }
   if (!hydrateCall) {
-    console.error('✗ hydrateRoot(document,...) call not found in any index-*.js chunk')
+    console.error(
+      '✗ hydrateRoot(document,...) call not found in any index-*.js chunk',
+    )
     failures += 1
   } else {
-    // Count nested jsx() invocations in the snippet immediately after StrictMode.
-    // Default entry: StrictMode → StartClient = 2 jsx calls total in the snippet.
-    // Our entry:    StrictMode → LogtoProvider → ScrollrAuthProvider → StartClient = 4 jsx calls.
-    // Any value > 2 indicates extra wrappers are present.
+    // Count nested jsx() invocations.
+    // Default entry: StrictMode → StartClient = 2 jsx calls.
+    // Our entry:    StrictMode → Sentry.ErrorBoundary (+ fallback) → LogtoProvider → ScrollrAuthProvider → StartClient ≥ 5 jsx calls.
     const jsxCount = (hydrateCall.snippet.match(/\.jsx\(/g) || []).length
-    if (jsxCount < 4) {
+    if (jsxCount < 5) {
       console.error(
         `✗ client entry hydrateRoot is missing provider wrappers ` +
-          `(found ${jsxCount} jsx() calls, expected ≥4 for StrictMode > LogtoProvider > ScrollrAuthProvider > StartClient). ` +
+          `(found ${jsxCount} jsx() calls in 2KB window, expected ≥5 for ` +
+          `StrictMode > Sentry.ErrorBoundary > LogtoProvider > ScrollrAuthProvider > StartClient). ` +
           `Did src/client.tsx get renamed or deleted? Start's default client entry has no providers and will throw at hydration.`,
       )
       failures += 1
     } else {
-      console.log(`✓ client entry wraps StartClient with auth providers (${jsxCount} jsx calls in hydrateRoot)`)
+      console.log(
+        `✓ client entry wraps StartClient with auth + error-boundary providers (${jsxCount} jsx calls in hydrateRoot window)`,
+      )
     }
   }
 } catch (err) {

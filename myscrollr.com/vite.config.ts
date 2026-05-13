@@ -4,6 +4,7 @@ import { URL, fileURLToPath } from 'node:url'
 
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 import { defineConfig } from 'vite'
 import viteReact from '@vitejs/plugin-react'
 import type { Plugin } from 'vite'
@@ -68,6 +69,12 @@ const pkg = JSON.parse(
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  build: {
+    // Generate source maps but don't expose them via a `//# sourceMappingURL`
+    // comment in the bundle. The Sentry plugin uploads them and (when an auth
+    // token is set) deletes them locally so they never ship to clients.
+    sourcemap: 'hidden',
+  },
   plugins: [
     tanstackStart({
       router: {},
@@ -94,6 +101,19 @@ export default defineConfig({
     viteReact(),
     tailwindcss(),
     copyShellToIndex(),
+    // Sentry plugin MUST be last so it sees the final bundle output.
+    // Disabled automatically when SENTRY_AUTH_TOKEN isn't set (local builds).
+    sentryVitePlugin({
+      org: process.env.SENTRY_ORG,
+      project: 'scrollr-web',
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      release: { name: `myscrollr-web@${pkg.version}` },
+      sourcemaps: {
+        filesToDeleteAfterUpload: ['./dist/**/*.map'],
+      },
+      disable: !process.env.SENTRY_AUTH_TOKEN,
+      telemetry: false,
+    }),
   ],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
