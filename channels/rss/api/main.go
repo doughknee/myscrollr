@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -56,6 +57,12 @@ type registrationRoute struct {
 func main() {
 	// Load .env (optional — don't fatal if missing)
 	_ = godotenv.Load()
+
+	// Sentry init — before any other infrastructure. No-op when
+	// SENTRY_DSN is unset.
+	if initSentry() {
+		defer sentry.Flush(2 * time.Second)
+	}
 
 	// -------------------------------------------------------------------------
 	// Connect to PostgreSQL
@@ -132,6 +139,13 @@ func main() {
 		db:         dbPool,
 		rdb:        rdb,
 		httpClient: &http.Client{Timeout: HealthProxyTimeout},
+	}
+
+	// Sentry middleware MUST be first so panics from anything below are
+	// captured. Followed by the user-hook for anonymous user ID tagging.
+	if os.Getenv("SENTRY_DSN") != "" {
+		fiberApp.Use(sentryMiddleware())
+		fiberApp.Use(sentryUserHook())
 	}
 
 	// Internal routes (called by core gateway only)
