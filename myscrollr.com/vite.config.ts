@@ -22,7 +22,9 @@ export default defineConfig({
         enabled: true,
       },
       prerender: {
-        enabled: false,
+        enabled: true,
+        crawlLinks: false,
+        filter: ({ path }) => path === '/legal',
       },
     }),
     viteReact(),

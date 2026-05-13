@@ -222,6 +222,5 @@ export const Route = createRootRoute({
         content: 'https://myscrollr.com/og/default.png',
       },
     ],
-    links: [{ rel: 'canonical', href: 'https://myscrollr.com/' }],
   }),
 })
