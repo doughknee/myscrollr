@@ -48,7 +48,7 @@ RUN npm run build
 FROM nginx:alpine
 
 # Copy built assets to nginx
-COPY --from=builder /app/myscrollr.com/dist /usr/share/nginx/html
+COPY --from=builder /app/myscrollr.com/dist/client /usr/share/nginx/html
 
 # SPA fallback: route all paths to index.html for client-side routing
 # Includes security headers, gzip compression, and proper caching
