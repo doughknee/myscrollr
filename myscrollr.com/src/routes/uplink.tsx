@@ -213,6 +213,7 @@ export const Route = createFileRoute('/uplink')({
       description:
         'Unlock unlimited tracking, real-time data delivery, and early access to new channels. Plans from $9.99/month with annual savings.',
       path: '/uplink',
+      image: 'https://myscrollr.com/og/uplink.png',
       type: 'product',
       jsonLd: [
         productOffers(STATIC_TIERS),

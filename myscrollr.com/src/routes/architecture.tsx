@@ -30,6 +30,7 @@ export const Route = createFileRoute('/architecture')({
       description:
         'Behind the scenes: how Scrollr delivers real-time finance, sports, news, and fantasy data from source APIs through CDC PubSub to your desktop. Built with Go, Rust, React, PostgreSQL, and Redis.',
       path: '/architecture',
+      image: 'https://myscrollr.com/og/architecture.png',
       type: 'article',
       jsonLd: breadcrumbs([
         { name: 'Home', path: '/' },

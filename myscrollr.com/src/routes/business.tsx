@@ -59,6 +59,7 @@ export const Route = createFileRoute('/business')({
       description:
         'Custom-branded Scrollr deployments for brokerages, sports venues, fantasy platforms, crypto exchanges, and news publishers. Multi-display, self-hosted, dedicated support. Starts at $500/mo.',
       path: '/business',
+      image: 'https://myscrollr.com/og/business.png',
       jsonLd: breadcrumbs([
         { name: 'Home', path: '/' },
         { name: 'Business', path: '/business' },

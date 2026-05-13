@@ -23,6 +23,7 @@ export const Route = createFileRoute('/download')({
       description:
         'Download Scrollr for macOS, Windows, or Linux. A quiet ticker at the edge of your screen with live sports, markets, news, and fantasy data. Free and open source.',
       path: '/download',
+      image: 'https://myscrollr.com/og/download.png',
       jsonLd: [
         softwareApplication,
         breadcrumbs([

@@ -21,7 +21,8 @@
     "serve": "vite preview",
     "lint": "eslint",
     "format": "prettier",
-    "check": "prettier --write . && eslint --fix"
+    "check": "prettier --write . && eslint --fix",
+    "og-images": "node scripts/generate-og-images.mjs"
   },
   "dependencies": {
     "@logto/react": "^4.0.12",
@@ -45,6 +46,7 @@
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
     "baseline-browser-mapping": "^2.9.19",
+    "playwright": "^1.60.0",
     "prettier": "^3.5.3",
     "typescript": "^5.9.3",
     "vite": "^7.1.7"

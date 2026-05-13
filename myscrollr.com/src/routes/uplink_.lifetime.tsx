@@ -36,6 +36,7 @@ export const Route = createFileRoute('/uplink_/lifetime')({
       description:
         'One payment, forever access to all Scrollr Uplink features. Only 128 founding member slots available.',
       path: '/uplink/lifetime',
+      image: 'https://myscrollr.com/og/uplink.png',
       type: 'product',
       jsonLd: breadcrumbs([
         { name: 'Home', path: '/' },
