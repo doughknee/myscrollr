@@ -49,6 +49,7 @@ import type { SubscriptionStatus, TierLimitsResponse } from '@/api/client'
 import type { BackdropBeam } from '@/components/landing/_ConvergenceBackdrop'
 import { ConvergenceBackdrop } from '@/components/landing/_ConvergenceBackdrop'
 import { usePageMeta } from '@/lib/usePageMeta'
+import { seededRandom } from '@/lib/seededRandom'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { useGetToken } from '@/hooks/useGetToken'
 import { billingApi, tierLimitsApi } from '@/api/client'
@@ -544,15 +545,30 @@ function getPriceId(tier: TierKey, plan: PlanKey): string {
 
 // ── CTA Particles ──────────────────────────────────────────────
 
-const CTA_PARTICLES = Array.from({ length: 20 }, (_, i) => ({
-  id: i,
-  x: Math.random() * 100,
-  y: Math.random() * 100,
-  size: Math.random() * 3 + 1.5,
-  delay: Math.random() * 5,
-  duration: Math.random() * 6 + 8,
-  color: i % 3 === 0 ? '#00b8db' : i % 3 === 1 ? '#a78bfa' : '#34d399',
-}))
+const CTA_PARTICLES = Array.from({ length: 20 }, (_, i) => {
+  const random = seededRandom(i * 6151 + 12289)
+  return {
+    id: i,
+    x: random() * 100,
+    y: random() * 100,
+    size: random() * 3 + 1.5,
+    delay: random() * 5,
+    duration: random() * 6 + 8,
+    color: i % 3 === 0 ? '#00b8db' : i % 3 === 1 ? '#a78bfa' : '#34d399',
+  }
+})
+
+const FOOTER_PARTICLES = Array.from({ length: 14 }, (_, i) => {
+  const random = seededRandom(i * 4093 + 8191)
+  return {
+    id: i,
+    x: 20 + random() * 60,
+    y: 10 + random() * 80,
+    size: random() * 2.5 + 1.5,
+    delay: 0.5 + random() * 3,
+    duration: random() * 5 + 6,
+  }
+})
 
 // ── Uplink FAQ ─────────────────────────────────────────────────
 
@@ -1995,14 +2011,7 @@ function UplinkPage() {
                   />
 
                   {/* ── Floating particles ── */}
-                  {Array.from({ length: 14 }, (_, i) => ({
-                    id: i,
-                    x: 20 + Math.random() * 60,
-                    y: 10 + Math.random() * 80,
-                    size: Math.random() * 2.5 + 1.5,
-                    delay: 0.5 + Math.random() * 3,
-                    duration: Math.random() * 5 + 6,
-                  })).map((p) => (
+                  {FOOTER_PARTICLES.map((p) => (
                     <motion.div
                       key={p.id}
                       className="absolute rounded-full pointer-events-none"

@@ -15,6 +15,7 @@ import type {
   BackdropParticle,
 } from '@/components/landing/_ConvergenceBackdrop'
 import { DownloadButton } from '@/components/DownloadButton'
+import { seededRandom } from '@/lib/seededRandom'
 
 import { useGitHubStats } from '@/hooks/useGitHubStats'
 import { ConvergenceBackdrop } from '@/components/landing/_ConvergenceBackdrop'
@@ -39,15 +40,18 @@ const CHANNELS = [
  * rings + mouse-spring orb on top, that pushed integrated GPUs hard.
  * 12 reads as visually identical at typical viewport sizes (the field
  * was visually saturated at 28 anyway). */
-const PARTICLES = Array.from({ length: 12 }, (_, i) => ({
-  id: i,
-  x: Math.random() * 100,
-  y: Math.random() * 100,
-  size: Math.random() * 3 + 1.5,
-  delay: Math.random() * 5,
-  duration: Math.random() * 6 + 8,
-  channelIndex: i % 4,
-}))
+const PARTICLES = Array.from({ length: 12 }, (_, i) => {
+  const random = seededRandom(i * 9301 + 49297)
+  return {
+    id: i,
+    x: random() * 100,
+    y: random() * 100,
+    size: random() * 3 + 1.5,
+    delay: random() * 5,
+    duration: random() * 6 + 8,
+    channelIndex: i % 4,
+  }
+})
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Animated counter hook                                                    */

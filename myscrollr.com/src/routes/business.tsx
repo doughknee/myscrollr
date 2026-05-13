@@ -40,6 +40,7 @@ import { businessApi } from '@/api/client'
 import { FAQSection } from '@/components/landing/FAQSection'
 import { ConvergenceBackdrop } from '@/components/landing/_ConvergenceBackdrop'
 import { usePageMeta } from '@/lib/usePageMeta'
+import { seededRandom } from '@/lib/seededRandom'
 import { useGitHubStats } from '@/hooks/useGitHubStats'
 
 // ── Constants ───────────────────────────────────────────────────
@@ -341,15 +342,18 @@ const USE_CASE_OPTIONS = [
 
 // ── CTA Particles ──────────────────────────────────────────────
 
-const CTA_PARTICLES = Array.from({ length: 12 }, (_, i) => ({
-  id: i,
-  x: Math.random() * 100,
-  y: Math.random() * 100,
-  size: Math.random() * 3 + 1.5,
-  delay: Math.random() * 5,
-  duration: Math.random() * 6 + 8,
-  color: i % 2 === 0 ? '#34d399' : '#00b8db',
-}))
+const CTA_PARTICLES = Array.from({ length: 12 }, (_, i) => {
+  const random = seededRandom(i * 7919 + 31337)
+  return {
+    id: i,
+    x: random() * 100,
+    y: random() * 100,
+    size: random() * 3 + 1.5,
+    delay: random() * 5,
+    duration: random() * 6 + 8,
+    color: i % 2 === 0 ? '#34d399' : '#00b8db',
+  }
+})
 
 /* ══════════════════════════════════════════════════════════════════
    HERO
