@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
 use dotenv::dotenv;
 use serde::Serialize;
@@ -51,11 +52,84 @@ const READINESS_BRIDGE_INTERVAL: Duration = Duration::from_secs(10);
 /// the per-league budget allocation.
 const SPORTS_DAILY_QUOTA: u32 = 7500;
 
-#[tokio::main]
-async fn main() {
+/// Initialize Sentry. The returned guard MUST live for the lifetime of
+/// the process — Drop flushes pending events on shutdown. Sentry MUST
+/// initialize before the Tokio runtime starts (the crate's docs forbid
+/// `#[tokio::main]` for this reason).
+///
+/// Privacy posture (see docs/superpowers/plans/2026-05-12-sentry-rollout.md):
+/// - send_default_pii=false: no IPs, no auto-attached user info
+/// - before_send strips request bodies, headers, query strings, user
+/// - stack frame filenames have $HOME scrubbed to ~
+fn init_sentry() -> sentry::ClientInitGuard {
+    sentry::init((
+        std::env::var("SENTRY_DSN").ok(),
+        sentry::ClientOptions {
+            release: Some(
+                format!("scrollr-sports-svc@{}", env!("CARGO_PKG_VERSION")).into(),
+            ),
+            environment: Some(
+                std::env::var("ENVIRONMENT")
+                    .unwrap_or_else(|_| "development".to_string())
+                    .into(),
+            ),
+            traces_sample_rate: 0.1,
+            attach_stacktrace: true,
+            send_default_pii: false,
+            max_breadcrumbs: 50,
+            before_send: Some(std::sync::Arc::new(|mut event| {
+                event.user = None;
+                if let Some(req) = event.request.as_mut() {
+                    req.cookies = None;
+                    req.headers.clear();
+                    req.data = None;
+                    req.query_string = None;
+                }
+                let home = dirs::home_dir()
+                    .map(|h| h.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                for exc in event.exception.iter_mut() {
+                    if let Some(st) = exc.stacktrace.as_mut() {
+                        for frame in st.frames.iter_mut() {
+                            if let Some(filename) = frame.filename.as_mut() {
+                                if !home.is_empty() {
+                                    let s: String = filename.to_string();
+                                    *filename = s.replace(&home, "~").into();
+                                }
+                            }
+                        }
+                    }
+                }
+                Some(event)
+            })),
+            ..Default::default()
+        },
+    ))
+}
+
+fn main() -> Result<()> {
     dotenv().ok();
     let _ = init_async_logger("./logs");
 
+    // Sentry init — MUST happen before the Tokio runtime starts. Guard's
+    // Drop flushes events on shutdown.
+    let _sentry_guard = init_sentry();
+    sentry::configure_scope(|scope| {
+        scope.set_tag("service", "scrollr-sports-svc");
+        if let Ok(sha) = std::env::var("GIT_SHA") {
+            scope.set_tag("git_sha", sha);
+        }
+    });
+
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .context("build tokio runtime")?;
+
+    runtime.block_on(run_service())
+}
+
+async fn run_service() -> Result<()> {
     let health = Arc::new(Mutex::new(SportsHealth::new()));
     let readiness = Arc::new(ReadinessGate::new(Some(Duration::from_secs(
         MAX_POLL_STALENESS_SECS,
@@ -80,7 +154,9 @@ async fn main() {
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "3002".to_string());
     let addr = format!("0.0.0.0:{}", port);
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await
+        .context("bind health server")?;
     println!("Sports Service listening on {} (connecting to DB...)", addr);
 
     // Spawn background init. `spawn_supervised` catches panics so a bug
@@ -95,6 +171,7 @@ async fn main() {
             match initialize_pool().await {
                 Ok(p) => break Arc::new(p),
                 Err(e) if remaining == 0 => {
+                    sentry_anyhow::capture_anyhow(&e);
                     fatal(
                         &readiness_bg,
                         format!("DB init failed after {RETRIES} retries: {e:#}"),
@@ -116,6 +193,10 @@ async fn main() {
         let (client, leagues) = match init_sports_service(&pool).await {
             Ok(result) => result,
             Err(e) => {
+                sentry::capture_message(
+                    &format!("Sports init failed: {e}"),
+                    sentry::Level::Fatal,
+                );
                 // Misconfiguration: no leagues or missing API key. Exit so
                 // Kubernetes surfaces the error and operator attention is
                 // forced; the old behavior silently served /health as 200.
@@ -303,9 +384,10 @@ async fn main() {
             cancel_for_shutdown.cancel();
         })
         .await
-        .unwrap();
+        .context("serve health endpoints")?;
 
     println!("Sports Service shut down gracefully");
+    Ok(())
 }
 
 async fn shutdown_signal() {

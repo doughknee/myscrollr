@@ -23,5 +23,19 @@ anyhow = "1.0"
 futures-util = "0.3"
 sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "chrono", "migrate"] }
 
+# Sentry — error monitoring. send_default_pii=false by default; we add
+# explicit scrubbing in before_send (see main.rs init_sentry).
+sentry = { version = "0.42", default-features = false, features = [
+    "backtrace",
+    "contexts",
+    "panic",
+    "reqwest",
+    "rustls",
+    "anyhow",
+    "release-health",
+] }
+sentry-anyhow = "0.42"
+dirs = "5"
+
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
