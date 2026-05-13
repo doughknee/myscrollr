@@ -12,7 +12,7 @@
 // Also asserts dist/client/_shell.html exists (the SPA fallback target).
 // If any check fails, exits non-zero so the build fails.
 
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -104,6 +104,57 @@ if (!existsSync(shell)) {
   failures += 1
 } else {
   console.log('✓ _shell.html present')
+}
+
+// Guard: the client entry bundle must wrap StartClient in our auth providers.
+// Without `src/client.tsx`, TanStack Start silently falls back to its built-in
+// default entry which has no providers. That builds and prerenders fine but
+// throws "useScrollrAuth must be used within a ScrollrAuthProvider" at
+// hydration time.
+//
+// Detection strategy: find the bundle chunk that contains the
+// `hydrateRoot(document,...)` call and verify its immediate argument is NOT
+// the bare `StrictMode > StartClient` pattern from Start's default entry. The
+// default entry compiles to `hydrateRoot(document,jsx(StrictMode,{children:jsx(StartClient...)}))`
+// — i.e. StrictMode's children is a SINGLE jsx call rather than nested
+// providers. Our `client.tsx` compiles to nested `jsx(LogtoProvider,{...,children:jsx(ScrollrAuthProvider,{...,children:jsx(StartClient,...)}})`.
+try {
+  const assetsDir = join(clientDir, 'assets')
+  const jsFiles = readdirSync(assetsDir).filter(
+    (f) => f.startsWith('index-') && f.endsWith('.js'),
+  )
+  let hydrateCall = null
+  for (const f of jsFiles) {
+    const content = readFileSync(join(assetsDir, f), 'utf8')
+    const match = content.match(/hydrateRoot\(document,([^)]{0,500})/)
+    if (match) {
+      hydrateCall = { file: f, snippet: match[1] }
+      break
+    }
+  }
+  if (!hydrateCall) {
+    console.error('✗ hydrateRoot(document,...) call not found in any index-*.js chunk')
+    failures += 1
+  } else {
+    // Count nested jsx() invocations in the snippet immediately after StrictMode.
+    // Default entry: StrictMode → StartClient = 2 jsx calls total in the snippet.
+    // Our entry:    StrictMode → LogtoProvider → ScrollrAuthProvider → StartClient = 4 jsx calls.
+    // Any value > 2 indicates extra wrappers are present.
+    const jsxCount = (hydrateCall.snippet.match(/\.jsx\(/g) || []).length
+    if (jsxCount < 4) {
+      console.error(
+        `✗ client entry hydrateRoot is missing provider wrappers ` +
+          `(found ${jsxCount} jsx() calls, expected ≥4 for StrictMode > LogtoProvider > ScrollrAuthProvider > StartClient). ` +
+          `Did src/client.tsx get renamed or deleted? Start's default client entry has no providers and will throw at hydration.`,
+      )
+      failures += 1
+    } else {
+      console.log(`✓ client entry wraps StartClient with auth providers (${jsxCount} jsx calls in hydrateRoot)`)
+    }
+  }
+} catch (err) {
+  console.error('✗ failed to scan client entry bundle:', err.message)
+  failures += 1
 }
 
 if (failures > 0) {

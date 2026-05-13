@@ -98,7 +98,7 @@ src/
 │   ├── invite.tsx       # super-user invite completion
 │   ├── callback.tsx     # Logto OAuth redirect
 │   └── u.$username.tsx  # public profile
-├── main.tsx             # entry — Logto provider, router
+├── client.tsx           # TanStack Start client entry — wraps StartClient in Logto + ScrollrAuth providers
 └── styles.css           # Tailwind + design tokens
 ```
 
