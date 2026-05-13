@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, useInView, useMotionValue, useSpring } from 'motion/react'
 import { Link } from '@tanstack/react-router'
-import { GitFork, Github, Globe, MessageSquare, Star, Zap } from 'lucide-react'
+import {
+  Building2,
+  GitFork,
+  Github,
+  Globe,
+  MessageSquare,
+  Star,
+  Zap,
+} from 'lucide-react'
 import type {
   BackdropBeam,
   BackdropParticle,
@@ -315,7 +323,7 @@ export function CallToAction() {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ delay: 0.85, duration: 0.5, ease: EASE }}
-            className="mt-12 flex items-center gap-6"
+            className="mt-12 flex flex-wrap items-center justify-center gap-x-6 gap-y-3"
           >
             <a
               href="https://github.com/brandon-relentnet/myscrollr"
@@ -334,6 +342,14 @@ export function CallToAction() {
               <Globe className="size-4" aria-hidden />
               Explore Channels
             </a>
+            <span className="w-px h-4 bg-base-content/10" />
+            <Link
+              to="/business"
+              className="inline-flex items-center gap-2 text-sm text-base-content/40 hover:text-primary transition-[color] duration-200"
+            >
+              <Building2 className="size-4" aria-hidden />
+              Running a business?
+            </Link>
           </motion.div>
         </div>
       </div>

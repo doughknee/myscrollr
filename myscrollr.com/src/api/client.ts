@@ -644,6 +644,53 @@ export const supportApi = {
     }),
 }
 
+// ── Business Leads API ────────────────────────────────────────────
+//
+// Anonymous lead-capture endpoint backing the marketing /business
+// page. Server (api/core/handlers_business_leads.go) persists every
+// accepted submission to `business_leads` as the source of truth, then
+// best-effort dispatches a Resend notification to enterprise@ plus an
+// auto-reply to the lead. Per-IP rate-limited 5/hour.
+//
+// `use_case` values must match the keys in allowedBusinessUseCases on
+// the server. Drift is a 400 from the validator.
+
+export type BusinessUseCase =
+  | 'sports-bars'
+  | 'brokerages'
+  | 'fantasy'
+  | 'sportsbooks'
+  | 'crypto'
+  | 'news'
+  | 'other'
+
+export interface BusinessLeadPayload {
+  name: string
+  email: string
+  company: string
+  use_case: BusinessUseCase
+  message: string
+}
+
+export interface BusinessLeadResponse {
+  status: string
+  message: string
+}
+
+export const businessApi = {
+  /**
+   * Submit a B2B inquiry. Per-IP rate-limited (5/hour). Throws on
+   * validation or transport failure; the caller should surface the
+   * thrown message and let the user retry.
+   */
+  submit: (payload: BusinessLeadPayload) =>
+    request<BusinessLeadResponse>('/business-leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+}
+
 // ── GDPR Account Export + Delete ──────────────────────────────────
 //
 // 30-day soft-delete grace window. Users can cancel from the Account

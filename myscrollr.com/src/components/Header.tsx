@@ -1,5 +1,6 @@
 import { Link, useLocation } from '@tanstack/react-router'
 import {
+  Building2,
   ChevronRight,
   Download,
   House,
@@ -106,7 +107,12 @@ export default function Header() {
 
             <NavLink to="/uplink" activeOn="/uplink">
               <Satellite size={14} />
-              Uplink
+              Pricing
+            </NavLink>
+
+            <NavLink to="/business" activeOn="/business">
+              <Building2 size={14} />
+              Business
             </NavLink>
 
             <NavLink to="/download" activeOn="/download">
@@ -253,7 +259,15 @@ export default function Header() {
                   icon={<ChevronRight size={18} />}
                   onClick={() => setIsOpen(false)}
                 >
-                  Uplink
+                  Pricing
+                </MobileNavLink>
+
+                <MobileNavLink
+                  to="/business"
+                  icon={<ChevronRight size={18} />}
+                  onClick={() => setIsOpen(false)}
+                >
+                  Business
                 </MobileNavLink>
 
                 <MobileNavLink

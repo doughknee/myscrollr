@@ -192,6 +192,12 @@ func (s *Server) setupRoutes() {
 	// hourly Redis counter inside the handler both protect this route.
 	s.App.Post("/support/ticket/public", HandleSubmitPublicSupportTicket)
 
+	// B2B lead capture from the marketing /business page. Same
+	// abuse-protection model as /support/ticket/public: Fiber IP
+	// limiter on the outside, per-IP hourly Redis counter inside
+	// the handler.
+	s.App.Post("/business-leads", HandleSubmitBusinessLead)
+
 	// Partner-approval URLs for AI-drafted replies. No auth — these are
 	// HMAC-signed single-use tokens that the partner clicks from email.
 	s.App.Get("/support/send", HandleSupportSend)

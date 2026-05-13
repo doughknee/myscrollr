@@ -17,6 +17,7 @@ import { Route as InviteRouteImport } from './routes/invite'
 import { Route as DownloadRouteImport } from './routes/download'
 import { Route as ChannelsRouteImport } from './routes/channels'
 import { Route as CallbackRouteImport } from './routes/callback'
+import { Route as BusinessRouteImport } from './routes/business'
 import { Route as ArchitectureRouteImport } from './routes/architecture'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
@@ -63,6 +64,11 @@ const CallbackRoute = CallbackRouteImport.update({
   path: '/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BusinessRoute = BusinessRouteImport.update({
+  id: '/business',
+  path: '/business',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ArchitectureRoute = ArchitectureRouteImport.update({
   id: '/architecture',
   path: '/architecture',
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/architecture': typeof ArchitectureRoute
+  '/business': typeof BusinessRoute
   '/callback': typeof CallbackRoute
   '/channels': typeof ChannelsRoute
   '/download': typeof DownloadRoute
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/architecture': typeof ArchitectureRoute
+  '/business': typeof BusinessRoute
   '/callback': typeof CallbackRoute
   '/channels': typeof ChannelsRoute
   '/download': typeof DownloadRoute
@@ -124,6 +132,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/architecture': typeof ArchitectureRoute
+  '/business': typeof BusinessRoute
   '/callback': typeof CallbackRoute
   '/channels': typeof ChannelsRoute
   '/download': typeof DownloadRoute
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/architecture'
+    | '/business'
     | '/callback'
     | '/channels'
     | '/download'
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/architecture'
+    | '/business'
     | '/callback'
     | '/channels'
     | '/download'
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/architecture'
+    | '/business'
     | '/callback'
     | '/channels'
     | '/download'
@@ -187,6 +199,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
   ArchitectureRoute: typeof ArchitectureRoute
+  BusinessRoute: typeof BusinessRoute
   CallbackRoute: typeof CallbackRoute
   ChannelsRoute: typeof ChannelsRoute
   DownloadRoute: typeof DownloadRoute
@@ -257,6 +270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/business': {
+      id: '/business'
+      path: '/business'
+      fullPath: '/business'
+      preLoaderRoute: typeof BusinessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/architecture': {
       id: '/architecture'
       path: '/architecture'
@@ -299,6 +319,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
   ArchitectureRoute: ArchitectureRoute,
+  BusinessRoute: BusinessRoute,
   CallbackRoute: CallbackRoute,
   ChannelsRoute: ChannelsRoute,
   DownloadRoute: DownloadRoute,
