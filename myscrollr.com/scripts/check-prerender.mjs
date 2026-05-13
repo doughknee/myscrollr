@@ -30,7 +30,11 @@ const ROUTES = [
   { path: '/support', file: 'support/index.html', minJsonLd: 2 }, // FAQ + breadcrumbs
   { path: '/legal', file: 'legal/index.html', minJsonLd: 1 },
   { path: '/uplink', file: 'uplink/index.html', minJsonLd: 3 }, // Product + FAQ + breadcrumbs
-  { path: '/uplink/lifetime', file: 'uplink/lifetime/index.html', minJsonLd: 1 },
+  {
+    path: '/uplink/lifetime',
+    file: 'uplink/lifetime/index.html',
+    minJsonLd: 1,
+  },
 ]
 
 const SITE_ORIGIN = 'https://myscrollr.com'
@@ -87,10 +91,7 @@ for (const route of ROUTES) {
 
   const jsonLdCount = (html.match(/application\/ld\+json/g) || []).length
   if (jsonLdCount < route.minJsonLd) {
-    fail(
-      route,
-      `jsonLd=${jsonLdCount} expected at least ${route.minJsonLd}`,
-    )
+    fail(route, `jsonLd=${jsonLdCount} expected at least ${route.minJsonLd}`)
     continue
   }
 
