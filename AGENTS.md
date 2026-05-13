@@ -146,6 +146,58 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 4. **Topic-based CDC PubSub**: Core dispatches CDC events via Redis topic-based PubSub (O(1) per event).
 5. **Desktop is the primary product.** The website serves marketing, auth, and billing only.
 
+## Error Monitoring — Sentry
+
+Every component has Sentry wired in. **Privacy is the hard constraint** — see [`docs/superpowers/plans/2026-05-12-sentry-rollout.md`](docs/superpowers/plans/2026-05-12-sentry-rollout.md) for the full plan and the privacy audit checklist.
+
+### What's instrumented
+
+| Component | SDK | Project |
+|---|---|---|
+| `myscrollr.com/` | `@sentry/react` | `scrollr-web` |
+| `desktop/` (webview, both windows) | `@sentry/react` | `scrollr-desktop` (tagged `runtime=webview`, `window=ticker|app`) |
+| `desktop/src-tauri/` (Rust core) | `sentry@0.42` crate | `scrollr-desktop` (tagged `runtime=rust-core`) |
+| `api/` (core Go) | `sentry-go@v0.46` + `sentry-go/fiber` | `scrollr-core-api` |
+| `channels/{finance,sports,rss,fantasy}/api/` | `sentry-go@v0.46` + `sentry-go/fiber` | `scrollr-{name}-api` |
+| `channels/{finance,sports,rss}/service/` | `sentry@0.42` + `sentry-anyhow@0.42` Rust crates | `scrollr-{name}-svc` |
+
+### Adding a new error capture site
+
+**JS (React):**
+```ts
+import * as Sentry from '@sentry/react'
+
+try {
+  await doSomething()
+} catch (err) {
+  Sentry.captureException(err, { tags: { feature: 'checkout' } })
+}
+```
+
+**Go (Fiber):** panics are auto-captured by `sentryfiber`. For non-panic errors:
+```go
+hub := sentryfiber.GetHubFromContext(c)
+if hub != nil {
+    hub.CaptureException(err)
+}
+```
+
+**Rust:** use `sentry_anyhow::capture_anyhow(&e)` for `anyhow::Error`. For custom error types that don't impl `Into<anyhow::Error>`, use `sentry::capture_message(&fmt::format!("..."), sentry::Level::Error)`.
+
+### Forbidden patterns
+
+- **Never** call `Sentry.replayIntegration()` or `Sentry.feedbackIntegration()`.
+- **Never** add tokens, emails, IPs, or request bodies to a Sentry event. Format strings like `fmt.Errorf("token %s: %w", token, err)` are forbidden — wrap with `%w` only.
+- **Never** propagate trace headers to third-party services (Stripe, Logto, Yahoo, TwelveData, ESPN, RSS sources). The default `tracePropagationTargets` covers this; don't widen it.
+- **Never** rotate `SENTRY_USER_SALT` — existing hashes would un-cluster all historical events.
+- **Never** use `#[tokio::main]` in Rust services. Sentry must initialize before the Tokio runtime starts. Use `fn main() -> Result<()>` that inits Sentry, builds the runtime manually, and calls `runtime.block_on(run_service())`.
+
+### Privacy enforcement
+
+Each Go service ships a `sentry_scrubbing_test.go` that constructs a worst-case event (auth headers, OAuth code/state, refresh token in body, IP/email/username) and asserts the scrubber strips it all. If that test ever fails, the integration is leaking — do NOT deploy.
+
+When in doubt, run the audit checklist in the rollout plan.
+
 ## Database Migrations
 
 All systems use formal migrations. Inline `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE` blocks have been replaced.
