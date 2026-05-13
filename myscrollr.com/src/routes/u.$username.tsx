@@ -11,9 +11,16 @@ import { motion } from 'motion/react'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { pageVariants, sectionVariants } from '@/lib/animations'
 import { API_BASE, authenticatedFetch } from '@/api/client'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { seo } from '@/lib/seo'
 
 export const Route = createFileRoute('/u/$username')({
+  head: ({ params }) =>
+    seo({
+      title: `${params.username} — Scrollr`,
+      description: `View ${params.username}'s Scrollr profile and connected channels.`,
+      path: `/u/${params.username}`,
+      noindex: true,
+    }),
   component: ProfilePage,
 })
 
@@ -37,11 +44,6 @@ interface ProfileData {
 
 function ProfilePage() {
   const { username } = Route.useParams()
-  usePageMeta({
-    title: `${username} — Scrollr`,
-    description: `View ${username}'s Scrollr profile and connected channels.`,
-    canonicalUrl: `https://myscrollr.com/u/${username}`,
-  })
   const { isAuthenticated, signIn, getIdTokenClaims, getAccessToken } =
     useScrollrAuth()
   const [profile, setProfile] = useState<ProfileData | null>(null)

@@ -16,20 +16,24 @@
   "scripts": {
     "predev": "node scripts/fetch-latest-version.mjs",
     "dev": "vite --port 3000",
-    "prebuild": "node scripts/fetch-latest-version.mjs",
+    "prebuild": "node scripts/fetch-latest-version.mjs && node scripts/generate-sitemap.mjs",
     "build": "vite build && tsc",
+    "postbuild": "node scripts/check-prerender.mjs",
     "serve": "vite preview",
     "lint": "eslint",
     "format": "prettier",
-    "check": "prettier --write . && eslint --fix"
+    "check": "prettier --write . && eslint --fix",
+    "og-images": "node scripts/generate-og-images.mjs"
   },
   "dependencies": {
     "@logto/react": "^4.0.12",
     "@stripe/react-stripe-js": "^5.6.0",
     "@stripe/stripe-js": "^8.7.0",
     "@tailwindcss/vite": "^4.0.6",
-    "@tanstack/react-router": "^1.132.0",
-    "@tanstack/router-plugin": "^1.132.0",
+    "@tanstack/react-router": "^1.169.2",
+    "@tanstack/react-start": "^1.167.65",
+    "@tanstack/router-plugin": "^1.167.35",
+    "@tanstack/start-plugin-core": "^1.169.20",
     "lucide-react": "^0.545.0",
     "motion": "^12.23.24",
     "react": "^19.2.0",
@@ -43,6 +47,7 @@
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
     "baseline-browser-mapping": "^2.9.19",
+    "playwright": "^1.60.0",
     "prettier": "^3.5.3",
     "typescript": "^5.9.3",
     "vite": "^7.1.7"

@@ -22,9 +22,21 @@ import {
 
 import { motion } from 'motion/react'
 import type { ComponentType } from 'react'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { seo } from '@/lib/seo'
+import { breadcrumbs } from '@/lib/structured-data'
 
 export const Route = createFileRoute('/channels')({
+  head: () =>
+    seo({
+      title: 'Channels — Scrollr',
+      description:
+        'Browse the channels and widgets available in the Scrollr desktop app: Finance, Sports, News, Fantasy, Clock, Timer, Weather, and System Monitor. Plus upcoming integrations.',
+      path: '/channels',
+      jsonLd: breadcrumbs([
+        { name: 'Home', path: '/' },
+        { name: 'Channels', path: '/channels' },
+      ]),
+    }),
   component: ChannelsPage,
 })
 
@@ -202,13 +214,6 @@ const WIDGETS: Array<WidgetDef> = [
 // ── Page Component ─────────────────────────────────────────────
 
 function ChannelsPage() {
-  usePageMeta({
-    title: 'Channels — Scrollr',
-    description:
-      'Browse channels and widgets available in the Scrollr desktop app.',
-    canonicalUrl: 'https://myscrollr.com/channels',
-  })
-
   return (
     <div className="min-h-screen pt-20">
       {/* ── HERO ─────────────────────────────────────────────── */}

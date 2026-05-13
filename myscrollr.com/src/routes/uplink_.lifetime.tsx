@@ -14,7 +14,8 @@ import {
 } from 'lucide-react'
 
 import type { SubscriptionStatus } from '@/api/client'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { seo } from '@/lib/seo'
+import { breadcrumbs } from '@/lib/structured-data'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { useGetToken } from '@/hooks/useGetToken'
 import { billingApi } from '@/api/client'
@@ -29,6 +30,20 @@ const HEX_WARNING = '#f59e0b'
 
 export const Route = createFileRoute('/uplink_/lifetime')({
   validateSearch: () => ({}),
+  head: () =>
+    seo({
+      title: 'Lifetime Uplink — Scrollr Founding Members',
+      description:
+        'One payment, forever access to all Scrollr Uplink features. Only 128 founding member slots available.',
+      path: '/uplink/lifetime',
+      image: 'https://myscrollr.com/og/uplink.png',
+      type: 'product',
+      jsonLd: breadcrumbs([
+        { name: 'Home', path: '/' },
+        { name: 'Uplink', path: '/uplink' },
+        { name: 'Lifetime', path: '/uplink/lifetime' },
+      ]),
+    }),
   component: LifetimePage,
 })
 
@@ -44,13 +59,6 @@ function Feature({ children }: { children: React.ReactNode }) {
 
 // ── Page Component ──────────────────────────────────────────────
 function LifetimePage() {
-  usePageMeta({
-    title: 'Lifetime Uplink — Scrollr',
-    description:
-      'Permanent Uplink access. One payment, forever. Only 128 founding member slots available.',
-    canonicalUrl: 'https://myscrollr.com/uplink/lifetime',
-  })
-
   const { isAuthenticated, signIn } = useScrollrAuth()
   const getToken = useGetToken()
 

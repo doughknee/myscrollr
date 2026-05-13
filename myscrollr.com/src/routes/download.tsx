@@ -10,12 +10,28 @@ import {
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { LinuxFormat } from '@/lib/getDownloadInfo'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { seo } from '@/lib/seo'
+import { breadcrumbs, softwareApplication } from '@/lib/structured-data'
 import { DownloadButton } from '@/components/DownloadButton'
 import { detectIsIntelMac, detectPlatform } from '@/lib/detectPlatform'
 import { triggerDownload } from '@/lib/getDownloadInfo'
 
 export const Route = createFileRoute('/download')({
+  head: () =>
+    seo({
+      title: 'Download Scrollr — Free Desktop App',
+      description:
+        'Download Scrollr for macOS, Windows, or Linux. A quiet ticker at the edge of your screen with live sports, markets, news, and fantasy data. Free and open source.',
+      path: '/download',
+      image: 'https://myscrollr.com/og/download.png',
+      jsonLd: [
+        softwareApplication,
+        breadcrumbs([
+          { name: 'Home', path: '/' },
+          { name: 'Download', path: '/download' },
+        ]),
+      ],
+    }),
   component: DownloadPage,
 })
 
@@ -89,13 +105,6 @@ function useDetectedPlatform(): PlatformId {
 // ── Component ──────────────────────────────────────────────────
 
 function DownloadPage() {
-  usePageMeta({
-    title: 'Download Scrollr - Free Desktop App',
-    description:
-      'Download Scrollr for macOS, Windows, or Linux. A quiet ticker at the edge of your screen with live sports, markets, news, and fantasy data.',
-    canonicalUrl: 'https://myscrollr.com/download',
-  })
-
   const detected = useDetectedPlatform()
   const recommended = PLATFORMS.find((p) => p.id === detected) ?? PLATFORMS[0]
 

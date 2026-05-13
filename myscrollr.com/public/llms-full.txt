@@ -1,0 +1,183 @@
+# Scrollr — Full LLM Digest
+
+Scrollr is a quiet desktop ticker for live finance, sports, news, and fantasy data. Open source, privacy-first, and free. Available for macOS, Windows, and Linux.
+
+This digest contains the product overview, pricing details, and consolidated FAQ for AI crawler consumption. The desktop app is the primary product; myscrollr.com serves marketing, account management, and billing.
+
+---
+
+## What Scrollr Is
+
+Scrollr is a quiet ticker at the edge of your screen with live sports, markets, news, and fantasy data. It runs as a thin always-on-top bar (top or bottom of any screen), plus a full dashboard for configuration. The four data channels — Finance, Sports, News, Fantasy — stream from source APIs through a Change-Data-Capture PubSub pipeline to your desktop. Free tier polls; paid tiers can stream via Server-Sent Events.
+
+Built with: Go (gateway + channel APIs), Rust (ingestion services, Tauri desktop core), React (web + Tauri webview), PostgreSQL (state), Redis (channel registry + PubSub), Logto (auth), Stripe (billing).
+
+Core principles: zero tracking, no ads, no data brokers, source available under GNU AGPL v3.0, runs locally.
+
+## Channels
+
+Live data channels:
+
+- Finance: real-time stock and crypto prices from TwelveData.
+- Sports: live scores across NFL, NBA, MLB, NHL, MLS, Premier League, NCAAF, NCAAM (college sports require a paid tier).
+- News: articles from any RSS feed — built-in catalog plus custom user-added feeds (paid tiers).
+- Fantasy: Yahoo Fantasy Sports league standings, matchups, and roster updates.
+
+Utility widgets (no API costs, included on every tier):
+
+- Clock
+- Timer
+- Weather
+- System Monitor (CPU, RAM, disk, network)
+
+## Pricing
+
+All tiers include the full dashboard at myscrollr.com.
+
+### Free
+
+- 5 stock/crypto symbols
+- 1 RSS feed
+- 1 sports league
+- No fantasy leagues
+- 60s polling refresh
+- Site filtering: blacklist only
+
+### Uplink — $9.99/month or $79.99/year
+
+- 25 symbols, 25 RSS feeds, 1 custom RSS feed
+- 8 sports leagues, 1 Yahoo fantasy league
+- 30s polling refresh
+- Early access to new features
+
+### Uplink Pro — $24.99/month or $199.99/year
+
+- 75 symbols, 100 RSS feeds, 3 custom RSS feeds
+- 20 sports leagues, 3 Yahoo fantasy leagues
+- 10s polling refresh
+- Custom alerts (price targets, score thresholds, keyword triggers)
+- Feed profiles, advanced controls, site filtering: blacklist + whitelist
+
+### Uplink Ultimate — $49.99/month or $399.99/year
+
+- Unlimited symbols, RSS feeds, and sports leagues
+- 10 custom RSS feeds, 10 Yahoo fantasy leagues
+- Real-time Server-Sent Events delivery (no polling)
+- Webhooks push alerts to Discord, Slack, or any URL
+- Data export (CSV / JSON)
+- API access for personal dashboards or automation
+
+### Lifetime
+
+One-time payment for permanent Uplink access. 128 founding member slots available.
+
+### Business
+
+Branded desktop deployments for teams. Custom branding, multi-display, self-hosted, dedicated support. From $500/mo. See https://myscrollr.com/business.
+
+## Privacy
+
+- No analytics, no tracking pixels, no telemetry.
+- Channel configurations and preferences stored locally on your device.
+- Only server-side data is your account profile and subscription status.
+- Source code is publicly available on GitHub under GNU AGPL v3.0.
+
+## FAQ
+
+The questions and answers below are aggregated from the live FAQ sections on myscrollr.com/support and myscrollr.com/uplink. They reflect the canonical Scrollr help content.
+
+### General
+
+#### Is Scrollr free?
+
+Yes. The free tier gives you real-time data across all four channels with generous limits and no ads. Upgrade to Uplink for more capacity, or Uplink Ultimate for live streaming data and unlimited everything.
+
+#### Does it affect my computer's performance?
+
+Not noticeably. All data flows through a single lightweight connection. The ticker uses minimal CPU and memory. You can check resource usage anytime with the built-in System Monitor widget.
+
+#### Is my data private?
+
+Scrollr contains zero analytics, zero tracking pixels, and zero telemetry. Your channel configurations and preferences are stored on your device. The only server-side data is your account profile and subscription status.
+
+#### What platforms are supported?
+
+Scrollr runs natively on macOS (Apple Silicon), Windows (x64), and Linux (x64). Each platform gets a dedicated build optimized for that OS.
+
+#### Do I need an account?
+
+You can browse widgets and explore the desktop app without signing in. An account is needed to add channels (Finance, Sports, News, Fantasy) and to sync your setup across devices.
+
+#### What data does Scrollr show?
+
+Four channels: live stock and crypto prices (Finance), scores across 20+ leagues (Sports), articles from RSS feeds (News), and Yahoo Fantasy Sports leagues (Fantasy). Plus utility widgets for weather, clocks, system monitoring, uptime, and GitHub Actions.
+
+#### Can I customize the feed?
+
+Extensively. Move the ticker to the top or bottom of the screen by right-clicking it (or using the up/down chevron in the hover toolbar). In Settings > Ticker you can change the detail level (Compact / Detailed), add ticker rows, and adjust speed. Within each channel you can filter, sort, and toggle individual data points on or off under Options > Display preferences.
+
+#### Is Scrollr open source?
+
+Yes. Every line of code is publicly available on GitHub under the GNU AGPL v3.0 license. You can inspect, fork, or contribute.
+
+#### How do I update the app?
+
+Scrollr checks for updates automatically on launch. When an update is available, you'll see a notification prompting you to install. Updates are downloaded in the background and applied on next restart.
+
+#### How does live data work vs. polling?
+
+Free, Uplink, and Uplink Pro tiers use polling — the app fetches fresh data at regular intervals (60s on Free, 30s on Uplink, 10s on Uplink Pro). Uplink Ultimate uses a persistent SSE connection for instant live updates as data changes on the server.
+
+#### What's the difference between Uplink tiers?
+
+Free: 5 stock/crypto symbols, 1 news feed, 1 sports league, no fantasy leagues, 60s polling. Uplink: 25 symbols, 25 feeds, 8 sports leagues, 1 fantasy league, 30s polling. Uplink Pro: 75 symbols, 100 feeds, 20 sports leagues, 3 fantasy leagues, 10s polling. Uplink Ultimate: unlimited symbols/feeds/sports leagues, 10 fantasy leagues, live SSE streaming.
+
+### Uplink pricing
+
+#### What does "data delivery" mean?
+
+Free users get data refreshed every 60 seconds via polling. Uplink cuts that to 30 seconds. Pro pushes it to 10 seconds. Ultimate eliminates polling entirely — data arrives the instant it changes via Server-Sent Events (SSE), the same technology used by stock trading platforms.
+
+#### How many symbols can I track?
+
+Tracked symbols are the stocks, ETFs, and crypto tickers that appear in your finance feed. Free accounts can follow up to 5 at a time. Uplink raises that to 25. Pro gives you 75 — enough for a serious portfolio. With Ultimate, there is no cap — add every ticker you care about and they all stream in real time.
+
+#### How many RSS feeds can I follow?
+
+RSS feeds power the news channel. Free accounts can subscribe to 1 feed from the default catalog. Uplink expands that to 25, Pro to 100, giving you broad coverage across topics. Ultimate removes the limit entirely — subscribe to as many sources as you want.
+
+#### What are custom RSS feeds?
+
+Beyond the built-in catalog, custom feeds let you paste any RSS or Atom URL. Free accounts cannot add custom feeds. Uplink gives you 1, Pro gives you 3 — enough for niche industry sources, personal blogs, or company news. Ultimate removes the cap so you can add every source you follow.
+
+#### What sports leagues are included?
+
+Every tier includes live scores from the NFL, NBA, MLB, NHL, MLS, and Premier League. All paid tiers add college football (NCAAF) and college basketball (NCAAM), with scores updating at the delivery speed of your tier.
+
+#### How many fantasy leagues can I connect?
+
+Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. Free accounts cannot connect Yahoo leagues. Uplink supports up to 1. Pro gives you 3 — enough for multi-sport managers. Ultimate raises the cap to 10 leagues across every sport.
+
+#### What are custom alerts?
+
+Custom alerts let you define conditions that trigger notifications: a stock hitting a target price, a game entering the 4th quarter, or an RSS item matching a keyword. Alerts are evaluated in the app background — no server round-trip needed. Available on Pro and Ultimate tiers.
+
+#### What are feed profiles and advanced controls?
+
+Feed profiles let you save different configurations — like "Work" showing only finance and RSS, or "Weekend" with sports and fantasy. Advanced controls add pinning, custom sort rules, and per-channel filtering within the feed. Both features are exclusive to Pro and Ultimate tiers.
+
+#### What is site filtering?
+
+Site filtering controls where the feed bar appears. Every tier includes blacklist filtering — hide the bar on specific displays. Pro and Ultimate add whitelist mode on top, so you can restrict the bar to only the displays you choose.
+
+#### What about webhooks, data export, and API access?
+
+Webhooks push your alerts to Discord, Slack, or any URL. Data export lets you download tracked symbols, historical prices, and game results as CSV or JSON. API access gives you programmatic read access to your MyScrollr data for personal dashboards or automation. All three are exclusive to Ultimate.
+
+#### What does early access include?
+
+Every paid tier unlocks early access to new features, channels, and UI updates before they roll out to free users. This includes beta channels, experimental feed modes, and new dashboard widgets. You get to try everything first and provide feedback that shapes the final release.
+
+#### Does every tier get the full dashboard?
+
+Every user gets complete access to the web dashboard at myscrollr.com. You can view all your channels, manage your watchlists, configure feeds, and adjust preferences regardless of your subscription tier. Paid tiers enhance the data flowing into the dashboard, not the dashboard itself.

@@ -48,7 +48,9 @@ import type { FAQItem } from '@/components/landing/FAQSection'
 import type { SubscriptionStatus, TierLimitsResponse } from '@/api/client'
 import type { BackdropBeam } from '@/components/landing/_ConvergenceBackdrop'
 import { ConvergenceBackdrop } from '@/components/landing/_ConvergenceBackdrop'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { seo } from '@/lib/seo'
+import { breadcrumbs, faqPage, productOffers } from '@/lib/structured-data'
+import { seededRandom } from '@/lib/seededRandom'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { useGetToken } from '@/hooks/useGetToken'
 import { billingApi, tierLimitsApi } from '@/api/client'
@@ -107,8 +109,121 @@ function AnimatedPrice({ value }: { value: number }) {
   return <>{display}</>
 }
 
+// Static JSON-LD source data for the /uplink route. Kept module-scope
+// so it serializes cleanly inside head() during prerender. Pricing
+// mirrors the in-file PRICING constant; cap numbers mirror
+// FALLBACK_LIMITS — keep all three in sync.
+//
+// FAQ answers cite the same fallback caps the visible FAQ shows on
+// first paint (buildUplinkFAQ reads FALLBACK_LIMITS before the API
+// responds), so Google's FAQPage rich-result policy holds: schema
+// answer text matches what crawlers see in the static HTML.
+const STATIC_TIERS = [
+  {
+    name: 'Uplink',
+    description:
+      'Unlimited tracking, faster delivery, and full RSS catalog access.',
+    priceMonthly: 9.99,
+    priceAnnual: 79.99,
+  },
+  {
+    name: 'Pro',
+    description:
+      'Real-time data, custom alerts, advanced feed controls, and more tracked symbols.',
+    priceMonthly: 24.99,
+    priceAnnual: 199.99,
+  },
+  {
+    name: 'Ultimate',
+    description:
+      'No caps on symbols, RSS feeds, or sports leagues. Up to 10 Yahoo fantasy leagues. Server-Sent Events delivery, webhooks, data export, and API access.',
+    priceMonthly: 49.99,
+    priceAnnual: 399.99,
+  },
+]
+
+const STATIC_FAQ = [
+  {
+    question: 'What does "data delivery" mean?',
+    answer:
+      'Free users get data refreshed every 60 seconds via polling. Uplink cuts that to 30 seconds. Pro pushes it to 10 seconds. Ultimate eliminates polling entirely — data arrives the instant it changes via Server-Sent Events (SSE), the same technology used by stock trading platforms.',
+  },
+  {
+    question: 'How many symbols can I track?',
+    answer:
+      'Tracked symbols are the stocks, ETFs, and crypto tickers that appear in your finance feed. Free accounts can follow up to 5 at a time. Uplink raises that to 25. Pro gives you 75 — enough for a serious portfolio. With Ultimate, there is no cap — add every ticker you care about and they all stream in real time.',
+  },
+  {
+    question: 'How many RSS feeds can I follow?',
+    answer:
+      'RSS feeds power the news channel. Free accounts can subscribe to 1 feed from the default catalog. Uplink expands that to 25, Pro to 100, giving you broad coverage across topics. Ultimate removes the limit entirely — subscribe to as many sources as you want.',
+  },
+  {
+    question: 'What are custom RSS feeds?',
+    answer:
+      'Beyond the built-in catalog, custom feeds let you paste any RSS or Atom URL. Free accounts cannot add custom feeds. Uplink gives you 1, Pro gives you 3 — enough for niche industry sources, personal blogs, or company news. Ultimate removes the cap so you can add every source you follow.',
+  },
+  {
+    question: 'What sports leagues are included?',
+    answer:
+      'Every tier includes live scores from the NFL, NBA, MLB, NHL, MLS, and Premier League. All paid tiers add college football (NCAAF) and college basketball (NCAAM), with scores updating at the delivery speed of your tier.',
+  },
+  {
+    question: 'How many fantasy leagues can I connect?',
+    answer:
+      'Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. Free accounts cannot connect Yahoo leagues. Uplink supports up to 1. Pro gives you 3 — enough for multi-sport managers. Ultimate raises the cap to 10 leagues across every sport.',
+  },
+  {
+    question: 'What are custom alerts?',
+    answer:
+      'Custom alerts let you define conditions that trigger notifications: a stock hitting a target price, a game entering the 4th quarter, or an RSS item matching a keyword. Alerts are evaluated in the app background — no server round-trip needed. Available on Pro and Ultimate tiers.',
+  },
+  {
+    question: 'What are feed profiles and advanced controls?',
+    answer:
+      'Feed profiles let you save different configurations — like "Work" showing only finance and RSS, or "Weekend" with sports and fantasy. Advanced controls add pinning, custom sort rules, and per-channel filtering within the feed. Both features are exclusive to Pro and Ultimate tiers.',
+  },
+  {
+    question: 'What is site filtering?',
+    answer:
+      'Site filtering controls where the feed bar appears. Every tier includes blacklist filtering — hide the bar on specific displays. Pro and Ultimate add whitelist mode on top, so you can restrict the bar to only the displays you choose.',
+  },
+  {
+    question: 'What about webhooks, data export, and API access?',
+    answer:
+      'Webhooks push your alerts to Discord, Slack, or any URL. Data export lets you download tracked symbols, historical prices, and game results as CSV or JSON. API access gives you programmatic read access to your MyScrollr data for personal dashboards or automation. All three are exclusive to Ultimate.',
+  },
+  {
+    question: 'What does early access include?',
+    answer:
+      'Every paid tier unlocks early access to new features, channels, and UI updates before they roll out to free users. This includes beta channels, experimental feed modes, and new dashboard widgets. You get to try everything first and provide feedback that shapes the final release.',
+  },
+  {
+    question: 'Does every tier get the full dashboard?',
+    answer:
+      'Every user gets complete access to the web dashboard at myscrollr.com. You can view all your channels, manage your watchlists, configure feeds, and adjust preferences regardless of your subscription tier. Paid tiers enhance the data flowing into the dashboard, not the dashboard itself.',
+  },
+]
+
 export const Route = createFileRoute('/uplink')({
   validateSearch: () => ({}),
+  head: () =>
+    seo({
+      title: 'Uplink — Pricing for Scrollr',
+      description:
+        'Unlock unlimited tracking, real-time data delivery, and early access to new channels. Plans from $9.99/month with annual savings.',
+      path: '/uplink',
+      image: 'https://myscrollr.com/og/uplink.png',
+      type: 'product',
+      jsonLd: [
+        productOffers(STATIC_TIERS),
+        faqPage(STATIC_FAQ),
+        breadcrumbs([
+          { name: 'Home', path: '/' },
+          { name: 'Uplink', path: '/uplink' },
+        ]),
+      ],
+    }),
   component: UplinkPage,
 })
 
@@ -544,15 +659,30 @@ function getPriceId(tier: TierKey, plan: PlanKey): string {
 
 // ── CTA Particles ──────────────────────────────────────────────
 
-const CTA_PARTICLES = Array.from({ length: 20 }, (_, i) => ({
-  id: i,
-  x: Math.random() * 100,
-  y: Math.random() * 100,
-  size: Math.random() * 3 + 1.5,
-  delay: Math.random() * 5,
-  duration: Math.random() * 6 + 8,
-  color: i % 3 === 0 ? '#00b8db' : i % 3 === 1 ? '#a78bfa' : '#34d399',
-}))
+const CTA_PARTICLES = Array.from({ length: 20 }, (_, i) => {
+  const random = seededRandom(i * 6151 + 12289)
+  return {
+    id: i,
+    x: random() * 100,
+    y: random() * 100,
+    size: random() * 3 + 1.5,
+    delay: random() * 5,
+    duration: random() * 6 + 8,
+    color: i % 3 === 0 ? '#00b8db' : i % 3 === 1 ? '#a78bfa' : '#34d399',
+  }
+})
+
+const FOOTER_PARTICLES = Array.from({ length: 14 }, (_, i) => {
+  const random = seededRandom(i * 4093 + 8191)
+  return {
+    id: i,
+    x: 20 + random() * 60,
+    y: 10 + random() * 80,
+    size: random() * 2.5 + 1.5,
+    delay: 0.5 + random() * 3,
+    duration: random() * 5 + 6,
+  }
+})
 
 // ── Uplink FAQ ─────────────────────────────────────────────────
 
@@ -565,12 +695,17 @@ function buildUplinkFAQ(limits: TierLimitsResponse): Array<FAQItem> {
   const free = limits.tiers.free
   const uplink = limits.tiers.uplink
   const pro = limits.tiers.uplink_pro
+  const ult = limits.tiers.uplink_ultimate
 
   // "Connect N league" — "None" when free has zero fantasy leagues.
   const freeFantasyCopy =
     free.fantasy === 0
       ? 'No Yahoo leagues'
       : `${free.fantasy} Yahoo league${free.fantasy === 1 ? '' : 's'}`
+
+  // Render an Ultimate-tier cap value: numbers stay numbers, null = "unlimited".
+  const ultimateCopy = (n: number | null): string =>
+    n === null ? 'unlimited' : `${n}`
 
   return [
     {
@@ -615,8 +750,8 @@ function buildUplinkFAQ(limits: TierLimitsResponse): Array<FAQItem> {
     {
       icon: Crown,
       question: 'How many fantasy leagues can I connect?',
-      highlight: `${freeFantasyCopy} on free, ${uplink.fantasy} with Uplink, ${pro.fantasy} with Pro, or every league with Ultimate.`,
-      answer: `Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. Free accounts ${free.fantasy === 0 ? 'cannot connect Yahoo leagues' : `connect ${free.fantasy} league${free.fantasy === 1 ? '' : 's'}`}. Uplink supports up to ${uplink.fantasy}. Pro gives you ${pro.fantasy} — enough for multi-sport managers. Ultimate connects every league across every sport with no restrictions.`,
+      highlight: `${freeFantasyCopy} on free, ${uplink.fantasy} with Uplink, ${pro.fantasy} with Pro, or ${ultimateCopy(ult.fantasy)} with Ultimate.`,
+      answer: `Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. Free accounts ${free.fantasy === 0 ? 'cannot connect Yahoo leagues' : `connect ${free.fantasy} league${free.fantasy === 1 ? '' : 's'}`}. Uplink supports up to ${uplink.fantasy}. Pro gives you ${pro.fantasy} — enough for multi-sport managers. Ultimate raises the cap to ${ultimateCopy(ult.fantasy)} leagues across every sport.`,
       accent: 'rose',
     },
     {
@@ -954,13 +1089,6 @@ function PricingFeature({
 // ── Page Component ──────────────────────────────────────────────
 
 function UplinkPage() {
-  usePageMeta({
-    title: 'Uplink \u2014 Scrollr',
-    description:
-      'Total coverage for power users. Scrollr Uplink gives you unlimited tracking, real-time data delivery, and early access to new channels.',
-    canonicalUrl: 'https://myscrollr.com/uplink',
-  })
-
   const { isAuthenticated, signIn } = useScrollrAuth()
   const getToken = useGetToken()
 
@@ -1995,14 +2123,7 @@ function UplinkPage() {
                   />
 
                   {/* ── Floating particles ── */}
-                  {Array.from({ length: 14 }, (_, i) => ({
-                    id: i,
-                    x: 20 + Math.random() * 60,
-                    y: 10 + Math.random() * 80,
-                    size: Math.random() * 2.5 + 1.5,
-                    delay: 0.5 + Math.random() * 3,
-                    duration: Math.random() * 5 + 6,
-                  })).map((p) => (
+                  {FOOTER_PARTICLES.map((p) => (
                     <motion.div
                       key={p.id}
                       className="absolute rounded-full pointer-events-none"

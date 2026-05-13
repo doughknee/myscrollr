@@ -39,7 +39,9 @@ import type { BackdropBeam } from '@/components/landing/_ConvergenceBackdrop'
 import { businessApi } from '@/api/client'
 import { FAQSection } from '@/components/landing/FAQSection'
 import { ConvergenceBackdrop } from '@/components/landing/_ConvergenceBackdrop'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { seo } from '@/lib/seo'
+import { breadcrumbs } from '@/lib/structured-data'
+import { seededRandom } from '@/lib/seededRandom'
 import { useGitHubStats } from '@/hooks/useGitHubStats'
 
 // ── Constants ───────────────────────────────────────────────────
@@ -51,6 +53,18 @@ const REPO = 'brandon-relentnet/myscrollr'
 // ── Route ───────────────────────────────────────────────────────
 
 export const Route = createFileRoute('/business')({
+  head: () =>
+    seo({
+      title: 'Scrollr for Business — Branded Desktop Deployments',
+      description:
+        'Custom-branded Scrollr deployments for brokerages, sports venues, fantasy platforms, crypto exchanges, and news publishers. Multi-display, self-hosted, dedicated support. Starts at $500/mo.',
+      path: '/business',
+      image: 'https://myscrollr.com/og/business.png',
+      jsonLd: breadcrumbs([
+        { name: 'Home', path: '/' },
+        { name: 'Business', path: '/business' },
+      ]),
+    }),
   component: BusinessPage,
 })
 
@@ -341,15 +355,18 @@ const USE_CASE_OPTIONS = [
 
 // ── CTA Particles ──────────────────────────────────────────────
 
-const CTA_PARTICLES = Array.from({ length: 12 }, (_, i) => ({
-  id: i,
-  x: Math.random() * 100,
-  y: Math.random() * 100,
-  size: Math.random() * 3 + 1.5,
-  delay: Math.random() * 5,
-  duration: Math.random() * 6 + 8,
-  color: i % 2 === 0 ? '#34d399' : '#00b8db',
-}))
+const CTA_PARTICLES = Array.from({ length: 12 }, (_, i) => {
+  const random = seededRandom(i * 7919 + 31337)
+  return {
+    id: i,
+    x: random() * 100,
+    y: random() * 100,
+    size: random() * 3 + 1.5,
+    delay: random() * 5,
+    duration: random() * 6 + 8,
+    color: i % 2 === 0 ? '#34d399' : '#00b8db',
+  }
+})
 
 /* ══════════════════════════════════════════════════════════════════
    HERO
@@ -1777,13 +1794,6 @@ function BottomCTA() {
    ══════════════════════════════════════════════════════════════════ */
 
 function BusinessPage() {
-  usePageMeta({
-    title: 'Business — Scrollr',
-    description:
-      'Scrollr for business: branded desktop deployments for teams, brokerages, sports venues, fantasy platforms, crypto exchanges, and news publishers. Custom branding, multi-display, self-hosted, dedicated support. Starts at $500/mo.',
-    canonicalUrl: 'https://myscrollr.com/business',
-  })
-
   return (
     <div className="min-h-screen">
       <BusinessHero />

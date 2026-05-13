@@ -82,7 +82,8 @@ Permissions-Policy are configured in the image's nginx.conf.
 src/
 ├── api/                 # fetch client, typed endpoint wrappers
 ├── components/          # UI components (hero, pricing cards, legal docs, etc.)
-├── hooks/               # useAuth, usePageMeta, useTheme, etc.
+├── hooks/               # useScrollrAuth, useGetToken, useTheme, etc.
+├── lib/                 # seo(), structured-data templates, seededRandom, etc.
 ├── routes/              # file-based TanStack Router routes
 │   ├── __root.tsx       # shell + error boundary + global layout
 │   ├── index.tsx        # home / landing

@@ -20,9 +20,23 @@ import {
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 
-import { usePageMeta } from '@/lib/usePageMeta'
+import { seo } from '@/lib/seo'
+import { breadcrumbs } from '@/lib/structured-data'
 
 export const Route = createFileRoute('/architecture')({
+  head: () =>
+    seo({
+      title: 'How Scrollr Works — Architecture Deep-Dive',
+      description:
+        'Behind the scenes: how Scrollr delivers real-time finance, sports, news, and fantasy data from source APIs through CDC PubSub to your desktop. Built with Go, Rust, React, PostgreSQL, and Redis.',
+      path: '/architecture',
+      image: 'https://myscrollr.com/og/architecture.png',
+      type: 'article',
+      jsonLd: breadcrumbs([
+        { name: 'Home', path: '/' },
+        { name: 'Architecture', path: '/architecture' },
+      ]),
+    }),
   component: ArchitecturePage,
 })
 
@@ -279,13 +293,6 @@ const TECH_STACK: Array<TechGroup> = [
 // ── Page Component ─────────────────────────────────────────────
 
 function ArchitecturePage() {
-  usePageMeta({
-    title: 'Architecture — Scrollr',
-    description:
-      'How Scrollr works: real-time data pipeline from source APIs through CDC to your desktop, powered by Go, Rust, React, and Redis.',
-    canonicalUrl: 'https://myscrollr.com/architecture',
-  })
-
   return (
     <div className="min-h-screen pt-20">
       {/* ── HERO ─────────────────────────────────────────────── */}
