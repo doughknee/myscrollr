@@ -1,5 +1,7 @@
 .git
 .env
+# Cache file written by @sentry/vite-plugin during source map upload.
+.env.sentry-build-plugin
 target/
 # Cargo.lock is ignored by default for the rest of the workspace (Rust
 # convention for libraries — re-resolution per build is fine when the

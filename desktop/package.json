@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.19",
+    "@sentry/react": "^10.53.1",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-router": "^1.166.7",
     "@tauri-apps/api": "^2.0.0",
@@ -51,6 +52,7 @@
     "sonner": "^2.0.7"
   },
   "devDependencies": {
+    "@sentry/vite-plugin": "^5.3.0",
     "@tailwindcss/vite": "^4.0.6",
     "@tanstack/router-plugin": "^1.166.7",
     "@tauri-apps/cli": "^2.0.0",
