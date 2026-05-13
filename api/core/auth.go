@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/MicahParks/keyfunc/v2"
+	"github.com/getsentry/sentry-go"
+	sentryfiber "github.com/getsentry/sentry-go/fiber"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -131,6 +133,15 @@ func ValidateAuth(c *fiber.Ctx) error {
 	}
 
 	c.Locals("user_id", sub)
+
+	// Attach an anonymous user ID to the Sentry hub for this request.
+	// The hash is irreversible (SHA-256 of sub + SENTRY_USER_SALT, first
+	// 8 bytes). NEVER attach the raw Logto sub, email, or username.
+	if hub := sentryfiber.GetHubFromContext(c); hub != nil {
+		if hashed := HashUserSub(sub); hashed != "" {
+			hub.Scope().SetUser(sentry.User{ID: hashed})
+		}
+	}
 
 	// Extract roles injected by Logto Custom JWT (e.g. ["uplink"])
 	var roles []string

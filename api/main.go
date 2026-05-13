@@ -6,11 +6,21 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/joho/godotenv"
 
 	"github.com/brandon-relentnet/myscrollr/api/core"
 )
+
+// envOr returns the env value or fallback when unset.
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
 
 // @title Scrollr API
 // @version 2.0
@@ -23,6 +33,34 @@ import (
 // @description Type 'Bearer ' followed by your Logto JWT.
 func main() {
 	_ = godotenv.Load()
+
+	// Sentry init — must happen before any infrastructure that might panic.
+	// When SENTRY_DSN is empty, Sentry is a no-op (no events sent, no
+	// background goroutines started).
+	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
+		err := sentry.Init(sentry.ClientOptions{
+			Dsn:              dsn,
+			Environment:      envOr("ENVIRONMENT", "development"),
+			Release:          envOr("GIT_SHA", "unknown"),
+			EnableTracing:    true,
+			TracesSampleRate: 0.1,
+			AttachStacktrace: true,
+			SendDefaultPII:   false,
+			BeforeSend: func(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
+				core.ScrubSentryEvent(event)
+				return event
+			},
+		})
+		if err != nil {
+			log.Printf("[Sentry] init failed: %v", err)
+		} else {
+			log.Printf("[Sentry] initialized for environment=%s", envOr("ENVIRONMENT", "development"))
+			sentry.ConfigureScope(func(scope *sentry.Scope) {
+				scope.SetTag("service", "scrollr-core-api")
+			})
+			defer sentry.Flush(2 * time.Second)
+		}
+	}
 
 	// Root context — cancelled on shutdown signal
 	ctx, cancel := context.WithCancel(context.Background())

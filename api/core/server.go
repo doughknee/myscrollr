@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	sentryfiber "github.com/getsentry/sentry-go/fiber"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
@@ -62,6 +63,18 @@ func (s *Server) Setup() {
 
 // setupMiddleware attaches security headers, CORS, and rate limiting.
 func (s *Server) setupMiddleware() {
+	// Sentry middleware MUST be first so panics from anything below it are
+	// captured. WaitForDelivery=false keeps requests off the Sentry HTTP
+	// path. Repanic=true lets Fiber's built-in recover see panics too, so
+	// the error response still reaches the client.
+	if os.Getenv("SENTRY_DSN") != "" {
+		s.App.Use(sentryfiber.New(sentryfiber.Options{
+			Repanic:         true,
+			WaitForDelivery: false,
+			Timeout:         2 * time.Second,
+		}))
+	}
+
 	// Security Headers
 	s.App.Use(func(c *fiber.Ctx) error {
 		c.Set("X-XSS-Protection", "1; mode=block")
