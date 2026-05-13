@@ -24,9 +24,17 @@ import { userApi } from '@/api/client'
 import { useGetToken } from '@/hooks/useGetToken'
 import SubscriptionStatus from '@/components/billing/SubscriptionStatus'
 import AccountDangerZone from '@/components/account/AccountDangerZone'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { seo } from '@/lib/seo'
 
 export const Route = createFileRoute('/account')({
+  head: () =>
+    seo({
+      title: 'Account — Scrollr',
+      description:
+        'Manage your Scrollr account, subscription, and connected services.',
+      path: '/account',
+      noindex: true,
+    }),
   component: AccountHub,
 })
 
@@ -100,12 +108,6 @@ const HUB_CARDS: Array<HubCardDef> = [
 ]
 
 function AccountHub() {
-  usePageMeta({
-    title: 'Account — Scrollr',
-    description:
-      'Manage your Scrollr account, subscription, and connected services.',
-    canonicalUrl: 'https://myscrollr.com/account',
-  })
   const { isAuthenticated, isLoading } = useScrollrAuth()
   const navigate = useNavigate()
   const getToken = useGetToken()

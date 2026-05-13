@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, BookOpen, ChevronDown, Info, List } from 'lucide-react'
 
 import type { LegalDocument, LegalSection } from '@/components/legal/documents'
-import { usePageMeta } from '@/lib/usePageMeta'
 import { seo } from '@/lib/seo'
 import { breadcrumbs } from '@/lib/structured-data'
 import { itemVariants, pageVariants, sectionVariants } from '@/lib/animations'
@@ -47,11 +46,13 @@ function LegalPage() {
   const activeDoc = getDocument(activeSlug)!
   const categories = useMemo(() => getDocumentsByCategory(), [])
 
-  usePageMeta({
-    title: `${activeDoc.title} — Scrollr`,
-    description: `${activeDoc.title} for the Scrollr platform. Last updated ${activeDoc.lastUpdated}.`,
-    canonicalUrl: 'https://myscrollr.com/legal',
-  })
+  // Reflect the active legal doc in the browser tab title. The prerendered
+  // <title> stays "Legal — Scrollr" (correct for crawlers; canonical is /legal
+  // for all ?doc= variants). Each route owns its head() — we only write here,
+  // never restore, so a route transition's head() update is authoritative.
+  useEffect(() => {
+    document.title = `${activeDoc.title} — Scrollr`
+  }, [activeDoc.title])
 
   // Scroll content to top when doc changes
   useEffect(() => {

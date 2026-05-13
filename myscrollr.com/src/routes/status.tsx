@@ -15,10 +15,18 @@ import {
 } from 'lucide-react'
 import { motion } from 'motion/react'
 import type { ComponentType } from 'react'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { seo } from '@/lib/seo'
 import { API_BASE } from '@/api/client'
 
 export const Route = createFileRoute('/status')({
+  head: () =>
+    seo({
+      title: 'System Status — Scrollr',
+      description:
+        'Live system status for the Scrollr platform. Monitor infrastructure, ingestion workers, and API health.',
+      path: '/status',
+      noindex: true,
+    }),
   component: StatusPage,
 })
 
@@ -149,13 +157,6 @@ function overallLabel(health: HealthData | null): string {
 // --- Component ---
 
 function StatusPage() {
-  usePageMeta({
-    title: 'System Status — Scrollr',
-    description:
-      'Live system status for the Scrollr platform. Monitor infrastructure, ingestion workers, and API health.',
-    canonicalUrl: 'https://myscrollr.com/status',
-  })
-
   const [health, setHealth] = useState<HealthData | null>(null)
   const [channels, setChannels] = useState<Array<ChannelEntry>>([])
   const [viewers, setViewers] = useState<number | null>(null)
