@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -66,6 +67,12 @@ type registrationRoute struct {
 func main() {
 	// Load .env (optional — don't fatal if missing)
 	_ = godotenv.Load()
+
+	// Sentry init — before any other infrastructure. No-op when
+	// SENTRY_DSN is unset.
+	if initSentry() {
+		defer sentry.Flush(2 * time.Second)
+	}
 
 	// -------------------------------------------------------------------------
 	// Connect to PostgreSQL
@@ -243,6 +250,13 @@ func main() {
 		AppName:               "Scrollr Fantasy API",
 		DisableStartupMessage: false,
 	})
+
+	// Sentry middleware MUST be first so panics from anything below are
+	// captured. Followed by the user-hook for anonymous user ID tagging.
+	if os.Getenv("SENTRY_DSN") != "" {
+		fiberApp.Use(sentryMiddleware())
+		fiberApp.Use(sentryUserHook())
+	}
 
 	// Yahoo OAuth routes.
 	//   /yahoo/start    — Auth REQUIRED. Core gateway verifies the Scrollr
