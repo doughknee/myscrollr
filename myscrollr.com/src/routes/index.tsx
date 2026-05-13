@@ -1,6 +1,11 @@
 import { Suspense, lazy } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { seo } from '@/lib/seo'
+import {
+  organization,
+  softwareApplication,
+  website,
+} from '@/lib/structured-data'
 import { HeroSection } from '@/components/landing/HeroSection'
 import { HowItWorks } from '@/components/landing/HowItWorks'
 import { ChannelsShowcase } from '@/components/landing/ChannelsShowcase'
@@ -30,16 +35,18 @@ const CallToAction = lazy(() =>
 
 export const Route = createFileRoute('/')({
   component: HomePage,
+  head: () =>
+    seo({
+      title: 'Scrollr — Live Data on Your Desktop',
+      description:
+        'A quiet ticker at the edge of your screen with live sports, markets, news, and fantasy data. Free and open source. macOS, Windows, Linux.',
+      path: '/',
+      imageAlt: 'Scrollr desktop ticker showing live market and sports data.',
+      jsonLd: [organization, website, softwareApplication],
+    }),
 })
 
 function HomePage() {
-  usePageMeta({
-    title: 'Scrollr — Live Data on Your Desktop',
-    description:
-      'Live sports scores, crypto prices, news, and fantasy updates on your desktop. Open source, private by design, and free.',
-    canonicalUrl: 'https://myscrollr.com/',
-  })
-
   return (
     <>
       <HeroSection />
