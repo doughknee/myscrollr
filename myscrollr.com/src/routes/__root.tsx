@@ -105,6 +105,13 @@ function RootDocument({ children }: { children: ReactNode }) {
           type="font/woff2"
           crossOrigin="anonymous"
         />
+        <link
+          rel="preload"
+          href="/fonts/ibm-plex-mono-400.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
         <link rel="stylesheet" href={appCss} />
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
