@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { URL, fileURLToPath } from 'node:url'
 
 import tailwindcss from '@tailwindcss/vite'
-import { tanstackRouter } from '@tanstack/router-plugin/vite'
+import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import { defineConfig } from 'vite'
 import viteReact from '@vitejs/plugin-react'
 
@@ -16,9 +16,14 @@ const pkg = JSON.parse(
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
-    tanstackRouter({
-      target: 'react',
-      autoCodeSplitting: true,
+    tanstackStart({
+      router: {},
+      spa: {
+        enabled: true,
+      },
+      prerender: {
+        enabled: false,
+      },
     }),
     viteReact(),
     tailwindcss(),
