@@ -18,7 +18,7 @@
     "dev": "vite --port 3000",
     "prebuild": "node scripts/fetch-latest-version.mjs && node scripts/generate-sitemap.mjs",
     "build": "vite build && tsc",
-    "postbuild": "node scripts/check-prerender.mjs",
+    "postbuild": "node scripts/check-sentry-tunnel.mjs && node scripts/check-prerender.mjs",
     "serve": "vite preview",
     "lint": "eslint",
     "format": "prettier",

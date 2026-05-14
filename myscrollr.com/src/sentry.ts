@@ -28,6 +28,9 @@ export function initSentry() {
 
   Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN,
+    // Same-origin tunnel avoids browser tracking protection/ad blockers
+    // blocking direct requests to *.sentry.io.
+    tunnel: '/api/sentry-envelope',
     environment: 'production',
     release: `myscrollr-web@${__APP_VERSION__}`,
 

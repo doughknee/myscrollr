@@ -87,6 +87,16 @@ RUN printf 'server {\n\
         image/svg+xml\n\
         font/woff2;\n\
 \n\
+    # ── Sentry tunnel: same-origin proxy avoids browser blocking ─\n\
+    location = /api/sentry-envelope {\n\
+        proxy_pass https://o4511384091033600.ingest.us.sentry.io/api/4511384375132160/envelope/;\n\
+        proxy_ssl_server_name on;\n\
+        proxy_pass_request_headers off;\n\
+        proxy_set_header Host o4511384091033600.ingest.us.sentry.io;\n\
+        proxy_set_header Content-Type $content_type;\n\
+        proxy_set_header Content-Length $content_length;\n\
+    }\n\
+\n\
     # ── HTML: no-cache so users always get latest deploy ────────\n\
     location / {\n\
         include /etc/nginx/security-headers.conf;\n\
@@ -112,7 +122,7 @@ RUN printf 'server {\n\
 printf 'add_header X-Content-Type-Options "nosniff" always;\n\
 add_header Referrer-Policy "strict-origin-when-cross-origin" always;\n\
 add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;\n\
-add_header Content-Security-Policy "default-src '"'"'self'"'"'; frame-ancestors '"'"'self'"'"' https://relentnet.com; script-src '"'"'self'"'"' '"'"'unsafe-inline'"'"' https://js.stripe.com; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' data: https:; font-src '"'"'self'"'"'; connect-src '"'"'self'"'"' https://api.myscrollr.com https://auth.myscrollr.com https://api.stripe.com https://api.github.com https://*.ingest.us.sentry.io; frame-src https://js.stripe.com https://hooks.stripe.com; base-uri '"'"'self'"'"'; form-action '"'"'self'"'"';" always;\n\
+add_header Content-Security-Policy "default-src '"'"'self'"'"'; frame-ancestors '"'"'self'"'"' https://relentnet.com; script-src '"'"'self'"'"' '"'"'unsafe-inline'"'"' https://js.stripe.com; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' data: https:; font-src '"'"'self'"'"'; connect-src '"'"'self'"'"' https://api.myscrollr.com https://auth.myscrollr.com https://api.stripe.com https://api.github.com; frame-src https://js.stripe.com https://hooks.stripe.com; base-uri '"'"'self'"'"'; form-action '"'"'self'"'"';" always;\n\
 ' > /etc/nginx/security-headers.conf
 
 EXPOSE 3000
