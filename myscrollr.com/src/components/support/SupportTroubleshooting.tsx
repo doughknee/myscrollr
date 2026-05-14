@@ -37,6 +37,10 @@ export function SupportTroubleshooting() {
       eyebrow="Troubleshooting"
       title="When something isn't working"
       description="Common symptoms and the steps that resolve them. If none of these help, send us a note from the contact form below."
+      screenshot={{
+        basename: 'support/troubleshooting',
+        alt: 'The in-app troubleshooting tab in Scrollr, listing the same articles and remediation steps shown here.',
+      }}
     >
       <SupportAccordion entries={entries} idPrefix="trouble" />
     </SupportSection>

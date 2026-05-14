@@ -7,9 +7,11 @@ import {
   website,
 } from '@/lib/structured-data'
 import { HeroSection } from '@/components/landing/HeroSection'
+import { TickerShowcase } from '@/components/landing/TickerShowcase'
 import { HowItWorks } from '@/components/landing/HowItWorks'
 import { ChannelsShowcase } from '@/components/landing/ChannelsShowcase'
 import { CustomizationShowcase } from '@/components/landing/CustomizationShowcase'
+import { MakeItYoursSection } from '@/components/landing/MakeItYoursSection'
 import { BenefitsSection } from '@/components/landing/BenefitsSection'
 import { TrustSection } from '@/components/landing/TrustSection'
 
@@ -51,11 +53,15 @@ function HomePage() {
     <>
       <HeroSection />
 
+      <TickerShowcase />
+
       <HowItWorks />
 
       <ChannelsShowcase />
 
       <CustomizationShowcase />
+
+      <MakeItYoursSection />
 
       <BenefitsSection />
 

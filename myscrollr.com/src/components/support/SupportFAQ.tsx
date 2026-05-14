@@ -14,6 +14,10 @@ export function SupportFAQ() {
       eyebrow="FAQ"
       title="Frequently asked questions"
       description="Quick answers to the questions people most often have about Scrollr."
+      screenshot={{
+        basename: 'support/faq',
+        alt: 'The in-app FAQ tab in Scrollr, listing the same questions and answers shown here.',
+      }}
     >
       <SupportAccordion entries={entries} idPrefix="faq" />
     </SupportSection>

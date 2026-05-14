@@ -1,7 +1,7 @@
 import { motion } from 'motion/react'
 import { Activity, GitPullRequest, HeartPulse } from 'lucide-react'
 import type { Sliders } from 'lucide-react'
-import { useTheme } from '@/hooks/useTheme'
+import { ProductScreenshot } from '@/components/ProductScreenshot'
 
 // ── Constants ────────────────────────────────────────────────────
 
@@ -9,24 +9,49 @@ const EASE = [0.22, 1, 0.36, 1] as const
 
 // ── Types & Data ─────────────────────────────────────────────────
 
+/**
+ * Discriminated union for the card's visual:
+ *  - `single`: one full-bleed screenshot at the top (dashboard captures).
+ *  - `tickerStack`: a stack of full-width ticker strips, each with its
+ *    own tiny eyebrow caption. Used when the abstract concept (density)
+ *    is better shown by an actual A/B than by a settings panel.
+ */
+type CardMedia =
+  | {
+      kind: 'single'
+      /** ProductScreenshot basename relative to `/screenshots/`. */
+      basename: string
+      alt: string
+    }
+  | {
+      kind: 'tickerStack'
+      /** One or more ticker rows stacked top-to-bottom. */
+      rows: ReadonlyArray<{
+        basename: string
+        densityLabel: string
+        aspect: '2930 / 80' | '2930 / 124'
+        alt: string
+      }>
+    }
+
 interface CustomizationCard {
   /** Stable id for keying. */
-  id: 'style' | 'catalog'
+  id: 'catalog' | 'ticker' | 'style'
   /** Eyebrow above the headline (e.g. "Density · Speed · Color"). */
   eyebrow: string
   /** Headline shown on the card. */
   title: string
   /** Body copy under the headline. */
   body: string
+  /** Card media — single screenshot or a ticker stack. */
+  media: CardMedia
   /**
-   * Public file basename for the screenshot. The component appends
-   * `-{theme}@1x.webp` and `-{theme}@2x.webp` per device pixel ratio.
+   * Layout slot. The section renders the first two cards side-by-side
+   * on the top row and the third card full-width below. Cards declare
+   * which slot they occupy explicitly so we can reorder data without
+   * having to swap CSS spans.
    */
-  imageBasename: string
-  /** Alt text for the screenshot. */
-  alt: string
-  /** Aspect ratio fed into the wrapper as `aspect-[w/h]`. */
-  aspect: string
+  slot: 'top-left' | 'top-right' | 'wide'
   /** Optional badge chips rendered under the body copy. */
   chips?: Array<{
     icon: typeof Sliders
@@ -36,27 +61,61 @@ interface CustomizationCard {
 
 const CARDS: Array<CustomizationCard> = [
   {
-    id: 'style',
-    eyebrow: 'Density · Speed · Color',
-    title: 'Tune it to your day',
-    body: 'Compact when you want a glance, detailed when you want context. Crank the speed up for a busy market, slow it down for a quiet afternoon. Pick a color treatment that matches the rest of your desktop.',
-    imageBasename: 'style',
-    alt: 'Scrollr settings panel with side-by-side compact and detailed previews, a slow-to-fast speed slider, and tight, normal, wide, colorful, theme, subtle style presets.',
-    aspect: '1600/1134',
-  },
-  {
     id: 'catalog',
+    slot: 'top-left',
     eyebrow: 'Channels · Widgets · Extensions',
     title: 'Add what you actually need',
     body: 'Markets, scores, headlines, and fantasy are just the start. Pin live system stats, your Uptime Kuma board, or GitHub Actions status right next to last quarter\u2019s earnings &mdash; the ticker becomes whatever your day looks like.',
-    imageBasename: 'catalog',
-    alt: 'Scrollr source catalog showing Finance, Sports, Fantasy, News, Clock, and Weather as added, alongside available widgets for System Monitor, Uptime, and GitHub.',
-    aspect: '1600/1134',
+    media: {
+      kind: 'single',
+      basename: 'overview/catalog',
+      alt: 'Scrollr source catalog showing Finance, Sports, Fantasy, News, Clock, and Weather as added, alongside available widgets for System Monitor, Uptime, and GitHub.',
+    },
     chips: [
       { icon: Activity, label: 'System Monitor' },
       { icon: HeartPulse, label: 'Uptime Kuma' },
       { icon: GitPullRequest, label: 'GitHub Actions' },
     ],
+  },
+  {
+    id: 'ticker',
+    slot: 'top-right',
+    eyebrow: 'Speed · Position · Rows',
+    title: 'Make it sit exactly where you want',
+    body: 'Dock the ticker to the top, bottom, or both edges of your display. Crank the scroll speed up for a busy market, slow it down for a quiet afternoon. Add a second row when one channel isn\u2019t enough.',
+    media: {
+      kind: 'single',
+      basename: 'configure/ticker',
+      alt: 'Scrollr ticker settings panel with controls for edge position, scroll speed, row count, and per-row channel assignment.',
+    },
+  },
+  {
+    id: 'style',
+    slot: 'wide',
+    eyebrow: 'Density · Color · Theme',
+    title: 'Tune it to your day',
+    body: 'Compact when you want a glance, detailed when you want context. Stacked, you can see exactly how much breathing room each density adds &mdash; pick whichever matches how much detail you actually need.',
+    // Density is best proven by an actual A/B of two ticker strips, not
+    // by a settings UI describing density. The wide layout below means
+    // both rows get to render at the section's full width, where the
+    // extreme aspect ratio finally has room to read properly.
+    media: {
+      kind: 'tickerStack',
+      rows: [
+        {
+          basename: 'ticker/all-purpose-compact',
+          densityLabel: 'Compact',
+          aspect: '2930 / 80',
+          alt: 'Compact Scrollr ticker showing all channels together with minimal vertical space.',
+        },
+        {
+          basename: 'ticker/all-purpose-detailed',
+          densityLabel: 'Detailed',
+          aspect: '2930 / 124',
+          alt: 'Detailed Scrollr ticker showing all channels together with extra context per item.',
+        },
+      ],
+    },
   },
 ]
 
@@ -69,9 +128,6 @@ function ShowcaseCard({
   card: CustomizationCard
   delay: number
 }) {
-  const { theme } = useTheme()
-  const base = `/screenshots/customization/${card.imageBasename}-${theme}`
-
   return (
     <motion.article
       initial={{ opacity: 0, y: 24 }}
@@ -91,40 +147,23 @@ function ShowcaseCard({
         aria-hidden="true"
       />
 
-      {/* Screenshot */}
+      {/* Media — either a single dashboard screenshot or a stacked
+          pair of ticker rows. Both render inside the same bordered band
+          at the top of the card so the card silhouettes stay consistent
+          across the two card types. */}
+      <CardMediaArea media={card.media} />
+
+      {/* Body — on the full-width "wide" card we cap the text column
+          so paragraphs don't sprawl past a comfortable measure. The
+          tickers above still take the card's full width, since their
+          extreme aspect ratio needs every pixel to read. */}
       <div
-        className="relative w-full overflow-hidden border-b border-base-300/40 bg-base-100/40"
-        style={{ aspectRatio: card.aspect.replace('/', ' / ') }}
+        className={
+          card.slot === 'wide'
+            ? 'flex flex-1 flex-col gap-3 p-6 sm:p-8 mx-auto w-full max-w-2xl text-center items-center'
+            : 'flex flex-1 flex-col gap-3 p-6 sm:p-7'
+        }
       >
-        <picture className="absolute inset-0">
-          <source
-            srcSet={`${base}@1x.webp 1x, ${base}@2x.webp 2x`}
-            type="image/webp"
-          />
-          <img
-            src={`${base}@1x.webp`}
-            alt={card.alt}
-            width={1600}
-            height={1134}
-            loading="lazy"
-            decoding="async"
-            className="block h-full w-full object-cover object-top"
-            draggable={false}
-          />
-        </picture>
-
-        {/* Soft inner shadow for depth against light bg */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            boxShadow: 'inset 0 -40px 60px -40px rgba(0,0,0,0.08)',
-          }}
-          aria-hidden="true"
-        />
-      </div>
-
-      {/* Body */}
-      <div className="flex flex-1 flex-col gap-3 p-6 sm:p-7">
         <span className="text-[11px] font-mono uppercase tracking-wider text-base-content/35">
           {card.eyebrow}
         </span>
@@ -152,6 +191,59 @@ function ShowcaseCard({
         ) : null}
       </div>
     </motion.article>
+  )
+}
+
+// ── Media renderer ───────────────────────────────────────────────
+
+function CardMediaArea({ media }: { media: CardMedia }) {
+  if (media.kind === 'single') {
+    return (
+      <div className="relative w-full overflow-hidden border-b border-base-300/40 bg-base-100/40">
+        <ProductScreenshot
+          basename={media.basename}
+          alt={media.alt}
+          pictureClassName="block w-full"
+          imgClassName="block h-full w-full object-cover object-top"
+        />
+        {/* Soft inner shadow for depth against light bg */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            boxShadow: 'inset 0 -40px 60px -40px rgba(0,0,0,0.08)',
+          }}
+          aria-hidden="true"
+        />
+      </div>
+    )
+  }
+
+  // tickerStack: two (or more) ticker rows stacked vertically, each
+  // captioned with its density label. Sits in the same border-b band
+  // as the single variant; vertical padding gives the strips breathing
+  // room since their content is dense.
+  return (
+    <div className="relative w-full overflow-hidden border-b border-base-300/40 bg-base-100/40 px-5 py-6 sm:px-7 sm:py-8 flex flex-col gap-4">
+      {media.rows.map((row) => (
+        <figure key={row.basename} className="flex flex-col gap-1.5">
+          <figcaption className="text-[10px] font-mono uppercase tracking-[0.18em] text-base-content/40">
+            {row.densityLabel}
+          </figcaption>
+          <div
+            className="overflow-hidden rounded-md border border-base-300/40 bg-base-100/60 shadow-sm"
+            style={{ aspectRatio: row.aspect }}
+          >
+            <ProductScreenshot
+              basename={row.basename}
+              alt={row.alt}
+              aspect={row.aspect}
+              pictureClassName="block w-full h-full"
+              imgClassName="block h-full w-full object-cover"
+            />
+          </div>
+        </figure>
+      ))}
+    </div>
   )
 }
 
@@ -184,14 +276,18 @@ export function CustomizationShowcase() {
           </p>
         </motion.div>
 
-        {/* Cards */}
+        {/* Cards: asymmetric grid — two cards across on the top row,
+            one full-width card below. On mobile (<md) all three stack
+            in a single column. The bottom card spans both columns at
+            md+ via `md:col-span-2`. */}
         <div className="grid gap-6 lg:gap-8 md:grid-cols-2">
           {CARDS.map((card, index) => (
-            <ShowcaseCard
+            <div
               key={card.id}
-              card={card}
-              delay={0.15 + index * 0.1}
-            />
+              className={card.slot === 'wide' ? 'md:col-span-2' : undefined}
+            >
+              <ShowcaseCard card={card} delay={0.15 + index * 0.1} />
+            </div>
           ))}
         </div>
       </div>

@@ -13,6 +13,7 @@ import type { LinuxFormat } from '@/lib/getDownloadInfo'
 import { seo } from '@/lib/seo'
 import { breadcrumbs, softwareApplication } from '@/lib/structured-data'
 import { DownloadButton } from '@/components/DownloadButton'
+import { ProductScreenshot } from '@/components/ProductScreenshot'
 import { detectIsIntelMac, detectPlatform } from '@/lib/detectPlatform'
 import { triggerDownload } from '@/lib/getDownloadInfo'
 
@@ -144,6 +145,36 @@ function DownloadPage() {
               {recommended.arch} &middot; Free &middot; Open source
             </p>
           </motion.div>
+
+          {/* ── What you'll see ────────────────────────────────
+              A real screenshot of the desktop ticker so people see what
+              they're about to install before they install it. Reduces
+              post-download "wait, what is this?" bounces. */}
+          <motion.figure
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-80px' }}
+            transition={{ duration: 0.7, ease: EASE, delay: 0.3 }}
+            className="relative mx-auto mt-16 max-w-4xl"
+          >
+            <div
+              aria-hidden="true"
+              className="absolute -inset-8 rounded-[2rem] bg-primary/5 blur-3xl pointer-events-none"
+            />
+            <div className="relative overflow-hidden rounded-2xl border border-base-300/40 bg-base-200/40 backdrop-blur-sm shadow-2xl">
+              <ProductScreenshot
+                basename="overview/home"
+                alt="The Scrollr home dashboard showing live channel feeds for scores, prices, and headlines side-by-side."
+                priority
+                pictureClassName="block w-full"
+                imgClassName="block h-full w-full object-cover object-top"
+              />
+            </div>
+            <figcaption className="mt-4 text-center text-xs text-base-content/45">
+              The Scrollr dashboard after first launch, with sample channels
+              enabled.
+            </figcaption>
+          </motion.figure>
         </div>
       </section>
 

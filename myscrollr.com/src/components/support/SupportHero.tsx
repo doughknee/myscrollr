@@ -1,5 +1,6 @@
 import { motion } from 'motion/react'
 import { LifeBuoy } from 'lucide-react'
+import { ProductScreenshot } from '@/components/ProductScreenshot'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -80,6 +81,30 @@ export function SupportHero() {
             </a>
           ))}
         </motion.nav>
+
+        {/* In-app Support tab preview — reinforces that the same help
+            content shown below exists inside the desktop app, so users
+            don't have to context-switch to the website every time. */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: EASE, delay: 0.25 }}
+          className="relative mx-auto mt-14 max-w-3xl"
+        >
+          <div
+            aria-hidden="true"
+            className="absolute -inset-6 rounded-[2rem] bg-primary/5 blur-3xl pointer-events-none"
+          />
+          <div className="relative overflow-hidden rounded-2xl border border-base-300/40 bg-base-200/40 backdrop-blur-sm shadow-lg">
+            <ProductScreenshot
+              basename="support/home"
+              alt="The Scrollr in-app Support tab, with the same Getting Started, FAQ, Troubleshooting, Billing, and Contact sections shown on this page."
+              priority
+              pictureClassName="block w-full"
+              imgClassName="block h-full w-full object-cover object-top"
+            />
+          </div>
+        </motion.div>
       </div>
     </section>
   )

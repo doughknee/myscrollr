@@ -11,6 +11,10 @@ export function SupportGettingStarted() {
       eyebrow="Getting Started"
       title="From download to your first ticker in minutes"
       description="Five steps to go from zero to live data scrolling on your screen."
+      screenshot={{
+        basename: 'support/getting-started',
+        alt: 'The in-app Getting Started panel in Scrollr, walking through the same setup steps shown here.',
+      }}
     >
       <ol className="space-y-3">
         {GETTING_STARTED_STEPS.map((step, i) => (

@@ -14,6 +14,10 @@ export function SupportBilling() {
       eyebrow="Account & Billing"
       title="Subscriptions, plans, and payment"
       description="How upgrades, cancellations, trials, and billing-portal access work."
+      screenshot={{
+        basename: 'support/account-billing',
+        alt: 'The in-app account and billing tab in Scrollr, showing plan, usage, and payment details.',
+      }}
     >
       <SupportAccordion entries={entries} idPrefix="billing" />
     </SupportSection>

@@ -109,6 +109,10 @@ export function SupportContactForm() {
       eyebrow="Contact"
       title="Still need help? Send us a note"
       description="We read every message. Replies usually arrive within 1-2 business days."
+      screenshot={{
+        basename: 'support/contact-form',
+        alt: 'The in-app Contact form in Scrollr, which submits to the same support inbox as this form.',
+      }}
     >
       {success ? (
         <SuccessPanel

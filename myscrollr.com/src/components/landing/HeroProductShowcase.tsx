@@ -1,21 +1,25 @@
 import { useEffect } from 'react'
 import { motion } from 'motion/react'
+import { ProductScreenshot } from '@/components/ProductScreenshot'
 import { useTheme } from '@/hooks/useTheme'
 
 /**
  * Hero showcase that crossfades between real product screenshots.
  *
- * Replaces the older `HeroDesktopPreview`'s animated SVG mockup with
- * static WebP images of the actual app, eliminating the per-frame
- * Motion animation cost (springs, scale transitions, per-chip enter/exit)
- * that taxed older / less powerful machines.
+ * Refactored to consume the canonical `<ProductScreenshot>` primitive
+ * so all four channel images share the same theming, srcset, decoding,
+ * and alt-text plumbing as every other screenshot on the site. The
+ * earlier inline `<picture>`/`<source>` implementation predated the
+ * shared component and pointed at the deprecated `/screenshots/hero/`
+ * directory; both have been collapsed into a single source of truth
+ * under `/screenshots/channels/`.
  *
  * Renders all four channel screenshots stacked, with the active one
- * faded in. The `<picture>` element serves a 1x or 2x WebP variant
- * based on device pixel ratio, and the dark/light variant based on
- * the user's site theme. Black artifacts at the rounded corners of
- * the captured window (a side effect of OS screenshot tools) are
- * masked by `border-radius` on the image itself.
+ * faded in via opacity. Inactive screenshots stay mounted at opacity 0
+ * so subsequent swaps are instant once images are decoded. The first
+ * channel preloads eagerly (`priority`); the rest fall back to lazy
+ * decoding because they sit behind the active one and the user can't
+ * see them until they advance.
  *
  * Props match the previous component so `HeroSection.tsx` does not
  * need to change shape:
@@ -38,9 +42,10 @@ const ACCENT_GLOW: Record<Channel, string> = {
   fantasy: 'rgba(168,85,247,0.10)', // violet
 }
 
-// Accessible alt-text per channel + theme. Surfaces what the screenshot
+// Accessible alt-text per channel. Surfaces what the screenshot
 // actually shows for screen-reader users and as fallback when images
-// fail to load.
+// fail to load. Inactive screenshots get an empty alt so AT only
+// sees the visible one.
 const ALT_TEXT: Record<Channel, string> = {
   sports:
     'Scrollr desktop app showing live MLB scores with team logos, status pills, and tabs for Schedule and Standings.',
@@ -63,6 +68,7 @@ interface HeroProductShowcaseProps {
 
 export function HeroProductShowcase({ activeIndex }: HeroProductShowcaseProps) {
   const { theme } = useTheme()
+  const siteTheme: 'light' | 'dark' = theme === 'light' ? 'light' : 'dark'
   const safeIndex =
     ((activeIndex % CHANNELS.length) + CHANNELS.length) % CHANNELS.length
   const activeChannel = CHANNELS[safeIndex]
@@ -74,8 +80,8 @@ export function HeroProductShowcase({ activeIndex }: HeroProductShowcaseProps) {
   useEffect(() => {
     const next = CHANNELS[(safeIndex + 1) % CHANNELS.length]
     const links = [
-      `/screenshots/hero/${next}-${theme}@1x.webp`,
-      `/screenshots/hero/${next}-${theme}@2x.webp`,
+      `/screenshots/channels/${next}-${siteTheme}@1x.webp`,
+      `/screenshots/channels/${next}-${siteTheme}@2x.webp`,
     ].map((href) => {
       const link = document.createElement('link')
       link.rel = 'prefetch'
@@ -89,14 +95,14 @@ export function HeroProductShowcase({ activeIndex }: HeroProductShowcaseProps) {
         link.remove()
       }
     }
-  }, [safeIndex, theme])
+  }, [safeIndex, siteTheme])
 
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.6, ease: 'easeOut' }}
-      className="relative w-[360px] sm:w-[480px] lg:w-[500px] xl:w-[640px] 2xl:w-[780px] aspect-[1600/1134]"
+      className="relative w-[360px] sm:w-[480px] lg:w-[500px] xl:w-[640px] 2xl:w-[780px] aspect-[1600/954]"
     >
       {/* Ambient glow tinted by the active channel's accent color. */}
       <div
@@ -111,10 +117,8 @@ export function HeroProductShowcase({ activeIndex }: HeroProductShowcaseProps) {
       <div className="relative h-full w-full">
         {CHANNELS.map((channel, idx) => {
           const isActive = idx === safeIndex
-          const base = `/screenshots/hero/${channel}-${theme}`
-
           return (
-            <picture
+            <div
               key={channel}
               className="absolute inset-0"
               style={{
@@ -123,22 +127,15 @@ export function HeroProductShowcase({ activeIndex }: HeroProductShowcaseProps) {
                 pointerEvents: 'none',
               }}
             >
-              <source
-                srcSet={`${base}@1x.webp 1x, ${base}@2x.webp 2x`}
-                type="image/webp"
-              />
-              <img
-                src={`${base}@1x.webp`}
+              <ProductScreenshot
+                basename={`channels/${channel}`}
+                themeOverride={siteTheme}
                 alt={isActive ? ALT_TEXT[channel] : ''}
-                width={1600}
-                height={1134}
-                loading={isActive ? 'eager' : 'lazy'}
-                decoding="async"
-                fetchPriority={isActive ? 'high' : 'auto'}
-                className="block h-full w-full rounded-xl object-cover shadow-xl"
-                draggable={false}
+                priority={isActive}
+                pictureClassName="absolute inset-0"
+                imgClassName="block h-full w-full rounded-xl object-cover shadow-xl"
               />
-            </picture>
+            </div>
           )
         })}
       </div>

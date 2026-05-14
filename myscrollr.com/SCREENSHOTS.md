@@ -1,142 +1,167 @@
-# Hero screenshots
+# Product screenshots
 
-This document covers how to capture, optimize, and ship product screenshots
-for the marketing site's hero showcase (`HeroProductShowcase.tsx`).
+This document covers how product screenshots are captured, optimized, and
+consumed by the marketing site.
 
-The hero rotates through four channels (sports, finance, news, fantasy) in
-both light and dark themes — eight raw captures total. The captures are
-processed by `scripts/optimize-hero-screenshots.sh` into per-DPR WebP
-variants that the showcase consumes via `<picture>`.
+The site uses a **single pipeline** for every screenshot — hero, customization,
+channels, support, themes — driven by `scripts/optimize-screenshots.mjs` and
+rendered through the shared `<ProductScreenshot>` component.
+
+---
+
+## Source of truth
+
+Raw, full-resolution PNGs live at the **repo root** under `ss/cropped/`:
+
+```
+ss/cropped/
+  darkmode/       dark-<slug>.png            ← every dark-mode capture
+  lightmode/      light-<slug>.png           ← every light-mode capture
+  themes/dark/    theme-<name>-dark-settings.png
+  themes/light/   theme-<name>-light-settings.png
+```
+
+All sources are **2478×1478** (aspect ≈ `1600 / 954`, i.e. 1.677). Keep this
+size locked when adding new captures so the optimize script and the
+`<ProductScreenshot>` aspect-ratio defaults stay aligned.
+
+`ss/cropped/` is committed so screenshots regenerate deterministically on CI.
 
 ---
 
 ## Capture
 
-### What to capture
+### Conventions
 
-One screenshot per channel × theme:
+- One screenshot per slug × theme (dark + light). Theme-named accent palettes
+  (Catppuccin, Dracula, etc.) are captured only for the **settings panel**
+  since that's the canonical "theme preview" surface.
+- Resolution: capture at the same display zoom level every time. macOS
+  `Cmd+Shift+4` → Space → click the Scrollr window works well.
+- Don't full-screen — the window's rounded corners and title bar are part of
+  the "this is a desktop product" signal.
+- Wait for real data to populate before capturing; avoid loading skeletons,
+  empty states, partially-loaded UI.
+- Move the cursor off-window, dismiss menus/tooltips.
+- Don't capture PII. If the in-app data shows friend names or private league
+  titles, switch to a different league or scrub before committing.
+- Crop to exactly 2478×1478. If your tool produces a different output, batch
+  through ImageMagick / sips before dropping into `ss/cropped/`.
 
-| File path                                   | Channel | Theme |
-| ------------------------------------------- | ------- | ----- |
-| `scrollr_screenshots/mac_dark_finance.png`  | finance | dark  |
-| `scrollr_screenshots/mac_light_finance.png` | finance | light |
-| `scrollr_screenshots/mac_dark_sports.png`   | sports  | dark  |
-| `scrollr_screenshots/mac_light_sports.png`  | sports  | light |
-| `scrollr_screenshots/mac_dark_news.png`     | news    | dark  |
-| `scrollr_screenshots/mac_light_news.png`    | news    | light |
-| `scrollr_screenshots/mac_dark_fantasy.png`  | fantasy | dark  |
-| `scrollr_screenshots/mac_light_fantasy.png` | fantasy | light |
+### Adding a new screenshot
 
-The `scrollr_screenshots/` directory is gitignored. Files live there
-permanently as the source of truth; the optimize script reads from there
-and writes finished assets to `myscrollr.com/public/screenshots/hero/`
-which is committed.
+1. Capture the new dark + light PNGs.
+2. Drop them in `ss/cropped/darkmode/dark-<slug>.png` and
+   `ss/cropped/lightmode/light-<slug>.png`.
+3. Add an entry to the `FEED_MAP` table in
+   `myscrollr.com/scripts/optimize-screenshots.mjs`, picking a category
+   (`channels`, `widgets`, `configure`, `display`, `overview`, `support`)
+   and a basename:
 
-### Capture tips
+   ```js
+   { slug: 'my-new-feature', category: 'overview', basename: 'my-feature' }
+   ```
 
-1. Set the Scrollr window to a consistent size (~1600×1000 logical pixels).
-   All eight captures should be the same size.
-2. Don't full-screen the app. The window's rounded corners and title bar
-   are part of what signals "this is a desktop product."
-3. Capture **only the window**, not the desktop background:
-   - macOS: `Cmd+Shift+4` then press Space, hover the Scrollr window,
-     click. Output will include a transparent margin and the system
-     drop shadow.
-   - Windows: Snipping Tool → "Window" mode (`Win+Shift+S`).
-   - Linux: `gnome-screenshot --window` or your DE's equivalent.
-4. The captured PNG may have a uniform black margin. That is fine.
-   The optimize script auto-trims it.
-5. Wait for real data to populate in the feed before capturing. Avoid
-   loading skeletons, empty states, or partially-loaded UI.
-6. Move your cursor off-window and dismiss any open menus / tooltips.
-7. Don't capture PII. Yahoo Fantasy team names that contain real-world
-   friend names are okay if they're yours; otherwise switch to a
-   different league before capturing.
-8. Switch the in-app theme between dark and light captures, but keep
-   the window position / size locked.
+4. Run `npm run optimize:screenshots`.
+5. Reference it from a component as
+   `<ProductScreenshot basename="overview/my-feature" alt="…" />`.
+
+For single-theme captures (only dark or only light), use the
+`SINGLE_THEME_MAP` table instead.
+
+For new accent themes, add the slug to the `THEME_NAMES` array; the optimize
+script handles the `themes/dark/` and `themes/light/` source folders.
 
 ---
 
 ## Optimize
 
 ```sh
-./scripts/optimize-hero-screenshots.sh
+npm run optimize:screenshots          # incremental
+npm run optimize:screenshots -- --force   # full rebuild
 ```
 
-The script:
+The script (`myscrollr.com/scripts/optimize-screenshots.mjs`):
 
-1. Reads raw PNGs from `scrollr_screenshots/`
-2. Auto-trims the uniform black margin via ImageMagick (`-fuzz 5%`,
-   `-trim`)
-3. Generates two WebP variants per capture (1× at 1600px wide for
-   standard-DPI displays, 2× at 3200px wide for Retina)
-4. Writes outputs to `myscrollr.com/public/screenshots/hero/` named
-   `<channel>-<theme>@{1x|2x}.webp`
-5. Prints byte sizes plus a per-visitor cumulative download estimate
-6. Skips files that have not changed since the last run
+1. Verifies every source PNG declared in its mapping tables actually exists,
+   failing loudly on the first missing file rather than partially writing.
+2. Reads each PNG via `sharp`.
+3. Emits two WebP variants per source into
+   `myscrollr.com/public/screenshots/<category>/<basename>-<theme>@{1,2}x.webp`:
+
+   | Variant | Width  | Quality | Used for                    |
+   |---------|--------|---------|-----------------------------|
+   | `@1x`   | 1600w  | 78      | Standard-DPI displays       |
+   | `@2x`   | 3200w  | 72      | Retina / hidpi (`sharp`'s `withoutEnlargement: true` keeps it at native 2478w since the source is smaller) |
+
+4. Skips files that already exist and are newer than the source (idempotent).
+5. Runs as part of `prebuild`, so every deploy ships fresh, optimized assets.
 
 ### Requirements
 
-- ImageMagick 7+ (`brew install imagemagick`)
-- libwebp (`brew install webp`)
-
-The script is bash-3.2-compatible (works with the system bash that
-ships on macOS).
-
-### Adjusting quality or sizes
-
-Open the script and edit:
-
-- `WIDTH_1X` / `WIDTH_2X` — display dimensions (don't lower 1× below
-  the largest hero render width, currently 780px on 2xl)
-- `QUALITY` — WebP quality (1-100). 82 is visually lossless for app
-  screenshots. Drop to 70-75 if a future capture has a lot of detail
-  (e.g. dense news feed) and the per-visitor budget exceeds 1 MB.
-
-### Per-visitor budget
-
-The optimize script reports cumulative download size per theme and DPR.
-Target: under 1 MB for the worst case (2× retina light theme), since
-that covers the full hero rotation.
-
-Current state (2026-04-28): worst case is ~630 KB. Comfortably under.
+- `sharp` (installed as a dev dependency in `myscrollr.com/package.json`).
+  No ImageMagick / libwebp / shell prerequisites — pure Node + `sharp`'s
+  bundled libvips.
 
 ---
 
 ## Render
 
-The `HeroProductShowcase` component reads the active theme from
-`useTheme()` and serves the matching WebP variant via `<picture>`.
+The shared `<ProductScreenshot>` component (`src/components/ProductScreenshot.tsx`)
+is the only consumer. It handles:
 
-- Source order: 2× source first, 1× source second. Browsers pick based
-  on `devicePixelRatio`.
-- Dark/light is selected by appending the theme class to the asset
-  basename (e.g. `finance-dark@1x.webp`).
-- Channel order in the rotation matches the `WORDS` array in
-  `Typewriter.tsx`: sports, finance, news, fantasy. If the order changes
-  in `WORDS`, update the `CHANNELS` constant in `HeroProductShowcase.tsx`
-  to match.
+- **Theme resolution**: reads `useTheme()` and serves the matching variant.
+  `themeOverride` forces a specific theme; `variantSuffix` forces an
+  arbitrary suffix for cases like the theme switcher rendering Dracula
+  regardless of the site theme.
+- **`<picture>` + `srcset`**: serves 1× or 2× WebP based on
+  `devicePixelRatio`.
+- **Decoding hints**: `priority` flips `loading=eager` + `fetchpriority=high`
+  + `decoding=sync` for above-the-fold images. Everything else lazy-loads.
+- **Aspect ratio**: defaults to `1600 / 954` (matches the optimized output).
+  Override only if you're rendering a non-standard crop.
+
+Example:
+
+```tsx
+<ProductScreenshot
+  basename="channels/finance"
+  alt="Scrollr finance feed showing live ticker symbols."
+  priority={false}
+/>
+```
+
+The basename joins to `/screenshots/${basename}-${theme}@{1,2}x.webp`.
+
+### Aspect ratio
+
+The captured app window is **2478×1478**, optimized to **1600×954** at @1x
+(same aspect, scaled down). The component renders at this exact aspect by
+default. If the captured window size changes (Tauri version, OS chrome
+change, multi-monitor at a different DPR), the source dimensions and the
+default aspect in `<ProductScreenshot>` must move together — otherwise
+`object-cover` will start cropping and `object-contain` will letterbox.
 
 ### Rounded corners
 
-The captured app window has rounded corners. After auto-trim, small
-black artifacts can remain at each corner of the bounding box. The
-showcase masks these with `rounded-xl` on the rendered `<img>`. If a
-future capture has a different corner radius (Tauri version change, OS
-version change, etc.) and the artifacts become visible, bump the
-border-radius class up one step.
+The captured app window has rounded corners. After capture, small black
+artifacts can remain at each corner of the bounding box. The renderer masks
+these with `rounded-xl` on the `<img>` (consumers apply this through
+`imgClassName`). If a future capture has a different corner radius, bump
+the radius class up one step.
 
 ---
 
-## Adding a new channel
+## Where each screenshot is used
 
-1. Capture two new PNGs (`mac_dark_<channel>.png`, `mac_light_<channel>.png`)
-   and drop them in `scrollr_screenshots/`.
-2. Add the channel to the `CHANNELS` array in
-   `scripts/optimize-hero-screenshots.sh`.
-3. Run the script.
-4. Add the channel to the `CHANNELS` array in
-   `myscrollr.com/src/components/landing/HeroProductShowcase.tsx` plus
-   matching entries in `ACCENT_GLOW` and `ALT_TEXT`.
-5. Coordinate with `WORDS` in `Typewriter.tsx` and the `WORD_ACCENTS`
-   in `HeroSection.tsx` so the rotation matches the new channel order.
+| Category        | Used in                                                |
+|-----------------|--------------------------------------------------------|
+| `channels/`     | `HeroProductShowcase` (home hero rotation, 4 channels) |
+| `configure/`    | `CustomizationShowcase` (style card)                   |
+| `overview/`     | `CustomizationShowcase` (catalog card)                 |
+| `themes/`       | `MakeItYoursSection` (switcher + decorative deck)      |
+| `widgets/`      | Reserved for `/channels` page (planned)                |
+| `display/`      | Reserved for `/channels` configure mosaic (planned)    |
+| `support/`      | Reserved for `/support` section illustrations (planned)|
+
+Refresh the placements as new pages adopt the asset set.

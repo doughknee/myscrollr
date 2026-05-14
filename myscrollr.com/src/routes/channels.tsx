@@ -24,6 +24,7 @@ import { motion } from 'motion/react'
 import type { ComponentType } from 'react'
 import { seo } from '@/lib/seo'
 import { breadcrumbs } from '@/lib/structured-data'
+import { ProductScreenshot } from '@/components/ProductScreenshot'
 
 export const Route = createFileRoute('/channels')({
   head: () =>
@@ -65,6 +66,25 @@ interface ChannelDef {
     strokeWidth?: number
     className?: string
   }>
+  /**
+   * `<ProductScreenshot>` basename for the live-feed thumbnail shown at
+   * the top of the card (e.g. `channels/finance`). Asset basenames don't
+   * always match `id` (the RSS channel uses `news` assets), which is why
+   * this is an explicit field rather than computed.
+   */
+  screenshot: string
+  /** Alt text for the thumbnail. */
+  screenshotAlt: string
+  /** Companion configure-panel screenshot used in the mosaic below. */
+  configureScreenshot: string
+  configureScreenshotAlt: string
+  /**
+   * Optional compact ticker-strip screenshot rendered at the bottom of
+   * the card to demonstrate the channel's always-on-top output. Only
+   * available for channels (not widgets); widgets are dashboard-only.
+   */
+  tickerScreenshot?: string
+  tickerScreenshotAlt?: string
 }
 
 interface ComingSoonChannel {
@@ -84,6 +104,15 @@ const CHANNELS: Array<ChannelDef> = [
     Icon: TrendingUp,
     hex: HEX.primary,
     Watermark: TrendingUp,
+    screenshot: 'channels/finance',
+    screenshotAlt:
+      'Scrollr finance channel showing live stock and crypto prices, percent change, and gainers/losers filters.',
+    configureScreenshot: 'configure/finance',
+    configureScreenshotAlt:
+      'Scrollr finance configuration panel for adding and managing tracked symbols.',
+    tickerScreenshot: 'ticker/finance-compact',
+    tickerScreenshotAlt:
+      'Compact Scrollr ticker strip showing live finance prices and percent change.',
   },
   {
     id: 'sports',
@@ -94,6 +123,15 @@ const CHANNELS: Array<ChannelDef> = [
     Icon: Trophy,
     hex: HEX.secondary,
     Watermark: Trophy,
+    screenshot: 'channels/sports',
+    screenshotAlt:
+      'Scrollr sports channel showing live MLB scores with team logos and game status pills.',
+    configureScreenshot: 'configure/sports',
+    configureScreenshotAlt:
+      'Scrollr sports configuration panel for selecting leagues and teams.',
+    tickerScreenshot: 'ticker/sports-compact',
+    tickerScreenshotAlt:
+      'Compact Scrollr ticker strip showing live sports scores across multiple games.',
   },
   {
     id: 'rss',
@@ -104,6 +142,15 @@ const CHANNELS: Array<ChannelDef> = [
     Icon: Rss,
     hex: HEX.info,
     Watermark: Rss,
+    screenshot: 'channels/news',
+    screenshotAlt:
+      'Scrollr news channel showing the latest headlines from custom RSS sources with recency indicators.',
+    configureScreenshot: 'configure/news',
+    configureScreenshotAlt:
+      'Scrollr news configuration panel for subscribing to RSS feeds across multiple categories.',
+    tickerScreenshot: 'ticker/news-compact',
+    tickerScreenshotAlt:
+      'Compact Scrollr ticker strip showing the latest RSS headlines scrolling across the screen.',
   },
   {
     id: 'fantasy',
@@ -114,6 +161,15 @@ const CHANNELS: Array<ChannelDef> = [
     Icon: Ghost,
     hex: HEX.accent,
     Watermark: Ghost,
+    screenshot: 'channels/fantasy',
+    screenshotAlt:
+      'Scrollr Yahoo Fantasy channel showing league overview cards, matchup scores, and win probability.',
+    configureScreenshot: 'configure/fantasy',
+    configureScreenshotAlt:
+      'Scrollr fantasy configuration panel for managing connected Yahoo Fantasy leagues.',
+    tickerScreenshot: 'ticker/fantasy-compact',
+    tickerScreenshotAlt:
+      'Compact Scrollr ticker strip showing Yahoo Fantasy league matchups.',
   },
 ]
 
@@ -166,6 +222,9 @@ interface WidgetDef {
   Icon: ComponentType<{ size?: number; className?: string }>
   hex: string
   platforms: string
+  /** `<ProductScreenshot>` basename for the widget feed thumbnail. */
+  screenshot: string
+  screenshotAlt: string
 }
 
 const WIDGETS: Array<WidgetDef> = [
@@ -178,6 +237,9 @@ const WIDGETS: Array<WidgetDef> = [
     Icon: Clock,
     hex: '#6366f1',
     platforms: 'Desktop',
+    screenshot: 'widgets/clock',
+    screenshotAlt:
+      'Scrollr world clock widget showing the current time across multiple cities.',
   },
   {
     id: 'timer',
@@ -188,6 +250,9 @@ const WIDGETS: Array<WidgetDef> = [
     Icon: Timer,
     hex: '#f59e0b',
     platforms: 'Desktop',
+    screenshot: 'widgets/timer',
+    screenshotAlt:
+      'Scrollr timer widget showing a Pomodoro session with controls for play, pause, and reset.',
   },
   {
     id: 'weather',
@@ -198,6 +263,9 @@ const WIDGETS: Array<WidgetDef> = [
     Icon: Cloud,
     hex: '#0ea5e9',
     platforms: 'Desktop',
+    screenshot: 'widgets/weather',
+    screenshotAlt:
+      'Scrollr weather widget showing current conditions, temperature, and forecast for a saved city.',
   },
   {
     id: 'sysmon',
@@ -208,6 +276,9 @@ const WIDGETS: Array<WidgetDef> = [
     Icon: Cpu,
     hex: '#06b6d4',
     platforms: 'Desktop only',
+    screenshot: 'widgets/sysmon',
+    screenshotAlt:
+      'Scrollr system monitor widget showing CPU and memory usage with visual progress bars and system stats.',
   },
 ]
 
@@ -284,6 +355,7 @@ function ChannelsPage() {
             className="text-center mb-12 sm:mb-16"
           >
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
+              Choose your{' '}
               <span className="text-gradient-primary">Channels</span>
             </h2>
             <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
@@ -291,7 +363,7 @@ function ChannelsPage() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-6xl mx-auto">
             {CHANNELS.map((channel, i) => (
               <motion.div
                 key={channel.id}
@@ -334,7 +406,7 @@ function ChannelsPage() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-6xl mx-auto">
             {WIDGETS.map((widget, i) => (
               <motion.div
                 key={widget.id}
@@ -354,6 +426,9 @@ function ChannelsPage() {
           </div>
         </div>
       </section>
+
+      {/* ── CONFIGURE ANYTHING (screenshot mosaic) ─────────────── */}
+      <ConfigureAnythingSection />
 
       {/* ── COMING SOON / ROADMAP ────────────────────────────── */}
       <section className="relative overflow-hidden">
@@ -510,89 +585,265 @@ function ChannelsPage() {
   )
 }
 
+// ── Configure Anything (screenshot mosaic) ─────────────────────
+
+/**
+ * 2x2 mosaic of the four channel configuration panels, captioned with
+ * the channel's name and a one-line description of what's configurable.
+ * Sits between the Widgets grid and the Roadmap section to break up a
+ * page of feature cards with a more atmospheric, "this is the actual
+ * product" beat.
+ *
+ * Each tile uses the channel's accent color for its border + bottom
+ * caption strip, so the mosaic reads as a continuation of the per-card
+ * accent language used above.
+ */
+function ConfigureAnythingSection() {
+  return (
+    <section className="relative overflow-hidden">
+      <div className="container relative z-10">
+        <motion.div
+          style={{ opacity: 0 }}
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-80px' }}
+          transition={{ duration: 0.7, ease: EASE }}
+          className="text-center mb-12 sm:mb-16"
+        >
+          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
+            Configure <span className="text-gradient-primary">anything</span>
+          </h2>
+          <p className="text-base text-base-content/45 leading-relaxed max-w-xl mx-auto">
+            Every channel comes with its own settings panel. Add the symbols,
+            leagues, feeds, or teams you actually care about — and leave the
+            rest out.
+          </p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6">
+          {CHANNELS.map((channel, i) => (
+            <motion.figure
+              key={`configure-${channel.id}`}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-60px' }}
+              transition={{
+                delay: i * 0.08,
+                duration: 0.6,
+                ease: EASE,
+              }}
+              className="group relative overflow-hidden rounded-2xl border bg-base-200/40 backdrop-blur-sm"
+              style={{ borderColor: `${channel.hex}25` }}
+            >
+              {/* Accent top line, matches the card pattern above */}
+              <div
+                className="absolute top-0 left-0 right-0 h-px z-10"
+                style={{
+                  background: `linear-gradient(90deg, transparent, ${channel.hex} 50%, transparent)`,
+                  opacity: 0.5,
+                }}
+                aria-hidden="true"
+              />
+
+              {/* Configure panel screenshot */}
+              <ProductScreenshot
+                basename={channel.configureScreenshot}
+                alt={channel.configureScreenshotAlt}
+                pictureClassName="block w-full"
+                imgClassName="block h-full w-full object-cover object-top transition-transform duration-700 group-hover:scale-[1.02]"
+              />
+
+              {/* Caption strip */}
+              <figcaption
+                className="relative flex items-center justify-between gap-4 px-5 py-4 border-t"
+                style={{
+                  borderTopColor: `${channel.hex}20`,
+                  background: `linear-gradient(180deg, transparent, ${channel.hex}06)`,
+                }}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                    style={{
+                      background: `${channel.hex}15`,
+                      boxShadow: `0 0 0 1px ${channel.hex}20`,
+                    }}
+                  >
+                    <channel.Icon
+                      size={14}
+                      className="text-base-content/80"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-base-content truncate">
+                      {channel.name}
+                    </p>
+                    <p
+                      className="text-[11px] font-medium truncate"
+                      style={{ color: `${channel.hex}90` }}
+                    >
+                      {channel.description}
+                    </p>
+                  </div>
+                </div>
+
+                <span
+                  className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide rounded-full border shrink-0"
+                  style={{
+                    color: `${channel.hex}cc`,
+                    background: `${channel.hex}0a`,
+                    borderColor: `${channel.hex}25`,
+                  }}
+                >
+                  <Puzzle size={10} />
+                  Configurable
+                </span>
+              </figcaption>
+            </motion.figure>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 // ── Channel Card ───────────────────────────────────────────────
 
 function ChannelCard({ channel }: { channel: ChannelDef }) {
   const { hex } = channel
 
   return (
-    <div className="group relative bg-base-200/40 border border-base-300/25 rounded-xl p-6 overflow-hidden hover:border-base-300/50 transition-colors h-full flex flex-col">
+    <div className="group relative bg-base-200/40 border border-base-300/25 rounded-xl overflow-hidden hover:border-base-300/50 transition-colors h-full flex flex-col">
       {/* Accent top line */}
       <div
-        className="absolute top-0 left-0 right-0 h-px"
+        className="absolute top-0 left-0 right-0 h-px z-20"
         style={{
           background: `linear-gradient(90deg, transparent, ${hex} 50%, transparent)`,
         }}
       />
 
-      {/* Corner dot grid */}
+      {/* Screenshot banner: the live-feed thumbnail anchors the card and
+          gives each channel a unique visual identity beyond its color
+          accent. Sits behind a subtle bottom gradient that blends into
+          the card body so the icon/header reads against the screenshot
+          without a hard seam. */}
       <div
-        className="absolute top-0 right-0 w-20 h-20 opacity-[0.04] text-base-content"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle, currentColor 1px, transparent 1px)',
-          backgroundSize: '8px 8px',
-        }}
-      />
+        className="relative w-full overflow-hidden border-b border-base-300/25"
+        style={{ backgroundColor: `${hex}08` }}
+      >
+        <ProductScreenshot
+          basename={channel.screenshot}
+          alt={channel.screenshotAlt}
+          pictureClassName="block w-full"
+          imgClassName="block h-full w-full object-cover object-top transition-transform duration-700 group-hover:scale-[1.03]"
+        />
 
-      {/* Ambient glow orb on hover */}
-      <div
-        className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-        style={{ background: `${hex}10` }}
-      />
+        {/* Bottom fade into the card body */}
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-12"
+          style={{
+            background:
+              'linear-gradient(to bottom, transparent, color-mix(in srgb, var(--color-base-200) 60%, transparent))',
+          }}
+          aria-hidden="true"
+        />
+      </div>
 
-      <div className="relative z-10 flex flex-col flex-1">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div
-            className="w-11 h-11 rounded-xl flex items-center justify-center"
-            style={{
-              background: `${hex}15`,
-              boxShadow: `0 0 20px ${hex}15, 0 0 0 1px ${hex}20`,
-            }}
-          >
-            <channel.Icon size={20} className="text-base-content/80" />
+      {/* Card body — typography scales up with the 2-column layout
+          so the screenshots above don't dominate at the expense of the
+          card's actual content. */}
+      <div className="relative p-7 sm:p-8 flex flex-col flex-1">
+        {/* Corner dot grid */}
+        <div
+          className="absolute top-0 right-0 w-24 h-24 opacity-[0.04] text-base-content"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle, currentColor 1px, transparent 1px)',
+            backgroundSize: '8px 8px',
+          }}
+        />
+
+        {/* Ambient glow orb on hover */}
+        <div
+          className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+          style={{ background: `${hex}10` }}
+        />
+
+        <div className="relative z-10 flex flex-col flex-1">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-5">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{
+                background: `${hex}15`,
+                boxShadow: `0 0 20px ${hex}15, 0 0 0 1px ${hex}20`,
+              }}
+            >
+              <channel.Icon size={22} className="text-base-content/80" />
+            </div>
+
+            <span
+              className="px-3 py-1 text-[10px] font-bold uppercase tracking-wide rounded-full border"
+              style={{
+                color: `${hex}99`,
+                background: `${hex}08`,
+                borderColor: `${hex}20`,
+              }}
+            >
+              Desktop
+            </span>
           </div>
 
-          <span
-            className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide rounded-full border"
-            style={{
-              color: `${hex}99`,
-              background: `${hex}08`,
-              borderColor: `${hex}20`,
-            }}
+          {/* Content */}
+          <h3 className="text-xl sm:text-2xl font-bold text-base-content mb-1.5 tracking-tight">
+            {channel.name}
+          </h3>
+          <p
+            className="text-xs mb-4 font-semibold uppercase tracking-wide"
+            style={{ color: `${hex}b3` }}
           >
-            Desktop
-          </span>
-        </div>
+            {channel.description}
+          </p>
+          <p className="text-sm text-base-content/55 leading-relaxed">
+            {channel.detail}
+          </p>
 
-        {/* Content */}
-        <h3 className="text-sm font-bold text-base-content mb-1">
-          {channel.name}
-        </h3>
-        <p
-          className="text-[10px] mb-3 font-medium"
-          style={{ color: `${hex}90` }}
-        >
-          {channel.description}
-        </p>
-        <p className="text-xs text-base-content/40 leading-relaxed">
-          {channel.detail}
-        </p>
+          {/* Ticker preview — completes the card's narrative: the
+              dashboard banner above shows the configure-target, this
+              compact ticker strip shows the lived output. */}
+          {channel.tickerScreenshot ? (
+            <div
+              className="mt-6 overflow-hidden rounded-md border bg-base-100/40"
+              style={{
+                aspectRatio: '2930 / 80',
+                borderColor: `${hex}25`,
+              }}
+            >
+              <ProductScreenshot
+                basename={channel.tickerScreenshot}
+                alt={channel.tickerScreenshotAlt ?? ''}
+                aspect="2930 / 80"
+                pictureClassName="block w-full h-full"
+                imgClassName="block h-full w-full object-cover"
+              />
+            </div>
+          ) : null}
 
-        {/* Footer */}
-        <div className="mt-auto pt-5">
-          <span className="text-[10px] font-medium text-base-content/30">
-            Available in the desktop app
-          </span>
+          {/* Footer */}
+          <div className="mt-auto pt-6">
+            <span className="text-xs font-medium text-base-content/35">
+              Available in the desktop app
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Watermark icon */}
+      {/* Watermark icon — anchored to the outer card so it bleeds off
+          the bottom-right corner of the body. */}
       <channel.Watermark
-        size={100}
+        size={120}
         strokeWidth={0.4}
-        className="absolute -bottom-3 -right-3 text-base-content/[0.025] pointer-events-none"
+        className="absolute -bottom-4 -right-4 text-base-content/[0.025] pointer-events-none"
       />
     </div>
   )
@@ -604,82 +855,106 @@ function WidgetCard({ widget }: { widget: WidgetDef }) {
   const { hex } = widget
 
   return (
-    <div className="group relative bg-base-200/40 border border-base-300/25 rounded-xl p-6 overflow-hidden hover:border-base-300/50 transition-colors h-full flex flex-col">
+    <div className="group relative bg-base-200/40 border border-base-300/25 rounded-xl overflow-hidden hover:border-base-300/50 transition-colors h-full flex flex-col">
       {/* Accent top line */}
       <div
-        className="absolute top-0 left-0 right-0 h-px"
+        className="absolute top-0 left-0 right-0 h-px z-20"
         style={{
           background: `linear-gradient(90deg, transparent, ${hex} 50%, transparent)`,
         }}
       />
 
-      {/* Corner dot grid */}
+      {/* Screenshot banner — same pattern as ChannelCard. */}
       <div
-        className="absolute top-0 right-0 w-20 h-20 opacity-[0.04] text-base-content"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle, currentColor 1px, transparent 1px)',
-          backgroundSize: '8px 8px',
-        }}
-      />
+        className="relative w-full overflow-hidden border-b border-base-300/25"
+        style={{ backgroundColor: `${hex}08` }}
+      >
+        <ProductScreenshot
+          basename={widget.screenshot}
+          alt={widget.screenshotAlt}
+          pictureClassName="block w-full"
+          imgClassName="block h-full w-full object-cover object-top transition-transform duration-700 group-hover:scale-[1.03]"
+        />
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-12"
+          style={{
+            background:
+              'linear-gradient(to bottom, transparent, color-mix(in srgb, var(--color-base-200) 60%, transparent))',
+          }}
+          aria-hidden="true"
+        />
+      </div>
 
-      {/* Ambient glow */}
-      <div
-        className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-        style={{ background: `${hex}10` }}
-      />
+      {/* Card body — typography scales up for the 2-column layout. */}
+      <div className="relative p-7 sm:p-8 flex flex-col flex-1">
+        {/* Corner dot grid */}
+        <div
+          className="absolute top-0 right-0 w-24 h-24 opacity-[0.04] text-base-content"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle, currentColor 1px, transparent 1px)',
+            backgroundSize: '8px 8px',
+          }}
+        />
 
-      <div className="relative z-10 flex flex-col flex-1">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div
-            className="w-11 h-11 rounded-xl flex items-center justify-center"
-            style={{
-              background: `${hex}15`,
-              boxShadow: `0 0 20px ${hex}15, 0 0 0 1px ${hex}20`,
-            }}
-          >
-            <widget.Icon size={20} className="text-base-content/80" />
+        {/* Ambient glow */}
+        <div
+          className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+          style={{ background: `${hex}10` }}
+        />
+
+        <div className="relative z-10 flex flex-col flex-1">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-5">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{
+                background: `${hex}15`,
+                boxShadow: `0 0 20px ${hex}15, 0 0 0 1px ${hex}20`,
+              }}
+            >
+              <widget.Icon size={22} className="text-base-content/80" />
+            </div>
+
+            <span
+              className="px-3 py-1 text-[10px] font-bold uppercase tracking-wide rounded-full border"
+              style={{
+                color: `${hex}99`,
+                background: `${hex}08`,
+                borderColor: `${hex}20`,
+              }}
+            >
+              {widget.platforms}
+            </span>
           </div>
 
-          <span
-            className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide rounded-full border"
-            style={{
-              color: `${hex}99`,
-              background: `${hex}08`,
-              borderColor: `${hex}20`,
-            }}
+          {/* Content */}
+          <h3 className="text-xl sm:text-2xl font-bold text-base-content mb-1.5 tracking-tight">
+            {widget.name}
+          </h3>
+          <p
+            className="text-xs mb-4 font-semibold uppercase tracking-wide"
+            style={{ color: `${hex}b3` }}
           >
-            {widget.platforms}
-          </span>
-        </div>
+            {widget.description}
+          </p>
+          <p className="text-sm text-base-content/55 leading-relaxed">
+            {widget.detail}
+          </p>
 
-        {/* Content */}
-        <h3 className="text-sm font-bold text-base-content mb-1">
-          {widget.name}
-        </h3>
-        <p
-          className="text-[10px] mb-3 font-medium"
-          style={{ color: `${hex}90` }}
-        >
-          {widget.description}
-        </p>
-        <p className="text-xs text-base-content/40 leading-relaxed">
-          {widget.detail}
-        </p>
-
-        {/* Footer info — no action button, widgets are built-in */}
-        <div className="mt-auto pt-5">
-          <span className="text-[10px] font-medium text-base-content/30">
-            Built-in — no setup required
-          </span>
+          {/* Footer info — no action button, widgets are built-in */}
+          <div className="mt-auto pt-6">
+            <span className="text-xs font-medium text-base-content/35">
+              Built-in — no setup required
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Watermark icon */}
       <widget.Icon
-        size={100}
-        className="absolute -bottom-3 -right-3 text-base-content/[0.025] pointer-events-none"
+        size={120}
+        className="absolute -bottom-4 -right-4 text-base-content/[0.025] pointer-events-none"
       />
     </div>
   )

@@ -54,6 +54,14 @@ scripts/*.json
 # stay out of git. See myscrollr.com/SCREENSHOTS.md.
 scrollr_screenshots/
 
+# Uncropped originals from screen capture. The optimize-screenshots.mjs
+# script reads ONLY from ss/cropped/ and ss/cropped-ticker/, which ARE
+# committed for CI reproducibility. The manual_screenshots/ folders are
+# the working uncropped sources (~79MB) — useful locally for re-cropping
+# but bloat the repo if committed. See myscrollr.com/SCREENSHOTS.md.
+ss/manual_screenshots/
+ss/ticker_screenshots_manual/
+
 # Active session handoffs — rolling local state per the global AGENTS.md
 # convention. Specs and plans under docs/superpowers/ remain committed
 # as engineering history; only the in-flight handoff notes are local.

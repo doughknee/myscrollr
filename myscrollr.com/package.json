@@ -16,7 +16,8 @@
   "scripts": {
     "predev": "node scripts/fetch-latest-version.mjs",
     "dev": "vite --port 3000",
-    "prebuild": "node scripts/fetch-latest-version.mjs && node scripts/generate-sitemap.mjs",
+    "prebuild": "node scripts/fetch-latest-version.mjs && node scripts/generate-sitemap.mjs && node scripts/optimize-screenshots.mjs",
+    "optimize:screenshots": "node scripts/optimize-screenshots.mjs",
     "build": "vite build && tsc",
     "postbuild": "node scripts/check-sentry-tunnel.mjs && node scripts/check-prerender.mjs",
     "serve": "vite preview",
@@ -51,6 +52,7 @@
     "baseline-browser-mapping": "^2.9.19",
     "playwright": "^1.60.0",
     "prettier": "^3.5.3",
+    "sharp": "^0.34.5",
     "typescript": "^5.9.3",
     "vite": "^7.1.7"
   }
