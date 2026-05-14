@@ -10,7 +10,7 @@ MyScrollr aggregates financial market data, sports scores, RSS feeds, and Yahoo 
 
 Monorepo — each component is independently deployable with its own dependencies:
 
-- `api/` — Core gateway API (Go 1.22, Fiber v2, sub-package `core/`)
+- `api/` — Core gateway API (Go 1.25, Fiber v2, sub-package `core/`)
 - `myscrollr.com/` — Marketing website + auth/billing (React 19, Vite 7, TanStack Router, Tailwind v4)
 - `desktop/` — Tauri v2 desktop app (React 19, Vite 7, TanStack Router + Query, Tailwind v4, Rust backend) — **primary product**
 - `channels/{finance,sports,rss}/api/` — Channel Go APIs (flat `main` package, independent modules)
@@ -110,7 +110,7 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 
 ## Code Style — Go
 
-- `gofmt` formatting. No custom linter. Go 1.22 across all modules.
+- `gofmt` formatting. No custom linter. Go 1.25 across all modules.
 - All use Fiber v2, pgx v5, go-redis v9.
 - **Module isolation is absolute.** Each Go API has its own `go.mod`. No shared packages. Code duplication between channels is intentional — do not extract shared libraries.
 - Core API: `core/` sub-package, package-level vars (`DBPool`, `Rdb`), `Server` struct.
