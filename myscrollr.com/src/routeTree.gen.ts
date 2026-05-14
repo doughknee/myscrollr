@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UplinkRouteImport } from './routes/uplink'
+import { Route as TssSpaShellRouteImport } from './routes/tss-spa-shell'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as StatusRouteImport } from './routes/status'
 import { Route as LegalRouteImport } from './routes/legal'
@@ -27,6 +28,11 @@ import { Route as UUsernameRouteImport } from './routes/u.$username'
 const UplinkRoute = UplinkRouteImport.update({
   id: '/uplink',
   path: '/uplink',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TssSpaShellRoute = TssSpaShellRouteImport.update({
+  id: '/tss-spa-shell',
+  path: '/tss-spa-shell',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SupportRoute = SupportRouteImport.update({
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/legal': typeof LegalRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
+  '/tss-spa-shell': typeof TssSpaShellRoute
   '/uplink': typeof UplinkRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink/lifetime': typeof UplinkLifetimeRoute
@@ -123,6 +130,7 @@ export interface FileRoutesByTo {
   '/legal': typeof LegalRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
+  '/tss-spa-shell': typeof TssSpaShellRoute
   '/uplink': typeof UplinkRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink/lifetime': typeof UplinkLifetimeRoute
@@ -140,6 +148,7 @@ export interface FileRoutesById {
   '/legal': typeof LegalRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
+  '/tss-spa-shell': typeof TssSpaShellRoute
   '/uplink': typeof UplinkRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink_/lifetime': typeof UplinkLifetimeRoute
@@ -158,6 +167,7 @@ export interface FileRouteTypes {
     | '/legal'
     | '/status'
     | '/support'
+    | '/tss-spa-shell'
     | '/uplink'
     | '/u/$username'
     | '/uplink/lifetime'
@@ -174,6 +184,7 @@ export interface FileRouteTypes {
     | '/legal'
     | '/status'
     | '/support'
+    | '/tss-spa-shell'
     | '/uplink'
     | '/u/$username'
     | '/uplink/lifetime'
@@ -190,6 +201,7 @@ export interface FileRouteTypes {
     | '/legal'
     | '/status'
     | '/support'
+    | '/tss-spa-shell'
     | '/uplink'
     | '/u/$username'
     | '/uplink_/lifetime'
@@ -207,6 +219,7 @@ export interface RootRouteChildren {
   LegalRoute: typeof LegalRoute
   StatusRoute: typeof StatusRoute
   SupportRoute: typeof SupportRoute
+  TssSpaShellRoute: typeof TssSpaShellRoute
   UplinkRoute: typeof UplinkRoute
   UUsernameRoute: typeof UUsernameRoute
   UplinkLifetimeRoute: typeof UplinkLifetimeRoute
@@ -219,6 +232,13 @@ declare module '@tanstack/react-router' {
       path: '/uplink'
       fullPath: '/uplink'
       preLoaderRoute: typeof UplinkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tss-spa-shell': {
+      id: '/tss-spa-shell'
+      path: '/tss-spa-shell'
+      fullPath: '/tss-spa-shell'
+      preLoaderRoute: typeof TssSpaShellRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/support': {
@@ -327,6 +347,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalRoute: LegalRoute,
   StatusRoute: StatusRoute,
   SupportRoute: SupportRoute,
+  TssSpaShellRoute: TssSpaShellRoute,
   UplinkRoute: UplinkRoute,
   UUsernameRoute: UUsernameRoute,
   UplinkLifetimeRoute: UplinkLifetimeRoute,

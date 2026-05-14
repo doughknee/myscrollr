@@ -1,4 +1,4 @@
-import { Link, useLocation } from '@tanstack/react-router'
+import { ClientOnly, Link, useLocation } from '@tanstack/react-router'
 import {
   Building2,
   ChevronRight,
@@ -18,30 +18,20 @@ import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import ScrollrSVG from '@/components/ScrollrSVG'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
+/**
+ * Header is SSR-safe. Auth-dependent slices live inside the three
+ * <ClientOnly> children below (account nav link + auth menu, in both
+ * desktop and mobile layouts). The Header itself never calls
+ * `useScrollrAuth()`, so the entire layout chrome prerenders correctly.
+ *
+ * Each <ClientOnly>'s subtree consumes Logto via `useScrollrAuth()`.
+ * During SSR these render to null (the auth state is unknown server-
+ * side anyway), and hydrate on the client once Logto initialises.
+ */
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const drawerRef = useRef<HTMLElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
-  const { signIn, signOut, isAuthenticated, isLoading, getIdTokenClaims } =
-    useScrollrAuth()
-  const [userClaims, setUserClaims] = useState<IdTokenClaims>()
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      getIdTokenClaims().then(setUserClaims)
-    } else {
-      setUserClaims(undefined)
-    }
-  }, [isAuthenticated, getIdTokenClaims])
-
-  const handleSignIn = () => {
-    signIn()
-  }
-
-  const handleSignOut = () => {
-    // signOut() calls Logto signOut
-    signOut(`${window.location.origin}`)
-  }
 
   // Close drawer on Escape and trap focus
   const closeDrawer = useCallback(() => {
@@ -120,50 +110,18 @@ export default function Header() {
               Download
             </NavLink>
 
-            {isAuthenticated && (
-              <>
-                <NavLink to="/account" activeOn="/account">
-                  <UserCircle size={14} />
-                  {userClaims?.username || userClaims?.name || 'Account'}
-                </NavLink>
-              </>
-            )}
+            <ClientOnly>
+              <DesktopAccountLink />
+            </ClientOnly>
           </nav>
         </LayoutGroup>
 
         {/* Auth Section */}
         <div className="flex-1 hidden lg:flex items-center gap-3 justify-end">
           <ThemeToggle />
-
-          {isLoading ? (
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-primary/40 animate-pulse" />
-              <span className="text-xs text-base-content/30">Initializing</span>
-            </div>
-          ) : isAuthenticated ? (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleSignOut}
-              className="flex items-center gap-2 px-4 py-2 text-xs font-semibold border border-error/30 text-error/80 hover:bg-error/10 hover:border-error/50 transition-colors rounded-lg cursor-pointer"
-            >
-              <LogOut size={14} />
-              Sign Out
-            </motion.button>
-          ) : (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleSignIn}
-              className="btn btn-primary btn-sm flex items-center gap-2"
-            >
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-content opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary-content" />
-              </span>
-              Sign In
-            </motion.button>
-          )}
+          <ClientOnly>
+            <DesktopAuthMenu />
+          </ClientOnly>
         </div>
 
         {/* Mobile Menu Button */}
@@ -278,64 +236,176 @@ export default function Header() {
                   Download
                 </MobileNavLink>
 
-                {isAuthenticated && (
-                  <>
-                    <MobileNavLink
-                      to="/account"
-                      icon={<ChevronRight size={18} />}
-                      onClick={() => setIsOpen(false)}
-                    >
-                      {userClaims?.username || userClaims?.name || 'Account'}
-                    </MobileNavLink>
-                  </>
-                )}
+                <ClientOnly>
+                  <MobileAccountLink onNavigate={() => setIsOpen(false)} />
+                </ClientOnly>
               </nav>
 
               {/* Drawer Footer */}
               <div className="px-5 py-5 border-t border-base-300/50 space-y-3">
-                {isLoading ? (
-                  <div className="flex items-center justify-center gap-2 py-3">
-                    <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                    <span className="text-xs text-base-content/40">
-                      Loading...
-                    </span>
-                  </div>
-                ) : isAuthenticated ? (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      handleSignOut()
-                      setIsOpen(false)
-                    }}
-                    className="w-full flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold border border-error/30 text-error/80 hover:bg-error/10 hover:border-error/50 transition-colors rounded-lg cursor-pointer"
-                  >
-                    <LogOut size={16} />
-                    Sign Out
-                  </motion.button>
-                ) : (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      handleSignIn()
-                      setIsOpen(false)
-                    }}
-                    className="w-full btn btn-primary flex items-center justify-center gap-2"
-                  >
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-content opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-primary-content" />
-                    </span>
-                    Sign In
-                  </motion.button>
-                )}
+                <ClientOnly>
+                  <MobileAuthMenu onAfterAction={() => setIsOpen(false)} />
+                </ClientOnly>
               </div>
             </motion.aside>
           </>
         )}
       </AnimatePresence>
     </>
+  )
+}
+
+// ── Auth-dependent slices ────────────────────────────────────────────
+// Each of these calls `useScrollrAuth()` and therefore must render
+// only on the client (wrapped in <ClientOnly> at the call site).
+
+function useUserClaims(): IdTokenClaims | undefined {
+  const { isAuthenticated, getIdTokenClaims } = useScrollrAuth()
+  const [userClaims, setUserClaims] = useState<IdTokenClaims>()
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      getIdTokenClaims().then(setUserClaims)
+    } else {
+      setUserClaims(undefined)
+    }
+  }, [isAuthenticated, getIdTokenClaims])
+
+  return userClaims
+}
+
+function DesktopAccountLink() {
+  const { isAuthenticated } = useScrollrAuth()
+  const userClaims = useUserClaims()
+
+  if (!isAuthenticated) return null
+
+  return (
+    <NavLink to="/account" activeOn="/account">
+      <UserCircle size={14} />
+      {userClaims?.username || userClaims?.name || 'Account'}
+    </NavLink>
+  )
+}
+
+function DesktopAuthMenu() {
+  const { signIn, signOut, isAuthenticated, isLoading } = useScrollrAuth()
+
+  const handleSignIn = () => {
+    signIn()
+  }
+  const handleSignOut = () => {
+    signOut(`${window.location.origin}`)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2">
+        <div className="h-2 w-2 rounded-full bg-primary/40 animate-pulse" />
+        <span className="text-xs text-base-content/30">Initializing</span>
+      </div>
+    )
+  }
+
+  if (isAuthenticated) {
+    return (
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={handleSignOut}
+        className="flex items-center gap-2 px-4 py-2 text-xs font-semibold border border-error/30 text-error/80 hover:bg-error/10 hover:border-error/50 transition-colors rounded-lg cursor-pointer"
+      >
+        <LogOut size={14} />
+        Sign Out
+      </motion.button>
+    )
+  }
+
+  return (
+    <motion.button
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={handleSignIn}
+      className="btn btn-primary btn-sm flex items-center gap-2"
+    >
+      <span className="relative flex h-1.5 w-1.5">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-content opacity-75" />
+        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary-content" />
+      </span>
+      Sign In
+    </motion.button>
+  )
+}
+
+function MobileAccountLink({ onNavigate }: { onNavigate: () => void }) {
+  const { isAuthenticated } = useScrollrAuth()
+  const userClaims = useUserClaims()
+
+  if (!isAuthenticated) return null
+
+  return (
+    <MobileNavLink
+      to="/account"
+      icon={<ChevronRight size={18} />}
+      onClick={onNavigate}
+    >
+      {userClaims?.username || userClaims?.name || 'Account'}
+    </MobileNavLink>
+  )
+}
+
+function MobileAuthMenu({ onAfterAction }: { onAfterAction: () => void }) {
+  const { signIn, signOut, isAuthenticated, isLoading } = useScrollrAuth()
+
+  const handleSignIn = () => {
+    signIn()
+  }
+  const handleSignOut = () => {
+    signOut(`${window.location.origin}`)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-3">
+        <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+        <span className="text-xs text-base-content/40">Loading...</span>
+      </div>
+    )
+  }
+
+  if (isAuthenticated) {
+    return (
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={() => {
+          handleSignOut()
+          onAfterAction()
+        }}
+        className="w-full flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold border border-error/30 text-error/80 hover:bg-error/10 hover:border-error/50 transition-colors rounded-lg cursor-pointer"
+      >
+        <LogOut size={16} />
+        Sign Out
+      </motion.button>
+    )
+  }
+
+  return (
+    <motion.button
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={() => {
+        handleSignIn()
+        onAfterAction()
+      }}
+      className="w-full btn btn-primary flex items-center justify-center gap-2"
+    >
+      <span className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-content opacity-75" />
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-primary-content" />
+      </span>
+      Sign In
+    </motion.button>
   )
 }
 

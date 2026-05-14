@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { ClientOnly, Link, createFileRoute } from '@tanstack/react-router'
 import {
   AnimatePresence,
   motion,
@@ -224,7 +224,16 @@ export const Route = createFileRoute('/uplink')({
         ]),
       ],
     }),
-  component: UplinkPage,
+  // Uplink is auth/subscription-aware throughout — wrap the entire page
+  // in ClientOnly so the route still prerenders correct <head> meta and
+  // JSON-LD, while the dynamic auth-conditional body hydrates on the
+  // client. The other landing pages prerender real body content; this
+  // one is interactive-only by design.
+  component: () => (
+    <ClientOnly>
+      <UplinkPage />
+    </ClientOnly>
+  ),
 })
 
 // ── Comparison Data ─────────────────────────────────────────────

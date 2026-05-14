@@ -1,5 +1,4 @@
 import {
-  ClientOnly,
   HeadContent,
   Link,
   Outlet,
@@ -151,35 +150,33 @@ function RootLayout() {
 
   return (
     <RootDocument>
-      <ClientOnly>
-        <MotionConfig reducedMotion="user">
-          <div className="min-h-screen relative overflow-x-clip">
-            {/* Skip to main content — first focusable element */}
-            <a
-              href="#main-content"
-              className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-lg focus:bg-primary focus:text-primary-content focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:shadow-lg"
-            >
-              Skip to main content
-            </a>
+      <MotionConfig reducedMotion="user">
+        <div className="min-h-screen relative overflow-x-clip">
+          {/* Skip to main content — first focusable element */}
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-lg focus:bg-primary focus:text-primary-content focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:shadow-lg"
+          >
+            Skip to main content
+          </a>
 
-            {/* Navigation */}
-            <Header />
+          {/* Navigation */}
+          <Header />
 
-            {/* Main Content */}
-            <main
-              ref={mainRef}
-              id="main-content"
-              className="relative"
-              tabIndex={-1}
-            >
-              <Outlet />
-            </main>
+          {/* Main Content */}
+          <main
+            ref={mainRef}
+            id="main-content"
+            className="relative"
+            tabIndex={-1}
+          >
+            <Outlet />
+          </main>
 
-            {/* Footer */}
-            <Footer />
-          </div>
-        </MotionConfig>
-      </ClientOnly>
+          {/* Footer */}
+          <Footer />
+        </div>
+      </MotionConfig>
     </RootDocument>
   )
 }

@@ -13,5 +13,8 @@ Disallow: /invite
 Disallow: /callback
 Disallow: /status
 Disallow: /u/
+# Synthetic SPA-shell route. Used internally by TanStack Start to
+# generate _shell.html for nginx's SPA fallback. Not a real page.
+Disallow: /tss-spa-shell
 
 Sitemap: https://myscrollr.com/sitemap.xml

@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { ClientOnly, Link, createFileRoute } from '@tanstack/react-router'
 import { motion } from 'motion/react'
 import { Suspense, lazy, useEffect, useState } from 'react'
 import {
@@ -44,7 +44,14 @@ export const Route = createFileRoute('/uplink_/lifetime')({
         { name: 'Lifetime', path: '/uplink/lifetime' },
       ]),
     }),
-  component: LifetimePage,
+  // Lifetime is auth/subscription-aware throughout — wrap in ClientOnly
+  // so the route still prerenders correct <head> meta and JSON-LD,
+  // while the dynamic auth-conditional body hydrates on the client.
+  component: () => (
+    <ClientOnly>
+      <LifetimePage />
+    </ClientOnly>
+  ),
 })
 
 // ── Feature line ────────────────────────────────────────────────

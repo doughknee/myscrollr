@@ -10,23 +10,21 @@ import viteReact from '@vitejs/plugin-react'
 import type { Plugin } from 'vite'
 
 /**
- * After the TanStack Start build + prerender phase, copy the prerendered
- * SPA shell (`dist/client/_shell.html`) to `dist/client/index.html` so that
- * static hosts (nginx, Coolify) serve the fully-prerendered home page
- * (with `<title>`, canonical, JSON-LD) at `/` — not the bare SPA shell.
+ * Safety net: if for any reason `dist/client/index.html` is missing
+ * after prerender, copy the SPA shell into its place so static hosts
+ * (nginx) still serve *something* at `/`.
  *
- * Background: with `spa.enabled: true`, start-plugin-core's `post-build.js`
- * pushes a shell entry at the SPA `maskPath` (defaults to `/`), then the
- * `autoStaticPathsDiscovery` step de-dupes via `new Map`. The shell entry
- * is pushed last, so it always wins for `/`. Setting `maskPath` to a
- * synthetic path doesn't help either, because Start renders the shell by
- * actually fetching that path — and a non-existent route returns 404.
+ * Background: this plugin was added when start-plugin-core's
+ * `post-build.js` pushed the SPA shell at the home path (`maskPath: '/'`)
+ * and the prerender de-dup Map (keyed by `path`) caused the shell entry
+ * to overwrite the home page entry — so `dist/client/index.html` never
+ * got written and nginx had to serve `_shell.html` (empty body) instead.
  *
- * Since the shell is rendered by fetching `/`, `_shell.html` already
- * contains the home route's full `head()` output (meta, canonical,
- * JSON-LD). Copying it to `index.html` gives correct content at `/`
- * without re-rendering, while preserving `_shell.html` as the SPA
- * fallback for dynamic routes (`/account`, `/u/$username`, etc.).
+ * That's now fixed by pointing `spa.maskPath` at a synthetic
+ * `/tss-spa-shell` route (see `src/routes/tss-spa-shell.tsx`), letting
+ * both the home prerender AND the shell render to distinct files
+ * (`index.html` and `_shell.html` respectively). This plugin therefore
+ * becomes a no-op under normal conditions — kept as defense in depth.
  */
 function copyShellToIndex(): Plugin {
   const run = (): Promise<void> => {
@@ -80,6 +78,21 @@ export default defineConfig({
       router: {},
       spa: {
         enabled: true,
+        // Render the SPA shell at a synthetic path so it doesn't
+        // collide with the home page in the prerender de-dup Map (which
+        // is keyed by `path`). With the default maskPath of "/", the
+        // shell entry overwrites the home entry and `dist/client/index.html`
+        // is never written — the home route then has to be filled in by
+        // `copyShellToIndex` with the shell's contents (Header+Footer +
+        // empty <main>), which is what caused the "everything flashes
+        // in" feel on the home page.
+        //
+        // The synthetic route at `src/routes/_tss-spa-shell.tsx`
+        // returns a minimal placeholder body so the prerender request
+        // succeeds. Both `_shell.html` (SPA fallback target nginx
+        // serves for unknown paths) AND `index.html` (real home
+        // prerender) get written separately.
+        maskPath: '/tss-spa-shell',
       },
       prerender: {
         enabled: true,
@@ -94,6 +107,11 @@ export default defineConfig({
           ]
           if (excluded.includes(path)) return false
           if (path.startsWith('/u/')) return false // dynamic profile pages
+          // NOTE: /tss-spa-shell intentionally passes through the filter
+          // — start-plugin-core uses spa.maskPath as a normal page entry
+          // with outputPath="/_shell", so it must be crawled in order
+          // for `_shell.html` to be written. The de-dup Map keyed by
+          // path naturally prevents a second `/tss-spa-shell/index.html`.
           return true
         },
       },

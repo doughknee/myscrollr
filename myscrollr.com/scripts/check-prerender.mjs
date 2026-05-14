@@ -19,17 +19,64 @@ import { dirname, join } from 'node:path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const clientDir = join(__dirname, '..', 'dist', 'client')
 
-// Per-route expected contract. `minJsonLd` is the minimum number of
-// <script type="application/ld+json"> blocks expected.
+// Per-route expected contract.
+// - `minJsonLd`: minimum <script type="application/ld+json"> blocks
+// - `expectedBody`: substring that must appear in the prerendered body
+//   (NOT in <head>) to prove the page actually SSRs real content.
+//   Marketing routes need this so a future regression that re-wraps the
+//   layout in <ClientOnly> (and ships an empty body) fails the build.
+//   Auth/subscription pages (uplink, uplink/lifetime) intentionally
+//   render their bodies on the client only — they omit this field.
 const ROUTES = [
-  { path: '/', file: 'index.html', minJsonLd: 3 }, // Org, WebSite, SoftwareApp
-  { path: '/channels', file: 'channels/index.html', minJsonLd: 1 },
-  { path: '/download', file: 'download/index.html', minJsonLd: 2 }, // softwareApp + breadcrumbs
-  { path: '/business', file: 'business/index.html', minJsonLd: 1 },
-  { path: '/architecture', file: 'architecture/index.html', minJsonLd: 1 },
-  { path: '/support', file: 'support/index.html', minJsonLd: 2 }, // FAQ + breadcrumbs
-  { path: '/legal', file: 'legal/index.html', minJsonLd: 1 },
-  { path: '/uplink', file: 'uplink/index.html', minJsonLd: 3 }, // Product + FAQ + breadcrumbs
+  {
+    // The home page prerenders real hero content (the SPA shell is
+    // pointed at a synthetic `/tss-spa-shell` route via `spa.maskPath`
+    // so the home prerender wins the de-dup race). Asserts the hero
+    // body copy so a regression that breaks SSR is caught at build.
+    path: '/',
+    file: 'index.html',
+    minJsonLd: 3, // Org, WebSite, SoftwareApp
+    expectedBody: 'A quiet ticker at the edge of your screen',
+  },
+  {
+    path: '/channels',
+    file: 'channels/index.html',
+    minJsonLd: 1,
+    expectedBody: 'Real-time market data',
+  },
+  {
+    path: '/download',
+    file: 'download/index.html',
+    minJsonLd: 2, // softwareApp + breadcrumbs
+    expectedBody: 'Download for',
+  },
+  {
+    path: '/business',
+    file: 'business/index.html',
+    minJsonLd: 1,
+    expectedBody: 'Sports bars',
+  },
+  {
+    path: '/architecture',
+    file: 'architecture/index.html',
+    minJsonLd: 1,
+    expectedBody: 'Per-user Redis',
+  },
+  {
+    path: '/support',
+    file: 'support/index.html',
+    minJsonLd: 2, // FAQ + breadcrumbs
+    expectedBody: 'How can we',
+  },
+  {
+    path: '/legal',
+    file: 'legal/index.html',
+    minJsonLd: 1,
+    expectedBody: 'Terms of Service',
+  },
+  // Uplink pages render their auth-aware bodies client-side only;
+  // <head> still prerenders for SEO. No body assertion.
+  { path: '/uplink', file: 'uplink/index.html', minJsonLd: 3 },
   {
     path: '/uplink/lifetime',
     file: 'uplink/lifetime/index.html',
@@ -95,7 +142,26 @@ for (const route of ROUTES) {
     continue
   }
 
-  pass(route, `title="${titleMatch[1]}" jsonLd=${jsonLdCount}`)
+  if (route.expectedBody) {
+    // Strip <head>…</head> before searching so we never match metadata
+    // (title, description, og:*, JSON-LD) — only real rendered body.
+    const bodyOnly = html.replace(/<head[\s\S]*?<\/head>/i, '')
+    if (!bodyOnly.includes(route.expectedBody)) {
+      fail(
+        route,
+        `body missing expected content "${route.expectedBody}" ` +
+          `(this usually means the layout was re-wrapped in <ClientOnly> ` +
+          `or the route component crashed during SSR — body is empty)`,
+      )
+      continue
+    }
+  }
+
+  pass(
+    route,
+    `title="${titleMatch[1]}" jsonLd=${jsonLdCount}` +
+      (route.expectedBody ? ` body="${route.expectedBody}" ✓` : ''),
+  )
 }
 
 const shell = join(clientDir, '_shell.html')
@@ -103,7 +169,23 @@ if (!existsSync(shell)) {
   console.error('✗ _shell.html missing (SPA fallback target)')
   failures += 1
 } else {
-  console.log('✓ _shell.html present')
+  // Assert the shell body has real Header chrome so nginx never serves
+  // a blank page for unknown routes. The shell is rendered by fetching
+  // the synthetic `/tss-spa-shell` route; if that route or the layout
+  // ever ships an empty body again (e.g. a fresh <ClientOnly> wrap),
+  // this assertion fails.
+  const shellHtml = readFileSync(shell, 'utf8')
+  const shellBody = shellHtml.replace(/<head[\s\S]*?<\/head>/i, '')
+  const expectedShellChrome = 'Always Visible'
+  if (!shellBody.includes(expectedShellChrome)) {
+    console.error(
+      `✗ _shell.html missing expected chrome "${expectedShellChrome}" ` +
+        `— the SPA fallback would render a blank page for unknown routes`,
+    )
+    failures += 1
+  } else {
+    console.log('✓ _shell.html present with Header chrome')
+  }
 }
 
 // Guard: the client entry bundle must wrap StartClient in our auth providers.

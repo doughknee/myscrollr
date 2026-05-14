@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { ClientOnly, createFileRoute } from '@tanstack/react-router'
 import { seo } from '@/lib/seo'
 import { breadcrumbs, faqPage } from '@/lib/structured-data'
 import { FAQ_ITEMS } from '@/components/support/support-content'
@@ -35,7 +35,11 @@ function SupportPage() {
       <SupportFAQ />
       <SupportTroubleshooting />
       <SupportBilling />
-      <SupportContactForm />
+      {/* Contact form is auth-aware (pre-fills name/email from claims).
+          Wrapped in ClientOnly so the rest of /support prerenders. */}
+      <ClientOnly>
+        <SupportContactForm />
+      </ClientOnly>
     </main>
   )
 }
