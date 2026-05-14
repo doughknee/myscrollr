@@ -109,10 +109,13 @@ fn init_sentry() -> sentry::ClientInitGuard {
 
 fn main() -> Result<()> {
     dotenv().ok();
-    let _ = init_async_logger("./logs");
 
     // Sentry init — MUST happen before the Tokio runtime starts. Guard's
     // Drop flushes events on shutdown.
+    //
+    // init_async_logger is intentionally NOT called here — it uses
+    // tokio::spawn internally and panics with "there is no reactor running"
+    // if called outside a Tokio runtime. It runs at the top of run_service().
     let _sentry_guard = init_sentry();
     sentry::configure_scope(|scope| {
         scope.set_tag("service", "scrollr-sports-svc");
@@ -130,6 +133,12 @@ fn main() -> Result<()> {
 }
 
 async fn run_service() -> Result<()> {
+    // Logger init MUST be inside the Tokio runtime — init_async_logger
+    // spawns background tasks. Calling it from sync main() panics with
+    // "there is no reactor running, must be called from the context of
+    // a Tokio 1.x runtime".
+    let _ = init_async_logger("./logs");
+
     let health = Arc::new(Mutex::new(SportsHealth::new()));
     let readiness = Arc::new(ReadinessGate::new(Some(Duration::from_secs(
         MAX_POLL_STALENESS_SECS,
