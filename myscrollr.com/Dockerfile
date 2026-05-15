@@ -65,8 +65,24 @@ COPY --from=builder /app/myscrollr.com/dist/client /usr/share/nginx/html
 # Includes security headers, gzip compression, and proper caching
 RUN printf 'server {\n\
     listen 3000;\n\
+    server_name _;\n\
     root /usr/share/nginx/html;\n\
     index index.html;\n\
+\n\
+    # ── Redirect-leak guards ────────────────────────────────────\n\
+    # Without these, nginx builds Location headers using its own\n\
+    # listen port (3000) and the inbound scheme (http, since TLS\n\
+    # is terminated at the k8s ingress). That produced redirects\n\
+    # like "http://myscrollr.com:3000/uplink/" — port-leaked,\n\
+    # scheme-downgraded, and unreachable from the public edge.\n\
+    # absolute_redirect off  -> emit relative Location ("/uplink/")\n\
+    #                          which clients resolve against the\n\
+    #                          original request URL (preserving\n\
+    #                          https + correct host).\n\
+    # port_in_redirect off   -> belt + suspenders: never include\n\
+    #                          ":3000" in any Location header.\n\
+    absolute_redirect off;\n\
+    port_in_redirect off;\n\
 \n\
     # ── Security headers (server-level) ─────────────────────────\n\
     # NOTE: nginx add_header in a child location block overrides\n\
@@ -100,10 +116,23 @@ RUN printf 'server {\n\
     }\n\
 \n\
     # ── HTML: no-cache so users always get latest deploy ────────\n\
+    # try_files order matters:\n\
+    #   1. $uri              — exact file (e.g. /robots.txt, /sitemap.xml)\n\
+    #   2. $uri/index.html   — prerendered route (e.g. /uplink ->\n\
+    #                          /uplink/index.html). Serves the file\n\
+    #                          DIRECTLY at 200. This avoids the built-in\n\
+    #                          "$uri/" directory match, which would have\n\
+    #                          issued a 301 to add a trailing slash —\n\
+    #                          the source of the original redirect leak\n\
+    #                          and a mismatch with our canonical URLs\n\
+    #                          (sitemap + <link rel=canonical> declare\n\
+    #                          /uplink, not /uplink/).\n\
+    #   3. /index.html       — SPA fallback for dynamic routes\n\
+    #                          (/account, /callback, /u/$username, etc.)\n\
     location / {\n\
         include /etc/nginx/security-headers.conf;\n\
         add_header Cache-Control "no-cache";\n\
-        try_files $uri $uri/ /index.html;\n\
+        try_files $uri $uri/index.html /index.html;\n\
     }\n\
 \n\
     # ── Hashed static assets: cache forever ─────────────────────\n\
