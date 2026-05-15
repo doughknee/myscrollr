@@ -2529,10 +2529,12 @@ function UplinkPage() {
                     }}
                     role="button"
                     tabIndex={isTierDisabled('uplink') ? -1 : 0}
-                    // Accessible name leads with visible text "Uplink" so
-                    // screen-reader output matches what sighted users see
-                    // (Lighthouse label-content-name-mismatch).
-                    aria-label={`Uplink ${BILLING_LABELS[billingPeriod]} plan`}
+                    // No aria-label: the card's visible content (tier
+                    // name, description, price, features, CTA) is the
+                    // accessible name. Lighthouse's label-content-name-
+                    // mismatch audit requires the accessible name to
+                    // include all contained visible text — a short
+                    // label can't satisfy that for a complex card.
                     onClick={() =>
                       !isTierDisabled('uplink') &&
                       handleSelectPlan(billingPeriod, 'uplink')
@@ -2684,7 +2686,7 @@ function UplinkPage() {
                     }}
                     role="button"
                     tabIndex={isTierDisabled('pro') ? -1 : 0}
-                    aria-label={`Pro ${BILLING_LABELS[billingPeriod]} plan`}
+                    // See Uplink card above for why aria-label is omitted.
                     onClick={() =>
                       !isTierDisabled('pro') &&
                       handleSelectPlan(billingPeriod, 'pro')
@@ -2838,7 +2840,7 @@ function UplinkPage() {
                     }}
                     role="button"
                     tabIndex={isTierDisabled('ultimate') ? -1 : 0}
-                    aria-label={`Ultimate ${BILLING_LABELS[billingPeriod]} plan`}
+                    // See Uplink card above for why aria-label is omitted.
                     onClick={() =>
                       !isTierDisabled('ultimate') &&
                       handleSelectPlan(billingPeriod, 'ultimate')

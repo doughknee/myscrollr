@@ -130,7 +130,9 @@ function SingleDownloadButton({ platform, label }: SingleDownloadButtonProps) {
     <button
       type="button"
       onClick={handleClick}
-      aria-label={`Download Scrollr for ${label}`}
+      // No aria-label: the visible "Download for {label}" text already
+      // names the button. A redundant aria-label that didn't match the
+      // visible text triggered Lighthouse label-content-name-mismatch.
       className="group relative inline-flex cursor-pointer items-center gap-3 rounded-full bg-primary px-7 py-3.5 text-sm font-semibold text-primary-content! shadow-lg transition-all duration-200 hover:brightness-110 hover:shadow-xl active:scale-[0.98]"
     >
       <Download
