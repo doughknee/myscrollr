@@ -12,15 +12,25 @@ const dockerfile = readFileSync(join(root, 'Dockerfile'), 'utf8')
 const failures = []
 
 if (!sentrySource.includes("tunnel: '/api/sentry-envelope'")) {
-  failures.push('src/sentry.ts must route browser events through /api/sentry-envelope')
+  failures.push(
+    'src/sentry.ts must route browser events through /api/sentry-envelope',
+  )
 }
 
 if (!dockerfile.includes('location = /api/sentry-envelope')) {
-  failures.push('Dockerfile must define an exact nginx location for /api/sentry-envelope')
+  failures.push(
+    'Dockerfile must define an exact nginx location for /api/sentry-envelope',
+  )
 }
 
-if (!dockerfile.includes('proxy_pass https://o4511384091033600.ingest.us.sentry.io/api/4511384375132160/envelope/')) {
-  failures.push('Dockerfile must proxy the tunnel to the scrollr-web Sentry envelope endpoint')
+if (
+  !dockerfile.includes(
+    'proxy_pass https://o4511384091033600.ingest.us.sentry.io/api/4511384375132160/envelope/',
+  )
+) {
+  failures.push(
+    'Dockerfile must proxy the tunnel to the scrollr-web Sentry envelope endpoint',
+  )
 }
 
 if (!dockerfile.includes('proxy_ssl_server_name on')) {

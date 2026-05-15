@@ -256,12 +256,16 @@ try {
           const progressButton = document.querySelector(
             'button[aria-label^="Show "]',
           )
-          const heroCopy = Array.from(heroSection?.querySelectorAll('p') ?? []).find((p) =>
-            p.textContent?.includes('A quiet ticker at the edge of your screen'),
+          const heroCopy = Array.from(
+            heroSection?.querySelectorAll('p') ?? [],
+          ).find((p) =>
+            p.textContent?.includes(
+              'A quiet ticker at the edge of your screen',
+            ),
           )
-          const downloadLink = Array.from(heroSection?.querySelectorAll('a') ?? []).find((a) =>
-            a.textContent?.includes('Download'),
-          )
+          const downloadLink = Array.from(
+            heroSection?.querySelectorAll('a') ?? [],
+          ).find((a) => a.textContent?.includes('Download'))
           if (!header || !heading || !screenshot || !progressButton) return null
 
           const headerRect = header.getBoundingClientRect()
@@ -290,7 +294,10 @@ try {
           )
           failures += 1
         } else {
-          if (heroMobileLayout.headingTop < heroMobileLayout.headerBottom + 12) {
+          if (
+            heroMobileLayout.headingTop <
+            heroMobileLayout.headerBottom + 12
+          ) {
             console.error(
               `✗ ${route.path} @ ${viewport.name} (${viewport.width}px): ` +
                 `hero heading starts under fixed header — headingTop=${heroMobileLayout.headingTop}, ` +
@@ -316,7 +323,10 @@ try {
 
           if (
             Math.abs(heroMobileLayout.screenshotLeft - 12) > 1 ||
-            Math.abs(heroMobileLayout.screenshotRight - (heroMobileLayout.clientWidth - 12)) > 1
+            Math.abs(
+              heroMobileLayout.screenshotRight -
+                (heroMobileLayout.clientWidth - 12),
+            ) > 1
           ) {
             console.error(
               `✗ ${route.path} @ ${viewport.name} (${viewport.width}px): ` +
@@ -326,7 +336,10 @@ try {
             failures += 1
           }
 
-          if (!heroMobileLayout.hasHeroCopy || heroMobileLayout.hasDownloadLink) {
+          if (
+            !heroMobileLayout.hasHeroCopy ||
+            heroMobileLayout.hasDownloadLink
+          ) {
             console.error(
               `✗ ${route.path} @ ${viewport.name} (${viewport.width}px): ` +
                 `hero copy/download CTA state is wrong — ` +
@@ -408,7 +421,8 @@ try {
           )
           failures += 1
         } else {
-          const contentGap = mobileFlow.howHeaderTop - mobileFlow.lastTickerBottom
+          const contentGap =
+            mobileFlow.howHeaderTop - mobileFlow.lastTickerBottom
           if (contentGap > 120) {
             console.error(
               `✗ ${route.path} @ ${viewport.name} (${viewport.width}px): ` +
@@ -449,7 +463,8 @@ try {
 
           if (
             mobileFlow.compactTickerStripHeight === null ||
-            mobileFlow.compactTickerStripHeight >= mobileFlow.tickerStripHeight - 4
+            mobileFlow.compactTickerStripHeight >=
+              mobileFlow.tickerStripHeight - 4
           ) {
             console.error(
               `✗ ${route.path} @ ${viewport.name} (${viewport.width}px): ` +
@@ -461,8 +476,11 @@ try {
           }
 
           if (
-            Math.abs(mobileFlow.tickerImageTop - mobileFlow.tickerStripTop) > 1 ||
-            Math.abs(mobileFlow.tickerImageBottom - mobileFlow.tickerStripBottom) > 1
+            Math.abs(mobileFlow.tickerImageTop - mobileFlow.tickerStripTop) >
+              1 ||
+            Math.abs(
+              mobileFlow.tickerImageBottom - mobileFlow.tickerStripBottom,
+            ) > 1
           ) {
             console.error(
               `✗ ${route.path} @ ${viewport.name} (${viewport.width}px): ` +
@@ -498,17 +516,29 @@ try {
             ),
           )
           const filterRow = buttons[0]?.parentElement
-          const tickerBand = channels?.querySelector('[data-channel-ticker-band]')
-          const caption = channels?.querySelector('[data-channel-ticker-caption]')
+          const tickerBand = channels?.querySelector(
+            '[data-channel-ticker-band]',
+          )
+          const caption = channels?.querySelector(
+            '[data-channel-ticker-caption]',
+          )
 
-          if (!channels || buttons.length !== 4 || !filterRow || !tickerBand || !caption) {
+          if (
+            !channels ||
+            buttons.length !== 4 ||
+            !filterRow ||
+            !tickerBand ||
+            !caption
+          ) {
             return null
           }
 
           const buttonTops = buttons.map((button) =>
             Math.round(button.getBoundingClientRect().top),
           )
-          const headerRect = channels.querySelector('h2')?.getBoundingClientRect()
+          const headerRect = channels
+            .querySelector('h2')
+            ?.getBoundingClientRect()
           const filterRect = filterRow.getBoundingClientRect()
           const tickerRect = tickerBand.getBoundingClientRect()
 
@@ -552,7 +582,10 @@ try {
             failures += 1
           }
 
-          if (channelsMobileLayout.tickerTop - channelsMobileLayout.filterBottom > 32) {
+          if (
+            channelsMobileLayout.tickerTop - channelsMobileLayout.filterBottom >
+            32
+          ) {
             console.error(
               `✗ ${route.path} @ ${viewport.name} (${viewport.width}px): ` +
                 `channel ticker should sit close to mobile filters — ` +
@@ -576,15 +609,20 @@ try {
 
         const customizeTickerLayout = await page.evaluate(() => {
           const customize = document.querySelector('#customize')
-          const media = customize?.querySelector('[data-customization-ticker-media]')
+          const media = customize?.querySelector(
+            '[data-customization-ticker-media]',
+          )
           const strips = Array.from(
-            customize?.querySelectorAll('[data-customization-ticker-strip]') ?? [],
+            customize?.querySelectorAll('[data-customization-ticker-strip]') ??
+              [],
           )
 
           if (!customize || !media || strips.length < 2) return null
 
           const mediaRect = media.getBoundingClientRect()
-          const stripRects = strips.map((strip) => strip.getBoundingClientRect())
+          const stripRects = strips.map((strip) =>
+            strip.getBoundingClientRect(),
+          )
 
           return {
             mediaLeft: Math.round(mediaRect.left),
@@ -623,9 +661,13 @@ try {
         }
 
         await page.evaluate(() => window.scrollTo(0, 0))
-        await page.locator('section').first().getByRole('button', {
-          name: 'How It Works',
-        }).click()
+        await page
+          .locator('section')
+          .first()
+          .getByRole('button', {
+            name: 'How It Works',
+          })
+          .click()
         await page.waitForTimeout(900)
         const scrollTarget = await page.evaluate(() => {
           const header = document.querySelector('header')
@@ -644,7 +686,9 @@ try {
             `✗ ${route.path} @ ${viewport.name} (${viewport.width}px): missing scroll target elements`,
           )
           failures += 1
-        } else if (Math.abs(scrollTarget.tickerTop - scrollTarget.headerBottom) > 8) {
+        } else if (
+          Math.abs(scrollTarget.tickerTop - scrollTarget.headerBottom) > 8
+        ) {
           console.error(
             `✗ ${route.path} @ ${viewport.name} (${viewport.width}px): ` +
               `hero How It Works button should scroll to ticker section — ` +

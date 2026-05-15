@@ -95,10 +95,10 @@ The script (`myscrollr.com/scripts/optimize-screenshots.mjs`):
 3. Emits two WebP variants per source into
    `myscrollr.com/public/screenshots/<category>/<basename>-<theme>@{1,2}x.webp`:
 
-   | Variant | Width  | Quality | Used for                    |
-   |---------|--------|---------|-----------------------------|
-   | `@1x`   | 1600w  | 78      | Standard-DPI displays       |
-   | `@2x`   | 3200w  | 72      | Retina / hidpi (`sharp`'s `withoutEnlargement: true` keeps it at native 2478w since the source is smaller) |
+   | Variant | Width | Quality | Used for                                                                                                   |
+   | ------- | ----- | ------- | ---------------------------------------------------------------------------------------------------------- |
+   | `@1x`   | 1600w | 78      | Standard-DPI displays                                                                                      |
+   | `@2x`   | 3200w | 72      | Retina / hidpi (`sharp`'s `withoutEnlargement: true` keeps it at native 2478w since the source is smaller) |
 
 4. Skips files that already exist and are newer than the source (idempotent).
 5. Runs as part of `prebuild`, so every deploy ships fresh, optimized assets.
@@ -123,7 +123,7 @@ is the only consumer. It handles:
 - **`<picture>` + `srcset`**: serves 1× or 2× WebP based on
   `devicePixelRatio`.
 - **Decoding hints**: `priority` flips `loading=eager` + `fetchpriority=high`
-  + `decoding=sync` for above-the-fold images. Everything else lazy-loads.
+  - `decoding=sync` for above-the-fold images. Everything else lazy-loads.
 - **Aspect ratio**: defaults to `1600 / 954` (matches the optimized output).
   Override only if you're rendering a non-standard crop.
 
@@ -160,14 +160,14 @@ the radius class up one step.
 
 ## Where each screenshot is used
 
-| Category        | Used in                                                |
-|-----------------|--------------------------------------------------------|
-| `channels/`     | `HeroProductShowcase` (home hero rotation, 4 channels) |
-| `configure/`    | `CustomizationShowcase` (style card)                   |
-| `overview/`     | `CustomizationShowcase` (catalog card)                 |
-| `themes/`       | `MakeItYoursSection` (switcher + decorative deck)      |
-| `widgets/`      | Reserved for `/channels` page (planned)                |
-| `display/`      | Reserved for `/channels` configure mosaic (planned)    |
-| `support/`      | Reserved for `/support` section illustrations (planned)|
+| Category     | Used in                                                 |
+| ------------ | ------------------------------------------------------- |
+| `channels/`  | `HeroProductShowcase` (home hero rotation, 4 channels)  |
+| `configure/` | `CustomizationShowcase` (style card)                    |
+| `overview/`  | `CustomizationShowcase` (catalog card)                  |
+| `themes/`    | `MakeItYoursSection` (switcher + decorative deck)       |
+| `widgets/`   | Reserved for `/channels` page (planned)                 |
+| `display/`   | Reserved for `/channels` configure mosaic (planned)     |
+| `support/`   | Reserved for `/support` section illustrations (planned) |
 
 Refresh the placements as new pages adopt the asset set.

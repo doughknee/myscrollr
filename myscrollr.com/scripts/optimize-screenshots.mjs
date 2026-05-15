@@ -256,10 +256,7 @@ const QUALITY_2X = 72
  */
 async function encode(srcPath, outPath, width, quality) {
   if (!FORCE && existsSync(outPath)) {
-    const [srcStat, outStat] = await Promise.all([
-      stat(srcPath),
-      stat(outPath),
-    ])
+    const [srcStat, outStat] = await Promise.all([stat(srcPath), stat(outPath)])
     if (outStat.mtimeMs >= srcStat.mtimeMs) {
       return { skipped: true }
     }
@@ -336,8 +333,18 @@ async function verifySources() {
     if (!existsSync(path)) missing.push(path)
   }
   for (const name of THEME_NAMES) {
-    const dark = join(srcRoot, 'themes', 'dark', `theme-${name}-dark-settings.png`)
-    const light = join(srcRoot, 'themes', 'light', `theme-${name}-light-settings.png`)
+    const dark = join(
+      srcRoot,
+      'themes',
+      'dark',
+      `theme-${name}-dark-settings.png`,
+    )
+    const light = join(
+      srcRoot,
+      'themes',
+      'light',
+      `theme-${name}-light-settings.png`,
+    )
     if (!existsSync(dark)) missing.push(dark)
     if (!existsSync(light)) missing.push(light)
   }

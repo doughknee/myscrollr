@@ -189,7 +189,9 @@ function TickerChipItem({ chip }: { chip: TickerChip }) {
       >
         {chip.label}
       </span>
-      <span className={`text-[9px] sm:text-[10px] font-mono ${c.sub} whitespace-nowrap`}>
+      <span
+        className={`text-[9px] sm:text-[10px] font-mono ${c.sub} whitespace-nowrap`}
+      >
         {chip.value}
       </span>
     </div>
@@ -490,7 +492,7 @@ export function ChannelsShowcase() {
                 key={stream.key}
                 type="button"
                 onClick={() => handleFilterClick(stream.key)}
-                  className={`inline-flex shrink-0 items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-[color,background-color,border-color,box-shadow] duration-300 cursor-pointer ${
+                className={`inline-flex shrink-0 items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-[color,background-color,border-color,box-shadow] duration-300 cursor-pointer ${
                   isActive
                     ? `${stream.activeBg} ${stream.activeText} border-transparent shadow-md`
                     : 'bg-base-200/50 text-base-content/35 border-base-300/30 hover:text-base-content/55 hover:bg-base-200/70'
