@@ -124,8 +124,12 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
+          # Do not restore ~/.cargo/bin on macOS: a poisoned cache can replace
+          # cargo with rustup-init and break cargo metadata inside tauri-action.
+          prefix-key: "v1-rust-no-bin"
           workspaces: "desktop/src-tauri -> target"
           cache-on-failure: "true"
+          cache-bin: "false"
 
       - name: Install frontend dependencies
         run: npm ci
