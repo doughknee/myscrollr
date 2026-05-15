@@ -16,16 +16,23 @@ import {
 import { motion } from 'motion/react'
 import type { ComponentType } from 'react'
 import { seo } from '@/lib/seo'
+import { breadcrumbs, organization } from '@/lib/structured-data'
 import { API_BASE } from '@/api/client'
 
 export const Route = createFileRoute('/status')({
   head: () =>
     seo({
-      title: 'System Status — Scrollr',
+      title: 'Scrollr System Status',
       description:
-        'Live system status for the Scrollr platform. Monitor infrastructure, ingestion workers, and API health.',
+        'Live system status for the Scrollr platform. Real-time health of infrastructure, ingestion workers, and channel APIs.',
       path: '/status',
-      noindex: true,
+      jsonLd: [
+        organization,
+        breadcrumbs([
+          { name: 'Home', path: '/' },
+          { name: 'Status', path: '/status' },
+        ]),
+      ],
     }),
   component: StatusPage,
 })

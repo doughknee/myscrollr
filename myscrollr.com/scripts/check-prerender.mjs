@@ -35,52 +35,77 @@ const ROUTES = [
     // body copy so a regression that breaks SSR is caught at build.
     path: '/',
     file: 'index.html',
-    minJsonLd: 3, // Org, WebSite, SoftwareApp
+    minJsonLd: 4, // Org, WebSite, SoftwareApp, FAQPage
     expectedBody: 'What actually sits',
   },
   {
     path: '/channels',
     file: 'channels/index.html',
-    minJsonLd: 1,
+    minJsonLd: 2, // organization + breadcrumbs
     expectedBody: 'Real-time market data',
   },
   {
     path: '/download',
     file: 'download/index.html',
-    minJsonLd: 2, // softwareApp + breadcrumbs
+    minJsonLd: 3, // organization + softwareApp + breadcrumbs
     expectedBody: 'Download for',
+  },
+  {
+    path: '/download/mac',
+    file: 'download/mac/index.html',
+    minJsonLd: 3, // organization + softwareApp + breadcrumbs
+    expectedBody: 'Download Scrollr',
+  },
+  {
+    path: '/download/windows',
+    file: 'download/windows/index.html',
+    minJsonLd: 3,
+    expectedBody: 'Download Scrollr',
+  },
+  {
+    path: '/download/linux',
+    file: 'download/linux/index.html',
+    minJsonLd: 3,
+    expectedBody: 'Download Scrollr',
   },
   {
     path: '/business',
     file: 'business/index.html',
-    minJsonLd: 1,
+    minJsonLd: 2, // organization + breadcrumbs
     expectedBody: 'Sports bars',
   },
   {
     path: '/architecture',
     file: 'architecture/index.html',
-    minJsonLd: 1,
+    minJsonLd: 3, // organization + TechArticle + breadcrumbs
     expectedBody: 'Per-user Redis',
   },
   {
     path: '/support',
     file: 'support/index.html',
-    minJsonLd: 2, // FAQ + breadcrumbs
+    minJsonLd: 3, // organization + FAQ + breadcrumbs
     expectedBody: 'How can we',
   },
   {
     path: '/legal',
     file: 'legal/index.html',
-    minJsonLd: 1,
+    minJsonLd: 2, // organization + breadcrumbs
     expectedBody: 'Terms of Service',
   },
   // Uplink pages render their auth-aware bodies client-side only;
   // <head> still prerenders for SEO. No body assertion.
-  { path: '/uplink', file: 'uplink/index.html', minJsonLd: 3 },
+  { path: '/uplink', file: 'uplink/index.html', minJsonLd: 4 }, // org + productOffers + faq + breadcrumbs
   {
     path: '/uplink/lifetime',
     file: 'uplink/lifetime/index.html',
-    minJsonLd: 1,
+    minJsonLd: 2, // organization + breadcrumbs
+  },
+  {
+    path: '/status',
+    file: 'status/index.html',
+    minJsonLd: 2, // organization + breadcrumbs
+    // No body assertion: status body renders live data via useEffect,
+    // so the prerendered HTML body is intentionally minimal.
   },
 ]
 

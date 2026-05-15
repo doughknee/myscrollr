@@ -42,8 +42,17 @@ const LINUX_FORMATS: ReadonlyArray<{
  * build time, the click handler navigates directly to the asset URL
  * inside the user-gesture event without any awaitable network call.
  * No loading state, no timeout, no in-page fallback needed.
+ *
+ * `forcedPlatform`: when set, skips browser detection. Used by the
+ * per-OS deep-link routes (`/download/mac`, `/windows`, `/linux`) so
+ * a shared URL renders the same CTA regardless of the visitor's actual
+ * OS. Mobile visitors still get the mobile picker because forcing a
+ * platform doesn't change the fact that they can't install a desktop
+ * app on their phone.
  */
-export function DownloadButton() {
+export function DownloadButton({
+  forcedPlatform,
+}: { forcedPlatform?: 'macos' | 'windows' | 'linux' } = {}) {
   const [info, setInfo] = useState<PlatformInfo>(() => detectPlatform())
   const [isIntelMac, setIsIntelMac] = useState(false)
 
@@ -51,8 +60,30 @@ export function DownloadButton() {
   // SSR-safe defaults; once we have a real `navigator` the picture
   // can change (specifically: mobile detection).
   useEffect(() => {
-    setInfo(detectPlatform())
-  }, [])
+    const detected = detectPlatform()
+    if (forcedPlatform && !detected.isMobile) {
+      // Per-OS deep link wins on desktop visitors. Keep mobile detection
+      // intact so iOS/Android visitors still see the picker.
+      const labelByPlatform = {
+        macos: 'macOS',
+        windows: 'Windows',
+        linux: 'Linux',
+      } as const
+      const archByPlatform = {
+        macos: 'Apple Silicon',
+        windows: 'x64',
+        linux: 'x64',
+      } as const
+      setInfo({
+        ...detected,
+        platform: forcedPlatform,
+        label: labelByPlatform[forcedPlatform],
+        archLabel: archByPlatform[forcedPlatform],
+      })
+    } else {
+      setInfo(detected)
+    }
+  }, [forcedPlatform])
 
   // Architecture detection is async and only resolves on Chromium browsers.
   // Silent best-effort: if we can confirm Intel, we warn; otherwise we say nothing.

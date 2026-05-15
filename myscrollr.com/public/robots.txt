@@ -11,10 +11,12 @@ User-agent: *
 Disallow: /account
 Disallow: /invite
 Disallow: /callback
-Disallow: /status
 Disallow: /u/
 # Synthetic SPA-shell route. Used internally by TanStack Start to
 # generate _shell.html for nginx's SPA fallback. Not a real page.
 Disallow: /tss-spa-shell
+# Note: /status is intentionally indexable. It's a public service-health
+# page with no auth requirement. The body is live data that populates on
+# the client; the prerendered <head> carries the SEO meta.
 
 Sitemap: https://myscrollr.com/sitemap.xml

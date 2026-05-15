@@ -24,6 +24,7 @@ import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UplinkLifetimeRouteImport } from './routes/uplink_.lifetime'
 import { Route as UUsernameRouteImport } from './routes/u.$username'
+import { Route as DownloadOsRouteImport } from './routes/download_.$os'
 
 const UplinkRoute = UplinkRouteImport.update({
   id: '/uplink',
@@ -100,6 +101,11 @@ const UUsernameRoute = UUsernameRouteImport.update({
   path: '/u/$username',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DownloadOsRoute = DownloadOsRouteImport.update({
+  id: '/download_/$os',
+  path: '/download/$os',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -115,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/support': typeof SupportRoute
   '/tss-spa-shell': typeof TssSpaShellRoute
   '/uplink': typeof UplinkRoute
+  '/download/$os': typeof DownloadOsRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink/lifetime': typeof UplinkLifetimeRoute
 }
@@ -132,6 +139,7 @@ export interface FileRoutesByTo {
   '/support': typeof SupportRoute
   '/tss-spa-shell': typeof TssSpaShellRoute
   '/uplink': typeof UplinkRoute
+  '/download/$os': typeof DownloadOsRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink/lifetime': typeof UplinkLifetimeRoute
 }
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   '/support': typeof SupportRoute
   '/tss-spa-shell': typeof TssSpaShellRoute
   '/uplink': typeof UplinkRoute
+  '/download_/$os': typeof DownloadOsRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink_/lifetime': typeof UplinkLifetimeRoute
 }
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/tss-spa-shell'
     | '/uplink'
+    | '/download/$os'
     | '/u/$username'
     | '/uplink/lifetime'
   fileRoutesByTo: FileRoutesByTo
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/tss-spa-shell'
     | '/uplink'
+    | '/download/$os'
     | '/u/$username'
     | '/uplink/lifetime'
   id:
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/tss-spa-shell'
     | '/uplink'
+    | '/download_/$os'
     | '/u/$username'
     | '/uplink_/lifetime'
   fileRoutesById: FileRoutesById
@@ -221,6 +233,7 @@ export interface RootRouteChildren {
   SupportRoute: typeof SupportRoute
   TssSpaShellRoute: typeof TssSpaShellRoute
   UplinkRoute: typeof UplinkRoute
+  DownloadOsRoute: typeof DownloadOsRoute
   UUsernameRoute: typeof UUsernameRoute
   UplinkLifetimeRoute: typeof UplinkLifetimeRoute
 }
@@ -332,6 +345,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UUsernameRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/download_/$os': {
+      id: '/download_/$os'
+      path: '/download/$os'
+      fullPath: '/download/$os'
+      preLoaderRoute: typeof DownloadOsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -349,6 +369,7 @@ const rootRouteChildren: RootRouteChildren = {
   SupportRoute: SupportRoute,
   TssSpaShellRoute: TssSpaShellRoute,
   UplinkRoute: UplinkRoute,
+  DownloadOsRoute: DownloadOsRoute,
   UUsernameRoute: UUsernameRoute,
   UplinkLifetimeRoute: UplinkLifetimeRoute,
 }
