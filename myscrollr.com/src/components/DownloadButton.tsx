@@ -6,6 +6,23 @@ import type { PlatformInfo } from '@/lib/detectPlatform'
 import { detectIsIntelMac, detectPlatform } from '@/lib/detectPlatform'
 import { FALLBACK_RELEASES_URL, triggerDownload } from '@/lib/getDownloadInfo'
 
+// SSR baseline. Must match what `detectPlatform()` returns when
+// `navigator` is undefined — see `lib/detectPlatform.ts`. The initial
+// render on BOTH server and client uses this constant so the hydrated
+// HTML matches byte-for-byte. The real platform is resolved inside
+// the mount effect below and triggers a re-render with the correct
+// button. Using `detectPlatform()` directly as the lazy initializer
+// (the previous approach) ran the function on the client during the
+// first render with a real `navigator`, producing a different button
+// than SSR and throwing React error #418.
+const SSR_PLATFORM_INFO: PlatformInfo = {
+  platform: 'linux',
+  isMobile: false,
+  isIntelMac: false,
+  label: 'Linux',
+  archLabel: 'x64',
+}
+
 const LINUX_FORMATS: ReadonlyArray<{
   format: LinuxFormat
   label: string
@@ -53,12 +70,17 @@ const LINUX_FORMATS: ReadonlyArray<{
 export function DownloadButton({
   forcedPlatform,
 }: { forcedPlatform?: 'macos' | 'windows' | 'linux' } = {}) {
-  const [info, setInfo] = useState<PlatformInfo>(() => detectPlatform())
+  // Always start from the SSR baseline. The mount effect below swaps
+  // in the real platform on the client. Calling `detectPlatform()` in
+  // the initial state (as a lazy initializer) would run on the client
+  // with a real `navigator` and produce different JSX than the
+  // prerendered HTML — hydration mismatch (React #418).
+  const [info, setInfo] = useState<PlatformInfo>(SSR_PLATFORM_INFO)
   const [isIntelMac, setIsIntelMac] = useState(false)
 
-  // Re-detect on mount because the component initially renders with
-  // SSR-safe defaults; once we have a real `navigator` the picture
-  // can change (specifically: mobile detection).
+  // Resolve the real platform on mount. Effects only run on the
+  // client, so by the time this fires hydration is complete and React
+  // is free to re-render with the correct download CTA.
   useEffect(() => {
     const detected = detectPlatform()
     if (forcedPlatform && !detected.isMobile) {
