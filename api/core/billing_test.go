@@ -156,3 +156,93 @@ func TestPlanRankUpgradeDowngrade(t *testing.T) {
 		}
 	}
 }
+
+func TestHasSubscriptionConflict(t *testing.T) {
+	tests := []struct {
+		name           string
+		existingPlan   string
+		existingStatus string
+		isLifetime     bool
+		newPlan        string
+		want           bool
+	}{
+		// Free users never conflict.
+		{"free plan", "free", "active", false, "monthly", false},
+		{"free plan trialing status", "free", "trialing", false, "ultimate_monthly", false},
+
+		// Active or trialing paid plans block a new subscription.
+		{"active monthly blocks", "monthly", "active", false, "pro_monthly", true},
+		{"active pro blocks", "pro_monthly", "active", false, "ultimate_monthly", true},
+		{"trialing blocks", "monthly", "trialing", false, "monthly", true},
+
+		// Ended subscriptions don't block re-subscribing.
+		{"canceled does not block", "monthly", "canceled", false, "monthly", false},
+		{"canceling does not block", "pro_monthly", "canceling", false, "pro_monthly", false},
+		{"past_due does not block", "monthly", "past_due", false, "monthly", false},
+		{"none status does not block", "monthly", "none", false, "monthly", false},
+
+		// Lifetime members may stack Ultimate or Pro on top...
+		{"lifetime can add ultimate monthly", "lifetime", "active", true, "ultimate_monthly", false},
+		{"lifetime can add ultimate annual", "lifetime", "active", true, "ultimate_annual", false},
+		{"lifetime can add pro monthly", "lifetime", "active", true, "pro_monthly", false},
+		{"lifetime can add pro annual", "lifetime", "active", true, "pro_annual", false},
+		// ...but not a base Uplink subscription.
+		{"lifetime cannot add base monthly", "lifetime", "active", true, "monthly", true},
+		{"lifetime cannot add base annual", "lifetime", "active", true, "annual", true},
+
+		// Non-lifetime users get no stacking exception.
+		{"active without lifetime cannot add ultimate", "monthly", "active", false, "ultimate_monthly", true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := hasSubscriptionConflict(tc.existingPlan, tc.existingStatus, tc.isLifetime, tc.newPlan)
+			if got != tc.want {
+				t.Errorf("hasSubscriptionConflict(%q, %q, %v, %q) = %v, want %v",
+					tc.existingPlan, tc.existingStatus, tc.isLifetime, tc.newPlan, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestHasLifetimeCheckoutConflict(t *testing.T) {
+	tests := []struct {
+		name           string
+		existingPlan   string
+		existingStatus string
+		isLifetime     bool
+		want           bool
+	}{
+		// Existing lifetime members can't buy lifetime again.
+		{"lifetime member blocks", "lifetime", "none", true, true},
+		{"lifetime member with stacked sub blocks", "ultimate_monthly", "active", true, true},
+
+		// Free users can always buy lifetime.
+		{"free plan", "free", "none", false, false},
+		{"free plan active status", "free", "active", false, false},
+		{"free plan trialing status", "free", "trialing", false, false},
+
+		// Active or trialing paid subscriptions block lifetime purchase —
+		// a trial converts to a paid subscription that would stack on lifetime.
+		{"active monthly blocks", "monthly", "active", false, true},
+		{"active annual blocks", "annual", "active", false, true},
+		{"trialing monthly blocks", "monthly", "trialing", false, true},
+		{"trialing pro blocks", "pro_monthly", "trialing", false, true},
+
+		// Ended subscriptions don't block buying lifetime.
+		{"canceled does not block", "monthly", "canceled", false, false},
+		{"canceling does not block", "annual", "canceling", false, false},
+		{"past_due does not block", "monthly", "past_due", false, false},
+		{"none status does not block", "monthly", "none", false, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := hasLifetimeCheckoutConflict(tc.existingPlan, tc.existingStatus, tc.isLifetime)
+			if got != tc.want {
+				t.Errorf("hasLifetimeCheckoutConflict(%q, %q, %v) = %v, want %v",
+					tc.existingPlan, tc.existingStatus, tc.isLifetime, got, tc.want)
+			}
+		})
+	}
+}

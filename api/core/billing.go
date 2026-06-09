@@ -112,6 +112,44 @@ func planRank(plan string) int {
 	}
 }
 
+// hasSubscriptionConflict reports whether an existing billing record blocks
+// starting a new subscription checkout for newPlan. An active or trialing
+// paid plan conflicts, with one exception: lifetime members may stack an
+// Ultimate or Pro subscription on top of their lifetime plan.
+//
+// Shared by HandleCreateCheckoutSession, HandleCreateSetupIntent, and
+// HandleConfirmSubscription so the eligibility rule can't drift between the
+// checkout entry points.
+func hasSubscriptionConflict(existingPlan, existingStatus string, isLifetime bool, newPlan string) bool {
+	if existingPlan == "free" {
+		return false
+	}
+	if existingStatus != "active" && existingStatus != "trialing" {
+		return false
+	}
+	if isLifetime && (isUltimatePlan(newPlan) || isProPlan(newPlan)) {
+		return false
+	}
+	return true
+}
+
+// hasLifetimeCheckoutConflict reports whether an existing billing record blocks
+// purchasing the lifetime plan. Existing lifetime members are blocked, as is
+// anyone with an active or trialing paid subscription — a trial converts to a
+// paid subscription, which would then stack on top of lifetime.
+//
+// Shared by HandleCreateLifetimeCheckout and HandleCreatePaymentIntent so the
+// eligibility rule can't drift between the two lifetime purchase entry points.
+func hasLifetimeCheckoutConflict(existingPlan, existingStatus string, isLifetime bool) bool {
+	if isLifetime {
+		return true
+	}
+	if existingPlan == "free" {
+		return false
+	}
+	return existingStatus == "active" || existingStatus == "trialing"
+}
+
 // getOrCreateStripeCustomer looks up or creates a Stripe customer for the user.
 // If a cached customer ID is stale (e.g. Stripe mode switch, deleted customer),
 // it deletes the stale record and creates a fresh customer.
@@ -212,16 +250,12 @@ func HandleCreateCheckoutSession(c *fiber.Ctx) error {
 		`SELECT plan, status, lifetime FROM stripe_customers WHERE logto_sub = $1`, userID,
 	).Scan(&existingPlan, &existingStatus, &isLifetime)
 
-	if err == nil && existingPlan != "free" && (existingStatus == "active" || existingStatus == "trialing") {
-		// Lifetime members can add an Ultimate or Pro subscription on top
-		// (Ultimate gets 50% off coupon applied below)
-		if isLifetime && (isUltimatePlan(plan) || isProPlan(plan)) {
-			// Allow through
-		} else {
-			return c.Status(fiber.StatusConflict).JSON(ErrorResponse{
-				Status: "error", Error: "You already have an active subscription",
-			})
-		}
+	// Lifetime members can add an Ultimate or Pro subscription on top
+	// (Ultimate gets 50% off coupon applied below)
+	if err == nil && hasSubscriptionConflict(existingPlan, existingStatus, isLifetime, plan) {
+		return c.Status(fiber.StatusConflict).JSON(ErrorResponse{
+			Status: "error", Error: "You already have an active subscription",
+		})
 	}
 
 	// Get email from JWT claims (may be empty)
@@ -320,7 +354,7 @@ func HandleCreateLifetimeCheckout(c *fiber.Ctx) error {
 				Status: "error", Error: "You already have a lifetime membership",
 			})
 		}
-		if existingPlan != "free" && existingStatus == "active" {
+		if hasLifetimeCheckoutConflict(existingPlan, existingStatus, isLifetime) {
 			return c.Status(fiber.StatusConflict).JSON(ErrorResponse{
 				Status: "error", Error: "Please cancel your current subscription before purchasing lifetime",
 			})
@@ -401,15 +435,11 @@ func HandleCreateSetupIntent(c *fiber.Ctx) error {
 		`SELECT plan, status, lifetime FROM stripe_customers WHERE logto_sub = $1`, userID,
 	).Scan(&existingPlan, &existingStatus, &isLifetime)
 
-	if err == nil && existingPlan != "free" && (existingStatus == "active" || existingStatus == "trialing") {
-		// Lifetime members can add Ultimate or Pro on top
-		if isLifetime && (isUltimatePlan(plan) || isProPlan(plan)) {
-			// Allow through
-		} else {
-			return c.Status(fiber.StatusConflict).JSON(ErrorResponse{
-				Status: "error", Error: "You already have an active subscription",
-			})
-		}
+	// Lifetime members can add Ultimate or Pro on top
+	if err == nil && hasSubscriptionConflict(existingPlan, existingStatus, isLifetime, plan) {
+		return c.Status(fiber.StatusConflict).JSON(ErrorResponse{
+			Status: "error", Error: "You already have an active subscription",
+		})
 	}
 
 	email, _ := c.Locals("user_email").(string)
@@ -511,14 +541,11 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 		`SELECT plan, status, lifetime FROM stripe_customers WHERE logto_sub = $1`, userID,
 	).Scan(&existingPlan, &existingStatus, &existingLifetime)
 
-	if err == nil && existingPlan != "free" && (existingStatus == "active" || existingStatus == "trialing") {
-		if existingLifetime && (isUltimatePlan(plan) || isProPlan(plan)) {
-			// Allow lifetime members to add Ultimate or Pro
-		} else {
-			return c.Status(fiber.StatusConflict).JSON(ErrorResponse{
-				Status: "error", Error: "You already have an active subscription",
-			})
-		}
+	// Lifetime members can add Ultimate or Pro on top
+	if err == nil && hasSubscriptionConflict(existingPlan, existingStatus, existingLifetime, plan) {
+		return c.Status(fiber.StatusConflict).JSON(ErrorResponse{
+			Status: "error", Error: "You already have an active subscription",
+		})
 	}
 
 	// Retrieve the SetupIntent and verify ownership
@@ -704,7 +731,7 @@ func HandleCreatePaymentIntent(c *fiber.Ctx) error {
 				Status: "error", Error: "You already have lifetime access",
 			})
 		}
-		if existingPlan != "free" && (existingStatus == "active" || existingStatus == "trialing") {
+		if hasLifetimeCheckoutConflict(existingPlan, existingStatus, existingLifetime) {
 			return c.Status(fiber.StatusConflict).JSON(ErrorResponse{
 				Status: "error", Error: "Please cancel your current subscription before purchasing lifetime",
 			})
