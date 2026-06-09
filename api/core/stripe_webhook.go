@@ -46,22 +46,24 @@ func HandleStripeWebhook(c *fiber.Ctx) error {
 	// it — skip to avoid double-processing. This collapses the previous
 	// check-then-insert flow (which had a race window between the EXISTS probe
 	// and the INSERT) into a single atomic statement.
-	var claimedID string
-	claimErr := DBPool.QueryRow(context.Background(),
-		`INSERT INTO stripe_webhook_events (event_id) VALUES ($1)
-		 ON CONFLICT (event_id) DO NOTHING
-		 RETURNING event_id`,
-		event.ID,
-	).Scan(&claimedID)
-	if claimErr == pgx.ErrNoRows {
-		// Another worker already claimed this event. Skip.
-		log.Printf("[Stripe Webhook] Skipping duplicate event %s (type: %s)", event.ID, event.Type)
-		return c.SendStatus(fiber.StatusOK)
-	}
-	if claimErr != nil {
-		// Some other DB error. Log and proceed — better to double-process than to
-		// drop events. The handlers below are all idempotent.
-		log.Printf("[Stripe Webhook] Failed to claim event idempotency slot: %v", claimErr)
+	if DBPool != nil {
+		var claimedID string
+		claimErr := DBPool.QueryRow(context.Background(),
+			`INSERT INTO stripe_webhook_events (event_id) VALUES ($1)
+			 ON CONFLICT (event_id) DO NOTHING
+			 RETURNING event_id`,
+			event.ID,
+		).Scan(&claimedID)
+		if claimErr == pgx.ErrNoRows {
+			// Another worker already claimed this event. Skip.
+			log.Printf("[Stripe Webhook] Skipping duplicate event %s (type: %s)", event.ID, event.Type)
+			return c.SendStatus(fiber.StatusOK)
+		}
+		if claimErr != nil {
+			// Some other DB error. Log and proceed — better to double-process than to
+			// drop events. The handlers below are all idempotent.
+			log.Printf("[Stripe Webhook] Failed to claim event idempotency slot: %v", claimErr)
+		}
 	}
 
 	switch event.Type {
@@ -161,18 +163,9 @@ func handleCheckoutCompleted(event stripe.Event) {
 	// Assign the appropriate Logto role.
 	// During trial, always grant Ultimate access regardless of selected plan.
 	// When the trial ends, subscription.updated fires and assigns the correct role.
-	if subStatus == "trialing" || plan == "lifetime" || isUltimatePlan(plan) {
-		if err := AssignUltimateRole(logtoSub); err != nil {
-			log.Printf("[Stripe Webhook] Failed to assign uplink_ultimate role to %s: %v", logtoSub, err)
-		}
-	} else if isProPlan(plan) {
-		if err := AssignProRole(logtoSub); err != nil {
-			log.Printf("[Stripe Webhook] Failed to assign uplink_pro role to %s: %v", logtoSub, err)
-		}
-	} else {
-		if err := AssignUplinkRole(logtoSub); err != nil {
-			log.Printf("[Stripe Webhook] Failed to assign uplink role to %s: %v", logtoSub, err)
-		}
+	tier := decideCheckoutTier(subStatus, plan)
+	if err := assignTierRole(logtoSub, tier); err != nil {
+		log.Printf("[Stripe Webhook] Failed to assign %s role to %s: %v", tier, logtoSub, err)
 	}
 
 	// Subscription state changed — overview's tier + subscription
@@ -212,63 +205,38 @@ func handleSubscriptionUpdated(event stripe.Event) {
 	log.Printf("[Stripe Webhook] Subscription updated: user=%s status=%s plan=%s cancel_at_period_end=%v",
 		logtoSub, status, plan, sub.CancelAtPeriodEnd)
 
-	dbStatus := status
-	if sub.CancelAtPeriodEnd {
-		dbStatus = "canceling"
-	}
+	action := decideSubscriptionUpdate(status, sub.CancelAtPeriodEnd, plan)
 
 	_, err := DBPool.Exec(context.Background(),
 		`UPDATE stripe_customers SET
 		   plan = $2, status = $3, current_period_end = $4,
 		   stripe_subscription_id = $5, updated_at = now()
 		 WHERE logto_sub = $1`,
-		logtoSub, plan, dbStatus, periodEnd, sub.ID,
+		logtoSub, plan, action.DBStatus, periodEnd, sub.ID,
 	)
 	if err != nil {
 		log.Printf("[Stripe Webhook] Failed to update subscription for %s: %v", logtoSub, err)
 	}
 
-	// If subscription is active (not canceling), ensure correct role is assigned.
-	newTier := ""
-	if (status == "active" || status == "trialing") && !sub.CancelAtPeriodEnd {
-		if status == "trialing" {
-			// During trial, always grant Ultimate access regardless of selected plan.
-			// This matches checkout.session.completed behavior — trial users get
-			// full access. When the trial ends, this handler fires again with
-			// status="active" and assigns the plan-appropriate role.
-			if err := AssignUltimateRole(logtoSub); err != nil {
-				log.Printf("[Stripe Webhook] Failed to assign trial ultimate role to %s: %v", logtoSub, err)
-			}
-			newTier = "uplink_ultimate"
-		} else {
-			// Active subscription: remove stale roles first to handle plan
-			// up/downgrades cleanly, then assign only the current one.
-			if err := RemoveUplinkRole(logtoSub); err != nil {
-				log.Printf("[Stripe Webhook] Failed to remove uplink role from %s: %v", logtoSub, err)
-			}
-			if err := RemoveProRole(logtoSub); err != nil {
-				log.Printf("[Stripe Webhook] Failed to remove uplink_pro role from %s: %v", logtoSub, err)
-			}
-			if err := RemoveUltimateRole(logtoSub); err != nil {
-				log.Printf("[Stripe Webhook] Failed to remove uplink_ultimate role from %s: %v", logtoSub, err)
-			}
-
-			if isUltimatePlan(plan) {
-				if err := AssignUltimateRole(logtoSub); err != nil {
-					log.Printf("[Stripe Webhook] Failed to assign uplink_ultimate role to %s: %v", logtoSub, err)
-				}
-				newTier = "uplink_ultimate"
-			} else if isProPlan(plan) {
-				if err := AssignProRole(logtoSub); err != nil {
-					log.Printf("[Stripe Webhook] Failed to assign uplink_pro role to %s: %v", logtoSub, err)
-				}
-				newTier = "uplink_pro"
-			} else {
-				if err := AssignUplinkRole(logtoSub); err != nil {
-					log.Printf("[Stripe Webhook] Failed to assign uplink role to %s: %v", logtoSub, err)
-				}
-				newTier = "uplink"
-			}
+	// Active subscriptions remove stale roles first to handle plan
+	// up/downgrades cleanly, then assign only the current one. Trials
+	// always get Ultimate access (matching checkout.session.completed);
+	// when the trial ends, this handler fires again with status="active"
+	// and assigns the plan-appropriate role.
+	if action.ClearPaidRoles {
+		if err := RemoveUplinkRole(logtoSub); err != nil {
+			log.Printf("[Stripe Webhook] Failed to remove uplink role from %s: %v", logtoSub, err)
+		}
+		if err := RemoveProRole(logtoSub); err != nil {
+			log.Printf("[Stripe Webhook] Failed to remove uplink_pro role from %s: %v", logtoSub, err)
+		}
+		if err := RemoveUltimateRole(logtoSub); err != nil {
+			log.Printf("[Stripe Webhook] Failed to remove uplink_ultimate role from %s: %v", logtoSub, err)
+		}
+	}
+	if action.AssignTier != "" {
+		if err := assignTierRole(logtoSub, action.AssignTier); err != nil {
+			log.Printf("[Stripe Webhook] Failed to assign %s role to %s: %v", action.AssignTier, logtoSub, err)
 		}
 	}
 
@@ -276,8 +244,8 @@ func handleSubscriptionUpdated(event stripe.Event) {
 	// This is a no-op for upgrades (higher caps = nothing to trim) and
 	// the safety net for downgrades. Called after role assignment so a
 	// failed Logto call doesn't block the prune.
-	if newTier != "" {
-		PruneUserChannelsForTier(context.Background(), logtoSub, newTier)
+	if action.AssignTier != "" {
+		PruneUserChannelsForTier(context.Background(), logtoSub, action.AssignTier)
 	}
 
 	// Tier and subscription fields in the overview response just changed.
@@ -370,18 +338,9 @@ func handleInvoicePaid(event stripe.Event) {
 		logtoSub,
 	)
 
-	if isUltimatePlan(currentPlan) {
-		if err := AssignUltimateRole(logtoSub); err != nil {
-			log.Printf("[Stripe Webhook] Failed to re-assign uplink_ultimate role to %s: %v", logtoSub, err)
-		}
-	} else if isProPlan(currentPlan) {
-		if err := AssignProRole(logtoSub); err != nil {
-			log.Printf("[Stripe Webhook] Failed to re-assign uplink_pro role to %s: %v", logtoSub, err)
-		}
-	} else {
-		if err := AssignUplinkRole(logtoSub); err != nil {
-			log.Printf("[Stripe Webhook] Failed to re-assign uplink role to %s: %v", logtoSub, err)
-		}
+	tier := tierForPlan(currentPlan)
+	if err := assignTierRole(logtoSub, tier); err != nil {
+		log.Printf("[Stripe Webhook] Failed to re-assign %s role to %s: %v", tier, logtoSub, err)
 	}
 }
 
