@@ -128,6 +128,11 @@ func (s *Server) setupMiddleware() {
 		"/support/ticket":                   true,
 	}
 
+	// Counters live in Redis so all replicas share one per-IP budget
+	// (ADR-0001); the limiters' KeyGenerators keep their keys disjoint
+	// ("oauth:"-prefixed vs bare IP) within the shared prefix.
+	limiterStorage := newRedisLimiterStorage("ratelimit:")
+
 	// Stricter rate limiter for OAuth initiation endpoints (e.g. /yahoo/start).
 	// Applied BEFORE the general rate limiter so it runs first.
 	oauthRateLimitPaths := map[string]bool{
@@ -136,6 +141,7 @@ func (s *Server) setupMiddleware() {
 	s.App.Use(limiter.New(limiter.Config{
 		Max:        OAuthRateLimitMax,
 		Expiration: OAuthRateLimitExpiration,
+		Storage:    limiterStorage,
 		KeyGenerator: func(c *fiber.Ctx) string {
 			return "oauth:" + c.IP()
 		},
@@ -147,6 +153,7 @@ func (s *Server) setupMiddleware() {
 	s.App.Use(limiter.New(limiter.Config{
 		Max:        RateLimitMax,
 		Expiration: RateLimitExpiration,
+		Storage:    limiterStorage,
 		KeyGenerator: func(c *fiber.Ctx) string {
 			return c.IP()
 		},
