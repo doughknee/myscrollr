@@ -57,6 +57,14 @@ const (
 	TopicPrefixRSS     = "cdc:rss:"       // cdc:rss:{feed_url_fnv_hash}
 	TopicPrefixFantasy = "cdc:fantasy:"   // cdc:fantasy:{league_key}
 	TopicPrefixCore    = "cdc:core:user:" // cdc:core:user:{logto_sub}
+
+	// TopicSSEControlResubscribe carries cross-replica SSE control
+	// messages (ADR-0001): payload is the logto sub whose channel config
+	// changed. Every replica receives it and rebuilds that user's topic
+	// subscriptions if it holds an SSE connection for them — without
+	// this, only the replica that served the config-change HTTP request
+	// would refresh, leaving the connection-holding replica stale.
+	TopicSSEControlResubscribe = "sse:ctl:resubscribe"
 )
 
 // =============================================================================
