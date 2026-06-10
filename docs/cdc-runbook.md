@@ -306,16 +306,30 @@ the damage a future Sequin outage can do:
    **Settings** → **Advanced Configuration** → **Edit** → set
    `max_slot_wal_keep_size` to `10240` (the panel takes MB → 10 GB).
 
-   Or via the CLI (the panel's parameter list is authoritative —
-   if the API rejects the key, use the panel):
+   `doctl databases configuration update` is known-broken for this
+   (tested June 2026 against doctl's bundled godo: the API returns
+   `422 the mask must be set with which fields are being updated`).
+   If you want a CLI path, PATCH the API directly — it accepts the
+   single-key body fine:
 
    ```sh
    doctl databases list   # get the cluster UUID
-   doctl databases configuration update <db-uuid> --engine pg \
-     --config-json '{"max_slot_wal_keep_size": 10240}'
+   curl -X PATCH "https://api.digitalocean.com/v2/databases/<db-uuid>/config" \
+     -H "Authorization: Bearer $DIGITALOCEAN_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"config": {"max_slot_wal_keep_size": 10240}}'
+   # expect HTTP 200 with empty body
    ```
 
-2. **Verify it took effect** (psql against the cluster):
+2. **Verify it took effect** — read the config back:
+
+   ```sh
+   curl -s "https://api.digitalocean.com/v2/databases/<db-uuid>/config" \
+     -H "Authorization: Bearer $DIGITALOCEAN_TOKEN" | \
+     jq .config.max_slot_wal_keep_size   # want: 10240, not absent/-1
+   ```
+
+   or via psql against the cluster:
 
    ```sql
    SHOW max_slot_wal_keep_size;   -- want: 10GB, not -1
@@ -331,8 +345,12 @@ Sizing: trades (~40 writes/sec) dominate WAL volume; 10 GB is many
 hours of slot-stall headroom, and both 2026-04 incidents blew well
 past it before detection — so the cap binds long before auto-scale
 billing does. This is managed-cluster config — it cannot be set via
-the regular DATABASE_URL path or from this repo, so it remains a
-manual ops step until someone runs the above.
+the regular DATABASE_URL path or from this repo.
+
+**Status: applied 2026-06-10** to `scrollr-db`
+(8ab18589-09fb-4a7a-aaca-03f2dc5d56a2) via the direct API PATCH
+above; readback confirmed `10240`. If the cluster is ever rebuilt or
+migrated, re-apply and re-verify.
 
 ## Related
 
