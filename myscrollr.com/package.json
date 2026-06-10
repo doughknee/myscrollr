@@ -21,6 +21,8 @@
     "build": "vite build && tsc",
     "postbuild": "node scripts/check-sentry-tunnel.mjs && node scripts/check-prerender.mjs && node scripts/check-mobile-viewport.mjs",
     "serve": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint",
     "format": "prettier",
     "check": "prettier --write . && eslint --fix",
@@ -54,6 +56,7 @@
     "prettier": "^3.5.3",
     "sharp": "^0.34.5",
     "typescript": "^5.9.3",
-    "vite": "^7.1.7"
+    "vite": "^7.1.7",
+    "vitest": "^4.1.8"
   }
 }

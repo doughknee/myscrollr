@@ -53,15 +53,22 @@ cargo build --release && cargo run   # finance=3001, sports=3002, rss=3004
 
 ### Tests
 
-No test infrastructure exists yet. When adding tests:
-
 - **TypeScript** (Vitest): All: `npx vitest run`. File: `npx vitest run path/to/file.test.ts`. Single: `npx vitest run -t "test name"`.
 - **Go**: All: `go test ./...`. File: `go test ./path/to/pkg`. Single: `go test -run TestName ./path/to/pkg`.
 - **Rust**: All: `cargo test`. Single: `cargo test test_name`.
 
+Go integration tests in `api/core` (GDPR purge cascade, Stripe webhook idempotency) need a real Postgres and gate on `TEST_DATABASE_URL` — they skip when it's unset, so plain `go test ./...` always works without a database. To run them locally, point the variable at a scratch database (the tests apply the repo's migrations and truncate the tables they touch — never use a database with real data):
+
+```sh
+TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/scrollr_test?sslmode=disable" go test ./core
+```
+
 ### CI
 
-Desktop releases only (`.github/workflows/desktop-release.yml`). Triggers on push to `main` when `desktop/` changes, or via `workflow_dispatch`. Builds Linux/macOS/Windows via `tauri-action`. Node 22, stable Rust, `npm ci`. No CI for website, Go APIs, or Rust services.
+- `.github/workflows/backend-tests.yml` — Go + Rust tests on every push/PR touching `api/` or `channels/`. The Go jobs get a Postgres 16 service container with `TEST_DATABASE_URL` set, so the `api/core` integration tests run for real in CI.
+- `.github/workflows/frontend-tests.yml` — Vitest suites for `myscrollr.com/` and `desktop/` on every push/PR touching them.
+- `.github/workflows/desktop-release.yml` — desktop releases. Triggers on push to `main` when `desktop/` changes, or via `workflow_dispatch`. Builds Linux/macOS/Windows via `tauri-action`. Node 22, stable Rust, `npm ci`.
+- `.github/workflows/deploy.yml` — builds and deploys the API, channels, and website to production on push to `main`.
 
 ## Code Style — TypeScript
 
