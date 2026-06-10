@@ -37,6 +37,25 @@ jobs:
       run:
         working-directory: ${{ matrix.dir }}
 
+    # Real Postgres for integration tests (currently only api/core has
+    # them — the GDPR purge cascade and Stripe webhook idempotency).
+    # Tests gate on TEST_DATABASE_URL and skip when it's unset, so
+    # `go test ./...` still works locally without a database.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: scrollr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v4
 
@@ -47,6 +66,8 @@ jobs:
           cache-dependency-path: ${{ matrix.dir }}/go.sum
 
       - run: go test ./...
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/scrollr_test?sslmode=disable
 
   # ── Rust tests (3 independent jobs, run in parallel) ───────────
   rust-tests:

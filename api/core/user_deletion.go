@@ -138,6 +138,22 @@ func HandleExportUserData(c *fiber.Ctx) error {
 
 // ─── Soft-delete request lifecycle ──────────────────────────────────
 
+// deletionBlockedBySubscription reports whether a live subscription blocks
+// an account-deletion request. Live (or still-billable) subscription states
+// must be canceled first so we never purge an account Stripe will keep
+// charging. Lifetime members are never blocked — their Stripe row is
+// anonymized at purge time and kept for tax records.
+func deletionBlockedBySubscription(stripeStatus string, lifetime bool) bool {
+	if lifetime {
+		return false
+	}
+	switch stripeStatus {
+	case "active", "trialing", "canceling", "past_due":
+		return true
+	}
+	return false
+}
+
 // HandleRequestAccountDeletion schedules an account for permanent purge
 // after the 30-day grace window. Refuses if the user has a live
 // (non-lifetime) subscription — the UI should tell them to cancel first.
@@ -176,14 +192,11 @@ func HandleRequestAccountDeletion(c *fiber.Ctx) error {
 		`SELECT status, lifetime FROM stripe_customers WHERE logto_sub = $1`,
 		userID,
 	).Scan(&stripeStatus, &lifetime)
-	if !lifetime {
-		switch stripeStatus {
-		case "active", "trialing", "canceling", "past_due":
-			return c.Status(fiber.StatusConflict).JSON(ErrorResponse{
-				Status: "error",
-				Error:  "Cancel your subscription before deleting your account.",
-			})
-		}
+	if deletionBlockedBySubscription(stripeStatus, lifetime) {
+		return c.Status(fiber.StatusConflict).JSON(ErrorResponse{
+			Status: "error",
+			Error:  "Cancel your subscription before deleting your account.",
+		})
 	}
 
 	now := time.Now().UTC()
