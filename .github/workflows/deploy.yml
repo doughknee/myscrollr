@@ -337,6 +337,7 @@ jobs:
           kubectl apply -f k8s/core-api.yaml
           kubectl apply -f k8s/website.yaml
           kubectl apply -f k8s/ingress.yaml
+          kubectl apply -f k8s/network-policies.yaml
 
       # Patch the GIT_SHA key in scrollr-secrets so the next pod restart
       # picks up the deployed commit's SHA as the Sentry release tag.

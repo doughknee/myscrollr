@@ -1,0 +1,242 @@
+# =============================================================================
+# Network policies — enforce the gateway trust model at the network layer
+# =============================================================================
+#
+# The channel APIs trust the `X-User-Sub` header set by the core API proxy
+# (see api/CHANNELS.md). That trust is only sound if nothing except the core
+# API can reach them. These policies make that guarantee real:
+#
+#   ingress-nginx ──► website:3000
+#   ingress-nginx ──► core-api:8080
+#   core-api      ──► {finance,sports,rss,fantasy}-api  (8081-8084)
+#   {channel}-api ──► {channel}-service                  (3001/3002/3004,
+#                                                         health probes)
+#
+# Everything else inbound is denied by the namespace-wide default-deny.
+# Egress is intentionally unrestricted (policyTypes: [Ingress] everywhere) —
+# pods reach the DO-managed Postgres/Redis, Logto, Stripe, and the external
+# data providers, and nothing here touches that.
+#
+# Notes:
+#   - Kubelet liveness/readiness probes and `kubectl port-forward` (used by
+#     scripts/smoke/production-readiness.sh) originate from the node host,
+#     which Cilium (DOKS' CNI) allows regardless of policy.
+#   - cert-manager's HTTP-01 solver pods run in this namespace and must
+#     accept traffic from ingress-nginx, or certificate renewal silently
+#     breaks under default-deny. The last policy covers them.
+#   - Adding a new channel? Copy the channel-API + channel-service pair of
+#     policies and adjust app labels + ports.
+#   - Rollback: kubectl delete -f k8s/network-policies.yaml
+#
+# The ingress-nginx namespace is matched via the automatic
+# kubernetes.io/metadata.name label (k8s >= 1.21).
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: scrollr
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-website
+  namespace: scrollr
+spec:
+  podSelector:
+    matchLabels:
+      app: website
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-core-api
+  namespace: scrollr
+spec:
+  podSelector:
+    matchLabels:
+      app: core-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-core-to-finance-api
+  namespace: scrollr
+spec:
+  podSelector:
+    matchLabels:
+      app: finance-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: core-api
+      ports:
+        - protocol: TCP
+          port: 8081
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-core-to-sports-api
+  namespace: scrollr
+spec:
+  podSelector:
+    matchLabels:
+      app: sports-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: core-api
+      ports:
+        - protocol: TCP
+          port: 8082
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-core-to-rss-api
+  namespace: scrollr
+spec:
+  podSelector:
+    matchLabels:
+      app: rss-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: core-api
+      ports:
+        - protocol: TCP
+          port: 8083
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-core-to-fantasy-api
+  namespace: scrollr
+spec:
+  podSelector:
+    matchLabels:
+      app: fantasy-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: core-api
+      ports:
+        - protocol: TCP
+          port: 8084
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-finance-api-to-finance-service
+  namespace: scrollr
+spec:
+  podSelector:
+    matchLabels:
+      app: finance-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: finance-api
+      ports:
+        - protocol: TCP
+          port: 3001
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-sports-api-to-sports-service
+  namespace: scrollr
+spec:
+  podSelector:
+    matchLabels:
+      app: sports-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: sports-api
+      ports:
+        - protocol: TCP
+          port: 3002
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-rss-api-to-rss-service
+  namespace: scrollr
+spec:
+  podSelector:
+    matchLabels:
+      app: rss-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: rss-api
+      ports:
+        - protocol: TCP
+          port: 3004
+---
+# cert-manager HTTP-01 solver pods are created on demand in this namespace
+# during certificate issuance/renewal. Without this, the namespace-wide
+# default-deny blocks the ACME challenge and certs stop renewing.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-acme-solver
+  namespace: scrollr
+spec:
+  podSelector:
+    matchLabels:
+      acme.cert-manager.io/http01-solver: "true"
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
