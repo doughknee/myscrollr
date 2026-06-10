@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import snapshot from "../../api/core/tier_limits.json";
 import {
   TIER_LIMITS,
   getLimit,
@@ -151,6 +152,30 @@ describe("TIER_LIMITS table", () => {
     for (const tier of tiers) {
       expect(TIER_LIMITS[tier]).toBeDefined();
     }
+  });
+
+  // Cross-language drift guard. api/core/tier_limits.json is the shared
+  // snapshot of the backend's DefaultTierLimits (api/core/tier_limits.go);
+  // a Go test pins the Go map to it and a myscrollr.com test pins the
+  // pricing page's FALLBACK_LIMITS to it. This test closes the loop for
+  // the desktop mirror. Infinity here corresponds to null on the wire.
+  it("matches the shared snapshot api/core/tier_limits.json exactly", () => {
+    const toWire = (n: number) => (n === Infinity ? null : n);
+    const wire = Object.fromEntries(
+      Object.entries(TIER_LIMITS).map(([tier, l]) => [
+        tier,
+        {
+          symbols: toWire(l.symbols),
+          feeds: toWire(l.feeds),
+          custom_feeds: toWire(l.customFeeds),
+          leagues: toWire(l.leagues),
+          fantasy: toWire(l.fantasy),
+          max_ticker_rows: l.maxTickerRows,
+          max_ticker_customization: l.maxTickerCustomization,
+        },
+      ])
+    );
+    expect(wire).toEqual(snapshot.tiers);
   });
 
   it("super_user matches or exceeds every other tier on every numeric key", () => {

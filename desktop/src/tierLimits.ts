@@ -12,9 +12,11 @@ import type { SubscriptionTier } from "./auth";
 //
 // If you change a number here, you MUST also update:
 //   - api/core/tier_limits.go        (the Go map)
+//   - api/core/tier_limits.json      (shared sync snapshot — the test in
+//     tierLimits.test.ts pins this file to it, so CI catches drift)
 //   - api/core/tier_limits_test.go   (the assertion)
-//   - myscrollr.com/src/routes/uplink.tsx (the FALLBACK_LIMITS constant,
-//     for first-paint before the runtime fetch resolves)
+//   - myscrollr.com/src/lib/fallbackTierLimits.ts (the FALLBACK_LIMITS
+//     constant, for first-paint before the runtime fetch resolves)
 //
 // Infinity here corresponds to `null` on the wire (null round-trips
 // through JSON; Infinity does not).

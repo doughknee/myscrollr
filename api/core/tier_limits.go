@@ -28,9 +28,12 @@ type TierLimitsResponse struct {
 // DefaultTierLimits is the authoritative source of truth for per-tier caps.
 //
 // SOURCE OF TRUTH — any change here MUST also propagate to:
+//   - api/core/tier_limits.json     (shared sync snapshot — a Go test and
+//     both frontends' Vitest suites pin their copies to it, so CI fails
+//     on whichever side was left stale)
 //   - desktop/src/tierLimits.ts     (kept in sync manually; synchronous
 //     reads required by config panels during render)
-//   - myscrollr.com/src/routes/uplink.tsx (`FALLBACK_LIMITS` constant,
+//   - myscrollr.com/src/lib/fallbackTierLimits.ts (`FALLBACK_LIMITS`,
 //     used only for first-paint while the API response is in flight)
 //   - api/core/tier_limits_test.go  (assertion protecting this table
 //     from silent edits — run `go test ./core/...` after any change)
