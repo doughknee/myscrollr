@@ -298,20 +298,41 @@ report the publication as unhealthy without it.
 ## Prevention: bounding WAL growth
 
 DO's managed Postgres defaults `max_slot_wal_keep_size` to `-1` (no
-limit). This means any stale slot holds WAL indefinitely. To cap the
-damage a future Sequin outage can do:
+limit). This means any stale slot holds WAL indefinitely — this has
+already caused two billing incidents (see "Failure modes"). To cap
+the damage a future Sequin outage can do:
 
-1. Via DO control panel → your db cluster → **Settings** → **Database
-   configuration** → set `max_slot_wal_keep_size` to something like
-   `10GB` (or via `doctl databases configuration update`).
-2. With this set, Postgres will forcibly break any slot whose
+1. **Set the cap.** DO control panel → `scrollr-db` cluster →
+   **Settings** → **Advanced Configuration** → **Edit** → set
+   `max_slot_wal_keep_size` to `10240` (the panel takes MB → 10 GB).
+
+   Or via the CLI (the panel's parameter list is authoritative —
+   if the API rejects the key, use the panel):
+
+   ```sh
+   doctl databases list   # get the cluster UUID
+   doctl databases configuration update <db-uuid> --engine pg \
+     --config-json '{"max_slot_wal_keep_size": 10240}'
+   ```
+
+2. **Verify it took effect** (psql against the cluster):
+
+   ```sql
+   SHOW max_slot_wal_keep_size;   -- want: 10GB, not -1
+   ```
+
+3. With this set, Postgres will forcibly break any slot whose
    `restart_lsn` falls more than 10 GB behind current WAL. Sequin
    will then see a `wal_removed` error on reconnect — which is loud,
-   obvious, and fixable via slot recreate. Way better than silent
-   billing.
+   obvious, and fixable via slot recreate (see "Recovery"). Way
+   better than silent billing.
 
-This is a manual control-panel change; I can't set it via the regular
-DATABASE_URL path. Putting it on the "follow-up ops task" list.
+Sizing: trades (~40 writes/sec) dominate WAL volume; 10 GB is many
+hours of slot-stall headroom, and both 2026-04 incidents blew well
+past it before detection — so the cap binds long before auto-scale
+billing does. This is managed-cluster config — it cannot be set via
+the regular DATABASE_URL path or from this repo, so it remains a
+manual ops step until someone runs the above.
 
 ## Related
 
