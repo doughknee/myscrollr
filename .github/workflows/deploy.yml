@@ -45,7 +45,7 @@ jobs:
       fantasy-api: ${{ steps.manual.outputs.fantasy-api || steps.changes.outputs.fantasy-api }}
       k8s: ${{ steps.manual.outputs.k8s || steps.changes.outputs.k8s }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Resolve manual service selection
         id: manual
@@ -102,7 +102,7 @@ jobs:
             esac
           done
 
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: changes
         if: github.event_name == 'push'
         with:
@@ -177,7 +177,7 @@ jobs:
         if: matrix.changed != 'true'
         run: echo "Skipping ${{ matrix.service }} — no changes detected"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         if: matrix.changed == 'true'
 
       - name: Install doctl
@@ -310,7 +310,7 @@ jobs:
     needs: [detect-changes, build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
