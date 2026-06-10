@@ -7,12 +7,17 @@ on:
       - "api/**"
       - "channels/**/*.go"
       - "channels/**/*.rs"
+      # Run on edits to this workflow itself — the setup-go@v6 bump broke
+      # all five Go jobs and nothing noticed until an unrelated PR touched
+      # api/**.
+      - ".github/workflows/backend-tests.yml"
   pull_request:
     branches: [main]
     paths:
       - "api/**"
       - "channels/**/*.go"
       - "channels/**/*.rs"
+      - ".github/workflows/backend-tests.yml"
 
 jobs:
   # ── Go tests (5 independent jobs, run in parallel) ─────────────
@@ -21,15 +26,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # `dir` is where tests run; `modroot` is the module root holding
+          # go.mod/go.sum (api/core is a package inside the api module).
           - dir: api/core
+            modroot: api
             module: github.com/brandon-relentnet/myscrollr/api
           - dir: channels/finance/api
+            modroot: channels/finance/api
             module: github.com/brandon-relentnet/scrollr-finance
           - dir: channels/sports/api
+            modroot: channels/sports/api
             module: github.com/brandon-relentnet/scrollr-sports
           - dir: channels/rss/api
+            modroot: channels/rss/api
             module: github.com/brandon-relentnet/scrollr-rss
           - dir: channels/fantasy/api
+            modroot: channels/fantasy/api
             module: github.com/brandon-relentnet/scrollr-fantasy
 
     runs-on: ubuntu-latest
@@ -59,11 +71,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Read the Go version from each module's go.mod instead of pinning
+      # it here. setup-go@v6 defaults GOTOOLCHAIN=local, so a stale pin
+      # fails hard ("go.mod requires go >= X") rather than silently
+      # auto-downloading the right toolchain like v5 did.
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.21"
+          go-version-file: ${{ matrix.modroot }}/go.mod
           cache: true
-          cache-dependency-path: ${{ matrix.dir }}/go.sum
+          cache-dependency-path: ${{ matrix.modroot }}/go.sum
 
       - run: go test ./...
         env:
