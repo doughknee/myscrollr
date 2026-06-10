@@ -112,8 +112,9 @@ func addChannelSubscriptions(ctx context.Context, logtoSub, channelType string, 
 		}
 	}
 
-	// Rebuild topic subscriptions so active SSE connections get the new channel
-	UpdateUserTopicSubscriptions(logtoSub)
+	// Rebuild topic subscriptions on every replica holding an SSE
+	// connection for this user (Redis control message, ADR-0001)
+	NotifyTopicSubscriptionChange(logtoSub)
 
 	enabled := true
 	callChannelLifecycle(ctx, channelType, "sync", logtoSub, config, nil, &enabled)
@@ -139,8 +140,10 @@ func removeChannelSubscriptions(ctx context.Context, logtoSub, channelType strin
 		}
 	}
 
-	// Rebuild topic subscriptions so active SSE connections stop receiving this channel
-	UpdateUserTopicSubscriptions(logtoSub)
+	// Rebuild topic subscriptions on every replica so active SSE
+	// connections stop receiving this channel (Redis control message,
+	// ADR-0001)
+	NotifyTopicSubscriptionChange(logtoSub)
 
 	enabled := false
 	callChannelLifecycle(ctx, channelType, "sync", logtoSub, config, nil, &enabled)

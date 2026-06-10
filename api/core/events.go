@@ -127,8 +127,9 @@ func (h *Hub) dispatchWorker(ctx context.Context) {
 	}
 }
 
-// listenToTopics subscribes to all CDC topic patterns and dispatches to
-// registered clients based on the topic subscription registry.
+// listenToTopics subscribes to all CDC topic patterns plus the SSE
+// control channel and dispatches to registered clients based on the
+// topic subscription registry.
 func (h *Hub) listenToTopics(ctx context.Context) {
 	pubsub := PSubscribe(ctx,
 		TopicPrefixFinance+"*",
@@ -136,14 +137,15 @@ func (h *Hub) listenToTopics(ctx context.Context) {
 		TopicPrefixRSS+"*",
 		TopicPrefixFantasy+"*",
 		TopicPrefixCore+"*",
+		TopicSSEControlResubscribe,
 	)
 	defer pubsub.Close()
 
 	ch := pubsub.Channel()
 
-	log.Printf("[EventHub] Listening to topic patterns: %s* %s* %s* %s* %s*",
+	log.Printf("[EventHub] Listening to topic patterns: %s* %s* %s* %s* %s* + %s",
 		TopicPrefixFinance, TopicPrefixSports, TopicPrefixRSS,
-		TopicPrefixFantasy, TopicPrefixCore)
+		TopicPrefixFantasy, TopicPrefixCore, TopicSSEControlResubscribe)
 
 	for {
 		select {
@@ -153,41 +155,53 @@ func (h *Hub) listenToTopics(ctx context.Context) {
 			if !ok {
 				return
 			}
+			h.handleTopicMessage(msg.Channel, []byte(msg.Payload))
+		}
+	}
+}
 
-			topic := msg.Channel
-			payload := []byte(msg.Payload)
+// handleTopicMessage routes a single pub/sub message. Split from
+// listenToTopics so tests can exercise routing without a live Redis
+// subscription loop.
+func (h *Hub) handleTopicMessage(topic string, payload []byte) {
+	// Control message: a user's channel config changed somewhere in the
+	// fleet (ADR-0001). Rebuild local topic subscriptions; replicas
+	// holding no connection for the user no-op inside
+	// UpdateUserTopicSubscriptions.
+	if topic == TopicSSEControlResubscribe {
+		UpdateUserTopicSubscriptions(string(payload))
+		return
+	}
 
-			// Special case: core user-specific topics (user_preferences, user_channels).
-			// These target a single user directly -- no registry lookup needed.
-			if strings.HasPrefix(topic, TopicPrefixCore) {
-				userID := topic[len(TopicPrefixCore):]
-				select {
-				case h.dispatchCh <- dispatchJob{userID: userID, payload: payload}:
-				default:
-					// Queue full — drop to avoid blocking the listener.
-					// Rate-limited log so the drop is observable without
-					// flooding logs when the queue saturates.
-					logDispatchDrop()
-				}
-				continue
-			}
+	// Special case: core user-specific topics (user_preferences, user_channels).
+	// These target a single user directly -- no registry lookup needed.
+	if strings.HasPrefix(topic, TopicPrefixCore) {
+		userID := topic[len(TopicPrefixCore):]
+		select {
+		case h.dispatchCh <- dispatchJob{userID: userID, payload: payload}:
+		default:
+			// Queue full — drop to avoid blocking the listener.
+			// Rate-limited log so the drop is observable without
+			// flooding logs when the queue saturates.
+			logDispatchDrop()
+		}
+		return
+	}
 
-			// Look up all users subscribed to this topic
-			users := h.registry.getUsersForTopic(topic)
-			if users == nil {
-				continue
-			}
+	// Look up all users subscribed to this topic
+	users := h.registry.getUsersForTopic(topic)
+	if users == nil {
+		return
+	}
 
-			// Fan-out via worker pool (non-blocking enqueue)
-			for userID := range users {
-				select {
-				case h.dispatchCh <- dispatchJob{userID: userID, payload: payload}:
-				default:
-					// Queue full — drop oldest-style backpressure.
-					// Rate-limited log so the drop is observable.
-					logDispatchDrop()
-				}
-			}
+	// Fan-out via worker pool (non-blocking enqueue)
+	for userID := range users {
+		select {
+		case h.dispatchCh <- dispatchJob{userID: userID, payload: payload}:
+		default:
+			// Queue full — drop oldest-style backpressure.
+			// Rate-limited log so the drop is observable.
+			logDispatchDrop()
 		}
 	}
 }
@@ -337,15 +351,33 @@ func UnsubscribeFromTopic(userID, topic string) {
 	globalHub.registry.unsubscribe(userID, topic)
 }
 
-// UpdateUserTopicSubscriptions rebuilds a user's topic subscriptions.
-// Called from channel CRUD handlers when a user modifies their channels.
-// Only operates if the user has an active SSE connection.
+// UpdateUserTopicSubscriptions rebuilds a user's topic subscriptions on
+// THIS replica. Only operates if the user has an active SSE connection
+// here — which is why channel CRUD handlers must not call it directly:
+// with multiple replicas, the HTTP request and the SSE connection can
+// live on different pods. Reached via NotifyTopicSubscriptionChange →
+// Redis control message → handleTopicMessage, so every replica runs it
+// (ADR-0001).
 func UpdateUserTopicSubscriptions(userID string) {
 	if _, ok := globalHub.clients.Load(userID); !ok {
-		return // No active connection, nothing to update
+		return // No active connection on this replica, nothing to update
 	}
 	globalHub.registry.unsubscribeAll(userID)
 	go subscribeUserToTopics(userID)
+}
+
+// NotifyTopicSubscriptionChange tells every replica to rebuild the
+// user's SSE topic subscriptions after a channel config change. Goes
+// through Redis pub/sub so the replica holding the user's SSE
+// connection refreshes even when this HTTP request was served by a
+// different replica (ADR-0001). Falls back to a local refresh if the
+// publish fails, so a Redis hiccup never makes a single replica worse
+// than the old direct call.
+func NotifyTopicSubscriptionChange(userID string) {
+	if err := PublishRaw(TopicSSEControlResubscribe, []byte(userID)); err != nil {
+		log.Printf("[EventHub] resubscribe publish failed for %s (falling back to local refresh): %v", userID, err)
+		UpdateUserTopicSubscriptions(userID)
+	}
 }
 
 // RouteToRecordOwner sends a CDC event directly to the user identified in the record.
