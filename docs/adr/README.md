@@ -7,4 +7,4 @@ one.
 
 | ADR | Title | Status |
 |-----|-------|--------|
-| [0001](0001-sse-multi-replica.md) | Scaling core-api SSE delivery past one replica | Proposed |
+| [0001](0001-sse-multi-replica.md) | Scaling core-api SSE delivery past one replica | Accepted |

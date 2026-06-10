@@ -1,6 +1,6 @@
 # ADR-0001: Scaling core-api SSE delivery past one replica
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-10
 **Deciders:** Brandon Harris
 
