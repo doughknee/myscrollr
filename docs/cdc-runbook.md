@@ -17,9 +17,15 @@ Sequin (self-hosted on scrollr-infra Coolify, sequin.myscrollr.com)
         │
         │  HTTP POST /webhooks/sequin with SEQUIN_WEBHOOK_SECRET
         ▼
-core-api (k8s, scrollr/core-api)
+core-api (k8s, scrollr/core-api — ANY replica receives the webhook)
   └── `handlers_webhook.go::HandleSequinWebhook`
-  └── routes to Redis topic PubSub: cdc:finance:*, cdc:sports:*, etc.
+  └── publishes to Redis topic PubSub: cdc:finance:*, cdc:sports:*, etc.
+        │
+        ▼
+Redis pub/sub ──▶ EVERY core-api replica PSUBSCRIBEs the cdc:* patterns
+  └── each replica fans out in-process to its own SSE connections
+  └── channel-config changes broadcast `sse:ctl:resubscribe` so the
+      replica holding the user's stream refreshes (ADR-0001)
         │
         ▼
 Desktop client via SSE (`/events/dashboard`)
