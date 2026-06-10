@@ -455,8 +455,13 @@ func HandleGetOverview(c *fiber.Ctx) error {
 
 	// Fast path: serve from Redis. We use raw bytes (Send) instead of
 	// JSON-decode-then-re-encode so cache hits are zero-copy.
+	//
+	// UserContext (not c.Context()): the fasthttp RequestCtx doubles as a
+	// context.Context tied to the connection, which Fiber's app.Test
+	// reports as already-canceled — and the rest of this package passes
+	// explicit contexts to DB/Redis calls anyway.
 	if Rdb != nil {
-		if cached, err := Rdb.Get(c.Context(), cacheKey).Bytes(); err == nil {
+		if cached, err := Rdb.Get(c.UserContext(), cacheKey).Bytes(); err == nil {
 			c.Set("X-Cache", "hit")
 			c.Set("Content-Type", "application/json")
 			return c.Send(cached)
@@ -468,7 +473,7 @@ func HandleGetOverview(c *fiber.Ctx) error {
 	// Slow path: singleflight ensures concurrent misses for the same
 	// user assemble exactly once.
 	result, err, _ := overviewGroup.Do(userID, func() (interface{}, error) {
-		return assembleOverview(c.Context(), c, userID)
+		return assembleOverview(c.UserContext(), c, userID)
 	})
 	if err != nil {
 		log.Printf("[Overview] assemble for %s: %v", userID, err)
@@ -495,7 +500,7 @@ func HandleGetOverview(c *fiber.Ctx) error {
 	}
 
 	if Rdb != nil {
-		if setErr := Rdb.Set(c.Context(), cacheKey, payload, OverviewCacheTTL).Err(); setErr != nil {
+		if setErr := Rdb.Set(c.UserContext(), cacheKey, payload, OverviewCacheTTL).Err(); setErr != nil {
 			log.Printf("[Overview] cache write for %s: %v", userID, setErr)
 		}
 	}

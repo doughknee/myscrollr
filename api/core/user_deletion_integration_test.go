@@ -2,16 +2,13 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // =============================================================================
@@ -19,72 +16,22 @@ import (
 // =============================================================================
 //
 // These tests exercise the real SQL against a real PostgreSQL database and
-// are skipped when TEST_DATABASE_URL is unset. CI provides a postgres
-// service container (.github/workflows/backend-tests.yml). Locally:
-//
-//   TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5433/scrollr_test?sslmode=disable" go test ./core
-//
-// The database is prepared with the repo's actual migrations — core plus
-// the fantasy channel's (the purge cascade deletes from yahoo_* tables,
-// which the fantasy service owns in the shared production database).
-// Logto is stubbed with a local HTTP server via LOGTO_ENDPOINT.
+// are skipped when TEST_DATABASE_URL is unset. TestMain (main_test.go)
+// owns the database connection and migrations. Logto is stubbed with a
+// local HTTP server via LOGTO_ENDPOINT.
 
-var integrationMigrateOnce sync.Once
-
-// integrationMigrateURL appends sslmode + a migrations-table override the
-// same way ConnectDB does, tolerating URLs with or without existing params.
-func integrationMigrateURL(dbURL, table string) string {
-	u := dbURL
-	if !strings.Contains(u, "sslmode=") {
-		if strings.Contains(u, "?") {
-			u += "&sslmode=disable"
-		} else {
-			u += "?sslmode=disable"
-		}
-	}
-	return u + "&x-migrations-table=" + table
-}
-
-// setupIntegrationDB connects DBPool to the test database, applies
-// migrations once per test binary, and truncates all tables the purge
-// cascade touches so each test starts clean. Skips when no test database
-// is configured.
+// setupIntegrationDB skips unless TestMain put the package in integration
+// mode, then truncates every table the integration tests touch so each
+// test starts clean.
 func setupIntegrationDB(t *testing.T) {
 	t.Helper()
-	dbURL := os.Getenv("TEST_DATABASE_URL")
-	if dbURL == "" {
+	if DBPool == nil {
 		t.Skip("TEST_DATABASE_URL not set — skipping integration test")
 	}
-
-	integrationMigrateOnce.Do(func() {
-		for _, src := range []struct{ path, table string }{
-			{"file://../migrations", "schema_migrations_core"},
-			{"file://../../channels/fantasy/api/migrations", "schema_migrations_fantasy"},
-		} {
-			m, err := migrate.New(src.path, integrationMigrateURL(dbURL, src.table))
-			if err != nil {
-				t.Fatalf("create migrator for %s: %v", src.path, err)
-			}
-			if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-				m.Close()
-				t.Fatalf("migrate %s: %v", src.path, err)
-			}
-			m.Close()
-		}
-	})
-
-	pool, err := pgxpool.New(context.Background(), dbURL)
-	if err != nil {
-		t.Fatalf("connect test database: %v", err)
+	if testMiniRedis != nil {
+		testMiniRedis.FlushAll()
 	}
-	prev := DBPool
-	DBPool = pool
-	t.Cleanup(func() {
-		DBPool = prev
-		pool.Close()
-	})
-
-	_, err = pool.Exec(context.Background(), `
+	_, err := DBPool.Exec(context.Background(), `
 		TRUNCATE TABLE user_channels, user_preferences, stripe_customers,
 		               stripe_webhook_events, user_deletion_requests,
 		               yahoo_user_leagues, yahoo_users, yahoo_leagues CASCADE
@@ -94,11 +41,14 @@ func setupIntegrationDB(t *testing.T) {
 	}
 }
 
-// logtoStub fakes the two Logto Management API endpoints the purge path
-// uses: the M2M token grant and the user delete.
+// logtoStub fakes the Logto Management API endpoints the webhook and
+// purge paths use: the M2M token grant, user delete, and role
+// assignment/removal. Role calls are recorded as "sub:roleID" strings.
 type logtoStub struct {
 	mu         sync.Mutex
 	deleted    []string
+	assigned   []string
+	removed    []string
 	failDelete bool
 }
 
@@ -107,6 +57,25 @@ func (s *logtoStub) deletedSubs() []string {
 	defer s.mu.Unlock()
 	return append([]string(nil), s.deleted...)
 }
+
+func (s *logtoStub) assignedRoles() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.assigned...)
+}
+
+func (s *logtoStub) removedRoles() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.removed...)
+}
+
+// Role IDs the stub environment configures — tests assert against these.
+const (
+	stubRoleUplink   = "role-uplink"
+	stubRolePro      = "role-pro"
+	stubRoleUltimate = "role-ultimate"
+)
 
 func newLogtoStub(t *testing.T) *logtoStub {
 	t.Helper()
@@ -117,21 +86,42 @@ func newLogtoStub(t *testing.T) *logtoStub {
 		_, _ = w.Write([]byte(`{"access_token":"test-m2m-token","expires_in":3600}`))
 	})
 	mux.HandleFunc("/api/users/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodDelete {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
+		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/users/"), "/")
+		switch {
+		// DELETE /api/users/{sub} — account deletion
+		case len(parts) == 1 && r.Method == http.MethodDelete:
+			s.mu.Lock()
+			fail := s.failDelete
+			if !fail {
+				s.deleted = append(s.deleted, parts[0])
+			}
+			s.mu.Unlock()
+			if fail {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		// POST /api/users/{sub}/roles — assign roles
+		case len(parts) == 2 && parts[1] == "roles" && r.Method == http.MethodPost:
+			var body struct {
+				RoleIDs []string `json:"roleIds"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			s.mu.Lock()
+			for _, id := range body.RoleIDs {
+				s.assigned = append(s.assigned, parts[0]+":"+id)
+			}
+			s.mu.Unlock()
+			w.WriteHeader(http.StatusCreated)
+		// DELETE /api/users/{sub}/roles/{roleID} — remove role
+		case len(parts) == 3 && parts[1] == "roles" && r.Method == http.MethodDelete:
+			s.mu.Lock()
+			s.removed = append(s.removed, parts[0]+":"+parts[2])
+			s.mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusNotFound)
 		}
-		s.mu.Lock()
-		fail := s.failDelete
-		if !fail {
-			s.deleted = append(s.deleted, strings.TrimPrefix(r.URL.Path, "/api/users/"))
-		}
-		s.mu.Unlock()
-		if fail {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusNoContent)
 	})
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
@@ -139,6 +129,9 @@ func newLogtoStub(t *testing.T) *logtoStub {
 	t.Setenv("LOGTO_ENDPOINT", server.URL)
 	t.Setenv("LOGTO_M2M_APP_ID", "test-app")
 	t.Setenv("LOGTO_M2M_APP_SECRET", "test-secret")
+	t.Setenv("LOGTO_UPLINK_ROLE_ID", stubRoleUplink)
+	t.Setenv("LOGTO_PRO_ROLE_ID", stubRolePro)
+	t.Setenv("LOGTO_ULTIMATE_ROLE_ID", stubRoleUltimate)
 
 	// Drop any M2M token cached by a previous test so this test's stub
 	// issues its own.

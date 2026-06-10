@@ -3,7 +3,9 @@ package core
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
+	"time"
 )
 
 // TestDefaultTierLimits_Exact pins the numeric values shipped to production.
@@ -128,22 +130,52 @@ func sportsCfg(n int) map[string]any {
 	return map[string]any{"leagues": lgs}
 }
 
-// Helper: build an RSS config with `total` feeds where `custom` of them are user-added.
+// curatedFixtureURL is pinned into the curated-URL cache by
+// TestValidateChannelConfig_Boundaries so is_custom derivation is
+// deterministic (see pinCuratedFixture).
+const curatedFixtureURL = "https://curated.example.com/feed"
+
+// Helper: build an RSS config with `total` feeds where `custom` of them are
+// user-added. Custom feeds get distinct non-curated URLs so the server-side
+// derivation (URL ∉ curated set → custom) classifies them the same way the
+// client-asserted flag does.
 func rssCfg(total, custom int) map[string]any {
 	feeds := make([]any, total)
 	for i := range feeds {
-		m := map[string]any{"name": "F", "url": "https://example.com/feed"}
+		m := map[string]any{"name": "F", "url": curatedFixtureURL}
 		if i < custom {
 			m["is_custom"] = true
+			m["url"] = fmt.Sprintf("https://custom.example.com/feed/%d", i)
 		}
 		feeds[i] = m
 	}
 	return map[string]any{"feeds": feeds}
 }
 
+// pinCuratedFixture pins the curated-URL cache to exactly the fixture URL
+// for the duration of the test. This makes the rss cases exercise the
+// production path (server-side is_custom derivation from the curated
+// catalog) identically in unit mode (no DB → cache would be nil and fall
+// back to client trust) and integration mode (DB present but tracked_feeds
+// empty → every URL would look custom).
+func pinCuratedFixture(t *testing.T) {
+	t.Helper()
+	curatedFeedURLsMu.Lock()
+	prevCache, prevExpires := curatedFeedURLsCache, curatedFeedURLsExpires
+	curatedFeedURLsCache = map[string]bool{curatedFixtureURL: true}
+	curatedFeedURLsExpires = time.Now().Add(time.Hour)
+	curatedFeedURLsMu.Unlock()
+	t.Cleanup(func() {
+		curatedFeedURLsMu.Lock()
+		curatedFeedURLsCache, curatedFeedURLsExpires = prevCache, prevExpires
+		curatedFeedURLsMu.Unlock()
+	})
+}
+
 // TestValidateChannelConfig_Boundaries confirms that exactly-at-limit is
 // accepted and one-over is rejected for every enforced channel/tier pair.
 func TestValidateChannelConfig_Boundaries(t *testing.T) {
+	pinCuratedFixture(t)
 	cases := []struct {
 		name        string
 		tier        string
