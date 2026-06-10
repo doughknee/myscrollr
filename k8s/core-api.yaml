@@ -6,7 +6,18 @@ metadata:
   labels:
     app: core-api
 spec:
-  replicas: 1
+  # Two replicas for HA and zero-drop deploys (ADR-0001). Safe because
+  # SSE fan-out rides Redis pub/sub per replica, channel-config changes
+  # broadcast resubscribes via sse:ctl:resubscribe, and rate-limit
+  # counters live in Redis — no remaining state assumes a single pod.
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Never drop below the replica count during rollouts: surge a new
+      # pod first, kill an old one only after the new one is Ready.
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: core-api
@@ -85,3 +96,16 @@ spec:
     - port: 8080
       targetPort: 8080
   type: ClusterIP
+---
+# Keep at least one core-api pod through voluntary disruptions (node
+# drains, cluster upgrades) — the whole API surface routes through it.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: core-api
+  namespace: scrollr
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: core-api
