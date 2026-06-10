@@ -11,6 +11,9 @@ on:
       # Tier-limit drift guard: both frontends pin their hardcoded tier
       # tables to this snapshot, so an edit to it must re-run their tests.
       - "api/core/tier_limits.json"
+      # Self-trigger on workflow edits (same gap that let the setup-go@v6
+      # breakage ship silently in backend-tests).
+      - ".github/workflows/frontend-tests.yml"
   pull_request:
     branches: [main]
     paths:
@@ -21,6 +24,9 @@ on:
       # Tier-limit drift guard: both frontends pin their hardcoded tier
       # tables to this snapshot, so an edit to it must re-run their tests.
       - "api/core/tier_limits.json"
+      # Self-trigger on workflow edits (same gap that let the setup-go@v6
+      # breakage ship silently in backend-tests).
+      - ".github/workflows/frontend-tests.yml"
 
 jobs:
   vitest:
