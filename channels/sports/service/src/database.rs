@@ -1,9 +1,9 @@
-use std::{env, time::Duration, sync::Arc};
+use std::{collections::HashMap, env, time::Duration, sync::Arc};
 use anyhow::{Context, Result};
 use sqlx::postgres::PgPoolOptions;
 pub use sqlx::PgPool;
 use sqlx::{FromRow, query, query_as};
-use chrono::Utc;
+use chrono::{NaiveDate, Utc};
 use serde::Deserialize;
 
 /// Build the sqlx migrator for this service.
@@ -418,6 +418,79 @@ pub async fn cleanup_old_games(pool: &Arc<PgPool>) -> Result<u64> {
     )
     .execute(&mut *connection)
     .await?;
+    Ok(result.rows_affected())
+}
+
+// =============================================================================
+// Rate budget persistence — sports_rate_budget (host, UTC day) → consumed
+// =============================================================================
+
+/// Load today's (UTC) consumed request count per host. Used once on startup
+/// to seed the RateLimiter so a mid-day restart resumes from the quota
+/// actually spent instead of a fresh full budget.
+///
+/// Errors are logged and yield an empty map (fail open: the service starts
+/// with full budgets, which is exactly the pre-persistence behavior). The
+/// header clamp in RateLimiter::update still catches the overshoot.
+pub async fn get_consumed_today(pool: &Arc<PgPool>) -> HashMap<String, u32> {
+    let today = Utc::now().date_naive();
+    let result: Result<Vec<(String, i32)>, sqlx::Error> = async {
+        let mut conn = pool.acquire().await?;
+        let rows = query_as("SELECT host, consumed FROM sports_rate_budget WHERE day = $1")
+            .bind(today)
+            .fetch_all(&mut *conn)
+            .await?;
+        Ok(rows)
+    }.await;
+
+    match result {
+        Ok(rows) => rows
+            .into_iter()
+            .map(|(host, consumed)| (host, consumed.max(0) as u32))
+            .collect(),
+        Err(e) => {
+            log::error!("Failed to load persisted rate-budget consumption, starting from full quota: {}", e);
+            HashMap::new()
+        }
+    }
+}
+
+/// Add per-host consumption deltas to the given UTC day's rows. Additive
+/// upsert (`consumed + delta`, not overwrite) so flushes are safe even if
+/// another writer touched the row between flushes.
+pub async fn add_consumed(
+    pool: &Arc<PgPool>,
+    day: NaiveDate,
+    deltas: &HashMap<String, u32>,
+) -> Result<()> {
+    let mut conn = pool.acquire().await?;
+    for (host, delta) in deltas {
+        query(
+            "INSERT INTO sports_rate_budget (host, day, consumed)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (host, day) DO UPDATE SET
+                 consumed = sports_rate_budget.consumed + EXCLUDED.consumed,
+                 updated_at = NOW()"
+        )
+        .bind(host)
+        .bind(day)
+        .bind(*delta as i32)
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(())
+}
+
+/// Delete rate-budget rows older than a week. Only today's row is ever read
+/// back; a week of history is kept for operator debugging (e.g. comparing
+/// against the api-sports dashboard after a quota incident).
+pub async fn prune_rate_budget(pool: &Arc<PgPool>) -> Result<u64> {
+    let cutoff = Utc::now().date_naive() - chrono::Days::new(7);
+    let mut conn = pool.acquire().await?;
+    let result = query("DELETE FROM sports_rate_budget WHERE day < $1")
+        .bind(cutoff)
+        .execute(&mut *conn)
+        .await?;
     Ok(result.rows_affected())
 }
 

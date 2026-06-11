@@ -6,7 +6,7 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 use sports_service::{
-    database::initialize_pool,
+    database::{add_consumed, get_consumed_today, initialize_pool, prune_rate_budget, PgPool},
     init::{fatal, spawn_supervised, ReadinessGate, ReadinessSnapshot},
     init_sports_service,
     log::init_async_logger,
@@ -51,6 +51,31 @@ const READINESS_BRIDGE_INTERVAL: Duration = Duration::from_secs(10);
 /// reset. Keep these in lockstep — drift between them would silently corrupt
 /// the per-league budget allocation.
 const SPORTS_DAILY_QUOTA: u32 = 7500;
+
+/// How often accumulated per-host request consumption is flushed to the
+/// `sports_rate_budget` table. Batched rather than per-request to keep DB
+/// write load negligible (at most one upsert per host per interval). An
+/// unclean shutdown can lose up to one interval's worth of counts — small,
+/// bounded slack compared to the full-quota reset this persistence prevents.
+const BUDGET_FLUSH_INTERVAL_SECS: u64 = 60;
+
+/// Persist accumulated per-host consumption to Postgres, attributed to the
+/// current UTC day. On write failure the deltas are handed back to the
+/// in-memory buffer so the next flush retries them — dropping them would
+/// under-count after a restart and let the service overshoot the quota.
+async fn flush_consumed(pool: &Arc<PgPool>, rate_limiter: &Arc<RateLimiter>) {
+    let deltas = rate_limiter.take_consumed();
+    if deltas.is_empty() {
+        return;
+    }
+    let day = chrono::Utc::now().date_naive();
+    if let Err(e) = add_consumed(pool, day, &deltas).await {
+        eprintln!("[Rate Budget] Failed to persist consumed counts, will retry: {e:#}");
+        for (host, n) in deltas {
+            rate_limiter.note_consumed(&host, n);
+        }
+    }
+}
 
 /// Initialize Sentry. The returned guard MUST live for the lifetime of
 /// the process — Drop flushes pending events on shutdown. Sentry MUST
@@ -219,7 +244,24 @@ async fn run_service() -> Result<()> {
         // in-season league can borrow from when its reserved budget is
         // exhausted. Prevents Champions League knockout nights from starving
         // Premier League polls.
-        let rate_limiter = Arc::new(RateLimiter::new_per_league(&leagues, SPORTS_DAILY_QUOTA));
+        //
+        // Budgets are seeded from today's persisted consumption so a pod
+        // restart mid-day (deploy, OOM, node drain) resumes from the quota
+        // actually remaining — the upstream counter only resets at UTC
+        // midnight, while a fresh in-memory limiter would grant itself the
+        // full 7,500 again.
+        let consumed_today = get_consumed_today(&pool).await;
+        if !consumed_today.is_empty() {
+            println!(
+                "[Rate Budget] Seeding budgets from persisted consumption: {:?}",
+                consumed_today
+            );
+        }
+        let rate_limiter = Arc::new(RateLimiter::new_per_league_seeded(
+            &leagues,
+            SPORTS_DAILY_QUOTA,
+            &consumed_today,
+        ));
 
         let client = Arc::new(client);
         let leagues = Arc::new(leagues);
@@ -355,7 +397,35 @@ async fn run_service() -> Result<()> {
             }
         });
 
+        // ── Periodic flush: persist consumed counts to Postgres ──────────
+        // Drains the RateLimiter's per-host consumption buffer into the
+        // sports_rate_budget table so the counts survive a pod restart
+        // (see the seeding above). Final flush on shutdown so a graceful
+        // termination loses nothing.
+        let pool_flush = pool.clone();
+        let rl_flush = rate_limiter.clone();
+        let cancel_flush = cancel_bg.clone();
+        spawn_supervised("sports-budget-flush", async move {
+            println!(
+                "Starting rate-budget flush loop (every {}s)...",
+                BUDGET_FLUSH_INTERVAL_SECS
+            );
+            loop {
+                tokio::select! {
+                    _ = cancel_flush.cancelled() => {
+                        flush_consumed(&pool_flush, &rl_flush).await;
+                        println!("Budget flush loop shutting down (final flush done)...");
+                        break;
+                    }
+                    _ = tokio::time::sleep(Duration::from_secs(BUDGET_FLUSH_INTERVAL_SECS)) => {
+                        flush_consumed(&pool_flush, &rl_flush).await;
+                    }
+                }
+            }
+        });
+
         // ── Daily reset: rate budgets at UTC midnight ─────────────────────
+        let pool_reset = pool.clone();
         let leagues_reset = leagues.clone();
         let rl_reset = rate_limiter.clone();
         let cancel_reset = cancel_bg.clone();
@@ -377,7 +447,18 @@ async fn run_service() -> Result<()> {
                         break;
                     }
                     _ = tokio::time::sleep(std::time::Duration::from_secs(wait_secs)) => {
+                        // Drain the consumption buffer before resetting. We're
+                        // just past midnight here, so up to one flush-interval
+                        // of pre-midnight requests lands in the new day's row —
+                        // a small, conservative error (shrinks the new day's
+                        // seed slightly on a later restart).
+                        flush_consumed(&pool_reset, &rl_reset).await;
                         rl_reset.reset_daily(&leagues_reset, SPORTS_DAILY_QUOTA);
+                        match prune_rate_budget(&pool_reset).await {
+                            Ok(n) if n > 0 => println!("[Rate Budget] Pruned {n} old budget rows"),
+                            Ok(_) => {}
+                            Err(e) => eprintln!("[Rate Budget] Failed to prune old budget rows: {e:#}"),
+                        }
                         println!("[Rate Budget] Daily reset completed at UTC midnight");
                     }
                 }
