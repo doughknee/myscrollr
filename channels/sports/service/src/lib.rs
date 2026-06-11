@@ -21,9 +21,11 @@ pub mod types;
 /// Number of days ahead to poll in the schedule task. 7 days covers a full
 /// week of fixtures — Premier League Saturday matches show up Monday morning.
 ///
-/// Rate-budget impact (worst case, 4 in-season football leagues): 4 leagues
-/// × 8 dates × 48 polls/day = 1,536 calls/day on the football host, well
-/// under the 7,500/day quota.
+/// Rate-budget impact: only in-season leagues are polled (off-season leagues
+/// are skipped in both poll_live and poll_schedule). Worst case on the
+/// football host is 4 simultaneous in-season leagues (Aug–Nov, Mar–May):
+/// 4 leagues × 8 dates × 48 polls/day = 1,536 schedule calls/day, leaving
+/// ~6,000 of the 7,500/day quota for live polling.
 const SCHEDULE_DAYS_AHEAD: i64 = 7;
 
 /// Delay between league requests on startup burst to avoid rate limits.
@@ -158,7 +160,16 @@ pub async fn poll_live(
     let mut total_failed = 0u32;
     let mut leagues_with_live = 0u32;
 
+    let current_month = now.month() as i32;
+
     for league in leagues {
+        // Off-season leagues have no fixtures — polling them burns the shared
+        // budget pool on requests that return empty. Skip silently (this loop
+        // runs every 30-60s; logging would flood).
+        if league.is_offseason(current_month) {
+            continue;
+        }
+
         if !rate_limiter.try_consume(&league.name) {
             warn!("[{}] Skipping live poll — per-league budget exhausted (reserved={}, shared={})",
                 league.name,
@@ -256,9 +267,20 @@ pub async fn poll_schedule(
     let mut total_upserted = 0u32;
     let mut total_failed = 0u32;
 
+    let current_month = now.month() as i32;
+
     for league in leagues {
         // Formula 1 fetches the whole season (no date param), skip per-date polling
         if league.sport_api == "formula-1" {
+            continue;
+        }
+
+        // Off-season leagues have no upcoming fixtures inside the 8-date
+        // window. Skipping saves 8 requests × 48 cycles/day per dormant
+        // league — with three off-season soccer leagues that's ~1,150
+        // football-host requests/day spent on empty schedules.
+        if league.is_offseason(current_month) {
+            info!("[{}] Skipping schedule poll — off-season in month {}", league.name, current_month);
             continue;
         }
 
