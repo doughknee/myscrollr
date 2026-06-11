@@ -191,6 +191,17 @@ pub struct TrackedLeague {
     pub offseason_months: Option<Vec<i32>>,
 }
 
+impl TrackedLeague {
+    /// True when `month` (1-12) falls inside this league's configured
+    /// off-season window. Leagues without `offseason_months` are treated
+    /// as always in season.
+    pub fn is_offseason(&self, month: i32) -> bool {
+        self.offseason_months
+            .as_ref()
+            .is_some_and(|months| months.contains(&month))
+    }
+}
+
 // =============================================================================
 // Game data — normalized from all api-sports.io sport APIs
 // =============================================================================

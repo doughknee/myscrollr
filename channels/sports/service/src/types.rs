@@ -1,7 +1,8 @@
 use chrono::{DateTime, Datelike, Utc};
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::RwLock;
 
 #[derive(Serialize, Clone)]
 pub struct SportsHealth {
@@ -78,6 +79,12 @@ pub struct RateLimiter {
     league_to_host: HashMap<String, String>,
     /// Per-host shared pool — fed by off-season leagues' donated shares.
     host_shared: HashMap<String, AtomicU32>,
+    /// League names currently inside their off-season window. These leagues
+    /// have no reserved budget AND may not borrow from the shared pool — the
+    /// pool exists so in-season leagues can use the budget dormant leagues
+    /// donated. Refreshed at construction and at each daily reset (the month
+    /// can change at UTC midnight).
+    offseason_leagues: RwLock<HashSet<String>>,
 }
 
 impl RateLimiter {
@@ -93,6 +100,7 @@ impl RateLimiter {
             league_reserved: HashMap::new(),
             league_to_host: HashMap::new(),
             host_shared: HashMap::new(),
+            offseason_leagues: RwLock::new(HashSet::new()),
         }
     }
 
@@ -120,18 +128,18 @@ impl RateLimiter {
         let mut league_to_host = HashMap::new();
         let mut host_shared = HashMap::new();
         let mut host_remaining = HashMap::new();
+        let mut offseason = HashSet::new();
 
         for (host, host_leagues) in &by_host {
             let n = host_leagues.len().max(1) as u32;
             let share = daily_total / n;
             let mut donated = 0u32;
             for l in host_leagues {
-                let is_offseason = l.offseason_months.as_ref()
-                    .map(|months| months.contains(&current_month))
-                    .unwrap_or(false);
+                let is_offseason = l.is_offseason(current_month);
                 let reserved = if is_offseason { 0 } else { share };
                 if is_offseason {
                     donated += share;
+                    offseason.insert(l.name.clone());
                 }
                 league_reserved.insert(l.name.clone(), AtomicU32::new(reserved));
                 league_to_host.insert(l.name.clone(), host.clone());
@@ -145,6 +153,7 @@ impl RateLimiter {
             league_reserved,
             league_to_host,
             host_shared,
+            offseason_leagues: RwLock::new(offseason),
         }
     }
 
@@ -164,6 +173,17 @@ impl RateLimiter {
                     Err(actual) => cur = actual,
                 }
             }
+        }
+        // Off-season leagues have no reserved share and may not raid the
+        // shared pool — it exists so in-season leagues can borrow the budget
+        // dormant leagues donated. Without this check, a dormant league that
+        // is still polled drains the very pool it donated (June 2026: three
+        // off-season soccer leagues burned the whole football-host quota).
+        if self.offseason_leagues.read()
+            .map(|s| s.contains(league_name))
+            .unwrap_or(false)
+        {
+            return false;
         }
         // Fall back to shared pool
         let Some(host) = self.league_to_host.get(league_name) else {
@@ -207,17 +227,17 @@ impl RateLimiter {
             by_host.entry(l.sport_api.clone()).or_default().push(l);
         }
 
+        let mut offseason = HashSet::new();
         for (host, host_leagues) in &by_host {
             let n = host_leagues.len().max(1) as u32;
             let share = daily_total / n;
             let mut donated = 0u32;
             for l in host_leagues {
-                let is_offseason = l.offseason_months.as_ref()
-                    .map(|months| months.contains(&current_month))
-                    .unwrap_or(false);
+                let is_offseason = l.is_offseason(current_month);
                 let reserved = if is_offseason { 0 } else { share };
                 if is_offseason {
                     donated += share;
+                    offseason.insert(l.name.clone());
                 }
                 if let Some(slot) = self.league_reserved.get(&l.name) {
                     slot.store(reserved, Ordering::Relaxed);
@@ -229,6 +249,11 @@ impl RateLimiter {
             if let Some(slot) = self.host_remaining.get(host) {
                 slot.store(daily_total, Ordering::Relaxed);
             }
+        }
+        // Re-derive the off-season set — the month may have rolled over,
+        // moving leagues into or out of their off-season window.
+        if let Ok(mut s) = self.offseason_leagues.write() {
+            *s = offseason;
         }
     }
 
@@ -416,6 +441,31 @@ mod tests {
         }
         assert_eq!(rl.shared_remaining("football"), 0);
         // Now exhausted
+        assert!(!rl.try_consume("Premier League"));
+    }
+
+    #[test]
+    fn test_offseason_league_cannot_drain_shared_pool() {
+        use chrono::Datelike;
+        // Regression test for the June 2026 quota exhaustion: an off-season
+        // league has reserved=0, and try_consume must NOT let it fall through
+        // to the shared pool — that pool exists for in-season leagues.
+        let current_month = chrono::Utc::now().month() as i32;
+        let leagues = vec![
+            make_league("Premier League", "football", None),
+            make_league("Off", "football", Some(vec![current_month])),
+        ];
+        let rl = RateLimiter::new_per_league(&leagues, 1000);
+
+        // Off-season league is denied outright; shared pool untouched.
+        assert!(!rl.try_consume("Off"));
+        assert_eq!(rl.shared_remaining("football"), 500);
+
+        // In-season league can still spend its reserved share AND borrow
+        // the donated share from the pool.
+        for _ in 0..1000 {
+            assert!(rl.try_consume("Premier League"));
+        }
         assert!(!rl.try_consume("Premier League"));
     }
 
