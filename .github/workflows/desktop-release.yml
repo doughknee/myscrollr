@@ -15,8 +15,23 @@ on:
           - linux
   push:
     branches: [main]
+    # Pattern order matters: a negated pattern after a positive match excludes
+    # the path. The workflow still runs if at least one changed file survives
+    # the net filter, so a push touching both a test file and a source file
+    # still builds. Excluded files are covered by frontend-tests.yml, and
+    # tsconfig.json deliberately stays included — it is an input to the
+    # release build (vite build && tsc --noEmit).
     paths:
       - "desktop/**"
+      # Test-only changes don't need release artifacts.
+      - "!desktop/src/**/*.test.ts"
+      - "!desktop/src/**/*.test.tsx"
+      - "!desktop/vitest*.ts"
+      # Docs and dev tooling that never reach the release artifacts.
+      - "!desktop/**/*.md"
+      - "!desktop/.env.example"
+      - "!desktop/screenshots/**"
+      - "!desktop/scripts/capture-screenshots.mjs"
       - ".github/workflows/desktop-release.yml"
 
 permissions:
