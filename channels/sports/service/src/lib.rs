@@ -367,6 +367,9 @@ pub async fn poll_standings(
             url = format!("{}&sport={}", url, league.sport_api);
         }
 
+        // Standings requests don't go through try_consume (has_budget gate
+        // above), so record them against the persisted consumption count.
+        rate_limiter.note_consumed(&league.sport_api, 1);
         match client.get(&url).send().await {
             Ok(resp) => {
                 if let Some(remaining) = resp.headers()
@@ -920,6 +923,9 @@ pub async fn poll_teams(
             url = format!("{}&sport={}", url, league.sport_api);
         }
 
+        // Teams requests don't go through try_consume (has_budget gate
+        // above), so record them against the persisted consumption count.
+        rate_limiter.note_consumed(&league.sport_api, 1);
         match client.get(&url).send().await {
             Ok(resp) => {
                 if let Some(remaining) = resp.headers()
