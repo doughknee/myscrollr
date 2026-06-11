@@ -1,6 +1,6 @@
 {
   "productName": "Scrollr",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "identifier": "com.scrollr.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",

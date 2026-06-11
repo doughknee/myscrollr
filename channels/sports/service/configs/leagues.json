@@ -100,6 +100,17 @@
     "offseason_months": [6, 7]
   },
   {
+    "name": "FIFA World Cup",
+    "sport_api": "football",
+    "api_host": "v3.football.api-sports.io",
+    "league_id": 1,
+    "category": "Soccer",
+    "country": "World",
+    "season_format": "calendar",
+    "season": "2026",
+    "offseason_months": [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
+  },
+  {
     "name": "Formula 1",
     "sport_api": "formula-1",
     "api_host": "v1.formula-1.api-sports.io",
