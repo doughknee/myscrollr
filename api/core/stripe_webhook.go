@@ -3,10 +3,13 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log"
 	"os"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/stripe/stripe-go/v82"
@@ -270,9 +273,17 @@ func handleSubscriptionDeleted(event stripe.Event) {
 
 	// Check if user has lifetime (don't remove role if so)
 	var isLifetime bool
-	_ = DBPool.QueryRow(context.Background(),
+	lifetimeErr := DBPool.QueryRow(context.Background(),
 		`SELECT lifetime FROM stripe_customers WHERE logto_sub = $1`, logtoSub,
 	).Scan(&isLifetime)
+	if lifetimeErr != nil && !errors.Is(lifetimeErr, pgx.ErrNoRows) {
+		// Can't tell if this is a lifetime customer — keep their roles
+		// (decideStripPaidRoles fails safe) rather than risk stripping a
+		// lifetime purchase. Surface the failure: it leaves role state
+		// unreconciled with Stripe.
+		log.Printf("[Stripe Webhook] Lifetime lookup failed for %s (keeping paid roles): %v", logtoSub, lifetimeErr)
+		sentry.CaptureException(fmt.Errorf("stripe webhook: lifetime lookup failed during subscription.deleted: %w", lifetimeErr))
+	}
 
 	// Reset to free plan in DB
 	_, err := DBPool.Exec(context.Background(),
@@ -286,8 +297,9 @@ func handleSubscriptionDeleted(event stripe.Event) {
 		log.Printf("[Stripe Webhook] Failed to reset subscription for %s: %v", logtoSub, err)
 	}
 
-	// Remove all paid roles (only if not lifetime)
-	if !isLifetime {
+	// Remove all paid roles (only if not lifetime; on lookup failure, fail
+	// safe and keep them)
+	if decideStripPaidRoles(isLifetime, lifetimeErr) {
 		if err := RemoveUplinkRole(logtoSub); err != nil {
 			log.Printf("[Stripe Webhook] Failed to remove uplink role from %s: %v", logtoSub, err)
 		}
