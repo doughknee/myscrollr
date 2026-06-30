@@ -429,7 +429,11 @@ func subscribeUserToTopics(userID string) {
 			continue
 		}
 
-		switch ch.ChannelType {
+		// Route by the widget's backing data source, not its exact
+		// channel_type, so split widgets (sports_nfl, finance_stocks, …)
+		// subscribe through the same per-source logic as the legacy coarse
+		// types. The per-league/per-symbol values still come from config.
+		switch DataSourceForWidget(ch.ChannelType) {
 		case "finance":
 			symbols := extractSymbolsFromConfig(ch.Config)
 			for _, sym := range symbols {

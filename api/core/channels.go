@@ -71,7 +71,13 @@ func SyncChannelSubscriptions(logtoSub string) {
 
 	ctx := context.Background()
 	for _, ch := range channels {
-		setKey := RedisChannelSubscribersPrefix + ch.ChannelType
+		// Key the broadcast subscriber set by data SOURCE, not the exact
+		// widget type, so split widgets (sports_nfl, finance_stocks, …) land
+		// in the set the backing service reads (e.g. channel:subscribers:
+		// predictions). Per-league/per-symbol routing is handled below + in
+		// the SSE topic registry.
+		source := DataSourceForWidget(ch.ChannelType)
+		setKey := RedisChannelSubscribersPrefix + source
 		if ch.Enabled {
 			AddSubscriber(ctx, setKey, logtoSub)
 		} else {
@@ -79,7 +85,7 @@ func SyncChannelSubscriptions(logtoSub string) {
 		}
 
 		// Sports: sync per-league subscriber sets based on user's configured leagues
-		if ch.ChannelType == "sports" {
+		if source == "sports" {
 			leagues := extractSportsLeaguesFromConfig(ch.Config)
 			if len(leagues) > 0 {
 				leagueKeys := make([]string, len(leagues))
@@ -107,10 +113,11 @@ func SyncChannelSubscriptions(logtoSub string) {
 // For sports, this also adds the user to all per-league subscriber sets.
 // Also updates the in-memory topic registry for active SSE connections.
 func addChannelSubscriptions(ctx context.Context, logtoSub, channelType string, config map[string]interface{}) {
-	AddSubscriber(ctx, RedisChannelSubscribersPrefix+channelType, logtoSub)
+	source := DataSourceForWidget(channelType)
+	AddSubscriber(ctx, RedisChannelSubscribersPrefix+source, logtoSub)
 
 	// Sports: populate per-league subscriber sets for user's configured leagues.
-	if channelType == "sports" {
+	if source == "sports" {
 		leagues := extractSportsLeaguesFromConfig(config)
 		if len(leagues) > 0 {
 			leagueKeys := make([]string, len(leagues))
@@ -135,10 +142,11 @@ func addChannelSubscriptions(ctx context.Context, logtoSub, channelType string, 
 // For sports, this also removes the user from all per-league subscriber sets.
 // Also updates the in-memory topic registry for active SSE connections.
 func removeChannelSubscriptions(ctx context.Context, logtoSub, channelType string, config map[string]interface{}) {
-	RemoveSubscriber(ctx, RedisChannelSubscribersPrefix+channelType, logtoSub)
+	source := DataSourceForWidget(channelType)
+	RemoveSubscriber(ctx, RedisChannelSubscribersPrefix+source, logtoSub)
 
 	// Sports: remove from per-league subscriber sets for user's configured leagues.
-	if channelType == "sports" {
+	if source == "sports" {
 		leagues := extractSportsLeaguesFromConfig(config)
 		if len(leagues) > 0 {
 			leagueKeys := make([]string, len(leagues))
@@ -162,7 +170,10 @@ func removeChannelSubscriptions(ctx context.Context, logtoSub, channelType strin
 
 // callChannelLifecycle sends a lifecycle event to a channel if it has the channel_lifecycle capability.
 func callChannelLifecycle(ctx context.Context, channelType, event, userSub string, config, oldConfig map[string]interface{}, enabled *bool) {
-	ch := GetChannel(channelType)
+	// Resolve to the backing data source so widget types (e.g. "news") reach
+	// the right service's lifecycle hook (rss). Legacy coarse types map to
+	// themselves.
+	ch := GetChannel(DataSourceForWidget(channelType))
 	if ch == nil || !ch.HasCapability("channel_lifecycle") {
 		return
 	}
@@ -269,9 +280,11 @@ func CreateChannel(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validate channel type against discovered channels
-	validTypes := GetValidChannelTypes()
-	if !validTypes[req.ChannelType] {
+	// Validate channel type: accept either a registered backend channel
+	// (Redis service discovery) or a known widget type (the code registry in
+	// widgets.go). Additive during the widget/slot transition so legacy
+	// coarse types ("sports") and new split widgets ("sports_nfl") both pass.
+	if !GetValidChannelTypes()[req.ChannelType] && !IsKnownWidgetType(req.ChannelType) {
 		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
 			Status: "error",
 			Error:  "Invalid channel type",
@@ -388,8 +401,7 @@ func UpdateChannel(c *fiber.Ctx) error {
 	}
 
 	channelType := c.Params("type")
-	validTypes := GetValidChannelTypes()
-	if !validTypes[channelType] {
+	if !GetValidChannelTypes()[channelType] && !IsKnownWidgetType(channelType) {
 		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
 			Status: "error",
 			Error:  "Invalid channel type",

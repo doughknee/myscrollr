@@ -410,10 +410,13 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 			res.Channels = channels
 		}
 
+		// Key by data SOURCE, not the exact widget type, so split widgets
+		// (sports_nfl, finance_stocks, …) still select their backing service's
+		// dashboard provider below (matched on intg.Name).
 		enabledChannels := make(map[string]bool)
 		for _, ch := range channels {
 			if ch.Enabled {
-				enabledChannels[ch.ChannelType] = true
+				enabledChannels[DataSourceForWidget(ch.ChannelType)] = true
 			}
 		}
 
