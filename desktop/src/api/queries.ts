@@ -7,6 +7,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { isAuthenticated, hasRefreshToken } from "../auth";
 import { authFetch, request, rssApi, fetchOverview } from "./client";
+import { DEMO } from "../config";
 import type { TrackedFeed, UserOverview } from "./client";
 import type { DashboardResponse, Game } from "../types";
 
@@ -20,6 +21,7 @@ export const queryKeys = {
     finance: ["catalogs", "finance"] as const,
     rss: ["catalogs", "rss"] as const,
     rssAll: ["catalogs", "rss", "all"] as const,
+    predictions: ["catalogs", "predictions"] as const,
   },
   fantasy: {
     status: ["fantasy", "status"] as const,
@@ -50,6 +52,17 @@ export function userOverviewQueryOptions() {
 // ── Dashboard Query ──────────────────────────────────────────────
 
 async function fetchDashboard(): Promise<DashboardResponse> {
+  // Demo mode: talk to the no-auth bridge directly (it serves /dashboard with
+  // channels[] and ignores Authorization), so the live Kalshi demo works
+  // signed-out with zero infra. See channels/predictions/LOCAL_DEV.md.
+  if (DEMO) {
+    const demo = await request<{
+      data: DashboardResponse["data"];
+      channels?: DashboardResponse["channels"];
+    }>("/dashboard");
+    return { data: demo.data, channels: demo.channels } as DashboardResponse;
+  }
+
   // Try authenticated path if token is valid OR a refresh token can restore the session.
   // This prevents the deadlock where an expired access token blocked the only code path
   // that could trigger a refresh via getValidToken().
@@ -129,6 +142,18 @@ export interface TrackedSymbol {
   symbol: string;
   name: string;
   category: string;
+}
+
+/**
+ * Catalog entry for the Predictions channel — one row per trackable
+ * Kalshi market, surfaced by `GET /predictions/catalog`. Drives the
+ * CategoryPicker's favorites selection + category counts.
+ */
+export interface PredictionCatalogEntry {
+  ticker: string;
+  title: string;
+  category: string;
+  series_ticker?: string;
 }
 
 export interface Standing {
@@ -213,6 +238,14 @@ export function financeCatalogOptions() {
   return queryOptions({
     queryKey: queryKeys.catalogs.finance,
     queryFn: () => request<TrackedSymbol[]>("/finance/symbols"),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function predictionsCatalogOptions() {
+  return queryOptions({
+    queryKey: queryKeys.catalogs.predictions,
+    queryFn: () => request<PredictionCatalogEntry[]>("/predictions/catalog"),
     staleTime: 5 * 60 * 1000,
   });
 }

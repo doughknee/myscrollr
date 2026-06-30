@@ -3,7 +3,7 @@ import clsx from "clsx";
 import { ChevronDown, Plus, Settings2 } from "lucide-react";
 import { Ticker } from "motion-plus/react";
 import { useMotionValue, animate, AnimatePresence, motion } from "motion/react";
-import type { DashboardResponse, Trade, Game, RssItem, WidgetTickerData } from "../types";
+import type { DashboardResponse, Trade, Game, RssItem, WidgetTickerData, Prediction } from "../types";
 import type {
   MixMode,
   ChipColorMode,
@@ -18,6 +18,7 @@ import type { LeagueResponse as FantasyLeague } from "../channels/fantasy/types"
 import TradeChip from "./chips/TradeChip";
 import GameChip from "./chips/GameChip";
 import RssChip from "./chips/RssChip";
+import PredictionChip from "./chips/PredictionChip";
 import FantasyStatChip from "./chips/FantasyStatChip";
 import FollowedPlayerChip from "./chips/FollowedPlayerChip";
 import ConsolidatedChip from "./chips/ConsolidatedChip";
@@ -25,6 +26,7 @@ import { selectRssForTicker } from "../channels/rss/view";
 import { selectFinanceForTicker } from "../channels/finance/view";
 import { selectFantasyForTicker } from "../channels/fantasy/view";
 import { selectSportsForTicker, getSportsDisplayConfig } from "../channels/sports/view";
+import { selectPredictionsForTicker } from "../channels/predictions/view";
 import {
   findTopN,
   findTopBench,
@@ -468,6 +470,35 @@ export default function ScrollrTicker({
                   showSource={shouldShowOnTicker(rssPrefs.showSource)}
                   showTimestamps={shouldShowOnTicker(rssPrefs.showTimestamps)}
                   onClick={() => onChipClick?.("rss", item.id, chipUrlForRss(item))}
+                />
+              )
+            );
+          }
+          break;
+        }
+
+        case "predictions": {
+          // Premier prediction-markets channel. Implied probability +
+          // ▲/▼ delta is the "heartbeat"; the universal `defaultSort`
+          // (movers/volume/closing) governs ordering on both surfaces.
+          const predictionsPrefs = channelDisplay?.predictions;
+          if (!predictionsPrefs) continue;
+          const sorted = selectPredictionsForTicker(
+            data as Prediction[],
+            predictionsPrefs,
+          );
+          for (const p of sorted) {
+            bucket.push(
+              wrap(`pred-${p.id}`,
+                <PredictionChip
+                  prediction={p}
+                  comfort={comfort}
+                  colorMode={chipColorMode}
+                  showDelta={shouldShowOnTicker(predictionsPrefs.showDelta)}
+                  showCategory={shouldShowOnTicker(predictionsPrefs.showCategory)}
+                  showVolume={shouldShowOnTicker(predictionsPrefs.showVolume)}
+                  showCloseTime={shouldShowOnTicker(predictionsPrefs.showCloseTime)}
+                  onClick={() => onChipClick?.("predictions", p.id, p.link)}
                 />
               )
             );

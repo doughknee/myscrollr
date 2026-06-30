@@ -137,7 +137,7 @@ export async function authFetch<T>(
 
 // ── Channel Types ───────────────────────────────────────────────
 
-export type ChannelType = "finance" | "sports" | "fantasy" | "rss";
+export type ChannelType = "finance" | "sports" | "fantasy" | "rss" | "predictions";
 
 export interface Channel {
   id: number;

@@ -136,6 +136,7 @@ func (h *Hub) listenToTopics(ctx context.Context) {
 		TopicPrefixSports+"*",
 		TopicPrefixRSS+"*",
 		TopicPrefixFantasy+"*",
+		TopicPrefixPredictions+"*",
 		TopicPrefixCore+"*",
 		TopicSSEControlResubscribe,
 	)
@@ -143,9 +144,9 @@ func (h *Hub) listenToTopics(ctx context.Context) {
 
 	ch := pubsub.Channel()
 
-	log.Printf("[EventHub] Listening to topic patterns: %s* %s* %s* %s* %s* + %s",
+	log.Printf("[EventHub] Listening to topic patterns: %s* %s* %s* %s* %s* %s* + %s",
 		TopicPrefixFinance, TopicPrefixSports, TopicPrefixRSS,
-		TopicPrefixFantasy, TopicPrefixCore, TopicSSEControlResubscribe)
+		TopicPrefixFantasy, TopicPrefixPredictions, TopicPrefixCore, TopicSSEControlResubscribe)
 
 	for {
 		select {
@@ -458,6 +459,11 @@ func subscribeUserToTopics(userID string) {
 			for _, lk := range leagueKeys {
 				globalHub.registry.subscribe(userID, TopicPrefixFantasy+lk)
 			}
+
+		case "predictions":
+			// v1 channel-wide broadcast: every enabled predictions user
+			// subscribes to the single "all" topic. No per-entity config.
+			globalHub.registry.subscribe(userID, TopicPrefixPredictions+"all")
 		}
 	}
 }

@@ -48,7 +48,7 @@ import { useTheme } from "./hooks/useTheme";
 
 // ── Constants ────────────────────────────────────────────────────
 
-import { API_BASE as API_URL } from "./config";
+import { API_BASE as API_URL, DEMO } from "./config";
 
 // ── App (Ticker Window) ─────────────────────────────────────────
 
@@ -100,6 +100,11 @@ export default function App() {
 
   const channelTabs = useMemo(() => {
     if (channels.length === 0) {
+      // Demo mode (VITE_DEMO) talks to the local bridge, which serves only the
+      // predictions slice and may not surface channels[] on the ticker window
+      // in time — show predictions rather than the finance/sports teaser the
+      // bridge can't fill.
+      if (DEMO) return ["predictions"];
       // Signed-out users get the finance + sports demo tabs so the
       // public-feed teaser renders on the ticker. Signed-in users with
       // zero channels deliberately get an empty tab list so the ticker
@@ -185,7 +190,9 @@ export default function App() {
   // ── SSE lifecycle ───────────────────────────────────────────
 
   const startSSE = useCallback(async () => {
-    const token = await getValidToken();
+    // Demo mode talks to the no-auth bridge, which ignores the Bearer —
+    // use a placeholder so the SSE stream still starts without Logto.
+    const token = DEMO ? "demo" : await getValidToken();
     if (!token) return;
     sseActiveRef.current = true;
     setDeliveryMode("sse");
@@ -247,7 +254,7 @@ export default function App() {
         setAuthenticated(true);
       }
 
-      if (resolvedTier === "uplink_ultimate" || resolvedTier === "super_user") {
+      if (DEMO || resolvedTier === "uplink_ultimate" || resolvedTier === "super_user") {
         startSSE();
       }
     }

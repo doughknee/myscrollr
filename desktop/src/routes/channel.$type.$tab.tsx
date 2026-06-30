@@ -23,6 +23,7 @@ import FinanceDisplayPanel from "../channels/finance/DisplayPanel";
 import SportsDisplayPanel from "../channels/sports/DisplayPanel";
 import RssDisplayPanel from "../channels/rss/DisplayPanel";
 import FantasyDisplayPanel from "../channels/fantasy/DisplayPanel";
+import PredictionsDisplayPanel from "../channels/predictions/DisplayPanel";
 import { useShell } from "../shell-context";
 import { loadPref } from "../preferences";
 import type { Channel, ChannelType } from "../api/client";
@@ -56,6 +57,7 @@ function ChannelRoute() {
     sports: true,
     rss: true,
     fantasy: true,
+    predictions: true,
   };
 
   // Subtitle reflects the current sub-route in the breadcrumb:
@@ -174,6 +176,8 @@ function ChannelDisplayTab({ type }: { type: string }) {
       return <RssDisplayPanel />;
     case "fantasy":
       return <FantasyDisplayPanel />;
+    case "predictions":
+      return <PredictionsDisplayPanel />;
     default:
       return null;
   }

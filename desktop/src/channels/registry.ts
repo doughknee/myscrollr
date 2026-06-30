@@ -15,7 +15,7 @@ const modules = import.meta.glob<Record<string, ChannelManifest>>("./*/FeedTab.t
 const { get, getAll, ORDER } = createRegistry<ChannelManifest>(
   modules,
   "Channel",
-  ["finance", "sports", "fantasy", "rss"],
+  ["finance", "sports", "fantasy", "rss", "predictions"],
 );
 
 /** Look up a channel by id. */

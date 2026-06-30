@@ -116,6 +116,61 @@ export function truncate(text: string, maxLen: number): string {
 }
 
 /**
+ * Abbreviate a large count with a K/M/B suffix (e.g. 12_400 → "12.4K",
+ * 3_000_000 → "3M"). Values below 1,000 render as-is. Used by the
+ * Predictions channel to keep volume glanceable in dense rows.
+ */
+export function formatCompactNumber(value: number | string | undefined): string {
+  if (value == null) return "";
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(num)) return String(value);
+  const abs = Math.abs(num);
+  if (abs < 1_000) return String(Math.round(num));
+  const units: Array<{ limit: number; suffix: string }> = [
+    { limit: 1_000_000_000, suffix: "B" },
+    { limit: 1_000_000, suffix: "M" },
+    { limit: 1_000, suffix: "K" },
+  ];
+  for (const { limit, suffix } of units) {
+    if (abs >= limit) {
+      const scaled = num / limit;
+      // One decimal under 10x the unit, none above (keeps it tight).
+      const str =
+        Math.abs(scaled) < 10 ? scaled.toFixed(1) : Math.round(scaled).toString();
+      return `${str.replace(/\.0$/, "")}${suffix}`;
+    }
+  }
+  return String(Math.round(num));
+}
+
+/**
+ * Format the time remaining until a close timestamp as a short
+ * countdown ("3d", "5h", "12m", "45s"), or "Closed" once elapsed.
+ * Returns "" when the timestamp is missing or unparseable.
+ *
+ * @param closeStr ISO-8601 close time, or `null` / `undefined`.
+ * @param now      Reference "now" in epoch-ms (usually from `useNow()`).
+ */
+export function formatCloseCountdown(
+  closeStr: string | null | undefined,
+  now: number,
+): string {
+  if (!closeStr) return "";
+  const t = new Date(closeStr).getTime();
+  if (isNaN(t)) return "";
+  const diff = t - now;
+  if (diff <= 0) return "Closed";
+  const secs = Math.floor(diff / 1000);
+  const mins = Math.floor(secs / 60);
+  const hours = Math.floor(mins / 60);
+  const days = Math.floor(hours / 24);
+  if (days >= 1) return `${days}d`;
+  if (hours >= 1) return `${hours}h`;
+  if (mins >= 1) return `${mins}m`;
+  return `${secs}s`;
+}
+
+/**
  * Format a duration in seconds as human-readable uptime.
  * Returns "2d 5h", "3h 12m", or "45m".
  */

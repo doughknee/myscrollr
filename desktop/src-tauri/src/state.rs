@@ -14,6 +14,12 @@ pub struct AuthServerRunning(pub Arc<Mutex<bool>>);
 #[derive(Clone)]
 pub struct AuthServerStop(pub Arc<AtomicBool>);
 
+// ── Kalshi live stream state ─────────────────────────────────────
+
+/// Holds the cancellation handle for the background authenticated Kalshi
+/// user-data WS stream (`commands::kalshi`). `None` when no stream is running.
+pub struct KalshiStreamHandle(pub Mutex<Option<watch::Sender<bool>>>);
+
 // ── System monitor state ─────────────────────────────────────────
 
 /// Data that never changes between polls — cached on first call.

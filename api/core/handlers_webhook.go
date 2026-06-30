@@ -159,6 +159,11 @@ func topicForRecord(table string, record map[string]interface{}) string {
 		}
 		return TopicPrefixFantasy + leagueKey
 
+	// Predictions: v1 channel-wide broadcast — every market update goes to
+	// the single "all" topic that every predictions subscriber listens on.
+	case "markets":
+		return TopicPrefixPredictions + "all"
+
 	default:
 		return ""
 	}

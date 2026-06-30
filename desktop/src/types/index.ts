@@ -22,6 +22,29 @@ export interface Trade {
   link?: string;
 }
 
+// ── Predictions ──────────────────────────────────────────────────
+
+export interface Prediction {
+  id: string;
+  source: string;
+  ticker: string;
+  event_ticker?: string;
+  category?: string;
+  title: string;
+  subtitle?: string;
+  yes_price: number;       // cents 0-100 == implied %
+  yes_bid?: number;
+  yes_ask?: number;
+  prev_yes_price?: number; // for ▲/▼ delta
+  volume?: number;
+  open_interest?: number;
+  status?: string;
+  result?: string;
+  close_time?: string;     // RFC3339
+  link?: string;
+  updated_at?: string;     // RFC3339
+}
+
 // ── Sports ───────────────────────────────────────────────────────
 
 export interface Game {
@@ -73,6 +96,7 @@ export interface DashboardResponse {
     sports?: Game[];
     sports_meta?: SportsMeta;
     rss?: RssItem[];
+    predictions?: Prediction[];
     [key: string]: unknown;
   };
   preferences?: {

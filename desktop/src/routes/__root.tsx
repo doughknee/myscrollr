@@ -38,6 +38,7 @@ import AuthGate from "../components/onboarding/AuthGate";
 
 // Registries
 import { getAllChannels } from "../channels/registry";
+import { DEMO } from "../config";
 import { getAllWidgets, getWidget } from "../widgets/registry";
 import { CANONICAL_ORDER } from "../marketplace";
 
@@ -388,8 +389,10 @@ function RootLayout() {
   // ── App / auth state ────────────────────────────────────────
   // The wizard was removed in the IA refactor (2026-05-09). New
   // users land directly on /feed which renders an empty hero card.
-  const showAuthGate = !auth.authenticated;
-  const showApp = auth.authenticated;
+  // Demo mode (VITE_DEMO=1) bypasses the Logto auth wall so the live Kalshi
+  // demo runs signed-out against the no-auth bridge. Strictly dev-only.
+  const showAuthGate = !auth.authenticated && !DEMO;
+  const showApp = auth.authenticated || DEMO;
 
   // ── SSE status tracking ─────────────────────────────────────
   // Listen directly for SSE status events from the Rust backend.

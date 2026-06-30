@@ -4,6 +4,7 @@ import FinanceConfigPanel from "./finance/ConfigPanel";
 import SportsConfigPanel from "./sports/ConfigPanel";
 import RssConfigPanel from "./rss/ConfigPanel";
 import FantasyConfigPanel from "./fantasy/ConfigPanel";
+import PredictionsConfigPanel from "./predictions/ConfigPanel";
 
 // ── Props ────────────────────────────────────────────────────────
 
@@ -54,6 +55,14 @@ export default function ChannelConfigPanel({
     case "fantasy":
       return (
         <FantasyConfigPanel
+          channel={channel}
+          subscriptionTier={subscriptionTier}
+          hex={hex}
+        />
+      );
+    case "predictions":
+      return (
+        <PredictionsConfigPanel
           channel={channel}
           subscriptionTier={subscriptionTier}
           hex={hex}

@@ -45,3 +45,11 @@ export const AUTH_ENDPOINT = readOptionalEnv(import.meta.env.VITE_AUTH_ENDPOINT)
 export const LOGTO_APP_ID = readOptionalEnv(import.meta.env.VITE_LOGTO_APP_ID);
 export const REDIRECT_URI = "http://127.0.0.1:19284/callback";
 export const REFRESH_BUFFER_MS = 60_000;
+
+// ── Dev demo mode ───────────────────────────────────────────────
+// VITE_DEMO=1 runs the app SIGNED OUT against a no-auth local backend
+// (the predictions `serve_bridge`, which ignores Authorization), bypassing
+// Logto so the live Kalshi demo works with zero infra. STRICTLY a local
+// dev affordance — never set in release/CI builds. See
+// channels/predictions/LOCAL_DEV.md.
+export const DEMO = import.meta.env.VITE_DEMO === "1";
