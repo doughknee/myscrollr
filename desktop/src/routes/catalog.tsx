@@ -14,6 +14,7 @@ import type { Channel, ChannelType } from "../api/client";
 import { dashboardQueryOptions, queryKeys } from "../api/queries";
 import type { DashboardResponse } from "../types";
 import { useShell, useShellData } from "../shell-context";
+import { getMaxWidgets } from "../tierLimits";
 import CatalogCard from "../components/marketplace/CatalogCard";
 import QueryErrorBanner from "../components/QueryErrorBanner";
 import RouteError from "../components/RouteError";
@@ -73,6 +74,15 @@ function CatalogPage() {
     () => new Set([...enabledChannelIds, ...enabledWidgetIds]),
     [enabledChannelIds, enabledWidgetIds],
   );
+
+  // Widget/slot model (2026-06-30): a plan caps how many widgets run at
+  // once. Slots in use = enabled channels + enabled local widgets. At
+  // capacity, the catalog locks *new* adds (already-added items stay
+  // interactive). nil/Infinity = unlimited.
+  const slotsAtCapacity = useMemo(() => {
+    const used = channels.length + prefs.widgets.enabledWidgets.length;
+    return used >= getMaxWidgets(tier);
+  }, [channels.length, prefs.widgets.enabledWidgets.length, tier]);
 
   const visibleItems = useMemo(() => {
     const filtered = filter === "all"
@@ -265,6 +275,7 @@ function CatalogPage() {
                     enabled={allEnabledIds.has(item.id)}
                     tier={tier}
                     authenticated={authenticated}
+                    slotsAtCapacity={slotsAtCapacity}
                     dashboardLoading={isLoading}
                     onAdd={handleAdd}
                     onLogin={onLogin}

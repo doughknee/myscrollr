@@ -20,6 +20,9 @@ interface CatalogCardProps {
   enabled: boolean;
   tier: SubscriptionTier;
   authenticated: boolean;
+  /** True when the user is at their plan's widget-slot limit. New adds are
+   *  locked; already-added and tier-locked items keep their own states. */
+  slotsAtCapacity?: boolean;
   /** Disable Add button while dashboard is loading (channels enabled state unknown). */
   dashboardLoading: boolean;
   onAdd: (item: CatalogItem) => Promise<void>;
@@ -35,6 +38,7 @@ export default function CatalogCard({
   enabled,
   tier,
   authenticated,
+  slotsAtCapacity,
   dashboardLoading,
   onAdd,
   onLogin,
@@ -45,12 +49,16 @@ export default function CatalogCard({
   const tierLocked =
     authenticated && item.requiredTier !== "free" && !tierMeetsRequirement(tier, item.requiredTier);
 
+  // At the plan's widget-slot cap: lock *new* adds. Already-added items keep
+  // their "Open" state; tier-locked items keep their own upsell.
+  const slotLocked = !!slotsAtCapacity && !enabled && !tierLocked && authenticated;
+
   async function handleAdd() {
     if (!authenticated && item.kind === "channel") {
       onLogin();
       return;
     }
-    if (tierLocked) {
+    if (tierLocked || slotLocked) {
       open("https://myscrollr.com/uplink");
       return;
     }
@@ -121,6 +129,15 @@ export default function CatalogCard({
         </div>
       )}
 
+      {/* Widget-slot limit badge */}
+      {slotLocked && (
+        <div className="flex items-center gap-1.5 mb-2.5 px-2 py-1 rounded-md bg-warn/10 border border-warn/20 w-fit">
+          <span className="text-ui-chip font-medium text-warn">
+            Widget limit reached
+          </span>
+        </div>
+      )}
+
       {/* Unauthenticated channel hint */}
       {!authenticated && item.kind === "channel" && !enabled && (
         <div className="flex items-center gap-1.5 mb-2.5 px-2 py-1 rounded-md bg-info/10 border border-info/20 w-fit">
@@ -150,7 +167,7 @@ export default function CatalogCard({
               />
             </button>
           )
-        ) : tierLocked ? (
+        ) : tierLocked || slotLocked ? (
           <button
             onClick={() => open("https://myscrollr.com/uplink")}
             className="flex items-center gap-1 text-ui-chip font-medium text-warn hover:text-warn/80 transition-all duration-150 active:scale-95"

@@ -685,8 +685,13 @@ const DEFAULT_CHANNEL_DISPLAY: ChannelDisplayPrefs = {
 };
 
 const DEFAULT_WIDGETS: WidgetPrefs = {
-  enabledWidgets: [],
-  widgetsOnTicker: [],
+  // Onboarding default (widget/slot redesign, 2026-06-30): a brand-new
+  // account starts with the zero-config Clock so the ticker has something to
+  // show immediately instead of an empty bar. It costs 1 of the free plan's
+  // 3 slots and needs no setup. Existing users keep their saved prefs — this
+  // only seeds fresh installs.
+  enabledWidgets: ["clock"],
+  widgetsOnTicker: ["clock"],
   pinnedWidgets: {},
   clock: {
     ticker: { ...DEFAULT_CLOCK_TICKER },
