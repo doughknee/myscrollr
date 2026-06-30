@@ -18,6 +18,7 @@ import (
 func TestDefaultTierLimits_Exact(t *testing.T) {
 	cases := []struct {
 		tier                   string
+		maxWidgets             *int
 		symbols                *int
 		feeds                  *int
 		customFeeds            *int
@@ -26,11 +27,11 @@ func TestDefaultTierLimits_Exact(t *testing.T) {
 		maxTickerRows          int
 		maxTickerCustomization bool
 	}{
-		{"free", intPtr(5), intPtr(1), intPtr(0), intPtr(1), intPtr(0), 1, false},
-		{"uplink", intPtr(25), intPtr(25), intPtr(1), intPtr(8), intPtr(1), 2, false},
-		{"uplink_pro", intPtr(75), intPtr(100), intPtr(3), intPtr(20), intPtr(3), 3, false},
-		{"uplink_ultimate", nil, nil, intPtr(10), nil, intPtr(10), 3, true},
-		{"super_user", nil, nil, nil, nil, nil, 3, true},
+		{"free", intPtr(3), intPtr(5), intPtr(1), intPtr(0), intPtr(1), intPtr(0), 1, false},
+		{"uplink", intPtr(6), intPtr(25), intPtr(25), intPtr(1), intPtr(8), intPtr(1), 2, false},
+		{"uplink_pro", intPtr(12), intPtr(75), intPtr(100), intPtr(3), intPtr(20), intPtr(3), 3, false},
+		{"uplink_ultimate", nil, nil, nil, intPtr(10), nil, intPtr(10), 3, true},
+		{"super_user", nil, nil, nil, nil, nil, nil, 3, true},
 	}
 
 	for _, c := range cases {
@@ -39,6 +40,7 @@ func TestDefaultTierLimits_Exact(t *testing.T) {
 			t.Errorf("missing tier: %q", c.tier)
 			continue
 		}
+		assertIntPtrEq(t, c.tier+".max_widgets", c.maxWidgets, got.MaxWidgets)
 		assertIntPtrEq(t, c.tier+".symbols", c.symbols, got.Symbols)
 		assertIntPtrEq(t, c.tier+".feeds", c.feeds, got.Feeds)
 		assertIntPtrEq(t, c.tier+".custom_feeds", c.customFeeds, got.CustomFeeds)
@@ -86,6 +88,15 @@ func TestTierLimitsJSONShape(t *testing.T) {
 	free := parsed["tiers"]["free"]
 	if got, ok := free["symbols"].(float64); !ok || got != 5 {
 		t.Errorf("free.symbols = %v (want 5)", free["symbols"])
+	}
+
+	// max_widgets must round-trip: a finite slot cap on free, null
+	// (unlimited) on the top tiers.
+	if got, ok := free["max_widgets"].(float64); !ok || got != 3 {
+		t.Errorf("free.max_widgets = %v (want 3)", free["max_widgets"])
+	}
+	if ult["max_widgets"] != nil {
+		t.Errorf("uplink_ultimate.max_widgets = %v (want null)", ult["max_widgets"])
 	}
 }
 

@@ -49,6 +49,17 @@ func GetUserChannels(logtoSub string) ([]Channel, error) {
 	return channels, nil
 }
 
+// CountEnabledChannels returns how many enabled channels (widgets) a user
+// currently has — the "slots in use" for the widget/slot model. Used by
+// CreateChannel to gate new additions against the tier's MaxWidgets cap.
+func CountEnabledChannels(ctx context.Context, logtoSub string) (int, error) {
+	var n int
+	err := DBPool.QueryRow(ctx,
+		`SELECT count(*) FROM user_channels WHERE logto_sub = $1 AND enabled = true`,
+		logtoSub).Scan(&n)
+	return n, err
+}
+
 // SyncChannelSubscriptions rebuilds Redis subscription sets for a user from their
 // current channels in the database. Called on dashboard load and after channel CRUD.
 func SyncChannelSubscriptions(logtoSub string) {
@@ -275,6 +286,24 @@ func CreateChannel(c *fiber.Ctx) error {
 	// but the API is the only place that actually matters — the Rust
 	// ingestion services trust user_channels.config verbatim.
 	tier := tierFromRoles(GetUserRoles(c))
+
+	// Slot gate (widget/slot model, 2026-06-30): block adding a *new*
+	// widget once the user is at their tier's MaxWidgets cap. Existing
+	// over-cap users are grandfathered — we never disable what they
+	// already have, we only block new adds. nil cap = unlimited. A count
+	// error is logged but not fatal: failing open here is safer than
+	// blocking a legitimate add on a transient DB blip (the per-feature
+	// validation below still runs).
+	if max := MaxWidgetsForTier(tier); max != nil {
+		if count, err := CountEnabledChannels(context.Background(), userID); err != nil {
+			log.Printf("[Channels] slot count failed for %s: %v", userID, err)
+		} else if count >= *max {
+			tle := &TierLimitError{Tier: tier, ChannelType: req.ChannelType, Field: "widgets", Limit: *max, Got: count + 1}
+			log.Printf("[Channels] slot limit reached for %s: %d/%d", userID, count, *max)
+			return c.Status(fiber.StatusForbidden).JSON(tierLimitErrorResponse(tle))
+		}
+	}
+
 	if err := ValidateChannelConfig(tier, req.ChannelType, req.Config); err != nil {
 		var tle *TierLimitError
 		if errors.As(err, &tle) {

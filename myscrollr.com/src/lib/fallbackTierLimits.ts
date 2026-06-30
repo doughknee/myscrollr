@@ -12,6 +12,7 @@ import type { TierLimitsResponse } from '@/api/client'
 export const FALLBACK_LIMITS: TierLimitsResponse = {
   tiers: {
     free: {
+      max_widgets: 3,
       symbols: 5,
       feeds: 1,
       custom_feeds: 0,
@@ -21,6 +22,7 @@ export const FALLBACK_LIMITS: TierLimitsResponse = {
       max_ticker_customization: false,
     },
     uplink: {
+      max_widgets: 6,
       symbols: 25,
       feeds: 25,
       custom_feeds: 1,
@@ -30,6 +32,7 @@ export const FALLBACK_LIMITS: TierLimitsResponse = {
       max_ticker_customization: false,
     },
     uplink_pro: {
+      max_widgets: 12,
       symbols: 75,
       feeds: 100,
       custom_feeds: 3,
@@ -39,6 +42,7 @@ export const FALLBACK_LIMITS: TierLimitsResponse = {
       max_ticker_customization: false,
     },
     uplink_ultimate: {
+      max_widgets: null,
       symbols: null,
       feeds: null,
       custom_feeds: 10,
@@ -48,6 +52,7 @@ export const FALLBACK_LIMITS: TierLimitsResponse = {
       max_ticker_customization: true,
     },
     super_user: {
+      max_widgets: null,
       symbols: null,
       feeds: null,
       custom_feeds: null,

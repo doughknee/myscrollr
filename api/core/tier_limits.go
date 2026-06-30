@@ -11,6 +11,12 @@ import (
 // round-trip cleanly through JSON (where Go's Infinity has no analogue)
 // and lets clients treat null as "no cap."
 type ChannelLimits struct {
+	// MaxWidgets caps how many widgets a user may run at once — the slot
+	// model from the 2026-06-30 widget/slot redesign. A nil pointer means
+	// "unlimited". During the transition this lever lives alongside the
+	// per-feature caps below; those are retired as their UI consumers
+	// migrate to the widget catalog.
+	MaxWidgets             *int `json:"max_widgets"`
 	Symbols                *int `json:"symbols"`
 	Feeds                  *int `json:"feeds"`
 	CustomFeeds            *int `json:"custom_feeds"`
@@ -42,11 +48,11 @@ type TierLimitsResponse struct {
 // these values directly gate what the DB will accept, so drift is
 // unforgiving.
 var DefaultTierLimits = map[string]ChannelLimits{
-	"free":            {Symbols: intPtr(5), Feeds: intPtr(1), CustomFeeds: intPtr(0), Leagues: intPtr(1), Fantasy: intPtr(0), MaxTickerRows: 1, MaxTickerCustomization: false},
-	"uplink":          {Symbols: intPtr(25), Feeds: intPtr(25), CustomFeeds: intPtr(1), Leagues: intPtr(8), Fantasy: intPtr(1), MaxTickerRows: 2, MaxTickerCustomization: false},
-	"uplink_pro":      {Symbols: intPtr(75), Feeds: intPtr(100), CustomFeeds: intPtr(3), Leagues: intPtr(20), Fantasy: intPtr(3), MaxTickerRows: 3, MaxTickerCustomization: false},
-	"uplink_ultimate": {Symbols: nil, Feeds: nil, CustomFeeds: intPtr(10), Leagues: nil, Fantasy: intPtr(10), MaxTickerRows: 3, MaxTickerCustomization: true},
-	"super_user":      {Symbols: nil, Feeds: nil, CustomFeeds: nil, Leagues: nil, Fantasy: nil, MaxTickerRows: 3, MaxTickerCustomization: true},
+	"free":            {MaxWidgets: intPtr(3), Symbols: intPtr(5), Feeds: intPtr(1), CustomFeeds: intPtr(0), Leagues: intPtr(1), Fantasy: intPtr(0), MaxTickerRows: 1, MaxTickerCustomization: false},
+	"uplink":          {MaxWidgets: intPtr(6), Symbols: intPtr(25), Feeds: intPtr(25), CustomFeeds: intPtr(1), Leagues: intPtr(8), Fantasy: intPtr(1), MaxTickerRows: 2, MaxTickerCustomization: false},
+	"uplink_pro":      {MaxWidgets: intPtr(12), Symbols: intPtr(75), Feeds: intPtr(100), CustomFeeds: intPtr(3), Leagues: intPtr(20), Fantasy: intPtr(3), MaxTickerRows: 3, MaxTickerCustomization: false},
+	"uplink_ultimate": {MaxWidgets: nil, Symbols: nil, Feeds: nil, CustomFeeds: intPtr(10), Leagues: nil, Fantasy: intPtr(10), MaxTickerRows: 3, MaxTickerCustomization: true},
+	"super_user":      {MaxWidgets: nil, Symbols: nil, Feeds: nil, CustomFeeds: nil, Leagues: nil, Fantasy: nil, MaxTickerRows: 3, MaxTickerCustomization: true},
 }
 
 // HandleGetTierLimits serves the tier limits map to any caller — clients
@@ -67,6 +73,18 @@ func HandleGetTierLimits(c *fiber.Ctx) error {
 // above so each row stays readable.
 func intPtr(n int) *int {
 	return &n
+}
+
+// MaxWidgetsForTier returns the widget-slot cap for a tier (nil =
+// unlimited). Unknown tiers fall back to "free", matching the defensive
+// default ValidateChannelConfig uses, so an unrecognized JWT role can
+// never grant more slots than the free plan.
+func MaxWidgetsForTier(tier string) *int {
+	limits, ok := DefaultTierLimits[tier]
+	if !ok {
+		limits = DefaultTierLimits["free"]
+	}
+	return limits.MaxWidgets
 }
 
 // ─── Server-side enforcement ─────────────────────────────────────────
@@ -93,6 +111,14 @@ func (e *TierLimitError) Error() string {
 // UserFacingMessage returns copy suitable for the `error` field of a 403
 // response body. Kept short and specific so the UI can show it verbatim.
 func (e *TierLimitError) UserFacingMessage() string {
+	// The widget-slot cap reads more naturally as a "running at once"
+	// message than the per-feature "you tried to save N" phrasing.
+	if e.Field == "widgets" {
+		return fmt.Sprintf(
+			"Your %s plan runs %d widgets at once. Disable one to add another, or upgrade for more.",
+			TierDisplayName(e.Tier), e.Limit,
+		)
+	}
 	return fmt.Sprintf(
 		"Your %s plan allows %d %s; you tried to save %d.",
 		TierDisplayName(e.Tier), e.Limit, e.Field, e.Got,

@@ -1,6 +1,7 @@
 {
   "tiers": {
     "free": {
+      "max_widgets": 3,
       "symbols": 5,
       "feeds": 1,
       "custom_feeds": 0,
@@ -10,6 +11,7 @@
       "max_ticker_customization": false
     },
     "uplink": {
+      "max_widgets": 6,
       "symbols": 25,
       "feeds": 25,
       "custom_feeds": 1,
@@ -19,6 +21,7 @@
       "max_ticker_customization": false
     },
     "uplink_pro": {
+      "max_widgets": 12,
       "symbols": 75,
       "feeds": 100,
       "custom_feeds": 3,
@@ -28,6 +31,7 @@
       "max_ticker_customization": false
     },
     "uplink_ultimate": {
+      "max_widgets": null,
       "symbols": null,
       "feeds": null,
       "custom_feeds": 10,
@@ -37,6 +41,7 @@
       "max_ticker_customization": true
     },
     "super_user": {
+      "max_widgets": null,
       "symbols": null,
       "feeds": null,
       "custom_feeds": null,
@@ -47,4 +52,3 @@
     }
   }
 }
-

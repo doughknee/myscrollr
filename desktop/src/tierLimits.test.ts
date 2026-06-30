@@ -4,11 +4,26 @@ import {
   TIER_LIMITS,
   getLimit,
   isUnlimited,
+  getMaxWidgets,
   getMaxTickerRows,
   canCustomizeTickerRows,
   maxItemsForBrowser,
 } from "./tierLimits";
 import type { SubscriptionTier } from "./auth";
+
+// ── getMaxWidgets ───────────────────────────────────────────────
+
+describe("getMaxWidgets", () => {
+  it.each<[SubscriptionTier, number]>([
+    ["free", 3],
+    ["uplink", 6],
+    ["uplink_pro", 12],
+    ["uplink_ultimate", Infinity],
+    ["super_user", Infinity],
+  ])("returns %s = %d", (tier, expected) => {
+    expect(getMaxWidgets(tier)).toBe(expected);
+  });
+});
 
 // ── getLimit ────────────────────────────────────────────────────
 
@@ -165,6 +180,7 @@ describe("TIER_LIMITS table", () => {
       Object.entries(TIER_LIMITS).map(([tier, l]) => [
         tier,
         {
+          max_widgets: toWire(l.maxWidgets),
           symbols: toWire(l.symbols),
           feeds: toWire(l.feeds),
           custom_feeds: toWire(l.customFeeds),
@@ -179,7 +195,7 @@ describe("TIER_LIMITS table", () => {
   });
 
   it("super_user matches or exceeds every other tier on every numeric key", () => {
-    const keys = ["symbols", "feeds", "customFeeds", "leagues", "fantasy", "maxTickerRows"] as const;
+    const keys = ["maxWidgets", "symbols", "feeds", "customFeeds", "leagues", "fantasy", "maxTickerRows"] as const;
     const tiers: SubscriptionTier[] = ["free", "uplink", "uplink_pro", "uplink_ultimate"];
     for (const key of keys) {
       const superVal = TIER_LIMITS.super_user[key];

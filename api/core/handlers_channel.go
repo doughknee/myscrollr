@@ -46,32 +46,18 @@ func StreamEvents(c *fiber.Ctx) error {
 		})
 	}
 
-	// 2. Validate JWT and get user ID
-	userID, claims, err := ValidateToken(tokenString)
+	// 2. Validate JWT and get user ID. Real-time delivery is available to
+	// every tier (widget/slot redesign, 2026-06-30): the former
+	// Ultimate-only gate was removed so the "always-on live ticker" promise
+	// holds for all plans. Monetization is now purely the widget-slot count;
+	// more SSE subscribers do not increase upstream data-provider quota
+	// (CDC fans out already-ingested data via Redis).
+	userID, _, err := ValidateToken(tokenString)
 	if err != nil {
 		log.Printf("[SSE] Auth failed: %v", err)
 		return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
 			Status: "unauthorized",
 			Error:  "Invalid or expired token",
-		})
-	}
-
-	// 2b. Extract roles and enforce Uplink Ultimate requirement
-	var roles []string
-	if rawRoles, ok := claims["roles"]; ok {
-		if roleSlice, ok := rawRoles.([]interface{}); ok {
-			for _, r := range roleSlice {
-				if s, ok := r.(string); ok {
-					roles = append(roles, s)
-				}
-			}
-		}
-	}
-	tier := tierFromRoles(roles)
-	if tier != "uplink_ultimate" && tier != "super_user" {
-		return c.Status(fiber.StatusForbidden).JSON(ErrorResponse{
-			Status: "forbidden",
-			Error:  "SSE requires an Uplink Ultimate subscription",
 		})
 	}
 
