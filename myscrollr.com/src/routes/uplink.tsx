@@ -279,7 +279,20 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
     return n === 0 ? 'None' : String(n)
   }
 
+  const widgets = (n: number | null): string =>
+    n === null ? 'Unlimited' : `${n} widgets`
+
   return [
+    {
+      label: 'Widgets at once',
+      free: widgets(free.max_widgets),
+      uplink: widgets(uplink.max_widgets),
+      pro: widgets(pro.max_widgets),
+      ultimate: widgets(ult.max_widgets),
+      uplinkUp: true,
+      proUp: true,
+      ultimateUp: true,
+    },
     {
       label: 'Data Delivery',
       free: '60s polling',
@@ -675,6 +688,13 @@ function buildUplinkFAQ(limits: TierLimitsResponse): Array<FAQItem> {
     n === null ? 'unlimited' : `${n}`
 
   return [
+    {
+      icon: Sparkles,
+      question: 'What are widgets, and how many do I get?',
+      highlight: `Run ${ultimateCopy(free.max_widgets)} widgets at once on Free, up to ${ultimateCopy(ult.max_widgets)} on Ultimate.`,
+      answer: `Widgets are the building blocks of your ticker — MLB scores, a stocks watchlist, crypto prices, your news feed, Yahoo Fantasy, and more. Your plan sets how many run at the same time: Free runs ${free.max_widgets}, Uplink ${uplink.max_widgets}, Pro ${pro.max_widgets}, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.`,
+      accent: 'emerald',
+    },
     {
       icon: Zap,
       question: 'What does "data delivery" mean?',
