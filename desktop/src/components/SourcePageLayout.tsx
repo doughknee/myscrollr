@@ -2,21 +2,24 @@
  * SourcePageLayout — page chassis for channel and widget routes.
  *
  * Renders through the universal `PageLayout`. Source pages no longer
- * have a visible tab band — Feed is the single visible page. All
- * secondary actions (Configure, Display preferences, Remove) live in
- * a contextual menu opened by the "Options" pill button in the
- * TopBar. The breadcrumb segments are plain navigation text — the
- * pill is the single, explicit menu trigger.
+ * have a visible tab band — Feed is the single visible page. Secondary
+ * actions (Configure, Remove) live in a contextual menu opened by the
+ * "Options" pill button in the TopBar. The breadcrumb segments are
+ * plain navigation text — the pill is the single, explicit menu trigger.
  *
- * The /feed, /configuration, and /display routes all still exist for
- * direct deeplinks, tray actions, and the Catalog "Open" → feed flow.
+ * The /feed and /configuration routes both still exist for direct
+ * deeplinks, tray actions, and the Catalog "Open" → feed flow. The old
+ * per-channel /display venue-matrix pages were removed in the
+ * widget/slot redesign (2026-06-30) — display venue prefs still persist
+ * for backward compat and the ticker reads them, but are no longer
+ * user-configurable here.
  *
  * IA refactor 2026-05-09 — see
  * docs/superpowers/specs/2026-05-09-desktop-ia-refactor-design.md
  * Walkthrough discoverability fix 2026-05-11.
  */
 import { useState } from "react";
-import { Settings as SettingsIcon, SlidersHorizontal, Tv, Trash2 } from "lucide-react";
+import { Settings as SettingsIcon, Tv, Trash2 } from "lucide-react";
 import ConfirmDialog from "./ConfirmDialog";
 import PageLayout from "./layout/PageLayout";
 import { type OverflowMenuItem } from "./OverflowMenu";
@@ -34,7 +37,7 @@ import { type OverflowMenuItem } from "./OverflowMenu";
 // a visible tab band; users navigate via the OverflowMenu in the
 // TopBar entityAction slot.
 
-export const VALID_TABS = ["feed", "configuration", "display"] as const;
+export const VALID_TABS = ["feed", "configuration"] as const;
 export type SourceTab = (typeof VALID_TABS)[number];
 
 /** Parse a raw tab parameter into a valid SourceTab.
@@ -83,10 +86,6 @@ interface SourcePageLayoutProps {
   onRemove?: () => void;
   /** "channel" triggers a ConfirmDialog before removal; "widget" removes immediately. */
   sourceKind?: "channel" | "widget";
-  /** Whether this source has display preferences. Channels: true.
-   *  Widgets: their display options live alongside config; we don't
-   *  surface a separate "Display" menu item for them. */
-  hasDisplayPreferences?: boolean;
 }
 
 export default function SourcePageLayout({
@@ -98,7 +97,6 @@ export default function SourcePageLayout({
   children,
   onRemove,
   sourceKind,
-  hasDisplayPreferences = false,
 }: SourcePageLayoutProps) {
   const [confirmRemove, setConfirmRemove] = useState(false);
 
@@ -142,18 +140,6 @@ export default function SourcePageLayout({
           : "Pick what to track",
       icon: SettingsIcon,
       onSelect: () => onTabChange("configuration"),
-    });
-  }
-
-  // Display preferences — channels only, on its own /display route.
-  // Hidden when already on Display.
-  if (hasDisplayPreferences && activeTab !== "display") {
-    menuItems.push({
-      key: "display",
-      label: "Display preferences",
-      hint: "Choose what shows on Home and the ticker",
-      icon: SlidersHorizontal,
-      onSelect: () => onTabChange("display"),
     });
   }
 

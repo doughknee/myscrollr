@@ -7,10 +7,9 @@
  *
  * Source-level actions (remove) are in the header bar.
  *
- * Display preferences live as a section inside the Configure tab —
- * the IA refactor (2026-05-09) folded the old Display tab into
- * Configure for symmetry with widgets and to reduce per-source
- * cognitive overhead.
+ * The old per-channel Display venue-matrix pages were removed in the
+ * widget/slot redesign (2026-06-30). Display venue prefs still persist
+ * for backward compat (the ticker reads them) but aren't configured here.
  */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import RouteError from "../components/RouteError";
@@ -19,11 +18,6 @@ import { useQuery } from "@tanstack/react-query";
 import { getChannel, getAllChannels } from "../channels/registry";
 import { dashboardQueryOptions } from "../api/queries";
 import ChannelConfigPanel from "../channels/ChannelConfigPanel";
-import FinanceDisplayPanel from "../channels/finance/DisplayPanel";
-import SportsDisplayPanel from "../channels/sports/DisplayPanel";
-import RssDisplayPanel from "../channels/rss/DisplayPanel";
-import FantasyDisplayPanel from "../channels/fantasy/DisplayPanel";
-import PredictionsDisplayPanel from "../channels/predictions/DisplayPanel";
 import { useShell } from "../shell-context";
 import { loadPref } from "../preferences";
 import type { Channel, ChannelType } from "../api/client";
@@ -50,26 +44,10 @@ function ChannelRoute() {
     return <SourceNotFound kind="Channel" name={type} />;
   }
 
-  // Channels with display preferences. Drives the OverflowMenu's
-  // "Display preferences" entry and the /display route's content.
-  const HAS_DISPLAY: Record<string, boolean> = {
-    finance: true,
-    sports: true,
-    rss: true,
-    fantasy: true,
-    predictions: true,
-  };
-
   // Subtitle reflects the current sub-route in the breadcrumb:
   //   Home / Sports                   (feed — no subtitle)
   //   Home / Sports / Configure       (configuration tab)
-  //   Home / Sports / Display         (display tab)
-  const subtitle =
-    tab === "configuration"
-      ? "Configure"
-      : tab === "display"
-        ? "Display preferences"
-        : undefined;
+  const subtitle = tab === "configuration" ? "Configure" : undefined;
 
   return (
     <SourcePageLayout
@@ -85,7 +63,6 @@ function ChannelRoute() {
         navigate({ to: "/feed" });
       }}
       sourceKind="channel"
-      hasDisplayPreferences={HAS_DISPLAY[type] ?? false}
     >
       {tab === "feed" && (
         <ChannelFeedTab
@@ -98,7 +75,6 @@ function ChannelRoute() {
       {tab === "configuration" && (
         <ChannelConfigTab type={type} dashboard={dashboard} />
       )}
-      {tab === "display" && <ChannelDisplayTab type={type} />}
     </SourcePageLayout>
   );
 }
@@ -161,26 +137,6 @@ function ChannelConfigTab({
       hex={manifest?.hex ?? "var(--color-accent)"}
     />
   );
-}
-
-function ChannelDisplayTab({ type }: { type: string }) {
-  // Per-channel display preferences. Finance has the new live-preview
-  // DisplayPanel (2026 polish); the others still use the old
-  // venue-grid layout pending the same treatment.
-  switch (type) {
-    case "finance":
-      return <FinanceDisplayPanel />;
-    case "sports":
-      return <SportsDisplayPanel />;
-    case "rss":
-      return <RssDisplayPanel />;
-    case "fantasy":
-      return <FantasyDisplayPanel />;
-    case "predictions":
-      return <PredictionsDisplayPanel />;
-    default:
-      return null;
-  }
 }
 
 function ChannelPending() {
