@@ -152,15 +152,15 @@ export default function CatalogCard({
         {loading ? (
           <Loader2 size={14} className="animate-spin text-fg-4" />
         ) : enabled ? (
-          // Already added: only "Open" — removal happens on the
-          // source page (see Source page Trash + Undo). One canonical
-          // home per verb.
+          // Already added: channels open straight to Configure (the catalog
+          // is the one place to add AND set up a source); widgets open their
+          // page. Removal happens there via Trash + Undo. One home per verb.
           onOpen && (
             <button
               onClick={() => onOpen(item)}
               className="group flex items-center gap-0.5 text-ui-chip font-semibold text-accent hover:text-accent/80 transition-all duration-150 active:scale-95"
             >
-              Open
+              {item.kind === "channel" ? "Configure" : "Open"}
               <ChevronRight
                 size={12}
                 className="transition-transform duration-200 group-hover:translate-x-0.5"

@@ -281,7 +281,11 @@ function CatalogPage() {
                     onLogin={onLogin}
                     onOpen={(it) => {
                       if (it.kind === "channel") {
-                        navigate({ to: "/channel/$type/$tab", params: { type: it.id, tab: "feed" } });
+                        // Added channels open straight to Configure — the
+                        // catalog is the one surface for adding AND setting
+                        // up a source, no Options-menu hunting (widget/slot
+                        // redesign, 2026-06-30).
+                        navigate({ to: "/channel/$type/$tab", params: { type: it.id, tab: "configuration" } });
                       } else {
                         navigate({ to: "/widget/$id/$tab", params: { id: it.id, tab: "feed" } });
                       }
