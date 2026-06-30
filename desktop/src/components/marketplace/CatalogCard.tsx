@@ -49,9 +49,11 @@ export default function CatalogCard({
   const tierLocked =
     authenticated && item.requiredTier !== "free" && !tierMeetsRequirement(tier, item.requiredTier);
 
-  // At the plan's widget-slot cap: lock *new* adds. Already-added items keep
-  // their "Open" state; tier-locked items keep their own upsell.
-  const slotLocked = !!slotsAtCapacity && !enabled && !tierLocked && authenticated;
+  // At the plan's widget-slot cap: lock *new* adds. The cap applies to
+  // everyone (free = 3 widgets), including signed-out/demo sessions, since
+  // local widgets count toward it too ("every widget counts"). Already-added
+  // and tier-locked items keep their own states.
+  const slotLocked = !!slotsAtCapacity && !enabled && !tierLocked;
 
   async function handleAdd() {
     if (!authenticated && item.kind === "channel") {
