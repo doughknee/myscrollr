@@ -74,7 +74,7 @@ export default function CatalogCard({
   return (
     <div
       className={clsx(
-        "group/card relative flex flex-col overflow-hidden rounded-xl border border-edge/40 bg-base-150/30 p-4",
+        "group/card relative flex min-h-[10rem] flex-col overflow-hidden rounded-xl border border-edge/40 bg-base-150/30 p-4",
         "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft-sm hover:border-edge/60 hover:bg-base-150/50",
         // Added cards de-emphasized so new content stays prominent.
         enabled && "opacity-80 hover:opacity-100",
@@ -118,10 +118,7 @@ export default function CatalogCard({
                 </span>
               )}
             </div>
-            <span
-              className="text-ui-chip font-semibold uppercase tracking-wide"
-              style={{ color: item.hex }}
-            >
+            <span className="text-ui-chip font-semibold uppercase tracking-wide text-fg-4">
               {CATEGORY_LABELS[item.category]}
             </span>
           </div>
@@ -156,7 +153,8 @@ export default function CatalogCard({
           onOpen && (
             <button
               onClick={() => onOpen(item)}
-              className="group/btn flex items-center gap-0.5 rounded-lg px-2.5 py-1 text-ui-chip font-semibold text-accent bg-accent/10 hover:bg-accent/[0.16] shadow-soft-sm transition-all duration-150 active:scale-95"
+              style={{ backgroundColor: item.hex, color: readableTextOn(item.hex) }}
+              className="group/btn flex items-center gap-0.5 rounded-lg px-2.5 py-1 text-ui-chip font-semibold shadow-soft-sm transition-all duration-150 active:scale-95 hover:brightness-110"
             >
               {item.kind === "data" ? "Configure" : "Open"}
               <ChevronRight
@@ -183,11 +181,16 @@ export default function CatalogCard({
           <button
             onClick={handleAdd}
             disabled={dashboardLoading && item.kind === "data"}
+            style={
+              dashboardLoading && item.kind === "data"
+                ? undefined
+                : { backgroundColor: item.hex, color: readableTextOn(item.hex) }
+            }
             className={clsx(
               "rounded-lg px-3 py-1 text-ui-chip font-semibold shadow-soft-sm transition-all duration-150 active:scale-95",
               dashboardLoading && item.kind === "data"
-                ? "text-fg-4 cursor-not-allowed bg-base-200/60"
-                : "text-surface bg-accent hover:bg-accent/90",
+                ? "cursor-not-allowed bg-base-200/60 text-fg-4"
+                : "hover:brightness-110",
             )}
           >
             Add
@@ -204,4 +207,17 @@ const TIER_ORDER: SubscriptionTier[] = ["free", "uplink", "uplink_pro", "uplink_
 
 function tierMeetsRequirement(current: SubscriptionTier, required: SubscriptionTier): boolean {
   return TIER_ORDER.indexOf(current) >= TIER_ORDER.indexOf(required);
+}
+
+// Pick a readable text color (near-black or white) for a solid brand-colored
+// button, from the color's perceived luminance — so a light brand (gold, teal)
+// gets dark text and a dark brand (navy, red) gets white.
+function readableTextOn(hex: string): string {
+  const h = hex.replace("#", "");
+  if (h.length < 6) return "#ffffff";
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.62 ? "#111827" : "#ffffff";
 }
