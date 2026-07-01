@@ -74,62 +74,65 @@ export default function CatalogCard({
   return (
     <div
       className={clsx(
-        "group/card flex flex-col rounded-xl border border-edge/40 overflow-hidden bg-base-150/30",
+        "group/card relative flex flex-col overflow-hidden rounded-xl border border-edge/40 bg-base-150/30 p-4",
         "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft-sm hover:border-edge/60 hover:bg-base-150/50",
         // Added cards de-emphasized so new content stays prominent.
         enabled && "opacity-80 hover:opacity-100",
       )}
     >
-      {/* Brand header band — a subtle wash of the widget's own color, with
-          the real logo (no bubble) or a colored icon fallback. */}
+      {/* Brand wash — a single vertical fade of the widget's color across the
+          whole card, so there's no seam where a header band would end. */}
       <div
-        className="flex items-center gap-3 px-4 pt-4 pb-3"
+        className="pointer-events-none absolute inset-x-0 top-0 h-24"
         style={{
-          background: `linear-gradient(135deg, ${item.hex}26 0%, ${item.hex}0d 55%, transparent 100%)`,
+          background: `linear-gradient(to bottom, ${item.hex}30 0%, ${item.hex}0a 45%, transparent 100%)`,
         }}
-      >
-        {item.logoUrl && !logoFailed ? (
-          <img
-            src={item.logoUrl}
-            alt=""
-            loading="lazy"
-            className="w-10 h-10 rounded-lg object-contain shrink-0"
-            onError={() => setLogoFailed(true)}
-          />
-        ) : (
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-            style={{ backgroundColor: `${item.hex}20`, color: item.hex }}
-          >
-            <Icon size={22} />
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="text-ui-body font-semibold truncate">{item.name}</span>
-            {enabled && (
-              <span className="flex items-center gap-0.5 text-ui-chip font-medium text-success shrink-0">
-                <Check size={10} />
-                Added
-              </span>
-            )}
-          </div>
-          <span
-            className="text-ui-chip font-semibold uppercase tracking-wide"
-            style={{ color: item.hex }}
-          >
-            {CATEGORY_LABELS[item.category]}
-          </span>
-        </div>
-      </div>
+      />
 
-      {/* Body */}
-      <div className="flex flex-1 flex-col px-4 pb-3.5 pt-2.5">
-        <p className="text-ui-meta leading-relaxed line-clamp-2 min-h-[2.4em]">
+      {/* Content */}
+      <div className="relative flex flex-1 flex-col">
+        <div className="flex items-center gap-3">
+          {item.logoUrl && !logoFailed ? (
+            <img
+              src={item.logoUrl}
+              alt=""
+              loading="lazy"
+              className="w-10 h-10 rounded-lg object-contain shrink-0"
+              onError={() => setLogoFailed(true)}
+            />
+          ) : (
+            <div
+              className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+              style={{ backgroundColor: `${item.hex}20`, color: item.hex }}
+            >
+              <Icon size={22} />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-ui-body font-semibold truncate">{item.name}</span>
+              {enabled && (
+                <span className="flex items-center gap-0.5 text-ui-chip font-medium text-success shrink-0">
+                  <Check size={10} />
+                  Added
+                </span>
+              )}
+            </div>
+            <span
+              className="text-ui-chip font-semibold uppercase tracking-wide"
+              style={{ color: item.hex }}
+            >
+              {CATEGORY_LABELS[item.category]}
+            </span>
+          </div>
+        </div>
+
+        <p className="mt-2.5 text-ui-meta leading-relaxed line-clamp-2 min-h-[2.4em]">
           {item.description}
         </p>
 
-        {/* Status badge — only one shows at a time. */}
+        {/* Locked context (subtle, in flow). Free/unlocked widgets show
+            nothing here, keeping the grid calm. */}
         {tierLocked ? (
           <span className="mt-2.5 w-fit rounded-md bg-warn/10 border border-warn/20 px-2 py-0.5 text-ui-chip font-medium text-warn">
             Requires {TIER_LABELS[item.requiredTier]}
@@ -138,58 +141,58 @@ export default function CatalogCard({
           <span className="mt-2.5 w-fit rounded-md bg-warn/10 border border-warn/20 px-2 py-0.5 text-ui-chip font-medium text-warn">
             Widget limit reached
           </span>
-        ) : !authenticated && item.kind === "data" && !enabled ? (
-          <span className="mt-2.5 w-fit rounded-md bg-info/10 border border-info/20 px-2 py-0.5 text-ui-chip font-medium text-info">
-            Sign in to add
-          </span>
         ) : null}
+      </div>
 
-        {/* Action row — pinned to the bottom so cards align. */}
-        <div className="mt-auto pt-3 flex items-center justify-end">
-          {loading ? (
+      {/* Action — revealed on hover (or keyboard focus), absolutely positioned
+          so it never adds height or shouts on every card. Its own background +
+          shadow keep it readable over the content. */}
+      <div className="absolute bottom-3 right-3 opacity-0 translate-y-1 transition-all duration-150 group-hover/card:opacity-100 group-hover/card:translate-y-0 focus-within:opacity-100 focus-within:translate-y-0">
+        {loading ? (
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-base-100/80 shadow-soft-sm">
             <Loader2 size={14} className="animate-spin text-fg-4" />
-          ) : enabled ? (
-            onOpen && (
-              <button
-                onClick={() => onOpen(item)}
-                className="group/btn flex items-center gap-0.5 rounded-lg px-2.5 py-1 text-ui-chip font-semibold text-accent bg-accent/10 hover:bg-accent/[0.16] transition-all duration-150 active:scale-95"
-              >
-                {item.kind === "data" ? "Configure" : "Open"}
-                <ChevronRight
-                  size={12}
-                  className="transition-transform duration-200 group-hover/btn:translate-x-0.5"
-                />
-              </button>
-            )
-          ) : tierLocked || slotLocked ? (
+          </span>
+        ) : enabled ? (
+          onOpen && (
             <button
-              onClick={() => open("https://myscrollr.com/uplink")}
-              className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-ui-chip font-semibold text-warn bg-warn/10 hover:bg-warn/[0.16] transition-all duration-150 active:scale-95"
+              onClick={() => onOpen(item)}
+              className="group/btn flex items-center gap-0.5 rounded-lg px-2.5 py-1 text-ui-chip font-semibold text-accent bg-accent/10 hover:bg-accent/[0.16] shadow-soft-sm transition-all duration-150 active:scale-95"
             >
-              Upgrade <ExternalLink size={10} />
+              {item.kind === "data" ? "Configure" : "Open"}
+              <ChevronRight
+                size={12}
+                className="transition-transform duration-200 group-hover/btn:translate-x-0.5"
+              />
             </button>
-          ) : !authenticated && item.kind === "data" ? (
-            <button
-              onClick={onLogin}
-              className="rounded-lg px-2.5 py-1 text-ui-chip font-semibold text-accent bg-accent/10 hover:bg-accent/[0.16] transition-all duration-150 active:scale-95"
-            >
-              Sign in
-            </button>
-          ) : (
-            <button
-              onClick={handleAdd}
-              disabled={dashboardLoading && item.kind === "data"}
-              className={clsx(
-                "rounded-lg px-3 py-1 text-ui-chip font-semibold transition-all duration-150 active:scale-95",
-                dashboardLoading && item.kind === "data"
-                  ? "text-fg-4 cursor-not-allowed bg-base-200/40"
-                  : "text-surface bg-accent hover:bg-accent/90",
-              )}
-            >
-              Add
-            </button>
-          )}
-        </div>
+          )
+        ) : tierLocked || slotLocked ? (
+          <button
+            onClick={() => open("https://myscrollr.com/uplink")}
+            className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-ui-chip font-semibold text-warn bg-warn/15 hover:bg-warn/25 shadow-soft-sm transition-all duration-150 active:scale-95"
+          >
+            Upgrade <ExternalLink size={10} />
+          </button>
+        ) : !authenticated && item.kind === "data" ? (
+          <button
+            onClick={onLogin}
+            className="rounded-lg px-2.5 py-1 text-ui-chip font-semibold text-accent bg-accent/10 hover:bg-accent/[0.16] shadow-soft-sm transition-all duration-150 active:scale-95"
+          >
+            Sign in
+          </button>
+        ) : (
+          <button
+            onClick={handleAdd}
+            disabled={dashboardLoading && item.kind === "data"}
+            className={clsx(
+              "rounded-lg px-3 py-1 text-ui-chip font-semibold shadow-soft-sm transition-all duration-150 active:scale-95",
+              dashboardLoading && item.kind === "data"
+                ? "text-fg-4 cursor-not-allowed bg-base-200/60"
+                : "text-surface bg-accent hover:bg-accent/90",
+            )}
+          >
+            Add
+          </button>
+        )}
       </div>
     </div>
   );
