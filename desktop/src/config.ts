@@ -43,6 +43,17 @@ export const API_HOST = (() => {
 
 export const AUTH_ENDPOINT = readOptionalEnv(import.meta.env.VITE_AUTH_ENDPOINT);
 export const LOGTO_APP_ID = readOptionalEnv(import.meta.env.VITE_LOGTO_APP_ID);
+
+// Logto resource indicator (RFC 8707) requested for access tokens. Defaults
+// to API_BASE — a normal build requests a token for its own API. But for
+// local dev against a REMOTE Logto (e.g. pointing at prod auth while the API
+// runs on localhost), Logto only recognizes the resource it has registered,
+// so set VITE_LOGTO_RESOURCE to that (e.g. https://api.myscrollr.com) while
+// API_BASE stays local. Otherwise Logto rejects the auth request with
+// "resource indicator is missing, or unknown".
+export const LOGTO_RESOURCE =
+  readOptionalEnv(import.meta.env.VITE_LOGTO_RESOURCE) || API_BASE;
+
 export const REDIRECT_URI = "http://127.0.0.1:19284/callback";
 export const REFRESH_BUFFER_MS = 60_000;
 

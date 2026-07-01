@@ -28,6 +28,7 @@ import {
   AUTH_ENDPOINT as LOGTO_ENDPOINT,
   LOGTO_APP_ID,
   API_BASE as API_RESOURCE,
+  LOGTO_RESOURCE,
   REDIRECT_URI,
   REFRESH_BUFFER_MS,
 } from "./config";
@@ -450,7 +451,7 @@ export async function login(): Promise<AuthState | null> {
       redirect_uri: REDIRECT_URI,
       response_type: "code",
       scope: "openid profile email offline_access",
-      resource: API_RESOURCE,
+      resource: LOGTO_RESOURCE,
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
       state,
