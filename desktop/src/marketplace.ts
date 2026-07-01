@@ -404,11 +404,25 @@ const WIDGET_LOGO_DOMAINS: Record<string, string> = {
   predictions: "kalshi.com",
 };
 
-/** Brand logo URL for a widget id (or undefined). icon.horse returns the
+// icon.horse silently returns a *blank* (200 + transparent) image for a few
+// domains (kalshi.com, ufc.com) — the <img> "loads" successfully, so the
+// card's onError fallback never fires and the tile just shows empty. Pin those
+// to an explicit URL that actually resolves. DuckDuckGo's icon CDN returns the
+// real, opaque brand mark (verified: Kalshi's green "K", the UFC wordmark),
+// never a transparent blank, and is CORS/CSP-friendly.
+const WIDGET_LOGO_OVERRIDES: Record<string, string> = {
+  predictions: "https://icons.duckduckgo.com/ip3/kalshi.com.ico",
+  sports_ufc: "https://icons.duckduckgo.com/ip3/ufc.com.ico",
+};
+
+/** Brand logo URL for a widget id (or undefined). Prefers an explicit override
+ *  for domains icon.horse can't resolve; otherwise icon.horse returns the
  *  highest-resolution icon a site offers (apple-touch-icon, etc.) — much
  *  crisper than a raw favicon, no API key. Cards fall back to the colored
  *  icon on load error. */
 export function widgetLogoUrl(id: string): string | undefined {
+  const override = WIDGET_LOGO_OVERRIDES[id];
+  if (override) return override;
   const domain = WIDGET_LOGO_DOMAINS[id];
   return domain ? `https://icon.horse/icon/${domain}` : undefined;
 }
