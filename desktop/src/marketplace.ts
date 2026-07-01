@@ -185,11 +185,13 @@ const WIDGET_LOGO_DOMAINS: Record<string, string> = {
   predictions: "kalshi.com",
 };
 
-/** Brand logo URL for a widget id (or undefined). DuckDuckGo icon service —
- *  no API key; cards fall back to the colored icon on load error. */
+/** Brand logo URL for a widget id (or undefined). icon.horse returns the
+ *  highest-resolution icon a site offers (apple-touch-icon, etc.) — much
+ *  crisper than a raw favicon, no API key. Cards fall back to the colored
+ *  icon on load error. */
 export function widgetLogoUrl(id: string): string | undefined {
   const domain = WIDGET_LOGO_DOMAINS[id];
-  return domain ? `https://icons.duckduckgo.com/ip3/${domain}.ico` : undefined;
+  return domain ? `https://icon.horse/icon/${domain}` : undefined;
 }
 
 function buildDataItem(def: DataWidgetDef): CatalogItem | null {
