@@ -416,17 +416,35 @@ func (a *App) queryTradesBySymbols(symbols []string) []Trade {
 	return trades
 }
 
-// getUserFinanceSymbols extracts the symbol list from a user's finance channel config.
+// getUserFinanceSymbols unions the symbol lists across a user's finance widget
+// channels (finance_stocks, finance_crypto, …; plus any legacy coarse 'finance'
+// row). The per-asset-class split lives in the widget's config; here we gather
+// every symbol the user follows so the ingest/query layer serves them all.
 func (a *App) getUserFinanceSymbols(logtoSub string) []string {
-	var configJSON []byte
-	err := a.db.QueryRow(context.Background(), `
+	rows, err := a.db.Query(context.Background(), `
 		SELECT config FROM user_channels
-		WHERE logto_sub = $1 AND channel_type = 'finance'
-	`, logtoSub).Scan(&configJSON)
+		WHERE logto_sub = $1
+		  AND (channel_type = 'finance' OR channel_type LIKE 'finance\_%')
+	`, logtoSub)
 	if err != nil {
 		return nil
 	}
-	return extractSymbolsFromConfig(configJSON)
+	defer rows.Close()
+	seen := make(map[string]bool)
+	var symbols []string
+	for rows.Next() {
+		var configJSON []byte
+		if err := rows.Scan(&configJSON); err != nil {
+			continue
+		}
+		for _, s := range extractSymbolsFromConfig(configJSON) {
+			if !seen[s] {
+				seen[s] = true
+				symbols = append(symbols, s)
+			}
+		}
+	}
+	return symbols
 }
 
 // =============================================================================
