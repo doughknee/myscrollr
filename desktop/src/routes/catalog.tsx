@@ -1,14 +1,14 @@
 import { useState, useMemo, useCallback } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { LayoutGrid, Search, Radio, Boxes } from "lucide-react";
+import { LayoutGrid, Search, Boxes, Trophy, TrendingUp, Rss, Gamepad2, LineChart } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 
 import { defaultPinForNewWidget } from "../preferences";
 import { getCatalogItems, CATEGORY_LABELS, CANONICAL_ORDER } from "../marketplace";
-import type { CatalogCategory, CatalogItem } from "../marketplace";
+import type { WidgetCategory, CatalogItem } from "../marketplace";
 import { channelsApi } from "../api/client";
 import type { Channel, ChannelType } from "../api/client";
 import { dashboardQueryOptions, queryKeys } from "../api/queries";
@@ -30,12 +30,27 @@ export const Route = createFileRoute("/catalog")({
 
 // ── Category filter options ─────────────────────────────────────
 
-type FilterTab = "all" | CatalogCategory;
+type FilterTab = "all" | WidgetCategory;
+
+const CATEGORY_ICONS: Record<WidgetCategory, LucideIcon> = {
+  sports: Trophy,
+  finance: TrendingUp,
+  news: Rss,
+  fantasy: Gamepad2,
+  predictions: LineChart,
+  utility: Boxes,
+};
 
 const FILTER_TABS: { key: FilterTab; label: string; icon: LucideIcon; hint: string }[] = [
-  { key: "all", label: "All", icon: LayoutGrid, hint: "Show every channel and widget" },
-  { key: "channel", label: CATEGORY_LABELS["channel"], icon: Radio, hint: "Show only data channels" },
-  { key: "widget", label: CATEGORY_LABELS["widget"], icon: Boxes, hint: "Show only utility widgets" },
+  { key: "all", label: "All", icon: LayoutGrid, hint: "Show every widget" },
+  ...(
+    ["sports", "finance", "news", "fantasy", "predictions", "utility"] as WidgetCategory[]
+  ).map((c) => ({
+    key: c,
+    label: CATEGORY_LABELS[c],
+    icon: CATEGORY_ICONS[c],
+    hint: `Show ${CATEGORY_LABELS[c]} widgets`,
+  })),
 ];
 
 // ── Sort order: enabled first, then canonical order ─────────────
@@ -95,7 +110,7 @@ function CatalogPage() {
 
   const handleAdd = useCallback(
     async (item: CatalogItem) => {
-      if (item.kind === "channel") {
+      if (item.kind === "data") {
         const channelType = item.id as ChannelType;
 
         // Optimistic insert: write a placeholder channel into the
@@ -111,7 +126,7 @@ function CatalogPage() {
           channel_type: channelType,
           enabled: true,
           ticker_enabled: true,
-          config: {},
+          config: item.addConfig ?? {},
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           logto_sub: "",
@@ -155,7 +170,7 @@ function CatalogPage() {
         // we reconcile the optimistic row with the server response.
         // On failure we roll back and surface the error.
         channelsApi
-          .create(channelType)
+          .create(channelType, item.addConfig ?? {})
           .then((created) => {
             queryClient.setQueryData<DashboardResponse>(
               queryKeys.dashboard,
@@ -280,7 +295,7 @@ function CatalogPage() {
                     onAdd={handleAdd}
                     onLogin={onLogin}
                     onOpen={(it) => {
-                      if (it.kind === "channel") {
+                      if (it.kind === "data") {
                         // Added channels open straight to Configure — the
                         // catalog is the one surface for adding AND setting
                         // up a source, no Options-menu hunting (widget/slot

@@ -1,5 +1,6 @@
 import type { Channel } from "../api/client";
 import type { SubscriptionTier } from "../auth";
+import { sourceForWidget } from "../marketplace";
 import FinanceConfigPanel from "./finance/ConfigPanel";
 import SportsConfigPanel from "./sports/ConfigPanel";
 import RssConfigPanel from "./rss/ConfigPanel";
@@ -27,7 +28,9 @@ export default function ChannelConfigPanel({
   connected,
   hex,
 }: ChannelConfigPanelProps) {
-  switch (channelType) {
+  // Resolve widget ids (sports_nfl, finance_stocks, news, …) to their coarse
+  // source so each maps to the right per-source config panel.
+  switch (sourceForWidget(channelType) ?? channelType) {
     case "finance":
       return (
         <FinanceConfigPanel

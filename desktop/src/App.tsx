@@ -40,7 +40,7 @@ import type { SubscriptionTier } from "./auth";
 import type { ChannelType } from "./api/client";
 import type { DeliveryMode } from "./types";
 import type { AppPreferences, TickerPosition } from "./preferences";
-import { getAllChannels } from "./channels/registry";
+import { getCatalogItems } from "./marketplace";
 import { getAllWidgets } from "./widgets/registry";
 import { useWidgetTickerData } from "./hooks/useWidgetTickerData";
 import { useTheme } from "./hooks/useTheme";
@@ -128,12 +128,13 @@ export default function App() {
   // renders that don't change the channel set.
   const installedChannelsMeta = useMemo(() => {
     if (channels.length === 0) return [];
-    const manifestById = new Map(
-      getAllChannels().map((c) => [c.id, c]),
-    );
+    // Resolve each enabled channel row to its WIDGET display (name/icon/hex)
+    // from the flat catalog, so split widgets show as "MLB"/"Stocks" — not
+    // the coarse "Sports"/"Finance" source they read from.
+    const metaById = new Map(getCatalogItems().map((it) => [it.id, it]));
     return channels
       .filter((ch) => ch.enabled)
-      .map((ch) => manifestById.get(ch.channel_type))
+      .map((ch) => metaById.get(ch.channel_type))
       .filter((m): m is NonNullable<typeof m> => Boolean(m))
       .map((m) => ({
         id: m.id,

@@ -2,16 +2,10 @@ import { useState } from "react";
 import clsx from "clsx";
 import { Check, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
-import type { CatalogItem, CatalogCategory } from "../../marketplace";
+import type { CatalogItem } from "../../marketplace";
+import { CATEGORY_LABELS } from "../../marketplace";
 import type { SubscriptionTier } from "../../auth";
 import { TIER_LABELS } from "../../auth";
-
-// ── Category badge ──────────────────────────────────────────────
-
-const CATEGORY_BADGE: Record<CatalogCategory, string> = {
-  channel: "Channel",
-  widget: "Widget",
-};
 
 // ── Props ───────────────────────────────────────────────────────
 
@@ -56,7 +50,7 @@ export default function CatalogCard({
   const slotLocked = !!slotsAtCapacity && !enabled && !tierLocked;
 
   async function handleAdd() {
-    if (!authenticated && item.kind === "channel") {
+    if (!authenticated && item.kind === "data") {
       onLogin();
       return;
     }
@@ -112,7 +106,7 @@ export default function CatalogCard({
             )}
           </div>
           <span className="text-ui-section">
-            {CATEGORY_BADGE[item.category]}
+            {CATEGORY_LABELS[item.category]}
           </span>
         </div>
       </div>
@@ -141,7 +135,7 @@ export default function CatalogCard({
       )}
 
       {/* Unauthenticated channel hint */}
-      {!authenticated && item.kind === "channel" && !enabled && (
+      {!authenticated && item.kind === "data" && !enabled && (
         <div className="flex items-center gap-1.5 mb-2.5 px-2 py-1 rounded-md bg-info/10 border border-info/20 w-fit">
           <span className="text-ui-chip font-medium text-info">
             Sign in to add
@@ -162,7 +156,7 @@ export default function CatalogCard({
               onClick={() => onOpen(item)}
               className="group flex items-center gap-0.5 text-ui-chip font-semibold text-accent hover:text-accent/80 transition-all duration-150 active:scale-95"
             >
-              {item.kind === "channel" ? "Configure" : "Open"}
+              {item.kind === "data" ? "Configure" : "Open"}
               <ChevronRight
                 size={12}
                 className="transition-transform duration-200 group-hover:translate-x-0.5"
@@ -176,7 +170,7 @@ export default function CatalogCard({
           >
             Upgrade <ExternalLink size={10} />
           </button>
-        ) : !authenticated && item.kind === "channel" ? (
+        ) : !authenticated && item.kind === "data" ? (
           <button
             onClick={onLogin}
             className="text-ui-chip font-semibold text-accent hover:text-accent/80 transition-all duration-150 active:scale-95"
@@ -186,10 +180,10 @@ export default function CatalogCard({
         ) : (
           <button
             onClick={handleAdd}
-            disabled={dashboardLoading && item.kind === "channel"}
+            disabled={dashboardLoading && item.kind === "data"}
             className={clsx(
               "text-ui-chip font-semibold transition-all duration-150 active:scale-95",
-              dashboardLoading && item.kind === "channel"
+              dashboardLoading && item.kind === "data"
                 ? "text-fg-4 cursor-not-allowed"
                 : "text-accent hover:text-accent/80",
             )}
