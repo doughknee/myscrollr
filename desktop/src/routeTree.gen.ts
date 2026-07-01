@@ -16,6 +16,7 @@ import { Route as FeedRouteImport } from './routes/feed'
 import { Route as CatalogRouteImport } from './routes/catalog'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WidgetIdInfoRouteImport } from './routes/widget.$id.info'
 import { Route as WidgetIdTabRouteImport } from './routes/widget.$id.$tab'
 import { Route as ChannelTypeTabRouteImport } from './routes/channel.$type.$tab'
 
@@ -54,6 +55,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WidgetIdInfoRoute = WidgetIdInfoRouteImport.update({
+  id: '/widget/$id/info',
+  path: '/widget/$id/info',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WidgetIdTabRoute = WidgetIdTabRouteImport.update({
   id: '/widget/$id/$tab',
   path: '/widget/$id/$tab',
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/ticker': typeof TickerRoute
   '/channel/$type/$tab': typeof ChannelTypeTabRoute
   '/widget/$id/$tab': typeof WidgetIdTabRoute
+  '/widget/$id/info': typeof WidgetIdInfoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByTo {
   '/ticker': typeof TickerRoute
   '/channel/$type/$tab': typeof ChannelTypeTabRoute
   '/widget/$id/$tab': typeof WidgetIdTabRoute
+  '/widget/$id/info': typeof WidgetIdInfoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   '/ticker': typeof TickerRoute
   '/channel/$type/$tab': typeof ChannelTypeTabRoute
   '/widget/$id/$tab': typeof WidgetIdTabRoute
+  '/widget/$id/info': typeof WidgetIdInfoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
     | '/ticker'
     | '/channel/$type/$tab'
     | '/widget/$id/$tab'
+    | '/widget/$id/info'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
     | '/ticker'
     | '/channel/$type/$tab'
     | '/widget/$id/$tab'
+    | '/widget/$id/info'
   id:
     | '__root__'
     | '/'
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '/ticker'
     | '/channel/$type/$tab'
     | '/widget/$id/$tab'
+    | '/widget/$id/info'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,6 +157,7 @@ export interface RootRouteChildren {
   TickerRoute: typeof TickerRoute
   ChannelTypeTabRoute: typeof ChannelTypeTabRoute
   WidgetIdTabRoute: typeof WidgetIdTabRoute
+  WidgetIdInfoRoute: typeof WidgetIdInfoRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -198,6 +211,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/widget/$id/info': {
+      id: '/widget/$id/info'
+      path: '/widget/$id/info'
+      fullPath: '/widget/$id/info'
+      preLoaderRoute: typeof WidgetIdInfoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/widget/$id/$tab': {
       id: '/widget/$id/$tab'
       path: '/widget/$id/$tab'
@@ -225,6 +245,7 @@ const rootRouteChildren: RootRouteChildren = {
   TickerRoute: TickerRoute,
   ChannelTypeTabRoute: ChannelTypeTabRoute,
   WidgetIdTabRoute: WidgetIdTabRoute,
+  WidgetIdInfoRoute: WidgetIdInfoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -3,7 +3,7 @@ import clsx from "clsx";
 import { Check, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import type { CatalogItem } from "../../marketplace";
-import { CATEGORY_LABELS } from "../../marketplace";
+import { CATEGORY_LABELS, readableTextOn } from "../../marketplace";
 import type { SubscriptionTier } from "../../auth";
 import { TIER_LABELS } from "../../auth";
 
@@ -23,6 +23,9 @@ interface CatalogCardProps {
   onLogin: () => void;
   /** Navigate to the channel/widget page when already added. */
   onOpen?: (item: CatalogItem) => void;
+  /** Open the widget's "more info" page. Fires on card body click/Enter —
+   *  the corner action (Add/Configure) stops propagation so it doesn't. */
+  onInfo?: (item: CatalogItem) => void;
 }
 
 // ── Component ───────────────────────────────────────────────────
@@ -37,6 +40,7 @@ export default function CatalogCard({
   onAdd,
   onLogin,
   onOpen,
+  onInfo,
 }: CatalogCardProps) {
   const [loading, setLoading] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
@@ -73,9 +77,28 @@ export default function CatalogCard({
 
   return (
     <div
+      // The whole card body is the "learn more" affordance — clicking (or
+      // Enter/Space when focused) opens the widget's info page. The corner
+      // action (Add/Configure) stops propagation so it stays a separate hit.
+      role={onInfo ? "button" : undefined}
+      tabIndex={onInfo ? 0 : undefined}
+      aria-label={onInfo ? `More about ${item.name}` : undefined}
+      onClick={onInfo ? () => onInfo(item) : undefined}
+      onKeyDown={
+        onInfo
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onInfo(item);
+              }
+            }
+          : undefined
+      }
       className={clsx(
         "group/card relative flex flex-col overflow-hidden rounded-xl border border-edge/40 bg-base-150/30 p-4",
         "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft-sm hover:border-edge/60 hover:bg-base-150/50",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
+        onInfo && "cursor-pointer",
         // Added cards de-emphasized so new content stays prominent.
         enabled && "opacity-80 hover:opacity-100",
       )}
@@ -146,8 +169,13 @@ export default function CatalogCard({
 
       {/* Action — revealed on hover (or keyboard focus), absolutely positioned
           so it never adds height or shouts on every card. Its own background +
-          shadow keep it readable over the content. */}
-      <div className="absolute bottom-3 right-3 opacity-0 translate-y-1 transition-all duration-150 group-hover/card:opacity-100 group-hover/card:translate-y-0 focus-within:opacity-100 focus-within:translate-y-0">
+          shadow keep it readable over the content. stopPropagation keeps a
+          click/keypress here from also opening the info page (card body). */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        className="absolute bottom-3 right-3 opacity-0 translate-y-1 transition-all duration-150 group-hover/card:opacity-100 group-hover/card:translate-y-0 focus-within:opacity-100 focus-within:translate-y-0"
+      >
         {loading ? (
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-base-100/80 shadow-soft-sm">
             <Loader2 size={14} className="animate-spin text-fg-4" />
@@ -210,17 +238,4 @@ const TIER_ORDER: SubscriptionTier[] = ["free", "uplink", "uplink_pro", "uplink_
 
 function tierMeetsRequirement(current: SubscriptionTier, required: SubscriptionTier): boolean {
   return TIER_ORDER.indexOf(current) >= TIER_ORDER.indexOf(required);
-}
-
-// Pick a readable text color (near-black or white) for a solid brand-colored
-// button, from the color's perceived luminance — so a light brand (gold, teal)
-// gets dark text and a dark brand (navy, red) gets white.
-function readableTextOn(hex: string): string {
-  const h = hex.replace("#", "");
-  if (h.length < 6) return "#ffffff";
-  const r = parseInt(h.slice(0, 2), 16);
-  const g = parseInt(h.slice(2, 4), 16);
-  const b = parseInt(h.slice(4, 6), 16);
-  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return lum > 0.62 ? "#111827" : "#ffffff";
 }

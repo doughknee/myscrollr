@@ -1,20 +1,16 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { LayoutGrid, Search, Boxes, Trophy, TrendingUp, Rss, Gamepad2, LineChart } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { toast } from "sonner";
 
-import { defaultPinForNewWidget } from "../preferences";
 import { getCatalogItems, CATEGORY_LABELS, CANONICAL_ORDER } from "../marketplace";
 import type { WidgetCategory, CatalogItem } from "../marketplace";
-import { channelsApi } from "../api/client";
-import type { Channel, ChannelType } from "../api/client";
-import { dashboardQueryOptions, queryKeys } from "../api/queries";
-import type { DashboardResponse } from "../types";
+import { dashboardQueryOptions } from "../api/queries";
 import { useShell, useShellData } from "../shell-context";
 import { getMaxWidgets } from "../tierLimits";
+import { useAddWidget } from "../hooks/useAddWidget";
 import CatalogCard from "../components/marketplace/CatalogCard";
 import QueryErrorBanner from "../components/QueryErrorBanner";
 import RouteError from "../components/RouteError";
@@ -68,10 +64,10 @@ function sortItems(items: CatalogItem[], enabledIds: Set<string>): CatalogItem[]
 
 function CatalogPage() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { prefs, onPrefsChange, authenticated, tier, onLogin } = useShell();
+  const { prefs, authenticated, tier, onLogin } = useShell();
   const { channels } = useShellData();
   const { error: dashboardError, isLoading } = useQuery(dashboardQueryOptions());
+  const handleAdd = useAddWidget();
 
   const [filter, setFilter] = useState<FilterTab>("all");
 
@@ -105,131 +101,6 @@ function CatalogPage() {
       : allItems.filter((item) => item.category === filter);
     return sortItems(filtered, allEnabledIds);
   }, [allItems, filter, allEnabledIds]);
-
-  // ── Add handler ─────────────────────────────────────────────
-
-  const handleAdd = useCallback(
-    async (item: CatalogItem) => {
-      if (item.kind === "data") {
-        const channelType = item.id as ChannelType;
-
-        // Optimistic insert: write a placeholder channel into the
-        // dashboard cache immediately so the Sidebar + CatalogCard
-        // "Added" badge flip on the next paint. Without this the user
-        // saw a 0.5-1s gap between click and any visible state change
-        // — the network round-trip to `POST /users/me/channels` plus
-        // the forced `/dashboard` refetch were both on the critical
-        // path. CDC + a background refetch reconcile the placeholder
-        // with the real row a moment later.
-        const optimisticChannel: Channel & { logto_sub: string } = {
-          id: -Date.now(), // ephemeral negative id, replaced on reconcile
-          channel_type: channelType,
-          enabled: true,
-          ticker_enabled: true,
-          config: item.addConfig ?? {},
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          logto_sub: "",
-        };
-
-        const previous = queryClient.getQueryData<DashboardResponse>(
-          queryKeys.dashboard,
-        );
-
-        queryClient.setQueryData<DashboardResponse>(
-          queryKeys.dashboard,
-          (old) => {
-            if (!old) {
-              return {
-                data: {},
-                channels: [optimisticChannel],
-              } as DashboardResponse;
-            }
-            // Don't double-insert if the channel is somehow already
-            // present (e.g. CDC raced us).
-            const existing = old.channels ?? [];
-            if (existing.some((c) => c.channel_type === channelType)) {
-              return old;
-            }
-            return {
-              ...old,
-              channels: [...existing, optimisticChannel],
-            };
-          },
-        );
-
-        // Navigate immediately — the channel page's queries will fire
-        // in parallel with the create call below.
-        navigate({
-          to: "/channel/$type/$tab",
-          params: { type: item.id, tab: "feed" },
-        });
-        toast.success(`${item.name} added`);
-
-        // Fire the network call without blocking the UI. On success
-        // we reconcile the optimistic row with the server response.
-        // On failure we roll back and surface the error.
-        channelsApi
-          .create(channelType, item.addConfig ?? {})
-          .then((created) => {
-            queryClient.setQueryData<DashboardResponse>(
-              queryKeys.dashboard,
-              (old) => {
-                if (!old) return old;
-                const channels = (old.channels ?? []).map((c) =>
-                  c.id === optimisticChannel.id
-                    ? ({ ...created, logto_sub: c.logto_sub } as Channel & {
-                        logto_sub: string;
-                      })
-                    : c,
-                );
-                return { ...old, channels };
-              },
-            );
-            // Quietly resync in the background so any server-side
-            // fields we didn't model (logto_sub, etc.) line up.
-            queryClient.invalidateQueries({
-              queryKey: queryKeys.dashboard,
-              refetchType: "none",
-            });
-          })
-          .catch((err) => {
-            // Roll back the optimistic insert.
-            queryClient.setQueryData<DashboardResponse>(
-              queryKeys.dashboard,
-              previous,
-            );
-            const message =
-              err instanceof Error ? err.message : "Failed to add channel";
-            toast.error(`Couldn't add ${item.name}: ${message}`);
-          });
-      } else {
-        const nextEnabled = [...prefs.widgets.enabledWidgets, item.id];
-        const nextOnTicker = [...prefs.widgets.widgetsOnTicker, item.id];
-        // Auto-pin newly added widgets to the right side so they land
-        // in the static pinned zone instead of disappearing into the
-        // scrolling tape. Preserve any existing pin config (re-adding
-        // a previously-removed widget honors the user's last choice).
-        // Walkthrough fix 2026-05-11 — see preferences.ts:defaultPinForNewWidget.
-        const nextPinned = { ...prefs.widgets.pinnedWidgets };
-        if (!nextPinned[item.id]) {
-          nextPinned[item.id] = defaultPinForNewWidget();
-        }
-        onPrefsChange({
-          ...prefs,
-          widgets: {
-            ...prefs.widgets,
-            enabledWidgets: nextEnabled,
-            widgetsOnTicker: nextOnTicker,
-            pinnedWidgets: nextPinned,
-          },
-        });
-        toast.success(`${item.name} added`);
-        navigate({ to: "/widget/$id/$tab", params: { id: item.id, tab: "feed" } });
-      }
-    },
-    [navigate, queryClient, prefs, onPrefsChange],
-  );
 
   // ── Render ──────────────────────────────────────────────────
   //
@@ -294,6 +165,9 @@ function CatalogPage() {
                     dashboardLoading={isLoading}
                     onAdd={handleAdd}
                     onLogin={onLogin}
+                    onInfo={(it) =>
+                      navigate({ to: "/widget/$id/info", params: { id: it.id } })
+                    }
                     onOpen={(it) => {
                       if (it.kind === "data") {
                         // Added channels open straight to Configure — the
