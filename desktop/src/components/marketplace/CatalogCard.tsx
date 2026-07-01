@@ -74,7 +74,7 @@ export default function CatalogCard({
   return (
     <div
       className={clsx(
-        "group/card relative flex min-h-[10rem] flex-col overflow-hidden rounded-xl border border-edge/40 bg-base-150/30 p-4",
+        "group/card relative flex flex-col overflow-hidden rounded-xl border border-edge/40 bg-base-150/30 p-4",
         "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft-sm hover:border-edge/60 hover:bg-base-150/50",
         // Added cards de-emphasized so new content stays prominent.
         enabled && "opacity-80 hover:opacity-100",
@@ -124,7 +124,10 @@ export default function CatalogCard({
           </div>
         </div>
 
-        <p className="mt-2.5 text-ui-meta leading-relaxed line-clamp-2 min-h-[2.4em]">
+        {/* Reserve exactly two lines (leading-relaxed = 1.625 → 3.25em) so
+            1- and 2-line descriptions occupy the same height and cards stay
+            uniform without inflating the whole card. */}
+        <p className="mt-2.5 text-ui-meta leading-relaxed line-clamp-2 h-[3.25em]">
           {item.description}
         </p>
 
