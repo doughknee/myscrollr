@@ -13,6 +13,9 @@ func TestDataSourceForWidget(t *testing.T) {
 		{"finance_stocks", "finance"},
 		{"finance_crypto", "finance"},
 		{"news", "rss"},
+		{"news_bbc", "rss"},
+		{"news_hackernews", "rss"},
+		{"rss_custom", "rss"},
 		{"fantasy_yahoo", "fantasy"},
 		{"predictions", "predictions"},
 		// Dynamic via source prefix (league not in the featured set).
@@ -42,6 +45,7 @@ func TestDataSourceForWidget(t *testing.T) {
 func TestIsKnownWidgetType(t *testing.T) {
 	known := []string{
 		"sports_nfl", "finance_stocks", "finance_crypto", "news",
+		"news_bbc", "rss_custom",
 		"fantasy_yahoo", "predictions", "clock", "github",
 		"sports_premier_league", // dynamic league
 		"finance", "sports", "rss", "fantasy", // legacy coarse

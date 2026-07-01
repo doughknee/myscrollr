@@ -84,6 +84,10 @@ var widgetSourcePrefixes = map[string]string{
 	"sports_":  "sports",
 	"finance_": "finance",
 	"fantasy_": "fantasy",
+	// News is the rss source split into per-feed widgets: news_bbc,
+	// news_hackernews, … plus rss_custom for user-added feeds.
+	"news_": "rss",
+	"rss_":  "rss",
 }
 
 // legacyChannelTypes are the pre-migration coarse channel_type values. They

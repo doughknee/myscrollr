@@ -71,63 +71,45 @@ interface DataWidgetDef {
   description: string;
   category: WidgetCategory;
   source: string;
+  /** Distinct brand accent (hex). Overrides the coarse source's color so
+   *  widgets in the same category don't all look the same. */
+  color: string;
   addConfig?: Record<string, unknown>;
   requiredTier?: SubscriptionTier;
 }
 
 // League name strings in addConfig.leagues must match what the sports service
-// emits (config.leagues → cdc:sports:{LEAGUE}). These follow the identifiers
-// in api/core/constants.go; confirm against the live sports catalog when the
-// sports service is wired (World Cup was added recently).
+// emits (config.leagues → cdc:sports:{LEAGUE}); confirm against the live sports
+// catalog when the sports service is wired. News widgets are single curated
+// feeds from channels/rss/service/configs/feeds.json — each is rss filtered to
+// its one feed URL; "rss_custom" is the bring-your-own-feed widget.
 const DATA_WIDGETS: DataWidgetDef[] = [
   // Finance — split by asset class.
-  {
-    id: "finance_stocks",
-    name: "Stocks",
-    description: "Live stock & ETF prices for the symbols you pick.",
-    category: "finance",
-    source: "finance",
-    addConfig: { symbols: [], asset_class: "stock" },
-  },
-  {
-    id: "finance_crypto",
-    name: "Crypto",
-    description: "Live crypto prices for the coins you pick.",
-    category: "finance",
-    source: "finance",
-    addConfig: { symbols: [], asset_class: "crypto" },
-  },
+  { id: "finance_stocks", name: "Stocks", description: "Live stock & ETF prices for the symbols you pick.", category: "finance", source: "finance", color: "#16a34a", addConfig: { symbols: [], asset_class: "stock" } },
+  { id: "finance_crypto", name: "Crypto", description: "Live crypto prices for the coins you pick.", category: "finance", source: "finance", color: "#f7931a", addConfig: { symbols: [], asset_class: "crypto" } },
   // Sports — one widget per league.
-  { id: "sports_nfl", name: "NFL", description: "Live NFL scores and game states.", category: "sports", source: "sports", addConfig: { leagues: ["NFL"] } },
-  { id: "sports_nba", name: "NBA", description: "Live NBA scores and game states.", category: "sports", source: "sports", addConfig: { leagues: ["NBA"] } },
-  { id: "sports_nhl", name: "NHL", description: "Live NHL scores and game states.", category: "sports", source: "sports", addConfig: { leagues: ["NHL"] } },
-  { id: "sports_mlb", name: "MLB", description: "Live MLB scores and game states.", category: "sports", source: "sports", addConfig: { leagues: ["MLB"] } },
-  { id: "sports_f1", name: "F1", description: "Formula 1 race weekends and results.", category: "sports", source: "sports", addConfig: { leagues: ["Formula 1"] } },
-  { id: "sports_worldcup", name: "World Cup", description: "FIFA World Cup fixtures and scores.", category: "sports", source: "sports", addConfig: { leagues: ["World Cup"] } },
-  // News, Fantasy, Predictions.
-  {
-    id: "news",
-    name: "News",
-    description: "Headlines from Hacker News and any RSS/Atom feeds you add.",
-    category: "news",
-    source: "rss",
-    addConfig: { feeds: [] },
-  },
-  {
-    id: "fantasy_yahoo",
-    name: "Yahoo Fantasy",
-    description: "Your Yahoo Fantasy leagues, matchups, and standings.",
-    category: "fantasy",
-    source: "fantasy",
-    requiredTier: "uplink",
-  },
-  {
-    id: "predictions",
-    name: "Predictions",
-    description: "Live prediction-market odds from Kalshi.",
-    category: "predictions",
-    source: "predictions",
-  },
+  { id: "sports_nfl", name: "NFL", description: "Live NFL scores and game states.", category: "sports", source: "sports", color: "#013369", addConfig: { leagues: ["NFL"] } },
+  { id: "sports_nba", name: "NBA", description: "Live NBA scores and game states.", category: "sports", source: "sports", color: "#c9082a", addConfig: { leagues: ["NBA"] } },
+  { id: "sports_nhl", name: "NHL", description: "Live NHL scores and game states.", category: "sports", source: "sports", color: "#111827", addConfig: { leagues: ["NHL"] } },
+  { id: "sports_mlb", name: "MLB", description: "Live MLB scores and game states.", category: "sports", source: "sports", color: "#002d72", addConfig: { leagues: ["MLB"] } },
+  { id: "sports_f1", name: "F1", description: "Formula 1 race weekends and results.", category: "sports", source: "sports", color: "#e10600", addConfig: { leagues: ["Formula 1"] } },
+  { id: "sports_worldcup", name: "World Cup", description: "FIFA World Cup fixtures and scores.", category: "sports", source: "sports", color: "#2e7d46", addConfig: { leagues: ["World Cup"] } },
+  // News — 10 curated feeds, each its own widget.
+  { id: "news_bbc", name: "BBC News", description: "World, UK and breaking news from the BBC.", category: "news", source: "rss", color: "#b80000", addConfig: { feeds: [{ name: "BBC News", url: "https://feeds.bbci.co.uk/news/rss.xml" }] } },
+  { id: "news_npr", name: "NPR", description: "US and world news, analysis and reporting from NPR.", category: "news", source: "rss", color: "#4667de", addConfig: { feeds: [{ name: "NPR News", url: "https://feeds.npr.org/1001/rss.xml" }] } },
+  { id: "news_guardian", name: "The Guardian", description: "Independent world news, opinion and reporting.", category: "news", source: "rss", color: "#052962", addConfig: { feeds: [{ name: "The Guardian", url: "https://www.theguardian.com/world/rss" }] } },
+  { id: "news_aljazeera", name: "Al Jazeera", description: "Breaking news from the Middle East and around the world.", category: "news", source: "rss", color: "#e8a33d", addConfig: { feeds: [{ name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml" }] } },
+  { id: "news_propublica", name: "ProPublica", description: "Investigative journalism in the public interest.", category: "news", source: "rss", color: "#c8102e", addConfig: { feeds: [{ name: "ProPublica", url: "https://feeds.propublica.org/propublica/main" }] } },
+  { id: "news_bloomberg", name: "Bloomberg", description: "Global markets, finance and business news.", category: "news", source: "rss", color: "#1a1a2e", addConfig: { feeds: [{ name: "Bloomberg Markets", url: "https://feeds.bloomberg.com/markets/news.rss" }] } },
+  { id: "news_cnbc", name: "CNBC", description: "Markets, business and finance headlines.", category: "news", source: "rss", color: "#005594", addConfig: { feeds: [{ name: "CNBC Top News", url: "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114" }] } },
+  { id: "news_nasa", name: "NASA", description: "Space, science and mission news from NASA.", category: "news", source: "rss", color: "#0b3d91", addConfig: { feeds: [{ name: "NASA Breaking News", url: "https://www.nasa.gov/news-release/feed/" }] } },
+  { id: "news_hackernews", name: "Hacker News", description: "Top stories from the Hacker News front page.", category: "news", source: "rss", color: "#ff6600", addConfig: { feeds: [{ name: "Hacker News", url: "https://hnrss.org/frontpage" }] } },
+  { id: "news_theverge", name: "The Verge", description: "Technology, science, art and culture.", category: "news", source: "rss", color: "#5200ff", addConfig: { feeds: [{ name: "The Verge", url: "https://www.theverge.com/rss/index.xml" }] } },
+  // Custom RSS — bring your own feeds.
+  { id: "rss_custom", name: "Custom RSS", description: "Follow any RSS or Atom feed by pasting its URL.", category: "news", source: "rss", color: "#ee802f", addConfig: { feeds: [] } },
+  // Fantasy, Predictions.
+  { id: "fantasy_yahoo", name: "Yahoo Fantasy", description: "Your Yahoo Fantasy leagues, matchups, and standings.", category: "fantasy", source: "fantasy", color: "#6001d2", requiredTier: "uplink" },
+  { id: "predictions", name: "Predictions", description: "Live prediction-market odds from Kalshi.", category: "predictions", source: "predictions", color: "#1fc9a0" },
 ];
 
 // ── Resolution helpers (widget id → coarse source manifest) ─────
@@ -171,7 +153,7 @@ export function widgetManifest(
   if (!def) return getChannel(id) ?? getWidget(id);
   const source = getChannel(def.source);
   if (!source) return undefined;
-  return { ...source, id: def.id, name: def.name, tabLabel: def.name };
+  return { ...source, id: def.id, name: def.name, tabLabel: def.name, hex: def.color };
 }
 
 // ── Builder ─────────────────────────────────────────────────────
@@ -183,10 +165,10 @@ function buildDataItem(def: DataWidgetDef): CatalogItem | null {
     id: def.id,
     name: def.name,
     description: def.description,
-    // Icon/hex/info come from the coarse source manifest for now; a later
-    // pass can give per-widget icons (distinct sport logos, etc.).
+    // Distinct per-widget brand color; the icon still comes from the coarse
+    // source for now (per-widget hero art differentiates further next).
     icon: src.icon,
-    hex: src.hex,
+    hex: def.color,
     category: def.category,
     kind: "data",
     source: def.source,
