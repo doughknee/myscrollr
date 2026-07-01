@@ -1,14 +1,13 @@
 import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import clsx from "clsx";
 import { Star, X } from "lucide-react";
 import LeagueManager from "./LeagueManager";
+import { ToggleRow } from "../../components/settings/SettingsControls";
 import { useSportsConfig } from "../../hooks/useSportsConfig";
 import { sportsCatalogOptions, sportsTeamsOptions } from "../../api/queries";
 import type { TeamInfo } from "../../api/queries";
 import { getLimit } from "../../tierLimits";
 import { dataWidgetDef } from "../../marketplace";
-import type { Venue } from "../../preferences";
 import type { Channel } from "../../api/client";
 import type { SubscriptionTier } from "../../auth";
 
@@ -130,75 +129,34 @@ function SportsWidgetConfig({
         </div>
       </section>
 
-      {/* Display */}
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-fg">Display</h3>
-        <DisplayToggle
+      {/* Display — venue collapsed to an on/off switch (on = "both",
+          off = "off"); feed-vs-ticker granularity isn't exposed per-widget. */}
+      <section className="flex flex-col gap-0.5">
+        <h3 className="px-3 text-sm font-semibold text-fg">Display</h3>
+        <ToggleRow
           label="Upcoming games"
-          hint="Show games that haven't started yet"
-          value={display.showUpcoming}
-          onChange={(v) => setDisplay({ showUpcoming: v })}
+          description="Show games that haven't started yet"
+          checked={display.showUpcoming !== "off"}
+          onChange={(c) => setDisplay({ showUpcoming: c ? "both" : "off" })}
         />
-        <DisplayToggle
+        <ToggleRow
           label="Final scores"
-          hint="Keep completed games in the feed"
-          value={display.showFinal}
-          onChange={(v) => setDisplay({ showFinal: v })}
+          description="Keep completed games in the feed"
+          checked={display.showFinal !== "off"}
+          onChange={(c) => setDisplay({ showFinal: c ? "both" : "off" })}
         />
-        <DisplayToggle
+        <ToggleRow
           label="Team logos"
-          value={display.showLogos}
-          onChange={(v) => setDisplay({ showLogos: v })}
+          checked={display.showLogos !== "off"}
+          onChange={(c) => setDisplay({ showLogos: c ? "both" : "off" })}
         />
-        <DisplayToggle
+        <ToggleRow
           label="Game timer"
-          hint="Show the live clock / countdown"
-          value={display.showTimer}
-          onChange={(v) => setDisplay({ showTimer: v })}
+          description="Show the live clock / countdown"
+          checked={display.showTimer !== "off"}
+          onChange={(c) => setDisplay({ showTimer: c ? "both" : "off" })}
         />
       </section>
-    </div>
-  );
-}
-
-// A display element's venue collapsed to an on/off switch (on = "both",
-// off = "off"). Venue granularity (feed-only vs ticker-only) isn't exposed
-// per-widget — the toggle is the simple, legible control.
-function DisplayToggle({
-  label,
-  hint,
-  value,
-  onChange,
-}: {
-  label: string;
-  hint?: string;
-  value: Venue;
-  onChange: (v: Venue) => void;
-}) {
-  const on = value !== "off";
-  return (
-    <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-edge/40 bg-base-150/30">
-      <div className="min-w-0">
-        <div className="text-ui-body text-fg-2">{label}</div>
-        {hint && <div className="text-ui-meta text-fg-4">{hint}</div>}
-      </div>
-      <button
-        role="switch"
-        aria-checked={on}
-        aria-label={label}
-        onClick={() => onChange(on ? "off" : "both")}
-        className={clsx(
-          "relative h-5 w-9 shrink-0 rounded-full transition-colors",
-          on ? "bg-accent" : "bg-base-300",
-        )}
-      >
-        <span
-          className={clsx(
-            "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
-            on ? "translate-x-4" : "translate-x-0.5",
-          )}
-        />
-      </button>
     </div>
   );
 }
