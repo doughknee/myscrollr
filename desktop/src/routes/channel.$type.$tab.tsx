@@ -15,7 +15,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import RouteError from "../components/RouteError";
 import SourcePageLayout, { parseSourceTab, SourceNotFound } from "../components/SourcePageLayout";
 import { useQuery } from "@tanstack/react-query";
-import { manifestForWidget } from "../marketplace";
+import { widgetManifest } from "../marketplace";
 import { dashboardQueryOptions } from "../api/queries";
 import ChannelConfigPanel from "../channels/ChannelConfigPanel";
 import { useShell } from "../shell-context";
@@ -38,7 +38,7 @@ function ChannelRoute() {
 
   // Resolve the widget id (e.g. "sports_nfl", "finance_stocks") to its coarse
   // source manifest, which owns the FeedTab. Also resolves legacy coarse ids.
-  const channel = manifestForWidget(type) as ChannelManifest | undefined;
+  const channel = widgetManifest(type) as ChannelManifest | undefined;
   const { data: dashboard } = useQuery(dashboardQueryOptions());
   const { onDeleteChannel } = useShell();
 
@@ -114,7 +114,7 @@ function ChannelConfigTab({
     (ch) => ch.channel_type === type,
   );
 
-  const manifest = manifestForWidget(type);
+  const manifest = widgetManifest(type);
   const deliveryMode = loadPref<DeliveryMode>("deliveryMode", "polling");
 
   if (!channelData) {

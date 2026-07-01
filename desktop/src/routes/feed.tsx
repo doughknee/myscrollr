@@ -24,7 +24,7 @@ import TickerLayoutSummary from "../components/TickerLayoutSummary";
 import PageLayout from "../components/layout/PageLayout";
 import EmptySection from "../components/layout/EmptySection";
 import { useShell, useShellData } from "../shell-context";
-import { CHANNEL_ORDER } from "../channels/registry";
+import { widgetManifest, CANONICAL_ORDER } from "../marketplace";
 import { WIDGET_ORDER } from "../widgets/registry";
 import { getStore } from "../lib/store";
 import { timeAgo } from "../utils/format";
@@ -137,15 +137,27 @@ function HomePage() {
     navigate({ to: "/ticker" });
   }, [navigate]);
 
-  const orderedChannels = useMemo(
-    () =>
-      CHANNEL_ORDER.map((id) => {
-        const ch = channels.find((c) => c.channel_type === id);
-        const manifest = allChannelManifests.find((m) => m.id === id);
-        return ch && manifest ? { ch, manifest } : null;
-      }).filter(Boolean) as { ch: Channel; manifest: ChannelManifest }[],
-    [channels, allChannelManifests],
-  );
+  // Resolve each enabled channel row to a render manifest — the coarse source's
+  // FeedTab carrying the widget's own name/id — then order by the catalog's
+  // canonical order. Handles split widgets (sports_mlb, finance_stocks, …).
+  const orderedChannels = useMemo(() => {
+    const items = channels
+      .filter((c) => c.enabled)
+      .map((ch) => {
+        const manifest = widgetManifest(ch.channel_type) as
+          | ChannelManifest
+          | undefined;
+        return manifest ? { ch, manifest } : null;
+      })
+      .filter(
+        (x): x is { ch: Channel; manifest: ChannelManifest } => x !== null,
+      );
+    return items.sort(
+      (a, b) =>
+        CANONICAL_ORDER.indexOf(a.ch.channel_type) -
+        CANONICAL_ORDER.indexOf(b.ch.channel_type),
+    );
+  }, [channels]);
 
   const orderedWidgets = useMemo(
     () =>

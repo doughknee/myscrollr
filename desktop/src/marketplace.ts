@@ -155,6 +155,25 @@ export function manifestForWidget(
   return getChannel(id) ?? getWidget(id);
 }
 
+/** The catalog item (display: name/icon/hex/category) for a widget id. */
+export function catalogItemById(id: string): CatalogItem | undefined {
+  return getCatalogItems().find((it) => it.id === id);
+}
+
+/** A manifest for RENDERING a data widget on Home / Source pages: the coarse
+ *  source's FeedTab + icon + info, but the widget's own id + name (so an MLB
+ *  widget shows "MLB", not "Sports"). Falls back to a legacy coarse channel or
+ *  a utility manifest. */
+export function widgetManifest(
+  id: string,
+): ChannelManifest | WidgetManifest | undefined {
+  const def = dataWidgetDef(id);
+  if (!def) return getChannel(id) ?? getWidget(id);
+  const source = getChannel(def.source);
+  if (!source) return undefined;
+  return { ...source, id: def.id, name: def.name, tabLabel: def.name };
+}
+
 // ── Builder ─────────────────────────────────────────────────────
 
 function buildDataItem(def: DataWidgetDef): CatalogItem | null {

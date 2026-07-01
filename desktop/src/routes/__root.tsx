@@ -38,6 +38,7 @@ import AuthGate from "../components/onboarding/AuthGate";
 
 // Registries
 import { getAllChannels } from "../channels/registry";
+import { catalogItemById } from "../marketplace";
 import { DEMO } from "../config";
 import { getAllWidgets, getWidget } from "../widgets/registry";
 import { CANONICAL_ORDER } from "../marketplace";
@@ -603,7 +604,7 @@ function RootLayout() {
 
     for (const id of CANONICAL_ORDER) {
       if (enabledChannelIds.has(id)) {
-        const m = allChannelManifests.find((m) => m.id === id);
+        const m = catalogItemById(id);
         if (m) {
           sources.push({ id, name: m.name, hex: m.hex, icon: m.icon, kind: "channel" });
         }
