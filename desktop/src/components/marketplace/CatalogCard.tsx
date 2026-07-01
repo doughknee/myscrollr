@@ -39,6 +39,7 @@ export default function CatalogCard({
   onOpen,
 }: CatalogCardProps) {
   const [loading, setLoading] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
 
   const tierLocked =
     authenticated && item.requiredTier !== "free" && !tierMeetsRequirement(tier, item.requiredTier);
@@ -76,7 +77,7 @@ export default function CatalogCard({
         // Matches the dense Section card chrome used on Settings,
         // Ticker, and Account so the catalog reads as part of the
         // same surface vocabulary instead of its own visual island.
-        "rounded-xl border border-edge/35 bg-base-150/35 p-3.5",
+        "rounded-xl border border-edge/35 bg-base-150/35 p-4",
         // Subtle 200ms hover lift gives the grid life without
         // becoming distracting.
         "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft-sm hover:border-edge/55 hover:bg-base-150/55",
@@ -90,10 +91,20 @@ export default function CatalogCard({
       {/* Header row: icon + name + category badge */}
       <div className="flex items-start gap-3 mb-2.5">
         <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-          style={{ backgroundColor: `${item.hex}15`, color: item.hex }}
+          className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
+          style={{ backgroundColor: `${item.hex}14`, color: item.hex }}
         >
-          <Icon size={20} />
+          {item.logoUrl && !logoFailed ? (
+            <img
+              src={item.logoUrl}
+              alt=""
+              loading="lazy"
+              className="w-7 h-7 object-contain"
+              onError={() => setLogoFailed(true)}
+            />
+          ) : (
+            <Icon size={22} />
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">

@@ -49,6 +49,8 @@ export interface CatalogItem {
   description: string;
   icon: ComponentType<IconProps>;
   hex: string;
+  /** Brand logo URL (real mark). Cards show this, falling back to `icon`. */
+  logoUrl?: string;
   category: WidgetCategory;
   /** "data" → a backend-connected widget (created via the channels API);
    *  "utility" → a local-only widget (stored in preferences). */
@@ -158,6 +160,38 @@ export function widgetManifest(
 
 // ── Builder ─────────────────────────────────────────────────────
 
+// Brand domains for widget logos. Only widgets that represent a single brand
+// get one (news sources, sports leagues, Yahoo, Kalshi); the rest fall back to
+// their colored icon. Displaying a service's own mark to represent an
+// integration with it is standard nominative use.
+const WIDGET_LOGO_DOMAINS: Record<string, string> = {
+  sports_nfl: "nfl.com",
+  sports_nba: "nba.com",
+  sports_nhl: "nhl.com",
+  sports_mlb: "mlb.com",
+  sports_f1: "formula1.com",
+  sports_worldcup: "fifa.com",
+  news_bbc: "bbc.com",
+  news_npr: "npr.org",
+  news_guardian: "theguardian.com",
+  news_aljazeera: "aljazeera.com",
+  news_propublica: "propublica.org",
+  news_bloomberg: "bloomberg.com",
+  news_cnbc: "cnbc.com",
+  news_nasa: "nasa.gov",
+  news_hackernews: "news.ycombinator.com",
+  news_theverge: "theverge.com",
+  fantasy_yahoo: "yahoo.com",
+  predictions: "kalshi.com",
+};
+
+/** Brand logo URL for a widget id (or undefined). DuckDuckGo icon service —
+ *  no API key; cards fall back to the colored icon on load error. */
+export function widgetLogoUrl(id: string): string | undefined {
+  const domain = WIDGET_LOGO_DOMAINS[id];
+  return domain ? `https://icons.duckduckgo.com/ip3/${domain}.ico` : undefined;
+}
+
 function buildDataItem(def: DataWidgetDef): CatalogItem | null {
   const src = getChannel(def.source);
   if (!src) return null; // source channel not registered — skip
@@ -169,6 +203,7 @@ function buildDataItem(def: DataWidgetDef): CatalogItem | null {
     // source for now (per-widget hero art differentiates further next).
     icon: src.icon,
     hex: def.color,
+    logoUrl: widgetLogoUrl(def.id),
     category: def.category,
     kind: "data",
     source: def.source,
