@@ -16,6 +16,7 @@ import { Trophy, Filter } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { sportsFullQueryOptions } from "../../api/queries";
 import { useSportsConfig } from "../../hooks/useSportsConfig";
+import { dataWidgetDef } from "../../marketplace";
 import { ScoresTab } from "./ScoresTab";
 import { ScheduleTab } from "./ScheduleTab";
 import { StandingsTab } from "./StandingsTab";
@@ -167,30 +168,40 @@ function buildFavoriteSet(favorites: Record<string, FavoriteTeam>): Set<string> 
 
 // ── FeedTab ──────────────────────────────────────────────────────
 
-function SportsFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
+function SportsFeedTab({ mode, feedContext, onConfigure, widgetId }: FeedTabProps) {
   const [tab, setTab] = useState<SportsTab>("scores");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [leagueFilter, setLeagueFilter] = useState<Set<string>>(new Set());
-  const { leagues, display, favoriteTeams } = useSportsConfig();
+  const { leagues, display, favoriteTeams } = useSportsConfig(widgetId ?? "sports");
+
+  // A per-league widget (sports_nfl) scopes the whole page to its one league:
+  // its league is intrinsic, so we filter the shared /sports payload down and
+  // hide the league-filter dropdown (nothing to filter within one league).
+  const scopedLeague = useMemo(() => {
+    const l = widgetId ? dataWidgetDef(widgetId)?.addConfig?.leagues : undefined;
+    return Array.isArray(l) && typeof l[0] === "string" ? (l[0] as string) : undefined;
+  }, [widgetId]);
 
   // Full channel page reads from /sports directly (not /dashboard), which
   // returns every game for the user's selected leagues without per-league
-  // fair-share capping. The page's league + status filter chips let the
-  // user narrow down by hand — we surface all the data and let them control it.
+  // fair-share capping. The page's status filter chips (plus a league filter
+  // on the coarse channel) let the user narrow down by hand.
   const { data: sportsData } = useQuery(sportsFullQueryOptions());
-  const games = useMemo(
-    () => sportsData?.sports ?? [],
-    [sportsData?.sports],
-  );
+  const games = useMemo(() => {
+    const all = sportsData?.sports ?? [];
+    return scopedLeague ? all.filter((g) => g.league === scopedLeague) : all;
+  }, [sportsData?.sports, scopedLeague]);
 
-  // Unique leagues from current games for the filter dropdown
+  // Unique leagues from current games for the filter dropdown. Empty for a
+  // single-league widget, which hides the filter (LeagueFilter renders null).
   const availableLeagues = useMemo(() => {
+    if (scopedLeague) return [];
     const set = new Set<string>();
     for (const g of games) {
       if (g.league) set.add(g.league);
     }
     return Array.from(set).sort();
-  }, [games]);
+  }, [games, scopedLeague]);
 
   // Favorite team names as a Set for fast lookup
   const favoriteTeamNames = useMemo(

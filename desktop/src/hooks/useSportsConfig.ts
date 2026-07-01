@@ -8,6 +8,7 @@ import { useCallback, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { channelsApi } from "../api/client";
+import type { ChannelType } from "../api/client";
 import { queryKeys } from "../api/queries";
 import { useShellData } from "../shell-context";
 import { normalizeSportsDisplayConfig } from "../channels/sports/view";
@@ -38,12 +39,14 @@ const DEFAULT_DISPLAY: SportsDisplayPrefs = {
   showTimer: "both",
 };
 
-export function useSportsConfig() {
+export function useSportsConfig(channelType: string = "sports") {
   const { channels } = useShellData();
   const queryClient = useQueryClient();
 
-  // Read current config from the channels data (comes via dashboard response)
-  const sportsChannel = channels.find((c) => c.channel_type === "sports");
+  // Read current config from the channels data (comes via dashboard response).
+  // channelType is the specific widget row (e.g. "sports_nfl") post widget-split;
+  // defaults to the legacy coarse "sports" channel for back-compat.
+  const sportsChannel = channels.find((c) => c.channel_type === channelType);
   const raw = (sportsChannel?.config ?? {}) as Record<string, unknown>;
 
   const config: SportsConfig = useMemo(() => {
@@ -69,7 +72,7 @@ export function useSportsConfig() {
 
   const mutation = useMutation({
     mutationFn: (next: SportsConfig) =>
-      channelsApi.update("sports", {
+      channelsApi.update(channelType as ChannelType, {
         config: next as unknown as Record<string, unknown>,
       }),
     onSuccess: () => {

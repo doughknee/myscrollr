@@ -99,7 +99,14 @@ function ChannelFeedTab({
     ),
   };
 
-  return <channel.FeedTab mode="comfort" feedContext={feedContext} onConfigure={onConfigure} />;
+  return (
+    <channel.FeedTab
+      mode="comfort"
+      widgetId={type}
+      feedContext={feedContext}
+      onConfigure={onConfigure}
+    />
+  );
 }
 
 function ChannelConfigTab({

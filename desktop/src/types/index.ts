@@ -128,6 +128,13 @@ export interface FeedTabProps {
    * Each channel decides what goes here (e.g., selected RSS feeds).
    */
   feedContext: Record<string, unknown>;
+  /**
+   * The specific widget/channel id being rendered (e.g. "sports_nfl",
+   * "finance_crypto"). Lets a shared source FeedTab scope itself to that one
+   * widget's fixed dimension (league / asset class / feed). Undefined for a
+   * legacy coarse channel, where the FeedTab shows the whole source.
+   */
+  widgetId?: string;
   /** Navigate to the Settings/configuration tab. */
   onConfigure?: () => void;
 }
