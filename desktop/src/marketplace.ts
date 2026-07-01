@@ -343,6 +343,14 @@ export function dataWidgetDef(id: string): DataWidgetDef | undefined {
   return DATA_WIDGETS.find((w) => w.id === id);
 }
 
+/** The fixed asset class ("stock" | "crypto") for a finance widget, or
+ *  undefined. Lets the finance feed + Configure scope to that one class so
+ *  Stocks and Crypto stop sharing a mixed list. */
+export function assetClassForWidget(id: string): string | undefined {
+  const ac = dataWidgetDef(id)?.addConfig?.asset_class;
+  return typeof ac === "string" ? ac : undefined;
+}
+
 /** The manifest that owns rendering for a widget id: the coarse channel
  *  manifest for a data widget, or the utility widget's own manifest. */
 export function manifestForWidget(

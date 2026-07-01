@@ -22,6 +22,7 @@ import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
 import { applyFinancePipeline, type FinanceSortKey, type FinanceDirectionFilter } from "./view";
 import type { Trade, FeedTabProps, ChannelManifest } from "../../types";
+import { assetClassForWidget } from "../../marketplace";
 import { shouldShowOnFeed } from "../../preferences";
 import type { FinanceDisplayPrefs } from "../../preferences";
 
@@ -70,7 +71,7 @@ const LOAD_MORE_INCREMENT = 20;
 
 // ── FeedTab ──────────────────────────────────────────────────────
 
-function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabProps) {
+function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure, widgetId }: FeedTabProps) {
   const { prefs } = useShell();
   const dp = prefs.channelDisplay.finance;
 
@@ -89,12 +90,12 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabP
   // the per-row "Xs ago" labels never advance between price updates.
   const now = useNow();
 
-  const trades = useMemo(
+  const allTrades = useMemo(
     () => (dashboard?.data?.finance as Trade[] | undefined) ?? [],
     [dashboard?.data?.finance],
   );
 
-  // Symbol → category lookup from the catalog
+  // Symbol → category lookup from the (full) catalog.
   const categoryMap = useMemo(() => {
     const map = new Map<string, string>();
     if (catalog) {
@@ -106,6 +107,17 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabP
     }
     return map;
   }, [catalog]);
+
+  // A per-asset-class widget (finance_stocks / finance_crypto) scopes the feed
+  // to its class: crypto = the "Crypto" category, stocks = everything else.
+  const assetClass = widgetId ? assetClassForWidget(widgetId) : undefined;
+  const trades = useMemo(() => {
+    if (!assetClass) return allTrades;
+    return allTrades.filter((t) => {
+      const isCrypto = categoryMap.get(t.symbol) === "Crypto";
+      return assetClass === "crypto" ? isCrypto : !isCrypto;
+    });
+  }, [allTrades, assetClass, categoryMap]);
 
   // Derive categories with counts from current trades
   const categoryList = useMemo(() => {

@@ -4,6 +4,7 @@ import SymbolManager from "./SymbolManager";
 import { useChannelConfig } from "../../hooks/useChannelConfig";
 import { financeCatalogOptions, dashboardQueryOptions } from "../../api/queries";
 import { getLimit } from "../../tierLimits";
+import { assetClassForWidget } from "../../marketplace";
 import type { Channel } from "../../api/client";
 import type { Trade } from "../../types";
 import type { SubscriptionTier } from "../../auth";
@@ -26,8 +27,10 @@ export default function FinanceConfigPanel({
   channel,
   subscriptionTier,
 }: FinanceConfigPanelProps) {
+  const channelType = channel.channel_type;
+  const assetClass = assetClassForWidget(channelType);
   const { error, setError, saving, updateItems } =
-    useChannelConfig<string[]>("finance", "symbols");
+    useChannelConfig<string[]>(channelType, "symbols");
 
   const config = channel.config as FinanceChannelConfig;
   const symbols = Array.isArray(config?.symbols) ? config.symbols : [];
@@ -37,10 +40,22 @@ export default function FinanceConfigPanel({
   // ── Queries ────────────────────────────────────────────────────
 
   const {
-    data: catalog = [],
+    data: fullCatalog = [],
     isLoading: catalogLoading,
     isError: catalogError,
   } = useQuery(financeCatalogOptions());
+
+  // Scope the picker to this widget's asset class — the "Crypto" category for
+  // the crypto widget, everything else for stocks — so Stocks and Crypto stop
+  // sharing one mixed list (and you can't add crypto to Stocks).
+  const catalog = useMemo(() => {
+    if (!assetClass) return fullCatalog;
+    return fullCatalog.filter((item) =>
+      assetClass === "crypto"
+        ? item.category === "Crypto"
+        : item.category !== "Crypto",
+    );
+  }, [fullCatalog, assetClass]);
 
   const { data: dashboard } = useQuery(dashboardQueryOptions());
   const trades = useMemo(
