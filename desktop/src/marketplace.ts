@@ -51,6 +51,8 @@ export interface CatalogItem {
   hex: string;
   /** Brand logo URL (real mark). Cards show this, falling back to `icon`. */
   logoUrl?: string;
+  /** Render the logo on a light tile (transparent/dark marks like UFC). */
+  logoLight?: boolean;
   category: WidgetCategory;
   /** "data" → a backend-connected widget (created via the channels API);
    *  "utility" → a local-only widget (stored in preferences). */
@@ -84,6 +86,9 @@ interface DataWidgetDef {
    *  own thing (NFL ≠ MLB ≠ BBC) instead of sharing one generic blurb. */
   about?: string;
   usage?: string[];
+  /** Render the logo on a light tile. For transparent/dark marks (e.g. the
+   *  black UFC wordmark) that would vanish when placed flush on a dark card. */
+  logoLight?: boolean;
 }
 
 // Shared usage recipes — most widgets in a family follow the same three
@@ -213,7 +218,7 @@ const DATA_WIDGETS: DataWidgetDef[] = [
     about: "Live UEFA Champions League scores through the league phase and into the knockout rounds.",
   },
   {
-    id: "sports_ufc", name: "UFC", category: "sports", source: "sports", color: "#d20a0a",
+    id: "sports_ufc", name: "UFC", category: "sports", source: "sports", color: "#d20a0a", logoLight: true,
     description: "UFC fight cards and results.",
     addConfig: { leagues: ["UFC"] },
     about: "UFC fight cards and results — main card and prelims, bout by bout on event nights.",
@@ -314,9 +319,9 @@ const DATA_WIDGETS: DataWidgetDef[] = [
     ],
   },
   {
-    id: "predictions", name: "Predictions", category: "predictions", source: "predictions", color: "#1fc9a0",
-    description: "Live prediction-market odds from Kalshi.",
-    about: "Live prediction-market odds from Kalshi — the market's real-time read on elections, econ prints, and the events in the news.",
+    id: "predictions", name: "Kalshi", category: "predictions", source: "predictions", color: "#1fc9a0",
+    description: "Live odds from the Kalshi prediction market.",
+    about: "Live odds from Kalshi, the regulated US prediction market — a real-time read on elections, economic prints, and the events in the news.",
     usage: [
       "Live market odds update as money moves.",
       "Follow the events and questions you care about.",
@@ -439,6 +444,7 @@ function buildDataItem(def: DataWidgetDef): CatalogItem | null {
     icon: src.icon,
     hex: def.color,
     logoUrl: widgetLogoUrl(def.id),
+    logoLight: def.logoLight,
     category: def.category,
     kind: "data",
     source: def.source,

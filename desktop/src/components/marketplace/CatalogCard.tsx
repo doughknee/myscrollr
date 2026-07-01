@@ -120,7 +120,12 @@ export default function CatalogCard({
               src={item.logoUrl}
               alt=""
               loading="lazy"
-              className="w-10 h-10 rounded-lg object-contain shrink-0"
+              className={clsx(
+                "w-10 h-10 rounded-lg object-contain shrink-0",
+                // Transparent/dark marks (UFC) need a light tile or they
+                // disappear flush on a dark card.
+                item.logoLight && "bg-white p-1",
+              )}
               onError={() => setLogoFailed(true)}
             />
           ) : (
