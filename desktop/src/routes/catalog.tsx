@@ -170,13 +170,19 @@ function CatalogPage() {
                     }
                     onOpen={(it) => {
                       if (it.kind === "data") {
-                        // Added channels open straight to Configure — the
-                        // catalog is the one surface for adding AND setting
-                        // up a source, no Options-menu hunting (widget/slot
-                        // redesign, 2026-06-30).
-                        navigate({ to: "/channel/$type/$tab", params: { type: it.id, tab: "configuration" } });
+                        navigate({ to: "/channel/$type/$tab", params: { type: it.id, tab: "feed" } });
                       } else {
                         navigate({ to: "/widget/$id/$tab", params: { id: it.id, tab: "feed" } });
+                      }
+                    }}
+                    onConfigure={(it) => {
+                      // The catalog is the one surface for adding AND setting
+                      // up a widget — no Options-menu hunting (widget/slot
+                      // redesign, 2026-06-30).
+                      if (it.kind === "data") {
+                        navigate({ to: "/channel/$type/$tab", params: { type: it.id, tab: "configuration" } });
+                      } else {
+                        navigate({ to: "/widget/$id/$tab", params: { id: it.id, tab: "configuration" } });
                       }
                     }}
                   />

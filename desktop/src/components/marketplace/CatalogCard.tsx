@@ -21,8 +21,10 @@ interface CatalogCardProps {
   dashboardLoading: boolean;
   onAdd: (item: CatalogItem) => Promise<void>;
   onLogin: () => void;
-  /** Navigate to the channel/widget page when already added. */
+  /** Open the widget's main view (feed) when already added. */
   onOpen?: (item: CatalogItem) => void;
+  /** Open the widget's configuration when already added. */
+  onConfigure?: (item: CatalogItem) => void;
   /** Open the widget's "more info" page. Fires on card body click/Enter —
    *  the corner action (Add/Configure) stops propagation so it doesn't. */
   onInfo?: (item: CatalogItem) => void;
@@ -40,6 +42,7 @@ export default function CatalogCard({
   onAdd,
   onLogin,
   onOpen,
+  onConfigure,
   onInfo,
 }: CatalogCardProps) {
   const [loading, setLoading] = useState(false);
@@ -186,19 +189,27 @@ export default function CatalogCard({
             <Loader2 size={14} className="animate-spin text-fg-4" />
           </span>
         ) : enabled ? (
-          onOpen && (
+          // Added: a text "Configure" (secondary) beside a solid "Open"
+          // (primary) — settings vs. the live view.
+          <div className="flex items-center gap-1">
             <button
-              onClick={() => onOpen(item)}
+              onClick={() => onConfigure?.(item)}
+              className="rounded-lg px-2 py-1 text-ui-chip font-semibold text-fg-3 transition-colors hover:bg-base-200/70 hover:text-fg-1"
+            >
+              Configure
+            </button>
+            <button
+              onClick={() => onOpen?.(item)}
               style={{ backgroundColor: item.hex, color: readableTextOn(item.hex) }}
               className="group/btn flex items-center gap-0.5 rounded-lg px-2.5 py-1 text-ui-chip font-semibold shadow-soft-sm transition-all duration-150 active:scale-95 hover:brightness-110"
             >
-              {item.kind === "data" ? "Configure" : "Open"}
+              Open
               <ChevronRight
                 size={12}
                 className="transition-transform duration-200 group-hover/btn:translate-x-0.5"
               />
             </button>
-          )
+          </div>
         ) : tierLocked || slotLocked ? (
           <button
             onClick={() => open("https://myscrollr.com/uplink")}

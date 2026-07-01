@@ -101,59 +101,61 @@ function WidgetInfoPage() {
 
   const openWidget = () => {
     if (item.kind === "data") {
-      navigate({
-        to: "/channel/$type/$tab",
-        params: { type: item.id, tab: "configuration" },
-      });
+      navigate({ to: "/channel/$type/$tab", params: { type: item.id, tab: "feed" } });
     } else {
       navigate({ to: "/widget/$id/$tab", params: { id: item.id, tab: "feed" } });
     }
   };
-
-  // Primary CTA — same gating order as the catalog card.
-  let cta: {
-    label: string;
-    onClick: () => void;
-    icon?: LucideIcon;
-    brand?: boolean;
-    tone?: "accent" | "warn";
-    disabled?: boolean;
+  const configureWidget = () => {
+    if (item.kind === "data") {
+      navigate({ to: "/channel/$type/$tab", params: { type: item.id, tab: "configuration" } });
+    } else {
+      navigate({ to: "/widget/$id/$tab", params: { id: item.id, tab: "configuration" } });
+    }
   };
-  if (enabled) {
-    cta = {
-      label: item.kind === "data" ? "Configure" : "Open",
-      onClick: openWidget,
-      icon: ChevronRight,
-      brand: true,
-    };
-  } else if (!authenticated && item.kind === "data") {
-    cta = { label: "Sign in to add", onClick: onLogin, tone: "accent" };
-  } else if (tierLocked) {
-    cta = {
-      label: `Requires ${TIER_LABELS[item.requiredTier]} — Upgrade`,
-      onClick: () => open("https://myscrollr.com/uplink"),
-      icon: ExternalLink,
-      tone: "warn",
-    };
-  } else if (slotLocked) {
-    cta = {
-      label: "Widget limit reached — Upgrade",
-      onClick: () => open("https://myscrollr.com/uplink"),
-      icon: ExternalLink,
-      tone: "warn",
-    };
-  } else {
-    cta = {
-      label: `Add ${item.name}`,
-      onClick: () => {
-        void addWidget(item);
-      },
-      icon: Plus,
-      brand: true,
-      disabled: dashboardLoading && item.kind === "data",
-    };
+
+  // CTA for a widget that is NOT yet added (same gating order as the catalog
+  // card). Added widgets render a Configure + Open pair instead — see below.
+  let cta:
+    | {
+        label: string;
+        onClick: () => void;
+        icon?: LucideIcon;
+        brand?: boolean;
+        tone?: "accent" | "warn";
+        disabled?: boolean;
+      }
+    | null = null;
+  if (!enabled) {
+    if (!authenticated && item.kind === "data") {
+      cta = { label: "Sign in to add", onClick: onLogin, tone: "accent" };
+    } else if (tierLocked) {
+      cta = {
+        label: `Requires ${TIER_LABELS[item.requiredTier]} — Upgrade`,
+        onClick: () => open("https://myscrollr.com/uplink"),
+        icon: ExternalLink,
+        tone: "warn",
+      };
+    } else if (slotLocked) {
+      cta = {
+        label: "Widget limit reached — Upgrade",
+        onClick: () => open("https://myscrollr.com/uplink"),
+        icon: ExternalLink,
+        tone: "warn",
+      };
+    } else {
+      cta = {
+        label: `Add ${item.name}`,
+        onClick: () => {
+          void addWidget(item);
+        },
+        icon: Plus,
+        brand: true,
+        disabled: dashboardLoading && item.kind === "data",
+      };
+    }
   }
-  const CtaIcon = cta.icon;
+  const CtaIcon = cta?.icon;
 
   return (
     <PageLayout title={item.name} parentLabel="Catalog" onParentClick={backToCatalog}>
@@ -254,25 +256,48 @@ function WidgetInfoPage() {
 
         {/* Actions */}
         <div className="flex items-center gap-3 border-t border-edge/40 pt-5">
-          <button
-            onClick={cta.onClick}
-            disabled={cta.disabled}
-            style={
-              cta.brand && !cta.disabled
-                ? { backgroundColor: item.hex, color: textOn }
-                : undefined
-            }
-            className={clsx(
-              "flex items-center gap-1.5 rounded-lg px-4 py-2 text-ui-body font-semibold shadow-soft-sm transition-all duration-150 active:scale-[0.98]",
-              cta.brand && !cta.disabled && "hover:brightness-110",
-              cta.tone === "accent" && "bg-accent/10 text-accent hover:bg-accent/[0.16]",
-              cta.tone === "warn" && "bg-warn/15 text-warn hover:bg-warn/25",
-              cta.disabled && "cursor-not-allowed bg-base-200/60 text-fg-4",
-            )}
-          >
-            {CtaIcon && <CtaIcon size={15} />}
-            {cta.label}
-          </button>
+          {enabled ? (
+            <>
+              {/* Added: secondary "Configure" text button + primary "Open". */}
+              <button
+                onClick={configureWidget}
+                className="rounded-lg px-3 py-2 text-ui-body font-semibold text-fg-2 transition-colors hover:bg-base-150/70 hover:text-fg-1"
+              >
+                Configure
+              </button>
+              <button
+                onClick={openWidget}
+                style={{ backgroundColor: item.hex, color: textOn }}
+                className="group/btn flex items-center gap-1.5 rounded-lg px-4 py-2 text-ui-body font-semibold shadow-soft-sm transition-all duration-150 active:scale-[0.98] hover:brightness-110"
+              >
+                Open
+                <ChevronRight
+                  size={15}
+                  className="transition-transform duration-200 group-hover/btn:translate-x-0.5"
+                />
+              </button>
+            </>
+          ) : cta ? (
+            <button
+              onClick={cta.onClick}
+              disabled={cta.disabled}
+              style={
+                cta.brand && !cta.disabled
+                  ? { backgroundColor: item.hex, color: textOn }
+                  : undefined
+              }
+              className={clsx(
+                "flex items-center gap-1.5 rounded-lg px-4 py-2 text-ui-body font-semibold shadow-soft-sm transition-all duration-150 active:scale-[0.98]",
+                cta.brand && !cta.disabled && "hover:brightness-110",
+                cta.tone === "accent" && "bg-accent/10 text-accent hover:bg-accent/[0.16]",
+                cta.tone === "warn" && "bg-warn/15 text-warn hover:bg-warn/25",
+                cta.disabled && "cursor-not-allowed bg-base-200/60 text-fg-4",
+              )}
+            >
+              {CtaIcon && <CtaIcon size={15} />}
+              {cta.label}
+            </button>
+          ) : null}
           <button
             onClick={backToCatalog}
             className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-ui-body font-medium text-fg-3 transition-colors hover:bg-base-150/60"
