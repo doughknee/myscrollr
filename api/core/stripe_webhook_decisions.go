@@ -21,7 +21,7 @@ import (
 //     incomplete, etc. leave roles as-is.
 
 // Tier identifiers returned by the decision helpers. These match the Logto
-// role names and the tier strings PruneUserChannelsForTier expects.
+// role names and the tier strings PruneWidgetsForTier expects.
 const (
 	tierUplink   = "uplink"
 	tierPro      = "uplink_pro"
@@ -61,7 +61,7 @@ type subscriptionUpdateAction struct {
 	// so plan up/downgrades don't leave stale roles behind.
 	ClearPaidRoles bool
 	// AssignTier is the tier role to assign; "" leaves roles untouched.
-	// Non-empty also triggers PruneUserChannelsForTier for that tier.
+	// Non-empty also triggers PruneWidgetsForTier for that tier.
 	AssignTier string
 }
 

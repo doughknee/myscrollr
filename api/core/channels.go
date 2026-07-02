@@ -612,56 +612,102 @@ func DeleteChannel(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "ok", "message": "Channel removed"})
 }
 
-// PruneUserChannelsForTier walks all user_channels rows for a user and
-// trims each config to the caps of the given tier. UPDATEs are skipped
-// for rows that were already within-cap. Intended to be called from the
+// PruneWidgetsForTier disables (never deletes) a user's newest enabled
+// widgets until the count fits the tier's slot cap — the downgrade
+// safety net of the widget/slot model. Oldest widgets survive
+// (created_at ASC); rows stay in user_channels so the user can
+// re-enable them after re-upgrading. Intended to be called from the
 // Stripe webhook whenever a subscription change demotes the user to a
-// lower tier — stops silent over-use of TwelveData/Yahoo budgets that
-// the frontend cap-gate can't protect against.
+// lower tier. Local utility widgets live client-side and are enforced
+// by the desktop cap-gate, not here.
 //
 // Returns nothing — failures are logged but do not propagate, because
 // the webhook handler's primary job (role assignment, DB status update)
 // must complete even if a prune fails.
-func PruneUserChannelsForTier(ctx context.Context, logtoSub, tier string) {
-	channels, err := GetUserChannels(logtoSub)
+func PruneWidgetsForTier(ctx context.Context, logtoSub, tier string) {
+	max := MaxWidgetsForTier(tier)
+	if max == nil {
+		return // unlimited slots — nothing to prune
+	}
+	channels, err := GetUserChannels(logtoSub) // ordered created_at ASC
 	if err != nil {
-		log.Printf("[Prune] Failed to list channels for %s: %v", logtoSub, err)
+		log.Printf("[Prune] Failed to list widgets for %s: %v", logtoSub, err)
 		return
 	}
-	for _, ch := range channels {
-		newConfig, report := PruneChannelConfig(tier, ch.ChannelType, ch.Config)
-		if !report.Changed() {
-			continue
-		}
-		newJSON, err := json.Marshal(newConfig)
-		if err != nil {
-			log.Printf("[Prune] Failed to marshal pruned config for %s/%s: %v", logtoSub, ch.ChannelType, err)
-			continue
-		}
-		_, err = DBPool.Exec(ctx, `
-			UPDATE user_channels SET config = $3, updated_at = now()
-			WHERE logto_sub = $1 AND channel_type = $2
-		`, logtoSub, ch.ChannelType, newJSON)
-		if err != nil {
-			log.Printf("[Prune] Failed to UPDATE %s/%s: %v", logtoSub, ch.ChannelType, err)
-			continue
-		}
-		log.Printf("[Prune] %s/%s to tier %s: symbols=%d→%d feeds=%d→%d custom=%d→%d leagues=%d→%d",
-			logtoSub, ch.ChannelType, tier,
-			report.SymbolsBefore, report.SymbolsAfter,
-			report.FeedsBefore, report.FeedsAfter,
-			report.CustomFeedsBefore, report.CustomFeedsAfter,
-			report.LeaguesBefore, report.LeaguesAfter,
-		)
-		// Refresh subscriptions + lifecycle hook so the Rust service
-		// sees the trimmed config immediately instead of on next sync.
-		if ch.Enabled {
-			addChannelSubscriptions(ctx, logtoSub, ch.ChannelType, newConfig)
-		}
-		callChannelLifecycle(ctx, ch.ChannelType, "updated", logtoSub, newConfig, ch.Config, nil)
+	kept, pruned := partitionWidgetsForCap(channels, *max)
+	if len(pruned) == 0 {
+		return
 	}
+
+	// Sources and sports leagues the surviving widgets still need. Split
+	// widgets share source-level subscriber sets (sports_nfl and
+	// sports_nba both live in channel:subscribers:sports), so a pruned
+	// widget must not yank a subscription a kept sibling depends on.
+	keptSources := map[string]bool{}
+	keptLeagues := map[string]bool{}
+	for _, ch := range kept {
+		keptSources[DataSourceForWidget(ch.ChannelType)] = true
+		for _, lg := range extractSportsLeaguesFromConfig(ch.Config) {
+			keptLeagues[lg] = true
+		}
+	}
+
+	for _, ch := range pruned {
+		_, err := DBPool.Exec(ctx, `
+			UPDATE user_channels SET enabled = false, updated_at = now()
+			WHERE logto_sub = $1 AND channel_type = $2
+		`, logtoSub, ch.ChannelType)
+		if err != nil {
+			log.Printf("[Prune] Failed to disable %s/%s: %v", logtoSub, ch.ChannelType, err)
+			continue
+		}
+		log.Printf("[Prune] Disabled %s/%s: tier %s allows %d widget slots", logtoSub, ch.ChannelType, tier, *max)
+
+		source := DataSourceForWidget(ch.ChannelType)
+		if !keptSources[source] {
+			RemoveSubscriber(ctx, RedisChannelSubscribersPrefix+source, logtoSub)
+		}
+		if source == "sports" {
+			var stale []string
+			for _, lg := range extractSportsLeaguesFromConfig(ch.Config) {
+				if !keptLeagues[lg] {
+					stale = append(stale, SportsLeagueSubscribersPrefix+lg)
+				}
+			}
+			if len(stale) > 0 {
+				if err := RemoveSubscriberMulti(ctx, stale, logtoSub); err != nil {
+					log.Printf("[Prune] Failed to remove league subscriptions for %s: %v", logtoSub, err)
+				}
+			}
+		}
+
+		// Tell the backing service this widget went dark.
+		enabled := false
+		callChannelLifecycle(ctx, ch.ChannelType, "sync", logtoSub, ch.Config, nil, &enabled)
+	}
+
+	// Rebuild SSE topics on every replica holding a connection for this
+	// user (Redis control message, ADR-0001), then refresh cached views.
+	NotifyTopicSubscriptionChange(logtoSub)
 	InvalidateDashboardCache(logtoSub)
 	InvalidateOverviewCache(ctx, logtoSub)
+}
+
+// partitionWidgetsForCap splits a created_at-ascending channel list into
+// the enabled widgets that fit the slot cap (oldest first) and the
+// enabled overflow to disable. Disabled rows pass through untouched.
+func partitionWidgetsForCap(channels []Channel, max int) (kept, pruned []Channel) {
+	for _, ch := range channels {
+		if !ch.Enabled {
+			continue
+		}
+		if len(kept) < max {
+			kept = append(kept, ch)
+		} else {
+			pruned = append(pruned, ch)
+		}
+	}
+	return kept, pruned
 }
 
 // extractSportsLeaguesFromConfig reads the "leagues" array from a sports

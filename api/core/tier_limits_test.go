@@ -233,54 +233,66 @@ func TestTierLimitError_UserFacingMessage(t *testing.T) {
 	}
 }
 
-// ─── PruneChannelConfig ──────────────────────────────────────────────
+// ─── partitionWidgetsForCap (downgrade slot prune) ───────────────────
 
-// TestPruneChannelConfig_CapsRetired confirms prune is a no-op on every tier
-// now that per-feature caps are retired — a downgrade never trims widget depth.
-func TestPruneChannelConfig_CapsRetired(t *testing.T) {
-	cases := []struct {
-		tier        string
-		channelType string
-		config      map[string]any
-		countKey    string
-		wantLen     int
-	}{
-		{"free", "finance", financeCfg(200), "symbols", 200},
-		{"free", "sports", sportsCfg(50), "leagues", 50},
-		{"free", "rss", rssCfg(100, 40), "feeds", 100},
+// TestPartitionWidgetsForCap covers the selection logic of the downgrade
+// prune: keep the oldest enabled widgets up to the slot cap, mark the
+// newest overflow for disabling, and never touch already-disabled rows.
+func TestPartitionWidgetsForCap(t *testing.T) {
+	w := func(name string, enabled bool) Channel {
+		return Channel{ChannelType: name, Enabled: enabled}
 	}
-	for _, c := range cases {
-		out, report := PruneChannelConfig(c.tier, c.channelType, c.config)
-		if got := len(out[c.countKey].([]any)); got != c.wantLen {
-			t.Errorf("%s/%s: want %d (no prune), got %d", c.tier, c.channelType, c.wantLen, got)
-		}
-		if report.Changed() {
-			t.Errorf("%s/%s: prune should be a no-op now", c.tier, c.channelType)
-		}
+	// created_at ASC order, matching GetUserChannels.
+	channels := []Channel{
+		w("sports_nfl", true),
+		w("finance_stocks", true),
+		w("news_bbc", false), // user-disabled — passes through untouched
+		w("sports_nba", true),
+		w("predictions", true),
+		w("fantasy_yahoo", true),
+	}
+
+	kept, pruned := partitionWidgetsForCap(channels, 3)
+
+	wantKept := []string{"sports_nfl", "finance_stocks", "sports_nba"}
+	wantPruned := []string{"predictions", "fantasy_yahoo"}
+	if got := widgetNames(kept); !equalStrings(got, wantKept) {
+		t.Errorf("kept = %v, want %v", got, wantKept)
+	}
+	if got := widgetNames(pruned); !equalStrings(got, wantPruned) {
+		t.Errorf("pruned = %v, want %v", got, wantPruned)
 	}
 }
 
-// TestPruneChannelConfig_UltimateIsNoOp — no cap ⇒ no prune.
-func TestPruneChannelConfig_UltimateIsNoOp(t *testing.T) {
-	cfg := financeCfg(500)
-	out, report := PruneChannelConfig("uplink_ultimate", "finance", cfg)
-	if got := len(out["symbols"].([]any)); got != 500 {
-		t.Errorf("symbols after prune: want 500 (unchanged), got %d", got)
+// TestPartitionWidgetsForCap_UnderCap — nothing to prune when the user
+// fits their slots (the upgrade / no-op path).
+func TestPartitionWidgetsForCap_UnderCap(t *testing.T) {
+	channels := []Channel{
+		{ChannelType: "sports_nfl", Enabled: true},
+		{ChannelType: "news_bbc", Enabled: true},
 	}
-	if report.Changed() {
-		t.Error("ultimate tier should not register any change")
+	kept, pruned := partitionWidgetsForCap(channels, 3)
+	if len(kept) != 2 || len(pruned) != 0 {
+		t.Errorf("kept=%d pruned=%d, want kept=2 pruned=0", len(kept), len(pruned))
 	}
 }
 
-// TestPruneChannelConfig_UnknownChannelNoOp — don't touch configs we
-// don't understand.
-func TestPruneChannelConfig_UnknownChannelNoOp(t *testing.T) {
-	cfg := map[string]any{"custom_array": []any{"a", "b", "c"}}
-	out, report := PruneChannelConfig("free", "future_channel", cfg)
-	if got, ok := out["custom_array"].([]any); !ok || len(got) != 3 {
-		t.Errorf("unknown channel config should pass through; got %v", out)
+func widgetNames(chs []Channel) []string {
+	names := make([]string, len(chs))
+	for i, ch := range chs {
+		names[i] = ch.ChannelType
 	}
-	if report.Changed() {
-		t.Error("unknown channel should not register any change")
+	return names
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
 	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

@@ -243,12 +243,12 @@ func handleSubscriptionUpdated(event stripe.Event) {
 		}
 	}
 
-	// Auto-prune oversized channel configs to match the new tier's caps.
-	// This is a no-op for upgrades (higher caps = nothing to trim) and
-	// the safety net for downgrades. Called after role assignment so a
-	// failed Logto call doesn't block the prune.
+	// Disable widgets over the new tier's slot cap. This is a no-op for
+	// upgrades (more slots = nothing over cap) and the safety net for
+	// downgrades. Called after role assignment so a failed Logto call
+	// doesn't block the prune.
 	if action.AssignTier != "" {
-		PruneUserChannelsForTier(context.Background(), logtoSub, action.AssignTier)
+		PruneWidgetsForTier(context.Background(), logtoSub, action.AssignTier)
 	}
 
 	// Tier and subscription fields in the overview response just changed.
@@ -309,9 +309,9 @@ func handleSubscriptionDeleted(event stripe.Event) {
 		if err := RemoveUltimateRole(logtoSub); err != nil {
 			log.Printf("[Stripe Webhook] Failed to remove uplink_ultimate role from %s: %v", logtoSub, err)
 		}
-		// Full cancellation drops the user to the free tier — trim any
-		// configs they accumulated while on a paid plan down to free caps.
-		PruneUserChannelsForTier(context.Background(), logtoSub, "free")
+		// Full cancellation drops the user to the free tier — disable any
+		// widgets over the free slot cap (newest first, never deleted).
+		PruneWidgetsForTier(context.Background(), logtoSub, "free")
 	}
 
 	// Subscription went away (or downgraded to free) — overview is stale.

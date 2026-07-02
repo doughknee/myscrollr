@@ -219,10 +219,13 @@ func TestIntegrationSubscriptionDeletedResetsAndPrunes(t *testing.T) {
 	stub := newLogtoStub(t)
 	const sub = "user_hook_del"
 	seedStripeCustomer(t, sub, "cus_del_1", "ultimate_monthly", "active", false)
-	// Ten tracked symbols — double the free-tier cap of five.
-	mustExec(t, `INSERT INTO user_channels (logto_sub, channel_type, enabled, config)
-	             VALUES ($1, 'finance', true,
-	                     '{"symbols":["A","B","C","D","E","F","G","H","I","J"]}')`, sub)
+	// Five widgets on Ultimate (unlimited slots) — two over the free
+	// slot cap of three. Staggered created_at pins the prune order.
+	widgets := []string{"sports_nfl", "finance_stocks", "news_bbc", "sports_nba", "predictions"}
+	for i, w := range widgets {
+		mustExec(t, `INSERT INTO user_channels (logto_sub, channel_type, enabled, config, created_at)
+		             VALUES ($1, $2, true, '{}', now() + make_interval(secs => $3))`, sub, w, i)
+	}
 
 	handleSubscriptionDeleted(stripeEvent("customer.subscription.deleted", `{
 		"id": "sub_del_1", "object": "subscription", "customer": "cus_del_1"
@@ -236,21 +239,38 @@ func TestIntegrationSubscriptionDeletedResetsAndPrunes(t *testing.T) {
 		t.Errorf("removed roles = %v, want all three paid roles cleared", got)
 	}
 
-	// The downgrade safety net must trim the config to free-tier caps.
-	var configJSON []byte
-	if err := DBPool.QueryRow(context.Background(),
-		`SELECT config FROM user_channels WHERE logto_sub = $1 AND channel_type = 'finance'`, sub,
-	).Scan(&configJSON); err != nil {
-		t.Fatalf("read pruned config: %v", err)
+	// The downgrade safety net must disable (never delete) the newest
+	// widgets over the free slot cap; the oldest three keep running.
+	rows, err := DBPool.Query(context.Background(),
+		`SELECT channel_type, enabled FROM user_channels
+		 WHERE logto_sub = $1 ORDER BY created_at ASC`, sub)
+	if err != nil {
+		t.Fatalf("read widgets after prune: %v", err)
 	}
-	var config struct {
-		Symbols []string `json:"symbols"`
+	defer rows.Close()
+	got := map[string]bool{}
+	for rows.Next() {
+		var widget string
+		var enabled bool
+		if err := rows.Scan(&widget, &enabled); err != nil {
+			t.Fatalf("scan widget row: %v", err)
+		}
+		got[widget] = enabled
 	}
-	if err := json.Unmarshal(configJSON, &config); err != nil {
-		t.Fatalf("unmarshal pruned config: %v", err)
+	want := map[string]bool{
+		"sports_nfl":     true,
+		"finance_stocks": true,
+		"news_bbc":       true,
+		"sports_nba":     false,
+		"predictions":    false,
 	}
-	if len(config.Symbols) != 5 {
-		t.Errorf("symbols after prune = %d (%v), want free-tier cap of 5", len(config.Symbols), config.Symbols)
+	if len(got) != len(want) {
+		t.Errorf("widget rows after prune = %d (%v), want %d — prune must disable, not delete", len(got), got, len(want))
+	}
+	for widget, wantEnabled := range want {
+		if gotEnabled, ok := got[widget]; !ok || gotEnabled != wantEnabled {
+			t.Errorf("widget %s: enabled=%v (present=%v), want enabled=%v", widget, gotEnabled, ok, wantEnabled)
+		}
 	}
 }
 
