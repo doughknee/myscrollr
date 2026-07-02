@@ -11,11 +11,17 @@ stays at 1.1.0 and nobody gets force-updated.
 | Version | Codename | Theme | Size |
 |---|---|---|---|
 | v1.1.1 | Paper Cuts | Bug fixes + fossil removals, ship fast | S |
-| v1.2.0 | The Library | Catalog becomes yours + slots-only monetization everywhere | M |
-| v1.3.0 | Time Controls | Day-range windows replace vague feed toggles | M |
-| v1.4.0 | Kalshi Grows Up | Predictions widget behaves like a widget | M |
-| v1.5.0 | Double-Decker 2.0 | Multi-row ticker rebuilt around widgets | L |
-| — | Website rides along | Pricing rewrite ships with v1.2.0; screenshots after v1.4.0 | S–M |
+| v1.1.2 | The Library | Catalog becomes yours + slots-only monetization everywhere | M |
+| v1.1.3 | Time Controls | Day-range windows replace vague feed toggles | M |
+| v1.1.4 | Kalshi Grows Up | Predictions widget behaves like a widget | M |
+| v1.2.0 | Double-Decker 2.0 | Multi-row ticker rebuilt around widgets | L |
+| — | Website rides along | Pricing rewrite ships with v1.1.2; screenshots after v1.1.4 | S–M |
+
+*Numbering philosophy (house style, see v1.0.9→v1.0.20): patch = the same app,
+better — fixes, refinements, even sizable ones. Minor = something new to learn.
+Only Double-Decker introduces a new interaction model + config migration, so it
+alone earns the minor. Numbers are assigned at release time; if a batch grows or
+merges, promote it then.*
 
 ---
 
@@ -56,7 +62,7 @@ No design decisions required; pure execution.
 
 ---
 
-## v1.2.0 — The Library
+## v1.1.2 — The Library
 
 **Goal:** the catalog stops being a store you visited once, and the whole product
 tells one monetization story: *your plan = how many widgets you run.*
@@ -88,7 +94,7 @@ tells one monetization story: *your plan = how many widgets you run.*
 
 ---
 
-## v1.3.0 — Time Controls
+## v1.1.3 — Time Controls
 
 **Goal:** replace vague "upcoming / final" style toggles with a control people
 actually think in: *how many days back, how many days ahead.*
@@ -106,7 +112,7 @@ actually think in: *how many days back, how many days ahead.*
 
 ---
 
-## v1.4.0 — Kalshi Grows Up
+## v1.1.4 — Kalshi Grows Up
 
 **Goal:** the predictions widget stops being a foreign app bolted on.
 
@@ -125,7 +131,7 @@ actually think in: *how many days back, how many days ahead.*
 
 ---
 
-## v1.5.0 — Double-Decker 2.0
+## v1.2.0 — Double-Decker 2.0
 
 **Goal:** the multi-row ticker becomes the flagship feature it deserves to be.
 Biggest item on the list; gets its own design pass before any code.
@@ -147,7 +153,7 @@ Biggest item on the list; gets its own design pass before any code.
 
 - **Marketing screenshots** — all product imagery still shows the channel-era UI.
   Reshooting now would capture a product we're about to polish twice more. Do it
-  after v1.4.0. Precondition either way: `desktop/scripts/capture-screenshots.mjs`
+  after v1.1.4. Precondition either way: `desktop/scripts/capture-screenshots.mjs`
   still shoots deleted routes and needs updating first.
 - **Popularity sorting** if PostHog wiring drags — A–Z ships regardless.
 
