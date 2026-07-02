@@ -254,7 +254,7 @@ function LifetimePage() {
               >
                 Lifetime members get permanent Uplink-tier access with a single
                 payment — plus 50% off any Uplink Ultimate subscription.
-                Real-time SSE, unlimited symbols, webhooks, API access — all at
+                Unlimited widgets at once, webhooks, API access — all at
                 half price, for as long as you subscribe. Only 128 founding
                 member slots will ever exist.
               </motion.p>
@@ -270,12 +270,12 @@ function LifetimePage() {
                   50% off any Uplink Ultimate subscription — from $25.00/mo
                 </Feature>
                 <Feature>
-                  Real-time SSE, unlimited symbols, feeds & leagues
+                  Unlimited widgets, webhooks & API access at half price
                 </Feature>
-                <Feature>Permanent Uplink-tier access (30s polling)</Feature>
-                <Feature>25 symbols, 50 RSS feeds, 3 fantasy leagues</Feature>
+                <Feature>Permanent Uplink-tier access (6 widgets at once)</Feature>
+                <Feature>Yahoo Fantasy sync + unlimited items per widget</Feature>
                 <Feature>Founding member badge & priority support</Feature>
-                <Feature>Early access to new features & channels</Feature>
+                <Feature>Early access to new features & widgets</Feature>
               </motion.div>
             </div>
 
@@ -406,8 +406,8 @@ function LifetimePage() {
                       </p>
                       <p className="text-[10px] text-base-content/35 leading-relaxed">
                         Lifetime members get half off any Uplink Ultimate
-                        subscription. Real-time SSE, unlimited symbols and
-                        feeds, webhooks, API access, and data export — all at
+                        subscription. Unlimited widgets at once, webhooks,
+                        API access, and data export — all at
                         half price.
                       </p>
                     </div>

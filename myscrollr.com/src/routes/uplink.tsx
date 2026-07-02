@@ -35,7 +35,6 @@ import {
   Lock,
   Minus,
   Rocket,
-  Rss,
   Satellite,
   ShieldAlert,
   Sparkles,
@@ -131,21 +130,21 @@ const STATIC_TIERS = [
   {
     name: 'Uplink',
     description:
-      'Unlimited tracking, faster delivery, and full RSS catalog access.',
+      'Six widgets at once, Yahoo Fantasy sync, and early access to new widgets.',
     priceMonthly: 9.99,
     priceAnnual: 79.99,
   },
   {
     name: 'Pro',
     description:
-      'Real-time data, custom alerts, advanced feed controls, and more tracked symbols.',
+      'Twelve widgets at once, custom alerts, feed profiles, advanced feed controls, and priority RSS refresh.',
     priceMonthly: 24.99,
     priceAnnual: 199.99,
   },
   {
     name: 'Ultimate',
     description:
-      'No caps on symbols, RSS feeds, or sports leagues. Up to 10 Yahoo fantasy leagues. Server-Sent Events delivery, webhooks, data export, and API access.',
+      'Unlimited widgets at once, webhooks, data export, API access, and priority support.',
     priceMonthly: 49.99,
     priceAnnual: 399.99,
   },
@@ -153,34 +152,34 @@ const STATIC_TIERS = [
 
 const STATIC_FAQ = [
   {
+    question: 'What are widgets, and how many do I get?',
+    answer:
+      'Widgets are the building blocks of your ticker — MLB scores, a stocks watchlist, crypto prices, your news feed, Yahoo Fantasy, and more. Your plan sets how many run at the same time: Free runs 3, Uplink 6, Pro 12, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.',
+  },
+  {
     question: 'What does "data delivery" mean?',
     answer:
-      'Free users get data refreshed every 60 seconds via polling. Uplink cuts that to 30 seconds. Pro pushes it to 10 seconds. Ultimate eliminates polling entirely — data arrives the instant it changes via Server-Sent Events (SSE), the same technology used by stock trading platforms.',
+      'Every plan streams data in real time over Server-Sent Events (SSE) — the same technology used by stock trading platforms. The moment a price ticks or a score changes, it appears in your ticker. Polling only exists as a brief fallback while a connection re-establishes.',
   },
   {
-    question: 'How many symbols can I track?',
+    question: 'Are there limits inside a widget?',
     answer:
-      'Tracked symbols are the stocks, ETFs, and crypto tickers that appear in your finance feed. Free accounts can follow up to 5 at a time. Uplink raises that to 25. Pro gives you 75 — enough for a serious portfolio. With Ultimate, there is no cap — add every ticker you care about and they all stream in real time.',
-  },
-  {
-    question: 'How many RSS feeds can I follow?',
-    answer:
-      'RSS feeds power the news channel. Free accounts can subscribe to 1 feed from the default catalog. Uplink expands that to 25, Pro to 100, giving you broad coverage across topics. Ultimate removes the limit entirely — subscribe to as many sources as you want.',
+      'No. Every plan holds unlimited items inside each widget — track 5 or 500 symbols in your Stocks widget, follow every source in your news feeds, sync every fantasy league you play. Your plan only sets how many widgets run at once.',
   },
   {
     question: 'What are custom RSS feeds?',
     answer:
-      'Beyond the built-in catalog, custom feeds let you paste any RSS or Atom URL. Free accounts cannot add custom feeds. Uplink gives you 1, Pro gives you 3 — enough for niche industry sources, personal blogs, or company news. Ultimate removes the cap so you can add every source you follow.',
+      'Beyond the curated news catalog, the Custom RSS widget lets you paste any RSS or Atom URL — niche industry sources, personal blogs, or company news. It is included on every plan, holds unlimited sources, and counts as one widget.',
   },
   {
     question: 'What sports leagues are included?',
     answer:
-      'Every tier includes live scores from the NFL, NBA, MLB, NHL, MLS, and Premier League. All paid tiers add college football (NCAAF) and college basketball (NCAAM), with scores updating at the delivery speed of your tier.',
+      'All 14 leagues are available on every plan — NFL, NBA, MLB, NHL, MLS, Premier League, La Liga, Champions League, World Cup, F1, UFC, AFL, plus college football and basketball. Each league is its own widget, so you add exactly the ones you follow and scores stream in live.',
   },
   {
     question: 'How many fantasy leagues can I connect?',
     answer:
-      'Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. Free accounts cannot connect Yahoo leagues. Uplink supports up to 1. Pro gives you 3 — enough for multi-sport managers. Ultimate raises the cap to 10 leagues across every sport.',
+      'As many as you play. Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. The Yahoo Fantasy widget is available on every paid plan — Uplink and up — and syncs unlimited leagues across every sport.',
   },
   {
     question: 'What are custom alerts?',
@@ -220,7 +219,7 @@ export const Route = createFileRoute('/uplink')({
     seo({
       title: 'Scrollr Uplink: Pricing & Plans',
       description:
-        'Scrollr Uplink unlocks unlimited tracking, real-time data delivery, and early access to new channels. Plans from $9.99/month with annual savings.',
+        'Scrollr Uplink unlocks more widgets at once, Yahoo Fantasy sync, and power-user tools — on top of real-time streaming for everyone. Plans from $9.99/month with annual savings.',
       path: '/uplink',
       image: 'https://myscrollr.com/og/uplink.png',
       type: 'product',
@@ -274,11 +273,6 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
   const pro = limits.tiers.uplink_pro
   const ult = limits.tiers.uplink_ultimate
 
-  const none = (n: number | null): string => {
-    if (n === null) return 'Unlimited'
-    return n === 0 ? 'None' : String(n)
-  }
-
   const widgets = (n: number | null): string =>
     n === null ? 'Unlimited' : `${n} widgets`
 
@@ -295,60 +289,24 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
     },
     {
       label: 'Data Delivery',
-      free: '60s polling',
-      uplink: '30s polling',
-      pro: '10s polling',
+      free: 'Real-time SSE',
+      uplink: 'Real-time SSE',
+      pro: 'Real-time SSE',
       ultimate: 'Real-time SSE',
-      uplinkUp: true,
-      proUp: true,
-      ultimateUp: true,
     },
     {
-      label: 'Tracked Symbols',
-      free: fmtLimit(free.symbols, 'symbol'),
-      uplink: fmtLimit(uplink.symbols, 'symbol'),
-      pro: fmtLimit(pro.symbols, 'symbol'),
-      ultimate: fmtLimit(ult.symbols, 'symbol'),
-      uplinkUp: true,
-      proUp: true,
-      ultimateUp: true,
+      label: 'Items per Widget',
+      free: 'Unlimited',
+      uplink: 'Unlimited',
+      pro: 'Unlimited',
+      ultimate: 'Unlimited',
     },
     {
-      label: 'RSS Feeds',
-      free: fmtLimit(free.feeds, 'feed'),
-      uplink: fmtLimit(uplink.feeds, 'feed'),
-      pro: fmtLimit(pro.feeds, 'feed'),
-      ultimate: fmtLimit(ult.feeds, 'feed'),
-      uplinkUp: true,
-      proUp: true,
-      ultimateUp: true,
-    },
-    {
-      label: 'Custom RSS Feeds',
-      free: none(free.custom_feeds),
-      uplink: none(uplink.custom_feeds),
-      pro: none(pro.custom_feeds),
-      ultimate: none(ult.custom_feeds),
-      uplinkUp: true,
-      proUp: true,
-      ultimateUp: true,
-    },
-    {
-      label: 'Sports Leagues',
-      free: fmtLimit(free.leagues, 'league'),
-      uplink: fmtLimit(uplink.leagues, 'league'),
-      pro: fmtLimit(pro.leagues, 'league'),
-      ultimate: fmtLimit(ult.leagues, 'league'),
-      uplinkUp: true,
-      proUp: true,
-      ultimateUp: true,
-    },
-    {
-      label: 'Fantasy Leagues',
-      free: none(free.fantasy),
-      uplink: fmtLimit(uplink.fantasy, 'league'),
-      pro: fmtLimit(pro.fantasy, 'league'),
-      ultimate: fmtLimit(ult.fantasy, 'league'),
+      label: 'Yahoo Fantasy',
+      free: 'No',
+      uplink: 'Yes',
+      pro: 'Yes',
+      ultimate: 'Yes',
       uplinkUp: true,
       proUp: true,
       ultimateUp: true,
@@ -485,15 +443,15 @@ function buildTierShowcases(limits: TierLimitsResponse): Array<TierShowcase> {
       name: 'Uplink',
       tagline: 'Check in every morning. Miss nothing.',
       hex: '#00b8db',
-      delivery: '30s polling',
-      deliverySub: '2x faster than free',
+      delivery: `${uplink.max_widgets} widgets`,
+      deliverySub: 'Double the free plan',
       useCase:
-        "You open Scrollr with your coffee, scan your watchlist, skim the morning RSS headlines, and check last night's scores. Data refreshes every 30 seconds — fast enough to catch a pre-market move before you leave for work.",
+        "You open Scrollr with your coffee, scan your watchlist, skim the morning headlines, and check last night's scores — with your fantasy roster and an extra league running alongside. Everything streams in live, so you catch the pre-market move before you leave for work.",
       features: [
-        `${fmtLimit(uplink.symbols, 'tracked symbol')}`,
-        `${fmtLimit(uplink.feeds, 'RSS feed')}, ${uplink.custom_feeds ?? 0} custom`,
-        `${fmtLimit(uplink.fantasy, 'fantasy league')}`,
-        'Pro + College sports',
+        `${uplink.max_widgets} widgets at once`,
+        'Yahoo Fantasy sync',
+        'Unlimited items per widget',
+        'Every sports & news widget',
         'Blacklist site filtering',
         'Early access to features',
       ],
@@ -504,18 +462,17 @@ function buildTierShowcases(limits: TierLimitsResponse): Array<TierShowcase> {
       name: 'Pro',
       tagline: 'Know the moment it happens',
       hex: '#a78bfa',
-      delivery: '10s polling',
-      deliverySub: '6x faster than free',
+      delivery: `${pro.max_widgets} widgets`,
+      deliverySub: '4x the free plan',
       useCase:
         'You set an alert when TSLA crosses $280. You save a "Work" feed profile that hides sports. When the 4th quarter starts on a close game, you get notified without checking. Scrollr watches so you don\'t have to.',
       features: [
-        `${fmtLimit(pro.symbols, 'tracked symbol')}`,
-        `${fmtLimit(pro.feeds, 'RSS feed')}, ${pro.custom_feeds ?? 0} custom`,
-        `${fmtLimit(pro.fantasy, 'fantasy league')}`,
+        `${pro.max_widgets} widgets at once`,
         'Custom alerts & notifications',
         'Feed profiles & advanced controls',
         'Priority RSS refresh',
         'Blacklist + Whitelist filtering',
+        'Everything in Uplink',
       ],
     },
     {
@@ -524,12 +481,12 @@ function buildTierShowcases(limits: TierLimitsResponse): Array<TierShowcase> {
       name: 'Uplink Ultimate',
       tagline: 'Everything. Zero limits.',
       hex: '#34d399',
-      delivery: 'Real-time SSE',
-      deliverySub: 'Instant — zero delay',
+      delivery: 'Unlimited widgets',
+      deliverySub: 'No slot cap at all',
       useCase:
-        'Your data streams in real time via SSE. Webhooks push alerts to your Discord. You export weekly market data to a spreadsheet. Your personal dashboard pulls from the API. Scrollr becomes infrastructure, not just a feed.',
+        'Every widget you follow, all running at once. Webhooks push alerts to your Discord. You export weekly market data to a spreadsheet. Your personal dashboard pulls from the API. Scrollr becomes infrastructure, not just a feed.',
       features: [
-        'Unlimited symbols, feeds & leagues',
+        'Unlimited widgets at once',
         'Webhooks & integrations',
         'Data export (CSV / JSON)',
         'API access',
@@ -605,12 +562,6 @@ function tierFromPlan(plan: string): TierKey | null {
 // test pins it to api/core/tier_limits.json (the shared snapshot of the
 // backend's DefaultTierLimits).
 
-/** Render a numeric cap in the form "25 feeds" / "Unlimited". */
-function fmtLimit(value: number | null, unit: string): string {
-  if (value === null) return 'Unlimited'
-  return `${value} ${unit}${value === 1 ? '' : 's'}`
-}
-
 /** Hook: fetch tier limits once on mount, fall back to embedded constant. */
 function useTierLimits(): TierLimitsResponse {
   const [limits, setLimits] = useState<TierLimitsResponse>(FALLBACK_LIMITS)
@@ -677,12 +628,6 @@ function buildUplinkFAQ(limits: TierLimitsResponse): Array<FAQItem> {
   const pro = limits.tiers.uplink_pro
   const ult = limits.tiers.uplink_ultimate
 
-  // "Connect N league" — "None" when free has zero fantasy leagues.
-  const freeFantasyCopy =
-    free.fantasy === 0
-      ? 'No Yahoo leagues'
-      : `${free.fantasy} Yahoo league${free.fantasy === 1 ? '' : 's'}`
-
   // Render an Ultimate-tier cap value: numbers stay numbers, null = "unlimited".
   const ultimateCopy = (n: number | null): string =>
     n === null ? 'unlimited' : `${n}`
@@ -699,46 +644,45 @@ function buildUplinkFAQ(limits: TierLimitsResponse): Array<FAQItem> {
       icon: Zap,
       question: 'What does "data delivery" mean?',
       highlight:
-        'How fast new data reaches you — from 60-second polling to instant real-time streaming.',
+        'Real time on every plan — data lands the instant it changes.',
       answer:
-        'Free users get data refreshed every 60 seconds via polling. Uplink cuts that to 30 seconds. Pro pushes it to 10 seconds. Ultimate eliminates polling entirely — data arrives the instant it changes via Server-Sent Events (SSE), the same technology used by stock trading platforms.',
+        'Every plan streams data in real time over Server-Sent Events (SSE) — the same technology used by stock trading platforms. The moment a price ticks or a score changes, it appears in your ticker. Polling only exists as a brief fallback while a connection re-establishes.',
       accent: 'emerald',
     },
     {
       icon: BarChart3,
-      question: 'How many symbols can I track?',
-      highlight: `Free gets ${free.symbols}, Uplink gets ${uplink.symbols}, Pro gets ${pro.symbols}, and Ultimate has no cap at all.`,
-      answer: `Tracked symbols are the stocks, ETFs, and crypto tickers that appear in your finance feed. Free accounts can follow up to ${free.symbols} at a time. Uplink raises that to ${uplink.symbols}. Pro gives you ${pro.symbols} — enough for a serious portfolio. With Ultimate, there is no cap — add every ticker you care about and they all stream in real time.`,
+      question: 'Are there limits inside a widget?',
+      highlight:
+        'None — every widget holds unlimited items on every plan.',
+      answer:
+        'No. Every plan holds unlimited items inside each widget — track 5 or 500 symbols in your Stocks widget, follow every source in your news feeds, sync every fantasy league you play. Your plan only sets how many widgets run at once.',
       accent: 'cyan',
-    },
-    {
-      icon: Rss,
-      question: 'How many RSS feeds can I follow?',
-      highlight: `From ${free.feeds} feed${free.feeds === 1 ? '' : 's'} on Free to completely unlimited on the top tier.`,
-      answer: `RSS feeds power the news channel. Free accounts can subscribe to ${free.feeds} feed${free.feeds === 1 ? '' : 's'} from the default catalog. Uplink expands that to ${uplink.feeds}, Pro to ${pro.feeds}, giving you broad coverage across topics. Ultimate removes the limit entirely — subscribe to as many sources as you want.`,
-      accent: 'amber',
     },
     {
       icon: Sparkles,
       question: 'What are custom RSS feeds?',
       highlight:
         'Add any RSS URL you want — your own blogs, niche sources, anything with a feed.',
-      answer: `Beyond the built-in catalog, custom feeds let you paste any RSS or Atom URL. Free accounts cannot add custom feeds. Uplink gives you ${uplink.custom_feeds}, Pro gives you ${pro.custom_feeds} — enough for niche industry sources, personal blogs, or company news. Ultimate removes the cap so you can add every source you follow.`,
+      answer:
+        'Beyond the curated news catalog, the Custom RSS widget lets you paste any RSS or Atom URL — niche industry sources, personal blogs, or company news. It is included on every plan, holds unlimited sources, and counts as one widget.',
       accent: 'orange',
     },
     {
       icon: Trophy,
       question: 'What sports leagues are included?',
-      highlight: 'Free covers pro leagues. All paid tiers add college sports.',
+      highlight:
+        'All 14 leagues on every plan — each league is its own widget.',
       answer:
-        "Every tier includes live scores from the NFL, NBA, MLB, NHL, MLS, and Premier League. All paid tiers add college football (NCAAF) and college basketball (NCAAM), with scores updating at your tier's delivery speed.",
+        'All 14 leagues are available on every plan — NFL, NBA, MLB, NHL, MLS, Premier League, La Liga, Champions League, World Cup, F1, UFC, AFL, plus college football and basketball. Each league is its own widget, so you add exactly the ones you follow and scores stream in live.',
       accent: 'violet',
     },
     {
       icon: Crown,
       question: 'How many fantasy leagues can I connect?',
-      highlight: `${freeFantasyCopy} on free, ${uplink.fantasy} with Uplink, ${pro.fantasy} with Pro, or ${ultimateCopy(ult.fantasy)} with Ultimate.`,
-      answer: `Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. Free accounts ${free.fantasy === 0 ? 'cannot connect Yahoo leagues' : `connect ${free.fantasy} league${free.fantasy === 1 ? '' : 's'}`}. Uplink supports up to ${uplink.fantasy}. Pro gives you ${pro.fantasy} — enough for multi-sport managers. Ultimate raises the cap to ${ultimateCopy(ult.fantasy)} leagues across every sport.`,
+      highlight:
+        'Unlimited Yahoo leagues on any paid plan — Uplink and up.',
+      answer:
+        'As many as you play. Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. The Yahoo Fantasy widget is available on every paid plan — Uplink and up — and syncs unlimited leagues across every sport.',
       accent: 'rose',
     },
     {
@@ -1413,8 +1357,8 @@ function UplinkPage() {
             <div className="space-y-3 text-xs text-base-content/50 leading-relaxed">
               <p>
                 If you cancel now, you&apos;ll lose access to all premium
-                features immediately &mdash; including real-time data, higher
-                limits, and Uplink Ultimate access.
+                features immediately &mdash; including your extra widget
+                slots and Uplink Ultimate access.
               </p>
               <p className="font-semibold text-base-content/70">
                 This is the only free trial offered per account. Once canceled,
@@ -1623,8 +1567,8 @@ function UplinkPage() {
                 </span>
                 <p className="text-base text-base-content/40 leading-relaxed">
                   Scrollr is free and open source. Three paid tiers for power
-                  users who want more — expanded limits, faster delivery, custom
-                  alerts, and real-time data via SSE.
+                  users who want more — more widgets at once, Yahoo Fantasy
+                  sync, custom alerts, and power-user integrations.
                 </p>
               </motion.div>
 
@@ -2332,11 +2276,11 @@ function UplinkPage() {
                           {[
                             'Permanent Uplink-tier access',
                             '50% off Unlimited upgrade',
-                            '30s polling delivery',
+                            `${tierLimits.tiers.uplink.max_widgets} widgets at once`,
                             'Founding member badge',
-                            `${tierLimits.tiers.uplink.symbols} symbols, ${tierLimits.tiers.uplink.feeds} RSS feeds`,
+                            'Yahoo Fantasy sync',
                             'Priority support',
-                            'Pro + College sports',
+                            'Unlimited items per widget',
                             'Early access to features',
                           ].map((feature) => (
                             <div
@@ -2365,8 +2309,8 @@ function UplinkPage() {
                             </p>
                             <p className="text-[10px] text-base-content/35 leading-relaxed">
                               Lifetime members get half off any Ultimate
-                              subscription. Real-time SSE, unlimited symbols and
-                              feeds, webhooks, API access, and data export — all
+                              subscription. Unlimited widgets at once,
+                              webhooks, API access, and data export — all
                               at half price.
                             </p>
                           </div>
@@ -2444,18 +2388,14 @@ function UplinkPage() {
                       </div>
 
                       <div className="space-y-2.5 mb-6">
-                        <PricingFeature>60s polling delivery</PricingFeature>
                         <PricingFeature>
-                          {tierLimits.tiers.free.symbols} symbols,{' '}
-                          {tierLimits.tiers.free.feeds} RSS feed
-                          {tierLimits.tiers.free.feeds === 1 ? '' : 's'}
+                          {tierLimits.tiers.free.max_widgets} widgets at once
                         </PricingFeature>
+                        <PricingFeature>Real-time SSE delivery</PricingFeature>
                         <PricingFeature>
-                          {tierLimits.tiers.free.fantasy === 0
-                            ? 'No fantasy leagues'
-                            : `${tierLimits.tiers.free.fantasy} fantasy league${tierLimits.tiers.free.fantasy === 1 ? '' : 's'}`}
+                          Unlimited items per widget
                         </PricingFeature>
-                        <PricingFeature>Pro sports leagues</PricingFeature>
+                        <PricingFeature>Every sports league</PricingFeature>
                         <PricingFeature>Full desktop app access</PricingFeature>
                       </div>
 
@@ -2606,22 +2546,15 @@ function UplinkPage() {
                       </div>
 
                       <div className="space-y-2.5 mb-6">
-                        <PricingFeature>30s polling delivery</PricingFeature>
                         <PricingFeature>
-                          {tierLimits.tiers.uplink.symbols} symbols,{' '}
-                          {tierLimits.tiers.uplink.feeds} RSS feeds
+                          {tierLimits.tiers.uplink.max_widgets} widgets at once
                         </PricingFeature>
+                        <PricingFeature>Yahoo Fantasy sync</PricingFeature>
+                        <PricingFeature>Real-time SSE delivery</PricingFeature>
                         <PricingFeature>
-                          {tierLimits.tiers.uplink.custom_feeds} custom RSS feed
-                          {tierLimits.tiers.uplink.custom_feeds === 1
-                            ? ''
-                            : 's'}
+                          Unlimited items per widget
                         </PricingFeature>
-                        <PricingFeature>
-                          {tierLimits.tiers.uplink.fantasy} fantasy league
-                          {tierLimits.tiers.uplink.fantasy === 1 ? '' : 's'}
-                        </PricingFeature>
-                        <PricingFeature>Pro + College sports</PricingFeature>
+                        <PricingFeature>Every sports league</PricingFeature>
                         <PricingFeature>Early access</PricingFeature>
                       </div>
 
@@ -2759,11 +2692,8 @@ function UplinkPage() {
 
                       <div className="space-y-2.5 mb-6">
                         <PricingFeature highlight>
-                          10s polling delivery
-                        </PricingFeature>
-                        <PricingFeature highlight>
-                          {tierLimits.tiers.uplink_pro.symbols} symbols,{' '}
-                          {tierLimits.tiers.uplink_pro.feeds} RSS feeds
+                          {tierLimits.tiers.uplink_pro.max_widgets} widgets at
+                          once
                         </PricingFeature>
                         <PricingFeature highlight>
                           Custom alerts & notifications
@@ -2775,7 +2705,10 @@ function UplinkPage() {
                           Priority RSS refresh
                         </PricingFeature>
                         <PricingFeature highlight>
-                          {tierLimits.tiers.uplink_pro.fantasy} fantasy leagues
+                          Whitelist site filtering
+                        </PricingFeature>
+                        <PricingFeature highlight>
+                          Everything in Uplink
                         </PricingFeature>
                       </div>
 
@@ -3056,7 +2989,7 @@ function UplinkPage() {
 
                         <div className="space-y-2.5 mb-6">
                           <PricingFeature highlight>
-                            Real-time SSE delivery
+                            Unlimited widgets at once
                           </PricingFeature>
                           <PricingFeature highlight>
                             Unlimited everything
