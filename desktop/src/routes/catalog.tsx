@@ -306,7 +306,10 @@ function CatalogPage() {
           description="No items match this filter. Try a different category."
         />
       ) : (
-        <AnimatePresence mode="wait" initial={false}>
+        // No initial={false} here — it would propagate presence-context
+        // suppression and block the card entrances on page arrival
+        // (same bug PageLayout had until v1.1.1).
+        <AnimatePresence mode="wait">
           <motion.div
             key={`${filter}-${sort}`}
             initial={{ opacity: 0 }}
