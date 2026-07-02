@@ -24,7 +24,8 @@ import TickerLayoutSummary from "../components/TickerLayoutSummary";
 import PageLayout from "../components/layout/PageLayout";
 import EmptySection from "../components/layout/EmptySection";
 import { useShell, useShellData } from "../shell-context";
-import { widgetManifest, CANONICAL_ORDER } from "../marketplace";
+import { widgetManifest, sourceForWidget, CANONICAL_ORDER } from "../marketplace";
+import { scopeSourceData } from "../utils/widgetScope";
 import { WIDGET_ORDER } from "../widgets/registry";
 import { getStore } from "../lib/store";
 import { timeAgo } from "../utils/format";
@@ -190,7 +191,7 @@ function HomePage() {
         <EmptySection
           icon={Sparkles}
           title="Welcome to Scrollr"
-          description="Your radar is empty. Add channels and widgets from the Catalog to start tracking what matters to you."
+          description="Your radar is empty. Add widgets from the Catalog to start tracking what matters to you."
           action={
             authenticated ? (
               <button
@@ -238,9 +239,11 @@ function HomePage() {
         // the top level. Without this unwrap the Home dashboard would
         // think Fantasy is empty even when leagues are imported, while
         // the standalone Feed view (which unwraps correctly) shows them.
-        const channelData = normalizeChannelData(
-          ch.channel_type,
-          dashboard?.data?.[ch.channel_type],
+        const source = sourceForWidget(ch.channel_type) ?? ch.channel_type;
+        const channelData = scopeSourceData(
+          source,
+          normalizeChannelData(source, dashboard?.data?.[source]),
+          ch.config as Record<string, unknown> | undefined,
         );
         const hasData = channelData.length > 0;
         const targetTab = hasData ? "feed" : "configuration";
@@ -412,13 +415,20 @@ function ChannelSection({
   const [editing, setEditing] = useState(false);
   const Icon = manifest.icon;
   const type = channel.channel_type;
-  // Same normalize as the home loop — Fantasy is `{ leagues: [...] }`,
-  // every other channel is a flat array. See normalizeChannelData.
+  // Resolve the widget id to its coarse source (dashboard.data is source-keyed)
+  // and scope the payload to this one widget's config — an NFL widget shows only
+  // NFL, finance_stocks only stocks, news_bbc only BBC. Mirrors the ticker.
+  const source = sourceForWidget(type) ?? type;
   const channelData = useMemo(
-    () => normalizeChannelData(type, data?.[type]),
-    [type, data],
+    () =>
+      scopeSourceData(
+        source,
+        normalizeChannelData(source, data?.[source]),
+        channel.config as Record<string, unknown> | undefined,
+      ),
+    [source, data, channel.config],
   );
-  const groups = useMemo(() => getGroups(type, channelData), [type, channelData]);
+  const groups = useMemo(() => getGroups(source, channelData), [source, channelData]);
   const hasSelections = selectedKeys.length > 0;
 
   function toggleGroup(key: string) {
@@ -546,7 +556,7 @@ function ChannelSection({
                     )}
                   </span>
                   <span className="text-xs text-fg truncate flex-1">
-                    {getGroupLabel(type, key, channelData)}
+                    {getGroupLabel(source, key, channelData)}
                   </span>
                 </button>
               );
@@ -567,10 +577,10 @@ function ChannelSection({
               if (e.key === "Enter") onRowClick();
             }}
           >
-            {type === "finance" && (
+            {source === "finance" && (
               <FinanceRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
             )}
-            {type === "sports" && (
+            {source === "sports" && (
               <SportsRows
                 data={channelData}
                 meta={(data?.sports_meta as { leagues?: LeagueMeta[] } | undefined)?.leagues}
@@ -578,11 +588,14 @@ function ChannelSection({
                 onConfigure={onConfigure}
               />
             )}
-            {type === "rss" && (
+            {source === "rss" && (
               <RssRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
             )}
-            {type === "fantasy" && (
+            {source === "fantasy" && (
               <FantasyRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
+            )}
+            {!["finance", "sports", "rss", "fantasy"].includes(source) && (
+              <EmptyDataRow channelType={source} onConfigure={onConfigure} />
             )}
           </motion.div>
         )}

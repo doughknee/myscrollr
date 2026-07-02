@@ -21,6 +21,7 @@ import clsx from "clsx";
 import Tooltip from "./Tooltip";
 import type { TickerRowConfig } from "../preferences";
 import type { ChannelManifest, WidgetManifest } from "../types";
+import { catalogItemById } from "../marketplace";
 
 interface TickerLayoutSummaryProps {
   /** Live layout rows (use the value returned by `useTickerLayout`). */
@@ -52,6 +53,10 @@ export default function TickerLayoutSummary({
   // without forcing the parent to do the join. Falls back to a neutral
   // grey for unknown ids (shouldn't happen in practice).
   const sourceColor = (id: string): string => {
+    // Split data widgets (sports_nfl, finance_stocks, news_bbc) resolve via the
+    // flat catalog — the coarse channelManifests only know "sports"/"finance".
+    const item = catalogItemById(id);
+    if (item) return item.hex;
     const ch = channelManifests.find((c) => c.id === id);
     if (ch) return ch.hex;
     const w = widgetManifests.find((mf) => mf.id === id);
@@ -60,6 +65,8 @@ export default function TickerLayoutSummary({
   };
 
   const sourceLabel = (id: string): string => {
+    const item = catalogItemById(id);
+    if (item) return item.name;
     const ch = channelManifests.find((c) => c.id === id);
     if (ch) return ch.tabLabel || ch.name || id;
     const w = widgetManifests.find((mf) => mf.id === id);

@@ -35,52 +35,12 @@ import {
 } from "../channels/fantasy/playerStats";
 import { buildYahooLeagueUrl, buildYahooPlayerUrl, chipUrlForFinance, chipUrlForSports, chipUrlForRss } from "../utils/chipUrl";
 import { sourceForWidget } from "../marketplace";
+import { scopeSourceData } from "../utils/widgetScope";
 
 // ── Module-level constants ───────────────────────────────────────
 
 const WIDGET_TYPES = ["clock", "timer", "weather", "sysmon", "uptime", "github"] as const;
 type WidgetType = (typeof WIDGET_TYPES)[number];
-
-// Scope a widget's coarse-source payload (dashboard.data is keyed by source)
-// down to that one widget's config, so per-widget boundaries hold on the tape:
-// an NFL widget shows only NFL, and two finance widgets don't each show
-// everything. Legacy coarse tabs never reach here (their source is undefined).
-function scopeChipData(
-  widgetId: string,
-  source: string,
-  data: unknown[],
-  channels: DashboardResponse["channels"],
-): unknown[] {
-  const config = channels?.find((c) => c.channel_type === widgetId)?.config as
-    | Record<string, unknown>
-    | undefined;
-  if (!config) return data;
-  switch (source) {
-    case "sports": {
-      const leagues = new Set(
-        Array.isArray(config.leagues) ? (config.leagues as string[]) : [],
-      );
-      return (data as Game[]).filter((g) => leagues.has(g.league));
-    }
-    case "finance": {
-      const symbols = new Set(
-        Array.isArray(config.symbols) ? (config.symbols as string[]) : [],
-      );
-      return (data as Trade[]).filter((t) => symbols.has(t.symbol));
-    }
-    case "rss": {
-      const feeds = Array.isArray(config.feeds)
-        ? (config.feeds as Array<{ url?: string }>)
-        : [];
-      const urls = new Set(
-        feeds.map((f) => f.url).filter((u): u is string => !!u),
-      );
-      return (data as RssItem[]).filter((i) => urls.has(i.feed_url));
-    }
-    default:
-      return data;
-  }
-}
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -452,7 +412,13 @@ export default function ScrollrTicker({
       // Scope the payload to this widget's own config (leagues / symbols / feed
       // URLs). Legacy coarse tabs (no source) show everything.
       const data = source
-        ? scopeChipData(tab, source, rawData, dashboard?.channels ?? [])
+        ? scopeSourceData(
+            source,
+            rawData,
+            dashboard?.channels?.find((c) => c.channel_type === tab)?.config as
+              | Record<string, unknown>
+              | undefined,
+          )
         : rawData;
       if (data.length === 0) continue;
 

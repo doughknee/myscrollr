@@ -244,6 +244,10 @@ func TestHasFantasyChannel(t *testing.T) {
 		{"no rows", OverviewChannels{}, false},
 		{"fantasy disabled", OverviewChannels{ByType: []OverviewChannelRow{{Type: "fantasy", Enabled: false}}}, false},
 		{"fantasy enabled", OverviewChannels{ByType: []OverviewChannelRow{{Type: "fantasy", Enabled: true}}}, true},
+		// Post widget-split, the row is "fantasy_yahoo" — must resolve to the
+		// fantasy source, not require the bare "fantasy" literal.
+		{"fantasy_yahoo enabled", OverviewChannels{ByType: []OverviewChannelRow{{Type: "fantasy_yahoo", Enabled: true}}}, true},
+		{"fantasy_yahoo disabled", OverviewChannels{ByType: []OverviewChannelRow{{Type: "fantasy_yahoo", Enabled: false}}}, false},
 		{"only finance", OverviewChannels{ByType: []OverviewChannelRow{{Type: "finance", Enabled: true}}}, false},
 	}
 	for _, tc := range cases {

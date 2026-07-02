@@ -28,7 +28,7 @@ export default function PredictionsConfigPanel({
   subscriptionTier,
 }: PredictionsConfigPanelProps) {
   const { error, setError, saving, updateItems } =
-    useChannelConfig<string[]>("predictions", "favorites");
+    useChannelConfig<string[]>(channel.channel_type, "favorites");
 
   const config = channel.config as PredictionsChannelConfig;
   const favorites = Array.isArray(config?.favorites) ? config.favorites : [];
