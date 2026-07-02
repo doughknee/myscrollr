@@ -19,10 +19,17 @@ import { queryKeys } from "../api/queries";
 import type { CatalogItem } from "../marketplace";
 import { disableWidget } from "../preferences";
 import { useUndoableAction } from "./useUndoableAction";
+import type { UndoShellPlumbing } from "./useUndoableAction";
 
-export function useRemoveWidget(): (item: CatalogItem) => Promise<void> {
+/**
+ * `shell` is only for callers OUTSIDE the shell provider (RootLayout's
+ * sidebar menu passes its own prefs + persistPrefs). Inside, omit.
+ */
+export function useRemoveWidget(
+  shell?: UndoShellPlumbing,
+): (item: CatalogItem) => Promise<void> {
   const queryClient = useQueryClient();
-  const undoable = useUndoableAction();
+  const undoable = useUndoableAction(shell);
 
   return useCallback(
     async (item: CatalogItem) => {

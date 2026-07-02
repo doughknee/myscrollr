@@ -593,8 +593,13 @@ function RootLayout() {
   // ── Sidebar context-menu actions (v1.1.2) ───────────────────
   // Right-click on a source row. Ticker + remove resolve through the
   // same handlers the ticker settings and the widget info page use —
-  // no new mutation paths.
-  const removeWidgetShared = useRemoveWidget();
+  // no new mutation paths. RootLayout PROVIDES ShellContext, so its
+  // own hooks can't read it — pass the local prefs plumbing instead
+  // (the "useShell must be used within RootLayout" crash).
+  const removeWidgetShared = useRemoveWidget({
+    prefs,
+    onPrefsChange: persistPrefs,
+  });
 
   const handleConfigureItem = useCallback(
     (id: string, kind: "channel" | "widget") => {
