@@ -730,53 +730,54 @@ export default function App() {
         }
       }
 
-      // Channels submenu (only when authenticated with channels)
-      if (chs.length > 0) {
-        const channelSubmenus: Submenu[] = [];
-        for (const ch of chs) {
-          const channelType = ch.channel_type;
-          const label =
-            channelType.charAt(0).toUpperCase() + channelType.slice(1);
-          const currentRow = getChannelTickerRow(prefsRef.current, ch);
-          const rowItems = await buildRowSubmenuItems(
-            currentRow,
-            (row) => {
-              // Optimistic update — flip the ref immediately so the next
-              // menu build reflects the change without waiting for the API.
-              const target = channelsRef.current.find(
-                (c) => c.channel_type === channelType,
-              );
-              if (target) target.ticker_enabled = row !== null;
-              handleChannelRowChange(channelType, row);
-            },
-            !ch.enabled,
-            () => addRowAndAssign(channelType, "channel"),
-          );
-          channelSubmenus.push(
-            await Submenu.new({ text: label, items: rowItems }),
-          );
-        }
-        items.push(
-          await Submenu.new({ text: "Channels", items: channelSubmenus }),
+      // Widgets submenu — one unified row-picker list. The widget/slot model
+      // has no coarse "channels": server-backed data widgets (sports_nfl,
+      // finance_stocks, …) and local widgets (clock, weather, …) sit together,
+      // each labeled by its catalog name.
+      const widgetSubmenus: Submenu[] = [];
+
+      // Data widgets — the user's enabled channels, labeled by their catalog
+      // name ("NFL", "Stocks", "BBC News"), not the raw channel_type.
+      const metaById = new Map(getCatalogItems().map((it) => [it.id, it]));
+      for (const ch of chs) {
+        const label =
+          metaById.get(ch.channel_type)?.name ??
+          `${ch.channel_type.charAt(0).toUpperCase()}${ch.channel_type.slice(1)}`;
+        const currentRow = getChannelTickerRow(prefsRef.current, ch);
+        const rowItems = await buildRowSubmenuItems(
+          currentRow,
+          (row) => {
+            // Optimistic update — flip the ref immediately so the next
+            // menu build reflects the change without waiting for the API.
+            const target = channelsRef.current.find(
+              (c) => c.channel_type === ch.channel_type,
+            );
+            if (target) target.ticker_enabled = row !== null;
+            handleChannelRowChange(ch.channel_type, row);
+          },
+          !ch.enabled,
+          () => addRowAndAssign(ch.channel_type, "channel"),
+        );
+        widgetSubmenus.push(
+          await Submenu.new({ text: label, items: rowItems }),
         );
       }
 
-      // Widgets submenu — same row-picker pattern.
-      const allWidgets = getAllWidgets();
-      if (allWidgets.length > 0) {
-        const widgetSubmenus: Submenu[] = [];
-        for (const widget of allWidgets) {
-          const currentRow = getWidgetTickerRow(prefsRef.current, widget.id);
-          const rowItems = await buildRowSubmenuItems(
-            currentRow,
-            (row) => handleWidgetRowChange(widget.id, row),
-            false,
-            () => addRowAndAssign(widget.id, "widget"),
-          );
-          widgetSubmenus.push(
-            await Submenu.new({ text: widget.name, items: rowItems }),
-          );
-        }
+      // Local widgets (clock, weather, …) — same row-picker pattern.
+      for (const widget of getAllWidgets()) {
+        const currentRow = getWidgetTickerRow(prefsRef.current, widget.id);
+        const rowItems = await buildRowSubmenuItems(
+          currentRow,
+          (row) => handleWidgetRowChange(widget.id, row),
+          false,
+          () => addRowAndAssign(widget.id, "widget"),
+        );
+        widgetSubmenus.push(
+          await Submenu.new({ text: widget.name, items: rowItems }),
+        );
+      }
+
+      if (widgetSubmenus.length > 0) {
         items.push(
           await Submenu.new({ text: "Widgets", items: widgetSubmenus }),
         );
