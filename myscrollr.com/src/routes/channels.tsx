@@ -95,6 +95,10 @@ interface ComingSoonChannel {
   name: string
   description: string
   Icon: ComponentType<{ size?: number; className?: string }>
+  /** Shipped and streaming — renders a "Live now" badge instead of the
+   *  dimmed Roadmap treatment. For widgets that are live in the app but
+   *  don't have catalog screenshots yet (e.g. Kalshi). */
+  live?: boolean
 }
 
 const CHANNELS: Array<ChannelDef> = [
@@ -182,6 +186,7 @@ const COMING_SOON: Array<ComingSoonChannel> = [
     name: 'Kalshi',
     description: 'Live prediction markets',
     Icon: TrendingUp,
+    live: true,
   },
   {
     id: 'discord',
@@ -471,19 +476,31 @@ function ChannelsPage() {
                   duration: 0.5,
                   ease: EASE,
                 }}
-                className="bg-base-200/40 border border-base-300/25 rounded-xl p-5 text-center opacity-60"
+                className={
+                  item.live
+                    ? 'bg-base-200/40 border border-primary/25 rounded-xl p-5 text-center'
+                    : 'bg-base-200/40 border border-base-300/25 rounded-xl p-5 text-center opacity-60'
+                }
               >
-                <div className="h-10 w-10 rounded-lg bg-base-300/30 flex items-center justify-center mx-auto mb-3 text-base-content/30">
+                <div
+                  className={`h-10 w-10 rounded-lg flex items-center justify-center mx-auto mb-3 ${item.live ? 'bg-primary/10 text-primary' : 'bg-base-300/30 text-base-content/30'}`}
+                >
                   <item.Icon size={18} />
                 </div>
-                <p className="text-xs font-semibold text-base-content/40">
+                <p
+                  className={`text-xs font-semibold ${item.live ? 'text-base-content/80' : 'text-base-content/40'}`}
+                >
                   {item.name}
                 </p>
-                <p className="text-[9px] text-base-content/25 mt-1">
+                <p
+                  className={`text-[9px] mt-1 ${item.live ? 'text-base-content/45' : 'text-base-content/25'}`}
+                >
                   {item.description}
                 </p>
-                <span className="inline-block mt-3 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-base-content/20 border border-base-300/25 rounded-full">
-                  Roadmap
+                <span
+                  className={`inline-block mt-3 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide rounded-full border ${item.live ? 'text-primary/80 border-primary/30 bg-primary/5' : 'text-base-content/20 border-base-300/25'}`}
+                >
+                  {item.live ? 'Live now' : 'Roadmap'}
                 </span>
               </motion.div>
             ))}
