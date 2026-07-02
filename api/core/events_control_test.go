@@ -20,6 +20,7 @@ func swapHub(t *testing.T) *Hub {
 	globalHub = &Hub{
 		registry:   &topicRegistry{},
 		dispatchCh: make(chan dispatchJob, 8),
+		invalCh:    make(chan string, 8),
 	}
 	t.Cleanup(func() { globalHub = prev })
 	return globalHub

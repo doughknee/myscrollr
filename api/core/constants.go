@@ -43,6 +43,11 @@ const (
 	SSEClientBufferSize  = 100
 	SSEDispatchWorkers   = 8
 	SSEDispatchQueueSize = 4096
+	// Cache-invalidation pipeline (events.go queueCacheInvalidation): the
+	// queue holds UNIQUE users awaiting a DEL, so its depth bounds distinct
+	// users per burst, not events — bursts repeat the same users and dedupe.
+	SSEInvalidationWorkers   = 4
+	SSEInvalidationQueueSize = 8192
 )
 
 // =============================================================================

@@ -36,17 +36,25 @@ func logDispatchDrop() {
 type Client struct {
 	UserID string
 	Ch     chan []byte
-	// closeOnce guards Ch so it's closed exactly once. Multiple paths can
-	// race to close it — the unregister CAS-retry loop, and the shutdown
-	// watcher — and closing a channel twice panics. sync.Once makes every
-	// close after the first a no-op.
-	closeOnce sync.Once
+	// mu + closed serialize channel close against concurrent trySend.
+	// Closing a channel while another goroutine sends on it is a data
+	// race (the old sync.Once + recover() pattern survived the panic but
+	// the race detector rightly flagged the close/send overlap). Senders
+	// take the read lock, close takes the write lock — a send can never
+	// overlap the close, and double-close is a guarded no-op.
+	mu     sync.RWMutex
+	closed bool
 }
 
 // closeCh closes the client's channel exactly once. Safe to call from any
-// number of goroutines / retries.
+// number of goroutines / retries, and safe against in-flight trySends.
 func (c *Client) closeCh() {
-	c.closeOnce.Do(func() { close(c.Ch) })
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.closed {
+		c.closed = true
+		close(c.Ch)
+	}
 }
 
 // clientList wraps a []*Client slice so it can be stored in sync.Map.
@@ -57,9 +65,16 @@ type clientList struct {
 	entries []*Client
 }
 
-// trySend attempts a non-blocking send, recovering from closed-channel panics.
+// trySend attempts a non-blocking send. The read lock excludes a concurrent
+// closeCh (write lock), so the closed check can't go stale mid-send; the
+// recover stays as a last-resort guard against future misuse.
 func trySend(client *Client, payload []byte) bool {
 	defer func() { recover() }()
+	client.mu.RLock()
+	defer client.mu.RUnlock()
+	if client.closed {
+		return false
+	}
 	select {
 	case client.Ch <- payload:
 		return true
@@ -87,6 +102,49 @@ type Hub struct {
 
 	// Worker pool dispatch channel
 	dispatchCh chan dispatchJob
+
+	// Cache-invalidation pipeline: dispatchToUser used to spawn one
+	// goroutine per dispatched event (go InvalidateUserCaches). Under a
+	// CDC burst with universal SSE that's unbounded — a local soak test
+	// piled up 2.4M goroutines while Redis DELs queued behind the pool
+	// limit. Instead: a bounded queue drained by a small worker pool,
+	// deduplicated per user (invalPending) so a burst of N events for one
+	// user costs one DEL, which is all it ever needed.
+	invalCh      chan string
+	invalPending sync.Map
+}
+
+// queueCacheInvalidation coalesces per-user cache invalidation requests.
+// Dedup is removed by the worker BEFORE the DEL runs, so an event arriving
+// mid-DEL re-queues and cannot be lost. If the queue of unique users is
+// somehow full, fall back to the old per-event goroutine — correctness
+// (no stale cache) beats strict boundedness in that rare corner.
+func (h *Hub) queueCacheInvalidation(userID string) {
+	if _, alreadyQueued := h.invalPending.LoadOrStore(userID, struct{}{}); alreadyQueued {
+		return
+	}
+	select {
+	case h.invalCh <- userID:
+	default:
+		h.invalPending.Delete(userID)
+		go InvalidateUserCaches(userID)
+	}
+}
+
+// invalidationWorker drains queued per-user cache invalidations.
+func (h *Hub) invalidationWorker(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case userID, ok := <-h.invalCh:
+			if !ok {
+				return
+			}
+			h.invalPending.Delete(userID)
+			InvalidateUserCaches(userID)
+		}
+	}
 }
 
 var globalHub *Hub
@@ -96,11 +154,16 @@ func InitHub(ctx context.Context) {
 	globalHub = &Hub{
 		registry:   &topicRegistry{},
 		dispatchCh: make(chan dispatchJob, SSEDispatchQueueSize),
+		invalCh:    make(chan string, SSEInvalidationQueueSize),
 	}
 
 	// Start dispatch worker pool
 	for i := 0; i < SSEDispatchWorkers; i++ {
 		go globalHub.dispatchWorker(ctx)
+	}
+	// Start cache-invalidation workers (see queueCacheInvalidation).
+	for i := 0; i < SSEInvalidationWorkers; i++ {
+		go globalHub.invalidationWorker(ctx)
 	}
 
 	go globalHub.listenToTopics(ctx)
@@ -245,7 +308,7 @@ func (h *Hub) handleTopicMessage(topic string, payload []byte) {
 // All DELs are pipelined into a single Redis round-trip and executed on
 // a goroutine so this never blocks the dispatch hot path.
 func (h *Hub) dispatchToUser(userID string, payload []byte) {
-	go InvalidateUserCaches(userID)
+	h.queueCacheInvalidation(userID)
 
 	value, ok := h.clients.Load(userID)
 	if !ok {
@@ -263,9 +326,15 @@ func (h *Hub) register(client *Client) {
 		existing, loaded := h.clients.Load(client.UserID)
 		if loaded {
 			old := existing.(*clientList)
-			newList := &clientList{
-				entries: append(old.entries, client),
-			}
+			// Copy explicitly — append(old.entries, client) can write into
+			// old.entries' spare capacity, so two concurrent registers would
+			// both write index len before the CAS settles a winner, and the
+			// loser's client could leak into the winner's published list
+			// (or be overwritten and silently never receive events).
+			entries := make([]*Client, len(old.entries)+1)
+			copy(entries, old.entries)
+			entries[len(old.entries)] = client
+			newList := &clientList{entries: entries}
 			if h.clients.CompareAndSwap(client.UserID, old, newList) {
 				break
 			}
@@ -286,6 +355,11 @@ func (h *Hub) register(client *Client) {
 func (h *Hub) unregister(client *Client) {
 	var lastConnection bool
 	for {
+		// Recompute from scratch on every attempt: a CAS that fails after
+		// len(newEntries)==0 set this true may retry against a list that
+		// gained a concurrent reconnect — carrying the stale true over
+		// would wipe the NEW connection's topic subscriptions below.
+		lastConnection = false
 		existing, ok := h.clients.Load(client.UserID)
 		if !ok {
 			return
