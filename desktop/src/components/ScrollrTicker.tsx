@@ -34,11 +34,53 @@ import {
   findInjuredPlayers,
 } from "../channels/fantasy/playerStats";
 import { buildYahooLeagueUrl, buildYahooPlayerUrl, chipUrlForFinance, chipUrlForSports, chipUrlForRss } from "../utils/chipUrl";
+import { sourceForWidget } from "../marketplace";
 
 // ── Module-level constants ───────────────────────────────────────
 
 const WIDGET_TYPES = ["clock", "timer", "weather", "sysmon", "uptime", "github"] as const;
 type WidgetType = (typeof WIDGET_TYPES)[number];
+
+// Scope a widget's coarse-source payload (dashboard.data is keyed by source)
+// down to that one widget's config, so per-widget boundaries hold on the tape:
+// an NFL widget shows only NFL, and two finance widgets don't each show
+// everything. Legacy coarse tabs never reach here (their source is undefined).
+function scopeChipData(
+  widgetId: string,
+  source: string,
+  data: unknown[],
+  channels: DashboardResponse["channels"],
+): unknown[] {
+  const config = channels?.find((c) => c.channel_type === widgetId)?.config as
+    | Record<string, unknown>
+    | undefined;
+  if (!config) return data;
+  switch (source) {
+    case "sports": {
+      const leagues = new Set(
+        Array.isArray(config.leagues) ? (config.leagues as string[]) : [],
+      );
+      return (data as Game[]).filter((g) => leagues.has(g.league));
+    }
+    case "finance": {
+      const symbols = new Set(
+        Array.isArray(config.symbols) ? (config.symbols as string[]) : [],
+      );
+      return (data as Trade[]).filter((t) => symbols.has(t.symbol));
+    }
+    case "rss": {
+      const feeds = Array.isArray(config.feeds)
+        ? (config.feeds as Array<{ url?: string }>)
+        : [];
+      const urls = new Set(
+        feeds.map((f) => f.url).filter((u): u is string => !!u),
+      );
+      return (data as RssItem[]).filter((i) => urls.has(i.feed_url));
+    }
+    default:
+      return data;
+  }
+}
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -231,16 +273,22 @@ export default function ScrollrTicker({
         continue;
       }
 
-      // ── Channel tabs: use dashboard.data ──────────────────────
-      const data = dashboard?.data?.[tab];
+      // ── Channel tabs ──────────────────────────────────────────
+      // activeTabs holds widget ids (sports_nfl, finance_stocks, news_bbc), but
+      // dashboard.data is keyed by the coarse source (sports/finance/rss).
+      // Resolve widget → source for the lookup; scope the payload below. A bare
+      // coarse/legacy tab (source undefined) shows everything.
+      const source = sourceForWidget(tab);
+      const effectiveSource = source ?? tab;
+      const rawData = dashboard?.data?.[effectiveSource];
 
       // Fantasy arrives as a structured { leagues: [...] } object, so it
       // needs its own branch before the generic array check below.
       // Uses `selectFantasyForTicker` which honours enabledLeagueKeys +
       // primaryLeagueKey from Display prefs — so the ticker stays in sync
       // with the Fantasy feed page.
-      if (tab === "fantasy") {
-        const fantasyPayload = data as { leagues?: unknown } | undefined;
+      if (effectiveSource === "fantasy") {
+        const fantasyPayload = rawData as { leagues?: unknown } | undefined;
         const leagues = Array.isArray(fantasyPayload?.leagues)
           ? (fantasyPayload.leagues as FantasyLeague[])
           : [];
@@ -399,9 +447,16 @@ export default function ScrollrTicker({
         continue;
       }
 
-      if (!Array.isArray(data) || data.length === 0) continue;
+      if (!Array.isArray(rawData) || rawData.length === 0) continue;
 
-      switch (tab) {
+      // Scope the payload to this widget's own config (leagues / symbols / feed
+      // URLs). Legacy coarse tabs (no source) show everything.
+      const data = source
+        ? scopeChipData(tab, source, rawData, dashboard?.channels ?? [])
+        : rawData;
+      if (data.length === 0) continue;
+
+      switch (effectiveSource) {
         case "finance": {
           // Apply Display prefs: `defaultSort` affects both feed and
           // ticker (universal sort). Per-field visibility (showChange,
