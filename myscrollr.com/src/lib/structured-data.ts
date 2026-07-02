@@ -102,7 +102,7 @@ export function productOffers(tiers: Array<Tier>) {
     '@type': 'Product',
     name: 'Scrollr Uplink',
     description:
-      'Premium subscription tiers for the Scrollr desktop app: unlimited tracking, real-time delivery, and early access to new channels.',
+      'Premium subscription tiers for the Scrollr desktop app: more widgets at once, Yahoo Fantasy sync, and early access to new widgets.',
     brand: { '@type': 'Brand', name: 'Scrollr' },
     offers: tiers.flatMap((t) => [
       {
@@ -174,7 +174,7 @@ export const HOMEPAGE_FAQ_ITEMS: ReadonlyArray<{
   {
     question: 'Is Scrollr free?',
     answer:
-      'The free tier gives you real-time data across all four channels with no ads or tracking. Uplink plans unlock higher limits, faster polling, custom RSS feeds, and fantasy league tracking. The entire codebase is open source under the AGPL-3.0 license.',
+      'The free tier streams real-time data with no ads or tracking. Uplink plans unlock more widgets at once, Yahoo Fantasy sync, and power-user tools like custom alerts and integrations. The entire codebase is open source under the AGPL-3.0 license.',
   },
   {
     question: 'Does it affect performance?',
@@ -194,17 +194,17 @@ export const HOMEPAGE_FAQ_ITEMS: ReadonlyArray<{
   {
     question: 'Do I need an account?',
     answer:
-      'A free Scrollr account is required to stream live channel data. Signing up takes under a minute, secures your config via our hosted auth, and unlocks all four channels (finance, sports, news, and fantasy), the web dashboard, and preference sync across devices.',
+      'A free Scrollr account is required to stream live widget data. Signing up takes under a minute, secures your config via our hosted auth, and unlocks the widget catalog (sports, stocks, crypto, news, and fantasy), the web dashboard, and preference sync across devices.',
   },
   {
     question: 'What data does Scrollr show?',
     answer:
-      'Four channels: real-time stock and crypto prices, live sports scores across major leagues, RSS news headlines from hundreds of sources, and Yahoo Fantasy league updates including standings and matchups.',
+      'A catalog of 30+ widgets: real-time stock and crypto prices, live scores from 14 sports leagues, curated news outlets plus custom RSS, and Yahoo Fantasy league updates including standings and matchups.',
   },
   {
     question: 'Can I customize the feed?',
     answer:
-      'Position the ticker at the top or bottom of your screen, drag to resize, switch between comfort and compact modes, choose overlay or push behavior, and pick which channels appear as tabs.',
+      'Position the ticker at the top or bottom of your screen, drag to resize, switch between comfort and compact modes, choose overlay or push behavior, and pick which widgets appear in the ticker.',
   },
   {
     question: 'Is Scrollr open source?',

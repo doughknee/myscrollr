@@ -178,14 +178,14 @@ export function DownloadPage({
             <div className="relative overflow-hidden rounded-2xl border border-base-300/40 bg-base-200/40 backdrop-blur-sm shadow-2xl">
               <ProductScreenshot
                 basename="overview/home"
-                alt="The Scrollr home dashboard showing live channel feeds for scores, prices, and headlines side-by-side."
+                alt="The Scrollr home dashboard showing live widget feeds for scores, prices, and headlines side-by-side."
                 priority
                 pictureClassName="block w-full"
                 imgClassName="block h-full w-full object-cover object-top"
               />
             </div>
             <figcaption className="mt-4 text-center text-xs text-base-content/45">
-              The Scrollr dashboard after first launch, with sample channels
+              The Scrollr dashboard after first launch, with sample widgets
               enabled.
             </figcaption>
           </motion.figure>

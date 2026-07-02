@@ -17,7 +17,7 @@ export const Route = createFileRoute('/u/$username')({
   head: ({ params }) =>
     seo({
       title: `${params.username} | Scrollr`,
-      description: `View ${params.username}'s Scrollr profile and connected channels.`,
+      description: `View ${params.username}'s Scrollr profile and connected widgets.`,
       path: `/u/${params.username}`,
       noindex: true,
     }),
@@ -168,7 +168,7 @@ function ProfilePage() {
             Auth Required
           </h1>
           <p className="text-base-content/45 text-sm leading-relaxed mb-8">
-            Sign in to access your profile and connected channels.
+            Sign in to access your profile and connected widgets.
           </p>
           <button
             type="button"
@@ -270,7 +270,7 @@ function ProfilePage() {
             transition={{ duration: 0.7, ease: EASE }}
           >
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
-              Connected <span className="text-gradient-primary">Channels</span>
+              Connected <span className="text-gradient-primary">Widgets</span>
             </h2>
             <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
               Linked services and data sources for this profile

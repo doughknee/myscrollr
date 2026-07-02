@@ -29,15 +29,15 @@ import { ProductScreenshot } from '@/components/ProductScreenshot'
 export const Route = createFileRoute('/channels')({
   head: () =>
     seo({
-      title: 'Scrollr Channels: Live Sports, Finance, News, Fantasy',
+      title: 'Scrollr Widgets: Live Sports, Finance, News, Fantasy',
       description:
-        'Browse the channels and widgets in the Scrollr desktop app: Finance, Sports, News, Fantasy, Clock, Timer, Weather, and System Monitor.',
+        'Browse the widget catalog in the Scrollr desktop app: 14 sports leagues, Stocks & Crypto, curated news + Custom RSS, Yahoo Fantasy, and utility widgets.',
       path: '/channels',
       jsonLd: [
         organization,
         breadcrumbs([
           { name: 'Home', path: '/' },
-          { name: 'Channels', path: '/channels' },
+          { name: 'Widgets', path: '/channels' },
         ]),
       ],
     }),
@@ -83,8 +83,8 @@ interface ChannelDef {
   configureScreenshotAlt: string
   /**
    * Optional compact ticker-strip screenshot rendered at the bottom of
-   * the card to demonstrate the channel's always-on-top output. Only
-   * available for channels (not widgets); widgets are dashboard-only.
+   * the card to demonstrate the widget family's always-on-top output.
+   * Only data widgets have ticker output; utilities are dashboard-only.
    */
   tickerScreenshot?: string
   tickerScreenshotAlt?: string
@@ -100,16 +100,16 @@ interface ComingSoonChannel {
 const CHANNELS: Array<ChannelDef> = [
   {
     id: 'finance',
-    name: 'Finance',
+    name: 'Stocks & Crypto',
     description: 'Real-time market data',
     detail:
-      'Tracked symbols across stocks and crypto via TwelveData WebSocket. Live price changes, percentage moves, and directional indicators.',
+      'Two market widgets — Stocks (ETFs included) and Crypto — streaming live prices via TwelveData WebSocket. Track unlimited symbols per widget with price changes, percentage moves, and directional indicators.',
     Icon: TrendingUp,
     hex: HEX.primary,
     Watermark: TrendingUp,
     screenshot: 'channels/finance',
     screenshotAlt:
-      'Scrollr finance channel showing live stock and crypto prices, percent change, and gainers/losers filters.',
+      'Scrollr Stocks & Crypto widgets showing live stock and crypto prices, percent change, and gainers/losers filters.',
     configureScreenshot: 'configure/finance',
     configureScreenshotAlt:
       'Scrollr finance configuration panel for adding and managing tracked symbols.',
@@ -120,15 +120,15 @@ const CHANNELS: Array<ChannelDef> = [
   {
     id: 'sports',
     name: 'Sports',
-    description: 'Live scores & schedules',
+    description: 'Live scores from 14 leagues',
     detail:
-      'NFL, NBA, NHL, and MLB scores from ESPN. Game states, team matchups, and real-time score updates polling every minute.',
+      'Every league is its own widget — NFL, NBA, MLB, NHL, MLS, Premier League, La Liga, Champions League, World Cup, F1, UFC, AFL, plus college football and basketball. Game states, matchups, and scores stream in real time.',
     Icon: Trophy,
     hex: HEX.secondary,
     Watermark: Trophy,
     screenshot: 'channels/sports',
     screenshotAlt:
-      'Scrollr sports channel showing live MLB scores with team logos and game status pills.',
+      'Scrollr sports widgets showing live MLB scores with team logos and game status pills.',
     configureScreenshot: 'configure/sports',
     configureScreenshotAlt:
       'Scrollr sports configuration panel for selecting leagues and teams.',
@@ -138,16 +138,16 @@ const CHANNELS: Array<ChannelDef> = [
   },
   {
     id: 'rss',
-    name: 'RSS Feeds',
-    description: 'Custom news streams',
+    name: 'News',
+    description: 'Curated outlets & custom feeds',
     detail:
-      '100+ curated feeds across 8 categories. Subscribe to the sources you care about and get articles delivered in real-time.',
+      'Ten curated outlet widgets — BBC, NPR, The Guardian, Bloomberg, CNBC, Al Jazeera, The Verge, Hacker News, NASA, ProPublica — plus a Custom RSS widget that takes any feed URL. Unlimited sources, delivered in real time.',
     Icon: Rss,
     hex: HEX.info,
     Watermark: Rss,
     screenshot: 'channels/news',
     screenshotAlt:
-      'Scrollr news channel showing the latest headlines from custom RSS sources with recency indicators.',
+      'Scrollr news widgets showing the latest headlines from custom RSS sources with recency indicators.',
     configureScreenshot: 'configure/news',
     configureScreenshotAlt:
       'Scrollr news configuration panel for subscribing to RSS feeds across multiple categories.',
@@ -160,13 +160,13 @@ const CHANNELS: Array<ChannelDef> = [
     name: 'Yahoo Fantasy',
     description: 'Fantasy sports leagues',
     detail:
-      'Connect your Yahoo account to view league standings, team rosters, weekly matchups, and live scoring across all your fantasy leagues.',
+      'Connect your Yahoo account to view league standings, team rosters, weekly matchups, and live scoring across unlimited fantasy leagues. Available on every paid plan — Uplink and up.',
     Icon: Ghost,
     hex: HEX.accent,
     Watermark: Ghost,
     screenshot: 'channels/fantasy',
     screenshotAlt:
-      'Scrollr Yahoo Fantasy channel showing league overview cards, matchup scores, and win probability.',
+      'Scrollr Yahoo Fantasy widget showing league overview cards, matchup scores, and win probability.',
     configureScreenshot: 'configure/fantasy',
     configureScreenshotAlt:
       'Scrollr fantasy configuration panel for managing connected Yahoo Fantasy leagues.',
@@ -177,6 +177,12 @@ const CHANNELS: Array<ChannelDef> = [
 ]
 
 const COMING_SOON: Array<ComingSoonChannel> = [
+  {
+    id: 'kalshi',
+    name: 'Kalshi',
+    description: 'Live prediction markets',
+    Icon: TrendingUp,
+  },
   {
     id: 'discord',
     name: 'Discord',
@@ -316,8 +322,7 @@ function ChannelsPage() {
           >
             <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/8 text-primary text-[10px] font-bold rounded-lg border border-primary/15 uppercase tracking-wide">
               <Puzzle size={12} />
-              {CHANNELS.length} channels &middot; {WIDGETS.length} widgets
-              &middot; {COMING_SOON.length} coming soon
+              30+ widgets &middot; {COMING_SOON.length} coming soon
             </span>
           </motion.div>
 
@@ -336,8 +341,8 @@ function ChannelsPage() {
             transition={{ duration: 0.6, delay: 0.3, ease: EASE }}
             className="text-base text-base-content/45 max-w-lg mx-auto leading-relaxed"
           >
-            Browse official channels or explore what the community is building.
-            Can't find what you want? Build it or suggest it.
+            Browse the widget catalog or explore what the community is
+            building. Can't find what you want? Build it or suggest it.
           </motion.p>
         </div>
 
@@ -359,10 +364,11 @@ function ChannelsPage() {
           >
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
               Choose your{' '}
-              <span className="text-gradient-primary">Channels</span>
+              <span className="text-gradient-primary">Widgets</span>
             </h2>
             <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
-              Real-time data sources available in the desktop app
+              Live data widgets — every one streams in real time, on every
+              plan
             </p>
           </motion.div>
 
@@ -401,7 +407,7 @@ function ChannelsPage() {
             className="text-center mb-12 sm:mb-16"
           >
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
-              Built-in <span className="text-gradient-primary">Widgets</span>
+              Utility <span className="text-gradient-primary">Widgets</span>
             </h2>
             <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
               Lightweight utilities that live alongside your feed — no account
@@ -448,11 +454,11 @@ function ChannelsPage() {
               On the <span className="text-gradient-primary">Roadmap</span>
             </h2>
             <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
-              Community-requested channels in development
+              Community-requested widgets in development
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {COMING_SOON.map((item, i) => (
               <motion.div
                 key={item.id}
@@ -552,9 +558,9 @@ function ChannelsPage() {
                   Missing Something?
                 </h3>
                 <p className="text-sm text-base-content/45 leading-relaxed max-w-md">
-                  Every Scrollr channel is a self-contained package. Fork the
-                  repo, follow the architecture, ship your plugin — or just tell
-                  us what you want.
+                  Every Scrollr data source is a self-contained package. Fork
+                  the repo, follow the architecture, ship your plugin — or just
+                  tell us what you want.
                 </p>
               </div>
 
@@ -591,13 +597,13 @@ function ChannelsPage() {
 // ── Configure Anything (screenshot mosaic) ─────────────────────
 
 /**
- * 2x2 mosaic of the four channel configuration panels, captioned with
- * the channel's name and a one-line description of what's configurable.
+ * 2x2 mosaic of the four Configure panels, captioned with the widget
+ * family's name and a one-line description of what's configurable.
  * Sits between the Widgets grid and the Roadmap section to break up a
  * page of feature cards with a more atmospheric, "this is the actual
  * product" beat.
  *
- * Each tile uses the channel's accent color for its border + bottom
+ * Each tile uses the family's accent color for its border + bottom
  * caption strip, so the mosaic reads as a continuation of the per-card
  * accent language used above.
  */
@@ -617,9 +623,8 @@ function ConfigureAnythingSection() {
             Configure <span className="text-gradient-primary">anything</span>
           </h2>
           <p className="text-base text-base-content/45 leading-relaxed max-w-xl mx-auto">
-            Every channel comes with its own settings panel. Add the symbols,
-            leagues, feeds, or teams you actually care about — and leave the
-            rest out.
+            Every widget has its own Configure page. Add the symbols, teams,
+            or feeds you actually care about — and leave the rest out.
           </p>
         </motion.div>
 

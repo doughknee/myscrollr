@@ -315,7 +315,7 @@ function DeleteConfirmModal({
         </div>
 
         <ul className="mb-5 space-y-1.5 text-xs text-base-content/70">
-          <li>• All channel configurations and preferences will be deleted.</li>
+          <li>• All widget configurations and preferences will be deleted.</li>
           <li>• Connected Yahoo Fantasy account will be disconnected.</li>
           <li>• Billing records stay anonymized for tax compliance.</li>
           <li>• You will be signed out and unable to sign back in.</li>

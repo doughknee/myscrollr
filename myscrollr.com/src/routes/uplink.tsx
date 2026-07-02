@@ -866,7 +866,7 @@ function BottomCTA({
             className="block mt-6 text-lg sm:text-xl text-base-content/50 max-w-lg leading-relaxed"
           >
             The core is free forever. Uplink, Pro, and Ultimate are for those
-            who want more data, faster delivery, and zero limits.
+            who want more widgets, more tools, and zero limits.
           </motion.span>
 
           {/* CTA buttons with central glow */}

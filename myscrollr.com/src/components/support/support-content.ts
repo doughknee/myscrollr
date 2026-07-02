@@ -16,7 +16,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Is Scrollr free?',
     answer:
-      'Yes. The free tier gives you real-time data across all four channels with generous limits and no ads. Upgrade to Uplink for more capacity, or Uplink Ultimate for live streaming data and unlimited everything.',
+      'Yes. The free tier streams real-time data to 3 widgets at once with no ads. Upgrade to Uplink or higher for more widget slots, Yahoo Fantasy sync, and power-user tools like alerts and integrations.',
   },
   {
     question: "Does it affect my computer's performance?",
@@ -26,7 +26,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Is my data private?',
     answer:
-      'Scrollr contains zero analytics, zero tracking pixels, and zero telemetry. Your channel configurations and preferences are stored on your device. The only server-side data is your account profile and subscription status.',
+      'Scrollr contains zero analytics, zero tracking pixels, and zero telemetry. Your widget configurations and preferences are stored on your device. The only server-side data is your account profile and subscription status.',
   },
   {
     question: 'What platforms are supported?',
@@ -36,17 +36,17 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Do I need an account?',
     answer:
-      'You can browse widgets and explore the desktop app without signing in. An account is needed to add channels (Finance, Sports, News, Fantasy) and to sync your setup across devices.',
+      'You can browse widgets and explore the desktop app without signing in. An account is needed to add live data widgets (sports, stocks, crypto, news, fantasy) and to sync your setup across devices.',
   },
   {
     question: 'What data does Scrollr show?',
     answer:
-      'Four channels: live stock and crypto prices (Finance), scores across 20+ leagues (Sports), articles from RSS feeds (News), and Yahoo Fantasy Sports leagues (Fantasy). Plus utility widgets for weather, clocks, system monitoring, uptime, and GitHub Actions.',
+      'A catalog of 30+ widgets: live stock and crypto prices, scores from 14 sports leagues, curated news outlets plus custom RSS, and Yahoo Fantasy Sports leagues. Plus utility widgets for weather, clocks, system monitoring, uptime, and GitHub Actions.',
   },
   {
     question: 'Can I customize the feed?',
     answer:
-      'Extensively. Move the ticker to the top or bottom of the screen by right-clicking it (or using the up/down chevron in the hover toolbar). In Settings > Ticker you can change the detail level (Compact / Detailed), add ticker rows, and adjust speed. Within each channel you can filter, sort, and toggle individual data points on or off under Options > Display preferences.',
+      'Extensively. Move the ticker to the top or bottom of the screen by right-clicking it (or using the up/down chevron in the hover toolbar). In Settings > Ticker you can change the detail level (Compact / Detailed), add ticker rows, and adjust speed. Within each widget you can filter, sort, and toggle individual data points on or off from its Configure page.',
   },
   {
     question: 'Is Scrollr open source?',
@@ -61,12 +61,12 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'How does live data work vs. polling?',
     answer:
-      'Free, Uplink, and Uplink Pro tiers use polling — the app fetches fresh data at regular intervals (60s on Free, 30s on Uplink, 10s on Uplink Pro). Uplink Ultimate uses a persistent SSE connection for instant live updates as data changes on the server.',
+      'Every plan streams live data over a persistent SSE connection — updates appear the instant data changes on the server. Polling is only used briefly as a fallback while a connection re-establishes.',
   },
   {
     question: "What's the difference between Uplink tiers?",
     answer:
-      'Free: 5 stock/crypto symbols, 1 news feed, 1 sports league, no fantasy leagues, 60s polling. Uplink: 25 symbols, 25 feeds, 8 sports leagues, 1 fantasy league, 30s polling. Uplink Pro: 75 symbols, 100 feeds, 20 sports leagues, 3 fantasy leagues, 10s polling. Uplink Ultimate: unlimited symbols/feeds/sports leagues, 10 fantasy leagues, live SSE streaming.',
+      'Your plan sets how many widgets run at once: Free 3, Uplink 6, Uplink Pro 12, Uplink Ultimate unlimited — with unlimited items inside every widget on every plan. Yahoo Fantasy requires Uplink or higher. Pro adds custom alerts, feed profiles, and whitelist filtering; Ultimate adds webhooks, data export, and API access.',
   },
 ]
 
@@ -95,11 +95,11 @@ export const TROUBLESHOOTING_ARTICLES: Array<TroubleshootingArticle> = [
   {
     title: 'Data not loading / feed shows empty',
     symptoms: [
-      'Channel added but shows "No data right now"',
+      'Widget added but shows "No data right now"',
       'Ticker shows empty slots where data should be',
     ],
     steps: [
-      'Open the channel and click Options > Configure to verify items are added (symbols, leagues, or feeds).',
+      "Open the widget's Configure page to verify items are added (symbols or feeds).",
       "Check that you're signed in (Settings > Account).",
       'Try switching away from and back to the feed tab.',
       'Check your internet connection.',

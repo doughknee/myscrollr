@@ -22,11 +22,11 @@ const STEPS = [
     id: 'download',
     title: 'Download the App',
     description:
-      'Grab the installer for macOS, Windows, or Linux. No sign-up needed to try the basics — create a free account to unlock more channels.',
+      'Grab the installer for macOS, Windows, or Linux. No sign-up needed to try the basics — create a free account to unlock live data widgets.',
   },
   {
     id: 'choose',
-    title: 'Pick Your Channels',
+    title: 'Pick Your Widgets',
     description:
       'Toggle on sports, markets, news, or fantasy. Whatever matters to you.',
   },
