@@ -309,7 +309,9 @@ const DATA_WIDGETS: DataWidgetDef[] = [
   },
   // Fantasy, Predictions.
   {
-    id: "fantasy_yahoo", name: "Yahoo Fantasy", category: "fantasy", source: "fantasy", color: "#6001d2", requiredTier: "uplink",
+    // Tier gate RETIRED v1.1.2 — Yahoo Fantasy is a normal widget on every
+    // plan (the slot is the only lever). No requiredTier = "free".
+    id: "fantasy_yahoo", name: "Yahoo Fantasy", category: "fantasy", source: "fantasy", color: "#6001d2",
     description: "Your Yahoo Fantasy leagues, matchups, and standings.",
     about: "Your Yahoo Fantasy leagues in the ticker — live scoring, matchups, and standings without ever opening the app.",
     usage: [

@@ -130,7 +130,7 @@ const STATIC_TIERS = [
   {
     name: 'Uplink',
     description:
-      'Six widgets at once, Yahoo Fantasy sync, and early access to new widgets.',
+      'Six widgets at once, priority support, and early access to new widgets.',
     priceMonthly: 9.99,
     priceAnnual: 79.99,
   },
@@ -144,7 +144,7 @@ const STATIC_TIERS = [
   {
     name: 'Ultimate',
     description:
-      'Unlimited widgets at once, webhooks, data export, API access, and priority support.',
+      'Unlimited widgets at once, plus webhooks, data export, and API access as they land.',
     priceMonthly: 49.99,
     priceAnnual: 399.99,
   },
@@ -179,7 +179,7 @@ const STATIC_FAQ = [
   {
     question: 'How many fantasy leagues can I connect?',
     answer:
-      'As many as you play. Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. The Yahoo Fantasy widget is available on every paid plan — Uplink and up — and syncs unlimited leagues across every sport.',
+      'As many as you play. Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. The Yahoo Fantasy widget is included on every plan — even Free — and syncs unlimited leagues across every sport.',
   },
   {
     question: 'What are custom alerts?',
@@ -219,7 +219,7 @@ export const Route = createFileRoute('/uplink')({
     seo({
       title: 'Scrollr Uplink: Pricing & Plans',
       description:
-        'Scrollr Uplink unlocks more widgets at once, Yahoo Fantasy sync, and power-user tools — on top of real-time streaming for everyone. Plans from $9.99/month with annual savings.',
+        'Scrollr Uplink unlocks more widgets at once, priority support, and power-user tools — on top of real-time streaming for everyone. Plans from $9.99/month with annual savings.',
       path: '/uplink',
       image: 'https://myscrollr.com/og/uplink.png',
       type: 'product',
@@ -302,14 +302,13 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
       ultimate: 'Unlimited',
     },
     {
+      // Tier gate retired v1.1.2 — a normal widget on every plan. The row
+      // stays because four checkmarks SELL the giveaway better than silence.
       label: 'Yahoo Fantasy',
-      free: 'No',
+      free: 'Yes',
       uplink: 'Yes',
       pro: 'Yes',
       ultimate: 'Yes',
-      uplinkUp: true,
-      proUp: true,
-      ultimateUp: true,
     },
     {
       label: 'Site Filtering',
@@ -396,11 +395,14 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
       ultimateUp: true,
     },
     {
+      // v1.1.2: moved from Ultimate-only to every paid tier.
       label: 'Priority Support',
       free: 'No',
-      uplink: 'No',
-      pro: 'No',
+      uplink: 'Yes',
+      pro: 'Yes',
       ultimate: 'Yes',
+      uplinkUp: true,
+      proUp: true,
       ultimateUp: true,
     },
     {
@@ -446,10 +448,10 @@ function buildTierShowcases(limits: TierLimitsResponse): Array<TierShowcase> {
       delivery: `${uplink.max_widgets} widgets`,
       deliverySub: 'Double the free plan',
       useCase:
-        "You open Scrollr with your coffee, scan your watchlist, skim the morning headlines, and check last night's scores — with your fantasy roster and an extra league running alongside. Everything streams in live, so you catch the pre-market move before you leave for work.",
+        "You open Scrollr with your coffee, scan your watchlist, skim the morning headlines, and check last night's scores — with your fantasy leagues running alongside. Everything streams in live, so you catch the pre-market move before you leave for work.",
       features: [
         `${uplink.max_widgets} widgets at once`,
-        'Yahoo Fantasy sync',
+        'Priority support',
         'Unlimited items per widget',
         'Every sports & news widget',
         'Blacklist site filtering',
@@ -490,7 +492,6 @@ function buildTierShowcases(limits: TierLimitsResponse): Array<TierShowcase> {
         'Webhooks & integrations',
         'Data export (CSV / JSON)',
         'API access',
-        'Priority support',
         'Everything in Pro, plus more',
       ],
     },
@@ -679,10 +680,9 @@ function buildUplinkFAQ(limits: TierLimitsResponse): Array<FAQItem> {
     {
       icon: Crown,
       question: 'How many fantasy leagues can I connect?',
-      highlight:
-        'Unlimited Yahoo leagues on any paid plan — Uplink and up.',
+      highlight: 'Unlimited Yahoo leagues on every plan — even Free.',
       answer:
-        'As many as you play. Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. The Yahoo Fantasy widget is available on every paid plan — Uplink and up — and syncs unlimited leagues across every sport.',
+        'As many as you play. Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. The Yahoo Fantasy widget is included on every plan — even Free — and syncs unlimited leagues across every sport.',
       accent: 'rose',
     },
     {
@@ -2552,7 +2552,7 @@ function UplinkPage() {
                         <PricingFeature>
                           {tierLimits.tiers.uplink.max_widgets} widgets at once
                         </PricingFeature>
-                        <PricingFeature>Yahoo Fantasy sync</PricingFeature>
+                        <PricingFeature>Priority support</PricingFeature>
                         <PricingFeature>Real-time SSE delivery</PricingFeature>
                         <PricingFeature>
                           Unlimited items per widget

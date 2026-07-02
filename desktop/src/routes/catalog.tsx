@@ -23,7 +23,12 @@ import { getCatalogItems, CATEGORY_LABELS, CANONICAL_ORDER } from "../marketplac
 import type { WidgetCategory, CatalogItem } from "../marketplace";
 import { dashboardQueryOptions } from "../api/queries";
 import { useShell, useShellData } from "../shell-context";
-import { getMaxWidgets } from "../tierLimits";
+import {
+  SlotPills,
+  slotHeadline,
+  slotSubline,
+  useSlotUsage,
+} from "../components/SlotMeter";
 import CatalogCard from "../components/marketplace/CatalogCard";
 import QueryErrorBanner from "../components/QueryErrorBanner";
 import RouteError from "../components/RouteError";
@@ -85,7 +90,7 @@ function orderItems(items: CatalogItem[], sort: SortMode): CatalogItem[] {
 
 function CatalogPage() {
   const navigate = useNavigate();
-  const { prefs, tier } = useShell();
+  const { prefs } = useShell();
   const { channels } = useShellData();
   const { error: dashboardError } = useQuery(dashboardQueryOptions());
 
@@ -107,20 +112,11 @@ function CatalogPage() {
     [enabledChannelIds, enabledWidgetIds],
   );
 
-  // Widget/slot model (2026-06-30): a plan caps how many widgets run at
-  // once. Slots in use = ENABLED channels + enabled local widgets — the
-  // server gate counts `WHERE enabled = true`, and the downgrade prune
-  // disables (never deletes) over-cap rows, so counting disabled rows here
-  // would lock the catalog for users the server would happily accept. At
+  // Widget/slot model: slot math + meter live in SlotMeter.tsx, shared
+  // with the Account page so the two surfaces can't drift (v1.1.2). At
   // capacity, the catalog locks *new* adds (already-added items stay
-  // interactive). nil/Infinity = unlimited.
-  const slots = useMemo(() => {
-    const used =
-      channels.filter((ch) => ch.enabled).length +
-      prefs.widgets.enabledWidgets.length;
-    const max = getMaxWidgets(tier);
-    return { used, max, atCapacity: used >= max };
-  }, [channels, prefs.widgets.enabledWidgets.length, tier]);
+  // interactive).
+  const slots = useSlotUsage();
 
   // Filter → split into "yours" vs "discover" → sort within each.
   const { yourItems, discoverItems } = useMemo(() => {
@@ -139,22 +135,6 @@ function CatalogPage() {
       ),
     };
   }, [allItems, filter, sort, allEnabledIds]);
-
-  // ── Header copy: the slot budget, stated once and visibly ────
-  const finiteMax = Number.isFinite(slots.max);
-  const openSlots = finiteMax ? (slots.max as number) - slots.used : Infinity;
-  const slotHeadline = !finiteMax
-    ? `${slots.used} widget${slots.used === 1 ? "" : "s"} added`
-    : slots.atCapacity
-      ? `All ${slots.max} widget slots in use`
-      : `${slots.used} of ${slots.max} widget slots used`;
-  const slotSub = !finiteMax
-    ? "Unlimited slots on your plan — add away."
-    : slots.atCapacity
-      ? "Remove a widget to free a slot, or upgrade for more."
-      : slots.used === 0
-        ? "Fresh start — pick your first widget below."
-        : `${openSlots} open slot${openSlots === 1 ? "" : "s"} — room for more.`;
 
   const cardFor = (item: CatalogItem, i: number) => (
     <motion.div
@@ -219,7 +199,7 @@ function CatalogPage() {
         transition={{ duration: 0.25, delay: 0.02, ease: [0.22, 0.61, 0.36, 1] }}
         className={clsx(
           "mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-xl border px-4 py-3",
-          slots.atCapacity && finiteMax
+          slots.atCapacity && slots.finite
             ? "border-warn/25 bg-warn/[0.06]"
             : "border-edge/40 bg-base-150/30",
         )}
@@ -228,7 +208,7 @@ function CatalogPage() {
           <span
             className={clsx(
               "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-              slots.atCapacity && finiteMax
+              slots.atCapacity && slots.finite
                 ? "bg-warn/15 text-warn"
                 : "bg-accent/10 text-accent",
             )}
@@ -238,33 +218,17 @@ function CatalogPage() {
           <div>
             <div className="flex items-center gap-2.5">
               <span className="text-ui-body font-semibold text-fg-1">
-                {slotHeadline}
+                {slotHeadline(slots)}
               </span>
               {/* Slot meter — one pill per slot, filled as used. */}
-              {finiteMax && (
-                <span className="flex items-center gap-1" aria-hidden>
-                  {Array.from({ length: slots.max as number }, (_, i) => (
-                    <span
-                      key={i}
-                      className={clsx(
-                        "h-1.5 w-4 rounded-full transition-colors",
-                        i < slots.used
-                          ? slots.atCapacity
-                            ? "bg-warn"
-                            : "bg-accent"
-                          : "bg-edge/60",
-                      )}
-                    />
-                  ))}
-                </span>
-              )}
+              <SlotPills usage={slots} />
             </div>
-            <div className="text-ui-chip text-fg-4">{slotSub}</div>
+            <div className="text-ui-chip text-fg-4">{slotSubline(slots)}</div>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          {slots.atCapacity && finiteMax && (
+          {slots.atCapacity && slots.finite && (
             <button
               onClick={() => void open("https://myscrollr.com/uplink")}
               className="shrink-0 rounded-lg bg-warn/15 px-3 py-1.5 text-ui-chip font-semibold text-warn transition-colors hover:bg-warn/25"

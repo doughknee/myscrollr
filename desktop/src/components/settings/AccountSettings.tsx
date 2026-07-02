@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { open } from "@tauri-apps/plugin-shell";
 import { toast } from "sonner";
 import clsx from "clsx";
@@ -11,7 +12,12 @@ import {
   updateProfile,
 } from "../../api/client";
 import { queryKeys, userOverviewQueryOptions } from "../../api/queries";
-import { TIER_LIMITS, isUnlimited, type NumericLimitKey } from "../../tierLimits";
+import {
+  SlotPills,
+  slotHeadline,
+  slotSubline,
+  useSlotUsage,
+} from "../SlotMeter";
 import type { SubscriptionTier } from "../../auth";
 import type { SubscriptionInfo } from "../../api/client";
 import { Section, DisplayRow, ActionRow } from "./SettingsControls";
@@ -100,6 +106,8 @@ export default function AccountSettings({
   const identity = authenticated ? getUserIdentity() : null;
   const userLabel = identity?.email ?? identity?.name ?? null;
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const slots = useSlotUsage();
 
   // Aggregated overview: channels count, fantasy summary, GDPR state.
   // Only fires when authenticated; query is cheap (cached server-side, 30s stale).
@@ -429,12 +437,31 @@ export default function AccountSettings({
 
       {/* ── Your Plan ────────────────────────────────────────── */}
       {authenticated && (
-        <Section index={5} title="Plan limits" variant="card">
-          <TierLimitsTable tier={tier} />
+        <Section index={5} title="Widget slots" variant="card">
+          {/* The plan story is ONE number now (v1.1.2): how many widgets
+              you run at once. The old per-feature limits table — five
+              rows of "Unlimited" since the caps were retired — is gone.
+              Meter + copy come from SlotMeter.tsx, shared with the
+              Catalog header. */}
+          <div className="px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="text-ui-body font-semibold text-fg">
+                {slotHeadline(slots)}
+              </span>
+              <SlotPills usage={slots} />
+            </div>
+            <p className="mt-1 text-ui-meta text-fg-4">{slotSubline(slots)}</p>
+          </div>
+          <ActionRow
+            label="Manage widgets"
+            description="Add, remove, and swap widgets in the Catalog."
+            action="Open Catalog"
+            onClick={() => navigate({ to: "/catalog" })}
+          />
           {tier !== "uplink_ultimate" && tier !== "super_user" && !isLifetime && (
             <ActionRow
               label={tier === "free" ? "Upgrade to Uplink" : "Upgrade plan"}
-              description="See plan details and pricing on the web."
+              description="More slots — run more widgets at once."
               action="Upgrade"
               actionClass="bg-accent/10 text-accent hover:bg-accent/20"
               onClick={() => open("https://myscrollr.com/uplink")}
@@ -505,28 +532,3 @@ export default function AccountSettings({
   );
 }
 
-// ── Tier limits table ───────────────────────────────────────────
-
-const LIMIT_ROWS: { label: string; key: NumericLimitKey }[] = [
-  { label: "Finance symbols", key: "symbols" },
-  { label: "News feeds", key: "feeds" },
-  { label: "Custom feeds", key: "customFeeds" },
-  { label: "Sports leagues", key: "leagues" },
-  { label: "Fantasy leagues", key: "fantasy" },
-];
-
-function TierLimitsTable({ tier }: { tier: SubscriptionTier }) {
-  const limits = TIER_LIMITS[tier];
-  return (
-    <>
-      {LIMIT_ROWS.map(({ label, key }) => (
-        <DisplayRow
-          key={key}
-          label={label}
-          value={isUnlimited(tier, key) ? "Unlimited" : String(limits[key])}
-          valueClass="text-ui-muted text-fg-2 tabular-nums"
-        />
-      ))}
-    </>
-  );
-}

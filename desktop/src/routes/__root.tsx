@@ -55,6 +55,8 @@ import {
   savePrefs,
   consumeTickerLayoutChanged,
   resolveThemeMode,
+  getChannelTickerRow,
+  getWidgetTickerRow,
 } from "../preferences";
 import type { AppPreferences } from "../preferences";
 import {
@@ -66,13 +68,14 @@ import { showTipOnce, TIP_IDS } from "../lib/tips";
 
 // Types
 import type { DeliveryMode } from "../types";
-import type { Channel, SubscriptionInfo } from "../api/client";
+import type { Channel, ChannelType, SubscriptionInfo } from "../api/client";
 
 // Hooks
 import { useTheme } from "../hooks/useTheme";
 import { useAuthState } from "../hooks/useAuthState";
 import { useChannelActions } from "../hooks/useChannelActions";
 import { useWidgetActions } from "../hooks/useWidgetActions";
+import { useRemoveWidget } from "../hooks/useRemoveWidget";
 import { useDashboardCDC } from "../hooks/useDashboardCDC";
 import { useTauriListener } from "../hooks/useTauriListener";
 import { useDeliveryHealth } from "../hooks/useDeliveryHealth";
@@ -587,6 +590,53 @@ function RootLayout() {
     [navigate],
   );
 
+  // ── Sidebar context-menu actions (v1.1.2) ───────────────────
+  // Right-click on a source row. Ticker + remove resolve through the
+  // same handlers the ticker settings and the widget info page use —
+  // no new mutation paths.
+  const removeWidgetShared = useRemoveWidget();
+
+  const handleConfigureItem = useCallback(
+    (id: string, kind: "channel" | "widget") => {
+      if (kind === "channel") {
+        navigate({ to: "/channel/$type/$tab", params: { type: id, tab: "configuration" } });
+      } else {
+        navigate({ to: "/widget/$id/$tab", params: { id, tab: "configuration" } });
+      }
+    },
+    [navigate],
+  );
+
+  const handleInfoItem = useCallback(
+    (id: string) => navigate({ to: "/widget/$id/info", params: { id } }),
+    [navigate],
+  );
+
+  const handleToggleItemTicker = useCallback(
+    (source: { id: string; kind: "channel" | "widget"; onTicker: boolean }) => {
+      if (source.kind === "channel") {
+        channelActions.handleToggleChannel(
+          source.id as ChannelType,
+          !source.onTicker,
+        );
+      } else {
+        widgetActions.handleToggleWidgetTicker(source.id);
+      }
+    },
+    [channelActions.handleToggleChannel, widgetActions.handleToggleWidgetTicker],
+  );
+
+  const handleRemoveItem = useCallback(
+    (source: { id: string }) => {
+      const item = catalogItemById(source.id);
+      if (!item) return;
+      // Removing the page you're standing on → land back on Home.
+      if (route.activeItem === source.id) navigate({ to: "/feed" });
+      void removeWidgetShared(item);
+    },
+    [navigate, removeWidgetShared, route.activeItem],
+  );
+
   // Build the sidebar source list from the user's enabled channels and
   // widgets. Channels come from the live `dashboard.channels` payload
   // (filtered to `enabled === true`); widgets come from
@@ -596,10 +646,10 @@ function RootLayout() {
   // flag controls whether chips appear on the ticker, not whether the
   // channel appears in navigation.
   const sidebarSources = useMemo(() => {
-    const enabledChannelIds = new Set<string>(
+    const enabledChannels = new Map<string, Channel>(
       (dashboard?.channels ?? [])
         .filter((c) => c.enabled === true)
-        .map((c) => c.channel_type),
+        .map((c) => [c.channel_type, c]),
     );
     const enabledWidgetIds = new Set(prefs.widgets.enabledWidgets);
 
@@ -609,23 +659,44 @@ function RootLayout() {
       hex: string;
       icon: React.ComponentType<{ size?: number; className?: string }>;
       kind: "channel" | "widget";
+      onTicker: boolean;
     }> = [];
 
     for (const id of CANONICAL_ORDER) {
-      if (enabledChannelIds.has(id)) {
+      const channel = enabledChannels.get(id);
+      if (channel) {
         const m = catalogItemById(id);
         if (m) {
-          sources.push({ id, name: m.name, hex: m.hex, icon: m.icon, kind: "channel" });
+          sources.push({
+            id,
+            name: m.name,
+            hex: m.hex,
+            icon: m.icon,
+            kind: "channel",
+            // On-ticker = assigned to a ticker row (v1.1.2 context menu).
+            onTicker: getChannelTickerRow(prefs, channel) !== null,
+          });
         }
       } else if (enabledWidgetIds.has(id)) {
         const m = allWidgets.find((w) => w.id === id);
         if (m) {
-          sources.push({ id, name: m.name, hex: m.hex, icon: m.icon, kind: "widget" });
+          sources.push({
+            id,
+            name: m.name,
+            hex: m.hex,
+            icon: m.icon,
+            kind: "widget",
+            onTicker: getWidgetTickerRow(prefs, id) !== null,
+          });
         }
       }
     }
     return sources;
-  }, [dashboard?.channels, prefs.widgets.enabledWidgets, allChannelManifests, allWidgets]);
+    // `prefs` wholesale: the ticker-row layout lives under
+    // prefs.appearance and enabled widgets under prefs.widgets — the
+    // list build is cheap, so one broad dep beats two narrow ones
+    // that could silently miss a third source of truth later.
+  }, [dashboard?.channels, prefs, allChannelManifests, allWidgets]);
 
   // ── Keyboard shortcuts ──────────────────────────────────────
   useEffect(() => {
@@ -835,6 +906,10 @@ function RootLayout() {
               onNavigateToAccount={handleNavigateToAccount}
               onNavigateToSupport={handleNavigateToSupport}
               onSelectItem={handleSelectPinned}
+              onConfigureItem={handleConfigureItem}
+              onInfoItem={handleInfoItem}
+              onToggleItemTicker={handleToggleItemTicker}
+              onRemoveItem={handleRemoveItem}
             />
 
             <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">

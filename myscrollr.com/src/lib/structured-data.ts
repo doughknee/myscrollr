@@ -102,7 +102,7 @@ export function productOffers(tiers: Array<Tier>) {
     '@type': 'Product',
     name: 'Scrollr Uplink',
     description:
-      'Premium subscription tiers for the Scrollr desktop app: more widgets at once, Yahoo Fantasy sync, and early access to new widgets.',
+      'Premium subscription tiers for the Scrollr desktop app: more widgets at once, priority support, and early access to new widgets.',
     brand: { '@type': 'Brand', name: 'Scrollr' },
     offers: tiers.flatMap((t) => [
       {
@@ -174,7 +174,7 @@ export const HOMEPAGE_FAQ_ITEMS: ReadonlyArray<{
   {
     question: 'Is Scrollr free?',
     answer:
-      'The free tier streams real-time data with no ads or tracking. Uplink plans unlock more widgets at once, Yahoo Fantasy sync, and power-user tools like custom alerts and integrations. The entire codebase is open source under the AGPL-3.0 license.',
+      'The free tier streams real-time data with no ads or tracking. Uplink plans unlock more widgets at once, priority support, and power-user tools like custom alerts and integrations. The entire codebase is open source under the AGPL-3.0 license.',
   },
   {
     question: 'Does it affect performance?',
