@@ -284,6 +284,12 @@ jobs:
           VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN_WEB }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          # Authenticated GitHub API for the website prebuild fetch scripts
+          # (fetch-releases.mjs / fetch-latest-version.mjs) — shared runner
+          # IPs exhaust the anonymous 60/hr limit. The ambient job token is
+          # plenty (public read); it's consumed builder-stage only and dies
+          # when the job ends.
+          GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           IMAGE="${REGISTRY}/${{ matrix.service }}"
           SHA_TAG="sha-${GITHUB_SHA::7}"
