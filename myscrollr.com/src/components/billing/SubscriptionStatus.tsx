@@ -40,7 +40,7 @@ const PLAN_PRICES: Record<string, string> = {
   pro_annual: '$199.99/yr',
   ultimate_monthly: '$49.99/mo',
   ultimate_annual: '$399.99/yr',
-  lifetime: '$399 one-time',
+  lifetime: '$999 one-time',
 }
 
 const DOWNGRADE_PLAN_NAMES: Record<string, string> = {

@@ -2236,14 +2236,14 @@ function UplinkPage() {
                         <div className="text-center mb-6">
                           <div className="flex items-baseline justify-center gap-2 mb-1">
                             <span className="text-5xl font-black text-base-content tracking-tight">
-                              $399
+                              $999
                             </span>
                             <span className="text-sm text-base-content/25">
                               one-time
                             </span>
                           </div>
                           <p className="text-[10px] text-warning/40">
-                            Permanent Uplink access &middot; No renewals
+                            Permanent Ultimate access &middot; No renewals
                           </p>
                         </div>
 
@@ -2274,11 +2274,11 @@ function UplinkPage() {
                         {/* Features — 2 columns */}
                         <div className="grid grid-cols-2 gap-x-6 gap-y-3 mb-8">
                           {[
-                            'Permanent Uplink-tier access',
-                            '50% off Unlimited upgrade',
-                            `${tierLimits.tiers.uplink.max_widgets} widgets at once`,
+                            'Permanent Ultimate access',
+                            'One payment — no renewals',
+                            'Unlimited widgets at once',
                             'Founding member badge',
-                            'Yahoo Fantasy sync',
+                            'Webhooks, export & API access',
                             'Priority support',
                             'Unlimited items per widget',
                             'Early access to features',
@@ -2305,13 +2305,12 @@ function UplinkPage() {
                         >
                           <div className="relative z-10">
                             <p className="text-[10px] text-primary/70 font-semibold mb-1">
-                              50% Off Ultimate — From $25.00/mo
+                              Everything Ultimate has. Forever.
                             </p>
                             <p className="text-[10px] text-base-content/35 leading-relaxed">
-                              Lifetime members get half off any Ultimate
-                              subscription. Unlimited widgets at once,
-                              webhooks, API access, and data export — all
-                              at half price.
+                              Every Ultimate feature — unlimited widgets at
+                              once, webhooks, API access, and data export —
+                              permanently included with one payment.
                             </p>
                           </div>
                         </div>

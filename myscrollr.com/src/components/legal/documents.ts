@@ -482,7 +482,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
       {
         heading: 'Pricing and Plans',
         content: [
-          'Uplink is available in three billing options: Monthly at $9.99 per month (Uplink), $24.99 per month (Uplink Pro), or $49.99 per month (Uplink Ultimate). Annual billing is available at $79.99/year (Uplink), $199.99/year (Uplink Pro), or $399.99/year (Uplink Ultimate). A Lifetime option is available at $399.00 (one-time payment, permanent Uplink-tier access with 50% off Ultimate upgrade).',
+          'Uplink is available in three billing options: Monthly at $9.99 per month (Uplink), $24.99 per month (Uplink Pro), or $49.99 per month (Uplink Ultimate). Annual billing is available at $79.99/year (Uplink), $199.99/year (Uplink Pro), or $399.99/year (Uplink Ultimate). A Lifetime option is available at $999.00 (one-time payment, permanent Uplink Ultimate access).',
           'All prices are in US Dollars (USD). Prices may be adjusted with notice to existing subscribers. Existing subscribers will be honored at their original rate for the remainder of their current billing period.',
         ],
       },
