@@ -10,8 +10,8 @@ stays at 1.1.0 and nobody gets force-updated.
 
 | Version | Codename | Theme | Size |
 |---|---|---|---|
-| v1.1.1 | Paper Cuts | Bug fixes + fossil removals, ship fast | S |
-| v1.1.2 | The Library | Catalog becomes yours + slots-only monetization everywhere | M |
+| ~~v1.1.1~~ | Paper Cuts | ✅ **Shipped 2026-07-02** — grew into the catalog redesign (absorbed half of The Library) | S→M |
+| v1.1.2 | The Library | Slots-only monetization everywhere (catalog half already shipped) | S–M |
 | v1.1.3 | Time Controls | Day-range windows replace vague feed toggles | M |
 | v1.1.4 | Kalshi Grows Up | Predictions widget behaves like a widget | M |
 | v1.2.0 | Double-Decker 2.0 | Multi-row ticker rebuilt around widgets | L |
@@ -29,51 +29,48 @@ merges, promote it then.*
 
 Not a release — the v1.1.0 loose ends:
 
-- [ ] **macOS 1.1.0 build** — accept the Apple Developer agreement, re-run the failed
-  job, `.dmg` appends to the published release. *(Blocks Mac users from updating.)*
-- [ ] **Sequin sink for `markets`** — the table isn't in the sink's delivery list yet;
-  sports/finance CDC verified flowing, predictions is polling-only until this is fixed.
+- [x] **macOS build** — Apple Developer agreement accepted 2026-07-02; v1.1.1 built,
+  notarized, and DMG-stapled clean. The v1.1.0 job rerun is moot — Macs update
+  straight to 1.1.1 (darwin is back in `latest.json`).
+- [x] **Sequin sink for `markets`** — verified delivering end-to-end 2026-07-02
+  (forced-row-touch test observed on `cdc:predictions:all`). The earlier silence was
+  write *sparsity*, not a broken sink: the service no longer creates untracked
+  markets, so off-peak updates arrive minutes apart.
 - [ ] Archive the old $399 Stripe price; delete the downloaded Kalshi key file.
 
 ---
 
-## v1.1.1 — Paper Cuts
+## ✅ v1.1.1 — Paper Cuts (shipped 2026-07-02, `desktop-v1.1.1`)
 
-**Goal:** every small thing that makes v1.1.0 feel unfinished, gone within days.
-No design decisions required; pure execution.
+**What was planned** shipped in full: the optimistic-add data fix, the card-height
+reflow, the tab-pill z-fix, the RSS per-source-cap retirement (with a one-shot 4→0
+prefs migration), and the entrance-animation pass — which turned up the real bug:
+`AnimatePresence initial={false}` in PageLayout was silently suppressing *every*
+mount animation in the app.
 
-**Fixes**
-- **Data appears only after visiting Configure.** Adding a news widget shows an empty
-  feed until you open Configure and come back. Likely the optimistic-add cache row
-  (empty config) not being reconciled until a refetch that Configure happens to
-  trigger. Fix the add flow so data lands on the feed page directly.
-- **"Widget limit reached" badge stretches catalog cards.** Reserve the badge's height
-  so at-capacity states don't reflow the grid.
-- **Catalog filter pill overlaps its label when moving right.** The sliding-pill
-  animation renders over the text in one direction — z-order/layering fix.
+**What it absorbed** (four rounds of live feel-testing pulled The Library's catalog
+half forward): browse-only catalog cards, full per-widget product/info pages (hero,
+ticker preview, quick facts, usage steps, More-like-this), the "Your widgets" /
+"Discover new widgets" split, Featured/A–Z sorting + the slot meter in a catalog
+header, and remove/swap from the widget page (which supersedes the planned
+"remove from the catalog card" — cards are deliberately button-free now).
 
-**Fossil removals**
-- **RSS "2 items per source" feed default.** Made sense when one News channel mixed ten
-  sources; now the source *is* the widget. Show the feed properly.
-
-**Polish**
-- **Entrance animations for Workspace and Account pages** to match the widget pages'
-  tab-switch quality.
+Also along for the ride: DOMPurify on both What's New pages, predictions in the
+production smoke script, the website release-fetch token, and — because the Apple
+agreement got accepted mid-release — the return of macOS builds.
 
 ---
 
 ## v1.1.2 — The Library
 
-**Goal:** the catalog stops being a store you visited once, and the whole product
-tells one monetization story: *your plan = how many widgets you run.*
+**Goal:** the whole product tells one monetization story: *your plan = how many
+widgets you run.* (The original catalog half — sections, sorting, remove — shipped
+early in v1.1.1; what remains is the monetization half plus one interaction item.)
 
-**Catalog**
-- **Two sections: "Your widgets" on top, the shop below.** Installed items clearly
-  yours (Configure / Open / Remove), everything else clearly addable.
-- **Remove directly from the catalog card** — no more hunting through Options.
+**Catalog (remaining)**
 - **Sidebar right-click menu per widget**: Configure, Remove, show/hide on ticker.
-- **Sorting: A–Z default in the shop**, with a "Popular" option if we wire install
-  counts out of PostHog (stretch — ship A–Z first, don't block on analytics).
+- **"Popular" sort option** if we wire install counts out of PostHog (stretch —
+  A–Z already shipped; don't block on analytics).
 
 **Monetization coherence**
 - **Retire the Fantasy tier gate.** Yahoo Fantasy becomes a normal widget on every
