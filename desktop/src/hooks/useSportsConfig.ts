@@ -8,6 +8,8 @@ import { useCallback, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { channelsApi } from "../api/client";
+import type { ChannelType } from "../api/client";
+import type { DashboardResponse } from "../types";
 import { queryKeys } from "../api/queries";
 import { useShellData } from "../shell-context";
 import { normalizeSportsDisplayConfig } from "../channels/sports/view";
@@ -38,12 +40,14 @@ const DEFAULT_DISPLAY: SportsDisplayPrefs = {
   showTimer: "both",
 };
 
-export function useSportsConfig() {
+export function useSportsConfig(channelType: string = "sports") {
   const { channels } = useShellData();
   const queryClient = useQueryClient();
 
-  // Read current config from the channels data (comes via dashboard response)
-  const sportsChannel = channels.find((c) => c.channel_type === "sports");
+  // Read current config from the channels data (comes via dashboard response).
+  // channelType is the specific widget row (e.g. "sports_nfl") post widget-split;
+  // defaults to the legacy coarse "sports" channel for back-compat.
+  const sportsChannel = channels.find((c) => c.channel_type === channelType);
   const raw = (sportsChannel?.config ?? {}) as Record<string, unknown>;
 
   const config: SportsConfig = useMemo(() => {
@@ -69,14 +73,37 @@ export function useSportsConfig() {
 
   const mutation = useMutation({
     mutationFn: (next: SportsConfig) =>
-      channelsApi.update("sports", {
+      channelsApi.update(channelType as ChannelType, {
         config: next as unknown as Record<string, unknown>,
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+    // Optimistic write: patch this channel's config in the dashboard cache
+    // immediately so toggles/team/league changes flip on the next paint
+    // instead of waiting on the POST + dashboard refetch (the old behavior
+    // felt like the control "took forever" to respond). Roll back on error;
+    // reconcile with the server on settle.
+    onMutate: async (next: SportsConfig) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.dashboard });
+      const previous = queryClient.getQueryData<DashboardResponse>(
+        queryKeys.dashboard,
+      );
+      queryClient.setQueryData<DashboardResponse>(queryKeys.dashboard, (old) => {
+        if (!old) return old;
+        const channels = (old.channels ?? []).map((c) =>
+          c.channel_type === channelType
+            ? { ...c, config: next as unknown as Record<string, unknown> }
+            : c,
+        );
+        return { ...old, channels };
+      });
+      return { previous };
     },
-    onError: () => {
+    onError: (_err, _next, ctx) => {
+      const prev = (ctx as { previous?: DashboardResponse } | undefined)?.previous;
+      if (prev) queryClient.setQueryData(queryKeys.dashboard, prev);
       toast.error("Failed to save \u2014 try again");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
     },
   });
 

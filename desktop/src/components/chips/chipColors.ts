@@ -122,6 +122,9 @@ const CHANNEL_MAP: Record<string, ChipColors> = {
   sports: SECONDARY,
   rss: INFO,
   fantasy: PURPLE,
+  // Predictions brand is indigo (#6366f1); accent-purple is the closest
+  // in-theme token and is unique on the ticker (fantasy is dashboard-only).
+  predictions: PURPLE,
   clock: WIDGET_CLOCK,
   timer: WIDGET_TIMER,
   weather: WIDGET_WEATHER,

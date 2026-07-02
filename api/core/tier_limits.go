@@ -11,6 +11,12 @@ import (
 // round-trip cleanly through JSON (where Go's Infinity has no analogue)
 // and lets clients treat null as "no cap."
 type ChannelLimits struct {
+	// MaxWidgets caps how many widgets a user may run at once — the slot
+	// model from the 2026-06-30 widget/slot redesign. A nil pointer means
+	// "unlimited". During the transition this lever lives alongside the
+	// per-feature caps below; those are retired as their UI consumers
+	// migrate to the widget catalog.
+	MaxWidgets             *int `json:"max_widgets"`
 	Symbols                *int `json:"symbols"`
 	Feeds                  *int `json:"feeds"`
 	CustomFeeds            *int `json:"custom_feeds"`
@@ -41,12 +47,16 @@ type TierLimitsResponse struct {
 // Once Sprint 3 wires backend enforcement on POST/PUT /users/me/channels,
 // these values directly gate what the DB will accept, so drift is
 // unforgiving.
+// Per-feature depth caps (Symbols/Feeds/CustomFeeds/Leagues/Fantasy) were
+// RETIRED 2026-07-02 — a nil pointer means unlimited, and every tier now has
+// unlimited depth inside a widget. MaxWidgets (the slot lever) is the only
+// per-tier gate; the ticker-row fields are kept for compatibility.
 var DefaultTierLimits = map[string]ChannelLimits{
-	"free":            {Symbols: intPtr(5), Feeds: intPtr(1), CustomFeeds: intPtr(0), Leagues: intPtr(1), Fantasy: intPtr(0), MaxTickerRows: 1, MaxTickerCustomization: false},
-	"uplink":          {Symbols: intPtr(25), Feeds: intPtr(25), CustomFeeds: intPtr(1), Leagues: intPtr(8), Fantasy: intPtr(1), MaxTickerRows: 2, MaxTickerCustomization: false},
-	"uplink_pro":      {Symbols: intPtr(75), Feeds: intPtr(100), CustomFeeds: intPtr(3), Leagues: intPtr(20), Fantasy: intPtr(3), MaxTickerRows: 3, MaxTickerCustomization: false},
-	"uplink_ultimate": {Symbols: nil, Feeds: nil, CustomFeeds: intPtr(10), Leagues: nil, Fantasy: intPtr(10), MaxTickerRows: 3, MaxTickerCustomization: true},
-	"super_user":      {Symbols: nil, Feeds: nil, CustomFeeds: nil, Leagues: nil, Fantasy: nil, MaxTickerRows: 3, MaxTickerCustomization: true},
+	"free":            {MaxWidgets: intPtr(3), MaxTickerRows: 1},
+	"uplink":          {MaxWidgets: intPtr(6), MaxTickerRows: 2},
+	"uplink_pro":      {MaxWidgets: intPtr(12), MaxTickerRows: 3},
+	"uplink_ultimate": {MaxTickerRows: 3, MaxTickerCustomization: true},
+	"super_user":      {MaxTickerRows: 3, MaxTickerCustomization: true},
 }
 
 // HandleGetTierLimits serves the tier limits map to any caller — clients
@@ -67,6 +77,18 @@ func HandleGetTierLimits(c *fiber.Ctx) error {
 // above so each row stays readable.
 func intPtr(n int) *int {
 	return &n
+}
+
+// MaxWidgetsForTier returns the widget-slot cap for a tier (nil =
+// unlimited). Unknown tiers fall back to "free", matching the defensive
+// default ValidateChannelConfig uses, so an unrecognized JWT role can
+// never grant more slots than the free plan.
+func MaxWidgetsForTier(tier string) *int {
+	limits, ok := DefaultTierLimits[tier]
+	if !ok {
+		limits = DefaultTierLimits["free"]
+	}
+	return limits.MaxWidgets
 }
 
 // ─── Server-side enforcement ─────────────────────────────────────────
@@ -93,6 +115,14 @@ func (e *TierLimitError) Error() string {
 // UserFacingMessage returns copy suitable for the `error` field of a 403
 // response body. Kept short and specific so the UI can show it verbatim.
 func (e *TierLimitError) UserFacingMessage() string {
+	// The widget-slot cap reads more naturally as a "running at once"
+	// message than the per-feature "you tried to save N" phrasing.
+	if e.Field == "widgets" {
+		return fmt.Sprintf(
+			"Your %s plan runs %d widgets at once. Disable one to add another, or upgrade for more.",
+			TierDisplayName(e.Tier), e.Limit,
+		)
+	}
 	return fmt.Sprintf(
 		"Your %s plan allows %d %s; you tried to save %d.",
 		TierDisplayName(e.Tier), e.Limit, e.Field, e.Got,
@@ -247,130 +277,3 @@ func tierLimitErrorResponse(e *TierLimitError) fiber.Map {
 	}
 }
 
-// PruneReport describes what PruneChannelConfig trimmed. Fields are
-// zero when nothing of that kind was over-cap. Used for logging +
-// potential future "we removed these" notifications.
-type PruneReport struct {
-	SymbolsBefore, SymbolsAfter         int
-	FeedsBefore, FeedsAfter             int
-	CustomFeedsBefore, CustomFeedsAfter int
-	LeaguesBefore, LeaguesAfter         int
-}
-
-// Changed returns true if the prune report describes any actual trim.
-// Callers skip the UPDATE when false.
-func (r PruneReport) Changed() bool {
-	return r.SymbolsBefore != r.SymbolsAfter ||
-		r.FeedsBefore != r.FeedsAfter ||
-		r.CustomFeedsBefore != r.CustomFeedsAfter ||
-		r.LeaguesBefore != r.LeaguesAfter
-}
-
-// PruneChannelConfig returns a new config map trimmed to fit the given
-// tier's caps. Non-array fields pass through untouched. Reports what
-// was trimmed so callers can log the diff.
-//
-// RSS trims custom feeds first (the scarce resource) and then drops
-// non-custom feeds from the tail until the total fits too.
-func PruneChannelConfig(tier, channelType string, config map[string]any) (map[string]any, PruneReport) {
-	limits, ok := DefaultTierLimits[tier]
-	if !ok {
-		limits = DefaultTierLimits["free"]
-	}
-	report := PruneReport{}
-	out := cloneMap(config)
-
-	switch channelType {
-	case "finance":
-		if arr, capv := asArray(out["symbols"]), limits.Symbols; capv != nil {
-			report.SymbolsBefore = len(arr)
-			if len(arr) > *capv {
-				arr = arr[:*capv]
-			}
-			report.SymbolsAfter = len(arr)
-			out["symbols"] = arr
-		}
-	case "sports":
-		if arr, capv := asArray(out["leagues"]), limits.Leagues; capv != nil {
-			report.LeaguesBefore = len(arr)
-			if len(arr) > *capv {
-				arr = arr[:*capv]
-			}
-			report.LeaguesAfter = len(arr)
-			out["leagues"] = arr
-		}
-	case "rss":
-		feeds := asArray(out["feeds"])
-		report.FeedsBefore = len(feeds)
-		customCount := 0
-		for _, f := range feeds {
-			if m, ok := f.(map[string]any); ok {
-				if isCustom, _ := m["is_custom"].(bool); isCustom {
-					customCount++
-				}
-			}
-		}
-		report.CustomFeedsBefore = customCount
-
-		// Pass 1: enforce custom feed cap. Walk front-to-back, keeping
-		// non-custom feeds unconditionally and custom feeds only while
-		// the running custom count is under cap.
-		if limits.CustomFeeds != nil && customCount > *limits.CustomFeeds {
-			kept := make([]any, 0, len(feeds))
-			customKept := 0
-			for _, f := range feeds {
-				m, ok := f.(map[string]any)
-				isCustom := false
-				if ok {
-					isCustom, _ = m["is_custom"].(bool)
-				}
-				if isCustom {
-					if customKept >= *limits.CustomFeeds {
-						continue
-					}
-					customKept++
-				}
-				kept = append(kept, f)
-			}
-			feeds = kept
-		}
-
-		// Pass 2: enforce total feed cap by dropping from the tail.
-		if limits.Feeds != nil && len(feeds) > *limits.Feeds {
-			feeds = feeds[:*limits.Feeds]
-		}
-
-		report.FeedsAfter = len(feeds)
-		newCustom := 0
-		for _, f := range feeds {
-			if m, ok := f.(map[string]any); ok {
-				if isCustom, _ := m["is_custom"].(bool); isCustom {
-					newCustom++
-				}
-			}
-		}
-		report.CustomFeedsAfter = newCustom
-		out["feeds"] = feeds
-	}
-
-	return out, report
-}
-
-func asArray(v any) []any {
-	arr, _ := v.([]any)
-	return arr
-}
-
-// cloneMap returns a shallow copy. The channel configs we prune always
-// have array values (which we never mutate in place — we reslice), so
-// a shallow copy is sufficient.
-func cloneMap(m map[string]any) map[string]any {
-	if m == nil {
-		return map[string]any{}
-	}
-	out := make(map[string]any, len(m))
-	for k, v := range m {
-		out[k] = v
-	}
-	return out
-}

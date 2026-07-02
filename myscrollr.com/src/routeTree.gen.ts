@@ -13,6 +13,7 @@ import { Route as UplinkRouteImport } from './routes/uplink'
 import { Route as TssSpaShellRouteImport } from './routes/tss-spa-shell'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as StatusRouteImport } from './routes/status'
+import { Route as ReleasesRouteImport } from './routes/releases'
 import { Route as LegalRouteImport } from './routes/legal'
 import { Route as InviteRouteImport } from './routes/invite'
 import { Route as DownloadRouteImport } from './routes/download'
@@ -44,6 +45,11 @@ const SupportRoute = SupportRouteImport.update({
 const StatusRoute = StatusRouteImport.update({
   id: '/status',
   path: '/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReleasesRoute = ReleasesRouteImport.update({
+  id: '/releases',
+  path: '/releases',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LegalRoute = LegalRouteImport.update({
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/download': typeof DownloadRoute
   '/invite': typeof InviteRoute
   '/legal': typeof LegalRoute
+  '/releases': typeof ReleasesRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
   '/tss-spa-shell': typeof TssSpaShellRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByTo {
   '/download': typeof DownloadRoute
   '/invite': typeof InviteRoute
   '/legal': typeof LegalRoute
+  '/releases': typeof ReleasesRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
   '/tss-spa-shell': typeof TssSpaShellRoute
@@ -154,6 +162,7 @@ export interface FileRoutesById {
   '/download': typeof DownloadRoute
   '/invite': typeof InviteRoute
   '/legal': typeof LegalRoute
+  '/releases': typeof ReleasesRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
   '/tss-spa-shell': typeof TssSpaShellRoute
@@ -174,6 +183,7 @@ export interface FileRouteTypes {
     | '/download'
     | '/invite'
     | '/legal'
+    | '/releases'
     | '/status'
     | '/support'
     | '/tss-spa-shell'
@@ -192,6 +202,7 @@ export interface FileRouteTypes {
     | '/download'
     | '/invite'
     | '/legal'
+    | '/releases'
     | '/status'
     | '/support'
     | '/tss-spa-shell'
@@ -210,6 +221,7 @@ export interface FileRouteTypes {
     | '/download'
     | '/invite'
     | '/legal'
+    | '/releases'
     | '/status'
     | '/support'
     | '/tss-spa-shell'
@@ -229,6 +241,7 @@ export interface RootRouteChildren {
   DownloadRoute: typeof DownloadRoute
   InviteRoute: typeof InviteRoute
   LegalRoute: typeof LegalRoute
+  ReleasesRoute: typeof ReleasesRoute
   StatusRoute: typeof StatusRoute
   SupportRoute: typeof SupportRoute
   TssSpaShellRoute: typeof TssSpaShellRoute
@@ -266,6 +279,13 @@ declare module '@tanstack/react-router' {
       path: '/status'
       fullPath: '/status'
       preLoaderRoute: typeof StatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/releases': {
+      id: '/releases'
+      path: '/releases'
+      fullPath: '/releases'
+      preLoaderRoute: typeof ReleasesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/legal': {
@@ -365,6 +385,7 @@ const rootRouteChildren: RootRouteChildren = {
   DownloadRoute: DownloadRoute,
   InviteRoute: InviteRoute,
   LegalRoute: LegalRoute,
+  ReleasesRoute: ReleasesRoute,
   StatusRoute: StatusRoute,
   SupportRoute: SupportRoute,
   TssSpaShellRoute: TssSpaShellRoute,

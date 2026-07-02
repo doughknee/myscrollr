@@ -149,9 +149,8 @@ function SourceFilter({ sources, selected, onToggle, onClearAll }: SourceFilterP
 
 // ── FeedTab ──────────────────────────────────────────────────────
 
-function RssFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
+function RssFeedTab({ mode, feedContext, onConfigure, widgetId }: FeedTabProps) {
   const { prefs } = useShell();
-  const dp = prefs.channelDisplay.rss;
 
   const dashboardLoaded = feedContext.__dashboardLoaded as boolean | undefined;
 
@@ -162,10 +161,41 @@ function RssFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
   // sync without each row spawning its own timer.
   const now = useNow();
 
-  const rssItems = useMemo(
-    () => (dashboard?.data?.rss as RssItemType[] | undefined) ?? [],
-    [dashboard?.data?.rss],
+  // This widget's channel row — source of its feed scope + display overrides.
+  const channel = useMemo(
+    () => dashboard?.channels?.find((c) => c.channel_type === widgetId),
+    [dashboard?.channels, widgetId],
   );
+
+  // Per-widget display overrides the global rss display where set.
+  const dp = useMemo(() => {
+    const override = (
+      channel?.config as { display?: Partial<RssDisplayPrefs> } | undefined
+    )?.display;
+    return override
+      ? { ...prefs.channelDisplay.rss, ...override }
+      : prefs.channelDisplay.rss;
+  }, [prefs.channelDisplay.rss, channel?.config]);
+
+  // Scope to this widget's own feeds (news_bbc → only the BBC feed;
+  // rss_custom → only the user's added feeds). undefined = a legacy coarse
+  // channel, which shows everything.
+  const widgetFeedUrls = useMemo(() => {
+    if (!widgetId || widgetId === "rss" || widgetId === "news") return undefined;
+    const feeds = (
+      channel?.config as { feeds?: Array<{ url?: string }> } | undefined
+    )?.feeds;
+    const urls = (Array.isArray(feeds) ? feeds : [])
+      .map((f) => f.url)
+      .filter((u): u is string => !!u);
+    return new Set(urls);
+  }, [channel?.config, widgetId]);
+
+  const rssItems = useMemo(() => {
+    const all = (dashboard?.data?.rss as RssItemType[] | undefined) ?? [];
+    if (!widgetFeedUrls) return all;
+    return all.filter((i) => widgetFeedUrls.has(i.feed_url));
+  }, [dashboard?.data?.rss, widgetFeedUrls]);
 
   // Build category map: feed_url → category
   //
@@ -354,12 +384,14 @@ function RssFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
     <div className="flex flex-col h-full">
       {/* Controls bar */}
       <div className="sticky top-0 z-20 bg-surface border-b border-edge/40 px-3 py-2 flex items-center gap-2 flex-wrap">
-        <SourceFilter
-          sources={allSources}
-          selected={selectedSources}
-          onToggle={toggleSource}
-          onClearAll={clearSources}
-        />
+        {allSources.length > 1 && (
+          <SourceFilter
+            sources={allSources}
+            selected={selectedSources}
+            onToggle={toggleSource}
+            onClearAll={clearSources}
+          />
+        )}
         <CategoryFilter
           categories={categoryList}
           selected={selectedCategories}

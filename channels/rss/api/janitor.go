@@ -228,7 +228,9 @@ func (a *App) removeBrokenCustomFeeds(ctx context.Context) (int, error) {
 				       '[]'::jsonb
 				   )
 			   )
-			 WHERE channel_type = 'rss'
+			 WHERE (channel_type IN ('rss', 'news')
+			        OR channel_type LIKE 'news\_%'
+			        OR channel_type LIKE 'rss\_%')
 			   AND config ? 'feeds'
 			   AND config->'feeds' @> jsonb_build_array(jsonb_build_object('url', $2::text))
 		`, MaxConsecutiveFailuresJanitor, url); pruneErr != nil {

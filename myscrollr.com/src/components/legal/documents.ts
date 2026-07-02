@@ -59,8 +59,8 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
     shortTitle: 'Terms',
     icon: FileText,
     category: 'core',
-    lastUpdated: 'February 2026',
-    effectiveDate: 'February 11, 2026',
+    lastUpdated: 'July 2026',
+    effectiveDate: 'July 2, 2026',
     sections: [
       {
         heading: 'Acceptance of Terms',
@@ -85,7 +85,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
       {
         heading: 'Use of the Platform',
         content: [
-          'The Platform aggregates publicly available and third-party data including financial market data, sports scores, RSS news feeds, and fantasy sports information. This data is provided for informational and entertainment purposes only.',
+          'The Platform aggregates publicly available and third-party data including financial market data, sports scores, RSS news feeds, fantasy sports information, and prediction-market data. This data is provided for informational and entertainment purposes only.',
           'You may use the Platform for personal, non-commercial purposes in accordance with these Terms and our Acceptable Use Policy. You may not use the Platform in any way that violates applicable laws or regulations.',
         ],
       },
@@ -100,7 +100,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Intellectual Property',
         content: [
           'The Scrollr platform source code is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). This means the source code is freely available, and you may use, modify, and distribute it in accordance with the terms of that license.',
-          'The Scrollr name, logo, and branding are trademarks of the project maintainers and may not be used without permission. Third-party data displayed through the Platform (market data, sports scores, news feeds, fantasy sports data) remains the property of its respective owners.',
+          'The Scrollr name, logo, and branding are trademarks of the project maintainers and may not be used without permission. Third-party data displayed through the Platform (market data, sports scores, news feeds, fantasy sports data, prediction-market data) remains the property of its respective owners.',
         ],
       },
       {
@@ -142,8 +142,8 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
     shortTitle: 'Privacy',
     icon: Shield,
     category: 'data',
-    lastUpdated: 'February 2026',
-    effectiveDate: 'February 11, 2026',
+    lastUpdated: 'July 2026',
+    effectiveDate: 'July 2, 2026',
     sections: [
       {
         heading: 'Overview',
@@ -159,6 +159,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
           'User Preferences: We store your feed display preferences (position, mode, behavior, enabled/disabled sites) in our PostgreSQL database, associated with your account identifier.',
           'Channel Configuration: We store which data channels you have enabled (finance, sports, RSS, fantasy) and their configuration settings.',
           'Yahoo Fantasy Data: If you connect your Yahoo Fantasy account, we store an encrypted refresh token (AES-256-GCM encryption) to maintain your connection. We also store your Yahoo user identifier, league data, standings, rosters, and matchup information that Yahoo provides through their API.',
+          'Kalshi Account Connection: If you connect your own Kalshi account in the desktop application (an optional feature for viewing your positions), your Kalshi API key ID and private key are stored ONLY in your device\'s operating-system keychain or credential store. They are never transmitted to our servers, never included in our database, and are used solely for read-only portfolio requests made directly from your device to Kalshi.',
           'Usage Data: We collect basic usage metrics including active SSE connection counts. We do not track individual page visits, browsing history, or behavioral analytics.',
         ],
       },
@@ -181,7 +182,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Third-Party Services',
         content: [
           'The Platform integrates with several third-party services. Each has its own privacy policy that we encourage you to review:',
-          'Logto (authentication) handles your login credentials and identity verification. TwelveData provides financial market data. ESPN provides sports scores and game data. Yahoo provides fantasy sports data when you authorize your account. RSS feed publishers provide news content through their public feeds.',
+          'Logto (authentication) handles your login credentials and identity verification. TwelveData provides financial market data. ESPN provides sports scores and game data. Yahoo provides fantasy sports data when you authorize your account. Kalshi provides prediction-market data. RSS feed publishers provide news content through their public feeds.',
           'We send your user identifier to our channel APIs via internal HTTP headers (X-User-Sub) to route data to your account. Third-party data providers do not receive your personal information directly from us.',
         ],
       },
@@ -229,8 +230,8 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
     shortTitle: 'Desktop Privacy',
     icon: Monitor,
     category: 'data',
-    lastUpdated: 'March 2026',
-    effectiveDate: 'March 30, 2026',
+    lastUpdated: 'July 2026',
+    effectiveDate: 'July 2, 2026',
     badge: 'New',
     sections: [
       {
@@ -249,12 +250,13 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
           'Dashboard state: Cached dashboard data for faster loading between sessions.',
           'Application logs: Diagnostic log files are written to a local logs directory within the application data folder. These logs contain operational information (connection status, errors, data sync events) and do not contain personal data, browsing activity, or content from other applications.',
           'Window state: Window position, size, and display information used to restore your ticker and main window layout between sessions.',
+          'Kalshi credentials (optional): If you connect your own Kalshi account, your Kalshi API key ID and RSA private key are stored in your operating system\'s secure keychain or credential store — not in the application data directory. The private key is read and used exclusively by the application\'s native layer; it is never exposed to the interface layer, never written to logs, and never transmitted to Scrollr servers. Disconnecting removes the stored credentials.',
         ],
       },
       {
         heading: 'Network Communication',
         content: [
-          'The desktop application communicates exclusively with Scrollr API servers (api.myscrollr.com) to retrieve real-time data via Server-Sent Events (SSE) and to synchronize your configuration.',
+          'The desktop application communicates with Scrollr API servers (api.myscrollr.com) to retrieve real-time data via Server-Sent Events (SSE) and to synchronize your configuration. If you optionally connect your own Kalshi account, the application additionally communicates directly with Kalshi\'s API from your device (see Third-Party Services below).',
           'All network communication uses HTTPS encryption. The application sends your authentication token and subscription tier with each request. It does not transmit any data about other applications, files, or activity on your device.',
         ],
       },
@@ -275,6 +277,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Third-Party Services',
         content: [
           'Yahoo Fantasy Sports: If you connect your Yahoo account, the desktop application opens your default browser for the OAuth authorization flow. The application stores an encrypted refresh token locally and on our servers to maintain the connection. See our Privacy Policy for details on Yahoo data handling.',
+          'Kalshi (optional): If you connect your own Kalshi account, the application communicates directly from your device to Kalshi\'s API using your credentials for READ-ONLY portfolio and position data. These requests do not pass through Scrollr servers. The application cannot place, modify, or cancel orders on your Kalshi account.',
           'The application does not include any analytics SDKs, telemetry services, crash reporters, or advertising frameworks.',
         ],
       },
@@ -347,8 +350,8 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
     shortTitle: 'Financial',
     icon: TrendingUp,
     category: 'data',
-    lastUpdated: 'February 2026',
-    effectiveDate: 'February 11, 2026',
+    lastUpdated: 'July 2026',
+    effectiveDate: 'July 2, 2026',
     sections: [
       {
         heading: 'Not Investment Advice',
@@ -390,9 +393,17 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         ],
       },
       {
+        heading: 'Prediction Markets Disclaimer',
+        content: [
+          'Prediction-market data displayed through the Platform is sourced from Kalshi, a CFTC-regulated exchange for event contracts. Scrollr displays market prices, volumes, and outcomes for informational and entertainment purposes only. Scrollr is not affiliated with, endorsed by, or sponsored by Kalshi.',
+          'Scrollr CANNOT and DOES NOT place, modify, or cancel orders on any prediction market. The optional "My Positions" feature reads your own Kalshi account data directly from your device using your own credentials and is strictly read-only.',
+          'Event contracts involve risk, including the possible loss of your entire position. Displayed prices may be delayed or incomplete and should not be relied upon as the sole basis for any trading decision. Nothing displayed constitutes a recommendation to buy or sell any event contract.',
+        ],
+      },
+      {
         heading: 'Third-Party Data Provider',
         content: [
-          "Financial data is provided by TwelveData (twelvedata.com). TwelveData's terms of service and data usage policies apply to the data we display. We are not responsible for the accuracy, availability, or completeness of data provided by TwelveData or any other third-party data source.",
+          "Financial data is provided by TwelveData (twelvedata.com). Prediction-market data is provided by Kalshi (kalshi.com). Each provider's terms of service and data usage policies apply to the data we display. We are not responsible for the accuracy, availability, or completeness of data provided by TwelveData, Kalshi, or any other third-party data source.",
         ],
       },
     ],
@@ -407,8 +418,8 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
     shortTitle: 'Third-Party',
     icon: Link2,
     category: 'data',
-    lastUpdated: 'February 2026',
-    effectiveDate: 'February 11, 2026',
+    lastUpdated: 'July 2026',
+    effectiveDate: 'July 2, 2026',
     sections: [
       {
         heading: 'Overview',
@@ -435,6 +446,13 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         content: [
           "Yahoo Fantasy Sports data is accessed through Yahoo's official API with explicit user authorization via OAuth 2.0. We only access fantasy sports data for users who have actively connected their Yahoo account. Yahoo and Yahoo Fantasy are trademarks of Yahoo Inc. We are not affiliated with or endorsed by Yahoo.",
           'Fantasy data includes league information, standings, matchups, and roster details. This data is synced periodically for active users.',
+        ],
+      },
+      {
+        heading: 'Prediction Market Data — Kalshi',
+        content: [
+          "Prediction-market data (event-contract prices, volumes, and outcomes) is sourced from Kalshi's public API under our own API credentials. Kalshi is a trademark of Kalshi Inc. We are not affiliated with, endorsed by, or sponsored by Kalshi.",
+          'Scrollr displays this data read-only and does not route, place, or execute orders. Users who optionally connect their own Kalshi account do so directly from their device with their own credentials; those requests do not pass through Scrollr servers. See our Financial Data Disclaimer for the prediction-markets risk disclosure.',
         ],
       },
       {
@@ -482,7 +500,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
       {
         heading: 'Pricing and Plans',
         content: [
-          'Uplink is available in three billing options: Monthly at $9.99 per month (Uplink), $24.99 per month (Uplink Pro), or $49.99 per month (Uplink Ultimate). Annual billing is available at $79.99/year (Uplink), $199.99/year (Uplink Pro), or $399.99/year (Uplink Ultimate). A Lifetime option is available at $399.00 (one-time payment, permanent Uplink-tier access with 50% off Ultimate upgrade).',
+          'Uplink is available in three billing options: Monthly at $9.99 per month (Uplink), $24.99 per month (Uplink Pro), or $49.99 per month (Uplink Ultimate). Annual billing is available at $79.99/year (Uplink), $199.99/year (Uplink Pro), or $399.99/year (Uplink Ultimate). A Lifetime option is available at $999.00 (one-time payment, permanent Uplink Ultimate access).',
           'All prices are in US Dollars (USD). Prices may be adjusted with notice to existing subscribers. Existing subscribers will be honored at their original rate for the remainder of their current billing period.',
         ],
       },

@@ -65,14 +65,14 @@ const ROWS: ReadonlyArray<TickerRow> = [
   },
   {
     basename: 'ticker/all-purpose-detailed',
-    channelLabel: 'All channels',
+    channelLabel: 'All widgets',
     densityLabel: 'Detailed',
     aspect: ASPECT_DETAILED,
     alt: 'Scrollr ticker showing sports, finance, news, and fantasy together in the detailed density.',
   },
   {
     basename: 'ticker/all-purpose-compact',
-    channelLabel: 'All channels',
+    channelLabel: 'All widgets',
     densityLabel: 'Compact',
     aspect: ASPECT_COMPACT,
     alt: 'Scrollr ticker showing sports, finance, news, and fantasy together in the compact density.',

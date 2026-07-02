@@ -6,6 +6,10 @@ metadata:
 data:
   # Derived URLs (replaces COOLIFY_FQDN build arg)
   API_URL: "https://api.myscrollr.com"
+  # Oldest desktop version the API supports; served at /app/min-version.
+  # 1.1.0 = the widget/slot release (migration 000014 reshapes user data
+  # in ways older clients can't render). Bump on future breaking deploys.
+  MIN_DESKTOP_VERSION: "1.1.0"
   LOGTO_URL: "https://auth.myscrollr.com/oidc"
   LOGTO_JWKS_URL: "https://auth.myscrollr.com/oidc/jwks"
   LOGTO_ENDPOINT: "https://auth.myscrollr.com"
@@ -25,12 +29,14 @@ data:
   # Stripe price IDs (not secret) — LIVE mode
   STRIPE_PRICE_MONTHLY: "price_1TMyBUFk6czwHVgrocQKaBHD"
   STRIPE_PRICE_ANNUAL: "price_1TMyBUFk6czwHVgr2AysFrfL"
-  STRIPE_PRICE_LIFETIME: "price_1TMyBWFk6czwHVgr5Y2xteB7"
+  # $999 one-time, permanent Ultimate (repriced 2026-07-02). The old $399
+  # price (price_1TMyBWFk6czwHVgr5Y2xteB7) stays purchasable until this
+  # deploys — archive it in the Stripe dashboard afterwards.
+  STRIPE_PRICE_LIFETIME: "price_1TonTQFk6czwHVgr2Jamp0l8"
   STRIPE_PRICE_PRO_MONTHLY: "price_1TMyBUFk6czwHVgrc6YHoQoj"
   STRIPE_PRICE_PRO_ANNUAL: "price_1TMyBVFk6czwHVgrN2oUq6fx"
   STRIPE_PRICE_ULTIMATE_MONTHLY: "price_1TMyBVFk6czwHVgriAztoY86"
   STRIPE_PRICE_ULTIMATE_ANNUAL: "price_1TMyBVFk6czwHVgr9ntOrMXf"
-  STRIPE_LIFETIME_ULTIMATE_COUPON_ID: "BLMMYMix"
 
   # Support / OS Ticket
   #

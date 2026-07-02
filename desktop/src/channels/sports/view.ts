@@ -126,15 +126,25 @@ export function selectSportsForFeed(
 import type { DashboardResponse } from "../../types";
 
 /**
- * Read the sports channel's display config from the dashboard payload
+ * Read a sports widget's display config from the dashboard payload
  * and normalize every field through `migrateVenue` so old boolean-era
  * configs (stored by clients before v1.0.2) still deserialize to valid
  * Venue values.
+ *
+ * Post-split (migration 000014) each sports league is its own row
+ * (sports_nfl, sports_nba, ...) carrying its own display toggles, so the
+ * caller passes the widget id it's rendering. The bare "sports" row only
+ * exists for legacy un-split configs -- it's the fallback, not the target.
  */
 export function getSportsDisplayConfig(
   dashboard: DashboardResponse | null | undefined,
+  widgetType?: string,
 ): SportsDisplayConfig {
-  const channel = dashboard?.channels?.find((c) => c.channel_type === "sports");
+  const channels = dashboard?.channels ?? [];
+  const channel =
+    (widgetType
+      ? channels.find((c) => c.channel_type === widgetType)
+      : undefined) ?? channels.find((c) => c.channel_type === "sports");
   return normalizeSportsDisplayConfig(channel?.config?.display);
 }
 

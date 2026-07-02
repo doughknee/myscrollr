@@ -1,6 +1,6 @@
 [package]
 name = "scrollr-desktop"
-version = "1.0.20"
+version = "1.1.0"
 edition = "2021"
 description = "Scrollr desktop app — pinned live ticker for sports, finance, RSS, and Yahoo Fantasy."
 authors = ["Brandon Ruth <brandon@myscrollr.com>"]
@@ -59,7 +59,39 @@ sentry = { version = "0.42", default-features = false, features = [
 # events are sent. Small, well-maintained dependency.
 dirs = "5"
 
+# ── Client-side Kalshi account link (on-device, read-only) ──────────
+# The user's Kalshi key never leaves the machine: we sign their requests
+# locally and store the key in the OS keychain (see `keyring`, per-target
+# below). The RSA-PSS signer is a cross-crate copy of
+# channels/predictions/service/src/kalshi/sign.rs (duplication is the repo
+# convention); versions are pinned to match the service crate so the two
+# signers stay byte-for-byte compatible. `tokio-tungstenite` powers the
+# authenticated, read-only user-data WS stream (market_positions/fill/
+# user_orders).
+anyhow = "1"
+rsa = { version = "0.9", features = ["pem"] }
+sha2 = "0.10"
+rand = "0.8"
+base64 = "0.22"
+tokio-tungstenite = { version = "0.28", default-features = false, features = [
+    "connect",
+    "rustls-tls-native-roots",
+] }
+
+# ── OS keychain (per-platform backend) ──────────────────────────────
+# `keyring` v3 requires an explicit platform backend feature. We enable
+# exactly one per target so each OS pulls only its native secret store and
+# release builds stay lean: Windows Credential Manager, macOS Keychain,
+# Linux Secret Service. Declared in the per-target sections below.
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["sync-secret-service"] }
+
 [target.'cfg(windows)'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
 windows-sys = { version = "0.59", features = [
     "Win32_System_Com",
     "Win32_Foundation",

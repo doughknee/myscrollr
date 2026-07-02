@@ -25,7 +25,7 @@ func GetUserChannels(logtoSub string) ([]Channel, error) {
 		SELECT id, logto_sub, channel_type, enabled, visible, config, created_at, updated_at
 		FROM user_channels
 		WHERE logto_sub = $1
-		ORDER BY created_at ASC
+		ORDER BY created_at ASC, id ASC
 	`, logtoSub)
 	if err != nil {
 		return nil, err
@@ -49,6 +49,17 @@ func GetUserChannels(logtoSub string) ([]Channel, error) {
 	return channels, nil
 }
 
+// CountEnabledChannels returns how many enabled channels (widgets) a user
+// currently has — the "slots in use" for the widget/slot model. Used by
+// CreateChannel to gate new additions against the tier's MaxWidgets cap.
+func CountEnabledChannels(ctx context.Context, logtoSub string) (int, error) {
+	var n int
+	err := DBPool.QueryRow(ctx,
+		`SELECT count(*) FROM user_channels WHERE logto_sub = $1 AND enabled = true`,
+		logtoSub).Scan(&n)
+	return n, err
+}
+
 // SyncChannelSubscriptions rebuilds Redis subscription sets for a user from their
 // current channels in the database. Called on dashboard load and after channel CRUD.
 func SyncChannelSubscriptions(logtoSub string) {
@@ -59,35 +70,67 @@ func SyncChannelSubscriptions(logtoSub string) {
 	}
 
 	ctx := context.Background()
+
+	// Compute DESIRED membership first, across all widgets, then apply.
+	// Split widgets share source-level subscriber sets (sports_nfl and
+	// sports_nba both live in channel:subscribers:sports), so per-row
+	// add/remove is order-dependent: a disabled sibling iterated after an
+	// enabled one would remove the subscription the enabled widget needs.
+	// The set semantics are "member iff ANY enabled widget uses it".
+	wantSource := map[string]bool{} // source -> any enabled widget?
+	wantLeague := map[string]bool{} // league -> any enabled sports widget?
 	for _, ch := range channels {
-		setKey := RedisChannelSubscribersPrefix + ch.ChannelType
+		source := DataSourceForWidget(ch.ChannelType)
+		if source == "" {
+			continue
+		}
+		if _, seen := wantSource[source]; !seen {
+			wantSource[source] = false
+		}
 		if ch.Enabled {
+			wantSource[source] = true
+		}
+		if source == "sports" {
+			for _, league := range extractSportsLeaguesFromConfig(ch.Config) {
+				if _, seen := wantLeague[league]; !seen {
+					wantLeague[league] = false
+				}
+				if ch.Enabled {
+					wantLeague[league] = true
+				}
+			}
+		}
+	}
+
+	for source, want := range wantSource {
+		setKey := RedisChannelSubscribersPrefix + source
+		if want {
 			AddSubscriber(ctx, setKey, logtoSub)
 		} else {
 			RemoveSubscriber(ctx, setKey, logtoSub)
 		}
-
-		// Sports: sync per-league subscriber sets based on user's configured leagues
-		if ch.ChannelType == "sports" {
-			leagues := extractSportsLeaguesFromConfig(ch.Config)
-			if len(leagues) > 0 {
-				leagueKeys := make([]string, len(leagues))
-				for i, league := range leagues {
-					leagueKeys[i] = SportsLeagueSubscribersPrefix + league
-				}
-				if ch.Enabled {
-					if err := AddSubscriberMulti(ctx, leagueKeys, logtoSub); err != nil {
-						log.Printf("[Channels] Failed to sync sports league subscriptions for %s: %v", logtoSub, err)
-					}
-				} else {
-					if err := RemoveSubscriberMulti(ctx, leagueKeys, logtoSub); err != nil {
-						log.Printf("[Channels] Failed to remove sports league subscriptions for %s: %v", logtoSub, err)
-					}
-				}
-			}
+	}
+	var addLeagues, removeLeagues []string
+	for league, want := range wantLeague {
+		if want {
+			addLeagues = append(addLeagues, SportsLeagueSubscribersPrefix+league)
+		} else {
+			removeLeagues = append(removeLeagues, SportsLeagueSubscribersPrefix+league)
 		}
+	}
+	if len(addLeagues) > 0 {
+		if err := AddSubscriberMulti(ctx, addLeagues, logtoSub); err != nil {
+			log.Printf("[Channels] Failed to sync sports league subscriptions for %s: %v", logtoSub, err)
+		}
+	}
+	if len(removeLeagues) > 0 {
+		if err := RemoveSubscriberMulti(ctx, removeLeagues, logtoSub); err != nil {
+			log.Printf("[Channels] Failed to remove sports league subscriptions for %s: %v", logtoSub, err)
+		}
+	}
 
-		// Call channel lifecycle hook via HTTP
+	// Call channel lifecycle hooks via HTTP (per widget, as before).
+	for _, ch := range channels {
 		callChannelLifecycle(ctx, ch.ChannelType, "sync", logtoSub, ch.Config, nil, &ch.Enabled)
 	}
 }
@@ -96,10 +139,11 @@ func SyncChannelSubscriptions(logtoSub string) {
 // For sports, this also adds the user to all per-league subscriber sets.
 // Also updates the in-memory topic registry for active SSE connections.
 func addChannelSubscriptions(ctx context.Context, logtoSub, channelType string, config map[string]interface{}) {
-	AddSubscriber(ctx, RedisChannelSubscribersPrefix+channelType, logtoSub)
+	source := DataSourceForWidget(channelType)
+	AddSubscriber(ctx, RedisChannelSubscribersPrefix+source, logtoSub)
 
 	// Sports: populate per-league subscriber sets for user's configured leagues.
-	if channelType == "sports" {
+	if source == "sports" {
 		leagues := extractSportsLeaguesFromConfig(config)
 		if len(leagues) > 0 {
 			leagueKeys := make([]string, len(leagues))
@@ -121,21 +165,55 @@ func addChannelSubscriptions(ctx context.Context, logtoSub, channelType string, 
 }
 
 // removeChannelSubscriptions removes Redis subscription entries for a deleted/disabled channel.
-// For sports, this also removes the user from all per-league subscriber sets.
+// For sports, this also removes the user from per-league subscriber sets.
 // Also updates the in-memory topic registry for active SSE connections.
+//
+// Split widgets share source-level (and can share league-level) subscriber
+// sets, so removals are guarded on the user's REMAINING enabled widgets:
+// disabling sports_nba must not yank channel:subscribers:sports while
+// sports_nfl is still enabled. Both callers (UpdateChannel disable,
+// DeleteChannel) update the DB before calling this, so GetUserChannels
+// reflects the post-removal state. On a listing error we skip the removals
+// entirely — a stale subscription self-heals on the next sync; a wrongly
+// dropped one silently kills live data for the surviving widgets.
 func removeChannelSubscriptions(ctx context.Context, logtoSub, channelType string, config map[string]interface{}) {
-	RemoveSubscriber(ctx, RedisChannelSubscribersPrefix+channelType, logtoSub)
+	source := DataSourceForWidget(channelType)
 
-	// Sports: remove from per-league subscriber sets for user's configured leagues.
-	if channelType == "sports" {
-		leagues := extractSportsLeaguesFromConfig(config)
-		if len(leagues) > 0 {
-			leagueKeys := make([]string, len(leagues))
-			for i, league := range leagues {
-				leagueKeys[i] = SportsLeagueSubscribersPrefix + league
+	remaining, err := GetUserChannels(logtoSub)
+	if err != nil {
+		log.Printf("[Channels] Skipping subscription removal for %s/%s (listing failed: %v)", logtoSub, channelType, err)
+	} else {
+		sourceStillNeeded := false
+		keptLeagues := map[string]bool{}
+		for _, ch := range remaining {
+			if !ch.Enabled || ch.ChannelType == channelType {
+				continue
 			}
-			if err := RemoveSubscriberMulti(ctx, leagueKeys, logtoSub); err != nil {
-				log.Printf("[Channels] Failed to remove sports league subscriptions for %s: %v", logtoSub, err)
+			chSource := DataSourceForWidget(ch.ChannelType)
+			if chSource == source {
+				sourceStillNeeded = true
+			}
+			if chSource == "sports" {
+				for _, league := range extractSportsLeaguesFromConfig(ch.Config) {
+					keptLeagues[league] = true
+				}
+			}
+		}
+
+		if !sourceStillNeeded {
+			RemoveSubscriber(ctx, RedisChannelSubscribersPrefix+source, logtoSub)
+		}
+		if source == "sports" {
+			var stale []string
+			for _, league := range extractSportsLeaguesFromConfig(config) {
+				if !keptLeagues[league] {
+					stale = append(stale, SportsLeagueSubscribersPrefix+league)
+				}
+			}
+			if len(stale) > 0 {
+				if err := RemoveSubscriberMulti(ctx, stale, logtoSub); err != nil {
+					log.Printf("[Channels] Failed to remove sports league subscriptions for %s: %v", logtoSub, err)
+				}
 			}
 		}
 	}
@@ -151,7 +229,10 @@ func removeChannelSubscriptions(ctx context.Context, logtoSub, channelType strin
 
 // callChannelLifecycle sends a lifecycle event to a channel if it has the channel_lifecycle capability.
 func callChannelLifecycle(ctx context.Context, channelType, event, userSub string, config, oldConfig map[string]interface{}, enabled *bool) {
-	ch := GetChannel(channelType)
+	// Resolve to the backing data source so widget types (e.g. "news") reach
+	// the right service's lifecycle hook (rss). Legacy coarse types map to
+	// themselves.
+	ch := GetChannel(DataSourceForWidget(channelType))
 	if ch == nil || !ch.HasCapability("channel_lifecycle") {
 		return
 	}
@@ -250,6 +331,12 @@ func CreateChannel(c *fiber.Ctx) error {
 	var req struct {
 		ChannelType string                 `json:"channel_type"`
 		Config      map[string]interface{} `json:"config"`
+		// LocalWidgets is the client's count of enabled utility widgets
+		// (clock/weather/…). They live in preferences, not user_channels, but
+		// every widget counts toward the slot cap — so the client reports them
+		// and the slot gate adds them to the DB channel count. Absent (older
+		// client) = 0, degrading to a data-channel-only gate.
+		LocalWidgets int `json:"local_widgets"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
@@ -258,13 +345,30 @@ func CreateChannel(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validate channel type against discovered channels
-	validTypes := GetValidChannelTypes()
-	if !validTypes[req.ChannelType] {
+	// Validate channel type: accept either a registered backend channel
+	// (Redis service discovery) or a known widget type (the code registry in
+	// widgets.go). Additive during the widget/slot transition so legacy
+	// coarse types ("sports") and new split widgets ("sports_nfl") both pass.
+	if !GetValidChannelTypes()[req.ChannelType] && !IsKnownWidgetType(req.ChannelType) {
 		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
 			Status: "error",
 			Error:  "Invalid channel type",
 		})
+	}
+	// Utility widgets (clock/weather/…) live in desktop preferences, not
+	// user_channels. A row for one would land in a bogus "" subscriber set
+	// and double-count against the slot cap (once here, once via
+	// local_widgets), so reject it outright.
+	if IsUtilityWidgetType(req.ChannelType) {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+			Status: "error",
+			Error:  "Utility widgets are stored locally, not as channels",
+		})
+	}
+	// The client attests its local utility-widget count; never let a
+	// negative value subtract from the server-side slot count.
+	if req.LocalWidgets < 0 {
+		req.LocalWidgets = 0
 	}
 
 	if req.Config == nil {
@@ -275,6 +379,30 @@ func CreateChannel(c *fiber.Ctx) error {
 	// but the API is the only place that actually matters — the Rust
 	// ingestion services trust user_channels.config verbatim.
 	tier := tierFromRoles(GetUserRoles(c))
+
+	// Slot gate (widget/slot model, 2026-06-30): block adding a *new*
+	// widget once the user is at their tier's MaxWidgets cap. Existing
+	// over-cap users are grandfathered — we never disable what they
+	// already have, we only block new adds. nil cap = unlimited. A count
+	// error is logged but not fatal: failing open here is safer than
+	// blocking a legitimate add on a transient DB blip (the per-feature
+	// validation below still runs).
+	if max := MaxWidgetsForTier(tier); max != nil {
+		if count, err := CountEnabledChannels(context.Background(), userID); err != nil {
+			log.Printf("[Channels] slot count failed for %s: %v", userID, err)
+		} else {
+			// Every widget counts toward the slot cap. Utility widgets live
+			// client-side (preferences), so add the client-reported count to
+			// the DB channel count.
+			used := count + req.LocalWidgets
+			if used >= *max {
+				tle := &TierLimitError{Tier: tier, ChannelType: req.ChannelType, Field: "widgets", Limit: *max, Got: used + 1}
+				log.Printf("[Channels] slot limit reached for %s: %d/%d (incl %d local)", userID, used, *max, req.LocalWidgets)
+				return c.Status(fiber.StatusForbidden).JSON(tierLimitErrorResponse(tle))
+			}
+		}
+	}
+
 	if err := ValidateChannelConfig(tier, req.ChannelType, req.Config); err != nil {
 		var tle *TierLimitError
 		if errors.As(err, &tle) {
@@ -359,8 +487,7 @@ func UpdateChannel(c *fiber.Ctx) error {
 	}
 
 	channelType := c.Params("type")
-	validTypes := GetValidChannelTypes()
-	if !validTypes[channelType] {
+	if !GetValidChannelTypes()[channelType] && !IsKnownWidgetType(channelType) {
 		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
 			Status: "error",
 			Error:  "Invalid channel type",
@@ -376,6 +503,10 @@ func UpdateChannel(c *fiber.Ctx) error {
 		Visible       *bool                  `json:"visible"`
 		TickerEnabled *bool                  `json:"ticker_enabled"`
 		Config        map[string]interface{} `json:"config"`
+		// LocalWidgets mirrors CreateChannel: the client's count of enabled
+		// utility widgets, added to the DB count when gating a re-enable.
+		// Absent (older client) = 0.
+		LocalWidgets int `json:"local_widgets"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
@@ -385,6 +516,35 @@ func UpdateChannel(c *fiber.Ctx) error {
 	}
 	if req.TickerEnabled != nil {
 		req.Visible = req.TickerEnabled
+	}
+	if req.LocalWidgets < 0 {
+		req.LocalWidgets = 0
+	}
+
+	// Gate RE-ENABLING against the widget-slot cap, exactly like
+	// CreateChannel gates new adds. Without this the cap is a one-way door:
+	// disable a widget, add a new one in the freed slot, re-enable the old
+	// one ungated — repeat past any tier limit (and past a Stripe-downgrade
+	// prune). Enabling an already-enabled widget stays a no-op passthrough.
+	if req.Enabled != nil && *req.Enabled {
+		tier := tierFromRoles(GetUserRoles(c))
+		if max := MaxWidgetsForTier(tier); max != nil {
+			var currentlyEnabled bool
+			err := DBPool.QueryRow(context.Background(), `
+				SELECT enabled FROM user_channels WHERE logto_sub = $1 AND channel_type = $2
+			`, userID, channelType).Scan(&currentlyEnabled)
+			// Row-lookup errors fall through: a missing row 404s on the
+			// UPDATE below, and transient errors fail open like CreateChannel.
+			if err == nil && !currentlyEnabled {
+				if count, err := CountEnabledChannels(context.Background(), userID); err != nil {
+					log.Printf("[Channels] slot count failed for %s: %v", userID, err)
+				} else if used := count + req.LocalWidgets; used >= *max {
+					tle := &TierLimitError{Tier: tier, ChannelType: channelType, Field: "widgets", Limit: *max, Got: used + 1}
+					log.Printf("[Channels] slot limit blocks re-enable for %s: %d/%d (incl %d local)", userID, used, *max, req.LocalWidgets)
+					return c.Status(fiber.StatusForbidden).JSON(tierLimitErrorResponse(tle))
+				}
+			}
+		}
 	}
 
 	// Tier-gate any incoming config. We only check when config is
@@ -559,56 +719,102 @@ func DeleteChannel(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "ok", "message": "Channel removed"})
 }
 
-// PruneUserChannelsForTier walks all user_channels rows for a user and
-// trims each config to the caps of the given tier. UPDATEs are skipped
-// for rows that were already within-cap. Intended to be called from the
+// PruneWidgetsForTier disables (never deletes) a user's newest enabled
+// widgets until the count fits the tier's slot cap — the downgrade
+// safety net of the widget/slot model. Oldest widgets survive
+// (created_at ASC); rows stay in user_channels so the user can
+// re-enable them after re-upgrading. Intended to be called from the
 // Stripe webhook whenever a subscription change demotes the user to a
-// lower tier — stops silent over-use of TwelveData/Yahoo budgets that
-// the frontend cap-gate can't protect against.
+// lower tier. Local utility widgets live client-side and are enforced
+// by the desktop cap-gate, not here.
 //
 // Returns nothing — failures are logged but do not propagate, because
 // the webhook handler's primary job (role assignment, DB status update)
 // must complete even if a prune fails.
-func PruneUserChannelsForTier(ctx context.Context, logtoSub, tier string) {
-	channels, err := GetUserChannels(logtoSub)
+func PruneWidgetsForTier(ctx context.Context, logtoSub, tier string) {
+	max := MaxWidgetsForTier(tier)
+	if max == nil {
+		return // unlimited slots — nothing to prune
+	}
+	channels, err := GetUserChannels(logtoSub) // ordered created_at ASC
 	if err != nil {
-		log.Printf("[Prune] Failed to list channels for %s: %v", logtoSub, err)
+		log.Printf("[Prune] Failed to list widgets for %s: %v", logtoSub, err)
 		return
 	}
-	for _, ch := range channels {
-		newConfig, report := PruneChannelConfig(tier, ch.ChannelType, ch.Config)
-		if !report.Changed() {
-			continue
-		}
-		newJSON, err := json.Marshal(newConfig)
-		if err != nil {
-			log.Printf("[Prune] Failed to marshal pruned config for %s/%s: %v", logtoSub, ch.ChannelType, err)
-			continue
-		}
-		_, err = DBPool.Exec(ctx, `
-			UPDATE user_channels SET config = $3, updated_at = now()
-			WHERE logto_sub = $1 AND channel_type = $2
-		`, logtoSub, ch.ChannelType, newJSON)
-		if err != nil {
-			log.Printf("[Prune] Failed to UPDATE %s/%s: %v", logtoSub, ch.ChannelType, err)
-			continue
-		}
-		log.Printf("[Prune] %s/%s to tier %s: symbols=%d→%d feeds=%d→%d custom=%d→%d leagues=%d→%d",
-			logtoSub, ch.ChannelType, tier,
-			report.SymbolsBefore, report.SymbolsAfter,
-			report.FeedsBefore, report.FeedsAfter,
-			report.CustomFeedsBefore, report.CustomFeedsAfter,
-			report.LeaguesBefore, report.LeaguesAfter,
-		)
-		// Refresh subscriptions + lifecycle hook so the Rust service
-		// sees the trimmed config immediately instead of on next sync.
-		if ch.Enabled {
-			addChannelSubscriptions(ctx, logtoSub, ch.ChannelType, newConfig)
-		}
-		callChannelLifecycle(ctx, ch.ChannelType, "updated", logtoSub, newConfig, ch.Config, nil)
+	kept, pruned := partitionWidgetsForCap(channels, *max)
+	if len(pruned) == 0 {
+		return
 	}
+
+	// Sources and sports leagues the surviving widgets still need. Split
+	// widgets share source-level subscriber sets (sports_nfl and
+	// sports_nba both live in channel:subscribers:sports), so a pruned
+	// widget must not yank a subscription a kept sibling depends on.
+	keptSources := map[string]bool{}
+	keptLeagues := map[string]bool{}
+	for _, ch := range kept {
+		keptSources[DataSourceForWidget(ch.ChannelType)] = true
+		for _, lg := range extractSportsLeaguesFromConfig(ch.Config) {
+			keptLeagues[lg] = true
+		}
+	}
+
+	for _, ch := range pruned {
+		_, err := DBPool.Exec(ctx, `
+			UPDATE user_channels SET enabled = false, updated_at = now()
+			WHERE logto_sub = $1 AND channel_type = $2
+		`, logtoSub, ch.ChannelType)
+		if err != nil {
+			log.Printf("[Prune] Failed to disable %s/%s: %v", logtoSub, ch.ChannelType, err)
+			continue
+		}
+		log.Printf("[Prune] Disabled %s/%s: tier %s allows %d widget slots", logtoSub, ch.ChannelType, tier, *max)
+
+		source := DataSourceForWidget(ch.ChannelType)
+		if !keptSources[source] {
+			RemoveSubscriber(ctx, RedisChannelSubscribersPrefix+source, logtoSub)
+		}
+		if source == "sports" {
+			var stale []string
+			for _, lg := range extractSportsLeaguesFromConfig(ch.Config) {
+				if !keptLeagues[lg] {
+					stale = append(stale, SportsLeagueSubscribersPrefix+lg)
+				}
+			}
+			if len(stale) > 0 {
+				if err := RemoveSubscriberMulti(ctx, stale, logtoSub); err != nil {
+					log.Printf("[Prune] Failed to remove league subscriptions for %s: %v", logtoSub, err)
+				}
+			}
+		}
+
+		// Tell the backing service this widget went dark.
+		enabled := false
+		callChannelLifecycle(ctx, ch.ChannelType, "sync", logtoSub, ch.Config, nil, &enabled)
+	}
+
+	// Rebuild SSE topics on every replica holding a connection for this
+	// user (Redis control message, ADR-0001), then refresh cached views.
+	NotifyTopicSubscriptionChange(logtoSub)
 	InvalidateDashboardCache(logtoSub)
 	InvalidateOverviewCache(ctx, logtoSub)
+}
+
+// partitionWidgetsForCap splits a created_at-ascending channel list into
+// the enabled widgets that fit the slot cap (oldest first) and the
+// enabled overflow to disable. Disabled rows pass through untouched.
+func partitionWidgetsForCap(channels []Channel, max int) (kept, pruned []Channel) {
+	for _, ch := range channels {
+		if !ch.Enabled {
+			continue
+		}
+		if len(kept) < max {
+			kept = append(kept, ch)
+		} else {
+			pruned = append(pruned, ch)
+		}
+	}
+	return kept, pruned
 }
 
 // extractSportsLeaguesFromConfig reads the "leagues" array from a sports

@@ -113,21 +113,24 @@ func planRank(plan string) int {
 }
 
 // hasSubscriptionConflict reports whether an existing billing record blocks
-// starting a new subscription checkout for newPlan. An active or trialing
-// paid plan conflicts, with one exception: lifetime members may stack an
-// Ultimate or Pro subscription on top of their lifetime plan.
+// starting a new subscription checkout for newPlan. Any active or trialing
+// paid plan conflicts — including lifetime, which since the 2026-07-02
+// repricing IS permanent Ultimate: there is no higher tier a lifetime
+// member could subscribe to, so the old "stack a discounted Ultimate on
+// top" exception (and its 50%-off coupon) is retired.
 //
 // Shared by HandleCreateCheckoutSession, HandleCreateSetupIntent, and
 // HandleConfirmSubscription so the eligibility rule can't drift between the
 // checkout entry points.
 func hasSubscriptionConflict(existingPlan, existingStatus string, isLifetime bool, newPlan string) bool {
+	_ = newPlan // every plan conflicts equally now; kept for call-site clarity
+	if isLifetime {
+		return true
+	}
 	if existingPlan == "free" {
 		return false
 	}
 	if existingStatus != "active" && existingStatus != "trialing" {
-		return false
-	}
-	if isLifetime && (isUltimatePlan(newPlan) || isProPlan(newPlan)) {
 		return false
 	}
 	return true
@@ -250,8 +253,8 @@ func HandleCreateCheckoutSession(c *fiber.Ctx) error {
 		`SELECT plan, status, lifetime FROM stripe_customers WHERE logto_sub = $1`, userID,
 	).Scan(&existingPlan, &existingStatus, &isLifetime)
 
-	// Lifetime members can add an Ultimate or Pro subscription on top
-	// (Ultimate gets 50% off coupon applied below)
+	// Lifetime = permanent Ultimate: lifetime members have nothing to
+	// subscribe to, and any active/trialing paid plan conflicts.
 	if err == nil && hasSubscriptionConflict(existingPlan, existingStatus, isLifetime, plan) {
 		return c.Status(fiber.StatusConflict).JSON(ErrorResponse{
 			Status: "error", Error: "You already have an active subscription",
@@ -298,17 +301,6 @@ func HandleCreateCheckoutSession(c *fiber.Ctx) error {
 	}
 	params.AddMetadata("logto_sub", userID)
 	params.AddMetadata("plan", plan)
-
-	// Lifetime members get 50% off Ultimate subscriptions
-	if isLifetime && isUltimatePlan(plan) {
-		couponID := os.Getenv("STRIPE_LIFETIME_ULTIMATE_COUPON_ID")
-		if couponID != "" {
-			params.Discounts = []*stripe.CheckoutSessionDiscountParams{
-				{Coupon: stripe.String(couponID)},
-			}
-			log.Printf("[Billing] Applied lifetime 50%% discount coupon for %s", userID)
-		}
-	}
 
 	session, err := checkoutsession.New(params)
 	if err != nil {
@@ -616,12 +608,6 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 		userID,
 	).Scan(&hadPriorSub)
 
-	// Check if lifetime member (for coupon)
-	var isLifetime bool
-	_ = DBPool.QueryRow(context.Background(),
-		`SELECT COALESCE(lifetime, false) FROM stripe_customers WHERE logto_sub = $1`, userID,
-	).Scan(&isLifetime)
-
 	// Create subscription
 	subParams := &stripe.SubscriptionParams{
 		Customer: stripe.String(customerID),
@@ -635,17 +621,6 @@ func HandleConfirmSubscription(c *fiber.Ctx) error {
 
 	if !hadPriorSub {
 		subParams.TrialPeriodDays = stripe.Int64(7)
-	}
-
-	// Lifetime members get 50% off Ultimate
-	if isLifetime && isUltimatePlan(plan) {
-		couponID := os.Getenv("STRIPE_LIFETIME_ULTIMATE_COUPON_ID")
-		if couponID != "" {
-			subParams.Discounts = []*stripe.SubscriptionDiscountParams{
-				{Coupon: stripe.String(couponID)},
-			}
-			log.Printf("[Billing] Applied lifetime 50%% discount coupon for %s", userID)
-		}
 	}
 
 	sub, err := stripesubscription.New(subParams)

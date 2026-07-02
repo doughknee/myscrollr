@@ -1,0 +1,38 @@
+[
+  {
+    "ticker": "KXWCWINNER-26-USA",
+    "title": "Will the USA win the 2026 FIFA World Cup?",
+    "category": "World",
+    "series_ticker": "KXWCWINNER"
+  },
+  {
+    "ticker": "KXPRESELECTION-28-DEM",
+    "title": "Will a Democrat win the 2028 US presidential election?",
+    "category": "Politics",
+    "series_ticker": "KXPRESELECTION"
+  },
+  {
+    "ticker": "FEDDECISION-26JUL-CUT",
+    "title": "Will the Fed cut rates at the July 2026 meeting?",
+    "category": "Economics",
+    "series_ticker": "FEDDECISION"
+  },
+  {
+    "ticker": "KXPGAWINNER-26MASTERS",
+    "title": "Who will win the 2026 Masters?",
+    "category": "Sports",
+    "series_ticker": "KXPGAWINNER"
+  },
+  {
+    "ticker": "HIGHTEMPNYC-26JUN26",
+    "title": "Highest temperature in NYC today",
+    "category": "Weather",
+    "series_ticker": "HIGHTEMPNYC"
+  },
+  {
+    "ticker": "BTCPRICE-26DEC31",
+    "title": "Will BTC close above $150k on Dec 31, 2026?",
+    "category": "Crypto",
+    "series_ticker": "BTCPRICE"
+  }
+]

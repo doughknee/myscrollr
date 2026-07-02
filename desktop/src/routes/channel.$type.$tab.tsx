@@ -7,26 +7,21 @@
  *
  * Source-level actions (remove) are in the header bar.
  *
- * Display preferences live as a section inside the Configure tab —
- * the IA refactor (2026-05-09) folded the old Display tab into
- * Configure for symmetry with widgets and to reduce per-source
- * cognitive overhead.
+ * The old per-channel Display venue-matrix pages were removed in the
+ * widget/slot redesign (2026-06-30). Display venue prefs still persist
+ * for backward compat (the ticker reads them) but aren't configured here.
  */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import RouteError from "../components/RouteError";
 import SourcePageLayout, { parseSourceTab, SourceNotFound } from "../components/SourcePageLayout";
 import { useQuery } from "@tanstack/react-query";
-import { getChannel, getAllChannels } from "../channels/registry";
+import { widgetManifest } from "../marketplace";
 import { dashboardQueryOptions } from "../api/queries";
 import ChannelConfigPanel from "../channels/ChannelConfigPanel";
-import FinanceDisplayPanel from "../channels/finance/DisplayPanel";
-import SportsDisplayPanel from "../channels/sports/DisplayPanel";
-import RssDisplayPanel from "../channels/rss/DisplayPanel";
-import FantasyDisplayPanel from "../channels/fantasy/DisplayPanel";
 import { useShell } from "../shell-context";
 import { loadPref } from "../preferences";
 import type { Channel, ChannelType } from "../api/client";
-import type { DashboardResponse, DeliveryMode } from "../types";
+import type { DashboardResponse, DeliveryMode, ChannelManifest } from "../types";
 
 export const Route = createFileRoute("/channel/$type/$tab")({
   loader: ({ context: { queryClient } }) =>
@@ -41,7 +36,9 @@ function ChannelRoute() {
   const navigate = useNavigate();
   const tab = parseSourceTab(rawTab);
 
-  const channel = getChannel(type);
+  // Resolve the widget id (e.g. "sports_nfl", "finance_stocks") to its coarse
+  // source manifest, which owns the FeedTab. Also resolves legacy coarse ids.
+  const channel = widgetManifest(type) as ChannelManifest | undefined;
   const { data: dashboard } = useQuery(dashboardQueryOptions());
   const { onDeleteChannel } = useShell();
 
@@ -49,25 +46,10 @@ function ChannelRoute() {
     return <SourceNotFound kind="Channel" name={type} />;
   }
 
-  // Channels with display preferences. Drives the OverflowMenu's
-  // "Display preferences" entry and the /display route's content.
-  const HAS_DISPLAY: Record<string, boolean> = {
-    finance: true,
-    sports: true,
-    rss: true,
-    fantasy: true,
-  };
-
   // Subtitle reflects the current sub-route in the breadcrumb:
   //   Home / Sports                   (feed — no subtitle)
   //   Home / Sports / Configure       (configuration tab)
-  //   Home / Sports / Display         (display tab)
-  const subtitle =
-    tab === "configuration"
-      ? "Configure"
-      : tab === "display"
-        ? "Display preferences"
-        : undefined;
+  const subtitle = tab === "configuration" ? "Configure" : undefined;
 
   return (
     <SourcePageLayout
@@ -83,7 +65,6 @@ function ChannelRoute() {
         navigate({ to: "/feed" });
       }}
       sourceKind="channel"
-      hasDisplayPreferences={HAS_DISPLAY[type] ?? false}
     >
       {tab === "feed" && (
         <ChannelFeedTab
@@ -96,7 +77,6 @@ function ChannelRoute() {
       {tab === "configuration" && (
         <ChannelConfigTab type={type} dashboard={dashboard} />
       )}
-      {tab === "display" && <ChannelDisplayTab type={type} />}
     </SourcePageLayout>
   );
 }
@@ -109,7 +89,7 @@ function ChannelFeedTab({
 }: {
   type: string;
   dashboard: DashboardResponse | undefined;
-  channel: NonNullable<ReturnType<typeof getChannel>>;
+  channel: ChannelManifest;
   onConfigure: () => void;
 }) {
   const feedContext = {
@@ -119,7 +99,14 @@ function ChannelFeedTab({
     ),
   };
 
-  return <channel.FeedTab mode="comfort" feedContext={feedContext} onConfigure={onConfigure} />;
+  return (
+    <channel.FeedTab
+      mode="comfort"
+      widgetId={type}
+      feedContext={feedContext}
+      onConfigure={onConfigure}
+    />
+  );
 }
 
 function ChannelConfigTab({
@@ -134,7 +121,7 @@ function ChannelConfigTab({
     (ch) => ch.channel_type === type,
   );
 
-  const manifest = getAllChannels().find((m) => m.id === type);
+  const manifest = widgetManifest(type);
   const deliveryMode = loadPref<DeliveryMode>("deliveryMode", "polling");
 
   if (!channelData) {
@@ -144,7 +131,7 @@ function ChannelConfigTab({
           Configuration unavailable
         </h2>
         <p className="text-sm text-fg-3 leading-relaxed">
-          This channel does not have a configuration panel.
+          This source does not have a configuration panel.
         </p>
       </div>
     );
@@ -159,24 +146,6 @@ function ChannelConfigTab({
       hex={manifest?.hex ?? "var(--color-accent)"}
     />
   );
-}
-
-function ChannelDisplayTab({ type }: { type: string }) {
-  // Per-channel display preferences. Finance has the new live-preview
-  // DisplayPanel (2026 polish); the others still use the old
-  // venue-grid layout pending the same treatment.
-  switch (type) {
-    case "finance":
-      return <FinanceDisplayPanel />;
-    case "sports":
-      return <SportsDisplayPanel />;
-    case "rss":
-      return <RssDisplayPanel />;
-    case "fantasy":
-      return <FantasyDisplayPanel />;
-    default:
-      return null;
-  }
 }
 
 function ChannelPending() {

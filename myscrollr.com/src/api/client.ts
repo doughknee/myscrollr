@@ -92,6 +92,8 @@ export type TierKey =
   | 'super_user'
 
 export interface ChannelLimits {
+  /** Widget-slot cap — how many widgets a tier runs at once. null = unlimited. */
+  max_widgets: number | null
   symbols: number | null
   feeds: number | null
   custom_feeds: number | null

@@ -13,11 +13,13 @@ data:
   SPORTS_CHANNEL_URL: "http://sports-api:8082"
   RSS_CHANNEL_URL: "http://rss-api:8083"
   FANTASY_CHANNEL_URL: "http://fantasy-api:8084"
+  PREDICTIONS_CHANNEL_URL: "http://predictions-api:8085"
 
   # Go API -> Rust service internal URLs (K8s Service DNS)
   INTERNAL_FINANCE_URL: "http://finance-service:3001"
   INTERNAL_SPORTS_URL: "http://sports-service:3002"
   INTERNAL_RSS_URL: "http://rss-service:3004"
+  INTERNAL_PREDICTIONS_URL: "http://predictions-service:3005"
 
   # Fantasy-specific
   YAHOO_CALLBACK_URL: "https://api.myscrollr.com/yahoo/callback"

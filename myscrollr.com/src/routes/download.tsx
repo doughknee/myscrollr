@@ -18,6 +18,7 @@ import {
 } from '@/lib/structured-data'
 import { DownloadButton } from '@/components/DownloadButton'
 import { ProductScreenshot } from '@/components/ProductScreenshot'
+import { LATEST_DESKTOP_VERSION } from '@/lib/latestVersion.generated'
 import { detectIsIntelMac, detectPlatform } from '@/lib/detectPlatform'
 import { triggerDownload } from '@/lib/getDownloadInfo'
 
@@ -158,6 +159,13 @@ export function DownloadPage({
             <p className="text-sm text-base-content/40">
               {recommended.arch} &middot; Free &middot; Open source
             </p>
+            <Link
+              to="/releases"
+              className="inline-flex items-center gap-1 text-xs font-medium text-primary/60 transition-colors hover:text-primary"
+            >
+              What&rsquo;s new &middot; v{LATEST_DESKTOP_VERSION}
+              <ExternalLink className="h-3 w-3" aria-hidden="true" />
+            </Link>
           </motion.div>
 
           {/* ── What you'll see ────────────────────────────────
@@ -178,14 +186,14 @@ export function DownloadPage({
             <div className="relative overflow-hidden rounded-2xl border border-base-300/40 bg-base-200/40 backdrop-blur-sm shadow-2xl">
               <ProductScreenshot
                 basename="overview/home"
-                alt="The Scrollr home dashboard showing live channel feeds for scores, prices, and headlines side-by-side."
+                alt="The Scrollr home dashboard showing live widget feeds for scores, prices, and headlines side-by-side."
                 priority
                 pictureClassName="block w-full"
                 imgClassName="block h-full w-full object-cover object-top"
               />
             </div>
             <figcaption className="mt-4 text-center text-xs text-base-content/45">
-              The Scrollr dashboard after first launch, with sample channels
+              The Scrollr dashboard after first launch, with sample widgets
               enabled.
             </figcaption>
           </motion.figure>

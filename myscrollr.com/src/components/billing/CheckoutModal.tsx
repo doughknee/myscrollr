@@ -95,7 +95,7 @@ interface SubscriptionPlan {
 interface LifetimePlan {
   name: 'Lifetime'
   tier: 'lifetime'
-  price: 399
+  price: 999
 }
 
 type PlanInfo = SubscriptionPlan | LifetimePlan

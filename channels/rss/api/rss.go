@@ -655,17 +655,37 @@ func (a *App) onSyncSubscriptions(ctx context.Context, userSub string, config ma
 // Database Helpers
 // =============================================================================
 
-// getUserRSSFeedURLs extracts the feed URLs from a user's RSS channel config.
+// getUserRSSFeedURLs unions the feed URLs across a user's news/rss widget
+// channels. Post-widget-split a user has one row per curated feed
+// (channel_type = 'news_bbc', …) plus 'rss_custom' for their own feeds — and a
+// legacy coarse 'rss'/'news' row may still exist. Gather them all.
 func (a *App) getUserRSSFeedURLs(ctx context.Context, logtoSub string) []string {
-	var configJSON []byte
-	err := a.db.QueryRow(ctx, `
+	rows, err := a.db.Query(ctx, `
 		SELECT config FROM user_channels
-		WHERE logto_sub = $1 AND channel_type = 'rss'
-	`, logtoSub).Scan(&configJSON)
+		WHERE logto_sub = $1
+		  AND (channel_type IN ('rss', 'news')
+		       OR channel_type LIKE 'news\_%'
+		       OR channel_type LIKE 'rss\_%')
+	`, logtoSub)
 	if err != nil {
 		return nil
 	}
-	return extractFeedURLsFromConfig(configJSON)
+	defer rows.Close()
+	seen := make(map[string]bool)
+	var urls []string
+	for rows.Next() {
+		var configJSON []byte
+		if err := rows.Scan(&configJSON); err != nil {
+			continue
+		}
+		for _, u := range extractFeedURLsFromConfig(configJSON) {
+			if !seen[u] {
+				seen[u] = true
+				urls = append(urls, u)
+			}
+		}
+	}
+	return urls
 }
 
 // queryRSSItems fetches the latest RSS items for the given feed URLs.

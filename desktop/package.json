@@ -43,6 +43,7 @@
     "@tauri-apps/plugin-updater": "^2.10.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.577.0",
+    "marked": "^18.0.5",
     "motion": "^12.35.1",
     "motion-plus": "https://api.motion.dev/registry.tgz?package=motion-plus&version=2.11.0&token=032997dbced0702754906e3f43111740b10beaa970fd6d26423e34e43a46acfe",
     "react": "^19.2.0",

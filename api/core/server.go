@@ -200,6 +200,7 @@ func (s *Server) setupRoutes() {
 
 	s.App.Get("/channels", s.listChannels)
 	s.App.Get("/tier-limits", HandleGetTierLimits)
+	s.App.Get("/app/min-version", HandleGetMinDesktopVersion)
 	s.App.Get("/", s.landingPage)
 
 	// --- Protected Routes ---
@@ -410,10 +411,13 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 			res.Channels = channels
 		}
 
+		// Key by data SOURCE, not the exact widget type, so split widgets
+		// (sports_nfl, finance_stocks, …) still select their backing service's
+		// dashboard provider below (matched on intg.Name).
 		enabledChannels := make(map[string]bool)
 		for _, ch := range channels {
 			if ch.Enabled {
-				enabledChannels[ch.ChannelType] = true
+				enabledChannels[DataSourceForWidget(ch.ChannelType)] = true
 			}
 		}
 

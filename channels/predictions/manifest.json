@@ -1,0 +1,18 @@
+{
+  "name": "predictions",
+  "display_name": "Predictions",
+  "internal_url": "http://predictions-api:8085",
+  "capabilities": [
+    "cdc_handler",
+    "dashboard_provider",
+    "health_checker",
+    "channel_lifecycle"
+  ],
+  "cdc_tables": ["markets"],
+  "routes": [
+    { "method": "GET", "path": "/predictions", "auth": true },
+    { "method": "GET", "path": "/predictions/public", "auth": false },
+    { "method": "GET", "path": "/predictions/health", "auth": false },
+    { "method": "GET", "path": "/predictions/catalog", "auth": false }
+  ]
+}

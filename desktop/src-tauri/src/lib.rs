@@ -1,5 +1,6 @@
 mod commands;
 mod compositor;
+mod kalshi;
 mod state;
 mod tray;
 
@@ -138,6 +139,7 @@ pub fn run() {
 
     let app = builder
         .manage(state::SseHandle(Mutex::new(None)))
+        .manage(state::KalshiStreamHandle(Mutex::new(None)))
         .manage(state::AuthServerRunning(Arc::new(Mutex::new(false))))
         .manage(state::AuthServerStop(Arc::new(AtomicBool::new(false))))
         .manage(state::SysInfoState(Arc::new(state::SysInfoInner {
@@ -155,6 +157,12 @@ pub fn run() {
             commands::auth::stop_auth_server,
             commands::sse::start_sse,
             commands::sse::stop_sse,
+            commands::kalshi::kalshi_connect,
+            commands::kalshi::kalshi_status,
+            commands::kalshi::kalshi_disconnect,
+            commands::kalshi::kalshi_portfolio,
+            commands::kalshi::kalshi_start_user_stream,
+            commands::kalshi::kalshi_stop_user_stream,
             commands::window::show_app_window,
             commands::window::quit_app,
             commands::system_info::get_system_info,

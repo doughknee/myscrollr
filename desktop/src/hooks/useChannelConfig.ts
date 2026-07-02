@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { channelsApi } from "../api/client";
 import { queryKeys } from "../api/queries";
 import type { ChannelType } from "../api/client";
+import type { DashboardResponse } from "../types";
 
 interface UseChannelConfigResult<T> {
   error: string | null;
@@ -33,12 +34,48 @@ export function useChannelConfig<T>(
   }, [error]);
 
   const updateMutation = useMutation({
-    mutationFn: (next: T) =>
-      channelsApi.update(channelType, { config: { [configKey]: next } }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+    // Send the FULL merged config so sibling fields (e.g. finance's
+    // asset_class, set on add) survive a partial update. onMutate has already
+    // patched the dashboard cache below, so we read the merged config from it.
+    mutationFn: (next: T) => {
+      const dash = queryClient.getQueryData<DashboardResponse>(
+        queryKeys.dashboard,
+      );
+      const current = dash?.channels?.find(
+        (c) => c.channel_type === channelType,
+      )?.config as Record<string, unknown> | undefined;
+      return channelsApi.update(channelType, {
+        config: current ?? { [configKey]: next },
+      });
     },
-    onError: (err) => {
+    // Optimistic write so the control responds on the next paint instead of
+    // waiting on the POST + dashboard refetch.
+    onMutate: async (next: T) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.dashboard });
+      const previous = queryClient.getQueryData<DashboardResponse>(
+        queryKeys.dashboard,
+      );
+      queryClient.setQueryData<DashboardResponse>(queryKeys.dashboard, (old) => {
+        if (!old) return old;
+        const channels = (old.channels ?? []).map((c) =>
+          c.channel_type === channelType
+            ? {
+                ...c,
+                config: {
+                  ...((c.config as Record<string, unknown>) ?? {}),
+                  [configKey]: next,
+                },
+              }
+            : c,
+        );
+        return { ...old, channels };
+      });
+      return { previous };
+    },
+    onError: (err, _next, ctx) => {
+      const prev = (ctx as { previous?: DashboardResponse } | undefined)
+        ?.previous;
+      if (prev) queryClient.setQueryData(queryKeys.dashboard, prev);
       // Tier-limit 403s come back as "Your Free plan allows..." — show
       // the server's message verbatim instead of our generic toast so
       // users understand why the save was refused and what to change.
@@ -48,6 +85,9 @@ export function useChannelConfig<T>(
       } else {
         toast.error("Failed to save \u2014 try again");
       }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
     },
   });
 

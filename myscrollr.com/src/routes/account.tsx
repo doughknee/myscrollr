@@ -180,7 +180,7 @@ function AccountHub() {
               </span>
             </h1>
             <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
-              Your personal data channels are ready for orchestration. Sync your
+              Your personal data widgets are ready for orchestration. Sync your
               leagues, track your assets, and stay in the flow.
             </p>
           </motion.div>
@@ -203,7 +203,7 @@ function AccountHub() {
               Your <span className="text-gradient-primary">Dashboard</span>
             </h2>
             <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
-              Subscription, channels, and system health at a glance
+              Subscription, widgets, and system health at a glance
             </p>
           </motion.div>
 

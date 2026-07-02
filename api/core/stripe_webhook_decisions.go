@@ -1,5 +1,11 @@
 package core
 
+import (
+	"errors"
+
+	"github.com/jackc/pgx/v5"
+)
+
 // =============================================================================
 // Stripe Webhook Decision Logic
 // =============================================================================
@@ -15,7 +21,7 @@ package core
 //     incomplete, etc. leave roles as-is.
 
 // Tier identifiers returned by the decision helpers. These match the Logto
-// role names and the tier strings PruneUserChannelsForTier expects.
+// role names and the tier strings PruneWidgetsForTier expects.
 const (
 	tierUplink   = "uplink"
 	tierPro      = "uplink_pro"
@@ -55,7 +61,7 @@ type subscriptionUpdateAction struct {
 	// so plan up/downgrades don't leave stale roles behind.
 	ClearPaidRoles bool
 	// AssignTier is the tier role to assign; "" leaves roles untouched.
-	// Non-empty also triggers PruneUserChannelsForTier for that tier.
+	// Non-empty also triggers PruneWidgetsForTier for that tier.
 	AssignTier string
 }
 
@@ -77,6 +83,21 @@ func decideSubscriptionUpdate(status string, cancelAtPeriodEnd bool, plan string
 		action.AssignTier = tierForPlan(plan)
 	}
 	return action
+}
+
+// decideStripPaidRoles reports whether a subscription deletion should strip
+// the user's paid roles, given the result of the lifetime-flag lookup.
+//
+// Fail safe: if the lookup errored we cannot tell whether the customer is
+// lifetime, and stripping roles from a lifetime customer is the worse failure
+// mode — keep the roles and let a later event or manual reconciliation sort it
+// out. pgx.ErrNoRows is not a failure: no customer row means no lifetime flag,
+// so roles are stripped as usual.
+func decideStripPaidRoles(isLifetime bool, lookupErr error) bool {
+	if lookupErr != nil && !errors.Is(lookupErr, pgx.ErrNoRows) {
+		return false
+	}
+	return !isLifetime
 }
 
 // assignTierRole assigns the Logto role for the given tier.

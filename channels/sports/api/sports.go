@@ -799,30 +799,64 @@ func (a *App) getUserGames(c *fiber.Ctx, userSub string, limit int) error {
 	return c.JSON(resp)
 }
 
-// getUserSportsLeagues extracts the league list from a user's sports channel config.
+// getUserSportsLeagues extracts the league list across a user's sports widget
+// channels. Post-widget-split (migration 000014) a user has one row per league
+// (channel_type = 'sports_nfl', …) rather than a single 'sports' row, so we
+// gather every sports_* channel (plus any legacy coarse 'sports' row) and union
+// their leagues.
 func (a *App) getUserSportsLeagues(logtoSub string) []string {
-	var configJSON []byte
-	err := a.db.QueryRow(context.Background(), `
+	rows, err := a.db.Query(context.Background(), `
 		SELECT config FROM user_channels
-		WHERE logto_sub = $1 AND channel_type = 'sports'
-	`, logtoSub).Scan(&configJSON)
+		WHERE logto_sub = $1
+		  AND (channel_type = 'sports' OR channel_type LIKE 'sports\_%')
+	`, logtoSub)
 	if err != nil {
 		return nil
 	}
-	return extractLeaguesFromConfig(configJSON)
+	defer rows.Close()
+	seen := make(map[string]bool)
+	var leagues []string
+	for rows.Next() {
+		var configJSON []byte
+		if err := rows.Scan(&configJSON); err != nil {
+			continue
+		}
+		for _, l := range extractLeaguesFromConfig(configJSON) {
+			if !seen[l] {
+				seen[l] = true
+				leagues = append(leagues, l)
+			}
+		}
+	}
+	return leagues
 }
 
-// getUserFavoriteTeams extracts favorite teams from a user's sports channel config.
+// getUserFavoriteTeams merges favorite teams across a user's sports widget
+// channels (keyed by league, so per-widget entries don't collide).
 func (a *App) getUserFavoriteTeams(logtoSub string) map[string]FavoriteTeam {
-	var configJSON []byte
-	err := a.db.QueryRow(context.Background(), `
+	rows, err := a.db.Query(context.Background(), `
 		SELECT config FROM user_channels
-		WHERE logto_sub = $1 AND channel_type = 'sports'
-	`, logtoSub).Scan(&configJSON)
+		WHERE logto_sub = $1
+		  AND (channel_type = 'sports' OR channel_type LIKE 'sports\_%')
+	`, logtoSub)
 	if err != nil {
 		return nil
 	}
-	return extractFavoriteTeamsFromConfig(configJSON)
+	defer rows.Close()
+	merged := make(map[string]FavoriteTeam)
+	for rows.Next() {
+		var configJSON []byte
+		if err := rows.Scan(&configJSON); err != nil {
+			continue
+		}
+		for k, v := range extractFavoriteTeamsFromConfig(configJSON) {
+			merged[k] = v
+		}
+	}
+	if len(merged) == 0 {
+		return nil
+	}
+	return merged
 }
 
 // =============================================================================

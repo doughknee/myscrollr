@@ -19,6 +19,8 @@ import {
   isEnabled as isAutostartEnabled,
 } from "@tauri-apps/plugin-autostart";
 import { getVersion } from "@tauri-apps/api/app";
+import { useUpdateGate } from "../hooks/useUpdateGate";
+import { UpdateRequiredOverlay } from "../components/UpdateRequiredOverlay";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import clsx from "clsx";
 import { Toaster, toast } from "sonner";
@@ -38,6 +40,8 @@ import AuthGate from "../components/onboarding/AuthGate";
 
 // Registries
 import { getAllChannels } from "../channels/registry";
+import { catalogItemById } from "../marketplace";
+import { DEMO } from "../config";
 import { getAllWidgets, getWidget } from "../widgets/registry";
 import { CANONICAL_ORDER } from "../marketplace";
 
@@ -297,6 +301,13 @@ function RootLayout() {
     appVersion,
   });
 
+  // Mandatory-update gate: unlike the toast above, this one can't be
+  // dismissed or disabled. When the API's /app/min-version says this
+  // build is too old for the current backend (breaking deploy), the
+  // whole shell is covered until the update installs. Fails open on
+  // any fetch/parse error — see useUpdateGate.
+  const updateGate = useUpdateGate(appVersion);
+
   // ── Undo snapshot GC ───────────────────────────────────────
   // Snapshots pushed by `useUndoableAction` live in a module-level
   // ring buffer (see lib/undoStack.ts). They auto-expire 60s after
@@ -333,7 +344,7 @@ function RootLayout() {
       showTipOnce(TIP_IDS.TICKER_RIGHT_CLICK, prefs, persistPrefs, {
         title: "Tip: right-click the ticker",
         description:
-          "Quick controls for channels, widgets, position, and Customize Ticker.",
+          "Quick controls for widgets, position, and Customize Ticker.",
         duration: 7_000,
       });
     }, 4_000);
@@ -388,8 +399,10 @@ function RootLayout() {
   // ── App / auth state ────────────────────────────────────────
   // The wizard was removed in the IA refactor (2026-05-09). New
   // users land directly on /feed which renders an empty hero card.
-  const showAuthGate = !auth.authenticated;
-  const showApp = auth.authenticated;
+  // Demo mode (VITE_DEMO=1) bypasses the Logto auth wall so the live Kalshi
+  // demo runs signed-out against the no-auth bridge. Strictly dev-only.
+  const showAuthGate = !auth.authenticated && !DEMO;
+  const showApp = auth.authenticated || DEMO;
 
   // ── SSE status tracking ─────────────────────────────────────
   // Listen directly for SSE status events from the Rust backend.
@@ -600,7 +613,7 @@ function RootLayout() {
 
     for (const id of CANONICAL_ORDER) {
       if (enabledChannelIds.has(id)) {
-        const m = allChannelManifests.find((m) => m.id === id);
+        const m = catalogItemById(id);
         if (m) {
           sources.push({ id, name: m.name, hex: m.hex, icon: m.icon, kind: "channel" });
         }
@@ -773,6 +786,14 @@ function RootLayout() {
         !IS_MACOS && "custom-chrome",
       )}
     >
+      {/* ── Mandatory update: blocks everything, including sign-in ── */}
+      {updateGate.updateRequired && (
+        <UpdateRequiredOverlay
+          appVersion={appVersion}
+          minVersion={updateGate.minVersion}
+        />
+      )}
+
       {/* ── Auth gate: unauthenticated users ── */}
       {showAuthGate && <AuthGate onLogin={auth.handleLogin} />}
 

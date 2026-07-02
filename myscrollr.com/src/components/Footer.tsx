@@ -14,14 +14,15 @@ export default function Footer() {
 
   const links = {
     product: [
-      { label: 'Channels', href: '/channels' },
+      { label: 'Widgets', href: '/channels' },
       { label: 'Download', href: '/download' },
       { label: 'Uplink', href: '/uplink' },
     ],
     resources: [
       { label: 'Status', href: '/status' },
       { label: 'Architecture', href: '/architecture' },
-      { label: 'Channels', href: '/channels' },
+      { label: 'Widgets', href: '/channels' },
+      { label: 'Releases', href: '/releases' },
     ],
     company: [
       { label: 'Terms', href: '/legal?doc=terms' },

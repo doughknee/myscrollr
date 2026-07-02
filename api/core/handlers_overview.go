@@ -404,7 +404,9 @@ func assembleOverview(ctx context.Context, c *fiber.Ctx, userID string) (*Overvi
 // worth the latency cost.
 func hasFantasyChannel(channels OverviewChannels) bool {
 	for _, c := range channels.ByType {
-		if c.Type == "fantasy" && c.Enabled {
+		// Match the fantasy SOURCE, not the literal — the widget row is
+		// "fantasy_yahoo" (post widget-split), never bare "fantasy".
+		if DataSourceForWidget(c.Type) == "fantasy" && c.Enabled {
 			return true
 		}
 	}

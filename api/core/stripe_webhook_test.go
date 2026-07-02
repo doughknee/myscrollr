@@ -3,12 +3,14 @@ package core
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/stripe/stripe-go/v82/webhook"
 )
 
@@ -130,6 +132,39 @@ func TestDecideSubscriptionUpdate(t *testing.T) {
 			if got != tc.want {
 				t.Errorf("decideSubscriptionUpdate(%q, %v, %q) = %+v, want %+v",
 					tc.status, tc.cancelAtPeriodEnd, tc.plan, got, tc.want)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// Decision logic — decideStripPaidRoles
+// =============================================================================
+
+func TestDecideStripPaidRoles(t *testing.T) {
+	tests := []struct {
+		name       string
+		isLifetime bool
+		lookupErr  error
+		want       bool
+	}{
+		// Clean lookup: lifetime flag decides.
+		{"not lifetime strips roles", false, nil, true},
+		{"lifetime keeps roles", true, nil, false},
+		// No customer row is a definitive "no lifetime flag" — strip as usual.
+		{"no rows strips roles", false, pgx.ErrNoRows, true},
+		{"wrapped no rows strips roles", false, fmt.Errorf("scan: %w", pgx.ErrNoRows), true},
+		// Any other lookup failure fails safe: never strip roles when we
+		// can't tell whether the customer is lifetime.
+		{"lookup failure keeps roles", false, errors.New("connection refused"), false},
+		{"lookup failure keeps roles even if scan defaulted true", true, errors.New("timeout"), false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := decideStripPaidRoles(tc.isLifetime, tc.lookupErr)
+			if got != tc.want {
+				t.Errorf("decideStripPaidRoles(%v, %v) = %v, want %v", tc.isLifetime, tc.lookupErr, got, tc.want)
 			}
 		})
 	}

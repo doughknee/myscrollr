@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -18,6 +17,7 @@ import (
 func TestDefaultTierLimits_Exact(t *testing.T) {
 	cases := []struct {
 		tier                   string
+		maxWidgets             *int
 		symbols                *int
 		feeds                  *int
 		customFeeds            *int
@@ -26,11 +26,13 @@ func TestDefaultTierLimits_Exact(t *testing.T) {
 		maxTickerRows          int
 		maxTickerCustomization bool
 	}{
-		{"free", intPtr(5), intPtr(1), intPtr(0), intPtr(1), intPtr(0), 1, false},
-		{"uplink", intPtr(25), intPtr(25), intPtr(1), intPtr(8), intPtr(1), 2, false},
-		{"uplink_pro", intPtr(75), intPtr(100), intPtr(3), intPtr(20), intPtr(3), 3, false},
-		{"uplink_ultimate", nil, nil, intPtr(10), nil, intPtr(10), 3, true},
-		{"super_user", nil, nil, nil, nil, nil, 3, true},
+		// Per-feature depth caps retired 2026-07-02 — nil (unlimited) on every
+		// tier. Only max_widgets (slot lever) + ticker rows still vary.
+		{"free", intPtr(3), nil, nil, nil, nil, nil, 1, false},
+		{"uplink", intPtr(6), nil, nil, nil, nil, nil, 2, false},
+		{"uplink_pro", intPtr(12), nil, nil, nil, nil, nil, 3, false},
+		{"uplink_ultimate", nil, nil, nil, nil, nil, nil, 3, true},
+		{"super_user", nil, nil, nil, nil, nil, nil, 3, true},
 	}
 
 	for _, c := range cases {
@@ -39,6 +41,7 @@ func TestDefaultTierLimits_Exact(t *testing.T) {
 			t.Errorf("missing tier: %q", c.tier)
 			continue
 		}
+		assertIntPtrEq(t, c.tier+".max_widgets", c.maxWidgets, got.MaxWidgets)
 		assertIntPtrEq(t, c.tier+".symbols", c.symbols, got.Symbols)
 		assertIntPtrEq(t, c.tier+".feeds", c.feeds, got.Feeds)
 		assertIntPtrEq(t, c.tier+".custom_feeds", c.customFeeds, got.CustomFeeds)
@@ -79,13 +82,23 @@ func TestTierLimitsJSONShape(t *testing.T) {
 	if ult["symbols"] != nil {
 		t.Errorf("uplink_ultimate.symbols = %v (want null)", ult["symbols"])
 	}
-	if got, ok := ult["custom_feeds"].(float64); !ok || got != 10 {
-		t.Errorf("uplink_ultimate.custom_feeds = %v (want 10)", ult["custom_feeds"])
+	// Depth caps are retired → null on every tier.
+	if ult["custom_feeds"] != nil {
+		t.Errorf("uplink_ultimate.custom_feeds = %v (want null)", ult["custom_feeds"])
 	}
 
 	free := parsed["tiers"]["free"]
-	if got, ok := free["symbols"].(float64); !ok || got != 5 {
-		t.Errorf("free.symbols = %v (want 5)", free["symbols"])
+	if free["symbols"] != nil {
+		t.Errorf("free.symbols = %v (want null)", free["symbols"])
+	}
+
+	// max_widgets must round-trip: a finite slot cap on free, null
+	// (unlimited) on the top tiers.
+	if got, ok := free["max_widgets"].(float64); !ok || got != 3 {
+		t.Errorf("free.max_widgets = %v (want 3)", free["max_widgets"])
+	}
+	if ult["max_widgets"] != nil {
+		t.Errorf("uplink_ultimate.max_widgets = %v (want null)", ult["max_widgets"])
 	}
 }
 
@@ -172,92 +185,28 @@ func pinCuratedFixture(t *testing.T) {
 	})
 }
 
-// TestValidateChannelConfig_Boundaries confirms that exactly-at-limit is
-// accepted and one-over is rejected for every enforced channel/tier pair.
-func TestValidateChannelConfig_Boundaries(t *testing.T) {
+// TestValidateChannelConfig_CapsRetired confirms the per-feature depth caps
+// were retired (2026-07-02): configs of any size pass on EVERY tier. The
+// widget-slot cap (enforced in channels.go, not here) is the only lever now.
+func TestValidateChannelConfig_CapsRetired(t *testing.T) {
 	pinCuratedFixture(t)
 	cases := []struct {
-		name        string
 		tier        string
 		channelType string
 		config      map[string]any
-		wantField   string // empty = no error expected
 	}{
-		// Finance — symbols
-		{"free finance at cap", "free", "finance", financeCfg(5), ""},
-		{"free finance over cap", "free", "finance", financeCfg(6), "symbols"},
-		{"uplink finance at cap", "uplink", "finance", financeCfg(25), ""},
-		{"uplink finance over cap", "uplink", "finance", financeCfg(26), "symbols"},
-		{"ultimate finance unlimited", "uplink_ultimate", "finance", financeCfg(10000), ""},
-		{"super_user finance unlimited", "super_user", "finance", financeCfg(100000), ""},
-
-		// Sports — leagues
-		{"free sports at cap", "free", "sports", sportsCfg(1), ""},
-		{"free sports over cap", "free", "sports", sportsCfg(2), "leagues"},
-		{"pro sports at cap", "uplink_pro", "sports", sportsCfg(20), ""},
-		{"pro sports over cap", "uplink_pro", "sports", sportsCfg(21), "leagues"},
-
-		// RSS — feeds + custom_feeds
-		{"free rss at feed cap, no custom", "free", "rss", rssCfg(1, 0), ""},
-		{"free rss over feed cap", "free", "rss", rssCfg(2, 0), "feeds"},
-		{"free rss 1 custom forbidden", "free", "rss", rssCfg(1, 1), "custom_feeds"},
-		{"uplink rss at custom cap", "uplink", "rss", rssCfg(2, 1), ""},
-		{"uplink rss over custom cap", "uplink", "rss", rssCfg(3, 2), "custom_feeds"},
-		{"pro rss under feed cap, over custom", "uplink_pro", "rss", rssCfg(10, 4), "custom_feeds"},
-		{"pro rss at custom cap, over feed cap", "uplink_pro", "rss", rssCfg(101, 3), "feeds"},
-		{"ultimate rss unlimited feeds", "uplink_ultimate", "rss", rssCfg(5000, 10), ""},
-		{"ultimate rss at custom cap", "uplink_ultimate", "rss", rssCfg(5000, 10), ""},
-		{"ultimate rss over custom cap", "uplink_ultimate", "rss", rssCfg(5000, 11), "custom_feeds"},
-
-		// Empty config is always valid (first create).
-		{"free finance empty", "free", "finance", map[string]any{}, ""},
-		{"free rss empty", "free", "rss", map[string]any{}, ""},
+		{"free", "finance", financeCfg(1000)},
+		{"free", "sports", sportsCfg(1000)},
+		{"free", "rss", rssCfg(1000, 500)},
+		{"uplink", "finance", financeCfg(10000)},
+		{"uplink_pro", "rss", rssCfg(10000, 9000)},
+		{"bogus_tier", "finance", financeCfg(1000)}, // unknown → free → still no cap
+		{"free", "finance", map[string]any{}},
 	}
-
 	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			err := ValidateChannelConfig(c.tier, c.channelType, c.config)
-			if c.wantField == "" {
-				if err != nil {
-					t.Errorf("want nil, got %v", err)
-				}
-				return
-			}
-			if err == nil {
-				t.Errorf("want error on %s, got nil", c.wantField)
-				return
-			}
-			var tle *TierLimitError
-			if !errors.As(err, &tle) {
-				t.Errorf("want *TierLimitError, got %T: %v", err, err)
-				return
-			}
-			if tle.Field != c.wantField {
-				t.Errorf("field: want %q, got %q", c.wantField, tle.Field)
-			}
-			if tle.Tier != c.tier {
-				t.Errorf("tier: want %q, got %q", c.tier, tle.Tier)
-			}
-		})
-	}
-}
-
-// TestValidateChannelConfig_UnknownTierFallsBackToFree guards against JWTs
-// with unknown role names leaking elevated privileges.
-func TestValidateChannelConfig_UnknownTierFallsBackToFree(t *testing.T) {
-	err := ValidateChannelConfig("bogus_tier", "finance", financeCfg(6))
-	if err == nil {
-		t.Fatal("want error, got nil")
-	}
-	var tle *TierLimitError
-	if !errors.As(err, &tle) {
-		t.Fatalf("want *TierLimitError, got %T", err)
-	}
-	if tle.Tier != "free" {
-		t.Errorf("tier: want %q (fallback), got %q", "free", tle.Tier)
-	}
-	if tle.Limit != 5 {
-		t.Errorf("limit: want 5 (free cap), got %d", tle.Limit)
+		if err := ValidateChannelConfig(c.tier, c.channelType, c.config); err != nil {
+			t.Errorf("%s/%s: caps retired, want nil, got %v", c.tier, c.channelType, err)
+		}
 	}
 }
 
@@ -284,95 +233,66 @@ func TestTierLimitError_UserFacingMessage(t *testing.T) {
 	}
 }
 
-// ─── PruneChannelConfig ──────────────────────────────────────────────
+// ─── partitionWidgetsForCap (downgrade slot prune) ───────────────────
 
-// TestPruneChannelConfig_FinanceTrimsToSymbolCap — ultimate → pro loses
-// everything over 75.
-func TestPruneChannelConfig_FinanceTrimsToSymbolCap(t *testing.T) {
-	cfg := financeCfg(200)
-	out, report := PruneChannelConfig("uplink_pro", "finance", cfg)
-	if got := len(out["symbols"].([]any)); got != 75 {
-		t.Errorf("symbols after prune: want 75, got %d", got)
+// TestPartitionWidgetsForCap covers the selection logic of the downgrade
+// prune: keep the oldest enabled widgets up to the slot cap, mark the
+// newest overflow for disabling, and never touch already-disabled rows.
+func TestPartitionWidgetsForCap(t *testing.T) {
+	w := func(name string, enabled bool) Channel {
+		return Channel{ChannelType: name, Enabled: enabled}
 	}
-	if report.SymbolsBefore != 200 || report.SymbolsAfter != 75 {
-		t.Errorf("report: want 200→75, got %d→%d", report.SymbolsBefore, report.SymbolsAfter)
+	// created_at ASC order, matching GetUserChannels.
+	channels := []Channel{
+		w("sports_nfl", true),
+		w("finance_stocks", true),
+		w("news_bbc", false), // user-disabled — passes through untouched
+		w("sports_nba", true),
+		w("predictions", true),
+		w("fantasy_yahoo", true),
 	}
-	if !report.Changed() {
-		t.Error("report should register a change")
+
+	kept, pruned := partitionWidgetsForCap(channels, 3)
+
+	wantKept := []string{"sports_nfl", "finance_stocks", "sports_nba"}
+	wantPruned := []string{"predictions", "fantasy_yahoo"}
+	if got := widgetNames(kept); !equalStrings(got, wantKept) {
+		t.Errorf("kept = %v, want %v", got, wantKept)
+	}
+	if got := widgetNames(pruned); !equalStrings(got, wantPruned) {
+		t.Errorf("pruned = %v, want %v", got, wantPruned)
 	}
 }
 
-// TestPruneChannelConfig_UltimateIsNoOp — no cap ⇒ no prune.
-func TestPruneChannelConfig_UltimateIsNoOp(t *testing.T) {
-	cfg := financeCfg(500)
-	out, report := PruneChannelConfig("uplink_ultimate", "finance", cfg)
-	if got := len(out["symbols"].([]any)); got != 500 {
-		t.Errorf("symbols after prune: want 500 (unchanged), got %d", got)
+// TestPartitionWidgetsForCap_UnderCap — nothing to prune when the user
+// fits their slots (the upgrade / no-op path).
+func TestPartitionWidgetsForCap_UnderCap(t *testing.T) {
+	channels := []Channel{
+		{ChannelType: "sports_nfl", Enabled: true},
+		{ChannelType: "news_bbc", Enabled: true},
 	}
-	if report.Changed() {
-		t.Error("ultimate tier should not register any change")
+	kept, pruned := partitionWidgetsForCap(channels, 3)
+	if len(kept) != 2 || len(pruned) != 0 {
+		t.Errorf("kept=%d pruned=%d, want kept=2 pruned=0", len(kept), len(pruned))
 	}
 }
 
-// TestPruneChannelConfig_RSS_CustomFirst — when both caps would trip,
-// the pruner drops custom feeds first (they're the scarcer resource)
-// then trims the remaining pool by the total cap.
-func TestPruneChannelConfig_RSS_CustomFirst(t *testing.T) {
-	// Pro tier: feeds=100, custom_feeds=3. Input has 110 feeds, 5 custom.
-	cfg := rssCfg(110, 5)
-	out, report := PruneChannelConfig("uplink_pro", "rss", cfg)
-
-	feeds := out["feeds"].([]any)
-	if len(feeds) != 100 {
-		t.Errorf("feeds after prune: want 100, got %d", len(feeds))
+func widgetNames(chs []Channel) []string {
+	names := make([]string, len(chs))
+	for i, ch := range chs {
+		names[i] = ch.ChannelType
 	}
-	customKept := 0
-	for _, f := range feeds {
-		m := f.(map[string]any)
-		if v, _ := m["is_custom"].(bool); v {
-			customKept++
+	return names
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
 		}
 	}
-	if customKept != 3 {
-		t.Errorf("custom feeds kept: want 3, got %d", customKept)
-	}
-	if report.FeedsBefore != 110 || report.FeedsAfter != 100 ||
-		report.CustomFeedsBefore != 5 || report.CustomFeedsAfter != 3 {
-		t.Errorf("report mismatch: %+v", report)
-	}
-}
-
-// TestPruneChannelConfig_FreeRSSDropsAllCustom — free allows 0 custom.
-func TestPruneChannelConfig_FreeRSSDropsAllCustom(t *testing.T) {
-	cfg := rssCfg(1, 1) // 1 custom feed only
-	out, _ := PruneChannelConfig("free", "rss", cfg)
-	feeds := out["feeds"].([]any)
-	if len(feeds) != 0 {
-		t.Errorf("free tier should drop the 1 custom feed (cap 0); got %d feeds", len(feeds))
-	}
-}
-
-// TestPruneChannelConfig_SportsLeaguesTrim — ultimate → free drops to 1.
-func TestPruneChannelConfig_SportsLeaguesTrim(t *testing.T) {
-	cfg := sportsCfg(10)
-	out, report := PruneChannelConfig("free", "sports", cfg)
-	if got := len(out["leagues"].([]any)); got != 1 {
-		t.Errorf("leagues after prune: want 1, got %d", got)
-	}
-	if report.LeaguesBefore != 10 || report.LeaguesAfter != 1 {
-		t.Errorf("report: want 10→1, got %d→%d", report.LeaguesBefore, report.LeaguesAfter)
-	}
-}
-
-// TestPruneChannelConfig_UnknownChannelNoOp — don't touch configs we
-// don't understand.
-func TestPruneChannelConfig_UnknownChannelNoOp(t *testing.T) {
-	cfg := map[string]any{"custom_array": []any{"a", "b", "c"}}
-	out, report := PruneChannelConfig("free", "future_channel", cfg)
-	if got, ok := out["custom_array"].([]any); !ok || len(got) != 3 {
-		t.Errorf("unknown channel config should pass through; got %v", out)
-	}
-	if report.Changed() {
-		t.Error("unknown channel should not register any change")
-	}
+	return true
 }

@@ -92,6 +92,7 @@ func channelUserCacheKeys(userSub string) []string {
 		"cache:finance:" + userSub,
 		"cache:sports:" + userSub,
 		"cache:rss:" + userSub,
+		"cache:predictions:" + userSub,
 	}
 }
 

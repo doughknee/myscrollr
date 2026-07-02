@@ -43,6 +43,11 @@ const (
 	SSEClientBufferSize  = 100
 	SSEDispatchWorkers   = 8
 	SSEDispatchQueueSize = 4096
+	// Cache-invalidation pipeline (events.go queueCacheInvalidation): the
+	// queue holds UNIQUE users awaiting a DEL, so its depth bounds distinct
+	// users per burst, not events — bursts repeat the same users and dedupe.
+	SSEInvalidationWorkers   = 4
+	SSEInvalidationQueueSize = 8192
 )
 
 // =============================================================================
@@ -52,11 +57,12 @@ const (
 const (
 	// Each CDC event is published to exactly one topic channel.
 	// The Hub subscribes to all topic patterns and fans out in-memory.
-	TopicPrefixFinance = "cdc:finance:"   // cdc:finance:{SYMBOL}
-	TopicPrefixSports  = "cdc:sports:"    // cdc:sports:{LEAGUE}
-	TopicPrefixRSS     = "cdc:rss:"       // cdc:rss:{feed_url_fnv_hash}
-	TopicPrefixFantasy = "cdc:fantasy:"   // cdc:fantasy:{league_key}
-	TopicPrefixCore    = "cdc:core:user:" // cdc:core:user:{logto_sub}
+	TopicPrefixFinance     = "cdc:finance:"     // cdc:finance:{SYMBOL}
+	TopicPrefixSports      = "cdc:sports:"      // cdc:sports:{LEAGUE}
+	TopicPrefixRSS         = "cdc:rss:"         // cdc:rss:{feed_url_fnv_hash}
+	TopicPrefixFantasy     = "cdc:fantasy:"     // cdc:fantasy:{league_key}
+	TopicPrefixPredictions = "cdc:predictions:" // cdc:predictions:all (v1 channel-wide broadcast)
+	TopicPrefixCore        = "cdc:core:user:"   // cdc:core:user:{logto_sub}
 
 	// TopicSSEControlResubscribe carries cross-replica SSE control
 	// messages (ADR-0001): payload is the logto sub whose channel config

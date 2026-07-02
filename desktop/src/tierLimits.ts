@@ -20,9 +20,21 @@ import type { SubscriptionTier } from "./auth";
 //
 // Infinity here corresponds to `null` on the wire (null round-trips
 // through JSON; Infinity does not).
+//
+// WIDGET/SLOT REDESIGN (2026-06-30): `maxWidgets` is the ONLY monetization
+// lever — how many widgets a tier runs at once. The per-feature depth caps
+// (symbols/feeds/customFeeds/leagues/fantasy) were RETIRED on 2026-07-02:
+// every tier now has unlimited depth inside a widget ("track a hundred stocks
+// in one Stocks widget"), so they're all Infinity. The fields remain only for
+// wire/type compatibility. Provider-quota protection moves to rate limiting,
+// not per-user caps. `maxTickerRows`/`maxTickerCustomization` are free in the
+// product model; kept only so existing consumers compile until the ticker UI
+// is reworked.
 // =====================================================================
 
 interface ChannelLimits {
+  /** Max widgets a tier can run at once — the slot model. Infinity = unlimited. */
+  maxWidgets: number;
   symbols: number;
   feeds: number;
   customFeeds: number;
@@ -34,49 +46,44 @@ interface ChannelLimits {
   maxTickerCustomization: boolean;
 }
 
+// Per-feature depth caps are all Infinity (retired) — `maxWidgets` is the only
+// gating lever. Only maxWidgets + the ticker-row fields still vary by tier.
+const UNLIMITED_DEPTH = {
+  symbols: Infinity,
+  feeds: Infinity,
+  customFeeds: Infinity,
+  leagues: Infinity,
+  fantasy: Infinity,
+} as const;
+
 export const TIER_LIMITS: Record<SubscriptionTier, ChannelLimits> = {
   free: {
-    symbols: 5,
-    feeds: 1,
-    customFeeds: 0,
-    leagues: 1,
-    fantasy: 0,
+    maxWidgets: 3,
+    ...UNLIMITED_DEPTH,
     maxTickerRows: 1,
     maxTickerCustomization: false,
   },
   uplink: {
-    symbols: 25,
-    feeds: 25,
-    customFeeds: 1,
-    leagues: 8,
-    fantasy: 1,
+    maxWidgets: 6,
+    ...UNLIMITED_DEPTH,
     maxTickerRows: 2,
     maxTickerCustomization: false,
   },
   uplink_pro: {
-    symbols: 75,
-    feeds: 100,
-    customFeeds: 3,
-    leagues: 20,
-    fantasy: 3,
+    maxWidgets: 12,
+    ...UNLIMITED_DEPTH,
     maxTickerRows: 3,
     maxTickerCustomization: false,
   },
   uplink_ultimate: {
-    symbols: Infinity,
-    feeds: Infinity,
-    customFeeds: 10,
-    leagues: Infinity,
-    fantasy: 10,
+    maxWidgets: Infinity,
+    ...UNLIMITED_DEPTH,
     maxTickerRows: 3,
     maxTickerCustomization: true,
   },
   super_user: {
-    symbols: Infinity,
-    feeds: Infinity,
-    customFeeds: Infinity,
-    leagues: Infinity,
-    fantasy: Infinity,
+    maxWidgets: Infinity,
+    ...UNLIMITED_DEPTH,
     maxTickerRows: 3,
     maxTickerCustomization: true,
   },
@@ -91,6 +98,15 @@ export type NumericLimitKey = {
 }[keyof ChannelLimits];
 
 type LimitKey = NumericLimitKey;
+
+/**
+ * Max widgets the tier can run at once (the slot model). Infinity means
+ * unlimited. This is the lever the Catalog reads to decide when to show a
+ * widget as locked / "upgrade for more".
+ */
+export function getMaxWidgets(tier: SubscriptionTier): number {
+  return TIER_LIMITS[tier].maxWidgets;
+}
 
 /** Max ticker rows for the tier (1..3). */
 export function getMaxTickerRows(tier: SubscriptionTier): number {

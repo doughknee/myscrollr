@@ -97,7 +97,7 @@ export default function Header() {
 
             <NavLink to="/channels" activeOn="/channels">
               <Puzzle size={14} />
-              Channels
+              Widgets
             </NavLink>
 
             <NavLink to="/uplink" activeOn="/uplink">
@@ -218,7 +218,7 @@ export default function Header() {
                   icon={<ChevronRight size={18} />}
                   onClick={() => setIsOpen(false)}
                 >
-                  Channels
+                  Widgets
                 </MobileNavLink>
 
                 <MobileNavLink

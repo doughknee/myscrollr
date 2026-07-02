@@ -1092,7 +1092,7 @@ function ArchitecturePage() {
               className="inline-flex items-center gap-2 rounded-lg border border-base-300/40 bg-base-200/40 px-4 py-2 text-sm font-semibold text-base-content/70 hover:border-primary/30 hover:text-primary transition-colors"
             >
               <Puzzle size={14} aria-hidden="true" />
-              Browse channels
+              Browse widgets
             </Link>
             <Link
               to="/download"

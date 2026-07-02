@@ -32,9 +32,9 @@ export const Route = createFileRoute('/uplink_/lifetime')({
   validateSearch: () => ({}),
   head: () =>
     seo({
-      title: 'Scrollr Lifetime Uplink: Founding Members',
+      title: 'Scrollr Lifetime Ultimate: Founding Members',
       description:
-        'One payment, forever access to all Scrollr Uplink features. Only 128 founding member slots available.',
+        'One payment, permanent Uplink Ultimate access — unlimited widgets, webhooks, data export, and API access forever. Only 128 founding member slots available.',
       path: '/uplink/lifetime',
       image: 'https://myscrollr.com/og/uplink.png',
       type: 'product',
@@ -112,7 +112,7 @@ function LifetimePage() {
           }
         >
           <CheckoutModal
-            plan={{ name: 'Lifetime', tier: 'lifetime', price: 399 }}
+            plan={{ name: 'Lifetime', tier: 'lifetime', price: 999 }}
             hasTrial={false}
             getToken={getToken}
             onSuccess={() => {
@@ -238,9 +238,9 @@ function LifetimePage() {
                 transition={{ duration: 0.7, delay: 0.1, ease: EASE }}
                 className="text-5xl md:text-7xl font-black tracking-tight leading-[0.9] mb-6"
               >
-                50% Off
+                Ultimate.
                 <br />
-                <span className="text-primary">Ultimate.</span>
+                <span className="text-primary">One Payment.</span>
                 <br />
                 <span className="text-warning">Forever.</span>
               </motion.h1>
@@ -252,10 +252,10 @@ function LifetimePage() {
                 transition={{ duration: 0.6, delay: 0.2, ease: EASE }}
                 className="text-sm text-base-content/40 leading-relaxed max-w-md mb-10"
               >
-                Lifetime members get permanent Uplink-tier access with a single
-                payment — plus 50% off any Uplink Ultimate subscription.
-                Real-time SSE, unlimited symbols, webhooks, API access — all at
-                half price, for as long as you subscribe. Only 128 founding
+                Lifetime members get permanent Uplink Ultimate access with a
+                single payment — unlimited widgets at once, webhooks, data
+                export, and API access, forever. No renewals, no tiers to
+                think about. Only 128 founding
                 member slots will ever exist.
               </motion.p>
 
@@ -267,15 +267,13 @@ function LifetimePage() {
                 className="space-y-3 mb-10"
               >
                 <Feature>
-                  50% off any Uplink Ultimate subscription — from $25.00/mo
+                  Permanent Uplink Ultimate access — one payment, no renewals
                 </Feature>
-                <Feature>
-                  Real-time SSE, unlimited symbols, feeds & leagues
-                </Feature>
-                <Feature>Permanent Uplink-tier access (30s polling)</Feature>
-                <Feature>25 symbols, 50 RSS feeds, 3 fantasy leagues</Feature>
+                <Feature>Unlimited widgets at once</Feature>
+                <Feature>Webhooks, data export & API access</Feature>
+                <Feature>Yahoo Fantasy sync + unlimited items per widget</Feature>
                 <Feature>Founding member badge & priority support</Feature>
-                <Feature>Early access to new features & channels</Feature>
+                <Feature>Early access to new features & widgets</Feature>
               </motion.div>
             </div>
 
@@ -347,7 +345,7 @@ function LifetimePage() {
                   <div className="mb-2">
                     <div className="flex items-baseline gap-2">
                       <span className="text-5xl font-black text-base-content tracking-tight">
-                        $399
+                        $999
                       </span>
                       <span className="text-sm text-base-content/25">
                         one-time
@@ -355,7 +353,7 @@ function LifetimePage() {
                     </div>
                   </div>
                   <p className="text-[10px] text-warning/40 mb-4">
-                    Equivalent to ~3.3 years of Uplink Monthly at $9.99/mo
+                    Pays for itself vs Ultimate Annual ($399.99/yr) in 2.5 years
                   </p>
 
                   {/* Unlimited upgrade callout — with aura */}
@@ -402,13 +400,13 @@ function LifetimePage() {
                     />
                     <div className="relative z-10">
                       <p className="text-[10px] text-primary/70 font-semibold mb-1">
-                        50% Off Uplink Ultimate — From $25.00/mo
+                        Everything Ultimate has. Forever.
                       </p>
                       <p className="text-[10px] text-base-content/35 leading-relaxed">
-                        Lifetime members get half off any Uplink Ultimate
-                        subscription. Real-time SSE, unlimited symbols and
-                        feeds, webhooks, API access, and data export — all at
-                        half price.
+                        Every Ultimate feature — unlimited widgets at once,
+                        webhooks, data export, API access, priority support —
+                        permanently included. Future Ultimate features land
+                        in your account automatically.
                       </p>
                     </div>
                   </div>

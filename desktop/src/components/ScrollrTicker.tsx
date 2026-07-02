@@ -3,7 +3,7 @@ import clsx from "clsx";
 import { ChevronDown, Plus, Settings2 } from "lucide-react";
 import { Ticker } from "motion-plus/react";
 import { useMotionValue, animate, AnimatePresence, motion } from "motion/react";
-import type { DashboardResponse, Trade, Game, RssItem, WidgetTickerData } from "../types";
+import type { DashboardResponse, Trade, Game, RssItem, WidgetTickerData, Prediction } from "../types";
 import type {
   MixMode,
   ChipColorMode,
@@ -18,6 +18,7 @@ import type { LeagueResponse as FantasyLeague } from "../channels/fantasy/types"
 import TradeChip from "./chips/TradeChip";
 import GameChip from "./chips/GameChip";
 import RssChip from "./chips/RssChip";
+import PredictionChip from "./chips/PredictionChip";
 import FantasyStatChip from "./chips/FantasyStatChip";
 import FollowedPlayerChip from "./chips/FollowedPlayerChip";
 import ConsolidatedChip from "./chips/ConsolidatedChip";
@@ -25,6 +26,7 @@ import { selectRssForTicker } from "../channels/rss/view";
 import { selectFinanceForTicker } from "../channels/finance/view";
 import { selectFantasyForTicker } from "../channels/fantasy/view";
 import { selectSportsForTicker, getSportsDisplayConfig } from "../channels/sports/view";
+import { selectPredictionsForTicker } from "../channels/predictions/view";
 import {
   findTopN,
   findTopBench,
@@ -32,6 +34,8 @@ import {
   findInjuredPlayers,
 } from "../channels/fantasy/playerStats";
 import { buildYahooLeagueUrl, buildYahooPlayerUrl, chipUrlForFinance, chipUrlForSports, chipUrlForRss } from "../utils/chipUrl";
+import { sourceForWidget } from "../marketplace";
+import { scopeSourceData } from "../utils/widgetScope";
 
 // ── Module-level constants ───────────────────────────────────────
 
@@ -229,16 +233,22 @@ export default function ScrollrTicker({
         continue;
       }
 
-      // ── Channel tabs: use dashboard.data ──────────────────────
-      const data = dashboard?.data?.[tab];
+      // ── Channel tabs ──────────────────────────────────────────
+      // activeTabs holds widget ids (sports_nfl, finance_stocks, news_bbc), but
+      // dashboard.data is keyed by the coarse source (sports/finance/rss).
+      // Resolve widget → source for the lookup; scope the payload below. A bare
+      // coarse/legacy tab (source undefined) shows everything.
+      const source = sourceForWidget(tab);
+      const effectiveSource = source ?? tab;
+      const rawData = dashboard?.data?.[effectiveSource];
 
       // Fantasy arrives as a structured { leagues: [...] } object, so it
       // needs its own branch before the generic array check below.
       // Uses `selectFantasyForTicker` which honours enabledLeagueKeys +
       // primaryLeagueKey from Display prefs — so the ticker stays in sync
       // with the Fantasy feed page.
-      if (tab === "fantasy") {
-        const fantasyPayload = data as { leagues?: unknown } | undefined;
+      if (effectiveSource === "fantasy") {
+        const fantasyPayload = rawData as { leagues?: unknown } | undefined;
         const leagues = Array.isArray(fantasyPayload?.leagues)
           ? (fantasyPayload.leagues as FantasyLeague[])
           : [];
@@ -397,9 +407,22 @@ export default function ScrollrTicker({
         continue;
       }
 
-      if (!Array.isArray(data) || data.length === 0) continue;
+      if (!Array.isArray(rawData) || rawData.length === 0) continue;
 
-      switch (tab) {
+      // Scope the payload to this widget's own config (leagues / symbols / feed
+      // URLs). Legacy coarse tabs (no source) show everything.
+      const data = source
+        ? scopeSourceData(
+            source,
+            rawData,
+            dashboard?.channels?.find((c) => c.channel_type === tab)?.config as
+              | Record<string, unknown>
+              | undefined,
+          )
+        : rawData;
+      if (data.length === 0) continue;
+
+      switch (effectiveSource) {
         case "finance": {
           // Apply Display prefs: `defaultSort` affects both feed and
           // ticker (universal sort). Per-field visibility (showChange,
@@ -426,10 +449,11 @@ export default function ScrollrTicker({
         }
 
         case "sports": {
-          // Sports display prefs live server-side on channel config.display.
-          // Per-field visibility uses the Venue enum mirroring the client-
-          // only channels; read each field through shouldShowOnTicker.
-          const sportsConfig = getSportsDisplayConfig(dashboard);
+          // Sports display prefs live server-side on the WIDGET row's
+          // config.display (per-league toggles since the 000014 split);
+          // pass the tab so an NFL widget's toggles gate NFL chips. Per-
+          // field visibility uses the Venue enum via shouldShowOnTicker.
+          const sportsConfig = getSportsDisplayConfig(dashboard, tab);
           const showLogos = shouldShowOnTicker(sportsConfig.showLogos ?? "both");
           const showTimer = shouldShowOnTicker(sportsConfig.showTimer ?? "both");
           const sorted = selectSportsForTicker(data as Game[], sportsConfig);
@@ -468,6 +492,35 @@ export default function ScrollrTicker({
                   showSource={shouldShowOnTicker(rssPrefs.showSource)}
                   showTimestamps={shouldShowOnTicker(rssPrefs.showTimestamps)}
                   onClick={() => onChipClick?.("rss", item.id, chipUrlForRss(item))}
+                />
+              )
+            );
+          }
+          break;
+        }
+
+        case "predictions": {
+          // Premier prediction-markets channel. Implied probability +
+          // ▲/▼ delta is the "heartbeat"; the universal `defaultSort`
+          // (movers/volume/closing) governs ordering on both surfaces.
+          const predictionsPrefs = channelDisplay?.predictions;
+          if (!predictionsPrefs) continue;
+          const sorted = selectPredictionsForTicker(
+            data as Prediction[],
+            predictionsPrefs,
+          );
+          for (const p of sorted) {
+            bucket.push(
+              wrap(`pred-${p.id}`,
+                <PredictionChip
+                  prediction={p}
+                  comfort={comfort}
+                  colorMode={chipColorMode}
+                  showDelta={shouldShowOnTicker(predictionsPrefs.showDelta)}
+                  showCategory={shouldShowOnTicker(predictionsPrefs.showCategory)}
+                  showVolume={shouldShowOnTicker(predictionsPrefs.showVolume)}
+                  showCloseTime={shouldShowOnTicker(predictionsPrefs.showCloseTime)}
+                  onClick={() => onChipClick?.("predictions", p.id, p.link)}
                 />
               )
             );

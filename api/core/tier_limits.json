@@ -1,42 +1,47 @@
 {
   "tiers": {
     "free": {
-      "symbols": 5,
-      "feeds": 1,
-      "custom_feeds": 0,
-      "leagues": 1,
-      "fantasy": 0,
+      "max_widgets": 3,
+      "symbols": null,
+      "feeds": null,
+      "custom_feeds": null,
+      "leagues": null,
+      "fantasy": null,
       "max_ticker_rows": 1,
       "max_ticker_customization": false
     },
     "uplink": {
-      "symbols": 25,
-      "feeds": 25,
-      "custom_feeds": 1,
-      "leagues": 8,
-      "fantasy": 1,
+      "max_widgets": 6,
+      "symbols": null,
+      "feeds": null,
+      "custom_feeds": null,
+      "leagues": null,
+      "fantasy": null,
       "max_ticker_rows": 2,
       "max_ticker_customization": false
     },
     "uplink_pro": {
-      "symbols": 75,
-      "feeds": 100,
-      "custom_feeds": 3,
-      "leagues": 20,
-      "fantasy": 3,
+      "max_widgets": 12,
+      "symbols": null,
+      "feeds": null,
+      "custom_feeds": null,
+      "leagues": null,
+      "fantasy": null,
       "max_ticker_rows": 3,
       "max_ticker_customization": false
     },
     "uplink_ultimate": {
+      "max_widgets": null,
       "symbols": null,
       "feeds": null,
-      "custom_feeds": 10,
+      "custom_feeds": null,
       "leagues": null,
-      "fantasy": 10,
+      "fantasy": null,
       "max_ticker_rows": 3,
       "max_ticker_customization": true
     },
     "super_user": {
+      "max_widgets": null,
       "symbols": null,
       "feeds": null,
       "custom_feeds": null,
@@ -47,4 +52,3 @@
     }
   }
 }
-

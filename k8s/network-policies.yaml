@@ -164,6 +164,46 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  name: allow-core-to-predictions-api
+  namespace: scrollr
+spec:
+  podSelector:
+    matchLabels:
+      app: predictions-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: core-api
+      ports:
+        - protocol: TCP
+          port: 8085
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-predictions-api-to-predictions-service
+  namespace: scrollr
+spec:
+  podSelector:
+    matchLabels:
+      app: predictions-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: predictions-api
+      ports:
+        - protocol: TCP
+          port: 3005
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
   name: allow-finance-api-to-finance-service
   namespace: scrollr
 spec:

@@ -59,8 +59,8 @@ const CHANNELS: Array<ChannelInfo> = [
     scenarioTitle: 'Morning coffee, portfolio check',
     scenarioBody:
       "Glance at BTC, ETH, and your watchlist while reading the morning news. No apps to open, no tabs to switch. It's just there.",
-    stat: 'Up to ∞',
-    statLabel: 'tracked symbols',
+    stat: '∞',
+    statLabel: 'symbols per widget',
   },
   {
     key: 'sports',
@@ -75,9 +75,9 @@ const CHANNELS: Array<ChannelInfo> = [
     scenarioIcon: Timer,
     scenarioTitle: 'Never miss the final score',
     scenarioBody:
-      "NFL, NBA, NHL, MLB. Live scores tick along the bottom of your screen. You'll know the second the game ends.",
-    stat: '5',
-    statLabel: 'major leagues',
+      "Every league is its own widget — NFL, NBA, MLB, and 11 more. Live scores tick along the bottom of your screen. You'll know the second the game ends.",
+    stat: '14',
+    statLabel: 'league widgets',
   },
   {
     key: 'news',
@@ -92,9 +92,9 @@ const CHANNELS: Array<ChannelInfo> = [
     scenarioIcon: Newspaper,
     scenarioTitle: 'Headlines without the noise',
     scenarioBody:
-      'Curated RSS from 100+ sources across tech, world, finance, and more. No algorithms, no clickbait. Just the feeds you choose.',
-    stat: '100+',
-    statLabel: 'curated feeds',
+      'Curated outlet widgets — BBC, NPR, The Verge, and more — plus Custom RSS for any feed URL. No algorithms, no clickbait. Just the sources you choose.',
+    stat: '10+',
+    statLabel: 'outlets + custom RSS',
   },
   {
     key: 'fantasy',
@@ -470,8 +470,8 @@ export function ChannelsShowcase() {
             <span className="text-gradient-primary">One Ticker.</span>
           </h2>
           <p className="text-base text-base-content/45 max-w-lg leading-relaxed text-center">
-            Finance, sports, news, and fantasy today &mdash; with more on the
-            way. Toggle what you want, ignore the rest.
+            Sports, stocks, crypto, news, and fantasy widgets today &mdash;
+            with more on the way. Add what you want, ignore the rest.
           </p>
         </motion.div>
 

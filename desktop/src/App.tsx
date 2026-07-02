@@ -40,7 +40,7 @@ import type { SubscriptionTier } from "./auth";
 import type { ChannelType } from "./api/client";
 import type { DeliveryMode } from "./types";
 import type { AppPreferences, TickerPosition } from "./preferences";
-import { getAllChannels } from "./channels/registry";
+import { getCatalogItems, sourceForWidget } from "./marketplace";
 import { getAllWidgets } from "./widgets/registry";
 import { useWidgetTickerData } from "./hooks/useWidgetTickerData";
 import { useTheme } from "./hooks/useTheme";
@@ -48,7 +48,7 @@ import { useTheme } from "./hooks/useTheme";
 
 // ── Constants ────────────────────────────────────────────────────
 
-import { API_BASE as API_URL } from "./config";
+import { API_BASE as API_URL, DEMO } from "./config";
 
 // ── App (Ticker Window) ─────────────────────────────────────────
 
@@ -100,6 +100,11 @@ export default function App() {
 
   const channelTabs = useMemo(() => {
     if (channels.length === 0) {
+      // Demo mode (VITE_DEMO) talks to the local bridge, which serves only the
+      // predictions slice and may not surface channels[] on the ticker window
+      // in time — show predictions rather than the finance/sports teaser the
+      // bridge can't fill.
+      if (DEMO) return ["predictions"];
       // Signed-out users get the finance + sports demo tabs so the
       // public-feed teaser renders on the ticker. Signed-in users with
       // zero channels deliberately get an empty tab list so the ticker
@@ -123,12 +128,13 @@ export default function App() {
   // renders that don't change the channel set.
   const installedChannelsMeta = useMemo(() => {
     if (channels.length === 0) return [];
-    const manifestById = new Map(
-      getAllChannels().map((c) => [c.id, c]),
-    );
+    // Resolve each enabled channel row to its WIDGET display (name/icon/hex)
+    // from the flat catalog, so split widgets show as "MLB"/"Stocks" — not
+    // the coarse "Sports"/"Finance" source they read from.
+    const metaById = new Map(getCatalogItems().map((it) => [it.id, it]));
     return channels
       .filter((ch) => ch.enabled)
-      .map((ch) => manifestById.get(ch.channel_type))
+      .map((ch) => metaById.get(ch.channel_type))
       .filter((m): m is NonNullable<typeof m> => Boolean(m))
       .map((m) => ({
         id: m.id,
@@ -185,7 +191,9 @@ export default function App() {
   // ── SSE lifecycle ───────────────────────────────────────────
 
   const startSSE = useCallback(async () => {
-    const token = await getValidToken();
+    // Demo mode talks to the no-auth bridge, which ignores the Bearer —
+    // use a placeholder so the SSE stream still starts without Logto.
+    const token = DEMO ? "demo" : await getValidToken();
     if (!token) return;
     sseActiveRef.current = true;
     setDeliveryMode("sse");
@@ -247,7 +255,7 @@ export default function App() {
         setAuthenticated(true);
       }
 
-      if (resolvedTier === "uplink_ultimate" || resolvedTier === "super_user") {
+      if (DEMO || resolvedTier === "uplink_ultimate" || resolvedTier === "super_user") {
         startSSE();
       }
     }
@@ -722,53 +730,54 @@ export default function App() {
         }
       }
 
-      // Channels submenu (only when authenticated with channels)
-      if (chs.length > 0) {
-        const channelSubmenus: Submenu[] = [];
-        for (const ch of chs) {
-          const channelType = ch.channel_type;
-          const label =
-            channelType.charAt(0).toUpperCase() + channelType.slice(1);
-          const currentRow = getChannelTickerRow(prefsRef.current, ch);
-          const rowItems = await buildRowSubmenuItems(
-            currentRow,
-            (row) => {
-              // Optimistic update — flip the ref immediately so the next
-              // menu build reflects the change without waiting for the API.
-              const target = channelsRef.current.find(
-                (c) => c.channel_type === channelType,
-              );
-              if (target) target.ticker_enabled = row !== null;
-              handleChannelRowChange(channelType, row);
-            },
-            !ch.enabled,
-            () => addRowAndAssign(channelType, "channel"),
-          );
-          channelSubmenus.push(
-            await Submenu.new({ text: label, items: rowItems }),
-          );
-        }
-        items.push(
-          await Submenu.new({ text: "Channels", items: channelSubmenus }),
+      // Widgets submenu — one unified row-picker list. The widget/slot model
+      // has no coarse "channels": server-backed data widgets (sports_nfl,
+      // finance_stocks, …) and local widgets (clock, weather, …) sit together,
+      // each labeled by its catalog name.
+      const widgetSubmenus: Submenu[] = [];
+
+      // Data widgets — the user's enabled channels, labeled by their catalog
+      // name ("NFL", "Stocks", "BBC News"), not the raw channel_type.
+      const metaById = new Map(getCatalogItems().map((it) => [it.id, it]));
+      for (const ch of chs) {
+        const label =
+          metaById.get(ch.channel_type)?.name ??
+          `${ch.channel_type.charAt(0).toUpperCase()}${ch.channel_type.slice(1)}`;
+        const currentRow = getChannelTickerRow(prefsRef.current, ch);
+        const rowItems = await buildRowSubmenuItems(
+          currentRow,
+          (row) => {
+            // Optimistic update — flip the ref immediately so the next
+            // menu build reflects the change without waiting for the API.
+            const target = channelsRef.current.find(
+              (c) => c.channel_type === ch.channel_type,
+            );
+            if (target) target.ticker_enabled = row !== null;
+            handleChannelRowChange(ch.channel_type, row);
+          },
+          !ch.enabled,
+          () => addRowAndAssign(ch.channel_type, "channel"),
+        );
+        widgetSubmenus.push(
+          await Submenu.new({ text: label, items: rowItems }),
         );
       }
 
-      // Widgets submenu — same row-picker pattern.
-      const allWidgets = getAllWidgets();
-      if (allWidgets.length > 0) {
-        const widgetSubmenus: Submenu[] = [];
-        for (const widget of allWidgets) {
-          const currentRow = getWidgetTickerRow(prefsRef.current, widget.id);
-          const rowItems = await buildRowSubmenuItems(
-            currentRow,
-            (row) => handleWidgetRowChange(widget.id, row),
-            false,
-            () => addRowAndAssign(widget.id, "widget"),
-          );
-          widgetSubmenus.push(
-            await Submenu.new({ text: widget.name, items: rowItems }),
-          );
-        }
+      // Local widgets (clock, weather, …) — same row-picker pattern.
+      for (const widget of getAllWidgets()) {
+        const currentRow = getWidgetTickerRow(prefsRef.current, widget.id);
+        const rowItems = await buildRowSubmenuItems(
+          currentRow,
+          (row) => handleWidgetRowChange(widget.id, row),
+          false,
+          () => addRowAndAssign(widget.id, "widget"),
+        );
+        widgetSubmenus.push(
+          await Submenu.new({ text: widget.name, items: rowItems }),
+        );
+      }
+
+      if (widgetSubmenus.length > 0) {
         items.push(
           await Submenu.new({ text: "Widgets", items: widgetSubmenus }),
         );
@@ -875,8 +884,18 @@ export default function App() {
             // Otherwise filter activeTabs down to only the row's configured
             // sources. We pass activeTabs (not row.sources directly) so the
             // downstream pipeline still respects onboarding-level visibility.
+            //
+            // Persisted rows from pre-split builds hold COARSE ids ("sports",
+            // "rss"); post-migration tabs are widget ids ("sports_nfl",
+            // "news_bbc"). Match either the exact widget id or its coarse
+            // source, so a row pinned to "Sports" keeps showing all sports
+            // widgets instead of going permanently blank.
             const rowTabs = row.sources.length > 0
-              ? activeTabs.filter((tab) => row.sources.includes(tab))
+              ? activeTabs.filter(
+                  (tab) =>
+                    row.sources.includes(tab) ||
+                    row.sources.includes(sourceForWidget(tab) ?? ""),
+                )
               : activeTabs;
             // Empty-state CTAs are anchored to the first row only, so
             // multi-row layouts don't stack duplicate banners. Two

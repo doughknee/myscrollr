@@ -40,7 +40,7 @@ const PLAN_PRICES: Record<string, string> = {
   pro_annual: '$199.99/yr',
   ultimate_monthly: '$49.99/mo',
   ultimate_annual: '$399.99/yr',
-  lifetime: '$399 one-time',
+  lifetime: '$999 one-time',
 }
 
 const DOWNGRADE_PLAN_NAMES: Record<string, string> = {
@@ -187,8 +187,8 @@ export default function SubscriptionStatus({
           </span>
         </div>
         <p className="text-sm text-base-content/30">
-          Upgrade to Uplink for faster polling, or Uplink Ultimate for real-time
-          SSE.
+          Upgrade to Uplink for more widget slots, or Uplink Ultimate for
+          unlimited widgets.
         </p>
       </div>
     )
@@ -460,8 +460,8 @@ export default function SubscriptionStatus({
                 <>
                   <p>
                     If you cancel now, you&apos;ll lose access to all premium
-                    features immediately &mdash; including real-time data,
-                    higher limits, and Uplink Ultimate access.
+                    features immediately &mdash; including your extra widget
+                    slots and Uplink Ultimate access.
                   </p>
                   <p className="font-semibold text-base-content/70">
                     This is the only free trial offered per account. Once
@@ -481,8 +481,9 @@ export default function SubscriptionStatus({
                     plan.
                   </p>
                   <p>
-                    On the Free plan, you&apos;ll have reduced limits and
-                    60-second polling instead of real-time data.
+                    On the Free plan, you&apos;ll be limited to 3 widgets at
+                    once &mdash; your newest widgets over the cap are switched
+                    off, never deleted.
                   </p>
                 </>
               )}

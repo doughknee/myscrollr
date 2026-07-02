@@ -1,0 +1,352 @@
+/**
+ * MarketDetail — a focused modal for a single prediction market.
+ *
+ * Shows the full question, implied probability + delta, bid/ask spread, a live
+ * price-history sparkline (built from streamed ticks — see sparkline.ts),
+ * volume / open interest / close countdown, and resolution state. Lets the user
+ * star the market (watchlist) and set local price alerts ("tell me if this
+ * crosses 50%"), and deep-links out to Kalshi to act. Display-only — no order
+ * entry.
+ */
+import { useEffect, useMemo, useState } from "react";
+import { clsx } from "clsx";
+import { open } from "@tauri-apps/plugin-shell";
+import {
+  X,
+  Star,
+  ExternalLink,
+  Bell,
+  BellPlus,
+  Trash2,
+  TrendingUp,
+  TrendingDown,
+} from "lucide-react";
+import {
+  formatCompactNumber,
+  formatCloseCountdown,
+  relativeTime,
+} from "../../utils/format";
+import {
+  formatProbability,
+  formatSpread,
+  priceDelta,
+  isResolved,
+} from "./view";
+import { getHistory, sparklinePoints, trend } from "./sparkline";
+import { describeAlert, type AlertComparator, type PredictionAlert } from "./watchlist";
+import type { Prediction } from "../../types";
+
+interface MarketDetailProps {
+  market: Prediction;
+  now: number;
+  watched: boolean;
+  onToggleWatch: () => void;
+  alerts: PredictionAlert[];
+  onAddAlert: (input: {
+    ticker: string;
+    label: string;
+    comparator: AlertComparator;
+    threshold: number;
+  }) => void;
+  onRemoveAlert: (id: string) => void;
+  onClose: () => void;
+}
+
+const SPARK_W = 280;
+const SPARK_H = 56;
+
+export default function MarketDetail({
+  market,
+  now,
+  watched,
+  onToggleWatch,
+  alerts,
+  onAddAlert,
+  onRemoveAlert,
+  onClose,
+}: MarketDetailProps) {
+  // Close on Escape.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const delta = priceDelta(market);
+  const resolved = isResolved(market);
+  const history = getHistory(market.ticker);
+  const dir = trend(history);
+
+  const points = useMemo(
+    () => sparklinePoints(history, { width: SPARK_W, height: SPARK_H, pad: 4, min: 0, max: 100 }),
+    [history],
+  );
+
+  const myAlerts = alerts.filter((a) => a.ticker === market.ticker);
+  const countdown = formatCloseCountdown(market.close_time, now);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={market.title}
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-edge/60 bg-surface shadow-2xl"
+      >
+        {/* Header */}
+        <div className="flex items-start gap-2 border-b border-edge/30 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            {market.category && (
+              <span className="text-[10px] font-medium uppercase tracking-wide text-[#6366f1]">
+                {market.category}
+              </span>
+            )}
+            <h2 className="text-[15px] font-semibold leading-snug text-fg">{market.title}</h2>
+            {market.subtitle && (
+              <p className="mt-0.5 text-[12px] text-fg-3">{market.subtitle}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-surface-hover hover:text-fg cursor-pointer"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {/* Probability + sparkline */}
+          <div className="flex items-center justify-between gap-4 px-4 pt-4">
+            <div className="flex items-baseline gap-2">
+              <span className="font-mono text-4xl font-bold tabular-nums text-fg">
+                {formatProbability(market.yes_price)}
+              </span>
+              {delta !== 0 && (
+                <span
+                  className={clsx(
+                    "flex items-center gap-0.5 font-mono text-[13px] font-semibold tabular-nums",
+                    delta > 0 ? "text-up" : "text-down",
+                  )}
+                >
+                  {delta > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                  {Math.abs(delta)}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Sparkline */}
+          <div className="px-4 pt-2">
+            {history.length >= 2 ? (
+              <svg
+                viewBox={`0 0 ${SPARK_W} ${SPARK_H}`}
+                width="100%"
+                height={SPARK_H}
+                preserveAspectRatio="none"
+                role="img"
+                aria-label={`Recent price trend: ${dir}`}
+                className="overflow-visible"
+              >
+                <polyline
+                  points={points}
+                  fill="none"
+                  stroke={dir === "up" ? "var(--color-up)" : dir === "down" ? "var(--color-down)" : "var(--color-fg-3)"}
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </svg>
+            ) : (
+              <div className="flex h-[56px] items-center justify-center rounded-lg bg-base-100/40 text-[11px] text-fg-4">
+                Tracking price live… history builds as the market moves
+              </div>
+            )}
+          </div>
+
+          {/* Stat grid */}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 px-4 py-4 text-[12px]">
+            <Stat label="Spread (bid–ask)" value={formatSpread(market.yes_bid, market.yes_ask) || "—"} />
+            <Stat
+              label="Volume"
+              value={market.volume != null ? formatCompactNumber(market.volume) : "—"}
+            />
+            <Stat
+              label="Open interest"
+              value={market.open_interest != null ? formatCompactNumber(market.open_interest) : "—"}
+            />
+            <Stat
+              label={resolved ? "Resolved" : "Closes"}
+              value={
+                resolved
+                  ? (market.result ? market.result.toUpperCase() : "Settled")
+                  : countdown
+                    ? countdown === "Closed"
+                      ? "Closed"
+                      : `in ${countdown}`
+                    : "—"
+              }
+              tone={resolved && market.result ? (market.result.toLowerCase() === "yes" ? "up" : "down") : "flat"}
+            />
+          </div>
+
+          {/* Alerts */}
+          <div className="border-t border-edge/30 px-4 py-3">
+            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-fg-3">
+              <Bell size={12} />
+              Price alerts
+            </div>
+            {myAlerts.length > 0 && (
+              <ul className="mb-2 flex flex-col gap-1">
+                {myAlerts.map((a) => (
+                  <li
+                    key={a.id}
+                    className="flex items-center gap-2 rounded-lg bg-base-100/50 px-2.5 py-1.5 text-[12px]"
+                  >
+                    <span className="flex-1 text-fg-2">{describeAlert(a)}</span>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveAlert(a.id)}
+                      aria-label="Remove alert"
+                      className="text-fg-4 transition-colors hover:text-error cursor-pointer"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <AlertForm
+              onAdd={(comparator, threshold) =>
+                onAddAlert({
+                  ticker: market.ticker,
+                  label: market.title,
+                  comparator,
+                  threshold,
+                })
+              }
+            />
+          </div>
+        </div>
+
+        {/* Footer actions */}
+        <div className="flex items-center gap-2 border-t border-edge/30 px-4 py-3">
+          <button
+            type="button"
+            onClick={onToggleWatch}
+            aria-pressed={watched}
+            className={clsx(
+              "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors cursor-pointer",
+              watched
+                ? "border-amber-400/40 bg-amber-400/10 text-amber-400"
+                : "border-edge/50 text-fg-3 hover:text-fg-2",
+            )}
+          >
+            <Star size={13} className={watched ? "fill-current" : ""} />
+            {watched ? "Watching" : "Watch"}
+          </button>
+          {market.link && (
+            <button
+              type="button"
+              onClick={() => open(market.link!).catch(() => {})}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white transition-transform hover:-translate-y-px cursor-pointer"
+              style={{ background: "#6366f1" }}
+            >
+              <ExternalLink size={13} />
+              View on Kalshi
+            </button>
+          )}
+        </div>
+
+        {/* Last-updated footnote */}
+        {market.updated_at && (
+          <div className="border-t border-edge/20 px-4 py-1.5 text-center font-mono text-[10px] text-fg-4">
+            Updated {relativeTime(market.updated_at, now, { suffix: true })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Bits ─────────────────────────────────────────────────────────
+
+function Stat({
+  label,
+  value,
+  tone = "flat",
+}: {
+  label: string;
+  value: string;
+  tone?: "up" | "down" | "flat";
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10.5px] uppercase tracking-wide text-fg-4">{label}</span>
+      <span
+        className={clsx(
+          "font-mono text-[13px] font-semibold tabular-nums",
+          tone === "up" && "text-up",
+          tone === "down" && "text-down",
+          tone === "flat" && "text-fg",
+        )}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function AlertForm({ onAdd }: { onAdd: (comparator: AlertComparator, threshold: number) => void }) {
+  const [comparator, setComparator] = useState<AlertComparator>("above");
+  const [threshold, setThreshold] = useState("50");
+
+  const submit = () => {
+    const n = Math.round(Number(threshold));
+    if (!Number.isFinite(n) || n < 0 || n > 100) return;
+    onAdd(comparator, n);
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[12px] text-fg-3">Alert me when</span>
+      <select
+        value={comparator}
+        onChange={(e) => setComparator(e.target.value as AlertComparator)}
+        aria-label="Alert direction"
+        className="rounded-md border border-edge/50 bg-base-100 px-1.5 py-1 text-[12px] text-fg-2 outline-none focus:border-accent/60 cursor-pointer"
+      >
+        <option value="above">above</option>
+        <option value="below">below</option>
+      </select>
+      <div className="flex items-center rounded-md border border-edge/50 bg-base-100 px-1.5 focus-within:border-accent/60">
+        <input
+          type="number"
+          min={0}
+          max={100}
+          value={threshold}
+          onChange={(e) => setThreshold(e.target.value)}
+          aria-label="Alert threshold percent"
+          className="w-10 bg-transparent py-1 text-right font-mono text-[12px] text-fg outline-none"
+        />
+        <span className="text-[12px] text-fg-3">%</span>
+      </div>
+      <button
+        type="button"
+        onClick={submit}
+        className="ml-auto inline-flex items-center gap-1 rounded-md bg-accent/15 px-2 py-1 text-[12px] font-medium text-accent transition-colors hover:bg-accent/25 cursor-pointer"
+      >
+        <BellPlus size={13} />
+        Add
+      </button>
+    </div>
+  );
+}

@@ -43,6 +43,9 @@ jobs:
           - dir: channels/fantasy/api
             modroot: channels/fantasy/api
             module: github.com/brandon-relentnet/scrollr-fantasy
+          - dir: channels/predictions/api
+            modroot: channels/predictions/api
+            module: github.com/brandon-relentnet/scrollr-predictions
 
     runs-on: ubuntu-latest
     defaults:
@@ -94,6 +97,7 @@ jobs:
           - dir: channels/finance/service
           - dir: channels/sports/service
           - dir: channels/rss/service
+          - dir: channels/predictions/service
 
     runs-on: ubuntu-latest
     defaults:

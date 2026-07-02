@@ -401,6 +401,26 @@ export interface FinanceDisplayPrefs {
   tickerDirectionMarker: "arrow" | "sign" | "none";
 }
 
+export interface PredictionsDisplayPrefs {
+  /** Implied-probability delta vs prev_yes_price (▲/▼ with up/down color). */
+  showDelta: Venue;
+  /** Category badge (Politics/Sports/Economics/…). */
+  showCategory: Venue;
+  /** Abbreviated trade volume. */
+  showVolume: Venue;
+  /** Countdown to market close. */
+  showCloseTime: Venue;
+  defaultSort: "movers" | "volume" | "closing" | "alpha";
+  /**
+   * Feed density. "comfort" (default) renders a responsive card grid
+   * with probability, delta, category badge, volume, and close-time
+   * countdown. "compact" renders a single dense ticker row — market,
+   * probability, delta — packing more markets per viewport. Drives the
+   * per-row component in FeedTab.
+   */
+  feedDensity: "compact" | "comfort";
+}
+
 export interface RssDisplayPrefs {
   showDescription: Venue;
   showSource: Venue;
@@ -483,6 +503,7 @@ export interface ChannelDisplayPrefs {
   finance: FinanceDisplayPrefs;
   rss: RssDisplayPrefs;
   fantasy: FantasyDisplayPrefs;
+  predictions: PredictionsDisplayPrefs;
 }
 
 /**
@@ -624,6 +645,14 @@ const DEFAULT_CHANNEL_DISPLAY: ChannelDisplayPrefs = {
     showTimestamps: "both",
     articlesPerSource: 4,
   },
+  predictions: {
+    showDelta: "both",
+    showCategory: "both",
+    showVolume: "both",
+    showCloseTime: "both",
+    defaultSort: "volume",
+    feedDensity: "comfort",
+  },
   fantasy: {
     matchupScore: "both",
     winProbability: "both",
@@ -656,8 +685,13 @@ const DEFAULT_CHANNEL_DISPLAY: ChannelDisplayPrefs = {
 };
 
 const DEFAULT_WIDGETS: WidgetPrefs = {
-  enabledWidgets: [],
-  widgetsOnTicker: [],
+  // Onboarding default (widget/slot redesign, 2026-06-30): a brand-new
+  // account starts with the zero-config Clock so the ticker has something to
+  // show immediately instead of an empty bar. It costs 1 of the free plan's
+  // 3 slots and needs no setup. Existing users keep their saved prefs — this
+  // only seeds fresh installs.
+  enabledWidgets: ["clock"],
+  widgetsOnTicker: ["clock"],
   pinnedWidgets: {},
   clock: {
     ticker: { ...DEFAULT_CLOCK_TICKER },
@@ -1034,6 +1068,32 @@ export function migrateFinanceDisplay(
   };
 }
 
+export function migratePredictionsDisplay(
+  saved: Partial<PredictionsDisplayPrefs> | undefined,
+): PredictionsDisplayPrefs {
+  const raw = (saved ?? {}) as Record<string, unknown>;
+  const density =
+    raw.feedDensity === "compact" || raw.feedDensity === "comfort"
+      ? raw.feedDensity
+      : DEFAULT_CHANNEL_DISPLAY.predictions.feedDensity;
+  const defaultSort =
+    raw.defaultSort === "movers" ||
+    raw.defaultSort === "volume" ||
+    raw.defaultSort === "closing" ||
+    raw.defaultSort === "alpha"
+      ? raw.defaultSort
+      : DEFAULT_CHANNEL_DISPLAY.predictions.defaultSort;
+  return {
+    ...DEFAULT_CHANNEL_DISPLAY.predictions,
+    showDelta: migrateVenue(raw.showDelta),
+    showCategory: migrateVenue(raw.showCategory),
+    showVolume: migrateVenue(raw.showVolume),
+    showCloseTime: migrateVenue(raw.showCloseTime),
+    defaultSort,
+    feedDensity: density,
+  };
+}
+
 export function migrateRssDisplay(
   saved: Partial<RssDisplayPrefs> | undefined,
 ): RssDisplayPrefs {
@@ -1215,6 +1275,7 @@ export function loadPrefs(): AppPreferences {
         finance: migrateFinanceDisplay(savedDisplay?.finance),
         rss: migrateRssDisplay(savedDisplay?.rss),
         fantasy: migrateFantasyDisplay(savedDisplay?.fantasy),
+        predictions: migratePredictionsDisplay(savedDisplay?.predictions),
       },
       homePreview:
         source.homePreview && typeof source.homePreview === "object" && !Array.isArray(source.homePreview)

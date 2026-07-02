@@ -63,7 +63,7 @@ const CARDS: Array<CustomizationCard> = [
   {
     id: 'catalog',
     slot: 'top-left',
-    eyebrow: 'Channels · Widgets · Extensions',
+    eyebrow: 'Widgets · Utilities · Extensions',
     title: 'Add what you actually need',
     body: 'Markets, scores, headlines, and fantasy are just the start. Pin live system stats, your Uptime Kuma board, or GitHub Actions status right next to last quarter\u2019s earnings &mdash; the ticker becomes whatever your day looks like.',
     media: {
@@ -82,11 +82,11 @@ const CARDS: Array<CustomizationCard> = [
     slot: 'top-right',
     eyebrow: 'Speed · Position · Rows',
     title: 'Make it sit exactly where you want',
-    body: 'Dock the ticker to the top, bottom, or both edges of your display. Crank the scroll speed up for a busy market, slow it down for a quiet afternoon. Add a second row when one channel isn\u2019t enough.',
+    body: 'Dock the ticker to the top, bottom, or both edges of your display. Crank the scroll speed up for a busy market, slow it down for a quiet afternoon. Add a second row when one isn\u2019t enough.',
     media: {
       kind: 'single',
       basename: 'configure/ticker',
-      alt: 'Scrollr ticker settings panel with controls for edge position, scroll speed, row count, and per-row channel assignment.',
+      alt: 'Scrollr ticker settings panel with controls for edge position, scroll speed, row count, and per-row widget assignment.',
     },
   },
   {
@@ -106,13 +106,13 @@ const CARDS: Array<CustomizationCard> = [
           basename: 'ticker/all-purpose-compact',
           densityLabel: 'Compact',
           aspect: '2930 / 80',
-          alt: 'Compact Scrollr ticker showing all channels together with minimal vertical space.',
+          alt: 'Compact Scrollr ticker showing all widgets together with minimal vertical space.',
         },
         {
           basename: 'ticker/all-purpose-detailed',
           densityLabel: 'Detailed',
           aspect: '2930 / 124',
-          alt: 'Detailed Scrollr ticker showing all channels together with extra context per item.',
+          alt: 'Detailed Scrollr ticker showing all widgets together with extra context per item.',
         },
       ],
     },

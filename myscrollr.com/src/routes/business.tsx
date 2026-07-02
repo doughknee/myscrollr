@@ -329,7 +329,7 @@ const BUSINESS_FAQ: Array<FAQItem> = [
     highlight:
       'Most engagements ship in 2-4 weeks. Timeline is committed in writing.',
     answer:
-      'A typical managed deployment with custom branding, two channels, and basic integrations ships in 2-4 weeks from kickoff. Self-hosted or heavy customization (new data sources, custom UI components, complex SSO) can take 6-12 weeks. The exact timeline is committed in the scope document before you pay anything.',
+      'A typical managed deployment with custom branding, two data sources, and basic integrations ships in 2-4 weeks from kickoff. Self-hosted or heavy customization (new data sources, custom UI components, complex SSO) can take 6-12 weeks. The exact timeline is committed in the scope document before you pay anything.',
     accent: 'orange',
   },
   {
