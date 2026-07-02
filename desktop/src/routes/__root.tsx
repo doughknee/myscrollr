@@ -19,6 +19,8 @@ import {
   isEnabled as isAutostartEnabled,
 } from "@tauri-apps/plugin-autostart";
 import { getVersion } from "@tauri-apps/api/app";
+import { useUpdateGate } from "../hooks/useUpdateGate";
+import { UpdateRequiredOverlay } from "../components/UpdateRequiredOverlay";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import clsx from "clsx";
 import { Toaster, toast } from "sonner";
@@ -298,6 +300,13 @@ function RootLayout() {
     enabled: prefs.startup.autoCheckUpdates,
     appVersion,
   });
+
+  // Mandatory-update gate: unlike the toast above, this one can't be
+  // dismissed or disabled. When the API's /app/min-version says this
+  // build is too old for the current backend (breaking deploy), the
+  // whole shell is covered until the update installs. Fails open on
+  // any fetch/parse error — see useUpdateGate.
+  const updateGate = useUpdateGate(appVersion);
 
   // ── Undo snapshot GC ───────────────────────────────────────
   // Snapshots pushed by `useUndoableAction` live in a module-level
@@ -777,6 +786,14 @@ function RootLayout() {
         !IS_MACOS && "custom-chrome",
       )}
     >
+      {/* ── Mandatory update: blocks everything, including sign-in ── */}
+      {updateGate.updateRequired && (
+        <UpdateRequiredOverlay
+          appVersion={appVersion}
+          minVersion={updateGate.minVersion}
+        />
+      )}
+
       {/* ── Auth gate: unauthenticated users ── */}
       {showAuthGate && <AuthGate onLogin={auth.handleLogin} />}
 

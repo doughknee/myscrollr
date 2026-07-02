@@ -200,6 +200,7 @@ func (s *Server) setupRoutes() {
 
 	s.App.Get("/channels", s.listChannels)
 	s.App.Get("/tier-limits", HandleGetTierLimits)
+	s.App.Get("/app/min-version", HandleGetMinDesktopVersion)
 	s.App.Get("/", s.landingPage)
 
 	// --- Protected Routes ---
