@@ -96,7 +96,10 @@ function WidgetInfoPage() {
     item.requiredTier !== "free" &&
     !tierMeets(tier, item.requiredTier);
 
-  const used = channels.length + prefs.widgets.enabledWidgets.length;
+  // Enabled rows only — matches the server gate (WHERE enabled = true).
+  const used =
+    channels.filter((ch) => ch.enabled).length +
+    prefs.widgets.enabledWidgets.length;
   const slotLocked = used >= getMaxWidgets(tier) && !enabled && !tierLocked;
 
   const openWidget = () => {

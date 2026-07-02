@@ -449,10 +449,11 @@ export default function ScrollrTicker({
         }
 
         case "sports": {
-          // Sports display prefs live server-side on channel config.display.
-          // Per-field visibility uses the Venue enum mirroring the client-
-          // only channels; read each field through shouldShowOnTicker.
-          const sportsConfig = getSportsDisplayConfig(dashboard);
+          // Sports display prefs live server-side on the WIDGET row's
+          // config.display (per-league toggles since the 000014 split);
+          // pass the tab so an NFL widget's toggles gate NFL chips. Per-
+          // field visibility uses the Venue enum via shouldShowOnTicker.
+          const sportsConfig = getSportsDisplayConfig(dashboard, tab);
           const showLogos = shouldShowOnTicker(sportsConfig.showLogos ?? "both");
           const showTimer = shouldShowOnTicker(sportsConfig.showTimer ?? "both");
           const sorted = selectSportsForTicker(data as Game[], sportsConfig);

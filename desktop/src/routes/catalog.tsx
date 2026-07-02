@@ -87,13 +87,18 @@ function CatalogPage() {
   );
 
   // Widget/slot model (2026-06-30): a plan caps how many widgets run at
-  // once. Slots in use = enabled channels + enabled local widgets. At
+  // once. Slots in use = ENABLED channels + enabled local widgets — the
+  // server gate counts `WHERE enabled = true`, and the downgrade prune
+  // disables (never deletes) over-cap rows, so counting disabled rows here
+  // would lock the catalog for users the server would happily accept. At
   // capacity, the catalog locks *new* adds (already-added items stay
   // interactive). nil/Infinity = unlimited.
   const slotsAtCapacity = useMemo(() => {
-    const used = channels.length + prefs.widgets.enabledWidgets.length;
+    const used =
+      channels.filter((ch) => ch.enabled).length +
+      prefs.widgets.enabledWidgets.length;
     return used >= getMaxWidgets(tier);
-  }, [channels.length, prefs.widgets.enabledWidgets.length, tier]);
+  }, [channels, prefs.widgets.enabledWidgets.length, tier]);
 
   const visibleItems = useMemo(() => {
     const filtered = filter === "all"

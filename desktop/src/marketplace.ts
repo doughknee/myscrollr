@@ -332,10 +332,23 @@ const DATA_WIDGETS: DataWidgetDef[] = [
 
 // ── Resolution helpers (widget id → coarse source manifest) ─────
 
+/** Legacy widget ids produced by the server-side migration (000014) that
+ *  have no catalog entry of their own. "news" is the renamed coarse rss
+ *  row every pre-split RSS user carries — it must keep resolving to the
+ *  rss source or their feeds silently vanish from the ticker, Home, and
+ *  the source page while still occupying a slot. */
+const LEGACY_WIDGET_SOURCES: Record<string, { source: string; name: string }> =
+  {
+    news: { source: "rss", name: "News" },
+  };
+
 /** The coarse source channel id for a data-widget id, or undefined for a
  *  utility widget / unknown id. E.g. "sports_nfl" → "sports". */
 export function sourceForWidget(id: string): string | undefined {
-  return DATA_WIDGETS.find((w) => w.id === id)?.source;
+  return (
+    DATA_WIDGETS.find((w) => w.id === id)?.source ??
+    LEGACY_WIDGET_SOURCES[id]?.source
+  );
 }
 
 /** The definition (incl. addConfig + source) for a data-widget id. */
@@ -364,7 +377,15 @@ export function widgetManifest(
   id: string,
 ): ChannelManifest | WidgetManifest | undefined {
   const def = dataWidgetDef(id);
-  if (!def) return getChannel(id) ?? getWidget(id);
+  if (!def) {
+    const legacy = LEGACY_WIDGET_SOURCES[id];
+    if (legacy) {
+      const source = getChannel(legacy.source);
+      if (!source) return undefined;
+      return { ...source, id, name: legacy.name, tabLabel: legacy.name };
+    }
+    return getChannel(id) ?? getWidget(id);
+  }
   const source = getChannel(def.source);
   if (!source) return undefined;
   return { ...source, id: def.id, name: def.name, tabLabel: def.name, hex: def.color };

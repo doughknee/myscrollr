@@ -40,7 +40,7 @@ import type { SubscriptionTier } from "./auth";
 import type { ChannelType } from "./api/client";
 import type { DeliveryMode } from "./types";
 import type { AppPreferences, TickerPosition } from "./preferences";
-import { getCatalogItems } from "./marketplace";
+import { getCatalogItems, sourceForWidget } from "./marketplace";
 import { getAllWidgets } from "./widgets/registry";
 import { useWidgetTickerData } from "./hooks/useWidgetTickerData";
 import { useTheme } from "./hooks/useTheme";
@@ -884,8 +884,18 @@ export default function App() {
             // Otherwise filter activeTabs down to only the row's configured
             // sources. We pass activeTabs (not row.sources directly) so the
             // downstream pipeline still respects onboarding-level visibility.
+            //
+            // Persisted rows from pre-split builds hold COARSE ids ("sports",
+            // "rss"); post-migration tabs are widget ids ("sports_nfl",
+            // "news_bbc"). Match either the exact widget id or its coarse
+            // source, so a row pinned to "Sports" keeps showing all sports
+            // widgets instead of going permanently blank.
             const rowTabs = row.sources.length > 0
-              ? activeTabs.filter((tab) => row.sources.includes(tab))
+              ? activeTabs.filter(
+                  (tab) =>
+                    row.sources.includes(tab) ||
+                    row.sources.includes(sourceForWidget(tab) ?? ""),
+                )
               : activeTabs;
             // Empty-state CTAs are anchored to the first row only, so
             // multi-row layouts don't stack duplicate banners. Two
