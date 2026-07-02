@@ -36,6 +36,17 @@ func logDispatchDrop() {
 type Client struct {
 	UserID string
 	Ch     chan []byte
+	// closeOnce guards Ch so it's closed exactly once. Multiple paths can
+	// race to close it — the unregister CAS-retry loop, and the shutdown
+	// watcher — and closing a channel twice panics. sync.Once makes every
+	// close after the first a no-op.
+	closeOnce sync.Once
+}
+
+// closeCh closes the client's channel exactly once. Safe to call from any
+// number of goroutines / retries.
+func (c *Client) closeCh() {
+	c.closeOnce.Do(func() { close(c.Ch) })
 }
 
 // clientList wraps a []*Client slice so it can be stored in sync.Map.
@@ -102,7 +113,7 @@ func InitHub(ctx context.Context) {
 		globalHub.clients.Range(func(key, value any) bool {
 			list := value.(*clientList)
 			for _, c := range list.entries {
-				close(c.Ch)
+				c.closeCh() // once-guarded — may race an in-flight unregister
 			}
 			globalHub.clients.Delete(key)
 			return true
@@ -285,7 +296,9 @@ func (h *Hub) unregister(client *Client) {
 		for _, c := range old.entries {
 			if c == client {
 				found = true
-				close(c.Ch)
+				// Do NOT close here: a failed CAS below re-enters this loop
+				// and would close the same channel twice. Close once, after
+				// the removal commits.
 			} else {
 				newEntries = append(newEntries, c)
 			}
@@ -306,6 +319,10 @@ func (h *Hub) unregister(client *Client) {
 		}
 		// CAS failed; retry
 	}
+	// The client is atomically removed from the hub — now safe to close its
+	// channel exactly once (a concurrent shutdown watcher may also race here;
+	// closeCh's sync.Once makes the double-close a no-op).
+	client.closeCh()
 	h.clientCount.Add(-1)
 
 	// Clean up topic subscriptions when the user's last connection closes

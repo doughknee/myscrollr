@@ -74,6 +74,17 @@ func StreamEvents(c *fiber.Ctx) error {
 
 	// 5. Stream events to the client
 	c.Context().SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
+		// This runs in a fasthttp-spawned goroutine, so a panic here crashes
+		// the whole process — Fiber's Recover middleware only wraps the request
+		// goroutine, not this one. Contain any panic (a write to a torn-down
+		// connection, a channel race, …): log it and let just this one SSE
+		// connection close. Declared first so it runs LAST (LIFO), covering the
+		// deferred UnregisterClient below as well.
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[SSE] recovered from panic in stream writer (user=%s): %v", userID, r)
+			}
+		}()
 		ticker := time.NewTicker(SSEHeartbeatInterval)
 		defer ticker.Stop()
 		defer UnregisterClient(client)
