@@ -94,7 +94,9 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
         // we reconcile the optimistic row with the server response.
         // On failure we roll back and surface the error.
         channelsApi
-          .create(channelType, item.addConfig ?? {})
+          // Report enabled utility-widget count so the server slot gate counts
+          // every widget (utilities live only in local preferences).
+          .create(channelType, item.addConfig ?? {}, prefs.widgets.enabledWidgets.length)
           .then((created) => {
             queryClient.setQueryData<DashboardResponse>(
               queryKeys.dashboard,

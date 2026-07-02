@@ -272,6 +272,12 @@ func CreateChannel(c *fiber.Ctx) error {
 	var req struct {
 		ChannelType string                 `json:"channel_type"`
 		Config      map[string]interface{} `json:"config"`
+		// LocalWidgets is the client's count of enabled utility widgets
+		// (clock/weather/…). They live in preferences, not user_channels, but
+		// every widget counts toward the slot cap — so the client reports them
+		// and the slot gate adds them to the DB channel count. Absent (older
+		// client) = 0, degrading to a data-channel-only gate.
+		LocalWidgets int `json:"local_widgets"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
@@ -310,10 +316,16 @@ func CreateChannel(c *fiber.Ctx) error {
 	if max := MaxWidgetsForTier(tier); max != nil {
 		if count, err := CountEnabledChannels(context.Background(), userID); err != nil {
 			log.Printf("[Channels] slot count failed for %s: %v", userID, err)
-		} else if count >= *max {
-			tle := &TierLimitError{Tier: tier, ChannelType: req.ChannelType, Field: "widgets", Limit: *max, Got: count + 1}
-			log.Printf("[Channels] slot limit reached for %s: %d/%d", userID, count, *max)
-			return c.Status(fiber.StatusForbidden).JSON(tierLimitErrorResponse(tle))
+		} else {
+			// Every widget counts toward the slot cap. Utility widgets live
+			// client-side (preferences), so add the client-reported count to
+			// the DB channel count.
+			used := count + req.LocalWidgets
+			if used >= *max {
+				tle := &TierLimitError{Tier: tier, ChannelType: req.ChannelType, Field: "widgets", Limit: *max, Got: used + 1}
+				log.Printf("[Channels] slot limit reached for %s: %d/%d (incl %d local)", userID, used, *max, req.LocalWidgets)
+				return c.Status(fiber.StatusForbidden).JSON(tierLimitErrorResponse(tle))
+			}
 		}
 	}
 

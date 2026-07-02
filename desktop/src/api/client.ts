@@ -180,11 +180,21 @@ export const channelsApi = {
   getAll: () =>
     authFetch<{ channels: Array<Channel> }>("/users/me/channels"),
 
-  create: (channelType: ChannelType, config: Record<string, unknown> = {}) =>
+  create: (
+    channelType: ChannelType,
+    config: Record<string, unknown> = {},
+    localWidgets?: number,
+  ) =>
     authFetch<Channel>("/users/me/channels", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel_type: channelType, config }),
+      body: JSON.stringify({
+        channel_type: channelType,
+        config,
+        // Report the enabled utility-widget count so the server slot gate
+        // counts every widget — utilities live only in local preferences.
+        ...(localWidgets !== undefined ? { local_widgets: localWidgets } : {}),
+      }),
     }),
 
   update: (
