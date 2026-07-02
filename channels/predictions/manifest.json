@@ -1,7 +1,7 @@
 {
   "name": "predictions",
   "display_name": "Predictions",
-  "internal_url": "http://scrollr-predictions-api:8085",
+  "internal_url": "http://predictions-api:8085",
   "capabilities": [
     "cdc_handler",
     "dashboard_provider",
