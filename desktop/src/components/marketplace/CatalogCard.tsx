@@ -162,17 +162,21 @@ export default function CatalogCard({
           {item.description}
         </p>
 
-        {/* Locked context (subtle, in flow). Free/unlocked widgets show
-            nothing here, keeping the grid calm. */}
-        {tierLocked ? (
-          <span className="mt-2.5 w-fit rounded-md bg-warn/10 border border-warn/20 px-2 py-0.5 text-ui-chip font-medium text-warn">
-            Requires {TIER_LABELS[item.requiredTier]}
-          </span>
-        ) : slotLocked ? (
-          <span className="mt-2.5 w-fit rounded-md bg-warn/10 border border-warn/20 px-2 py-0.5 text-ui-chip font-medium text-warn">
-            Widget limit reached
-          </span>
-        ) : null}
+        {/* Locked context (subtle, in flow). The row's height is
+            RESERVED on every card — same trick as the description's
+            h-[3.25em] above — so a "limit reached" state doesn't make
+            locked cards taller and reflow the whole grid. */}
+        <div className="mt-2.5 h-[1.75em]">
+          {tierLocked ? (
+            <span className="inline-block w-fit rounded-md bg-warn/10 border border-warn/20 px-2 py-0.5 text-ui-chip font-medium text-warn">
+              Requires {TIER_LABELS[item.requiredTier]}
+            </span>
+          ) : slotLocked ? (
+            <span className="inline-block w-fit rounded-md bg-warn/10 border border-warn/20 px-2 py-0.5 text-ui-chip font-medium text-warn">
+              Widget limit reached
+            </span>
+          ) : null}
+        </div>
       </div>
 
       {/* Action — revealed on hover (or keyboard focus), absolutely positioned

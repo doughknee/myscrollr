@@ -425,7 +425,7 @@ export interface RssDisplayPrefs {
   showDescription: Venue;
   showSource: Venue;
   showTimestamps: Venue;
-  articlesPerSource: number; // 1, 3, 5, 10, or 0 (all) — feed-only structural
+  articlesPerSource: number; // 0 = all (the default since v1.1.1); 1/3/5/10 legacy per-source caps
 }
 
 export type FantasySubTab = "overview" | "matchup" | "standings" | "roster";
@@ -643,7 +643,7 @@ const DEFAULT_CHANNEL_DISPLAY: ChannelDisplayPrefs = {
     showDescription: "both",
     showSource: "both",
     showTimestamps: "both",
-    articlesPerSource: 4,
+    articlesPerSource: 0,
   },
   predictions: {
     showDelta: "both",
@@ -1103,8 +1103,12 @@ export function migrateRssDisplay(
     showDescription: migrateVenue(raw.showDescription),
     showSource: migrateVenue(raw.showSource),
     showTimestamps: migrateVenue(raw.showTimestamps),
+    // One-shot migration (v1.1.1): 4 was the pre-widget-era DEFAULT and
+    // never appeared in the picker (1/3/5/10), so a stored 4 is an
+    // untouched default, not a user's choice — map it to 0 (all).
+    // Deliberately chosen values (1/3/5/10) survive.
     articlesPerSource:
-      typeof raw.articlesPerSource === "number"
+      typeof raw.articlesPerSource === "number" && raw.articlesPerSource !== 4
         ? raw.articlesPerSource
         : DEFAULT_CHANNEL_DISPLAY.rss.articlesPerSource,
   };

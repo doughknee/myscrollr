@@ -240,7 +240,20 @@ describe("migrateRssDisplay", () => {
     const migrated = migrateRssDisplay({
       articlesPerSource: "lots",
     } as unknown as Parameters<typeof migrateRssDisplay>[0]);
-    expect(migrated.articlesPerSource).toBe(4);
+    expect(migrated.articlesPerSource).toBe(0);
+  });
+
+  it("migrates the old untouched default (4) to All (0) — v1.1.1", () => {
+    // 4 was the pre-widget-era default and never appeared in the picker
+    // (1/3/5/10), so a stored 4 is not a user's choice.
+    const migrated = migrateRssDisplay({ articlesPerSource: 4 });
+    expect(migrated.articlesPerSource).toBe(0);
+  });
+
+  it("keeps deliberately chosen per-source caps (picker values)", () => {
+    for (const chosen of [1, 3, 5, 10]) {
+      expect(migrateRssDisplay({ articlesPerSource: chosen }).articlesPerSource).toBe(chosen);
+    }
   });
 });
 
