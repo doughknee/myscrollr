@@ -55,9 +55,11 @@ import {
   savePrefs,
   consumeTickerLayoutChanged,
   resolveThemeMode,
-  getChannelTickerRow,
-  getWidgetTickerRow,
 } from "../preferences";
+import {
+  getEffectiveChannelTickerRow,
+  getEffectiveWidgetTickerStatus,
+} from "../utils/tickerStatus";
 import type { AppPreferences } from "../preferences";
 import {
   gcExpired as undoStackGc,
@@ -678,8 +680,12 @@ function RootLayout() {
             hex: m.hex,
             icon: m.icon,
             kind: "channel",
-            // On-ticker = assigned to a ticker row (v1.1.2 context menu).
-            onTicker: getChannelTickerRow(prefs, channel) !== null,
+            // EFFECTIVE ticker state (v1.1.2 context menu) — the raw row
+            // getter ignores the server ticker_enabled flag, which made
+            // row-assigned channels read permanently "on" and the menu
+            // toggle one-way. The effective helper is what the feed page
+            // uses for exactly this question.
+            onTicker: getEffectiveChannelTickerRow(prefs, channel) !== null,
           });
         }
       } else if (enabledWidgetIds.has(id)) {
@@ -691,7 +697,12 @@ function RootLayout() {
             hex: m.hex,
             icon: m.icon,
             kind: "widget",
-            onTicker: getWidgetTickerRow(prefs, id) !== null,
+            // Effective status, NOT the raw row getter: pinned-zone
+            // widgets live in widgetsOnTicker/pinnedWidgets and never
+            // appear in rows[].sources — the raw getter read them as
+            // "off" and inverted the menu toggle.
+            onTicker:
+              getEffectiveWidgetTickerStatus(prefs, id).kind !== "off",
           });
         }
       }
