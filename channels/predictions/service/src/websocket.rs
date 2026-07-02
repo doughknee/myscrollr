@@ -116,6 +116,23 @@ struct TickerMsg {
     open_interest_fp: Option<String>,
 }
 
+/// Field-wise merge of two sparse ticker deltas: `newer` wins where it
+/// carries a value, `older` fills the gaps. Kalshi ticker messages are
+/// deltas (a trade tick carries last_price; a book tick may carry only
+/// bid/ask or volume), so replacing a buffered snapshot wholesale would
+/// silently drop the fields the newer message doesn't repeat.
+fn merge_ticker(older: TickerMsg, newer: TickerMsg) -> TickerMsg {
+    TickerMsg {
+        market_ticker: newer.market_ticker,
+        yes_bid_dollars: newer.yes_bid_dollars.or(older.yes_bid_dollars),
+        yes_ask_dollars: newer.yes_ask_dollars.or(older.yes_ask_dollars),
+        last_price_dollars: newer.last_price_dollars.or(older.last_price_dollars),
+        price_dollars: newer.price_dollars.or(older.price_dollars),
+        volume_fp: newer.volume_fp.or(older.volume_fp),
+        open_interest_fp: newer.open_interest_fp.or(older.open_interest_fp),
+    }
+}
+
 /// `market_lifecycle_v2` channel payload.
 #[derive(Debug, Deserialize, Default)]
 struct LifecycleMsg {
@@ -184,7 +201,11 @@ async fn flush_ticker(
     let Some(upsert) = ticker_to_upsert(ticker) else {
         return;
     };
-    match upsert_market(pool, &upsert).await {
+    // create_missing=false: the ticker firehose covers EVERY open Kalshi
+    // market. Only the curated catalog sweep creates rows -- an unknown
+    // ticker here would insert a title-less row flagged primary and flood
+    // the public feed + CDC with the whole Kalshi universe.
+    match upsert_market(pool, &upsert, false).await {
         Ok(true) => {
             *batch_number += 1;
             let mut health = health_state.lock().await;
@@ -379,19 +400,30 @@ pub(crate) async fn connect(
                             .is_some_and(|w| now.duration_since(*w) < COALESCE_WINDOW);
 
                         if within_window {
-                            // Inside the window: keep ONLY the newest snapshot;
-                            // the trailing-edge drain persists it once the
-                            // window elapses (no intermediate write, no loss).
-                            pending.insert(ticker.market_ticker.clone(), ticker);
-                        } else {
-                            // Leading edge: persist immediately for low latency.
+                            // Inside the window: merge into the buffered
+                            // snapshot (deltas are sparse -- replacing would
+                            // drop fields the newer tick doesn't repeat); the
+                            // trailing-edge drain persists it once the window
+                            // elapses (no intermediate write, no loss).
                             let key = ticker.market_ticker.clone();
+                            let merged = match pending.remove(&key) {
+                                Some(buffered) => merge_ticker(buffered, ticker),
+                                None => ticker,
+                            };
+                            pending.insert(key, merged);
+                        } else {
+                            // Leading edge: persist immediately for low
+                            // latency, folding in any buffered delta first.
+                            let key = ticker.market_ticker.clone();
+                            let merged = match pending.remove(&key) {
+                                Some(buffered) => merge_ticker(buffered, ticker),
+                                None => ticker,
+                            };
                             flush_ticker(
-                                &pool, &health_state, &ticker,
+                                &pool, &health_state, &merged,
                                 &mut batch_number, &mut error_count, &mut last_error,
                             ).await;
-                            last_write.insert(key.clone(), now);
-                            pending.remove(&key);
+                            last_write.insert(key, now);
                         }
                     }
                     "market_lifecycle_v2" => {

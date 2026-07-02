@@ -250,7 +250,7 @@ async fn catalog_sweep(state: &PredictionsState) {
             link: Some(market_link(series.as_deref(), &m.event_ticker)),
         };
 
-        match upsert_market(&state.pool, &upsert).await {
+        match upsert_market(&state.pool, &upsert, true).await {
             Ok(_) => {
                 persisted += 1;
                 if let Err(e) = upsert_tracked_market(

@@ -151,7 +151,10 @@ async fn main() -> Result<()> {
         .layer(cors)
         .with_state(state);
 
-    let addr = format!("0.0.0.0:{port}");
+    // Loopback ONLY: every route is unauthenticated by design (local demo
+    // bridge), so binding wide would serve the developer's Kalshi-derived
+    // data to the whole LAN.
+    let addr = format!("127.0.0.1:{port}");
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
         .with_context(|| format!("bind {addr}"))?;

@@ -251,7 +251,15 @@ async fn user_stream_loop(
                     .await
                     .is_err()
                 {
-                    // Failed to subscribe — drop and reconnect.
+                    // Failed to subscribe — back off before reconnecting. A
+                    // bare `continue` skips the sleep at the loop bottom and
+                    // hammers Kalshi with signed handshakes, risking a
+                    // rate-limit on the user's own credential.
+                    tokio::select! {
+                        _ = tokio::time::sleep(std::time::Duration::from_secs(backoff_secs)) => {}
+                        _ = cancel_rx.changed() => break,
+                    }
+                    backoff_secs = (backoff_secs * 2).min(30);
                     continue;
                 }
 

@@ -263,7 +263,14 @@ fn displayed_field_changed(prev: &MarketRow, next: &MarketUpsert) -> bool {
 ///     the OLD `yes_price` so the desktop "movers" delta works.
 ///
 /// Returns `true` when a write (insert or update) actually happened.
-pub async fn upsert_market(pool: &Arc<PgPool>, upsert: &MarketUpsert) -> Result<bool> {
+/// `create_missing` gates the INSERT branch: the catalog sweep passes true
+/// (it owns row creation), the WS ticker path passes false (it must never
+/// create rows -- see websocket.rs flush_ticker).
+pub async fn upsert_market(
+    pool: &Arc<PgPool>,
+    upsert: &MarketUpsert,
+    create_missing: bool,
+) -> Result<bool> {
     let id = upsert.id();
     let existing = get_market_row(pool, &id).await.context("read existing market row")?;
 
@@ -326,6 +333,11 @@ pub async fn upsert_market(pool: &Arc<PgPool>, upsert: &MarketUpsert) -> Result<
             Ok(true)
         }
         None => {
+            if !create_missing {
+                // Unknown market and this caller doesn't own creation
+                // (WS ticker path) -- drop the tick.
+                return Ok(false);
+            }
             let mut conn = pool.acquire().await?;
             query(
                 "INSERT INTO markets (
