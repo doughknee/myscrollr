@@ -15,7 +15,7 @@ Run MyScrollr locally with **real sign-in** (your prod Logto tenant) but a
 | Piece | How | Port |
 |---|---|---|
 | Postgres + Redis | Docker (`docker-compose.local.yml`) | 5432 / 6379 |
-| Core API | native `go run .` in `api/` | 8080 |
+| Core API | native `go run .` in `api/` | **18080** |
 | Desktop app | native `npm run tauri:dev` in `desktop/` | 5174 (Vite) |
 | Auth | your **prod** Logto (`auth.myscrollr.com`) | — |
 
@@ -23,6 +23,14 @@ Config files (all gitignored except the compose + this doc):
 `docker-compose.local.yml`, `api/.env`, `desktop/.env`.
 
 ---
+
+> **Why 18080, not 8080?** Steam's CEF webhelper runs with
+> `--remote-debugging-port=8080` bound to `127.0.0.1`, and on Windows that
+> specific bind BEATS a `0.0.0.0:8080` bind for all `localhost` traffic —
+> whenever Steam is open, every `localhost:8080` request silently lands in
+> Steam's debugger (404s) while the Core API looks healthy. Discovered
+> 2026-07-02 mid feel-pass. `api/.env` sets `PORT=18080` and
+> `desktop/.env` points at it.
 
 ## Milestone 1 — Core + auth
 
@@ -48,7 +56,7 @@ go run .
 ```
 Watch for: `[Auth] Initialized Logto JWKS from https://auth.myscrollr.com/oidc/jwks`,
 the migrations applying, and the server listening on `:8080`.
-Sanity check (new terminal): `curl http://localhost:8080/health`.
+Sanity check (new terminal): `curl http://localhost:18080/health`.
 
 ### 4. Start the desktop app
 ```bash
