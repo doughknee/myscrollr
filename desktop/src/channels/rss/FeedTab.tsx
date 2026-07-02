@@ -377,6 +377,7 @@ function RssFeedTab({ mode, feedContext, onConfigure, widgetId }: FeedTabProps) 
   if (rssItems.length === 0) {
     return (
       <EmptyChannelState
+        refreshing={Boolean(feedContext.__refreshing)}
         icon={Rss}
         noun="feeds"
         hasConfig={!!feedContext.__hasConfig}

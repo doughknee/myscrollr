@@ -151,6 +151,7 @@ function FantasyFeedTab({ mode, feedContext, onConfigure }: FeedTabProps) {
   if (leagues.length === 0) {
     return (
       <EmptyChannelState
+        refreshing={Boolean(feedContext.__refreshing)}
         icon={Swords}
         noun="fantasy leagues"
         hasConfig={!!feedContext.__hasConfig}

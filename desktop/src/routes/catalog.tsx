@@ -4,13 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { LayoutGrid, Search, Boxes, Trophy, TrendingUp, Rss, Gamepad2, LineChart } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { open } from "@tauri-apps/plugin-shell";
 
 import { getCatalogItems, CATEGORY_LABELS, CANONICAL_ORDER } from "../marketplace";
 import type { WidgetCategory, CatalogItem } from "../marketplace";
 import { dashboardQueryOptions } from "../api/queries";
 import { useShell, useShellData } from "../shell-context";
 import { getMaxWidgets } from "../tierLimits";
-import { useAddWidget } from "../hooks/useAddWidget";
 import CatalogCard from "../components/marketplace/CatalogCard";
 import QueryErrorBanner from "../components/QueryErrorBanner";
 import RouteError from "../components/RouteError";
@@ -64,10 +64,9 @@ function sortItems(items: CatalogItem[], enabledIds: Set<string>): CatalogItem[]
 
 function CatalogPage() {
   const navigate = useNavigate();
-  const { prefs, authenticated, tier, onLogin } = useShell();
+  const { prefs, tier } = useShell();
   const { channels } = useShellData();
-  const { error: dashboardError, isLoading } = useQuery(dashboardQueryOptions());
-  const handleAdd = useAddWidget();
+  const { error: dashboardError } = useQuery(dashboardQueryOptions());
 
   const [filter, setFilter] = useState<FilterTab>("all");
 
@@ -93,11 +92,12 @@ function CatalogPage() {
   // would lock the catalog for users the server would happily accept. At
   // capacity, the catalog locks *new* adds (already-added items stay
   // interactive). nil/Infinity = unlimited.
-  const slotsAtCapacity = useMemo(() => {
+  const slots = useMemo(() => {
     const used =
       channels.filter((ch) => ch.enabled).length +
       prefs.widgets.enabledWidgets.length;
-    return used >= getMaxWidgets(tier);
+    const max = getMaxWidgets(tier);
+    return { used, max, atCapacity: used >= max };
   }, [channels, prefs.widgets.enabledWidgets.length, tier]);
 
   const visibleItems = useMemo(() => {
@@ -133,6 +133,26 @@ function CatalogPage() {
         </div>
       )}
 
+      {/* Slot-capacity banner (v1.1.1): the cards themselves are
+          browse-only and never nag — capacity is stated once, up here. */}
+      {slots.atCapacity && Number.isFinite(slots.max) && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-warn/25 bg-warn/[0.07] px-4 py-2.5">
+          <p className="text-ui-meta text-fg-2">
+            All{" "}
+            <span className="font-semibold text-fg-1">
+              {slots.max} widget slots
+            </span>{" "}
+            are in use — remove a widget to make room, or upgrade for more.
+          </p>
+          <button
+            onClick={() => void open("https://myscrollr.com/uplink")}
+            className="shrink-0 rounded-lg bg-warn/15 px-3 py-1.5 text-ui-chip font-semibold text-warn transition-colors hover:bg-warn/25"
+          >
+            Upgrade
+          </button>
+        </div>
+      )}
+
       {visibleItems.length === 0 ? (
         <EmptySection
           icon={Search}
@@ -164,32 +184,9 @@ function CatalogPage() {
                   <CatalogCard
                     item={item}
                     enabled={allEnabledIds.has(item.id)}
-                    tier={tier}
-                    authenticated={authenticated}
-                    slotsAtCapacity={slotsAtCapacity}
-                    dashboardLoading={isLoading}
-                    onAdd={handleAdd}
-                    onLogin={onLogin}
                     onInfo={(it) =>
                       navigate({ to: "/widget/$id/info", params: { id: it.id } })
                     }
-                    onOpen={(it) => {
-                      if (it.kind === "data") {
-                        navigate({ to: "/channel/$type/$tab", params: { type: it.id, tab: "feed" } });
-                      } else {
-                        navigate({ to: "/widget/$id/$tab", params: { id: it.id, tab: "feed" } });
-                      }
-                    }}
-                    onConfigure={(it) => {
-                      // The catalog is the one surface for adding AND setting
-                      // up a widget — no Options-menu hunting (widget/slot
-                      // redesign, 2026-06-30).
-                      if (it.kind === "data") {
-                        navigate({ to: "/channel/$type/$tab", params: { type: it.id, tab: "configuration" } });
-                      } else {
-                        navigate({ to: "/widget/$id/$tab", params: { id: it.id, tab: "configuration" } });
-                      }
-                    }}
                   />
                 </motion.div>
               ))}

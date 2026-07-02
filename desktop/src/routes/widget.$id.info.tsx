@@ -14,7 +14,8 @@
  */
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import clsx from "clsx";
 import {
   ArrowLeft,
@@ -23,6 +24,7 @@ import {
   ExternalLink,
   PackageOpen,
   Plus,
+  Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
@@ -30,10 +32,14 @@ import { open } from "@tauri-apps/plugin-shell";
 import { catalogItemById, readableTextOn, CATEGORY_LABELS } from "../marketplace";
 import type { SubscriptionTier } from "../auth";
 import { TIER_LABELS } from "../auth";
-import { dashboardQueryOptions } from "../api/queries";
+import { channelsApi } from "../api/client";
+import type { ChannelType } from "../api/client";
+import { dashboardQueryOptions, queryKeys } from "../api/queries";
 import { useShell, useShellData } from "../shell-context";
 import { getMaxWidgets } from "../tierLimits";
 import { useAddWidget } from "../hooks/useAddWidget";
+import { useUndoableAction } from "../hooks/useUndoableAction";
+import { disableWidget } from "../preferences";
 import PageLayout from "../components/layout/PageLayout";
 import EmptySection from "../components/layout/EmptySection";
 import RouteError from "../components/RouteError";
@@ -66,6 +72,9 @@ function WidgetInfoPage() {
   const { channels } = useShellData();
   const { isLoading: dashboardLoading } = useQuery(dashboardQueryOptions());
   const addWidget = useAddWidget();
+  const queryClient = useQueryClient();
+  const undoable = useUndoableAction();
+  const [removing, setRemoving] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
 
   const item = catalogItemById(id);
@@ -100,7 +109,44 @@ function WidgetInfoPage() {
   const used =
     channels.filter((ch) => ch.enabled).length +
     prefs.widgets.enabledWidgets.length;
-  const slotLocked = used >= getMaxWidgets(tier) && !enabled && !tierLocked;
+  const maxSlots = getMaxWidgets(tier);
+  const slotLocked = used >= maxSlots && !enabled && !tierLocked;
+
+  // Human slot counter for the actions area (v1.1.1 catalog redesign —
+  // the info page is the transaction surface, so the plan context lives
+  // here, not on catalog cards). Infinity = unlimited plans.
+  const slotCounter = Number.isFinite(maxSlots)
+    ? used === 0 && !enabled
+      ? `0 of ${maxSlots} slots used — room for this one!`
+      : `${used} of ${maxSlots} widget slots used`
+    : `${used} widgets added · unlimited slots`;
+
+  const removeWidget = async () => {
+    if (item.kind === "data") {
+      setRemoving(true);
+      try {
+        await channelsApi.delete(item.id as ChannelType);
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+        toast.success(`${item.name} removed`, {
+          description: "Its slot is free for another widget.",
+        });
+      } catch (err) {
+        console.error("[Scrollr] Remove failed:", err);
+        toast.error(`Couldn't remove ${item.name}`);
+      } finally {
+        setRemoving(false);
+      }
+    } else {
+      // Utilities live in prefs — undoable, settings preserved.
+      undoable(
+        {
+          label: `Removed ${item.name}`,
+          description: "Its slot is free for another widget.",
+        },
+        (current) => disableWidget(current, item.id),
+      );
+    }
+  };
 
   const openWidget = () => {
     if (item.kind === "data") {
@@ -141,7 +187,7 @@ function WidgetInfoPage() {
       };
     } else if (slotLocked) {
       cta = {
-        label: "Widget limit reached — Upgrade",
+        label: "Upgrade for more slots",
         onClick: () => open("https://myscrollr.com/uplink"),
         icon: ExternalLink,
         tone: "warn",
@@ -257,8 +303,20 @@ function WidgetInfoPage() {
           </p>
         )}
 
+        {/* Slot context — the plan story lives here now, not on cards. */}
+        <div className="flex flex-col gap-2 border-t border-edge/40 pt-5">
+          <p className="text-ui-meta text-fg-4">{slotCounter}</p>
+          {slotLocked && (
+            <p className="text-ui-meta leading-relaxed text-fg-3">
+              All your slots are in use. You can always swap — remove a
+              widget you're not using to free its slot for this one, or
+              upgrade for more.
+            </p>
+          )}
+        </div>
+
         {/* Actions */}
-        <div className="flex items-center gap-3 border-t border-edge/40 pt-5">
+        <div className="flex items-center gap-3 pt-1">
           {enabled ? (
             <>
               {/* Added: secondary "Configure" text button + primary "Open". */}
@@ -278,6 +336,14 @@ function WidgetInfoPage() {
                   size={15}
                   className="transition-transform duration-200 group-hover/btn:translate-x-0.5"
                 />
+              </button>
+              <button
+                onClick={() => void removeWidget()}
+                disabled={removing}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-ui-body font-medium text-fg-4 transition-colors hover:bg-error/10 hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 size={14} />
+                Remove
               </button>
             </>
           ) : cta ? (

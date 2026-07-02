@@ -11,6 +11,7 @@
  * same 2-tab structure (Feed / Configure).
  */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { motion } from "motion/react";
 import RouteError from "../components/RouteError";
 import SourcePageLayout, { parseSourceTab, SourceNotFound } from "../components/SourcePageLayout";
 import { getWidget } from "../widgets/registry";
@@ -70,8 +71,19 @@ function WidgetRoute() {
       }}
       sourceKind="widget"
     >
-      {tab === "feed" && <WidgetFeedTab widget={widget} />}
-      {tab === "configuration" && <WidgetConfigTab id={id} />}
+      {/* Entrance to match the data-source pages (v1.1.1): utility
+          content fades up instead of popping in. Keyed by tab so
+          switching Feed ↔ Configure replays it. */}
+      <motion.div
+        key={tab}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, delay: 0.04, ease: [0.22, 0.61, 0.36, 1] }}
+        className="h-full"
+      >
+        {tab === "feed" && <WidgetFeedTab widget={widget} />}
+        {tab === "configuration" && <WidgetConfigTab id={id} />}
+      </motion.div>
     </SourcePageLayout>
   );
 }
