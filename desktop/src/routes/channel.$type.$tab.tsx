@@ -95,9 +95,17 @@ function ChannelFeedTab({
   channel: ChannelManifest;
   onConfigure: () => void;
 }) {
+  // An optimistic add row (id < 0, seeded by useAddWidget while the
+  // create request is in flight) can't have data yet — treat it as
+  // refreshing so the Configure CTA never flashes in the gap before
+  // the post-create refetch starts (v1.1.1 round 3).
+  const pendingAdd = (dashboard?.channels ?? []).some(
+    (ch) => ch.channel_type === type && ch.id < 0,
+  );
+
   const feedContext = {
     __dashboardLoaded: dashboard !== undefined,
-    __refreshing: dashboardFetching,
+    __refreshing: dashboardFetching || pendingAdd,
     __hasConfig: (dashboard?.channels ?? []).some(
       (ch) => ch.channel_type === type && ch.enabled,
     ),
