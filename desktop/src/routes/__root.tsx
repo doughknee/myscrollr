@@ -335,7 +335,7 @@ function RootLayout() {
       showTipOnce(TIP_IDS.TICKER_RIGHT_CLICK, prefs, persistPrefs, {
         title: "Tip: right-click the ticker",
         description:
-          "Quick controls for channels, widgets, position, and Customize Ticker.",
+          "Quick controls for widgets, position, and Customize Ticker.",
         duration: 7_000,
       });
     }, 4_000);

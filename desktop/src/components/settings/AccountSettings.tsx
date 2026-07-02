@@ -331,7 +331,7 @@ export default function AccountSettings({
         <Section title="Welcome" variant="card">
           <ActionRow
             label="Sign in to Scrollr"
-            description="Signing in syncs your subscription, profile, and channel preferences across devices and unlocks billing management."
+            description="Signing in syncs your subscription, profile, and source preferences across devices and unlocks billing management."
             action="Sign in"
             actionClass="bg-accent text-surface font-semibold hover:bg-accent/90"
             onClick={onLogin}
@@ -448,7 +448,7 @@ export default function AccountSettings({
         <Section title="Data" variant="card">
           <ActionRow
             label="Export your data"
-            description="Download your channels, preferences, and account metadata as JSON."
+            description="Download your sources, preferences, and account metadata as JSON."
             action={exportActionLabel}
             actionClass={clsx(
               "bg-accent/10 text-accent hover:bg-accent/20",

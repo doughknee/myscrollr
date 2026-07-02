@@ -23,9 +23,9 @@ export default function FeatureGuidesSection() {
 
   return (
     <div className="space-y-6">
-      {/* Channels */}
+      {/* Data sources */}
       <div>
-        <p className="mb-2 text-ui-section">Channels</p>
+        <p className="mb-2 text-ui-section">Data Sources</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {channels.map((ch) => (
             <GuideCard

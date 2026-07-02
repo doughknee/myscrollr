@@ -236,7 +236,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
           />
           <SegmentedRow
             label="Chip colors"
-            description="Channel colors, accent theme, or subtle grayscale."
+            description="Source colors, accent theme, or subtle grayscale."
             value={ticker.chipColors}
             options={CHIP_COLOR_OPTIONS}
             onChange={(v) => setTicker("chipColors", v)}
@@ -378,7 +378,7 @@ function RowCard({
         </div>
         {sources.length === 0 ? (
           <div className="text-ui-meta font-mono text-fg-3 py-2">
-            No channels or widgets enabled. Enable some in the main settings first.
+            No sources or widgets enabled. Enable some in the main settings first.
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-1.5">

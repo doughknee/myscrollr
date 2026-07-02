@@ -11,7 +11,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Is Scrollr free?",
     answer:
-      "Yes. The free tier gives you real-time data across all four channels with generous limits and no ads. Upgrade to Uplink for more capacity, or Uplink Ultimate for live streaming data and unlimited everything.",
+      "Yes. The free tier gives you real-time data across all four data sources with generous limits and no ads. Upgrade to Uplink for more capacity, or Uplink Ultimate for live streaming data and unlimited everything.",
   },
   {
     question: "Does it affect my computer's performance?",
@@ -21,7 +21,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Is my data private?",
     answer:
-      "Scrollr contains zero analytics, zero tracking pixels, and zero telemetry. Your channel configurations and preferences are stored on your device. The only server-side data is your account profile and subscription status.",
+      "Scrollr contains zero analytics, zero tracking pixels, and zero telemetry. Your source configurations and preferences are stored on your device. The only server-side data is your account profile and subscription status.",
   },
   {
     question: "What platforms are supported?",
@@ -31,17 +31,17 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Do I need an account?",
     answer:
-      "You can browse widgets and explore the app without signing in. An account is needed to add channels (Finance, Sports, News, Fantasy) and to sync your setup.",
+      "You can browse widgets and explore the app without signing in. An account is needed to add data sources (Finance, Sports, News, Fantasy) and to sync your setup.",
   },
   {
     question: "What data does Scrollr show?",
     answer:
-      "Four channels: live stock and crypto prices (Finance), scores across 20+ leagues (Sports), articles from RSS feeds (News), and Yahoo Fantasy Sports leagues (Fantasy). Plus utility widgets for weather, clocks, system monitoring, uptime, and GitHub Actions.",
+      "Four data sources: live stock and crypto prices (Finance), scores across 20+ leagues (Sports), articles from RSS feeds (News), and Yahoo Fantasy Sports leagues (Fantasy). Plus utility widgets for weather, clocks, system monitoring, uptime, and GitHub Actions.",
   },
   {
     question: "Can I customize the feed?",
     answer:
-      "Extensively. Move the ticker to the top or bottom of the screen by right-clicking it (or using the up/down chevron in the hover toolbar). In Settings > Ticker you can change the detail level (Compact / Detailed), add ticker rows, and adjust speed. Within each channel you can filter, sort, and toggle individual data points on or off under Options > Display preferences.",
+      "Extensively. Move the ticker to the top or bottom of the screen by right-clicking it (or using the up/down chevron in the hover toolbar). In Settings > Ticker you can change the detail level (Compact / Detailed), add ticker rows, and adjust speed. Within each source you can filter, sort, and toggle individual data points on or off under Options > Configure source.",
   },
   {
     question: "Is Scrollr open source?",
@@ -95,11 +95,11 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
   {
     title: "Data not loading / feed shows empty",
     symptoms: [
-      "Channel added but shows \"No data right now\"",
+      "Source added but shows \"No data right now\"",
       "Ticker shows empty slots where data should be",
     ],
     steps: [
-      "Open the channel and click Options > Configure to verify items are added (symbols, leagues, or feeds).",
+      "Open the source and click Options > Configure to verify items are added (symbols, leagues, or feeds).",
       "Check that you're signed in (Settings > Account).",
       "Try switching away from and back to the feed tab.",
       "Check your internet connection.",
@@ -155,7 +155,7 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
     ],
   },
   {
-    title: "Can't add channels",
+    title: "Can't add sources",
     symptoms: [
       "Clicking \"Add\" in the Catalog shows an error toast",
       "\"Failed to create channel\" message",
@@ -172,7 +172,7 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
       "Some feeds show data but others don't",
     ],
     steps: [
-      "Open the News channel, then Options > Configure source. Each tracked feed has a colored health dot — green is healthy, amber is stale, red is failing.",
+      "Open the News source, then Options > Configure source. Each tracked feed has a colored health dot — green is healthy, amber is stale, red is failing.",
       "Some feeds may be temporarily down. Try adding a different feed to verify your connection works.",
       "Custom feeds must be valid RSS or Atom URLs.",
     ],
@@ -216,10 +216,10 @@ export const GETTING_STARTED_STEPS: GettingStartedStep[] = [
     title: "Sign In",
     iconName: "LogIn",
     description:
-      "Create an account or sign in to sync your channels and settings. Free accounts get full access to all features with generous limits.",
+      "Create an account or sign in to sync your sources and settings. Free accounts get full access to all features with generous limits.",
   },
   {
-    title: "Add Channels",
+    title: "Add Sources",
     iconName: "LayoutGrid",
     description:
       "Open the Catalog from the sidebar to browse available data sources. Add Finance for stock prices, Sports for live scores, News for RSS feeds, or Fantasy for Yahoo leagues.",
@@ -228,7 +228,7 @@ export const GETTING_STARTED_STEPS: GettingStartedStep[] = [
     title: "Configure Your Feeds",
     iconName: "Settings",
     description:
-      "Each channel has a Configure view where you pick what to track. Open a channel, click Options in the title bar, then Configure source — add stock symbols, select sports leagues, subscribe to news feeds, or connect your Yahoo account.",
+      "Each source has a Configure view where you pick what to track. Open a source, click Options in the title bar, then Configure source — add stock symbols, select sports leagues, subscribe to news feeds, or connect your Yahoo account.",
   },
   {
     title: "Customize the Ticker",

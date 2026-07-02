@@ -351,18 +351,6 @@ export function assetClassForWidget(id: string): string | undefined {
   return typeof ac === "string" ? ac : undefined;
 }
 
-/** The manifest that owns rendering for a widget id: the coarse channel
- *  manifest for a data widget, or the utility widget's own manifest. */
-export function manifestForWidget(
-  id: string,
-): ChannelManifest | WidgetManifest | undefined {
-  const src = sourceForWidget(id);
-  if (src) return getChannel(src);
-  // Fall back to a coarse channel id (legacy rows in transition) then a
-  // utility widget id.
-  return getChannel(id) ?? getWidget(id);
-}
-
 /** The catalog item (display: name/icon/hex/category) for a widget id. */
 export function catalogItemById(id: string): CatalogItem | undefined {
   return getCatalogItems().find((it) => it.id === id);

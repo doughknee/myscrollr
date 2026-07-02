@@ -54,10 +54,10 @@ export function useChannelActions(): ChannelActions {
           to: "/channel/$type/$tab",
           params: { type: channelType, tab: "feed" },
         });
-        toast.success(`${channelName[channelType] ?? channelType} channel added`);
+        toast.success(`${channelName[channelType] ?? channelType} added`);
       } catch (err) {
         console.error("[Scrollr] Channel add failed:", err);
-        toast.error(`Couldn't add ${channelName[channelType] ?? channelType} channel`);
+        toast.error(`Couldn't add ${channelName[channelType] ?? channelType}`);
       }
     },
     [queryClient, navigate],
@@ -72,10 +72,10 @@ export function useChannelActions(): ChannelActions {
         // enabled), so no preference cleanup is needed here — the
         // dashboard refetch above triggers the sidebar update.
         navigate({ to: "/feed" });
-        toast.success(`${channelName[channelType] ?? channelType} channel removed`);
+        toast.success(`${channelName[channelType] ?? channelType} removed`);
       } catch (err) {
         console.error("[Scrollr] Channel delete failed:", err);
-        toast.error(`Couldn't remove ${channelName[channelType] ?? channelType} channel`);
+        toast.error(`Couldn't remove ${channelName[channelType] ?? channelType}`);
       }
     },
     [queryClient, navigate],

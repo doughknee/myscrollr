@@ -39,7 +39,7 @@ const CATEGORY_OPTIONS: { value: Category; label: string; icon: typeof Bug }[] =
   { value: "feedback", label: "General Feedback", icon: MessageSquare },
   { value: "billing", label: "Billing & Subscription", icon: CreditCard },
   { value: "account", label: "Account & Login", icon: UserCog },
-  { value: "channel", label: "Channel Help", icon: Radio },
+  { value: "channel", label: "Source Help", icon: Radio },
 ];
 
 const FREQUENCY_OPTIONS: { value: Frequency; label: string }[] = [
@@ -76,8 +76,8 @@ const HEADER_CONFIG: Record<Category, { title: string; subtitle: string }> = {
     subtitle: "Issues with signing in, password, or account settings",
   },
   channel: {
-    title: "Channel Help",
-    subtitle: "Issues with a specific data channel",
+    title: "Source Help",
+    subtitle: "Issues with a specific data source",
   },
 };
 
@@ -87,7 +87,7 @@ const SUBMIT_LABELS: Record<Category, string> = {
   feedback: "Submit Feedback",
   billing: "Submit Billing Question",
   account: "Submit Account Question",
-  channel: "Submit Channel Issue",
+  channel: "Submit Source Issue",
 };
 
 const SUCCESS_MESSAGES: Record<Category, string> = {
@@ -96,7 +96,7 @@ const SUCCESS_MESSAGES: Record<Category, string> = {
   feedback: "Feedback submitted — thanks for sharing",
   billing: "Billing question submitted — we'll follow up by email",
   account: "Account question submitted — we'll follow up by email",
-  channel: "Channel issue submitted — we'll follow up by email",
+  channel: "Source issue submitted — we'll follow up by email",
 };
 
 const MAX_FILES = 5;
@@ -650,13 +650,13 @@ export default function ContactForm({ onBack }: ContactFormProps) {
         {category === "channel" && (
           <>
             <div>
-              <label className={labelClass}>Which channel?</label>
+              <label className={labelClass}>Which source?</label>
               <select
                 value={channelSelection}
                 onChange={(e) => setChannelSelection(e.target.value)}
                 className={inputClass}
               >
-                <option value="">Select a channel...</option>
+                <option value="">Select a source...</option>
                 <option value="Finance">Finance</option>
                 <option value="Sports">Sports</option>
                 <option value="RSS">RSS</option>
@@ -670,7 +670,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
                 onChange={(e) => setDescription(e.target.value)}
                 rows={5}
                 required
-                placeholder="What's happening with this channel?"
+                placeholder="What's happening with this source?"
                 className={inputClass}
               />
             </div>

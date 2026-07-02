@@ -131,7 +131,7 @@ function ChannelConfigTab({
           Configuration unavailable
         </h2>
         <p className="text-sm text-fg-3 leading-relaxed">
-          This channel does not have a configuration panel.
+          This source does not have a configuration panel.
         </p>
       </div>
     );
