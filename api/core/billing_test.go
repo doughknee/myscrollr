@@ -181,14 +181,16 @@ func TestHasSubscriptionConflict(t *testing.T) {
 		{"past_due does not block", "monthly", "past_due", false, "monthly", false},
 		{"none status does not block", "monthly", "none", false, "monthly", false},
 
-		// Lifetime members may stack Ultimate or Pro on top...
-		{"lifetime can add ultimate monthly", "lifetime", "active", true, "ultimate_monthly", false},
-		{"lifetime can add ultimate annual", "lifetime", "active", true, "ultimate_annual", false},
-		{"lifetime can add pro monthly", "lifetime", "active", true, "pro_monthly", false},
-		{"lifetime can add pro annual", "lifetime", "active", true, "pro_annual", false},
-		// ...but not a base Uplink subscription.
-		{"lifetime cannot add base monthly", "lifetime", "active", true, "monthly", true},
-		{"lifetime cannot add base annual", "lifetime", "active", true, "annual", true},
+		// Lifetime IS permanent Ultimate (2026-07-02 repricing): there is
+		// nothing above it to subscribe to, so lifetime blocks everything —
+		// regardless of the record's status column.
+		{"lifetime blocks ultimate monthly", "lifetime", "active", true, "ultimate_monthly", true},
+		{"lifetime blocks ultimate annual", "lifetime", "active", true, "ultimate_annual", true},
+		{"lifetime blocks pro monthly", "lifetime", "active", true, "pro_monthly", true},
+		{"lifetime blocks pro annual", "lifetime", "active", true, "pro_annual", true},
+		{"lifetime blocks base monthly", "lifetime", "active", true, "monthly", true},
+		{"lifetime blocks base annual", "lifetime", "active", true, "annual", true},
+		{"lifetime blocks even with odd status", "lifetime", "none", true, "ultimate_monthly", true},
 
 		// Non-lifetime users get no stacking exception.
 		{"active without lifetime cannot add ultimate", "monthly", "active", false, "ultimate_monthly", true},

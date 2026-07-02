@@ -1192,9 +1192,13 @@ function UplinkPage() {
     return TIER_RANK[tier] > TIER_RANK[activeTier] ? 'Upgrade' : 'Downgrade'
   }
 
-  /** Whether a tier card should be non-interactive */
+  /** Whether a tier card should be non-interactive. Lifetime members
+   *  already own permanent Ultimate — every subscription card is moot
+   *  (and the server 409s the checkout anyway). */
   const isTierDisabled = (tier: TierKey): boolean =>
-    activeTier === tier || pendingDowngradeTier === tier
+    currentSub?.lifetime === true ||
+    activeTier === tier ||
+    pendingDowngradeTier === tier
 
   const TIER_NAMES: Record<TierKey, string> = {
     uplink: 'Uplink',
