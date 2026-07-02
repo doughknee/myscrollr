@@ -27,6 +27,11 @@ interface EmptyChannelStateProps {
   hasConfig: boolean;
   /** Whether the dashboard has loaded. */
   dashboardLoaded?: boolean;
+  /** True while the dashboard query is refetching — right after adding a
+   *  widget the row exists optimistically but its data hasn't landed yet;
+   *  showing the Configure CTA in that window (v1.1.0 bug) told users to
+   *  configure a widget that was simply still loading. */
+  refreshing?: boolean;
   /** Verb for the loading state (e.g. "prices", "scores", "articles"). */
   loadingNoun?: string;
   /** Hint text for the action (e.g. "choose what to track", "pick your leagues"). */
@@ -45,6 +50,7 @@ export default function EmptyChannelState({
   noun,
   hasConfig,
   dashboardLoaded,
+  refreshing,
   loadingNoun,
   actionHint,
   onConfigure,
@@ -56,7 +62,7 @@ export default function EmptyChannelState({
       )}
     >
       <Icon size={28} className="text-fg-4/40" />
-      {dashboardLoaded === false ? (
+      {dashboardLoaded === false || refreshing ? (
         <p className="text-xs text-fg-4">
           Loading {loadingNoun ?? noun}&hellip;
         </p>

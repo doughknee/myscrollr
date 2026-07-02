@@ -186,7 +186,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
       >
         <div className="space-y-4 min-w-0">
         {/* ── Behavior ───────────────────────────────────────── */}
-        <Section title="Behavior" variant="card">
+        <Section index={0} title="Behavior" variant="card">
           <ToggleRow
             label="Pause on hover"
             description="Slow the ticker while you hover so chips are easier to read."
@@ -219,7 +219,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
         </Section>
 
         {/* ── Display ────────────────────────────────────────── */}
-        <Section title="Display" variant="card">
+        <Section index={1} title="Display" variant="card">
           <SegmentedRow
             label="Detail level"
             description="Single line vs. detail row under each chip."
@@ -261,7 +261,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
 
         <div className="space-y-4 min-w-0">
         {/* ── Motion ─────────────────────────────────────────── */}
-        <Section title="Motion" variant="card">
+        <Section index={2} title="Motion" variant="card">
           <SliderRow
             label="Speed"
             description="How fast the ticker scrolls."
@@ -275,7 +275,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
         </Section>
 
         {/* ── Rows ───────────────────────────────────────────── */}
-        <Section title={`Rows (${rowCount}/${maxRows})`} variant="card">
+        <Section index={3} title={`Rows (${rowCount}/${maxRows})`} variant="card">
           <div className="px-3 pt-1 pb-2 space-y-2">
             {rows.map((row, rowIdx) => (
               <RowCard

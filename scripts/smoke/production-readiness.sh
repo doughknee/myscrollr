@@ -82,6 +82,8 @@ SERVICES=(
     "finance-api     18081  8081  /internal/health"
     "rss-api         18083  8083  /internal/health"
     "fantasy-api     18084  8084  /internal/health"
+    "predictions-service 13005 3005 /health/ready"
+    "predictions-api 18085  8085  /internal/health"
 )
 
 # ─── Helpers ──────────────────────────────────────────────────────────────

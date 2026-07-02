@@ -74,7 +74,21 @@ export function selectRssForTicker(
   prefs: RssDisplayPrefs,
 ): RssItem[] {
   const ordered = sortRssItems(items, "newest");
+  // Single-outlet widgets (news_bbc, news_npr, ...) have exactly one
+  // source — a per-source cap there just hides articles for no reason
+  // (v1.1.1 "smart removal"). The balancer only makes sense when
+  // multiple feeds compete for space (Custom RSS, legacy News).
+  if (distinctSourceCount(ordered) <= 1) return ordered;
   return limitPerSource(ordered, prefs.articlesPerSource);
+}
+
+/** Number of distinct sources present in a payload. Widgets are already
+ *  scoped per widget upstream, so this is "how many feeds does THIS
+ *  widget aggregate" — 1 for outlet widgets, N for Custom RSS. */
+export function distinctSourceCount(items: RssItem[]): number {
+  const sources = new Set<string>();
+  for (const item of items) sources.add(item.source_name);
+  return sources.size;
 }
 
 // ── Pipeline result (for FeedTab) ────────────────────────────────
@@ -140,7 +154,11 @@ export function applyRssPipeline(
   const overflow = new Map<string, number>();
   const isBySource = sortOrder === "by-source";
 
-  if (articlesPerSource > 0 && !showAll) {
+  // Per-source limiting only means anything when several sources are
+  // competing — single-outlet widgets show their whole feed (v1.1.1).
+  const multiSource = distinctSourceCount(items) > 1;
+
+  if (multiSource && articlesPerSource > 0 && !showAll) {
     const sourceCounts = new Map<string, number>();
     const limited: RssItem[] = [];
 

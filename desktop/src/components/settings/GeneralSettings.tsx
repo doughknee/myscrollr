@@ -205,7 +205,7 @@ export default function GeneralSettings({
     <div className="space-y-4">
       <div className="grid gap-4 grid-cols-2 items-start">
         <div className="space-y-4">
-          <Section title="Appearance" variant="card">
+          <Section index={0} title="Appearance" variant="card">
             <SelectRow
               label="Theme"
               description="Pick a color palette"
@@ -242,7 +242,7 @@ export default function GeneralSettings({
             />
           </Section>
 
-          <Section title="Window" variant="card">
+          <Section index={1} title="Window" variant="card">
             <ToggleRow
               label="Always on top"
               description="Keep the ticker above all other windows"
@@ -257,7 +257,7 @@ export default function GeneralSettings({
             />
           </Section>
 
-          <Section title="Startup" variant="card">
+          <Section index={2} title="Startup" variant="card">
             <ToggleRow
               label="Launch on system startup"
               description="Automatically open Scrollr when you start your computer"
@@ -269,11 +269,11 @@ export default function GeneralSettings({
 
         <div className="space-y-4">
 
-          <Section title="In-app shortcuts" variant="card">
+          <Section index={3} title="In-app shortcuts" variant="card">
             <ShortcutsList />
           </Section>
 
-          <Section title="Updates" variant="card">
+          <Section index={4} title="Updates" variant="card">
             <ToggleRow
               label="Check for updates on startup"
               description="Notify me when a new version is available shortly after launch"
@@ -289,7 +289,7 @@ export default function GeneralSettings({
             <WhatsNewRow />
           </Section>
 
-          <Section title="About" variant="card">
+          <Section index={5} title="About" variant="card">
             <DisplayRow label="Version" value={appVersion ? `v${appVersion}` : "\u2014"} />
           </Section>
         </div>

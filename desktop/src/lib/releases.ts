@@ -16,6 +16,7 @@
  * All parsing helpers are pure and unit-tested in releases.test.ts.
  */
 import { fetch } from "@tauri-apps/plugin-http";
+import DOMPurify from "dompurify";
 import { Marked } from "marked";
 
 // ── Types ───────────────────────────────────────────────────────
@@ -195,9 +196,11 @@ const releaseMarked = new Marked({ gfm: true, breaks: false });
  * blowing out the page (styled in style.css under .release-notes-md).
  */
 export function renderReleaseMarkdown(md: string): string {
-  const html = releaseMarked.parse(md ?? "", { async: false });
+  const raw = releaseMarked.parse(md ?? "", { async: false });
+  // Real sanitizer (ship-review follow-up) — the regex only stripped
+  // <script> blocks; DOMPurify also kills on* handlers + javascript: URLs.
+  const html = DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
   return html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<table>/gi, '<div class="md-table-wrap"><table>')
     .replace(/<\/table>/gi, "</table></div>");
 }

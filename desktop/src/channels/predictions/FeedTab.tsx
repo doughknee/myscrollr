@@ -281,6 +281,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
         {showSwitcher && <ViewSwitcher view={view} onChange={setView} />}
         <div className="flex-1 min-h-0">
           <EmptyChannelState
+            refreshing={Boolean(feedContext.__refreshing)}
             icon={TrendingUp}
             noun="markets"
             hasConfig={!!feedContext.__hasConfig}

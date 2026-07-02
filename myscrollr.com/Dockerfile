@@ -18,6 +18,10 @@ WORKDIR /app
 COPY myscrollr.com/ ./myscrollr.com/
 
 # Accept build-time env vars
+# Optional: raises the GitHub API rate limit for scripts/fetch-releases.mjs
+# during prebuild (shared CI runner IPs exhaust the anonymous 60/hr).
+# Builder-stage only; the final image is a separate stage.
+ARG GITHUB_TOKEN
 ARG VITE_API_URL
 ARG VITE_LOGTO_ENDPOINT
 ARG VITE_LOGTO_APP_ID

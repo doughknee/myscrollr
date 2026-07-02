@@ -236,6 +236,7 @@ function SportsFeedTab({ mode, feedContext, onConfigure, widgetId }: FeedTabProp
   if (games.length === 0 && leagues.length === 0) {
     return (
       <EmptyChannelState
+        refreshing={Boolean(feedContext.__refreshing)}
         icon={Trophy}
         noun="leagues"
         hasConfig={!!feedContext.__hasConfig}

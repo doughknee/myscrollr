@@ -467,10 +467,14 @@ function TabPill({
         <motion.span
           layoutId="topbar-tab-active"
           transition={{ type: "spring", stiffness: 500, damping: 38 }}
-          className="absolute inset-0 rounded bg-surface-3 shadow-sm"
+          // z-0 + z-10 on the label: all pills and labels share one
+          // stacking context, so without explicit layers the sliding
+          // pill paints by DOM order — moving RIGHT it lives in a
+          // later button and covered earlier labels mid-flight.
+          className="absolute inset-0 z-0 rounded bg-surface-3 shadow-sm"
         />
       )}
-      <span className="relative">{label}</span>
+      <span className="relative z-10">{label}</span>
     </button>
   );
 }

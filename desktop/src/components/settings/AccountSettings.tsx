@@ -244,7 +244,7 @@ export default function AccountSettings({
       <div className="grid gap-4 grid-cols-2 items-start">
         <div className="space-y-4 min-w-0">
       {/* ── Account ──────────────────────────────────────────── */}
-      <Section title="Account" variant="card">
+      <Section index={0} title="Account" variant="card">
         {authenticated ? (
           <>
             {userLabel && (
@@ -280,7 +280,7 @@ export default function AccountSettings({
 
       {/* ── Profile (inline edit) ────────────────────────────── */}
       {authenticated && (
-        <Section title="Profile" variant="card">
+        <Section index={1} title="Profile" variant="card">
           <ProfileField
             label="Display name"
             value={overview?.identity.name ?? ""}
@@ -306,7 +306,7 @@ export default function AccountSettings({
 
       {/* ── Security ─────────────────────────────────────────── */}
       {authenticated && (
-        <Section title="Security" variant="card">
+        <Section index={2} title="Security" variant="card">
           <ActionRow
             label="Password"
             description="We'll email you a reset link."
@@ -328,7 +328,7 @@ export default function AccountSettings({
       {/* Keeps the two-column grid balanced when logged out so the */}
       {/* Account card never sits alone next to an empty column.    */}
       {!authenticated && (
-        <Section title="Welcome" variant="card">
+        <Section index={3} title="Welcome" variant="card">
           <ActionRow
             label="Sign in to Scrollr"
             description="Signing in syncs your subscription, profile, and source preferences across devices and unlocks billing management."
@@ -341,7 +341,7 @@ export default function AccountSettings({
 
       {/* ── Subscription ─────────────────────────────────────── */}
       {authenticated && hasSub && (
-        <Section title="Subscription" variant="card">
+        <Section index={4} title="Subscription" variant="card">
           <DisplayRow
             label="Status"
             value={
@@ -429,7 +429,7 @@ export default function AccountSettings({
 
       {/* ── Your Plan ────────────────────────────────────────── */}
       {authenticated && (
-        <Section title="Plan limits" variant="card">
+        <Section index={5} title="Plan limits" variant="card">
           <TierLimitsTable tier={tier} />
           {tier !== "uplink_ultimate" && tier !== "super_user" && !isLifetime && (
             <ActionRow
@@ -445,7 +445,7 @@ export default function AccountSettings({
 
       {/* ── Your Data ────────────────────────────────────────── */}
       {authenticated && (
-        <Section title="Data" variant="card">
+        <Section index={6} title="Data" variant="card">
           <ActionRow
             label="Export your data"
             description="Download your sources, preferences, and account metadata as JSON."
@@ -460,7 +460,7 @@ export default function AccountSettings({
       )}
 
       {/* ── Danger zone ─────────────────────────────────────── */}
-      <Section title="Danger zone" variant="card">
+      <Section index={7} title="Danger zone" variant="card">
         <ActionRow
           label="Reset all settings"
           description="Clear every local preference. Your account, billing, and server data are untouched."

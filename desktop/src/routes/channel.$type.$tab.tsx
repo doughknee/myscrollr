@@ -39,7 +39,7 @@ function ChannelRoute() {
   // Resolve the widget id (e.g. "sports_nfl", "finance_stocks") to its coarse
   // source manifest, which owns the FeedTab. Also resolves legacy coarse ids.
   const channel = widgetManifest(type) as ChannelManifest | undefined;
-  const { data: dashboard } = useQuery(dashboardQueryOptions());
+  const { data: dashboard, isFetching: dashboardFetching } = useQuery(dashboardQueryOptions());
   const { onDeleteChannel } = useShell();
 
   if (!channel) {
@@ -70,6 +70,7 @@ function ChannelRoute() {
         <ChannelFeedTab
           type={type}
           dashboard={dashboard}
+          dashboardFetching={dashboardFetching}
           channel={channel}
           onConfigure={() => navigate({ to: "/channel/$type/$tab", params: { type, tab: "configuration" } })}
         />
@@ -84,16 +85,27 @@ function ChannelRoute() {
 function ChannelFeedTab({
   type,
   dashboard,
+  dashboardFetching,
   channel,
   onConfigure,
 }: {
   type: string;
   dashboard: DashboardResponse | undefined;
+  dashboardFetching: boolean;
   channel: ChannelManifest;
   onConfigure: () => void;
 }) {
+  // An optimistic add row (id < 0, seeded by useAddWidget while the
+  // create request is in flight) can't have data yet — treat it as
+  // refreshing so the Configure CTA never flashes in the gap before
+  // the post-create refetch starts (v1.1.1 round 3).
+  const pendingAdd = (dashboard?.channels ?? []).some(
+    (ch) => ch.channel_type === type && ch.id < 0,
+  );
+
   const feedContext = {
     __dashboardLoaded: dashboard !== undefined,
+    __refreshing: dashboardFetching || pendingAdd,
     __hasConfig: (dashboard?.channels ?? []).some(
       (ch) => ch.channel_type === type && ch.enabled,
     ),

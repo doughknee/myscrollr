@@ -38,6 +38,7 @@
     "@tanstack/react-start": "^1.167.65",
     "@tanstack/router-plugin": "^1.167.35",
     "@tanstack/start-plugin-core": "^1.169.20",
+    "dompurify": "^3.4.11",
     "lucide-react": "^0.545.0",
     "marked": "^18.0.5",
     "motion": "^12.23.24",

@@ -16,7 +16,7 @@ import FreshnessPill from "../../components/FreshnessPill";
 import CategoryFilter from "./CategoryFilter";
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
-import { applyRssPipeline, type RssSortOrder } from "./view";
+import { applyRssPipeline, type RssSortOrder, distinctSourceCount } from "./view";
 import type {
   RssItem as RssItemType,
   FeedTabProps,
@@ -318,6 +318,14 @@ function RssFeedTab({ mode, feedContext, onConfigure, widgetId }: FeedTabProps) 
     [rssItems, selectedSources, selectedCategories, sortOrder, dp.articlesPerSource, categoryMap, expandedSources, showAll],
   );
 
+  // Single-outlet widgets have exactly one source; the per-source
+  // limit UI only exists for multi-feed widgets (Custom RSS, legacy
+  // News) — see v1.1.1 smart removal.
+  const multiSource = useMemo(
+    () => distinctSourceCount(rssItems) > 1,
+    [rssItems],
+  );
+
   // ── Build render list ──────────────────────────────────────────
   type RenderEntry =
     | { kind: "article"; item: RssItemType; category?: string }
@@ -369,6 +377,7 @@ function RssFeedTab({ mode, feedContext, onConfigure, widgetId }: FeedTabProps) 
   if (rssItems.length === 0) {
     return (
       <EmptyChannelState
+        refreshing={Boolean(feedContext.__refreshing)}
         icon={Rss}
         noun="feeds"
         hasConfig={!!feedContext.__hasConfig}
@@ -448,8 +457,11 @@ function RssFeedTab({ mode, feedContext, onConfigure, widgetId }: FeedTabProps) 
         </div>
       )}
 
-      {/* Per-source limit info bar (chronological sorts only) */}
-      {!isBySource && totalHidden > 0 && !showAll && (
+      {/* Per-source limit info bar (chronological sorts only).
+          Both bars are multi-source-only: single-outlet widgets have no
+          per-source concept anymore (v1.1.1 smart removal), so a legacy
+          per-source pref must not resurface a pointless toggle there. */}
+      {multiSource && !isBySource && totalHidden > 0 && !showAll && (
         <div className="flex items-center justify-between px-3 py-1.5 bg-surface-2 border-b border-edge/30 text-ui-meta text-fg-3">
           <span>
             Showing {dp.articlesPerSource} per source &middot;{" "}
@@ -463,7 +475,7 @@ function RssFeedTab({ mode, feedContext, onConfigure, widgetId }: FeedTabProps) 
           </button>
         </div>
       )}
-      {!isBySource && showAll && totalHidden === 0 && dp.articlesPerSource > 0 && (
+      {multiSource && !isBySource && showAll && totalHidden === 0 && dp.articlesPerSource > 0 && (
         <div className="flex items-center justify-between px-3 py-1.5 bg-surface-2 border-b border-edge/30 text-ui-meta text-fg-3">
           <span>Showing all articles</span>
           <button

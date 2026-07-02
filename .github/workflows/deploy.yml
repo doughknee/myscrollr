@@ -284,6 +284,12 @@ jobs:
           VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN_WEB }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          # Authenticated GitHub API for the website prebuild fetch scripts
+          # (fetch-releases.mjs / fetch-latest-version.mjs) — shared runner
+          # IPs exhaust the anonymous 60/hr limit. The ambient job token is
+          # plenty (public read); it's consumed builder-stage only and dies
+          # when the job ends.
+          GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           IMAGE="${REGISTRY}/${{ matrix.service }}"
           SHA_TAG="sha-${GITHUB_SHA::7}"
@@ -304,7 +310,8 @@ jobs:
               "VITE_STRIPE_PRICE_ULTIMATE_ANNUAL=$VITE_STRIPE_PRICE_ULTIMATE_ANNUAL" \
               "VITE_SENTRY_DSN=$VITE_SENTRY_DSN" \
               "SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN" \
-              "SENTRY_ORG=$SENTRY_ORG"; do
+              "SENTRY_ORG=$SENTRY_ORG" \
+              "GITHUB_TOKEN=$GH_API_TOKEN"; do
               BUILD_ARGS="$BUILD_ARGS --build-arg $arg"
             done
           fi

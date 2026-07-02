@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { limitPerSource, applyRssPipeline, selectRssForTicker } from "./view";
+import { limitPerSource, applyRssPipeline, selectRssForTicker, distinctSourceCount } from "./view";
 import type { RssItem } from "../../types";
 import type { RssDisplayPrefs } from "../../preferences";
 
@@ -268,5 +268,52 @@ describe("selectRssForTicker", () => {
     const items = [mk(1, "a"), mk(2, "b"), mk(3, "a")];
     const result = selectRssForTicker(items, { ...DEFAULT_PREFS, articlesPerSource: 10 });
     expect(result.map((i) => i.id)).toEqual([1, 2, 3]);
+  });
+});
+
+// ── v1.1.1 smart removal: single-source payloads skip the cap ───
+
+describe("single-source smart removal (v1.1.1)", () => {
+  const capped: RssDisplayPrefs = { ...DEFAULT_PREFS, articlesPerSource: 2 };
+
+  it("distinctSourceCount counts unique sources", () => {
+    expect(distinctSourceCount([])).toBe(0);
+    expect(distinctSourceCount([mk(1, "a"), mk(2, "a")])).toBe(1);
+    expect(distinctSourceCount([mk(1, "a"), mk(2, "b"), mk(3, "a")])).toBe(2);
+  });
+
+  it("ticker: a single-outlet widget shows its whole feed despite a cap", () => {
+    const items = [mk(1, "bbc"), mk(2, "bbc"), mk(3, "bbc"), mk(4, "bbc")];
+    expect(selectRssForTicker(items, capped)).toHaveLength(4);
+  });
+
+  it("ticker: multi-source payloads still balance per source", () => {
+    const items = [mk(1, "a"), mk(2, "a"), mk(3, "a"), mk(4, "b")];
+    const result = selectRssForTicker(items, capped);
+    expect(result.filter((i) => i.source_name === "a")).toHaveLength(2);
+    expect(result.filter((i) => i.source_name === "b")).toHaveLength(1);
+  });
+
+  it("pipeline: single-source ignores the cap and reports nothing hidden", () => {
+    const items = [mk(1, "bbc"), mk(2, "bbc"), mk(3, "bbc")];
+    const { visibleItems, totalHidden } = applyRssPipeline(items, {
+      categoryMap: new Map(),
+      sortOrder: "newest",
+      articlesPerSource: 2,
+    });
+    expect(visibleItems).toHaveLength(3);
+    expect(totalHidden).toBe(0);
+  });
+
+  it("pipeline: multi-source still caps and reports overflow", () => {
+    const items = [mk(1, "a"), mk(2, "a"), mk(3, "a"), mk(4, "b")];
+    const { visibleItems, totalHidden, overflowCounts } = applyRssPipeline(items, {
+      categoryMap: new Map(),
+      sortOrder: "newest",
+      articlesPerSource: 2,
+    });
+    expect(visibleItems).toHaveLength(3);
+    expect(totalHidden).toBe(1);
+    expect(overflowCounts.get("a")).toBe(1);
   });
 });

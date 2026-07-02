@@ -138,13 +138,20 @@ export default function PageLayout({
           Settings) cross-fades the content while the TopBar chrome
           stays stable. The cross-fade uses 'wait' mode for a clean
           one-at-a-time transition without overlap during route
-          changes. */}
+          changes.
+
+          Do NOT pass initial={false} here: AnimatePresence sets
+          PresenceContext.initial=false for its first render, which
+          silently blocks the mount animation of EVERY nested motion
+          component — it killed all page entrance choreography
+          (catalog cards, settings sections, support hub) until
+          v1.1.1. Initial animations on page arrival are a feature. */}
       {fillHeight ? (
         // Fill-height mode: content area is a flex column with no
         // outer scroll. Children manage their own scrollable panel.
         // Used by Configure routes that have a long inner list.
         <div className="flex-1 min-h-0 flex flex-col">
-          <AnimatePresence mode="wait" initial={false}>
+          <AnimatePresence mode="wait">
             <motion.div
               key={contentKey}
               initial={{ opacity: 0, y: 4 }}
@@ -170,7 +177,7 @@ export default function PageLayout({
       ) : (
         // Default mode: content area scrolls; children stack vertically.
         <div className="flex-1 overflow-y-auto scrollbar-thin">
-          <AnimatePresence mode="wait" initial={false}>
+          <AnimatePresence mode="wait">
             <motion.div
               key={contentKey}
               initial={{ opacity: 0, y: 4 }}

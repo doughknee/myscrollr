@@ -112,11 +112,16 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
                 return { ...old, channels };
               },
             );
-            // Quietly resync in the background so any server-side
-            // fields we didn't model (logto_sub, etc.) line up.
+            // Resync NOW, refetching mounted queries: the user is
+            // already sitting on the widget's feed page (we navigated
+            // optimistically), and its data (dashboard.data[source])
+            // only exists server-side once the row is created. With
+            // refetchType "none" the mounted query never refetched and
+            // the feed stayed empty until Configure forced one — the
+            // v1.1.0 "data appears only after visiting Configure" bug.
             queryClient.invalidateQueries({
               queryKey: queryKeys.dashboard,
-              refetchType: "none",
+              refetchType: "active",
             });
           })
           .catch((err) => {

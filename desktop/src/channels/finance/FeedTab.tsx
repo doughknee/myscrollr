@@ -213,6 +213,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure, widgetId }
   if (trades.length === 0) {
     return (
       <EmptyChannelState
+        refreshing={Boolean(feedContext.__refreshing)}
         icon={TrendingUp}
         noun="stocks or crypto"
         hasConfig={!!feedContext.__hasConfig}

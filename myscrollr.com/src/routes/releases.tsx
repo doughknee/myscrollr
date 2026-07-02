@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import DOMPurify from 'dompurify'
 import { createFileRoute } from '@tanstack/react-router'
 import {
   ArrowDown,
@@ -51,9 +52,17 @@ const EASE = [0.22, 1, 0.36, 1] as const
 marked.use({ gfm: true, breaks: false })
 
 function renderNotes(markdown: string): string {
-  const html = marked.parse(markdown, { async: false })
+  const raw = marked.parse(markdown, { async: false })
+  // Real sanitizer (ship-review follow-up): the regex only stripped
+  // <script> blocks, leaving event-handler attributes and javascript:
+  // URLs. DOMPurify needs a DOM; rendering only happens client-side
+  // (lazy, on row expand), but the module loads during prerender too —
+  // hence the fallback.
+  const html =
+    typeof window !== 'undefined' && typeof DOMPurify.sanitize === 'function'
+      ? DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } })
+      : raw.replace(/<script[\s\S]*?<\/script>/gi, '')
   return html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<table>/g, '<div class="table-wrap"><table>')
     .replace(/<\/table>/g, '</table></div>')
 }
