@@ -304,7 +304,8 @@ jobs:
               "VITE_STRIPE_PRICE_ULTIMATE_ANNUAL=$VITE_STRIPE_PRICE_ULTIMATE_ANNUAL" \
               "VITE_SENTRY_DSN=$VITE_SENTRY_DSN" \
               "SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN" \
-              "SENTRY_ORG=$SENTRY_ORG"; do
+              "SENTRY_ORG=$SENTRY_ORG" \
+              "GITHUB_TOKEN=$GH_API_TOKEN"; do
               BUILD_ARGS="$BUILD_ARGS --build-arg $arg"
             done
           fi
