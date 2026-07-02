@@ -138,6 +138,15 @@ func IsKnownWidgetType(widgetType string) bool {
 	return DataSourceForWidget(widgetType) != ""
 }
 
+// IsUtilityWidgetType reports whether a widget_type is a local-only utility
+// (clock/timer/…). Utilities live in desktop preferences, not user_channels —
+// CreateChannel rejects them so they can't pollute subscriber sets or
+// double-count against the slot cap (once as a row, once via local_widgets).
+func IsUtilityWidgetType(widgetType string) bool {
+	def, ok := widgetByID[widgetType]
+	return ok && def.Kind == WidgetUtility
+}
+
 // GetFeaturedWidgets returns the curated widget catalog (for a future
 // /widgets discovery endpoint and the desktop Library).
 func GetFeaturedWidgets() []WidgetDef {
