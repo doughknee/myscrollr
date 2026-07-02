@@ -16,7 +16,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Is Scrollr free?',
     answer:
-      'Yes. The free tier streams real-time data to 3 widgets at once with no ads. Upgrade to Uplink or higher for more widget slots, Yahoo Fantasy sync, and power-user tools like alerts and integrations.',
+      'Yes. The free tier streams real-time data to 3 widgets at once with no ads. Upgrade to Uplink or higher for more widget slots, priority support, and power-user tools like alerts and integrations.',
   },
   {
     question: "Does it affect my computer's performance?",

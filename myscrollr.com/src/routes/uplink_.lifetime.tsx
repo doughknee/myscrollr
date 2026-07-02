@@ -271,7 +271,7 @@ function LifetimePage() {
                 </Feature>
                 <Feature>Unlimited widgets at once</Feature>
                 <Feature>Webhooks, data export & API access</Feature>
-                <Feature>Yahoo Fantasy sync + unlimited items per widget</Feature>
+                <Feature>Unlimited items inside every widget</Feature>
                 <Feature>Founding member badge & priority support</Feature>
                 <Feature>Early access to new features & widgets</Feature>
               </motion.div>

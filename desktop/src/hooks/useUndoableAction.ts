@@ -34,9 +34,9 @@
  *     wasn't worth the complexity for the first cut.
  */
 
-import { useCallback } from "react";
+import { useCallback, useContext } from "react";
 import { toast } from "sonner";
-import { useShell } from "../shell-context";
+import { ShellContext } from "../shell-context";
 import { pushSnapshot, restoreSnapshot } from "../lib/undoStack";
 import type { AppPreferences } from "../preferences";
 
@@ -62,16 +62,35 @@ interface UndoableActionOptions {
 type Mutator = (current: AppPreferences) => AppPreferences;
 
 /**
+ * Explicit prefs plumbing for callers that sit OUTSIDE the shell
+ * provider. RootLayout itself is the component that *renders*
+ * ShellContext.Provider, so hooks called in its body can't read the
+ * context — the v1.1.2 sidebar remove flow passes RootLayout's own
+ * `prefs` + `persistPrefs` here instead. Inside the provider, omit.
+ */
+export interface UndoShellPlumbing {
+  prefs: AppPreferences;
+  onPrefsChange: (prefs: AppPreferences) => void;
+}
+
+/**
  * Returns a function `(opts, mutator) => void` that executes the
  * mutation and shows an undo toast. The function identity is stable
  * across renders (useCallback) so it's safe to put in dependency
  * arrays.
  */
-export function useUndoableAction(): (
+export function useUndoableAction(external?: UndoShellPlumbing): (
   opts: UndoableActionOptions,
   mutator: Mutator,
 ) => void {
-  const { prefs, onPrefsChange } = useShell();
+  const ctx = useContext(ShellContext);
+  const resolved = external ?? ctx;
+  if (!resolved) {
+    throw new Error(
+      "useUndoableAction must be used within RootLayout or given explicit prefs plumbing",
+    );
+  }
+  const { prefs, onPrefsChange } = resolved;
 
   return useCallback(
     (opts: UndoableActionOptions, mutator: Mutator) => {

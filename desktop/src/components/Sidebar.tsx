@@ -32,21 +32,37 @@
  * the divider lines stay so the grouping survives visually.
  */
 import { useState } from "react";
-import { Settings, LifeBuoy, PanelLeftClose, PanelLeftOpen, Plus, RadioTower, UserCircle } from "lucide-react";
+import {
+  ArrowUpRight,
+  Info,
+  LifeBuoy,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  RadioTower,
+  Settings,
+  Settings2,
+  Trash2,
+  UserCircle,
+} from "lucide-react";
 import clsx from "clsx";
 import { motion } from "motion/react";
 import Tooltip from "./Tooltip";
+import ContextMenu from "./ContextMenu";
 import type { ChannelManifest, WidgetManifest } from "../types";
 import { loadPref, savePref } from "../preferences";
 
 // ── Props ───────────────────────────────────────────────────────
 
-interface SidebarSource {
+export interface SidebarSource {
   id: string;
   name: string;
   hex: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   kind: "channel" | "widget";
+  /** Whether this source currently has chips on the ticker — drives
+   *  the context menu's Show/Hide label (v1.1.2). */
+  onTicker: boolean;
 }
 
 interface SidebarProps {
@@ -79,6 +95,16 @@ interface SidebarProps {
   onNavigateToSupport: () => void;
   /** Navigate to a specific source (channel or widget) feed. */
   onSelectItem: (id: string, kind: "channel" | "widget") => void;
+
+  // ── Context-menu actions (v1.1.2: right-click a source row) ──
+  /** Open the source's Configure tab. */
+  onConfigureItem: (id: string, kind: "channel" | "widget") => void;
+  /** Open the widget's catalog info page. */
+  onInfoItem: (id: string) => void;
+  /** Toggle the source's presence on the ticker. */
+  onToggleItemTicker: (source: SidebarSource) => void;
+  /** Remove the widget (frees its slot). */
+  onRemoveItem: (source: SidebarSource) => void;
 }
 
 // ── Component ───────────────────────────────────────────────────
@@ -97,10 +123,21 @@ export default function Sidebar({
   onNavigateToAccount,
   onNavigateToSupport,
   onSelectItem,
+  onConfigureItem,
+  onInfoItem,
+  onToggleItemTicker,
+  onRemoveItem,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(() =>
     loadPref("sidebarCollapsed", false),
   );
+  // Right-click menu on a source row (v1.1.2). One menu at a time,
+  // anchored at the pointer.
+  const [menu, setMenu] = useState<{
+    source: SidebarSource;
+    x: number;
+    y: number;
+  } | null>(null);
 
   function toggleCollapsed() {
     const next = !collapsed;
@@ -137,6 +174,10 @@ export default function Sidebar({
               active={activeItem === source.id}
               collapsed={collapsed}
               onClick={() => onSelectItem(source.id, source.kind)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setMenu({ source, x: e.clientX, y: e.clientY });
+              }}
             />
           ))
         ) : (
@@ -235,6 +276,58 @@ export default function Sidebar({
           </button>
         </Tooltip>
       </div>
+
+      {/* ── Source context menu (v1.1.2) ───────────────────────
+          Everything you can do to a widget without leaving the rail:
+          open, configure, ticker visibility, its catalog page, and
+          remove. Actions resolve in the shell layer — the same paths
+          the info page and ticker settings use. */}
+      <ContextMenu
+        open={menu !== null}
+        x={menu?.x ?? 0}
+        y={menu?.y ?? 0}
+        onClose={() => setMenu(null)}
+        items={
+          menu
+            ? [
+                {
+                  key: "open",
+                  label: "Open",
+                  icon: ArrowUpRight,
+                  onSelect: () => onSelectItem(menu.source.id, menu.source.kind),
+                },
+                {
+                  key: "configure",
+                  label: "Configure",
+                  icon: Settings2,
+                  onSelect: () => onConfigureItem(menu.source.id, menu.source.kind),
+                },
+                {
+                  key: "ticker",
+                  label: menu.source.onTicker
+                    ? "Hide from ticker"
+                    : "Show on ticker",
+                  icon: RadioTower,
+                  onSelect: () => onToggleItemTicker(menu.source),
+                },
+                {
+                  key: "info",
+                  label: "Widget page",
+                  icon: Info,
+                  onSelect: () => onInfoItem(menu.source.id),
+                },
+                {
+                  key: "remove",
+                  label: "Remove",
+                  icon: Trash2,
+                  destructive: true,
+                  dividerBefore: true,
+                  onSelect: () => onRemoveItem(menu.source),
+                },
+              ]
+            : []
+        }
+      />
     </aside>
   );
 }
@@ -288,6 +381,7 @@ function NavItem({
   collapsed,
   accent = false,
   onClick,
+  onContextMenu,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -296,11 +390,14 @@ function NavItem({
   /** Accent variant for CTA-like items (currently "Add source"). */
   accent?: boolean;
   onClick: () => void;
+  /** Right-click handler — source rows open their context menu. */
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   return (
     <Tooltip content={collapsed ? label : undefined} side="right">
       <button
         onClick={onClick}
+        onContextMenu={onContextMenu}
         aria-current={active ? "page" : undefined}
         aria-label={collapsed ? label : undefined}
         className={clsx(

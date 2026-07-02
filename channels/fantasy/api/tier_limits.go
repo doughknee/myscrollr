@@ -3,48 +3,31 @@ package main
 import "github.com/gofiber/fiber/v2"
 
 // =============================================================================
-// Tier Limits — Fantasy League Imports
+// Tier Limits — Fantasy League Imports (RETIRED)
 // =============================================================================
 //
-// Mirrors the `Fantasy` column of api/core/tier_limits.go DefaultTierLimits.
-// Kept package-local on purpose: each Go module is independently deployable
-// and cross-module imports are banned by AGENTS.md. When the authoritative
-// table in api/core/tier_limits.go changes, update this file too.
+// v1.1.2 (2026-07-02): the per-tier league cap is GONE. The widget/slot model
+// made the widget slot — enforced by the core API's CreateChannel — the only
+// monetization lever, and Yahoo Fantasy is a normal widget on every plan with
+// unlimited depth inside it ("as many leagues as you play"). The old ladder
+// (free 0 / uplink 1 / pro 3 / ultimate 10) predated that model and survived
+// here by accident: this file is a package-local mirror (cross-module imports
+// are banned by AGENTS.md), so the 2026-07-02 core-side cap retirement never
+// reached it.
 //
-// Semantics:
-//   - Positive integer: hard cap on league count.
-//   - -1: unlimited (used for super_user and matches the JSON `null` cap
-//     contract exposed by /tier-limits).
-//
-// Unknown tiers fall through to "free" as a defensive default — an attacker
-// sending a bogus X-User-Tier header should get the strictest cap, not a
-// higher one.
+// FantasyLeagueCap and its call site in user_handlers.go are kept as a seam:
+// if a per-tier depth cap ever returns, the enforcement plumbing (header →
+// tier → cap → 403) is already wired and tested end-to-end.
 
-const (
-	TierFree           = "free"
-	TierUplink         = "uplink"
-	TierUplinkPro      = "uplink_pro"
-	TierUplinkUltimate = "uplink_ultimate"
-	TierSuperUser      = "super_user"
-)
+// TierFree is the least-privileged tier — GetUserTier's fallback when the
+// gateway header is missing.
+const TierFree = "free"
 
-// FantasyLeagueCap returns the league cap for a tier. -1 means unlimited.
+// FantasyLeagueCap returns the league-import cap for a tier. -1 means
+// unlimited — which is now every tier (see file header).
 func FantasyLeagueCap(tier string) int {
-	switch tier {
-	case TierSuperUser:
-		return -1
-	case TierUplinkUltimate:
-		return 10
-	case TierUplinkPro:
-		return 3
-	case TierUplink:
-		return 1
-	case TierFree:
-		return 0
-	default:
-		// Unknown / missing header — apply the strictest cap.
-		return 0
-	}
+	_ = tier
+	return -1
 }
 
 // GetUserTier reads the X-User-Tier header set by the core gateway for

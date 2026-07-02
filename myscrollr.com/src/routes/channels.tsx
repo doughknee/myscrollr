@@ -164,7 +164,7 @@ const CHANNELS: Array<ChannelDef> = [
     name: 'Yahoo Fantasy',
     description: 'Fantasy sports leagues',
     detail:
-      'Connect your Yahoo account to view league standings, team rosters, weekly matchups, and live scoring across unlimited fantasy leagues. Available on every paid plan — Uplink and up.',
+      'Connect your Yahoo account to view league standings, team rosters, weekly matchups, and live scoring across unlimited fantasy leagues. Included on every plan.',
     Icon: Ghost,
     hex: HEX.accent,
     Watermark: Ghost,

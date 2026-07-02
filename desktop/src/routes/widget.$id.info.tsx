@@ -10,7 +10,7 @@
  */
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import clsx from "clsx";
 import {
@@ -25,7 +25,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
-import { toast } from "sonner";
 
 import {
   catalogItemById,
@@ -36,14 +35,11 @@ import {
 import type { CatalogItem } from "../marketplace";
 import type { SubscriptionTier } from "../auth";
 import { TIER_LABELS } from "../auth";
-import { channelsApi } from "../api/client";
-import type { ChannelType } from "../api/client";
-import { dashboardQueryOptions, queryKeys } from "../api/queries";
+import { dashboardQueryOptions } from "../api/queries";
 import { useShell, useShellData } from "../shell-context";
 import { getMaxWidgets } from "../tierLimits";
 import { useAddWidget } from "../hooks/useAddWidget";
-import { useUndoableAction } from "../hooks/useUndoableAction";
-import { disableWidget } from "../preferences";
+import { useRemoveWidget } from "../hooks/useRemoveWidget";
 import PageLayout from "../components/layout/PageLayout";
 import EmptySection from "../components/layout/EmptySection";
 import RouteError from "../components/RouteError";
@@ -87,8 +83,7 @@ function WidgetInfoPage() {
   const { channels } = useShellData();
   const { isLoading: dashboardLoading } = useQuery(dashboardQueryOptions());
   const addWidget = useAddWidget();
-  const queryClient = useQueryClient();
-  const undoable = useUndoableAction();
+  const removeWidgetShared = useRemoveWidget();
   const [removing, setRemoving] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
 
@@ -141,30 +136,13 @@ function WidgetInfoPage() {
       : `${used} of ${maxSlots} widget slots used`
     : `${used} widgets added · unlimited slots`;
 
+  // Shared flow (useRemoveWidget) — same behavior as the sidebar menu.
   const removeWidget = async () => {
-    if (item.kind === "data") {
-      setRemoving(true);
-      try {
-        await channelsApi.delete(item.id as ChannelType);
-        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
-        toast.success(`${item.name} removed`, {
-          description: "Its slot is free for another widget.",
-        });
-      } catch (err) {
-        console.error("[Scrollr] Remove failed:", err);
-        toast.error(`Couldn't remove ${item.name}`);
-      } finally {
-        setRemoving(false);
-      }
-    } else {
-      // Utilities live in prefs — undoable, settings preserved.
-      undoable(
-        {
-          label: `Removed ${item.name}`,
-          description: "Its slot is free for another widget.",
-        },
-        (current) => disableWidget(current, item.id),
-      );
+    setRemoving(true);
+    try {
+      await removeWidgetShared(item);
+    } finally {
+      setRemoving(false);
     }
   };
 

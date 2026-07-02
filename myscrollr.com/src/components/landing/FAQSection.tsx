@@ -29,7 +29,7 @@ const FAQ_ITEMS: Array<FAQItem> = [
     question: 'Is Scrollr free?',
     highlight: 'A generous free tier with no ads or tracking. Upgrade anytime.',
     answer:
-      'The free tier streams real-time data with no ads or tracking. Uplink plans unlock more widgets at once, Yahoo Fantasy sync, and power-user tools like custom alerts and integrations. The entire codebase is open source under the AGPL-3.0 license.',
+      'The free tier streams real-time data with no ads or tracking. Uplink plans unlock more widgets at once, priority support, and power-user tools like custom alerts and integrations. The entire codebase is open source under the AGPL-3.0 license.',
     accent: 'emerald',
   },
   {
