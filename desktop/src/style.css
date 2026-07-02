@@ -1286,3 +1286,131 @@ textarea:focus-visible,
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Release notes markdown (What's New page) ──────────────────────
+   Styles the marked-rendered GitHub release bodies injected via
+   dangerouslySetInnerHTML in routes/releases.tsx. Uses the theme
+   tokens so notes read as native app content in every theme. */
+.release-notes-md {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--color-fg-2);
+  overflow-wrap: break-word;
+}
+.release-notes-md > :first-child {
+  margin-top: 0;
+}
+.release-notes-md > :last-child {
+  margin-bottom: 0;
+}
+.release-notes-md h1,
+.release-notes-md h2 {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--color-fg);
+  margin: 16px 0 6px;
+}
+.release-notes-md h3,
+.release-notes-md h4,
+.release-notes-md h5,
+.release-notes-md h6 {
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--color-fg);
+  margin: 12px 0 4px;
+}
+.release-notes-md p {
+  margin: 6px 0;
+}
+.release-notes-md ul,
+.release-notes-md ol {
+  margin: 6px 0;
+  padding-left: 1.4em;
+}
+.release-notes-md ul {
+  list-style: disc;
+}
+.release-notes-md ol {
+  list-style: decimal;
+}
+.release-notes-md li {
+  margin: 3px 0;
+}
+.release-notes-md li > ul,
+.release-notes-md li > ol {
+  margin: 2px 0;
+}
+.release-notes-md a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.release-notes-md a:hover {
+  filter: brightness(1.15);
+}
+.release-notes-md strong {
+  font-weight: 600;
+  color: var(--color-fg);
+}
+.release-notes-md code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--color-base-250);
+  border: 1px solid var(--color-edge);
+  color: var(--color-fg);
+}
+.release-notes-md pre {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--color-base-200);
+  border: 1px solid var(--color-edge);
+  overflow-x: auto;
+}
+.release-notes-md pre code {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.release-notes-md blockquote {
+  margin: 8px 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--color-edge-2);
+  color: var(--color-fg-3);
+}
+.release-notes-md hr {
+  border: 0;
+  border-top: 1px solid var(--color-edge);
+  margin: 12px 0;
+}
+.release-notes-md img {
+  max-width: 100%;
+  border-radius: 8px;
+}
+/* Tables: renderReleaseMarkdown wraps every <table> in .md-table-wrap
+   so wide tables scroll horizontally instead of blowing out the row. */
+.release-notes-md .md-table-wrap {
+  margin: 8px 0;
+  overflow-x: auto;
+}
+.release-notes-md table {
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 18px;
+}
+.release-notes-md th,
+.release-notes-md td {
+  padding: 5px 10px;
+  border: 1px solid var(--color-edge);
+  text-align: left;
+  vertical-align: top;
+}
+.release-notes-md th {
+  font-weight: 600;
+  color: var(--color-fg);
+  background: var(--color-base-200);
+}

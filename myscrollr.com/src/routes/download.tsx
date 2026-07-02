@@ -18,6 +18,7 @@ import {
 } from '@/lib/structured-data'
 import { DownloadButton } from '@/components/DownloadButton'
 import { ProductScreenshot } from '@/components/ProductScreenshot'
+import { LATEST_DESKTOP_VERSION } from '@/lib/latestVersion.generated'
 import { detectIsIntelMac, detectPlatform } from '@/lib/detectPlatform'
 import { triggerDownload } from '@/lib/getDownloadInfo'
 
@@ -158,6 +159,13 @@ export function DownloadPage({
             <p className="text-sm text-base-content/40">
               {recommended.arch} &middot; Free &middot; Open source
             </p>
+            <Link
+              to="/releases"
+              className="inline-flex items-center gap-1 text-xs font-medium text-primary/60 transition-colors hover:text-primary"
+            >
+              What&rsquo;s new &middot; v{LATEST_DESKTOP_VERSION}
+              <ExternalLink className="h-3 w-3" aria-hidden="true" />
+            </Link>
           </motion.div>
 
           {/* ── What you'll see ────────────────────────────────

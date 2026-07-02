@@ -26,6 +26,7 @@ const ROUTES = [
   { path: '/uplink', priority: 0.9, changefreq: 'monthly' },
   { path: '/uplink/lifetime', priority: 0.8, changefreq: 'monthly' },
   { path: '/channels', priority: 0.8, changefreq: 'weekly' },
+  { path: '/releases', priority: 0.6, changefreq: 'weekly' },
   { path: '/architecture', priority: 0.7, changefreq: 'monthly' },
   { path: '/business', priority: 0.7, changefreq: 'monthly' },
   { path: '/support', priority: 0.7, changefreq: 'monthly' },

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TickerRouteImport } from './routes/ticker'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ReleasesRouteImport } from './routes/releases'
 import { Route as FeedRouteImport } from './routes/feed'
 import { Route as CatalogRouteImport } from './routes/catalog'
 import { Route as AccountRouteImport } from './routes/account'
@@ -33,6 +34,11 @@ const SupportRoute = SupportRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReleasesRoute = ReleasesRouteImport.update({
+  id: '/releases',
+  path: '/releases',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FeedRoute = FeedRouteImport.update({
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AccountRoute
   '/catalog': typeof CatalogRoute
   '/feed': typeof FeedRoute
+  '/releases': typeof ReleasesRoute
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/ticker': typeof TickerRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/account': typeof AccountRoute
   '/catalog': typeof CatalogRoute
   '/feed': typeof FeedRoute
+  '/releases': typeof ReleasesRoute
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/ticker': typeof TickerRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/catalog': typeof CatalogRoute
   '/feed': typeof FeedRoute
+  '/releases': typeof ReleasesRoute
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/ticker': typeof TickerRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/catalog'
     | '/feed'
+    | '/releases'
     | '/settings'
     | '/support'
     | '/ticker'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/catalog'
     | '/feed'
+    | '/releases'
     | '/settings'
     | '/support'
     | '/ticker'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/catalog'
     | '/feed'
+    | '/releases'
     | '/settings'
     | '/support'
     | '/ticker'
@@ -152,6 +164,7 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   CatalogRoute: typeof CatalogRoute
   FeedRoute: typeof FeedRoute
+  ReleasesRoute: typeof ReleasesRoute
   SettingsRoute: typeof SettingsRoute
   SupportRoute: typeof SupportRoute
   TickerRoute: typeof TickerRoute
@@ -181,6 +194,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/releases': {
+      id: '/releases'
+      path: '/releases'
+      fullPath: '/releases'
+      preLoaderRoute: typeof ReleasesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/feed': {
@@ -240,6 +260,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRoute,
   CatalogRoute: CatalogRoute,
   FeedRoute: FeedRoute,
+  ReleasesRoute: ReleasesRoute,
   SettingsRoute: SettingsRoute,
   SupportRoute: SupportRoute,
   TickerRoute: TickerRoute,

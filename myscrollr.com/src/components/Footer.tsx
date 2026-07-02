@@ -22,6 +22,7 @@ export default function Footer() {
       { label: 'Status', href: '/status' },
       { label: 'Architecture', href: '/architecture' },
       { label: 'Widgets', href: '/channels' },
+      { label: 'Releases', href: '/releases' },
     ],
     company: [
       { label: 'Terms', href: '/legal?doc=terms' },

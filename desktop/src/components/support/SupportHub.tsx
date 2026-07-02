@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import {
   Search,
   Rocket,
@@ -7,6 +8,7 @@ import {
   BookOpen,
   CreditCard,
   MessageCircle,
+  Sparkles,
 } from "lucide-react";
 import clsx from "clsx";
 import { motion } from "motion/react";
@@ -125,6 +127,7 @@ function buildFeatureGuideResults(query: string): SearchResult[] {
 
 export default function SupportHub({ onSelectSection }: SupportHubProps) {
   const [query, setQuery] = useState("");
+  const navigate = useNavigate();
 
   const results = useMemo(() => {
     if (!query.trim()) return [];
@@ -222,6 +225,24 @@ export default function SupportHub({ onSelectSection }: SupportHubProps) {
                 </motion.button>
               );
             })}
+            {/* What's New — routes to /releases instead of a support
+                section, so it lives outside CATEGORIES/SectionId. */}
+            <motion.button
+              onClick={() => navigate({ to: "/releases" })}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: 0.25,
+                delay: 0.04 + CATEGORIES.length * 0.04,
+                ease: [0.22, 0.61, 0.36, 1],
+              }}
+              whileHover={{ y: -2 }}
+              className="rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left hover:border-accent/40 hover:bg-base-150/55 hover:shadow-soft-sm transition-[border-color,background-color,box-shadow] duration-200 active:scale-[0.98] cursor-pointer"
+            >
+              <Sparkles size={18} className="text-accent mb-2.5" />
+              <h3 className="text-ui-body font-semibold mb-1">What's New</h3>
+              <p className="text-ui-meta">Release notes and version history</p>
+            </motion.button>
           </div>
         )}
       </div>

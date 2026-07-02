@@ -1,4 +1,6 @@
 import { useState, useCallback, useRef } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { Sparkles } from "lucide-react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import {
@@ -284,6 +286,7 @@ export default function GeneralSettings({
               onDownload={handleDownloadAndInstall}
               onRelaunch={handleRelaunch}
             />
+            <WhatsNewRow />
           </Section>
 
           <Section title="About" variant="card">
@@ -339,6 +342,26 @@ function ShortcutsList() {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ── What's New link ─────────────────────────────────────────────
+// Quiet companion to the update checker: jumps to the /releases page
+// where every version's release notes live.
+
+function WhatsNewRow() {
+  const navigate = useNavigate();
+  return (
+    <div className="flex items-center justify-between px-3 py-2.5 rounded-lg">
+      <span className="text-ui-meta">See what changed in recent versions</span>
+      <button
+        onClick={() => navigate({ to: "/releases" })}
+        className="flex items-center gap-1 text-ui-chip font-medium px-2.5 py-1 rounded-md text-fg-3 hover:text-fg-2 hover:bg-base-250/50 transition-all duration-150 active:scale-95 cursor-pointer"
+      >
+        <Sparkles size={12} />
+        What's new
+      </button>
     </div>
   );
 }
