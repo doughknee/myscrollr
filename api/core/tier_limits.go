@@ -47,12 +47,16 @@ type TierLimitsResponse struct {
 // Once Sprint 3 wires backend enforcement on POST/PUT /users/me/channels,
 // these values directly gate what the DB will accept, so drift is
 // unforgiving.
+// Per-feature depth caps (Symbols/Feeds/CustomFeeds/Leagues/Fantasy) were
+// RETIRED 2026-07-02 — a nil pointer means unlimited, and every tier now has
+// unlimited depth inside a widget. MaxWidgets (the slot lever) is the only
+// per-tier gate; the ticker-row fields are kept for compatibility.
 var DefaultTierLimits = map[string]ChannelLimits{
-	"free":            {MaxWidgets: intPtr(3), Symbols: intPtr(5), Feeds: intPtr(1), CustomFeeds: intPtr(0), Leagues: intPtr(1), Fantasy: intPtr(0), MaxTickerRows: 1, MaxTickerCustomization: false},
-	"uplink":          {MaxWidgets: intPtr(6), Symbols: intPtr(25), Feeds: intPtr(25), CustomFeeds: intPtr(1), Leagues: intPtr(8), Fantasy: intPtr(1), MaxTickerRows: 2, MaxTickerCustomization: false},
-	"uplink_pro":      {MaxWidgets: intPtr(12), Symbols: intPtr(75), Feeds: intPtr(100), CustomFeeds: intPtr(3), Leagues: intPtr(20), Fantasy: intPtr(3), MaxTickerRows: 3, MaxTickerCustomization: false},
-	"uplink_ultimate": {MaxWidgets: nil, Symbols: nil, Feeds: nil, CustomFeeds: intPtr(10), Leagues: nil, Fantasy: intPtr(10), MaxTickerRows: 3, MaxTickerCustomization: true},
-	"super_user":      {MaxWidgets: nil, Symbols: nil, Feeds: nil, CustomFeeds: nil, Leagues: nil, Fantasy: nil, MaxTickerRows: 3, MaxTickerCustomization: true},
+	"free":            {MaxWidgets: intPtr(3), MaxTickerRows: 1},
+	"uplink":          {MaxWidgets: intPtr(6), MaxTickerRows: 2},
+	"uplink_pro":      {MaxWidgets: intPtr(12), MaxTickerRows: 3},
+	"uplink_ultimate": {MaxTickerRows: 3, MaxTickerCustomization: true},
+	"super_user":      {MaxTickerRows: 3, MaxTickerCustomization: true},
 }
 
 // HandleGetTierLimits serves the tier limits map to any caller — clients

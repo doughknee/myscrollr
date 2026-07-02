@@ -27,75 +27,46 @@ describe("getMaxWidgets", () => {
 
 // ── getLimit ────────────────────────────────────────────────────
 
+const DEPTH_KEYS = ["symbols", "feeds", "customFeeds", "leagues", "fantasy"] as const;
+const ALL_TIERS: SubscriptionTier[] = [
+  "free",
+  "uplink",
+  "uplink_pro",
+  "uplink_ultimate",
+  "super_user",
+];
+
 describe("getLimit", () => {
-  it("returns the correct numeric limit for free tier", () => {
-    expect(getLimit("free", "symbols")).toBe(5);
-    expect(getLimit("free", "feeds")).toBe(1);
-    expect(getLimit("free", "customFeeds")).toBe(0);
-    expect(getLimit("free", "leagues")).toBe(1);
-    expect(getLimit("free", "fantasy")).toBe(0);
+  // Per-feature depth caps were retired 2026-07-02 — unlimited on every tier.
+  it("returns Infinity for every depth cap on every tier", () => {
+    for (const tier of ALL_TIERS) {
+      for (const key of DEPTH_KEYS) {
+        expect(getLimit(tier, key)).toBe(Infinity);
+      }
+    }
+  });
+
+  it("still returns finite, tiered ticker-row limits", () => {
     expect(getLimit("free", "maxTickerRows")).toBe(1);
-  });
-
-  it("returns the correct numeric limit for uplink tier", () => {
-    expect(getLimit("uplink", "symbols")).toBe(25);
-    expect(getLimit("uplink", "feeds")).toBe(25);
-    expect(getLimit("uplink", "customFeeds")).toBe(1);
-    expect(getLimit("uplink", "leagues")).toBe(8);
-    expect(getLimit("uplink", "fantasy")).toBe(1);
     expect(getLimit("uplink", "maxTickerRows")).toBe(2);
-  });
-
-  it("returns the correct numeric limit for uplink_pro tier", () => {
-    expect(getLimit("uplink_pro", "symbols")).toBe(75);
-    expect(getLimit("uplink_pro", "feeds")).toBe(100);
-    expect(getLimit("uplink_pro", "customFeeds")).toBe(3);
-    expect(getLimit("uplink_pro", "leagues")).toBe(20);
-    expect(getLimit("uplink_pro", "fantasy")).toBe(3);
     expect(getLimit("uplink_pro", "maxTickerRows")).toBe(3);
-  });
-
-  it("returns Infinity for unlimited ultimate fields", () => {
-    expect(getLimit("uplink_ultimate", "symbols")).toBe(Infinity);
-    expect(getLimit("uplink_ultimate", "feeds")).toBe(Infinity);
-    expect(getLimit("uplink_ultimate", "leagues")).toBe(Infinity);
-  });
-
-  it("returns Infinity for super_user across every numeric key", () => {
-    expect(getLimit("super_user", "symbols")).toBe(Infinity);
-    expect(getLimit("super_user", "feeds")).toBe(Infinity);
-    expect(getLimit("super_user", "customFeeds")).toBe(Infinity);
-    expect(getLimit("super_user", "leagues")).toBe(Infinity);
-    expect(getLimit("super_user", "fantasy")).toBe(Infinity);
   });
 });
 
 // ── isUnlimited ─────────────────────────────────────────────────
 
 describe("isUnlimited", () => {
-  it("returns false for free tier symbols", () => {
-    expect(isUnlimited("free", "symbols")).toBe(false);
+  it("returns true for every retired depth cap on every tier", () => {
+    for (const tier of ALL_TIERS) {
+      for (const key of DEPTH_KEYS) {
+        expect(isUnlimited(tier, key)).toBe(true);
+      }
+    }
   });
 
-  it("returns false for uplink and uplink_pro tiers", () => {
-    expect(isUnlimited("uplink", "symbols")).toBe(false);
-    expect(isUnlimited("uplink_pro", "symbols")).toBe(false);
-  });
-
-  it("returns true for uplink_ultimate symbols", () => {
-    expect(isUnlimited("uplink_ultimate", "symbols")).toBe(true);
-  });
-
-  it("returns false for uplink_ultimate customFeeds (finite 10)", () => {
-    expect(isUnlimited("uplink_ultimate", "customFeeds")).toBe(false);
-  });
-
-  it("returns true for super_user across all numeric fields", () => {
-    expect(isUnlimited("super_user", "symbols")).toBe(true);
-    expect(isUnlimited("super_user", "feeds")).toBe(true);
-    expect(isUnlimited("super_user", "customFeeds")).toBe(true);
-    expect(isUnlimited("super_user", "leagues")).toBe(true);
-    expect(isUnlimited("super_user", "fantasy")).toBe(true);
+  it("returns false for the finite ticker-row limits", () => {
+    expect(isUnlimited("free", "maxTickerRows")).toBe(false);
+    expect(isUnlimited("uplink_pro", "maxTickerRows")).toBe(false);
   });
 });
 
@@ -131,25 +102,16 @@ describe("canCustomizeTickerRows", () => {
 // ── maxItemsForBrowser ──────────────────────────────────────────
 
 describe("maxItemsForBrowser", () => {
-  it("returns the finite number when the limit is finite", () => {
-    expect(maxItemsForBrowser("free", "symbols")).toBe(5);
-    expect(maxItemsForBrowser("uplink", "feeds")).toBe(25);
-    expect(maxItemsForBrowser("uplink_pro", "customFeeds")).toBe(3);
+  it("returns undefined for every retired depth cap (now unlimited)", () => {
+    for (const tier of ALL_TIERS) {
+      for (const key of DEPTH_KEYS) {
+        expect(maxItemsForBrowser(tier, key)).toBeUndefined();
+      }
+    }
   });
 
-  it("returns undefined when the limit is Infinity (ultimate)", () => {
-    expect(maxItemsForBrowser("uplink_ultimate", "symbols")).toBeUndefined();
-    expect(maxItemsForBrowser("uplink_ultimate", "leagues")).toBeUndefined();
-  });
-
-  it("returns undefined for super_user across all numeric fields", () => {
-    expect(maxItemsForBrowser("super_user", "symbols")).toBeUndefined();
-    expect(maxItemsForBrowser("super_user", "customFeeds")).toBeUndefined();
-    expect(maxItemsForBrowser("super_user", "fantasy")).toBeUndefined();
-  });
-
-  it("returns the finite ultimate customFeeds limit (10)", () => {
-    expect(maxItemsForBrowser("uplink_ultimate", "customFeeds")).toBe(10);
+  it("still returns the finite ticker-row limit", () => {
+    expect(maxItemsForBrowser("free", "maxTickerRows")).toBe(1);
   });
 });
 

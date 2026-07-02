@@ -181,9 +181,10 @@ func TestBuildTierFromContext_UplinkPro(t *testing.T) {
 	if got.Label != "Uplink Pro" {
 		t.Errorf("expected label=Uplink Pro, got %q", got.Label)
 	}
-	// Pro tier has Symbols=75 — sanity check the limits row threaded through.
-	if got.Limits.Symbols == nil || *got.Limits.Symbols != 75 {
-		t.Errorf("expected Symbols=75 for uplink_pro; got %v", got.Limits.Symbols)
+	// Per-feature depth caps are retired (nil now); sanity-check the limits
+	// row threaded through via MaxWidgets (pro = 12).
+	if got.Limits.MaxWidgets == nil || *got.Limits.MaxWidgets != 12 {
+		t.Errorf("expected MaxWidgets=12 for uplink_pro; got %v", got.Limits.MaxWidgets)
 	}
 }
 

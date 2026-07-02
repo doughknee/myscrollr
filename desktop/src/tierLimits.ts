@@ -21,13 +21,15 @@ import type { SubscriptionTier } from "./auth";
 // Infinity here corresponds to `null` on the wire (null round-trips
 // through JSON; Infinity does not).
 //
-// WIDGET/SLOT REDESIGN (2026-06-30): `maxWidgets` is the new primary
-// lever — how many widgets a tier runs at once. The per-feature caps
-// (symbols/feeds/leagues/…) and the ticker-row caps are retained during
-// the transition and retired as their UI consumers migrate to the widget
-// catalog. `maxTickerRows`/`maxTickerCustomization` are now free for all
-// tiers in the product model; the values below are kept only so existing
-// consumers compile until the ticker UI is reworked.
+// WIDGET/SLOT REDESIGN (2026-06-30): `maxWidgets` is the ONLY monetization
+// lever — how many widgets a tier runs at once. The per-feature depth caps
+// (symbols/feeds/customFeeds/leagues/fantasy) were RETIRED on 2026-07-02:
+// every tier now has unlimited depth inside a widget ("track a hundred stocks
+// in one Stocks widget"), so they're all Infinity. The fields remain only for
+// wire/type compatibility. Provider-quota protection moves to rate limiting,
+// not per-user caps. `maxTickerRows`/`maxTickerCustomization` are free in the
+// product model; kept only so existing consumers compile until the ticker UI
+// is reworked.
 // =====================================================================
 
 interface ChannelLimits {
@@ -44,54 +46,44 @@ interface ChannelLimits {
   maxTickerCustomization: boolean;
 }
 
+// Per-feature depth caps are all Infinity (retired) — `maxWidgets` is the only
+// gating lever. Only maxWidgets + the ticker-row fields still vary by tier.
+const UNLIMITED_DEPTH = {
+  symbols: Infinity,
+  feeds: Infinity,
+  customFeeds: Infinity,
+  leagues: Infinity,
+  fantasy: Infinity,
+} as const;
+
 export const TIER_LIMITS: Record<SubscriptionTier, ChannelLimits> = {
   free: {
     maxWidgets: 3,
-    symbols: 5,
-    feeds: 1,
-    customFeeds: 0,
-    leagues: 1,
-    fantasy: 0,
+    ...UNLIMITED_DEPTH,
     maxTickerRows: 1,
     maxTickerCustomization: false,
   },
   uplink: {
     maxWidgets: 6,
-    symbols: 25,
-    feeds: 25,
-    customFeeds: 1,
-    leagues: 8,
-    fantasy: 1,
+    ...UNLIMITED_DEPTH,
     maxTickerRows: 2,
     maxTickerCustomization: false,
   },
   uplink_pro: {
     maxWidgets: 12,
-    symbols: 75,
-    feeds: 100,
-    customFeeds: 3,
-    leagues: 20,
-    fantasy: 3,
+    ...UNLIMITED_DEPTH,
     maxTickerRows: 3,
     maxTickerCustomization: false,
   },
   uplink_ultimate: {
     maxWidgets: Infinity,
-    symbols: Infinity,
-    feeds: Infinity,
-    customFeeds: 10,
-    leagues: Infinity,
-    fantasy: 10,
+    ...UNLIMITED_DEPTH,
     maxTickerRows: 3,
     maxTickerCustomization: true,
   },
   super_user: {
     maxWidgets: Infinity,
-    symbols: Infinity,
-    feeds: Infinity,
-    customFeeds: Infinity,
-    leagues: Infinity,
-    fantasy: Infinity,
+    ...UNLIMITED_DEPTH,
     maxTickerRows: 3,
     maxTickerCustomization: true,
   },
