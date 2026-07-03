@@ -3,6 +3,7 @@ import { clsx } from "clsx";
 import { GameItem } from "./GameItem";
 import { isLive, isPre, isFinal } from "../../utils/gameHelpers";
 import { shouldShowOnFeed } from "../../preferences";
+import { selectSportsForFeed } from "./view";
 import type { Game, FeedMode } from "../../types";
 import type { SportsDisplayPrefs } from "../../hooks/useSportsConfig";
 import type { StatusFilter } from "./FeedTab";
@@ -29,21 +30,20 @@ export function ScoresTab({
   statusFilter,
 }: ScoresTabProps) {
   const filtered = useMemo(() => {
-    return games.filter((g) => {
+    // Day window first (v1.1.3 Time Controls — live games always pass),
+    // then the transient in-page filters on top.
+    const windowed = selectSportsForFeed(games, display);
+    return windowed.filter((g) => {
       // League filter
       if (leagueFilter.size > 0 && !leagueFilter.has(g.league)) return false;
 
-      // Status filter overrides display prefs when not "all"
+      // Status quick-filter narrows within the window when not "all"
       if (statusFilter === "live") return isLive(g);
       if (statusFilter === "upcoming") return isPre(g);
       if (statusFilter === "final") return isFinal(g);
-
-      // "all" — use display prefs
-      if (!shouldShowOnFeed(display.showUpcoming) && isPre(g)) return false;
-      if (!shouldShowOnFeed(display.showFinal) && isFinal(g)) return false;
       return true;
     });
-  }, [games, display.showUpcoming, display.showFinal, leagueFilter, statusFilter]);
+  }, [games, display, leagueFilter, statusFilter]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, Game[]>();

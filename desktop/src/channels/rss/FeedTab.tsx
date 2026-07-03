@@ -312,10 +312,11 @@ function RssFeedTab({ mode, feedContext, onConfigure, widgetId }: FeedTabProps) 
         categoryMap,
         sortOrder,
         articlesPerSource: dp.articlesPerSource,
+        maxArticleAgeDays: dp.maxArticleAgeDays,
         showAll,
         expandedSources,
       }),
-    [rssItems, selectedSources, selectedCategories, sortOrder, dp.articlesPerSource, categoryMap, expandedSources, showAll],
+    [rssItems, selectedSources, selectedCategories, sortOrder, dp.articlesPerSource, dp.maxArticleAgeDays, categoryMap, expandedSources, showAll],
   );
 
   // Single-outlet widgets have exactly one source; the per-source

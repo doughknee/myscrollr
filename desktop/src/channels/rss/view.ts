@@ -39,6 +39,35 @@ function sortRssItems(items: RssItem[], order: RssSortOrder): RssItem[] {
   });
 }
 
+// ── Pure: article-age window (v1.1.3 Time Controls) ─────────────
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Drop articles older than `maxAgeDays` (published_at, falling back to
+ * created_at). 0 = no filter. Unparseable timestamps stay visible rather
+ * than silently vanishing. `now` is injectable for tests.
+ *
+ * The cutoff is anchored to LOCAL CALENDAR DAYS, matching the sports
+ * window: maxAgeDays 1 = "published today", 3 = today + the two prior
+ * days — not a rolling 24h/72h period that would hide this morning's
+ * article at 11pm.
+ */
+export function filterByArticleAge(
+  items: RssItem[],
+  maxAgeDays: number,
+  now: number = Date.now(),
+): RssItem[] {
+  if (maxAgeDays <= 0) return items;
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
+  const cutoff = dayStart.getTime() - (maxAgeDays - 1) * DAY_MS;
+  return items.filter((i) => {
+    const t = new Date(i.published_at ?? i.created_at).getTime();
+    return !Number.isFinite(t) || t >= cutoff;
+  });
+}
+
 // ── Pure: per-source limit ───────────────────────────────────────
 
 /**
@@ -72,8 +101,12 @@ export function limitPerSource(items: RssItem[], limit: number): RssItem[] {
 export function selectRssForTicker(
   items: RssItem[],
   prefs: RssDisplayPrefs,
+  now: number = Date.now(),
 ): RssItem[] {
-  const ordered = sortRssItems(items, "newest");
+  // Age window first (v1.1.3) so the per-source balancer only allocates
+  // slots among articles that are actually eligible to show.
+  const fresh = filterByArticleAge(items, prefs.maxArticleAgeDays ?? 0, now);
+  const ordered = sortRssItems(fresh, "newest");
   // Single-outlet widgets (news_bbc, news_npr, ...) have exactly one
   // source — a per-source cap there just hides articles for no reason
   // (v1.1.1 "smart removal"). The balancer only makes sense when
@@ -91,6 +124,41 @@ export function distinctSourceCount(items: RssItem[]): number {
   return sources.size;
 }
 
+// ── Helper: per-widget display prefs (global + config.display) ──
+
+import type { DashboardResponse } from "../../types";
+
+/**
+ * Resolve a widget's effective RSS display prefs: the global
+ * `prefs.channelDisplay.rss` with the widget row's `config.display`
+ * override merged on top — the same merge FeedTab does. Added in
+ * v1.1.3 so the TICKER honors per-widget overrides (time window,
+ * per-source limit) instead of only the global prefs; mirror of
+ * `getSportsDisplayConfig`.
+ */
+export function getRssDisplayPrefs(
+  globalPrefs: RssDisplayPrefs,
+  dashboard: DashboardResponse | null | undefined,
+  widgetType?: string,
+): RssDisplayPrefs {
+  const channels = dashboard?.channels ?? [];
+  // channel_type is a widget id at runtime (news_bbc, rss_custom, …);
+  // compare as string so the legacy coarse rows ("rss" pre-000014,
+  // "news" post-rename) both resolve as the fallback.
+  const channel =
+    (widgetType
+      ? channels.find((c) => (c.channel_type as string) === widgetType)
+      : undefined) ??
+    channels.find((c) => {
+      const t = c.channel_type as string;
+      return t === "rss" || t === "news";
+    });
+  const override = (
+    channel?.config as { display?: Partial<RssDisplayPrefs> } | undefined
+  )?.display;
+  return override ? { ...globalPrefs, ...override } : globalPrefs;
+}
+
 // ── Pipeline result (for FeedTab) ────────────────────────────────
 
 export interface RssPipelineOptions {
@@ -104,6 +172,10 @@ export interface RssPipelineOptions {
   sortOrder: RssSortOrder;
   /** Per-source limit (from Display prefs). 0 = no limit. */
   articlesPerSource: number;
+  /** Article-age window in days (v1.1.3). 0 = no filter. */
+  maxArticleAgeDays?: number;
+  /** Injectable clock for tests; defaults to Date.now(). */
+  now?: number;
   /** Feed-page interactive toggle that disables the per-source limit. */
   showAll?: boolean;
   /** Feed-page: sources the user has expanded in by-source view. */
@@ -132,11 +204,15 @@ export function applyRssPipeline(
     categoryMap,
     sortOrder,
     articlesPerSource,
+    maxArticleAgeDays = 0,
+    now = Date.now(),
     showAll,
     expandedSources,
   } = opts;
 
-  let filtered = items;
+  // Age window first (v1.1.3) — everything downstream (filters, limit,
+  // overflow counts) should only ever see eligible articles.
+  let filtered = filterByArticleAge(items, maxArticleAgeDays, now);
 
   if (selectedSources && selectedSources.size > 0) {
     filtered = filtered.filter((i) => selectedSources.has(i.source_name));

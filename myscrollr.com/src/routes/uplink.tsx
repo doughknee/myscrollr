@@ -58,6 +58,7 @@ import { seededRandom } from '@/lib/seededRandom'
 import { FALLBACK_LIMITS } from '@/lib/fallbackTierLimits'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { useGetToken } from '@/hooks/useGetToken'
+import { useTilt } from '@/components/TiltCard'
 import { billingApi, tierLimitsApi } from '@/api/client'
 import { FAQSection } from '@/components/landing/FAQSection'
 
@@ -294,31 +295,10 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
       pro: 'Real-time SSE',
       ultimate: 'Real-time SSE',
     },
-    {
-      label: 'Items per Widget',
-      free: 'Unlimited',
-      uplink: 'Unlimited',
-      pro: 'Unlimited',
-      ultimate: 'Unlimited',
-    },
-    {
-      // Tier gate retired v1.1.2 — a normal widget on every plan. The row
-      // stays because four checkmarks SELL the giveaway better than silence.
-      label: 'Yahoo Fantasy',
-      free: 'Yes',
-      uplink: 'Yes',
-      pro: 'Yes',
-      ultimate: 'Yes',
-    },
-    {
-      label: 'Site Filtering',
-      free: 'Blacklist',
-      uplink: 'Blacklist',
-      pro: 'Blacklist + Whitelist',
-      ultimate: 'Blacklist + Whitelist',
-      proUp: true,
-      ultimateUp: true,
-    },
+    // v1.1.3 trim: Items-per-Widget, Yahoo Fantasy, and Site Filtering
+    // rows removed — rows where every column reads the same (or that
+    // describe table-stakes) dilute the one comparison that sells:
+    // widgets at once.
     {
       label: 'Custom Alerts',
       free: 'No',
@@ -348,24 +328,7 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
       proUp: true,
       ultimateUp: true,
     },
-    {
-      label: 'Priority RSS Refresh',
-      free: 'No',
-      uplink: 'No',
-      pro: 'Yes',
-      ultimate: 'Yes',
-      proUp: true,
-      ultimateUp: true,
-    },
-    {
-      label: 'Webhooks & Integrations',
-      free: 'No',
-      uplink: 'No',
-      pro: 'No',
-      ultimate: 'Yes',
-      ultimateUp: true,
-      comingSoon: true,
-    },
+    // v1.1.3 trim: Priority-RSS and Webhooks rows removed (see above).
     {
       label: 'Data Export',
       free: 'No',
@@ -405,13 +368,7 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
       proUp: true,
       ultimateUp: true,
     },
-    {
-      label: 'Dashboard Access',
-      free: 'Full',
-      uplink: 'Full',
-      pro: 'Full',
-      ultimate: 'Full',
-    },
+    // v1.1.3 trim: Dashboard-Access row removed (all-"Full" row said nothing).
   ]
 }
 
@@ -510,11 +467,13 @@ interface PricingPlan {
 const PRICING: Record<TierKey, Record<PlanKey, PricingPlan>> = {
   uplink: {
     monthly: { price: 9.99, period: '/mo', perMonth: 9.99 },
+    // Annual = exactly 8x monthly on every tier — sell it as time, not
+    // a dollar delta ("4 months free" beats "Save ~$40/yr").
     annual: {
       price: 79.99,
       period: '/yr',
       perMonth: 6.67,
-      savings: 'Save ~$40/yr',
+      savings: '4 months free',
     },
   },
   pro: {
@@ -523,7 +482,7 @@ const PRICING: Record<TierKey, Record<PlanKey, PricingPlan>> = {
       price: 199.99,
       period: '/yr',
       perMonth: 16.67,
-      savings: 'Save ~$100/yr',
+      savings: '4 months free',
     },
   },
   ultimate: {
@@ -532,7 +491,7 @@ const PRICING: Record<TierKey, Record<PlanKey, PricingPlan>> = {
       price: 399.99,
       period: '/yr',
       perMonth: 33.33,
-      savings: 'Save ~$200/yr',
+      savings: '4 months free',
     },
   },
 }
@@ -991,33 +950,10 @@ function BottomCTA({
   )
 }
 
-// ── Pricing Feature Line ──────────────────────────────────────────
-
-function PricingFeature({
-  children,
-  highlight,
-}: {
-  children: React.ReactNode
-  highlight?: boolean
-}) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <Check
-        size={12}
-        className={
-          highlight ? 'text-primary shrink-0' : 'text-base-content/20 shrink-0'
-        }
-      />
-      <span
-        className={`text-xs ${highlight ? 'text-base-content/60' : 'text-base-content/35'}`}
-      >
-        {children}
-      </span>
-    </div>
-  )
-}
-
 // ── Page Component ──────────────────────────────────────────────
+// (PricingFeature bullet-line component retired v1.1.3 — the plan
+// cards show only the widget cap; differentiators live in the
+// compare table.)
 
 function UplinkPage() {
   const { isAuthenticated, signIn } = useScrollrAuth()
@@ -1027,6 +963,13 @@ function UplinkPage() {
   // Rebuilds the comparison table, tier showcases, and FAQ whenever the
   // fetch resolves or the cached response changes.
   const tierLimits = useTierLimits()
+
+  // Pointer-tracking 3D tilt for the four plan cards (v1.1.3 polish).
+  // One spring set per card; replaces the old whileHover y-lift.
+  const freeTilt = useTilt()
+  const uplinkTilt = useTilt()
+  const proTilt = useTilt()
+  const ultimateTilt = useTilt()
   const comparisonRows = useMemo(
     () => buildComparison(tierLimits),
     [tierLimits],
@@ -2348,6 +2291,9 @@ function UplinkPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.03, duration: 0.5, ease: EASE }}
+                    ref={freeTilt.ref}
+                    style={freeTilt.style}
+                    {...freeTilt.handlers}
                     className="group relative bg-base-200/20 border border-base-300/20 rounded-xl p-6 overflow-hidden flex flex-col"
                   >
                     <div className="relative z-10 flex flex-col flex-1">
@@ -2390,16 +2336,15 @@ function UplinkPage() {
                         </div>
                       </div>
 
-                      <div className="space-y-2.5 mb-6">
-                        <PricingFeature>
-                          {tierLimits.tiers.free.max_widgets} widgets at once
-                        </PricingFeature>
-                        <PricingFeature>Real-time SSE delivery</PricingFeature>
-                        <PricingFeature>
-                          Unlimited items per widget
-                        </PricingFeature>
-                        <PricingFeature>Every sports league</PricingFeature>
-                        <PricingFeature>Full desktop app access</PricingFeature>
+                      {/* v1.1.3: the card IS the widget cap — everything
+                          else lives in the compare table below. */}
+                      <div className="mb-6 flex flex-col items-start gap-1.5 py-5">
+                        <span className="font-mono text-6xl font-black leading-none text-base-content/80">
+                          {tierLimits.tiers.free.max_widgets}
+                        </span>
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
+                          widgets at once
+                        </span>
                       </div>
 
                       <div className="mt-auto pt-2 flex flex-col items-center gap-1.5">
@@ -2438,10 +2383,9 @@ function UplinkPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.06, duration: 0.5, ease: EASE }}
-                    whileHover={{
-                      y: -3,
-                      transition: { type: 'tween', duration: 0.2 },
-                    }}
+                    ref={uplinkTilt.ref}
+                    style={uplinkTilt.style}
+                    {...uplinkTilt.handlers}
                     role="button"
                     tabIndex={isTierDisabled('uplink') ? -1 : 0}
                     // No aria-label: the card's visible content (tier
@@ -2548,17 +2492,19 @@ function UplinkPage() {
                         </div>
                       </div>
 
-                      <div className="space-y-2.5 mb-6">
-                        <PricingFeature>
-                          {tierLimits.tiers.uplink.max_widgets} widgets at once
-                        </PricingFeature>
-                        <PricingFeature>Priority support</PricingFeature>
-                        <PricingFeature>Real-time SSE delivery</PricingFeature>
-                        <PricingFeature>
-                          Unlimited items per widget
-                        </PricingFeature>
-                        <PricingFeature>Every sports league</PricingFeature>
-                        <PricingFeature>Early access</PricingFeature>
+                      <div className="mb-6 flex flex-col items-start gap-1.5 py-5">
+                        <span
+                          className="font-mono text-6xl font-black leading-none"
+                          style={{
+                            color: '#00b8db',
+                            textShadow: '0 0 28px #00b8db40',
+                          }}
+                        >
+                          {tierLimits.tiers.uplink.max_widgets}
+                        </span>
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
+                          widgets at once
+                        </span>
                       </div>
 
                       <div className="mt-auto pt-2 flex flex-col items-center gap-1.5">
@@ -2588,10 +2534,9 @@ function UplinkPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.09, duration: 0.5, ease: EASE }}
-                    whileHover={{
-                      y: -3,
-                      transition: { type: 'tween', duration: 0.2 },
-                    }}
+                    ref={proTilt.ref}
+                    style={proTilt.style}
+                    {...proTilt.handlers}
                     role="button"
                     tabIndex={isTierDisabled('pro') ? -1 : 0}
                     // See Uplink card above for why aria-label is omitted.
@@ -2693,26 +2638,19 @@ function UplinkPage() {
                         </div>
                       </div>
 
-                      <div className="space-y-2.5 mb-6">
-                        <PricingFeature highlight>
-                          {tierLimits.tiers.uplink_pro.max_widgets} widgets at
-                          once
-                        </PricingFeature>
-                        <PricingFeature highlight>
-                          Custom alerts & notifications
-                        </PricingFeature>
-                        <PricingFeature highlight>
-                          Feed profiles & controls
-                        </PricingFeature>
-                        <PricingFeature highlight>
-                          Priority RSS refresh
-                        </PricingFeature>
-                        <PricingFeature highlight>
-                          Whitelist site filtering
-                        </PricingFeature>
-                        <PricingFeature highlight>
-                          Everything in Uplink
-                        </PricingFeature>
+                      <div className="mb-6 flex flex-col items-start gap-1.5 py-5">
+                        <span
+                          className="font-mono text-6xl font-black leading-none"
+                          style={{
+                            color: '#a78bfa',
+                            textShadow: '0 0 28px #a78bfa40',
+                          }}
+                        >
+                          {tierLimits.tiers.uplink_pro.max_widgets}
+                        </span>
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
+                          widgets at once
+                        </span>
                       </div>
 
                       <div className="mt-auto pt-2 flex flex-col items-center gap-1.5">
@@ -2742,10 +2680,9 @@ function UplinkPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.12, duration: 0.5, ease: EASE }}
-                    whileHover={{
-                      y: -4,
-                      transition: { type: 'tween', duration: 0.2 },
-                    }}
+                    ref={ultimateTilt.ref}
+                    style={ultimateTilt.style}
+                    {...ultimateTilt.handlers}
                     role="button"
                     tabIndex={isTierDisabled('ultimate') ? -1 : 0}
                     // See Uplink card above for why aria-label is omitted.
@@ -2990,25 +2927,19 @@ function UplinkPage() {
                           </div>
                         </div>
 
-                        <div className="space-y-2.5 mb-6">
-                          <PricingFeature highlight>
-                            Unlimited widgets at once
-                          </PricingFeature>
-                          <PricingFeature highlight>
-                            Unlimited everything
-                          </PricingFeature>
-                          <PricingFeature highlight>
-                            Webhooks & integrations
-                          </PricingFeature>
-                          <PricingFeature highlight>
-                            Data export & API access
-                          </PricingFeature>
-                          <PricingFeature highlight>
-                            Priority support
-                          </PricingFeature>
-                          <PricingFeature highlight>
-                            Everything in Pro, plus more
-                          </PricingFeature>
+                        <div className="mb-6 flex flex-col items-start gap-1.5 py-5">
+                          <span
+                            className="font-mono text-6xl font-black leading-none"
+                            style={{
+                              color: '#34d399',
+                              textShadow: '0 0 28px #34d39940',
+                            }}
+                          >
+                            ∞
+                          </span>
+                          <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
+                            widgets at once
+                          </span>
                         </div>
 
                         <div className="mt-auto pt-2 flex flex-col items-center gap-1.5">

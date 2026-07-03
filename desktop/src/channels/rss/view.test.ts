@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { limitPerSource, applyRssPipeline, selectRssForTicker, distinctSourceCount } from "./view";
+import {
+  limitPerSource,
+  applyRssPipeline,
+  selectRssForTicker,
+  distinctSourceCount,
+  filterByArticleAge,
+} from "./view";
 import type { RssItem } from "../../types";
 import type { RssDisplayPrefs } from "../../preferences";
 
@@ -30,7 +36,82 @@ const DEFAULT_PREFS: RssDisplayPrefs = {
   showSource: "both",
   showTimestamps: "both",
   articlesPerSource: 4,
+  maxArticleAgeDays: 0,
 };
+
+// ── filterByArticleAge (v1.1.3 Time Controls) ───────────────────
+
+describe("filterByArticleAge", () => {
+  // Noon local time, so calendar-day math has slack on both sides.
+  const NOW = new Date("2026-06-10T12:00:00").getTime();
+  const hoursAgo = (h: number) =>
+    new Date(NOW - h * 3_600_000).toISOString();
+
+  it("passes everything through when maxAgeDays is 0", () => {
+    const items = [mk(1, "a", hoursAgo(24 * 30))];
+    expect(filterByArticleAge(items, 0, NOW)).toBe(items);
+  });
+
+  it("'today' (1 day) keeps this morning's article, drops yesterday's", () => {
+    const items = [
+      mk(1, "a", hoursAgo(3)), // 9am today
+      mk(2, "a", hoursAgo(20)), // 4pm yesterday
+    ];
+    const result = filterByArticleAge(items, 1, NOW);
+    expect(result.map((i) => i.id)).toEqual([1]);
+  });
+
+  it("counts calendar days including today", () => {
+    const items = [
+      mk(1, "a", hoursAgo(30)), // yesterday morning — inside 2 days
+      mk(2, "a", hoursAgo(3 * 24)), // three days back — outside 2 days
+    ];
+    const result = filterByArticleAge(items, 2, NOW);
+    expect(result.map((i) => i.id)).toEqual([1]);
+  });
+
+  it("falls back to created_at when published_at is null", () => {
+    const fresh = { ...mk(1, "a", null), created_at: hoursAgo(2) };
+    const stale = { ...mk(2, "a", null), created_at: hoursAgo(24 * 10) };
+    const result = filterByArticleAge([fresh, stale], 3, NOW);
+    expect(result.map((i) => i.id)).toEqual([1]);
+  });
+
+  it("keeps items with unparseable timestamps visible", () => {
+    const weird = { ...mk(1, "a", "not-a-date"), created_at: "also-bad" };
+    expect(filterByArticleAge([weird], 1, NOW)).toHaveLength(1);
+  });
+
+  it("applies inside the ticker selector via prefs", () => {
+    const items = [
+      mk(1, "a", hoursAgo(2)),
+      mk(2, "b", hoursAgo(24 * 5)),
+    ];
+    const result = selectRssForTicker(
+      items,
+      { ...DEFAULT_PREFS, maxArticleAgeDays: 2 },
+      NOW,
+    );
+    expect(result.map((i) => i.id)).toEqual([1]);
+  });
+
+  it("applies inside applyRssPipeline before per-source limiting", () => {
+    const items = [
+      mk(1, "a", hoursAgo(1)),
+      mk(2, "a", hoursAgo(24 * 9)), // stale — must not consume a slot
+      mk(3, "b", hoursAgo(2)),
+    ];
+    const result = applyRssPipeline(items, {
+      categoryMap: new Map(),
+      sortOrder: "newest",
+      articlesPerSource: 1,
+      maxArticleAgeDays: 2,
+      now: NOW,
+    });
+    expect(result.visibleItems.map((i) => i.id)).toEqual([1, 3]);
+    expect(result.totalHidden).toBe(0);
+  });
+});
 
 // ── limitPerSource ──────────────────────────────────────────────
 

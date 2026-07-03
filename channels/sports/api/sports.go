@@ -53,10 +53,14 @@ const (
 	// see every game for every selected league.
 	DefaultSportsLimit = 200
 
-	// DashboardSportsLimit caps the number of games returned for the
-	// home-feed glanceable row. The fair-share allocator (MinPerLeagueShare)
-	// ensures every selected league gets visibility within this cap.
-	DashboardSportsLimit = 20
+	// DashboardSportsLimit caps the number of games returned in the
+	// /dashboard payload — the desktop's only sports data source. Raised
+	// 20 → 60 for v1.1.3 Time Controls: finals now survive 7 days
+	// server-side and the per-widget day window (up to 7 back + 7 ahead)
+	// must find its games in this payload; at 20, a week of finals would
+	// have starved the upcoming slate. The fair-share allocator
+	// (MinPerLeagueShare) still guarantees every league visibility.
+	DashboardSportsLimit = 60
 
 	// PollingStaleThreshold is the maximum acceptable age of the last
 	// successful poll before a league is marked polling_healthy: false.
@@ -442,7 +446,12 @@ func (a *App) handleInternalDashboard(c *fiber.Ctx) error {
 
 	favoriteTeams := a.getUserFavoriteTeams(userSub)
 	// Home dashboard uses fair-share so every selected league is visible
-	// within the 20-row glanceable preview, regardless of relative volume.
+	// within the 60-row payload, regardless of relative volume. KNOWN GAP
+	// (v1.1.3): the priority ORDER ranks finals after ALL pre rows, so a
+	// high-volume league (MLB: ~15 fixtures/day x 8 days ingested) fills
+	// its share with live+pre and the ticker's "days back" window sees
+	// few or no finals. Fix = interleave recency (e.g. split each share
+	// between soonest-pre and newest-final) — queued for v1.1.4.
 	games, err := a.queryGamesByLeagues(ctx, leagues, DashboardSportsLimit, favoriteTeams, true)
 	if err != nil {
 		log.Printf("[Sports] Dashboard query failed: %v", err)
@@ -660,7 +669,7 @@ const MinPerLeagueShare = 2
 
 // queryGamesByLeagues fetches games for specific leagues.
 //
-// When `fairShare` is true (used by /dashboard with limit=20): each league
+// When `fairShare` is true (used by /dashboard with limit=60): each league
 // gets max(MinPerLeagueShare, ceil(limit/N)) candidate rows via a window
 // function, ranked by the standard priority (live > pre > final, favorites
 // first, soonest upcoming first). The global LIMIT then trims. This keeps

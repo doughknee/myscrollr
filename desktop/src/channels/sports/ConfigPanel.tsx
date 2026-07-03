@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Star, X } from "lucide-react";
 import LeagueManager from "./LeagueManager";
 import { ToggleRow } from "../../components/settings/SettingsControls";
+import { DayRangeControl } from "../../components/TimeWindowControl";
+import { SPORTS_WINDOW_MAX_DAYS } from "./view";
 import { useSportsConfig } from "../../hooks/useSportsConfig";
 import { sportsCatalogOptions, sportsTeamsOptions } from "../../api/queries";
 import type { TeamInfo } from "../../api/queries";
@@ -129,22 +131,23 @@ function SportsWidgetConfig({
         </div>
       </section>
 
+      {/* Time window (v1.1.3) — replaces the old upcoming/final toggles
+          with "how many days back / ahead". Live games always show. */}
+      <section className="flex flex-col gap-0.5">
+        <h3 className="px-3 text-sm font-semibold text-fg">Time window</h3>
+        <DayRangeControl
+          daysBack={display.daysBack}
+          daysAhead={display.daysAhead}
+          max={SPORTS_WINDOW_MAX_DAYS}
+          disabled={saving}
+          onChange={(next) => setDisplay(next)}
+        />
+      </section>
+
       {/* Display — venue collapsed to an on/off switch (on = "both",
           off = "off"); feed-vs-ticker granularity isn't exposed per-widget. */}
       <section className="flex flex-col gap-0.5">
         <h3 className="px-3 text-sm font-semibold text-fg">Display</h3>
-        <ToggleRow
-          label="Upcoming games"
-          description="Show games that haven't started yet"
-          checked={display.showUpcoming !== "off"}
-          onChange={(c) => setDisplay({ showUpcoming: c ? "both" : "off" })}
-        />
-        <ToggleRow
-          label="Final scores"
-          description="Keep completed games in the feed"
-          checked={display.showFinal !== "off"}
-          onChange={(c) => setDisplay({ showFinal: c ? "both" : "off" })}
-        />
         <ToggleRow
           label="Team logos"
           checked={display.showLogos !== "off"}

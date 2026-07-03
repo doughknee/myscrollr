@@ -48,9 +48,12 @@ async fn test_cleanup_per_state_thresholds() {
         ("alive_pre_recent",   "pre",   h(-1),  h(-1),  true),   // started 1h ago, well within 7d
         ("alive_pre_3d",       "pre",   d(-3),  d(-3),  true),   // 3 days old, still within 7d
         ("dead_pre_8d",        "pre",   d(-8),  d(-8),  false),  // 8 days past kickoff
-        ("alive_final_6h",     "final", h(-6),  h(-6),  true),   // <12h post final
-        ("dead_final_13h",     "final", h(-13), h(-13), false),  // 13h post final
-        ("dead_postponed_13h", "postponed", h(-13), h(-13), false),
+        // v1.1.3 Time Controls: finals/postponed retained 7 DAYS (was 12h)
+        // so the desktop day-window has data to look back at.
+        ("alive_final_6h",     "final", h(-6),  h(-6),  true),   // fresh final
+        ("alive_final_3d",     "final", d(-3),  d(-3),  true),   // within 7d window
+        ("dead_final_8d",      "final", d(-8),  d(-8),  false),  // past 7d retention
+        ("dead_postponed_8d",  "postponed", d(-8), d(-8), false),
         ("alive_in_recent",    "in",    h(-1),  h(-1),  true),   // live, recently seen
         ("alive_in_20h",       "in",    h(-22), h(-20), true),   // live, seen 20h ago
         ("dead_in_25h",        "in",    h(-30), h(-25), false),  // live, stale 25h

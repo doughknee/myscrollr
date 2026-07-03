@@ -426,6 +426,10 @@ export interface RssDisplayPrefs {
   showSource: Venue;
   showTimestamps: Venue;
   articlesPerSource: number; // 0 = all (the default since v1.1.1); 1/3/5/10 legacy per-source caps
+  /** v1.1.3 Time Controls: hide articles older than N days (published_at,
+   *  falling back to created_at). 0 = no age filter — every article the
+   *  server sends, which is the pre-v1.1.3 behavior. */
+  maxArticleAgeDays: number;
 }
 
 export type FantasySubTab = "overview" | "matchup" | "standings" | "roster";
@@ -644,6 +648,7 @@ const DEFAULT_CHANNEL_DISPLAY: ChannelDisplayPrefs = {
     showSource: "both",
     showTimestamps: "both",
     articlesPerSource: 0,
+    maxArticleAgeDays: 0,
   },
   predictions: {
     showDelta: "both",
@@ -1111,6 +1116,13 @@ export function migrateRssDisplay(
       typeof raw.articlesPerSource === "number" && raw.articlesPerSource !== 4
         ? raw.articlesPerSource
         : DEFAULT_CHANNEL_DISPLAY.rss.articlesPerSource,
+    // v1.1.3: clamp to a sane range; missing/invalid → 0 (no filter),
+    // which is exactly the pre-v1.1.3 behavior.
+    maxArticleAgeDays:
+      typeof raw.maxArticleAgeDays === "number" &&
+      Number.isFinite(raw.maxArticleAgeDays)
+        ? Math.min(30, Math.max(0, Math.round(raw.maxArticleAgeDays)))
+        : DEFAULT_CHANNEL_DISPLAY.rss.maxArticleAgeDays,
   };
 }
 

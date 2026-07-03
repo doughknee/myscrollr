@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import FeedManager from "./FeedManager";
 import { ToggleRow } from "../../components/settings/SettingsControls";
+import { ArticleAgeControl } from "../../components/TimeWindowControl";
 import { rssCatalogOptions } from "../../api/queries";
 import { useChannelConfig } from "../../hooks/useChannelConfig";
 import { useShell } from "../../shell-context";
@@ -61,6 +62,18 @@ function NewsWidgetConfig({ channel }: { channel: Channel }) {
         </div>
       </section>
 
+      {/* Time window (v1.1.3) — per-widget article age. Applies to the
+          feed AND the ticker (getRssDisplayPrefs merges this override). */}
+      <section className="flex flex-col gap-0.5">
+        <h3 className="px-3 text-sm font-semibold text-fg">Time window</h3>
+        <ArticleAgeControl
+          maxAgeDays={override.maxArticleAgeDays ?? globalRss.maxArticleAgeDays}
+          onChange={(days) =>
+            updateItems({ ...override, maxArticleAgeDays: days })
+          }
+        />
+      </section>
+
       <section className="flex flex-col gap-0.5">
         <h3 className="px-3 text-sm font-semibold text-fg">Display</h3>
         <ToggleRow
@@ -96,6 +109,16 @@ function RssFeedConfig({
   const { error, setError, saving, updateItems } = useChannelConfig<
     Array<{ name: string; url: string; is_custom?: boolean }>
   >(channel.channel_type, "feeds");
+
+  // Time window (v1.1.3) — same per-widget config.display slot the
+  // curated widgets use; separate keyed hook so feed writes and
+  // display writes can't clobber each other.
+  const { prefs: shellPrefs } = useShell();
+  const displayOverride =
+    (channel.config as { display?: Partial<RssDisplayPrefs> })?.display ?? {};
+  const { updateItems: updateDisplay } = useChannelConfig<
+    Partial<RssDisplayPrefs>
+  >(channel.channel_type, "display");
 
   const rssConfig = channel.config as RssChannelConfig;
   const feeds = Array.isArray(rssConfig?.feeds) ? rssConfig.feeds : [];
@@ -166,6 +189,20 @@ function RssFeedConfig({
           </button>
         </div>
       )}
+
+      {/* Time window (v1.1.3) — compact strip above the feed manager;
+          applies to feed + ticker via the config.display override. */}
+      <div className="shrink-0">
+        <ArticleAgeControl
+          maxAgeDays={
+            displayOverride.maxArticleAgeDays ??
+            shellPrefs.channelDisplay.rss.maxArticleAgeDays
+          }
+          onChange={(days) =>
+            updateDisplay({ ...displayOverride, maxArticleAgeDays: days })
+          }
+        />
+      </div>
 
       <div className="flex-1 min-h-0">
         <FeedManager
