@@ -13,9 +13,9 @@ stays at 1.1.0 and nobody gets force-updated.
 | ~~v1.1.1~~ | Paper Cuts | ✅ **Shipped 2026-07-02** — grew into the catalog redesign (absorbed half of The Library) | S→M |
 | ~~v1.1.2~~ | The Library | ✅ **Shipped 2026-07-02** — slots-only monetization everywhere, fantasy gate retired | S–M |
 | ~~v1.1.3~~ | Time Controls | ✅ **Shipped 2026-07-03** — day windows for sports/news + 7-day score retention (+ pricing-page overhaul rode along) | M |
-| v1.1.4 | Kalshi Grows Up | Predictions widget behaves like a widget | M |
+| ~~v1.1.4~~ | Kalshi Grows Up | ✅ **Shipped 2026-07-03** — event cards, watchlist-first ticker, real history charts (+ the fair-share finals fix) | M |
 | v1.2.0 | Double-Decker 2.0 | Multi-row ticker rebuilt around widgets | L |
-| — | Website rides along | Pricing rewrite ships with v1.1.2; screenshots after v1.1.4 | S–M |
+| — | Website rides along | Pricing rewrite shipped with v1.1.2–3; screenshots now unblocked (post-v1.1.4) | S–M |
 
 *Numbering philosophy (house style, see v1.0.9→v1.0.20): patch = the same app,
 better — fixes, refinements, even sizable ones. Minor = something new to learn.
@@ -112,11 +112,12 @@ A pricing-page overhaul rode along: plan cards reduced to the widget-cap
 stat (tier-tinted, pointer-tilt), compare table trimmed six rows, annual
 sold as "4 months free."
 
-**Carried to v1.1.4 (first item):** the dashboard fair-share query ranks
-finals after ALL pre rows, so a high-volume league (MLB) fills its payload
-share with upcoming fixtures and the ticker's "days back" under-delivers.
-Fix = split each league share between soonest-pre and newest-final (see
-KNOWN GAP comment in channels/sports/api/sports.go).
+**Carried to v1.1.4 (first item — ✅ landed there):** the dashboard fair-share
+query ranked finals after ALL pre rows, so a high-volume league (MLB) filled
+its payload share with upcoming fixtures and the ticker's "days back"
+under-delivered. Fixed in v1.1.4 by splitting each league share between
+soonest-pre and newest-final (`fairShareSideSplit` in
+channels/sports/api/sports.go).
 
 **Original scope notes (historical)**
 
@@ -136,7 +137,41 @@ actually think in: *how many days back, how many days ahead.*
 
 ---
 
-## v1.1.4 — Kalshi Grows Up
+## ✅ v1.1.4 — Kalshi Grows Up (shipped 2026-07-03, `desktop-v1.1.4`)
+
+Shipped after three rounds of live feel-testing against real Kalshi data:
+
+- **Event cards.** Markets carry their event context end-to-end (migration
+  `140000000002`; the sweep keeps each event's top two legs, 240-market
+  catalog cap). The feed groups legs under the event *question* — and any
+  single-leg event gets a synthetic No row, so there's never a lone "Yes"
+  card. Compact mode keeps flat rows, event-titled. Ticker chips and the
+  detail modal lead with the question too.
+- **Watchlist-first ticker.** Stars scope the ticker; no stars falls back to
+  the top-15 rank-1 movers — never again the whole ingested universe. Stars
+  survive category narrowing: `config.favorites` is repurposed as a silent
+  server mirror of the local watchlist and unioned into the payload, and the
+  feed's watchlist lens bypasses categories. Ship-review catch before merge:
+  the pref-store cache is per-webview, so the ticker window now *subscribes*
+  to watchlist changes instead of reading a boot-time snapshot.
+- **Real history charts.** The detail modal renders 7 days of hourly
+  candlesticks (Rust internal endpoint → Go proxy with a 5-min Redis cache);
+  the old live-session sparkline survives only as the loading fallback.
+- **Configure has a job now.** Categories = the widget's server-side
+  universe; the watchlist is managed in the same place; pre-1.1.4 favorites
+  pins auto-migrate into stars once (CategoryPicker.tsx deleted).
+- **Sports fair-share fix** (carried from v1.1.3): verified live at 60 rows —
+  29 upcoming + 1 live + 18 finals for MLB where the old query starved finals
+  entirely.
+
+**Post-ship watch-list (known minors):** pre-1.1.4 clients that still write
+`favorites` as pins are effectively editing the watchlist mirror (same union
+semantics — acceptable); a market that drops out of an event's top-2 keeps a
+stale `event_rank` until the next sweep touches it (the feed predicate
+tolerates this); during a deploy window where predictions-api is new but the
+service pod is old, candlesticks 5xx until the Rust pod rolls.
+
+**Original scope notes (historical)**
 
 **Goal:** the predictions widget stops being a foreign app bolted on.
 
@@ -176,9 +211,9 @@ Biggest item on the list; gets its own design pass before any code.
 ## Deferred on purpose
 
 - **Marketing screenshots** — all product imagery still shows the channel-era UI.
-  Reshooting now would capture a product we're about to polish twice more. Do it
-  after v1.1.4. Precondition either way: `desktop/scripts/capture-screenshots.mjs`
-  still shoots deleted routes and needs updating first.
+  v1.1.4 is out, so this is now **unblocked** — the UI it would capture is the one
+  users get. Precondition: `desktop/scripts/capture-screenshots.mjs` still shoots
+  deleted routes and needs updating first.
 - **Popularity sorting** if PostHog wiring drags — A–Z ships regardless.
 
 ## Sequencing rationale
