@@ -147,7 +147,7 @@ export interface TrackedSymbol {
 /**
  * Catalog entry for the Predictions channel — one row per trackable
  * Kalshi market, surfaced by `GET /predictions/catalog`. Drives the
- * CategoryPicker's favorites selection + category counts.
+ * the predictions Configure page's category chips + counts.
  */
 export interface PredictionCatalogEntry {
   ticker: string;

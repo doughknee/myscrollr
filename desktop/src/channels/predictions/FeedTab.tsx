@@ -858,7 +858,9 @@ const EventCard = memo(function EventCard({
         {event.title}
       </span>
 
-      {/* Outcome legs */}
+      {/* Outcome legs. Binary events are ONE market whose "No" side is
+          implicit (100 - yes), so a lone Yes leg gets a synthetic No row
+          — mirroring Kalshi's own Yes/No pair — instead of sitting alone. */}
       <div className="flex flex-col gap-1">
         {event.outcomes.map((m) => (
           <OutcomeRow
@@ -870,6 +872,17 @@ const EventCard = memo(function EventCard({
             onOpenDetail={onOpenDetail}
           />
         ))}
+        {event.outcomes.length === 1 &&
+          (event.outcomes[0].title ?? "").toLowerCase() === "yes" && (
+            <OutcomeRow
+              market={event.outcomes[0]}
+              display={display}
+              watched={watchedSet.has(event.outcomes[0].ticker)}
+              onToggleWatch={onToggleWatch}
+              onOpenDetail={onOpenDetail}
+              syntheticNo
+            />
+          )}
       </div>
 
       {/* Footer: summed volume across legs */}
@@ -882,21 +895,27 @@ const EventCard = memo(function EventCard({
   );
 });
 
-/** One outcome leg inside an EventCard — its own flash, star, and click. */
+/** One outcome leg inside an EventCard — its own flash, star, and click.
+ *  `syntheticNo` renders the implicit No side of a binary market
+ *  (100 - yes, inverted delta, no star — it's the same market, so the
+ *  Yes row owns the watchlist state). */
 function OutcomeRow({
   market,
   display,
   watched,
   onToggleWatch,
   onOpenDetail,
+  syntheticNo = false,
 }: {
   market: Prediction;
   display: PredictionsDisplayPrefs;
   watched: boolean;
   onToggleWatch: (ticker: string) => void;
   onOpenDetail: (market: Prediction) => void;
+  syntheticNo?: boolean;
 }) {
-  const delta = priceDelta(market);
+  const rawDelta = priceDelta(market);
+  const delta = syntheticNo ? -rawDelta : rawDelta;
   const isUp = delta > 0;
   const isDown = delta < 0;
 
@@ -917,18 +936,24 @@ function OutcomeRow({
   }, [market.yes_price]);
 
   // Binary events read best as "Yes" rows; multi-outcome events name
-  // their leg ("France", "Atlanta").
-  const legLabel =
-    market.title && market.title.toLowerCase() !== "yes"
+  // their leg ("France", "Atlanta"). The synthetic row is always "No".
+  const legLabel = syntheticNo
+    ? "No"
+    : market.title && market.title.toLowerCase() !== "yes"
       ? market.title
       : "Yes";
+
+  // The No side of a binary market is the complement of yes_price.
+  const shownPct = syntheticNo
+    ? Math.max(0, Math.min(100, 100 - (market.yes_price ?? 0)))
+    : market.yes_price;
 
   return (
     <div
       className={clsx(
         "flex items-center gap-1.5 rounded-md border border-edge/30 bg-base-100/40 px-2 py-1.5 transition-colors duration-700",
-        flash === "up" && "bg-up/8",
-        flash === "down" && "bg-down/8",
+        flash === (syntheticNo ? "down" : "up") && "bg-up/8",
+        flash === (syntheticNo ? "up" : "down") && "bg-down/8",
         isUp && "border-l-2 border-l-up/40",
         isDown && "border-l-2 border-l-down/40",
       )}
@@ -952,24 +977,29 @@ function OutcomeRow({
           </span>
         )}
         <span className="shrink-0 font-mono text-ui-body font-bold tabular-nums text-fg">
-          {formatProbability(market.yes_price)}
+          {formatProbability(shownPct)}
         </span>
       </button>
-      <button
-        type="button"
-        aria-label={watched ? "Remove from watchlist" : "Add to watchlist"}
-        aria-pressed={watched}
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleWatch(market.ticker);
-        }}
-        className={clsx(
-          "flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors cursor-pointer",
-          watched ? "text-amber-400" : "text-fg-4 hover:text-fg-2",
-        )}
-      >
-        <Star size={13} className={watched ? "fill-current" : ""} />
-      </button>
+      {syntheticNo ? (
+        // Spacer keeps the No row's numbers column-aligned with Yes.
+        <span className="h-6 w-6 shrink-0" aria-hidden />
+      ) : (
+        <button
+          type="button"
+          aria-label={watched ? "Remove from watchlist" : "Add to watchlist"}
+          aria-pressed={watched}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleWatch(market.ticker);
+          }}
+          className={clsx(
+            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors cursor-pointer",
+            watched ? "text-amber-400" : "text-fg-4 hover:text-fg-2",
+          )}
+        >
+          <Star size={13} className={watched ? "fill-current" : ""} />
+        </button>
+      )}
     </div>
   );
 }
