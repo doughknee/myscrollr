@@ -8,9 +8,10 @@ use tokio_util::sync::CancellationToken;
 use predictions_service::{
     database::initialize_pool,
     init::{fatal, spawn_supervised, ReadinessGate, ReadinessSnapshot},
+    kalshi::rest::RestClient,
     log::init_async_logger,
     start_predictions_services,
-    types::PredictionsHealth,
+    types::{try_rest_client_from_env, PredictionsHealth},
 };
 
 /// Freshness window for `/health/ready`. If the WebSocket hasn't processed
@@ -28,6 +29,22 @@ const READINESS_BRIDGE_INTERVAL: Duration = Duration::from_secs(10);
 struct AppState {
     health: Arc<Mutex<PredictionsHealth>>,
     readiness: Arc<ReadinessGate>,
+    /// Signed Kalshi client for the /internal/candlesticks proxy (v1.1.4).
+    /// None when creds are absent — the endpoint answers 503 instead of
+    /// blocking the health server from starting.
+    rest: Option<Arc<RestClient>>,
+}
+
+/// Query params for `/internal/candlesticks`. The predictions Go API looks
+/// up `series` from the markets table and forwards the time window; this
+/// service is a pure signed pass-through.
+#[derive(serde::Deserialize)]
+struct CandlesticksParams {
+    series: String,
+    ticker: String,
+    start_ts: i64,
+    end_ts: i64,
+    period_interval: u32,
 }
 
 #[derive(Serialize)]
@@ -140,14 +157,24 @@ async fn run_service() -> Result<()> {
     // something to talk to, but the readiness probe at /health/ready will
     // return 503 until `readiness.mark_ready()` is called from the init
     // task below.
+    let rest = match try_rest_client_from_env() {
+        Ok(c) => Some(Arc::new(c)),
+        Err(e) => {
+            eprintln!("[Candlesticks] Kalshi REST client unavailable ({e:#}); /internal/candlesticks will 503");
+            None
+        }
+    };
+
     let state = AppState {
         health: health.clone(),
         readiness: readiness.clone(),
+        rest,
     };
     let app = Router::new()
         .route("/health", get(health_ready_handler))
         .route("/health/live", get(health_live_handler))
         .route("/health/ready", get(health_ready_handler))
+        .route("/internal/candlesticks", get(candlesticks_handler))
         .with_state(state);
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "3005".to_string());
@@ -300,6 +327,35 @@ async fn shutdown_signal() {
 /// restart won't fix a migration mismatch).
 async fn health_live_handler() -> (StatusCode, Json<serde_json::Value>) {
     (StatusCode::OK, Json(serde_json::json!({"status": "alive"})))
+}
+
+/// Signed pass-through to Kalshi's candlesticks endpoint (v1.1.4 — the
+/// desktop detail-modal price chart). The Go API owns the DB lookup
+/// (series ticker) and Redis caching; this handler only signs + forwards.
+async fn candlesticks_handler(
+    State(state): State<AppState>,
+    axum::extract::Query(p): axum::extract::Query<CandlesticksParams>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let Some(rest) = state.rest.as_ref() else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({"error": "kalshi credentials not configured"})),
+        );
+    };
+    let query = format!(
+        "start_ts={}&end_ts={}&period_interval={}",
+        p.start_ts, p.end_ts, p.period_interval
+    );
+    match rest.get_candlesticks(&p.series, &p.ticker, &query).await {
+        Ok(v) => (StatusCode::OK, Json(v)),
+        Err(e) => {
+            eprintln!("[Candlesticks] fetch failed for {}: {e:#}", p.ticker);
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({"error": "kalshi candlesticks fetch failed"})),
+            )
+        }
+    }
 }
 
 /// Readiness probe: 200 only when init succeeded AND the WebSocket is

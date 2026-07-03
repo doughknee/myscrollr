@@ -4,8 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -33,6 +37,14 @@ const (
 
 	// PredictionsCatalogCacheTTL is how long the market catalog is cached.
 	PredictionsCatalogCacheTTL = 5 * time.Minute
+
+	// CandlesticksCacheTTL bounds how often we hit Kalshi for a market's
+	// price history (v1.1.4 detail-modal chart). Candles are hourly, so
+	// five minutes keeps the modal snappy without hammering the signed API.
+	CandlesticksCacheTTL = 5 * time.Minute
+
+	// CandlesticksWindowDays is the fixed history window the modal shows.
+	CandlesticksWindowDays = 7
 
 	// RedisPredictionsSubscribersPrefix is the Redis key prefix for the
 	// channel-wide predictions subscriber set. v1 routing is a channel-wide
@@ -151,6 +163,84 @@ func (a *App) getCatalog(c *fiber.Ctx) error {
 // healthHandler proxies a health check to the internal Rust predictions service.
 func (a *App) healthHandler(c *fiber.Ctx) error {
 	return ProxyInternalHealth(c, os.Getenv("INTERNAL_PREDICTIONS_URL"))
+}
+
+// getCandlesticks returns a market's price history for the desktop
+// detail-modal chart (v1.1.4): the last CandlesticksWindowDays of hourly
+// candles, proxied from the internal Rust service (which holds the Kalshi
+// credentials) and cached in Redis. This API owns the series-ticker lookup
+// so the Rust side stays a pure signed pass-through.
+func (a *App) getCandlesticks(c *fiber.Ctx) error {
+	ticker := strings.TrimSpace(c.Params("ticker"))
+	if ticker == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+			Status: "error", Error: "ticker is required",
+		})
+	}
+	ctx := context.Background()
+
+	cacheKey := "cache:predictions:candles:" + ticker
+	if cached, err := a.rdb.Get(ctx, cacheKey).Result(); err == nil && cached != "" {
+		c.Set("X-Cache", "HIT")
+		c.Set("Content-Type", "application/json")
+		return c.SendString(cached)
+	}
+
+	var series string
+	err := a.db.QueryRow(ctx,
+		"SELECT COALESCE(series_ticker, '') FROM markets WHERE ticker = $1",
+		ticker,
+	).Scan(&series)
+	if err != nil || series == "" {
+		return c.Status(fiber.StatusNotFound).JSON(ErrorResponse{
+			Status: "error", Error: "unknown market",
+		})
+	}
+
+	internalURL := strings.TrimRight(os.Getenv("INTERNAL_PREDICTIONS_URL"), "/")
+	if internalURL == "" {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(ErrorResponse{
+			Status: "error", Error: "ingestion service not configured",
+		})
+	}
+
+	end := time.Now().Unix()
+	start := end - CandlesticksWindowDays*24*3600
+	proxyURL := fmt.Sprintf(
+		"%s/internal/candlesticks?series=%s&ticker=%s&start_ts=%d&end_ts=%d&period_interval=60",
+		internalURL, url.QueryEscape(series), url.QueryEscape(ticker), start, end,
+	)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, proxyURL, nil)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+			Status: "error", Error: "failed to build upstream request",
+		})
+	}
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		log.Printf("[Predictions] Candlesticks proxy failed for %s: %v", ticker, err)
+		return c.Status(fiber.StatusBadGateway).JSON(ErrorResponse{
+			Status: "error", Error: "history unavailable",
+		})
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if err != nil || resp.StatusCode != http.StatusOK {
+		log.Printf("[Predictions] Candlesticks upstream %d for %s: %v", resp.StatusCode, ticker, err)
+		return c.Status(fiber.StatusBadGateway).JSON(ErrorResponse{
+			Status: "error", Error: "history unavailable",
+		})
+	}
+
+	if err := a.rdb.Set(ctx, cacheKey, string(body), CandlesticksCacheTTL).Err(); err != nil {
+		log.Printf("[Predictions] Candlesticks cache write failed for %s: %v", ticker, err)
+	}
+
+	c.Set("X-Cache", "MISS")
+	c.Set("Content-Type", "application/json")
+	return c.Send(body)
 }
 
 // =============================================================================

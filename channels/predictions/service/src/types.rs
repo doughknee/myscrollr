@@ -97,6 +97,31 @@ impl PredictionsState {
     }
 }
 
+/// Build a signed REST client from env WITHOUT the fatal-exit behavior of
+/// `PredictionsState::new`. Used by the health server's `/internal/
+/// candlesticks` proxy (v1.1.4): when creds are absent the endpoint
+/// degrades to 503 instead of taking the whole process down before init
+/// ever runs.
+pub fn try_rest_client_from_env() -> anyhow::Result<RestClient> {
+    use anyhow::Context;
+    let key_id = std::env::var("KALSHI_API_KEY_ID").context("KALSHI_API_KEY_ID unset")?;
+    let pem = match std::env::var("KALSHI_PRIVATE_KEY") {
+        Ok(p) if !p.trim().is_empty() => p,
+        _ => {
+            let path = std::env::var("KALSHI_PRIVATE_KEY_PATH")
+                .context("neither KALSHI_PRIVATE_KEY nor KALSHI_PRIVATE_KEY_PATH set")?;
+            std::fs::read_to_string(&path)
+                .with_context(|| format!("read KALSHI_PRIVATE_KEY_PATH ({path})"))?
+        }
+    };
+    let demo = std::env::var("KALSHI_ENV")
+        .map(|v| v.eq_ignore_ascii_case("demo"))
+        .unwrap_or(false);
+    let (rest_base, _ws_url) = kalshi::endpoints(demo);
+    let signer = Signer::from_pem(key_id, &pem)?;
+    RestClient::new(rest_base, signer)
+}
+
 /// Health payload surfaced through `/health/ready`. The readiness bridge loop
 /// in `main.rs` reads `connection_status == "connected"` and `batch_number`,
 /// so those two fields must stay present and named exactly.

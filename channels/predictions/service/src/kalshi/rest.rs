@@ -69,4 +69,21 @@ impl RestClient {
     pub async fn get_events(&self, query: &str) -> Result<EventsResponse> {
         self.get_json(&format!("{API_PREFIX}/events"), query).await
     }
+
+    /// `GET /series/{series}/markets/{ticker}/candlesticks` — price history
+    /// for the desktop detail-modal chart (v1.1.4). Returns the raw JSON
+    /// body: the predictions API proxies it through untouched, so this
+    /// service never needs to model Kalshi's candle shape.
+    pub async fn get_candlesticks(
+        &self,
+        series_ticker: &str,
+        ticker: &str,
+        query: &str,
+    ) -> Result<serde_json::Value> {
+        self.get_json(
+            &format!("{API_PREFIX}/series/{series_ticker}/markets/{ticker}/candlesticks"),
+            query,
+        )
+        .await
+    }
 }

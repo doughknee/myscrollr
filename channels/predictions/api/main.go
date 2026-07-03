@@ -155,6 +155,7 @@ func main() {
 	fiberApp.Get("/predictions/public", app.getPredictions) // Unauthenticated: returns all markets (same handler, same cache)
 	fiberApp.Get("/predictions/health", app.healthHandler)
 	fiberApp.Get("/predictions/catalog", app.getCatalog)
+	fiberApp.Get("/predictions/candlesticks/:ticker", app.getCandlesticks)
 
 	// -------------------------------------------------------------------------
 	// Start server with graceful shutdown
@@ -209,6 +210,7 @@ func startRegistration(ctx context.Context, rdb *redis.Client) {
 			{Method: "GET", Path: "/predictions/public", Auth: false},
 			{Method: "GET", Path: "/predictions/health", Auth: false},
 			{Method: "GET", Path: "/predictions/catalog", Auth: false},
+			{Method: "GET", Path: "/predictions/candlesticks/:ticker", Auth: true},
 		},
 	}
 
