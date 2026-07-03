@@ -11,7 +11,7 @@ stays at 1.1.0 and nobody gets force-updated.
 | Version | Codename | Theme | Size |
 |---|---|---|---|
 | ~~v1.1.1~~ | Paper Cuts | ✅ **Shipped 2026-07-02** — grew into the catalog redesign (absorbed half of The Library) | S→M |
-| v1.1.2 | The Library | Slots-only monetization everywhere (catalog half already shipped) | S–M |
+| ~~v1.1.2~~ | The Library | ✅ **Shipped 2026-07-02** — slots-only monetization everywhere, fantasy gate retired | S–M |
 | v1.1.3 | Time Controls | Day-range windows replace vague feed toggles | M |
 | v1.1.4 | Kalshi Grows Up | Predictions widget behaves like a widget | M |
 | v1.2.0 | Double-Decker 2.0 | Multi-row ticker rebuilt around widgets | L |
@@ -61,16 +61,25 @@ agreement got accepted mid-release — the return of macOS builds.
 
 ---
 
-## v1.1.2 — The Library
+## ✅ v1.1.2 — The Library (shipped 2026-07-02, `desktop-v1.1.2`)
 
-**Goal:** the whole product tells one monetization story: *your plan = how many
-widgets you run.* (The original catalog half — sections, sorting, remove — shipped
-early in v1.1.1; what remains is the monetization half plus one interaction item.)
+Shipped same-day as v1.1.1: the fantasy tier gate is fully retired (a normal
+widget on every plan including Free — which also surfaced and killed a
+leftover server-side ladder in the fantasy API that had been capping Uplink
+accounts at ONE league import despite the "unlimited leagues" marketing);
+the Account page swapped its all-"Unlimited" limits table for the shared
+slot meter; the sidebar grew a right-click menu (Open / Configure /
+Show-Hide on ticker / Widget page / Remove — the review pass caught and
+fixed the ticker toggle reading raw row state instead of effective state);
+and Priority Support moved from Ultimate-only to every paid tier across the
+pricing page, FAQ + JSON-LD mirrors, and support copy.
 
-**Catalog (remaining)**
-- **Sidebar right-click menu per widget**: Configure, Remove, show/hide on ticker.
-- **"Popular" sort option** if we wire install counts out of PostHog (stretch —
-  A–Z already shipped; don't block on analytics).
+**Deferred out of the release:** the "Popular" catalog sort (no analytics
+infra exists; A–Z + Featured cover sorting until install-count data is
+worth plumbing — note it could come from our own user_channels counts, no
+PostHog needed).
+
+**Original scope notes (historical)**
 
 **Monetization coherence**
 - **Retire the Fantasy tier gate.** Yahoo Fantasy becomes a normal widget on every
