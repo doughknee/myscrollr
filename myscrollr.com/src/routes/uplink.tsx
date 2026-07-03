@@ -466,11 +466,13 @@ interface PricingPlan {
 const PRICING: Record<TierKey, Record<PlanKey, PricingPlan>> = {
   uplink: {
     monthly: { price: 9.99, period: '/mo', perMonth: 9.99 },
+    // Annual = exactly 8x monthly on every tier — sell it as time, not
+    // a dollar delta ("4 months free" beats "Save ~$40/yr").
     annual: {
       price: 79.99,
       period: '/yr',
       perMonth: 6.67,
-      savings: 'Save ~$40/yr',
+      savings: '4 months free',
     },
   },
   pro: {
@@ -479,7 +481,7 @@ const PRICING: Record<TierKey, Record<PlanKey, PricingPlan>> = {
       price: 199.99,
       period: '/yr',
       perMonth: 16.67,
-      savings: 'Save ~$100/yr',
+      savings: '4 months free',
     },
   },
   ultimate: {
@@ -488,7 +490,7 @@ const PRICING: Record<TierKey, Record<PlanKey, PricingPlan>> = {
       price: 399.99,
       period: '/yr',
       perMonth: 33.33,
-      savings: 'Save ~$200/yr',
+      savings: '4 months free',
     },
   },
 }
@@ -2325,8 +2327,8 @@ function UplinkPage() {
 
                       {/* v1.1.3: the card IS the widget cap — everything
                           else lives in the compare table below. */}
-                      <div className="mb-6 flex flex-col items-center gap-1 py-4">
-                        <span className="font-mono text-5xl font-bold text-base-content/90">
+                      <div className="mb-6 flex flex-col items-center gap-1.5 py-5">
+                        <span className="font-mono text-6xl font-black leading-none text-base-content/80">
                           {tierLimits.tiers.free.max_widgets}
                         </span>
                         <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
@@ -2480,8 +2482,14 @@ function UplinkPage() {
                         </div>
                       </div>
 
-                      <div className="mb-6 flex flex-col items-center gap-1 py-4">
-                        <span className="font-mono text-5xl font-bold text-base-content/90">
+                      <div className="mb-6 flex flex-col items-center gap-1.5 py-5">
+                        <span
+                          className="font-mono text-6xl font-black leading-none"
+                          style={{
+                            color: '#00b8db',
+                            textShadow: '0 0 28px #00b8db40',
+                          }}
+                        >
                           {tierLimits.tiers.uplink.max_widgets}
                         </span>
                         <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
@@ -2621,8 +2629,14 @@ function UplinkPage() {
                         </div>
                       </div>
 
-                      <div className="mb-6 flex flex-col items-center gap-1 py-4">
-                        <span className="font-mono text-5xl font-bold text-base-content/90">
+                      <div className="mb-6 flex flex-col items-center gap-1.5 py-5">
+                        <span
+                          className="font-mono text-6xl font-black leading-none"
+                          style={{
+                            color: '#a78bfa',
+                            textShadow: '0 0 28px #a78bfa40',
+                          }}
+                        >
                           {tierLimits.tiers.uplink_pro.max_widgets}
                         </span>
                         <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
@@ -2905,8 +2919,14 @@ function UplinkPage() {
                           </div>
                         </div>
 
-                        <div className="mb-6 flex flex-col items-center gap-1 py-4">
-                          <span className="font-mono text-5xl font-bold text-base-content/90">
+                        <div className="mb-6 flex flex-col items-center gap-1.5 py-5">
+                          <span
+                            className="font-mono text-6xl font-black leading-none"
+                            style={{
+                              color: '#34d399',
+                              textShadow: '0 0 28px #34d39940',
+                            }}
+                          >
                             ∞
                           </span>
                           <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
