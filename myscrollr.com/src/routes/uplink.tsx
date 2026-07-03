@@ -294,31 +294,10 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
       pro: 'Real-time SSE',
       ultimate: 'Real-time SSE',
     },
-    {
-      label: 'Items per Widget',
-      free: 'Unlimited',
-      uplink: 'Unlimited',
-      pro: 'Unlimited',
-      ultimate: 'Unlimited',
-    },
-    {
-      // Tier gate retired v1.1.2 — a normal widget on every plan. The row
-      // stays because four checkmarks SELL the giveaway better than silence.
-      label: 'Yahoo Fantasy',
-      free: 'Yes',
-      uplink: 'Yes',
-      pro: 'Yes',
-      ultimate: 'Yes',
-    },
-    {
-      label: 'Site Filtering',
-      free: 'Blacklist',
-      uplink: 'Blacklist',
-      pro: 'Blacklist + Whitelist',
-      ultimate: 'Blacklist + Whitelist',
-      proUp: true,
-      ultimateUp: true,
-    },
+    // v1.1.3 trim: Items-per-Widget, Yahoo Fantasy, and Site Filtering
+    // rows removed — rows where every column reads the same (or that
+    // describe table-stakes) dilute the one comparison that sells:
+    // widgets at once.
     {
       label: 'Custom Alerts',
       free: 'No',
@@ -348,24 +327,7 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
       proUp: true,
       ultimateUp: true,
     },
-    {
-      label: 'Priority RSS Refresh',
-      free: 'No',
-      uplink: 'No',
-      pro: 'Yes',
-      ultimate: 'Yes',
-      proUp: true,
-      ultimateUp: true,
-    },
-    {
-      label: 'Webhooks & Integrations',
-      free: 'No',
-      uplink: 'No',
-      pro: 'No',
-      ultimate: 'Yes',
-      ultimateUp: true,
-      comingSoon: true,
-    },
+    // v1.1.3 trim: Priority-RSS and Webhooks rows removed (see above).
     {
       label: 'Data Export',
       free: 'No',
@@ -405,13 +367,7 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
       proUp: true,
       ultimateUp: true,
     },
-    {
-      label: 'Dashboard Access',
-      free: 'Full',
-      uplink: 'Full',
-      pro: 'Full',
-      ultimate: 'Full',
-    },
+    // v1.1.3 trim: Dashboard-Access row removed (all-"Full" row said nothing).
   ]
 }
 
@@ -991,33 +947,10 @@ function BottomCTA({
   )
 }
 
-// ── Pricing Feature Line ──────────────────────────────────────────
-
-function PricingFeature({
-  children,
-  highlight,
-}: {
-  children: React.ReactNode
-  highlight?: boolean
-}) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <Check
-        size={12}
-        className={
-          highlight ? 'text-primary shrink-0' : 'text-base-content/20 shrink-0'
-        }
-      />
-      <span
-        className={`text-xs ${highlight ? 'text-base-content/60' : 'text-base-content/35'}`}
-      >
-        {children}
-      </span>
-    </div>
-  )
-}
-
 // ── Page Component ──────────────────────────────────────────────
+// (PricingFeature bullet-line component retired v1.1.3 — the plan
+// cards show only the widget cap; differentiators live in the
+// compare table.)
 
 function UplinkPage() {
   const { isAuthenticated, signIn } = useScrollrAuth()
@@ -2390,16 +2323,15 @@ function UplinkPage() {
                         </div>
                       </div>
 
-                      <div className="space-y-2.5 mb-6">
-                        <PricingFeature>
-                          {tierLimits.tiers.free.max_widgets} widgets at once
-                        </PricingFeature>
-                        <PricingFeature>Real-time SSE delivery</PricingFeature>
-                        <PricingFeature>
-                          Unlimited items per widget
-                        </PricingFeature>
-                        <PricingFeature>Every sports league</PricingFeature>
-                        <PricingFeature>Full desktop app access</PricingFeature>
+                      {/* v1.1.3: the card IS the widget cap — everything
+                          else lives in the compare table below. */}
+                      <div className="mb-6 flex flex-col items-center gap-1 py-4">
+                        <span className="font-mono text-5xl font-bold text-base-content/90">
+                          {tierLimits.tiers.free.max_widgets}
+                        </span>
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
+                          widgets at once
+                        </span>
                       </div>
 
                       <div className="mt-auto pt-2 flex flex-col items-center gap-1.5">
@@ -2548,17 +2480,13 @@ function UplinkPage() {
                         </div>
                       </div>
 
-                      <div className="space-y-2.5 mb-6">
-                        <PricingFeature>
-                          {tierLimits.tiers.uplink.max_widgets} widgets at once
-                        </PricingFeature>
-                        <PricingFeature>Priority support</PricingFeature>
-                        <PricingFeature>Real-time SSE delivery</PricingFeature>
-                        <PricingFeature>
-                          Unlimited items per widget
-                        </PricingFeature>
-                        <PricingFeature>Every sports league</PricingFeature>
-                        <PricingFeature>Early access</PricingFeature>
+                      <div className="mb-6 flex flex-col items-center gap-1 py-4">
+                        <span className="font-mono text-5xl font-bold text-base-content/90">
+                          {tierLimits.tiers.uplink.max_widgets}
+                        </span>
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
+                          widgets at once
+                        </span>
                       </div>
 
                       <div className="mt-auto pt-2 flex flex-col items-center gap-1.5">
@@ -2693,26 +2621,13 @@ function UplinkPage() {
                         </div>
                       </div>
 
-                      <div className="space-y-2.5 mb-6">
-                        <PricingFeature highlight>
-                          {tierLimits.tiers.uplink_pro.max_widgets} widgets at
-                          once
-                        </PricingFeature>
-                        <PricingFeature highlight>
-                          Custom alerts & notifications
-                        </PricingFeature>
-                        <PricingFeature highlight>
-                          Feed profiles & controls
-                        </PricingFeature>
-                        <PricingFeature highlight>
-                          Priority RSS refresh
-                        </PricingFeature>
-                        <PricingFeature highlight>
-                          Whitelist site filtering
-                        </PricingFeature>
-                        <PricingFeature highlight>
-                          Everything in Uplink
-                        </PricingFeature>
+                      <div className="mb-6 flex flex-col items-center gap-1 py-4">
+                        <span className="font-mono text-5xl font-bold text-base-content/90">
+                          {tierLimits.tiers.uplink_pro.max_widgets}
+                        </span>
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
+                          widgets at once
+                        </span>
                       </div>
 
                       <div className="mt-auto pt-2 flex flex-col items-center gap-1.5">
@@ -2990,25 +2905,13 @@ function UplinkPage() {
                           </div>
                         </div>
 
-                        <div className="space-y-2.5 mb-6">
-                          <PricingFeature highlight>
-                            Unlimited widgets at once
-                          </PricingFeature>
-                          <PricingFeature highlight>
-                            Unlimited everything
-                          </PricingFeature>
-                          <PricingFeature highlight>
-                            Webhooks & integrations
-                          </PricingFeature>
-                          <PricingFeature highlight>
-                            Data export & API access
-                          </PricingFeature>
-                          <PricingFeature highlight>
-                            Priority support
-                          </PricingFeature>
-                          <PricingFeature highlight>
-                            Everything in Pro, plus more
-                          </PricingFeature>
+                        <div className="mb-6 flex flex-col items-center gap-1 py-4">
+                          <span className="font-mono text-5xl font-bold text-base-content/90">
+                            ∞
+                          </span>
+                          <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
+                            widgets at once
+                          </span>
                         </div>
 
                         <div className="mt-auto pt-2 flex flex-col items-center gap-1.5">
