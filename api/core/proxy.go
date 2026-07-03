@@ -56,7 +56,10 @@ func dynamicProxyHandler(c *fiber.Ctx) error {
 		if route.Auth {
 			if err := ValidateAuth(c); err != nil {
 				log.Printf("[Proxy] Auth failed for %s %s: %v", requestMethod, requestPath, err)
-				return err
+				// ValidateAuth already wrote the 401 — returning nil keeps
+				// it. Proxying anyway would let the upstream response
+				// overwrite the 401 (the fail-open this fixes).
+				return nil
 			}
 		}
 

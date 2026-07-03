@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -97,10 +98,24 @@ func ValidateToken(tokenString string) (sub string, claims jwt.MapClaims, err er
 	return sub, mapClaims, nil
 }
 
+// ErrUnauthenticated signals that ValidateAuth rejected the request and has
+// ALREADY written the 401 response. Callers must stop processing and return
+// nil so the written response stands — returning this error instead sends
+// Fiber's default error shape (still fails closed, but with the wrong body).
+var ErrUnauthenticated = errors.New("unauthenticated")
+
 // ValidateAuth extracts and validates the JWT from the request, setting
 // user_id and user_roles in c.Locals. It does NOT call c.Next(), making it
 // safe to use inline (e.g. from the dynamic proxy) without advancing
 // Fiber's handler chain.
+//
+// Returns nil ONLY when authentication succeeded. On failure it writes the
+// 401 response and returns ErrUnauthenticated. (It previously returned the
+// result of c.JSON — nil on a successful write — so `err != nil` callers
+// treated a rendered 401 as auth success and kept going: the dynamic proxy
+// forwarded unauthenticated requests to channels, whose upstream response
+// then overwrote the 401. That fail-open made every Auth:true channel route
+// effectively public.)
 func ValidateAuth(c *fiber.Ctx) error {
 	tokenString := ""
 	authHeader := c.Get("Authorization")
@@ -117,19 +132,21 @@ func ValidateAuth(c *fiber.Ctx) error {
 	}
 
 	if tokenString == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
+		_ = c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
 			Status: "unauthorized",
 			Error:  "Missing authentication",
 		})
+		return ErrUnauthenticated
 	}
 
 	sub, claims, err := ValidateToken(tokenString)
 	if err != nil {
 		log.Printf("[Auth Error] %v", err)
-		return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
+		_ = c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
 			Status: "unauthorized",
 			Error:  "Invalid or expired token",
 		})
+		return ErrUnauthenticated
 	}
 
 	c.Locals("user_id", sub)
@@ -179,11 +196,14 @@ func ValidateAuth(c *fiber.Ctx) error {
 }
 
 // LogtoAuth is the Fiber middleware that validates the Logto JWT and advances
-// to the next handler. For inline auth checks (e.g. in the dynamic proxy),
+// to the next handler. For inline auth checks (e.g. from the dynamic proxy),
 // use ValidateAuth instead.
 func LogtoAuth(c *fiber.Ctx) error {
 	if err := ValidateAuth(c); err != nil {
-		return err
+		// ValidateAuth already wrote the 401 — do NOT advance the chain
+		// (protected handlers must never execute unauthenticated), and
+		// return nil so the written response stands.
+		return nil
 	}
 	return c.Next()
 }
