@@ -46,7 +46,15 @@ const PredictionChip = memo(
     const delta = yes - prev;
     const isUp = delta >= 0;
     const pct = `${Math.round(yes)}%`;
-    const label = p.title || p.ticker;
+    // v1.1.4: lead with the event's QUESTION, not the leg. The leg stays
+    // visible when it names an outcome ("France", "Atlanta") because the
+    // probability belongs to the leg — but a bare "Yes" adds nothing next
+    // to "More tech layoffs in 2026? 92%".
+    const label = p.event_title || p.title || p.ticker;
+    const leg =
+      p.event_title && p.title && p.title.toLowerCase() !== "yes"
+        ? p.title
+        : "";
     const countdown = showCloseTime
       ? formatCloseCountdown(p.close_time, Date.now())
       : "";
@@ -55,13 +63,18 @@ const PredictionChip = memo(
       <button
         onClick={onClick}
         className={chipBaseClasses(comfort, c, "whitespace-nowrap")}
-        title={p.subtitle ? `${label} — ${p.subtitle}` : label}
+        title={leg ? `${label} — ${leg}` : label}
       >
-        {/* Row 1: question, implied probability, delta */}
+        {/* Row 1: question, outcome leg, implied probability, delta */}
         <div className={clsx("flex items-center gap-2", comfort && "text-ui-body")}>
           <span className={clsx("font-semibold max-w-[18rem] truncate", c.text)}>
             {label}
           </span>
+          {leg && (
+            <span className={clsx("max-w-[8rem] truncate", c.textDim)}>
+              {leg}
+            </span>
+          )}
           <span className={clsx("font-mono tabular-nums", c.textDim)}>{pct}</span>
           {showDelta && delta !== 0 && (
             <span
@@ -111,7 +124,8 @@ const PredictionChip = memo(
     prev.prediction.yes_price === next.prediction.yes_price &&
     prev.prediction.prev_yes_price === next.prediction.prev_yes_price &&
     prev.prediction.volume === next.prediction.volume &&
-    prev.prediction.title === next.prediction.title,
+    prev.prediction.title === next.prediction.title &&
+    prev.prediction.event_title === next.prediction.event_title,
 );
 
 export default PredictionChip;

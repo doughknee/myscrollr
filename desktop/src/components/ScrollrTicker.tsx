@@ -27,6 +27,7 @@ import { selectFinanceForTicker } from "../channels/finance/view";
 import { selectFantasyForTicker } from "../channels/fantasy/view";
 import { selectSportsForTicker, getSportsDisplayConfig } from "../channels/sports/view";
 import { selectPredictionsForTicker } from "../channels/predictions/view";
+import { getWatchlist } from "../channels/predictions/watchlist";
 import {
   findTopN,
   findTopBench,
@@ -503,11 +504,17 @@ export default function ScrollrTicker({
           // Premier prediction-markets channel. Implied probability +
           // ▲/▼ delta is the "heartbeat"; the universal `defaultSort`
           // (movers/volume/closing) governs ordering on both surfaces.
+          // v1.1.4 scoping: starred markets only when the watchlist has
+          // any (the ticker window shares localStorage with the main
+          // window, so getWatchlist reads the same store); otherwise the
+          // selector falls back to the top rank-1 movers — never again
+          // the whole ingested universe.
           const predictionsPrefs = channelDisplay?.predictions;
           if (!predictionsPrefs) continue;
           const sorted = selectPredictionsForTicker(
             data as Prediction[],
             predictionsPrefs,
+            new Set(getWatchlist()),
           );
           for (const p of sorted) {
             bucket.push(

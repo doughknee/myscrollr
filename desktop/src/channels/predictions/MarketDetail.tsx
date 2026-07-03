@@ -10,6 +10,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { clsx } from "clsx";
+import { useQuery } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-shell";
 import {
   X,
@@ -26,6 +27,8 @@ import {
   formatCloseCountdown,
   relativeTime,
 } from "../../utils/format";
+import { predictionsCandlesticksOptions } from "../../api/queries";
+import type { PredictionCandle } from "../../api/queries";
 import {
   formatProbability,
   formatSpread,
@@ -84,6 +87,25 @@ export default function MarketDetail({
     [history],
   );
 
+  // Real price history (v1.1.4): ~7 days of hourly candles via the
+  // Kalshi proxy. The live tick-accumulator sparkline stays as the
+  // fallback when the fetch fails or a market has no trade history.
+  const { data: candleData, isLoading: candlesLoading } = useQuery(
+    predictionsCandlesticksOptions(market.ticker),
+  );
+  const candlePts = useMemo(() => {
+    const rows: PredictionCandle[] = candleData?.candlesticks ?? [];
+    const pts: { t: number; v: number }[] = [];
+    for (const c of rows) {
+      const raw = c.price?.close_dollars ?? c.price?.mean_dollars;
+      if (!raw) continue;
+      const v = parseFloat(raw) * 100;
+      if (!Number.isFinite(v)) continue;
+      pts.push({ t: c.end_period_ts, v });
+    }
+    return pts;
+  }, [candleData]);
+
   const myAlerts = alerts.filter((a) => a.ticker === market.ticker);
   const countdown = formatCloseCountdown(market.close_time, now);
 
@@ -108,9 +130,19 @@ export default function MarketDetail({
                 {market.category}
               </span>
             )}
-            <h2 className="text-[15px] font-semibold leading-snug text-fg">{market.title}</h2>
-            {market.subtitle && (
-              <p className="mt-0.5 text-[12px] text-fg-3">{market.subtitle}</p>
+            {/* v1.1.4: the EVENT question headlines; this leg is the
+                subtitle ("More tech layoffs in 2026?" / Outcome: Yes). */}
+            <h2 className="text-[15px] font-semibold leading-snug text-fg">
+              {market.event_title || market.title}
+            </h2>
+            {market.event_title ? (
+              <p className="mt-0.5 text-[12px] text-fg-3">
+                Outcome: {market.title || market.subtitle || "Yes"}
+              </p>
+            ) : (
+              market.subtitle && (
+                <p className="mt-0.5 text-[12px] text-fg-3">{market.subtitle}</p>
+              )
             )}
           </div>
           <button
@@ -144,9 +176,15 @@ export default function MarketDetail({
             </div>
           </div>
 
-          {/* Sparkline */}
+          {/* Price history: real 7-day candles (v1.1.4), falling back to
+              the live tick-accumulator sparkline while loading fails or a
+              market has no trade history yet. */}
           <div className="px-4 pt-2">
-            {history.length >= 2 ? (
+            {candlePts.length >= 2 ? (
+              <HistoryChart points={candlePts} />
+            ) : candlesLoading ? (
+              <div className="h-[88px] animate-pulse rounded-lg bg-base-100/40" />
+            ) : history.length >= 2 ? (
               <svg
                 viewBox={`0 0 ${SPARK_W} ${SPARK_H}`}
                 width="100%"
@@ -278,6 +316,83 @@ export default function MarketDetail({
 }
 
 // ── Bits ─────────────────────────────────────────────────────────
+
+const CHART_W = 280;
+const CHART_H = 88;
+const CHART_PAD = 4;
+
+/**
+ * The real price-history chart (v1.1.4): an auto-scaled area line over
+ * ~7 days of hourly closes, colored by the window's overall direction,
+ * with the range labeled so a flat-looking line can't mislead.
+ */
+function HistoryChart({ points }: { points: { t: number; v: number }[] }) {
+  const { linePts, areaPts, min, max, up } = useMemo(() => {
+    const vs = points.map((p) => p.v);
+    let lo = Math.min(...vs);
+    let hi = Math.max(...vs);
+    // Flat markets get breathing room so the line doesn't hug an edge.
+    if (hi - lo < 4) {
+      const mid = (hi + lo) / 2;
+      lo = mid - 2;
+      hi = mid + 2;
+    }
+    lo = Math.max(0, lo - 1);
+    hi = Math.min(100, hi + 1);
+    const span = hi - lo || 1;
+    const innerW = CHART_W - CHART_PAD * 2;
+    const innerH = CHART_H - CHART_PAD * 2;
+    const step = innerW / (points.length - 1);
+    const xy = points.map(
+      (p, i) =>
+        `${(CHART_PAD + i * step).toFixed(1)},${(
+          CHART_PAD + (1 - (p.v - lo) / span) * innerH
+        ).toFixed(1)}`,
+    );
+    const baseline = CHART_H - CHART_PAD;
+    return {
+      linePts: xy.join(" "),
+      areaPts: `${CHART_PAD},${baseline} ${xy.join(" ")} ${CHART_W - CHART_PAD},${baseline}`,
+      min: lo,
+      max: hi,
+      up: points[points.length - 1].v >= points[0].v,
+    };
+  }, [points]);
+
+  const stroke = up ? "var(--color-up)" : "var(--color-down)";
+
+  return (
+    <div className="relative">
+      <svg
+        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+        width="100%"
+        height={CHART_H}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={`7-day price history, ${up ? "up" : "down"} overall`}
+      >
+        <polygon points={areaPts} fill={stroke} opacity="0.08" />
+        <polyline
+          points={linePts}
+          fill="none"
+          stroke={stroke}
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      </svg>
+      <span className="absolute right-0 top-0 font-mono text-[9px] tabular-nums text-fg-4">
+        {Math.round(max)}%
+      </span>
+      <span className="absolute bottom-4 right-0 font-mono text-[9px] tabular-nums text-fg-4">
+        {Math.round(min)}%
+      </span>
+      <span className="mt-0.5 block text-right font-mono text-[9px] uppercase tracking-wide text-fg-4">
+        7d · hourly
+      </span>
+    </div>
+  );
+}
 
 function Stat({
   label,
