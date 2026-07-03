@@ -53,10 +53,14 @@ const (
 	// see every game for every selected league.
 	DefaultSportsLimit = 200
 
-	// DashboardSportsLimit caps the number of games returned for the
-	// home-feed glanceable row. The fair-share allocator (MinPerLeagueShare)
-	// ensures every selected league gets visibility within this cap.
-	DashboardSportsLimit = 20
+	// DashboardSportsLimit caps the number of games returned in the
+	// /dashboard payload — the desktop's only sports data source. Raised
+	// 20 → 60 for v1.1.3 Time Controls: finals now survive 7 days
+	// server-side and the per-widget day window (up to 7 back + 7 ahead)
+	// must find its games in this payload; at 20, a week of finals would
+	// have starved the upcoming slate. The fair-share allocator
+	// (MinPerLeagueShare) still guarantees every league visibility.
+	DashboardSportsLimit = 60
 
 	// PollingStaleThreshold is the maximum acceptable age of the last
 	// successful poll before a league is marked polling_healthy: false.

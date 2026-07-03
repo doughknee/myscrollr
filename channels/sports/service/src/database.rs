@@ -401,7 +401,12 @@ pub async fn get_live_yesterday_leagues(pool: &Arc<PgPool>) -> Vec<String> {
 
 /// Delete stale games using per-state thresholds.
 ///
-/// - `final` / `postponed`: 12 hours past `start_time` — they're done.
+/// - `final` / `postponed`: 7 days past `start_time`. Was 12 hours until
+///           v1.1.3 Time Controls: the desktop's per-widget "N days back"
+///           window (0..7) needs finals to still EXIST server-side — with
+///           the 12h purge, "show me the last 3 days of scores" had no
+///           data to show. 7 days matches the pre-game horizon so the
+///           window is symmetric.
 /// - `pre`:  7 days past `start_time` — survives short polling outages.
 ///           A `pre` row this old means the API stopped returning the fixture
 ///           entirely; safe to prune.
@@ -412,7 +417,7 @@ pub async fn cleanup_old_games(pool: &Arc<PgPool>) -> Result<u64> {
     let mut connection = pool.acquire().await?;
     let result = query(
         "DELETE FROM games WHERE
-            (state IN ('final', 'postponed') AND start_time < NOW() - INTERVAL '12 hours')
+            (state IN ('final', 'postponed') AND start_time < NOW() - INTERVAL '7 days')
             OR (state = 'pre' AND start_time < NOW() - INTERVAL '7 days')
             OR (state = 'in' AND updated_at < NOW() - INTERVAL '24 hours')"
     )
