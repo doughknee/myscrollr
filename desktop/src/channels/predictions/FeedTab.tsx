@@ -71,9 +71,9 @@ export const predictionsChannel: ChannelManifest = {
       "the market gives a 'Yes' outcome — and moves in real time as " +
       "traders shift the odds.",
     usage: [
-      "Open Configure to pin markets and choose categories.",
-      "Probabilities update automatically when connected.",
-      "Click any market to view it on Kalshi.",
+      "Open Configure to choose which categories flow in.",
+      "Star any market — stars build your watchlist and take over the ticker.",
+      "Click any outcome for its price history, alerts, and the Kalshi link.",
     ],
   },
   FeedTab: PredictionsFeedTab,
