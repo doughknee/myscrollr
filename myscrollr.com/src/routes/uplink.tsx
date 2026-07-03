@@ -58,6 +58,7 @@ import { seededRandom } from '@/lib/seededRandom'
 import { FALLBACK_LIMITS } from '@/lib/fallbackTierLimits'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { useGetToken } from '@/hooks/useGetToken'
+import { useTilt } from '@/components/TiltCard'
 import { billingApi, tierLimitsApi } from '@/api/client'
 import { FAQSection } from '@/components/landing/FAQSection'
 
@@ -962,6 +963,13 @@ function UplinkPage() {
   // Rebuilds the comparison table, tier showcases, and FAQ whenever the
   // fetch resolves or the cached response changes.
   const tierLimits = useTierLimits()
+
+  // Pointer-tracking 3D tilt for the four plan cards (v1.1.3 polish).
+  // One spring set per card; replaces the old whileHover y-lift.
+  const freeTilt = useTilt()
+  const uplinkTilt = useTilt()
+  const proTilt = useTilt()
+  const ultimateTilt = useTilt()
   const comparisonRows = useMemo(
     () => buildComparison(tierLimits),
     [tierLimits],
@@ -2283,6 +2291,9 @@ function UplinkPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.03, duration: 0.5, ease: EASE }}
+                    ref={freeTilt.ref}
+                    style={freeTilt.style}
+                    {...freeTilt.handlers}
                     className="group relative bg-base-200/20 border border-base-300/20 rounded-xl p-6 overflow-hidden flex flex-col"
                   >
                     <div className="relative z-10 flex flex-col flex-1">
@@ -2327,7 +2338,7 @@ function UplinkPage() {
 
                       {/* v1.1.3: the card IS the widget cap — everything
                           else lives in the compare table below. */}
-                      <div className="mb-6 flex flex-col items-center gap-1.5 py-5">
+                      <div className="mb-6 flex flex-col items-start gap-1.5 py-5">
                         <span className="font-mono text-6xl font-black leading-none text-base-content/80">
                           {tierLimits.tiers.free.max_widgets}
                         </span>
@@ -2372,10 +2383,9 @@ function UplinkPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.06, duration: 0.5, ease: EASE }}
-                    whileHover={{
-                      y: -3,
-                      transition: { type: 'tween', duration: 0.2 },
-                    }}
+                    ref={uplinkTilt.ref}
+                    style={uplinkTilt.style}
+                    {...uplinkTilt.handlers}
                     role="button"
                     tabIndex={isTierDisabled('uplink') ? -1 : 0}
                     // No aria-label: the card's visible content (tier
@@ -2482,7 +2492,7 @@ function UplinkPage() {
                         </div>
                       </div>
 
-                      <div className="mb-6 flex flex-col items-center gap-1.5 py-5">
+                      <div className="mb-6 flex flex-col items-start gap-1.5 py-5">
                         <span
                           className="font-mono text-6xl font-black leading-none"
                           style={{
@@ -2524,10 +2534,9 @@ function UplinkPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.09, duration: 0.5, ease: EASE }}
-                    whileHover={{
-                      y: -3,
-                      transition: { type: 'tween', duration: 0.2 },
-                    }}
+                    ref={proTilt.ref}
+                    style={proTilt.style}
+                    {...proTilt.handlers}
                     role="button"
                     tabIndex={isTierDisabled('pro') ? -1 : 0}
                     // See Uplink card above for why aria-label is omitted.
@@ -2629,7 +2638,7 @@ function UplinkPage() {
                         </div>
                       </div>
 
-                      <div className="mb-6 flex flex-col items-center gap-1.5 py-5">
+                      <div className="mb-6 flex flex-col items-start gap-1.5 py-5">
                         <span
                           className="font-mono text-6xl font-black leading-none"
                           style={{
@@ -2671,10 +2680,9 @@ function UplinkPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.12, duration: 0.5, ease: EASE }}
-                    whileHover={{
-                      y: -4,
-                      transition: { type: 'tween', duration: 0.2 },
-                    }}
+                    ref={ultimateTilt.ref}
+                    style={ultimateTilt.style}
+                    {...ultimateTilt.handlers}
                     role="button"
                     tabIndex={isTierDisabled('ultimate') ? -1 : 0}
                     // See Uplink card above for why aria-label is omitted.
@@ -2919,7 +2927,7 @@ function UplinkPage() {
                           </div>
                         </div>
 
-                        <div className="mb-6 flex flex-col items-center gap-1.5 py-5">
+                        <div className="mb-6 flex flex-col items-start gap-1.5 py-5">
                           <span
                             className="font-mono text-6xl font-black leading-none"
                             style={{
