@@ -37,8 +37,10 @@ function PresetChips({
           aria-pressed={activeKey === o.key}
           className={clsx(
             "rounded-md px-2.5 py-1 text-ui-chip font-medium transition-colors disabled:opacity-50",
+            // Accent-tinted active state — bg-surface on bg-base-150 is
+            // near-invisible in the dark themes (#141420 vs #171726).
             activeKey === o.key
-              ? "bg-surface text-fg-1 shadow-soft-sm"
+              ? "bg-accent/15 font-semibold text-accent"
               : "text-fg-4 hover:text-fg-2",
           )}
         >
