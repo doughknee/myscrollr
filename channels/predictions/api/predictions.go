@@ -461,54 +461,42 @@ func (a *App) queryMarkets(ctx context.Context) ([]Prediction, error) {
 
 // queryMarketsForUser fetches the markets that make up a user's dashboard view.
 //
-// If the user pinned specific favorites, those tickers are returned. Otherwise,
-// if the user selected categories, the enabled markets in those categories are
-// returned. With neither configured, the full set of primary markets is
-// returned (v1 default: everyone sees everything).
+// `categories` narrows the universe (empty = everything). `favorites` is
+// the desktop WATCHLIST MIRROR (v1.1.4): those tickers are unioned in on
+// top of the universe, so a starred market always reaches the client even
+// when Configure's category filter would exclude it — a star means
+// "always show me this". Pre-1.1.4 clients that treated favorites as an
+// exclusive pin list still see their pins (now alongside the universe
+// every unpinned user always saw).
 func (a *App) queryMarketsForUser(favorites, categories []string) []Prediction {
 	ctx := context.Background()
 
-	if len(favorites) > 0 {
-		rows, err := a.db.Query(ctx, `
-			SELECT
-				id, COALESCE(source, 'kalshi'), ticker, COALESCE(event_ticker, ''),
-				COALESCE(event_title, ''), COALESCE(event_rank, 1),
-				COALESCE(category, 'Other'), COALESCE(title, ''), COALESCE(subtitle, ''),
-				COALESCE(yes_price, 0), COALESCE(yes_bid, 0), COALESCE(yes_ask, 0),
-				COALESCE(prev_yes_price, 0), COALESCE(volume, 0), COALESCE(open_interest, 0),
-				COALESCE(status, ''), COALESCE(result, ''), close_time,
-				COALESCE(link, ''), COALESCE(updated_at, created_at)
-			FROM markets
-			WHERE ticker = ANY($1)
-			ORDER BY volume DESC, ticker ASC
-		`, favorites)
-		return scanMarkets(rows, err)
+	if len(favorites) == 0 && len(categories) == 0 {
+		// v1 default: everyone sees everything.
+		predictions, err := a.queryMarkets(ctx)
+		if err != nil {
+			log.Printf("[Predictions] queryMarketsForUser default query failed: %v", err)
+			return nil
+		}
+		return predictions
 	}
 
-	if len(categories) > 0 {
-		rows, err := a.db.Query(ctx, `
-			SELECT
-				id, COALESCE(source, 'kalshi'), ticker, COALESCE(event_ticker, ''),
-				COALESCE(event_title, ''), COALESCE(event_rank, 1),
-				COALESCE(category, 'Other'), COALESCE(title, ''), COALESCE(subtitle, ''),
-				COALESCE(yes_price, 0), COALESCE(yes_bid, 0), COALESCE(yes_ask, 0),
-				COALESCE(prev_yes_price, 0), COALESCE(volume, 0), COALESCE(open_interest, 0),
-				COALESCE(status, ''), COALESCE(result, ''), close_time,
-				COALESCE(link, ''), COALESCE(updated_at, created_at)
-			FROM markets
-			WHERE (is_primary = true OR event_rank = 2) AND category = ANY($1)
-			ORDER BY volume DESC, ticker ASC
-		`, categories)
-		return scanMarkets(rows, err)
-	}
-
-	// Default: all primary markets.
-	predictions, err := a.queryMarkets(ctx)
-	if err != nil {
-		log.Printf("[Predictions] queryMarketsForUser default query failed: %v", err)
-		return nil
-	}
-	return predictions
+	rows, err := a.db.Query(ctx, `
+		SELECT
+			id, COALESCE(source, 'kalshi'), ticker, COALESCE(event_ticker, ''),
+			COALESCE(event_title, ''), COALESCE(event_rank, 1),
+			COALESCE(category, 'Other'), COALESCE(title, ''), COALESCE(subtitle, ''),
+			COALESCE(yes_price, 0), COALESCE(yes_bid, 0), COALESCE(yes_ask, 0),
+			COALESCE(prev_yes_price, 0), COALESCE(volume, 0), COALESCE(open_interest, 0),
+			COALESCE(status, ''), COALESCE(result, ''), close_time,
+			COALESCE(link, ''), COALESCE(updated_at, created_at)
+		FROM markets
+		WHERE ((is_primary = true OR event_rank = 2)
+		       AND (cardinality($1::text[]) = 0 OR category = ANY($1)))
+		   OR ticker = ANY($2)
+		ORDER BY volume DESC, ticker ASC
+	`, categories, favorites)
+	return scanMarkets(rows, err)
 }
 
 // scanMarkets scans a markets result set into a slice of Prediction. It accepts

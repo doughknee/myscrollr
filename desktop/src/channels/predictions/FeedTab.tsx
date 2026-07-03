@@ -42,6 +42,7 @@ import {
 } from "./watchlist";
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
+import { useChannelConfig } from "../../hooks/useChannelConfig";
 import {
   applyPredictionsPipeline,
   groupByEvent,
@@ -50,6 +51,7 @@ import {
   type PredictionsSortKey,
 } from "./view";
 import type { Prediction, FeedTabProps, ChannelManifest } from "../../types";
+import type { ChannelType } from "../../api/client";
 import { shouldShowOnFeed } from "../../preferences";
 import type { PredictionsDisplayPrefs } from "../../preferences";
 
@@ -100,9 +102,19 @@ function formatDelta(delta: number): string {
 
 // ── FeedTab ──────────────────────────────────────────────────────
 
-function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabProps) {
+function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure, widgetId }: FeedTabProps) {
   const { prefs } = useShell();
   const dp = prefs.channelDisplay.predictions;
+
+  // Watchlist mirror (v1.1.4 round 3): stars are local, but the server
+  // must know them so a starred market survives Configure's category
+  // narrowing (queryMarketsForUser unions favorites into the payload).
+  // config.favorites is that mirror — written on every toggle, never
+  // shown as its own UI.
+  const { updateItems: mirrorFavorites } = useChannelConfig<string[]>(
+    (widgetId ?? "predictions") as ChannelType,
+    "favorites",
+  );
 
   // The caller (Home or Source page) hints at a default mode, but the
   // user's per-channel feedDensity pref wins when set — so the same
@@ -131,13 +143,17 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
   // Records prices for sparklines + fires edge-triggered price alerts (toast).
   usePredictionAlerts(markets, alerts);
 
-  const toggleWatch = useCallback((ticker: string) => {
-    setWatchlist((prev) => {
-      const next = withToggled(prev, ticker);
-      saveWatchlist(next);
-      return next;
-    });
-  }, []);
+  const toggleWatch = useCallback(
+    (ticker: string) => {
+      setWatchlist((prev) => {
+        const next = withToggled(prev, ticker);
+        saveWatchlist(next);
+        mirrorFavorites(next);
+        return next;
+      });
+    },
+    [mirrorFavorites],
+  );
 
   const addAlertCb = useCallback(
     (input: { ticker: string; label: string; comparator: AlertComparator; threshold: number }) => {
@@ -228,10 +244,24 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
     [markets, selectedCategories, categoryMap, sortKey],
   );
 
-  // Watchlist lens narrows the filtered list to starred markets.
+  // Watchlist lens: starred markets, deliberately UNFILTERED by any
+  // category selection (client chips here or Configure's server-side
+  // narrowing) — a star means "always show me this" (v1.1.4 round 3).
+  // Sort still applies so the lens matches the grid's ordering.
   const lensItems = useMemo(
-    () => (lens === "watchlist" ? filtered.filter((m) => watchedSet.has(m.ticker)) : filtered),
-    [filtered, lens, watchedSet],
+    () =>
+      lens === "watchlist"
+        ? applyPredictionsPipeline(
+            markets.filter((m) => watchedSet.has(m.ticker)),
+            {
+              directionFilter: "all",
+              selectedCategories: new Set<string>(),
+              categoryMap,
+              sortKey,
+            },
+          )
+        : filtered,
+    [filtered, lens, watchedSet, markets, categoryMap, sortKey],
   );
 
   // Comfort mode renders Kalshi-style EVENT cards (v1.1.4): the sorted
@@ -858,9 +888,11 @@ const EventCard = memo(function EventCard({
         {event.title}
       </span>
 
-      {/* Outcome legs. Binary events are ONE market whose "No" side is
-          implicit (100 - yes), so a lone Yes leg gets a synthetic No row
-          — mirroring Kalshi's own Yes/No pair — instead of sitting alone. */}
+      {/* Outcome legs. ANY single-leg event gets a synthetic No row —
+          a lone market's No side is always its complement (100 - yes),
+          whether the leg is "Yes", "Reza Pahlavi", or "Before Jan 1,
+          2027" — mirroring Kalshi's own Yes/No pair instead of leaving
+          one row stranded. */}
       <div className="flex flex-col gap-1">
         {event.outcomes.map((m) => (
           <OutcomeRow
@@ -872,17 +904,16 @@ const EventCard = memo(function EventCard({
             onOpenDetail={onOpenDetail}
           />
         ))}
-        {event.outcomes.length === 1 &&
-          (event.outcomes[0].title ?? "").toLowerCase() === "yes" && (
-            <OutcomeRow
-              market={event.outcomes[0]}
-              display={display}
-              watched={watchedSet.has(event.outcomes[0].ticker)}
-              onToggleWatch={onToggleWatch}
-              onOpenDetail={onOpenDetail}
-              syntheticNo
-            />
-          )}
+        {event.outcomes.length === 1 && (
+          <OutcomeRow
+            market={event.outcomes[0]}
+            display={display}
+            watched={watchedSet.has(event.outcomes[0].ticker)}
+            onToggleWatch={onToggleWatch}
+            onOpenDetail={onOpenDetail}
+            syntheticNo
+          />
+        )}
       </div>
 
       {/* Footer: summed volume across legs */}

@@ -93,13 +93,18 @@ export default function PredictionsConfigPanel({
 
   const [watchlist, setWatchlist] = useState<string[]>(() => getWatchlist());
 
-  const unstar = useCallback((ticker: string) => {
-    setWatchlist((prev) => {
-      const next = withToggled(prev, ticker);
-      saveWatchlist(next);
-      return next;
-    });
-  }, []);
+  const unstar = useCallback(
+    (ticker: string) => {
+      setWatchlist((prev) => {
+        const next = withToggled(prev, ticker);
+        saveWatchlist(next);
+        // Keep the server mirror in step (see the sync note below).
+        updateFavorites(next);
+        return next;
+      });
+    },
+    [updateFavorites],
+  );
 
   // Resolve display titles: live payload first (has event_title), then
   // the catalog, then the raw ticker.
@@ -113,26 +118,34 @@ export default function PredictionsConfigPanel({
     [markets, catalog],
   );
 
-  // ── One-shot pins → stars migration ───────────────────────────
-  // The old Configure wrote server-side `favorites`; those pins now
-  // live where every other star lives. Runs once when legacy pins
-  // exist, merges them locally, clears the server slot.
+  // ── Watchlist ↔ server sync ───────────────────────────────────
+  // `config.favorites` is the watchlist's SERVER MIRROR (v1.1.4 r3),
+  // not its own feature: the dashboard query unions these tickers into
+  // the payload so a starred market survives Configure's category
+  // narrowing. On mount, merge both directions once — this also
+  // absorbs pre-1.1.4 pins from the old Configure into the stars, with
+  // a toast when that actually imports something new.
   const migratedRef = useRef(false);
   useEffect(() => {
+    if (migratedRef.current) return;
+    migratedRef.current = true;
     const favorites = Array.isArray(config?.favorites)
       ? config.favorites
       : [];
-    if (migratedRef.current || favorites.length === 0) return;
-    migratedRef.current = true;
     const current = getWatchlist();
     const merged = Array.from(new Set([...current, ...favorites]));
-    saveWatchlist(merged);
-    setWatchlist(merged);
-    updateFavorites([]);
-    toast.success(
-      `Moved ${favorites.length} pinned market${favorites.length === 1 ? "" : "s"} to your watchlist`,
-      { description: "Pins and stars are one list now." },
-    );
+    const imported = merged.length - current.length;
+    if (imported > 0) {
+      saveWatchlist(merged);
+      setWatchlist(merged);
+      toast.success(
+        `Moved ${imported} pinned market${imported === 1 ? "" : "s"} to your watchlist`,
+        { description: "Pins and stars are one list now." },
+      );
+    }
+    if (merged.length !== favorites.length) {
+      updateFavorites(merged);
+    }
   }, [config?.favorites, updateFavorites]);
 
   // ── Handlers ───────────────────────────────────────────────────
