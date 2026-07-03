@@ -5,6 +5,30 @@ import (
 	"testing"
 )
 
+func TestFairShareSideSplit(t *testing.T) {
+	tests := []struct {
+		perLeague, wantUp, wantDown int
+	}{
+		{60, 30, 30}, // single-league widget at the dashboard limit
+		{10, 5, 5},   // six leagues at limit 60
+		{5, 3, 2},    // odd share — the extra slot goes to upcoming
+		{3, 2, 1},
+		{2, 1, 1}, // MinPerLeagueShare floor — both sides stay visible
+		{1, 1, 0}, // degenerate: upcoming wins the only slot
+	}
+	for _, tt := range tests {
+		up, down := fairShareSideSplit(tt.perLeague)
+		if up != tt.wantUp || down != tt.wantDown {
+			t.Errorf("fairShareSideSplit(%d) = (%d, %d), want (%d, %d)",
+				tt.perLeague, up, down, tt.wantUp, tt.wantDown)
+		}
+		if up+down != tt.perLeague {
+			t.Errorf("fairShareSideSplit(%d): sides sum to %d, must equal the share",
+				tt.perLeague, up+down)
+		}
+	}
+}
+
 func TestExtractLeaguesFromConfig(t *testing.T) {
 	tests := []struct {
 		name  string

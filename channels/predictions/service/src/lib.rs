@@ -40,8 +40,14 @@ const RECONNECT_BACKOFF: Duration = Duration::from_secs(60);
 const EVENTS_PAGE_LIMIT: u32 = 200;
 
 /// Cap on how many of the most-liquid markets the sweep ingests, so we keep
-/// the ticker to the liquid head rather than the long tail.
-const CATALOG_MAX_MARKETS: usize = 200;
+/// the ticker to the liquid head rather than the long tail. Sized for
+/// ~120 events at two outcomes each (v1.1.4 event cards).
+const CATALOG_MAX_MARKETS: usize = 240;
+
+/// How many outcomes each event keeps (v1.1.4): the desktop renders
+/// Kalshi-style event cards with the top two legs. Rank 1 is `is_primary`
+/// for back-compat with pre-1.1.4 consumers.
+const MARKETS_PER_EVENT: u32 = 2;
 
 pub async fn start_predictions_services(
     pool: Arc<PgPool>,
@@ -144,9 +150,11 @@ async fn catalog_sweep(state: &PredictionsState) {
     // multivariate contracts that fill the first many pages, so the noise
     // filter below would drop the whole sweep to zero. The events endpoint
     // returns the curated, human-readable grouping carrying a per-event
-    // category plus the event's nested markets — exactly what a ticker wants.
-    // (Each tuple is (market, event_category).)
-    let mut all: Vec<(Market, Option<String>)> = Vec::new();
+    // category, the event's TITLE (the human question — stored per market
+    // row since v1.1.4 so the desktop can headline it), plus the event's
+    // nested markets — exactly what a ticker wants.
+    // (Each tuple is (market, event_category, event_title).)
+    let mut all: Vec<(Market, Option<String>, String)> = Vec::new();
     let mut cursor = String::new();
     let mut pages = 0u32;
 
@@ -167,7 +175,7 @@ async fn catalog_sweep(state: &PredictionsState) {
                         if m.event_ticker.is_empty() {
                             m.event_ticker = ev.event_ticker.clone();
                         }
-                        all.push((m, cat.clone()));
+                        all.push((m, cat.clone(), ev.title.clone()));
                     }
                 }
                 pages += 1;
@@ -196,31 +204,46 @@ async fn catalog_sweep(state: &PredictionsState) {
     );
 
     // Filter: drop KXMVE* multivariate tickers and zero-volume markets, sort
-    // by volume descending so the most-liquid markets win is_primary, then cap
-    // to the liquid head.
-    let mut markets: Vec<(Market, Option<String>)> = all
+    // by volume descending so the most-liquid markets rank first.
+    let mut markets: Vec<(Market, Option<String>, String)> = all
         .into_iter()
-        .filter(|(m, _)| !m.ticker.starts_with("KXMVE"))
-        .filter(|(m, _)| fp_volume(m.volume_fp.as_deref()) > 0)
+        .filter(|(m, _, _)| !m.ticker.starts_with("KXMVE"))
+        .filter(|(m, _, _)| fp_volume(m.volume_fp.as_deref()) > 0)
         .collect();
 
-    markets.sort_by(|(a, _), (b, _)| {
+    markets.sort_by(|(a, _, _), (b, _, _)| {
         fp_volume(b.volume_fp.as_deref()).cmp(&fp_volume(a.volume_fp.as_deref()))
     });
-    markets.truncate(CATALOG_MAX_MARKETS);
+
+    // v1.1.4: keep the top MARKETS_PER_EVENT outcomes per event (rank 1 =
+    // is_primary), capped to the liquid head overall. Volume order means
+    // an event's rank-1 leg is always its most-liquid one.
+    let mut event_counts: std::collections::HashMap<String, u32> =
+        std::collections::HashMap::new();
+    let mut selected: Vec<(Market, Option<String>, String, u32)> = Vec::new();
+    for (m, cat, ev_title) in markets {
+        let count = event_counts.entry(m.event_ticker.clone()).or_insert(0);
+        if *count >= MARKETS_PER_EVENT {
+            continue;
+        }
+        *count += 1;
+        selected.push((m, cat, ev_title, *count));
+        if selected.len() >= CATALOG_MAX_MARKETS {
+            break;
+        }
+    }
 
     let mut persisted = 0u64;
-    let mut seen_events: std::collections::HashSet<String> = std::collections::HashSet::new();
 
-    for (m, ev_category) in &markets {
+    for (m, ev_category, ev_title, rank) in &selected {
         // Prefer Kalshi's human-readable event category; fall back to the
         // ticker-prefix heuristic when an event carries none.
         let category = ev_category
             .clone()
             .unwrap_or_else(|| derive_category(&m.ticker, &m.event_ticker));
 
-        // The first (highest-volume) market per event is the representative.
-        let is_primary = seen_events.insert(m.event_ticker.clone());
+        // Rank 1 (highest-volume leg of its event) stays the representative.
+        let is_primary = *rank == 1;
 
         let series = series_prefix(&m.ticker);
         let title = m
@@ -248,6 +271,8 @@ async fn catalog_sweep(state: &PredictionsState) {
             open_time: parse_ts(m.open_time.as_deref()),
             close_time: parse_ts(m.close_time.as_deref()),
             link: Some(market_link(series.as_deref(), &m.event_ticker)),
+            event_title: non_empty(ev_title),
+            event_rank: Some(*rank as i16),
         };
 
         match upsert_market(&state.pool, &upsert, true).await {
