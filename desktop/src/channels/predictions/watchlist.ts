@@ -8,6 +8,7 @@
  * unit-tested in isolation and never spams on every tick.
  */
 import { loadPref, savePref } from "../../preferences";
+import { onStoreChange } from "../../lib/store";
 
 const WATCHLIST_KEY = "predictions.watchlist";
 const ALERTS_KEY = "predictions.alerts";
@@ -17,6 +18,19 @@ const ALERTS_KEY = "predictions.alerts";
 export function getWatchlist(): string[] {
   const raw = loadPref<unknown>(WATCHLIST_KEY, []);
   return Array.isArray(raw) ? raw.filter((t): t is string => typeof t === "string") : [];
+}
+
+/**
+ * Subscribe to watchlist changes from ANY webview. The pref store's cache
+ * is per-window — the ticker window never sees stars toggled in the main
+ * window unless it subscribes to the underlying Tauri-store key. Returns
+ * an unsubscribe function. (`loadPref` prefixes keys with "scrollr:", so
+ * the raw store key is spelled out here to match.)
+ */
+export function onWatchlistChange(callback: (list: string[]) => void): () => void {
+  return onStoreChange<unknown>(`scrollr:${WATCHLIST_KEY}`, () => {
+    callback(getWatchlist());
+  });
 }
 
 export function saveWatchlist(list: string[]): void {

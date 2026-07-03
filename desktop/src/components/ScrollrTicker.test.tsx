@@ -24,6 +24,15 @@ vi.mock("motion/react", () => ({
   },
 }));
 
+// The watchlist subscription reaches the Tauri store plugin (onKeyChange
+// lazily loads the store file), which crashes outside a Tauri webview.
+// Reads are fine (in-memory cache) — only the listener needs stubbing.
+vi.mock("../lib/store", () => ({
+  getStore: vi.fn((_key: string, fallback: unknown) => fallback),
+  setStore: vi.fn(),
+  onStoreChange: vi.fn(() => vi.fn()),
+}));
+
 const widgetData: WidgetTickerData = {
   clock: [],
   timer: [
