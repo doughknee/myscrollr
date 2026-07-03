@@ -55,6 +55,8 @@ const (
 			COALESCE(source, 'kalshi'),
 			ticker,
 			COALESCE(event_ticker, ''),
+			COALESCE(event_title, ''),
+			COALESCE(event_rank, 1),
 			COALESCE(category, 'Other'),
 			COALESCE(title, ''),
 			COALESCE(subtitle, ''),
@@ -70,7 +72,7 @@ const (
 			COALESCE(link, ''),
 			COALESCE(updated_at, created_at)
 		FROM markets
-		WHERE is_primary = true
+		WHERE is_primary = true OR event_rank = 2
 		ORDER BY volume DESC, ticker ASC`
 )
 
@@ -352,7 +354,8 @@ func (a *App) queryMarkets(ctx context.Context) ([]Prediction, error) {
 	for rows.Next() {
 		var p Prediction
 		if err := rows.Scan(
-			&p.ID, &p.Source, &p.Ticker, &p.EventTicker, &p.Category, &p.Title,
+			&p.ID, &p.Source, &p.Ticker, &p.EventTicker, &p.EventTitle,
+			&p.EventRank, &p.Category, &p.Title,
 			&p.Subtitle, &p.YesPrice, &p.YesBid, &p.YesAsk, &p.PrevYesPrice,
 			&p.Volume, &p.OpenInterest, &p.Status, &p.Result, &p.CloseTime,
 			&p.Link, &p.UpdatedAt,
@@ -379,6 +382,7 @@ func (a *App) queryMarketsForUser(favorites, categories []string) []Prediction {
 		rows, err := a.db.Query(ctx, `
 			SELECT
 				id, COALESCE(source, 'kalshi'), ticker, COALESCE(event_ticker, ''),
+				COALESCE(event_title, ''), COALESCE(event_rank, 1),
 				COALESCE(category, 'Other'), COALESCE(title, ''), COALESCE(subtitle, ''),
 				COALESCE(yes_price, 0), COALESCE(yes_bid, 0), COALESCE(yes_ask, 0),
 				COALESCE(prev_yes_price, 0), COALESCE(volume, 0), COALESCE(open_interest, 0),
@@ -395,13 +399,14 @@ func (a *App) queryMarketsForUser(favorites, categories []string) []Prediction {
 		rows, err := a.db.Query(ctx, `
 			SELECT
 				id, COALESCE(source, 'kalshi'), ticker, COALESCE(event_ticker, ''),
+				COALESCE(event_title, ''), COALESCE(event_rank, 1),
 				COALESCE(category, 'Other'), COALESCE(title, ''), COALESCE(subtitle, ''),
 				COALESCE(yes_price, 0), COALESCE(yes_bid, 0), COALESCE(yes_ask, 0),
 				COALESCE(prev_yes_price, 0), COALESCE(volume, 0), COALESCE(open_interest, 0),
 				COALESCE(status, ''), COALESCE(result, ''), close_time,
 				COALESCE(link, ''), COALESCE(updated_at, created_at)
 			FROM markets
-			WHERE is_primary = true AND category = ANY($1)
+			WHERE (is_primary = true OR event_rank = 2) AND category = ANY($1)
 			ORDER BY volume DESC, ticker ASC
 		`, categories)
 		return scanMarkets(rows, err)
@@ -429,7 +434,8 @@ func scanMarkets(rows pgx.Rows, err error) []Prediction {
 	for rows.Next() {
 		var p Prediction
 		if err := rows.Scan(
-			&p.ID, &p.Source, &p.Ticker, &p.EventTicker, &p.Category, &p.Title,
+			&p.ID, &p.Source, &p.Ticker, &p.EventTicker, &p.EventTitle,
+			&p.EventRank, &p.Category, &p.Title,
 			&p.Subtitle, &p.YesPrice, &p.YesBid, &p.YesAsk, &p.PrevYesPrice,
 			&p.Volume, &p.OpenInterest, &p.Status, &p.Result, &p.CloseTime,
 			&p.Link, &p.UpdatedAt,
