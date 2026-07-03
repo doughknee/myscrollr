@@ -12,7 +12,7 @@ stays at 1.1.0 and nobody gets force-updated.
 |---|---|---|---|
 | ~~v1.1.1~~ | Paper Cuts | ✅ **Shipped 2026-07-02** — grew into the catalog redesign (absorbed half of The Library) | S→M |
 | ~~v1.1.2~~ | The Library | ✅ **Shipped 2026-07-02** — slots-only monetization everywhere, fantasy gate retired | S–M |
-| v1.1.3 | Time Controls | Day-range windows replace vague feed toggles | M |
+| ~~v1.1.3~~ | Time Controls | ✅ **Shipped 2026-07-03** — day windows for sports/news + 7-day score retention (+ pricing-page overhaul rode along) | M |
 | v1.1.4 | Kalshi Grows Up | Predictions widget behaves like a widget | M |
 | v1.2.0 | Double-Decker 2.0 | Multi-row ticker rebuilt around widgets | L |
 | — | Website rides along | Pricing rewrite ships with v1.1.2; screenshots after v1.1.4 | S–M |
@@ -100,7 +100,25 @@ PostHog needed).
 
 ---
 
-## v1.1.3 — Time Controls
+## ✅ v1.1.3 — Time Controls (shipped 2026-07-03, `desktop-v1.1.3`)
+
+Shipped as planned: per-widget day windows for sports (calendar-day anchored,
+live games always show, presets + steppers) and news ("last N days"), the
+upcoming/final toggles retired with automatic migration of saved values, and
+finals now retained **7 days** server-side (was 12 hours) so the lookback has
+data — the prod backlog fills over the first week post-deploy. The ticker
+gained per-widget rss display override support (previously global-only).
+A pricing-page overhaul rode along: plan cards reduced to the widget-cap
+stat (tier-tinted, pointer-tilt), compare table trimmed six rows, annual
+sold as "4 months free."
+
+**Carried to v1.1.4 (first item):** the dashboard fair-share query ranks
+finals after ALL pre rows, so a high-volume league (MLB) fills its payload
+share with upcoming fixtures and the ticker's "days back" under-delivers.
+Fix = split each league share between soonest-pre and newest-final (see
+KNOWN GAP comment in channels/sports/api/sports.go).
+
+**Original scope notes (historical)**
 
 **Goal:** replace vague "upcoming / final" style toggles with a control people
 actually think in: *how many days back, how many days ahead.*
