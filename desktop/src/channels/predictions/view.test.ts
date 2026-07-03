@@ -3,6 +3,7 @@ import {
   sortPredictions,
   applyPredictionsPipeline,
   selectPredictionsForTicker,
+  groupByEvent,
   priceDelta,
   formatProbability,
   formatCentsPrice,
@@ -10,6 +11,7 @@ import {
   marketLabel,
   isResolved,
   selectResolvedToday,
+  TICKER_FALLBACK_LIMIT,
 } from "./view";
 import type { Prediction } from "../../types";
 import type { PredictionsDisplayPrefs } from "../../preferences";
@@ -364,5 +366,103 @@ describe("isResolved / selectResolvedToday", () => {
       mk({ id: "future", status: "settled", updated_at: "2026-06-26T18:00:00Z" }),
     ];
     expect(selectResolvedToday(items, now)).toHaveLength(0);
+  });
+});
+
+// ── Ticker scoping (v1.1.4: watchlist-first, top-N fallback) ────
+
+describe("selectPredictionsForTicker scoping", () => {
+  it("shows only watched markets when the watchlist has any — any rank", () => {
+    const items = [
+      mk({ id: "A", event_rank: 1, volume: 100 }),
+      mk({ id: "B", event_rank: 2, volume: 90 }),
+      mk({ id: "C", event_rank: 1, volume: 80 }),
+    ];
+    const out = selectPredictionsForTicker(
+      items,
+      { ...DEFAULT_PREFS, defaultSort: "volume" },
+      new Set(["B"]),
+    );
+    expect(out.map((p) => p.id)).toEqual(["B"]);
+  });
+
+  it("falls back to the top rank-1 legs, capped, when nothing is starred", () => {
+    const items = Array.from({ length: 40 }, (_, i) =>
+      mk({
+        id: `T${String(i).padStart(2, "0")}`,
+        event_rank: i % 2 === 0 ? 1 : 2,
+        volume: 1000 - i,
+      }),
+    );
+    const out = selectPredictionsForTicker(
+      items,
+      { ...DEFAULT_PREFS, defaultSort: "volume" },
+      new Set(),
+    );
+    expect(out.length).toBe(TICKER_FALLBACK_LIMIT);
+    expect(out.every((p) => (p.event_rank ?? 1) === 1)).toBe(true);
+    expect(out[0].id).toBe("T00"); // highest volume first
+  });
+
+  it("treats missing event_rank as rank 1 (pre-backfill rows)", () => {
+    const items = [mk({ id: "LEGACY", volume: 5 })];
+    const out = selectPredictionsForTicker(
+      items,
+      { ...DEFAULT_PREFS, defaultSort: "volume" },
+      new Set(),
+    );
+    expect(out.map((p) => p.id)).toEqual(["LEGACY"]);
+  });
+});
+
+// ── Event grouping (v1.1.4 Kalshi-style cards) ──────────────────
+
+describe("groupByEvent", () => {
+  it("folds legs into their event, rank-ordered, volume summed", () => {
+    const items = [
+      mk({
+        id: "WC-FR",
+        event_ticker: "WC",
+        event_title: "FIFA World Cup Winner",
+        event_rank: 1,
+        title: "France",
+        volume: 300,
+      }),
+      mk({ id: "SOLO", title: "Yes", volume: 50 }),
+      mk({
+        id: "WC-AR",
+        event_ticker: "WC",
+        event_title: "FIFA World Cup Winner",
+        event_rank: 2,
+        title: "Argentina",
+        volume: 200,
+      }),
+    ];
+    const events = groupByEvent(items);
+    expect(events).toHaveLength(2);
+
+    const wc = events.find((e) => e.eventTicker === "WC")!;
+    expect(wc.title).toBe("FIFA World Cup Winner");
+    expect(wc.outcomes.map((o) => o.title)).toEqual(["France", "Argentina"]);
+    expect(wc.volume).toBe(500);
+  });
+
+  it("preserves the input ordering by each event's lead leg", () => {
+    const items = [
+      mk({ id: "B1", event_ticker: "B", event_rank: 1, volume: 900 }),
+      mk({ id: "A1", event_ticker: "A", event_rank: 1, volume: 800 }),
+      mk({ id: "B2", event_ticker: "B", event_rank: 2, volume: 700 }),
+    ];
+    expect(groupByEvent(items).map((e) => e.eventTicker)).toEqual(["B", "A"]);
+  });
+
+  it("falls back to the leg title for pre-backfill rows without event_title", () => {
+    const items = [mk({ id: "OLD", event_ticker: "EV-OLD", title: "Atlanta" })];
+    expect(groupByEvent(items)[0].title).toBe("Atlanta");
+  });
+
+  it("keys markets without an event_ticker by their own ticker", () => {
+    const items = [mk({ id: "LONE", title: "Yes" })];
+    expect(groupByEvent(items)[0].eventTicker).toBe("LONE");
   });
 });

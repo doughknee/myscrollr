@@ -8,10 +8,16 @@ import "time"
 // derived from Kalshi's *_dollars decimal strings. JSON keys mirror the
 // `markets` table column names (snake_case). See channels/predictions/CONTRACT.md.
 type Prediction struct {
-	ID           string     `json:"id"`
-	Source       string     `json:"source"`
-	Ticker       string     `json:"ticker"`
-	EventTicker  string     `json:"event_ticker,omitempty"`
+	ID          string `json:"id"`
+	Source      string `json:"source"`
+	Ticker      string `json:"ticker"`
+	EventTicker string `json:"event_ticker,omitempty"`
+	// EventTitle is the event's human question ("More tech layoffs in
+	// 2026 than in 2025?") — the market's own Title is just its leg
+	// ("Yes", "Atlanta"). EventRank orders legs within an event
+	// (1 = most liquid / is_primary, 2 = second outcome). v1.1.4.
+	EventTitle   string     `json:"event_title,omitempty"`
+	EventRank    int        `json:"event_rank,omitempty"`
 	Category     string     `json:"category,omitempty"`
 	Title        string     `json:"title"`
 	Subtitle     string     `json:"subtitle,omitempty"`

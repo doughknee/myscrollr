@@ -67,15 +67,80 @@ export function sortPredictions(
 // ── Pure: selector for the ticker ────────────────────────────────
 
 /**
- * Baseline pipeline used by the ticker: applies the user's `defaultSort`
- * from Display prefs. Ticker does not expose interactive filters.
+ * Ticker chip budget when the user has no watchlist (v1.1.4): the top N
+ * rank-1 markets by the chosen sort — a briefing, not the old firehose
+ * of every ingested market. One star flips the rail to watchlist-only.
+ */
+export const TICKER_FALLBACK_LIMIT = 15;
+
+/**
+ * Baseline pipeline used by the ticker (v1.1.4 scoping):
+ *   - Watchlist non-empty → starred markets only (any event rank).
+ *   - Otherwise → the top TICKER_FALLBACK_LIMIT rank-1 legs (one per
+ *     event) by the user's `defaultSort`.
  */
 export function selectPredictionsForTicker(
   items: Prediction[],
   prefs: PredictionsDisplayPrefs,
+  watchlist?: ReadonlySet<string>,
 ): Prediction[] {
   const sortKey: PredictionsSortKey = prefs.defaultSort ?? "movers";
-  return sortPredictions(items, sortKey);
+  if (watchlist && watchlist.size > 0) {
+    return sortPredictions(
+      items.filter((p) => watchlist.has(p.ticker)),
+      sortKey,
+    );
+  }
+  const primaries = items.filter((p) => (p.event_rank ?? 1) === 1);
+  return sortPredictions(primaries, sortKey).slice(0, TICKER_FALLBACK_LIMIT);
+}
+
+// ── Pure: event grouping (v1.1.4 Kalshi-style cards) ─────────────
+
+export interface PredictionEvent {
+  eventTicker: string;
+  /** The event's human question; falls back to the lead leg's title for
+   *  rows ingested before the event_title backfill. */
+  title: string;
+  category?: string;
+  /** Rank-ordered legs (the server sends at most two per event). */
+  outcomes: Prediction[];
+  /** Summed across legs — the card's volume line. */
+  volume: number;
+  closeTime?: string | null;
+}
+
+/**
+ * Group a market list into events, preserving the input ordering by each
+ * event's LEAD leg (so an upstream sort applies to the cards). Markets
+ * without an event_ticker become single-outcome events keyed by ticker.
+ */
+export function groupByEvent(items: Prediction[]): PredictionEvent[] {
+  const byEvent = new Map<string, PredictionEvent>();
+  for (const p of items) {
+    const key = p.event_ticker || p.ticker;
+    const existing = byEvent.get(key);
+    if (!existing) {
+      byEvent.set(key, {
+        eventTicker: key,
+        title: p.event_title || p.title,
+        category: p.category,
+        outcomes: [p],
+        volume: num(p.volume),
+        closeTime: p.close_time ?? null,
+      });
+      continue;
+    }
+    existing.outcomes.push(p);
+    existing.volume += num(p.volume);
+    if (!existing.title && (p.event_title || p.title)) {
+      existing.title = p.event_title || p.title;
+    }
+  }
+  for (const ev of byEvent.values()) {
+    ev.outcomes.sort((a, b) => (a.event_rank ?? 1) - (b.event_rank ?? 1));
+  }
+  return Array.from(byEvent.values());
 }
 
 // ── Pipeline for FeedTab ─────────────────────────────────────────

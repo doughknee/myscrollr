@@ -177,6 +177,8 @@ pub struct MarketRow {
     pub title: Option<String>,
     pub subtitle: Option<String>,
     pub category: Option<String>,
+    pub event_title: Option<String>,
+    pub event_rank: Option<i16>,
 }
 
 /// The full set of displayed fields for a market upsert. All optional so a
@@ -202,6 +204,12 @@ pub struct MarketUpsert {
     pub open_time: Option<chrono::DateTime<Utc>>,
     pub close_time: Option<chrono::DateTime<Utc>>,
     pub link: Option<String>,
+    /// Event context (v1.1.4): the event's human question + this market's
+    /// rank within its event (1 = primary, 2 = second outcome). Only the
+    /// catalog sweep sets these; WS ticks leave them None (COALESCE keeps
+    /// the stored value).
+    pub event_title: Option<String>,
+    pub event_rank: Option<i16>,
 }
 
 impl MarketUpsert {
@@ -222,7 +230,7 @@ async fn get_market_row(pool: &Arc<PgPool>, id: &str) -> Result<Option<MarketRow
     let mut conn = pool.acquire().await?;
     let row: Option<MarketRow> = query_as(
         "SELECT id, yes_price, yes_bid, yes_ask, volume, volume_24h, open_interest,
-                status, result, title, subtitle, category
+                status, result, title, subtitle, category, event_title, event_rank
          FROM markets WHERE id = $1",
     )
     .bind(id)
@@ -250,6 +258,8 @@ fn displayed_field_changed(prev: &MarketRow, next: &MarketUpsert) -> bool {
         || changed!(title)
         || changed!(subtitle)
         || changed!(category)
+        || changed!(event_title)
+        || changed!(event_rank)
 }
 
 /// Upsert a market into the `markets` display table with CHANGE-DETECTION.
@@ -305,6 +315,8 @@ pub async fn upsert_market(
                     open_time     = COALESCE($17, open_time),
                     close_time    = COALESCE($18, close_time),
                     link          = COALESCE($19, link),
+                    event_title   = COALESCE($20, event_title),
+                    event_rank    = COALESCE($21, event_rank),
                     updated_at    = now()
                  WHERE id = $1",
             )
@@ -327,6 +339,8 @@ pub async fn upsert_market(
             .bind(upsert.open_time)
             .bind(upsert.close_time)
             .bind(&upsert.link)
+            .bind(&upsert.event_title)
+            .bind(upsert.event_rank)
             .execute(&mut *conn)
             .await
             .context("update market")?;
@@ -344,10 +358,11 @@ pub async fn upsert_market(
                     id, source, ticker, event_ticker, series_ticker, category, title,
                     subtitle, yes_price, yes_bid, yes_ask, prev_yes_price, volume,
                     volume_24h, open_interest, status, result, is_primary, open_time,
-                    close_time, link
+                    close_time, link, event_title, event_rank
                  ) VALUES (
                     $1, 'kalshi', $2, $3, $4, $5, $6, $7, $8, $9, $10, $8, $11, $12, $13,
-                    $14, $15, COALESCE($16, TRUE), $17, $18, $19
+                    $14, $15, COALESCE($16, TRUE), $17, $18, $19,
+                    COALESCE($20, ''), COALESCE($21, 1)
                  )
                  ON CONFLICT (id) DO NOTHING",
             )
@@ -370,6 +385,8 @@ pub async fn upsert_market(
             .bind(upsert.open_time)
             .bind(upsert.close_time)
             .bind(&upsert.link)
+            .bind(&upsert.event_title)
+            .bind(upsert.event_rank)
             .execute(&mut *conn)
             .await
             .context("insert market")?;
@@ -574,6 +591,8 @@ mod tests {
             title: None,
             subtitle: None,
             category: None,
+            event_title: None,
+            event_rank: None,
         }
     }
 
@@ -608,5 +627,20 @@ mod tests {
         let mut next = MarketUpsert::new("TEST");
         next.status = Some("closed".into());
         assert!(displayed_field_changed(&prev, &next));
+    }
+
+    #[test]
+    fn event_context_change_detected() {
+        // v1.1.4: the sweep back-filling event_title (or a rank flip when
+        // volumes reorder an event's legs) must count as a displayed
+        // change so CDC broadcasts it.
+        let prev = row(Some(62), Some("active"));
+        let mut next = MarketUpsert::new("TEST");
+        next.event_title = Some("More tech layoffs in 2026 than in 2025?".into());
+        assert!(displayed_field_changed(&prev, &next));
+
+        let mut rank_only = MarketUpsert::new("TEST");
+        rank_only.event_rank = Some(2);
+        assert!(displayed_field_changed(&prev, &rank_only));
     }
 }

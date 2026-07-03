@@ -446,12 +446,10 @@ func (a *App) handleInternalDashboard(c *fiber.Ctx) error {
 
 	favoriteTeams := a.getUserFavoriteTeams(userSub)
 	// Home dashboard uses fair-share so every selected league is visible
-	// within the 60-row payload, regardless of relative volume. KNOWN GAP
-	// (v1.1.3): the priority ORDER ranks finals after ALL pre rows, so a
-	// high-volume league (MLB: ~15 fixtures/day x 8 days ingested) fills
-	// its share with live+pre and the ticker's "days back" window sees
-	// few or no finals. Fix = interleave recency (e.g. split each share
-	// between soonest-pre and newest-final) — queued for v1.1.4.
+	// within the 60-row payload, regardless of relative volume. Each
+	// league's share splits between soonest-upcoming and newest-finals
+	// (v1.1.4, fairShareSideSplit) so the day-window always has both
+	// sides to show.
 	games, err := a.queryGamesByLeagues(ctx, leagues, DashboardSportsLimit, favoriteTeams, true)
 	if err != nil {
 		log.Printf("[Sports] Dashboard query failed: %v", err)
@@ -667,13 +665,32 @@ func (a *App) queryGames(ctx context.Context, limit int, favoriteTeams map[strin
 // fixtures (e.g. Premier League, F1).
 const MinPerLeagueShare = 2
 
+// fairShareSideSplit divides a league's candidate share between the
+// UPCOMING side (live + pre, soonest first) and the PAST side (finals,
+// newest first). v1.1.4: ranking every pre row ahead of every final let
+// a high-volume league (MLB: ~15 fixtures/day x 8 days ingested) fill
+// its whole share with the future slate, starving the desktop's
+// "days back" window of finals. Upcoming gets the odd slot (ceil) —
+// when in doubt, tonight's game beats last week's score.
+//
+// No cross-side redistribution: if a side has fewer rows than its
+// share (early season, off day), the payload simply comes up short of
+// the global limit rather than backfilling — simpler, and the desktop
+// only windows what exists anyway.
+func fairShareSideSplit(perLeague int) (upcoming, past int) {
+	upcoming = (perLeague + 1) / 2
+	past = perLeague / 2
+	return upcoming, past
+}
+
 // queryGamesByLeagues fetches games for specific leagues.
 //
 // When `fairShare` is true (used by /dashboard with limit=60): each league
 // gets max(MinPerLeagueShare, ceil(limit/N)) candidate rows via a window
-// function, ranked by the standard priority (live > pre > final, favorites
-// first, soonest upcoming first). The global LIMIT then trims. This keeps
-// every selected league visible on the glanceable home row.
+// function — split between soonest-upcoming and newest-finals (see
+// fairShareSideSplit), favorites boosted within each side. The global
+// LIMIT then trims. This keeps every selected league visible on the
+// glanceable home row AND gives the v1.1.3 day-window finals to show.
 //
 // When `fairShare` is false (used by /sports with limit=200 for the full
 // channel page): a simple ORDER BY priority LIMIT query, no per-league cap.
@@ -696,6 +713,12 @@ func (a *App) queryGamesByLeagues(ctx context.Context, leagues []string, limit i
 		if perLeague < MinPerLeagueShare {
 			perLeague = MinPerLeagueShare
 		}
+		// v1.1.4: rank within (league, side) where side = upcoming
+		// (live+pre) vs past (finals/postponed), then take each side's
+		// split of the share. Within the upcoming side live games always
+		// lead; the past side is newest-first. Favorites boost inside
+		// their side, never across it.
+		upShare, downShare := fairShareSideSplit(perLeague)
 		query = fmt.Sprintf(`
 			WITH ranked AS (
 				SELECT id, league, sport, external_game_id, link,
@@ -703,14 +726,15 @@ func (a *App) queryGamesByLeagues(ctx context.Context, leagues []string, limit i
 					away_team_name, away_team_logo, away_team_score, away_team_code,
 					start_time, short_detail, state, status_short, status_long,
 					timer, venue, season,
+					(state IN ('in', 'pre')) AS upcoming_side,
 					ROW_NUMBER() OVER (
-						PARTITION BY league
+						PARTITION BY league, (state IN ('in', 'pre'))
 						ORDER BY
-							CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
+							CASE state WHEN 'in' THEN 0 ELSE 1 END,
 							CASE WHEN home_team_name = ANY($2) OR away_team_name = ANY($2) THEN 0 ELSE 1 END,
 							CASE WHEN state = 'pre' THEN start_time END ASC,
 							CASE WHEN state != 'pre' THEN start_time END DESC
-					) AS rn
+					) AS side_rn
 				FROM games
 				WHERE league = ANY($1)
 			)
@@ -721,13 +745,14 @@ func (a *App) queryGamesByLeagues(ctx context.Context, leagues []string, limit i
 				COALESCE(status_short, ''), COALESCE(status_long, ''),
 				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')
 			FROM ranked
-			WHERE rn <= %d
+			WHERE (upcoming_side AND side_rn <= %d)
+			   OR (NOT upcoming_side AND side_rn <= %d)
 			ORDER BY
 				CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
 				CASE WHEN home_team_name = ANY($2) OR away_team_name = ANY($2) THEN 0 ELSE 1 END,
 				CASE WHEN state = 'pre' THEN start_time END ASC,
 				CASE WHEN state != 'pre' THEN start_time END DESC
-			LIMIT %d`, perLeague, limit)
+			LIMIT %d`, upShare, downShare, limit)
 	} else {
 		// No per-league cap. Show every game for every selected league.
 		query = fmt.Sprintf(`

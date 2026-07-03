@@ -4,8 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -34,6 +38,14 @@ const (
 	// PredictionsCatalogCacheTTL is how long the market catalog is cached.
 	PredictionsCatalogCacheTTL = 5 * time.Minute
 
+	// CandlesticksCacheTTL bounds how often we hit Kalshi for a market's
+	// price history (v1.1.4 detail-modal chart). Candles are hourly, so
+	// five minutes keeps the modal snappy without hammering the signed API.
+	CandlesticksCacheTTL = 5 * time.Minute
+
+	// CandlesticksWindowDays is the fixed history window the modal shows.
+	CandlesticksWindowDays = 7
+
 	// RedisPredictionsSubscribersPrefix is the Redis key prefix for the
 	// channel-wide predictions subscriber set. v1 routing is a channel-wide
 	// broadcast, so the only set used is "predictions:subscribers:all"
@@ -55,6 +67,8 @@ const (
 			COALESCE(source, 'kalshi'),
 			ticker,
 			COALESCE(event_ticker, ''),
+			COALESCE(event_title, ''),
+			COALESCE(event_rank, 1),
 			COALESCE(category, 'Other'),
 			COALESCE(title, ''),
 			COALESCE(subtitle, ''),
@@ -70,7 +84,7 @@ const (
 			COALESCE(link, ''),
 			COALESCE(updated_at, created_at)
 		FROM markets
-		WHERE is_primary = true
+		WHERE is_primary = true OR event_rank = 2
 		ORDER BY volume DESC, ticker ASC`
 )
 
@@ -149,6 +163,84 @@ func (a *App) getCatalog(c *fiber.Ctx) error {
 // healthHandler proxies a health check to the internal Rust predictions service.
 func (a *App) healthHandler(c *fiber.Ctx) error {
 	return ProxyInternalHealth(c, os.Getenv("INTERNAL_PREDICTIONS_URL"))
+}
+
+// getCandlesticks returns a market's price history for the desktop
+// detail-modal chart (v1.1.4): the last CandlesticksWindowDays of hourly
+// candles, proxied from the internal Rust service (which holds the Kalshi
+// credentials) and cached in Redis. This API owns the series-ticker lookup
+// so the Rust side stays a pure signed pass-through.
+func (a *App) getCandlesticks(c *fiber.Ctx) error {
+	ticker := strings.TrimSpace(c.Params("ticker"))
+	if ticker == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+			Status: "error", Error: "ticker is required",
+		})
+	}
+	ctx := context.Background()
+
+	cacheKey := "cache:predictions:candles:" + ticker
+	if cached, err := a.rdb.Get(ctx, cacheKey).Result(); err == nil && cached != "" {
+		c.Set("X-Cache", "HIT")
+		c.Set("Content-Type", "application/json")
+		return c.SendString(cached)
+	}
+
+	var series string
+	err := a.db.QueryRow(ctx,
+		"SELECT COALESCE(series_ticker, '') FROM markets WHERE ticker = $1",
+		ticker,
+	).Scan(&series)
+	if err != nil || series == "" {
+		return c.Status(fiber.StatusNotFound).JSON(ErrorResponse{
+			Status: "error", Error: "unknown market",
+		})
+	}
+
+	internalURL := strings.TrimRight(os.Getenv("INTERNAL_PREDICTIONS_URL"), "/")
+	if internalURL == "" {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(ErrorResponse{
+			Status: "error", Error: "ingestion service not configured",
+		})
+	}
+
+	end := time.Now().Unix()
+	start := end - CandlesticksWindowDays*24*3600
+	proxyURL := fmt.Sprintf(
+		"%s/internal/candlesticks?series=%s&ticker=%s&start_ts=%d&end_ts=%d&period_interval=60",
+		internalURL, url.QueryEscape(series), url.QueryEscape(ticker), start, end,
+	)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, proxyURL, nil)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
+			Status: "error", Error: "failed to build upstream request",
+		})
+	}
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		log.Printf("[Predictions] Candlesticks proxy failed for %s: %v", ticker, err)
+		return c.Status(fiber.StatusBadGateway).JSON(ErrorResponse{
+			Status: "error", Error: "history unavailable",
+		})
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if err != nil || resp.StatusCode != http.StatusOK {
+		log.Printf("[Predictions] Candlesticks upstream %d for %s: %v", resp.StatusCode, ticker, err)
+		return c.Status(fiber.StatusBadGateway).JSON(ErrorResponse{
+			Status: "error", Error: "history unavailable",
+		})
+	}
+
+	if err := a.rdb.Set(ctx, cacheKey, string(body), CandlesticksCacheTTL).Err(); err != nil {
+		log.Printf("[Predictions] Candlesticks cache write failed for %s: %v", ticker, err)
+	}
+
+	c.Set("X-Cache", "MISS")
+	c.Set("Content-Type", "application/json")
+	return c.Send(body)
 }
 
 // =============================================================================
@@ -352,7 +444,8 @@ func (a *App) queryMarkets(ctx context.Context) ([]Prediction, error) {
 	for rows.Next() {
 		var p Prediction
 		if err := rows.Scan(
-			&p.ID, &p.Source, &p.Ticker, &p.EventTicker, &p.Category, &p.Title,
+			&p.ID, &p.Source, &p.Ticker, &p.EventTicker, &p.EventTitle,
+			&p.EventRank, &p.Category, &p.Title,
 			&p.Subtitle, &p.YesPrice, &p.YesBid, &p.YesAsk, &p.PrevYesPrice,
 			&p.Volume, &p.OpenInterest, &p.Status, &p.Result, &p.CloseTime,
 			&p.Link, &p.UpdatedAt,
@@ -368,52 +461,42 @@ func (a *App) queryMarkets(ctx context.Context) ([]Prediction, error) {
 
 // queryMarketsForUser fetches the markets that make up a user's dashboard view.
 //
-// If the user pinned specific favorites, those tickers are returned. Otherwise,
-// if the user selected categories, the enabled markets in those categories are
-// returned. With neither configured, the full set of primary markets is
-// returned (v1 default: everyone sees everything).
+// `categories` narrows the universe (empty = everything). `favorites` is
+// the desktop WATCHLIST MIRROR (v1.1.4): those tickers are unioned in on
+// top of the universe, so a starred market always reaches the client even
+// when Configure's category filter would exclude it — a star means
+// "always show me this". Pre-1.1.4 clients that treated favorites as an
+// exclusive pin list still see their pins (now alongside the universe
+// every unpinned user always saw).
 func (a *App) queryMarketsForUser(favorites, categories []string) []Prediction {
 	ctx := context.Background()
 
-	if len(favorites) > 0 {
-		rows, err := a.db.Query(ctx, `
-			SELECT
-				id, COALESCE(source, 'kalshi'), ticker, COALESCE(event_ticker, ''),
-				COALESCE(category, 'Other'), COALESCE(title, ''), COALESCE(subtitle, ''),
-				COALESCE(yes_price, 0), COALESCE(yes_bid, 0), COALESCE(yes_ask, 0),
-				COALESCE(prev_yes_price, 0), COALESCE(volume, 0), COALESCE(open_interest, 0),
-				COALESCE(status, ''), COALESCE(result, ''), close_time,
-				COALESCE(link, ''), COALESCE(updated_at, created_at)
-			FROM markets
-			WHERE ticker = ANY($1)
-			ORDER BY volume DESC, ticker ASC
-		`, favorites)
-		return scanMarkets(rows, err)
+	if len(favorites) == 0 && len(categories) == 0 {
+		// v1 default: everyone sees everything.
+		predictions, err := a.queryMarkets(ctx)
+		if err != nil {
+			log.Printf("[Predictions] queryMarketsForUser default query failed: %v", err)
+			return nil
+		}
+		return predictions
 	}
 
-	if len(categories) > 0 {
-		rows, err := a.db.Query(ctx, `
-			SELECT
-				id, COALESCE(source, 'kalshi'), ticker, COALESCE(event_ticker, ''),
-				COALESCE(category, 'Other'), COALESCE(title, ''), COALESCE(subtitle, ''),
-				COALESCE(yes_price, 0), COALESCE(yes_bid, 0), COALESCE(yes_ask, 0),
-				COALESCE(prev_yes_price, 0), COALESCE(volume, 0), COALESCE(open_interest, 0),
-				COALESCE(status, ''), COALESCE(result, ''), close_time,
-				COALESCE(link, ''), COALESCE(updated_at, created_at)
-			FROM markets
-			WHERE is_primary = true AND category = ANY($1)
-			ORDER BY volume DESC, ticker ASC
-		`, categories)
-		return scanMarkets(rows, err)
-	}
-
-	// Default: all primary markets.
-	predictions, err := a.queryMarkets(ctx)
-	if err != nil {
-		log.Printf("[Predictions] queryMarketsForUser default query failed: %v", err)
-		return nil
-	}
-	return predictions
+	rows, err := a.db.Query(ctx, `
+		SELECT
+			id, COALESCE(source, 'kalshi'), ticker, COALESCE(event_ticker, ''),
+			COALESCE(event_title, ''), COALESCE(event_rank, 1),
+			COALESCE(category, 'Other'), COALESCE(title, ''), COALESCE(subtitle, ''),
+			COALESCE(yes_price, 0), COALESCE(yes_bid, 0), COALESCE(yes_ask, 0),
+			COALESCE(prev_yes_price, 0), COALESCE(volume, 0), COALESCE(open_interest, 0),
+			COALESCE(status, ''), COALESCE(result, ''), close_time,
+			COALESCE(link, ''), COALESCE(updated_at, created_at)
+		FROM markets
+		WHERE ((is_primary = true OR event_rank = 2)
+		       AND (cardinality($1::text[]) = 0 OR category = ANY($1)))
+		   OR ticker = ANY($2)
+		ORDER BY volume DESC, ticker ASC
+	`, categories, favorites)
+	return scanMarkets(rows, err)
 }
 
 // scanMarkets scans a markets result set into a slice of Prediction. It accepts
@@ -429,7 +512,8 @@ func scanMarkets(rows pgx.Rows, err error) []Prediction {
 	for rows.Next() {
 		var p Prediction
 		if err := rows.Scan(
-			&p.ID, &p.Source, &p.Ticker, &p.EventTicker, &p.Category, &p.Title,
+			&p.ID, &p.Source, &p.Ticker, &p.EventTicker, &p.EventTitle,
+			&p.EventRank, &p.Category, &p.Title,
 			&p.Subtitle, &p.YesPrice, &p.YesBid, &p.YesAsk, &p.PrevYesPrice,
 			&p.Volume, &p.OpenInterest, &p.Status, &p.Result, &p.CloseTime,
 			&p.Link, &p.UpdatedAt,

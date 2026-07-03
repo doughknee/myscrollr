@@ -27,6 +27,7 @@ import { selectFinanceForTicker } from "../channels/finance/view";
 import { selectFantasyForTicker } from "../channels/fantasy/view";
 import { selectSportsForTicker, getSportsDisplayConfig } from "../channels/sports/view";
 import { selectPredictionsForTicker } from "../channels/predictions/view";
+import { getWatchlist, onWatchlistChange } from "../channels/predictions/watchlist";
 import {
   findTopN,
   findTopBench,
@@ -189,6 +190,20 @@ export default function ScrollrTicker({
   const effectiveDirection: TickerDirection = rowConfig?.direction ?? direction;
   const effectiveSpeed: number = rowConfig?.speed ?? speed;
   const effectiveMixMode: MixMode = rowConfig?.mixMode ?? mixMode;
+
+  // Predictions watchlist (starred tickers). The pref store's cache is
+  // per-webview: stars are toggled in the MAIN window, and this ticker
+  // window only learns about them through the cross-window store
+  // subscription — without it, stars wouldn't reach the ticker until
+  // the next launch.
+  const [predictionsWatchlist, setPredictionsWatchlist] = useState<Set<string>>(
+    () => new Set(getWatchlist()),
+  );
+  useEffect(
+    () => onWatchlistChange((list) => setPredictionsWatchlist(new Set(list))),
+    [],
+  );
+
   // Build chip arrays per channel/widget, then combine based on mixMode.
   // Row filtering (multi-deck) happens UPSTREAM in App.tsx — activeTabs
   // here is already the per-row source list. No round-robin split.
@@ -503,11 +518,16 @@ export default function ScrollrTicker({
           // Premier prediction-markets channel. Implied probability +
           // ▲/▼ delta is the "heartbeat"; the universal `defaultSort`
           // (movers/volume/closing) governs ordering on both surfaces.
+          // v1.1.4 scoping: starred markets only when the watchlist has
+          // any (subscribed state above — live across windows);
+          // otherwise the selector falls back to the top rank-1 movers —
+          // never again the whole ingested universe.
           const predictionsPrefs = channelDisplay?.predictions;
           if (!predictionsPrefs) continue;
           const sorted = selectPredictionsForTicker(
             data as Prediction[],
             predictionsPrefs,
+            predictionsWatchlist,
           );
           for (const p of sorted) {
             bucket.push(
@@ -540,7 +560,7 @@ export default function ScrollrTicker({
       : buckets.flat();
 
     return allItems;
-  }, [dashboard, activeTabs, widgetData, onChipClick, onTogglePin, pinnedWidgets, comfort, effectiveMixMode, chipColorMode, channelDisplay, rowIndex]);
+  }, [dashboard, activeTabs, widgetData, onChipClick, onTogglePin, pinnedWidgets, comfort, effectiveMixMode, chipColorMode, channelDisplay, rowIndex, predictionsWatchlist]);
 
   // ── Shared refs ─────────────────────────────────────────────────
   const containerRef = useRef<HTMLDivElement>(null);

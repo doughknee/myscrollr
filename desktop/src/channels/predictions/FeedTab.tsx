@@ -42,12 +42,16 @@ import {
 } from "./watchlist";
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
+import { useChannelConfig } from "../../hooks/useChannelConfig";
 import {
   applyPredictionsPipeline,
+  groupByEvent,
   priceDelta,
+  type PredictionEvent,
   type PredictionsSortKey,
 } from "./view";
 import type { Prediction, FeedTabProps, ChannelManifest } from "../../types";
+import type { ChannelType } from "../../api/client";
 import { shouldShowOnFeed } from "../../preferences";
 import type { PredictionsDisplayPrefs } from "../../preferences";
 
@@ -67,9 +71,9 @@ export const predictionsChannel: ChannelManifest = {
       "the market gives a 'Yes' outcome — and moves in real time as " +
       "traders shift the odds.",
     usage: [
-      "Open Configure to pin markets and choose categories.",
-      "Probabilities update automatically when connected.",
-      "Click any market to view it on Kalshi.",
+      "Open Configure to choose which categories flow in.",
+      "Star any market — stars build your watchlist and take over the ticker.",
+      "Click any outcome for its price history, alerts, and the Kalshi link.",
     ],
   },
   FeedTab: PredictionsFeedTab,
@@ -98,9 +102,19 @@ function formatDelta(delta: number): string {
 
 // ── FeedTab ──────────────────────────────────────────────────────
 
-function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabProps) {
+function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure, widgetId }: FeedTabProps) {
   const { prefs } = useShell();
   const dp = prefs.channelDisplay.predictions;
+
+  // Watchlist mirror (v1.1.4 round 3): stars are local, but the server
+  // must know them so a starred market survives Configure's category
+  // narrowing (queryMarketsForUser unions favorites into the payload).
+  // config.favorites is that mirror — written on every toggle, never
+  // shown as its own UI.
+  const { updateItems: mirrorFavorites } = useChannelConfig<string[]>(
+    (widgetId ?? "predictions") as ChannelType,
+    "favorites",
+  );
 
   // The caller (Home or Source page) hints at a default mode, but the
   // user's per-channel feedDensity pref wins when set — so the same
@@ -129,13 +143,17 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
   // Records prices for sparklines + fires edge-triggered price alerts (toast).
   usePredictionAlerts(markets, alerts);
 
-  const toggleWatch = useCallback((ticker: string) => {
-    setWatchlist((prev) => {
-      const next = withToggled(prev, ticker);
-      saveWatchlist(next);
-      return next;
-    });
-  }, []);
+  const toggleWatch = useCallback(
+    (ticker: string) => {
+      setWatchlist((prev) => {
+        const next = withToggled(prev, ticker);
+        saveWatchlist(next);
+        mirrorFavorites(next);
+        return next;
+      });
+    },
+    [mirrorFavorites],
+  );
 
   const addAlertCb = useCallback(
     (input: { ticker: string; label: string; comparator: AlertComparator; threshold: number }) => {
@@ -226,16 +244,39 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
     [markets, selectedCategories, categoryMap, sortKey],
   );
 
-  // Watchlist lens narrows the filtered list to starred markets.
+  // Watchlist lens: starred markets, deliberately UNFILTERED by any
+  // category selection (client chips here or Configure's server-side
+  // narrowing) — a star means "always show me this" (v1.1.4 round 3).
+  // Sort still applies so the lens matches the grid's ordering.
   const lensItems = useMemo(
-    () => (lens === "watchlist" ? filtered.filter((m) => watchedSet.has(m.ticker)) : filtered),
-    [filtered, lens, watchedSet],
+    () =>
+      lens === "watchlist"
+        ? applyPredictionsPipeline(
+            markets.filter((m) => watchedSet.has(m.ticker)),
+            {
+              directionFilter: "all",
+              selectedCategories: new Set<string>(),
+              categoryMap,
+              sortKey,
+            },
+          )
+        : filtered,
+    [filtered, lens, watchedSet, markets, categoryMap, sortKey],
   );
 
+  // Comfort mode renders Kalshi-style EVENT cards (v1.1.4): the sorted
+  // market list folds into events ordered by each event's lead leg, so
+  // the Display-tab sort still governs the card order. Compact mode
+  // stays a flat dense market list.
+  const events = useMemo(() => groupByEvent(lensItems), [lensItems]);
+  const isComfort = mode === "comfort";
+
   // ── Pagination (incremental "load more") ─────────────────────
-  const visible = Math.min(visibleCount, lensItems.length);
+  const renderTotal = isComfort ? events.length : lensItems.length;
+  const visible = Math.min(visibleCount, renderTotal);
   const pageItems = lensItems.slice(0, visible);
-  const remaining = Math.max(0, lensItems.length - visible);
+  const pageEvents = events.slice(0, visible);
+  const remaining = Math.max(0, renderTotal - visible);
 
   // Most-recent update across filtered markets — drives the FreshnessPill.
   const latestUpdated = useMemo(() => {
@@ -383,26 +424,40 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
                 : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
             )}
           >
-            {pageItems.map((market) => (
-              <MarketItem
-                key={market.id}
-                market={market}
-                mode={mode}
-                display={dp}
-                category={market.category ?? categoryMap.get(market.id)}
-                now={now}
-                watched={watchedSet.has(market.ticker)}
-                onToggleWatch={mode === "comfort" ? toggleWatch : undefined}
-                onOpenDetail={mode === "comfort" ? openDetail : undefined}
-              />
-            ))}
+            {isComfort
+              ? pageEvents.map((ev) => (
+                  <EventCard
+                    key={ev.eventTicker}
+                    event={ev}
+                    display={dp}
+                    category={
+                      ev.category ??
+                      categoryMap.get(ev.outcomes[0]?.id ?? "")
+                    }
+                    now={now}
+                    watchedSet={watchedSet}
+                    onToggleWatch={toggleWatch}
+                    onOpenDetail={openDetail}
+                  />
+                ))
+              : pageItems.map((market) => (
+                  <MarketItem
+                    key={market.id}
+                    market={market}
+                    mode={mode}
+                    display={dp}
+                    category={market.category ?? categoryMap.get(market.id)}
+                    now={now}
+                    watched={watchedSet.has(market.ticker)}
+                  />
+                ))}
           </div>
           {remaining > 0 && (
             <div className="flex items-center justify-center gap-3 px-3 py-3 bg-surface border-t border-edge/30">
               <button
                 onClick={() =>
                   setVisibleCount((c) =>
-                    Math.min(lensItems.length, c + LOAD_MORE_INCREMENT),
+                    Math.min(renderTotal, c + LOAD_MORE_INCREMENT),
                   )
                 }
                 className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
@@ -410,7 +465,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
                 Load more
               </button>
               <span className="text-xs text-fg-3 tabular-nums font-mono">
-                {visible} of {lensItems.length}
+                {visible} of {renderTotal}
               </span>
             </div>
           )}
@@ -640,7 +695,7 @@ const MarketItem = memo(function MarketItem({
           </span>
         )}
         <span className="text-fg-2 truncate flex-1 font-sans">
-          {market.title}
+          {market.event_title || market.title}
         </span>
         {shouldShowOnFeed(display.showVolume) && market.volume != null && (
           <span className="text-fg-3 tabular-nums shrink-0">
@@ -768,6 +823,214 @@ const MarketItem = memo(function MarketItem({
   prev.market.prev_yes_price === next.market.prev_yes_price &&
   prev.market.volume === next.market.volume &&
   prev.market.title === next.market.title &&
+  prev.market.event_title === next.market.event_title &&
   prev.market.close_time === next.market.close_time &&
   prev.market.updated_at === next.market.updated_at
 );
+
+// ── EventCard (v1.1.4 Kalshi Grows Up) ──────────────────────────
+//
+// Kalshi-style card: the EVENT question headlines, with up to two
+// outcome legs inside. Each leg carries its own probability, delta,
+// price-flash, and watchlist star, and opens the detail modal for
+// exactly that leg — mirroring Kalshi's own Browse Markets cards.
+
+interface EventCardProps {
+  event: PredictionEvent;
+  display: PredictionsDisplayPrefs;
+  category?: string;
+  now: number;
+  watchedSet: Set<string>;
+  onToggleWatch: (ticker: string) => void;
+  onOpenDetail: (market: Prediction) => void;
+}
+
+const EventCard = memo(function EventCard({
+  event,
+  display,
+  category,
+  now,
+  watchedSet,
+  onToggleWatch,
+  onOpenDetail,
+}: EventCardProps) {
+  const lead = event.outcomes[0];
+  const countdown = formatCloseCountdown(
+    event.closeTime ?? lead?.close_time,
+    now,
+  );
+
+  return (
+    <div className="flex flex-col gap-2 bg-surface px-3 py-2.5">
+      {/* Header: category badge · close countdown */}
+      <div className="flex items-center justify-between gap-2 text-ui-chip">
+        {shouldShowOnFeed(display.showCategory) && category ? (
+          <span className="rounded bg-[#6366f1]/12 px-1.5 py-px font-medium text-[#6366f1]">
+            {category}
+          </span>
+        ) : (
+          <span />
+        )}
+        {shouldShowOnFeed(display.showCloseTime) && countdown && (
+          <span
+            className={clsx(
+              "font-mono tabular-nums text-fg-3",
+              countdown === "Closed" && "text-fg-4",
+            )}
+          >
+            {countdown === "Closed" ? countdown : `Closes ${countdown}`}
+          </span>
+        )}
+      </div>
+
+      {/* The event question */}
+      <span className="text-ui-body font-medium leading-snug text-fg line-clamp-2">
+        {event.title}
+      </span>
+
+      {/* Outcome legs. ANY single-leg event gets a synthetic No row —
+          a lone market's No side is always its complement (100 - yes),
+          whether the leg is "Yes", "Reza Pahlavi", or "Before Jan 1,
+          2027" — mirroring Kalshi's own Yes/No pair instead of leaving
+          one row stranded. */}
+      <div className="flex flex-col gap-1">
+        {event.outcomes.map((m) => (
+          <OutcomeRow
+            key={m.id}
+            market={m}
+            display={display}
+            watched={watchedSet.has(m.ticker)}
+            onToggleWatch={onToggleWatch}
+            onOpenDetail={onOpenDetail}
+          />
+        ))}
+        {event.outcomes.length === 1 && (
+          <OutcomeRow
+            market={event.outcomes[0]}
+            display={display}
+            watched={watchedSet.has(event.outcomes[0].ticker)}
+            onToggleWatch={onToggleWatch}
+            onOpenDetail={onOpenDetail}
+            syntheticNo
+          />
+        )}
+      </div>
+
+      {/* Footer: summed volume across legs */}
+      {shouldShowOnFeed(display.showVolume) && event.volume > 0 && (
+        <div className="text-ui-chip font-mono tabular-nums text-fg-3">
+          Vol {formatCompactNumber(event.volume)}
+        </div>
+      )}
+    </div>
+  );
+});
+
+/** One outcome leg inside an EventCard — its own flash, star, and click.
+ *  `syntheticNo` renders the implicit No side of a binary market
+ *  (100 - yes, inverted delta, no star — it's the same market, so the
+ *  Yes row owns the watchlist state). */
+function OutcomeRow({
+  market,
+  display,
+  watched,
+  onToggleWatch,
+  onOpenDetail,
+  syntheticNo = false,
+}: {
+  market: Prediction;
+  display: PredictionsDisplayPrefs;
+  watched: boolean;
+  onToggleWatch: (ticker: string) => void;
+  onOpenDetail: (market: Prediction) => void;
+  syntheticNo?: boolean;
+}) {
+  const rawDelta = priceDelta(market);
+  const delta = syntheticNo ? -rawDelta : rawDelta;
+  const isUp = delta > 0;
+  const isDown = delta < 0;
+
+  // Same flash-on-change pattern as MarketItem: one effect owns the ref
+  // so rapid back-to-back CDC events can't swallow a flash.
+  const prevPriceRef = useRef<number | null>(null);
+  const [flash, setFlash] = useState<"up" | "down" | null>(null);
+
+  useEffect(() => {
+    const current =
+      typeof market.yes_price === "number" ? market.yes_price : NaN;
+    const prev = prevPriceRef.current;
+    prevPriceRef.current = current;
+    if (prev === null || isNaN(current) || current === prev) return;
+    setFlash(current > prev ? "up" : "down");
+    const timer = setTimeout(() => setFlash(null), 800);
+    return () => clearTimeout(timer);
+  }, [market.yes_price]);
+
+  // Binary events read best as "Yes" rows; multi-outcome events name
+  // their leg ("France", "Atlanta"). The synthetic row is always "No".
+  const legLabel = syntheticNo
+    ? "No"
+    : market.title && market.title.toLowerCase() !== "yes"
+      ? market.title
+      : "Yes";
+
+  // The No side of a binary market is the complement of yes_price.
+  const shownPct = syntheticNo
+    ? Math.max(0, Math.min(100, 100 - (market.yes_price ?? 0)))
+    : market.yes_price;
+
+  return (
+    <div
+      className={clsx(
+        "flex items-center gap-1.5 rounded-md border border-edge/30 bg-base-100/40 px-2 py-1.5 transition-colors duration-700",
+        flash === (syntheticNo ? "down" : "up") && "bg-up/8",
+        flash === (syntheticNo ? "up" : "down") && "bg-down/8",
+        isUp && "border-l-2 border-l-up/40",
+        isDown && "border-l-2 border-l-down/40",
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => onOpenDetail(market)}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+      >
+        <span className="min-w-0 flex-1 truncate text-ui-meta text-fg-2">
+          {legLabel}
+        </span>
+        {shouldShowOnFeed(display.showDelta) && delta !== 0 && (
+          <span
+            className={clsx(
+              "shrink-0 font-mono text-ui-chip font-semibold tabular-nums",
+              isUp ? "text-up" : "text-down",
+            )}
+          >
+            {formatDelta(delta)}
+          </span>
+        )}
+        <span className="shrink-0 font-mono text-ui-body font-bold tabular-nums text-fg">
+          {formatProbability(shownPct)}
+        </span>
+      </button>
+      {syntheticNo ? (
+        // Spacer keeps the No row's numbers column-aligned with Yes.
+        <span className="h-6 w-6 shrink-0" aria-hidden />
+      ) : (
+        <button
+          type="button"
+          aria-label={watched ? "Remove from watchlist" : "Add to watchlist"}
+          aria-pressed={watched}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleWatch(market.ticker);
+          }}
+          className={clsx(
+            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors cursor-pointer",
+            watched ? "text-amber-400" : "text-fg-4 hover:text-fg-2",
+          )}
+        >
+          <Star size={13} className={watched ? "fill-current" : ""} />
+        </button>
+      )}
+    </div>
+  );
+}

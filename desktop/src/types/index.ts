@@ -29,6 +29,13 @@ export interface Prediction {
   source: string;
   ticker: string;
   event_ticker?: string;
+  /** The event's human question ("More tech layoffs in 2026 than in
+   *  2025?") — `title` is just this market's leg ("Yes", "Atlanta").
+   *  Empty until the post-migration sweep backfills it (v1.1.4). */
+  event_title?: string;
+  /** Leg rank within the event: 1 = most liquid (is_primary), 2 = the
+   *  second outcome the server ships for event cards (v1.1.4). */
+  event_rank?: number;
   category?: string;
   title: string;
   subtitle?: string;

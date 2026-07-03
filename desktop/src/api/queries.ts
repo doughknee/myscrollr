@@ -147,7 +147,7 @@ export interface TrackedSymbol {
 /**
  * Catalog entry for the Predictions channel — one row per trackable
  * Kalshi market, surfaced by `GET /predictions/catalog`. Drives the
- * CategoryPicker's favorites selection + category counts.
+ * the predictions Configure page's category chips + counts.
  */
 export interface PredictionCatalogEntry {
   ticker: string;
@@ -247,6 +247,41 @@ export function predictionsCatalogOptions() {
     queryKey: queryKeys.catalogs.predictions,
     queryFn: () => request<PredictionCatalogEntry[]>("/predictions/catalog"),
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ── Prediction price history (v1.1.4 detail-modal chart) ────────
+
+/** One hourly candle from the Kalshi proxy. Prices are decimal-dollar
+ *  strings ("0.0450" == 4.5% implied); `price` is absent for hours
+ *  with no trades. */
+export interface PredictionCandle {
+  end_period_ts: number;
+  price?: {
+    open_dollars?: string;
+    close_dollars?: string;
+    high_dollars?: string;
+    low_dollars?: string;
+    mean_dollars?: string;
+    previous_dollars?: string;
+  };
+}
+
+export interface PredictionCandlesticksResponse {
+  candlesticks?: PredictionCandle[];
+}
+
+/** ~7 days of hourly candles, proxied + Redis-cached server-side (5 min
+ *  TTL — staleTime mirrors it so reopening the modal is instant). */
+export function predictionsCandlesticksOptions(ticker: string) {
+  return queryOptions({
+    queryKey: ["predictions-candlesticks", ticker],
+    queryFn: () =>
+      request<PredictionCandlesticksResponse>(
+        `/predictions/candlesticks/${encodeURIComponent(ticker)}`,
+      ),
+    staleTime: 5 * 60 * 1000,
+    enabled: ticker.length > 0,
   });
 }
 
