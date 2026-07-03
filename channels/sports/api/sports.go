@@ -446,7 +446,12 @@ func (a *App) handleInternalDashboard(c *fiber.Ctx) error {
 
 	favoriteTeams := a.getUserFavoriteTeams(userSub)
 	// Home dashboard uses fair-share so every selected league is visible
-	// within the 20-row glanceable preview, regardless of relative volume.
+	// within the 60-row payload, regardless of relative volume. KNOWN GAP
+	// (v1.1.3): the priority ORDER ranks finals after ALL pre rows, so a
+	// high-volume league (MLB: ~15 fixtures/day x 8 days ingested) fills
+	// its share with live+pre and the ticker's "days back" window sees
+	// few or no finals. Fix = interleave recency (e.g. split each share
+	// between soonest-pre and newest-final) — queued for v1.1.4.
 	games, err := a.queryGamesByLeagues(ctx, leagues, DashboardSportsLimit, favoriteTeams, true)
 	if err != nil {
 		log.Printf("[Sports] Dashboard query failed: %v", err)
@@ -664,7 +669,7 @@ const MinPerLeagueShare = 2
 
 // queryGamesByLeagues fetches games for specific leagues.
 //
-// When `fairShare` is true (used by /dashboard with limit=20): each league
+// When `fairShare` is true (used by /dashboard with limit=60): each league
 // gets max(MinPerLeagueShare, ceil(limit/N)) candidate rows via a window
 // function, ranked by the standard priority (live > pre > final, favorites
 // first, soonest upcoming first). The global LIMIT then trims. This keeps
