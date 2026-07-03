@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { selectSportsForTicker, gameEngagement } from "./view";
+import {
+  selectSportsForTicker,
+  gameEngagement,
+  normalizeSportsDisplayConfig,
+  SPORTS_WINDOW_DEFAULTS,
+  SPORTS_WINDOW_MAX_DAYS,
+} from "./view";
 import type { SportsDisplayConfig } from "./view";
 import type { Game } from "../../types";
 
@@ -158,39 +164,70 @@ describe("selectSportsForTicker", () => {
     expect(result).toHaveLength(2);
   });
 
-  it("hides upcoming games when showUpcoming is feed-only", () => {
+  // ── Day window (v1.1.3 Time Controls) ──────────────────────────
+
+  it("hides finals older than daysBack (calendar-day anchored)", () => {
     const games = [
-      preGame(1, 10 * 60_000),
-      liveGame(2),
-      finalGame(3, 60 * 60_000),
+      finalGame(1, 30 * 60_000),          // finished 30m ago — today
+      finalGame(2, 3 * 24 * 3_600_000),   // 3 days ago
+      liveGame(3),
     ];
-    const config: SportsDisplayConfig = { showUpcoming: "feed" };
+    const config: SportsDisplayConfig = { daysBack: 1, daysAhead: 7 };
     const result = selectSportsForTicker(games, config);
-    expect(result.map((g) => g.id)).toEqual([2, 3]);
+    expect(result.map((g) => g.id)).toEqual([3, 1]);
   });
 
-  it("hides final games when showFinal is feed-only", () => {
+  it("hides pre-games beyond daysAhead", () => {
     const games = [
-      preGame(1, 10 * 60_000),
-      liveGame(2),
-      finalGame(3, 60 * 60_000),
+      preGame(1, 30 * 60_000),            // in 30 minutes
+      preGame(2, 5 * 24 * 3_600_000),     // in 5 days
     ];
-    const config: SportsDisplayConfig = { showFinal: "feed" };
+    const config: SportsDisplayConfig = { daysBack: 1, daysAhead: 1 };
     const result = selectSportsForTicker(games, config);
-    expect(result.map((g) => g.id)).toEqual([2, 1]);
+    expect(result.map((g) => g.id)).toEqual([1]);
   });
 
-  it("can hide both upcoming and final from the ticker at once (live only)", () => {
+  it("'Today' (0/0) keeps tonight's game AND today's earlier final", () => {
+    // Calendar-day anchoring: at any time of day, the whole of today
+    // is inside a 0/0 window — a rolling ±0h window would be empty.
     const games = [
-      preGame(1, 10 * 60_000),
-      liveGame(2),
-      finalGame(3, 60 * 60_000),
+      preGame(1, 2 * 3_600_000),   // tips off in 2h (still today at NOW)
+      finalGame(2, 2 * 3_600_000), // ended 2h ago (still today at NOW)
+      preGame(3, 2 * 24 * 3_600_000), // day after tomorrow
     ];
-    const result = selectSportsForTicker(games, {
-      showUpcoming: "off",
-      showFinal: "off",
+    const result = selectSportsForTicker(games, { daysBack: 0, daysAhead: 0 });
+    expect(result.map((g) => g.id)).toEqual([1, 2]);
+  });
+
+  it("live games always show, even outside the window", () => {
+    const games = [
+      liveGame(1),
+      finalGame(2, 4 * 24 * 3_600_000), // way outside
+    ];
+    const result = selectSportsForTicker(games, { daysBack: 0, daysAhead: 0 });
+    expect(result.map((g) => g.id)).toEqual([1]);
+  });
+
+  it("legacy showFinal:'off' maps to daysBack 0 via normalize", () => {
+    const cfg = normalizeSportsDisplayConfig({ showFinal: "off" });
+    expect(cfg.daysBack).toBe(0);
+    expect(cfg.daysAhead).toBe(SPORTS_WINDOW_DEFAULTS.daysAhead);
+  });
+
+  it("legacy showUpcoming:'off' maps to daysAhead 0 via normalize", () => {
+    const cfg = normalizeSportsDisplayConfig({ showUpcoming: "off" });
+    expect(cfg.daysAhead).toBe(0);
+    expect(cfg.daysBack).toBe(SPORTS_WINDOW_DEFAULTS.daysBack);
+  });
+
+  it("explicit stored day values beat the legacy inference and clamp", () => {
+    const cfg = normalizeSportsDisplayConfig({
+      showFinal: "off", // would infer 0…
+      daysBack: 3,      // …but explicit wins
+      daysAhead: 99,    // clamped to the retention horizon
     });
-    expect(result.map((g) => g.id)).toEqual([2]);
+    expect(cfg.daysBack).toBe(3);
+    expect(cfg.daysAhead).toBe(SPORTS_WINDOW_MAX_DAYS);
   });
 
   it("returns [] for empty input", () => {

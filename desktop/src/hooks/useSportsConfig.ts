@@ -12,7 +12,10 @@ import type { ChannelType } from "../api/client";
 import type { DashboardResponse } from "../types";
 import { queryKeys } from "../api/queries";
 import { useShellData } from "../shell-context";
-import { normalizeSportsDisplayConfig } from "../channels/sports/view";
+import {
+  normalizeSportsDisplayConfig,
+  SPORTS_WINDOW_DEFAULTS,
+} from "../channels/sports/view";
 import type { Venue } from "../preferences";
 
 export interface FavoriteTeam {
@@ -21,8 +24,9 @@ export interface FavoriteTeam {
 }
 
 export interface SportsDisplayPrefs {
-  showUpcoming: Venue;
-  showFinal: Venue;
+  /** Day window (v1.1.3 Time Controls) — see SportsDisplayConfig. */
+  daysBack: number;
+  daysAhead: number;
   showLogos: Venue;
   showTimer: Venue;
 }
@@ -34,8 +38,8 @@ export interface SportsConfig {
 }
 
 const DEFAULT_DISPLAY: SportsDisplayPrefs = {
-  showUpcoming: "both",
-  showFinal: "both",
+  daysBack: SPORTS_WINDOW_DEFAULTS.daysBack,
+  daysAhead: SPORTS_WINDOW_DEFAULTS.daysAhead,
   showLogos: "both",
   showTimer: "both",
 };
@@ -51,16 +55,16 @@ export function useSportsConfig(channelType: string = "sports") {
   const raw = (sportsChannel?.config ?? {}) as Record<string, unknown>;
 
   const config: SportsConfig = useMemo(() => {
-    // v1.0.2: normalize raw.display through `migrateVenue` so
-    // pre-venue-enum boolean configs (stored server-side by clients on
-    // <v1.0.2) deserialize to valid Venue values. `normalizeSportsDisplayConfig`
-    // returns a SportsDisplayConfig with all four fields populated.
+    // `normalizeSportsDisplayConfig` handles both legacy migrations:
+    // v1.0.2 boolean→Venue for the cosmetic toggles, and v1.1.3
+    // showUpcoming/showFinal→day-window mapping (an "off" toggle
+    // becomes 0 days on that side).
     const normalizedDisplay = normalizeSportsDisplayConfig(raw.display);
     return {
       leagues: Array.isArray(raw.leagues) ? (raw.leagues as string[]) : [],
       display: {
-        showUpcoming: normalizedDisplay.showUpcoming ?? DEFAULT_DISPLAY.showUpcoming,
-        showFinal: normalizedDisplay.showFinal ?? DEFAULT_DISPLAY.showFinal,
+        daysBack: normalizedDisplay.daysBack ?? DEFAULT_DISPLAY.daysBack,
+        daysAhead: normalizedDisplay.daysAhead ?? DEFAULT_DISPLAY.daysAhead,
         showLogos: normalizedDisplay.showLogos ?? DEFAULT_DISPLAY.showLogos,
         showTimer: normalizedDisplay.showTimer ?? DEFAULT_DISPLAY.showTimer,
       },

@@ -4,13 +4,13 @@
  * Sports display prefs live server-side on the dashboard channel config
  * (not in `prefs.channelDisplay`), so this selector accepts the config
  * blob shape. Both `FeedTab` and `ScrollrTicker` call `selectSportsForTicker`
- * to apply showUpcoming/showFinal filters + engagement sort.
+ * to apply the day window (v1.1.3 Time Controls) + engagement sort.
  *
  * SINGLE SOURCE OF TRUTH for Sports display prefs.
  */
 import type { Game } from "../../types";
-import { isLive, isCloseGame, isFinal, isPre } from "../../utils/gameHelpers";
-import { migrateVenue, shouldShowOnFeed, shouldShowOnTicker } from "../../preferences";
+import { isLive, isCloseGame } from "../../utils/gameHelpers";
+import { migrateVenue } from "../../preferences";
 import type { Venue } from "../../preferences";
 
 // ── Display prefs shape (mirrors server-side channel config.display) ─
@@ -21,10 +21,62 @@ import type { Venue } from "../../preferences";
 // read through `migrateVenue`.
 
 export interface SportsDisplayConfig {
-  showUpcoming?: Venue;
-  showFinal?: Venue;
+  /**
+   * Day window (v1.1.3 Time Controls): show games whose start_time falls
+   * between `daysBack` days ago and `daysAhead` days ahead. LIVE games
+   * always show regardless of the window — a live game is definitionally
+   * "now". Replaces the retired showUpcoming/showFinal venue toggles
+   * (normalizeSportsDisplayConfig still maps legacy stored values).
+   */
+  daysBack?: number;
+  daysAhead?: number;
   showLogos?: Venue;
   showTimer?: Venue;
+}
+
+/** Defaults: yesterday's finals through next week's slate. */
+export const SPORTS_WINDOW_DEFAULTS = { daysBack: 1, daysAhead: 7 } as const;
+
+/**
+ * Hard ceiling for both steppers — the server only retains games ±7 days
+ * (cleanup_old_games in the sports service), so offering more would show
+ * windows with no data in them.
+ */
+export const SPORTS_WINDOW_MAX_DAYS = 7;
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Window predicate shared by the ticker + feed selectors.
+ *
+ * Bounds are anchored to LOCAL CALENDAR DAYS, not rolling 24h periods:
+ * "Today" (0 back / 0 ahead) means all of today — a 7pm tip-off must
+ * not vanish from the window at 3pm. daysBack counts whole days before
+ * today; daysAhead counts whole days after today (inclusive of their
+ * full span).
+ */
+function inDayWindow(
+  g: Game,
+  daysBack: number,
+  daysAhead: number,
+  now: number,
+): boolean {
+  if (isLive(g)) return true;
+  const t = new Date(g.start_time).getTime();
+  // Defensive: an unparseable start_time stays visible rather than
+  // silently vanishing from every surface.
+  if (!Number.isFinite(t)) return true;
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
+  const lower = dayStart.getTime() - daysBack * DAY_MS;
+  const upper = dayStart.getTime() + (daysAhead + 1) * DAY_MS;
+  return t >= lower && t < upper;
+}
+
+function clampWindowDays(v: unknown, fallback: number): number {
+  return typeof v === "number" && Number.isFinite(v)
+    ? Math.min(SPORTS_WINDOW_MAX_DAYS, Math.max(0, Math.round(v)))
+    : fallback;
 }
 
 // ── Pure: engagement score ──────────────────────────────────────
@@ -57,15 +109,11 @@ export function gameEngagement(g: Game): number {
 // ── Pure: selector for the ticker ────────────────────────────────
 
 /**
- * Baseline pipeline used by the ticker: applies `showUpcoming`/`showFinal`
- * filters from the channel config.display blob, then sorts by engagement
- * (live games first, then upcoming, then finals) with a deterministic
- * tie-break on `start_time` so the ticker rail stays stable across
- * dashboard refetches.
- *
- * Filters only apply when the venue is `off` or ticker-only-excluded
- * ("feed"). `both` and `ticker` both permit the category to show on the
- * ticker.
+ * Baseline pipeline used by the ticker: applies the day window from the
+ * channel config.display blob (v1.1.3 Time Controls — live games always
+ * pass), then sorts by engagement (live games first, then upcoming, then
+ * finals) with a deterministic tie-break on `start_time` so the ticker
+ * rail stays stable across dashboard refetches.
  *
  * Tie-break direction is per-state:
  *   - pre/live   → start_time ASC (sooner / more in-progress first)
@@ -75,20 +123,19 @@ export function gameEngagement(g: Game): number {
  * old time-bucketed engagement encoded discretely, without producing a
  * different sort order on every refetch as games drift across clock
  * thresholds.
+ *
+ * `now` is injectable for tests; production callers omit it.
  */
 export function selectSportsForTicker(
   games: Game[],
   config: SportsDisplayConfig | null | undefined,
+  now: number = Date.now(),
 ): Game[] {
   const cfg = config ?? {};
-  const showUpcoming = shouldShowOnTicker(cfg.showUpcoming ?? "both");
-  const showFinal = shouldShowOnTicker(cfg.showFinal ?? "both");
+  const daysBack = cfg.daysBack ?? SPORTS_WINDOW_DEFAULTS.daysBack;
+  const daysAhead = cfg.daysAhead ?? SPORTS_WINDOW_DEFAULTS.daysAhead;
 
-  const filtered = games.filter((g) => {
-    if (!showUpcoming && isPre(g)) return false;
-    if (!showFinal && isFinal(g)) return false;
-    return true;
-  });
+  const filtered = games.filter((g) => inDayWindow(g, daysBack, daysAhead, now));
 
   return filtered.sort((a, b) => {
     const eDiff = gameEngagement(b) - gameEngagement(a);
@@ -103,22 +150,18 @@ export function selectSportsForTicker(
 }
 
 /**
- * Feed-side filter mirroring `selectSportsForTicker`. Filters apply
- * when a category's venue is `off` or ticker-only.
+ * Feed-side filter mirroring `selectSportsForTicker` — same day window,
+ * same live-game bypass, no re-sort (the feed has its own grouping).
  */
 export function selectSportsForFeed(
   games: Game[],
   config: SportsDisplayConfig | null | undefined,
+  now: number = Date.now(),
 ): Game[] {
   const cfg = config ?? {};
-  const showUpcoming = shouldShowOnFeed(cfg.showUpcoming ?? "both");
-  const showFinal = shouldShowOnFeed(cfg.showFinal ?? "both");
-
-  return games.filter((g) => {
-    if (!showUpcoming && isPre(g)) return false;
-    if (!showFinal && isFinal(g)) return false;
-    return true;
-  });
+  const daysBack = cfg.daysBack ?? SPORTS_WINDOW_DEFAULTS.daysBack;
+  const daysAhead = cfg.daysAhead ?? SPORTS_WINDOW_DEFAULTS.daysAhead;
+  return games.filter((g) => inDayWindow(g, daysBack, daysAhead, now));
 }
 
 // ── Helper: extract sports display config from dashboard ────────
@@ -152,9 +195,25 @@ export function normalizeSportsDisplayConfig(
   raw: unknown,
 ): SportsDisplayConfig {
   const obj = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+
+  // Legacy mapping (v1.1.3): the retired showUpcoming/showFinal venue
+  // toggles collapse into the day window. Only "off" ever hid a category
+  // on every surface, so it's the only value whose intent survives:
+  //   showFinal: "off"    → daysBack 0  (user didn't want past games)
+  //   showUpcoming: "off" → daysAhead 0 (user didn't want future games)
+  // Explicit stored day values always win over the legacy inference.
+  const legacyUpcoming = migrateVenue(obj.showUpcoming);
+  const legacyFinal = migrateVenue(obj.showFinal);
+
   return {
-    showUpcoming: migrateVenue(obj.showUpcoming),
-    showFinal: migrateVenue(obj.showFinal),
+    daysBack: clampWindowDays(
+      obj.daysBack,
+      legacyFinal === "off" ? 0 : SPORTS_WINDOW_DEFAULTS.daysBack,
+    ),
+    daysAhead: clampWindowDays(
+      obj.daysAhead,
+      legacyUpcoming === "off" ? 0 : SPORTS_WINDOW_DEFAULTS.daysAhead,
+    ),
     showLogos: migrateVenue(obj.showLogos),
     showTimer: migrateVenue(obj.showTimer),
   };

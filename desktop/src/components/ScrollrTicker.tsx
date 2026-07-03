@@ -22,7 +22,7 @@ import PredictionChip from "./chips/PredictionChip";
 import FantasyStatChip from "./chips/FantasyStatChip";
 import FollowedPlayerChip from "./chips/FollowedPlayerChip";
 import ConsolidatedChip from "./chips/ConsolidatedChip";
-import { selectRssForTicker } from "../channels/rss/view";
+import { selectRssForTicker, getRssDisplayPrefs } from "../channels/rss/view";
 import { selectFinanceForTicker } from "../channels/finance/view";
 import { selectFantasyForTicker } from "../channels/fantasy/view";
 import { selectSportsForTicker, getSportsDisplayConfig } from "../channels/sports/view";
@@ -475,13 +475,13 @@ export default function ScrollrTicker({
         }
 
         case "rss": {
-          // Apply Display prefs: `articlesPerSource` is feed-structural
-          // but still applies universally (both surfaces cap at the same
-          // per-source count). Per-field visibility (showSource, etc.)
-          // consults the Venue enum.
+          // Global Display prefs merged with THIS widget's config.display
+          // override (v1.1.3: the per-widget time window must gate ticker
+          // chips exactly like the feed — mirror of getSportsDisplayConfig).
           const rssPrefs = channelDisplay?.rss;
           if (!rssPrefs) continue;
-          const curated = selectRssForTicker(data as RssItem[], rssPrefs);
+          const merged = getRssDisplayPrefs(rssPrefs, dashboard, tab);
+          const curated = selectRssForTicker(data as RssItem[], merged);
           for (const item of curated) {
             bucket.push(
               wrap(`rss-${item.id}`,
