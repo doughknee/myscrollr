@@ -1,7 +1,74 @@
 # Local full-stack dev
 
 Run MyScrollr locally with **real sign-in** (your prod Logto tenant) but a
-**local database + local API**. No prod data is touched. Two milestones:
+**local database + local API**. No prod data is touched.
+
+---
+
+## Quick start (one command)
+
+The whole **backend** — Postgres, Redis, the Core API, and every channel (Go
+API + Rust ingester) — runs in Docker via `docker-compose.dev.yml`, driven by
+a `Makefile`. The **front-ends stay native**: the Tauri desktop app is a GUI
+window that can't run in a Linux container, and the marketing site hot-reloads
+better on the host.
+
+```bash
+make up        # build + start the entire backend, wait until it's healthy
+make web       # (new terminal) marketing site   → http://localhost:3000
+make desktop   # (new terminal) the Tauri desktop app
+```
+
+…or `make dev` to bring the backend up and open `web` + `desktop` in their own
+windows. `make help` lists everything. Day-to-day:
+
+| Command | What it does |
+|---|---|
+| `make up` | Build + start the backend in Docker; waits for health + channel discovery. |
+| `make down` | Stop the backend (**keeps** your local DB). |
+| `make logs` \| `make logs svc=core-api` | Tail all logs, or one service. |
+| `make ps` | Container status. |
+| `make rebuild` | Force a clean image rebuild after you edit backend code. |
+| `make clean` | Stop **and wipe** the Postgres + Redis volumes. |
+| `make web` / `make desktop` | Run the front-ends natively. |
+
+**Ports** (host): core `18080`, rss `8083`, finance `8181`, sports `8082`,
+fantasy `8084`, predictions `8085`, site `3000`. Postgres `5432`, Redis `6379`.
+
+### Prereqs (one-time)
+
+1. **Docker Desktop** running.
+2. The gitignored `.env` files must exist — `api/.env`, `desktop/.env`, and
+   `channels/<ch>/.env`. `make up` reuses them for secrets/config and only
+   overrides the container networking (DB/Redis host, `CHANNEL_URL`,
+   `INTERNAL_*_URL`, `PORT`). If you're starting from scratch, populate them
+   per the milestones below.
+3. **Predictions/Kalshi** is optional. `make up` runs `make prep`, which
+   extracts the Kalshi key from `channels/predictions/.env` into gitignored
+   files under `secrets/` (the RSA PEM is mounted as a file — Docker's
+   `env_file` can't carry a multiline value). No `.env`? `make kalshi-key`
+   pulls it from the `scrollr-secrets` cluster secret. If neither is present,
+   the predictions channel is simply skipped and the rest of the stack runs.
+
+### After editing backend code
+
+Images are built from the committed source, so a code change needs a rebuild:
+`make rebuild` (or `make up` again — it does an incremental `--build`). The Go
+images build in seconds; the Rust ones use `cargo-chef`, so only your changed
+crate recompiles.
+
+### The desktop ".exe" prompt
+
+That's Windows SmartScreen / the firewall reacting to the **unsigned local dev
+build** — it runs on the host, so Docker can't remove it. It's a host-side
+thing, not part of this stack. (See the note at the end of this doc.)
+
+---
+
+## The two milestones (manual runbook / underlying detail)
+
+`make up` automates everything below; this section is the fallback and explains
+what the containers actually do.
 
 - **Milestone 1 — Core + auth** (below): sign in, manage channels/widgets.
   Exercises slot-gating, Configure-from-catalog, the removed Display pages,
@@ -161,6 +228,38 @@ Not wired here — Kalshi isn't in `scrollr-secrets` (on-device key model). See
 
 ## Teardown
 ```bash
+make down     # stop the whole backend, keep data   (≡ compose down)
+make clean    # stop AND wipe the Postgres + Redis volumes (≡ compose down -v)
+```
+The front-ends are native, so stop them by closing their window / Ctrl+C.
+
+Legacy (infra-only) equivalents still work and share the same containers:
+```bash
 docker compose -f docker-compose.local.yml down     # keep data
 docker compose -f docker-compose.local.yml down -v  # wipe data
 ```
+
+---
+
+## The desktop dev build & the Windows "run this .exe?" prompt
+
+The Tauri desktop app is a native Windows binary (`scrollr-desktop.exe` +
+WebView2). Because it's an **unsigned local dev build**, Windows Defender
+SmartScreen and/or the firewall prompt the first time it runs. This is a
+host-side OS behavior — the app can't be containerized, so Docker has no
+bearing on it.
+
+To stop the nag, pre-approve the dev binary once (PowerShell as admin):
+
+```powershell
+# Allow the Tauri dev binary through the firewall (adjust the path if needed)
+$exe = "$PWD\desktop\src-tauri\target\debug\scrollr-desktop.exe"
+New-NetFirewallRule -DisplayName "Scrollr dev" -Direction Inbound `
+  -Program $exe -Action Allow -Profile Any
+```
+
+SmartScreen's "Windows protected your PC" dialog (a separate thing from the
+firewall) only appears for downloaded/packaged builds; the `tauri dev` binary
+running from your own build tree usually doesn't trigger it. If it does, "More
+info → Run anyway" once is remembered. The real fix is code-signing, which the
+**release** builds already do — this only affects local dev.
