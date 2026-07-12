@@ -1,0 +1,11 @@
+# Keep line endings sane on Windows checkouts (autocrlf). Shell scripts and
+# Makefiles MUST stay LF — a CRLF checkout makes bash/make choke on the
+# trailing \r ("command not found", broken recipes), which would break the
+# `make` dev tooling on a fresh clone. Node ESM scripts stay LF for parity.
+*.sh       text eol=lf
+*.mjs      text eol=lf
+Makefile   text eol=lf
+
+# SQL migrations are embedded and checksummed (sqlx / golang-migrate); pin LF
+# so a Windows CRLF checkout can't drift a migration's checksum vs CI/prod.
+*.sql      text eol=lf

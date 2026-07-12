@@ -1,0 +1,8 @@
+# Keep the multi-GB local Cargo build tree out of the Docker build context —
+# the image builds fresh inside. (CI checks out clean, so this is a no-op there.)
+target/
+# Never copy local secrets/config into an image layer.
+.env
+.env.*
+*.pem
+secrets/
