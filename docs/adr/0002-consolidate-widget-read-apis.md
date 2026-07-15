@@ -186,13 +186,15 @@ side of that line, so it stays a service.
 
 ## Action Items
 
-1. [ ] Audit consumers of every Redis subscriber set
+1. [x] Audit consumers of every Redis subscriber set
    (`finance:subscribers:*`, `sports:subscribers:league:*`,
    `rss:subscribers:*`, `channel:subscribers:*`,
    `predictions:subscribers:all`) across core, the Go services, and
    the Rust ingesters, and of `/internal/cdc`. Anything the Rust
    pollers read to scope their polling must survive the migration
    with identical write semantics. Document findings before PR 2.
+   **Done 2026-07-15 — see Appendix A. Verdict: the entire
+   subscriber-set subsystem is write-only; every reader is dead.**
 2. [ ] PR: fold finance-api into core (pilot — smallest, 48% unique).
    Package under `api/core/` (or `api/widgets/finance`), register
    routes directly, port tests, add `INTERNAL_FINANCE_URL` to core's
@@ -211,3 +213,43 @@ side of that line, so it stays a service.
 6. [ ] Verify in-cluster after each fold: route parity (diff JSON
    responses old vs new path), SSE topic delivery for the moved
    source, dashboards, and `production-readiness.sh` green.
+
+## Appendix A — Subscriber-set / CDC consumer audit (2026-07-15, REL-10)
+
+Method: grep-verified every Redis set verb (`SMembers`, `SAdd`, `SRem`,
+`SCard`, `SIsMember`, `SScan`, `SRandMember`) across `api/`,
+`channels/*/api/`, and `channels/*/service/`, plus every reference to
+`internal/cdc`, then resolved each hit to its enclosing function.
+
+**The decisive fact: no Rust service has a redis dependency at all**
+(no redis crate in any `channels/*/service/Cargo.toml`; the only
+"redis" mentions in Rust source are doc comments). Pollers scope their
+work from Postgres `tracked_*` tables. Nothing outside the Go code can
+read these sets.
+
+| Key / endpoint | Writers (all on live code paths) | Readers | Verdict |
+|---|---|---|---|
+| `channel:subscribers:{source}` | core `channels.go` CRUD/prune (:106–:214, :737); predictions-api `onSyncSubscriptions` | predictions `handleInternalCDC` only — dead | delete writes + readers |
+| `sports:subscribers:league:{L}` | core `AddSubscriberMulti` (:122, :153) **and** sports-api `onChannelUpdated` (dual-maintained) | sports `handleInternalCDC` — dead | delete both writers + reader |
+| `finance:subscribers:{symbol}` | finance-api `onSyncSubscriptions` | finance `handleInternalCDC` — dead | delete |
+| `rss:subscribers:{url}` | rss-api lifecycle handlers | rss `handleInternalCDC` — dead | delete |
+| `predictions:subscribers:all` | predictions-api `onSyncSubscriptions` | predictions `handleInternalCDC` — dead | delete |
+| `fantasy:league_users:{key}` | fantasy `AddLeagueSubscriber` on Yahoo import/remove | fantasy `handleInternalCDC` — dead; core SSE reads the `yahoo_user_leagues` **table** instead (`events.go:631`) | delete (fantasy stays a service — its own small PR) |
+| `POST /internal/cdc` (all 5 services) | — | **zero callers** repo-wide (core routes CDC in-process via `handlers_webhook.go` → `topicForRecord`) | delete handlers + route registrations |
+
+Every `GetSubscribers`/`SMembers` call in the five services lives
+inside `handleInternalCDC`; core itself has zero set reads. SSE topic
+subscription reads `user_channels.config` (and `yahoo_user_leagues`
+for fantasy) directly — it never touches these sets.
+
+**One live behavior rides the lifecycle contract:** the handlers also
+invalidate per-user dashboard caches (e.g. rss `onChannelDeleted` DELs
+`CacheKeyRSSPrefix+user`). The folds must keep cache invalidation as
+an in-process call; everything else in the lifecycle → subscriber-set
+machinery (core `redis.go` subscriber helpers, `channels.go`
+`SyncChannelSubscriptions`/add/remove, service helpers and handlers)
+is deletable.
+
+Residual risk: an out-of-repo consumer (ops script, manual redis
+query) can't be grepped for — but the sets carry a 7-day TTL and are
+ephemeral membership caches, so nothing durable can depend on them.
