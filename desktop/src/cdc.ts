@@ -76,7 +76,10 @@ export const CDC_TABLES: CDCTableConfig[] = [
     // just-ticked market to the front on every SSE event and churn the feed.
     sort: (a, b) => (a as Prediction).id.localeCompare((b as Prediction).id),
     validate: (r) => r.id != null,
-    maxItems: 60,
+    // Payload-sized (v1.1.5): ~240 live + resolved-today riders. The old 60
+    // was far below the poll payload, so every legit CDC insert evicted
+    // from the head and churned until the safety-net refetch restored it.
+    maxItems: 300,
   },
 ];
 

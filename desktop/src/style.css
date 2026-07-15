@@ -34,6 +34,9 @@
   --color-secondary: #ff4757;
   --color-info: #00d4ff;
   --color-accent-purple: #a855f7;
+  /* Predictions (Kalshi) brand teal — static across theme palettes,
+     like the widget colors below (v1.1.5 unified the indigo/teal split). */
+  --color-predictions: #1fc9a0;
 
   /* ── Widget colors ────────────────────────────────────────── */
   --color-widget-clock: #6366f1;
