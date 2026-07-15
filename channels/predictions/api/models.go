@@ -21,17 +21,31 @@ type Prediction struct {
 	Category     string     `json:"category,omitempty"`
 	Title        string     `json:"title"`
 	Subtitle     string     `json:"subtitle,omitempty"`
-	YesPrice     int        `json:"yes_price"`
-	YesBid       int        `json:"yes_bid,omitempty"`
-	YesAsk       int        `json:"yes_ask,omitempty"`
-	PrevYesPrice int        `json:"prev_yes_price,omitempty"`
-	Volume       int64      `json:"volume,omitempty"`
-	OpenInterest int64      `json:"open_interest,omitempty"`
-	Status       string     `json:"status,omitempty"`
-	Result       string     `json:"result,omitempty"`
-	CloseTime    *time.Time `json:"close_time,omitempty"`
-	Link         string     `json:"link,omitempty"`
-	UpdatedAt    *time.Time `json:"updated_at,omitempty"`
+	YesPrice     int   `json:"yes_price"`
+	YesBid       int   `json:"yes_bid,omitempty"`
+	YesAsk       int   `json:"yes_ask,omitempty"`
+	PrevYesPrice int   `json:"prev_yes_price,omitempty"`
+	Volume       int64 `json:"volume,omitempty"`
+	// Volume24h is the trailing-24h contract volume (refreshed by the
+	// catalog sweep). Drives the desktop's "Trending" sort — all-time
+	// Volume never shrinks, so it can't rank liveliness. v1.1.5.
+	Volume24h    int64 `json:"volume_24h,omitempty"`
+	OpenInterest int64 `json:"open_interest,omitempty"`
+	// InSweep is false once the market drops out of the curated sweep
+	// selection (settled / delisted / out-ranked). Such rows only appear
+	// in the payload while recently resolved ("Resolved today"); clients
+	// must not render them as live markets. No omitempty — false is the
+	// meaningful value. v1.1.5.
+	InSweep bool   `json:"in_sweep"`
+	Status  string `json:"status,omitempty"`
+	Result  string `json:"result,omitempty"`
+	// SettledAt is when the market transitioned into a resolved state
+	// (stamped once by the ingestion service). Drives "Resolved today";
+	// updated_at is unusable for that — any write refreshes it. v1.1.5.
+	SettledAt *time.Time `json:"settled_at,omitempty"`
+	CloseTime *time.Time `json:"close_time,omitempty"`
+	Link      string     `json:"link,omitempty"`
+	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 }
 
 // CDCRecord represents a Change Data Capture record from Sequin.

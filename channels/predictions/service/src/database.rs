@@ -179,6 +179,7 @@ pub struct MarketRow {
     pub category: Option<String>,
     pub event_title: Option<String>,
     pub event_rank: Option<i16>,
+    pub in_sweep: Option<bool>,
 }
 
 /// The full set of displayed fields for a market upsert. All optional so a
@@ -210,6 +211,10 @@ pub struct MarketUpsert {
     /// the stored value).
     pub event_title: Option<String>,
     pub event_rank: Option<i16>,
+    /// Sweep membership (v1.1.5): Some(true) from the catalog sweep, None
+    /// from WS ticks (COALESCE keeps the stored value). Demotion to false
+    /// happens only via `reconcile_sweep_selection`.
+    pub in_sweep: Option<bool>,
 }
 
 impl MarketUpsert {
@@ -230,13 +235,54 @@ async fn get_market_row(pool: &Arc<PgPool>, id: &str) -> Result<Option<MarketRow
     let mut conn = pool.acquire().await?;
     let row: Option<MarketRow> = query_as(
         "SELECT id, yes_price, yes_bid, yes_ask, volume, volume_24h, open_interest,
-                status, result, title, subtitle, category, event_title, event_rank
+                status, result, title, subtitle, category, event_title, event_rank,
+                in_sweep
          FROM markets WHERE id = $1",
     )
     .bind(id)
     .fetch_optional(&mut *conn)
     .await?;
     Ok(row)
+}
+
+/// True when a status/result pair represents a resolved market. Mirrors the
+/// desktop's `isResolved` (view.ts) and the Go API's resolved-recently
+/// predicate — keep the three in sync (CONTRACT.md).
+fn is_resolved(status: Option<&str>, result: Option<&str>) -> bool {
+    let status_resolved = status
+        .map(|s| {
+            let s = s.to_ascii_lowercase();
+            s == "settled" || s == "determined" || s == "finalized"
+        })
+        .unwrap_or(false);
+    let result_resolved = result
+        .map(|r| {
+            let r = r.to_ascii_lowercase();
+            r == "yes" || r == "no"
+        })
+        .unwrap_or(false);
+    status_resolved || result_resolved
+}
+
+/// The `settled_at` stamp for a write that may transition a row into a
+/// resolved state: Some(now) only when the effective next state is resolved
+/// and the previous state was not. Stamped once; COALESCE in SQL keeps the
+/// first value if a later write would stamp again.
+fn settled_at_stamp(
+    prev_status: Option<&str>,
+    prev_result: Option<&str>,
+    next_status: Option<&str>,
+    next_result: Option<&str>,
+) -> Option<chrono::DateTime<Utc>> {
+    let effective_status = next_status.or(prev_status);
+    let effective_result = next_result.or(prev_result);
+    if is_resolved(effective_status, effective_result)
+        && !is_resolved(prev_status, prev_result)
+    {
+        Some(Utc::now())
+    } else {
+        None
+    }
 }
 
 /// Returns true when any displayed field in `next` differs from `prev`.
@@ -260,6 +306,7 @@ fn displayed_field_changed(prev: &MarketRow, next: &MarketUpsert) -> bool {
         || changed!(category)
         || changed!(event_title)
         || changed!(event_rank)
+        || changed!(in_sweep)
 }
 
 /// Upsert a market into the `markets` display table with CHANGE-DETECTION.
@@ -286,6 +333,16 @@ pub async fn upsert_market(
 
     match existing {
         Some(prev) => {
+            // Dormant row + WS tick (v1.1.5): the ticker firehose covers
+            // every open Kalshi market, including thousands that dropped
+            // out of the curated sweep. Once demoted, those rows must stop
+            // generating writes/CDC events — only the sweep (create_missing
+            // = true) may touch them again, which is also how a market that
+            // re-enters the selection gets promoted back.
+            if !create_missing && prev.in_sweep == Some(false) {
+                return Ok(false);
+            }
+
             if !displayed_field_changed(&prev, upsert) {
                 // No-op tick — skip the write entirely to avoid CDC churn.
                 return Ok(false);
@@ -294,6 +351,14 @@ pub async fn upsert_market(
             // A displayed field changed. COALESCE each column so a sparse
             // ticker event only overwrites the fields it carries; carry the
             // OLD yes_price into prev_yes_price for the movers delta.
+            // settled_at is stamped once, on the transition into a resolved
+            // state (COALESCE on the COLUMN keeps the first stamp).
+            let settled_at = settled_at_stamp(
+                prev.status.as_deref(),
+                prev.result.as_deref(),
+                upsert.status.as_deref(),
+                upsert.result.as_deref(),
+            );
             let mut conn = pool.acquire().await?;
             query(
                 "UPDATE markets SET
@@ -317,6 +382,8 @@ pub async fn upsert_market(
                     link          = COALESCE($19, link),
                     event_title   = COALESCE($20, event_title),
                     event_rank    = COALESCE($21, event_rank),
+                    in_sweep      = COALESCE($22, in_sweep),
+                    settled_at    = COALESCE(settled_at, $23),
                     updated_at    = now()
                  WHERE id = $1",
             )
@@ -341,6 +408,8 @@ pub async fn upsert_market(
             .bind(&upsert.link)
             .bind(&upsert.event_title)
             .bind(upsert.event_rank)
+            .bind(upsert.in_sweep)
+            .bind(settled_at)
             .execute(&mut *conn)
             .await
             .context("update market")?;
@@ -352,17 +421,26 @@ pub async fn upsert_market(
                 // (WS ticker path) -- drop the tick.
                 return Ok(false);
             }
+            // A row that is resolved at insert (rare: a settled leg of a
+            // still-open event entering the selection) is stamped now — it
+            // just became visible to us, which is the best signal we have.
+            let settled_at = settled_at_stamp(
+                None,
+                None,
+                upsert.status.as_deref(),
+                upsert.result.as_deref(),
+            );
             let mut conn = pool.acquire().await?;
             query(
                 "INSERT INTO markets (
                     id, source, ticker, event_ticker, series_ticker, category, title,
                     subtitle, yes_price, yes_bid, yes_ask, prev_yes_price, volume,
                     volume_24h, open_interest, status, result, is_primary, open_time,
-                    close_time, link, event_title, event_rank
+                    close_time, link, event_title, event_rank, in_sweep, settled_at
                  ) VALUES (
                     $1, 'kalshi', $2, $3, $4, $5, $6, $7, $8, $9, $10, $8, $11, $12, $13,
                     $14, $15, COALESCE($16, TRUE), $17, $18, $19,
-                    COALESCE($20, ''), COALESCE($21, 1)
+                    COALESCE($20, ''), COALESCE($21, 1), COALESCE($22, TRUE), $23
                  )
                  ON CONFLICT (id) DO NOTHING",
             )
@@ -387,12 +465,47 @@ pub async fn upsert_market(
             .bind(&upsert.link)
             .bind(&upsert.event_title)
             .bind(upsert.event_rank)
+            .bind(upsert.in_sweep)
+            .bind(settled_at)
             .execute(&mut *conn)
             .await
             .context("insert market")?;
             Ok(true)
         }
     }
+}
+
+/// Demote every `in_sweep = TRUE` row that is NOT part of the current sweep
+/// selection (v1.1.5 reconciliation). Returns the demoted tickers so the
+/// caller can REST-check their real settlement status.
+///
+/// One statement, sweep-cadence (every 15 min); each demotion fires a CDC
+/// event (WAL-based), which is intended — clients learn the market left the
+/// curated set. Re-promotion happens naturally via the sweep's own upsert
+/// (`in_sweep: Some(true)`) *before* this runs, so a market that re-enters
+/// the selection is never demoted in the same cycle. CALLERS must gate this
+/// on a complete, plausibly-sized selection (`lib.rs::should_reconcile`) —
+/// an empty list demotes every live row.
+pub async fn reconcile_sweep_selection(
+    pool: &Arc<PgPool>,
+    selected_ids: &[String],
+) -> Result<Vec<String>> {
+    let mut conn = pool.acquire().await?;
+    // Deliberately does NOT touch updated_at: demotion is a membership
+    // change, not a data refresh. updated_at feeds "how fresh is this
+    // market" displays and the resolved-today window used to key off it —
+    // bumping it here made every long-settled row in a bulk demotion look
+    // freshly resolved (found during v1.1.5 verification).
+    let rows: Vec<(String,)> = query_as(
+        "UPDATE markets SET in_sweep = FALSE
+         WHERE in_sweep = TRUE AND NOT (id = ANY($1))
+         RETURNING ticker",
+    )
+    .bind(selected_ids)
+    .fetch_all(&mut *conn)
+    .await
+    .context("reconcile sweep selection")?;
+    Ok(rows.into_iter().map(|(t,)| t).collect())
 }
 
 /// Update only the lifecycle status/result of a market (from
@@ -416,17 +529,28 @@ pub async fn update_market_lifecycle(
         return Ok(false);
     }
 
+    // Stamp settled_at when THIS write is the transition into a resolved
+    // state (lifecycle WS event or the sweep's dropped-market recheck).
+    let settled_at = settled_at_stamp(
+        prev.status.as_deref(),
+        prev.result.as_deref(),
+        status,
+        result,
+    );
+
     let mut conn = pool.acquire().await?;
     query(
         "UPDATE markets SET
             status = COALESCE($2, status),
             result = COALESCE($3, result),
+            settled_at = COALESCE(settled_at, $4),
             updated_at = now()
          WHERE id = $1",
     )
     .bind(&id)
     .bind(status)
     .bind(result)
+    .bind(settled_at)
     .execute(&mut *conn)
     .await
     .context("update market lifecycle")?;
@@ -593,6 +717,7 @@ mod tests {
             category: None,
             event_title: None,
             event_rank: None,
+            in_sweep: Some(true),
         }
     }
 
@@ -627,6 +752,52 @@ mod tests {
         let mut next = MarketUpsert::new("TEST");
         next.status = Some("closed".into());
         assert!(displayed_field_changed(&prev, &next));
+    }
+
+    #[test]
+    fn resolved_state_detection() {
+        assert!(is_resolved(Some("settled"), None));
+        assert!(is_resolved(Some("Determined"), None));
+        assert!(is_resolved(Some("FINALIZED"), None));
+        assert!(is_resolved(Some("active"), Some("yes")));
+        assert!(is_resolved(None, Some("no")));
+        assert!(!is_resolved(Some("active"), Some("")));
+        assert!(!is_resolved(Some("closed"), None)); // closed trades no more but isn't resolved
+        assert!(!is_resolved(None, None));
+    }
+
+    #[test]
+    fn settled_at_stamps_only_on_transition() {
+        // active -> finalized: stamp.
+        assert!(settled_at_stamp(Some("active"), None, Some("finalized"), None).is_some());
+        // result arrives while status stays active: stamp.
+        assert!(settled_at_stamp(Some("active"), Some(""), None, Some("yes")).is_some());
+        // already resolved -> another resolved write: no re-stamp.
+        assert!(settled_at_stamp(Some("finalized"), None, Some("settled"), None).is_none());
+        assert!(settled_at_stamp(Some("active"), Some("yes"), Some("finalized"), None).is_none());
+        // sparse write carrying nothing lifecycle-ish on an active row: no stamp.
+        assert!(settled_at_stamp(Some("active"), None, None, None).is_none());
+        // insert-time resolution (no prev state): stamp.
+        assert!(settled_at_stamp(None, None, Some("finalized"), None).is_some());
+    }
+
+    #[test]
+    fn in_sweep_transition_detected() {
+        // v1.1.5: demotion/promotion must count as a displayed change so a
+        // CDC event tells clients the market left/re-entered the curated
+        // set; a sweep re-asserting the current value is a no-op.
+        let prev = row(Some(62), Some("active")); // in_sweep: Some(true)
+        let mut demote = MarketUpsert::new("TEST");
+        demote.in_sweep = Some(false);
+        assert!(displayed_field_changed(&prev, &demote));
+
+        let mut reassert = MarketUpsert::new("TEST");
+        reassert.in_sweep = Some(true);
+        assert!(!displayed_field_changed(&prev, &reassert));
+
+        // WS ticks (in_sweep: None) never count as a membership change.
+        let ws_tick = MarketUpsert::new("TEST");
+        assert!(!displayed_field_changed(&prev, &ws_tick));
     }
 
     #[test]

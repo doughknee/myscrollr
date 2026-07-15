@@ -58,11 +58,11 @@ const (
 	// audience.
 	RedisChannelSubscribersPrefix = "channel:subscribers:"
 
-	// MarketsQuery is the SQL used to fetch all tracked markets for display.
-	// COALESCE guards against NULL columns for rows that have been inserted
-	// but not yet updated by the Rust ingestion service.
-	MarketsQuery = `
-		SELECT
+	// marketsSelectList is the shared column list for market display
+	// queries. COALESCE guards against NULL columns for rows that have been
+	// inserted but not yet updated by the Rust ingestion service. Scan order
+	// must match scanMarkets / queryMarkets.
+	marketsSelectList = `
 			id,
 			COALESCE(source, 'kalshi'),
 			ticker,
@@ -77,15 +77,46 @@ const (
 			COALESCE(yes_ask, 0),
 			COALESCE(prev_yes_price, 0),
 			COALESCE(volume, 0),
+			COALESCE(volume_24h, 0),
 			COALESCE(open_interest, 0),
+			COALESCE(in_sweep, TRUE),
 			COALESCE(status, ''),
 			COALESCE(result, ''),
+			settled_at,
 			close_time,
 			COALESCE(link, ''),
-			COALESCE(updated_at, created_at)
+			COALESCE(updated_at, created_at)`
+
+	// marketsLiveWhere is the "live curated set" predicate (v1.1.5): rows in
+	// the current sweep selection that haven't passed close or settled. The
+	// close_time guard is a zombie backstop only — Kalshi sets close_time
+	// weeks past real settlement, so it can't DETECT settlement (that's what
+	// in_sweep + the lifecycle/recheck status writes are for), but a row
+	// past its close is definitively not live.
+	marketsLiveWhere = `in_sweep = TRUE
+			AND (is_primary = TRUE OR event_rank = 2)
+			AND (close_time IS NULL OR close_time > now())
+			AND lower(COALESCE(status, '')) NOT IN ('settled', 'determined', 'finalized')`
+
+	// marketsResolvedRecentlyWhere keeps just-settled markets in the payload
+	// for the desktop's "Resolved today" strip, regardless of sweep
+	// membership (settled markets leave the sweep by definition). Keyed on
+	// settled_at — the once-stamped resolution transition — NOT updated_at,
+	// which any write refreshes (a sweep volume touch or bulk demotion would
+	// make markets settled weeks ago look freshly resolved).
+	marketsResolvedRecentlyWhere = `settled_at IS NOT NULL
+			AND settled_at > now() - interval '24 hours'`
+
+	// MarketsQuery fetches every market the widget may display: the live
+	// curated set plus the trailing-24h resolved rows. Ordered by 24h volume
+	// (liveliness) — all-time volume never shrinks, so settled giants would
+	// permanently outrank live markets (the v1.1.4 stale-feed bug).
+	MarketsQuery = `
+		SELECT` + marketsSelectList + `
 		FROM markets
-		WHERE is_primary = true OR event_rank = 2
-		ORDER BY volume DESC, ticker ASC`
+		WHERE (` + marketsLiveWhere + `)
+		   OR (` + marketsResolvedRecentlyWhere + `)
+		ORDER BY volume_24h DESC NULLS LAST, volume DESC, ticker ASC`
 )
 
 // =============================================================================
@@ -291,16 +322,33 @@ func (a *App) handleInternalDashboard(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"predictions": []Prediction{}})
 	}
 
-	// Check per-user cache first
+	// Resolve the user's view: favorites/categories from channel config.
+	// v1.1.5 clients write no server config, so the common case is "no
+	// narrowing" — everyone gets the same payload, served from ONE shared
+	// cache entry (the same key getPredictions uses) instead of a
+	// duplicate per-user copy in Redis.
+	favorites, categories := a.getUserPredictionsConfig(userSub)
+	if len(favorites) == 0 && len(categories) == 0 {
+		var predictions []Prediction
+		if GetCache(a.rdb, CacheKeyPredictions, &predictions) {
+			return c.JSON(fiber.Map{"predictions": predictions})
+		}
+		predictions, err := a.queryMarkets(context.Background())
+		if err != nil {
+			log.Printf("[Predictions] Dashboard query failed: %v", err)
+			return c.JSON(fiber.Map{"predictions": []Prediction{}})
+		}
+		SetCache(a.rdb, CacheKeyPredictions, predictions, PredictionsCacheTTL)
+		return c.JSON(fiber.Map{"predictions": predictions})
+	}
+
+	// Narrowed view (pre-v1.1.5 client config): cached per user.
 	cacheKey := CacheKeyPredictionsPrefix + userSub
 	var predictions []Prediction
 	if GetCache(a.rdb, cacheKey, &predictions) {
 		return c.JSON(fiber.Map{"predictions": predictions})
 	}
 
-	// Resolve the user's view: their favorites/categories from channel config,
-	// falling back to all enabled markets.
-	favorites, categories := a.getUserPredictionsConfig(userSub)
 	predictions = a.queryMarketsForUser(favorites, categories)
 	if predictions == nil {
 		predictions = make([]Prediction, 0)
@@ -447,7 +495,8 @@ func (a *App) queryMarkets(ctx context.Context) ([]Prediction, error) {
 			&p.ID, &p.Source, &p.Ticker, &p.EventTicker, &p.EventTitle,
 			&p.EventRank, &p.Category, &p.Title,
 			&p.Subtitle, &p.YesPrice, &p.YesBid, &p.YesAsk, &p.PrevYesPrice,
-			&p.Volume, &p.OpenInterest, &p.Status, &p.Result, &p.CloseTime,
+			&p.Volume, &p.Volume24h, &p.OpenInterest, &p.InSweep,
+			&p.Status, &p.Result, &p.SettledAt, &p.CloseTime,
 			&p.Link, &p.UpdatedAt,
 		); err != nil {
 			log.Printf("[Predictions] Row scan failed: %v", err)
@@ -481,20 +530,17 @@ func (a *App) queryMarketsForUser(favorites, categories []string) []Prediction {
 		return predictions
 	}
 
+	// Old-client path (pre-v1.1.5 configs): category narrowing + favorites
+	// union, but on top of the same liveness gates as MarketsQuery — a
+	// starred or category-matched market that left the sweep must not keep
+	// serving frozen prices to old builds either.
 	rows, err := a.db.Query(ctx, `
-		SELECT
-			id, COALESCE(source, 'kalshi'), ticker, COALESCE(event_ticker, ''),
-			COALESCE(event_title, ''), COALESCE(event_rank, 1),
-			COALESCE(category, 'Other'), COALESCE(title, ''), COALESCE(subtitle, ''),
-			COALESCE(yes_price, 0), COALESCE(yes_bid, 0), COALESCE(yes_ask, 0),
-			COALESCE(prev_yes_price, 0), COALESCE(volume, 0), COALESCE(open_interest, 0),
-			COALESCE(status, ''), COALESCE(result, ''), close_time,
-			COALESCE(link, ''), COALESCE(updated_at, created_at)
+		SELECT`+marketsSelectList+`
 		FROM markets
-		WHERE ((is_primary = true OR event_rank = 2)
-		       AND (cardinality($1::text[]) = 0 OR category = ANY($1)))
-		   OR ticker = ANY($2)
-		ORDER BY volume DESC, ticker ASC
+		WHERE ((`+marketsLiveWhere+`)
+		       AND (cardinality($1::text[]) = 0 OR category = ANY($1) OR ticker = ANY($2)))
+		   OR (`+marketsResolvedRecentlyWhere+`)
+		ORDER BY volume_24h DESC NULLS LAST, volume DESC, ticker ASC
 	`, categories, favorites)
 	return scanMarkets(rows, err)
 }
@@ -515,7 +561,8 @@ func scanMarkets(rows pgx.Rows, err error) []Prediction {
 			&p.ID, &p.Source, &p.Ticker, &p.EventTicker, &p.EventTitle,
 			&p.EventRank, &p.Category, &p.Title,
 			&p.Subtitle, &p.YesPrice, &p.YesBid, &p.YesAsk, &p.PrevYesPrice,
-			&p.Volume, &p.OpenInterest, &p.Status, &p.Result, &p.CloseTime,
+			&p.Volume, &p.Volume24h, &p.OpenInterest, &p.InSweep,
+			&p.Status, &p.Result, &p.SettledAt, &p.CloseTime,
 			&p.Link, &p.UpdatedAt,
 		); err != nil {
 			log.Printf("[Predictions] Row scan failed: %v", err)

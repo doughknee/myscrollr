@@ -14,8 +14,8 @@ use std::{fs, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, time::sleep};
 
 use crate::database::{
-    record_poll_error, record_poll_success, seed_tracked_markets, upsert_market,
-    upsert_tracked_market, MarketUpsert, PgPool,
+    record_poll_error, record_poll_success, reconcile_sweep_selection, seed_tracked_markets,
+    update_market_lifecycle, upsert_market, upsert_tracked_market, MarketUpsert, PgPool,
 };
 use crate::kalshi::model::Market;
 use crate::log::{error, info, warn};
@@ -48,6 +48,34 @@ const CATALOG_MAX_MARKETS: usize = 240;
 /// Kalshi-style event cards with the top two legs. Rank 1 is `is_primary`
 /// for back-compat with pre-1.1.4 consumers.
 const MARKETS_PER_EVENT: u32 = 2;
+
+/// Per-request ticker batch for the dropped-market settlement recheck
+/// (v1.1.5). Kalshi's `GET /markets?tickers=` accepts a CSV; keep batches
+/// small to stay well inside URL-length and rate limits.
+const RECHECK_CHUNK: usize = 50;
+
+/// If a single reconcile demotes more rows than this, skip the settlement
+/// recheck for that cycle. A normal sweep drops a few dozen markets; a
+/// four-digit demotion is the one-time post-deploy backlog (or a Kalshi-side
+/// catalog upheaval), where per-ticker rechecks would be thousands of
+/// pointless signed calls about ancient markets.
+const RECHECK_SKIP_THRESHOLD: usize = 500;
+
+/// Reconciliation only runs on a sweep that is plausibly COMPLETE. A sweep
+/// whose pagination errored (or hit the safety page cap) has an incomplete
+/// selection — demoting against it would mark live markets dead; with an
+/// empty selection it would demote EVERY live market and blank the feed
+/// until the next successful sweep. Kalshi lists thousands of open events,
+/// so a clean sweep selecting fewer than this is itself an upstream anomaly
+/// we refuse to act on. (Ship-blocker caught in the v1.1.5 pre-merge
+/// review: a single timeout on the first /events page would have wiped the
+/// live set ~96x/day worst case.)
+const RECONCILE_MIN_SELECTED: usize = 50;
+
+/// Pure guard for `catalog_sweep`'s reconciliation step.
+fn should_reconcile(sweep_complete: bool, selected_len: usize) -> bool {
+    sweep_complete && selected_len >= RECONCILE_MIN_SELECTED
+}
 
 pub async fn start_predictions_services(
     pool: Arc<PgPool>,
@@ -157,6 +185,10 @@ async fn catalog_sweep(state: &PredictionsState) {
     let mut all: Vec<(Market, Option<String>, String)> = Vec::new();
     let mut cursor = String::new();
     let mut pages = 0u32;
+    // True only when pagination drained Kalshi's full open-events list. A
+    // partial sweep (page error / safety cap) may still upsert what it got,
+    // but MUST NOT reconcile — see `should_reconcile`.
+    let mut sweep_complete = true;
 
     loop {
         let query = if cursor.is_empty() {
@@ -188,11 +220,13 @@ async fn catalog_sweep(state: &PredictionsState) {
                 // Safety stop so a misbehaving cursor can't loop forever.
                 if pages >= 50 {
                     warn!("[ Kalshi ] Catalog sweep hit 50-page cap; stopping pagination");
+                    sweep_complete = false;
                     break;
                 }
             }
             Err(e) => {
                 warn!("[ Kalshi ] Catalog sweep page fetch failed: {e:#}");
+                sweep_complete = false;
                 break;
             }
         }
@@ -273,6 +307,7 @@ async fn catalog_sweep(state: &PredictionsState) {
             link: Some(market_link(series.as_deref(), &m.event_ticker)),
             event_title: non_empty(ev_title),
             event_rank: Some(*rank as i16),
+            in_sweep: Some(true),
         };
 
         match upsert_market(&state.pool, &upsert, true).await {
@@ -301,6 +336,85 @@ async fn catalog_sweep(state: &PredictionsState) {
     }
 
     info!("[ Kalshi ] Catalog sweep complete: {persisted} markets persisted");
+
+    // Reconciliation (v1.1.5): demote every row that is no longer part of
+    // the selection so the feed stops serving dead markets. Runs AFTER the
+    // upsert loop, so a market that re-entered the selection was already
+    // re-promoted (in_sweep: Some(true)) and is never demoted here.
+    //
+    // GUARDED: only a complete, plausibly-sized sweep may demote. "Absent
+    // from an incomplete selection" says nothing about a market being dead —
+    // and an errored first page would otherwise demote everything.
+    if !should_reconcile(sweep_complete, selected.len()) {
+        warn!(
+            "[ Kalshi ] Skipping sweep reconcile (complete={sweep_complete}, selected={}) — partial or implausibly small sweep",
+            selected.len()
+        );
+        return;
+    }
+    let selected_ids: Vec<String> = selected
+        .iter()
+        .map(|(m, _, _, _)| format!("kalshi:{}", m.ticker))
+        .collect();
+    match reconcile_sweep_selection(&state.pool, &selected_ids).await {
+        Ok(dropped) if dropped.is_empty() => {}
+        Ok(dropped) => {
+            info!("[ Kalshi ] Sweep reconcile: {} rows demoted", dropped.len());
+            recheck_dropped_markets(state, dropped).await;
+        }
+        Err(e) => warn!("[ Kalshi ] Sweep reconcile failed: {e:#}"),
+    }
+}
+
+/// REST-check the real status of markets that just dropped out of the sweep
+/// selection, so settlements land even though (a) settled markets vanish
+/// from the open-events sweep and (b) the `market_lifecycle_v2` WS message
+/// may have been missed (pod restart, reconnect gap). This is what keeps
+/// "Resolved today" honest — without it a settled market's row stays
+/// frozen at status='active' forever.
+async fn recheck_dropped_markets(state: &PredictionsState, dropped: Vec<String>) {
+    if dropped.len() > RECHECK_SKIP_THRESHOLD {
+        info!(
+            "[ Kalshi ] Skipping settlement recheck for {} demoted markets (> {RECHECK_SKIP_THRESHOLD}; bulk backlog, not fresh settlements)",
+            dropped.len()
+        );
+        return;
+    }
+
+    let mut updated = 0u64;
+    for chunk in dropped.chunks(RECHECK_CHUNK) {
+        let query = format!("tickers={}&limit={RECHECK_CHUNK}", chunk.join(","));
+        match state.rest.get_markets(&query).await {
+            Ok(resp) => {
+                for m in resp.markets {
+                    if m.ticker.is_empty() {
+                        continue;
+                    }
+                    match update_market_lifecycle(
+                        &state.pool,
+                        &m.ticker,
+                        m.status.as_deref(),
+                        m.result.as_deref(),
+                    )
+                    .await
+                    {
+                        Ok(true) => updated += 1,
+                        Ok(false) => {}
+                        Err(e) => warn!(
+                            "[ Kalshi ] Recheck lifecycle write failed for {}: {e:#}",
+                            m.ticker
+                        ),
+                    }
+                }
+            }
+            Err(e) => warn!("[ Kalshi ] Recheck fetch failed for a chunk of {}: {e:#}", chunk.len()),
+        }
+        // Same politeness delay as the sweep pagination.
+        sleep(Duration::from_millis(250)).await;
+    }
+    if updated > 0 {
+        info!("[ Kalshi ] Settlement recheck: {updated} demoted markets updated");
+    }
 }
 
 // ─── parsing / derivation helpers ────────────────────────────────────────
@@ -391,6 +505,17 @@ fn derive_category(ticker: &str, event_ticker: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reconcile_guard_requires_complete_plausible_sweep() {
+        // The v1.1.5 ship-blocker: an errored/empty sweep must never demote.
+        assert!(!should_reconcile(true, 0)); // empty selection
+        assert!(!should_reconcile(false, 240)); // partial pagination
+        assert!(!should_reconcile(false, 0)); // errored first page
+        assert!(!should_reconcile(true, RECONCILE_MIN_SELECTED - 1)); // implausibly small
+        assert!(should_reconcile(true, RECONCILE_MIN_SELECTED)); // floor is inclusive
+        assert!(should_reconcile(true, 240)); // normal sweep
+    }
 
     #[test]
     fn cents_rounds_dollars() {
