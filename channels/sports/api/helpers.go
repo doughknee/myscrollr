@@ -119,6 +119,9 @@ func probeIngestion(ctx context.Context, internalURL string) (int, error) {
 	return resp.StatusCode, nil
 }
 
+// maxHealthResponseBytes limits the body size read from internal health endpoints.
+const maxHealthResponseBytes = 1 << 20 // 1 MB
+
 // ProxyInternalHealth proxies a health check to an internal service URL.
 // Used by the public /sports/health endpoint so operators can curl the full
 // Rust-side payload without having to exec into the cluster.
@@ -141,7 +144,10 @@ func ProxyInternalHealth(c *fiber.Ctx, internalURL string) error {
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxHealthResponseBytes))
+	if err != nil {
+		log.Printf("[Sports] Failed to read health response body: %v", err)
+	}
 	c.Set("Content-Type", "application/json")
 	return c.Status(resp.StatusCode).Send(body)
 }

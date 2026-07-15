@@ -8,7 +8,7 @@ import (
 )
 
 // TestBuildReadyURL verifies that every input shape we'd reasonably get
-// from `INTERNAL_SPORTS_URL` produces the canonical /health/ready path.
+// from `INTERNAL_FINANCE_URL` produces the canonical /health/ready path.
 // Guards against the previous bug where `buildHealthURL` produced `/health`
 // and a follower typo turned it into `/healthy` without anyone noticing.
 func TestBuildReadyURL(t *testing.T) {

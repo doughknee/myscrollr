@@ -65,6 +65,9 @@ func buildHealthURL(baseURL string) string {
 	return url
 }
 
+// maxHealthResponseBytes limits the body size read from internal health endpoints.
+const maxHealthResponseBytes = 1 << 20 // 1 MB
+
 // ProxyInternalHealth proxies a health check to an internal service URL.
 func ProxyInternalHealth(c *fiber.Ctx, internalURL string) error {
 	if internalURL == "" {
@@ -85,7 +88,10 @@ func ProxyInternalHealth(c *fiber.Ctx, internalURL string) error {
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxHealthResponseBytes))
+	if err != nil {
+		log.Printf("[Fantasy] Failed to read health response body: %v", err)
+	}
 	c.Set("Content-Type", "application/json")
 	return c.Status(resp.StatusCode).Send(body)
 }
