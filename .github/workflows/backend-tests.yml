@@ -31,9 +31,6 @@ jobs:
           - dir: api/core
             modroot: api
             module: github.com/brandon-relentnet/myscrollr/api
-          - dir: channels/finance/api
-            modroot: channels/finance/api
-            module: github.com/brandon-relentnet/scrollr-finance
           - dir: channels/sports/api
             modroot: channels/sports/api
             module: github.com/brandon-relentnet/scrollr-sports

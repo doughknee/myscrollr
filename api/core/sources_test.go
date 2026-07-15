@@ -1,4 +1,8 @@
-package main
+package core
+
+// Ported from channels/finance/api/health_test.go when the finance
+// source was folded into core (ADR-0002, REL-14). These now guard the
+// shared ingestion-probe plumbing every local source uses.
 
 import (
 	"context"
@@ -8,9 +12,10 @@ import (
 )
 
 // TestBuildReadyURL verifies that every input shape we'd reasonably get
-// from `INTERNAL_FINANCE_URL` produces the canonical /health/ready path.
-// Guards against the previous bug where `buildHealthURL` produced `/health`
-// and a follower typo turned it into `/healthy` without anyone noticing.
+// from an `INTERNAL_*_URL` produces the canonical /health/ready path.
+// Guards against the previous bug where `buildHealthURL` produced
+// `/health` and a follower typo turned it into `/healthy` without anyone
+// noticing.
 func TestBuildReadyURL(t *testing.T) {
 	cases := []struct {
 		in   string
@@ -30,10 +35,9 @@ func TestBuildReadyURL(t *testing.T) {
 	}
 }
 
-// TestProbeIngestion_ForwardsStatusCode covers the critical invariant
-// enforced by handleInternalHealth: whatever HTTP status code the Rust
-// service's /health/ready returns, we need to propagate it so the k8s
-// readiness probe on the Go API can tell when ingestion is broken.
+// TestProbeIngestion_ForwardsStatusCode covers the critical invariant:
+// whatever HTTP status code the Rust service's /health/ready returns, we
+// propagate it so /health can tell when ingestion is broken.
 func TestProbeIngestion_ForwardsStatusCode(t *testing.T) {
 	cases := []int{200, 503, 500}
 	for _, want := range cases {
@@ -60,7 +64,7 @@ func TestProbeIngestion_ForwardsStatusCode(t *testing.T) {
 
 // TestProbeIngestion_NetworkErrorReturnsError verifies we surface a
 // connection-level failure (Rust service down entirely) as an error, so
-// handleInternalHealth can mark the pod degraded.
+// /health can mark the source degraded.
 func TestProbeIngestion_NetworkErrorReturnsError(t *testing.T) {
 	// Bind to :0 and immediately close — any client request will see
 	// ECONNREFUSED.

@@ -8,9 +8,11 @@
 #
 #   ingress-nginx ──► website:3000
 #   ingress-nginx ──► core-api:8080
-#   core-api      ──► {finance,sports,rss,fantasy}-api  (8081-8084)
-#   {channel}-api ──► {channel}-service                  (3001/3002/3004,
+#   core-api      ──► {sports,rss,fantasy,predictions}-api  (8082-8085)
+#   {channel}-api ──► {channel}-service                  (3002/3004/3005,
 #                                                         health probes)
+#   core-api      ──► finance-service:3001  (finance folded into core,
+#                                            ADR-0002; probe + /finance/health)
 #
 # Everything else inbound is denied by the namespace-wide default-deny.
 # Egress is intentionally unrestricted (policyTypes: [Ingress] everywhere) —
@@ -80,26 +82,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-core-to-finance-api
-  namespace: scrollr
-spec:
-  podSelector:
-    matchLabels:
-      app: finance-api
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: core-api
-      ports:
-        - protocol: TCP
-          port: 8081
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -201,10 +183,12 @@ spec:
         - protocol: TCP
           port: 3005
 ---
+# finance-api was folded into core-api (ADR-0002, REL-14) — core now
+# probes finance-service directly.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-finance-api-to-finance-service
+  name: allow-core-to-finance-service
   namespace: scrollr
 spec:
   podSelector:
@@ -216,7 +200,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              app: finance-api
+              app: core-api
       ports:
         - protocol: TCP
           port: 3001

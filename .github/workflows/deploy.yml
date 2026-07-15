@@ -36,7 +36,6 @@ jobs:
     outputs:
       core-api: ${{ steps.manual.outputs.core-api || steps.changes.outputs.core-api }}
       website: ${{ steps.manual.outputs.website || steps.changes.outputs.website }}
-      finance-api: ${{ steps.manual.outputs.finance-api || steps.changes.outputs.finance-api }}
       finance-service: ${{ steps.manual.outputs.finance-service || steps.changes.outputs.finance-service }}
       sports-api: ${{ steps.manual.outputs.sports-api || steps.changes.outputs.sports-api }}
       sports-service: ${{ steps.manual.outputs.sports-service || steps.changes.outputs.sports-service }}
@@ -58,7 +57,7 @@ jobs:
           # website, and only for `desktop-v*` tags. Other releases (none
           # exist today, but future-proof) are ignored.
           if [ "${{ github.event_name }}" = "release" ]; then
-            for svc in core-api website finance-api finance-service sports-api sports-service rss-api rss-service fantasy-api predictions-api predictions-service k8s; do
+            for svc in core-api website finance-service sports-api sports-service rss-api rss-service fantasy-api predictions-api predictions-service k8s; do
               echo "${svc}=false" >> $GITHUB_OUTPUT
             done
 
@@ -78,14 +77,14 @@ jobs:
             exit 0
           fi
 
-          for svc in core-api website finance-api finance-service sports-api sports-service rss-api rss-service fantasy-api predictions-api predictions-service k8s; do
+          for svc in core-api website finance-service sports-api sports-service rss-api rss-service fantasy-api predictions-api predictions-service k8s; do
             echo "${svc}=false" >> $GITHUB_OUTPUT
           done
 
           services="$(printf '%s' '${{ inputs.services }}' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
 
           if [ -z "$services" ] || [ "$services" = "all" ]; then
-            for svc in core-api website finance-api finance-service sports-api sports-service rss-api rss-service fantasy-api predictions-api predictions-service k8s; do
+            for svc in core-api website finance-service sports-api sports-service rss-api rss-service fantasy-api predictions-api predictions-service k8s; do
               echo "${svc}=true" >> $GITHUB_OUTPUT
             done
             exit 0
@@ -94,7 +93,7 @@ jobs:
           IFS=',' read -r -a selected <<< "$services"
           for svc in "${selected[@]}"; do
             case "$svc" in
-              core-api|website|finance-api|finance-service|sports-api|sports-service|rss-api|rss-service|fantasy-api|predictions-api|predictions-service|k8s)
+              core-api|website|finance-service|sports-api|sports-service|rss-api|rss-service|fantasy-api|predictions-api|predictions-service|k8s)
                 echo "${svc}=true" >> $GITHUB_OUTPUT
                 ;;
               *)
@@ -113,8 +112,6 @@ jobs:
               - 'api/**'
             website:
               - 'myscrollr.com/**'
-            finance-api:
-              - 'channels/finance/api/**'
             finance-service:
               - 'channels/finance/service/**'
             sports-api:
@@ -150,10 +147,6 @@ jobs:
             context: .
             dockerfile: ./myscrollr.com/Dockerfile
             changed: ${{ needs.detect-changes.outputs.website }}
-          - service: finance-api
-            context: ./channels/finance/api
-            dockerfile: ./channels/finance/api/Dockerfile
-            changed: ${{ needs.detect-changes.outputs.finance-api }}
           - service: finance-service
             context: ./channels/finance/service
             dockerfile: ./channels/finance/service/Dockerfile
@@ -352,7 +345,6 @@ jobs:
           kubectl apply -f k8s/sports-service.yaml
           kubectl apply -f k8s/rss-service.yaml
           kubectl apply -f k8s/predictions-service.yaml
-          kubectl apply -f k8s/finance-api.yaml
           kubectl apply -f k8s/sports-api.yaml
           kubectl apply -f k8s/rss-api.yaml
           kubectl apply -f k8s/fantasy-api.yaml
@@ -456,7 +448,6 @@ jobs:
 
           rollout_if_needed core-api "${{ needs.detect-changes.outputs.core-api }}"
           rollout_if_needed website "${{ needs.detect-changes.outputs.website }}"
-          rollout_if_needed finance-api "${{ needs.detect-changes.outputs.finance-api }}"
           rollout_if_needed finance-service "${{ needs.detect-changes.outputs.finance-service }}"
           rollout_if_needed sports-api "${{ needs.detect-changes.outputs.sports-api }}"
           rollout_if_needed sports-service "${{ needs.detect-changes.outputs.sports-service }}"

@@ -176,6 +176,11 @@ func (s *Server) setupMiddleware() {
 // setupRoutes mounts core public and protected routes.
 // Channel-specific routes are handled by SetupDynamicProxy.
 func (s *Server) setupRoutes() {
+	// Local widget sources (ADR-0002) — served in-process, registered
+	// ahead of the dynamic proxy so they win over any still-registered
+	// legacy channel service during cutover.
+	RegisterFinanceRoutes(s.App)
+
 	// --- Public Routes ---
 	s.App.Get("/health", s.healthCheck)
 	s.App.Get("/public/feed", HandlePublicFeed)
@@ -300,6 +305,9 @@ func (s *Server) healthCheck(c *fiber.Ctx) error {
 		httpClient := &http.Client{Timeout: HealthCheckTimeout}
 		var healthTargets []*ChannelInfo
 		for _, intg := range GetAllChannels() {
+			if isLocalSource(intg.Name) {
+				continue
+			}
 			if intg.HasCapability("health_checker") {
 				healthTargets = append(healthTargets, intg)
 			}
@@ -325,6 +333,18 @@ func (s *Server) healthCheck(c *fiber.Ctx) error {
 			}(intg)
 		}
 		wg.Wait()
+
+		// Local widget sources (ADR-0002) report in-process.
+		for name, src := range localSources {
+			if src.health == nil {
+				continue
+			}
+			status, healthy := src.health(context.Background())
+			res.Services[name] = status
+			if !healthy {
+				res.Status = "degraded"
+			}
+		}
 
 		cacheData, _ := json.Marshal(res)
 		// Only cache fully-healthy results. When degraded, we want every
@@ -423,6 +443,9 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 		dashboardClient := &http.Client{Timeout: HealthCheckTimeout}
 		var targets []*ChannelInfo
 		for _, intg := range GetAllChannels() {
+			if isLocalSource(intg.Name) {
+				continue
+			}
 			if enabledChannels[intg.Name] && intg.HasCapability("dashboard_provider") {
 				targets = append(targets, intg)
 			}
@@ -461,6 +484,16 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 
 		for _, r := range results {
 			for k, v := range r.data {
+				res.Data[k] = v
+			}
+		}
+
+		// Local widget sources (ADR-0002) contribute in-process.
+		for name, src := range localSources {
+			if src.dashboard == nil || !enabledChannels[name] {
+				continue
+			}
+			for k, v := range src.dashboard(context.Background(), userID) {
 				res.Data[k] = v
 			}
 		}

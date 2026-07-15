@@ -49,6 +49,8 @@ services:
       PORT: "8080"
       DATABASE_URL: *db-url
       REDIS_URL: *redis-url
+      # Finance is a local source inside core (ADR-0002, REL-14)
+      INTERNAL_FINANCE_URL: "http://finance-service:3001"
     ports: ["18080:8080"]
     depends_on: *needs-db-redis
     restart: unless-stopped
@@ -102,26 +104,7 @@ services:
     depends_on: *needs-db
     restart: unless-stopped
 
-  finance-api:
-    build:
-      context: ./channels/finance/api
-    container_name: scrollr-finance-api
-    env_file: [channels/finance/.env]
-    environment:
-      PORT: "8081"
-      DATABASE_URL: *db-url
-      REDIS_URL: *redis-url
-      CHANNEL_URL: "http://finance-api:8081"
-      INTERNAL_FINANCE_URL: "http://finance-service:3001"
-    ports: ["8181:8081"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      finance-service:
-        condition: service_started
-    restart: unless-stopped
+  # (finance-api folded into core-api — ADR-0002, REL-14)
 
   # ── Sports ──────────────────────────────────────────────────────────
   sports-service:
