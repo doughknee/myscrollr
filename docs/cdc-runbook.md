@@ -7,7 +7,7 @@ dashboard updates from Postgres to the core API's SSE endpoint.
 
 ```
 Postgres (DO Managed, scrollr-db)
-  └── publication: sequin_pub (16 tables)
+  └── publication: sequin_pub (23 tables)
   └── replication slot: sequin_slot (logical, pgoutput)
         │
         │  WAL replication stream

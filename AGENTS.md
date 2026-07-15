@@ -13,8 +13,8 @@ Monorepo — each component is independently deployable with its own dependencie
 - `api/` — Core gateway API (Go 1.25, Fiber v2, sub-package `core/`)
 - `myscrollr.com/` — Marketing website + auth/billing (React 19, Vite 7, TanStack Router, Tailwind v4)
 - `desktop/` — Tauri v2 desktop app (React 19, Vite 7, TanStack Router + Query, Tailwind v4, Rust backend) — **primary product**
-- `channels/{finance,sports,rss}/api/` — Channel Go APIs (flat `main` package, independent modules)
-- `channels/{finance,sports,rss}/service/` — Rust ingestion services (independent crates, edition 2024)
+- `channels/{finance,sports,rss,predictions}/api/` — Channel Go APIs (flat `main` package, independent modules)
+- `channels/{finance,sports,rss,predictions}/service/` — Rust ingestion services (independent crates, edition 2024; predictions holds the Kalshi credentials and WS sweep)
 - `channels/fantasy/api/` — Fantasy Go API (Yahoo OAuth2, Go-native sync, no Rust service)
 
 ## Build, Lint, Test Commands
@@ -42,13 +42,13 @@ npm run tauri:build  # Production build (native binary)
 
 ```sh
 go build -o scrollr_api && ./scrollr_api   # Core: port 8080
-go build -o {name}_api && ./{name}_api     # finance=8081, sports=8082, rss=8083, fantasy=8084
+go build -o {name}_api && ./{name}_api     # finance=8081, sports=8082, rss=8083, fantasy=8084, predictions=8085
 ```
 
-### Rust Services (`channels/{finance,sports,rss}/service/`)
+### Rust Services (`channels/{finance,sports,rss,predictions}/service/`)
 
 ```sh
-cargo build --release && cargo run   # finance=3001, sports=3002, rss=3004
+cargo build --release && cargo run   # finance=3001, sports=3002, rss=3004, predictions=3005
 ```
 
 ### Tests
@@ -147,6 +147,13 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 
 ## Architecture Rules
 
+> **Note:** Rules 1–3 are superseded for first-party widget sources by
+> [ADR-0002](docs/adr/0002-consolidate-widget-read-apis.md) — the finance,
+> sports, rss, and predictions Go read APIs are being folded into core-api
+> (Linear project "Backend consolidation", REL-10..17). Until each fold
+> lands, the rules below still describe the deployed system. Fantasy and
+> all Rust ingestion services keep the isolation model permanently.
+
 1. **Core API has zero channel-specific code.** Discovers channels via Redis, proxies routes dynamically.
 2. **Channel isolation is absolute.** Each channel owns its Go API, ingestion service, configs, and Docker Compose.
 3. **HTTP-only contract.** No shared Go interfaces or types. Core proxies `/{name}/*` with `X-User-Sub` header. Channels never validate JWTs.
@@ -167,6 +174,7 @@ Every component has Sentry wired in. **Privacy is the hard constraint** — see 
 | `api/` (core Go) | `sentry-go@v0.46` + `sentry-go/fiber` | `scrollr-core-api` |
 | `channels/{finance,sports,rss,fantasy}/api/` | `sentry-go@v0.46` + `sentry-go/fiber` | `scrollr-{name}-api` |
 | `channels/{finance,sports,rss}/service/` | `sentry@0.42` + `sentry-anyhow@0.42` Rust crates | `scrollr-{name}-svc` |
+| `channels/predictions/{api,service}/` | same wiring as the other channels | none yet — `PREDICTIONS_*_SENTRY_DSN` env vars exist but are unset (no Sentry project created) |
 
 ### Adding a new error capture site
 
@@ -271,8 +279,6 @@ Each service has a `tests/migration_versions.rs` that asserts every on-disk migr
 
 **Rust**: Create `<prefix>NNNNNNNNNN_description.up.sql` and `.down.sql` in the crate's `migrations/` directory, using your service's numeric prefix (`11*` for finance, `12*` for sports, `13*` for new rss). Sequence numbers must increase. Run `cargo test` — the `migration_versions.rs` test will reject any version outside your service's range.
 
-**Rust**: Create `YYYYMMDDHHMMSS_description.up.sql` and `YYYYMMDDHHMMSS_description.down.sql` in the crate's `migrations/` directory. The `cargo build` will verify compilation.
-
 ### Rules
 
 - **Never mix inline SQL and migration files.** All schema changes go through migrations.
@@ -284,7 +290,7 @@ Each service has a `tests/migration_versions.rs` that asserts every on-disk migr
 
 ## Docker & Deployment
 
-Each channel has its own `docker-compose.yml` (api + service containers) for local dev only. Production uses standalone Dockerfiles built and pushed to DigitalOcean Container Registry (`registry.digitalocean.com/scrollr/*`) by `.github/workflows/deploy.yml`, then rolled out to a DigitalOcean Kubernetes cluster (`scrollr-cluster`) via `kubectl apply -f k8s/`. Secrets live in the `scrollr-secrets` Kubernetes Secret (template in `k8s/secrets.yaml.template`). ConfigMaps in `k8s/configmap-*.yaml` hold non-sensitive runtime config. Ingress + TLS via nginx-ingress + cert-manager.
+Local dev is driven by the root `Makefile`: `docker-compose.local.yml` runs infra only (Postgres + Redis) for native backend work; `docker-compose.dev.yml` includes it and adds the full containerized backend (see `LOCAL_SETUP.md`). The per-channel `docker-compose.yml` files are legacy standalone artifacts not wired to the Makefile. Production uses standalone Dockerfiles built and pushed to DigitalOcean Container Registry (`registry.digitalocean.com/scrollr/*`) by `.github/workflows/deploy.yml`, then rolled out to a DigitalOcean Kubernetes cluster (`scrollr-cluster`) via `kubectl apply -f k8s/`. Secrets live in the `scrollr-secrets` Kubernetes Secret (template in `k8s/secrets.yaml.template`). ConfigMaps in `k8s/configmap-*.yaml` hold non-sensitive runtime config. Ingress + TLS via nginx-ingress + cert-manager.
 
 ## Git Workflow
 
