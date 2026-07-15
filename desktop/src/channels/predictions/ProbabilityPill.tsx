@@ -23,10 +23,12 @@ export interface ProbabilityPillProps {
   className?: string;
 }
 
+// Fixed min-widths (sized for "100%") so pills share a column edge across
+// rows and cards — variable-width pills made the delta column wobble.
 const SIZE_CLASSES: Record<NonNullable<ProbabilityPillProps["size"]>, string> = {
-  sm: "px-1.5 py-px text-ui-chip",
-  md: "px-2 py-0.5 text-ui-body",
-  lg: "px-2.5 py-1 text-base",
+  sm: "min-w-12 px-1.5 py-px text-ui-chip",
+  md: "min-w-14 px-2 py-0.5 text-ui-body",
+  lg: "min-w-16 px-2.5 py-1 text-base",
 };
 
 export default function ProbabilityPill({

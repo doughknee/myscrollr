@@ -306,7 +306,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
             hasConfig={!!feedContext.__hasConfig}
             dashboardLoaded={!!feedContext.__dashboardLoaded}
             loadingNoun="odds"
-            actionHint="markets load automatically"
+            actionHint="manage your watchlist"
             onConfigure={onConfigure}
           />
         </div>
@@ -410,12 +410,13 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
                   </button>
                 )}
               </div>
-              <div className="grid gap-px bg-edge grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-2 px-3 pb-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {section.events.slice(0, SECTION_PREVIEW_COUNT).map((ev) => (
                   <EventCard
                     key={ev.eventTicker}
                     event={ev}
                     display={dp}
+                    category={categoryOf(ev.outcomes[0])}
                     now={now}
                     watchedSet={watchedSet}
                     onToggleWatch={toggleWatch}
@@ -425,17 +426,16 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
               </div>
             </div>
           ))}
-          <div className="h-3" />
+          <div className="h-2" />
         </div>
       ) : (
         // ── Flat mode: other lenses / category focus / compact ────
         <>
           <div
             className={clsx(
-              "grid gap-px bg-edge",
               isComfort
-                ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                : "grid-cols-1",
+                ? "grid grid-cols-1 gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                : "grid grid-cols-1 gap-px bg-edge",
             )}
           >
             {isComfort
@@ -444,7 +444,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
                     key={ev.eventTicker}
                     event={ev}
                     display={dp}
-                    category={categoryFocus ? undefined : categoryOf(ev.outcomes[0])}
+                    category={categoryOf(ev.outcomes[0])}
                     now={now}
                     watchedSet={watchedSet}
                     onToggleWatch={toggleWatch}
@@ -461,7 +461,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
                 ))}
           </div>
           {remaining > 0 && (
-            <div className="flex items-center justify-center gap-3 px-3 py-3 bg-surface border-t border-edge/30">
+            <div className="flex items-center justify-center gap-3 px-3 pb-3">
               <button
                 onClick={() =>
                   setVisibleCount((c) =>
@@ -551,7 +551,7 @@ function ResolvedTodayStrip({
         />
       </button>
       {open && (
-      <div className="mt-1 flex gap-1.5 overflow-x-auto pb-0.5">
+      <div className="scrollbar-thin mt-1 flex gap-1.5 overflow-x-auto pb-0.5">
         {items.slice(0, 20).map((m) => {
           const won = (m.result ?? "").toLowerCase() === "yes";
           const lost = (m.result ?? "").toLowerCase() === "no";
@@ -561,7 +561,7 @@ function ResolvedTodayStrip({
               type="button"
               onClick={() => onOpen(m)}
               title={m.title}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-edge/40 bg-base-100/40 px-2 py-1 text-ui-chip transition-colors hover:border-edge cursor-pointer"
+              className="flex shrink-0 items-center gap-1.5 rounded-md border border-edge/40 bg-base-100/40 px-2 py-1 text-ui-chip transition-colors hover:border-edge cursor-pointer"
             >
               <span className="max-w-[140px] truncate text-fg-2">{marketLabel(m, 32)}</span>
               <span
@@ -683,9 +683,10 @@ const MarketItem = memo(function MarketItem({
       )}
     >
       <ProbabilityPill pct={market.yes_price} delta={delta} size="sm" />
+      {/* Fixed slot; empty (not "—") when unmoved, matching card rows. */}
       {shouldShowOnFeed(display.showDelta) && (
         <span className={clsx("tabular-nums min-w-[40px]", dirColor)}>
-          {formatDelta(delta)}
+          {delta !== 0 ? formatDelta(delta) : ""}
         </span>
       )}
       <span className="text-fg-2 truncate flex-1 font-sans">
@@ -718,14 +719,20 @@ const MarketItem = memo(function MarketItem({
   prev.market.updated_at === next.market.updated_at
 );
 
-// ── EventCard (v1.1.5 restyle) ───────────────────────────────────
+// ── EventCard (v1.1.5 polish pass) ──────────────────────────────
 //
-// Kalshi-style card: the EVENT question headlines with ONE watch star
-// (top-right, stars the lead leg), up to two outcome rows with
-// probability pills, and a 24h-volume footer. Leg-level starring stays
-// available inside MarketDetail. In browse mode the section header
-// already names the category, so the per-card badge only renders in
-// flat lenses (pass `category`).
+// Card anatomy (top to bottom) — every row has a left anchor, metadata
+// never floats alone (Kalshi hierarchy, Scrollr skin):
+//   1. Header: muted uppercase category LEFT · countdown + ★ RIGHT.
+//      With the category hidden by prefs, the countdown/★ group moves
+//      into the title row so no row is right-aligned metadata only.
+//   2. Title: the ONE focal point (text-ui-title), clamped to two
+//      lines with the two-line height reserved so card heights stay
+//      uniform across a row regardless of title length.
+//   3. Exactly two outcome rows (synthetic No fills single-leg events).
+//   4. Footer: 24h volume, left-aligned, quiet mono.
+// The star always stars the LEAD leg; leg-level starring lives in
+// MarketDetail.
 
 interface EventCardProps {
   event: PredictionEvent;
@@ -752,10 +759,23 @@ const EventCard = memo(function EventCard({
     event.closeTime ?? lead?.close_time,
     now,
   );
+  const showHeaderCategory =
+    shouldShowOnFeed(display.showCategory) && Boolean(category);
+  const showCountdown =
+    shouldShowOnFeed(display.showCloseTime) && Boolean(countdown);
 
-  return (
-    <div className="relative flex flex-col gap-2 bg-surface px-3 py-2.5">
-      {/* Watch star — one per card, stars the lead leg. */}
+  const metaGroup = (
+    <span className="flex shrink-0 items-center gap-1">
+      {showCountdown && (
+        <span
+          className={clsx(
+            "font-mono text-ui-chip tabular-nums",
+            countdown === "Closed" ? "text-fg-4" : "text-fg-3",
+          )}
+        >
+          {countdown === "Closed" ? countdown : `Closes ${countdown}`}
+        </span>
+      )}
       {lead && (
         <button
           type="button"
@@ -766,45 +786,38 @@ const EventCard = memo(function EventCard({
             onToggleWatch(lead.ticker);
           }}
           className={clsx(
-            "absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-md transition-colors cursor-pointer",
+            "flex h-5 w-5 items-center justify-center rounded transition-colors cursor-pointer hover:bg-surface-hover",
             watched ? "text-amber-400" : "text-fg-4 hover:text-fg-2",
           )}
         >
-          <Star size={14} className={watched ? "fill-current" : ""} />
+          <Star size={13} className={watched ? "fill-current" : ""} />
         </button>
       )}
+    </span>
+  );
 
-      {/* Header: category badge (flat lenses only) · close countdown */}
-      <div className="flex items-center justify-between gap-2 pr-7 text-ui-chip">
-        {shouldShowOnFeed(display.showCategory) && category ? (
-          <span
-            className="rounded px-1.5 py-px font-medium"
-            style={{
-              backgroundColor: `${PREDICTIONS_HEX}1f`,
-              color: PREDICTIONS_HEX,
-            }}
-          >
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border border-edge/40 bg-surface p-3 transition-colors hover:border-edge/70">
+      {/* Header row — category anchors the left so the countdown/star
+          never sit alone. */}
+      {showHeaderCategory && (
+        <div className="flex h-5 items-center justify-between gap-2">
+          <span className="truncate text-ui-chip font-medium uppercase tracking-wide text-fg-4">
             {category}
           </span>
-        ) : (
-          <span />
-        )}
-        {shouldShowOnFeed(display.showCloseTime) && countdown && (
-          <span
-            className={clsx(
-              "font-mono tabular-nums text-fg-3",
-              countdown === "Closed" && "text-fg-4",
-            )}
-          >
-            {countdown === "Closed" ? countdown : `Closes ${countdown}`}
-          </span>
-        )}
-      </div>
+          {metaGroup}
+        </div>
+      )}
 
-      {/* The event question */}
-      <span className="text-ui-body font-medium leading-snug text-fg line-clamp-2">
-        {event.title}
-      </span>
+      {/* Title row — the focal point. The two-line slot (20px line height
+          × 2) is reserved only at multi-column widths, where it keeps
+          neighbors row-aligned; single-column cards hug their title. */}
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-ui-title line-clamp-2 sm:min-h-10">
+          {event.title}
+        </span>
+        {!showHeaderCategory && metaGroup}
+      </div>
 
       {/* Outcome legs. ANY single-leg event gets a synthetic No row —
           a lone market's No side is always its complement (100 - yes),
@@ -830,9 +843,10 @@ const EventCard = memo(function EventCard({
         )}
       </div>
 
-      {/* Footer: summed 24h volume across legs */}
+      {/* Footer: 24h volume, quiet and left-anchored. mt-auto pins it to
+          the card bottom so footers align across a row. */}
       {shouldShowOnFeed(display.showVolume) && (event.volume24h > 0 || event.volume > 0) && (
-        <div className="text-ui-chip font-mono tabular-nums text-fg-3">
+        <div className="mt-auto pt-0.5 font-mono text-ui-chip tabular-nums text-fg-3">
           Vol {formatCompactNumber(event.volume24h || event.volume)}
           <span className="text-fg-4"> · 24h</span>
         </div>
@@ -842,6 +856,13 @@ const EventCard = memo(function EventCard({
 });
 
 /** One outcome leg inside an EventCard — label, delta, probability pill.
+ *
+ *  The right rail is two FIXED columns (delta slot + fixed-width pill) so
+ *  numbers share a column edge on every row of every card — a row without
+ *  movement reserves the delta slot empty rather than collapsing it.
+ *  Movement is expressed ONLY there (no tinted row borders: a conditional
+ *  border shifted the label 2px and made siblings misalign).
+ *
  *  `syntheticNo` renders the implicit No side of a binary market
  *  (100 - yes, inverted delta) — it's the same market, so the star and
  *  detail click belong to the Yes row / card. */
@@ -878,23 +899,20 @@ function OutcomeRow({
     <button
       type="button"
       onClick={() => onOpenDetail(market)}
-      className={clsx(
-        "flex w-full cursor-pointer items-center gap-1.5 rounded-md border border-edge/30 bg-base-100/40 px-2 py-1.5 text-left transition-colors hover:border-edge/60",
-        isUp && "border-l-2 border-l-up/40",
-        isDown && "border-l-2 border-l-down/40",
-      )}
+      className="flex w-full cursor-pointer items-center gap-1.5 rounded-md border border-edge/30 bg-base-100/40 px-2 py-1.5 text-left transition-colors hover:border-edge/60 hover:bg-surface-hover"
     >
       <span className="min-w-0 flex-1 truncate text-ui-meta text-fg-2">
         {legLabel}
       </span>
-      {shouldShowOnFeed(display.showDelta) && delta !== 0 && (
+      {shouldShowOnFeed(display.showDelta) && (
         <span
           className={clsx(
-            "shrink-0 font-mono text-ui-chip font-semibold tabular-nums",
-            isUp ? "text-up" : "text-down",
+            "w-9 shrink-0 text-right font-mono text-ui-chip font-semibold tabular-nums",
+            isUp && "text-up",
+            isDown && "text-down",
           )}
         >
-          {formatDelta(delta)}
+          {delta !== 0 ? formatDelta(delta) : ""}
         </span>
       )}
       <ProbabilityPill pct={shownPct} delta={delta} size="sm" />
