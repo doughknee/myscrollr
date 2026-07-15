@@ -14,6 +14,7 @@ stays at 1.1.0 and nobody gets force-updated.
 | ~~v1.1.2~~ | The Library | ✅ **Shipped 2026-07-02** — slots-only monetization everywhere, fantasy gate retired | S–M |
 | ~~v1.1.3~~ | Time Controls | ✅ **Shipped 2026-07-03** — day windows for sports/news + 7-day score retention (+ pricing-page overhaul rode along) | M |
 | ~~v1.1.4~~ | Kalshi Grows Up | ✅ **Shipped 2026-07-03** — event cards, watchlist-first ticker, real history charts (+ the fair-share finals fix) | M |
+| ~~v1.1.5~~ | Kalshi Cleans Up | ✅ **Shipped 2026-07-14** — sweep reconciliation ends the stale-market feed; lens-based browse, stars-only personalization, server config retired | M–L |
 | v1.2.0 | Double-Decker 2.0 | Multi-row ticker rebuilt around widgets | L |
 | — | Website rides along | Pricing rewrite shipped with v1.1.2–3; screenshots now unblocked (post-v1.1.4) | S–M |
 
@@ -187,6 +188,36 @@ service pod is old, candlesticks 5xx until the Rust pod rolls.
   `scopeSourceData` path (medium — the payload isn't scoped per user selection yet),
   plus the page redesign. Server already supports favorites/categories per user in
   the dashboard provider, so most of this is desktop-side.
+
+---
+
+## ✅ v1.1.5 — Kalshi Cleans Up (shipped 2026-07-14, `desktop-v1.1.5`)
+
+The v1.1.4 follow-through, in two stacked PRs (#223 backend, #224 desktop):
+
+- **Data you can trust.** The catalog sweep now demotes markets that drop out
+  of the selection (`in_sweep`), REST-rechecks dropped tickers so missed
+  settlements land, and stamps `settled_at` exactly once at resolution. The
+  API serves the live set + trailing-24h resolutions ordered by
+  `volume_24h` — prod went from 3,905 rows served (51 of the top 60 stale
+  >1 day) to ~240 live ones. WS ticks skip demoted rows, ending the
+  dormant-market CDC churn.
+- **One system.** Server-side `config.categories`/`favorites` retired (API
+  keeps honoring old clients; new client migrates + clears them once). The
+  feed is lens-based — Trending (category-section browse) / Movers /
+  Closing soon / Resolved (full result cards, replaced the chip strip) /
+  Watchlist — with a single control bar (segmented view switcher + lens
+  pills). Configure is one page: watchlist, ticker fallback, display grid.
+- **Polish pass** (Playwright-verified at 1440/375 against a checked-in
+  browser harness, `channels/predictions/preview/`): card anatomy with
+  category-anchored headers, uniform heights, fixed delta/pill columns,
+  probability-pill chip restyle, `--color-predictions` teal unification,
+  Home preview rows.
+
+**Known issues accepted:** a just-closed market can show a muted "Closed"
+chip until the next poll drops it; a starred market that falls out of the
+top-240 while still trading leaves the payload (favorites union retired) —
+the watchlist labels it "no longer tracked".
 
 ---
 
