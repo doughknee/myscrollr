@@ -32,7 +32,7 @@ windows. `make help` lists everything. Day-to-day:
 | `make clean` | Stop **and wipe** the Postgres + Redis volumes. |
 | `make web` / `make desktop` | Run the front-ends natively. |
 
-**Ports** (host): core `18080`, rss `8083`, finance `8181`, sports `8082`,
+**Ports** (host): core `18080` (serves `/finance/*` natively per ADR-0002), rss `8083`, sports `8082`,
 fantasy `8084`, predictions `8085`, site `3000`. Postgres `5432`, Redis `6379`.
 
 ### Prereqs (one-time)
@@ -147,21 +147,21 @@ against the **local** API with your real account + tier.
 ## Milestone 2 — Live channel data (all four channels local)
 
 All four data channels run locally against the **same** Postgres/Redis as the
-Core API. Each channel is a **Go API** (registers itself in Redis; the Core
-discovers + proxies it) plus, for finance/sports/rss, a **Rust ingester**
-(polls the provider, writes rows). Fantasy is Go-native (in-process sync).
+Core API. sports/rss/fantasy each have a **Go API** (registers itself in
+Redis; the Core discovers + proxies it); finance's Go API was folded into
+core (ADR-0002). finance/sports/rss each have a **Rust ingester** (polls the
+provider, writes rows). Fantasy is Go-native (in-process sync).
 
 ### Ports & secrets
 
 | Channel | Go API | Rust ingester | Provider secret |
 |---|---|---|---|
 | rss     | 8083     | 3004 | none (public feeds) |
-| finance | **8181** | 3001 | `TWELVEDATA_API_KEY` |
+| finance | (in core) | 3001 | `TWELVEDATA_API_KEY` |
 | sports  | 8082     | 3002 | `API_SPORTS_KEY` |
 | fantasy | 8084     | —    | `YAHOO_CLIENT_ID` / `YAHOO_CLIENT_SECRET` |
 
-Finance's Go API uses **8181**, not the default 8081 (a Windows `svchost` holds
-8081 here). Provider keys live in the DO cluster secret `scrollr-secrets`
+Provider keys live in the DO cluster secret `scrollr-secrets`
 (namespace `scrollr`); pull them into gitignored `channels/<ch>/.env` with
 kubectl, e.g.:
 
@@ -183,17 +183,21 @@ processes read it and would collide; pass the Go API's port inline instead.
 ```bash
 GO="$LOCALAPPDATA/go-toolchain/go/bin/go.exe"
 
-# rss  (no key)          finance                          sports                fantasy (Go-native)
+# rss  (no key)          finance (Rust only — API lives in core, ADR-0002)   sports    fantasy (Go-native)
 ( cd channels/rss/service     && set -a && . ../.env && set +a && cargo run )              # :3004
 ( cd channels/rss/api         && set -a && . ../.env && set +a && "$GO" run . )            # :8083
 ( cd channels/finance/service && set -a && . ../.env && set +a && cargo run )              # :3001
-( cd channels/finance/api     && set -a && . ../.env && set +a && PORT=8181 "$GO" run . )  # :8181
 ( cd channels/sports/service  && set -a && . ../.env && set +a && cargo run )              # :3002
 ( cd channels/sports/api      && set -a && . ../.env && set +a && "$GO" run . )            # :8082
 ( cd channels/fantasy/api     && set -a && . ../.env && set +a && "$GO" run . )            # :8084
 ```
 
-The Core logs `[Discovery] Channels updated: 4 active [fantasy,finance,rss,sports]`
+Finance's Go API was folded into core (ADR-0002, REL-14): core serves
+`/finance/*` itself and probes the Rust ingester via
+`INTERNAL_FINANCE_URL` (set it in `api/.env`, e.g.
+`http://localhost:3001`, or core reports finance healthy without probing).
+
+The Core logs `[Discovery] Channels updated: 3 active [fantasy,rss,sports]`
 within ~10s of each Go API starting.
 
 ### Gotchas (hit and fixed)

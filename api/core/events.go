@@ -288,7 +288,7 @@ func (h *Hub) handleTopicMessage(topic string, payload []byte) {
 // bug. Every CDC event means three separate cache entries are now stale:
 //
 //	cache:dashboard:<user>   — core's aggregated /dashboard response
-//	cache:finance:<user>     — finance-api's /internal/dashboard cache
+//	cache:finance:<user>     — the finance source's per-user dashboard cache (finance.go)
 //	cache:sports:<user>      — sports-api's /internal/dashboard cache
 //	cache:rss:<user>         — rss-api's /internal/dashboard cache
 //

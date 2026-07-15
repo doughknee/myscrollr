@@ -232,7 +232,20 @@ func callChannelLifecycle(ctx context.Context, channelType, event, userSub strin
 	// Resolve to the backing data source so widget types (e.g. "news") reach
 	// the right service's lifecycle hook (rss). Legacy coarse types map to
 	// themselves.
-	ch := GetChannel(DataSourceForWidget(channelType))
+	source := DataSourceForWidget(channelType)
+
+	// Local widget sources (ADR-0002): the only live behavior of the HTTP
+	// lifecycle contract was per-user cache invalidation (Appendix A) —
+	// subscriber-set maintenance had no readers. "created" and "sync"
+	// events only touched those dead sets, so they are no-ops here.
+	if src, ok := localSources[source]; ok {
+		if src.invalidateUser != nil && (event == "updated" || event == "deleted") {
+			src.invalidateUser(userSub)
+		}
+		return
+	}
+
+	ch := GetChannel(source)
 	if ch == nil || !ch.HasCapability("channel_lifecycle") {
 		return
 	}

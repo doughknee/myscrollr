@@ -28,7 +28,6 @@ READINESS_TIMEOUT=30 scripts/smoke/production-readiness.sh
 | `finance-service` | `/health/ready` | 3001 |
 | `rss-service` | `/health/ready` | 3004 |
 | `sports-api` | `/internal/health` | 8082 |
-| `finance-api` | `/internal/health` | 8081 |
 | `rss-api` | `/internal/health` | 8083 |
 | `fantasy-api` | `/internal/health` | 8084 |
 
