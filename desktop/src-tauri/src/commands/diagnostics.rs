@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sysinfo::System;
 use tauri::{AppHandle, Manager};
 
@@ -337,92 +337,4 @@ pub async fn collect_diagnostics(app: AppHandle) -> Result<DiagnosticReport, Str
         runtime,
         logs,
     })
-}
-
-// ── Logout-event diagnostics ─────────────────────────────────────
-//
-// Background: in v1.0.5 we shipped a fix for a multi-window refresh-
-// token rotation race that was logging users out periodically. The fix
-// targets one of several plausible auth-clearing paths. To verify it
-// worked (and surface any remaining paths firing), v1.0.6 instruments
-// every clearAuth() call in auth.ts to record what triggered the
-// clear, then writes the event to a JSON file in the Tauri app data
-// dir.
-//
-// This is developer-facing: there is no Settings UI for the events.
-// To retrieve them:
-//   1. Locate the file: ~/Library/Application Support/com.myscrollr.scrollr/logout-events.json
-//      (macOS path; analogous on Windows/Linux per dirs::data_dir())
-//   2. Or call read_logout_events() from devtools console:
-//      await invoke("read_logout_events")
-//
-// The file is rotated to keep the last LOGOUT_EVENT_LIMIT entries.
-
-const LOGOUT_EVENT_FILENAME: &str = "logout-events.json";
-const LOGOUT_EVENT_LIMIT: usize = 50;
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct LogoutEvent {
-    /// ISO-8601 timestamp at which clearAuth was called.
-    pub timestamp: String,
-    /// One of: refresh_4xx_no_recovery, no_refresh_token, explicit_signout,
-    /// dashboard_unauthenticated_sync, session_expired_banner,
-    /// network_error, unknown.
-    pub path: String,
-    /// Which Tauri window fired it: "main", "ticker", or "unknown".
-    pub window: String,
-    /// Snapshot of additional context the JS side wants to attach
-    /// (e.g. truncated stack, JWT expiry timestamps, network status).
-    /// Free-form to keep the schema flexible across future paths.
-    pub context: serde_json::Value,
-}
-
-fn logout_events_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("app_data_dir: {e}"))?;
-    if !dir.exists() {
-        std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir app_data_dir: {e}"))?;
-    }
-    Ok(dir.join(LOGOUT_EVENT_FILENAME))
-}
-
-fn read_events_file(path: &std::path::Path) -> Vec<LogoutEvent> {
-    match std::fs::read_to_string(path) {
-        Ok(s) if !s.is_empty() => serde_json::from_str::<Vec<LogoutEvent>>(&s).unwrap_or_default(),
-        _ => Vec::new(),
-    }
-}
-
-fn write_events_file(path: &std::path::Path, events: &[LogoutEvent]) -> Result<(), String> {
-    let body = serde_json::to_string_pretty(events).map_err(|e| format!("serialize: {e}"))?;
-    std::fs::write(path, body).map_err(|e| format!("write: {e}"))?;
-    Ok(())
-}
-
-/// Append a logout event to the local diagnostics file. Called from
-/// the JS auth.ts whenever clearAuth() fires so we can correlate
-/// observed logouts with the path that triggered them.
-#[tauri::command]
-pub fn record_logout_event(app: AppHandle, event: LogoutEvent) -> Result<(), String> {
-    let path = logout_events_path(&app)?;
-    let mut events = read_events_file(&path);
-    events.push(event);
-
-    // Rotate: keep only the most recent LOGOUT_EVENT_LIMIT entries.
-    let len = events.len();
-    if len > LOGOUT_EVENT_LIMIT {
-        events = events.split_off(len - LOGOUT_EVENT_LIMIT);
-    }
-
-    write_events_file(&path, &events)
-}
-
-/// Read all stored logout events. Called from devtools / diagnostics
-/// flow to dump the history. Returns the events newest-last.
-#[tauri::command]
-pub fn read_logout_events(app: AppHandle) -> Result<Vec<LogoutEvent>, String> {
-    let path = logout_events_path(&app)?;
-    Ok(read_events_file(&path))
 }

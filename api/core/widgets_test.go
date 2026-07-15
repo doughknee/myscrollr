@@ -63,15 +63,3 @@ func TestIsKnownWidgetType(t *testing.T) {
 		}
 	}
 }
-
-func TestGetFeaturedWidgets_ReturnsCopy(t *testing.T) {
-	a := GetFeaturedWidgets()
-	if len(a) == 0 {
-		t.Fatal("expected featured widgets")
-	}
-	a[0].Label = "MUTATED"
-	b := GetFeaturedWidgets()
-	if b[0].Label == "MUTATED" {
-		t.Error("GetFeaturedWidgets must return a defensive copy")
-	}
-}

@@ -104,15 +104,6 @@ const (
 	SportsLeagueSubscribersPrefix = "sports:subscribers:league:"
 )
 
-// SportsLeagues was a hardcoded list of league identifiers used before per-user
-// league subscriptions were added. League lists are now read from the user's
-// channel config JSONB (config.leagues). This variable is kept only as a
-// reference for the league name values the Rust ingestion service writes to the
-// games table's `league` column.
-//
-// Current leagues: NFL, NCAA Football, NBA, NCAA Basketball, NHL, MLB,
-// Premier League, La Liga, MLS, Champions League, Formula 1
-
 // =============================================================================
 // Dashboard Cache
 // =============================================================================

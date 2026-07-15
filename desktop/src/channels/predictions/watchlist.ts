@@ -51,10 +51,6 @@ export function toggleWatch(ticker: string): string[] {
   return next;
 }
 
-export function isWatched(ticker: string, list: string[]): boolean {
-  return list.includes(ticker);
-}
-
 // ── Alerts ───────────────────────────────────────────────────────
 
 export type AlertComparator = "above" | "below";

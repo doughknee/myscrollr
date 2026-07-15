@@ -70,17 +70,3 @@ export function useNow(): number {
 
   return now;
 }
-
-// ── Test/diagnostic helpers ──────────────────────────────────────
-// Exported for unit tests and devtools. Do not rely on these from
-// application code.
-
-/** @internal subscriber count. */
-export function __getSubscriberCount(): number {
-  return subscribers.size;
-}
-
-/** @internal whether the singleton interval is active. */
-export function __isIntervalActive(): boolean {
-  return intervalId !== null;
-}

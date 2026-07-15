@@ -31,13 +31,11 @@ type ChannelInfo struct {
 type Discovery struct {
 	mu          sync.RWMutex
 	channels    map[string]*ChannelInfo // keyed by name
-	tableIndex  map[string]string       // table_name -> channel name
 	lastSummary string                  // for change detection
 }
 
 var globalDiscovery = &Discovery{
-	channels:   make(map[string]*ChannelInfo),
-	tableIndex: make(map[string]string),
+	channels: make(map[string]*ChannelInfo),
 }
 
 // StartDiscovery performs an initial synchronous scan to discover channels,
@@ -70,7 +68,6 @@ func (d *Discovery) refresh() {
 	// Scan for all channel:* keys
 	var cursor uint64
 	channels := make(map[string]*ChannelInfo)
-	tableIndex := make(map[string]string)
 
 	for {
 		keys, nextCursor, err := Rdb.Scan(ctx, cursor, "channel:*", 100).Result()
@@ -90,9 +87,6 @@ func (d *Discovery) refresh() {
 				continue
 			}
 			channels[info.Name] = &info
-			for _, table := range info.CDCTables {
-				tableIndex[table] = info.Name
-			}
 		}
 
 		cursor = nextCursor
@@ -112,7 +106,6 @@ func (d *Discovery) refresh() {
 	d.mu.Lock()
 	changed := summary != d.lastSummary
 	d.channels = channels
-	d.tableIndex = tableIndex
 	d.lastSummary = summary
 	d.mu.Unlock()
 
@@ -138,18 +131,6 @@ func GetChannel(name string) *ChannelInfo {
 	globalDiscovery.mu.RLock()
 	defer globalDiscovery.mu.RUnlock()
 	return globalDiscovery.channels[name]
-}
-
-// GetChannelForTable returns the channel that handles a specific CDC table.
-func GetChannelForTable(tableName string) *ChannelInfo {
-	globalDiscovery.mu.RLock()
-	name, ok := globalDiscovery.tableIndex[tableName]
-	globalDiscovery.mu.RUnlock()
-
-	if !ok {
-		return nil
-	}
-	return GetChannel(name)
 }
 
 // GetValidChannelTypes returns a set of all registered channel names.

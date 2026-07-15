@@ -20,13 +20,6 @@ func GetActiveViewers(c *fiber.Ctx) error {
 // Accepts token via Authorization: Bearer header (preferred) or
 // ?token= query parameter (fallback for browser EventSource).
 //
-// @Summary Real-time event stream (authenticated)
-// @Description Server-Sent Events endpoint for per-user CDC updates
-// @Tags Events
-// @Produce text/event-stream
-// @Param token query string false "JWT access token (fallback if no Authorization header)"
-// @Param Authorization header string false "Bearer token (preferred)"
-// @Router /events [get]
 func StreamEvents(c *fiber.Ctx) error {
 	// 1. Extract token — prefer Authorization header, fall back to query param
 	tokenString := ""

@@ -2,18 +2,14 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# Install git and swag CLI
-RUN apk add --no-cache git && \
-    go install github.com/swaggo/swag/cmd/swag@latest
+# Install git for module fetching
+RUN apk add --no-cache git
 
 # Copy the module files
 COPY go.mod ./
 
 # Copy the source code
 COPY . .
-
-# Generate Swagger docs (--parseDependency scans sub-package core/)
-RUN swag init --parseDependency
 
 # Fetch dependencies
 RUN go mod tidy
@@ -41,7 +37,6 @@ RUN apk --no-cache add curl
 
 # Copy the Pre-built binary from the previous stage
 COPY --from=builder /app/main .
-COPY --from=builder /app/docs ./docs
 COPY --from=builder /app/migrations ./migrations
 
 # Expose port 8080 to the outside world

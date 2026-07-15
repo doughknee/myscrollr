@@ -1,5 +1,0 @@
-# Probe "today's stats" variants
-out/13-roster-today-date.xml	team/469.l.35099.t.5/roster/players/stats;type=date;date=2026-04-17
-out/14-roster-today-alt.xml	team/469.l.35099.t.5/roster;date=2026-04-17/players/stats;type=date;date=2026-04-17
-out/15-hitter-today.xml	players;player_keys=469.p.11531/stats;type=date;date=2026-04-17
-out/16-pitcher-today.xml	players;player_keys=469.p.10946/stats;type=date;date=2026-04-17

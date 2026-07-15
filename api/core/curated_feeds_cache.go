@@ -102,12 +102,3 @@ func getCuratedFeedURLs() map[string]bool {
 	curatedFeedURLsExpires = time.Now().Add(curatedFeedURLsCacheTTL)
 	return urls
 }
-
-// invalidateCuratedFeedURLs forces the next getCuratedFeedURLs call
-// to refresh from DB. Useful from tests; rarely needed in prod since
-// the curated set changes infrequently and a 5-min TTL is acceptable.
-func invalidateCuratedFeedURLs() {
-	curatedFeedURLsMu.Lock()
-	curatedFeedURLsExpires = time.Time{}
-	curatedFeedURLsMu.Unlock()
-}

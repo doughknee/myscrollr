@@ -27,28 +27,6 @@ export function sportLabel(gameCode: string): string {
   return GAME_CODE_LABELS[gameCode] || gameCode || "Fantasy";
 }
 
-/** Canonical position ordering for a given sport (starters first, bench/IR last). */
-export const POSITION_ORDER: Record<string, string[]> = {
-  nfl: ["QB", "RB", "WR", "TE", "W/R/T", "W/T", "FLEX", "K", "DEF", "D/ST", "BN", "IR", "IR+"],
-  nba: ["PG", "SG", "G", "SF", "PF", "F", "C", "Util", "BN", "IL", "IL+"],
-  nhl: ["C", "LW", "RW", "F", "D", "G", "Util", "BN", "IR", "IR+"],
-  mlb: [
-    "C",
-    "1B",
-    "2B",
-    "3B",
-    "SS",
-    "OF",
-    "Util",
-    "SP",
-    "RP",
-    "P",
-    "BN",
-    "IL",
-    "NA",
-  ],
-};
-
 /** True if the selected position keeps the player out of the starting lineup. */
 export function isBenchPosition(pos: string): boolean {
   if (!pos) return true;
@@ -385,35 +363,6 @@ export function statValue(
   return v;
 }
 
-/**
- * Return a compact "H/AB 5/17 · R 2 · RBI 1" summary for a player using
- * the league's own Yahoo-provided stat catalog. Kept for cases (ticker
- * chips, previews) where a single-line string is more appropriate than a
- * table. Labels come from Yahoo's <stat_categories> and values render
- * verbatim (preserving ratios like "5/17", IP thirds like "3.2", and
- * leading-period decimals like ".686"). Returns "" when no data.
- */
-export function fmtPlayerStats(
-  stats: Record<string, string> | null | undefined,
-  catalog: StatCatalog | null | undefined,
-  positionType?: string,
-): string {
-  const columns = statColumnsForPosition(catalog, positionType).filter(
-    (def) => stats && stats[def.stat_id] !== undefined,
-  );
-  if (columns.length === 0) return "";
-
-  return columns
-    .map((def) => {
-      const raw = stats ? stats[def.stat_id] : undefined;
-      if (raw === "" || raw === undefined || raw === null) return "";
-      if (def.display_only) return raw;
-      return `${def.display_name} ${raw}`;
-    })
-    .filter((s) => s.length > 0)
-    .join(" · ");
-}
-
 /** Short "W3" / "L2" / "T1" badge. */
 export function streakLabel(type: string, value: number): string {
   if (!type || value <= 0) return "—";
@@ -422,13 +371,6 @@ export function streakLabel(type: string, value: number): string {
 }
 
 // ── Roster helpers ─────────────────────────────────────────────
-
-/** Map of position-code → ordinal, for sorting. Bench/IR sorts last. */
-export function positionOrderIndex(gameCode: string, position: string): number {
-  const order = POSITION_ORDER[gameCode] ?? [];
-  const idx = order.indexOf(position);
-  return idx >= 0 ? idx : 999;
-}
 
 /** Status badge color class (Tailwind). */
 export function statusColorClass(status: string | null | undefined): string {

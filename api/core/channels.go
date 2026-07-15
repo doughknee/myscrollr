@@ -278,13 +278,6 @@ func callChannelLifecycle(ctx context.Context, channelType, event, userSub strin
 
 // GetChannels returns all channels for the authenticated user.
 //
-// @Summary Get user channels
-// @Description Returns all active channels for the authenticated user
-// @Tags Channels
-// @Produce json
-// @Success 200 {object} object{channels=[]Channel}
-// @Security LogtoAuth
-// @Router /users/me/channels [get]
 func GetChannels(c *fiber.Ctx) error {
 	userID := GetUserID(c)
 	if userID == "" {
@@ -308,17 +301,6 @@ func GetChannels(c *fiber.Ctx) error {
 
 // CreateChannel adds a new channel for the authenticated user.
 //
-// @Summary Create a channel
-// @Description Add a new channel for the authenticated user
-// @Tags Channels
-// @Accept json
-// @Produce json
-// @Param body body object true "Channel creation request" example({"channel_type":"rss","config":{}})
-// @Success 201 {object} Channel
-// @Failure 400 {object} ErrorResponse
-// @Failure 409 {object} ErrorResponse
-// @Security LogtoAuth
-// @Router /users/me/channels [post]
 func CreateChannel(c *fiber.Ctx) error {
 	userID := GetUserID(c)
 	if userID == "" {
@@ -466,17 +448,6 @@ func CreateChannel(c *fiber.Ctx) error {
 
 // UpdateChannel updates a channel by type for the authenticated user.
 //
-// @Summary Update a channel
-// @Description Update channel settings (enabled, visible, config) by channel type
-// @Tags Channels
-// @Accept json
-// @Produce json
-// @Param type path string true "Channel type (finance, sports, fantasy, rss)"
-// @Param body body object true "Channel update request"
-// @Success 200 {object} Channel
-// @Failure 404 {object} ErrorResponse
-// @Security LogtoAuth
-// @Router /users/me/channels/{type} [put]
 func UpdateChannel(c *fiber.Ctx) error {
 	userID := GetUserID(c)
 	if userID == "" {
@@ -653,15 +624,6 @@ func UpdateChannel(c *fiber.Ctx) error {
 
 // DeleteChannel removes a channel by type for the authenticated user.
 //
-// @Summary Delete a channel
-// @Description Remove a channel by type
-// @Tags Channels
-// @Produce json
-// @Param type path string true "Channel type"
-// @Success 200 {object} object{status=string,message=string}
-// @Failure 404 {object} ErrorResponse
-// @Security LogtoAuth
-// @Router /users/me/channels/{type} [delete]
 func DeleteChannel(c *fiber.Ctx) error {
 	userID := GetUserID(c)
 	if userID == "" {

@@ -16,7 +16,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
-	"github.com/gofiber/swagger"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -82,9 +81,7 @@ func (s *Server) setupMiddleware() {
 		c.Set("X-Download-Options", "noopen")
 		c.Set("Strict-Transport-Security", fmt.Sprintf("max-age=%d; includeSubDomains", HSTSMaxAge))
 		c.Set("X-DNS-Prefetch-Control", "off")
-		if strings.HasPrefix(c.Path(), "/swagger") {
-			c.Set("Content-Security-Policy", "default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; frame-ancestors 'self' https://relentnet.com")
-		} else if c.Path() == "/yahoo/callback" {
+		if c.Path() == "/yahoo/callback" {
 			// Yahoo OAuth callback returns HTML with inline <script> (postMessage + window.close)
 			// and inline style attributes. Allow those while keeping everything else locked down.
 			c.Set("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-ancestors 'self' https://relentnet.com")
@@ -179,8 +176,6 @@ func (s *Server) setupMiddleware() {
 // setupRoutes mounts core public and protected routes.
 // Channel-specific routes are handled by SetupDynamicProxy.
 func (s *Server) setupRoutes() {
-	s.App.Get("/swagger/*", swagger.HandlerDefault)
-
 	// --- Public Routes ---
 	s.App.Get("/health", s.healthCheck)
 	s.App.Get("/public/feed", HandlePublicFeed)
@@ -512,7 +507,6 @@ func (s *Server) landingPage(c *fiber.Ctx) error {
 		"links": fiber.Map{
 			"health":   "/health",
 			"channels": "/channels",
-			"docs":     "/swagger/index.html",
 			"frontend": frontendURL,
 			"status":   frontendURL + "/status",
 		},

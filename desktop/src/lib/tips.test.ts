@@ -6,14 +6,13 @@
  *   - First call marks the id as shown synchronously BEFORE the toast
  *     renders so a re-entrant call from the same render cycle (e.g.
  *     React StrictMode double-invoke) only fires the toast once.
- *   - resetTipsShown clears the list.
  *
  * We don't assert on the actual sonner toast rendering here — sonner
  * is mocked out so the tests stay headless. The visible UX is covered
  * manually during QA.
  */
 import { beforeEach, describe, it, expect, vi } from "vitest";
-import { showTipOnce, resetTipsShown, TIP_IDS } from "./tips";
+import { showTipOnce, TIP_IDS } from "./tips";
 import type { AppPreferences } from "../preferences";
 
 vi.mock("sonner", () => ({
@@ -118,19 +117,5 @@ describe("showTipOnce", () => {
     );
     const [, opts] = vi.mocked(toast.message).mock.calls[0];
     expect((opts as { duration?: number }).duration).toBe(10_000);
-  });
-});
-
-describe("resetTipsShown", () => {
-  it("clears the array via onPrefsChange", () => {
-    const prefs = makePrefs([
-      TIP_IDS.TICKER_RIGHT_CLICK,
-      TIP_IDS.TRAY_STILL_RUNNING,
-    ]);
-    const onPrefsChange = vi.fn();
-    resetTipsShown(prefs, onPrefsChange);
-    expect(onPrefsChange).toHaveBeenCalledTimes(1);
-    const [updated] = onPrefsChange.mock.calls[0];
-    expect(updated.tipsShown).toEqual([]);
   });
 });

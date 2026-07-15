@@ -146,11 +146,3 @@ func IsUtilityWidgetType(widgetType string) bool {
 	def, ok := widgetByID[widgetType]
 	return ok && def.Kind == WidgetUtility
 }
-
-// GetFeaturedWidgets returns the curated widget catalog (for a future
-// /widgets discovery endpoint and the desktop Library).
-func GetFeaturedWidgets() []WidgetDef {
-	out := make([]WidgetDef, len(featuredWidgets))
-	copy(out, featuredWidgets)
-	return out
-}

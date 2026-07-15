@@ -8,8 +8,6 @@
     "prettier.config.js",
     "vite.config.js"
   ],
-  "exclude": ["frontend_wxt/**/*"],
-
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",

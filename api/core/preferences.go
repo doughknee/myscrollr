@@ -99,13 +99,6 @@ func GetOrCreatePreferences(logtoSub string, roles ...[]string) (*UserPreference
 }
 
 // HandleGetPreferences returns the current user's preferences.
-// @Summary Get user preferences
-// @Description Fetches extension preferences for the authenticated user
-// @Tags Preferences
-// @Produce json
-// @Success 200 {object} UserPreferences
-// @Security LogtoAuth
-// @Router /users/me/preferences [get]
 func HandleGetPreferences(c *fiber.Ctx) error {
 	userID := GetUserID(c)
 	if userID == "" {
@@ -128,14 +121,6 @@ func HandleGetPreferences(c *fiber.Ctx) error {
 }
 
 // HandleUpdatePreferences performs a partial update of the user's preferences.
-// @Summary Update user preferences
-// @Description Partially updates extension preferences for the authenticated user
-// @Tags Preferences
-// @Accept json
-// @Produce json
-// @Success 200 {object} UserPreferences
-// @Security LogtoAuth
-// @Router /users/me/preferences [put]
 func HandleUpdatePreferences(c *fiber.Ctx) error {
 	userID := GetUserID(c)
 	if userID == "" {

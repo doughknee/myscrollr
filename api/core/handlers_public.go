@@ -29,12 +29,6 @@ type PublicFeedResponse struct {
 // HandlePublicFeed returns an aggregated feed of finance + sports data.
 // No authentication required. Results are cached in Redis for 30s.
 //
-// @Summary Public feed
-// @Description Returns finance and sports data for anonymous/free-tier polling
-// @Tags Public
-// @Produce json
-// @Success 200 {object} PublicFeedResponse
-// @Router /public/feed [get]
 func HandlePublicFeed(c *fiber.Ctx) error {
 	// Check Redis cache first
 	val, err := Rdb.Get(context.Background(), PublicFeedCacheKey).Result()

@@ -64,16 +64,6 @@ func setCORSHeaders(c *fiber.Ctx) {
 // HandleExtensionTokenExchange proxies an authorization_code token exchange
 // to Logto on behalf of the browser extension.
 //
-// @Summary Exchange authorization code for tokens (extension)
-// @Description Proxies PKCE code exchange to Logto for the browser extension client
-// @Tags Extension Auth
-// @Accept json
-// @Produce json
-// @Param body body object true "Token exchange request" example({"code":"abc","redirect_uri":"https://...","code_verifier":"..."})
-// @Success 200 {object} object "Token response from Logto"
-// @Failure 400 {object} ErrorResponse
-// @Failure 502 {object} ErrorResponse
-// @Router /extension/token [post]
 func HandleExtensionTokenExchange(c *fiber.Ctx) error {
 	setCORSHeaders(c)
 
@@ -120,16 +110,6 @@ func HandleExtensionTokenExchange(c *fiber.Ctx) error {
 // HandleExtensionTokenRefresh proxies a refresh_token grant to Logto
 // on behalf of the browser extension.
 //
-// @Summary Refresh access token (extension)
-// @Description Proxies refresh token grant to Logto for the browser extension client
-// @Tags Extension Auth
-// @Accept json
-// @Produce json
-// @Param body body object true "Token refresh request" example({"refresh_token":"..."})
-// @Success 200 {object} object "Token response from Logto"
-// @Failure 400 {object} ErrorResponse
-// @Failure 502 {object} ErrorResponse
-// @Router /extension/token/refresh [post]
 func HandleExtensionTokenRefresh(c *fiber.Ctx) error {
 	setCORSHeaders(c)
 

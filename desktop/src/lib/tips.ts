@@ -102,15 +102,3 @@ export function showTipOnce(
 
   return true;
 }
-
-/**
- * Test/debug helper: imperatively reset all tipsShown so the user
- * sees them again. Wire this up to a Settings affordance later if
- * users ask for "show me the hints again".
- */
-export function resetTipsShown(
-  prefs: AppPreferences,
-  onPrefsChange: (next: AppPreferences) => void,
-): void {
-  onPrefsChange({ ...prefs, tipsShown: [] });
-}

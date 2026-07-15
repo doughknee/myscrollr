@@ -373,11 +373,6 @@ export function formatProbability(yesPrice: number | null | undefined): string {
   return `${clampPct(yesPrice)}%`;
 }
 
-/** A price in cents as "62¢" (0–100). */
-export function formatCentsPrice(cents: number | null | undefined): string {
-  return `${clampPct(cents)}¢`;
-}
-
 function clampPct(v: number | null | undefined): number {
   const n = num(v);
   if (n < 0) return 0;
@@ -399,23 +394,6 @@ export function formatSpread(
   if (hasBid) return `${clampPct(bid)}¢`;
   if (hasAsk) return `${clampPct(ask)}¢`;
   return "";
-}
-
-/**
- * Short, glanceable label for a market. Kalshi event titles are full
- * sentences; the contract already stores a compacted `title`, so we lead with
- * that and append the outcome `subtitle` when it adds signal — truncated so it
- * never overruns a ticker chip or card. (Plan §8.1: title compaction.)
- */
-export function marketLabel(p: Prediction, maxLen = 64): string {
-  const title = (p.title || p.ticker || "").trim();
-  const sub = (p.subtitle ?? "").trim();
-  let label = title;
-  if (sub && sub.toLowerCase() !== title.toLowerCase() && !title.includes(sub)) {
-    label = `${title} · ${sub}`;
-  }
-  if (label.length <= maxLen) return label;
-  return `${label.slice(0, maxLen - 1).trimEnd()}…`;
 }
 
 // ── Resolved Today ───────────────────────────────────────────────

@@ -8,9 +8,7 @@ import {
   groupEventsByCategory,
   priceDelta,
   formatProbability,
-  formatCentsPrice,
   formatSpread,
-  marketLabel,
   isResolved,
   selectResolvedToday,
   outcomesByPrice,
@@ -438,14 +436,13 @@ describe("selectPredictionsForTicker", () => {
 
 // ── Display formatting ──────────────────────────────────────────
 
-describe("formatProbability / formatCentsPrice", () => {
+describe("formatProbability", () => {
   it("rounds and clamps to 0–100", () => {
     expect(formatProbability(62)).toBe("62%");
     expect(formatProbability(61.6)).toBe("62%");
     expect(formatProbability(-5)).toBe("0%");
     expect(formatProbability(140)).toBe("100%");
     expect(formatProbability(undefined)).toBe("0%");
-    expect(formatCentsPrice(38)).toBe("38¢");
   });
 });
 
@@ -456,33 +453,6 @@ describe("formatSpread", () => {
     expect(formatSpread(undefined, 63)).toBe("63¢");
     expect(formatSpread(undefined, undefined)).toBe("");
     expect(formatSpread(null, null)).toBe("");
-  });
-});
-
-describe("marketLabel", () => {
-  it("uses the title alone when there's no distinct subtitle", () => {
-    expect(marketLabel(mk({ id: "A", title: "Fed cuts in July", subtitle: undefined }))).toBe(
-      "Fed cuts in July",
-    );
-  });
-
-  it("appends a distinct subtitle", () => {
-    expect(
-      marketLabel(mk({ id: "A", title: "NYC high temp", subtitle: "90°F or above" })),
-    ).toBe("NYC high temp · 90°F or above");
-  });
-
-  it("does not duplicate a subtitle already contained in the title", () => {
-    expect(
-      marketLabel(mk({ id: "A", title: "Rain in Seattle today", subtitle: "Seattle" })),
-    ).toBe("Rain in Seattle today");
-  });
-
-  it("truncates overly long labels with an ellipsis", () => {
-    const long = "x".repeat(100);
-    const out = marketLabel(mk({ id: "A", title: long }), 20);
-    expect(out.length).toBe(20);
-    expect(out.endsWith("…")).toBe(true);
   });
 });
 

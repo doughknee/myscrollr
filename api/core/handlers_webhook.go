@@ -23,12 +23,6 @@ type CDCRecord struct {
 
 // HandleSequinWebhook processes incoming CDC events from Sequin.
 //
-// @Summary Receive Sequin CDC events
-// @Description Webhook for Sequin to push database changes (authenticated, per-user routing)
-// @Tags Webhooks
-// @Accept json
-// @Produce json
-// @Router /webhooks/sequin [post]
 func HandleSequinWebhook(c *fiber.Ctx) error {
 	// Verify webhook secret (mandatory)
 	secret := os.Getenv("SEQUIN_WEBHOOK_SECRET")

@@ -31,13 +31,11 @@ pub struct GpuStatic {
 
 // ── WMI deserialization structs ──────────────────────────────────
 
-#[allow(non_snake_case, non_camel_case_types, dead_code)]
+#[allow(non_snake_case, non_camel_case_types)]
 #[derive(Deserialize, Debug)]
 struct Win32_VideoController {
     Name: Option<String>,
     AdapterRAM: Option<u32>,
-    /// PNPDeviceID lets us match this controller to a perf-counter LUID.
-    PNPDeviceID: Option<String>,
 }
 
 #[allow(non_snake_case, non_camel_case_types)]
@@ -47,12 +45,11 @@ struct Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine {
     UtilizationPercentage: u64,
 }
 
-#[allow(non_snake_case, non_camel_case_types, dead_code)]
+#[allow(non_snake_case, non_camel_case_types)]
 #[derive(Deserialize, Debug)]
 struct Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory {
     Name: String,
     DedicatedUsage: u64,
-    SharedUsage: u64,
 }
 
 // Cached WMI connection per blocking-pool thread.

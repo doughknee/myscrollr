@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   withToggled,
-  isWatched,
   withAlertAdded,
   withAlertRemoved,
   withAlertPatched,
@@ -27,8 +26,6 @@ describe("watchlist (pure)", () => {
   it("toggles membership", () => {
     expect(withToggled([], "A")).toEqual(["A"]);
     expect(withToggled(["A", "B"], "A")).toEqual(["B"]);
-    expect(isWatched("B", ["A", "B"])).toBe(true);
-    expect(isWatched("C", ["A", "B"])).toBe(false);
   });
 });
 

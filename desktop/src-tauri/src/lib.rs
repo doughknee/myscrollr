@@ -167,8 +167,6 @@ pub fn run() {
             commands::window::quit_app,
             commands::system_info::get_system_info,
             commands::diagnostics::collect_diagnostics,
-            commands::diagnostics::record_logout_event,
-            commands::diagnostics::read_logout_events,
             tray::sync_tray_pin,
         ])
         .on_window_event(|window, event| {

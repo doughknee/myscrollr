@@ -1439,16 +1439,6 @@ export function resolveThemeName(
 }
 
 /**
- * @deprecated Use `resolveThemeMode` instead.
- * Kept as a thin alias so older imports continue to compile during
- * the multi-theme rollout. Will be removed once all call sites are
- * migrated.
- */
-export function resolveTheme(mode: ThemeMode): "light" | "dark" {
-  return resolveThemeMode(mode);
-}
-
-/**
  * Migrate a saved appearance blob to the new themeFamily + themeMode
  * shape. Existing builds wrote `{ theme: "light" | "dark" | "system" }`;
  * the new shape splits that into `themeFamily` + `themeMode`.
