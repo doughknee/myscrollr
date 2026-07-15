@@ -61,6 +61,22 @@ const RECHECK_CHUNK: usize = 50;
 /// pointless signed calls about ancient markets.
 const RECHECK_SKIP_THRESHOLD: usize = 500;
 
+/// Reconciliation only runs on a sweep that is plausibly COMPLETE. A sweep
+/// whose pagination errored (or hit the safety page cap) has an incomplete
+/// selection — demoting against it would mark live markets dead; with an
+/// empty selection it would demote EVERY live market and blank the feed
+/// until the next successful sweep. Kalshi lists thousands of open events,
+/// so a clean sweep selecting fewer than this is itself an upstream anomaly
+/// we refuse to act on. (Ship-blocker caught in the v1.1.5 pre-merge
+/// review: a single timeout on the first /events page would have wiped the
+/// live set ~96x/day worst case.)
+const RECONCILE_MIN_SELECTED: usize = 50;
+
+/// Pure guard for `catalog_sweep`'s reconciliation step.
+fn should_reconcile(sweep_complete: bool, selected_len: usize) -> bool {
+    sweep_complete && selected_len >= RECONCILE_MIN_SELECTED
+}
+
 pub async fn start_predictions_services(
     pool: Arc<PgPool>,
     health_state: Arc<Mutex<PredictionsHealth>>,
@@ -169,6 +185,10 @@ async fn catalog_sweep(state: &PredictionsState) {
     let mut all: Vec<(Market, Option<String>, String)> = Vec::new();
     let mut cursor = String::new();
     let mut pages = 0u32;
+    // True only when pagination drained Kalshi's full open-events list. A
+    // partial sweep (page error / safety cap) may still upsert what it got,
+    // but MUST NOT reconcile — see `should_reconcile`.
+    let mut sweep_complete = true;
 
     loop {
         let query = if cursor.is_empty() {
@@ -200,11 +220,13 @@ async fn catalog_sweep(state: &PredictionsState) {
                 // Safety stop so a misbehaving cursor can't loop forever.
                 if pages >= 50 {
                     warn!("[ Kalshi ] Catalog sweep hit 50-page cap; stopping pagination");
+                    sweep_complete = false;
                     break;
                 }
             }
             Err(e) => {
                 warn!("[ Kalshi ] Catalog sweep page fetch failed: {e:#}");
+                sweep_complete = false;
                 break;
             }
         }
@@ -319,6 +341,17 @@ async fn catalog_sweep(state: &PredictionsState) {
     // the selection so the feed stops serving dead markets. Runs AFTER the
     // upsert loop, so a market that re-entered the selection was already
     // re-promoted (in_sweep: Some(true)) and is never demoted here.
+    //
+    // GUARDED: only a complete, plausibly-sized sweep may demote. "Absent
+    // from an incomplete selection" says nothing about a market being dead —
+    // and an errored first page would otherwise demote everything.
+    if !should_reconcile(sweep_complete, selected.len()) {
+        warn!(
+            "[ Kalshi ] Skipping sweep reconcile (complete={sweep_complete}, selected={}) — partial or implausibly small sweep",
+            selected.len()
+        );
+        return;
+    }
     let selected_ids: Vec<String> = selected
         .iter()
         .map(|(m, _, _, _)| format!("kalshi:{}", m.ticker))
@@ -472,6 +505,17 @@ fn derive_category(ticker: &str, event_ticker: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reconcile_guard_requires_complete_plausible_sweep() {
+        // The v1.1.5 ship-blocker: an errored/empty sweep must never demote.
+        assert!(!should_reconcile(true, 0)); // empty selection
+        assert!(!should_reconcile(false, 240)); // partial pagination
+        assert!(!should_reconcile(false, 0)); // errored first page
+        assert!(!should_reconcile(true, RECONCILE_MIN_SELECTED - 1)); // implausibly small
+        assert!(should_reconcile(true, RECONCILE_MIN_SELECTED)); // floor is inclusive
+        assert!(should_reconcile(true, 240)); // normal sweep
+    }
 
     #[test]
     fn cents_rounds_dollars() {
