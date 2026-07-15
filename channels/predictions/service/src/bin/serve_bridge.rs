@@ -49,8 +49,13 @@ use predictions_service::kalshi::{
     ws,
 };
 
-/// How many of the highest-volume primary markets to seed the feed with.
-const FEED_CAP: usize = 80;
+/// How many of the highest-volume markets to seed the feed with. Two legs
+/// per event (mirroring the real service's MARKETS_PER_EVENT), so this is
+/// ~80 events — enough to exercise the category sections in the desktop UI.
+const FEED_CAP: usize = 160;
+
+/// How many outcomes each event keeps (contract parity with `lib.rs`).
+const MARKETS_PER_EVENT: u32 = 2;
 /// Per-page limit for the initial `GET /markets` sweep.
 const PAGE_LIMIT: u32 = 200;
 /// Safety stop so a misbehaving cursor can't paginate forever.
@@ -68,6 +73,10 @@ struct Prediction {
     source: String,
     ticker: String,
     event_ticker: String,
+    /// The event's human question (v1.1.4 contract).
+    event_title: String,
+    /// Leg rank within its event: 1 = most liquid, 2 = second outcome.
+    event_rank: i64,
     category: String,
     title: String,
     subtitle: String,
@@ -76,7 +85,11 @@ struct Prediction {
     yes_ask: i64,
     prev_yes_price: i64,
     volume: i64,
+    /// Trailing-24h volume (v1.1.5 contract) — drives the Trending sort.
+    volume_24h: i64,
     open_interest: i64,
+    /// Always true on the bridge: the in-memory feed IS the current sweep.
+    in_sweep: bool,
     status: String,
     result: String,
     close_time: String,
@@ -274,16 +287,20 @@ async fn initial_sweep(rest: &RestClient) -> Result<Vec<Prediction>> {
         fp_volume(b.volume_fp.as_deref()).cmp(&fp_volume(a.volume_fp.as_deref()))
     });
 
-    // First (highest-volume) market per event is the representative.
-    let mut seen_events: std::collections::HashSet<String> = std::collections::HashSet::new();
+    // Keep the top MARKETS_PER_EVENT legs per event (volume order means an
+    // event's rank-1 leg is always its most-liquid one) — contract parity
+    // with the real service's sweep.
+    let mut event_counts: std::collections::HashMap<String, u32> =
+        std::collections::HashMap::new();
     let mut out: Vec<Prediction> = Vec::with_capacity(FEED_CAP);
     for m in &markets {
-        let is_primary = seen_events.insert(m.event_ticker.clone());
-        if !is_primary {
+        let count = event_counts.entry(m.event_ticker.clone()).or_insert(0);
+        if *count >= MARKETS_PER_EVENT {
             continue;
         }
+        *count += 1;
         let meta = event_meta.get(&m.ticker);
-        out.push(market_to_prediction(m, meta));
+        out.push(market_to_prediction(m, meta, *count as i64));
         if out.len() >= FEED_CAP {
             break;
         }
@@ -487,9 +504,11 @@ async fn events(
 
 /// `meta` is the optional `(event_category, event_title)` captured from the
 /// `/events` sweep, used to enrich the display bucket/title when present.
+/// `rank` is the leg's position within its event (1 = most liquid).
 fn market_to_prediction(
     m: &Market,
     meta: Option<&(Option<String>, String)>,
+    rank: i64,
 ) -> Prediction {
     // Prefer the event's own category from Kalshi; fall back to our derived
     // bucket. Map Kalshi's category strings onto the CONTRACT buckets.
@@ -513,6 +532,11 @@ fn market_to_prediction(
         source: "kalshi".to_string(),
         ticker: m.ticker.clone(),
         event_ticker: m.event_ticker.clone(),
+        event_title: meta
+            .map(|(_, t)| t.clone())
+            .filter(|t| !t.is_empty())
+            .unwrap_or_default(),
+        event_rank: rank,
         category,
         title,
         subtitle: m.yes_sub_title.clone().unwrap_or_default(),
@@ -521,7 +545,9 @@ fn market_to_prediction(
         yes_ask: cents(m.yes_ask_dollars.as_deref()).unwrap_or(0),
         prev_yes_price: cents(m.previous_price_dollars.as_deref()).unwrap_or(yes_price),
         volume: fp_volume(m.volume_fp.as_deref()),
+        volume_24h: fp_opt(m.volume_24h_fp.as_deref()).unwrap_or(0),
         open_interest: fp_opt(m.open_interest_fp.as_deref()).unwrap_or(0),
+        in_sweep: true,
         status: m.status.clone().unwrap_or_default(),
         result: m.result.clone().unwrap_or_default(),
         close_time: m.close_time.clone().unwrap_or_default(),

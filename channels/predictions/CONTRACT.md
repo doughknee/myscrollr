@@ -28,6 +28,8 @@ JSON keys == DB column names (snake_case), matching the finance channel conventi
 | `status` | TEXT | lifecycle: active/closed/determined/settled |
 | `result` | TEXT | yes/no/'' when settled |
 | `is_primary` | BOOLEAN NOT NULL DEFAULT TRUE | representative market per event (filter noise) |
+| `in_sweep` | BOOLEAN NOT NULL DEFAULT TRUE | v1.1.5: in the current sweep selection; FALSE = dropped out (kept for history/"Resolved today") |
+| `settled_at` | TIMESTAMPTZ | v1.1.5: stamped ONCE on the transition into a resolved state (status settled/determined/finalized or result yes/no); NULL for pre-migration resolutions. Drives "Resolved today" — never use `updated_at` for that |
 | `open_time` | TIMESTAMPTZ | |
 | `close_time` | TIMESTAMPTZ | |
 | `link` | TEXT | `https://kalshi.com/markets/{series}/{event}` |
@@ -37,6 +39,19 @@ JSON keys == DB column names (snake_case), matching the finance channel conventi
 `REPLICA IDENTITY FULL`. Upsert on `id`. **Coalesce/change-detect**: only UPDATE
 when a displayed field actually changed (skip no-op ticks) — finance has no such
 guard; predictions needs it (Kalshi ticks are high-frequency).
+
+**Sweep reconciliation invariant (v1.1.5):** every catalog sweep demotes
+(`in_sweep = FALSE`) rows that are no longer in the current selection and
+REST-rechecks recently-dropped tickers so settlements land even when the
+`market_lifecycle_v2` WS event was missed. The WS ticker path never writes to
+demoted rows (`upsert_market` early-return); lifecycle/status writes still do.
+The Go API serves two branches: the live curated set (`in_sweep AND rank
+filter AND close_time not past AND status not settled`) plus anything with
+`settled_at` in the trailing 24h (feeds "Resolved today"), ordered by
+`volume_24h DESC` (all-time volume never shrinks, so it can't rank
+liveliness). Resolved-state detection (settled/determined/finalized or
+result yes/no) exists in three places — Rust `database::is_resolved`, the Go
+filter, desktop `view.ts::isResolved` — keep them in sync.
 
 ### `tracked_markets` — catalog (mirrors finance `tracked_symbols`)
 `id SERIAL PK, ticker TEXT UNIQUE, title TEXT, category TEXT, series_ticker TEXT,
@@ -58,9 +73,12 @@ export interface Prediction {
   yes_ask?: number;
   prev_yes_price?: number; // for ▲/▼ delta
   volume?: number;
+  volume_24h?: number;     // v1.1.5 — "Trending" sort; absent on old payloads
   open_interest?: number;
+  in_sweep?: boolean;      // v1.1.5 — false = left the curated set; treat undefined as true
   status?: string;
   result?: string;
+  settled_at?: string;     // v1.1.5 — RFC3339; when the market resolved (once-stamped)
   close_time?: string;     // RFC3339
   link?: string;
   updated_at?: string;     // RFC3339
@@ -84,9 +102,11 @@ export interface Prediction {
   favorites cap. Tier placement is open product decision Q10.
 
 ## User channel config shape (`user_channels.config` for channel_type=predictions)
-`{ "categories": string[], "favorites": string[] }` — categories drive the
-ticker contents; favorites pin specific markets. (v1 routing ignores these and
-broadcasts; they're stored for the UI + future per-category routing.)
+`{ "categories": string[], "favorites": string[] }` — **retired as of v1.1.5**:
+new desktop clients write neither key (personalization is the local star
+watchlist; all filtering is client-side) and actively clear their own config
+once. The Go API keeps honoring non-empty configs (category narrowing +
+favorites union in `queryMarketsForUser`) for pre-v1.1.5 builds indefinitely.
 
 ## Ports / env (Rust service + Go API)
 - Rust service: PORT default `3005` (finance 3001, sports 3002, rss 3004).

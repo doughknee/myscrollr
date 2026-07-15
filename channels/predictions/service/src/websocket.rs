@@ -473,6 +473,12 @@ pub(crate) async fn connect(
                         last_error = Some(format!("Kalshi WS error: {text}"));
                         error_count += 1;
                     }
+                    // Kalshi's newer EVENT-level lifecycle channel piggybacks
+                    // on our subscription. We track lifecycle per-market via
+                    // market_lifecycle_v2 (+ the sweep's settlement recheck);
+                    // parsing event-level payloads is deliberately deferred.
+                    // Ignore quietly — this was ~90% of our log volume.
+                    "event_lifecycle" => {}
                     other => {
                         warn!("Unhandled Kalshi WS message type '{other}': {text}");
                     }
