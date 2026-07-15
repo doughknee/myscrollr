@@ -79,11 +79,15 @@ impl RestClient {
     /// `GET /portfolio/positions` → the user's market positions (normalized),
     /// dropping flat (zero-contract, zero-resting) rows that Kalshi sometimes
     /// returns for previously-held markets.
+    ///
+    /// `count_filter` accepts only `position`/`total_traded` today —
+    /// `resting_order_count` was retired with the fixed-point migration.
+    /// `limit=1000` (the max) keeps every realistic account on one page.
     pub async fn positions(&self) -> Result<Vec<Position>> {
         let raw: RawPositionsResponse = self
             .get_json(
                 &format!("{API_PREFIX}/portfolio/positions"),
-                "count_filter=position,resting_order_count",
+                "count_filter=position&limit=1000",
             )
             .await?;
         Ok(raw
