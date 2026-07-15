@@ -479,11 +479,13 @@ pub async fn upsert_market(
 /// selection (v1.1.5 reconciliation). Returns the demoted tickers so the
 /// caller can REST-check their real settlement status.
 ///
-/// One statement, sweep-cadence (every 15 min): the demotion write bumps
-/// `updated_at` and fires a CDC event per row, which is intended — clients
-/// learn the market left the curated set. Re-promotion happens naturally via
-/// the sweep's own upsert (`in_sweep: Some(true)`) *before* this runs, so a
-/// market that re-enters the selection is never demoted in the same cycle.
+/// One statement, sweep-cadence (every 15 min); each demotion fires a CDC
+/// event (WAL-based), which is intended — clients learn the market left the
+/// curated set. Re-promotion happens naturally via the sweep's own upsert
+/// (`in_sweep: Some(true)`) *before* this runs, so a market that re-enters
+/// the selection is never demoted in the same cycle. CALLERS must gate this
+/// on a complete, plausibly-sized selection (`lib.rs::should_reconcile`) —
+/// an empty list demotes every live row.
 pub async fn reconcile_sweep_selection(
     pool: &Arc<PgPool>,
     selected_ids: &[String],
