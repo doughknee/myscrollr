@@ -59,6 +59,15 @@ const MUTED: ChipColors = {
   textFaint: "text-fg-3",
 };
 
+const PREDICTIONS: ChipColors = {
+  bg: "bg-predictions/[0.06]",
+  border: "border-predictions/25",
+  hoverBorder: "hover:border-predictions/40",
+  text: "text-predictions",
+  textDim: "text-predictions/70",
+  textFaint: "text-predictions/55",
+};
+
 // ── Widget color palettes ───────────────────────────────────────
 
 const WIDGET_CLOCK: ChipColors = {
@@ -122,9 +131,9 @@ const CHANNEL_MAP: Record<string, ChipColors> = {
   sports: SECONDARY,
   rss: INFO,
   fantasy: PURPLE,
-  // Predictions brand is indigo (#6366f1); accent-purple is the closest
-  // in-theme token and is unique on the ticker (fantasy is dashboard-only).
-  predictions: PURPLE,
+  // Predictions brand teal (#1fc9a0, v1.1.5) — its own static token so the
+  // ticker chip matches the catalog card and the channel accent everywhere.
+  predictions: PREDICTIONS,
   clock: WIDGET_CLOCK,
   timer: WIDGET_TIMER,
   weather: WIDGET_WEATHER,

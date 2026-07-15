@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   sortPredictions,
-  applyPredictionsPipeline,
+  selectLens,
+  isDisplayable,
   selectPredictionsForTicker,
   groupByEvent,
+  groupEventsByCategory,
   priceDelta,
   formatProbability,
   formatCentsPrice,
@@ -72,13 +74,23 @@ describe("sortPredictions", () => {
     expect(result.map((p) => p.id)).toEqual(["B", "C", "A"]);
   });
 
-  it("sorts by volume descending", () => {
+  it("sorts by trending (24h volume) descending", () => {
     const items = [
-      mk({ id: "A", volume: 100 }),
-      mk({ id: "B", volume: 900 }),
-      mk({ id: "C", volume: 400 }),
+      mk({ id: "A", volume_24h: 100 }),
+      mk({ id: "B", volume_24h: 900 }),
+      mk({ id: "C", volume_24h: 400 }),
     ];
-    const result = sortPredictions(items, "volume");
+    const result = sortPredictions(items, "trending");
+    expect(result.map((p) => p.id)).toEqual(["B", "C", "A"]);
+  });
+
+  it("trending falls back to all-time volume on old payloads", () => {
+    const items = [
+      mk({ id: "A", volume: 100 }), // no volume_24h at all
+      mk({ id: "B", volume: 900 }),
+      mk({ id: "C", volume_24h: 400, volume: 50 }),
+    ];
+    const result = sortPredictions(items, "trending");
     expect(result.map((p) => p.id)).toEqual(["B", "C", "A"]);
   });
 
@@ -128,107 +140,99 @@ describe("sortPredictions", () => {
       mk({ id: "B", volume: 5 }),
       mk({ id: "C", volume: undefined }),
     ];
-    const result = sortPredictions(items, "volume");
+    const result = sortPredictions(items, "trending");
     expect(result[0]!.id).toBe("B");
   });
 });
 
-// ── applyPredictionsPipeline ────────────────────────────────────
+// ── isDisplayable (v1.1.5 liveness guard) ───────────────────────
 
-describe("applyPredictionsPipeline", () => {
-  const categoryMap = new Map<string, string>([
-    ["a", "Politics"],
-    ["b", "Politics"],
-    ["c", "Sports"],
-    ["d", "Crypto"],
-  ]);
+describe("isDisplayable", () => {
+  it("passes live in-sweep markets and old payloads without the flag", () => {
+    expect(isDisplayable(mk({ id: "A", in_sweep: true }))).toBe(true);
+    expect(isDisplayable(mk({ id: "B" }))).toBe(true); // pre-v1.1.5 payload
+  });
 
+  it("rejects markets dropped from the sweep", () => {
+    expect(isDisplayable(mk({ id: "A", in_sweep: false }))).toBe(false);
+  });
+
+  it("rejects resolved markets (they belong to Resolved today)", () => {
+    expect(isDisplayable(mk({ id: "A", status: "settled" }))).toBe(false);
+    expect(isDisplayable(mk({ id: "B", result: "yes" }))).toBe(false);
+  });
+});
+
+// ── selectLens (v1.1.5 feed lenses) ─────────────────────────────
+
+describe("selectLens", () => {
   function makeItems(): Prediction[] {
     return [
-      mk({ id: "a", title: "A", yes_price: 60, prev_yes_price: 50, volume: 200, category: "Politics" }),
-      mk({ id: "b", title: "B", yes_price: 40, prev_yes_price: 50, volume: 400, category: "Politics" }),
-      mk({ id: "c", title: "C", yes_price: 70, prev_yes_price: 50, volume: 150, category: "Sports" }),
-      mk({ id: "d", title: "D", yes_price: 50, prev_yes_price: 50, volume: 110, category: "Crypto" }),
+      mk({ id: "hot", volume_24h: 900, yes_price: 50, prev_yes_price: 50 }),
+      mk({ id: "mover", volume_24h: 100, yes_price: 70, prev_yes_price: 50, close_time: "2026-03-01T00:00:00Z" }),
+      mk({ id: "closing", volume_24h: 200, yes_price: 50, prev_yes_price: 50, close_time: "2026-01-15T00:00:00Z" }),
+      mk({ id: "dead", volume_24h: 9999, in_sweep: false }),
+      mk({ id: "settled", volume_24h: 8888, status: "settled", result: "yes" }),
     ];
   }
 
-  it("applies direction=up (positive delta only)", () => {
-    const result = applyPredictionsPipeline(makeItems(), {
-      directionFilter: "up",
-      selectedCategories: new Set(),
-      categoryMap,
-      sortKey: "alpha",
-    });
-    expect(result.map((p) => p.id)).toEqual(["a", "c"]);
+  it("trending: live markets only, hottest first", () => {
+    const out = selectLens(makeItems(), "trending", new Set());
+    expect(out.map((p) => p.id)).toEqual(["hot", "closing", "mover"]);
   });
 
-  it("applies direction=down (negative delta only)", () => {
-    const result = applyPredictionsPipeline(makeItems(), {
-      directionFilter: "down",
-      selectedCategories: new Set(),
-      categoryMap,
-      sortKey: "alpha",
-    });
-    expect(result.map((p) => p.id)).toEqual(["b"]);
+  it("movers: only markets that moved, biggest move first", () => {
+    const out = selectLens(makeItems(), "movers", new Set());
+    expect(out.map((p) => p.id)).toEqual(["mover"]);
   });
 
-  it("direction=all keeps everything including unchanged", () => {
-    const result = applyPredictionsPipeline(makeItems(), {
-      directionFilter: "all",
-      selectedCategories: new Set(),
-      categoryMap,
-      sortKey: "alpha",
-    });
-    expect(result).toHaveLength(4);
+  it("closing: only future-closing markets, soonest first", () => {
+    const out = selectLens(makeItems(), "closing", new Set());
+    expect(out.map((p) => p.id)).toEqual(["closing", "mover"]);
   });
 
-  it("applies category filter (from prediction.category)", () => {
-    const result = applyPredictionsPipeline(makeItems(), {
-      directionFilter: "all",
-      selectedCategories: new Set(["Politics"]),
-      categoryMap,
-      sortKey: "alpha",
-    });
-    expect(result.map((p) => p.id)).toEqual(["a", "b"]);
+  it("watchlist: starred only; resolved stars stay, dropped stars leave", () => {
+    const out = selectLens(
+      makeItems(),
+      "watchlist",
+      new Set(["hot", "dead", "settled"]),
+    );
+    // "dead" (dropped, unresolved) is excluded; "settled" star kept for closure.
+    expect(out.map((p) => p.id).sort()).toEqual(["hot", "settled"]);
   });
 
-  it("falls back to categoryMap when prediction.category is absent", () => {
+  it("resolved: trailing-24h settlements only, anchored to `now`", () => {
+    const now = Date.parse("2026-06-26T12:00:00Z");
     const items = [
-      mk({ id: "a", title: "A", category: undefined }),
-      mk({ id: "c", title: "C", category: undefined }),
+      mk({ id: "live" }),
+      mk({ id: "fresh", status: "settled", settled_at: "2026-06-26T09:00:00Z" }),
+      mk({ id: "stale", status: "settled", settled_at: "2026-06-20T00:00:00Z" }),
     ];
-    const result = applyPredictionsPipeline(items, {
-      directionFilter: "all",
-      selectedCategories: new Set(["Sports"]),
-      categoryMap,
-      sortKey: "alpha",
-    });
-    expect(result.map((p) => p.id)).toEqual(["c"]);
+    const out = selectLens(items, "resolved", new Set(), now);
+    expect(out.map((p) => p.id)).toEqual(["fresh"]);
   });
+});
 
-  it("drops markets with no category mapping under a category filter", () => {
-    const items = [
-      mk({ id: "a", title: "A", category: "Politics" }),
-      mk({ id: "z", title: "Z", category: undefined }),
-    ];
-    const result = applyPredictionsPipeline(items, {
-      directionFilter: "all",
-      selectedCategories: new Set(["Politics"]),
-      categoryMap,
-      sortKey: "alpha",
-    });
-    expect(result.map((p) => p.id)).toEqual(["a"]);
-  });
+// ── groupEventsByCategory (v1.1.5 browse sections) ──────────────
 
-  it("combines direction + category filter + sort", () => {
-    const result = applyPredictionsPipeline(makeItems(), {
-      directionFilter: "up",
-      selectedCategories: new Set(["Politics"]),
-      categoryMap,
-      sortKey: "volume",
-    });
-    // up + Politics: only "a"
-    expect(result.map((p) => p.id)).toEqual(["a"]);
+describe("groupEventsByCategory", () => {
+  it("stable-groups events into sections ordered by summed 24h volume", () => {
+    const events = groupByEvent([
+      mk({ id: "s1", event_ticker: "S1", category: "Sports", volume_24h: 100 }),
+      mk({ id: "p1", event_ticker: "P1", category: "Politics", volume_24h: 900 }),
+      mk({ id: "s2", event_ticker: "S2", category: "Sports", volume_24h: 300 }),
+      mk({ id: "x1", event_ticker: "X1", volume_24h: 50 }), // no category
+    ]);
+    const sections = groupEventsByCategory(events);
+    expect(sections.map((s) => s.category)).toEqual([
+      "Politics", // 900
+      "Sports",   // 400
+      "Other",    // 50
+    ]);
+    // Events preserve input (lens-sorted) order within their section.
+    expect(sections[1].events.map((e) => e.eventTicker)).toEqual(["S1", "S2"]);
+    expect(sections[0].volume24h).toBe(900);
+    expect(sections[1].volume24h).toBe(400);
   });
 });
 
@@ -248,17 +252,30 @@ describe("selectPredictionsForTicker", () => {
     expect(result.map((p) => p.id)).toEqual(["B", "C", "A"]);
   });
 
-  it("applies defaultSort=volume from prefs", () => {
+  it("applies defaultSort=trending from prefs", () => {
     const items = [
-      mk({ id: "A", volume: 10 }),
-      mk({ id: "B", volume: 30 }),
-      mk({ id: "C", volume: 20 }),
+      mk({ id: "A", volume_24h: 10 }),
+      mk({ id: "B", volume_24h: 30 }),
+      mk({ id: "C", volume_24h: 20 }),
     ];
     const result = selectPredictionsForTicker(items, {
       ...DEFAULT_PREFS,
-      defaultSort: "volume",
+      defaultSort: "trending",
     });
     expect(result.map((p) => p.id)).toEqual(["B", "C", "A"]);
+  });
+
+  it("excludes dropped and resolved markets from the fallback rail", () => {
+    const items = [
+      mk({ id: "live", volume_24h: 10 }),
+      mk({ id: "dead", volume_24h: 999, in_sweep: false }),
+      mk({ id: "settled", volume_24h: 500, status: "finalized" }),
+    ];
+    const result = selectPredictionsForTicker(items, {
+      ...DEFAULT_PREFS,
+      defaultSort: "trending",
+    });
+    expect(result.map((p) => p.id)).toEqual(["live"]);
   });
 
   it("applies defaultSort=alpha from prefs", () => {
@@ -367,6 +384,28 @@ describe("isResolved / selectResolvedToday", () => {
     ];
     expect(selectResolvedToday(items, now)).toHaveLength(0);
   });
+
+  it("prefers settled_at over updated_at (v1.1.5)", () => {
+    const now = Date.parse("2026-06-26T12:00:00Z");
+    const items = [
+      // Settled long ago but its row was touched recently (sweep write /
+      // demotion) — settled_at keeps it OUT of "today".
+      mk({
+        id: "old-touch",
+        status: "settled",
+        settled_at: "2026-06-01T00:00:00Z",
+        updated_at: "2026-06-26T11:00:00Z",
+      }),
+      // Settled recently; updated_at stale — settled_at keeps it IN.
+      mk({
+        id: "fresh",
+        status: "settled",
+        settled_at: "2026-06-26T09:00:00Z",
+        updated_at: "2026-06-20T00:00:00Z",
+      }),
+    ];
+    expect(selectResolvedToday(items, now).map((p) => p.id)).toEqual(["fresh"]);
+  });
 });
 
 // ── Ticker scoping (v1.1.4: watchlist-first, top-N fallback) ────
@@ -380,10 +419,24 @@ describe("selectPredictionsForTicker scoping", () => {
     ];
     const out = selectPredictionsForTicker(
       items,
-      { ...DEFAULT_PREFS, defaultSort: "volume" },
+      { ...DEFAULT_PREFS, defaultSort: "trending" },
       new Set(["B"]),
     );
     expect(out.map((p) => p.id)).toEqual(["B"]);
+  });
+
+  it("drops a dropped-unresolved star but keeps a resolved one (v1.1.5)", () => {
+    const items = [
+      mk({ id: "gone", in_sweep: false }),
+      mk({ id: "done", in_sweep: false, status: "settled", result: "no" }),
+      mk({ id: "live" }),
+    ];
+    const out = selectPredictionsForTicker(
+      items,
+      { ...DEFAULT_PREFS, defaultSort: "trending" },
+      new Set(["gone", "done", "live"]),
+    );
+    expect(out.map((p) => p.id).sort()).toEqual(["done", "live"]);
   });
 
   it("falls back to the top rank-1 legs, capped, when nothing is starred", () => {
@@ -396,7 +449,7 @@ describe("selectPredictionsForTicker scoping", () => {
     );
     const out = selectPredictionsForTicker(
       items,
-      { ...DEFAULT_PREFS, defaultSort: "volume" },
+      { ...DEFAULT_PREFS, defaultSort: "trending" },
       new Set(),
     );
     expect(out.length).toBe(TICKER_FALLBACK_LIMIT);
@@ -408,7 +461,7 @@ describe("selectPredictionsForTicker scoping", () => {
     const items = [mk({ id: "LEGACY", volume: 5 })];
     const out = selectPredictionsForTicker(
       items,
-      { ...DEFAULT_PREFS, defaultSort: "volume" },
+      { ...DEFAULT_PREFS, defaultSort: "trending" },
       new Set(),
     );
     expect(out.map((p) => p.id)).toEqual(["LEGACY"]);
@@ -445,6 +498,8 @@ describe("groupByEvent", () => {
     expect(wc.title).toBe("FIFA World Cup Winner");
     expect(wc.outcomes.map((o) => o.title)).toEqual(["France", "Argentina"]);
     expect(wc.volume).toBe(500);
+    // volume24h falls back to all-time volume per leg (no volume_24h set).
+    expect(wc.volume24h).toBe(500);
   });
 
   it("preserves the input ordering by each event's lead leg", () => {

@@ -54,7 +54,13 @@ import type {
   Trade,
   Game,
   RssItem,
+  Prediction,
 } from "../types";
+import {
+  isDisplayable,
+  priceDelta,
+} from "../channels/predictions/view";
+import ProbabilityPill from "../channels/predictions/ProbabilityPill";
 import type { TempUnit, HomePreview } from "../preferences";
 import type { SystemInfo } from "../hooks/useSysmonData";
 import type { TimerState } from "../widgets/timer/types";
@@ -594,7 +600,10 @@ function ChannelSection({
             {source === "fantasy" && (
               <FantasyRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
             )}
-            {!["finance", "sports", "rss", "fantasy"].includes(source) && (
+            {source === "predictions" && (
+              <PredictionsRows data={channelData} onConfigure={onConfigure} />
+            )}
+            {!["finance", "sports", "rss", "fantasy", "predictions"].includes(source) && (
               <EmptyDataRow channelType={source} onConfigure={onConfigure} />
             )}
           </motion.div>
@@ -651,6 +660,46 @@ function FinanceRows({ data, filter, onConfigure }: { data: unknown; filter: str
             >
               {isUp ? "▲" : "▼"} {Math.abs(pct).toFixed(2)}%
             </span>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+// ── Predictions rows ────────────────────────────────────────────
+
+function PredictionsRows({ data, onConfigure }: { data: unknown; onConfigure: () => void }) {
+  const markets = Array.isArray(data) ? (data as Prediction[]) : [];
+  const live = markets.filter(isDisplayable);
+  if (live.length === 0) return <EmptyDataRow channelType="predictions" onConfigure={onConfigure} />;
+
+  // Top movers preview — the same "what changed" glance FinanceRows gives.
+  const sorted = [...live]
+    .sort((a, b) => Math.abs(priceDelta(b)) - Math.abs(priceDelta(a)))
+    .slice(0, MAX_PREVIEW);
+
+  return (
+    <>
+      {sorted.map((p) => {
+        const delta = priceDelta(p);
+        const isUp = delta > 0;
+        return (
+          <div key={p.id} className="flex items-center px-4 py-2.5 gap-4">
+            <span className="text-xs text-fg-2 truncate flex-1">
+              {p.event_title || p.title}
+            </span>
+            {/* Fixed delta slot + fixed-width pill — the channel's own
+                column treatment, so Home previews match the feed. */}
+            <span
+              className={clsx(
+                "text-xs font-medium tabular-nums w-10 text-right",
+                isUp ? "text-green-400" : "text-red-400",
+              )}
+            >
+              {delta !== 0 ? `${isUp ? "▲" : "▼"} ${Math.abs(delta)}` : ""}
+            </span>
+            <ProbabilityPill pct={p.yes_price} delta={delta} size="sm" />
           </div>
         );
       })}

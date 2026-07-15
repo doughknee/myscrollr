@@ -8,8 +8,20 @@
 import type { Prediction } from "../../types";
 import type { PredictionsDisplayPrefs } from "../../preferences";
 
-export type PredictionsSortKey = "movers" | "volume" | "closing" | "alpha";
-export type PredictionsDirectionFilter = "all" | "up" | "down";
+/** "trending" = trailing-24h volume (v1.1.5) — falls back to all-time
+ *  volume on old payloads that don't carry `volume_24h`. */
+export type PredictionsSortKey = "trending" | "movers" | "closing" | "alpha";
+
+/** The feed's ways of looking at the market universe (v1.1.5).
+ *  One lens row replaces the old direction filter + category config.
+ *  "resolved" is the trailing-24h settlement recap as a first-class view
+ *  (full cards) — it replaced the cramped chip strip. */
+export type PredictionsLens =
+  | "trending"
+  | "movers"
+  | "closing"
+  | "resolved"
+  | "watchlist";
 
 // ── Pure: coercion helpers ───────────────────────────────────────
 
@@ -34,6 +46,24 @@ function closeTimeMs(p: Prediction): number {
   return Number.isFinite(t) ? t : Number.POSITIVE_INFINITY;
 }
 
+/** Trending weight: trailing-24h volume, falling back to all-time volume
+ *  for old payloads (pre-v1.1.5 API / demo bridge). */
+function trendingVolume(p: Prediction): number {
+  return num(p.volume_24h) || num(p.volume);
+}
+
+/**
+ * Whether a market belongs in LIVE surfaces (feed grids, ticker fallback).
+ * `in_sweep === false` means the server's sweep dropped it (settled,
+ * delisted, or out-ranked) — its price is frozen, so rendering it as live
+ * is exactly the stale-data bug v1.1.5 fixes. Resolved markets are also
+ * excluded here; they surface via the "Resolved today" strip instead.
+ * Undefined `in_sweep` (old payloads) counts as live.
+ */
+export function isDisplayable(p: Prediction): boolean {
+  return p.in_sweep !== false && !isResolved(p);
+}
+
 // ── Pure: sort ───────────────────────────────────────────────────
 
 export function sortPredictions(
@@ -46,8 +76,8 @@ export function sortPredictions(
       case "movers":
         primary = moverMagnitude(b) - moverMagnitude(a);
         break;
-      case "volume":
-        primary = num(b.volume) - num(a.volume);
+      case "trending":
+        primary = trendingVolume(b) - trendingVolume(a);
         break;
       case "closing":
         // Soonest-to-close first; markets with no close_time sink last.
@@ -62,6 +92,55 @@ export function sortPredictions(
     // between live ticks (prevents jitter when many share a sort value).
     return a.ticker.localeCompare(b.ticker);
   });
+}
+
+// ── Pure: feed lenses (v1.1.5) ───────────────────────────────────
+
+/**
+ * The single entry point for the feed's market list. Applies the liveness
+ * guard, then the lens's own filter + ordering:
+ *   - trending: everything live, hottest (24h volume) first.
+ *   - movers: only markets whose price actually moved, biggest move first.
+ *   - closing: only markets with a future close, soonest first.
+ *   - resolved: settled within the trailing 24h, most recent first
+ *     (`now` anchors the window — pass the shared useNow() tick).
+ *   - watchlist: starred markets (any rank). Resolved stars stay visible
+ *     here — a star means "always show me this", and a just-settled
+ *     watched market is exactly what the user wants closure on.
+ */
+export function selectLens(
+  items: Prediction[],
+  lens: PredictionsLens,
+  watchlist: ReadonlySet<string>,
+  now: number = Date.now(),
+): Prediction[] {
+  switch (lens) {
+    case "trending":
+      return sortPredictions(items.filter(isDisplayable), "trending");
+    case "movers":
+      return sortPredictions(
+        items.filter((p) => isDisplayable(p) && priceDelta(p) !== 0),
+        "movers",
+      );
+    case "closing":
+      return sortPredictions(
+        items.filter(
+          (p) => isDisplayable(p) && Number.isFinite(closeTimeMs(p)),
+        ),
+        "closing",
+      );
+    case "resolved":
+      return selectResolvedToday(items, now);
+    case "watchlist":
+      return sortPredictions(
+        items.filter(
+          (p) =>
+            watchlist.has(p.ticker) &&
+            (p.in_sweep !== false || isResolved(p)),
+        ),
+        "trending",
+      );
+  }
 }
 
 // ── Pure: selector for the ticker ────────────────────────────────
@@ -84,14 +163,24 @@ export function selectPredictionsForTicker(
   prefs: PredictionsDisplayPrefs,
   watchlist?: ReadonlySet<string>,
 ): Prediction[] {
-  const sortKey: PredictionsSortKey = prefs.defaultSort ?? "movers";
+  const sortKey: PredictionsSortKey = prefs.defaultSort ?? "trending";
   if (watchlist && watchlist.size > 0) {
+    // Starred markets only. Dropped-but-unresolved stars are excluded —
+    // their frozen price scrolling by forever IS the stale-data bug.
+    // Resolved stars stay (final odds are closure, and the resolved-today
+    // payload window bounds how long they linger).
     return sortPredictions(
-      items.filter((p) => watchlist.has(p.ticker)),
+      items.filter(
+        (p) =>
+          watchlist.has(p.ticker) &&
+          (p.in_sweep !== false || isResolved(p)),
+      ),
       sortKey,
     );
   }
-  const primaries = items.filter((p) => (p.event_rank ?? 1) === 1);
+  const primaries = items.filter(
+    (p) => isDisplayable(p) && (p.event_rank ?? 1) === 1,
+  );
   return sortPredictions(primaries, sortKey).slice(0, TICKER_FALLBACK_LIMIT);
 }
 
@@ -107,6 +196,9 @@ export interface PredictionEvent {
   outcomes: Prediction[];
   /** Summed across legs — the card's volume line. */
   volume: number;
+  /** Summed trailing-24h volume across legs — orders category sections
+   *  and the card footer (v1.1.5). Falls back to all-time volume. */
+  volume24h: number;
   closeTime?: string | null;
 }
 
@@ -127,12 +219,14 @@ export function groupByEvent(items: Prediction[]): PredictionEvent[] {
         category: p.category,
         outcomes: [p],
         volume: num(p.volume),
+        volume24h: trendingVolume(p),
         closeTime: p.close_time ?? null,
       });
       continue;
     }
     existing.outcomes.push(p);
     existing.volume += num(p.volume);
+    existing.volume24h += trendingVolume(p);
     if (!existing.title && (p.event_title || p.title)) {
       existing.title = p.event_title || p.title;
     }
@@ -143,37 +237,41 @@ export function groupByEvent(items: Prediction[]): PredictionEvent[] {
   return Array.from(byEvent.values());
 }
 
-// ── Pipeline for FeedTab ─────────────────────────────────────────
+// ── Pure: category sections (v1.1.5 Kalshi-style browse) ─────────
 
-export interface PredictionsPipelineOptions {
-  directionFilter: PredictionsDirectionFilter;
-  selectedCategories: Set<string>;
-  categoryMap: Map<string, string>;
-  sortKey: PredictionsSortKey;
+export interface CategorySection {
+  category: string;
+  /** Events in input order (already lens-sorted upstream). */
+  events: PredictionEvent[];
+  /** Summed 24h volume across the section's events — section order. */
+  volume24h: number;
 }
 
-export function applyPredictionsPipeline(
-  items: Prediction[],
-  opts: PredictionsPipelineOptions,
-): Prediction[] {
-  const { directionFilter, selectedCategories, categoryMap, sortKey } = opts;
-
-  let list = items;
-
-  if (directionFilter === "up") {
-    list = list.filter((p) => priceDelta(p) > 0);
-  } else if (directionFilter === "down") {
-    list = list.filter((p) => priceDelta(p) < 0);
+/**
+ * Stable-group an (already sorted) event list into category sections,
+ * hottest section first. Events without a category land in "Other".
+ */
+export function groupEventsByCategory(
+  events: PredictionEvent[],
+): CategorySection[] {
+  const byCategory = new Map<string, CategorySection>();
+  for (const ev of events) {
+    const key = ev.category || "Other";
+    const existing = byCategory.get(key);
+    if (!existing) {
+      byCategory.set(key, {
+        category: key,
+        events: [ev],
+        volume24h: ev.volume24h,
+      });
+      continue;
+    }
+    existing.events.push(ev);
+    existing.volume24h += ev.volume24h;
   }
-
-  if (selectedCategories.size > 0) {
-    list = list.filter((p) => {
-      const cat = p.category ?? categoryMap.get(p.id);
-      return cat != null && selectedCategories.has(cat);
-    });
-  }
-
-  return sortPredictions(list, sortKey);
+  return Array.from(byCategory.values()).sort(
+    (a, b) => b.volume24h - a.volume24h,
+  );
 }
 
 // ── Display formatting (cents == implied probability) ────────────
@@ -243,7 +341,9 @@ export function isResolved(p: Prediction): boolean {
 /**
  * Markets resolved within the trailing `windowMs` (default 24h), most-recent
  * first. Drives the "Resolved Today" recap — closure no other feed gives.
- * Uses `updated_at` (the settlement write) falling back to `close_time`.
+ * Prefers `settled_at` (the once-stamped resolution transition, v1.1.5);
+ * `updated_at`/`close_time` are legacy fallbacks for old payloads where
+ * they were the best approximation available.
  */
 export function selectResolvedToday(
   items: Prediction[],
@@ -251,7 +351,7 @@ export function selectResolvedToday(
   windowMs = 24 * 60 * 60 * 1000,
 ): Prediction[] {
   const resolvedTimeMs = (p: Prediction): number => {
-    const stamp = p.updated_at ?? p.close_time;
+    const stamp = p.settled_at ?? p.updated_at ?? p.close_time;
     if (!stamp) return NaN;
     return new Date(stamp).getTime();
   };

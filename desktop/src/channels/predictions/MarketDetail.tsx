@@ -126,7 +126,7 @@ export default function MarketDetail({
         <div className="flex items-start gap-2 border-b border-edge/30 px-4 py-3">
           <div className="min-w-0 flex-1">
             {market.category && (
-              <span className="text-[10px] font-medium uppercase tracking-wide text-[#6366f1]">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-predictions">
                 {market.category}
               </span>
             )}
@@ -295,8 +295,7 @@ export default function MarketDetail({
             <button
               type="button"
               onClick={() => open(market.link!).catch(() => {})}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white transition-transform hover:-translate-y-px cursor-pointer"
-              style={{ background: "#6366f1" }}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-predictions px-3 py-1.5 text-[12px] font-semibold text-white transition-transform hover:-translate-y-px cursor-pointer"
             >
               <ExternalLink size={13} />
               View on Kalshi

@@ -21,6 +21,7 @@ import {
   boolsToEnum,
   migrateFinanceDisplay,
   migrateRssDisplay,
+  migratePredictionsDisplay,
   migrateFantasyDisplay,
   getSourceTickerRow,
   getChannelTickerRow,
@@ -254,6 +255,28 @@ describe("migrateRssDisplay", () => {
     for (const chosen of [1, 3, 5, 10]) {
       expect(migrateRssDisplay({ articlesPerSource: chosen }).articlesPerSource).toBe(chosen);
     }
+  });
+});
+
+describe("migratePredictionsDisplay", () => {
+  it("maps the retired 'volume' sort to 'trending' (v1.1.5)", () => {
+    const migrated = migratePredictionsDisplay({
+      defaultSort: "volume",
+    } as unknown as Parameters<typeof migratePredictionsDisplay>[0]);
+    expect(migrated.defaultSort).toBe("trending");
+  });
+
+  it("keeps valid sorts and defaults unknown ones to 'trending'", () => {
+    expect(migratePredictionsDisplay({ defaultSort: "movers" }).defaultSort).toBe("movers");
+    expect(migratePredictionsDisplay({ defaultSort: "closing" }).defaultSort).toBe("closing");
+    expect(migratePredictionsDisplay({ defaultSort: "alpha" }).defaultSort).toBe("alpha");
+    expect(migratePredictionsDisplay({ defaultSort: "trending" }).defaultSort).toBe("trending");
+    expect(
+      migratePredictionsDisplay({
+        defaultSort: "banana",
+      } as unknown as Parameters<typeof migratePredictionsDisplay>[0]).defaultSort,
+    ).toBe("trending");
+    expect(migratePredictionsDisplay(undefined).defaultSort).toBe("trending");
   });
 });
 

@@ -44,9 +44,18 @@ export interface Prediction {
   yes_ask?: number;
   prev_yes_price?: number; // for ▲/▼ delta
   volume?: number;
+  /** Trailing-24h volume — the "Trending" sort key (v1.1.5). Absent on
+   *  old payloads; fall back to all-time `volume`. */
+  volume_24h?: number;
   open_interest?: number;
+  /** False once the market left the server's curated sweep selection
+   *  (v1.1.5). Treat undefined (old payloads) as true. */
+  in_sweep?: boolean;
   status?: string;
   result?: string;
+  /** When the market resolved (once-stamped server-side, v1.1.5).
+   *  Preferred over `updated_at` for "Resolved today". RFC3339. */
+  settled_at?: string;
   close_time?: string;     // RFC3339
   link?: string;
   updated_at?: string;     // RFC3339

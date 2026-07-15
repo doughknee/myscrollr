@@ -65,7 +65,9 @@ const PredictionChip = memo(
         className={chipBaseClasses(comfort, c, "whitespace-nowrap")}
         title={leg ? `${label} — ${leg}` : label}
       >
-        {/* Row 1: question, outcome leg, implied probability, delta */}
+        {/* Row 1: question, outcome leg, probability pill, delta.
+            The pill mirrors the feed's ProbabilityPill classes (chips keep
+            their own chipColors system, so the classes are inlined). */}
         <div className={clsx("flex items-center gap-2", comfort && "text-ui-body")}>
           <span className={clsx("font-semibold max-w-[18rem] truncate", c.text)}>
             {label}
@@ -75,7 +77,16 @@ const PredictionChip = memo(
               {leg}
             </span>
           )}
-          <span className={clsx("font-mono tabular-nums", c.textDim)}>{pct}</span>
+          <span
+            className={clsx(
+              "inline-flex items-center rounded-full border px-1.5 font-mono font-bold tabular-nums text-ui-chip",
+              showDelta && delta > 0 && "border-up/40 text-up",
+              showDelta && delta < 0 && "border-down/40 text-down",
+              (!showDelta || delta === 0) && clsx("border-edge", c.textDim),
+            )}
+          >
+            {pct}
+          </span>
           {showDelta && delta !== 0 && (
             <span
               className={clsx(
@@ -95,10 +106,10 @@ const PredictionChip = memo(
             {showCategory && p.category && (
               <span className="uppercase tracking-wide">{p.category}</span>
             )}
-            {showVolume && p.volume != null && (
+            {showVolume && (p.volume_24h ?? p.volume) != null && (
               <>
                 {showCategory && p.category && <span className="text-fg-3">&middot;</span>}
-                <span>Vol {formatCompactNumber(p.volume)}</span>
+                <span>Vol {formatCompactNumber(p.volume_24h ?? p.volume ?? 0)}</span>
               </>
             )}
             {showCloseTime && countdown && (

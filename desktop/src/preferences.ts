@@ -410,7 +410,12 @@ export interface PredictionsDisplayPrefs {
   showVolume: Venue;
   /** Countdown to market close. */
   showCloseTime: Venue;
-  defaultSort: "movers" | "volume" | "closing" | "alpha";
+  /**
+   * v1.1.5: drives the TICKER's no-stars fallback ordering (the feed is
+   * lens-driven and owns its own ordering). "trending" = trailing-24h
+   * volume; legacy saved "volume" values migrate to it.
+   */
+  defaultSort: "trending" | "movers" | "closing" | "alpha";
   /**
    * Feed density. "comfort" (default) renders a responsive card grid
    * with probability, delta, category badge, volume, and close-time
@@ -655,7 +660,7 @@ const DEFAULT_CHANNEL_DISPLAY: ChannelDisplayPrefs = {
     showCategory: "both",
     showVolume: "both",
     showCloseTime: "both",
-    defaultSort: "volume",
+    defaultSort: "trending",
     feedDensity: "comfort",
   },
   fantasy: {
@@ -1082,12 +1087,14 @@ export function migratePredictionsDisplay(
       ? raw.feedDensity
       : DEFAULT_CHANNEL_DISPLAY.predictions.feedDensity;
   const defaultSort =
+    raw.defaultSort === "trending" ||
     raw.defaultSort === "movers" ||
-    raw.defaultSort === "volume" ||
     raw.defaultSort === "closing" ||
     raw.defaultSort === "alpha"
       ? raw.defaultSort
-      : DEFAULT_CHANNEL_DISPLAY.predictions.defaultSort;
+      : raw.defaultSort === "volume"
+        ? ("trending" as const) // v1.1.5: all-time volume sort became Trending (24h)
+        : DEFAULT_CHANNEL_DISPLAY.predictions.defaultSort;
   return {
     ...DEFAULT_CHANNEL_DISPLAY.predictions,
     showDelta: migrateVenue(raw.showDelta),
