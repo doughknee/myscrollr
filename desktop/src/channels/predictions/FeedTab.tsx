@@ -22,7 +22,6 @@ import {
   LineChart,
   Wallet,
   Star,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Flame,
@@ -285,7 +284,9 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
   if (showSwitcher && view === "positions") {
     return (
       <div className="flex h-full flex-col min-h-0">
-        <ViewSwitcher view={view} onChange={setView} />
+        <div className="flex shrink-0 items-center gap-2 border-b border-edge/30 bg-surface px-3 py-1.5">
+          <ViewSwitcher view={view} onChange={setView} />
+        </div>
         <div className="flex-1 min-h-0">
           <MyPositionsPanel markets={markets} hex={PREDICTIONS_HEX} />
         </div>
@@ -297,7 +298,11 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
   if (markets.length === 0) {
     return (
       <div className="flex h-full flex-col min-h-0">
-        {showSwitcher && <ViewSwitcher view={view} onChange={setView} />}
+        {showSwitcher && (
+          <div className="flex shrink-0 items-center gap-2 border-b border-edge/30 bg-surface px-3 py-1.5">
+            <ViewSwitcher view={view} onChange={setView} />
+          </div>
+        )}
         <div className="flex-1 min-h-0">
           <EmptyChannelState
             refreshing={Boolean(feedContext.__refreshing)}
@@ -316,12 +321,19 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
 
   return (
     <div ref={containerRef} className="flex flex-col h-full overflow-y-auto">
-      {showSwitcher && <ViewSwitcher view={view} onChange={setView} />}
-
-      {/* The ONE control row: four lenses + freshness. */}
+      {/* ONE control bar: view switcher (segmented, Tauri-only) · lens
+          pills · freshness. Two chrome rows collapsed into one; the two
+          control levels stay legible because the switcher is a contained
+          segmented control while lenses are open pills. */}
       {isComfort && (
         <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-edge/30 bg-surface px-3 py-1.5">
-          <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
+          {showSwitcher && (
+            <>
+              <ViewSwitcher view={view} onChange={setView} />
+              <div aria-hidden className="h-4 w-px shrink-0 bg-edge/60" />
+            </>
+          )}
+          <div className="scrollbar-none flex min-w-0 items-center gap-1 overflow-x-auto">
             {LENSES.map((l) => {
               const Icon = l.icon;
               const active = lens === l.value && !categoryFocus;
@@ -355,9 +367,10 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
         </div>
       )}
 
-      {/* Resolved Today recap (collapsible) */}
+      {/* Resolved Today — CONTENT, not chrome: styled and placed exactly
+          like a category section at the top of the scroll. */}
       {isComfort && lens !== "watchlist" && resolvedToday.length > 0 && (
-        <ResolvedTodayStrip items={resolvedToday} onOpen={openDetail} />
+        <ResolvedTodaySection items={resolvedToday} onOpen={openDetail} />
       )}
 
       {/* Market browse / grids */}
@@ -524,9 +537,13 @@ function LensPill({
   );
 }
 
-// ── Resolved Today recap ─────────────────────────────────────────
+// ── Resolved Today (content section) ─────────────────────────────
+//
+// Header markup mirrors the category section headers exactly — same
+// type, same count treatment, same x-alignment — so the recap reads as
+// the feed's first section rather than a third bar of chrome.
 
-function ResolvedTodayStrip({
+function ResolvedTodaySection({
   items,
   onOpen,
 }: {
@@ -535,23 +552,29 @@ function ResolvedTodayStrip({
 }) {
   const [open, setOpen] = useState(true);
   return (
-    <div className="border-b border-edge/30 bg-surface px-3 py-1.5">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="flex w-full items-center gap-1.5 text-ui-chip font-semibold uppercase tracking-wide text-fg-3 transition-colors hover:text-fg-2 cursor-pointer"
-      >
-        <CheckCircle2 size={12} />
-        Resolved today
-        <span className="font-mono text-fg-4">{items.length}</span>
-        <ChevronDown
-          size={13}
-          className={clsx("ml-auto transition-transform", open ? "" : "-rotate-90")}
-        />
-      </button>
+    <div className="flex flex-col">
+      <div className="flex items-center gap-1.5 px-3 pt-3 pb-1.5">
+        <h3 className="text-ui-section font-semibold uppercase tracking-wide text-fg-3">
+          Resolved today
+        </h3>
+        <span className="font-mono text-ui-chip tabular-nums text-fg-4">
+          {items.length}
+        </span>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-label={open ? "Collapse resolved today" : "Expand resolved today"}
+          className="ml-auto flex h-5 w-5 items-center justify-center rounded text-fg-4 transition-colors hover:bg-surface-hover hover:text-fg-2 cursor-pointer"
+        >
+          <ChevronDown
+            size={13}
+            className={clsx("transition-transform", open ? "" : "-rotate-90")}
+          />
+        </button>
+      </div>
       {open && (
-      <div className="scrollbar-thin mt-1 flex gap-1.5 overflow-x-auto pb-0.5">
+      <div className="scrollbar-thin flex gap-1.5 overflow-x-auto px-3 pb-1">
         {items.slice(0, 20).map((m) => {
           const won = (m.result ?? "").toLowerCase() === "yes";
           const lost = (m.result ?? "").toLowerCase() === "no";
@@ -584,6 +607,10 @@ function ResolvedTodayStrip({
 }
 
 // ── View switcher ────────────────────────────────────────────────
+//
+// A contained segmented control — deliberately a different shape from
+// the open lens pills so the two control levels (which VIEW vs which
+// LENS within Markets) stop reading as one row of identical chips.
 
 function ViewSwitcher({
   view,
@@ -594,13 +621,13 @@ function ViewSwitcher({
 }) {
   const tabs: { value: FeedView; label: string; icon: typeof LineChart }[] = [
     { value: "markets", label: "Markets", icon: LineChart },
-    { value: "positions", label: "My Positions", icon: Wallet },
+    { value: "positions", label: "Positions", icon: Wallet },
   ];
   return (
     <div
       role="tablist"
       aria-label="Predictions view"
-      className="flex shrink-0 items-center gap-1 border-b border-edge/30 bg-surface px-3 py-1.5"
+      className="flex shrink-0 items-center gap-0.5 rounded-lg border border-edge/30 bg-base-150/60 p-0.5"
     >
       {tabs.map((t) => {
         const active = view === t.value;
@@ -612,10 +639,10 @@ function ViewSwitcher({
             aria-selected={active}
             onClick={() => onChange(t.value)}
             className={clsx(
-              "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-ui-meta font-medium transition-colors cursor-pointer",
+              "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-ui-meta font-medium transition-colors cursor-pointer",
               active
-                ? "bg-accent/15 text-accent"
-                : "text-fg-3 hover:bg-surface-hover hover:text-fg-2",
+                ? "bg-surface text-fg shadow-soft-sm"
+                : "text-fg-3 hover:text-fg-2",
             )}
           >
             <Icon size={13} />
