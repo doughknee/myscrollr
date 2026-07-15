@@ -15,6 +15,7 @@ stays at 1.1.0 and nobody gets force-updated.
 | ~~v1.1.3~~ | Time Controls | ✅ **Shipped 2026-07-03** — day windows for sports/news + 7-day score retention (+ pricing-page overhaul rode along) | M |
 | ~~v1.1.4~~ | Kalshi Grows Up | ✅ **Shipped 2026-07-03** — event cards, watchlist-first ticker, real history charts (+ the fair-share finals fix) | M |
 | ~~v1.1.5~~ | Kalshi Cleans Up | ✅ **Shipped 2026-07-14** — sweep reconciliation ends the stale-market feed; lens-based browse, stars-only personalization, server config retired | M–L |
+| ~~v1.1.6~~ | Kalshi Fixed Up | ✅ **Shipped 2026-07-15** — history charts + My Positions un-broken (Kalshi fp migration), market search, multi-category filter, whole-card UX | M |
 | v1.2.0 | Double-Decker 2.0 | Multi-row ticker rebuilt around widgets | L |
 | — | Website rides along | Pricing rewrite shipped with v1.1.2–3; screenshots now unblocked (post-v1.1.4) | S–M |
 
@@ -218,6 +219,41 @@ The v1.1.4 follow-through, in two stacked PRs (#223 backend, #224 desktop):
 chip until the next poll drops it; a starred market that falls out of the
 top-240 while still trading leaves the payload (favorites union retired) —
 the watchlist labels it "no longer tracked".
+
+---
+
+## ✅ v1.1.6 — Kalshi Fixed Up (shipped 2026-07-15, `desktop-v1.1.6`)
+
+Two production bugs root-caused and fixed, plus the browse-UX pass —
+all inside the channel/widget scope (full evidence trail lives in the
+local `ui-review/NOTES.md` decision log; follow-ups filed as REL-5/6/7):
+
+- **History charts were 401ing on every market** — the candlesticks fetch
+  never sent auth against an `Auth: true` route; it only ever worked
+  through the fail-open hole hotfix #220 closed. Channel now owns an
+  `authFetch` query + distinct "unavailable" vs "no trades yet" fallbacks.
+- **My Positions showed zero with open positions** — Kalshi completed its
+  fixed-point migration (`position_fp`/`count_fp`/`outcome_side`; integer
+  twins removed) and the desktop parser had `*_dollars` fallbacks for
+  money but none for counts, so every position normalized to flat. Parser
+  now reads both shapes (mocked-response Rust tests), `count_filter`
+  corrected, `limit=1000`.
+- **Browse UX:** client-side market search (typo-tolerant, "/" focus);
+  whole-card click targets with hover/pressed affordance; fully clickable
+  section headers; multi-select category filter composing with search and
+  every lens; sticky control bar with pinned elevation + early collapse
+  into an animated filter menu (<1024px container); price-sorted outcomes
+  with "+N more" and an all-outcomes list in the detail modal; LIVE badge
+  + "Starts in Xh" indicator logic (dormant until the payload ships a
+  start-time field — REL-6 — close labels everywhere per the
+  no-fabrication rule).
+- **Layout lessons encoded in tests:** sticky must pin against the page
+  scroller (no dead inner scrollports), geometry assertions over
+  class-list assertions, focus rings inherit the parent's border-radius.
+
+**Known issues accepted:** "+N more" can't trigger until the server ships
+>2 legs per event (REL-5); signed-out users still get the chart fallback
+(candlesticks route stays authed — REL-7).
 
 ---
 

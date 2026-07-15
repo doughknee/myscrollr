@@ -214,9 +214,16 @@ export default function MyPositionsPanel({ markets, hex }: MyPositionsPanelProps
   const sortedPositions = sortPositionsByValue(portfolio.positions, prices);
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto">
+    // Page-scroll layout: the Source page owns the scroll (an inner
+    // `overflow-y-auto` here created a dead scrollport in-app — same fix
+    // as the FeedTab control bar). The summary scrolls with the content:
+    // pinning it under the sticky switcher needs a hardcoded offset that
+    // drifts with the bar's height, and it never pinned in prod anyway.
+    // ponytail: if stacked pinning is ever wanted, share the bar height
+    // via a CSS var instead of a px literal.
+    <div className="flex min-h-full flex-1 flex-col">
       {/* Summary header */}
-      <div className="sticky top-0 z-10 border-b border-edge/30 bg-surface px-4 py-3">
+      <div className="border-b border-edge/30 bg-surface px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-[11px] uppercase tracking-wide text-fg-3">Account value</div>

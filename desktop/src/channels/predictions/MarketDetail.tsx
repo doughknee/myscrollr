@@ -10,7 +10,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { clsx } from "clsx";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, queryOptions } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-shell";
 import {
   X,
@@ -27,8 +27,11 @@ import {
   formatCloseCountdown,
   relativeTime,
 } from "../../utils/format";
-import { predictionsCandlesticksOptions } from "../../api/queries";
-import type { PredictionCandle } from "../../api/queries";
+import { authFetch } from "../../api/client";
+import type {
+  PredictionCandle,
+  PredictionCandlesticksResponse,
+} from "../../api/queries";
 import {
   formatProbability,
   formatSpread,
@@ -37,10 +40,16 @@ import {
 } from "./view";
 import { getHistory, sparklinePoints, trend } from "./sparkline";
 import { describeAlert, type AlertComparator, type PredictionAlert } from "./watchlist";
+import { outcomeLabel } from "./search";
+import ProbabilityPill from "./ProbabilityPill";
 import type { Prediction } from "../../types";
 
 interface MarketDetailProps {
   market: Prediction;
+  /** Every live leg of this market's event, price-sorted (B2). The modal
+   *  lists them all when there's more than one; tapping switches markets. */
+  siblings?: Prediction[];
+  onSelectMarket?: (market: Prediction) => void;
   now: number;
   watched: boolean;
   onToggleWatch: () => void;
@@ -58,8 +67,31 @@ interface MarketDetailProps {
 const SPARK_W = 280;
 const SPARK_H = 56;
 
+/**
+ * Channel-owned candlesticks query. The route is `Auth: true`, so this MUST
+ * go through `authFetch` — the shared `predictionsCandlesticksOptions` used
+ * the unauthenticated `request()` and has 401'd on every call since the
+ * #220 auth fix closed the fail-open gateway hole (see ui-review/NOTES.md,
+ * A1). Same query key + staleTime as before (mirrors the server's 5-min
+ * Redis TTL).
+ */
+function candlesticksOptions(ticker: string) {
+  return queryOptions({
+    queryKey: ["predictions-candlesticks", ticker],
+    queryFn: () =>
+      authFetch<PredictionCandlesticksResponse>(
+        `/predictions/candlesticks/${encodeURIComponent(ticker)}`,
+      ),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    enabled: ticker.length > 0,
+  });
+}
+
 export default function MarketDetail({
   market,
+  siblings = [],
+  onSelectMarket,
   now,
   watched,
   onToggleWatch,
@@ -90,9 +122,11 @@ export default function MarketDetail({
   // Real price history (v1.1.4): ~7 days of hourly candles via the
   // Kalshi proxy. The live tick-accumulator sparkline stays as the
   // fallback when the fetch fails or a market has no trade history.
-  const { data: candleData, isLoading: candlesLoading } = useQuery(
-    predictionsCandlesticksOptions(market.ticker),
-  );
+  const {
+    data: candleData,
+    isLoading: candlesLoading,
+    isError: candlesError,
+  } = useQuery(candlesticksOptions(market.ticker));
   const candlePts = useMemo(() => {
     const rows: PredictionCandle[] = candleData?.candlesticks ?? [];
     const pts: { t: number; v: number }[] = [];
@@ -203,9 +237,27 @@ export default function MarketDetail({
                   strokeLinecap="round"
                 />
               </svg>
+            ) : candlesError ? (
+              // Fetch failed (offline, signed out, upstream hiccup) — say
+              // so instead of implying the market has no history.
+              <div className="flex h-[56px] flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-edge/50 bg-base-100/40">
+                <span className="text-[11px] font-medium text-fg-3">
+                  Price history unavailable right now
+                </span>
+                <span className="text-[10px] text-fg-4">
+                  Live price still updates below
+                </span>
+              </div>
             ) : (
-              <div className="flex h-[56px] items-center justify-center rounded-lg bg-base-100/40 text-[11px] text-fg-4">
-                Tracking price live… history builds as the market moves
+              // Fetch succeeded but the market has <2 traded hours — a
+              // genuinely fresh market. History accumulates from here.
+              <div className="flex h-[56px] flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-edge/50 bg-base-100/40">
+                <span className="text-[11px] font-medium text-fg-3">
+                  No trade history yet
+                </span>
+                <span className="text-[10px] text-fg-4">
+                  Tracking live — the chart builds as this market trades
+                </span>
               </div>
             )}
           </div>
@@ -235,6 +287,52 @@ export default function MarketDetail({
               tone={resolved && market.result ? (market.result.toLowerCase() === "yes" ? "up" : "down") : "flat"}
             />
           </div>
+
+          {/* All outcomes (B2): every live leg of the event, highest price
+              first, current one pinned visually. Tapping switches the modal
+              to that leg — how ">2 outcome" events reveal their full list. */}
+          {siblings.length >= 2 && onSelectMarket && (
+            <div className="border-t border-edge/30 px-4 py-3">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-fg-3">
+                All outcomes
+                <span className="ml-1.5 font-mono text-[10px] font-normal text-fg-4">
+                  {siblings.length}
+                </span>
+              </div>
+              <ul className="flex flex-col gap-1">
+                {siblings.map((s) => {
+                  const current = s.id === market.id;
+                  return (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        aria-current={current || undefined}
+                        onClick={() => {
+                          if (!current) onSelectMarket(s);
+                        }}
+                        className={clsx(
+                          "flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[12px] transition-colors",
+                          current
+                            ? "cursor-default border-accent/40 bg-accent/8"
+                            : "cursor-pointer border-edge/30 bg-base-100/40 hover:border-edge/60 hover:bg-surface-hover",
+                        )}
+                      >
+                        <span
+                          className={clsx(
+                            "min-w-0 flex-1 truncate",
+                            current ? "font-medium text-fg" : "text-fg-2",
+                          )}
+                        >
+                          {outcomeLabel(s)}
+                        </span>
+                        <ProbabilityPill pct={s.yes_price} delta={priceDelta(s)} size="sm" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
 
           {/* Alerts */}
           <div className="border-t border-edge/30 px-4 py-3">
