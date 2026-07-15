@@ -13,7 +13,11 @@ import {
   marketLabel,
   isResolved,
   selectResolvedToday,
+  outcomesByPrice,
+  cardOutcomes,
+  timeIndicator,
   TICKER_FALLBACK_LIMIT,
+  type MaybeStarts,
 } from "./view";
 import type { Prediction } from "../../types";
 import type { PredictionsDisplayPrefs } from "../../preferences";
@@ -58,6 +62,134 @@ describe("priceDelta", () => {
     expect(
       priceDelta(mk({ id: "A", yes_price: undefined as unknown as number, prev_yes_price: 20 })),
     ).toBe(-20);
+  });
+});
+
+// ── outcomesByPrice / cardOutcomes (B2) ─────────────────────────
+
+describe("outcomesByPrice", () => {
+  it("orders legs by implied probability, highest first", () => {
+    const legs = [
+      mk({ id: "low", yes_price: 10, event_rank: 1 }),
+      mk({ id: "high", yes_price: 80, event_rank: 3 }),
+      mk({ id: "mid", yes_price: 40, event_rank: 2 }),
+    ];
+    expect(outcomesByPrice(legs).map((m) => m.id)).toEqual(["high", "mid", "low"]);
+  });
+
+  it("breaks price ties by rank then ticker so order never jitters", () => {
+    const legs = [
+      mk({ id: "b-tick", yes_price: 50, event_rank: 2 }),
+      mk({ id: "a-tick", yes_price: 50, event_rank: 2 }),
+      mk({ id: "ranked", yes_price: 50, event_rank: 1 }),
+    ];
+    expect(outcomesByPrice(legs).map((m) => m.id)).toEqual([
+      "ranked",
+      "a-tick",
+      "b-tick",
+    ]);
+    // Stable under re-sort (same input, same output).
+    expect(outcomesByPrice(legs)).toEqual(outcomesByPrice(legs));
+  });
+
+  it("does not mutate its input", () => {
+    const legs = [mk({ id: "a", yes_price: 1 }), mk({ id: "b", yes_price: 9 })];
+    outcomesByPrice(legs);
+    expect(legs.map((m) => m.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("cardOutcomes", () => {
+  it("shows the top two by price and counts the rest as extra", () => {
+    const legs = [
+      mk({ id: "third", yes_price: 20 }),
+      mk({ id: "first", yes_price: 70 }),
+      mk({ id: "fourth", yes_price: 5 }),
+      mk({ id: "second", yes_price: 60 }),
+    ];
+    const { visible, extra } = cardOutcomes(legs);
+    expect(visible.map((m) => m.id)).toEqual(["first", "second"]);
+    expect(extra).toBe(2);
+  });
+
+  it("two-leg events show both with zero extra (no layout change)", () => {
+    const legs = [mk({ id: "a", yes_price: 30 }), mk({ id: "b", yes_price: 70 })];
+    const { visible, extra } = cardOutcomes(legs);
+    expect(visible).toHaveLength(2);
+    expect(extra).toBe(0);
+  });
+
+  it("single-leg events keep one visible row and zero extra", () => {
+    const { visible, extra } = cardOutcomes([mk({ id: "solo", yes_price: 50 })]);
+    expect(visible).toHaveLength(1);
+    expect(extra).toBe(0);
+  });
+});
+
+// ── timeIndicator (B3) ──────────────────────────────────────────
+
+describe("timeIndicator", () => {
+  const now = Date.parse("2026-07-15T12:00:00Z");
+  const hours = (n: number) =>
+    new Date(now + n * 3600 * 1000).toISOString();
+  const withStart = (
+    partial: Partial<Prediction> & { id: string },
+    start?: string,
+  ): MaybeStarts => ({ ...mk(partial), start_time: start });
+
+  it("LIVE once the event started and the market hasn't closed", () => {
+    const m = withStart({ id: "m", close_time: hours(2) }, hours(-1));
+    expect(timeIndicator(m, now)).toEqual({ kind: "live" });
+  });
+
+  it("LIVE with a start but no close_time (still in progress)", () => {
+    const m = withStart({ id: "m", close_time: undefined }, hours(-1));
+    expect(timeIndicator(m, now)).toEqual({ kind: "live" });
+  });
+
+  it("counts down to starts within 24h", () => {
+    const m = withStart({ id: "m", close_time: hours(48) }, hours(3));
+    expect(timeIndicator(m, now)).toEqual({
+      kind: "starts",
+      label: "Starts in 3h",
+    });
+  });
+
+  it("beyond the 24h window the close label wins", () => {
+    const m = withStart({ id: "m", close_time: hours(48) }, hours(25));
+    expect(timeIndicator(m, now)).toEqual({
+      kind: "closes",
+      label: "Closes 2d",
+    });
+  });
+
+  it("NO start_time → always the close label (no fabricated starts)", () => {
+    const m = mk({ id: "m", close_time: hours(3) });
+    expect(timeIndicator(m, now)).toEqual({ kind: "closes", label: "Closes 3h" });
+  });
+
+  it("an unparseable start_time falls back to the close label", () => {
+    const m = withStart({ id: "m", close_time: hours(5) }, "not-a-date");
+    expect(timeIndicator(m, now)).toEqual({ kind: "closes", label: "Closes 5h" });
+  });
+
+  it("Closed beats LIVE once the market's close has passed", () => {
+    const m = withStart({ id: "m", close_time: hours(-1) }, hours(-3));
+    expect(timeIndicator(m, now)).toEqual({ kind: "closed" });
+  });
+
+  it("resolved markets get no indicator (settlement is its own row)", () => {
+    const m = withStart(
+      { id: "m", result: "yes", close_time: hours(2) },
+      hours(-1),
+    );
+    expect(timeIndicator(m, now)).toEqual({ kind: "none" });
+  });
+
+  it("no close_time and no start_time → none", () => {
+    expect(timeIndicator(mk({ id: "m", close_time: undefined }), now)).toEqual({
+      kind: "none",
+    });
   });
 });
 

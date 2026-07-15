@@ -17,15 +17,21 @@
  */
 import { memo, useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { clsx } from "clsx";
+import { motion, AnimatePresence } from "motion/react";
 import {
   TrendingUp,
   LineChart,
   Wallet,
   Star,
+  Check,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   Flame,
   Clock,
+  Search,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardQueryOptions, predictionsCatalogOptions } from "../../api/queries";
@@ -59,10 +65,21 @@ import {
   groupByEvent,
   groupEventsByCategory,
   priceDelta,
+  cardOutcomes,
+  outcomesByPrice,
+  timeIndicator,
+  isResolved,
   type PredictionEvent,
   type PredictionsLens,
   type CategorySection,
+  type TimeIndicator,
 } from "./view";
+import {
+  searchEvents,
+  outcomeLabel,
+  type EventSearchHit,
+  type MatchRange,
+} from "./search";
 import type { Prediction, FeedTabProps, ChannelManifest } from "../../types";
 import { shouldShowOnFeed } from "../../preferences";
 import type { PredictionsDisplayPrefs } from "../../preferences";
@@ -177,16 +194,26 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
     setAlerts(persistRemoveAlert(id));
   }, []);
 
-  // ── Lens + category focus + market-detail modal ───────────────
+  // ── Lens + category filter + market-detail modal ──────────────
   const [lens, setLens] = useState<PredictionsLens>("trending");
-  const [categoryFocus, setCategoryFocus] = useState<string | null>(null);
+  // Multi-select category filter (empty = all). "View all" on a section
+  // focuses exactly that category; the menu toggles combine freely.
+  const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [detailMarket, setDetailMarket] = useState<Prediction | null>(null);
   const openDetail = useCallback((m: Prediction) => setDetailMarket(m), []);
   const closeDetail = useCallback(() => setDetailMarket(null), []);
 
+  const toggleCat = useCallback((c: string) => {
+    setSelectedCats((prev) =>
+      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
+    );
+  }, []);
+  const clearCats = useCallback(() => setSelectedCats([]), []);
+  const focusCategory = useCallback((c: string) => setSelectedCats([c]), []);
+
   const pickLens = useCallback((next: PredictionsLens) => {
     setLens(next);
-    setCategoryFocus(null);
+    setSelectedCats([]);
   }, []);
 
   // Resolved-today recap (trailing 24h), refreshed as `now` ticks.
@@ -227,22 +254,53 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
 
   const focusedItems = useMemo(
     () =>
-      categoryFocus
-        ? lensItems.filter((m) => categoryOf(m) === categoryFocus)
+      selectedCats.length > 0
+        ? lensItems.filter((m) => selectedCats.includes(categoryOf(m)))
         : lensItems,
-    [lensItems, categoryFocus, categoryOf],
+    [lensItems, selectedCats, categoryOf],
   );
 
   const events = useMemo(() => groupByEvent(focusedItems), [focusedItems]);
   const isComfort = mode === "comfort";
 
-  // Browse mode: Trending with no category focus = Kalshi-style sections.
+  // ── Market search (client-side only — see search.ts) ─────────
+  // The dashboard payload IS the full universe, so matching is pure and
+  // synchronous per keystroke: no debounce, no network, no loading state.
+  const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  // Roving selection for ↑/↓ + Enter, indexing into render order.
+  const [selIdx, setSelIdx] = useState(-1);
+
+  const eventCategoryOf = useCallback(
+    (ev: PredictionEvent): string | undefined =>
+      ev.outcomes[0] ? categoryOf(ev.outcomes[0]) : ev.category,
+    [categoryOf],
+  );
+
+  // null = search inactive (empty query, or compact density has no bar).
+  const hits = useMemo(
+    () => (isComfort ? searchEvents(query, events, eventCategoryOf) : null),
+    [isComfort, query, events, eventCategoryOf],
+  );
+  const searching = hits !== null;
+
+  const shownEvents = useMemo(
+    () => (hits ? events.filter((ev) => hits.has(ev.eventTicker)) : events),
+    [events, hits],
+  );
+
+  const changeQuery = useCallback((next: string) => {
+    setQuery(next);
+    setSelIdx(-1);
+  }, []);
+
+  // Browse mode: Trending with no category filter = Kalshi-style sections.
   const sections: CategorySection[] | null = useMemo(
     () =>
-      isComfort && lens === "trending" && !categoryFocus
-        ? groupEventsByCategory(events)
+      isComfort && lens === "trending" && selectedCats.length === 0
+        ? groupEventsByCategory(shownEvents)
         : null,
-    [isComfort, lens, categoryFocus, events],
+    [isComfort, lens, selectedCats, shownEvents],
   );
 
   // ── Pagination (flat modes only — sections self-cap) ─────────
@@ -251,12 +309,12 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [lens, categoryFocus, watchlist]);
+  }, [lens, selectedCats, watchlist, query]);
 
-  const renderTotal = isComfort ? events.length : focusedItems.length;
+  const renderTotal = isComfort ? shownEvents.length : focusedItems.length;
   const visible = Math.min(visibleCount, renderTotal);
   const pageItems = focusedItems.slice(0, visible);
-  const pageEvents = events.slice(0, visible);
+  const pageEvents = shownEvents.slice(0, visible);
   const remaining = Math.max(0, renderTotal - visible);
 
   // Most-recent update across visible markets — drives the FreshnessPill.
@@ -279,19 +337,139 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
     [detailMarket, markets],
   );
 
+  // Every leg of the open market's event, price-sorted — the detail view's
+  // "All outcomes" list (B2). Dropped-but-unresolved siblings are excluded
+  // (their frozen prices are the stale-data bug v1.1.5 killed).
+  const detailSiblings = useMemo(() => {
+    if (!liveDetail?.event_ticker) return [];
+    return outcomesByPrice(
+      markets.filter(
+        (m) =>
+          m.event_ticker === liveDetail.event_ticker &&
+          (m.in_sweep !== false || isResolved(m)),
+      ),
+    );
+  }, [liveDetail, markets]);
+
+  // ── Filter bar state (B4/B5) ──────────────────────────────────
+  // ALL categories in the payload (live + resolved), NOT the current
+  // lens's subset — the selector's options must not reshuffle when the
+  // user flips between Trending/Closing/Resolved. A category empty under
+  // the current lens just shows the empty state. Alphabetical.
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of markets) {
+      if (m.in_sweep !== false || isResolved(m)) set.add(categoryOf(m));
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [markets, categoryOf]);
+
+  // Sticky-bar elevation: a 1px sentinel above the bar leaves view exactly
+  // when the bar pins. Default (viewport) root — intersection is clipped
+  // through whichever ancestor actually scrolls (the Source page's
+  // PageLayout scroller in-app, the harness shell in dev), so this works
+  // without knowing the scroller. The sentinel is tracked as STATE, not a
+  // ref: the markets tree unmounts on the Positions view, and an observer
+  // left watching the detached node would freeze `stuck` at its last
+  // value — the bar came back pre-shadowed after a scrolled view switch.
+  const [stuck, setStuck] = useState(false);
+  const [sentinelEl, setSentinelEl] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!sentinelEl) {
+      setStuck(false);
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => setStuck(!entry.isIntersecting),
+      { threshold: 0 },
+    );
+    io.observe(sentinelEl);
+    return () => io.disconnect();
+  }, [sentinelEl]);
+
   // ── View switcher (Markets / My Positions) ───────────────────
   // Only on the full-size Source page (comfort). The compact Home preview
   // stays a pure markets list. "My Positions" is desktop-only (keychain).
   const [view, setView] = useState<FeedView>("markets");
   const showSwitcher = mode === "comfort" && isKalshiAvailable();
 
+  // ── Search keyboard support ───────────────────────────────────
+  // Render-order list of matched events for ↑/↓ + Enter. Sections show
+  // every match while searching, so section order IS the nav order.
+  const navEvents = useMemo(() => {
+    if (!searching) return [];
+    return sections ? sections.flatMap((s) => s.events) : pageEvents;
+  }, [searching, sections, pageEvents]);
+
+  const navIndex = useMemo(
+    () => new Map(navEvents.map((ev, i) => [ev.eventTicker, i])),
+    [navEvents],
+  );
+
+  // "/" focuses search from anywhere in the channel (unless typing).
+  useEffect(() => {
+    if (!isComfort || view !== "markets") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)
+      ) {
+        return;
+      }
+      // Don't steal focus out of an open modal (market detail).
+      if (document.querySelector('[role="dialog"]')) return;
+      e.preventDefault();
+      searchInputRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [isComfort, view]);
+
+  // Keep the keyboard-selected card in view.
+  useEffect(() => {
+    if (selIdx < 0) return;
+    containerRef.current
+      ?.querySelector(`[data-nav-idx="${selIdx}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [selIdx]);
+
+  const onSearchKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Escape") {
+        // First Escape clears, second blurs.
+        e.preventDefault();
+        if (query) changeQuery("");
+        else e.currentTarget.blur();
+        return;
+      }
+      if (!searching || navEvents.length === 0) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelIdx((i) => Math.min(i + 1, navEvents.length - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelIdx((i) => Math.max(i - 1, -1));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        const ev = navEvents[selIdx >= 0 && selIdx < navEvents.length ? selIdx : 0];
+        // Same landing as a card click: the top-priced leg.
+        const target = ev ? outcomesByPrice(ev.outcomes)[0] : undefined;
+        if (target) openDetail(target);
+      }
+    },
+    [query, changeQuery, searching, navEvents, selIdx, openDetail],
+  );
+
   if (showSwitcher && view === "positions") {
     return (
-      <div className="flex h-full flex-col min-h-0">
-        <div className="flex shrink-0 items-center gap-2 border-b border-edge/30 bg-surface px-3 py-1.5">
+      <div className="flex min-h-full flex-col">
+        {/* Sticky so the way back to Markets survives scrolling. */}
+        <div className="sticky top-0 z-20 flex shrink-0 items-center gap-2 border-b border-edge/30 bg-surface px-3 py-1.5">
           <ViewSwitcher view={view} onChange={setView} />
         </div>
-        <div className="flex-1 min-h-0">
+        <div className="flex flex-1 flex-col">
           <MyPositionsPanel markets={markets} hex={PREDICTIONS_HEX} />
         </div>
       </div>
@@ -301,13 +479,13 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
   // ── Empty state (no data at all) ─────────────────────────────
   if (markets.length === 0) {
     return (
-      <div className="flex h-full flex-col min-h-0">
+      <div className="flex min-h-full flex-col">
         {showSwitcher && (
           <div className="flex shrink-0 items-center gap-2 border-b border-edge/30 bg-surface px-3 py-1.5">
             <ViewSwitcher view={view} onChange={setView} />
           </div>
         )}
-        <div className="flex-1 min-h-0">
+        <div className="flex flex-1 flex-col justify-center">
           <EmptyChannelState
             refreshing={Boolean(feedContext.__refreshing)}
             icon={TrendingUp}
@@ -324,58 +502,123 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
   }
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full overflow-y-auto">
+    // NO inner scroll container: the Source page (PageLayout) owns the
+    // scroll. `overflow-y-auto` here created a never-scrolling scrollport
+    // that swallowed the bar's `sticky` in the real app — the bar only
+    // pins against the ancestor that actually scrolls. (RSS uses the same
+    // page-scroll structure.)
+    <div ref={containerRef} className="flex min-h-full flex-col">
       {/* ONE control bar: view switcher (segmented, Tauri-only) · lens
-          pills · freshness. Two chrome rows collapsed into one; the two
-          control levels stay legible because the switcher is a contained
-          segmented control while lenses are open pills. */}
+          pills + category select · freshness. Sticky with an elevation
+          change once pinned (sentinel + IntersectionObserver). The bar is
+          a @container: at narrow channel widths the lens pills + category
+          select collapse into a single Filter button so nothing clips
+          (B4/B5). */}
       {isComfort && (
-        <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-edge/30 bg-surface px-3 py-1.5">
-          {showSwitcher && (
-            <>
-              <ViewSwitcher view={view} onChange={setView} />
-              <div aria-hidden className="h-4 w-px shrink-0 bg-edge/60" />
-            </>
-          )}
-          <div className="scrollbar-none flex min-w-0 items-center gap-1 overflow-x-auto">
-            {LENSES.map((l) => {
-              const Icon = l.icon;
-              const active = lens === l.value && !categoryFocus;
-              return (
-                <LensPill key={l.value} active={active} onClick={() => pickLens(l.value)}>
-                  {Icon && (
-                    <Icon
-                      size={12}
-                      className={l.value === "watchlist" && active ? "fill-current" : ""}
-                    />
-                  )}
-                  {l.label}
-                  {l.value === "watchlist" && watchlist.length > 0
-                    ? ` ${watchlist.length}`
-                    : l.value === "resolved" && resolvedToday.length > 0
-                      ? ` ${resolvedToday.length}`
-                      : ""}
-                </LensPill>
-              );
-            })}
-            {categoryFocus && (
-              <LensPill active onClick={() => setCategoryFocus(null)}>
-                {categoryFocus}
-                <span aria-hidden className="text-accent/70">×</span>
-              </LensPill>
+        <>
+          <div ref={setSentinelEl} aria-hidden className="h-px shrink-0" />
+          <div
+            className={clsx(
+              "@container sticky top-0 z-20 -mt-px flex items-center gap-2 border-b bg-surface px-3 py-1.5 transition-shadow duration-200",
+              stuck
+                ? "border-edge/50 bg-surface/95 shadow-[0_6px_16px_-8px_rgba(0,0,0,0.35)] backdrop-blur-sm"
+                : "border-edge/30",
             )}
-          </div>
-          {latestUpdated && (
-            <div className="ml-auto shrink-0">
-              <FreshnessPill lastUpdated={latestUpdated} label="odds" />
+          >
+            {showSwitcher && (
+              <>
+                <ViewSwitcher view={view} onChange={setView} />
+                <div aria-hidden className="h-4 w-px shrink-0 bg-edge/60" />
+              </>
+            )}
+
+            {/* Wide: open lens pills. Counts live in the filter menu and
+                section headers — pills stay quiet (de-crowd pass). The
+                @5xl threshold collapses BEFORE the row runs out of room —
+                pills must never render cut off. */}
+            <div className="scrollbar-none hidden min-w-0 items-center gap-1 overflow-x-auto @5xl:flex">
+              {LENSES.map((l) => {
+                const Icon = l.icon;
+                const active = lens === l.value && selectedCats.length === 0;
+                return (
+                  <LensPill key={l.value} active={active} onClick={() => pickLens(l.value)}>
+                    {Icon && (
+                      <Icon
+                        size={12}
+                        className={l.value === "watchlist" && active ? "fill-current" : ""}
+                      />
+                    )}
+                    {l.label}
+                  </LensPill>
+                );
+              })}
             </div>
-          )}
-        </div>
+
+            {/* Narrow: everything above collapses into one Filter button. */}
+            <div className="@5xl:hidden">
+              <FilterMenu
+                lens={lens}
+                onPickLens={pickLens}
+                watchlistCount={watchlist.length}
+                resolvedCount={resolvedToday.length}
+                categories={categories}
+                selectedCats={selectedCats}
+                onToggleCategory={toggleCat}
+                onClearCategories={clearCats}
+              />
+            </div>
+
+            <div className="ml-auto flex min-w-0 shrink items-center gap-2">
+              {/* Category rides with the other narrowing controls (search)
+                  so the lens row keeps its breathing room. */}
+              <span className="hidden @5xl:block">
+                <CategoryMenu
+                  categories={categories}
+                  selected={selectedCats}
+                  onToggle={toggleCat}
+                  onClear={clearCats}
+                />
+              </span>
+              <SearchBox
+                inputRef={searchInputRef}
+                query={query}
+                onQueryChange={changeQuery}
+                onKeyDown={onSearchKeyDown}
+                resultCount={searching ? shownEvents.length : null}
+              />
+              {latestUpdated && (
+                <span className="hidden @xl:block">
+                  <FreshnessPill lastUpdated={latestUpdated} label="odds" />
+                </span>
+              )}
+            </div>
+          </div>
+        </>
       )}
 
       {/* Market browse / grids */}
       {renderTotal === 0 ? (
-        lens === "watchlist" ? (
+        searching ? (
+          <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
+            <Search size={22} className="text-fg-4" />
+            <p className="text-[12px] text-fg-3">
+              No markets match{" "}
+              <span className="font-medium text-fg-2">“{query.trim()}”</span>
+            </p>
+            <p className="text-[11px] text-fg-4">
+              Check the spelling, or try a shorter word.
+            </p>
+            <button
+              onClick={() => {
+                changeQuery("");
+                searchInputRef.current?.focus();
+              }}
+              className="mt-1 px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
+            >
+              Clear search
+            </button>
+          </div>
+        ) : lens === "watchlist" ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2 px-6 text-center">
             <Star size={22} className="text-fg-4" />
             <p className="text-[12px] text-fg-3">No watched markets yet</p>
@@ -408,38 +651,62 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
         // ── Browse mode: category sections, hottest first ─────────
         <div className="flex flex-col">
           {sections.map((section) => (
-            <div key={section.category} className="flex flex-col">
-              <div className="flex items-center gap-1.5 px-3 pt-3 pb-1.5">
-                <h3 className="text-ui-section font-semibold uppercase tracking-wide text-fg-3">
+            // rounded-md is invisible here — it only feeds the header
+            // button's inherited focus-ring radius (global focus rule).
+            <div key={section.category} className="flex flex-col rounded-md">
+              {/* Whole header row is the "View all" target (B1) — same
+                  hover treatment as the cards. mx/px split keeps the label
+                  x-aligned with card content (12px) while the hover surface
+                  stays inset. */}
+              <button
+                type="button"
+                onClick={() => focusCategory(section.category)}
+                aria-label={`View all ${section.category} markets`}
+                className="group mx-1.5 mb-1 mt-1.5 flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-surface-hover active:bg-surface-hover/70"
+              >
+                <span
+                  data-section-title
+                  role="heading"
+                  aria-level={3}
+                  className="text-ui-section font-semibold uppercase tracking-wide text-fg-3 transition-colors group-hover:text-fg-2"
+                >
                   {section.category}
-                </h3>
+                </span>
                 <span className="font-mono text-ui-chip tabular-nums text-fg-4">
                   {section.events.length}
                 </span>
-                {section.events.length > SECTION_PREVIEW_COUNT && (
-                  <button
-                    type="button"
-                    onClick={() => setCategoryFocus(section.category)}
-                    className="ml-auto inline-flex items-center gap-0.5 text-ui-meta font-medium text-accent hover:text-accent/80 transition-colors cursor-pointer"
-                  >
+                {!searching && (
+                  <span className="ml-auto inline-flex items-center gap-0.5 text-ui-meta font-medium text-accent opacity-80 transition-opacity group-hover:opacity-100">
                     View all
                     <ChevronRight size={13} />
-                  </button>
+                  </span>
                 )}
-              </div>
+              </button>
               <div className="grid grid-cols-1 gap-2 px-3 pb-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {section.events.slice(0, SECTION_PREVIEW_COUNT).map((ev) => (
-                  <EventCard
-                    key={ev.eventTicker}
-                    event={ev}
-                    display={dp}
-                    category={categoryOf(ev.outcomes[0])}
-                    now={now}
-                    watchedSet={watchedSet}
-                    onToggleWatch={toggleWatch}
-                    onOpenDetail={openDetail}
-                  />
-                ))}
+                {/* While searching every match shows (no preview cap) and
+                    leavers animate out. */}
+                <AnimatePresence initial={false} mode="popLayout">
+                  {section.events
+                    .slice(0, searching ? undefined : SECTION_PREVIEW_COUNT)
+                    .map((ev) => (
+                      <CardCell
+                        key={ev.eventTicker}
+                        navIdx={navIndex.get(ev.eventTicker)}
+                        selected={selIdx >= 0 && navIndex.get(ev.eventTicker) === selIdx}
+                      >
+                        <EventCard
+                          event={ev}
+                          display={dp}
+                          category={categoryOf(ev.outcomes[0])}
+                          now={now}
+                          watchedSet={watchedSet}
+                          onToggleWatch={toggleWatch}
+                          onOpenDetail={openDetail}
+                          hit={hits?.get(ev.eventTicker)}
+                        />
+                      </CardCell>
+                    ))}
+                </AnimatePresence>
               </div>
             </div>
           ))}
@@ -455,40 +722,50 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
                 : "grid grid-cols-1 gap-px bg-edge",
             )}
           >
-            {!isComfort
-              ? pageItems.map((market) => (
-                  <MarketItem
-                    key={market.id}
-                    market={market}
-                    display={dp}
-                    now={now}
-                  />
-                ))
-              : lens === "resolved"
-                ? pageEvents.map((ev) => (
-                    <ResolvedCard
-                      key={ev.eventTicker}
-                      event={ev}
-                      display={dp}
-                      category={categoryOf(ev.outcomes[0])}
-                      now={now}
-                      watchedSet={watchedSet}
-                      onToggleWatch={toggleWatch}
-                      onOpenDetail={openDetail}
-                    />
-                  ))
-                : pageEvents.map((ev) => (
-                    <EventCard
-                      key={ev.eventTicker}
-                      event={ev}
-                      display={dp}
-                      category={categoryOf(ev.outcomes[0])}
-                      now={now}
-                      watchedSet={watchedSet}
-                      onToggleWatch={toggleWatch}
-                      onOpenDetail={openDetail}
-                    />
-                  ))}
+            {!isComfort ? (
+              pageItems.map((market) => (
+                <MarketItem
+                  key={market.id}
+                  market={market}
+                  display={dp}
+                  now={now}
+                />
+              ))
+            ) : (
+              <AnimatePresence initial={false} mode="popLayout">
+                {pageEvents.map((ev) => (
+                  <CardCell
+                    key={ev.eventTicker}
+                    navIdx={navIndex.get(ev.eventTicker)}
+                    selected={selIdx >= 0 && navIndex.get(ev.eventTicker) === selIdx}
+                  >
+                    {lens === "resolved" ? (
+                      <ResolvedCard
+                        event={ev}
+                        display={dp}
+                        category={categoryOf(ev.outcomes[0])}
+                        now={now}
+                        watchedSet={watchedSet}
+                        onToggleWatch={toggleWatch}
+                        onOpenDetail={openDetail}
+                        hit={hits?.get(ev.eventTicker)}
+                      />
+                    ) : (
+                      <EventCard
+                        event={ev}
+                        display={dp}
+                        category={categoryOf(ev.outcomes[0])}
+                        now={now}
+                        watchedSet={watchedSet}
+                        onToggleWatch={toggleWatch}
+                        onOpenDetail={openDetail}
+                        hit={hits?.get(ev.eventTicker)}
+                      />
+                    )}
+                  </CardCell>
+                ))}
+              </AnimatePresence>
+            )}
           </div>
           {remaining > 0 && (
             <div className="flex items-center justify-center gap-3 px-3 pb-3">
@@ -514,6 +791,8 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
       {liveDetail && (
         <MarketDetail
           market={liveDetail}
+          siblings={detailSiblings}
+          onSelectMarket={openDetail}
           now={now}
           watched={watchedSet.has(liveDetail.ticker)}
           onToggleWatch={() => toggleWatch(liveDetail.ticker)}
@@ -554,6 +833,415 @@ function LensPill({
   );
 }
 
+// ── Filter bar controls (B4/B5) ──────────────────────────────────
+
+/** Close an open popover on outside-mousedown or Escape. */
+function useDismiss<T extends HTMLElement>(
+  ref: React.RefObject<T | null>,
+  open: boolean,
+  onClose: () => void,
+) {
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [ref, open, onClose]);
+}
+
+/** Shared dropdown panel: one look + one entrance for every bar menu. */
+function MenuPanel({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <motion.div
+      role="menu"
+      initial={{ opacity: 0, y: -4, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -4, scale: 0.98 }}
+      transition={{ duration: 0.14, ease: "easeOut" }}
+      className={clsx(
+        "absolute top-full z-30 mt-1 max-h-80 origin-top overflow-y-auto rounded-xl border border-edge/50 bg-surface p-1 shadow-xl scrollbar-thin",
+        className,
+      )}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/** Category filter — multi-select popover (empty selection = all).
+ *  Toggling keeps the menu open so several categories combine in one
+ *  visit; outside-click or Esc dismisses. */
+function CategoryMenu({
+  categories,
+  selected,
+  onToggle,
+  onClear,
+}: {
+  categories: string[];
+  selected: string[];
+  onToggle: (c: string) => void;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(rootRef, open, close);
+
+  const label =
+    selected.length === 0
+      ? "All"
+      : selected.length === 1
+        ? selected[0]
+        : `${selected.length} categories`;
+
+  return (
+    // rounded-full on the WRAPPER matters: the app's global focus rule
+    // draws its ring with `border-radius: inherit` (from the parent).
+    <div ref={rootRef} className="relative shrink-0 rounded-full">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Filter by category"
+        className={clsx(
+          "flex max-w-40 cursor-pointer items-center gap-1 rounded-full border py-1 pl-2.5 pr-2 text-ui-meta font-medium transition-colors",
+          selected.length > 0 || open
+            ? "border-accent/40 bg-accent/15 text-accent"
+            : "border-edge/30 bg-base-150/60 text-fg-3 hover:text-fg-2",
+        )}
+      >
+        <span className="truncate">{label}</span>
+        <ChevronDown
+          size={12}
+          aria-hidden
+          className={clsx(
+            "shrink-0 transition-transform duration-150",
+            open && "rotate-180",
+            selected.length > 0 || open ? "text-accent/70" : "text-fg-4",
+          )}
+        />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <MenuPanel className="right-0 w-56">
+            <MenuRow
+              selected={selected.length === 0}
+              onClick={onClear}
+              role="menuitemradio"
+            >
+              All categories
+            </MenuRow>
+            {categories.map((c) => (
+              <MenuRow
+                key={c}
+                selected={selected.includes(c)}
+                onClick={() => onToggle(c)}
+                role="menuitemcheckbox"
+              >
+                {c}
+              </MenuRow>
+            ))}
+          </MenuPanel>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/** Narrow-width collapse of the lens pills + category menu: one Filter
+ *  button (with an active-filter count badge) opening a compact menu. The
+ *  wide bar hides this via container queries and vice versa. */
+function FilterMenu({
+  lens,
+  onPickLens,
+  watchlistCount,
+  resolvedCount,
+  categories,
+  selectedCats,
+  onToggleCategory,
+  onClearCategories,
+}: {
+  lens: PredictionsLens;
+  onPickLens: (l: PredictionsLens) => void;
+  watchlistCount: number;
+  resolvedCount: number;
+  categories: string[];
+  selectedCats: string[];
+  onToggleCategory: (c: string) => void;
+  onClearCategories: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(rootRef, open, close);
+
+  const activeCount = (lens !== "trending" ? 1 : 0) + selectedCats.length;
+
+  return (
+    // NOT position:relative — the dropdown anchors to the sticky bar (the
+    // nearest positioned ancestor) so it spans the channel width instead of
+    // clipping off-screen at narrow widths. rounded-lg feeds the global
+    // focus rule's `border-radius: inherit` for the button's ring.
+    <div ref={rootRef} className="shrink-0 rounded-lg">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Filters"
+        className={clsx(
+          "relative flex h-7 w-8 cursor-pointer items-center justify-center rounded-lg border transition-colors",
+          open || activeCount > 0
+            ? "border-accent/40 bg-accent/15 text-accent"
+            : "border-edge/30 bg-base-150/60 text-fg-3 hover:text-fg-2",
+        )}
+      >
+        <SlidersHorizontal size={13} />
+        {activeCount > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-accent px-0.5 font-mono text-[9px] font-bold leading-none text-white">
+            {activeCount}
+          </span>
+        )}
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <MenuPanel className="inset-x-2">
+            <MenuHeading>View</MenuHeading>
+            {LENSES.map((l) => (
+              <MenuRow
+                key={l.value}
+                selected={lens === l.value}
+                onClick={() => onPickLens(l.value)}
+                role="menuitemradio"
+              >
+                {l.label}
+                {l.value === "watchlist" && watchlistCount > 0
+                  ? ` ${watchlistCount}`
+                  : l.value === "resolved" && resolvedCount > 0
+                    ? ` ${resolvedCount}`
+                    : ""}
+              </MenuRow>
+            ))}
+            <MenuHeading>Category</MenuHeading>
+            <MenuRow
+              selected={selectedCats.length === 0}
+              onClick={onClearCategories}
+              role="menuitemradio"
+            >
+              All categories
+            </MenuRow>
+            {categories.map((c) => (
+              <MenuRow
+                key={c}
+                selected={selectedCats.includes(c)}
+                onClick={() => onToggleCategory(c)}
+                role="menuitemcheckbox"
+              >
+                {c}
+              </MenuRow>
+            ))}
+          </MenuPanel>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function MenuHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="px-2 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-fg-4 first:pt-1">
+      {children}
+    </div>
+  );
+}
+
+function MenuRow({
+  selected,
+  onClick,
+  children,
+  role = "menuitemradio",
+}: {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  /** menuitemcheckbox rows toggle (multi-select) and stay hoverable. */
+  role?: "menuitemradio" | "menuitemcheckbox";
+}) {
+  return (
+    <button
+      type="button"
+      role={role}
+      aria-checked={selected}
+      onClick={onClick}
+      className={clsx(
+        "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-ui-meta transition-colors hover:bg-surface-hover",
+        selected ? "text-accent" : "text-fg-2",
+      )}
+    >
+      <span className="min-w-0 flex-1 truncate">{children}</span>
+      {selected && <Check size={13} className="shrink-0" />}
+    </button>
+  );
+}
+
+// ── Search UI ────────────────────────────────────────────────────
+
+/** Compact-by-default search field; expands on focus (or while a query is
+ *  set). Same contained shape as the ViewSwitcher so the control bar stays
+ *  one family. Results filter the grid in place as the user types. */
+function SearchBox({
+  inputRef,
+  query,
+  onQueryChange,
+  onKeyDown,
+  resultCount,
+}: {
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  query: string;
+  onQueryChange: (next: string) => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  /** Matched-event count while searching, null when search is inactive. */
+  resultCount: number | null;
+}) {
+  const [focused, setFocused] = useState(false);
+  const expanded = focused || query.length > 0;
+  return (
+    <div
+      className={clsx(
+        "relative flex items-center rounded-lg border transition-all duration-200",
+        expanded
+          ? "w-40 border-accent/50 bg-surface ring-1 ring-accent/25 sm:w-64"
+          : "w-24 border-edge/30 bg-base-150/60 sm:w-32",
+      )}
+    >
+      <Search
+        size={13}
+        className={clsx(
+          "pointer-events-none absolute left-2",
+          expanded ? "text-accent" : "text-fg-4",
+        )}
+      />
+      <input
+        ref={inputRef}
+        type="text"
+        value={query}
+        onChange={(e) => onQueryChange(e.target.value)}
+        onKeyDown={onKeyDown}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        placeholder="Search"
+        aria-label="Search markets"
+        spellCheck={false}
+        autoCorrect="off"
+        autoComplete="off"
+        className="w-full bg-transparent py-1 pl-7 pr-6 text-ui-meta text-fg outline-none placeholder:text-fg-4"
+      />
+      {query ? (
+        <button
+          type="button"
+          aria-label="Clear search"
+          // Keep focus in the input across the click (mousedown blurs).
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            onQueryChange("");
+            inputRef.current?.focus();
+          }}
+          className="absolute right-1.5 flex h-4 w-4 cursor-pointer items-center justify-center rounded text-fg-4 transition-colors hover:text-fg-2"
+        >
+          <X size={12} />
+        </button>
+      ) : (
+        !focused && (
+          <kbd
+            aria-hidden
+            className="pointer-events-none absolute right-1.5 rounded border border-edge/40 bg-base-150 px-1 font-mono text-[9px] leading-4 text-fg-4"
+          >
+            /
+          </kbd>
+        )
+      )}
+      {resultCount !== null && (
+        <span role="status" className="sr-only">
+          {resultCount === 0
+            ? "No markets match"
+            : `${resultCount} markets match`}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Grid cell for a card: exit animation (search filter), keyboard-selection
+ *  ring, and the data-nav-idx hook scrollIntoView targets. */
+function CardCell({
+  navIdx,
+  selected,
+  children,
+}: {
+  navIdx?: number;
+  selected?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <motion.div
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.12 }}
+      data-nav-idx={navIdx}
+      className={clsx(
+        "h-full min-w-0 rounded-lg",
+        selected && "ring-2 ring-accent",
+      )}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/** Text with matched substrings wrapped in a subtle accent mark. */
+function Highlight({
+  text,
+  ranges,
+}: {
+  text: string;
+  ranges?: MatchRange[];
+}) {
+  if (!ranges || ranges.length === 0) return <>{text}</>;
+  const parts: React.ReactNode[] = [];
+  let pos = 0;
+  for (const [start, end] of ranges) {
+    if (start >= text.length) break;
+    if (start > pos) parts.push(text.slice(pos, start));
+    parts.push(
+      <mark
+        key={start}
+        className="rounded-[2px] bg-accent/25 text-inherit"
+      >
+        {text.slice(start, Math.min(end, text.length))}
+      </mark>,
+    );
+    pos = end;
+  }
+  if (pos < text.length) parts.push(text.slice(pos));
+  return <>{parts}</>;
+}
+
 // ── ResolvedCard (the Resolved lens) ─────────────────────────────
 //
 // Same card anatomy as EventCard — header (category · settled-time + ★),
@@ -570,6 +1258,8 @@ interface ResolvedCardProps {
   watchedSet: Set<string>;
   onToggleWatch: (ticker: string) => void;
   onOpenDetail: (market: Prediction) => void;
+  /** Search-match highlight ranges, present only while searching. */
+  hit?: EventSearchHit;
 }
 
 function resolvedStamp(p: Prediction | undefined): string | undefined {
@@ -584,6 +1274,7 @@ const ResolvedCard = memo(function ResolvedCard({
   watchedSet,
   onToggleWatch,
   onOpenDetail,
+  hit,
 }: ResolvedCardProps) {
   const lead = event.outcomes[0];
   const watched = lead ? watchedSet.has(lead.ticker) : false;
@@ -617,12 +1308,29 @@ const ResolvedCard = memo(function ResolvedCard({
     </span>
   );
 
+  const openCard = () => {
+    if (lead) onOpenDetail(lead);
+  };
+
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-edge/40 bg-surface p-3 transition-colors hover:border-edge/70">
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Open ${event.title}`}
+      onClick={openCard}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openCard();
+        }
+      }}
+      className="flex h-full cursor-pointer flex-col gap-1.5 rounded-lg border border-edge/40 bg-surface p-3 transition-[border-color,box-shadow,transform,background-color] duration-150 hover:border-edge/80 hover:bg-surface-hover/40 hover:shadow-soft-sm active:scale-[0.99]"
+    >
       {showHeaderCategory && (
         <div className="flex h-5 items-center justify-between gap-2">
           <span className="truncate text-ui-chip font-medium uppercase tracking-wide text-fg-4">
-            {category}
+            <Highlight text={category!} ranges={hit?.categoryRanges} />
           </span>
           {metaGroup}
         </div>
@@ -630,7 +1338,7 @@ const ResolvedCard = memo(function ResolvedCard({
 
       <div className="flex items-start justify-between gap-2">
         <span className="text-ui-title line-clamp-2 sm:min-h-10">
-          {event.title}
+          <Highlight text={event.title} ranges={hit?.titleRanges} />
         </span>
         {!showHeaderCategory && metaGroup}
       </div>
@@ -642,17 +1350,19 @@ const ResolvedCard = memo(function ResolvedCard({
           const result = (m.result ?? "").toLowerCase();
           const won = result === "yes";
           const lost = result === "no";
-          const legLabel =
-            m.title && m.title.toLowerCase() !== "yes" ? m.title : "Yes";
+          const legLabel = outcomeLabel(m);
           return (
             <button
               key={m.id}
               type="button"
-              onClick={() => onOpenDetail(m)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenDetail(m);
+              }}
               className="flex w-full cursor-pointer items-center gap-1.5 rounded-md border border-edge/30 bg-base-100/40 px-2 py-1.5 text-left transition-colors hover:border-edge/60 hover:bg-surface-hover"
             >
               <span className="min-w-0 flex-1 truncate text-ui-meta text-fg-2">
-                {legLabel}
+                <Highlight text={legLabel} ranges={hit?.outcomeRanges[m.id]} />
               </span>
               <span
                 className={clsx(
@@ -770,6 +1480,7 @@ const MarketItem = memo(function MarketItem({
 
   const dirColor = isUp ? "text-up" : isDown ? "text-down" : "text-fg-3";
   const countdown = formatCloseCountdown(market.close_time, now);
+  const ind = timeIndicator(market, now);
 
   return (
     <a
@@ -797,9 +1508,18 @@ const MarketItem = memo(function MarketItem({
           {formatCompactNumber(market.volume_24h ?? market.volume)}
         </span>
       )}
-      {shouldShowOnFeed(display.showCloseTime) && countdown && (
-        <span className="text-fg-3 tabular-nums shrink-0">{countdown}</span>
-      )}
+      {/* Compact rows share the indicator logic: LIVE badge when live,
+          else the terse countdown in a reserved slot (no tick reflow). */}
+      {shouldShowOnFeed(display.showCloseTime) &&
+        (ind.kind === "live" ? (
+          <TimeBadge ind={ind} />
+        ) : (
+          countdown && (
+            <span className="inline-block min-w-[4ch] shrink-0 text-right tabular-nums text-fg-3">
+              {countdown}
+            </span>
+          )
+        ))}
     </a>
   );
 }, (prev, next) =>
@@ -842,6 +1562,8 @@ interface EventCardProps {
   watchedSet: Set<string>;
   onToggleWatch: (ticker: string) => void;
   onOpenDetail: (market: Prediction) => void;
+  /** Search-match highlight ranges, present only while searching. */
+  hit?: EventSearchHit;
 }
 
 const EventCard = memo(function EventCard({
@@ -852,30 +1574,34 @@ const EventCard = memo(function EventCard({
   watchedSet,
   onToggleWatch,
   onOpenDetail,
+  hit,
 }: EventCardProps) {
   const lead = event.outcomes[0];
   const watched = lead ? watchedSet.has(lead.ticker) : false;
-  const countdown = formatCloseCountdown(
-    event.closeTime ?? lead?.close_time,
-    now,
-  );
+  // Time indicator (B3) — evaluated against the event's close time; the
+  // lead leg carries any (future) start_time field.
+  const ind: TimeIndicator = lead
+    ? timeIndicator(
+        { ...lead, close_time: event.closeTime ?? lead.close_time },
+        now,
+      )
+    : { kind: "none" };
   const showHeaderCategory =
     shouldShowOnFeed(display.showCategory) && Boolean(category);
-  const showCountdown =
-    shouldShowOnFeed(display.showCloseTime) && Boolean(countdown);
+  const showTime = shouldShowOnFeed(display.showCloseTime) && ind.kind !== "none";
+
+  // Top outcomes by price + the hidden count (B2). Detail shows them all.
+  const { visible, extra } = cardOutcomes(event.outcomes);
+  // Card click lands on the top-priced leg — the first row the user reads
+  // (the ★ still anchors to the rank-1 lead; rank ≠ price on some events).
+  const openCard = () => {
+    const target = visible[0] ?? lead;
+    if (target) onOpenDetail(target);
+  };
 
   const metaGroup = (
     <span className="flex shrink-0 items-center gap-1">
-      {showCountdown && (
-        <span
-          className={clsx(
-            "font-mono text-ui-chip tabular-nums",
-            countdown === "Closed" ? "text-fg-4" : "text-fg-3",
-          )}
-        >
-          {countdown === "Closed" ? countdown : `Closes ${countdown}`}
-        </span>
-      )}
+      {showTime && <TimeBadge ind={ind} />}
       {lead && (
         <button
           type="button"
@@ -897,13 +1623,29 @@ const EventCard = memo(function EventCard({
   );
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-edge/40 bg-surface p-3 transition-colors hover:border-edge/70">
+    // Whole card opens the market detail (B1); the outcome rows, star and
+    // "+N more" are their own targets via stopPropagation. role=button (not
+    // <button>) because interactive children live inside.
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Open ${event.title}`}
+      onClick={openCard}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return; // inner controls handle their own keys
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openCard();
+        }
+      }}
+      className="flex h-full cursor-pointer flex-col gap-1.5 rounded-lg border border-edge/40 bg-surface p-3 transition-[border-color,box-shadow,transform,background-color] duration-150 hover:border-edge/80 hover:bg-surface-hover/40 hover:shadow-soft-sm active:scale-[0.99]"
+    >
       {/* Header row — category anchors the left so the countdown/star
           never sit alone. */}
       {showHeaderCategory && (
         <div className="flex h-5 items-center justify-between gap-2">
           <span className="truncate text-ui-chip font-medium uppercase tracking-wide text-fg-4">
-            {category}
+            <Highlight text={category!} ranges={hit?.categoryRanges} />
           </span>
           {metaGroup}
         </div>
@@ -914,23 +1656,23 @@ const EventCard = memo(function EventCard({
           neighbors row-aligned; single-column cards hug their title. */}
       <div className="flex items-start justify-between gap-2">
         <span className="text-ui-title line-clamp-2 sm:min-h-10">
-          {event.title}
+          <Highlight text={event.title} ranges={hit?.titleRanges} />
         </span>
         {!showHeaderCategory && metaGroup}
       </div>
 
-      {/* Outcome legs. ANY single-leg event gets a synthetic No row —
-          a lone market's No side is always its complement (100 - yes),
-          whether the leg is "Yes", "Reza Pahlavi", or "Before Jan 1,
-          2027" — mirroring Kalshi's own Yes/No pair instead of leaving
-          one row stranded. */}
+      {/* Outcome legs, highest price first, capped at two (B2). ANY
+          single-leg event gets a synthetic No row — a lone market's No
+          side is always its complement (100 - yes) — mirroring Kalshi's
+          own Yes/No pair instead of leaving one row stranded. */}
       <div className="flex flex-col gap-1">
-        {event.outcomes.map((m) => (
+        {visible.map((m) => (
           <OutcomeRow
             key={m.id}
             market={m}
             display={display}
             onOpenDetail={onOpenDetail}
+            ranges={hit?.outcomeRanges[m.id]}
           />
         ))}
         {event.outcomes.length === 1 && (
@@ -940,6 +1682,18 @@ const EventCard = memo(function EventCard({
             onOpenDetail={onOpenDetail}
             syntheticNo
           />
+        )}
+        {extra > 0 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              openCard();
+            }}
+            className="self-start rounded-md px-2 py-0.5 text-ui-chip font-medium text-accent transition-colors hover:bg-accent/10 cursor-pointer"
+          >
+            +{extra} more
+          </button>
         )}
       </div>
 
@@ -954,6 +1708,40 @@ const EventCard = memo(function EventCard({
     </div>
   );
 });
+
+/** The card's time indicator (B3): a LIVE badge, a reserved-width
+ *  countdown ("Starts in 3h" / "Closes 5d"), or a muted "Closed". Reserved
+ *  widths (ch, mono) mean the 1s tick can shorten the text without ever
+ *  reflowing the card. */
+function TimeBadge({ ind }: { ind: TimeIndicator }) {
+  if (ind.kind === "none") return null;
+  if (ind.kind === "live") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-error/10 px-1.5 py-px font-mono text-ui-chip font-bold uppercase tracking-wide text-error">
+        <span
+          aria-hidden
+          className="h-1.5 w-1.5 rounded-full bg-error motion-safe:animate-pulse"
+        />
+        Live
+      </span>
+    );
+  }
+  if (ind.kind === "closed") {
+    return (
+      <span className="font-mono text-ui-chip tabular-nums text-fg-4">Closed</span>
+    );
+  }
+  return (
+    <span
+      className={clsx(
+        "inline-block whitespace-nowrap text-right font-mono text-ui-chip tabular-nums text-fg-3",
+        ind.kind === "starts" ? "min-w-[13ch]" : "min-w-[11ch]",
+      )}
+    >
+      {ind.label}
+    </span>
+  );
+}
 
 /** One outcome leg inside an EventCard — label, delta, probability pill.
  *
@@ -971,11 +1759,14 @@ function OutcomeRow({
   display,
   onOpenDetail,
   syntheticNo = false,
+  ranges,
 }: {
   market: Prediction;
   display: PredictionsDisplayPrefs;
   onOpenDetail: (market: Prediction) => void;
   syntheticNo?: boolean;
+  /** Search-match ranges within the (non-synthetic) leg label. */
+  ranges?: MatchRange[];
 }) {
   const rawDelta = priceDelta(market);
   const delta = syntheticNo ? -rawDelta : rawDelta;
@@ -984,11 +1775,9 @@ function OutcomeRow({
 
   // Binary events read best as "Yes" rows; multi-outcome events name
   // their leg ("France", "Atlanta"). The synthetic row is always "No".
-  const legLabel = syntheticNo
-    ? "No"
-    : market.title && market.title.toLowerCase() !== "yes"
-      ? market.title
-      : "Yes";
+  // outcomeLabel is shared with the search matcher so highlight offsets
+  // always line up with what's rendered.
+  const legLabel = syntheticNo ? "No" : outcomeLabel(market);
 
   // The No side of a binary market is the complement of yes_price.
   const shownPct = syntheticNo
@@ -998,11 +1787,15 @@ function OutcomeRow({
   return (
     <button
       type="button"
-      onClick={() => onOpenDetail(market)}
+      onClick={(e) => {
+        // The whole card is a click target now (B1) — keep the row its own.
+        e.stopPropagation();
+        onOpenDetail(market);
+      }}
       className="flex w-full cursor-pointer items-center gap-1.5 rounded-md border border-edge/30 bg-base-100/40 px-2 py-1.5 text-left transition-colors hover:border-edge/60 hover:bg-surface-hover"
     >
       <span className="min-w-0 flex-1 truncate text-ui-meta text-fg-2">
-        {legLabel}
+        <Highlight text={legLabel} ranges={syntheticNo ? undefined : ranges} />
       </span>
       {shouldShowOnFeed(display.showDelta) && (
         <span
