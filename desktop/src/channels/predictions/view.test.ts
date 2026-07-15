@@ -200,6 +200,17 @@ describe("selectLens", () => {
     // "dead" (dropped, unresolved) is excluded; "settled" star kept for closure.
     expect(out.map((p) => p.id).sort()).toEqual(["hot", "settled"]);
   });
+
+  it("resolved: trailing-24h settlements only, anchored to `now`", () => {
+    const now = Date.parse("2026-06-26T12:00:00Z");
+    const items = [
+      mk({ id: "live" }),
+      mk({ id: "fresh", status: "settled", settled_at: "2026-06-26T09:00:00Z" }),
+      mk({ id: "stale", status: "settled", settled_at: "2026-06-20T00:00:00Z" }),
+    ];
+    const out = selectLens(items, "resolved", new Set(), now);
+    expect(out.map((p) => p.id)).toEqual(["fresh"]);
+  });
 });
 
 // ── groupEventsByCategory (v1.1.5 browse sections) ──────────────

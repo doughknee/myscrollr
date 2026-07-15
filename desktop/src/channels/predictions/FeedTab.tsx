@@ -22,7 +22,7 @@ import {
   LineChart,
   Wallet,
   Star,
-  ChevronDown,
+  CheckCircle2,
   ChevronRight,
   Flame,
   Clock,
@@ -32,6 +32,7 @@ import { dashboardQueryOptions, predictionsCatalogOptions } from "../../api/quer
 import {
   formatCompactNumber,
   formatCloseCountdown,
+  relativeTime,
 } from "../../utils/format";
 import EmptyChannelState from "../../components/EmptyChannelState";
 import FreshnessPill from "../../components/FreshnessPill";
@@ -57,7 +58,6 @@ import {
   selectResolvedToday,
   groupByEvent,
   groupEventsByCategory,
-  marketLabel,
   priceDelta,
   type PredictionEvent,
   type PredictionsLens,
@@ -83,7 +83,7 @@ export const predictionsChannel: ChannelManifest = {
       "the market gives a 'Yes' outcome — and moves in real time as " +
       "traders shift the odds.",
     usage: [
-      "Browse Trending by category, or flip lenses: Movers, Closing soon.",
+      "Browse Trending by category, or flip lenses: Movers, Closing soon, Resolved.",
       "Star any market — stars build your watchlist and take over the ticker.",
       "Click any outcome for its price history, alerts, and the Kalshi link.",
     ],
@@ -118,6 +118,7 @@ const LENSES: { value: PredictionsLens; label: string; icon?: typeof Flame }[] =
   { value: "trending", label: "Trending", icon: Flame },
   { value: "movers", label: "Movers", icon: TrendingUp },
   { value: "closing", label: "Closing soon", icon: Clock },
+  { value: "resolved", label: "Resolved", icon: CheckCircle2 },
   { value: "watchlist", label: "Watchlist", icon: Star },
 ];
 
@@ -216,9 +217,12 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
   );
 
   // ── Data pipeline (pure selectors from view.ts) ───────────────
+  // `now` only anchors the resolved lens's 24h window — freeze it for the
+  // other lenses so their memo doesn't churn on every 1s tick.
+  const lensNow = lens === "resolved" ? now : 0;
   const lensItems = useMemo(
-    () => selectLens(markets, lens, watchedSet),
-    [markets, lens, watchedSet],
+    () => selectLens(markets, lens, watchedSet, lensNow),
+    [markets, lens, watchedSet, lensNow],
   );
 
   const focusedItems = useMemo(
@@ -348,7 +352,9 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
                   {l.label}
                   {l.value === "watchlist" && watchlist.length > 0
                     ? ` ${watchlist.length}`
-                    : ""}
+                    : l.value === "resolved" && resolvedToday.length > 0
+                      ? ` ${resolvedToday.length}`
+                      : ""}
                 </LensPill>
               );
             })}
@@ -365,12 +371,6 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
             </div>
           )}
         </div>
-      )}
-
-      {/* Resolved Today — CONTENT, not chrome: styled and placed exactly
-          like a category section at the top of the scroll. */}
-      {isComfort && lens !== "watchlist" && resolvedToday.length > 0 && (
-        <ResolvedTodaySection items={resolvedToday} onOpen={openDetail} />
       )}
 
       {/* Market browse / grids */}
@@ -391,7 +391,11 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <p className="text-[12px] text-fg-3">Nothing here right now</p>
+            <p className="text-[12px] text-fg-3">
+              {lens === "resolved"
+                ? "Nothing settled in the last 24 hours"
+                : "Nothing here right now"}
+            </p>
             <button
               onClick={() => pickLens("trending")}
               className="px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
@@ -451,27 +455,40 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
                 : "grid grid-cols-1 gap-px bg-edge",
             )}
           >
-            {isComfort
-              ? pageEvents.map((ev) => (
-                  <EventCard
-                    key={ev.eventTicker}
-                    event={ev}
-                    display={dp}
-                    category={categoryOf(ev.outcomes[0])}
-                    now={now}
-                    watchedSet={watchedSet}
-                    onToggleWatch={toggleWatch}
-                    onOpenDetail={openDetail}
-                  />
-                ))
-              : pageItems.map((market) => (
+            {!isComfort
+              ? pageItems.map((market) => (
                   <MarketItem
                     key={market.id}
                     market={market}
                     display={dp}
                     now={now}
                   />
-                ))}
+                ))
+              : lens === "resolved"
+                ? pageEvents.map((ev) => (
+                    <ResolvedCard
+                      key={ev.eventTicker}
+                      event={ev}
+                      display={dp}
+                      category={categoryOf(ev.outcomes[0])}
+                      now={now}
+                      watchedSet={watchedSet}
+                      onToggleWatch={toggleWatch}
+                      onOpenDetail={openDetail}
+                    />
+                  ))
+                : pageEvents.map((ev) => (
+                    <EventCard
+                      key={ev.eventTicker}
+                      event={ev}
+                      display={dp}
+                      category={categoryOf(ev.outcomes[0])}
+                      now={now}
+                      watchedSet={watchedSet}
+                      onToggleWatch={toggleWatch}
+                      onOpenDetail={openDetail}
+                    />
+                  ))}
           </div>
           {remaining > 0 && (
             <div className="flex items-center justify-center gap-3 px-3 pb-3">
@@ -537,74 +554,130 @@ function LensPill({
   );
 }
 
-// ── Resolved Today (content section) ─────────────────────────────
+// ── ResolvedCard (the Resolved lens) ─────────────────────────────
 //
-// Header markup mirrors the category section headers exactly — same
-// type, same count treatment, same x-alignment — so the recap reads as
-// the feed's first section rather than a third bar of chrome.
+// Same card anatomy as EventCard — header (category · settled-time + ★),
+// dominant clamped title, outcome rows, quiet footer — but purpose-fit
+// content for settled markets: each leg carries its RESULT badge instead
+// of a live probability pill, and the footer shows total volume (24h
+// volume decays to noise once trading stops).
 
-function ResolvedTodaySection({
-  items,
-  onOpen,
-}: {
-  items: Prediction[];
-  onOpen: (m: Prediction) => void;
-}) {
-  const [open, setOpen] = useState(true);
-  return (
-    <div className="flex flex-col">
-      <div className="flex items-center gap-1.5 px-3 pt-3 pb-1.5">
-        <h3 className="text-ui-section font-semibold uppercase tracking-wide text-fg-3">
-          Resolved today
-        </h3>
-        <span className="font-mono text-ui-chip tabular-nums text-fg-4">
-          {items.length}
-        </span>
+interface ResolvedCardProps {
+  event: PredictionEvent;
+  display: PredictionsDisplayPrefs;
+  category?: string;
+  now: number;
+  watchedSet: Set<string>;
+  onToggleWatch: (ticker: string) => void;
+  onOpenDetail: (market: Prediction) => void;
+}
+
+function resolvedStamp(p: Prediction | undefined): string | undefined {
+  return p?.settled_at ?? p?.updated_at ?? p?.close_time ?? undefined;
+}
+
+const ResolvedCard = memo(function ResolvedCard({
+  event,
+  display,
+  category,
+  now,
+  watchedSet,
+  onToggleWatch,
+  onOpenDetail,
+}: ResolvedCardProps) {
+  const lead = event.outcomes[0];
+  const watched = lead ? watchedSet.has(lead.ticker) : false;
+  const stamp = resolvedStamp(lead);
+  const settledLabel = stamp ? `Settled ${relativeTime(stamp, now)}` : "Settled";
+  const showHeaderCategory =
+    shouldShowOnFeed(display.showCategory) && Boolean(category);
+
+  const metaGroup = (
+    <span className="flex shrink-0 items-center gap-1">
+      <span className="font-mono text-ui-chip tabular-nums text-fg-3">
+        {settledLabel}
+      </span>
+      {lead && (
         <button
           type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          aria-label={open ? "Collapse resolved today" : "Expand resolved today"}
-          className="ml-auto flex h-5 w-5 items-center justify-center rounded text-fg-4 transition-colors hover:bg-surface-hover hover:text-fg-2 cursor-pointer"
+          aria-label={watched ? "Remove from watchlist" : "Add to watchlist"}
+          aria-pressed={watched}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleWatch(lead.ticker);
+          }}
+          className={clsx(
+            "flex h-5 w-5 items-center justify-center rounded transition-colors cursor-pointer hover:bg-surface-hover",
+            watched ? "text-amber-400" : "text-fg-4 hover:text-fg-2",
+          )}
         >
-          <ChevronDown
-            size={13}
-            className={clsx("transition-transform", open ? "" : "-rotate-90")}
-          />
+          <Star size={13} className={watched ? "fill-current" : ""} />
         </button>
+      )}
+    </span>
+  );
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border border-edge/40 bg-surface p-3 transition-colors hover:border-edge/70">
+      {showHeaderCategory && (
+        <div className="flex h-5 items-center justify-between gap-2">
+          <span className="truncate text-ui-chip font-medium uppercase tracking-wide text-fg-4">
+            {category}
+          </span>
+          {metaGroup}
+        </div>
+      )}
+
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-ui-title line-clamp-2 sm:min-h-10">
+          {event.title}
+        </span>
+        {!showHeaderCategory && metaGroup}
       </div>
-      {open && (
-      <div className="scrollbar-thin flex gap-1.5 overflow-x-auto px-3 pb-1">
-        {items.slice(0, 20).map((m) => {
-          const won = (m.result ?? "").toLowerCase() === "yes";
-          const lost = (m.result ?? "").toLowerCase() === "no";
+
+      {/* Legs with their results — no synthetic No here; settlement is
+          already the answer, one row per resolved leg. */}
+      <div className="flex flex-col gap-1">
+        {event.outcomes.map((m) => {
+          const result = (m.result ?? "").toLowerCase();
+          const won = result === "yes";
+          const lost = result === "no";
+          const legLabel =
+            m.title && m.title.toLowerCase() !== "yes" ? m.title : "Yes";
           return (
             <button
               key={m.id}
               type="button"
-              onClick={() => onOpen(m)}
-              title={m.title}
-              className="flex shrink-0 items-center gap-1.5 rounded-md border border-edge/40 bg-base-100/40 px-2 py-1 text-ui-chip transition-colors hover:border-edge cursor-pointer"
+              onClick={() => onOpenDetail(m)}
+              className="flex w-full cursor-pointer items-center gap-1.5 rounded-md border border-edge/30 bg-base-100/40 px-2 py-1.5 text-left transition-colors hover:border-edge/60 hover:bg-surface-hover"
             >
-              <span className="max-w-[140px] truncate text-fg-2">{marketLabel(m, 32)}</span>
+              <span className="min-w-0 flex-1 truncate text-ui-meta text-fg-2">
+                {legLabel}
+              </span>
               <span
                 className={clsx(
-                  "rounded px-1 py-px font-mono text-[9px] font-bold uppercase",
-                  won && "bg-up/15 text-up",
-                  lost && "bg-down/15 text-down",
+                  "inline-flex min-w-12 items-center justify-center rounded-full px-1.5 py-px font-mono text-ui-chip font-bold uppercase",
+                  won && "bg-up/10 text-up",
+                  lost && "bg-down/10 text-down",
                   !won && !lost && "bg-surface-2 text-fg-3",
                 )}
               >
-                {m.result ? m.result : "settled"}
+                {won ? "Yes" : lost ? "No" : "Settled"}
               </span>
             </button>
           );
         })}
       </div>
+
+      {shouldShowOnFeed(display.showVolume) && event.volume > 0 && (
+        <div className="mt-auto pt-0.5 font-mono text-ui-chip tabular-nums text-fg-3">
+          Vol {formatCompactNumber(event.volume)}
+          <span className="text-fg-4"> · total</span>
+        </div>
       )}
     </div>
   );
-}
+});
 
 // ── View switcher ────────────────────────────────────────────────
 //

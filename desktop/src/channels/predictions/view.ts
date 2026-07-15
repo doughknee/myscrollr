@@ -12,9 +12,16 @@ import type { PredictionsDisplayPrefs } from "../../preferences";
  *  volume on old payloads that don't carry `volume_24h`. */
 export type PredictionsSortKey = "trending" | "movers" | "closing" | "alpha";
 
-/** The feed's four ways of looking at the market universe (v1.1.5).
- *  One lens row replaces the old direction filter + category config. */
-export type PredictionsLens = "trending" | "movers" | "closing" | "watchlist";
+/** The feed's ways of looking at the market universe (v1.1.5).
+ *  One lens row replaces the old direction filter + category config.
+ *  "resolved" is the trailing-24h settlement recap as a first-class view
+ *  (full cards) — it replaced the cramped chip strip. */
+export type PredictionsLens =
+  | "trending"
+  | "movers"
+  | "closing"
+  | "resolved"
+  | "watchlist";
 
 // ── Pure: coercion helpers ───────────────────────────────────────
 
@@ -95,6 +102,8 @@ export function sortPredictions(
  *   - trending: everything live, hottest (24h volume) first.
  *   - movers: only markets whose price actually moved, biggest move first.
  *   - closing: only markets with a future close, soonest first.
+ *   - resolved: settled within the trailing 24h, most recent first
+ *     (`now` anchors the window — pass the shared useNow() tick).
  *   - watchlist: starred markets (any rank). Resolved stars stay visible
  *     here — a star means "always show me this", and a just-settled
  *     watched market is exactly what the user wants closure on.
@@ -103,6 +112,7 @@ export function selectLens(
   items: Prediction[],
   lens: PredictionsLens,
   watchlist: ReadonlySet<string>,
+  now: number = Date.now(),
 ): Prediction[] {
   switch (lens) {
     case "trending":
@@ -119,6 +129,8 @@ export function selectLens(
         ),
         "closing",
       );
+    case "resolved":
+      return selectResolvedToday(items, now);
     case "watchlist":
       return sortPredictions(
         items.filter(
