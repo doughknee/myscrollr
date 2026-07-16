@@ -42,6 +42,36 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # ── Guard: never touch a published release ─────────────────────
+  # tauri-action does NOT create a new draft when the tag's release
+  # already exists — it uploads into it, silently replacing the assets
+  # of a PUBLISHED release (this bit us on 2026-07-16: two desktop
+  # pushes without a version bump rebuilt and swapped the live v1.1.6
+  # binaries + latest.json in place). Build only when the current
+  # version's release is missing or still a draft; otherwise skip with
+  # a warning — the fix is bumping the version in tauri.conf.json.
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      proceed: ${{ steps.check.outputs.proceed }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: desktop/src-tauri/tauri.conf.json
+      - id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="desktop-v$(jq -r .version desktop/src-tauri/tauri.conf.json)"
+          IS_DRAFT=$(gh release view "$TAG" --json isDraft --jq .isDraft --repo "$GITHUB_REPOSITORY" 2>/dev/null || echo "missing")
+          if [ "$IS_DRAFT" = "false" ]; then
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::$TAG is already published — skipping the build so its assets are never overwritten. Bump the version in desktop/src-tauri/tauri.conf.json to cut a new release."
+          else
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            echo "$TAG release state: $IS_DRAFT (missing or draft) — proceeding."
+          fi
+
   # ── Resolve the build matrix based on the selected platform ────
   # Push triggers and "all" both build every target. Selecting a single
   # platform via workflow_dispatch produces a one-entry matrix.
@@ -75,7 +105,8 @@ jobs:
 
   # ── Build ──────────────────────────────────────────────────────
   build:
-    needs: [matrix-setup]
+    needs: [matrix-setup, preflight]
+    if: needs.preflight.outputs.proceed == 'true'
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.matrix-setup.outputs.matrix) }}
