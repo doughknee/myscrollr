@@ -2,11 +2,10 @@
  * Sidebar — collapsible navigation rail.
  *
  *   ┌────────────┐
- *   │ + Add source│  ← CTA slot, drills into Catalog
  *   │ SOURCES    │
  *   │ Finance    │
  *   │ Sports     │
- *   │ Weather    │
+ *   │ + 2/3      │  ← slot chip: add-source CTA + cap meter in one
  *   │    ⋮       │
  *   │ [Account ▾]│⇤│  ← footer chip: Settings/Ticker/Account/Support
  *   └────────────┘      menu + collapse toggle
@@ -16,9 +15,9 @@
  * stays minimal: sources are the rail, everything app-level hides
  * behind the footer account chip.
  *
- * Collapses to a 48px icon-only rail with tooltips. The Sources
- * heading is hidden in the collapsed state (it'd just be an empty
- * row).
+ * Defaults to the 48px icon-only rail (tooltips carry labels; the
+ * slot chip shows cap dots) — a slot-capped source list doesn't fill
+ * a 200px panel. Expanding is one click and the pref persists.
  */
 import { useState, forwardRef } from "react";
 import type { ButtonHTMLAttributes, Ref } from "react";
@@ -127,7 +126,9 @@ export default function Sidebar({
   onRemoveItem,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(() =>
-    loadPref("sidebarCollapsed", false),
+    // Collapsed is the default: with a slot-capped source list the
+    // expanded rail is mostly void. Users who expand keep their pref.
+    loadPref("sidebarCollapsed", true),
   );
   // Right-click menu on a source row (v1.1.2). One menu at a time,
   // anchored at the pointer.
@@ -143,14 +144,7 @@ export default function Sidebar({
     savePref("sidebarCollapsed", next);
   }
 
-  // Unused widget slots, rendered as ghost rows under the sources so
-  // a small-cap rail (free = 3) reads as room-to-fill instead of
-  // empty space. Capped at 3 ghosts so larger tiers don't get a
-  // ladder; unlimited tiers get none.
   const slotCap = getMaxWidgets(tier);
-  const emptySlots = Number.isFinite(slotCap)
-    ? Math.min(3, Math.max(0, slotCap - sources.length))
-    : 0;
 
   return (
     <aside
@@ -159,18 +153,6 @@ export default function Sidebar({
         collapsed ? "w-[48px]" : "w-[200px]",
       )}
     >
-      {/* ── Add source — the CTA slot ─────────────────────────── */}
-      <div className={clsx("shrink-0 pt-2", collapsed ? "px-1" : "px-2")}>
-        <NavItem
-          icon={<Plus size={15} strokeWidth={2.5} />}
-          label="Add source"
-          active={isMarketplace}
-          collapsed={collapsed}
-          accent
-          onClick={onNavigateToMarketplace}
-        />
-      </div>
-
       {/* ── Sources ─────────────────────────────────────────────
           The user's enabled channels and widgets in canonical
           order. Scrollable when long. */}
@@ -199,25 +181,15 @@ export default function Sidebar({
           />
         ))}
 
-        {/* Ghost slots — the slot model made visible. Each unused
-            slot is a dashed affordance into the catalog. */}
-        {Array.from({ length: emptySlots }, (_, i) => (
-          <GhostSlot
-            key={`ghost-${i}`}
-            collapsed={collapsed}
-            onClick={onNavigateToMarketplace}
-          />
-        ))}
-
-        {/* Unlimited tiers get no ghosts — keep a text nudge when
-            the rail would otherwise be completely empty. */}
-        {sources.length === 0 && emptySlots === 0 && !collapsed && (
-          <p className="px-2.5 text-ui-meta leading-snug">
-            No sources yet. Use{" "}
-            <span className="font-medium text-accent">Add source</span>{" "}
-            to get started.
-          </p>
-        )}
+        {/* Slot chip — the single add-source affordance, with the
+            cap woven in (status + action in one control). */}
+        <SlotChip
+          collapsed={collapsed}
+          used={sources.length}
+          cap={slotCap}
+          active={isMarketplace}
+          onClick={onNavigateToMarketplace}
+        />
       </NavGroup>
 
       {/* ── Workspace ─────────────────────────────────────────── */}
@@ -443,35 +415,80 @@ function NavItem({
   );
 }
 
-// ── Ghost slot ──────────────────────────────────────────────────
-// An unused widget slot. Slightly shorter and quieter than a real
-// source row so it recedes; hover pulls it toward the accent to read
-// as "add something here".
+// ── Slot chip ───────────────────────────────────────────────────
+// The single add-source affordance, doubling as the slot meter.
+// Collapsed: a `+` with cap dots beneath (●●○ — only for small caps,
+// dots don't scale past 6). Expanded: "+ Add source · 2/3". At cap
+// it flips to the upgrade affordance; unlimited tiers get a plain +.
+// Either way it lands on the catalog, which handles the upsell.
 
-function GhostSlot({
+function SlotChip({
   collapsed,
+  used,
+  cap,
+  active,
   onClick,
 }: {
   collapsed: boolean;
+  used: number;
+  cap: number;
+  active: boolean;
   onClick: () => void;
 }) {
+  const finite = Number.isFinite(cap);
+  const atCap = finite && used >= cap;
+  const showDots = collapsed && finite && cap <= 6;
+
+  const label = !finite
+    ? "Add a source"
+    : atCap
+      ? `All ${cap} slots used — get more slots`
+      : `${used} of ${cap} slots used — add a source`;
+
   return (
-    <Tooltip content={collapsed ? "Empty slot — add a source" : undefined} side="right">
+    <Tooltip content={collapsed ? label : undefined} side="right">
       <button
         onClick={onClick}
-        aria-label="Empty slot — add a source"
+        aria-label={label}
         className={clsx(
-          "flex items-center w-full rounded-lg border border-dashed border-edge-2/70 text-fg-4",
-          "hover:border-accent/50 hover:text-fg-3 transition-colors duration-150",
+          "flex w-full rounded-lg font-medium",
+          "transition-all duration-150 active:scale-[0.97]",
           collapsed
-            ? "justify-center py-1"
-            : "gap-2.5 px-2.5 py-1 text-ui-meta",
+            ? "flex-col items-center gap-1 py-1.5 px-0"
+            : "items-center gap-2.5 px-2.5 py-1.5 text-ui-body",
+          active
+            ? "bg-accent/15 text-accent"
+            : "text-accent/85 hover:bg-accent/10 hover:text-accent",
         )}
       >
         <span className="shrink-0 flex items-center justify-center w-5 h-5">
-          <Plus size={13} />
+          <Plus size={15} strokeWidth={2.5} />
         </span>
-        {!collapsed && <span className="truncate">Empty slot</span>}
+        {showDots && (
+          <span className="flex items-center gap-[3px]" aria-hidden>
+            {Array.from({ length: cap }, (_, i) => (
+              <span
+                key={i}
+                className={clsx(
+                  "w-1 h-1 rounded-full",
+                  i < used ? "bg-accent/70" : "bg-edge-2",
+                )}
+              />
+            ))}
+          </span>
+        )}
+        {!collapsed && (
+          <>
+            <span className="truncate">
+              {atCap ? "Get more slots" : "Add source"}
+            </span>
+            {finite && (
+              <span className="ml-auto shrink-0 text-ui-meta text-fg-4">
+                {used}/{cap}
+              </span>
+            )}
+          </>
+        )}
       </button>
     </Tooltip>
   );

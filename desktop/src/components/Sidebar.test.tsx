@@ -1,7 +1,7 @@
 /**
- * Sidebar ghost slots — unused widget slots render as dashed
- * "Empty slot" rows (≤3, none for unlimited tiers) that navigate to
- * the catalog. See REL-24.
+ * Sidebar slot chip — the single add-source affordance doubles as
+ * the slot meter: "N of M slots used" states, upgrade flip at cap,
+ * plain + on unlimited tiers. See REL-25.
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
@@ -44,36 +44,50 @@ function renderSidebar(opts: { tier: SubscriptionTier; sourceCount: number }) {
   return { onNavigateToMarketplace };
 }
 
-const ghostRows = () =>
-  screen.queryAllByRole("button", { name: /empty slot/i });
-
-describe("Sidebar ghost slots", () => {
-  it("renders one ghost per unused slot (free tier, 2 of 3 used)", () => {
+describe("Sidebar slot chip", () => {
+  it("shows used/cap and the add affordance below the cap", () => {
     renderSidebar({ tier: "free", sourceCount: 2 });
-    expect(ghostRows()).toHaveLength(1);
+    expect(
+      screen.getByRole("button", {
+        name: "2 of 3 slots used — add a source",
+      }),
+    ).toBeInTheDocument();
   });
 
-  it("renders no ghosts when every slot is used", () => {
+  it("flips to the upgrade affordance at cap", () => {
     renderSidebar({ tier: "free", sourceCount: 3 });
-    expect(ghostRows()).toHaveLength(0);
+    expect(
+      screen.getByRole("button", {
+        name: "All 3 slots used — get more slots",
+      }),
+    ).toBeInTheDocument();
   });
 
-  it("caps ghosts at 3 for larger tiers", () => {
-    renderSidebar({ tier: "uplink_pro", sourceCount: 2 }); // 10 free slots
-    expect(ghostRows()).toHaveLength(3);
+  it("shows a plain add affordance on unlimited tiers", () => {
+    renderSidebar({ tier: "uplink_ultimate", sourceCount: 5 });
+    expect(
+      screen.getByRole("button", { name: "Add a source" }),
+    ).toBeInTheDocument();
   });
 
-  it("renders no ghosts on unlimited tiers", () => {
-    renderSidebar({ tier: "uplink_ultimate", sourceCount: 0 });
-    expect(ghostRows()).toHaveLength(0);
-  });
-
-  it("ghost click navigates to the catalog", () => {
+  it("navigates to the catalog on click", () => {
     const { onNavigateToMarketplace } = renderSidebar({
       tier: "free",
       sourceCount: 2,
     });
-    fireEvent.click(ghostRows()[0]);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "2 of 3 slots used — add a source",
+      }),
+    );
     expect(onNavigateToMarketplace).toHaveBeenCalledOnce();
+  });
+
+  it("renders exactly one add affordance (no ghost rows, no top CTA)", () => {
+    renderSidebar({ tier: "free", sourceCount: 1 });
+    const addButtons = screen.queryAllByRole("button", {
+      name: /add a source|add source|empty slot/i,
+    });
+    expect(addButtons).toHaveLength(1);
   });
 });
