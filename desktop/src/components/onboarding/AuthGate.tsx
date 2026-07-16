@@ -1,4 +1,5 @@
 import { Zap } from "lucide-react";
+import WindowControls from "../WindowControls";
 
 interface AuthGateProps {
   onLogin: () => void;
@@ -9,6 +10,12 @@ export default function AuthGate({ onLogin }: AuthGateProps) {
     <div className="flex flex-col items-center justify-center h-screen w-screen select-none">
       {/* Draggable region for window movement */}
       <div data-tauri-drag-region className="absolute inset-x-0 top-0 h-8" />
+
+      {/* Window controls — signed-out is before the app shell/TopBar
+          exists, so the frameless window needs its own close/minimize. */}
+      <div className="absolute top-0 right-0 flex items-center h-9">
+        <WindowControls />
+      </div>
 
       <div className="flex flex-col items-center gap-6 max-w-sm text-center px-6">
         {/* Logo */}

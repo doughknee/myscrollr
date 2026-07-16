@@ -21,7 +21,9 @@ import type { ButtonHTMLAttributes, Ref } from "react";
 import { ArrowLeft, ArrowRight, ChevronDown, Pin, Radio, RadioTower } from "lucide-react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "motion/react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import Tooltip from "./Tooltip";
+import WindowControls, { IS_MACOS } from "./WindowControls";
 import ConnectionIndicator from "./ConnectionIndicator";
 import ScrollLogo from "./ScrollLogo";
 import OverflowMenu from "./OverflowMenu";
@@ -44,6 +46,23 @@ interface TopBarProps {
   onTogglePin: () => void;
 }
 
+// ── Frameless-window drag region ────────────────────────────────
+//
+// On Windows/Linux the window is frameless and the TopBar doubles as
+// the title bar: empty areas move the window, double-click toggles
+// maximize — the same contract as native chrome. Drag is via JS
+// (startDragging), NOT CSS app-region: app-region makes macOS
+// WKWebView swallow mouse events before they reach JavaScript,
+// breaking all buttons.
+function handleDragRegion(e: React.MouseEvent) {
+  if (IS_MACOS || e.buttons !== 1) return;
+  // Interactive children keep their normal behavior.
+  if ((e.target as HTMLElement).closest("button, a, input")) return;
+  const win = getCurrentWindow();
+  if (e.detail === 2) void win.toggleMaximize();
+  else void win.startDragging();
+}
+
 // ── Component ───────────────────────────────────────────────────
 
 export default function TopBar({
@@ -64,6 +83,7 @@ export default function TopBar({
     <div
       role="toolbar"
       aria-label="App controls"
+      onMouseDown={handleDragRegion}
       className="flex items-center h-11 shrink-0 px-3 gap-2 border-b border-edge/40 bg-surface-2/40 backdrop-blur-sm select-none"
     >
       {/* ── Brand mark (left) ──────────────────────────────── */}
@@ -270,6 +290,15 @@ export default function TopBar({
 
         <ConnectionIndicator health={health} />
       </div>
+
+      {/* ── Window controls (Windows/Linux frameless only) ────
+          self-stretch: full bar height; -mr-3 cancels the bar's px-3
+          so the buttons sit flush in the window corner. */}
+      {!IS_MACOS && (
+        <div className="flex self-stretch ml-1 -mr-3">
+          <WindowControls />
+        </div>
+      )}
     </div>
   );
 }

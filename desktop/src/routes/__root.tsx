@@ -1,7 +1,9 @@
 /**
  * Root layout route — the persistent app shell.
  *
- * Renders TitleBar + Sidebar + content <Outlet />.
+ * Renders TopBar + Sidebar + content <Outlet />. On Windows/Linux the
+ * window is frameless and the TopBar doubles as the title bar (drag
+ * region + inline window controls).
  * Single navigation paradigm via the labeled Sidebar component.
  */
 import {
@@ -30,7 +32,7 @@ import { Toaster, toast } from "sonner";
 // CSS arrives (the original "unstyled until first Undo click" bug).
 
 // Shell components
-import TitleBar from "../components/TitleBar";
+import { IS_MACOS } from "../components/WindowControls";
 import Sidebar from "../components/Sidebar";
 import ConnectionBanner from "../components/ConnectionBanner";
 import TopBar from "../components/TopBar";
@@ -101,12 +103,6 @@ interface RouterContext {
 export const Route = createRootRouteWithContext<RouterContext>()({
   component: RootLayout,
 });
-
-// ── Platform detection ──────────────────────────────────────────
-
-const IS_MACOS =
-  (navigator as { userAgentData?: { platform?: string } }).userAgentData
-    ?.platform === "macOS" || /Mac/.test(navigator.platform);
 
 // ── URL helpers ─────────────────────────────────────────────────
 
@@ -869,8 +865,6 @@ function RootLayout() {
       {/* ── Main app shell: authenticated ── */}
       {showApp && (
         <PageIdentityProvider>
-          {!IS_MACOS && <TitleBar />}
-
           {/* TopBar — primary chrome row spanning the full window.
               Houses the Scrollr brand mark, Spotify-style forward/back
               navigation, page-identity breadcrumb (read from
