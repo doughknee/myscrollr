@@ -166,6 +166,15 @@ function parseRoute(pathname: string) {
       isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: true,
     };
   }
+  // Releases needs its own branch: the fallback below reports isFeed,
+  // which would light up the sidebar's Home row on /releases.
+  if (kind === "releases") {
+    return {
+      activeItem: "",
+      isChannel: false, isWidget: false, isFeed: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false,
+    };
+  }
   return {
     activeItem: "",
     isChannel: false, isWidget: false, isFeed: true,
@@ -553,6 +562,7 @@ function RootLayout() {
   );
 
   const handleNavigateToFeed = useCallback(() => navigate({ to: "/feed" }), [navigate]);
+  const handleNavigateToReleases = useCallback(() => navigate({ to: "/releases" }), [navigate]);
   const handleNavigateToSettings = useCallback(() => navigate({ to: "/settings" }), [navigate]);
   const handleNavigateToTicker = useCallback(() => navigate({ to: "/ticker" }), [navigate]);
   const handleNavigateToAccount = useCallback(() => navigate({ to: "/account" }), [navigate]);
@@ -878,7 +888,7 @@ function RootLayout() {
             health={deliveryHealth}
             canBack={navHistory.canBack}
             canForward={navHistory.canForward}
-            onNavigateHome={handleNavigateToFeed}
+            onNavigateToReleases={handleNavigateToReleases}
             onBack={navHistory.back}
             onForward={navHistory.forward}
             onToggleTicker={handleTickerToggle}
@@ -892,9 +902,11 @@ function RootLayout() {
               isAccount={route.isAccount}
               isMarketplace={route.isMarketplace}
               isSupport={route.isSupport}
+              isFeed={route.isFeed}
               activeItem={route.activeItem}
               tier={auth.tier}
               sources={sidebarSources}
+              onNavigateHome={handleNavigateToFeed}
               onNavigateToMarketplace={handleNavigateToMarketplace}
               onNavigateToSettings={handleNavigateToSettings}
               onNavigateToTicker={handleNavigateToTicker}

@@ -24,6 +24,7 @@ import type { ButtonHTMLAttributes, Ref } from "react";
 import {
   ArrowUpRight,
   ChevronDown,
+  Home,
   Info,
   LifeBuoy,
   PanelLeftClose,
@@ -71,6 +72,8 @@ interface SidebarProps {
   isMarketplace: boolean;
   /** Whether the support page is active. */
   isSupport: boolean;
+  /** Whether the home feed is active. Drives the pinned Home row. */
+  isFeed: boolean;
   /** Currently active channel or widget ID (for highlighting). */
   activeItem: string;
   /** Subscription tier — shown on the footer account chip. */
@@ -79,6 +82,8 @@ interface SidebarProps {
   /** Resolved enabled-source manifest data, in canonical order. */
   sources: SidebarSource[];
 
+  /** Navigate to the home feed (the pinned Home row). */
+  onNavigateHome: () => void;
   /** Navigate to the catalog page (used by "+ Add source"). */
   onNavigateToMarketplace: () => void;
   /** Navigate to the settings page. */
@@ -111,9 +116,11 @@ export default function Sidebar({
   isAccount,
   isMarketplace,
   isSupport,
+  isFeed,
   activeItem,
   tier,
   sources,
+  onNavigateHome,
   onNavigateToMarketplace,
   onNavigateToSettings,
   onNavigateToTicker,
@@ -162,6 +169,16 @@ export default function Sidebar({
         collapsed={collapsed}
         className="flex-1 overflow-y-auto scrollbar-thin"
       >
+        {/* Home — pinned above the user's sources so the rail always
+            has an anchor, even with zero sources. */}
+        <NavItem
+          icon={<Home size={15} />}
+          label="Home"
+          active={isFeed}
+          collapsed={collapsed}
+          onClick={onNavigateHome}
+        />
+
         {sources.map((source) => (
           <NavItem
             key={source.id}
@@ -451,11 +468,11 @@ function SlotChip({
         onClick={onClick}
         aria-label={label}
         className={clsx(
-          "flex w-full rounded-lg font-medium",
+          "relative flex items-center w-full rounded-lg font-medium",
           "transition-all duration-150 active:scale-[0.97]",
           collapsed
-            ? "flex-col items-center gap-1 py-1.5 px-0"
-            : "items-center gap-2.5 px-2.5 py-1.5 text-ui-body",
+            ? "justify-center py-1.5 px-0"
+            : "gap-2.5 px-2.5 py-1.5 text-ui-body",
           active
             ? "bg-accent/15 text-accent"
             : "text-accent/85 hover:bg-accent/10 hover:text-accent",
@@ -464,8 +481,13 @@ function SlotChip({
         <span className="shrink-0 flex items-center justify-center w-5 h-5">
           <Plus size={15} strokeWidth={2.5} />
         </span>
+        {/* Cap dots pinned to the bottom edge inside the padding, so
+            the chip stays exactly NavItem-height. */}
         {showDots && (
-          <span className="flex items-center gap-[3px]" aria-hidden>
+          <span
+            className="absolute bottom-[3px] left-1/2 -translate-x-1/2 flex items-center gap-[3px]"
+            aria-hidden
+          >
             {Array.from({ length: cap }, (_, i) => (
               <span
                 key={i}

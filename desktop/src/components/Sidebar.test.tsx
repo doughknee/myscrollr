@@ -9,8 +9,13 @@ import { TrendingUp } from "lucide-react";
 import Sidebar from "./Sidebar";
 import type { SubscriptionTier } from "../auth";
 
-function renderSidebar(opts: { tier: SubscriptionTier; sourceCount: number }) {
+function renderSidebar(opts: {
+  tier: SubscriptionTier;
+  sourceCount: number;
+  isFeed?: boolean;
+}) {
   const onNavigateToMarketplace = vi.fn();
+  const onNavigateHome = vi.fn();
   const sources = Array.from({ length: opts.sourceCount }, (_, i) => ({
     id: `src-${i}`,
     name: `Source ${i}`,
@@ -26,9 +31,11 @@ function renderSidebar(opts: { tier: SubscriptionTier; sourceCount: number }) {
       isAccount={false}
       isMarketplace={false}
       isSupport={false}
+      isFeed={opts.isFeed ?? false}
       activeItem=""
       tier={opts.tier}
       sources={sources}
+      onNavigateHome={onNavigateHome}
       onNavigateToMarketplace={onNavigateToMarketplace}
       onNavigateToSettings={() => {}}
       onNavigateToTicker={() => {}}
@@ -41,7 +48,7 @@ function renderSidebar(opts: { tier: SubscriptionTier; sourceCount: number }) {
       onRemoveItem={() => {}}
     />,
   );
-  return { onNavigateToMarketplace };
+  return { onNavigateToMarketplace, onNavigateHome };
 }
 
 describe("Sidebar slot chip", () => {
@@ -89,5 +96,33 @@ describe("Sidebar slot chip", () => {
       name: /add a source|add source|empty slot/i,
     });
     expect(addButtons).toHaveLength(1);
+  });
+});
+
+describe("Sidebar home row", () => {
+  it("is present even with zero sources", () => {
+    renderSidebar({ tier: "free", sourceCount: 0 });
+    expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
+  });
+
+  it("navigates home on click", () => {
+    const { onNavigateHome } = renderSidebar({ tier: "free", sourceCount: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Home" }));
+    expect(onNavigateHome).toHaveBeenCalledOnce();
+  });
+
+  it("is marked current on the feed route", () => {
+    renderSidebar({ tier: "free", sourceCount: 1, isFeed: true });
+    expect(screen.getByRole("button", { name: "Home" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("is not marked current off the feed route", () => {
+    renderSidebar({ tier: "free", sourceCount: 1, isFeed: false });
+    expect(screen.getByRole("button", { name: "Home" })).not.toHaveAttribute(
+      "aria-current",
+    );
   });
 });

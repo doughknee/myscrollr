@@ -39,7 +39,7 @@ interface TopBarProps {
   health: DeliveryHealth;
   canBack: boolean;
   canForward: boolean;
-  onNavigateHome: () => void;
+  onNavigateToReleases: () => void;
   onBack: () => void;
   onForward: () => void;
   onToggleTicker: () => void;
@@ -71,7 +71,7 @@ export default function TopBar({
   health,
   canBack,
   canForward,
-  onNavigateHome,
+  onNavigateToReleases,
   onBack,
   onForward,
   onToggleTicker,
@@ -86,17 +86,21 @@ export default function TopBar({
       onMouseDown={handleDragRegion}
       className="flex items-center h-11 shrink-0 px-3 gap-2 select-none"
     >
-      {/* ── Brand mark (left) ──────────────────────────────── */}
-      <button
-        onClick={onNavigateHome}
-        aria-label="Scrollr — go to home"
-        className="flex items-center gap-2 px-1.5 h-7 rounded-md hover:bg-surface-hover transition-colors shrink-0"
-      >
-        <ScrollLogo alive={tickerOn} size={20} />
-        <span className="text-ui-body font-semibold tracking-tight">
-          Scrollr
-        </span>
-      </button>
+      {/* ── Brand mark (left) ────────────────────────────────
+          Home lives in the sidebar rail now, so the mark takes the
+          "what's new" slot — the app's version + release notes. */}
+      <Tooltip content="What's new" side="bottom">
+        <button
+          onClick={onNavigateToReleases}
+          aria-label="Scrollr — what's new"
+          className="flex items-center gap-2 px-1.5 h-7 rounded-md hover:bg-surface-hover transition-colors shrink-0"
+        >
+          <ScrollLogo alive={tickerOn} size={20} />
+          <span className="text-ui-body font-semibold tracking-tight">
+            Scrollr
+          </span>
+        </button>
+      </Tooltip>
 
       <div className="w-px h-5 bg-edge/40 mx-1 shrink-0" />
 
