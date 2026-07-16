@@ -16,7 +16,8 @@ stays at 1.1.0 and nobody gets force-updated.
 | ~~v1.1.4~~ | Kalshi Grows Up | ✅ **Shipped 2026-07-03** — event cards, watchlist-first ticker, real history charts (+ the fair-share finals fix) | M |
 | ~~v1.1.5~~ | Kalshi Cleans Up | ✅ **Shipped 2026-07-14** — sweep reconciliation ends the stale-market feed; lens-based browse, stars-only personalization, server config retired | M–L |
 | ~~v1.1.6~~ | Kalshi Fixed Up | ✅ **Shipped 2026-07-15** — history charts + My Positions un-broken (Kalshi fp migration), market search, multi-category filter, whole-card UX | M |
-| v1.1.7 | Spring Cleaning | Under-the-hood release: backend consolidated into core (ADR-0002), simpler undo, Kalshi connect slimmed to prod-only, compact-number polish | S |
+| ~~v1.1.7~~ | Spring Cleaning | ✅ **Shipped 2026-07-16** — under-the-hood release: backend consolidated into core (ADR-0002), simpler undo, Kalshi connect slimmed to prod-only, compact-number polish | S |
+| v1.1.8 | A Fresh Coat | Claude-desktop-style chrome (single-row title bar, inset canvas, icon-dock sidebar + account chip), Home row + What's New, status page, and realtime SSE unlocked for every tier (client gate fix) | M |
 | v1.2.0 | Double-Decker 2.0 | Multi-row ticker rebuilt around widgets | L |
 | — | Website rides along | Pricing rewrite shipped with v1.1.2–3; screenshots now unblocked (post-v1.1.4) | S–M |
 
