@@ -39,6 +39,8 @@ interface TopBarProps {
   health: DeliveryHealth;
   canBack: boolean;
   canForward: boolean;
+  /** Whether the What's New page is open — lights up the brand mark. */
+  isReleases: boolean;
   onNavigateToReleases: () => void;
   onBack: () => void;
   onForward: () => void;
@@ -71,6 +73,7 @@ export default function TopBar({
   health,
   canBack,
   canForward,
+  isReleases,
   onNavigateToReleases,
   onBack,
   onForward,
@@ -93,7 +96,13 @@ export default function TopBar({
         <button
           onClick={onNavigateToReleases}
           aria-label="Scrollr — what's new"
-          className="flex items-center gap-2 px-1.5 h-7 rounded-md hover:bg-surface-hover transition-colors shrink-0"
+          aria-current={isReleases ? "page" : undefined}
+          className={clsx(
+            "flex items-center gap-2 px-1.5 h-7 rounded-md transition-colors shrink-0",
+            isReleases
+              ? "bg-accent/10 text-accent"
+              : "hover:bg-surface-hover",
+          )}
         >
           <ScrollLogo alive={tickerOn} size={20} />
           <span className="text-ui-body font-semibold tracking-tight">

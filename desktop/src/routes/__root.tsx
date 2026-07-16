@@ -114,56 +114,56 @@ function parseRoute(pathname: string) {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: true,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false,
     };
   }
   if (kind === "channel" && itemId) {
     return {
       activeItem: itemId,
       isChannel: true, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false,
     };
   }
   if (kind === "widget" && itemId) {
     return {
       activeItem: itemId,
       isChannel: false, isWidget: true, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false,
     };
   }
   if (kind === "catalog") {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: true, isSupport: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: true, isSupport: false, isReleases: false,
     };
   }
   if (kind === "settings") {
     return {
       activeItem: "settings",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: true, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false,
+      isSettings: true, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false,
     };
   }
   if (kind === "ticker") {
     return {
       activeItem: "ticker",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: true, isAccount: false, isMarketplace: false, isSupport: false,
+      isSettings: false, isTicker: true, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false,
     };
   }
   if (kind === "account") {
     return {
       activeItem: "account",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: true, isMarketplace: false, isSupport: false,
+      isSettings: false, isTicker: false, isAccount: true, isMarketplace: false, isSupport: false, isReleases: false,
     };
   }
   if (kind === "support") {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: true,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: true, isReleases: false,
     };
   }
   // Releases needs its own branch: the fallback below reports isFeed,
@@ -172,13 +172,13 @@ function parseRoute(pathname: string) {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: true,
     };
   }
   return {
     activeItem: "",
     isChannel: false, isWidget: false, isFeed: true,
-    isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false,
+    isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false,
   };
 }
 
@@ -888,6 +888,7 @@ function RootLayout() {
             health={deliveryHealth}
             canBack={navHistory.canBack}
             canForward={navHistory.canForward}
+            isReleases={route.isReleases}
             onNavigateToReleases={handleNavigateToReleases}
             onBack={navHistory.back}
             onForward={navHistory.forward}
