@@ -114,71 +114,78 @@ function parseRoute(pathname: string) {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: true,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "channel" && itemId) {
     return {
       activeItem: itemId,
       isChannel: true, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "widget" && itemId) {
     return {
       activeItem: itemId,
       isChannel: false, isWidget: true, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "catalog") {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: true, isSupport: false, isReleases: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: true, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "settings") {
     return {
       activeItem: "settings",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: true, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false,
+      isSettings: true, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "ticker") {
     return {
       activeItem: "ticker",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: true, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false,
+      isSettings: false, isTicker: true, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "account") {
     return {
       activeItem: "account",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: true, isMarketplace: false, isSupport: false, isReleases: false,
+      isSettings: false, isTicker: false, isAccount: true, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "support") {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: true, isReleases: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: true, isReleases: false, isStatus: false,
     };
   }
-  // Releases needs its own branch: the fallback below reports isFeed,
-  // which would light up the sidebar's Home row on /releases.
+  // Releases and status need their own branches: the fallback below
+  // reports isFeed, which would light up the sidebar's Home row there.
   if (kind === "releases") {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: true,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: true, isStatus: false,
+    };
+  }
+  if (kind === "status") {
+    return {
+      activeItem: "",
+      isChannel: false, isWidget: false, isFeed: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: true,
     };
   }
   return {
     activeItem: "",
     isChannel: false, isWidget: false, isFeed: true,
-    isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false,
+    isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
   };
 }
 
@@ -562,6 +569,7 @@ function RootLayout() {
 
   const handleNavigateToFeed = useCallback(() => navigate({ to: "/feed" }), [navigate]);
   const handleNavigateToReleases = useCallback(() => navigate({ to: "/releases" }), [navigate]);
+  const handleNavigateToStatus = useCallback(() => navigate({ to: "/status" }), [navigate]);
   const handleNavigateToSettings = useCallback(() => navigate({ to: "/settings" }), [navigate]);
   const handleNavigateToTicker = useCallback(() => navigate({ to: "/ticker" }), [navigate]);
   const handleNavigateToAccount = useCallback(() => navigate({ to: "/account" }), [navigate]);
@@ -888,7 +896,9 @@ function RootLayout() {
             canBack={navHistory.canBack}
             canForward={navHistory.canForward}
             isReleases={route.isReleases}
+            isStatus={route.isStatus}
             onNavigateToReleases={handleNavigateToReleases}
+            onNavigateToStatus={handleNavigateToStatus}
             onBack={navHistory.back}
             onForward={navHistory.forward}
             onToggleTicker={handleTickerToggle}

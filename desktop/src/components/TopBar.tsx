@@ -41,7 +41,10 @@ interface TopBarProps {
   canForward: boolean;
   /** Whether the What's New page is open — lights up the brand mark. */
   isReleases: boolean;
+  /** Whether the Status page is open — lights up the indicator. */
+  isStatus: boolean;
   onNavigateToReleases: () => void;
+  onNavigateToStatus: () => void;
   onBack: () => void;
   onForward: () => void;
   onToggleTicker: () => void;
@@ -74,7 +77,9 @@ export default function TopBar({
   canBack,
   canForward,
   isReleases,
+  isStatus,
   onNavigateToReleases,
+  onNavigateToStatus,
   onBack,
   onForward,
   onToggleTicker,
@@ -301,7 +306,11 @@ export default function TopBar({
 
         <div className="w-px h-5 bg-edge/40 mx-1" />
 
-        <ConnectionIndicator health={health} />
+        <ConnectionIndicator
+          health={health}
+          active={isStatus}
+          onClick={onNavigateToStatus}
+        />
       </div>
 
       {/* ── Window controls (Windows/Linux frameless only) ────

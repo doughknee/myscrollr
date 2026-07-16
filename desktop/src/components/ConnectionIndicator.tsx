@@ -2,23 +2,16 @@
  * ConnectionIndicator — small visual signal of "is the data on this
  * screen actually live, or am I looking at stale chips?"
  *
- * Phase 2 (Apr 26) addition. The shell already owned a delivery-mode
- * banner (`ConnectionBanner.tsx`) but it ONLY surfaces during SSE
- * outages on Ultimate tier — so for normal operation, free-tier users,
- * and silent staleness, the user had no signal at all.
+ * Surfaces the four-state derivation from `useDeliveryHealth`:
+ *   - **live** (green pulse + gradient ring): the realtime stream is
+ *     carrying updates. Universal — every tier streams (REL-27).
+ *   - **polling** (mint): stream is reconnecting; poll keeps data current
+ *   - **stale** (amber, with age label): data is aging
+ *   - **offline** (red): we can't reach the server
  *
- * This indicator surfaces the four-state derivation from
- * `useDeliveryHealth` (live / polling / stale / offline) as a single
- * dot in the title bar:
- *   - **live** (green pulse with gradient ring on Ultimate): "your
- *     premium realtime stream is doing its job"
- *   - **polling** (mint): "data is current, polling cadence"
- *   - **stale** (amber, with age label): "data is aging, hover for
- *     'X ago'"
- *   - **offline** (red): "we can't reach the server"
- *
- * Hover surfaces the descriptive copy from the hook so the user
- * understands what each state means without a help page.
+ * The tooltip stays to a few words — clicking opens /status, which
+ * explains the state properly and shows the backend's own health.
+ * Detail belongs on a page, not in a hover.
  */
 import clsx from "clsx";
 import Tooltip from "./Tooltip";
@@ -26,12 +19,18 @@ import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
 
 interface ConnectionIndicatorProps {
   health: DeliveryHealth;
+  /** Open the status page. */
+  onClick: () => void;
+  /** Whether the status page is the current route. */
+  active?: boolean;
   /** Optional className appended to the wrapper. */
   className?: string;
 }
 
 export default function ConnectionIndicator({
   health,
+  onClick,
+  active,
   className,
 }: ConnectionIndicatorProps) {
   const dotColor =
@@ -43,38 +42,34 @@ export default function ConnectionIndicator({
           ? "bg-warning"
           : "bg-error";
 
-  // Subtle pulse animation only for live mode — overuse on every
-  // state would feel busy. Stale/offline are deliberately static so
-  // they read as "frozen" / "dead".
+  // Subtle pulse only for live — overuse on every state would feel
+  // busy. Stale/offline are deliberately static so they read as
+  // "frozen" / "dead".
   const pulse = health.state === "live" ? "animate-pulse" : undefined;
 
-  // Gradient ring around the dot whenever the realtime stream is
-  // carrying updates. Real-time is universal (see useDeliveryHealth),
-  // so this is a pure status signal — ring = live, no ring = falling
-  // back to polling.
+  // Gradient ring whenever the realtime stream is carrying updates.
+  // Real-time is universal (see useDeliveryHealth), so this is a pure
+  // status signal — ring = live, no ring = falling back to polling.
   const showRing = health.state === "live";
 
   return (
-    <Tooltip
-      content={`${health.label} — ${health.description}`}
-      side="bottom"
-    >
-      <div
+    <Tooltip content={`${health.label} — view status`} side="bottom">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-current={active ? "page" : undefined}
+        aria-label={`Connection status: ${health.label}. View status page.`}
         className={clsx(
           "flex items-center gap-1.5 px-2 h-6 rounded-md select-none",
-          "text-[10px] font-mono uppercase tracking-wider",
+          "text-[10px] font-mono uppercase tracking-wider transition-colors",
           health.state === "live" || health.state === "polling"
             ? "text-fg-3"
             : health.state === "stale"
               ? "text-warning"
               : "text-error",
+          active ? "bg-surface-hover" : "hover:bg-surface-hover",
           className,
         )}
-        // The Tooltip's clone passes ref through; we just need the
-        // hover target to be focusable so keyboard users can read the
-        // description too.
-        tabIndex={0}
-        aria-label={`Connection status: ${health.label}. ${health.description}`}
       >
         <span className="relative inline-flex w-1.5 h-1.5">
           {showRing && (
@@ -97,7 +92,7 @@ export default function ConnectionIndicator({
           />
         </span>
         <span>{health.label}</span>
-      </div>
+      </button>
     </Tooltip>
   );
 }

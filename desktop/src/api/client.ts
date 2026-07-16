@@ -93,6 +93,31 @@ export async function request<T>(
   return handleResponse<T>(response);
 }
 
+// ── Health ──────────────────────────────────────────────────────
+
+/** Core's own view of its dependencies (public — no auth). */
+export interface HealthResponse {
+  status: string;
+  database: string;
+  redis: string;
+  services: Record<string, string>;
+}
+
+/**
+ * GET /health — deliberately does NOT go through `request()`.
+ *
+ * Core answers 503 whenever any dependency is degraded (it doubles as
+ * the k8s readiness probe, see api/core/server.go), but the body is
+ * still the full, useful report naming exactly what's down. Routing it
+ * through `handleResponse` would throw on precisely the case the
+ * status page exists to show. Only a failed request or an unparseable
+ * body is a real error here.
+ */
+export async function fetchHealth(): Promise<HealthResponse> {
+  const response = await fetchWithTimeout(`${API_BASE}/health`);
+  return (await response.json()) as HealthResponse;
+}
+
 /**
  * Authenticated request — resolves a valid token via getValidToken()
  * (handles silent refresh) and attaches it as a Bearer header.

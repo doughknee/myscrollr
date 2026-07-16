@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TickerRouteImport } from './routes/ticker'
 import { Route as SupportRouteImport } from './routes/support'
+import { Route as StatusRouteImport } from './routes/status'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReleasesRouteImport } from './routes/releases'
 import { Route as FeedRouteImport } from './routes/feed'
@@ -29,6 +30,11 @@ const TickerRoute = TickerRouteImport.update({
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
   path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StatusRoute = StatusRouteImport.update({
+  id: '/status',
+  path: '/status',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -84,6 +90,7 @@ export interface FileRoutesByFullPath {
   '/feed': typeof FeedRoute
   '/releases': typeof ReleasesRoute
   '/settings': typeof SettingsRoute
+  '/status': typeof StatusRoute
   '/support': typeof SupportRoute
   '/ticker': typeof TickerRoute
   '/channel/$type/$tab': typeof ChannelTypeTabRoute
@@ -97,6 +104,7 @@ export interface FileRoutesByTo {
   '/feed': typeof FeedRoute
   '/releases': typeof ReleasesRoute
   '/settings': typeof SettingsRoute
+  '/status': typeof StatusRoute
   '/support': typeof SupportRoute
   '/ticker': typeof TickerRoute
   '/channel/$type/$tab': typeof ChannelTypeTabRoute
@@ -111,6 +119,7 @@ export interface FileRoutesById {
   '/feed': typeof FeedRoute
   '/releases': typeof ReleasesRoute
   '/settings': typeof SettingsRoute
+  '/status': typeof StatusRoute
   '/support': typeof SupportRoute
   '/ticker': typeof TickerRoute
   '/channel/$type/$tab': typeof ChannelTypeTabRoute
@@ -126,6 +135,7 @@ export interface FileRouteTypes {
     | '/feed'
     | '/releases'
     | '/settings'
+    | '/status'
     | '/support'
     | '/ticker'
     | '/channel/$type/$tab'
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/feed'
     | '/releases'
     | '/settings'
+    | '/status'
     | '/support'
     | '/ticker'
     | '/channel/$type/$tab'
@@ -152,6 +163,7 @@ export interface FileRouteTypes {
     | '/feed'
     | '/releases'
     | '/settings'
+    | '/status'
     | '/support'
     | '/ticker'
     | '/channel/$type/$tab'
@@ -166,6 +178,7 @@ export interface RootRouteChildren {
   FeedRoute: typeof FeedRoute
   ReleasesRoute: typeof ReleasesRoute
   SettingsRoute: typeof SettingsRoute
+  StatusRoute: typeof StatusRoute
   SupportRoute: typeof SupportRoute
   TickerRoute: typeof TickerRoute
   ChannelTypeTabRoute: typeof ChannelTypeTabRoute
@@ -187,6 +200,13 @@ declare module '@tanstack/react-router' {
       path: '/support'
       fullPath: '/support'
       preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/status': {
+      id: '/status'
+      path: '/status'
+      fullPath: '/status'
+      preLoaderRoute: typeof StatusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -262,6 +282,7 @@ const rootRouteChildren: RootRouteChildren = {
   FeedRoute: FeedRoute,
   ReleasesRoute: ReleasesRoute,
   SettingsRoute: SettingsRoute,
+  StatusRoute: StatusRoute,
   SupportRoute: SupportRoute,
   TickerRoute: TickerRoute,
   ChannelTypeTabRoute: ChannelTypeTabRoute,
