@@ -2,14 +2,14 @@
  * TopBar — the app's primary chrome row.
  *
  * Layout:
- *   [logo + Scrollr] | [←][→] | breadcrumb · subtitle    [entityAction] | [Ticker] [📌] | [●Connected]
+ *   [logo + Scrollr] | [←][→] | breadcrumb · subtitle    [entityAction] | [Ticker] | [⚡]
  *
  * The TopBar is the single canonical home for:
  *   - Brand mark (clickable → Home)
  *   - Forward/back navigation (Spotify-style)
  *   - Page identity (where am I — published via PageContext)
  *   - Page-level entity action (Trash on source pages)
- *   - Ambient toggles (ticker on/off, pin)
+ *   - Ambient toggles (ticker on/off)
  *   - Connection status
  *
  * Page-level chrome (title + breadcrumb) used to live inside the
@@ -18,10 +18,12 @@
  */
 import { forwardRef, useLayoutEffect, useRef, useState } from "react";
 import type { ButtonHTMLAttributes, Ref } from "react";
-import { ArrowLeft, ArrowRight, ChevronDown, Pin, Radio, RadioTower } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, Radio, RadioTower } from "lucide-react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "motion/react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import Tooltip from "./Tooltip";
+import WindowControls, { IS_MACOS } from "./WindowControls";
 import ConnectionIndicator from "./ConnectionIndicator";
 import ScrollLogo from "./ScrollLogo";
 import OverflowMenu from "./OverflowMenu";
@@ -33,30 +35,51 @@ import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
 
 interface TopBarProps {
   tickerOn: boolean;
-  pinned: boolean;
   health: DeliveryHealth;
   canBack: boolean;
   canForward: boolean;
-  onNavigateHome: () => void;
+  /** Whether the What's New page is open — lights up the brand mark. */
+  isReleases: boolean;
+  /** Whether the Status page is open — lights up the indicator. */
+  isStatus: boolean;
+  onNavigateToReleases: () => void;
+  onNavigateToStatus: () => void;
   onBack: () => void;
   onForward: () => void;
   onToggleTicker: () => void;
-  onTogglePin: () => void;
+}
+
+// ── Frameless-window drag region ────────────────────────────────
+//
+// On Windows/Linux the window is frameless and the TopBar doubles as
+// the title bar: empty areas move the window, double-click toggles
+// maximize — the same contract as native chrome. Drag is via JS
+// (startDragging), NOT CSS app-region: app-region makes macOS
+// WKWebView swallow mouse events before they reach JavaScript,
+// breaking all buttons.
+function handleDragRegion(e: React.MouseEvent) {
+  if (IS_MACOS || e.buttons !== 1) return;
+  // Interactive children keep their normal behavior.
+  if ((e.target as HTMLElement).closest("button, a, input")) return;
+  const win = getCurrentWindow();
+  if (e.detail === 2) void win.toggleMaximize();
+  else void win.startDragging();
 }
 
 // ── Component ───────────────────────────────────────────────────
 
 export default function TopBar({
   tickerOn,
-  pinned,
   health,
   canBack,
   canForward,
-  onNavigateHome,
+  isReleases,
+  isStatus,
+  onNavigateToReleases,
+  onNavigateToStatus,
   onBack,
   onForward,
   onToggleTicker,
-  onTogglePin,
 }: TopBarProps) {
   const page = usePageIdentity();
 
@@ -64,19 +87,30 @@ export default function TopBar({
     <div
       role="toolbar"
       aria-label="App controls"
-      className="flex items-center h-11 shrink-0 px-3 gap-2 border-b border-edge/40 bg-surface-2/40 backdrop-blur-sm select-none"
+      onMouseDown={handleDragRegion}
+      className="flex items-center h-11 shrink-0 px-3 gap-2 select-none"
     >
-      {/* ── Brand mark (left) ──────────────────────────────── */}
-      <button
-        onClick={onNavigateHome}
-        aria-label="Scrollr — go to home"
-        className="flex items-center gap-2 px-1.5 h-7 rounded-md hover:bg-surface-hover transition-colors shrink-0"
-      >
-        <ScrollLogo alive={tickerOn} size={20} />
-        <span className="text-ui-body font-semibold tracking-tight">
-          Scrollr
-        </span>
-      </button>
+      {/* ── Brand mark (left) ────────────────────────────────
+          Home lives in the sidebar rail now, so the mark takes the
+          "what's new" slot — the app's version + release notes. */}
+      <Tooltip content="What's new" side="bottom">
+        <button
+          onClick={onNavigateToReleases}
+          aria-label="Scrollr — what's new"
+          aria-current={isReleases ? "page" : undefined}
+          className={clsx(
+            "flex items-center gap-2 px-1.5 h-7 rounded-md transition-colors shrink-0",
+            isReleases
+              ? "bg-accent/10 text-accent"
+              : "hover:bg-surface-hover",
+          )}
+        >
+          <ScrollLogo alive={tickerOn} size={20} />
+          <span className="text-ui-body font-semibold tracking-tight">
+            Scrollr
+          </span>
+        </button>
+      </Tooltip>
 
       <div className="w-px h-5 bg-edge/40 mx-1 shrink-0" />
 
@@ -237,39 +271,23 @@ export default function TopBar({
           </button>
         </Tooltip>
 
-        <Tooltip
-          content={
-            pinned ? "Stop keeping window above others" : "Keep window above other windows"
-          }
-          side="bottom"
-        >
-          <button
-            type="button"
-            role="switch"
-            aria-checked={pinned}
-            onClick={onTogglePin}
-            aria-label={pinned ? "Unpin window" : "Pin window on top"}
-            className={clsx(
-              "flex items-center justify-center w-7 h-7 rounded-md transition-all duration-200 active:scale-90",
-              pinned
-                ? "bg-info/15 text-info hover:bg-info/20"
-                : "text-fg-4 hover:text-fg-2 hover:bg-surface-hover",
-            )}
-          >
-            <Pin
-              size={12}
-              className={clsx(
-                "transition-transform duration-200",
-                pinned && "fill-current rotate-45",
-              )}
-            />
-          </button>
-        </Tooltip>
-
         <div className="w-px h-5 bg-edge/40 mx-1" />
 
-        <ConnectionIndicator health={health} />
+        <ConnectionIndicator
+          health={health}
+          active={isStatus}
+          onClick={onNavigateToStatus}
+        />
       </div>
+
+      {/* ── Window controls (Windows/Linux frameless only) ────
+          self-stretch: full bar height; -mr-3 cancels the bar's px-3
+          so the buttons sit flush in the window corner. */}
+      {!IS_MACOS && (
+        <div className="flex self-stretch ml-1 -mr-3">
+          <WindowControls />
+        </div>
+      )}
     </div>
   );
 }

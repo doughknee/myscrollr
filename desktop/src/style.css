@@ -1209,15 +1209,6 @@ body {
   animation: unlimited-dot-glow 2s ease-in-out infinite;
 }
 
-/* ── Custom title bar ─────────────────────────────────────────── */
-/* Drag is handled via JS (startDragging) — NOT CSS app-region.
-   CSS app-region: drag causes macOS WKWebView to swallow mouse
-   events before they reach JavaScript, breaking all buttons. */
-
-.titlebar {
-  border-bottom: 1px solid var(--color-edge);
-}
-
 /* Rounded corners for custom-chrome windows (Linux/Windows).
    macOS uses native decorations which handle rounding themselves. */
 #app-shell.custom-chrome {

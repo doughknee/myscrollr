@@ -2,101 +2,86 @@
  * ConnectionIndicator — small visual signal of "is the data on this
  * screen actually live, or am I looking at stale chips?"
  *
- * Phase 2 (Apr 26) addition. The shell already owned a delivery-mode
- * banner (`ConnectionBanner.tsx`) but it ONLY surfaces during SSE
- * outages on Ultimate tier — so for normal operation, free-tier users,
- * and silent staleness, the user had no signal at all.
+ * One icon per state, no text in the good states (the TopBar is icon
+ * language; ALL-CAPS labels shouted). Degraded states grow a short
+ * label — bad news should be louder than good news:
+ *   - **live** (green zap): the realtime stream is carrying updates
+ *   - **polling** (mint refresh): stream reconnecting; polls keep data current
+ *   - **stale** (amber clock + "X ago"): data is visibly aging
+ *   - **offline** (red wifi-off + "Offline"): can't reach the server
  *
- * This indicator surfaces the four-state derivation from
- * `useDeliveryHealth` (live / polling / stale / offline) as a single
- * dot in the title bar:
- *   - **live** (green pulse with gradient ring on Ultimate): "your
- *     premium realtime stream is doing its job"
- *   - **polling** (mint): "data is current, polling cadence"
- *   - **stale** (amber, with age label): "data is aging, hover for
- *     'X ago'"
- *   - **offline** (red): "we can't reach the server"
+ * The icon set matches ConnectionBanner (Zap / WifiOff) and the
+ * status page imports DELIVERY_STATE_META below, so every surface
+ * speaks the same visual language.
  *
- * Hover surfaces the descriptive copy from the hook so the user
- * understands what each state means without a help page.
+ * The tooltip stays to a few words — clicking opens /status, which
+ * explains the state properly. Detail belongs on a page, not a hover.
  */
 import clsx from "clsx";
+import { Clock, RefreshCw, WifiOff, Zap } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Tooltip from "./Tooltip";
-import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
+import type {
+  DeliveryHealth,
+  DeliveryHealthState,
+} from "../hooks/useDeliveryHealth";
+
+/** Shared state → icon/color language (also used by /status). */
+export const DELIVERY_STATE_META: Record<
+  DeliveryHealthState,
+  { icon: LucideIcon; text: string; bg: string }
+> = {
+  live: { icon: Zap, text: "text-success", bg: "bg-success/10" },
+  polling: { icon: RefreshCw, text: "text-accent", bg: "bg-accent/10" },
+  stale: { icon: Clock, text: "text-warning", bg: "bg-warning/10" },
+  offline: { icon: WifiOff, text: "text-error", bg: "bg-error/10" },
+};
 
 interface ConnectionIndicatorProps {
   health: DeliveryHealth;
+  /** Open the status page. */
+  onClick: () => void;
+  /** Whether the status page is the current route. */
+  active?: boolean;
   /** Optional className appended to the wrapper. */
   className?: string;
 }
 
 export default function ConnectionIndicator({
   health,
+  onClick,
+  active,
   className,
 }: ConnectionIndicatorProps) {
-  const dotColor =
-    health.state === "live"
-      ? "bg-success"
-      : health.state === "polling"
-        ? "bg-accent"
-        : health.state === "stale"
-          ? "bg-warning"
-          : "bg-error";
+  const meta = DELIVERY_STATE_META[health.state];
+  const Icon = meta.icon;
 
-  // Subtle pulse animation only for live mode — overuse on every
-  // state would feel busy. Stale/offline are deliberately static so
-  // they read as "frozen" / "dead".
-  const pulse = health.state === "live" ? "animate-pulse" : undefined;
-
-  // Gradient ring around the dot only when SSE is eligible AND active.
-  // Visually rewards Ultimate users for paying, and never appears
-  // for free-tier users (avoids "what's that ring?" confusion).
-  const showRing = health.sseEligible && health.state === "live";
+  // Good states are icon-only; degraded states earn a label.
+  const degraded = health.state === "stale" || health.state === "offline";
 
   return (
-    <Tooltip
-      content={`${health.label} — ${health.description}`}
-      side="bottom"
-    >
-      <div
+    <Tooltip content={`${health.label} — view status`} side="bottom">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-current={active ? "page" : undefined}
+        aria-label={`Connection status: ${health.label}. View status page.`}
         className={clsx(
-          "flex items-center gap-1.5 px-2 h-6 rounded-md select-none",
-          "text-[10px] font-mono uppercase tracking-wider",
-          health.state === "live" || health.state === "polling"
-            ? "text-fg-3"
-            : health.state === "stale"
-              ? "text-warning"
-              : "text-error",
+          "flex items-center justify-center gap-1.5 h-7 rounded-md select-none transition-colors",
+          degraded ? "px-2" : "w-7",
+          // Healthy states sit quietly in the chrome like every other
+          // icon; state color is reserved for degraded states (and the
+          // status page's tile, which is a hero, not chrome).
+          degraded ? meta.text : "text-fg-4 hover:text-fg-2",
+          active ? "bg-surface-hover" : "hover:bg-surface-hover",
           className,
         )}
-        // The Tooltip's clone passes ref through; we just need the
-        // hover target to be focusable so keyboard users can read the
-        // description too.
-        tabIndex={0}
-        aria-label={`Connection status: ${health.label}. ${health.description}`}
       >
-        <span className="relative inline-flex w-1.5 h-1.5">
-          {showRing && (
-            <span
-              aria-hidden
-              className="absolute -inset-1 rounded-full opacity-60"
-              style={{
-                background:
-                  "conic-gradient(from 0deg, var(--color-success), var(--color-accent), var(--color-info), var(--color-success))",
-                animation: "spin 4s linear infinite",
-              }}
-            />
-          )}
-          <span
-            className={clsx(
-              "relative inline-flex w-1.5 h-1.5 rounded-full",
-              dotColor,
-              pulse,
-            )}
-          />
-        </span>
-        <span>{health.label}</span>
-      </div>
+        <Icon size={13} strokeWidth={2.2} />
+        {degraded && (
+          <span className="text-ui-chip font-medium">{health.label}</span>
+        )}
+      </button>
     </Tooltip>
   );
 }

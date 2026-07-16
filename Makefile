@@ -29,10 +29,10 @@ up: doctor prep ## Build + start the full backend in Docker, wait for health
 	@bash scripts/dev/migrate-rss.sh
 	@if [ -f secrets/predictions.docker.env ]; then \
 	  echo "[up] building all services (incl. predictions)..."; \
-	  $(COMPOSE_PRED) up -d --build; \
+	  $(COMPOSE_PRED) up -d --build --remove-orphans; \
 	else \
 	  echo "[up] predictions skipped (no Kalshi key — run 'make kalshi-key' to enable); building the rest..."; \
-	  $(COMPOSE) up -d --build; \
+	  $(COMPOSE) up -d --build --remove-orphans; \
 	fi
 	@bash scripts/dev/wait-healthy.sh
 

@@ -1,7 +1,9 @@
 /**
  * Root layout route — the persistent app shell.
  *
- * Renders TitleBar + Sidebar + content <Outlet />.
+ * Renders TopBar + Sidebar + content <Outlet />. On Windows/Linux the
+ * window is frameless and the TopBar doubles as the title bar (drag
+ * region + inline window controls).
  * Single navigation paradigm via the labeled Sidebar component.
  */
 import {
@@ -30,7 +32,7 @@ import { Toaster, toast } from "sonner";
 // CSS arrives (the original "unstyled until first Undo click" bug).
 
 // Shell components
-import TitleBar from "../components/TitleBar";
+import { IS_MACOS } from "../components/WindowControls";
 import Sidebar from "../components/Sidebar";
 import ConnectionBanner from "../components/ConnectionBanner";
 import TopBar from "../components/TopBar";
@@ -102,12 +104,6 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   component: RootLayout,
 });
 
-// ── Platform detection ──────────────────────────────────────────
-
-const IS_MACOS =
-  (navigator as { userAgentData?: { platform?: string } }).userAgentData
-    ?.platform === "macOS" || /Mac/.test(navigator.platform);
-
 // ── URL helpers ─────────────────────────────────────────────────
 
 function parseRoute(pathname: string) {
@@ -118,62 +114,78 @@ function parseRoute(pathname: string) {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: true,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "channel" && itemId) {
     return {
       activeItem: itemId,
       isChannel: true, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "widget" && itemId) {
     return {
       activeItem: itemId,
       isChannel: false, isWidget: true, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "catalog") {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: true, isSupport: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: true, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "settings") {
     return {
       activeItem: "settings",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: true, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false,
+      isSettings: true, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "ticker") {
     return {
       activeItem: "ticker",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: true, isAccount: false, isMarketplace: false, isSupport: false,
+      isSettings: false, isTicker: true, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "account") {
     return {
       activeItem: "account",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: true, isMarketplace: false, isSupport: false,
+      isSettings: false, isTicker: false, isAccount: true, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "support") {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: true,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: true, isReleases: false, isStatus: false,
+    };
+  }
+  // Releases and status need their own branches: the fallback below
+  // reports isFeed, which would light up the sidebar's Home row there.
+  if (kind === "releases") {
+    return {
+      activeItem: "",
+      isChannel: false, isWidget: false, isFeed: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: true, isStatus: false,
+    };
+  }
+  if (kind === "status") {
+    return {
+      activeItem: "",
+      isChannel: false, isWidget: false, isFeed: false,
+      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: true,
     };
   }
   return {
     activeItem: "",
     isChannel: false, isWidget: false, isFeed: true,
-    isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false,
+    isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
   };
 }
 
@@ -417,7 +429,6 @@ function RootLayout() {
   }, []);
   const deliveryHealth = useDeliveryHealth({
     deliveryMode,
-    tier: auth.tier,
     now: healthNow,
   });
 
@@ -557,6 +568,8 @@ function RootLayout() {
   );
 
   const handleNavigateToFeed = useCallback(() => navigate({ to: "/feed" }), [navigate]);
+  const handleNavigateToReleases = useCallback(() => navigate({ to: "/releases" }), [navigate]);
+  const handleNavigateToStatus = useCallback(() => navigate({ to: "/status" }), [navigate]);
   const handleNavigateToSettings = useCallback(() => navigate({ to: "/settings" }), [navigate]);
   const handleNavigateToTicker = useCallback(() => navigate({ to: "/ticker" }), [navigate]);
   const handleNavigateToAccount = useCallback(() => navigate({ to: "/account" }), [navigate]);
@@ -795,13 +808,6 @@ function RootLayout() {
     });
   }, [prefs, persistPrefs]);
 
-  const handlePinToggle = useCallback(() => {
-    persistPrefs({
-      ...prefs,
-      window: { ...prefs.window, pinned: !prefs.window.pinned },
-    });
-  }, [prefs, persistPrefs]);
-
   // ── Shell context values (split: stable + volatile) ────────
 
   const shellStableValue = useMemo(
@@ -851,7 +857,9 @@ function RootLayout() {
     <div
       id="app-shell"
       className={clsx(
-        "flex flex-col h-screen w-screen overflow-hidden bg-surface text-fg",
+        // surface-2 is the frame tone: TopBar + Sidebar sit directly
+        // on it; route content lives in the inset rounded panel below.
+        "flex flex-col h-screen w-screen overflow-hidden bg-surface-2 text-fg",
         !IS_MACOS && "custom-chrome",
       )}
     >
@@ -869,35 +877,39 @@ function RootLayout() {
       {/* ── Main app shell: authenticated ── */}
       {showApp && (
         <PageIdentityProvider>
-          {!IS_MACOS && <TitleBar />}
-
           {/* TopBar — primary chrome row spanning the full window.
               Houses the Scrollr brand mark, Spotify-style forward/back
               navigation, page-identity breadcrumb (read from
-              PageContext), entityAction, and the ambient ticker/pin/
-              connection controls. Always visible regardless of route. */}
+              PageContext), entityAction, and the ambient ticker +
+              connection controls. Always visible regardless of route.
+              (Always-on-top moved to Settings → Window — the chrome
+              button wasn't earning its slot.) */}
           <TopBar
             tickerOn={prefs.ticker.showTicker}
-            pinned={prefs.window.pinned}
             health={deliveryHealth}
             canBack={navHistory.canBack}
             canForward={navHistory.canForward}
-            onNavigateHome={handleNavigateToFeed}
+            isReleases={route.isReleases}
+            isStatus={route.isStatus}
+            onNavigateToReleases={handleNavigateToReleases}
+            onNavigateToStatus={handleNavigateToStatus}
             onBack={navHistory.back}
             onForward={navHistory.forward}
             onToggleTicker={handleTickerToggle}
-            onTogglePin={handlePinToggle}
           />
 
-          <div className="flex flex-1 min-h-0 overflow-hidden">
+          <div className="flex flex-1 min-h-0 overflow-hidden gap-1.5 pr-1.5 pb-1.5">
             <Sidebar
               isSettings={route.isSettings}
               isTicker={route.isTicker}
               isAccount={route.isAccount}
               isMarketplace={route.isMarketplace}
               isSupport={route.isSupport}
+              isFeed={route.isFeed}
               activeItem={route.activeItem}
+              tier={auth.tier}
               sources={sidebarSources}
+              onNavigateHome={handleNavigateToFeed}
               onNavigateToMarketplace={handleNavigateToMarketplace}
               onNavigateToSettings={handleNavigateToSettings}
               onNavigateToTicker={handleNavigateToTicker}
@@ -910,8 +922,11 @@ function RootLayout() {
               onRemoveItem={handleRemoveItem}
             />
 
-            <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-              <ConnectionBanner deliveryMode={deliveryMode} tier={auth.tier} />
+            {/* Inset content canvas — the rounded panel that holds
+                every route. overflow-hidden clips page scroll to the
+                radius. */}
+            <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-surface rounded-xl border border-edge/50 shadow-sm">
+              <ConnectionBanner deliveryMode={deliveryMode} />
 
               {auth.sessionExpired && (
                 <div className="flex items-center justify-between px-4 py-2 bg-warn/10 border-b border-warn/20 shrink-0">

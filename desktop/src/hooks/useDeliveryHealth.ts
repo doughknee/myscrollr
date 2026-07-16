@@ -8,22 +8,20 @@
  *   tells the user whether the app is *actually* delivering data right
  *   now. The user cares about a single signal: "is what I'm looking at
  *   live, stale, or wrong?" This hook collapses the inputs into that
- *   one signal, plus a tier-aware "sse-active" highlight that gives
- *   Ultimate users visible feedback that they're getting the realtime
- *   stream they're paying for.
+ *   one signal.
  *
- *   Pre-Phase-2, this signal was either invisible (no UI for normal
- *   operation) or too late (`ConnectionBanner` only fires for SSE
- *   outages on Ultimate tier). The new ConnectionIndicator + ticker
- *   edge strip both consume this hook so they always agree.
+ *   Delivery is NOT tier-dependent: the server dropped the
+ *   Ultimate-only gate on /events with the widget-slot redesign
+ *   (8e9f0f9, 2026-06-30) — monetization is the slot count. Every
+ *   authenticated tier streams, so this hook doesn't care about tier;
+ *   polling is purely the reconnect fallback.
  *
  * State machine:
  *
  *     live      — `deliveryMode === "sse"` AND data fresh (<60s)
- *                 (Ultimate/super_user only — for them this is
- *                 "your premium realtime stream is working")
- *     polling   — data fresh (<60s) but on polling-only delivery
- *                 (the default for non-Ultimate tiers; not an error)
+ *                 (the steady state for everyone)
+ *     polling   — data fresh (<60s) but the stream is down and the
+ *                 poll fallback is carrying updates (not an error)
  *     stale     — last successful update was 60s–5min ago
  *                 (data is shown but visibly aging)
  *     offline   — last successful update was >5min ago OR no data yet
@@ -43,12 +41,8 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardQueryOptions } from "../api/queries";
 import type { DeliveryMode } from "../types";
-import type { SubscriptionTier } from "../auth";
 
 export type DeliveryHealthState = "live" | "polling" | "stale" | "offline";
-
-/** Tiers that are *expected* to receive SSE — only these can show "live". */
-const SSE_TIERS = new Set<SubscriptionTier>(["uplink_ultimate", "super_user"]);
 
 /** Data older than this is "stale" (yellow). */
 const STALE_THRESHOLD_MS = 60_000;
@@ -59,8 +53,6 @@ const OFFLINE_THRESHOLD_MS = 5 * 60_000;
 export interface DeliveryHealth {
   /** Coarse state used to drive color and label. */
   state: DeliveryHealthState;
-  /** Whether the user's tier benefits from SSE (drives the gradient ring). */
-  sseEligible: boolean;
   /** ms since last successful dashboard fetch, or null if no fetch yet. */
   ageMs: number | null;
   /** Convenience: human-readable "X ago" or "live" / "offline". */
@@ -71,7 +63,6 @@ export interface DeliveryHealth {
 
 interface UseDeliveryHealthArgs {
   deliveryMode: DeliveryMode;
-  tier: SubscriptionTier;
   /**
    * Override "now" for derivation — used by tests. Defaults to the
    * current time at render. The hook does NOT recompute on a timer,
@@ -82,7 +73,6 @@ interface UseDeliveryHealthArgs {
 
 export function useDeliveryHealth({
   deliveryMode,
-  tier,
   now,
 }: UseDeliveryHealthArgs): DeliveryHealth {
   // Read-only subscription to the existing dashboard query so we can
@@ -95,7 +85,6 @@ export function useDeliveryHealth({
   });
 
   return useMemo(() => {
-    const sseEligible = SSE_TIERS.has(tier);
     const lastUpdate = dashboardQuery.dataUpdatedAt || 0;
     const t = now ?? Date.now();
     const ageMs = lastUpdate > 0 ? t - lastUpdate : null;
@@ -106,17 +95,17 @@ export function useDeliveryHealth({
       state = "offline";
     } else if (ageMs > STALE_THRESHOLD_MS) {
       state = "stale";
-    } else if (deliveryMode === "sse" && sseEligible) {
+    } else if (deliveryMode === "sse") {
       state = "live";
     } else {
       state = "polling";
     }
 
     const label = labelFor(state, ageMs);
-    const description = descriptionFor(state, sseEligible, ageMs);
+    const description = descriptionFor(state, ageMs);
 
-    return { state, sseEligible, ageMs, label, description };
-  }, [deliveryMode, tier, dashboardQuery.dataUpdatedAt, now]);
+    return { state, ageMs, label, description };
+  }, [deliveryMode, dashboardQuery.dataUpdatedAt, now]);
 }
 
 function labelFor(state: DeliveryHealthState, ageMs: number | null): string {
@@ -134,16 +123,13 @@ function labelFor(state: DeliveryHealthState, ageMs: number | null): string {
 
 function descriptionFor(
   state: DeliveryHealthState,
-  sseEligible: boolean,
   ageMs: number | null,
 ): string {
   switch (state) {
     case "live":
       return "Connected to the realtime stream — updates as soon as they happen.";
     case "polling":
-      return sseEligible
-        ? "Realtime stream is reconnecting. Polling every minute meanwhile."
-        : "Polling every minute. Upgrade to Uplink Ultimate for realtime SSE updates.";
+      return "Realtime stream is reconnecting. Polling every minute meanwhile.";
     case "stale": {
       const ago = ageMs ? formatAge(ageMs) : "a while";
       return `No update in ${ago}. Data on screen may be slightly behind.`;

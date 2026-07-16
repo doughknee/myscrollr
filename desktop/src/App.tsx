@@ -241,7 +241,11 @@ export default function App() {
     },
   );
 
-  // ── Initial SSE start for ultimate tier ───────────────────────
+  // ── Initial SSE start ─────────────────────────────────────────
+  // Real-time is universal: the server dropped the Ultimate-only gate
+  // on /events with the widget-slot redesign (8e9f0f9, 2026-06-30) —
+  // monetization is the slot count, not delivery. Every authenticated
+  // tier streams; polling is only the reconnect fallback.
 
   useEffect(() => {
     async function init() {
@@ -255,7 +259,7 @@ export default function App() {
         setAuthenticated(true);
       }
 
-      if (DEMO || resolvedTier === "uplink_ultimate" || resolvedTier === "super_user") {
+      if (DEMO || token) {
         startSSE();
       }
     }
@@ -287,22 +291,14 @@ export default function App() {
         // Re-read tier on every auth store change (login OR token refresh).
         // A forced refresh after subscription change writes new roles to the JWT.
         const newTier = getTier();
-        const oldTier = tierRef.current;
         setTier(newTier);
         tierRef.current = newTier;
 
         if (!wasAuth) {
-          // Fresh login — invalidate dashboard
+          // Fresh login — invalidate dashboard and open the stream.
+          // Tier no longer affects delivery (real-time is universal).
           queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
-        }
-
-        // Start/stop SSE based on tier change
-        const newHasSSE = newTier === "uplink_ultimate" || newTier === "super_user";
-        const oldHasSSE = oldTier === "uplink_ultimate" || oldTier === "super_user";
-        if (newHasSSE && !oldHasSSE) {
-          startSSE();
-        } else if (!newHasSSE && sseActiveRef.current) {
-          stopSSE();
+          if (!sseActiveRef.current) startSSE();
         }
       }
     });

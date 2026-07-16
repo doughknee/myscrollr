@@ -1,39 +1,30 @@
 /**
  * Sidebar — collapsible navigation rail.
  *
- * The rail is split into three labeled groups so a long list of
- * unrelated nav items doesn't read as a single undifferentiated
- * column:
- *
- *   ┌──────────┐
- *   │ SOURCES  │
- *   │ Finance  │
- *   │ Sports   │
- *   │ Weather  │
- *   ├──────────┤
- *   │ WORKSPACE│
- *   │ + Add    │  ← drilled into Catalog
- *   │ Settings │
- *   │ Ticker   │
- *   ├──────────┤
- *   │ ACCOUNT  │
- *   │ Account  │
- *   │ Support  │
- *   ├──────────┤
- *   │ Collapse │
- *   └──────────┘
+ *   ┌────────────┐
+ *   │ SOURCES    │
+ *   │ Finance    │
+ *   │ Sports     │
+ *   │ + 2/3      │  ← slot chip: add-source CTA + cap meter in one
+ *   │    ⋮       │
+ *   │ [Account ▾]│⇤│  ← footer chip: Settings/Ticker/Account/Support
+ *   └────────────┘      menu + collapse toggle
  *
  * Home navigation lives on the Scrollr brand mark in the TopBar;
  * connection/ticker status lives in the TopBar too. The sidebar
- * stays minimal and navigational.
+ * stays minimal: sources are the rail, everything app-level hides
+ * behind the footer account chip.
  *
- * Collapses to a 48px icon-only rail with tooltips. Group headings
- * are hidden in the collapsed state (they'd just be empty rows) but
- * the divider lines stay so the grouping survives visually.
+ * Defaults to the 48px icon-only rail (tooltips carry labels; the
+ * slot chip shows cap dots) — a slot-capped source list doesn't fill
+ * a 200px panel. Expanding is one click and the pref persists.
  */
-import { useState } from "react";
+import { useState, forwardRef } from "react";
+import type { ButtonHTMLAttributes, Ref } from "react";
 import {
   ArrowUpRight,
+  ChevronDown,
+  Home,
   Info,
   LifeBuoy,
   PanelLeftClose,
@@ -49,8 +40,12 @@ import clsx from "clsx";
 import { motion } from "motion/react";
 import Tooltip from "./Tooltip";
 import ContextMenu from "./ContextMenu";
+import OverflowMenu from "./OverflowMenu";
 import type { ChannelManifest, WidgetManifest } from "../types";
 import { loadPref, savePref } from "../preferences";
+import { TIER_LABELS, getUserIdentity } from "../auth";
+import type { SubscriptionTier } from "../auth";
+import { getMaxWidgets } from "../tierLimits";
 
 // ── Props ───────────────────────────────────────────────────────
 
@@ -77,12 +72,18 @@ interface SidebarProps {
   isMarketplace: boolean;
   /** Whether the support page is active. */
   isSupport: boolean;
+  /** Whether the home feed is active. Drives the pinned Home row. */
+  isFeed: boolean;
   /** Currently active channel or widget ID (for highlighting). */
   activeItem: string;
+  /** Subscription tier — shown on the footer account chip. */
+  tier: SubscriptionTier;
 
   /** Resolved enabled-source manifest data, in canonical order. */
   sources: SidebarSource[];
 
+  /** Navigate to the home feed (the pinned Home row). */
+  onNavigateHome: () => void;
   /** Navigate to the catalog page (used by "+ Add source"). */
   onNavigateToMarketplace: () => void;
   /** Navigate to the settings page. */
@@ -115,8 +116,11 @@ export default function Sidebar({
   isAccount,
   isMarketplace,
   isSupport,
+  isFeed,
   activeItem,
+  tier,
   sources,
+  onNavigateHome,
   onNavigateToMarketplace,
   onNavigateToSettings,
   onNavigateToTicker,
@@ -129,7 +133,9 @@ export default function Sidebar({
   onRemoveItem,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(() =>
-    loadPref("sidebarCollapsed", false),
+    // Collapsed is the default: with a slot-capped source list the
+    // expanded rail is mostly void. Users who expand keep their pref.
+    loadPref("sidebarCollapsed", true),
   );
   // Right-click menu on a source row (v1.1.2). One menu at a time,
   // anchored at the pointer.
@@ -145,10 +151,12 @@ export default function Sidebar({
     savePref("sidebarCollapsed", next);
   }
 
+  const slotCap = getMaxWidgets(tier);
+
   return (
     <aside
       className={clsx(
-        "flex flex-col shrink-0 border-r border-edge bg-surface-2 h-full overflow-hidden select-none transition-[width] duration-200 ease-out",
+        "flex flex-col shrink-0 h-full overflow-hidden select-none transition-[width] duration-200 ease-out",
         collapsed ? "w-[48px]" : "w-[200px]",
       )}
     >
@@ -161,118 +169,108 @@ export default function Sidebar({
         collapsed={collapsed}
         className="flex-1 overflow-y-auto scrollbar-thin"
       >
-        {sources.length > 0 ? (
-          sources.map((source) => (
-            <NavItem
-              key={source.id}
-              icon={
-                <span style={{ color: source.hex }}>
-                  <source.icon size={15} />
-                </span>
-              }
-              label={source.name}
-              active={activeItem === source.id}
-              collapsed={collapsed}
-              onClick={() => onSelectItem(source.id, source.kind)}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                setMenu({ source, x: e.clientX, y: e.clientY });
-              }}
-            />
-          ))
-        ) : (
-          !collapsed && (
-            <p className="px-2.5 text-ui-meta leading-snug">
-              No sources yet. Use{" "}
-              <span className="font-medium text-accent">Add source</span>{" "}
-              to get started.
-            </p>
-          )
-        )}
+        {/* Home — pinned above the user's sources so the rail always
+            has an anchor, even with zero sources. */}
+        <NavItem
+          icon={<Home size={15} />}
+          label="Home"
+          active={isFeed}
+          collapsed={collapsed}
+          onClick={onNavigateHome}
+        />
+
+        {sources.map((source) => (
+          <NavItem
+            key={source.id}
+            icon={
+              <span style={{ color: source.hex }}>
+                <source.icon size={15} />
+              </span>
+            }
+            label={source.name}
+            active={activeItem === source.id}
+            collapsed={collapsed}
+            onClick={() => onSelectItem(source.id, source.kind)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenu({ source, x: e.clientX, y: e.clientY });
+            }}
+          />
+        ))}
+
+        {/* Slot chip — the single add-source affordance, with the
+            cap woven in (status + action in one control). */}
+        <SlotChip
+          collapsed={collapsed}
+          used={sources.length}
+          cap={slotCap}
+          active={isMarketplace}
+          onClick={onNavigateToMarketplace}
+        />
       </NavGroup>
 
       {/* ── Workspace ─────────────────────────────────────────── */}
-      <NavGroup
-        ariaLabel="Workspace"
-        heading="Workspace"
-        collapsed={collapsed}
-        bordered
-      >
-        <NavItem
-          icon={<Plus size={15} strokeWidth={2.5} />}
-          label="Add source"
-          active={isMarketplace}
-          collapsed={collapsed}
-          accent
-          onClick={onNavigateToMarketplace}
-        />
-        <NavItem
-          icon={<Settings size={15} />}
-          label="Settings"
-          active={isSettings}
-          collapsed={collapsed}
-          onClick={onNavigateToSettings}
-        />
-        <NavItem
-          icon={<RadioTower size={15} />}
-          label="Ticker"
-          active={isTicker}
-          collapsed={collapsed}
-          onClick={onNavigateToTicker}
-        />
-      </NavGroup>
-
-      {/* ── Account ───────────────────────────────────────────── */}
-      <NavGroup
-        ariaLabel="Account"
-        heading="Account"
-        collapsed={collapsed}
-        bordered
-      >
-        <NavItem
-          icon={<UserCircle size={15} />}
-          label="Account"
-          active={isAccount}
-          collapsed={collapsed}
-          onClick={onNavigateToAccount}
-        />
-        <NavItem
-          icon={<LifeBuoy size={15} />}
-          label="Support"
-          active={isSupport}
-          collapsed={collapsed}
-          onClick={onNavigateToSupport}
-        />
-      </NavGroup>
-
-      {/* ── Collapse toggle ───────────────────────────────────────
-          Lives outside the three labeled groups because it's chrome,
-          not navigation. Connection status + ticker status live in
-          the TopBar — see components/TopBar.tsx. */}
+      {/* ── Footer: account chip + collapse ─────────────────────
+          Everything app-level (Settings, Ticker, Account, Support)
+          lives behind one chip menu — the sidebar's rows stay
+          reserved for sources. */}
       <div
         className={clsx(
-          "shrink-0 border-t border-edge py-2",
-          collapsed ? "px-1" : "px-2",
+          "shrink-0 py-2",
+          collapsed
+            ? "px-1 flex flex-col items-stretch gap-1"
+            : "px-2 flex items-center gap-1",
         )}
       >
+        <OverflowMenu
+          placement={collapsed ? "right-end" : "top-start"}
+          triggerLabel="Account & app"
+          trigger={
+            <AccountChip
+              collapsed={collapsed}
+              tierLabel={TIER_LABELS[tier]}
+              active={isSettings || isTicker || isAccount || isSupport}
+            />
+          }
+          items={[
+            {
+              key: "settings",
+              label: "Settings",
+              icon: Settings,
+              onSelect: onNavigateToSettings,
+            },
+            {
+              key: "ticker",
+              label: "Ticker",
+              icon: RadioTower,
+              onSelect: onNavigateToTicker,
+            },
+            { key: "d1", divider: true },
+            {
+              key: "account",
+              label: "Account",
+              icon: UserCircle,
+              onSelect: onNavigateToAccount,
+            },
+            {
+              key: "support",
+              label: "Support",
+              icon: LifeBuoy,
+              onSelect: onNavigateToSupport,
+            },
+          ]}
+        />
         <Tooltip content={collapsed ? "Expand sidebar" : "Collapse sidebar"} side="right">
           <button
             onClick={toggleCollapsed}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={clsx(
-              "flex items-center w-full rounded-lg text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
+              "flex items-center justify-center shrink-0 rounded-lg text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
               "transition-all duration-150 active:scale-[0.97]",
-              collapsed
-                ? "justify-center py-1.5"
-                : "gap-2.5 px-2.5 py-1.5",
+              collapsed ? "w-full py-1.5" : "w-7 h-7",
             )}
           >
-            <span className="shrink-0 flex items-center justify-center w-5 h-5">
-              {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
-            </span>
-            {!collapsed && (
-              <span className="text-ui-meta font-medium">Collapse</span>
-            )}
+            {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
           </button>
         </Tooltip>
       </div>
@@ -334,23 +332,21 @@ export default function Sidebar({
 
 // ── Nav group ───────────────────────────────────────────────────
 // A labeled section of nav items. Hides the heading when collapsed
-// (a single-character label looks like a glyph). The optional
-// `bordered` flag adds a top divider so visually distinct groups
-// don't blur into each other. Sources is the only group that scrolls
-// — the rest stay shrink-0 so they always sit at their natural size.
+// (a single-character label looks like a glyph). Groups separate by
+// whitespace + headings alone — no divider hairlines on the frame.
+// Sources is the only group that scrolls — the rest stay shrink-0 so
+// they always sit at their natural size.
 
 function NavGroup({
   ariaLabel,
   heading,
   collapsed,
-  bordered = false,
   className,
   children,
 }: {
   ariaLabel: string;
   heading: string;
   collapsed: boolean;
-  bordered?: boolean;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -360,7 +356,6 @@ function NavGroup({
       className={clsx(
         "shrink-0 py-2 space-y-0.5",
         collapsed ? "px-1" : "px-2",
-        bordered && "border-t border-edge",
         className,
       )}
     >
@@ -409,29 +404,194 @@ function NavItem({
           active
             ? accent
               ? "bg-accent/15 text-accent"
-              : "bg-accent/10 text-fg"
+              : "text-fg"
             : accent
               ? "text-accent/85 hover:bg-accent/10 hover:text-accent"
               : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
         )}
       >
-        {/* Active indicator — left accent bar. Uses motion's
-            layoutId so it slides between nav items when the active
-            page changes, instead of popping in/out. The accent CTA
-            already carries its own active treatment so we suppress
-            the bar there to avoid double-emphasis. */}
+        {/* Active indicator — filled pill behind the row. layoutId
+            makes it slide between nav items when the active page
+            changes (same pattern as the TopBar tab pill; z-0 fill +
+            z-10 content so labels stay above it mid-flight). The
+            accent CTA carries its own active treatment so the pill
+            is suppressed there to avoid double-emphasis. */}
         {active && !accent && (
           <motion.span
             layoutId="sidebar-active-indicator"
             transition={{ type: "spring", stiffness: 380, damping: 30 }}
-            className="absolute left-0 top-1.5 bottom-1.5 w-[2.5px] rounded-full bg-accent"
+            className="absolute inset-0 z-0 rounded-lg bg-accent/10"
           />
         )}
-        <span className="shrink-0 flex items-center justify-center w-5 h-5">
+        <span className="relative z-10 shrink-0 flex items-center justify-center w-5 h-5">
           {icon}
         </span>
-        {!collapsed && <span className="truncate">{label}</span>}
+        {!collapsed && <span className="relative z-10 truncate">{label}</span>}
       </button>
     </Tooltip>
   );
 }
+
+// ── Slot chip ───────────────────────────────────────────────────
+// The single add-source affordance, doubling as the slot meter.
+// Collapsed: a `+` with cap dots beneath (●●○ — only for small caps,
+// dots don't scale past 6). Expanded: "+ Add source · 2/3". At cap
+// it flips to the upgrade affordance; unlimited tiers get a plain +.
+// Either way it lands on the catalog, which handles the upsell.
+
+function SlotChip({
+  collapsed,
+  used,
+  cap,
+  active,
+  onClick,
+}: {
+  collapsed: boolean;
+  used: number;
+  cap: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const finite = Number.isFinite(cap);
+  const atCap = finite && used >= cap;
+  const showDots = collapsed && finite && cap <= 6;
+
+  const label = !finite
+    ? "Add a source"
+    : atCap
+      ? `All ${cap} slots used — get more slots`
+      : `${used} of ${cap} slots used — add a source`;
+
+  return (
+    <Tooltip content={collapsed ? label : undefined} side="right">
+      <button
+        onClick={onClick}
+        aria-label={label}
+        className={clsx(
+          "relative flex items-center w-full rounded-lg font-medium",
+          "transition-all duration-150 active:scale-[0.97]",
+          collapsed
+            ? "justify-center py-1.5 px-0"
+            : "gap-2.5 px-2.5 py-1.5 text-ui-body",
+          active
+            ? "bg-accent/15 text-accent"
+            : "text-accent/85 hover:bg-accent/10 hover:text-accent",
+        )}
+      >
+        <span className="shrink-0 flex items-center justify-center w-5 h-5">
+          <Plus size={15} strokeWidth={2.5} />
+        </span>
+        {/* Cap dots pinned to the bottom edge inside the padding, so
+            the chip stays exactly NavItem-height. */}
+        {showDots && (
+          <span
+            className="absolute bottom-[3px] left-1/2 -translate-x-1/2 flex items-center gap-[3px]"
+            aria-hidden
+          >
+            {Array.from({ length: cap }, (_, i) => (
+              <span
+                key={i}
+                className={clsx(
+                  "w-1 h-1 rounded-full",
+                  i < used ? "bg-accent/70" : "bg-edge-2",
+                )}
+              />
+            ))}
+          </span>
+        )}
+        {!collapsed && (
+          <>
+            <span className="truncate">
+              {atCap ? "Get more slots" : "Add source"}
+            </span>
+            {finite && (
+              <span className="ml-auto shrink-0 text-ui-meta text-fg-4">
+                {used}/{cap}
+              </span>
+            )}
+          </>
+        )}
+      </button>
+    </Tooltip>
+  );
+}
+
+// ── Account chip ────────────────────────────────────────────────
+// Footer trigger for the app-level menu (Settings/Ticker/Account/
+// Support). floating-ui injects ref + aria handlers via cloneElement,
+// so this is a forwardRef-compatible button (same pattern as the
+// TopBar's MoreTabsTrigger). `active` marks that one of the menu's
+// pages is currently open.
+
+const AccountChip = forwardRef(function AccountChip(
+  {
+    collapsed,
+    tierLabel,
+    active,
+    ...props
+  }: ButtonHTMLAttributes<HTMLButtonElement> & {
+    collapsed: boolean;
+    tierLabel: string;
+    active: boolean;
+  },
+  ref: Ref<HTMLButtonElement>,
+) {
+  const isOpen =
+    props["aria-expanded"] === true || props["aria-expanded"] === "true";
+
+  // Identity from the token claims — stable for the sidebar's
+  // lifetime (it only renders authenticated). Claude-style two-line
+  // chip: name on top, plan caption beneath.
+  const { name, email } = getUserIdentity();
+  const displayName = name || email?.split("@")[0] || "Account";
+  const initial = displayName.charAt(0).toUpperCase();
+
+  return (
+    <button
+      ref={ref}
+      type="button"
+      {...props}
+      className={clsx(
+        "flex items-center rounded-lg min-w-0",
+        "transition-all duration-150 active:scale-[0.97]",
+        collapsed
+          ? "w-full justify-center py-1.5"
+          : "flex-1 gap-2 px-1.5 py-1",
+        active || isOpen
+          ? "bg-surface-hover"
+          : "hover:bg-surface-hover",
+      )}
+    >
+      {/* Initial avatar */}
+      <span
+        className={clsx(
+          "shrink-0 flex items-center justify-center rounded-full",
+          "bg-accent/15 text-accent text-[11px] font-semibold",
+          collapsed ? "w-6 h-6" : "w-7 h-7",
+        )}
+      >
+        {initial}
+      </span>
+      {!collapsed && (
+        <>
+          <span className="flex flex-col items-start min-w-0 leading-tight">
+            <span className="w-full truncate text-left text-ui-body font-medium text-fg-2">
+              {displayName}
+            </span>
+            <span className="w-full truncate text-left text-ui-meta text-fg-4">
+              {tierLabel} plan
+            </span>
+          </span>
+          <ChevronDown
+            size={11}
+            className="ml-auto shrink-0 text-fg-4"
+            style={{
+              transition: "transform 300ms var(--ease-snap)",
+              transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+            }}
+          />
+        </>
+      )}
+    </button>
+  );
+});
