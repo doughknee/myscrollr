@@ -8,11 +8,11 @@
 #
 #   ingress-nginx ──► website:3000
 #   ingress-nginx ──► core-api:8080
-#   core-api      ──► {sports,rss,fantasy,predictions}-api  (8082-8085)
-#   {channel}-api ──► {channel}-service                  (3002/3004/3005,
-#                                                         health probes)
-#   core-api      ──► finance-service:3001  (finance folded into core,
-#                                            ADR-0002; probe + /finance/health)
+#   core-api      ──► {rss,fantasy}-api  (8083/8084)
+#   rss-api       ──► rss-service:3004   (health probes)
+#   core-api      ──► {finance,sports,predictions}-service  (3001/3002/3005 —
+#                     these Go APIs folded into core, ADR-0002; probes +
+#                     /{source}/health + predictions candlesticks)
 #
 # Everything else inbound is denied by the namespace-wide default-deny.
 # Egress is intentionally unrestricted (policyTypes: [Ingress] everywhere) —
@@ -86,26 +86,6 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-core-to-sports-api
-  namespace: scrollr
-spec:
-  podSelector:
-    matchLabels:
-      app: sports-api
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: core-api
-      ports:
-        - protocol: TCP
-          port: 8082
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
   name: allow-core-to-rss-api
   namespace: scrollr
 spec:
@@ -143,30 +123,12 @@ spec:
         - protocol: TCP
           port: 8084
 ---
+# predictions-api was folded into core-api (ADR-0002, REL-15) — core now
+# probes predictions-service directly (health + candlesticks pass-through).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-core-to-predictions-api
-  namespace: scrollr
-spec:
-  podSelector:
-    matchLabels:
-      app: predictions-api
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: core-api
-      ports:
-        - protocol: TCP
-          port: 8085
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-predictions-api-to-predictions-service
+  name: allow-core-to-predictions-service
   namespace: scrollr
 spec:
   podSelector:
@@ -178,7 +140,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              app: predictions-api
+              app: core-api
       ports:
         - protocol: TCP
           port: 3005
@@ -205,10 +167,12 @@ spec:
         - protocol: TCP
           port: 3001
 ---
+# sports-api was folded into core-api (ADR-0002, REL-15) — core now
+# probes sports-service directly.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-sports-api-to-sports-service
+  name: allow-core-to-sports-service
   namespace: scrollr
 spec:
   podSelector:
@@ -220,7 +184,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              app: sports-api
+              app: core-api
       ports:
         - protocol: TCP
           port: 3002

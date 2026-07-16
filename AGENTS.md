@@ -13,7 +13,7 @@ Monorepo — each component is independently deployable with its own dependencie
 - `api/` — Core gateway API (Go 1.25, Fiber v2, sub-package `core/`)
 - `myscrollr.com/` — Marketing website + auth/billing (React 19, Vite 7, TanStack Router, Tailwind v4)
 - `desktop/` — Tauri v2 desktop app (React 19, Vite 7, TanStack Router + Query, Tailwind v4, Rust backend) — **primary product**
-- `channels/{sports,rss,predictions}/api/` — Channel Go APIs (flat `main` package, independent modules). Finance's Go API was folded into `api/core/finance.go` (ADR-0002, REL-14)
+- `channels/rss/api/` — RSS channel Go API (flat `main` package, independent module). The finance, sports, and predictions Go APIs were folded into `api/core/{finance,sports,predictions}.go` (ADR-0002)
 - `channels/{finance,sports,rss,predictions}/service/` — Rust ingestion services (independent crates, edition 2024; predictions holds the Kalshi credentials and WS sweep)
 - `channels/fantasy/api/` — Fantasy Go API (Yahoo OAuth2, Go-native sync, no Rust service)
 
@@ -42,7 +42,7 @@ npm run tauri:build  # Production build (native binary)
 
 ```sh
 go build -o scrollr_api && ./scrollr_api   # Core: port 8080
-go build -o {name}_api && ./{name}_api     # sports=8082, rss=8083, fantasy=8084, predictions=8085 (finance lives in core)
+go build -o {name}_api && ./{name}_api     # rss=8083, fantasy=8084 (finance/sports/predictions live in core)
 ```
 
 ### Rust Services (`channels/{finance,sports,rss,predictions}/service/`)
@@ -172,7 +172,7 @@ Every component has Sentry wired in. **Privacy is the hard constraint** — see 
 | `desktop/` (webview, both windows) | `@sentry/react` | `scrollr-desktop` (tagged `runtime=webview`, `window=ticker|app`) |
 | `desktop/src-tauri/` (Rust core) | `sentry@0.42` crate | `scrollr-desktop` (tagged `runtime=rust-core`) |
 | `api/` (core Go) | `sentry-go@v0.46` + `sentry-go/fiber` | `scrollr-core-api` |
-| `channels/{sports,rss,fantasy}/api/` | `sentry-go@v0.46` + `sentry-go/fiber` | `scrollr-{name}-api` (finance reports under `scrollr-core-api` since ADR-0002) |
+| `channels/{rss,fantasy}/api/` | `sentry-go@v0.46` + `sentry-go/fiber` | `scrollr-{name}-api` (finance/sports/predictions report under `scrollr-core-api` since ADR-0002) |
 | `channels/{finance,sports,rss}/service/` | `sentry@0.42` + `sentry-anyhow@0.42` Rust crates | `scrollr-{name}-svc` |
 | `channels/predictions/{api,service}/` | same wiring as the other channels | none yet — `PREDICTIONS_*_SENTRY_DSN` env vars exist but are unset (no Sentry project created) |
 

@@ -31,18 +31,12 @@ jobs:
           - dir: api/core
             modroot: api
             module: github.com/brandon-relentnet/myscrollr/api
-          - dir: channels/sports/api
-            modroot: channels/sports/api
-            module: github.com/brandon-relentnet/scrollr-sports
           - dir: channels/rss/api
             modroot: channels/rss/api
             module: github.com/brandon-relentnet/scrollr-rss
           - dir: channels/fantasy/api
             modroot: channels/fantasy/api
             module: github.com/brandon-relentnet/scrollr-fantasy
-          - dir: channels/predictions/api
-            modroot: channels/predictions/api
-            module: github.com/brandon-relentnet/scrollr-predictions
 
     runs-on: ubuntu-latest
     defaults:

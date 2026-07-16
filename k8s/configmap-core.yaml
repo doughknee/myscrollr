@@ -23,6 +23,8 @@ data:
   # Rust ingestion services core probes directly (local widget sources,
   # ADR-0002). Moved from channels-config as each Go channel API folds in.
   INTERNAL_FINANCE_URL: "http://finance-service:3001"
+  INTERNAL_SPORTS_URL: "http://sports-service:3002"
+  INTERNAL_PREDICTIONS_URL: "http://predictions-service:3005"
 
   # Logto role IDs (not secret, just config)
   LOGTO_UPLINK_ROLE_ID: "x8qz9zmdthw19n10dqnr5"

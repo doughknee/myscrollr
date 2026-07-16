@@ -180,6 +180,8 @@ func (s *Server) setupRoutes() {
 	// ahead of the dynamic proxy so they win over any still-registered
 	// legacy channel service during cutover.
 	RegisterFinanceRoutes(s.App)
+	RegisterSportsRoutes(s.App)
+	RegisterPredictionsRoutes(s.App)
 
 	// --- Public Routes ---
 	s.App.Get("/health", s.healthCheck)

@@ -289,7 +289,7 @@ func (h *Hub) handleTopicMessage(topic string, payload []byte) {
 //
 //	cache:dashboard:<user>   — core's aggregated /dashboard response
 //	cache:finance:<user>     — the finance source's per-user dashboard cache (finance.go)
-//	cache:sports:<user>      — sports-api's /internal/dashboard cache
+//	cache:sports:<user>      — the sports source's per-user dashboard cache (sports.go)
 //	cache:rss:<user>         — rss-api's /internal/dashboard cache
 //
 // Without clearing ALL of them, a desktop safety-net refetch (triggered
