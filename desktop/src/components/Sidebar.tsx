@@ -43,8 +43,9 @@ import ContextMenu from "./ContextMenu";
 import OverflowMenu from "./OverflowMenu";
 import type { ChannelManifest, WidgetManifest } from "../types";
 import { loadPref, savePref } from "../preferences";
-import { TIER_LABELS } from "../auth";
+import { TIER_LABELS, getUserIdentity } from "../auth";
 import type { SubscriptionTier } from "../auth";
+import { getMaxWidgets } from "../tierLimits";
 
 // ── Props ───────────────────────────────────────────────────────
 
@@ -142,6 +143,15 @@ export default function Sidebar({
     savePref("sidebarCollapsed", next);
   }
 
+  // Unused widget slots, rendered as ghost rows under the sources so
+  // a small-cap rail (free = 3) reads as room-to-fill instead of
+  // empty space. Capped at 3 ghosts so larger tiers don't get a
+  // ladder; unlimited tiers get none.
+  const slotCap = getMaxWidgets(tier);
+  const emptySlots = Number.isFinite(slotCap)
+    ? Math.min(3, Math.max(0, slotCap - sources.length))
+    : 0;
+
   return (
     <aside
       className={clsx(
@@ -170,33 +180,43 @@ export default function Sidebar({
         collapsed={collapsed}
         className="flex-1 overflow-y-auto scrollbar-thin"
       >
-        {sources.length > 0 ? (
-          sources.map((source) => (
-            <NavItem
-              key={source.id}
-              icon={
-                <span style={{ color: source.hex }}>
-                  <source.icon size={15} />
-                </span>
-              }
-              label={source.name}
-              active={activeItem === source.id}
-              collapsed={collapsed}
-              onClick={() => onSelectItem(source.id, source.kind)}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                setMenu({ source, x: e.clientX, y: e.clientY });
-              }}
-            />
-          ))
-        ) : (
-          !collapsed && (
-            <p className="px-2.5 text-ui-meta leading-snug">
-              No sources yet. Use{" "}
-              <span className="font-medium text-accent">Add source</span>{" "}
-              to get started.
-            </p>
-          )
+        {sources.map((source) => (
+          <NavItem
+            key={source.id}
+            icon={
+              <span style={{ color: source.hex }}>
+                <source.icon size={15} />
+              </span>
+            }
+            label={source.name}
+            active={activeItem === source.id}
+            collapsed={collapsed}
+            onClick={() => onSelectItem(source.id, source.kind)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenu({ source, x: e.clientX, y: e.clientY });
+            }}
+          />
+        ))}
+
+        {/* Ghost slots — the slot model made visible. Each unused
+            slot is a dashed affordance into the catalog. */}
+        {Array.from({ length: emptySlots }, (_, i) => (
+          <GhostSlot
+            key={`ghost-${i}`}
+            collapsed={collapsed}
+            onClick={onNavigateToMarketplace}
+          />
+        ))}
+
+        {/* Unlimited tiers get no ghosts — keep a text nudge when
+            the rail would otherwise be completely empty. */}
+        {sources.length === 0 && emptySlots === 0 && !collapsed && (
+          <p className="px-2.5 text-ui-meta leading-snug">
+            No sources yet. Use{" "}
+            <span className="font-medium text-accent">Add source</span>{" "}
+            to get started.
+          </p>
         )}
       </NavGroup>
 
@@ -423,6 +443,40 @@ function NavItem({
   );
 }
 
+// ── Ghost slot ──────────────────────────────────────────────────
+// An unused widget slot. Slightly shorter and quieter than a real
+// source row so it recedes; hover pulls it toward the accent to read
+// as "add something here".
+
+function GhostSlot({
+  collapsed,
+  onClick,
+}: {
+  collapsed: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip content={collapsed ? "Empty slot — add a source" : undefined} side="right">
+      <button
+        onClick={onClick}
+        aria-label="Empty slot — add a source"
+        className={clsx(
+          "flex items-center w-full rounded-lg border border-dashed border-edge-2/70 text-fg-4",
+          "hover:border-accent/50 hover:text-fg-3 transition-colors duration-150",
+          collapsed
+            ? "justify-center py-1"
+            : "gap-2.5 px-2.5 py-1 text-ui-meta",
+        )}
+      >
+        <span className="shrink-0 flex items-center justify-center w-5 h-5">
+          <Plus size={13} />
+        </span>
+        {!collapsed && <span className="truncate">Empty slot</span>}
+      </button>
+    </Tooltip>
+  );
+}
+
 // ── Account chip ────────────────────────────────────────────────
 // Footer trigger for the app-level menu (Settings/Ticker/Account/
 // Support). floating-ui injects ref + aria handlers via cloneElement,
@@ -445,31 +499,50 @@ const AccountChip = forwardRef(function AccountChip(
 ) {
   const isOpen =
     props["aria-expanded"] === true || props["aria-expanded"] === "true";
+
+  // Identity from the token claims — stable for the sidebar's
+  // lifetime (it only renders authenticated). Claude-style two-line
+  // chip: name on top, plan caption beneath.
+  const { name, email } = getUserIdentity();
+  const displayName = name || email?.split("@")[0] || "Account";
+  const initial = displayName.charAt(0).toUpperCase();
+
   return (
     <button
       ref={ref}
       type="button"
       {...props}
       className={clsx(
-        "flex items-center rounded-lg font-medium min-w-0",
+        "flex items-center rounded-lg min-w-0",
         "transition-all duration-150 active:scale-[0.97]",
         collapsed
           ? "w-full justify-center py-1.5"
-          : "flex-1 gap-2.5 px-2.5 py-1.5 text-ui-body",
+          : "flex-1 gap-2 px-1.5 py-1",
         active || isOpen
-          ? "bg-surface-hover text-fg"
-          : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
+          ? "bg-surface-hover"
+          : "hover:bg-surface-hover",
       )}
     >
-      <span className="shrink-0 flex items-center justify-center w-5 h-5">
-        <UserCircle size={15} />
+      {/* Initial avatar */}
+      <span
+        className={clsx(
+          "shrink-0 flex items-center justify-center rounded-full",
+          "bg-accent/15 text-accent text-[11px] font-semibold",
+          collapsed ? "w-6 h-6" : "w-7 h-7",
+        )}
+      >
+        {initial}
       </span>
       {!collapsed && (
         <>
-          {/* The tier IS the label (Claude-style plan chip) —
-              "Account" + tier + chevron doesn't fit the 200px rail,
-              and "Uplink Ultimate" + "plan" wouldn't either. */}
-          <span className="truncate">{tierLabel}</span>
+          <span className="flex flex-col items-start min-w-0 leading-tight">
+            <span className="w-full truncate text-left text-ui-body font-medium text-fg-2">
+              {displayName}
+            </span>
+            <span className="w-full truncate text-left text-ui-meta text-fg-4">
+              {tierLabel} plan
+            </span>
+          </span>
           <ChevronDown
             size={11}
             className="ml-auto shrink-0 text-fg-4"
