@@ -234,12 +234,18 @@ func callChannelLifecycle(ctx context.Context, channelType, event, userSub strin
 	// themselves.
 	source := DataSourceForWidget(channelType)
 
-	// Local widget sources (ADR-0002): the only live behavior of the HTTP
-	// lifecycle contract was per-user cache invalidation (Appendix A) —
-	// subscriber-set maintenance had no readers. "created" and "sync"
-	// events only touched those dead sets, so they are no-ops here.
+	// Local widget sources (ADR-0002): most sources only need per-user
+	// cache invalidation (the one live behavior of the HTTP lifecycle
+	// contract — Appendix A); rss provides a full lifecycle hook because
+	// it also syncs custom feeds into the polling-target tables.
 	if src, ok := localSources[source]; ok {
-		if src.invalidateUser != nil && (event == "updated" || event == "deleted") {
+		if src.lifecycle != nil {
+			enabledVal := false
+			if enabled != nil {
+				enabledVal = *enabled
+			}
+			src.lifecycle(event, userSub, config, oldConfig, enabledVal)
+		} else if src.invalidateUser != nil && (event == "updated" || event == "deleted") {
 			src.invalidateUser(userSub)
 		}
 		return

@@ -31,9 +31,15 @@ type localSource struct {
 	health func(ctx context.Context) (status string, healthy bool)
 
 	// invalidateUser drops the source's per-user caches after a channel
-	// config change — the only live behavior of the retired HTTP
-	// lifecycle contract (ADR-0002 Appendix A).
+	// config change — for most sources the only live behavior of the
+	// retired HTTP lifecycle contract (ADR-0002 Appendix A).
 	invalidateUser func(userSub string)
+
+	// lifecycle, when set, receives the full channel lifecycle event and
+	// takes precedence over invalidateUser. Only rss needs it — its
+	// lifecycle syncs the user's custom feeds into the polling-target
+	// tables in addition to cache invalidation.
+	lifecycle func(event, userSub string, config, oldConfig map[string]interface{}, enabled bool)
 }
 
 // localSources is keyed by data-source name (the values returned by
@@ -42,6 +48,7 @@ var localSources = map[string]localSource{
 	"finance":     financeSource,
 	"sports":      sportsSource,
 	"predictions": predictionsSource,
+	"rss":         rssSource,
 }
 
 // isLocalSource reports whether a discovered channel name is served

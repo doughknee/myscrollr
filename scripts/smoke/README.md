@@ -27,7 +27,6 @@ READINESS_TIMEOUT=30 scripts/smoke/production-readiness.sh
 | `sports-service` | `/health/ready` | 3002 |
 | `finance-service` | `/health/ready` | 3001 |
 | `rss-service` | `/health/ready` | 3004 |
-| `rss-api` | `/internal/health` | 8083 |
 | `fantasy-api` | `/internal/health` | 8084 |
 
 These are the same endpoints Kubernetes' `readinessProbe` hits for each

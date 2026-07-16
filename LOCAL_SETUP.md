@@ -32,8 +32,8 @@ windows. `make help` lists everything. Day-to-day:
 | `make clean` | Stop **and wipe** the Postgres + Redis volumes. |
 | `make web` / `make desktop` | Run the front-ends natively. |
 
-**Ports** (host): core `18080` (serves `/finance/*`, `/sports/*`, and
-`/predictions/*` natively per ADR-0002), rss `8083`, fantasy `8084`,
+**Ports** (host): core `18080` (serves `/finance/*`, `/sports/*`, `/rss/*`,
+and `/predictions/*` natively per ADR-0002), fantasy `8084`,
 site `3000`. Postgres `5432`, Redis `6379`.
 
 ### Prereqs (one-time)
@@ -148,8 +148,8 @@ against the **local** API with your real account + tier.
 ## Milestone 2 — Live channel data (all four channels local)
 
 All data channels run locally against the **same** Postgres/Redis as the
-Core API. rss and fantasy each have a **Go API** (registers itself in
-Redis; the Core discovers + proxies it); the finance, sports, and
+Core API. fantasy is the one remaining **Go API** (registers itself in
+Redis; the Core discovers + proxies it); the finance, sports, rss, and
 predictions Go APIs were folded into core (ADR-0002). finance/sports/rss/
 predictions each have a **Rust ingester** (polls the provider, writes
 rows). Fantasy is Go-native (in-process sync).
@@ -158,7 +158,7 @@ rows). Fantasy is Go-native (in-process sync).
 
 | Channel | Go API | Rust ingester | Provider secret |
 |---|---|---|---|
-| rss     | 8083     | 3004 | none (public feeds) |
+| rss     | (in core) | 3004 | none (public feeds) |
 | finance | (in core) | 3001 | `TWELVEDATA_API_KEY` |
 | sports  | (in core) | 3002 | `API_SPORTS_KEY` |
 | fantasy | 8084     | —    | `YAHOO_CLIENT_ID` / `YAHOO_CLIENT_SECRET` |
@@ -186,22 +186,22 @@ processes read it and would collide; pass the Go API's port inline instead.
 ```bash
 GO="$LOCALAPPDATA/go-toolchain/go/bin/go.exe"
 
-# rss (no key — the only remaining channel Go API besides fantasy)   fantasy (Go-native)
+# Rust ingesters                                                       fantasy (Go-native)
 ( cd channels/rss/service     && set -a && . ../.env && set +a && cargo run )              # :3004
-( cd channels/rss/api         && set -a && . ../.env && set +a && "$GO" run . )            # :8083
 ( cd channels/finance/service && set -a && . ../.env && set +a && cargo run )              # :3001
 ( cd channels/sports/service  && set -a && . ../.env && set +a && cargo run )              # :3002
 ( cd channels/fantasy/api     && set -a && . ../.env && set +a && "$GO" run . )            # :8084
 ```
 
-The finance, sports, and predictions Go APIs were folded into core
-(ADR-0002): core serves `/finance/*`, `/sports/*`, and `/predictions/*`
-itself and probes the Rust ingesters via `INTERNAL_{FINANCE,SPORTS,
-PREDICTIONS}_URL` (set them in `api/.env`, e.g. `http://localhost:3001`;
-unset means core reports that source healthy without probing).
+The finance, sports, rss, and predictions Go APIs were folded into core
+(ADR-0002): core serves `/finance/*`, `/sports/*`, `/rss/*`, and
+`/predictions/*` itself and probes the Rust ingesters via
+`INTERNAL_{FINANCE,SPORTS,RSS,PREDICTIONS}_URL` (set them in `api/.env`,
+e.g. `http://localhost:3001`; unset means core reports that source
+healthy without probing). Core also runs the RSS janitor (Redis-locked).
 
-The Core logs `[Discovery] Channels updated: 2 active [fantasy,rss]`
-within ~10s of each Go API starting.
+The Core logs `[Discovery] Channels updated: 1 active [fantasy]`
+within ~10s of the fantasy API starting.
 
 ### Gotchas (hit and fixed)
 

@@ -78,7 +78,6 @@ SERVICES=(
     "sports-service  13002  3002  /health/ready"
     "finance-service 13001  3001  /health/ready"
     "rss-service     13004  3004  /health/ready"
-    "rss-api         18083  8083  /internal/health"
     "fantasy-api     18084  8084  /internal/health"
     "predictions-service 13005 3005 /health/ready"
 )

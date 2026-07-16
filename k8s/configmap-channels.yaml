@@ -9,13 +9,9 @@ data:
   FRONTEND_URL: "https://myscrollr.com"
 
   # Channel API self-registration URLs (K8s Service DNS)
-  # (finance/sports/predictions APIs folded into core-api — ADR-0002)
-  RSS_CHANNEL_URL: "http://rss-api:8083"
+  # (finance/sports/rss/predictions APIs folded into core-api — ADR-0002;
+  # fantasy is the one remaining channel service)
   FANTASY_CHANNEL_URL: "http://fantasy-api:8084"
-
-  # Go API -> Rust service internal URLs (K8s Service DNS)
-  # (finance/sports/predictions moved to core-config — ADR-0002)
-  INTERNAL_RSS_URL: "http://rss-service:3004"
 
   # Fantasy-specific
   YAHOO_CALLBACK_URL: "https://api.myscrollr.com/yahoo/callback"
