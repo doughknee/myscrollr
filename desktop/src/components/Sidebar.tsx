@@ -196,7 +196,6 @@ export default function Sidebar({
         ariaLabel="Workspace"
         heading="Workspace"
         collapsed={collapsed}
-        bordered
       >
         <NavItem
           icon={<Plus size={15} strokeWidth={2.5} />}
@@ -227,7 +226,6 @@ export default function Sidebar({
         ariaLabel="Account"
         heading="Account"
         collapsed={collapsed}
-        bordered
       >
         <NavItem
           icon={<UserCircle size={15} />}
@@ -251,7 +249,7 @@ export default function Sidebar({
           the TopBar — see components/TopBar.tsx. */}
       <div
         className={clsx(
-          "shrink-0 border-t border-edge py-2",
+          "shrink-0 py-2",
           collapsed ? "px-1" : "px-2",
         )}
       >
@@ -334,23 +332,21 @@ export default function Sidebar({
 
 // ── Nav group ───────────────────────────────────────────────────
 // A labeled section of nav items. Hides the heading when collapsed
-// (a single-character label looks like a glyph). The optional
-// `bordered` flag adds a top divider so visually distinct groups
-// don't blur into each other. Sources is the only group that scrolls
-// — the rest stay shrink-0 so they always sit at their natural size.
+// (a single-character label looks like a glyph). Groups separate by
+// whitespace + headings alone — no divider hairlines on the frame.
+// Sources is the only group that scrolls — the rest stay shrink-0 so
+// they always sit at their natural size.
 
 function NavGroup({
   ariaLabel,
   heading,
   collapsed,
-  bordered = false,
   className,
   children,
 }: {
   ariaLabel: string;
   heading: string;
   collapsed: boolean;
-  bordered?: boolean;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -360,7 +356,6 @@ function NavGroup({
       className={clsx(
         "shrink-0 py-2 space-y-0.5",
         collapsed ? "px-1" : "px-2",
-        bordered && "border-t border-edge",
         className,
       )}
     >
@@ -409,28 +404,29 @@ function NavItem({
           active
             ? accent
               ? "bg-accent/15 text-accent"
-              : "bg-accent/10 text-fg"
+              : "text-fg"
             : accent
               ? "text-accent/85 hover:bg-accent/10 hover:text-accent"
               : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
         )}
       >
-        {/* Active indicator — left accent bar. Uses motion's
-            layoutId so it slides between nav items when the active
-            page changes, instead of popping in/out. The accent CTA
-            already carries its own active treatment so we suppress
-            the bar there to avoid double-emphasis. */}
+        {/* Active indicator — filled pill behind the row. layoutId
+            makes it slide between nav items when the active page
+            changes (same pattern as the TopBar tab pill; z-0 fill +
+            z-10 content so labels stay above it mid-flight). The
+            accent CTA carries its own active treatment so the pill
+            is suppressed there to avoid double-emphasis. */}
         {active && !accent && (
           <motion.span
             layoutId="sidebar-active-indicator"
             transition={{ type: "spring", stiffness: 380, damping: 30 }}
-            className="absolute left-0 top-1.5 bottom-1.5 w-[2.5px] rounded-full bg-accent"
+            className="absolute inset-0 z-0 rounded-lg bg-accent/10"
           />
         )}
-        <span className="shrink-0 flex items-center justify-center w-5 h-5">
+        <span className="relative z-10 shrink-0 flex items-center justify-center w-5 h-5">
           {icon}
         </span>
-        {!collapsed && <span className="truncate">{label}</span>}
+        {!collapsed && <span className="relative z-10 truncate">{label}</span>}
       </button>
     </Tooltip>
   );
