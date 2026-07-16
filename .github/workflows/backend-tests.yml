@@ -31,9 +31,6 @@ jobs:
           - dir: api/core
             modroot: api
             module: github.com/brandon-relentnet/myscrollr/api
-          - dir: channels/rss/api
-            modroot: channels/rss/api
-            module: github.com/brandon-relentnet/scrollr-rss
           - dir: channels/fantasy/api
             modroot: channels/fantasy/api
             module: github.com/brandon-relentnet/scrollr-fantasy

@@ -49,9 +49,10 @@ services:
       PORT: "8080"
       DATABASE_URL: *db-url
       REDIS_URL: *redis-url
-      # Local widget sources inside core (ADR-0002, REL-14/15)
+      # Local widget sources inside core (ADR-0002, REL-14/15/16)
       INTERNAL_FINANCE_URL: "http://finance-service:3001"
       INTERNAL_SPORTS_URL: "http://sports-service:3002"
+      INTERNAL_RSS_URL: "http://rss-service:3004"
       INTERNAL_PREDICTIONS_URL: "http://predictions-service:3005"
     ports: ["18080:8080"]
     depends_on: *needs-db-redis
@@ -70,26 +71,7 @@ services:
     depends_on: *needs-db
     restart: unless-stopped
 
-  rss-api:
-    build:
-      context: ./channels/rss/api
-    container_name: scrollr-rss-api
-    env_file: [channels/rss/.env]
-    environment:
-      PORT: "8083"
-      DATABASE_URL: *db-url
-      REDIS_URL: *redis-url
-      CHANNEL_URL: "http://rss-api:8083"
-      INTERNAL_RSS_URL: "http://rss-service:3004"
-    ports: ["8083:8083"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      rss-service:
-        condition: service_started
-    restart: unless-stopped
+  # (rss-api folded into core-api — ADR-0002, REL-16)
 
   # ── Finance ─────────────────────────────────────────────────────────
   # The Go API listens on 8081 inside the container but is PUBLISHED on 8181

@@ -8,11 +8,11 @@
 #
 #   ingress-nginx ──► website:3000
 #   ingress-nginx ──► core-api:8080
-#   core-api      ──► {rss,fantasy}-api  (8083/8084)
-#   rss-api       ──► rss-service:3004   (health probes)
-#   core-api      ──► {finance,sports,predictions}-service  (3001/3002/3005 —
-#                     these Go APIs folded into core, ADR-0002; probes +
-#                     /{source}/health + predictions candlesticks)
+#   core-api      ──► fantasy-api:8084  (the one remaining channel service)
+#   core-api      ──► {finance,sports,rss,predictions}-service  (3001/3002/
+#                     3004/3005 — the widget read APIs folded into core,
+#                     ADR-0002; health probes + /{source}/health +
+#                     predictions candlesticks)
 #
 # Everything else inbound is denied by the namespace-wide default-deny.
 # Egress is intentionally unrestricted (policyTypes: [Ingress] everywhere) —
@@ -82,26 +82,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-core-to-rss-api
-  namespace: scrollr
-spec:
-  podSelector:
-    matchLabels:
-      app: rss-api
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: core-api
-      ports:
-        - protocol: TCP
-          port: 8083
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -192,7 +172,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-rss-api-to-rss-service
+  name: allow-core-to-rss-service
   namespace: scrollr
 spec:
   podSelector:
@@ -204,7 +184,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              app: rss-api
+              app: core-api
       ports:
         - protocol: TCP
           port: 3004

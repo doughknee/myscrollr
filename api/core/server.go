@@ -182,6 +182,7 @@ func (s *Server) setupRoutes() {
 	RegisterFinanceRoutes(s.App)
 	RegisterSportsRoutes(s.App)
 	RegisterPredictionsRoutes(s.App)
+	RegisterRSSRoutes(s.App)
 
 	// --- Public Routes ---
 	s.App.Get("/health", s.healthCheck)

@@ -88,6 +88,10 @@ func main() {
 	// pods otherwise grow this table unboundedly between restarts.
 	core.StartWebhookEventsPruner(ctx)
 
+	// RSS auto-cleanup janitor (moved in-process with the rss fold,
+	// ADR-0002 REL-16). Redis-locked so only one replica sweeps.
+	core.StartRSSJanitor(ctx)
+
 	// Register Discord slash commands (idempotent on every boot when
 	// configured). No-op if Discord env vars aren't set.
 	core.RegisterDiscordSlashCommandsAtBoot(ctx)
