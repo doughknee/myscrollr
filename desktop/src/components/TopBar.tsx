@@ -2,14 +2,14 @@
  * TopBar — the app's primary chrome row.
  *
  * Layout:
- *   [logo + Scrollr] | [←][→] | breadcrumb · subtitle    [entityAction] | [Ticker] [📌] | [●Connected]
+ *   [logo + Scrollr] | [←][→] | breadcrumb · subtitle    [entityAction] | [Ticker] | [⚡]
  *
  * The TopBar is the single canonical home for:
  *   - Brand mark (clickable → Home)
  *   - Forward/back navigation (Spotify-style)
  *   - Page identity (where am I — published via PageContext)
  *   - Page-level entity action (Trash on source pages)
- *   - Ambient toggles (ticker on/off, pin)
+ *   - Ambient toggles (ticker on/off)
  *   - Connection status
  *
  * Page-level chrome (title + breadcrumb) used to live inside the
@@ -18,7 +18,7 @@
  */
 import { forwardRef, useLayoutEffect, useRef, useState } from "react";
 import type { ButtonHTMLAttributes, Ref } from "react";
-import { ArrowLeft, ArrowRight, ChevronDown, Pin, Radio, RadioTower } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, Radio, RadioTower } from "lucide-react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "motion/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -35,7 +35,6 @@ import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
 
 interface TopBarProps {
   tickerOn: boolean;
-  pinned: boolean;
   health: DeliveryHealth;
   canBack: boolean;
   canForward: boolean;
@@ -48,7 +47,6 @@ interface TopBarProps {
   onBack: () => void;
   onForward: () => void;
   onToggleTicker: () => void;
-  onTogglePin: () => void;
 }
 
 // ── Frameless-window drag region ────────────────────────────────
@@ -72,7 +70,6 @@ function handleDragRegion(e: React.MouseEvent) {
 
 export default function TopBar({
   tickerOn,
-  pinned,
   health,
   canBack,
   canForward,
@@ -83,7 +80,6 @@ export default function TopBar({
   onBack,
   onForward,
   onToggleTicker,
-  onTogglePin,
 }: TopBarProps) {
   const page = usePageIdentity();
 
@@ -272,35 +268,6 @@ export default function TopBar({
           >
             {tickerOn ? <RadioTower size={12} /> : <Radio size={12} />}
             <span>Ticker</span>
-          </button>
-        </Tooltip>
-
-        <Tooltip
-          content={
-            pinned ? "Stop keeping window above others" : "Keep window above other windows"
-          }
-          side="bottom"
-        >
-          <button
-            type="button"
-            role="switch"
-            aria-checked={pinned}
-            onClick={onTogglePin}
-            aria-label={pinned ? "Unpin window" : "Pin window on top"}
-            className={clsx(
-              "flex items-center justify-center w-7 h-7 rounded-md transition-all duration-200 active:scale-90",
-              pinned
-                ? "bg-info/15 text-info hover:bg-info/20"
-                : "text-fg-4 hover:text-fg-2 hover:bg-surface-hover",
-            )}
-          >
-            <Pin
-              size={12}
-              className={clsx(
-                "transition-transform duration-200",
-                pinned && "fill-current rotate-45",
-              )}
-            />
           </button>
         </Tooltip>
 

@@ -808,13 +808,6 @@ function RootLayout() {
     });
   }, [prefs, persistPrefs]);
 
-  const handlePinToggle = useCallback(() => {
-    persistPrefs({
-      ...prefs,
-      window: { ...prefs.window, pinned: !prefs.window.pinned },
-    });
-  }, [prefs, persistPrefs]);
-
   // ── Shell context values (split: stable + volatile) ────────
 
   const shellStableValue = useMemo(
@@ -887,11 +880,12 @@ function RootLayout() {
           {/* TopBar — primary chrome row spanning the full window.
               Houses the Scrollr brand mark, Spotify-style forward/back
               navigation, page-identity breadcrumb (read from
-              PageContext), entityAction, and the ambient ticker/pin/
-              connection controls. Always visible regardless of route. */}
+              PageContext), entityAction, and the ambient ticker +
+              connection controls. Always visible regardless of route.
+              (Always-on-top moved to Settings → Window — the chrome
+              button wasn't earning its slot.) */}
           <TopBar
             tickerOn={prefs.ticker.showTicker}
-            pinned={prefs.window.pinned}
             health={deliveryHealth}
             canBack={navHistory.canBack}
             canForward={navHistory.canForward}
@@ -902,7 +896,6 @@ function RootLayout() {
             onBack={navHistory.back}
             onForward={navHistory.forward}
             onToggleTicker={handleTickerToggle}
-            onTogglePin={handlePinToggle}
           />
 
           <div className="flex flex-1 min-h-0 overflow-hidden gap-1.5 pr-1.5 pb-1.5">

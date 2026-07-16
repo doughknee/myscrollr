@@ -69,7 +69,10 @@ export default function ConnectionIndicator({
         className={clsx(
           "flex items-center justify-center gap-1.5 h-7 rounded-md select-none transition-colors",
           degraded ? "px-2" : "w-7",
-          meta.text,
+          // Healthy states sit quietly in the chrome like every other
+          // icon; state color is reserved for degraded states (and the
+          // status page's tile, which is a hero, not chrome).
+          degraded ? meta.text : "text-fg-4 hover:text-fg-2",
           active ? "bg-surface-hover" : "hover:bg-surface-hover",
           className,
         )}
