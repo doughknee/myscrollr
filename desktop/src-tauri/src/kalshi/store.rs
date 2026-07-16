@@ -12,8 +12,6 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use super::KalshiEnv;
-
 /// Keychain service name (the "target" on Windows Credential Manager).
 const SERVICE: &str = "com.myscrollr.desktop.kalshi";
 /// Meta entry: holds the chunk count and acts as the "connected" marker.
@@ -33,11 +31,12 @@ const CHUNK_CHARS: usize = 1000;
 /// `Debug` is implemented manually to REDACT the PEM — so an accidental
 /// `{:?}` (a log line, a `.unwrap()` panic, a Sentry capture) can never leak
 /// the private key. Do not derive `Debug` here.
+/// Older blobs also carried an `env: "prod" | "demo"` field; serde
+/// ignores unknown fields on load, so pre-existing keychain entries
+/// remain readable after the env plumbing was removed (prod-only).
 #[derive(Serialize, Deserialize, Clone)]
 pub struct StoredCredential {
     pub key_id: String,
-    /// "prod" | "demo".
-    pub env: String,
     /// PEM-encoded RSA private key. SECRET — never log, never return to JS.
     pub pem: String,
 }
@@ -46,15 +45,8 @@ impl std::fmt::Debug for StoredCredential {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StoredCredential")
             .field("key_id", &self.key_id)
-            .field("env", &self.env)
             .field("pem", &"<redacted>")
             .finish()
-    }
-}
-
-impl StoredCredential {
-    pub fn env(&self) -> KalshiEnv {
-        KalshiEnv::parse(&self.env)
     }
 }
 
@@ -64,7 +56,6 @@ impl StoredCredential {
 pub struct CredentialStatus {
     pub connected: bool,
     pub key_id: Option<String>,
-    pub env: Option<String>,
 }
 
 impl CredentialStatus {
@@ -72,7 +63,6 @@ impl CredentialStatus {
         CredentialStatus {
             connected: false,
             key_id: None,
-            env: None,
         }
     }
 }
@@ -149,7 +139,6 @@ pub fn status() -> Result<CredentialStatus> {
         Some(cred) => CredentialStatus {
             connected: true,
             key_id: Some(cred.key_id),
-            env: Some(cred.env),
         },
         None => CredentialStatus::disconnected(),
     })
@@ -185,7 +174,6 @@ mod tests {
     fn debug_redacts_the_pem() {
         let c = StoredCredential {
             key_id: "my-key-id".into(),
-            env: "prod".into(),
             pem: "-----BEGIN RSA PRIVATE KEY-----SECRETMATERIAL".into(),
         };
         let printed = format!("{c:?}");
@@ -198,13 +186,21 @@ mod tests {
     fn serde_round_trip_preserves_fields() {
         let c = StoredCredential {
             key_id: "kid".into(),
-            env: "demo".into(),
             pem: "PEMDATA".into(),
         };
         let json = serde_json::to_string(&c).expect("serialize");
         let back: StoredCredential = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(back.key_id, "kid");
         assert_eq!(back.pem, "PEMDATA");
-        assert_eq!(back.env(), KalshiEnv::Demo);
+    }
+
+    #[test]
+    fn legacy_blob_with_env_field_still_loads() {
+        // Pre-env-removal keychain blobs carried `"env":"prod"` — they
+        // must keep deserializing after the field was dropped.
+        let json = r#"{"key_id":"kid","env":"prod","pem":"PEMDATA"}"#;
+        let back: StoredCredential = serde_json::from_str(json).expect("deserialize legacy blob");
+        assert_eq!(back.key_id, "kid");
+        assert_eq!(back.pem, "PEMDATA");
     }
 }

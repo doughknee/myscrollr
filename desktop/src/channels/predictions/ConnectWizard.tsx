@@ -121,7 +121,7 @@ export default function ConnectWizard({ onConnected, hex }: ConnectWizardProps) 
       setStatus("ok");
       // Brief success beat, then hand control to the panel.
       setTimeout(() => {
-        onConnected({ connected: true, key_id: result.key_id, env: result.env });
+        onConnected({ connected: true, key_id: result.key_id });
       }, 1200);
     } catch (err) {
       // The backend returns already-friendly, plain-language messages.

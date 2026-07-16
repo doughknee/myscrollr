@@ -119,28 +119,20 @@ export function truncate(text: string, maxLen: number): string {
  * Abbreviate a large count with a K/M/B suffix (e.g. 12_400 → "12.4K",
  * 3_000_000 → "3M"). Values below 1,000 render as-is. Used by the
  * Predictions channel to keep volume glanceable in dense rows.
+ *
+ * Locale is pinned to en-US so the suffixes stay K/M/B (matching the
+ * rest of the app's hand-formatted output) regardless of OS locale.
  */
+const compactNumberFormat = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
 export function formatCompactNumber(value: number | string | undefined): string {
   if (value == null) return "";
   const num = typeof value === "string" ? parseFloat(value) : value;
   if (isNaN(num)) return String(value);
-  const abs = Math.abs(num);
-  if (abs < 1_000) return String(Math.round(num));
-  const units: Array<{ limit: number; suffix: string }> = [
-    { limit: 1_000_000_000, suffix: "B" },
-    { limit: 1_000_000, suffix: "M" },
-    { limit: 1_000, suffix: "K" },
-  ];
-  for (const { limit, suffix } of units) {
-    if (abs >= limit) {
-      const scaled = num / limit;
-      // One decimal under 10x the unit, none above (keeps it tight).
-      const str =
-        Math.abs(scaled) < 10 ? scaled.toFixed(1) : Math.round(scaled).toString();
-      return `${str.replace(/\.0$/, "")}${suffix}`;
-    }
-  }
-  return String(Math.round(num));
+  return compactNumberFormat.format(num);
 }
 
 /**

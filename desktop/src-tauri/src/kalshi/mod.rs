@@ -20,57 +20,16 @@ pub mod store;
 pub mod ws;
 
 /// REST host (no path). Production, dedicated external-API host.
+/// (Kalshi also runs a demo environment at external-api.demo.kalshi.co;
+/// the app targeted prod-only in practice, so the env plumbing was
+/// removed — reintroduce a KalshiEnv enum here if demo keys are ever
+/// needed for testing.)
 pub const PROD_REST_BASE: &str = "https://external-api.kalshi.com";
-/// REST host (no path). Demo environment — demo keys only work here.
-pub const DEMO_REST_BASE: &str = "https://external-api.demo.kalshi.co";
 
 /// WebSocket URL (full, includes the ws path). Production.
 pub const PROD_WS_URL: &str = "wss://external-api-ws.kalshi.com/trade-api/ws/v2";
-/// WebSocket URL (full, includes the ws path). Demo.
-pub const DEMO_WS_URL: &str = "wss://external-api-ws.demo.kalshi.co/trade-api/ws/v2";
 
 /// Path prefix for REST requests — part of the signed message, no query.
 pub const API_PREFIX: &str = "/trade-api/v2";
 /// Path signed for the WebSocket upgrade (distinct from `API_PREFIX`).
 pub const WS_PATH: &str = "/trade-api/ws/v2";
-
-/// Which Kalshi environment a credential targets. Keys are environment
-/// specific — a prod key only works against prod, a demo key against demo.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum KalshiEnv {
-    Prod,
-    Demo,
-}
-
-impl KalshiEnv {
-    /// Parse the string the frontend sends; defaults to prod for anything
-    /// that is not explicitly "demo" (the user's real key is a prod key).
-    pub fn parse(s: &str) -> Self {
-        if s.eq_ignore_ascii_case("demo") {
-            KalshiEnv::Demo
-        } else {
-            KalshiEnv::Prod
-        }
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            KalshiEnv::Prod => "prod",
-            KalshiEnv::Demo => "demo",
-        }
-    }
-
-    pub fn rest_base(self) -> &'static str {
-        match self {
-            KalshiEnv::Prod => PROD_REST_BASE,
-            KalshiEnv::Demo => DEMO_REST_BASE,
-        }
-    }
-
-    pub fn ws_url(self) -> &'static str {
-        match self {
-            KalshiEnv::Prod => PROD_WS_URL,
-            KalshiEnv::Demo => DEMO_WS_URL,
-        }
-    }
-}

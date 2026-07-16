@@ -3,7 +3,7 @@ import { clsx } from "clsx";
 import type { RssItem } from "../../types";
 import type { ChipColorMode } from "../../preferences";
 import { getChipColors, chipBaseClasses } from "./chipColors";
-import { timeAgo } from "../../utils/format";
+import { timeAgo, truncate } from "../../utils/format";
 
 interface RssChipProps {
   item: RssItem;
@@ -19,8 +19,7 @@ interface RssChipProps {
 const RssChip = memo(function RssChip({ item, comfort, colorMode = "channel", showSource = true, showTimestamps = true, onClick }: RssChipProps) {
   const c = getChipColors(colorMode, "rss");
   const maxLen = comfort ? 60 : 40;
-  const headline =
-    item.title.length > maxLen ? item.title.slice(0, maxLen) + "\u2026" : item.title;
+  const headline = truncate(item.title, maxLen);
   const hasSource = showSource && item.source_name;
   const hasTime = showTimestamps && item.published_at;
 

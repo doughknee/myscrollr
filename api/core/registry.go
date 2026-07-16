@@ -1,6 +1,9 @@
 package core
 
-import "sync"
+import (
+	"maps"
+	"sync"
+)
 
 // topicRegistry maintains bidirectional mappings between users and topics.
 // It enables O(1) topic -> user lookups for message dispatch.
@@ -21,11 +24,10 @@ type topicRegistry struct {
 
 // cloneSet creates a shallow copy of a string set.
 func cloneSet(src map[string]struct{}) map[string]struct{} {
-	dst := make(map[string]struct{}, len(src)+1)
-	for k, v := range src {
-		dst[k] = v
+	if src == nil {
+		return map[string]struct{}{}
 	}
-	return dst
+	return maps.Clone(src)
 }
 
 // subscribe adds a user to a topic (copy-on-write).

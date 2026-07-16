@@ -10,20 +10,21 @@
  *     (prefs) => removeTickerRow(prefs, 1),
  *   );
  *
- * The hook reads `prefs` and `onPrefsChange` from `useShell()`, takes
- * a snapshot of the current prefs, applies your mutator, and shows a
- * sonner toast with an Undo button. Clicking Undo restores the prefs
- * blob from the snapshot via `onPrefsChange` (which also broadcasts
+ * The hook reads `prefs` and `onPrefsChange` from `useShell()`, deep-
+ * clones the current prefs into the toast's Undo closure, applies your
+ * mutator, and shows a sonner toast with an Undo button. Clicking Undo
+ * restores the captured blob via `onPrefsChange` (which also broadcasts
  * to the ticker window via the existing store sync, so undo works
  * cross-window).
  *
  * Behavior contract:
- *   - Toast lives 5 seconds. Snapshot lives 60 seconds. Click Undo
- *     within 60s and it works even if the toast already faded.
+ *   - The snapshot lives in the Undo callback's closure, so it is
+ *     restorable exactly as long as the toast can fire (sonner pauses
+ *     the dismiss timer on hover). No stack, no expiry, no GC.
  *   - Successive undoable actions REPLACE the previous toast (sonner's
  *     `id` parameter forces this). Only the latest action is undoable
- *     via the visible toast — older snapshots remain in the stack but
- *     have no UI surface.
+ *     — which was always the case; earlier revisions kept a 20-entry
+ *     ring buffer whose older snapshots had no UI surface.
  *   - If the mutator returns the same prefs reference (no-op), we
  *     skip the snapshot AND the toast. Prevents noise like "Removed
  *     Row 1" after a click that didn't actually delete anything (e.g.
@@ -37,7 +38,6 @@
 import { useCallback, useContext } from "react";
 import { toast } from "sonner";
 import { ShellContext } from "../shell-context";
-import { pushSnapshot, restoreSnapshot } from "../lib/undoStack";
 import type { AppPreferences } from "../preferences";
 
 /** Single, replaceable toast id so successive actions don't stack. */
@@ -103,7 +103,9 @@ export function useUndoableAction(external?: UndoShellPlumbing): (
       // store write and confuse the user with a phantom undo toast.
       if (after === before) return;
 
-      const snapshotId = pushSnapshot(opts.label, before);
+      // Deep-clone into the closure so later mutations to the live
+      // prefs object can't corrupt the restore point.
+      const snapshot = structuredClone(before);
       onPrefsChange(after);
 
       toast.message(opts.label, {
@@ -113,22 +115,11 @@ export function useUndoableAction(external?: UndoShellPlumbing): (
         action: {
           label: "Undo",
           onClick: () => {
-            const restored = restoreSnapshot(snapshotId);
-            if (restored) {
-              onPrefsChange(restored);
-              toast.success("Restored", {
-                id: UNDO_TOAST_ID,
-                duration: 1_500,
-              });
-            } else {
-              // Snapshot was GC'd or otherwise vanished. Surface a
-              // friendly error instead of silently doing nothing —
-              // the user clicked Undo expecting feedback.
-              toast.error("Couldn't undo — too much time passed", {
-                id: UNDO_TOAST_ID,
-                duration: 2_000,
-              });
-            }
+            onPrefsChange(snapshot);
+            toast.success("Restored", {
+              id: UNDO_TOAST_ID,
+              duration: 1_500,
+            });
           },
         },
       });

@@ -61,11 +61,6 @@ import {
   getEffectiveWidgetTickerStatus,
 } from "../utils/tickerStatus";
 import type { AppPreferences } from "../preferences";
-import {
-  gcExpired as undoStackGc,
-  pushSnapshot as pushUndoSnapshot,
-  restoreSnapshot as restoreUndoSnapshot,
-} from "../lib/undoStack";
 import { showTipOnce, TIP_IDS } from "../lib/tips";
 
 // Types
@@ -257,11 +252,11 @@ function RootLayout() {
         ? `Removed: ${sourceList}${more}.`
         : undefined;
 
-    // Snapshot the *current* (post-clamp) prefs before the toast
-    // fires. If the user clicks Undo we splice the saved pre-clamp
-    // rows back into that snapshot so the rest of the prefs (theme,
-    // widgets, channels) stay current.
-    const id = pushUndoSnapshot("Tier-clamp restore", prefs);
+    // Snapshot the *current* (post-clamp) prefs into the Undo
+    // closure before the toast fires. If the user clicks Undo we
+    // splice the saved pre-clamp rows back into that snapshot so the
+    // rest of the prefs (theme, widgets, channels) stay current.
+    const snapshot = structuredClone(prefs);
 
     toast.message("Your ticker layout was simplified to fit your plan.", {
       id: "scrollr-tier-clamp",
@@ -270,7 +265,7 @@ function RootLayout() {
       action: {
         label: "Undo",
         onClick: () => {
-          const base = restoreUndoSnapshot(id) ?? prefs;
+          const base = snapshot;
           const restored: AppPreferences = {
             ...base,
             appearance: {
@@ -312,19 +307,6 @@ function RootLayout() {
   // whole shell is covered until the update installs. Fails open on
   // any fetch/parse error — see useUpdateGate.
   const updateGate = useUpdateGate(appVersion);
-
-  // ── Undo snapshot GC ───────────────────────────────────────
-  // Snapshots pushed by `useUndoableAction` live in a module-level
-  // ring buffer (see lib/undoStack.ts). They auto-expire 60s after
-  // creation, but the module doesn't run its own timer to keep tests
-  // deterministic — the shell drives GC instead. A 10s cadence is
-  // generous: snapshots only need to be cleaned up roughly on the
-  // order of their lifetime, and we don't want a per-second timer
-  // adding noise to React DevTools.
-  useEffect(() => {
-    const timer = setInterval(() => undoStackGc(), 10_000);
-    return () => clearInterval(timer);
-  }, []);
 
   // Inline persist helper used by the tip-firing effects below — we
   // can't reach `handlePrefsChange` here because it's declared further

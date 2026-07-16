@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestExtractLeaguesFromConfig(t *testing.T) {
+func TestExtractStringArrayLeagues(t *testing.T) {
 	tests := []struct {
 		name   string
 		config map[string]interface{}
@@ -80,20 +80,20 @@ func TestExtractLeaguesFromConfig(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := extractLeaguesFromConfig(tc.config)
+			got := extractStringArray(tc.config, "leagues")
 			if tc.want == nil {
 				if got != nil {
-					t.Errorf("extractLeaguesFromConfig = %v, want nil", got)
+					t.Errorf("extractStringArray = %v, want nil", got)
 				}
 				return
 			}
 			if len(got) != len(tc.want) {
-				t.Errorf("extractLeaguesFromConfig = %v, want %v", got, tc.want)
+				t.Errorf("extractStringArray = %v, want %v", got, tc.want)
 				return
 			}
 			for i := range got {
 				if got[i] != tc.want[i] {
-					t.Errorf("extractLeaguesFromConfig[%d] = %q, want %q", i, got[i], tc.want[i])
+					t.Errorf("extractStringArray[%d] = %q, want %q", i, got[i], tc.want[i])
 				}
 			}
 		})

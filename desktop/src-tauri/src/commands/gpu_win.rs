@@ -120,7 +120,7 @@ pub fn probe_static() -> GpuStatic {
     // For the actual VRAM size we MUST go through DXGI — WMI's
     // AdapterRAM truncates anything over 4GB (it's a u32 in a struct
     // designed in the 32-bit era). DXGI returns a 64-bit value.
-    let dxgi_vram = dxgi_vram_for(name.as_deref());
+    let dxgi_vram = read_vram_from_registry(name.as_deref());
 
     // 2. Find the matching perf-counter adapter to get the LUID.
     // The "primary" adapter from the perf counters' perspective is
@@ -250,7 +250,7 @@ fn read_vram_from_registry(name: Option<&str>) -> Option<u64> {
     //       DriverDesc    REG_SZ    AMD Radeon RX 7900 XTX
     //       HardwareInformation.qwMemorySize    REG_QWORD    0x600000000
     //       ...
-    let out = crate::commands::system_info::system_info_quiet_command("reg")
+    let out = crate::commands::system_info::quiet_command("reg")
         .args([
             "query",
             &format!("HKLM\\{DISPLAY_CLASS_GUID}"),
@@ -294,7 +294,7 @@ fn read_vram_from_registry(name: Option<&str>) -> Option<u64> {
 
     for sub in subkeys {
         // Query DriverDesc for this subkey
-        let desc_out = crate::commands::system_info::system_info_quiet_command("reg")
+        let desc_out = crate::commands::system_info::quiet_command("reg")
             .args(["query", &sub, "/v", "DriverDesc"])
             .output()
             .ok()?;
@@ -312,7 +312,7 @@ fn read_vram_from_registry(name: Option<&str>) -> Option<u64> {
         }
 
         // Query the qword size
-        let qw_out = crate::commands::system_info::system_info_quiet_command("reg")
+        let qw_out = crate::commands::system_info::quiet_command("reg")
             .args(["query", &sub, "/v", "HardwareInformation.qwMemorySize"])
             .output()
             .ok()?;
@@ -336,9 +336,4 @@ fn read_vram_from_registry(name: Option<&str>) -> Option<u64> {
     }
 
     None
-}
-
-/// Public helper that the static probe calls.
-fn dxgi_vram_for(name: Option<&str>) -> Option<u64> {
-    read_vram_from_registry(name)
 }

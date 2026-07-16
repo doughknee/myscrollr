@@ -158,10 +158,9 @@ pub fn set_ticker_visible(_window: tauri::Window, _visible: bool) -> Result<(), 
     #[cfg(target_os = "windows")]
     {
         use crate::commands::appbar_win;
-        if _visible {
-            // The next position_ticker call will register if needed.
-            // Nothing to do here proactively — registration is lazy.
-        } else {
+        // On show there is nothing to do proactively — the next
+        // position_ticker call registers the AppBar lazily.
+        if !_visible {
             let _ = appbar_win::unregister(&_window);
         }
     }

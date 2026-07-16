@@ -85,3 +85,4 @@ myscrollr.com/src/lib/latestVersion.generated.ts
 # desktop release history for the /releases page (loaded optionally via
 # import.meta.glob, so a missing file never breaks dev).
 myscrollr.com/src/lib/releases.generated.ts
+ui-review-out/

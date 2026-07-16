@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -139,13 +138,11 @@ func main() {
 	clientID := os.Getenv("YAHOO_CLIENT_ID")
 	clientSecret := os.Getenv("YAHOO_CLIENT_SECRET")
 
-	// Derive callback URL from env
+	// Callback URL comes from the environment (channels-config in k8s,
+	// channels/fantasy/.env locally). The old COOLIFY_FQDN-derived
+	// fallback was removed with the Coolify era — the variable is set
+	// nowhere anymore.
 	redirectURL := os.Getenv("YAHOO_CALLBACK_URL")
-	if redirectURL == "" {
-		if fqdn := CleanFQDN(); fqdn != "" {
-			redirectURL = fmt.Sprintf("https://%s/yahoo/callback", fqdn)
-		}
-	}
 
 	// YAHOO_CLIENT_ID and YAHOO_CLIENT_SECRET are both required — the entire
 	// purpose of this service is Yahoo OAuth2 + sync. Booting without them

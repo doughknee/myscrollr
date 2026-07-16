@@ -14,7 +14,7 @@ use crate::kalshi::{
     rest::RestClient,
     sign::Signer,
     store::{self, CredentialStatus, StoredCredential},
-    ws, KalshiEnv,
+    ws, PROD_WS_URL,
 };
 use crate::state::KalshiStreamHandle;
 use serde::Serialize;
@@ -25,7 +25,6 @@ use tokio::sync::watch;
 #[derive(Serialize)]
 pub struct ConnectResult {
     pub key_id: String,
-    pub env: String,
     pub balance_cents: i64,
 }
 
@@ -53,7 +52,7 @@ fn client_from_store() -> Result<RestClient, String> {
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Not connected".to_string())?;
     let signer = Signer::from_pem(cred.key_id.clone(), &cred.pem).map_err(|e| e.to_string())?;
-    RestClient::new(cred.env(), signer).map_err(|e| e.to_string())
+    RestClient::new(signer).map_err(|e| e.to_string())
 }
 
 /// Connect the user's Kalshi account.
@@ -63,11 +62,7 @@ fn client_from_store() -> Result<RestClient, String> {
 /// `key_id` is the Key ID the user typed. We validate the pair by making a
 /// signed `GET /portfolio/balance`, and only persist on success.
 #[tauri::command]
-pub async fn kalshi_connect(
-    key_id: String,
-    pem_path: String,
-    env: Option<String>,
-) -> Result<ConnectResult, String> {
+pub async fn kalshi_connect(key_id: String, pem_path: String) -> Result<ConnectResult, String> {
     let key_id = key_id.trim().to_string();
     if key_id.is_empty() {
         return Err("Please enter your Key ID from Kalshi.".into());
@@ -78,14 +73,12 @@ pub async fn kalshi_connect(
     let pem = std::fs::read_to_string(&pem_path)
         .map_err(|_| "We couldn't open that file. Please drag in the connection file you downloaded from Kalshi.".to_string())?;
 
-    let env = KalshiEnv::parse(env.as_deref().unwrap_or("prod"));
-
     let signer = Signer::from_pem(key_id.clone(), &pem).map_err(|_| {
         "That file doesn't look like a Kalshi connection file. Make sure you \
          dragged in the file Kalshi downloaded when you created the connection."
             .to_string()
     })?;
-    let client = RestClient::new(env, signer).map_err(|e| e.to_string())?;
+    let client = RestClient::new(signer).map_err(|e| e.to_string())?;
 
     // The balance call both validates the credential and gives us the figure
     // to confirm back to the user.
@@ -99,7 +92,6 @@ pub async fn kalshi_connect(
     // it's safe to surface the cause to help diagnose device-specific issues.
     store::save(&StoredCredential {
         key_id: key_id.clone(),
-        env: env.as_str().to_string(),
         pem,
     })
     .map_err(|e| {
@@ -108,12 +100,11 @@ pub async fn kalshi_connect(
 
     Ok(ConnectResult {
         key_id,
-        env: env.as_str().to_string(),
         balance_cents,
     })
 }
 
-/// Non-secret connection status for the UI (connected?, key id, env).
+/// Non-secret connection status for the UI (connected?, key id).
 #[tauri::command]
 pub fn kalshi_status() -> Result<CredentialStatus, String> {
     store::status().map_err(|e| e.to_string())
@@ -200,7 +191,7 @@ async fn user_stream_loop(
     use futures_util::{SinkExt, StreamExt};
     use tokio_tungstenite::tungstenite::Message;
 
-    let ws_url = cred.env().ws_url();
+    let ws_url = PROD_WS_URL;
     let mut backoff_secs = 1u64;
     let mut sub_id = 1u64;
 

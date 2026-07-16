@@ -526,7 +526,7 @@ func subscribeUserToTopics(userID string) {
 		// types. The per-league/per-symbol values still come from config.
 		switch DataSourceForWidget(ch.ChannelType) {
 		case "finance":
-			symbols := extractSymbolsFromConfig(ch.Config)
+			symbols := extractStringArray(ch.Config, "symbols")
 			for _, sym := range symbols {
 				globalHub.registry.subscribe(userID, TopicPrefixFinance+sym)
 			}
@@ -534,7 +534,7 @@ func subscribeUserToTopics(userID string) {
 		case "sports":
 			// Subscribe only to the user's configured leagues.
 			// Config shape: {"leagues": ["NFL", "NBA", ...]}
-			leagues := extractLeaguesFromConfig(ch.Config)
+			leagues := extractStringArray(ch.Config, "leagues")
 			for _, league := range leagues {
 				globalHub.registry.subscribe(userID, TopicPrefixSports+league)
 			}
@@ -563,10 +563,11 @@ func subscribeUserToTopics(userID string) {
 	}
 }
 
-// extractSymbolsFromConfig reads the "symbols" array from a channel's config JSONB.
-// Config shape: {"symbols": ["AAPL", "GOOG", ...]}
-func extractSymbolsFromConfig(config map[string]interface{}) []string {
-	raw, ok := config["symbols"]
+// extractStringArray reads a string array under `key` from a channel's
+// config JSONB (e.g. {"symbols": ["AAPL", ...]} or {"leagues": ["NFL", ...]}).
+// Empty strings and non-string entries are dropped.
+func extractStringArray(config map[string]interface{}, key string) []string {
+	raw, ok := config[key]
 	if !ok {
 		return nil
 	}
@@ -574,13 +575,13 @@ func extractSymbolsFromConfig(config map[string]interface{}) []string {
 	if !ok {
 		return nil
 	}
-	symbols := make([]string, 0, len(arr))
+	out := make([]string, 0, len(arr))
 	for _, v := range arr {
 		if s, ok := v.(string); ok && s != "" {
-			symbols = append(symbols, s)
+			out = append(out, s)
 		}
 	}
-	return symbols
+	return out
 }
 
 // extractFeedURLsFromConfig reads feed URLs from a channel's config JSONB.
@@ -607,25 +608,6 @@ func extractFeedURLsFromConfig(config map[string]interface{}) []string {
 	return urls
 }
 
-// extractLeaguesFromConfig reads the "leagues" array from a sports channel's config JSONB.
-// Config shape: {"leagues": ["NFL", "NBA", ...]}
-func extractLeaguesFromConfig(config map[string]interface{}) []string {
-	raw, ok := config["leagues"]
-	if !ok {
-		return nil
-	}
-	arr, ok := raw.([]interface{})
-	if !ok {
-		return nil
-	}
-	leagues := make([]string, 0, len(arr))
-	for _, v := range arr {
-		if s, ok := v.(string); ok && s != "" {
-			leagues = append(leagues, s)
-		}
-	}
-	return leagues
-}
 
 // getUserFantasyLeagues returns the Yahoo league keys a user has imported.
 // Uses yahoo_user_leagues junction table (yahoo_leagues.guid was removed).
