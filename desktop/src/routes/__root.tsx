@@ -893,6 +893,7 @@ function RootLayout() {
               isMarketplace={route.isMarketplace}
               isSupport={route.isSupport}
               activeItem={route.activeItem}
+              tier={auth.tier}
               sources={sidebarSources}
               onNavigateToMarketplace={handleNavigateToMarketplace}
               onNavigateToSettings={handleNavigateToSettings}

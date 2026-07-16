@@ -1,39 +1,30 @@
 /**
  * Sidebar — collapsible navigation rail.
  *
- * The rail is split into three labeled groups so a long list of
- * unrelated nav items doesn't read as a single undifferentiated
- * column:
- *
- *   ┌──────────┐
- *   │ SOURCES  │
- *   │ Finance  │
- *   │ Sports   │
- *   │ Weather  │
- *   ├──────────┤
- *   │ WORKSPACE│
- *   │ + Add    │  ← drilled into Catalog
- *   │ Settings │
- *   │ Ticker   │
- *   ├──────────┤
- *   │ ACCOUNT  │
- *   │ Account  │
- *   │ Support  │
- *   ├──────────┤
- *   │ Collapse │
- *   └──────────┘
+ *   ┌────────────┐
+ *   │ + Add source│  ← CTA slot, drills into Catalog
+ *   │ SOURCES    │
+ *   │ Finance    │
+ *   │ Sports     │
+ *   │ Weather    │
+ *   │    ⋮       │
+ *   │ [Account ▾]│⇤│  ← footer chip: Settings/Ticker/Account/Support
+ *   └────────────┘      menu + collapse toggle
  *
  * Home navigation lives on the Scrollr brand mark in the TopBar;
  * connection/ticker status lives in the TopBar too. The sidebar
- * stays minimal and navigational.
+ * stays minimal: sources are the rail, everything app-level hides
+ * behind the footer account chip.
  *
- * Collapses to a 48px icon-only rail with tooltips. Group headings
- * are hidden in the collapsed state (they'd just be empty rows) but
- * the divider lines stay so the grouping survives visually.
+ * Collapses to a 48px icon-only rail with tooltips. The Sources
+ * heading is hidden in the collapsed state (it'd just be an empty
+ * row).
  */
-import { useState } from "react";
+import { useState, forwardRef } from "react";
+import type { ButtonHTMLAttributes, Ref } from "react";
 import {
   ArrowUpRight,
+  ChevronDown,
   Info,
   LifeBuoy,
   PanelLeftClose,
@@ -49,8 +40,11 @@ import clsx from "clsx";
 import { motion } from "motion/react";
 import Tooltip from "./Tooltip";
 import ContextMenu from "./ContextMenu";
+import OverflowMenu from "./OverflowMenu";
 import type { ChannelManifest, WidgetManifest } from "../types";
 import { loadPref, savePref } from "../preferences";
+import { TIER_LABELS } from "../auth";
+import type { SubscriptionTier } from "../auth";
 
 // ── Props ───────────────────────────────────────────────────────
 
@@ -79,6 +73,8 @@ interface SidebarProps {
   isSupport: boolean;
   /** Currently active channel or widget ID (for highlighting). */
   activeItem: string;
+  /** Subscription tier — shown on the footer account chip. */
+  tier: SubscriptionTier;
 
   /** Resolved enabled-source manifest data, in canonical order. */
   sources: SidebarSource[];
@@ -116,6 +112,7 @@ export default function Sidebar({
   isMarketplace,
   isSupport,
   activeItem,
+  tier,
   sources,
   onNavigateToMarketplace,
   onNavigateToSettings,
@@ -152,6 +149,18 @@ export default function Sidebar({
         collapsed ? "w-[48px]" : "w-[200px]",
       )}
     >
+      {/* ── Add source — the CTA slot ─────────────────────────── */}
+      <div className={clsx("shrink-0 pt-2", collapsed ? "px-1" : "px-2")}>
+        <NavItem
+          icon={<Plus size={15} strokeWidth={2.5} />}
+          label="Add source"
+          active={isMarketplace}
+          collapsed={collapsed}
+          accent
+          onClick={onNavigateToMarketplace}
+        />
+      </div>
+
       {/* ── Sources ─────────────────────────────────────────────
           The user's enabled channels and widgets in canonical
           order. Scrollable when long. */}
@@ -192,85 +201,67 @@ export default function Sidebar({
       </NavGroup>
 
       {/* ── Workspace ─────────────────────────────────────────── */}
-      <NavGroup
-        ariaLabel="Workspace"
-        heading="Workspace"
-        collapsed={collapsed}
-      >
-        <NavItem
-          icon={<Plus size={15} strokeWidth={2.5} />}
-          label="Add source"
-          active={isMarketplace}
-          collapsed={collapsed}
-          accent
-          onClick={onNavigateToMarketplace}
-        />
-        <NavItem
-          icon={<Settings size={15} />}
-          label="Settings"
-          active={isSettings}
-          collapsed={collapsed}
-          onClick={onNavigateToSettings}
-        />
-        <NavItem
-          icon={<RadioTower size={15} />}
-          label="Ticker"
-          active={isTicker}
-          collapsed={collapsed}
-          onClick={onNavigateToTicker}
-        />
-      </NavGroup>
-
-      {/* ── Account ───────────────────────────────────────────── */}
-      <NavGroup
-        ariaLabel="Account"
-        heading="Account"
-        collapsed={collapsed}
-      >
-        <NavItem
-          icon={<UserCircle size={15} />}
-          label="Account"
-          active={isAccount}
-          collapsed={collapsed}
-          onClick={onNavigateToAccount}
-        />
-        <NavItem
-          icon={<LifeBuoy size={15} />}
-          label="Support"
-          active={isSupport}
-          collapsed={collapsed}
-          onClick={onNavigateToSupport}
-        />
-      </NavGroup>
-
-      {/* ── Collapse toggle ───────────────────────────────────────
-          Lives outside the three labeled groups because it's chrome,
-          not navigation. Connection status + ticker status live in
-          the TopBar — see components/TopBar.tsx. */}
+      {/* ── Footer: account chip + collapse ─────────────────────
+          Everything app-level (Settings, Ticker, Account, Support)
+          lives behind one chip menu — the sidebar's rows stay
+          reserved for sources. */}
       <div
         className={clsx(
           "shrink-0 py-2",
-          collapsed ? "px-1" : "px-2",
+          collapsed
+            ? "px-1 flex flex-col items-stretch gap-1"
+            : "px-2 flex items-center gap-1",
         )}
       >
+        <OverflowMenu
+          placement={collapsed ? "right-end" : "top-start"}
+          triggerLabel="Account & app"
+          trigger={
+            <AccountChip
+              collapsed={collapsed}
+              tierLabel={TIER_LABELS[tier]}
+              active={isSettings || isTicker || isAccount || isSupport}
+            />
+          }
+          items={[
+            {
+              key: "settings",
+              label: "Settings",
+              icon: Settings,
+              onSelect: onNavigateToSettings,
+            },
+            {
+              key: "ticker",
+              label: "Ticker",
+              icon: RadioTower,
+              onSelect: onNavigateToTicker,
+            },
+            { key: "d1", divider: true },
+            {
+              key: "account",
+              label: "Account",
+              icon: UserCircle,
+              onSelect: onNavigateToAccount,
+            },
+            {
+              key: "support",
+              label: "Support",
+              icon: LifeBuoy,
+              onSelect: onNavigateToSupport,
+            },
+          ]}
+        />
         <Tooltip content={collapsed ? "Expand sidebar" : "Collapse sidebar"} side="right">
           <button
             onClick={toggleCollapsed}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={clsx(
-              "flex items-center w-full rounded-lg text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
+              "flex items-center justify-center shrink-0 rounded-lg text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
               "transition-all duration-150 active:scale-[0.97]",
-              collapsed
-                ? "justify-center py-1.5"
-                : "gap-2.5 px-2.5 py-1.5",
+              collapsed ? "w-full py-1.5" : "w-7 h-7",
             )}
           >
-            <span className="shrink-0 flex items-center justify-center w-5 h-5">
-              {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
-            </span>
-            {!collapsed && (
-              <span className="text-ui-meta font-medium">Collapse</span>
-            )}
+            {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
           </button>
         </Tooltip>
       </div>
@@ -431,3 +422,64 @@ function NavItem({
     </Tooltip>
   );
 }
+
+// ── Account chip ────────────────────────────────────────────────
+// Footer trigger for the app-level menu (Settings/Ticker/Account/
+// Support). floating-ui injects ref + aria handlers via cloneElement,
+// so this is a forwardRef-compatible button (same pattern as the
+// TopBar's MoreTabsTrigger). `active` marks that one of the menu's
+// pages is currently open.
+
+const AccountChip = forwardRef(function AccountChip(
+  {
+    collapsed,
+    tierLabel,
+    active,
+    ...props
+  }: ButtonHTMLAttributes<HTMLButtonElement> & {
+    collapsed: boolean;
+    tierLabel: string;
+    active: boolean;
+  },
+  ref: Ref<HTMLButtonElement>,
+) {
+  const isOpen =
+    props["aria-expanded"] === true || props["aria-expanded"] === "true";
+  return (
+    <button
+      ref={ref}
+      type="button"
+      {...props}
+      className={clsx(
+        "flex items-center rounded-lg font-medium min-w-0",
+        "transition-all duration-150 active:scale-[0.97]",
+        collapsed
+          ? "w-full justify-center py-1.5"
+          : "flex-1 gap-2.5 px-2.5 py-1.5 text-ui-body",
+        active || isOpen
+          ? "bg-surface-hover text-fg"
+          : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
+      )}
+    >
+      <span className="shrink-0 flex items-center justify-center w-5 h-5">
+        <UserCircle size={15} />
+      </span>
+      {!collapsed && (
+        <>
+          {/* The tier IS the label (Claude-style plan chip) —
+              "Account" + tier + chevron doesn't fit the 200px rail,
+              and "Uplink Ultimate" + "plan" wouldn't either. */}
+          <span className="truncate">{tierLabel}</span>
+          <ChevronDown
+            size={11}
+            className="ml-auto shrink-0 text-fg-4"
+            style={{
+              transition: "transform 300ms var(--ease-snap)",
+              transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+            }}
+          />
+        </>
+      )}
+    </button>
+  );
+});
