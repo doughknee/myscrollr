@@ -49,8 +49,10 @@ services:
       PORT: "8080"
       DATABASE_URL: *db-url
       REDIS_URL: *redis-url
-      # Finance is a local source inside core (ADR-0002, REL-14)
+      # Local widget sources inside core (ADR-0002, REL-14/15)
       INTERNAL_FINANCE_URL: "http://finance-service:3001"
+      INTERNAL_SPORTS_URL: "http://sports-service:3002"
+      INTERNAL_PREDICTIONS_URL: "http://predictions-service:3005"
     ports: ["18080:8080"]
     depends_on: *needs-db-redis
     restart: unless-stopped
@@ -119,26 +121,7 @@ services:
     depends_on: *needs-db
     restart: unless-stopped
 
-  sports-api:
-    build:
-      context: ./channels/sports/api
-    container_name: scrollr-sports-api
-    env_file: [channels/sports/.env]
-    environment:
-      PORT: "8082"
-      DATABASE_URL: *db-url
-      REDIS_URL: *redis-url
-      CHANNEL_URL: "http://sports-api:8082"
-      INTERNAL_SPORTS_URL: "http://sports-service:3002"
-    ports: ["8082:8082"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      sports-service:
-        condition: service_started
-    restart: unless-stopped
+  # (sports-api folded into core-api — ADR-0002, REL-15)
 
   # ── Fantasy (Go-native, no Rust ingester) ──────────────────────────
   # YAHOO_CALLBACK_URL in the .env points at http://localhost:8084/fantasy/
@@ -178,25 +161,4 @@ services:
     depends_on: *needs-db
     restart: unless-stopped
 
-  # Go API needs no secrets (all networking) — so no env_file, no PEM risk.
-  predictions-api:
-    build:
-      context: ./channels/predictions/api
-    container_name: scrollr-predictions-api
-    profiles: ["predictions"]
-    environment:
-      PORT: "8085"
-      DATABASE_URL: *db-url
-      REDIS_URL: *redis-url
-      CHANNEL_URL: "http://predictions-api:8085"
-      INTERNAL_PREDICTIONS_URL: "http://predictions-service:3005"
-      ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:5174,tauri://localhost"
-    ports: ["8085:8085"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      predictions-service:
-        condition: service_started
-    restart: unless-stopped
+  # (predictions-api folded into core-api — ADR-0002, REL-15)

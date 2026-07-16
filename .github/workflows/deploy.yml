@@ -37,12 +37,10 @@ jobs:
       core-api: ${{ steps.manual.outputs.core-api || steps.changes.outputs.core-api }}
       website: ${{ steps.manual.outputs.website || steps.changes.outputs.website }}
       finance-service: ${{ steps.manual.outputs.finance-service || steps.changes.outputs.finance-service }}
-      sports-api: ${{ steps.manual.outputs.sports-api || steps.changes.outputs.sports-api }}
       sports-service: ${{ steps.manual.outputs.sports-service || steps.changes.outputs.sports-service }}
       rss-api: ${{ steps.manual.outputs.rss-api || steps.changes.outputs.rss-api }}
       rss-service: ${{ steps.manual.outputs.rss-service || steps.changes.outputs.rss-service }}
       fantasy-api: ${{ steps.manual.outputs.fantasy-api || steps.changes.outputs.fantasy-api }}
-      predictions-api: ${{ steps.manual.outputs.predictions-api || steps.changes.outputs.predictions-api }}
       predictions-service: ${{ steps.manual.outputs.predictions-service || steps.changes.outputs.predictions-service }}
       k8s: ${{ steps.manual.outputs.k8s || steps.changes.outputs.k8s }}
     steps:
@@ -57,7 +55,7 @@ jobs:
           # website, and only for `desktop-v*` tags. Other releases (none
           # exist today, but future-proof) are ignored.
           if [ "${{ github.event_name }}" = "release" ]; then
-            for svc in core-api website finance-service sports-api sports-service rss-api rss-service fantasy-api predictions-api predictions-service k8s; do
+            for svc in core-api website finance-service sports-service rss-api rss-service fantasy-api predictions-service k8s; do
               echo "${svc}=false" >> $GITHUB_OUTPUT
             done
 
@@ -77,14 +75,14 @@ jobs:
             exit 0
           fi
 
-          for svc in core-api website finance-service sports-api sports-service rss-api rss-service fantasy-api predictions-api predictions-service k8s; do
+          for svc in core-api website finance-service sports-service rss-api rss-service fantasy-api predictions-service k8s; do
             echo "${svc}=false" >> $GITHUB_OUTPUT
           done
 
           services="$(printf '%s' '${{ inputs.services }}' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
 
           if [ -z "$services" ] || [ "$services" = "all" ]; then
-            for svc in core-api website finance-service sports-api sports-service rss-api rss-service fantasy-api predictions-api predictions-service k8s; do
+            for svc in core-api website finance-service sports-service rss-api rss-service fantasy-api predictions-service k8s; do
               echo "${svc}=true" >> $GITHUB_OUTPUT
             done
             exit 0
@@ -93,7 +91,7 @@ jobs:
           IFS=',' read -r -a selected <<< "$services"
           for svc in "${selected[@]}"; do
             case "$svc" in
-              core-api|website|finance-service|sports-api|sports-service|rss-api|rss-service|fantasy-api|predictions-api|predictions-service|k8s)
+              core-api|website|finance-service|sports-service|rss-api|rss-service|fantasy-api|predictions-service|k8s)
                 echo "${svc}=true" >> $GITHUB_OUTPUT
                 ;;
               *)
@@ -114,8 +112,6 @@ jobs:
               - 'myscrollr.com/**'
             finance-service:
               - 'channels/finance/service/**'
-            sports-api:
-              - 'channels/sports/api/**'
             sports-service:
               - 'channels/sports/service/**'
             rss-api:
@@ -124,8 +120,6 @@ jobs:
               - 'channels/rss/service/**'
             fantasy-api:
               - 'channels/fantasy/api/**'
-            predictions-api:
-              - 'channels/predictions/api/**'
             predictions-service:
               - 'channels/predictions/service/**'
             k8s:
@@ -151,10 +145,6 @@ jobs:
             context: ./channels/finance/service
             dockerfile: ./channels/finance/service/Dockerfile
             changed: ${{ needs.detect-changes.outputs.finance-service }}
-          - service: sports-api
-            context: ./channels/sports/api
-            dockerfile: ./channels/sports/api/Dockerfile
-            changed: ${{ needs.detect-changes.outputs.sports-api }}
           - service: sports-service
             context: ./channels/sports/service
             dockerfile: ./channels/sports/service/Dockerfile
@@ -171,10 +161,6 @@ jobs:
             context: ./channels/fantasy/api
             dockerfile: ./channels/fantasy/api/Dockerfile
             changed: ${{ needs.detect-changes.outputs.fantasy-api }}
-          - service: predictions-api
-            context: ./channels/predictions/api
-            dockerfile: ./channels/predictions/api/Dockerfile
-            changed: ${{ needs.detect-changes.outputs.predictions-api }}
           - service: predictions-service
             context: ./channels/predictions/service
             dockerfile: ./channels/predictions/service/Dockerfile
@@ -345,10 +331,8 @@ jobs:
           kubectl apply -f k8s/sports-service.yaml
           kubectl apply -f k8s/rss-service.yaml
           kubectl apply -f k8s/predictions-service.yaml
-          kubectl apply -f k8s/sports-api.yaml
           kubectl apply -f k8s/rss-api.yaml
           kubectl apply -f k8s/fantasy-api.yaml
-          kubectl apply -f k8s/predictions-api.yaml
           kubectl apply -f k8s/core-api.yaml
           kubectl apply -f k8s/website.yaml
           kubectl apply -f k8s/ingress.yaml
@@ -449,12 +433,10 @@ jobs:
           rollout_if_needed core-api "${{ needs.detect-changes.outputs.core-api }}"
           rollout_if_needed website "${{ needs.detect-changes.outputs.website }}"
           rollout_if_needed finance-service "${{ needs.detect-changes.outputs.finance-service }}"
-          rollout_if_needed sports-api "${{ needs.detect-changes.outputs.sports-api }}"
           rollout_if_needed sports-service "${{ needs.detect-changes.outputs.sports-service }}"
           rollout_if_needed rss-api "${{ needs.detect-changes.outputs.rss-api }}"
           rollout_if_needed rss-service "${{ needs.detect-changes.outputs.rss-service }}"
           rollout_if_needed fantasy-api "${{ needs.detect-changes.outputs.fantasy-api }}"
-          rollout_if_needed predictions-api "${{ needs.detect-changes.outputs.predictions-api }}"
           rollout_if_needed predictions-service "${{ needs.detect-changes.outputs.predictions-service }}"
 
       # Post-deploy smoke test. Fails the workflow if any service's
