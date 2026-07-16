@@ -60,173 +60,6 @@ func CountEnabledChannels(ctx context.Context, logtoSub string) (int, error) {
 	return n, err
 }
 
-// SyncChannelSubscriptions rebuilds Redis subscription sets for a user from their
-// current channels in the database. Called on dashboard load and after channel CRUD.
-func SyncChannelSubscriptions(logtoSub string) {
-	channels, err := GetUserChannels(logtoSub)
-	if err != nil {
-		log.Printf("[Channels] Failed to sync subscriptions for %s: %v", logtoSub, err)
-		return
-	}
-
-	ctx := context.Background()
-
-	// Compute DESIRED membership first, across all widgets, then apply.
-	// Split widgets share source-level subscriber sets (sports_nfl and
-	// sports_nba both live in channel:subscribers:sports), so per-row
-	// add/remove is order-dependent: a disabled sibling iterated after an
-	// enabled one would remove the subscription the enabled widget needs.
-	// The set semantics are "member iff ANY enabled widget uses it".
-	wantSource := map[string]bool{} // source -> any enabled widget?
-	wantLeague := map[string]bool{} // league -> any enabled sports widget?
-	for _, ch := range channels {
-		source := DataSourceForWidget(ch.ChannelType)
-		if source == "" {
-			continue
-		}
-		if _, seen := wantSource[source]; !seen {
-			wantSource[source] = false
-		}
-		if ch.Enabled {
-			wantSource[source] = true
-		}
-		if source == "sports" {
-			for _, league := range extractSportsLeaguesFromConfig(ch.Config) {
-				if _, seen := wantLeague[league]; !seen {
-					wantLeague[league] = false
-				}
-				if ch.Enabled {
-					wantLeague[league] = true
-				}
-			}
-		}
-	}
-
-	for source, want := range wantSource {
-		setKey := RedisChannelSubscribersPrefix + source
-		if want {
-			AddSubscriber(ctx, setKey, logtoSub)
-		} else {
-			RemoveSubscriber(ctx, setKey, logtoSub)
-		}
-	}
-	var addLeagues, removeLeagues []string
-	for league, want := range wantLeague {
-		if want {
-			addLeagues = append(addLeagues, SportsLeagueSubscribersPrefix+league)
-		} else {
-			removeLeagues = append(removeLeagues, SportsLeagueSubscribersPrefix+league)
-		}
-	}
-	if len(addLeagues) > 0 {
-		if err := AddSubscriberMulti(ctx, addLeagues, logtoSub); err != nil {
-			log.Printf("[Channels] Failed to sync sports league subscriptions for %s: %v", logtoSub, err)
-		}
-	}
-	if len(removeLeagues) > 0 {
-		if err := RemoveSubscriberMulti(ctx, removeLeagues, logtoSub); err != nil {
-			log.Printf("[Channels] Failed to remove sports league subscriptions for %s: %v", logtoSub, err)
-		}
-	}
-
-	// Call channel lifecycle hooks via HTTP (per widget, as before).
-	for _, ch := range channels {
-		callChannelLifecycle(ctx, ch.ChannelType, "sync", logtoSub, ch.Config, nil, &ch.Enabled)
-	}
-}
-
-// addChannelSubscriptions adds Redis subscription entries for a newly created/enabled channel.
-// For sports, this also adds the user to all per-league subscriber sets.
-// Also updates the in-memory topic registry for active SSE connections.
-func addChannelSubscriptions(ctx context.Context, logtoSub, channelType string, config map[string]interface{}) {
-	source := DataSourceForWidget(channelType)
-	AddSubscriber(ctx, RedisChannelSubscribersPrefix+source, logtoSub)
-
-	// Sports: populate per-league subscriber sets for user's configured leagues.
-	if source == "sports" {
-		leagues := extractSportsLeaguesFromConfig(config)
-		if len(leagues) > 0 {
-			leagueKeys := make([]string, len(leagues))
-			for i, league := range leagues {
-				leagueKeys[i] = SportsLeagueSubscribersPrefix + league
-			}
-			if err := AddSubscriberMulti(ctx, leagueKeys, logtoSub); err != nil {
-				log.Printf("[Channels] Failed to add sports league subscriptions for %s: %v", logtoSub, err)
-			}
-		}
-	}
-
-	// Rebuild topic subscriptions on every replica holding an SSE
-	// connection for this user (Redis control message, ADR-0001)
-	NotifyTopicSubscriptionChange(logtoSub)
-
-	enabled := true
-	callChannelLifecycle(ctx, channelType, "sync", logtoSub, config, nil, &enabled)
-}
-
-// removeChannelSubscriptions removes Redis subscription entries for a deleted/disabled channel.
-// For sports, this also removes the user from per-league subscriber sets.
-// Also updates the in-memory topic registry for active SSE connections.
-//
-// Split widgets share source-level (and can share league-level) subscriber
-// sets, so removals are guarded on the user's REMAINING enabled widgets:
-// disabling sports_nba must not yank channel:subscribers:sports while
-// sports_nfl is still enabled. Both callers (UpdateChannel disable,
-// DeleteChannel) update the DB before calling this, so GetUserChannels
-// reflects the post-removal state. On a listing error we skip the removals
-// entirely — a stale subscription self-heals on the next sync; a wrongly
-// dropped one silently kills live data for the surviving widgets.
-func removeChannelSubscriptions(ctx context.Context, logtoSub, channelType string, config map[string]interface{}) {
-	source := DataSourceForWidget(channelType)
-
-	remaining, err := GetUserChannels(logtoSub)
-	if err != nil {
-		log.Printf("[Channels] Skipping subscription removal for %s/%s (listing failed: %v)", logtoSub, channelType, err)
-	} else {
-		sourceStillNeeded := false
-		keptLeagues := map[string]bool{}
-		for _, ch := range remaining {
-			if !ch.Enabled || ch.ChannelType == channelType {
-				continue
-			}
-			chSource := DataSourceForWidget(ch.ChannelType)
-			if chSource == source {
-				sourceStillNeeded = true
-			}
-			if chSource == "sports" {
-				for _, league := range extractSportsLeaguesFromConfig(ch.Config) {
-					keptLeagues[league] = true
-				}
-			}
-		}
-
-		if !sourceStillNeeded {
-			RemoveSubscriber(ctx, RedisChannelSubscribersPrefix+source, logtoSub)
-		}
-		if source == "sports" {
-			var stale []string
-			for _, league := range extractSportsLeaguesFromConfig(config) {
-				if !keptLeagues[league] {
-					stale = append(stale, SportsLeagueSubscribersPrefix+league)
-				}
-			}
-			if len(stale) > 0 {
-				if err := RemoveSubscriberMulti(ctx, stale, logtoSub); err != nil {
-					log.Printf("[Channels] Failed to remove sports league subscriptions for %s: %v", logtoSub, err)
-				}
-			}
-		}
-	}
-
-	// Rebuild topic subscriptions on every replica so active SSE
-	// connections stop receiving this channel (Redis control message,
-	// ADR-0001)
-	NotifyTopicSubscriptionChange(logtoSub)
-
-	enabled := false
-	callChannelLifecycle(ctx, channelType, "sync", logtoSub, config, nil, &enabled)
-}
-
 // callChannelLifecycle sends a lifecycle event to a channel if it has the channel_lifecycle capability.
 func callChannelLifecycle(ctx context.Context, channelType, event, userSub string, config, oldConfig map[string]interface{}, enabled *bool) {
 	// Resolve to the backing data source so widget types (e.g. "news") reach
@@ -357,8 +190,8 @@ func CreateChannel(c *fiber.Ctx) error {
 		})
 	}
 	// Utility widgets (clock/weather/…) live in desktop preferences, not
-	// user_channels. A row for one would land in a bogus "" subscriber set
-	// and double-count against the slot cap (once here, once via
+	// user_channels. A row for one has no backing data source and would
+	// double-count against the slot cap (once here, once via
 	// local_widgets), so reject it outright.
 	if IsUtilityWidgetType(req.ChannelType) {
 		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
@@ -447,13 +280,14 @@ func CreateChannel(c *fiber.Ctx) error {
 		ch.Config = map[string]interface{}{}
 	}
 
-	// Maintain Redis subscription sets
+	// Rebuild SSE topic subscriptions on every replica holding a
+	// connection for this user (Redis control message, ADR-0001)
 	ctx := context.Background()
 	if ch.Enabled {
-		addChannelSubscriptions(ctx, userID, ch.ChannelType, ch.Config)
+		NotifyTopicSubscriptionChange(userID)
 	}
 
-	// Call OnChannelCreated hook via HTTP
+	// Call OnChannelCreated hook (in-process for local sources)
 	callChannelLifecycle(ctx, ch.ChannelType, "created", userID, ch.Config, nil, nil)
 
 	// Invalidate dashboard cache so next poll gets fresh data
@@ -622,15 +456,12 @@ func UpdateChannel(c *fiber.Ctx) error {
 		ch.Config = map[string]interface{}{}
 	}
 
-	// Maintain Redis subscription sets based on new enabled state
+	// Rebuild SSE topic subscriptions on every replica holding a
+	// connection for this user (Redis control message, ADR-0001)
 	ctx := context.Background()
-	if ch.Enabled {
-		addChannelSubscriptions(ctx, userID, ch.ChannelType, ch.Config)
-	} else {
-		removeChannelSubscriptions(ctx, userID, ch.ChannelType, ch.Config)
-	}
+	NotifyTopicSubscriptionChange(userID)
 
-	// Call OnChannelUpdated hook via HTTP
+	// Call OnChannelUpdated hook (in-process for local sources)
 	callChannelLifecycle(ctx, channelType, "updated", userID, ch.Config, oldConfig, nil)
 
 	// Invalidate dashboard cache so next poll gets fresh data
@@ -687,9 +518,11 @@ func DeleteChannel(c *fiber.Ctx) error {
 	if config == nil {
 		config = map[string]interface{}{}
 	}
-	removeChannelSubscriptions(ctx, userID, channelType, config)
+	// Rebuild SSE topic subscriptions on every replica so active
+	// connections stop receiving this channel (ADR-0001)
+	NotifyTopicSubscriptionChange(userID)
 
-	// Call OnChannelDeleted hook via HTTP
+	// Call OnChannelDeleted hook (in-process for local sources)
 	callChannelLifecycle(ctx, channelType, "deleted", userID, config, nil, nil)
 
 	// Invalidate dashboard cache so next poll gets fresh data
@@ -722,22 +555,9 @@ func PruneWidgetsForTier(ctx context.Context, logtoSub, tier string) {
 		log.Printf("[Prune] Failed to list widgets for %s: %v", logtoSub, err)
 		return
 	}
-	kept, pruned := partitionWidgetsForCap(channels, *max)
+	_, pruned := partitionWidgetsForCap(channels, *max)
 	if len(pruned) == 0 {
 		return
-	}
-
-	// Sources and sports leagues the surviving widgets still need. Split
-	// widgets share source-level subscriber sets (sports_nfl and
-	// sports_nba both live in channel:subscribers:sports), so a pruned
-	// widget must not yank a subscription a kept sibling depends on.
-	keptSources := map[string]bool{}
-	keptLeagues := map[string]bool{}
-	for _, ch := range kept {
-		keptSources[DataSourceForWidget(ch.ChannelType)] = true
-		for _, lg := range extractSportsLeaguesFromConfig(ch.Config) {
-			keptLeagues[lg] = true
-		}
 	}
 
 	for _, ch := range pruned {
@@ -750,28 +570,6 @@ func PruneWidgetsForTier(ctx context.Context, logtoSub, tier string) {
 			continue
 		}
 		log.Printf("[Prune] Disabled %s/%s: tier %s allows %d widget slots", logtoSub, ch.ChannelType, tier, *max)
-
-		source := DataSourceForWidget(ch.ChannelType)
-		if !keptSources[source] {
-			RemoveSubscriber(ctx, RedisChannelSubscribersPrefix+source, logtoSub)
-		}
-		if source == "sports" {
-			var stale []string
-			for _, lg := range extractSportsLeaguesFromConfig(ch.Config) {
-				if !keptLeagues[lg] {
-					stale = append(stale, SportsLeagueSubscribersPrefix+lg)
-				}
-			}
-			if len(stale) > 0 {
-				if err := RemoveSubscriberMulti(ctx, stale, logtoSub); err != nil {
-					log.Printf("[Prune] Failed to remove league subscriptions for %s: %v", logtoSub, err)
-				}
-			}
-		}
-
-		// Tell the backing service this widget went dark.
-		enabled := false
-		callChannelLifecycle(ctx, ch.ChannelType, "sync", logtoSub, ch.Config, nil, &enabled)
 	}
 
 	// Rebuild SSE topics on every replica holding a connection for this
@@ -796,27 +594,4 @@ func partitionWidgetsForCap(channels []Channel, max int) (kept, pruned []Channel
 		}
 	}
 	return kept, pruned
-}
-
-// extractSportsLeaguesFromConfig reads the "leagues" array from a sports
-// channel's config JSONB map. Config shape: {"leagues": ["NFL", "NBA", ...]}
-func extractSportsLeaguesFromConfig(config map[string]interface{}) []string {
-	if config == nil {
-		return nil
-	}
-	raw, ok := config["leagues"]
-	if !ok {
-		return nil
-	}
-	arr, ok := raw.([]interface{})
-	if !ok {
-		return nil
-	}
-	leagues := make([]string, 0, len(arr))
-	for _, v := range arr {
-		if s, ok := v.(string); ok && s != "" {
-			leagues = append(leagues, s)
-		}
-	}
-	return leagues
 }

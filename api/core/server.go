@@ -439,9 +439,6 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 			}
 		}
 
-		// Warm Redis subscription sets from current DB state
-		go SyncChannelSubscriptions(userID)
-
 		// 3. Fetch dashboard data from each enabled channel via HTTP (parallel)
 		dashboardClient := &http.Client{Timeout: HealthCheckTimeout}
 		var targets []*ChannelInfo
