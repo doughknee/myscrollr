@@ -116,51 +116,6 @@ func InvalidateUserCaches(userSub string) {
 	}
 }
 
-// --- Subscription Set Helpers ---
-// Used to track which users subscribe to which data types.
-// Keys follow the convention:
-//   channel:subscribers:{type}  (e.g. channel:subscribers:finance)
-//   rss:subscribers:{feed_url}  (e.g. rss:subscribers:https://example.com/feed.xml)
-
-// AddSubscriber adds a user to a subscription set.
-func AddSubscriber(ctx context.Context, setKey, userSub string) error {
-	return Rdb.SAdd(ctx, setKey, userSub).Err()
-}
-
-// RemoveSubscriber removes a user from a subscription set.
-func RemoveSubscriber(ctx context.Context, setKey, userSub string) error {
-	return Rdb.SRem(ctx, setKey, userSub).Err()
-}
-
-// AddSubscriberMulti adds a user to multiple subscription sets in a single
-// pipeline round-trip. Used for sports per-league sets where a single subscribe
-// action touches 8+ Redis keys.
-func AddSubscriberMulti(ctx context.Context, setKeys []string, userSub string) error {
-	if len(setKeys) == 0 {
-		return nil
-	}
-	pipe := Rdb.Pipeline()
-	for _, key := range setKeys {
-		pipe.SAdd(ctx, key, userSub)
-	}
-	_, err := pipe.Exec(ctx)
-	return err
-}
-
-// RemoveSubscriberMulti removes a user from multiple subscription sets in a
-// single pipeline round-trip.
-func RemoveSubscriberMulti(ctx context.Context, setKeys []string, userSub string) error {
-	if len(setKeys) == 0 {
-		return nil
-	}
-	pipe := Rdb.Pipeline()
-	for _, key := range setKeys {
-		pipe.SRem(ctx, key, userSub)
-	}
-	_, err := pipe.Exec(ctx)
-	return err
-}
-
 // --- AI Triage: Recent Ticket Summaries ---
 // Sliding window of the last N ticket summaries, used as context when
 // asking Claude to dupe-detect against recent submissions. Keyed by a

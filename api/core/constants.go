@@ -93,15 +93,8 @@ const (
 // =============================================================================
 
 const (
-	RedisChannelSubscribersPrefix = "channel:subscribers:"
-	RedisEventsUserPrefix         = "events:user:"
-	RedisDashboardCachePrefix     = "cache:dashboard:"
-
-	// SportsLeagueSubscribersPrefix is the per-league subscriber set prefix.
-	// Keys: sports:subscribers:league:{NFL}, sports:subscribers:league:{NBA}, etc.
-	// Used by the core API for subscriber management and the sports channel for
-	// per-league CDC fan-out routing.
-	SportsLeagueSubscribersPrefix = "sports:subscribers:league:"
+	RedisEventsUserPrefix     = "events:user:"
+	RedisDashboardCachePrefix = "cache:dashboard:"
 )
 
 // =============================================================================

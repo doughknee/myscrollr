@@ -29,40 +29,6 @@ func TestFairShareSideSplit(t *testing.T) {
 	}
 }
 
-func TestExtractLeaguesFromConfig(t *testing.T) {
-	tests := []struct {
-		name   string
-		config map[string]interface{}
-		want   []string
-	}{
-		{name: "nil config", config: nil, want: nil},
-		{
-			name:   "valid leagues",
-			config: map[string]interface{}{"leagues": []interface{}{"NFL", "NBA"}},
-			want:   []string{"NFL", "NBA"},
-		},
-		{
-			name:   "empty strings filtered",
-			config: map[string]interface{}{"leagues": []interface{}{"NFL", "", "MLB"}},
-			want:   []string{"NFL", "MLB"},
-		},
-		{name: "no leagues field", config: map[string]interface{}{"other": 1}, want: nil},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := extractLeaguesFromConfig(tc.config)
-			if len(got) != len(tc.want) {
-				t.Fatalf("extractLeaguesFromConfig = %v, want %v", got, tc.want)
-			}
-			for i := range got {
-				if got[i] != tc.want[i] {
-					t.Errorf("extractLeaguesFromConfig[%d] = %q, want %q", i, got[i], tc.want[i])
-				}
-			}
-		})
-	}
-}
-
 func TestExtractFavoriteTeamsFromConfig(t *testing.T) {
 	got := extractFavoriteTeamsFromConfig([]byte(`{"favoriteTeams":{"NFL":{"teamId":12,"teamName":"Kansas City Chiefs"}}}`))
 	if len(got) != 1 || got["NFL"].TeamName != "Kansas City Chiefs" || got["NFL"].TeamID != 12 {

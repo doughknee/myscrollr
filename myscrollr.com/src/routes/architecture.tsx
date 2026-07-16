@@ -111,10 +111,10 @@ const PIPELINE_STEPS: Array<PipelineStep> = [
     Icon: Cpu,
     title: 'Ingestion Services',
     description:
-      'Three independent Rust services collect, normalize, and write data to PostgreSQL. Each runs its own schedule and connection strategy.',
+      'Four independent Rust services collect, normalize, and write data to PostgreSQL. Each runs its own schedule and connection strategy.',
     hex: HEX.info,
     label: 'PROCESS',
-    items: ['Finance :3001', 'Sports :3002', 'RSS :3004'],
+    items: ['Finance :3001', 'Sports :3002', 'RSS :3004', 'Kalshi :3005'],
     Watermark: Cpu,
   },
   {
@@ -131,10 +131,10 @@ const PIPELINE_STEPS: Array<PipelineStep> = [
     Icon: Radio,
     title: 'Real-time Delivery',
     description:
-      'Core API routes CDC records to channel APIs, which return affected user lists. Core publishes to per-user Redis channels via SSE.',
+      'Core API maps each CDC record to a topic in-process and publishes via Redis pub/sub. Every replica fans out to its own SSE clients.',
     hex: HEX.accent,
     label: 'DELIVER',
-    items: ['CDC Routing', 'Redis Pub/Sub', 'SSE Stream', 'Per-user'],
+    items: ['Topic Routing', 'Redis Pub/Sub', 'SSE Stream', 'Per-user'],
     Watermark: Radio,
   },
 ]
@@ -168,8 +168,8 @@ const CDC_FLOW: Array<CdcStep> = [
     hex: HEX.primary,
   },
   {
-    label: 'Channel API',
-    detail: 'POST /internal/cdc → users[]',
+    label: 'Topic Router',
+    detail: 'record → cdc:{source}:{key}',
     Icon: Cable,
     hex: HEX.info,
   },
@@ -204,17 +204,17 @@ interface Principle {
 const PRINCIPLES: Array<Principle> = [
   {
     Icon: Box,
-    title: 'Decoupled Channels',
+    title: 'Isolated Ingestion',
     description:
-      'Each channel is a fully self-contained unit with its own Go API, Rust service, frontend components, and config. No shared code between channels.',
+      'Each data source has its own Rust ingestion service with an independent schedule, quota budget, and crash blast radius. Widget read APIs live inside the core gateway.',
     hex: HEX.primary,
     Watermark: Box,
   },
   {
     Icon: Shield,
-    title: 'Zero-trust Proxying',
+    title: 'Zero-trust Gateway',
     description:
-      'Core API validates JWTs and injects X-User-Sub headers. Integration APIs never see tokens — they trust the core gateway.',
+      'Core API validates JWTs at the edge. The one proxied service (Fantasy) never sees tokens — it trusts identity headers injected by the gateway.',
     hex: HEX.secondary,
     Watermark: Shield,
   },
@@ -222,7 +222,7 @@ const PRINCIPLES: Array<Principle> = [
     Icon: RefreshCw,
     title: 'Self-registration',
     description:
-      'Channel APIs register in Redis on startup with a 30s TTL heartbeat. Core discovers them dynamically — no hardcoded routes.',
+      'The Fantasy service registers in Redis on startup with a 30s TTL heartbeat and is discovered dynamically. First-party widget sources are served natively by core.',
     hex: HEX.info,
     Watermark: RefreshCw,
   },
@@ -256,7 +256,7 @@ const TECH_STACK: Array<TechGroup> = [
     Icon: Server,
     hex: HEX.primary,
     items: [
-      { name: 'Go 1.22', detail: 'Fiber v2, pgx, Redis' },
+      { name: 'Go 1.25', detail: 'Fiber v2, pgx, Redis' },
       { name: 'SSE Hub', detail: 'Per-user Redis Pub/Sub channels' },
       { name: 'Logto', detail: 'Self-hosted OIDC, JWT validation' },
     ],
@@ -311,9 +311,9 @@ const TECH_STACK: Array<TechGroup> = [
     Icon: Cloud,
     hex: HEX.info,
     items: [
-      { name: 'Coolify', detail: 'Self-hosted PaaS' },
-      { name: 'Docker Compose', detail: 'Per-integration bundles' },
-      { name: 'Nixpacks', detail: 'Frontend builds' },
+      { name: 'Kubernetes', detail: 'DigitalOcean DOKS + DOCR' },
+      { name: 'GitHub Actions', detail: 'Build, deploy, smoke test' },
+      { name: 'nginx + cert-manager', detail: 'Ingress, TLS' },
     ],
     Watermark: Cloud,
   },

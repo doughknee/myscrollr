@@ -65,7 +65,10 @@ func (d *Discovery) run(ctx context.Context) {
 func (d *Discovery) refresh() {
 	ctx := context.Background()
 
-	// Scan for all channel:* keys
+	// Scan for all channel:* keys. Historical note: this pattern used to
+	// overlap the channel:subscribers:* sets (surviving only because GET
+	// on a SET errors and is skipped below); those sets were retired with
+	// ADR-0002, so the pattern now matches registrations only.
 	var cursor uint64
 	channels := make(map[string]*ChannelInfo)
 

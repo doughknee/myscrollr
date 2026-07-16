@@ -119,12 +119,12 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 
 - `gofmt` formatting. No custom linter. Go 1.25 across all modules.
 - All use Fiber v2, pgx v5, go-redis v9.
-- **Module isolation is absolute.** Each Go API has its own `go.mod`. No shared packages. Code duplication between channels is intentional — do not extract shared libraries.
-- Core API: `core/` sub-package, package-level vars (`DBPool`, `Rdb`), `Server` struct.
-- Channel APIs: flat `main` package, `App` struct holding deps (`db *pgxpool.Pool`, `rdb *redis.Client`).
+- Two Go modules: `api/` (core, incl. the folded widget sources) and `channels/fantasy/api/`. No shared packages between them — fantasy keeps the HTTP-only contract (ADR-0002 retired the old five-module duplication rule).
+- Core API: `core/` sub-package, package-level vars (`DBPool`, `Rdb`), `Server` struct. Widget sources register in `localSources` (`api/core/sources.go`).
+- Fantasy API: flat `main` package, `App` struct holding deps (`db *pgxpool.Pool`, `rdb *redis.Client`).
 - Naming: PascalCase exports, camelCase unexported, short receivers (`s *Server`, `a *App`), `snake_case` JSON tags. Constants are PascalCase, grouped with `=====` comment separators.
 - Error handling: `if err != nil` returns. `fmt.Errorf("context: %w", err)` wrapping. `log.Printf("[Context] message: %v", err)` with bracketed prefixes. `log.Fatalf` for startup failures. HTTP errors via `ErrorResponse` struct.
-- Registration: channels self-register in Redis with 30s TTL, 20s heartbeat.
+- Registration: fantasy self-registers in Redis with 30s TTL, 20s heartbeat.
 - **Keep `api/core/extension_auth.go` and `/extension/token` routes** — the desktop app uses these for PKCE auth despite the legacy naming.
 
 ## Code Style — Rust
@@ -147,17 +147,12 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 
 ## Architecture Rules
 
-> **Note:** Rules 1–3 are superseded for first-party widget sources by
-> [ADR-0002](docs/adr/0002-consolidate-widget-read-apis.md) — the finance,
-> sports, rss, and predictions Go read APIs are being folded into core-api
-> (Linear project "Backend consolidation", REL-10..17). Until each fold
-> lands, the rules below still describe the deployed system. Fantasy and
-> all Rust ingestion services keep the isolation model permanently.
+(Reshaped by [ADR-0002](docs/adr/0002-consolidate-widget-read-apis.md), July 2026.)
 
-1. **Core API has zero channel-specific code.** Discovers channels via Redis, proxies routes dynamically.
-2. **Channel isolation is absolute.** Each channel owns its Go API, ingestion service, configs, and Docker Compose.
-3. **HTTP-only contract.** No shared Go interfaces or types. Core proxies `/{name}/*` with `X-User-Sub` header. Channels never validate JWTs.
-4. **Topic-based CDC PubSub**: Core dispatches CDC events via Redis topic-based PubSub (O(1) per event).
+1. **Widget read APIs live in core.** Finance, sports, rss, and predictions are served natively by `api/core/{finance,sports,rss,predictions}.go` behind the `localSource` seam (`api/core/sources.go`): native routes registered ahead of the dynamic proxy, plus in-process dashboard/health/lifecycle hooks. Adding a data source = a Go package in core + (usually) a Rust ingester.
+2. **Ingestion is isolated.** Each source's poller is a separate Rust service with its own schedule, quota blast radius, and rollout cadence (fantasy ingests in-process in Go). Core reaches ingesters only via `INTERNAL_{SOURCE}_URL` health probes, plus the predictions candlesticks pass-through.
+3. **Fantasy is the one proxied channel service.** It self-registers in Redis (30s TTL heartbeat), is discovered and proxied dynamically, and trusts the `X-User-Sub` header core injects after JWT validation — it never sees tokens. The HTTP-only contract and module isolation still apply to it.
+4. **Topic-based CDC PubSub**: Core maps CDC events to topics in-process and dispatches via Redis PubSub (O(1) per event); every replica fans out to its own SSE clients (ADR-0001).
 5. **Desktop is the primary product.** The website serves marketing, auth, and billing only.
 
 ## Error Monitoring — Sentry
