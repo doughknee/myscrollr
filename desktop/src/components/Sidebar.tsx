@@ -148,7 +148,7 @@ export default function Sidebar({
   return (
     <aside
       className={clsx(
-        "flex flex-col shrink-0 border-r border-edge bg-surface-2 h-full overflow-hidden select-none transition-[width] duration-200 ease-out",
+        "flex flex-col shrink-0 h-full overflow-hidden select-none transition-[width] duration-200 ease-out",
         collapsed ? "w-[48px]" : "w-[200px]",
       )}
     >

@@ -847,7 +847,9 @@ function RootLayout() {
     <div
       id="app-shell"
       className={clsx(
-        "flex flex-col h-screen w-screen overflow-hidden bg-surface text-fg",
+        // surface-2 is the frame tone: TopBar + Sidebar sit directly
+        // on it; route content lives in the inset rounded panel below.
+        "flex flex-col h-screen w-screen overflow-hidden bg-surface-2 text-fg",
         !IS_MACOS && "custom-chrome",
       )}
     >
@@ -883,7 +885,7 @@ function RootLayout() {
             onTogglePin={handlePinToggle}
           />
 
-          <div className="flex flex-1 min-h-0 overflow-hidden">
+          <div className="flex flex-1 min-h-0 overflow-hidden gap-1.5 pr-1.5 pb-1.5">
             <Sidebar
               isSettings={route.isSettings}
               isTicker={route.isTicker}
@@ -904,7 +906,10 @@ function RootLayout() {
               onRemoveItem={handleRemoveItem}
             />
 
-            <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+            {/* Inset content canvas — the rounded panel that holds
+                every route. overflow-hidden clips page scroll to the
+                radius. */}
+            <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-surface rounded-xl border border-edge/50 shadow-sm">
               <ConnectionBanner deliveryMode={deliveryMode} tier={auth.tier} />
 
               {auth.sessionExpired && (

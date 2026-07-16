@@ -84,7 +84,7 @@ export default function TopBar({
       role="toolbar"
       aria-label="App controls"
       onMouseDown={handleDragRegion}
-      className="flex items-center h-11 shrink-0 px-3 gap-2 border-b border-edge/40 bg-surface-2/40 backdrop-blur-sm select-none"
+      className="flex items-center h-11 shrink-0 px-3 gap-2 select-none"
     >
       {/* ── Brand mark (left) ──────────────────────────────── */}
       <button
