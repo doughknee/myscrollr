@@ -2,20 +2,40 @@
  * ConnectionIndicator — small visual signal of "is the data on this
  * screen actually live, or am I looking at stale chips?"
  *
- * Surfaces the four-state derivation from `useDeliveryHealth`:
- *   - **live** (green pulse + gradient ring): the realtime stream is
- *     carrying updates. Universal — every tier streams (REL-27).
- *   - **polling** (mint): stream is reconnecting; poll keeps data current
- *   - **stale** (amber, with age label): data is aging
- *   - **offline** (red): we can't reach the server
+ * One icon per state, no text in the good states (the TopBar is icon
+ * language; ALL-CAPS labels shouted). Degraded states grow a short
+ * label — bad news should be louder than good news:
+ *   - **live** (green zap): the realtime stream is carrying updates
+ *   - **polling** (mint refresh): stream reconnecting; polls keep data current
+ *   - **stale** (amber clock + "X ago"): data is visibly aging
+ *   - **offline** (red wifi-off + "Offline"): can't reach the server
+ *
+ * The icon set matches ConnectionBanner (Zap / WifiOff) and the
+ * status page imports DELIVERY_STATE_META below, so every surface
+ * speaks the same visual language.
  *
  * The tooltip stays to a few words — clicking opens /status, which
- * explains the state properly and shows the backend's own health.
- * Detail belongs on a page, not in a hover.
+ * explains the state properly. Detail belongs on a page, not a hover.
  */
 import clsx from "clsx";
+import { Clock, RefreshCw, WifiOff, Zap } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Tooltip from "./Tooltip";
-import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
+import type {
+  DeliveryHealth,
+  DeliveryHealthState,
+} from "../hooks/useDeliveryHealth";
+
+/** Shared state → icon/color language (also used by /status). */
+export const DELIVERY_STATE_META: Record<
+  DeliveryHealthState,
+  { icon: LucideIcon; text: string; bg: string }
+> = {
+  live: { icon: Zap, text: "text-success", bg: "bg-success/10" },
+  polling: { icon: RefreshCw, text: "text-accent", bg: "bg-accent/10" },
+  stale: { icon: Clock, text: "text-warning", bg: "bg-warning/10" },
+  offline: { icon: WifiOff, text: "text-error", bg: "bg-error/10" },
+};
 
 interface ConnectionIndicatorProps {
   health: DeliveryHealth;
@@ -33,24 +53,11 @@ export default function ConnectionIndicator({
   active,
   className,
 }: ConnectionIndicatorProps) {
-  const dotColor =
-    health.state === "live"
-      ? "bg-success"
-      : health.state === "polling"
-        ? "bg-accent"
-        : health.state === "stale"
-          ? "bg-warning"
-          : "bg-error";
+  const meta = DELIVERY_STATE_META[health.state];
+  const Icon = meta.icon;
 
-  // Subtle pulse only for live — overuse on every state would feel
-  // busy. Stale/offline are deliberately static so they read as
-  // "frozen" / "dead".
-  const pulse = health.state === "live" ? "animate-pulse" : undefined;
-
-  // Gradient ring whenever the realtime stream is carrying updates.
-  // Real-time is universal (see useDeliveryHealth), so this is a pure
-  // status signal — ring = live, no ring = falling back to polling.
-  const showRing = health.state === "live";
+  // Good states are icon-only; degraded states earn a label.
+  const degraded = health.state === "stale" || health.state === "offline";
 
   return (
     <Tooltip content={`${health.label} — view status`} side="bottom">
@@ -60,38 +67,17 @@ export default function ConnectionIndicator({
         aria-current={active ? "page" : undefined}
         aria-label={`Connection status: ${health.label}. View status page.`}
         className={clsx(
-          "flex items-center gap-1.5 px-2 h-6 rounded-md select-none",
-          "text-[10px] font-mono uppercase tracking-wider transition-colors",
-          health.state === "live" || health.state === "polling"
-            ? "text-fg-3"
-            : health.state === "stale"
-              ? "text-warning"
-              : "text-error",
+          "flex items-center justify-center gap-1.5 h-7 rounded-md select-none transition-colors",
+          degraded ? "px-2" : "w-7",
+          meta.text,
           active ? "bg-surface-hover" : "hover:bg-surface-hover",
           className,
         )}
       >
-        <span className="relative inline-flex w-1.5 h-1.5">
-          {showRing && (
-            <span
-              aria-hidden
-              className="absolute -inset-1 rounded-full opacity-60"
-              style={{
-                background:
-                  "conic-gradient(from 0deg, var(--color-success), var(--color-accent), var(--color-info), var(--color-success))",
-                animation: "spin 4s linear infinite",
-              }}
-            />
-          )}
-          <span
-            className={clsx(
-              "relative inline-flex w-1.5 h-1.5 rounded-full",
-              dotColor,
-              pulse,
-            )}
-          />
-        </span>
-        <span>{health.label}</span>
+        <Icon size={13} strokeWidth={2.2} />
+        {degraded && (
+          <span className="text-ui-chip font-medium">{health.label}</span>
+        )}
       </button>
     </Tooltip>
   );
