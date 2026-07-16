@@ -16,7 +16,6 @@ import { renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { useDeliveryHealth } from "./useDeliveryHealth";
-import type { SubscriptionTier } from "../auth";
 
 // Build a wrapper that seeds the dashboard query cache with a known
 // `dataUpdatedAt` so we don't have to fire actual fetches.
@@ -49,7 +48,6 @@ function buildHarness(opts: {
 
 function setupHook(args: {
   deliveryMode?: "polling" | "sse";
-  tier?: SubscriptionTier;
   now?: number;
   dataUpdatedAt?: number;
   hasData?: boolean;
@@ -62,7 +60,6 @@ function setupHook(args: {
     () =>
       useDeliveryHealth({
         deliveryMode: args.deliveryMode ?? "polling",
-        tier: args.tier ?? "free",
         now: args.now,
       }),
     { wrapper },
@@ -95,42 +92,46 @@ describe("useDeliveryHealth — state machine", () => {
     expect(result.current.label).toMatch(/ago/);
   });
 
-  it("returns live for ultimate users with fresh sse data", () => {
+  it("returns live with fresh sse data", () => {
     const { result } = setupHook({
       now: NOW,
       dataUpdatedAt: NOW - 10_000,
       deliveryMode: "sse",
-      tier: "uplink_ultimate",
     });
     expect(result.current.state).toBe("live");
-    expect(result.current.sseEligible).toBe(true);
     expect(result.current.label).toBe("Live");
   });
 
-  it("returns polling for non-ultimate users even with sse mode", () => {
-    // Defensive: shouldn't happen in practice (SSE isn't started for
-    // lower tiers), but if backend or a bug puts a Free user in
-    // deliveryMode='sse', we still surface 'polling' because they're
-    // not eligible for the live label.
+  // Regression guard for REL-27: this hook used to gate "live" behind
+  // SSE_TIERS (ultimate/super_user), so a Free user on a working
+  // stream rendered "Polling". Real-time is universal — tier is not an
+  // input to delivery health at all.
+  it("returns live on sse regardless of tier", () => {
     const { result } = setupHook({
       now: NOW,
       dataUpdatedAt: NOW - 10_000,
       deliveryMode: "sse",
-      tier: "free",
     });
-    expect(result.current.state).toBe("polling");
-    expect(result.current.sseEligible).toBe(false);
+    expect(result.current.state).toBe("live");
   });
 
-  it("returns polling for ultimate users on polling delivery", () => {
+  it("returns polling on polling delivery (stream reconnecting)", () => {
     const { result } = setupHook({
       now: NOW,
       dataUpdatedAt: NOW - 5_000,
       deliveryMode: "polling",
-      tier: "uplink_ultimate",
     });
     expect(result.current.state).toBe("polling");
-    expect(result.current.sseEligible).toBe(true);
+  });
+
+  it("never upsells a tier in the polling description", () => {
+    const { result } = setupHook({
+      now: NOW,
+      dataUpdatedAt: NOW - 5_000,
+      deliveryMode: "polling",
+    });
+    expect(result.current.description).not.toMatch(/upgrade|ultimate/i);
+    expect(result.current.description).toMatch(/reconnect/i);
   });
 });
 
@@ -142,7 +143,6 @@ describe("useDeliveryHealth — boundaries", () => {
       now: NOW,
       dataUpdatedAt: NOW - 60_000,
       deliveryMode: "sse",
-      tier: "uplink_ultimate",
     });
     // 60_000ms exactly is NOT > STALE_THRESHOLD (60_000), so still fresh.
     expect(result.current.state).toBe("live");
@@ -153,7 +153,6 @@ describe("useDeliveryHealth — boundaries", () => {
       now: NOW,
       dataUpdatedAt: NOW - 60_001,
       deliveryMode: "sse",
-      tier: "uplink_ultimate",
     });
     expect(result.current.state).toBe("stale");
   });
@@ -173,20 +172,14 @@ describe("useDeliveryHealth — descriptions", () => {
       now: 1_700_000_000_000,
       dataUpdatedAt: 1_700_000_000_000 - 1_000,
       deliveryMode: "sse",
-      tier: "uplink_ultimate",
     });
     expect(result.current.description).toMatch(/realtime/i);
   });
 
-  it("nudges non-ultimate polling users toward upgrade", () => {
-    const { result } = setupHook({
-      now: 1_700_000_000_000,
-      dataUpdatedAt: 1_700_000_000_000 - 1_000,
-      deliveryMode: "polling",
-      tier: "free",
-    });
-    expect(result.current.description.toLowerCase()).toContain("upgrade");
-  });
+  // The old "nudges non-ultimate polling users toward upgrade" test
+  // lived here. It asserted copy that became false when real-time went
+  // universal (REL-27) — polling is now a reconnect state, not a plan
+  // limit. The state-machine block asserts the replacement copy.
 
   it("describes the offline state as a connection problem", () => {
     const { result } = setupHook({});

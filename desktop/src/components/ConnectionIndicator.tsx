@@ -48,10 +48,11 @@ export default function ConnectionIndicator({
   // they read as "frozen" / "dead".
   const pulse = health.state === "live" ? "animate-pulse" : undefined;
 
-  // Gradient ring around the dot only when SSE is eligible AND active.
-  // Visually rewards Ultimate users for paying, and never appears
-  // for free-tier users (avoids "what's that ring?" confusion).
-  const showRing = health.sseEligible && health.state === "live";
+  // Gradient ring around the dot whenever the realtime stream is
+  // carrying updates. Real-time is universal (see useDeliveryHealth),
+  // so this is a pure status signal — ring = live, no ring = falling
+  // back to polling.
+  const showRing = health.state === "live";
 
   return (
     <Tooltip

@@ -422,7 +422,6 @@ function RootLayout() {
   }, []);
   const deliveryHealth = useDeliveryHealth({
     deliveryMode,
-    tier: auth.tier,
     now: healthNow,
   });
 
@@ -924,7 +923,7 @@ function RootLayout() {
                 every route. overflow-hidden clips page scroll to the
                 radius. */}
             <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-surface rounded-xl border border-edge/50 shadow-sm">
-              <ConnectionBanner deliveryMode={deliveryMode} tier={auth.tier} />
+              <ConnectionBanner deliveryMode={deliveryMode} />
 
               {auth.sessionExpired && (
                 <div className="flex items-center justify-between px-4 py-2 bg-warn/10 border-b border-warn/20 shrink-0">

@@ -1,6 +1,8 @@
 /**
  * ConnectionBanner — reassures users when SSE is down but polling is
- * keeping data current.
+ * keeping data current. Applies to every tier: real-time delivery is
+ * universal (see useDeliveryHealth), so a dropped stream is always
+ * worth explaining.
  *
  * The CDC + polling redundancy means users never actually lose data when
  * the stream drops, but without a visible cue they perceive "the app is
@@ -17,19 +19,11 @@ import { WifiOff, Zap } from "lucide-react";
 interface ConnectionBannerProps {
   /** Current delivery mode — from the SSE state source of truth. */
   deliveryMode: "sse" | "polling" | "offline";
-  /** User's tier — determines whether SSE is the expected baseline. */
-  tier: string;
 }
 
 const DISMISS_STORAGE_KEY = "scrollr:connbanner-dismissed";
 
-/**
- * Tiers that expect live SSE delivery. Lower tiers are poll-only, so a
- * "using polling" banner would be noise for them.
- */
-const SSE_TIERS = new Set(["uplink_ultimate", "super_user"]);
-
-export default function ConnectionBanner({ deliveryMode, tier }: ConnectionBannerProps) {
+export default function ConnectionBanner({ deliveryMode }: ConnectionBannerProps) {
   const [dismissed, setDismissed] = useState<boolean>(() =>
     localStorage.getItem(DISMISS_STORAGE_KEY) === deliveryMode,
   );
@@ -46,8 +40,10 @@ export default function ConnectionBanner({ deliveryMode, tier }: ConnectionBanne
     }
   }, [deliveryMode]);
 
-  const expectsSse = SSE_TIERS.has(tier);
-  const visible = !dismissed && expectsSse && deliveryMode !== "sse";
+  // Every tier expects the live stream now, so any non-sse mode is
+  // worth explaining — it means the stream dropped, not that the plan
+  // doesn't include it.
+  const visible = !dismissed && deliveryMode !== "sse";
   if (!visible) return null;
 
   const Icon = deliveryMode === "offline" ? WifiOff : Zap;
