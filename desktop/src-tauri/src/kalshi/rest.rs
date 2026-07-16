@@ -13,9 +13,9 @@ use super::model::{
     RawPositionsResponse, RestingOrder,
 };
 use super::sign::Signer;
-use super::{KalshiEnv, API_PREFIX};
+use super::{API_PREFIX, PROD_REST_BASE};
 
-/// A thin signed REST client bound to one credential + environment.
+/// A thin signed REST client bound to one credential.
 #[derive(Clone)]
 pub struct RestClient {
     base: String,
@@ -24,13 +24,13 @@ pub struct RestClient {
 }
 
 impl RestClient {
-    pub fn new(env: KalshiEnv, signer: Signer) -> Result<Self> {
+    pub fn new(signer: Signer) -> Result<Self> {
         let http = Client::builder()
             .timeout(Duration::from_secs(15))
             .build()
             .context("build reqwest client")?;
         Ok(Self {
-            base: env.rest_base().to_string(),
+            base: PROD_REST_BASE.to_string(),
             signer,
             http,
         })

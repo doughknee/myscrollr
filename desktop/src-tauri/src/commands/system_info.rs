@@ -16,9 +16,7 @@ use crate::state::{GpuDynamic, StaticSystemInfo, SysInfoInner, SysInfoState};
 /// only exists in `std::os::windows::process::CommandExt` so the
 /// import + call is gated on `cfg(windows)`. On macOS/Linux the
 /// returned Command is identical to `Command::new(name)`.
-pub(crate) fn system_info_quiet_command(name: &str) -> std::process::Command { quiet_command(name) }
-
-fn quiet_command(name: &str) -> std::process::Command {
+pub(crate) fn quiet_command(name: &str) -> std::process::Command {
     // The `mut` is only needed on Windows where we call
     // `cmd.creation_flags(...)` below. The `#[allow(unused_mut)]`
     // silences the harmless warning on macOS/Linux without breaking

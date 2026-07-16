@@ -7,7 +7,7 @@ package core
 
 import "testing"
 
-func TestExtractSymbolsFromConfig(t *testing.T) {
+func TestExtractStringArraySymbols(t *testing.T) {
 	tests := []struct {
 		name   string
 		config map[string]interface{}
@@ -52,13 +52,13 @@ func TestExtractSymbolsFromConfig(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := extractSymbolsFromConfig(tc.config)
+			got := extractStringArray(tc.config, "symbols")
 			if len(got) != len(tc.want) {
-				t.Fatalf("extractSymbolsFromConfig = %v, want %v", got, tc.want)
+				t.Fatalf("extractStringArray = %v, want %v", got, tc.want)
 			}
 			for i := range got {
 				if got[i] != tc.want[i] {
-					t.Errorf("extractSymbolsFromConfig[%d] = %q, want %q", i, got[i], tc.want[i])
+					t.Errorf("extractStringArray[%d] = %q, want %q", i, got[i], tc.want[i])
 				}
 			}
 		})

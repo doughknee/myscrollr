@@ -279,7 +279,7 @@ func getUserFinanceSymbols(ctx context.Context, logtoSub string) []string {
 		if err := json.Unmarshal(configJSON, &config); err != nil {
 			continue
 		}
-		for _, s := range extractSymbolsFromConfig(config) {
+		for _, s := range extractStringArray(config, "symbols") {
 			if !seen[s] {
 				seen[s] = true
 				symbols = append(symbols, s)

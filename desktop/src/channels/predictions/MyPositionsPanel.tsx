@@ -79,7 +79,7 @@ export default function MyPositionsPanel({ markets, hex }: MyPositionsPanelProps
     let active = true;
     kalshiStatus()
       .then((s) => active && setCredStatus(s))
-      .catch(() => active && setCredStatus({ connected: false, key_id: null, env: null }));
+      .catch(() => active && setCredStatus({ connected: false, key_id: null }));
     return () => {
       active = false;
     };
@@ -148,7 +148,7 @@ export default function MyPositionsPanel({ markets, hex }: MyPositionsPanelProps
     await kalshiDisconnect().catch(() => {});
     queryClient.removeQueries({ queryKey: PORTFOLIO_KEY });
     setStreamStatus("disconnected");
-    setCredStatus({ connected: false, key_id: null, env: null });
+    setCredStatus({ connected: false, key_id: null });
   }, [queryClient]);
 
   const handleConnected = useCallback(
@@ -341,7 +341,7 @@ export default function MyPositionsPanel({ markets, hex }: MyPositionsPanelProps
       {/* Footer: disconnect */}
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-edge/30 px-4 py-3">
         <span className="font-mono text-[10.5px] text-fg-4">
-          Linked on this device{credStatus?.env === "demo" ? " · demo" : ""} · read-only
+          Linked on this device · read-only
         </span>
         <button
           type="button"

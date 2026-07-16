@@ -20,12 +20,10 @@ import { invoke } from "@tauri-apps/api/core";
 export interface CredentialStatus {
   connected: boolean;
   key_id: string | null;
-  env: string | null;
 }
 
 export interface ConnectResult {
   key_id: string;
-  env: string;
   balance_cents: number;
 }
 
@@ -110,12 +108,10 @@ export function kalshiStatus(): Promise<CredentialStatus> {
 export function kalshiConnect(args: {
   keyId: string;
   pemPath: string;
-  env?: "prod" | "demo";
 }): Promise<ConnectResult> {
   return invoke<ConnectResult>("kalshi_connect", {
     keyId: args.keyId,
     pemPath: args.pemPath,
-    env: args.env ?? "prod",
   });
 }
 

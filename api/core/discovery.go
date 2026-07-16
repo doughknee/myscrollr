@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -174,10 +175,5 @@ func GetChannelRoutes() []struct {
 
 // HasCapability checks if a channel has a specific capability.
 func (info *ChannelInfo) HasCapability(cap string) bool {
-	for _, c := range info.Capabilities {
-		if c == cap {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(info.Capabilities, cap)
 }

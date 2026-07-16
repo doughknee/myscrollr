@@ -725,7 +725,7 @@ func getUserSportsLeagues(ctx context.Context, logtoSub string) []string {
 		if err := json.Unmarshal(configJSON, &config); err != nil {
 			continue
 		}
-		for _, l := range extractLeaguesFromConfig(config) {
+		for _, l := range extractStringArray(config, "leagues") {
 			if !seen[l] {
 				seen[l] = true
 				leagues = append(leagues, l)

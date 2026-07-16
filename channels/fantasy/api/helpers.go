@@ -182,20 +182,6 @@ func Decrypt(encrypted string) (string, error) {
 // URL / Environment Helpers
 // =============================================================================
 
-// CleanFQDN reads COOLIFY_FQDN from the environment and returns the bare
-// hostname with any scheme prefix (https://, http://) and trailing slash
-// stripped. Returns an empty string if the variable is not set.
-func CleanFQDN() string {
-	fqdn := os.Getenv("COOLIFY_FQDN")
-	if fqdn == "" {
-		return ""
-	}
-	fqdn = strings.TrimPrefix(fqdn, "https://")
-	fqdn = strings.TrimPrefix(fqdn, "http://")
-	fqdn = strings.TrimSuffix(fqdn, "/")
-	return fqdn
-}
-
 // ValidateURL cleans a URL string, ensuring it has a scheme prefix.
 // Returns the fallback if the input is empty.
 func ValidateURL(urlStr, fallback string) string {
