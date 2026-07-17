@@ -18,7 +18,9 @@ export function GearMenu({
   ariaLabel?: string;
   /** Panel anchor/size classes (MenuPanel is absolute to this wrapper). */
   panelClassName?: string;
-  children: React.ReactNode;
+  /** Panel contents; pass a function to receive `close` (for rows that
+   *  navigate away and should dismiss the popover). */
+  children: React.ReactNode | ((close: () => void) => React.ReactNode);
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -45,7 +47,11 @@ export function GearMenu({
         <Settings size={13} />
       </button>
       <AnimatePresence>
-        {open && <MenuPanel className={panelClassName}>{children}</MenuPanel>}
+        {open && (
+          <MenuPanel className={panelClassName}>
+            {typeof children === "function" ? children(close) : children}
+          </MenuPanel>
+        )}
       </AnimatePresence>
     </div>
   );

@@ -26,20 +26,15 @@ import {
   DisplayRow,
   ActionRow,
 } from "../../components/settings/SettingsControls";
-import UpgradePrompt from "../../components/UpgradePrompt";
 import { useShell } from "../../shell-context";
 import { SPORT_EMOJI, sportLabel } from "./types";
 import type { LeagueResponse } from "./types";
-import type { SubscriptionTier } from "../../auth";
 
 const LEAGUES_PER_PAGE = 6;
 
 interface ConnectedViewProps {
   leagues: LeagueResponse[];
   yahooConnected: boolean;
-  atLeagueLimit: boolean;
-  maxLeagues: number;
-  subscriptionTier: SubscriptionTier;
   hex: string;
   /** Discovery ran but Yahoo returned zero leagues for this account. */
   noLeaguesFound: boolean;
@@ -50,9 +45,6 @@ interface ConnectedViewProps {
 export function ConnectedView({
   leagues,
   yahooConnected,
-  atLeagueLimit,
-  maxLeagues,
-  subscriptionTier,
   hex,
   noLeaguesFound,
   onStartDiscovery,
@@ -141,18 +133,6 @@ export function ConnectedView({
             <DisplayRow label="Finished / past" value={String(pastCount)} />
           )}
         </Section>
-      )}
-
-      {/* Upgrade prompt at limit */}
-      {atLeagueLimit && (
-        <div className="mb-4 px-3">
-          <UpgradePrompt
-            current={leagues.length}
-            max={maxLeagues}
-            noun="Fantasy leagues"
-            tier={subscriptionTier}
-          />
-        </div>
       )}
 
       {/* League management */}

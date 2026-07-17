@@ -11,7 +11,9 @@ import { MenuPanel, MenuRow, useDismiss } from "./Menu";
 
 export interface SelectOption<T extends string> {
   value: T;
-  label: string;
+  /** Usually a string; richer nodes (icon + text) render fine in both
+   *  the trigger and the rows. */
+  label: React.ReactNode;
 }
 
 export function SelectMenu<T extends string>({
