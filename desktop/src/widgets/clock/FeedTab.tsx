@@ -18,7 +18,7 @@ export const clockWidget: WidgetManifest = {
     usage: [
       "Your local time appears in the Clock feed and can appear on the ticker.",
       "Add world clocks from the feed view to track more time zones.",
-      "Turn on world clocks in Configure to include selected time zones on the ticker.",
+      "Turn on world clocks from the gear menu to include selected time zones on the ticker.",
       "Use the 12h/24h control to change clock formatting.",
     ],
   },

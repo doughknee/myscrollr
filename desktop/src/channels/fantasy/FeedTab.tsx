@@ -71,7 +71,7 @@ export const fantasyChannel: ChannelManifest = {
       "your Yahoo Fantasy leagues. Scores, injuries, and seedings update in " +
       "near real time as games play out.",
     usage: [
-      "Import your leagues from the Configure tab.",
+      "Connect Yahoo from the gear menu to import your leagues.",
       "Pick a primary league to surface as the hero view.",
       "Flip between Overview, Matchup, Standings, and Roster to manage your teams.",
     ],

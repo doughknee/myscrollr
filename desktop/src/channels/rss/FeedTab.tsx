@@ -69,7 +69,7 @@ export const rssChannel: ChannelManifest = {
       "Collect articles from your favorite websites into one place. " +
       "New articles appear automatically as they are published.",
     usage: [
-      "Open Configure to add news sources.",
+      "Manage feeds from the Feeds view (Custom RSS).",
       "Articles are sorted by publish date, newest first.",
       "Click any article to open it in your browser.",
     ],
@@ -462,7 +462,7 @@ function RssFeedTab({ mode, feedContext, onConfigure, widgetId }: FeedTabProps) 
             actionHint="add websites"
             actionLabel={isComfort && isCustom ? "Add feeds" : undefined}
             onConfigure={
-              isComfort && isCustom ? () => setView("feeds") : onConfigure
+              isComfort && isCustom ? () => setView("feeds") : undefined
             }
           />
         </div>

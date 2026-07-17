@@ -598,16 +598,6 @@ function RootLayout() {
     onPrefsChange: persistPrefs,
   });
 
-  const handleConfigureItem = useCallback(
-    (id: string, kind: "channel" | "widget") => {
-      if (kind === "channel") {
-        navigate({ to: "/channel/$type/$tab", params: { type: id, tab: "configuration" } });
-      } else {
-        navigate({ to: "/widget/$id/$tab", params: { id, tab: "configuration" } });
-      }
-    },
-    [navigate],
-  );
 
   const handleInfoItem = useCallback(
     (id: string) => navigate({ to: "/widget/$id/info", params: { id } }),
@@ -916,7 +906,6 @@ function RootLayout() {
               onNavigateToAccount={handleNavigateToAccount}
               onNavigateToSupport={handleNavigateToSupport}
               onSelectItem={handleSelectPinned}
-              onConfigureItem={handleConfigureItem}
               onInfoItem={handleInfoItem}
               onToggleItemTicker={handleToggleItemTicker}
               onRemoveItem={handleRemoveItem}

@@ -113,7 +113,7 @@ interface ScrollrTickerProps {
   /**
    * When true, this row should render the "you have channels installed
    * but none are currently on the ticker" CTA — a row of per-channel
-   * quick-link chips that open each channel's Configure tab. Mutually
+   * quick-link chips that open each channel (ticker toggle lives in-widget). Mutually
    * exclusive with `showSourcelessCTA`; only one fires at a time.
    * Parent (App.tsx) gates this on first row + authenticated + has
    * installed channels + no ticker-enabled channels + no pinned widgets.
@@ -132,7 +132,7 @@ interface ScrollrTickerProps {
     icon: React.ComponentType<{ size?: number; className?: string }>;
   }>;
   /** Click handler for the per-channel quick-link chips (opens Configure). */
-  onConfigureChannel?: (channelId: string) => void;
+  onOpenChannel?: (channelId: string) => void;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -179,7 +179,7 @@ export default function ScrollrTicker({
   onAddSources,
   showInstalledOffCTA = false,
   installedChannels = [],
-  onConfigureChannel,
+  onOpenChannel,
 }: ScrollrTickerProps) {
   // Per-row overrides shadow the globals. The Ultimate-gate is enforced
   // upstream — Settings only lets Ultimate/super_user WRITE these fields,
@@ -814,8 +814,8 @@ export default function ScrollrTicker({
                   <button
                     key={ch.id}
                     type="button"
-                    onClick={() => onConfigureChannel?.(ch.id)}
-                    disabled={!onConfigureChannel}
+                    onClick={() => onOpenChannel?.(ch.id)}
+                    disabled={!onOpenChannel}
                     className={clsx(
                       "inline-flex items-center gap-1.5 shrink-0 rounded-md",
                       "px-2 py-1 text-ui-meta font-semibold",
@@ -827,7 +827,7 @@ export default function ScrollrTicker({
                       backgroundColor: `${ch.hex}14`,   // ~8% alpha
                       borderColor: `${ch.hex}3D`,       // ~24% alpha
                     }}
-                    title={`Configure ${ch.name}`}
+                    title={`Open ${ch.name}`}
                   >
                     <ChannelIcon size={12} className="shrink-0" />
                     <span className="truncate">{ch.name}</span>

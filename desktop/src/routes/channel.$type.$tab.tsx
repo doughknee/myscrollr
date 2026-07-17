@@ -72,7 +72,7 @@ function ChannelRoute() {
           dashboard={dashboard}
           dashboardFetching={dashboardFetching}
           channel={channel}
-          onConfigure={() => navigate({ to: "/channel/$type/$tab", params: { type, tab: "configuration" } })}
+          onConfigure={() => navigate({ to: "/channel/$type/$tab", params: { type, tab: "feed" } })}
         />
       )}
       {tab === "configuration" && (

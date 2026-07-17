@@ -63,7 +63,7 @@ export const financeChannel: ChannelManifest = {
       "Track stocks, ETFs, and cryptocurrencies with live price updates. " +
       "Prices update automatically so your feed always shows the latest.",
     usage: [
-      "Open Configure to add symbols and start tracking.",
+      "Open the Symbols view to choose what to track.",
       "Prices update automatically when connected.",
       "Click any symbol to view its chart on Google Finance.",
     ],
@@ -385,7 +385,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure, widgetId }
             loadingNoun="prices"
             actionHint="choose what to track"
             actionLabel={isComfort ? "Choose symbols to track" : undefined}
-            onConfigure={isComfort ? () => setView("symbols") : onConfigure}
+            onConfigure={isComfort ? () => setView("symbols") : undefined}
           />
         </div>
       ) : filtered.length === 0 ? (

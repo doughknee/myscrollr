@@ -95,7 +95,7 @@ interface DataWidgetDef {
 // steps, so we name them once and reuse. Per-widget `usage` overrides these.
 const USAGE_TEAM_SPORT = [
   "Live scores and game state update automatically.",
-  "Set a favorite team in Configure to keep it front and center.",
+  "Set a favorite team from the gear menu to keep it front and center.",
   "Pin it on game days so scores stay on screen.",
 ];
 const USAGE_NEWS = [
@@ -117,7 +117,7 @@ const DATA_WIDGETS: DataWidgetDef[] = [
     addConfig: { symbols: [], asset_class: "stock" },
     about: "Real-time stock and ETF prices for the tickers you follow. Your watchlist streams live as the market moves — no brokerage app open, no tab to babysit.",
     usage: [
-      "Add the tickers you want to watch in Configure.",
+      "Add the tickers you want to watch from the Symbols view.",
       "Quotes stream in real time during market hours.",
       "Pin it to keep your watchlist always visible.",
     ],
@@ -128,7 +128,7 @@ const DATA_WIDGETS: DataWidgetDef[] = [
     addConfig: { symbols: [], asset_class: "crypto" },
     about: "Live crypto prices for the coins you track, streamed around the clock. From BTC and ETH to the long tail, your picks update the moment the market does.",
     usage: [
-      "Add the coins you want to watch in Configure.",
+      "Add the coins you want to watch from the Symbols view.",
       "Prices stream 24/7 — crypto never closes.",
       "Pin it so every big move catches your eye.",
     ],
@@ -302,7 +302,7 @@ const DATA_WIDGETS: DataWidgetDef[] = [
     addConfig: { feeds: [] },
     about: "Bring your own feeds. Paste any RSS or Atom URL and Scrollr streams its latest items alongside everything else.",
     usage: [
-      "Paste any RSS or Atom feed URL in Configure.",
+      "Paste any RSS or Atom feed URL in the Feeds view.",
       "Add as many feeds as you like — they merge into one stream.",
       "Perfect for niche blogs, newsletters, or subreddits with a feed.",
     ],
@@ -315,7 +315,7 @@ const DATA_WIDGETS: DataWidgetDef[] = [
     description: "Your Yahoo Fantasy leagues, matchups, and standings.",
     about: "Your Yahoo Fantasy leagues in the ticker — live scoring, matchups, and standings without ever opening the app.",
     usage: [
-      "Connect your Yahoo account in Configure.",
+      "Connect your Yahoo account from the gear menu.",
       "Leagues, matchups, and standings sync automatically.",
       "Live scoring updates while your players are on the field.",
     ],

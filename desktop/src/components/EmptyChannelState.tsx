@@ -4,20 +4,12 @@
  * Replaces the repeated empty-state pattern in finance, sports, rss, and
  * fantasy feeds.
  *
- * Copy is pointed at the **"Options" pill in the TopBar** — the
- * Settings2 icon + "Options" label rendered next to the page title.
- * That pill is the canonical menu trigger on source pages (channel +
- * widget). The CTA button still jumps directly to the Configure sub-
- * tab so the one-tap fix is preserved; the surrounding copy teaches
- * the user where the menu lives so they can do it themselves next
- * time.
- *
- * Walkthrough fix 2026-05-11 — previously this tip pointed at a
- * breadcrumb dropdown (channel name + chevron) which no longer exists
- * after the source-page menu was consolidated under the Options pill.
+ * Since the configure-page teardown, every widget's settings live
+ * in-widget (bar + gear popover); the CTA (when a channel passes one)
+ * opens the relevant in-feed view, and the tip points at the gear.
  */
 import { clsx } from "clsx";
-import { ChevronDown, Settings2 } from "lucide-react";
+import { Settings2 } from "lucide-react";
 
 interface EmptyChannelStateProps {
   icon: React.ComponentType<{ size?: number; className?: string }>;
@@ -88,11 +80,11 @@ export default function EmptyChannelState({
                 "transition-colors active:scale-[0.97]",
               )}
             >
-              {actionLabel ?? `Open Configure to ${actionHint ?? `add ${noun}`}`}
+              {actionLabel ?? actionHint ?? `Add ${noun}`}
             </button>
           ) : null}
           <p className="text-[11px] text-fg-4/80 text-center max-w-sm leading-relaxed">
-            Tip: click{" "}
+            Tip: every widget's settings live in its own bar and{" "}
             <span
               className={clsx(
                 "inline-flex items-center gap-1 align-baseline",
@@ -101,10 +93,9 @@ export default function EmptyChannelState({
               )}
             >
               <Settings2 size={9} strokeWidth={2.5} aria-hidden="true" />
-              Options
-              <ChevronDown size={9} strokeWidth={2.5} aria-hidden="true" />
+              gear
             </span>{" "}
-            in the title bar to open this menu yourself next time.
+            menu at the top of the widget.
           </p>
           <p className="text-[11px] text-fg-4/70 text-center max-w-sm leading-relaxed">
             Looking for a different source? Use{" "}

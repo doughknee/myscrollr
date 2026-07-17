@@ -41,7 +41,7 @@ export const uptimeWidget: WidgetManifest = {
     usage: [
       "Paste your Uptime Kuma public status page URL to connect.",
       "All monitors from your status page appear with their current status.",
-      "Hide specific monitors from the ticker in the Configure tab.",
+      "Hide specific monitors from the ticker via the gear menu.",
       "Configure the poll interval to control how often statuses refresh.",
     ],
   },

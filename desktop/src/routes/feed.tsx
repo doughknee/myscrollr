@@ -251,8 +251,6 @@ function HomePage() {
           normalizeChannelData(source, dashboard?.data?.[source]),
           ch.config as Record<string, unknown> | undefined,
         );
-        const hasData = channelData.length > 0;
-        const targetTab = hasData ? "feed" : "configuration";
         return (
           <motion.div
             key={ch.channel_type}
@@ -285,13 +283,15 @@ function HomePage() {
               onRowClick={() =>
                 navigate({
                   to: "/channel/$type/$tab",
-                  params: { type: ch.channel_type, tab: targetTab },
+                  params: { type: ch.channel_type, tab: "feed" },
                 })
               }
+              // Config lives inside the widget now — every CTA lands on
+              // the feed, where the bar/gear carries the configuration.
               onConfigure={() =>
                 navigate({
                   to: "/channel/$type/$tab",
-                  params: { type: ch.channel_type, tab: "configuration" },
+                  params: { type: ch.channel_type, tab: "feed" },
                 })
               }
             />
@@ -881,11 +881,11 @@ function FantasyRows({ data, filter, onConfigure }: { data: unknown; filter: str
 
 // ── Empty data row ──────────────────────────────────────────────
 
-const EMPTY_HINTS: Record<string, { message: string; action: string }> = {
-  finance: { message: "No stocks configured yet", action: "choose what to track" },
-  sports: { message: "No leagues configured yet", action: "pick your leagues" },
-  rss: { message: "No feeds configured yet", action: "add websites to follow" },
-  fantasy: { message: "No leagues imported yet", action: "connect Yahoo Fantasy" },
+const EMPTY_HINTS: Record<string, { message: string; name: string }> = {
+  finance: { message: "No stocks configured yet", name: "Finance" },
+  sports: { message: "No leagues configured yet", name: "Sports" },
+  rss: { message: "No feeds configured yet", name: "News" },
+  fantasy: { message: "No leagues imported yet", name: "Fantasy" },
 };
 
 function EmptyDataRow({
@@ -910,7 +910,7 @@ function EmptyDataRow({
           className="inline-flex items-center gap-1.5 text-[11px] text-accent hover:text-accent/80 transition-colors"
         >
           <Settings size={11} />
-          Open Settings to {hint.action}
+          Open {hint.name}
         </button>
       )}
     </div>

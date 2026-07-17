@@ -153,13 +153,6 @@ function WidgetInfoPage() {
       navigate({ to: "/widget/$id/$tab", params: { id: item.id, tab: "feed" } });
     }
   };
-  const configureWidget = () => {
-    if (item.kind === "data") {
-      navigate({ to: "/channel/$type/$tab", params: { type: item.id, tab: "configuration" } });
-    } else {
-      navigate({ to: "/widget/$id/$tab", params: { id: item.id, tab: "configuration" } });
-    }
-  };
 
   // Primary hero action for a widget that is NOT yet added.
   type HeroAction = {
@@ -282,13 +275,6 @@ function WidgetInfoPage() {
                       size={15}
                       className="transition-transform duration-200 group-hover/btn:translate-x-0.5"
                     />
-                  </button>
-                  <button
-                    onClick={configureWidget}
-                    className="rounded-lg bg-white/15 px-4 py-2.5 text-ui-body font-semibold backdrop-blur-sm transition-colors hover:bg-white/25"
-                    style={{ color: textOn }}
-                  >
-                    Configure
                   </button>
                 </>
               ) : primaryAction ? (

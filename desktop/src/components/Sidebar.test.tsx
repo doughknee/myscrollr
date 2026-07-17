@@ -42,7 +42,6 @@ function renderSidebar(opts: {
       onNavigateToAccount={() => {}}
       onNavigateToSupport={() => {}}
       onSelectItem={() => {}}
-      onConfigureItem={() => {}}
       onInfoItem={() => {}}
       onToggleItemTicker={() => {}}
       onRemoveItem={() => {}}

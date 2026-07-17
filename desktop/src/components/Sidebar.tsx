@@ -98,8 +98,6 @@ interface SidebarProps {
   onSelectItem: (id: string, kind: "channel" | "widget") => void;
 
   // ── Context-menu actions (v1.1.2: right-click a source row) ──
-  /** Open the source's Configure tab. */
-  onConfigureItem: (id: string, kind: "channel" | "widget") => void;
   /** Open the widget's catalog info page. */
   onInfoItem: (id: string) => void;
   /** Toggle the source's presence on the ticker. */
@@ -127,7 +125,6 @@ export default function Sidebar({
   onNavigateToAccount,
   onNavigateToSupport,
   onSelectItem,
-  onConfigureItem,
   onInfoItem,
   onToggleItemTicker,
   onRemoveItem,
@@ -293,12 +290,6 @@ export default function Sidebar({
                   label: "Open",
                   icon: ArrowUpRight,
                   onSelect: () => onSelectItem(menu.source.id, menu.source.kind),
-                },
-                {
-                  key: "configure",
-                  label: "Configure",
-                  icon: Settings2,
-                  onSelect: () => onConfigureItem(menu.source.id, menu.source.kind),
                 },
                 {
                   key: "ticker",

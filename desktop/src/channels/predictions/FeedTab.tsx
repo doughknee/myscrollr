@@ -577,7 +577,6 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
             dashboardLoaded={!!feedContext.__dashboardLoaded}
             loadingNoun="odds"
             actionHint="manage your watchlist"
-            onConfigure={onConfigure}
           />
         </div>
       </div>

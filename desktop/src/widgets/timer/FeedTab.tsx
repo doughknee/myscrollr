@@ -18,8 +18,8 @@ export const timerWidget: WidgetManifest = {
     usage: [
       "Choose Pomodoro, Countdown, or Stopwatch from the mode selector.",
       "Use Space to start or pause and R to reset while the timer feed is focused.",
-      "Enable active timer ticker output in the Configure tab.",
-      "Adjust Pomodoro session lengths and long-break cadence in Configure.",
+      "Enable active timer ticker output from the gear menu.",
+      "Adjust Pomodoro session lengths and long-break cadence from the gear menu.",
     ],
   },
   FeedTab: TimerFeedTab,
