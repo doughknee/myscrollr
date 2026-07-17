@@ -199,6 +199,48 @@ async function run() {
     await page.close();
   }
 
+  // ════ 1440px — gear popover (in-widget Display settings) ═════════
+  {
+    const { page, consoleErrors } = await newPage(browser, 1440, 900);
+    console.log("== 1440px · gear popover ==");
+
+    const gear = page.locator('[aria-label="Predictions settings"]');
+    check("gear renders in the bar", (await gear.count()) === 1);
+    await gear.click();
+    await page.waitForSelector('[role="menu"]');
+    await page.waitForTimeout(250);
+    check(
+      "display grid renders in the popover",
+      (await page.locator('[role="menu"] [role="grid"]').count()) === 1,
+    );
+
+    // Toggling Volume off the Feed hides card footers live; the popover
+    // stays open (settings rows are not dismiss-on-click menu items).
+    const volBefore = await page.locator("text=/^Vol /").count();
+    await page.locator('[role="menu"] [aria-label="Hide Volume on Feed"]').click();
+    await page.waitForTimeout(250);
+    check("popover stays open on toggle", (await page.locator('[role="menu"]').count()) === 1);
+    const volAfter = await page.locator("text=/^Vol /").count();
+    check(
+      "volume toggle hides card volume live",
+      volBefore > 0 && volAfter === 0,
+      `${volBefore} -> ${volAfter}`,
+    );
+    await page.locator('[role="menu"] [aria-label="Show Volume on Feed"]').click();
+    await page.waitForTimeout(250);
+    check(
+      "volume toggle restores card volume",
+      (await page.locator("text=/^Vol /").count()) === volBefore,
+    );
+    await page.screenshot({ path: `${OUT}/vb-18-gear-popover-1440.png` });
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(250);
+    check("Esc closes the gear popover", (await page.locator('[role="menu"]').count()) === 0);
+
+    check("no console errors (gear page)", consoleErrors.length === 0, consoleErrors.join(" | "));
+    await page.close();
+  }
+
   // ════ 1440px — B4 sticky elevation ═══════════════════════════════
   {
     const { page, consoleErrors } = await newPage(browser, 1440, 900);
