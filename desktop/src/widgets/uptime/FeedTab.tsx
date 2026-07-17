@@ -19,6 +19,8 @@ import type { KumaMonitor } from "./types";
 import { fetchKumaStatus, loadMonitors, saveMonitors, MONITOR_STATUS_LABELS, MONITOR_STATUS_COLORS, MONITOR_STATUS_TEXT } from "./types";
 import { toast } from "sonner";
 import { useShell } from "../../shell-context";
+import { GearMenu } from "../../components/widget-bar/GearMenu";
+import UptimeSettings from "./Settings";
 import { savePrefs, updateWidgetPrefs } from "../../preferences";
 import { useSyncedQuery } from "../../hooks/useSyncedQuery";
 import { LS_UPTIME_MONITORS } from "../../constants";
@@ -48,7 +50,31 @@ export const uptimeWidget: WidgetManifest = {
 
 // ── FeedTab ─────────────────────────────────────────────────────
 
-function UptimeFeedTab({ mode: feedMode }: FeedTabProps) {
+function UptimeFeedTab(props: FeedTabProps) {
+  return (
+    <div className="relative flex min-h-full flex-col">
+      {/* Comfort mode floats the gear top-right — the widget's settings
+          surface once the Configure page dies. */}
+      {props.mode === "comfort" && (
+        <div className="absolute right-3 top-3 z-10">
+          <UptimeGear />
+        </div>
+      )}
+      <UptimeFeedBody {...props} />
+    </div>
+  );
+}
+
+function UptimeGear() {
+  const { prefs, onPrefsChange } = useShell();
+  return (
+    <GearMenu ariaLabel="Uptime settings" panelClassName="right-0 w-80">
+      <UptimeSettings prefs={prefs} onPrefsChange={onPrefsChange} />
+    </GearMenu>
+  );
+}
+
+function UptimeFeedBody({ mode: feedMode }: FeedTabProps) {
   const compact = feedMode === "compact";
   const shell = useShell();
   const queryClient = useQueryClient();

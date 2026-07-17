@@ -22,6 +22,8 @@ import {
   CI_STATUS_TEXT,
 } from "./types";
 import { useShell } from "../../shell-context";
+import { GearMenu } from "../../components/widget-bar/GearMenu";
+import GitHubSettings from "./Settings";
 import { savePrefs, updateWidgetPrefs } from "../../preferences";
 import { useSyncedQuery } from "../../hooks/useSyncedQuery";
 import { LS_GITHUB_REPOS } from "../../constants";
@@ -51,7 +53,31 @@ export const githubWidget: WidgetManifest = {
 
 // ── FeedTab ─────────────────────────────────────────────────────
 
-function GitHubFeedTab({ mode: feedMode }: FeedTabProps) {
+function GitHubFeedTab(props: FeedTabProps) {
+  return (
+    <div className="relative flex min-h-full flex-col">
+      {/* Comfort mode floats the gear top-right — the widget's settings
+          surface once the Configure page dies. */}
+      {props.mode === "comfort" && (
+        <div className="absolute right-3 top-3 z-10">
+          <GitHubGear />
+        </div>
+      )}
+      <GitHubFeedBody {...props} />
+    </div>
+  );
+}
+
+function GitHubGear() {
+  const { prefs, onPrefsChange } = useShell();
+  return (
+    <GearMenu ariaLabel="GitHub settings" panelClassName="right-0 w-80">
+      <GitHubSettings prefs={prefs} onPrefsChange={onPrefsChange} />
+    </GearMenu>
+  );
+}
+
+function GitHubFeedBody({ mode: feedMode }: FeedTabProps) {
   const compact = feedMode === "compact";
   const shell = useShell();
   const configRepos = shell.prefs.widgets.github.repos;

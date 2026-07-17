@@ -1,5 +1,8 @@
 import { TimerReset } from "lucide-react";
 import { Timer } from "./Timer";
+import { GearMenu } from "../../components/widget-bar/GearMenu";
+import { useShell } from "../../shell-context";
+import TimerSettings from "./Settings";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 
 export const timerWidget: WidgetManifest = {
@@ -22,7 +25,31 @@ export const timerWidget: WidgetManifest = {
   FeedTab: TimerFeedTab,
 };
 
-function TimerFeedTab({ mode }: FeedTabProps) {
+function TimerFeedTab(props: FeedTabProps) {
+  return (
+    <div className="relative flex min-h-full flex-col">
+      {/* Comfort mode floats the gear top-right — the widget's settings
+          surface once the Configure page dies. */}
+      {props.mode === "comfort" && (
+        <div className="absolute right-3 top-3 z-10">
+          <TimerGear />
+        </div>
+      )}
+      <TimerFeedBody {...props} />
+    </div>
+  );
+}
+
+function TimerGear() {
+  const { prefs, onPrefsChange } = useShell();
+  return (
+    <GearMenu ariaLabel="Timer settings" panelClassName="right-0 w-80">
+      <TimerSettings prefs={prefs} onPrefsChange={onPrefsChange} />
+    </GearMenu>
+  );
+}
+
+function TimerFeedBody({ mode }: FeedTabProps) {
   return (
     <div className="p-3">
       <Timer compact={mode === "compact"} />

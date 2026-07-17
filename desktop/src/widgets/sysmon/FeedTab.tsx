@@ -1,5 +1,8 @@
 import { Activity } from "lucide-react";
 import type { FeedTabProps, WidgetManifest } from "../../types";
+import { GearMenu } from "../../components/widget-bar/GearMenu";
+import { useShell } from "../../shell-context";
+import SysmonSettings from "./Settings";
 import { useSysmonData } from "../../hooks/useSysmonData";
 import { formatBytes, formatUptime } from "../../utils/format";
 import { findCpuTemp, findGpuTemp, usageColor, usageColorClass, tempColorClass, formatFreq, formatWatts, formatRate } from "./utils";
@@ -26,7 +29,31 @@ function DetailLine({ items }: { items: (string | null | undefined)[] }) {
 
 // ── FeedTab Component ───────────────────────────────────────────
 
-function SysmonFeedTab({ mode: feedMode }: FeedTabProps) {
+function SysmonFeedTab(props: FeedTabProps) {
+  return (
+    <div className="relative flex min-h-full flex-col">
+      {/* Comfort mode floats the gear top-right — the widget's settings
+          surface once the Configure page dies. */}
+      {props.mode === "comfort" && (
+        <div className="absolute right-3 top-3 z-10">
+          <SysmonGear />
+        </div>
+      )}
+      <SysmonFeedBody {...props} />
+    </div>
+  );
+}
+
+function SysmonGear() {
+  const { prefs, onPrefsChange } = useShell();
+  return (
+    <GearMenu ariaLabel="System monitor settings" panelClassName="right-0 w-80">
+      <SysmonSettings prefs={prefs} onPrefsChange={onPrefsChange} />
+    </GearMenu>
+  );
+}
+
+function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
   const compact = feedMode === "compact";
   const info = useSysmonData(POLL_INTERVAL);
 

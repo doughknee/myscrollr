@@ -11,6 +11,9 @@ import Tooltip from "../../components/Tooltip";
 import { CloudSun } from "lucide-react";
 import { WeatherCard } from "./WeatherCard";
 import { CitySearch } from "./CitySearch";
+import { GearMenu } from "../../components/widget-bar/GearMenu";
+import { useShell } from "../../shell-context";
+import WeatherSettings from "./Settings";
 import { weatherQueryOptions, queryKeys } from "../../api/queries";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 import type { WeatherLocation } from "./types";
@@ -42,7 +45,31 @@ export const weatherWidget: WidgetManifest = {
 
 // ── FeedTab ─────────────────────────────────────────────────────
 
-function WeatherFeedTab({ mode: feedMode }: FeedTabProps) {
+function WeatherFeedTab(props: FeedTabProps) {
+  return (
+    <div className="relative flex min-h-full flex-col">
+      {/* Comfort mode floats the gear top-right — the widget's settings
+          surface once the Configure page dies. */}
+      {props.mode === "comfort" && (
+        <div className="absolute right-3 top-3 z-10">
+          <WeatherGear />
+        </div>
+      )}
+      <WeatherFeedBody {...props} />
+    </div>
+  );
+}
+
+function WeatherGear() {
+  const { prefs, onPrefsChange } = useShell();
+  return (
+    <GearMenu ariaLabel="Weather settings" panelClassName="right-0 w-80">
+      <WeatherSettings prefs={prefs} onPrefsChange={onPrefsChange} />
+    </GearMenu>
+  );
+}
+
+function WeatherFeedBody({ mode: feedMode }: FeedTabProps) {
   const compact = feedMode === "compact";
 
   // Weather data from TanStack Query — shared cache with __root.tsx observer
