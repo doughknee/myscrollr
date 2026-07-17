@@ -23,15 +23,11 @@ import {
   LineChart,
   Wallet,
   Star,
-  Check,
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   Flame,
   Clock,
   Search,
-  SlidersHorizontal,
-  X,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardQueryOptions, predictionsCatalogOptions } from "../../api/queries";
@@ -42,6 +38,20 @@ import {
 } from "../../utils/format";
 import EmptyChannelState from "../../components/EmptyChannelState";
 import FreshnessPill from "../../components/FreshnessPill";
+import { WidgetBar, BarDivider, BarPill } from "../../components/widget-bar/Bar";
+import {
+  useDismiss,
+  MenuPanel,
+  MenuHeading,
+  MenuRow,
+  FilterTrigger,
+} from "../../components/widget-bar/Menu";
+import {
+  Segmented,
+  type SegmentedOption,
+} from "../../components/widget-bar/Segmented";
+import { SearchBox, useSlashFocus } from "../../components/widget-bar/SearchBox";
+import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import MyPositionsPanel from "./MyPositionsPanel";
 import MarketDetail from "./MarketDetail";
 import ProbabilityPill from "./ProbabilityPill";
@@ -121,6 +131,12 @@ const PREDICTIONS_HEX = "#1fc9a0";
 const SECTION_PREVIEW_COUNT = 6;
 
 type FeedView = "markets" | "positions";
+
+/** Markets / My Positions — options for the Segmented view switch. */
+const VIEW_OPTIONS: SegmentedOption<FeedView>[] = [
+  { value: "markets", label: "Markets", icon: LineChart },
+  { value: "positions", label: "Positions", icon: Wallet },
+];
 
 // ── Display helpers ──────────────────────────────────────────────
 
@@ -364,29 +380,6 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [markets, categoryOf]);
 
-  // Sticky-bar elevation: a 1px sentinel above the bar leaves view exactly
-  // when the bar pins. Default (viewport) root — intersection is clipped
-  // through whichever ancestor actually scrolls (the Source page's
-  // PageLayout scroller in-app, the harness shell in dev), so this works
-  // without knowing the scroller. The sentinel is tracked as STATE, not a
-  // ref: the markets tree unmounts on the Positions view, and an observer
-  // left watching the detached node would freeze `stuck` at its last
-  // value — the bar came back pre-shadowed after a scrolled view switch.
-  const [stuck, setStuck] = useState(false);
-  const [sentinelEl, setSentinelEl] = useState<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!sentinelEl) {
-      setStuck(false);
-      return;
-    }
-    const io = new IntersectionObserver(
-      ([entry]) => setStuck(!entry.isIntersecting),
-      { threshold: 0 },
-    );
-    io.observe(sentinelEl);
-    return () => io.disconnect();
-  }, [sentinelEl]);
-
   // ── View switcher (Markets / My Positions) ───────────────────
   // Only on the full-size Source page (comfort). The compact Home preview
   // stays a pure markets list. "My Positions" is desktop-only (keychain).
@@ -406,26 +399,9 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
     [navEvents],
   );
 
-  // "/" focuses search from anywhere in the channel (unless typing).
-  useEffect(() => {
-    if (!isComfort || view !== "markets") return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
-      const t = e.target as HTMLElement | null;
-      if (
-        t &&
-        (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)
-      ) {
-        return;
-      }
-      // Don't steal focus out of an open modal (market detail).
-      if (document.querySelector('[role="dialog"]')) return;
-      e.preventDefault();
-      searchInputRef.current?.focus();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [isComfort, view]);
+  // "/" focuses search from anywhere in the channel (unless typing, or
+  // the market-detail modal is open).
+  useSlashFocus(searchInputRef, isComfort && view === "markets");
 
   // Keep the keyboard-selected card in view.
   useEffect(() => {
@@ -435,15 +411,10 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
       ?.scrollIntoView({ block: "nearest" });
   }, [selIdx]);
 
+  // Roving ↑/↓ + Enter while searching; two-stage Escape lives inside
+  // SearchBox.
   const onSearchKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Escape") {
-        // First Escape clears, second blurs.
-        e.preventDefault();
-        if (query) changeQuery("");
-        else e.currentTarget.blur();
-        return;
-      }
       if (!searching || navEvents.length === 0) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -459,7 +430,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
         if (target) openDetail(target);
       }
     },
-    [query, changeQuery, searching, navEvents, selIdx, openDetail],
+    [searching, navEvents, selIdx, openDetail],
   );
 
   if (showSwitcher && view === "positions") {
@@ -467,7 +438,12 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
       <div className="flex min-h-full flex-col">
         {/* Sticky so the way back to Markets survives scrolling. */}
         <div className="sticky top-0 z-20 flex shrink-0 items-center gap-2 border-b border-edge/30 bg-surface px-3 py-1.5">
-          <ViewSwitcher view={view} onChange={setView} />
+          <Segmented
+            ariaLabel="Predictions view"
+            value={view}
+            onChange={setView}
+            options={VIEW_OPTIONS}
+          />
         </div>
         <div className="flex flex-1 flex-col">
           <MyPositionsPanel markets={markets} hex={PREDICTIONS_HEX} />
@@ -482,7 +458,12 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
       <div className="flex min-h-full flex-col">
         {showSwitcher && (
           <div className="flex shrink-0 items-center gap-2 border-b border-edge/30 bg-surface px-3 py-1.5">
-            <ViewSwitcher view={view} onChange={setView} />
+            <Segmented
+              ariaLabel="Predictions view"
+              value={view}
+              onChange={setView}
+              options={VIEW_OPTIONS}
+            />
           </div>
         )}
         <div className="flex flex-1 flex-col justify-center">
@@ -509,91 +490,89 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
     // page-scroll structure.)
     <div ref={containerRef} className="flex min-h-full flex-col">
       {/* ONE control bar: view switcher (segmented, Tauri-only) · lens
-          pills + category select · freshness. Sticky with an elevation
-          change once pinned (sentinel + IntersectionObserver). The bar is
-          a @container: at narrow channel widths the lens pills + category
-          select collapse into a single Filter button so nothing clips
-          (B4/B5). */}
+          pills + category select · search · freshness. WidgetBar owns the
+          sticky @container shell and the pinned-elevation sentinel. At
+          narrow channel widths the lens pills + category select collapse
+          into a single Filter button so nothing clips (B4/B5). */}
       {isComfort && (
-        <>
-          <div ref={setSentinelEl} aria-hidden className="h-px shrink-0" />
-          <div
-            className={clsx(
-              "@container sticky top-0 z-20 -mt-px flex items-center gap-2 border-b bg-surface px-3 py-1.5 transition-shadow duration-200",
-              stuck
-                ? "border-edge/50 bg-surface/95 shadow-[0_6px_16px_-8px_rgba(0,0,0,0.35)] backdrop-blur-sm"
-                : "border-edge/30",
-            )}
-          >
-            {showSwitcher && (
-              <>
-                <ViewSwitcher view={view} onChange={setView} />
-                <div aria-hidden className="h-4 w-px shrink-0 bg-edge/60" />
-              </>
-            )}
-
-            {/* Wide: open lens pills. Counts live in the filter menu and
-                section headers — pills stay quiet (de-crowd pass). The
-                @5xl threshold collapses BEFORE the row runs out of room —
-                pills must never render cut off. */}
-            <div className="scrollbar-none hidden min-w-0 items-center gap-1 overflow-x-auto @5xl:flex">
-              {LENSES.map((l) => {
-                const Icon = l.icon;
-                const active = lens === l.value && selectedCats.length === 0;
-                return (
-                  <LensPill key={l.value} active={active} onClick={() => pickLens(l.value)}>
-                    {Icon && (
-                      <Icon
-                        size={12}
-                        className={l.value === "watchlist" && active ? "fill-current" : ""}
-                      />
-                    )}
-                    {l.label}
-                  </LensPill>
-                );
-              })}
-            </div>
-
-            {/* Narrow: everything above collapses into one Filter button. */}
-            <div className="@5xl:hidden">
-              <FilterMenu
-                lens={lens}
-                onPickLens={pickLens}
-                watchlistCount={watchlist.length}
-                resolvedCount={resolvedToday.length}
-                categories={categories}
-                selectedCats={selectedCats}
-                onToggleCategory={toggleCat}
-                onClearCategories={clearCats}
+        <WidgetBar>
+          {showSwitcher && (
+            <>
+              <Segmented
+                ariaLabel="Predictions view"
+                value={view}
+                onChange={setView}
+                options={VIEW_OPTIONS}
               />
-            </div>
+              <BarDivider />
+            </>
+          )}
 
-            <div className="ml-auto flex min-w-0 shrink items-center gap-2">
-              {/* Category rides with the other narrowing controls (search)
-                  so the lens row keeps its breathing room. */}
-              <span className="hidden @5xl:block">
-                <CategoryMenu
-                  categories={categories}
-                  selected={selectedCats}
-                  onToggle={toggleCat}
-                  onClear={clearCats}
-                />
-              </span>
-              <SearchBox
-                inputRef={searchInputRef}
-                query={query}
-                onQueryChange={changeQuery}
-                onKeyDown={onSearchKeyDown}
-                resultCount={searching ? shownEvents.length : null}
-              />
-              {latestUpdated && (
-                <span className="hidden @xl:block">
-                  <FreshnessPill lastUpdated={latestUpdated} label="odds" />
-                </span>
-              )}
-            </div>
+          {/* Wide: open lens pills. Counts live in the filter menu and
+              section headers — pills stay quiet (de-crowd pass). The
+              @5xl threshold collapses BEFORE the row runs out of room —
+              pills must never render cut off. */}
+          <div className="scrollbar-none hidden min-w-0 items-center gap-1 overflow-x-auto @5xl:flex">
+            {LENSES.map((l) => {
+              const Icon = l.icon;
+              const active = lens === l.value && selectedCats.length === 0;
+              return (
+                <BarPill key={l.value} active={active} onClick={() => pickLens(l.value)}>
+                  {Icon && (
+                    <Icon
+                      size={12}
+                      className={l.value === "watchlist" && active ? "fill-current" : ""}
+                    />
+                  )}
+                  {l.label}
+                </BarPill>
+              );
+            })}
           </div>
-        </>
+
+          {/* Narrow: everything above collapses into one Filter button. */}
+          <div className="@5xl:hidden">
+            <FilterMenu
+              lens={lens}
+              onPickLens={pickLens}
+              watchlistCount={watchlist.length}
+              resolvedCount={resolvedToday.length}
+              categories={categories}
+              selectedCats={selectedCats}
+              onToggleCategory={toggleCat}
+              onClearCategories={clearCats}
+            />
+          </div>
+
+          <div className="ml-auto flex min-w-0 shrink items-center gap-2">
+            {/* Category rides with the other narrowing controls (search)
+                so the lens row keeps its breathing room. */}
+            <span className="hidden @5xl:block">
+              <MultiSelectMenu
+                options={categories}
+                selected={selectedCats}
+                onToggle={toggleCat}
+                onClear={clearCats}
+                noun="categories"
+                ariaLabel="Filter by category"
+              />
+            </span>
+            <SearchBox
+              inputRef={searchInputRef}
+              query={query}
+              onQueryChange={changeQuery}
+              onKeyDown={onSearchKeyDown}
+              resultCount={searching ? shownEvents.length : null}
+              ariaLabel="Search markets"
+              noun="markets"
+            />
+            {latestUpdated && (
+              <span className="hidden @xl:block">
+                <FreshnessPill lastUpdated={latestUpdated} label="odds" />
+              </span>
+            )}
+          </div>
+        </WidgetBar>
       )}
 
       {/* Market browse / grids */}
@@ -806,163 +785,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
   );
 }
 
-// ── Lens pill ────────────────────────────────────────────────────
-
-function LensPill({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={clsx(
-        "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-ui-meta font-medium transition-colors cursor-pointer",
-        active
-          ? "bg-accent/15 text-accent"
-          : "text-fg-3 hover:bg-surface-hover hover:text-fg-2",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
 // ── Filter bar controls (B4/B5) ──────────────────────────────────
-
-/** Close an open popover on outside-mousedown or Escape. */
-function useDismiss<T extends HTMLElement>(
-  ref: React.RefObject<T | null>,
-  open: boolean,
-  onClose: () => void,
-) {
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) onClose();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [ref, open, onClose]);
-}
-
-/** Shared dropdown panel: one look + one entrance for every bar menu. */
-function MenuPanel({
-  className,
-  children,
-}: {
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <motion.div
-      role="menu"
-      initial={{ opacity: 0, y: -4, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -4, scale: 0.98 }}
-      transition={{ duration: 0.14, ease: "easeOut" }}
-      className={clsx(
-        "absolute top-full z-30 mt-1 max-h-80 origin-top overflow-y-auto rounded-xl border border-edge/50 bg-surface p-1 shadow-xl scrollbar-thin",
-        className,
-      )}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-/** Category filter — multi-select popover (empty selection = all).
- *  Toggling keeps the menu open so several categories combine in one
- *  visit; outside-click or Esc dismisses. */
-function CategoryMenu({
-  categories,
-  selected,
-  onToggle,
-  onClear,
-}: {
-  categories: string[];
-  selected: string[];
-  onToggle: (c: string) => void;
-  onClear: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
-  useDismiss(rootRef, open, close);
-
-  const label =
-    selected.length === 0
-      ? "All"
-      : selected.length === 1
-        ? selected[0]
-        : `${selected.length} categories`;
-
-  return (
-    // rounded-full on the WRAPPER matters: the app's global focus rule
-    // draws its ring with `border-radius: inherit` (from the parent).
-    <div ref={rootRef} className="relative shrink-0 rounded-full">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label="Filter by category"
-        className={clsx(
-          "flex max-w-40 cursor-pointer items-center gap-1 rounded-full border py-1 pl-2.5 pr-2 text-ui-meta font-medium transition-colors",
-          selected.length > 0 || open
-            ? "border-accent/40 bg-accent/15 text-accent"
-            : "border-edge/30 bg-base-150/60 text-fg-3 hover:text-fg-2",
-        )}
-      >
-        <span className="truncate">{label}</span>
-        <ChevronDown
-          size={12}
-          aria-hidden
-          className={clsx(
-            "shrink-0 transition-transform duration-150",
-            open && "rotate-180",
-            selected.length > 0 || open ? "text-accent/70" : "text-fg-4",
-          )}
-        />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <MenuPanel className="right-0 w-56">
-            <MenuRow
-              selected={selected.length === 0}
-              onClick={onClear}
-              role="menuitemradio"
-            >
-              All categories
-            </MenuRow>
-            {categories.map((c) => (
-              <MenuRow
-                key={c}
-                selected={selected.includes(c)}
-                onClick={() => onToggle(c)}
-                role="menuitemcheckbox"
-              >
-                {c}
-              </MenuRow>
-            ))}
-          </MenuPanel>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 /** Narrow-width collapse of the lens pills + category menu: one Filter
  *  button (with an active-filter count badge) opening a compact menu. The
@@ -999,26 +822,11 @@ function FilterMenu({
     // clipping off-screen at narrow widths. rounded-lg feeds the global
     // focus rule's `border-radius: inherit` for the button's ring.
     <div ref={rootRef} className="shrink-0 rounded-lg">
-      <button
-        type="button"
+      <FilterTrigger
+        open={open}
+        badgeCount={activeCount}
         onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label="Filters"
-        className={clsx(
-          "relative flex h-7 w-8 cursor-pointer items-center justify-center rounded-lg border transition-colors",
-          open || activeCount > 0
-            ? "border-accent/40 bg-accent/15 text-accent"
-            : "border-edge/30 bg-base-150/60 text-fg-3 hover:text-fg-2",
-        )}
-      >
-        <SlidersHorizontal size={13} />
-        {activeCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-accent px-0.5 font-mono text-[9px] font-bold leading-none text-white">
-            {activeCount}
-          </span>
-        )}
-      </button>
+      />
 
       <AnimatePresence>
         {open && (
@@ -1060,130 +868,6 @@ function FilterMenu({
           </MenuPanel>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-function MenuHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="px-2 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-fg-4 first:pt-1">
-      {children}
-    </div>
-  );
-}
-
-function MenuRow({
-  selected,
-  onClick,
-  children,
-  role = "menuitemradio",
-}: {
-  selected: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  /** menuitemcheckbox rows toggle (multi-select) and stay hoverable. */
-  role?: "menuitemradio" | "menuitemcheckbox";
-}) {
-  return (
-    <button
-      type="button"
-      role={role}
-      aria-checked={selected}
-      onClick={onClick}
-      className={clsx(
-        "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-ui-meta transition-colors hover:bg-surface-hover",
-        selected ? "text-accent" : "text-fg-2",
-      )}
-    >
-      <span className="min-w-0 flex-1 truncate">{children}</span>
-      {selected && <Check size={13} className="shrink-0" />}
-    </button>
-  );
-}
-
-// ── Search UI ────────────────────────────────────────────────────
-
-/** Compact-by-default search field; expands on focus (or while a query is
- *  set). Same contained shape as the ViewSwitcher so the control bar stays
- *  one family. Results filter the grid in place as the user types. */
-function SearchBox({
-  inputRef,
-  query,
-  onQueryChange,
-  onKeyDown,
-  resultCount,
-}: {
-  inputRef: React.RefObject<HTMLInputElement | null>;
-  query: string;
-  onQueryChange: (next: string) => void;
-  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-  /** Matched-event count while searching, null when search is inactive. */
-  resultCount: number | null;
-}) {
-  const [focused, setFocused] = useState(false);
-  const expanded = focused || query.length > 0;
-  return (
-    <div
-      className={clsx(
-        "relative flex items-center rounded-lg border transition-all duration-200",
-        expanded
-          ? "w-40 border-accent/50 bg-surface ring-1 ring-accent/25 sm:w-64"
-          : "w-24 border-edge/30 bg-base-150/60 sm:w-32",
-      )}
-    >
-      <Search
-        size={13}
-        className={clsx(
-          "pointer-events-none absolute left-2",
-          expanded ? "text-accent" : "text-fg-4",
-        )}
-      />
-      <input
-        ref={inputRef}
-        type="text"
-        value={query}
-        onChange={(e) => onQueryChange(e.target.value)}
-        onKeyDown={onKeyDown}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        placeholder="Search"
-        aria-label="Search markets"
-        spellCheck={false}
-        autoCorrect="off"
-        autoComplete="off"
-        className="w-full bg-transparent py-1 pl-7 pr-6 text-ui-meta text-fg outline-none placeholder:text-fg-4"
-      />
-      {query ? (
-        <button
-          type="button"
-          aria-label="Clear search"
-          // Keep focus in the input across the click (mousedown blurs).
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            onQueryChange("");
-            inputRef.current?.focus();
-          }}
-          className="absolute right-1.5 flex h-4 w-4 cursor-pointer items-center justify-center rounded text-fg-4 transition-colors hover:text-fg-2"
-        >
-          <X size={12} />
-        </button>
-      ) : (
-        !focused && (
-          <kbd
-            aria-hidden
-            className="pointer-events-none absolute right-1.5 rounded border border-edge/40 bg-base-150 px-1 font-mono text-[9px] leading-4 text-fg-4"
-          >
-            /
-          </kbd>
-        )
-      )}
-      {resultCount !== null && (
-        <span role="status" className="sr-only">
-          {resultCount === 0
-            ? "No markets match"
-            : `${resultCount} markets match`}
-        </span>
-      )}
     </div>
   );
 }
@@ -1388,54 +1072,6 @@ const ResolvedCard = memo(function ResolvedCard({
     </div>
   );
 });
-
-// ── View switcher ────────────────────────────────────────────────
-//
-// A contained segmented control — deliberately a different shape from
-// the open lens pills so the two control levels (which VIEW vs which
-// LENS within Markets) stop reading as one row of identical chips.
-
-function ViewSwitcher({
-  view,
-  onChange,
-}: {
-  view: FeedView;
-  onChange: (v: FeedView) => void;
-}) {
-  const tabs: { value: FeedView; label: string; icon: typeof LineChart }[] = [
-    { value: "markets", label: "Markets", icon: LineChart },
-    { value: "positions", label: "Positions", icon: Wallet },
-  ];
-  return (
-    <div
-      role="tablist"
-      aria-label="Predictions view"
-      className="flex shrink-0 items-center gap-0.5 rounded-lg border border-edge/30 bg-base-150/60 p-0.5"
-    >
-      {tabs.map((t) => {
-        const active = view === t.value;
-        const Icon = t.icon;
-        return (
-          <button
-            key={t.value}
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(t.value)}
-            className={clsx(
-              "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-ui-meta font-medium transition-colors cursor-pointer",
-              active
-                ? "bg-surface text-fg shadow-soft-sm"
-                : "text-fg-3 hover:text-fg-2",
-            )}
-          >
-            <Icon size={13} />
-            {t.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 // ── MarketItem (compact density only) ────────────────────────────
 //
