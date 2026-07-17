@@ -37,7 +37,6 @@ import {
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import { GearMenu } from "../../components/widget-bar/GearMenu";
-import { ToggleRow } from "../../components/settings/SettingsControls";
 import { ArticleAgeControl } from "../../components/TimeWindowControl";
 import FeedManager from "./FeedManager";
 import { useChannelConfig } from "../../hooks/useChannelConfig";
@@ -692,9 +691,6 @@ function RssGear({
     Partial<RssDisplayPrefs>
   >(channelType, "display");
 
-  const effDescription = override.showDescription ?? globalRss.showDescription;
-  const effTimestamps = override.showTimestamps ?? globalRss.showTimestamps;
-
   return (
     <GearMenu ariaLabel="News settings" panelClassName="right-0 w-80">
       <MenuHeading>Time window</MenuHeading>
@@ -706,23 +702,6 @@ function RssGear({
           }
         />
       </div>
-      <MenuHeading>Display</MenuHeading>
-      <ToggleRow
-        label="Article descriptions"
-        description="Show a short summary under each headline"
-        checked={effDescription !== "off"}
-        onChange={(c) =>
-          updateDisplay({ ...override, showDescription: c ? "both" : "off" })
-        }
-      />
-      <ToggleRow
-        label="Timestamps"
-        description="Show how long ago each article was published"
-        checked={effTimestamps !== "off"}
-        onChange={(c) =>
-          updateDisplay({ ...override, showTimestamps: c ? "both" : "off" })
-        }
-      />
     </GearMenu>
   );
 }

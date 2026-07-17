@@ -37,7 +37,6 @@ import { SearchBox, useSlashFocus } from "../../components/widget-bar/SearchBox"
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import { GearMenu } from "../../components/widget-bar/GearMenu";
-import DisplayItemsGrid from "../../components/settings/DisplayItemsGrid";
 import SymbolManager from "./SymbolManager";
 import { useChannelConfig } from "../../hooks/useChannelConfig";
 import { useShell } from "../../shell-context";
@@ -568,38 +567,6 @@ function FinanceGear() {
 
   return (
     <GearMenu ariaLabel="Finance settings" panelClassName="right-0 w-80">
-      <MenuHeading>Display</MenuHeading>
-      <div className="px-1 pb-1">
-        <DisplayItemsGrid
-          sections={[
-            {
-              rows: [
-                {
-                  key: "showChange",
-                  label: "% change",
-                  description: "Signed percentage move",
-                  value: dp.showChange,
-                },
-                {
-                  key: "showPrevClose",
-                  label: "Previous close",
-                  description: "Prior session's closing price",
-                  value: dp.showPrevClose,
-                },
-                {
-                  key: "showLastUpdated",
-                  label: "Last updated",
-                  description: "Time since the latest price tick",
-                  value: dp.showLastUpdated,
-                },
-              ],
-            },
-          ]}
-          onChange={(changes) =>
-            patchDisplay(changes as Partial<FinanceDisplayPrefs>)
-          }
-        />
-      </div>
       <MenuHeading>Feed density</MenuHeading>
       <div className="px-1 pb-1">
         <Segmented

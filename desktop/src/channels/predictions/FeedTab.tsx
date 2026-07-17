@@ -55,7 +55,6 @@ import {
 import { SearchBox, useSlashFocus } from "../../components/widget-bar/SearchBox";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { GearMenu } from "../../components/widget-bar/GearMenu";
-import DisplayItemsGrid from "../../components/settings/DisplayItemsGrid";
 import MyPositionsPanel from "./MyPositionsPanel";
 import MarketDetail from "./MarketDetail";
 import ProbabilityPill from "./ProbabilityPill";
@@ -953,44 +952,6 @@ function PredictionsGear() {
 
   return (
     <GearMenu ariaLabel="Predictions settings" panelClassName="right-0 w-80">
-      <MenuHeading>Display</MenuHeading>
-      <div className="px-1 pb-1">
-        <DisplayItemsGrid
-          sections={[
-            {
-              rows: [
-                {
-                  key: "showDelta",
-                  label: "Probability delta",
-                  description: "▲/▼ move vs the previous price",
-                  value: dp.showDelta,
-                },
-                {
-                  key: "showCategory",
-                  label: "Category badge",
-                  description: "Politics, Sports, Economics, …",
-                  value: dp.showCategory,
-                },
-                {
-                  key: "showVolume",
-                  label: "Volume",
-                  description: "Trailing-24h contract volume",
-                  value: dp.showVolume,
-                },
-                {
-                  key: "showCloseTime",
-                  label: "Close countdown",
-                  description: "Time until the market closes",
-                  value: dp.showCloseTime,
-                },
-              ],
-            },
-          ]}
-          onChange={(changes) =>
-            patchDisplay(changes as Partial<PredictionsDisplayPrefs>)
-          }
-        />
-      </div>
       <MenuHeading>Feed density</MenuHeading>
       <div className="px-1 pb-1">
         <Segmented

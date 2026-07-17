@@ -163,10 +163,10 @@ async function run() {
     await page.waitForTimeout(250);
     const gearText = (await page.locator('[role="menu"]').innerText()).toUpperCase();
     check(
-      "gear lists time window + display toggles",
+      "gear is time window only (display toggles removed)",
       gearText.includes("TIME WINDOW") &&
-        gearText.includes("ARTICLE DESCRIPTIONS") &&
-        gearText.includes("TIMESTAMPS"),
+        !gearText.includes("ARTICLE DESCRIPTIONS") &&
+        !gearText.includes("TIMESTAMPS"),
     );
     await page.screenshot({ path: `${OUT}/rss-04-gear-1440.png` });
     await page.keyboard.press("Escape");

@@ -120,11 +120,11 @@ async function run() {
     await page.waitForTimeout(300);
     const gearText = (await page.locator('[role="menu"]').innerText()).toUpperCase();
     check(
-      "gear lists favorite team + window + display",
+      "gear is favorite team + window only (display toggles removed)",
       gearText.includes("FAVORITE NFL TEAM") &&
         gearText.includes("TIME WINDOW") &&
-        gearText.includes("TEAM LOGOS") &&
-        gearText.includes("GAME TIMER"),
+        !gearText.includes("TEAM LOGOS") &&
+        !gearText.includes("GAME TIMER"),
     );
 
     // Teams fetched (from the seeded cache) on first open: the select

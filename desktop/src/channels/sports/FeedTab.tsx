@@ -40,7 +40,7 @@ import {
   type SegmentedOption,
 } from "../../components/widget-bar/Segmented";
 import { GearMenu } from "../../components/widget-bar/GearMenu";
-import { SelectRow, ToggleRow } from "../../components/settings/SettingsControls";
+import { SelectRow } from "../../components/settings/SettingsControls";
 import { DayRangeControl } from "../../components/TimeWindowControl";
 import { SPORTS_WINDOW_MAX_DAYS } from "./view";
 import { isLive, isPre, isFinal } from "../../utils/gameHelpers";
@@ -384,18 +384,6 @@ function SportsGearContents({
           onChange={(next) => setDisplay(next)}
         />
       </div>
-      <MenuHeading>Display</MenuHeading>
-      <ToggleRow
-        label="Team logos"
-        checked={display.showLogos !== "off"}
-        onChange={(c) => setDisplay({ showLogos: c ? "both" : "off" })}
-      />
-      <ToggleRow
-        label="Game timer"
-        description="Show the live clock / countdown"
-        checked={display.showTimer !== "off"}
-        onChange={(c) => setDisplay({ showTimer: c ? "both" : "off" })}
-      />
     </>
   );
 }

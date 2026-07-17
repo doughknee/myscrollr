@@ -209,28 +209,17 @@ async function run() {
     await gear.click();
     await page.waitForSelector('[role="menu"]');
     await page.waitForTimeout(250);
-    check(
-      "display grid renders in the popover",
-      (await page.locator('[role="menu"] [role="grid"]').count()) === 1,
-    );
 
-    // Toggling Volume off the Feed hides card footers live; the popover
-    // stays open (settings rows are not dismiss-on-click menu items).
-    const volBefore = await page.locator("text=/^Vol /").count();
-    await page.locator('[role="menu"] [aria-label="Hide Volume on Feed"]').click();
-    await page.waitForTimeout(250);
-    check("popover stays open on toggle", (await page.locator('[role="menu"]').count()) === 1);
-    const volAfter = await page.locator("text=/^Vol /").count();
+    // Display-item toggles were removed (defaults only) — the gear keeps
+    // just the functional prefs.
     check(
-      "volume toggle hides card volume live",
-      volBefore > 0 && volAfter === 0,
-      `${volBefore} -> ${volAfter}`,
+      "no display grid (defaults only)",
+      (await page.locator('[role="menu"] [role="grid"]').count()) === 0,
     );
-    await page.locator('[role="menu"] [aria-label="Show Volume on Feed"]').click();
-    await page.waitForTimeout(250);
+    const gearText = (await page.locator('[role="menu"]').innerText()).toUpperCase();
     check(
-      "volume toggle restores card volume",
-      (await page.locator("text=/^Vol /").count()) === volBefore,
+      "gear keeps density + ticker fallback",
+      gearText.includes("FEED DENSITY") && gearText.includes("TICKER WITHOUT STARS"),
     );
     await page.screenshot({ path: `${OUT}/vb-18-gear-popover-1440.png` });
     await page.keyboard.press("Escape");

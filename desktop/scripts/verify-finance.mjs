@@ -187,18 +187,18 @@ async function run() {
     await gear.click();
     await page.waitForSelector('[role="menu"]');
     await page.waitForTimeout(250);
-    check("display grid renders in popover", (await page.locator('[role="menu"] [role="grid"]').count()) === 1);
 
-    // Toggle "% change" off the feed → change spans disappear live.
-    const pctBefore = await page.locator(`${ROW} >> text=/%/`).count();
-    await page.locator('[role="menu"] [aria-label="Hide % change on Feed"]').click();
-    await page.waitForTimeout(250);
-    check("popover stays open on toggle", (await page.locator('[role="menu"]').count()) === 1);
-    const pctAfter = await page.locator(`${ROW} >> text=/%/`).count();
-    check("%-change toggle hides values live", pctBefore > 0 && pctAfter === 0, `${pctBefore} -> ${pctAfter}`);
-    await page.locator('[role="menu"] [aria-label="Show % change on Feed"]').click();
-    await page.waitForTimeout(250);
-    check("%-change restored", (await page.locator(`${ROW} >> text=/%/`).count()) === pctBefore);
+    // Display-item toggles were removed (defaults only) — the gear keeps
+    // just the functional prefs.
+    check(
+      "no display grid (defaults only)",
+      (await page.locator('[role="menu"] [role="grid"]').count()) === 0,
+    );
+    const gearText = (await page.locator('[role="menu"]').innerText()).toUpperCase();
+    check(
+      "gear keeps density + default sort",
+      gearText.includes("FEED DENSITY") && gearText.includes("DEFAULT SORT"),
+    );
     await page.screenshot({ path: `${OUT}/fin-04-gear-1440.png` });
 
     // Density: comfort → compact kills the bar but keeps a floating gear
