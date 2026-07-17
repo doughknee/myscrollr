@@ -22,7 +22,7 @@ import { dashboardQueryOptions, rssCatalogOptions } from "../../api/queries";
 import { relativeTime, truncate } from "../../utils/format";
 import EmptyChannelState from "../../components/EmptyChannelState";
 import FreshnessPill from "../../components/FreshnessPill";
-import { WidgetBar } from "../../components/widget-bar/Bar";
+import { WidgetBar, BarDivider } from "../../components/widget-bar/Bar";
 import {
   useDismiss,
   MenuPanel,
@@ -371,15 +371,20 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
           )}
 
           {view === "articles" && !showEmpty ? (
-            <div className="ml-auto flex min-w-0 shrink items-center gap-2">
-              {/* Wide: the three menus inline. Collapse BEFORE clipping. */}
-              <span className="hidden items-center gap-2 @2xl:flex">
+            <>
+              {isCustom && <BarDivider />}
+
+              {/* Left cluster: the filters (Kalshi weighting — filters
+                  anchor the left, utilities keep the right). Collapse
+                  BEFORE clipping. */}
+              <div className="hidden min-w-0 items-center gap-2 @2xl:flex">
                 <SelectMenu
                   value={sortOrder}
                   options={SORT_OPTIONS}
                   onChange={pickSort}
                   ariaLabel="Sort articles"
                   prefix="Sort"
+                  align="left"
                 />
                 {allSources.length > 1 && (
                   <MultiSelectMenu
@@ -390,6 +395,7 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
                     onClear={clearSources}
                     noun="sources"
                     ariaLabel="Filter by source"
+                    align="left"
                   />
                 )}
                 {categoryList.length > 0 && (
@@ -403,11 +409,12 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
                     onClear={clearCategories}
                     noun="categories"
                     ariaLabel="Filter by category"
+                    align="left"
                   />
                 )}
-              </span>
+              </div>
               {/* Narrow: one Filter menu. */}
-              <span className="@2xl:hidden">
+              <div className="@2xl:hidden">
                 <RssFilterMenu
                   sortOrder={sortOrder}
                   onPickSort={pickSort}
@@ -421,18 +428,21 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
                   onToggleCategory={toggleCategory}
                   onClearCategories={clearCategories}
                 />
-              </span>
-              {latestUpdated && (
-                <span className="hidden @xl:block">
-                  <FreshnessPill lastUpdated={latestUpdated} label="article" />
-                </span>
-              )}
-              <RssGear
-                channelType={channelType}
-                override={displayOverride}
-                globalRss={prefs.channelDisplay.rss}
-              />
-            </div>
+              </div>
+
+              <div className="ml-auto flex min-w-0 shrink items-center gap-2">
+                {latestUpdated && (
+                  <span className="hidden @xl:block">
+                    <FreshnessPill lastUpdated={latestUpdated} label="article" />
+                  </span>
+                )}
+                <RssGear
+                  channelType={channelType}
+                  override={displayOverride}
+                  globalRss={prefs.channelDisplay.rss}
+                />
+              </div>
+            </>
           ) : (
             <div className="ml-auto">
               <RssGear

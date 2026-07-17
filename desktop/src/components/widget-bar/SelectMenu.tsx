@@ -22,6 +22,7 @@ export function SelectMenu<T extends string>({
   onChange,
   ariaLabel,
   prefix,
+  align = "right",
 }: {
   value: T;
   options: SelectOption<T>[];
@@ -29,6 +30,9 @@ export function SelectMenu<T extends string>({
   ariaLabel: string;
   /** Optional quiet label prefix on the trigger (e.g. "Sort"). */
   prefix?: string;
+  /** Which trigger edge the panel hangs from — use "left" for triggers
+   *  in the bar's left cluster so the panel opens into the page. */
+  align?: "left" | "right";
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -67,7 +71,7 @@ export function SelectMenu<T extends string>({
       </button>
       <AnimatePresence>
         {open && (
-          <MenuPanel className="right-0 w-56">
+          <MenuPanel className={align === "left" ? "left-0 w-56" : "right-0 w-56"}>
             {options.map((o) => (
               <MenuRow
                 key={o.value}

@@ -42,9 +42,13 @@ export function WidgetBar({ children }: { children: React.ReactNode }) {
   return (
     <>
       <div ref={setSentinelEl} aria-hidden className="h-px shrink-0" />
+      {/* rounded-t-xl matches the app shell's inset content panel: the
+          pinned bar's surface/backdrop-blur layer escapes the ancestor's
+          border-radius clip in Chromium/WebView2 and would paint a square
+          corner over the panel curve while scrolled. */}
       <div
         className={clsx(
-          "@container sticky top-0 z-20 -mt-px flex items-center gap-2 border-b bg-surface px-3 py-1.5 transition-shadow duration-200",
+          "@container sticky top-0 z-20 -mt-px flex items-center gap-2 rounded-t-xl border-b bg-surface px-3 py-1.5 transition-shadow duration-200",
           stuck
             ? "border-edge/50 bg-surface/95 shadow-[0_6px_16px_-8px_rgba(0,0,0,0.35)] backdrop-blur-sm"
             : "border-edge/30",
