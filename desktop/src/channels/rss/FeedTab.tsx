@@ -115,14 +115,22 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
     [dashboard?.channels, widgetId],
   );
 
-  // Per-widget display overrides the global rss display where set.
+  // Per-widget display overrides the global rss display where set —
+  // functional overrides only (time window, per-source limit): stored
+  // show* venues are ignored since the 2026-07-17 defaults reset
+  // (mirrors getRssDisplayPrefs in ./view.ts).
   const dp = useMemo(() => {
     const override = (
       channel?.config as { display?: Partial<RssDisplayPrefs> } | undefined
     )?.display;
-    return override
-      ? { ...prefs.channelDisplay.rss, ...override }
-      : prefs.channelDisplay.rss;
+    if (!override) return prefs.channelDisplay.rss;
+    const {
+      showSource: _source,
+      showDescription: _description,
+      showTimestamps: _timestamps,
+      ...functional
+    } = override;
+    return { ...prefs.channelDisplay.rss, ...functional };
   }, [prefs.channelDisplay.rss, channel?.config]);
 
   // Scope to this widget's own feeds (news_bbc → only the BBC feed;

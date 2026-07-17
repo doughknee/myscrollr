@@ -156,7 +156,18 @@ export function getRssDisplayPrefs(
   const override = (
     channel?.config as { display?: Partial<RssDisplayPrefs> } | undefined
   )?.display;
-  return override ? { ...globalPrefs, ...override } : globalPrefs;
+  if (!override) return globalPrefs;
+  // 2026-07-17 defaults reset: the description/timestamp toggles left
+  // the UI with the configure-page teardown — stored show* overrides are
+  // ignored; only the functional overrides (time window, per-source
+  // limit) survive the merge.
+  const {
+    showSource: _source,
+    showDescription: _description,
+    showTimestamps: _timestamps,
+    ...functional
+  } = override;
+  return { ...globalPrefs, ...functional };
 }
 
 // ── Pipeline result (for FeedTab) ────────────────────────────────

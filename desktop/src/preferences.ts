@@ -1065,11 +1065,15 @@ export function migrateFinanceDisplay(
     raw.tickerDirectionMarker === "none"
       ? raw.tickerDirectionMarker
       : DEFAULT_CHANNEL_DISPLAY.finance.tickerDirectionMarker;
+  // 2026-07-17 defaults reset: the display-item toggles left the UI with
+  // the configure-page teardown, so stored show* venues are deliberately
+  // IGNORED — the DEFAULT_CHANNEL_DISPLAY spread supplies them and every
+  // install renders the defaults. Functional prefs (sort, density,
+  // marker) keep honoring saved values. Sports' equivalents are forced
+  // in normalizeSportsDisplayConfig; rss per-widget overrides are
+  // stripped where they merge (channels/rss/view.ts + FeedTab).
   return {
     ...DEFAULT_CHANNEL_DISPLAY.finance,
-    showChange: migrateVenue(raw.showChange),
-    showPrevClose: migrateVenue(raw.showPrevClose),
-    showLastUpdated: migrateVenue(raw.showLastUpdated),
     defaultSort:
       (raw.defaultSort as FinanceDisplayPrefs["defaultSort"] | undefined) ??
       DEFAULT_CHANNEL_DISPLAY.finance.defaultSort,
@@ -1095,12 +1099,9 @@ export function migratePredictionsDisplay(
       : raw.defaultSort === "volume"
         ? ("trending" as const) // v1.1.5: all-time volume sort became Trending (24h)
         : DEFAULT_CHANNEL_DISPLAY.predictions.defaultSort;
+  // 2026-07-17 defaults reset — see migrateFinanceDisplay for the note.
   return {
     ...DEFAULT_CHANNEL_DISPLAY.predictions,
-    showDelta: migrateVenue(raw.showDelta),
-    showCategory: migrateVenue(raw.showCategory),
-    showVolume: migrateVenue(raw.showVolume),
-    showCloseTime: migrateVenue(raw.showCloseTime),
     defaultSort,
     feedDensity: density,
   };
@@ -1110,11 +1111,10 @@ export function migrateRssDisplay(
   saved: Partial<RssDisplayPrefs> | undefined,
 ): RssDisplayPrefs {
   const raw = (saved ?? {}) as Record<string, unknown>;
+  // 2026-07-17 defaults reset — show* venues come from the defaults
+  // spread; see migrateFinanceDisplay for the note.
   return {
     ...DEFAULT_CHANNEL_DISPLAY.rss,
-    showDescription: migrateVenue(raw.showDescription),
-    showSource: migrateVenue(raw.showSource),
-    showTimestamps: migrateVenue(raw.showTimestamps),
     // One-shot migration (v1.1.1): 4 was the pre-widget-era DEFAULT and
     // never appeared in the picker (1/3/5/10), so a stored 4 is an
     // untouched default, not a user's choice — map it to 0 (all).
