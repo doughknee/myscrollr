@@ -21,11 +21,9 @@ import {
 import clsx from "clsx";
 import { motion, AnimatePresence } from "motion/react";
 import Tooltip from "../../components/Tooltip";
-import UpgradePrompt from "../../components/UpgradePrompt";
 import EmptySection from "../../components/layout/EmptySection";
-import CategoryFilter from "./CategoryFilter";
+import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import type { TrackedFeed } from "../../api/client";
-import type { SubscriptionTier } from "../../auth";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -44,10 +42,6 @@ interface FeedManagerProps {
   onRemove: (url: string) => void;
   loading: boolean;
   error: boolean;
-  maxFeeds: number;
-  maxCustomFeeds: number;
-  customCount: number;
-  subscriptionTier: SubscriptionTier;
   saving: boolean;
 }
 
@@ -74,10 +68,6 @@ export default function FeedManager({
   onRemove,
   loading,
   error,
-  maxFeeds,
-  maxCustomFeeds,
-  customCount,
-  subscriptionTier,
   saving,
 }: FeedManagerProps) {
   const [search, setSearch] = useState("");
@@ -100,9 +90,6 @@ export default function FeedManager({
     () => new Map(catalogAll.map((f) => [f.url, f])),
     [catalogAll],
   );
-
-  const atFeedLimit = feeds.length >= maxFeeds;
-  const atCustomLimit = customCount >= maxCustomFeeds;
 
   // Build the unified list: every catalog feed + any custom feeds
   // not already in the catalog.
@@ -212,11 +199,11 @@ export default function FeedManager({
       if (saving) return;
       if (feed.isTracked) {
         onRemove(feed.url);
-      } else if (!atFeedLimit) {
+      } else {
         onAddCatalog(feed.url);
       }
     },
-    [saving, atFeedLimit, onAddCatalog, onRemove],
+    [saving, onAddCatalog, onRemove],
   );
 
   const toggleCategory = useCallback((cat: string) => {
@@ -258,43 +245,24 @@ export default function FeedManager({
       <div className="shrink-0 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <h3 className="text-sm font-semibold text-fg">Feeds</h3>
-          <span
-            className={clsx(
-              "px-1.5 py-px rounded-full text-ui-chip font-medium tabular-nums",
-              atFeedLimit ? "bg-warn/15 text-warn" : "bg-accent/15 text-accent",
-            )}
-          >
+          <span className="px-1.5 py-px rounded-full text-ui-chip font-medium tabular-nums bg-accent/15 text-accent">
             {feeds.length}
-            {maxFeeds !== Infinity && ` / ${maxFeeds}`}
           </span>
         </div>
-        {!atFeedLimit && maxCustomFeeds > 0 && (
-          <button
-            onClick={() => setShowCustomForm((v) => !v)}
-            className={clsx(
-              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-ui-meta font-medium",
-              "transition-all duration-150 active:scale-95",
-              showCustomForm
-                ? "border-accent/50 bg-accent/10 text-accent"
-                : "border-edge/40 text-fg-3 hover:text-accent hover:border-accent/40",
-            )}
-          >
-            <Plus size={11} />
-            Custom feed
-          </button>
-        )}
+        <button
+          onClick={() => setShowCustomForm((v) => !v)}
+          className={clsx(
+            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-ui-meta font-medium",
+            "transition-all duration-150 active:scale-95",
+            showCustomForm
+              ? "border-accent/50 bg-accent/10 text-accent"
+              : "border-edge/40 text-fg-3 hover:text-accent hover:border-accent/40",
+          )}
+        >
+          <Plus size={11} />
+          Custom feed
+        </button>
       </div>
-
-      {atFeedLimit && (
-        <div className="shrink-0">
-          <UpgradePrompt
-            current={feeds.length}
-            max={maxFeeds}
-            noun="feeds"
-            tier={subscriptionTier}
-          />
-        </div>
-      )}
 
       <AnimatePresence initial={false}>
         {showCustomForm && (
@@ -310,52 +278,36 @@ export default function FeedManager({
                 <span className="text-ui-section uppercase tracking-wider font-bold text-fg-3">
                   Add your own feed
                 </span>
-                {maxCustomFeeds !== Infinity && (
-                  <span className="text-ui-chip text-fg-3 tabular-nums">
-                    {customCount}/{maxCustomFeeds} custom
-                  </span>
-                )}
               </div>
-              {atCustomLimit ? (
-                <UpgradePrompt
-                  current={customCount}
-                  max={maxCustomFeeds}
-                  noun="custom feeds"
-                  tier={subscriptionTier}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Feed name"
+                  className="flex-1 px-2.5 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta font-mono text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
                 />
-              ) : (
-                <>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      type="text"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      placeholder="Feed name"
-                      className="flex-1 px-2.5 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta font-mono text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
-                    />
-                    <input
-                      type="url"
-                      value={newUrl}
-                      onChange={(e) => setNewUrl(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleAddCustom();
-                      }}
-                      placeholder="https://..."
-                      className="flex-[2] px-2.5 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta font-mono text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
-                    />
-                    <button
-                      onClick={handleAddCustom}
-                      disabled={saving || !newName.trim() || !newUrl.trim()}
-                      className="px-2.5 py-1.5 rounded-md bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20 transition-all duration-150 active:scale-95 flex items-center gap-1 disabled:opacity-30 cursor-pointer"
-                    >
-                      <Plus size={11} />
-                      <span className="text-ui-meta font-medium">Add</span>
-                    </button>
-                  </div>
-                  {urlError && (
-                    <p className="text-ui-meta text-error/80">{urlError}</p>
-                  )}
-                </>
+                <input
+                  type="url"
+                  value={newUrl}
+                  onChange={(e) => setNewUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddCustom();
+                  }}
+                  placeholder="https://..."
+                  className="flex-[2] px-2.5 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta font-mono text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
+                />
+                <button
+                  onClick={handleAddCustom}
+                  disabled={saving || !newName.trim() || !newUrl.trim()}
+                  className="px-2.5 py-1.5 rounded-md bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20 transition-all duration-150 active:scale-95 flex items-center gap-1 disabled:opacity-30 cursor-pointer"
+                >
+                  <Plus size={11} />
+                  <span className="text-ui-meta font-medium">Add</span>
+                </button>
+              </div>
+              {urlError && (
+                <p className="text-ui-meta text-error/80">{urlError}</p>
               )}
             </div>
           </motion.div>
@@ -386,12 +338,14 @@ export default function FeedManager({
           )}
         </div>
 
-        <CategoryFilter
-          categories={categories}
-          selected={selectedCategories}
+        <MultiSelectMenu
+          options={categories.map((c) => c.name)}
+          counts={Object.fromEntries(categories.map((c) => [c.name, c.count]))}
+          selected={Array.from(selectedCategories)}
           onToggle={toggleCategory}
-          onClearAll={() => setSelectedCategories(new Set())}
-          alignRight
+          onClear={() => setSelectedCategories(new Set())}
+          noun="categories"
+          ariaLabel="Filter by category"
         />
 
         <Tooltip
@@ -486,7 +440,6 @@ export default function FeedManager({
                 key={feed.url}
                 feed={feed}
                 trackedSubscription={tracked}
-                atLimit={atFeedLimit}
                 saving={saving}
                 onToggle={() => toggleFeed(feed)}
               />
@@ -503,14 +456,12 @@ export default function FeedManager({
 interface FeedRowProps {
   feed: UnifiedFeed;
   trackedSubscription: SubscribedFeed | undefined;
-  atLimit: boolean;
   saving: boolean;
   onToggle: () => void;
 }
 
-function FeedRow({ feed, atLimit, saving, onToggle }: FeedRowProps) {
+function FeedRow({ feed, saving, onToggle }: FeedRowProps) {
   const tracked = feed.isTracked;
-  const blocked = !tracked && atLimit;
   const health = feedHealth(feed);
 
   return (
@@ -518,21 +469,13 @@ function FeedRow({ feed, atLimit, saving, onToggle }: FeedRowProps) {
       type="button"
       role="listitem"
       onClick={onToggle}
-      disabled={saving || blocked}
-      aria-label={
-        tracked
-          ? `Remove ${feed.name}`
-          : blocked
-            ? `${feed.name} — at feed limit`
-            : `Add ${feed.name}`
-      }
+      disabled={saving}
+      aria-label={tracked ? `Remove ${feed.name}` : `Add ${feed.name}`}
       className={clsx(
         "w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all duration-150 group active:scale-[0.995]",
         tracked
           ? "bg-accent/[0.04] hover:bg-accent/[0.08]"
-          : blocked
-            ? "opacity-40 cursor-not-allowed"
-            : "hover:bg-base-200/50 cursor-pointer",
+          : "hover:bg-base-200/50 cursor-pointer",
         saving && "cursor-wait",
       )}
     >

@@ -7,7 +7,6 @@ import { ArticleAgeControl } from "../../components/TimeWindowControl";
 import { rssCatalogOptions } from "../../api/queries";
 import { useChannelConfig } from "../../hooks/useChannelConfig";
 import { useShell } from "../../shell-context";
-import { getLimit } from "../../tierLimits";
 import type { RssDisplayPrefs } from "../../preferences";
 import type { Channel, RssChannelConfig } from "../../api/client";
 import type { SubscriptionTier } from "../../auth";
@@ -124,13 +123,6 @@ function RssFeedConfig({
   const feeds = Array.isArray(rssConfig?.feeds) ? rssConfig.feeds : [];
   const feedUrlSet = useMemo(() => new Set(feeds.map((f) => f.url)), [feeds]);
 
-  const maxFeeds = getLimit(subscriptionTier, "feeds");
-  const maxCustomFeeds = getLimit(subscriptionTier, "customFeeds");
-  const customFeedCount = useMemo(
-    () => feeds.filter((f) => f.is_custom).length,
-    [feeds],
-  );
-
   // Two catalogs: "clean" (curated, healthy feeds for browsing) and
   // "all" (includes failing feeds + the user's customs, used for
   // health badges on rows the user has already subscribed to).
@@ -146,13 +138,12 @@ function RssFeedConfig({
 
   const addCatalogFeed = useCallback(
     (url: string) => {
-      if (feeds.length >= maxFeeds) return;
       const allFeeds = [...catalog, ...catalogAll];
       const feed = allFeeds.find((f) => f.url === url);
       if (!feed || feedUrlSet.has(url)) return;
       updateItems([...feeds, { name: feed.name, url: feed.url }]);
     },
-    [catalog, catalogAll, feeds, feedUrlSet, updateItems, maxFeeds],
+    [catalog, catalogAll, feeds, feedUrlSet, updateItems],
   );
 
   const removeFeed = useCallback(
@@ -164,15 +155,13 @@ function RssFeedConfig({
 
   const addCustomFeed = useCallback(
     (name: string, url: string) => {
-      if (feeds.length >= maxFeeds) return;
-      if (customFeedCount >= maxCustomFeeds) return;
       if (feedUrlSet.has(url)) {
         toast.error("This feed is already added");
         return;
       }
       updateItems([...feeds, { name, url, is_custom: true }]);
     },
-    [feeds, feedUrlSet, updateItems, maxFeeds, maxCustomFeeds, customFeedCount],
+    [feeds, feedUrlSet, updateItems],
   );
 
   return (
@@ -214,10 +203,6 @@ function RssFeedConfig({
           onRemove={removeFeed}
           loading={catalogLoading}
           error={catalogError}
-          maxFeeds={maxFeeds}
-          maxCustomFeeds={maxCustomFeeds}
-          customCount={customFeedCount}
-          subscriptionTier={subscriptionTier}
           saving={saving}
         />
       </div>
