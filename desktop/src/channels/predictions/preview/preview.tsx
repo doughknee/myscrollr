@@ -285,7 +285,6 @@ function main(): void {
             <FeedTab
               mode={density}
               feedContext={feedContext}
-              onConfigure={noop}
               widgetId="predictions"
             />
           </div>

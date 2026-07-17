@@ -98,7 +98,7 @@ const VIEW_OPTIONS: SegmentedOption<RssView>[] = [
 
 // ── FeedTab ──────────────────────────────────────────────────────
 
-function RssFeedTab({ mode, feedContext, onConfigure, widgetId }: FeedTabProps) {
+function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   const { prefs } = useShell();
 
   const dashboardLoaded = feedContext.__dashboardLoaded as boolean | undefined;

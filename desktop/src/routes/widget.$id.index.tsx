@@ -1,34 +1,29 @@
 /**
- * Widget route — renders widget feed or configuration.
+ * Widget route — renders the widget feed.
  *
- * URL: /widget/:id/:tab
- *   - id: "clock" | "weather" | "sysmon" | "uptime" | "github"
- *   - tab: "feed" | "configuration"
+ * URL: /widget/:id  (id: "clock" | "weather" | "sysmon" | "uptime" | "github" | "timer")
  *
- * Source-level actions (remove with Undo toast) are in the header bar.
- * Display preferences for widgets live as part of the Configure tab —
- * the IA refactor (2026-05-09) made channel and widget pages share the
- * same 2-tab structure (Feed / Configure).
+ * The configuration tab is gone — every setting lives inside the widget
+ * itself (gear popover). NOTE: this is deliberately an INDEX route
+ * (widget.$id.index.tsx, not widget.$id.tsx) so it doesn't become
+ * widget.$id.info.tsx's layout parent and demand an Outlet.
  */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import RouteError from "../components/RouteError";
-import SourcePageLayout, { parseSourceTab, SourceNotFound } from "../components/SourcePageLayout";
+import SourcePageLayout, { SourceNotFound } from "../components/SourcePageLayout";
 import { getWidget } from "../widgets/registry";
-import WidgetConfigPanel from "../widgets/WidgetConfigPanel";
-import { useShell } from "../shell-context";
 import { useUndoableAction } from "../hooks/useUndoableAction";
 import { disableWidget } from "../preferences";
 
-export const Route = createFileRoute("/widget/$id/$tab")({
+export const Route = createFileRoute("/widget/$id/")({
   component: WidgetRoute,
   errorComponent: RouteError,
 });
 
 function WidgetRoute() {
-  const { id, tab: rawTab } = Route.useParams();
+  const { id } = Route.useParams();
   const navigate = useNavigate();
-  const tab = parseSourceTab(rawTab);
 
   const widget = getWidget(id);
   // Undoable wrapper for the Trash button. Pre-Phase-1 widget removal
@@ -48,11 +43,6 @@ function WidgetRoute() {
   return (
     <SourcePageLayout
       name={widget.name}
-      description={tab === "configuration" ? "Configure" : undefined}
-      activeTab={tab}
-      onTabChange={(t) =>
-        navigate({ to: "/widget/$id/$tab", params: { id, tab: t } })
-      }
       onBack={() => navigate({ to: "/feed" })}
       onRemove={() => {
         undoable(
@@ -72,41 +62,15 @@ function WidgetRoute() {
       sourceKind="widget"
     >
       {/* Entrance to match the data-source pages (v1.1.1): utility
-          content fades up instead of popping in. Keyed by tab so
-          switching Feed ↔ Configure replays it. */}
+          content fades up instead of popping in. */}
       <motion.div
-        key={tab}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25, delay: 0.04, ease: [0.22, 0.61, 0.36, 1] }}
         className="h-full"
       >
-        {tab === "feed" && <WidgetFeedTab widget={widget} />}
-        {tab === "configuration" && <WidgetConfigTab id={id} />}
+        <widget.FeedTab mode="comfort" feedContext={{ __dashboardLoaded: true }} />
       </motion.div>
     </SourcePageLayout>
-  );
-}
-
-function WidgetFeedTab({
-  widget,
-}: {
-  widget: NonNullable<ReturnType<typeof getWidget>>;
-}) {
-  const feedContext = {
-    __dashboardLoaded: true,
-  };
-  return <widget.FeedTab mode="comfort" feedContext={feedContext} />;
-}
-
-function WidgetConfigTab({ id }: { id: string }) {
-  const shell = useShell();
-
-  return (
-    <WidgetConfigPanel
-      widgetId={id}
-      prefs={shell.prefs}
-      onPrefsChange={shell.onPrefsChange}
-    />
   );
 }

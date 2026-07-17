@@ -184,7 +184,7 @@ const LENSES: { value: PredictionsLens; label: string; icon?: typeof Flame }[] =
 
 // ── FeedTab ──────────────────────────────────────────────────────
 
-function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabProps) {
+function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   const { prefs } = useShell();
   const dp = prefs.channelDisplay.predictions;
 

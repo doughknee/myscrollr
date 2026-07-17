@@ -11,27 +11,15 @@ import {
 } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 import { getStore, setStore } from "./lib/store";
+import { resolveInitialEntry } from "./routeCompat";
 import type { QueryClient } from "@tanstack/react-query";
 
 // ── Persistence ──────────────────────────────────────────────────
 
 const HISTORY_KEY = "scrollr:lastRoute";
 
-/** Routes that were removed or moved — redirect to their replacements. */
-const ROUTE_REDIRECTS: Record<string, string> = {
-  "/settings/general": "/settings",
-  "/settings/ticker": "/ticker",
-  "/settings/account": "/account",
-};
-
 function getInitialEntry(): string {
-  const saved = getStore<string | null>(HISTORY_KEY, null);
-  if (saved) {
-    const redirect = ROUTE_REDIRECTS[saved];
-    if (redirect) return redirect;
-    return saved;
-  }
-  return "/";
+  return resolveInitialEntry(getStore<string | null>(HISTORY_KEY, null));
 }
 
 // ── Router factory ───────────────────────────────────────────────

@@ -276,22 +276,22 @@ function HomePage() {
               }
               onViewAll={() =>
                 navigate({
-                  to: "/channel/$type/$tab",
-                  params: { type: ch.channel_type, tab: "feed" },
+                  to: "/channel/$type",
+                  params: { type: ch.channel_type },
                 })
               }
               onRowClick={() =>
                 navigate({
-                  to: "/channel/$type/$tab",
-                  params: { type: ch.channel_type, tab: "feed" },
+                  to: "/channel/$type",
+                  params: { type: ch.channel_type },
                 })
               }
               // Config lives inside the widget now — every CTA lands on
               // the feed, where the bar/gear carries the configuration.
               onConfigure={() =>
                 navigate({
-                  to: "/channel/$type/$tab",
-                  params: { type: ch.channel_type, tab: "feed" },
+                  to: "/channel/$type",
+                  params: { type: ch.channel_type },
                 })
               }
             />
@@ -320,8 +320,8 @@ function HomePage() {
             }
             onNavigate={(id) =>
               navigate({
-                to: "/widget/$id/$tab",
-                params: { id, tab: "feed" },
+                to: "/widget/$id",
+                params: { id },
               })
             }
           />

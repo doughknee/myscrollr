@@ -85,8 +85,8 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
         // Navigate immediately — the channel page's queries will fire
         // in parallel with the create call below.
         navigate({
-          to: "/channel/$type/$tab",
-          params: { type: item.id, tab: "feed" },
+          to: "/channel/$type",
+          params: { type: item.id },
         });
         toast.success(`${item.name} added`);
 
@@ -156,7 +156,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
           },
         });
         toast.success(`${item.name} added`);
-        navigate({ to: "/widget/$id/$tab", params: { id: item.id, tab: "feed" } });
+        navigate({ to: "/widget/$id", params: { id: item.id } });
       }
     },
     [navigate, queryClient, prefs, onPrefsChange],

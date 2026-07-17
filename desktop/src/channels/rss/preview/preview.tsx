@@ -167,7 +167,6 @@ function main(): void {
             <FeedTab
               mode="comfort"
               feedContext={feedContext}
-              onConfigure={noop}
               widgetId={widgetId}
             />
           </div>

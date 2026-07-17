@@ -555,11 +555,11 @@ function RootLayout() {
         return;
       }
       if (channelsRef.current.some((ch) => ch.channel_type === id)) {
-        navigate({ to: "/channel/$type/$tab", params: { type: id, tab: "feed" } });
+        navigate({ to: "/channel/$type", params: { type: id } });
         return;
       }
       if (getWidget(id)) {
-        navigate({ to: "/widget/$id/$tab", params: { id, tab: "feed" } });
+        navigate({ to: "/widget/$id", params: { id } });
         return;
       }
       navigate({ to: "/feed" });
@@ -579,9 +579,9 @@ function RootLayout() {
   const handleSelectPinned = useCallback(
     (id: string, kind: "channel" | "widget") => {
       if (kind === "channel") {
-        navigate({ to: "/channel/$type/$tab", params: { type: id, tab: "feed" } });
+        navigate({ to: "/channel/$type", params: { type: id } });
       } else {
-        navigate({ to: "/widget/$id/$tab", params: { id, tab: "feed" } });
+        navigate({ to: "/widget/$id", params: { id } });
       }
     },
     [navigate],
@@ -750,9 +750,9 @@ function RootLayout() {
           const tab = segments[2];
           if (tab && tab !== "feed") {
             if (route.isChannel) {
-              navigate({ to: "/channel/$type/$tab", params: { type: route.activeItem, tab: "feed" } });
+              navigate({ to: "/channel/$type", params: { type: route.activeItem } });
             } else {
-              navigate({ to: "/widget/$id/$tab", params: { id: route.activeItem, tab: "feed" } });
+              navigate({ to: "/widget/$id", params: { id: route.activeItem } });
             }
             return;
           }

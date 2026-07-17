@@ -1,52 +1,20 @@
 /**
  * SourcePageLayout — page chassis for channel and widget routes.
  *
- * Renders through the universal `PageLayout`. Source pages no longer
- * have a visible tab band — Feed is the single visible page. Secondary
- * actions (Configure, Remove) live in a contextual menu opened by the
- * "Options" pill button in the TopBar. The breadcrumb segments are
- * plain navigation text — the pill is the single, explicit menu trigger.
- *
- * The /feed and /configuration routes both still exist for direct
- * deeplinks, tray actions, and the Catalog "Open" → feed flow. The old
- * per-channel /display venue-matrix pages were removed in the
- * widget/slot redesign (2026-06-30) — display venue prefs still persist
- * for backward compat and the ticker reads them, but are no longer
- * user-configurable here.
+ * Renders through the universal `PageLayout`. Since the configure-page
+ * teardown the feed is the only page a source has — every setting lives
+ * inside the widget itself (bar + gear popover). The Options pill keeps
+ * the source-level Remove action; the breadcrumb is plain navigation.
  *
  * IA refactor 2026-05-09 — see
  * docs/superpowers/specs/2026-05-09-desktop-ia-refactor-design.md
  * Walkthrough discoverability fix 2026-05-11.
  */
 import { useState } from "react";
-import { Settings as SettingsIcon, Tv, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import ConfirmDialog from "./ConfirmDialog";
 import PageLayout from "./layout/PageLayout";
 import { type OverflowMenuItem } from "./OverflowMenu";
-
-// Note: "Manage on ticker" used to live in this menu but was removed in
-// the 2026-05-11 walkthrough fix — it navigated users away from the
-// source they were configuring to a global Settings panel, which testers
-// found jarring. Ticker configuration is still reachable from the main
-// Settings route. See AGENTS.md or the PR description for context.
-
-// ── Shared tab constants ────────────────────────────────────────
-//
-// SourceTab is part of the URL contract — channels can be deeplinked
-// to /channel/$type/feed, /configuration, or /display. We don't render
-// a visible tab band; users navigate via the OverflowMenu in the
-// TopBar entityAction slot.
-
-export const VALID_TABS = ["feed", "configuration"] as const;
-export type SourceTab = (typeof VALID_TABS)[number];
-
-/** Parse a raw tab parameter into a valid SourceTab.
- *  Falls back to "feed" for anything unrecognised. */
-export function parseSourceTab(rawTab: string): SourceTab {
-  return (VALID_TABS as readonly string[]).includes(rawTab)
-    ? (rawTab as SourceTab)
-    : "feed";
-}
 
 /** Fallback for when a source (channel or widget) is not found. */
 export function SourceNotFound({
@@ -71,12 +39,6 @@ export function SourceNotFound({
 
 interface SourcePageLayoutProps {
   name: string;
-  /** Optional 1-line description rendered next to the name. */
-  description?: string;
-  /** Current tab — "feed" or "configuration". */
-  activeTab: SourceTab;
-  /** Navigate to a different tab (used by menu items + Configure CTAs). */
-  onTabChange: (tab: SourceTab) => void;
   /** Click handler for the parent breadcrumb in the TopBar
    *  (typically navigates back to /feed). */
   onBack: () => void;
@@ -90,9 +52,6 @@ interface SourcePageLayoutProps {
 
 export default function SourcePageLayout({
   name,
-  description,
-  activeTab,
-  onTabChange,
   onBack,
   children,
   onRemove,
@@ -108,43 +67,8 @@ export default function SourcePageLayout({
     }
   }
 
-  // Build the menu items list. Order is intentional: when away from
-  // Feed, "Back to feed" goes first so the menu always offers a
-  // canonical way out. Then Configure → Display, a divider, then
-  // destructive Remove at the bottom. (Pre-2026-05-11 this also
-  // included "Manage on ticker" — removed because it navigated users
-  // away from the source page to global ticker settings, which
-  // confused testers.)
   const menuItems: OverflowMenuItem[] = [];
-
-  // Always offer "Back to feed" when not on the feed already. This
-  // is the canonical way to escape Configure / Display.
-  if (activeTab !== "feed") {
-    menuItems.push({
-      key: "feed",
-      label: "Back to feed",
-      icon: Tv,
-      onSelect: () => onTabChange("feed"),
-    });
-    menuItems.push({ key: "div-back", divider: true });
-  }
-
-  // Configure — always present except when already there.
-  if (activeTab !== "configuration") {
-    menuItems.push({
-      key: "configure",
-      label: sourceKind === "widget" ? "Configure widget" : "Configure source",
-      hint:
-        sourceKind === "widget"
-          ? "Pick what to track and how it renders"
-          : "Pick what to track",
-      icon: SettingsIcon,
-      onSelect: () => onTabChange("configuration"),
-    });
-  }
-
   if (onRemove) {
-    menuItems.push({ key: "div-1", divider: true });
     menuItems.push({
       key: "remove",
       label: `Remove ${name}`,
@@ -154,39 +78,17 @@ export default function SourcePageLayout({
     });
   }
 
-  // Feed view is data-dense (grids of trade cards, score cards, RSS
-  // articles, etc.) and should render flush to the content area at
-  // full width. Configure / Display are forms — they keep the
-  // narrow-column padded layout for legibility.
-  const isFeed = activeTab === "feed";
-
   return (
     <>
       <PageLayout
         title={name}
-        subtitle={description}
         parentLabel="Home"
         onParentClick={onBack}
-        // When on a sub-route (Configure or Display), clicking the
-        // source name in the breadcrumb returns to the source's Feed
-        // view. On Feed itself the title is plain text.
-        onTitleClick={
-          activeTab !== "feed" ? () => onTabChange("feed") : undefined
-        }
-        width={isFeed ? "wide" : "narrow"}
-        // Configure tab gets a fill-height shell so SymbolManager (and
-        // future configure surfaces in other channels) can scroll its
-        // own list within a fixed pane instead of growing the page.
-        fillHeight={activeTab === "configuration"}
-        // Feed tab renders flush to the viewport edges (no PageLayout
-        // padding / max-width clamp). The feed's own components own
-        // their padding. Configure / Display keep the default padded
-        // narrow column.
-        noContentPadding={isFeed}
-        // Source pages use the "Options" pill in the TopBar as the
-        // sole menu trigger; the breadcrumb is plain navigation text.
-        // Walkthrough fix 2026-05-11 — testers preferred the explicit
-        // pill over the hidden breadcrumb dropdown.
+        // The feed is data-dense (grids of trade cards, score cards, RSS
+        // articles, etc.): full width, flush to the content area — the
+        // feed's own components own their padding.
+        width="wide"
+        noContentPadding
         menuItems={menuItems}
         menuLabel={`${name} options`}
       >

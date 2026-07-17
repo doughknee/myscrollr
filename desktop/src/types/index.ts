@@ -151,8 +151,6 @@ export interface FeedTabProps {
    * legacy coarse channel, where the FeedTab shows the whole source.
    */
   widgetId?: string;
-  /** Navigate to the Settings/configuration tab. */
-  onConfigure?: () => void;
 }
 
 /** Structured info content for the Info tab. */

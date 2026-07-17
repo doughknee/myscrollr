@@ -112,7 +112,7 @@ const LOAD_MORE_INCREMENT = 20;
 
 // ── FeedTab ──────────────────────────────────────────────────────
 
-function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure, widgetId }: FeedTabProps) {
+function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProps) {
   const { prefs } = useShell();
   const dp = prefs.channelDisplay.finance;
 

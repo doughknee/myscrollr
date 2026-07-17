@@ -6,7 +6,7 @@
  * the primary action, a live-feeling ticker preview, quick facts, usage
  * steps, the plan/slot context, Remove, and related widgets to keep the
  * browse going. Works for ANY widget id (data or utility) — the static
- * `info` segment wins over `/widget/$id/$tab`.
+ * `info` segment wins over the widget index route.
  */
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -148,9 +148,9 @@ function WidgetInfoPage() {
 
   const openWidget = () => {
     if (item.kind === "data") {
-      navigate({ to: "/channel/$type/$tab", params: { type: item.id, tab: "feed" } });
+      navigate({ to: "/channel/$type", params: { type: item.id } });
     } else {
-      navigate({ to: "/widget/$id/$tab", params: { id: item.id, tab: "feed" } });
+      navigate({ to: "/widget/$id", params: { id: item.id } });
     }
   };
 

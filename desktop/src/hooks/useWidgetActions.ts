@@ -70,8 +70,8 @@ export function useWidgetActions(
 
       if (!isEnabled) {
         navigate({
-          to: "/widget/$id/$tab",
-          params: { id: widgetId, tab: "feed" },
+          to: "/widget/$id",
+          params: { id: widgetId },
         });
       }
       if (isEnabled && activeItem === widgetId) {

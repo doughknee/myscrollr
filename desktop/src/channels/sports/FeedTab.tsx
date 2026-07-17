@@ -108,7 +108,7 @@ function buildFavoriteSet(favorites: Record<string, FavoriteTeam>): Set<string> 
 
 // ── FeedTab ──────────────────────────────────────────────────────
 
-function SportsFeedTab({ mode, feedContext, onConfigure, widgetId }: FeedTabProps) {
+function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   const [tab, setTab] = useState<SportsTab>("scores");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const { leagues, display, favoriteTeams } = useSportsConfig(widgetId ?? "sports");

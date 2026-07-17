@@ -51,8 +51,8 @@ export function useChannelActions(): ChannelActions {
         await channelsApi.create(channelType);
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
         navigate({
-          to: "/channel/$type/$tab",
-          params: { type: channelType, tab: "feed" },
+          to: "/channel/$type",
+          params: { type: channelType },
         });
         toast.success(`${channelName[channelType] ?? channelType} added`);
       } catch (err) {
