@@ -36,7 +36,6 @@ import {
 import { SearchBox, useSlashFocus } from "../../components/widget-bar/SearchBox";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
-import { GearMenu } from "../../components/widget-bar/GearMenu";
 import SymbolManager from "./SymbolManager";
 import { useChannelConfig } from "../../hooks/useChannelConfig";
 import { useShell } from "../../shell-context";
@@ -101,26 +100,19 @@ interface FinanceChannelConfig {
   symbols?: string[];
 }
 
-const DENSITY_OPTIONS: SegmentedOption<"comfort" | "compact">[] = [
-  { value: "comfort", label: "Comfort" },
-  { value: "compact", label: "Compact" },
-];
-
 const PAGE_SIZE = 20;
 const LOAD_MORE_INCREMENT = 20;
 
 // ── FeedTab ──────────────────────────────────────────────────────
 
 function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProps) {
-  const { prefs } = useShell();
+  const { prefs, onPrefsChange } = useShell();
   const dp = prefs.channelDisplay.finance;
 
-  // The caller (Home or Source page) hints at a default mode, but
-  // the user's per-channel feedDensity pref wins when set. This
-  // means the same channel can render compact on Home (caller hint
-  // wins for the small preview) and comfort on the Source page
-  // when the user prefers it, controlled from one Display setting.
-  const mode = dp.feedDensity ?? callerMode;
+  // Density is caller-driven only (the per-widget feedDensity pref was
+  // deleted in the 2026-07-17 settings unification — feeds render
+  // comfort; the ticker owns the one density concept).
+  const mode = callerMode;
 
   const { data: dashboard } = useQuery(dashboardQueryOptions());
   const { data: catalog } = useQuery(financeCatalogOptions());
@@ -178,6 +170,23 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   const [view, setView] = useState<FinanceView>("feed");
   const [directionFilter, setDirectionFilter] = useState<DirectionFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>(() => dp.defaultSort ?? "alpha");
+
+  // Sticky sort (2026-07-17 unification): the bar's sort choice persists
+  // as dp.defaultSort — the gear's separate "Default sort" rows are gone,
+  // and the ticker keeps following the same pref.
+  const pickSort = useCallback(
+    (next: SortKey) => {
+      setSortKey(next);
+      onPrefsChange({
+        ...prefs,
+        channelDisplay: {
+          ...prefs.channelDisplay,
+          finance: { ...prefs.channelDisplay.finance, defaultSort: next },
+        },
+      });
+    },
+    [prefs, onPrefsChange],
+  );
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
 
   const toggleCategory = useCallback((cat: string) => {
@@ -306,7 +315,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                   onPickDirection={setDirectionFilter}
                   directionCounts={directionCounts}
                   sortKey={sortKey}
-                  onPickSort={setSortKey}
+                  onPickSort={pickSort}
                   categories={categoryList}
                   selectedCategories={selectedCategories}
                   onToggleCategory={toggleCategory}
@@ -319,12 +328,12 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                   <SelectMenu
                     value={sortKey}
                     options={SORT_OPTIONS}
-                    onChange={setSortKey}
+                    onChange={pickSort}
                     ariaLabel="Sort symbols"
                     prefix="Sort"
                   />
                 </span>
-                {categoryList.length > 0 && (
+                {categoryList.length > 1 && (
                   <span className="hidden @5xl:block">
                     <MultiSelectMenu
                       options={categoryList.map((c) => c.name)}
@@ -352,23 +361,10 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                     <FreshnessPill lastUpdated={latestUpdated} label="price" />
                   </span>
                 )}
-                <FinanceGear />
               </div>
             </>
-          ) : (
-            <div className="ml-auto">
-              <FinanceGear />
-            </div>
-          )}
+          ) : null}
         </WidgetBar>
-      )}
-
-      {/* Compact density has no bar — float the gear so the widget keeps
-          a settings surface (and a way back to comfort) in every mode. */}
-      {!isComfort && (
-        <div className="absolute right-2 top-2 z-10 rounded-lg bg-surface shadow-soft-sm">
-          <FinanceGear />
-        </div>
       )}
 
       {showSymbols ? (
@@ -538,56 +534,6 @@ function FinanceFilterMenu({
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-// ── Gear popover (display prefs — previously orphaned) ──────────
-//
-// showChange / showPrevClose / showLastUpdated, default sort, and feed
-// density had NO edit surface since the per-channel Display pages were
-// removed (2026-06-30) — the ticker and feed read them, nothing wrote
-// them. The gear reclaims them.
-
-function FinanceGear() {
-  const { prefs, onPrefsChange } = useShell();
-  const dp = prefs.channelDisplay.finance;
-
-  const patchDisplay = useCallback(
-    (patch: Partial<FinanceDisplayPrefs>) => {
-      onPrefsChange({
-        ...prefs,
-        channelDisplay: {
-          ...prefs.channelDisplay,
-          finance: { ...prefs.channelDisplay.finance, ...patch },
-        },
-      });
-    },
-    [prefs, onPrefsChange],
-  );
-
-  return (
-    <GearMenu ariaLabel="Finance settings" panelClassName="right-0 w-80">
-      <MenuHeading>Feed density</MenuHeading>
-      <div className="px-1 pb-1">
-        <Segmented
-          ariaLabel="Feed density"
-          value={dp.feedDensity ?? "comfort"}
-          onChange={(d) => patchDisplay({ feedDensity: d })}
-          options={DENSITY_OPTIONS}
-        />
-      </div>
-      <MenuHeading>Default sort</MenuHeading>
-      {SORT_OPTIONS.map((opt) => (
-        <MenuRow
-          key={opt.value}
-          role="menuitemradio"
-          selected={(dp.defaultSort ?? "alpha") === opt.value}
-          onClick={() => patchDisplay({ defaultSort: opt.value })}
-        >
-          {opt.label}
-        </MenuRow>
-      ))}
-    </GearMenu>
   );
 }
 

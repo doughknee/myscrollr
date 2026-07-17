@@ -229,7 +229,6 @@ function main(): void {
     channelDisplay: {
       predictions: {
         ...migratePredictionsDisplay(undefined),
-        feedDensity: density,
       },
     },
   } as unknown as AppPreferences;

@@ -1,4 +1,5 @@
 import { Activity } from "lucide-react";
+import { clsx } from "clsx";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 import { GearMenu } from "../../components/widget-bar/GearMenu";
 import { useShell } from "../../shell-context";
@@ -56,6 +57,11 @@ function SysmonGear() {
 function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
   const compact = feedMode === "compact";
   const info = useSysmonData(POLL_INTERVAL);
+  // Stat selection (2026-07-17 unification): the gear's toggles gate
+  // BOTH the feed cells and the ticker chips. (Config keys still live
+  // under `ticker` for storage compatibility.)
+  const { prefs } = useShell();
+  const stats = prefs.widgets.sysmon.ticker;
 
   // ── Loading state ───────────────────────────────────────────
   if (!info) {
@@ -86,28 +92,34 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
         </div>
 
         <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-widget-sysmon/[0.04] border border-widget-sysmon/10">
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <span className="text-xs font-mono text-widget-sysmon/70 shrink-0">
-              CPU
-            </span>
-            <span
-              className={`text-sm font-mono font-semibold tabular-nums ${usageColorClass(info.cpuUsage)}`}
-            >
-              {Math.round(info.cpuUsage)}%
-            </span>
-          </div>
-          <div className="w-px h-4 bg-widget-sysmon/10" />
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <span className="text-xs font-mono text-widget-sysmon/70 shrink-0">
-              RAM
-            </span>
-            <span
-              className={`text-sm font-mono font-semibold tabular-nums ${usageColorClass(memPct)}`}
-            >
-              {Math.round(memPct)}%
-            </span>
-          </div>
-          {(info.gpuUsage !== null || gpuTemp) && (
+          {stats.cpu && (
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <span className="text-xs font-mono text-widget-sysmon/70 shrink-0">
+                CPU
+              </span>
+              <span
+                className={`text-sm font-mono font-semibold tabular-nums ${usageColorClass(info.cpuUsage)}`}
+              >
+                {Math.round(info.cpuUsage)}%
+              </span>
+            </div>
+          )}
+          {stats.memory && (
+            <>
+              {stats.cpu && <div className="w-px h-4 bg-widget-sysmon/10" />}
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                <span className="text-xs font-mono text-widget-sysmon/70 shrink-0">
+                  RAM
+                </span>
+                <span
+                  className={`text-sm font-mono font-semibold tabular-nums ${usageColorClass(memPct)}`}
+                >
+                  {Math.round(memPct)}%
+                </span>
+              </div>
+            </>
+          )}
+          {stats.gpu && (info.gpuUsage !== null || gpuTemp) && (
             <>
               <div className="w-px h-4 bg-widget-sysmon/10" />
               <div className="flex items-center gap-1.5 shrink-0">
@@ -130,7 +142,7 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
               </div>
             </>
           )}
-          {info.gpuPowerWatts !== null && (
+          {stats.gpuPower && info.gpuPowerWatts !== null && (
             <>
               <div className="w-px h-4 bg-widget-sysmon/10" />
               <span className="text-sm font-mono font-semibold tabular-nums text-fg-2 shrink-0">
@@ -177,140 +189,180 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
         </div>
       </div>
 
-      {/* 2x2 stats grid */}
+      {/* Stats grid — cells follow the gear's stat selection (network
+          has no toggle and is always on). Borders are computed per index
+          so the hairlines stay correct with 1–4 cells; a lone trailing
+          cell spans both columns. */}
       <div className="grid grid-cols-2 rounded-xl border border-widget-sysmon/10 overflow-hidden">
-        {/* CPU */}
-        <div className="p-3 border-r border-b border-widget-sysmon/10 bg-widget-sysmon/[0.03] space-y-1.5">
-          <span className="text-xs font-mono text-widget-sysmon/70 uppercase tracking-wider">
-            CPU
-          </span>
-          <div
-            className={`text-xl font-mono font-bold tabular-nums ${usageColorClass(info.cpuUsage)}`}
-          >
-            {Math.round(info.cpuUsage)}%
-          </div>
-          <div className="h-1.5 rounded-full bg-widget-sysmon/10 overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${Math.min(100, info.cpuUsage)}%`,
-                background: `linear-gradient(90deg, #34d399, ${usageColor(info.cpuUsage)})`,
-              }}
-            />
-          </div>
-          <DetailLine
-            items={[
-              info.cpuFreqMhz !== null ? formatFreq(info.cpuFreqMhz) : null,
-              cpuTemp
-                ? `${Math.round(cpuTemp.temp)}\u00B0C`
-                : null,
-            ]}
-          />
-        </div>
+        {(() => {
+          const cells: { key: string; node: React.ReactNode }[] = [];
+          if (stats.cpu) {
+            cells.push({
+              key: "cpu",
+              node: (
+                <>
+                  <span className="text-xs font-mono text-widget-sysmon/70 uppercase tracking-wider">
+                    CPU
+                  </span>
+                  <div
+                    className={`text-xl font-mono font-bold tabular-nums ${usageColorClass(info.cpuUsage)}`}
+                  >
+                    {Math.round(info.cpuUsage)}%
+                  </div>
+                  <div className="h-1.5 rounded-full bg-widget-sysmon/10 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(100, info.cpuUsage)}%`,
+                        background: `linear-gradient(90deg, #34d399, ${usageColor(info.cpuUsage)})`,
+                      }}
+                    />
+                  </div>
+                  <DetailLine
+                    items={[
+                      info.cpuFreqMhz !== null ? formatFreq(info.cpuFreqMhz) : null,
+                      cpuTemp ? `${Math.round(cpuTemp.temp)}°C` : null,
+                    ]}
+                  />
+                </>
+              ),
+            });
+          }
+          if (stats.memory) {
+            cells.push({
+              key: "memory",
+              node: (
+                <>
+                  <span className="text-xs font-mono text-widget-sysmon/70 uppercase tracking-wider">
+                    Memory
+                  </span>
+                  <div
+                    className={`text-xl font-mono font-bold tabular-nums ${usageColorClass(memPct)}`}
+                  >
+                    {Math.round(memPct)}%
+                  </div>
+                  <div className="h-1.5 rounded-full bg-widget-sysmon/10 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(100, memPct)}%`,
+                        background: `linear-gradient(90deg, #34d399, ${usageColor(memPct)})`,
+                      }}
+                    />
+                  </div>
+                  <div className="text-xs font-mono text-fg-3 tabular-nums">
+                    {formatBytes(info.memUsed)} / {formatBytes(info.memTotal)}
+                  </div>
+                </>
+              ),
+            });
+          }
+          if (stats.gpu) {
+            cells.push({
+              key: "gpu",
+              node: (
+                <>
+                  <span className="text-xs font-mono text-widget-sysmon/70 uppercase tracking-wider">
+                    GPU
+                  </span>
+                  {info.gpuUsage !== null ? (
+                    <>
+                      <div
+                        className={`text-xl font-mono font-bold tabular-nums ${usageColorClass(info.gpuUsage)}`}
+                      >
+                        {Math.round(info.gpuUsage)}%
+                      </div>
+                      <div className="h-1.5 rounded-full bg-widget-sysmon/10 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${Math.min(100, info.gpuUsage)}%`,
+                            background: `linear-gradient(90deg, #34d399, ${usageColor(info.gpuUsage)})`,
+                          }}
+                        />
+                      </div>
+                      <DetailLine
+                        items={[
+                          info.gpuClockMhz !== null
+                            ? formatFreq(info.gpuClockMhz)
+                            : null,
+                          stats.gpuPower && info.gpuPowerWatts !== null
+                            ? formatWatts(info.gpuPowerWatts)
+                            : null,
+                          gpuTemp ? `${Math.round(gpuTemp.temp)}°C` : null,
+                        ]}
+                      />
+                      {info.gpuVramTotal !== null && info.gpuVramUsed !== null && (
+                        <div className="text-xs font-mono text-fg-3 tabular-nums">
+                          {formatBytes(info.gpuVramUsed)} /{" "}
+                          {formatBytes(info.gpuVramTotal)} Video memory
+                        </div>
+                      )}
+                    </>
+                  ) : gpuTemp ? (
+                    <div
+                      className={`text-xl font-mono font-bold tabular-nums ${tempColorClass(gpuTemp.temp, gpuTemp.critical)}`}
+                    >
+                      {Math.round(gpuTemp.temp)}&deg;C
+                    </div>
+                  ) : (
+                    <div className="text-xs font-mono text-fg-4">No GPU detected</div>
+                  )}
+                </>
+              ),
+            });
+          }
+          cells.push({
+            key: "network",
+            node: (
+              <>
+                <span className="text-xs font-mono text-widget-sysmon/70 uppercase tracking-wider">
+                  Network
+                </span>
+                {info.network.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {info.network.map((iface) => (
+                      <div key={iface.name} className="space-y-0.5">
+                        <div className="text-xs font-mono text-fg-3 truncate">
+                          {iface.name}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono text-emerald-400/90 tabular-nums">
+                            {"↑"} {formatRate(iface.txBytes, POLL_INTERVAL)}
+                          </span>
+                          <span className="text-[10px] font-mono text-fg-3">
+                            {"↓"} {formatRate(iface.rxBytes, POLL_INTERVAL)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs font-mono text-fg-4">No network connections found</div>
+                )}
+              </>
+            ),
+          });
 
-        {/* Memory */}
-        <div className="p-3 border-b border-widget-sysmon/10 bg-widget-sysmon/[0.03] space-y-1.5">
-          <span className="text-xs font-mono text-widget-sysmon/70 uppercase tracking-wider">
-            Memory
-          </span>
-          <div
-            className={`text-xl font-mono font-bold tabular-nums ${usageColorClass(memPct)}`}
-          >
-            {Math.round(memPct)}%
-          </div>
-          <div className="h-1.5 rounded-full bg-widget-sysmon/10 overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${Math.min(100, memPct)}%`,
-                background: `linear-gradient(90deg, #34d399, ${usageColor(memPct)})`,
-              }}
-            />
-          </div>
-          <div className="text-xs font-mono text-fg-3 tabular-nums">
-            {formatBytes(info.memUsed)} / {formatBytes(info.memTotal)}
-          </div>
-        </div>
-
-        {/* GPU */}
-        <div className="p-3 border-r border-widget-sysmon/10 bg-widget-sysmon/[0.03] space-y-1.5">
-          <span className="text-xs font-mono text-widget-sysmon/70 uppercase tracking-wider">
-            GPU
-          </span>
-          {info.gpuUsage !== null ? (
-            <>
+          const lastRowStart =
+            cells.length % 2 === 0 ? cells.length - 2 : cells.length - 1;
+          return cells.map((cell, i) => {
+            const spanBoth = cells.length % 2 === 1 && i === cells.length - 1;
+            return (
               <div
-                className={`text-xl font-mono font-bold tabular-nums ${usageColorClass(info.gpuUsage)}`}
+                key={cell.key}
+                className={clsx(
+                  "p-3 bg-widget-sysmon/[0.03] space-y-1.5 border-widget-sysmon/10",
+                  spanBoth && "col-span-2",
+                  i % 2 === 0 && !spanBoth && "border-r",
+                  i < lastRowStart && "border-b",
+                )}
               >
-                {Math.round(info.gpuUsage)}%
+                {cell.node}
               </div>
-              <div className="h-1.5 rounded-full bg-widget-sysmon/10 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${Math.min(100, info.gpuUsage)}%`,
-                    background: `linear-gradient(90deg, #34d399, ${usageColor(info.gpuUsage)})`,
-                  }}
-                />
-              </div>
-              <DetailLine
-                items={[
-                  info.gpuClockMhz !== null
-                    ? formatFreq(info.gpuClockMhz)
-                    : null,
-                  info.gpuPowerWatts !== null
-                    ? formatWatts(info.gpuPowerWatts)
-                    : null,
-                  gpuTemp
-                    ? `${Math.round(gpuTemp.temp)}\u00B0C`
-                    : null,
-                ]}
-              />
-              {info.gpuVramTotal !== null && info.gpuVramUsed !== null && (
-                <div className="text-xs font-mono text-fg-3 tabular-nums">
-                  {formatBytes(info.gpuVramUsed)} /{" "}
-                  {formatBytes(info.gpuVramTotal)} Video memory
-                </div>
-              )}
-            </>
-          ) : gpuTemp ? (
-            <div
-              className={`text-xl font-mono font-bold tabular-nums ${tempColorClass(gpuTemp.temp, gpuTemp.critical)}`}
-            >
-              {Math.round(gpuTemp.temp)}&deg;C
-            </div>
-          ) : (
-            <div className="text-xs font-mono text-fg-4">No GPU detected</div>
-          )}
-        </div>
-
-        {/* Network */}
-        <div className="p-3 bg-widget-sysmon/[0.03] space-y-1.5">
-          <span className="text-xs font-mono text-widget-sysmon/70 uppercase tracking-wider">
-            Network
-          </span>
-          {info.network.length > 0 ? (
-            <div className="space-y-1.5">
-              {info.network.map((iface) => (
-                <div key={iface.name} className="space-y-0.5">
-                  <div className="text-xs font-mono text-fg-3 truncate">
-                    {iface.name}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-emerald-400/90 tabular-nums">
-                      {"\u2191"} {formatRate(iface.txBytes, POLL_INTERVAL)}
-                    </span>
-                    <span className="text-[10px] font-mono text-fg-3">
-                      {"\u2193"} {formatRate(iface.rxBytes, POLL_INTERVAL)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-xs font-mono text-fg-4">No network connections found</div>
-          )}
-        </div>
+            );
+          });
+        })()}
       </div>
     </div>
   );
@@ -332,7 +384,7 @@ export const sysmonWidget: WidgetManifest = {
       "CPU, memory, and GPU usage appear on the ticker.",
       "Turn individual stats on or off from the gear menu.",
       "The feed view shows detailed real-time stats including temperatures and a full breakdown.",
-      "Keep the system monitor in a fixed spot on the ticker via the gear menu.",
+      "Pin it to a ticker row from Home to keep it in a fixed spot.",
     ],
   },
   desktopOnly: true,

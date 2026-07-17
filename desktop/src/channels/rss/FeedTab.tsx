@@ -209,7 +209,11 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   const [view, setView] = useState<RssView>("articles");
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
-  const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
+  // Sticky sort (2026-07-17 unification): initialized from the persisted
+  // per-widget override (dp merges it); filters deliberately reset.
+  const [sortOrder, setSortOrder] = useState<SortOrder>(
+    () => dp.feedSort ?? "newest",
+  );
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
 
@@ -230,11 +234,22 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   );
   const channelType = (channel?.channel_type ?? widgetId ?? "rss") as ChannelType;
 
-  const pickSort = useCallback((next: SortOrder) => {
-    setSortOrder(next);
-    setShowAll(false);
-    setExpandedSources(new Set());
-  }, []);
+  // Persists the sticky sort into this widget's config.display override
+  // (same slot the time window uses; separate keyed hook from the gear's
+  // so writes can't clobber each other's reads).
+  const { updateItems: persistDisplay } = useChannelConfig<
+    Partial<RssDisplayPrefs>
+  >(channelType, "display");
+
+  const pickSort = useCallback(
+    (next: SortOrder) => {
+      setSortOrder(next);
+      setShowAll(false);
+      setExpandedSources(new Set());
+      persistDisplay({ ...displayOverride, feedSort: next });
+    },
+    [displayOverride, persistDisplay],
+  );
 
   const toggleSource = useCallback((source: string) => {
     setSelectedSources((prev) => {
@@ -405,7 +420,7 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
                     align="left"
                   />
                 )}
-                {categoryList.length > 0 && (
+                {categoryList.length > 1 && (
                   <MultiSelectMenu
                     options={categoryList.map((c) => c.name)}
                     counts={Object.fromEntries(
@@ -650,7 +665,7 @@ function RssFilterMenu({
                 ))}
               </>
             )}
-            {categories.length > 0 && (
+            {categories.length > 1 && (
               <>
                 <MenuHeading>Category</MenuHeading>
                 <MenuRow

@@ -196,6 +196,10 @@ async function run() {
 
     check("NO view switch (intrinsic feed)", (await page.locator('[aria-label="News view"]').count()) === 0);
     check("NO sources menu (single source)", (await page.locator('[aria-label="Filter by source"]').count()) === 0);
+    check(
+      "NO categories menu (single category — the NASA case)",
+      (await page.locator('[aria-label="Filter by category"]').count()) === 0,
+    );
     check("gear still present", (await page.locator('[aria-label="News settings"]').count()) === 1);
     const rows = await page.locator(ROW).allInnerTexts();
     check("scoped to the widget's feed", rows.length > 0 && rows.every((t) => t.includes("BBC")), `rows=${rows.length}`);

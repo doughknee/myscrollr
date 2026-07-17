@@ -752,16 +752,18 @@ describe("widget timer preference migration", () => {
       },
     }));
 
+    // 2026-07-17 unification: stored per-item ticker values are ignored —
+    // tracked content always reaches the ticker.
     expect(prefs.clock).toMatchObject({
       ticker: {
-        localTime: false,
+        localTime: true,
         showTimezones: true,
-        excludedTimezones: ["America/New_York"],
+        excludedTimezones: [],
       },
     });
     expect("activeTimer" in prefs.clock.ticker).toBe(false);
     expect(prefs.timer).toEqual({
-      ticker: { activeTimer: false },
+      ticker: { activeTimer: true },
       pomodoro: {
         workMins: 50,
         shortBreakMins: 10,
@@ -875,7 +877,9 @@ describe("widget timer preference migration", () => {
 
     expect(prefs.enabledWidgets).toEqual(["clock", "timer"]);
     expect(prefs.widgetsOnTicker).toEqual(["clock"]);
-    expect(prefs.timer.ticker.activeTimer).toBe(false);
+    // 2026-07-17 unification: a running timer always reaches the ticker;
+    // the stored activeTimer:false is deliberately ignored.
+    expect(prefs.timer.ticker.activeTimer).toBe(true);
   });
 
   it("does not auto-add timer visibility when current timer prefs exist", () => {

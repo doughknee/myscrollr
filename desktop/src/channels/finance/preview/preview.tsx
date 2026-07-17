@@ -122,7 +122,6 @@ function main(): void {
     channelDisplay: {
       finance: {
         ...migrateFinanceDisplay(undefined),
-        feedDensity: density,
       },
     },
   } as unknown as AppPreferences;

@@ -218,8 +218,8 @@ async function run() {
     );
     const gearText = (await page.locator('[role="menu"]').innerText()).toUpperCase();
     check(
-      "gear keeps density + ticker fallback",
-      gearText.includes("FEED DENSITY") && gearText.includes("TICKER WITHOUT STARS"),
+      "gear is ticker fallback only (density deleted)",
+      gearText.includes("TICKER WITHOUT STARS") && !gearText.includes("FEED DENSITY"),
     );
     await page.screenshot({ path: `${OUT}/vb-18-gear-popover-1440.png` });
     await page.keyboard.press("Escape");

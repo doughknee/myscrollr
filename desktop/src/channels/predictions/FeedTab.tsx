@@ -153,11 +153,6 @@ const TICKER_FALLBACKS: {
   { value: "closing", label: "Closing soon", hint: "nearest to close" },
 ];
 
-const DENSITY_OPTIONS: SegmentedOption<"comfort" | "compact">[] = [
-  { value: "comfort", label: "Comfort" },
-  { value: "compact", label: "Compact" },
-];
-
 /** Pre-v1.1.5 server-side config keys (see the migration effect). */
 interface LegacyPredictionsConfig {
   categories?: string[];
@@ -187,11 +182,10 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   const { prefs } = useShell();
   const dp = prefs.channelDisplay.predictions;
 
-  // The caller (Home or Source page) hints at a default mode, but the
-  // user's per-channel feedDensity pref wins when set — so the same
-  // channel can render compact on Home (caller hint wins for the small
-  // preview) and comfort on the Source page, controlled from Configure.
-  const mode = dp.feedDensity ?? callerMode;
+  // Density is caller-driven only (the per-widget feedDensity pref was
+  // deleted in the 2026-07-17 settings unification — feeds render
+  // comfort; the ticker owns the one density concept).
+  const mode = callerMode;
 
   const { data: dashboard } = useQuery(dashboardQueryOptions());
   const { data: catalog } = useQuery(predictionsCatalogOptions());
@@ -676,13 +670,6 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
         </WidgetBar>
       )}
 
-      {/* Compact density has no bar — float the gear so the widget keeps
-          a settings surface (and a way back to comfort) in every mode. */}
-      {!isComfort && (
-        <div className="absolute right-2 top-2 z-10 rounded-lg bg-surface shadow-soft-sm">
-          <PredictionsGear />
-        </div>
-      )}
 
       {/* Market browse / grids */}
       {renderTotal === 0 ? (
@@ -952,15 +939,6 @@ function PredictionsGear() {
 
   return (
     <GearMenu ariaLabel="Predictions settings" panelClassName="right-0 w-80">
-      <MenuHeading>Feed density</MenuHeading>
-      <div className="px-1 pb-1">
-        <Segmented
-          ariaLabel="Feed density"
-          value={dp.feedDensity ?? "comfort"}
-          onChange={(d) => patchDisplay({ feedDensity: d })}
-          options={DENSITY_OPTIONS}
-        />
-      </div>
       <MenuHeading>Ticker without stars</MenuHeading>
       {TICKER_FALLBACKS.map((opt) => (
         <MenuRow

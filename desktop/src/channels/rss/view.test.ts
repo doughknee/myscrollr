@@ -35,6 +35,7 @@ const DEFAULT_PREFS: RssDisplayPrefs = {
   showDescription: "both",
   showSource: "both",
   showTimestamps: "both",
+  feedSort: "newest",
   articlesPerSource: 4,
   maxArticleAgeDays: 0,
 };

@@ -56,7 +56,10 @@ async function run() {
     check("sort menu present", (await page.locator('[aria-label="Sort symbols"]').count()) === 1);
     check("category menu present", (await page.locator('[aria-label="Filter by category"]').count()) === 1);
     check("search present", (await page.locator(SEARCH).count()) === 1);
-    check("gear present", (await page.locator('[aria-label="Finance settings"]').count()) === 1);
+    check(
+      "no gear (nothing left to configure — sort persists from the bar)",
+      (await page.locator('[aria-label="Finance settings"]').count()) === 0,
+    );
     check("no chips/counts bands (one bar only)", (await page.locator("text=/\\d+ up/").count()) === 0);
     const rowsAll = await page.locator(ROW).count();
     check("feed rows render", rowsAll > 10, `rows=${rowsAll}`);
@@ -178,44 +181,29 @@ async function run() {
     await page.close();
   }
 
-  // ════ 1440px — gear popover + density round-trip ═════════════════
+  // ════ 1440px — sticky sort (2026-07-17 unification) ══════════════
+  // The bar's sort choice also writes dp.defaultSort; true cross-launch
+  // persistence rides the shell pref store (code-level), so here we
+  // assert the choice survives a Feed⇄Symbols view switch and keeps
+  // ordering the feed.
   {
     const { page, consoleErrors } = await newPage(browser, 1440, 900);
-    console.log("== 1440px · gear + density ==");
+    console.log("== 1440px · sticky sort ==");
 
-    const gear = page.locator('[aria-label="Finance settings"]');
-    await gear.click();
+    await page.locator('[aria-label="Sort symbols"]').click();
     await page.waitForSelector('[role="menu"]');
+    await page.locator('[role="menu"] [role="menuitemradio"]:has-text("% Change")').click();
     await page.waitForTimeout(250);
+    await page.locator('[role="tab"]:has-text("Symbols")').click();
+    await page.waitForSelector("text=Click a row to add or remove");
+    await page.locator('[role="tab"]:has-text("Feed")').click();
+    await page.waitForSelector(ROW);
+    const sortLabel = await page.locator('[aria-label="Sort symbols"]').innerText();
+    check("sort survives a view round-trip", sortLabel.includes("% Change"), sortLabel);
+    const firstRow = await page.locator(ROW).first().innerText();
+    check("feed still sorted by % change", firstRow.includes("+"), firstRow.replace(/\n/g, " | "));
 
-    // Display-item toggles were removed (defaults only) — the gear keeps
-    // just the functional prefs.
-    check(
-      "no display grid (defaults only)",
-      (await page.locator('[role="menu"] [role="grid"]').count()) === 0,
-    );
-    const gearText = (await page.locator('[role="menu"]').innerText()).toUpperCase();
-    check(
-      "gear keeps density + default sort",
-      gearText.includes("FEED DENSITY") && gearText.includes("DEFAULT SORT"),
-    );
-    await page.screenshot({ path: `${OUT}/fin-04-gear-1440.png` });
-
-    // Density: comfort → compact kills the bar but keeps a floating gear
-    // (the way back), compact → comfort restores the bar.
-    await page.locator('[role="menu"] [role="tab"]:has-text("Compact")').click();
-    await page.waitForTimeout(300);
-    check("compact: bar gone", (await page.locator('[aria-label="Finance view"]').count()) === 0);
-    const floatingGear = page.locator('[aria-label="Finance settings"]');
-    check("compact: floating gear present", (await floatingGear.count()) === 1);
-    await page.screenshot({ path: `${OUT}/fin-05-compact-floating-gear-1440.png` });
-    await floatingGear.click();
-    await page.waitForSelector('[role="menu"]');
-    await page.locator('[role="menu"] [role="tab"]:has-text("Comfort")').click();
-    await page.waitForTimeout(300);
-    check("comfort restored via floating gear", (await page.locator('[aria-label="Finance view"]').count()) === 1);
-
-    check("no console errors (gear page)", consoleErrors.length === 0, consoleErrors.join(" | "));
+    check("no console errors (sticky-sort page)", consoleErrors.length === 0, consoleErrors.join(" | "));
     await page.close();
   }
 

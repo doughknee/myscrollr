@@ -1,14 +1,15 @@
-/** Sysmon settings surface — rendered inside the in-feed gear popover and (until teardown) the Configure page. */
-import { useCallback } from "react";
+/**
+ * Sysmon settings surface — rendered inside the in-feed gear popover.
+ * 2026-07-17 unification: the stat toggles are CONTENT selection — they
+ * gate both the feed cards and the ticker chips. (The config keys still
+ * live under `ticker` for storage compatibility.)
+ */
 import {
   Section,
   ToggleRow,
   SegmentedRow,
-  ResetButton,
 } from "../../components/settings/SettingsControls";
-import TickerPinSection from "../../components/settings/TickerPinSection";
 import { useWidgetConfig } from "../../hooks/useWidgetConfig";
-import { DEFAULT_SYSMON_TICKER } from "../../preferences";
 import type { TempUnit } from "../../preferences";
 import type { WidgetConfigPanelProps } from "../../hooks/useWidgetConfig";
 
@@ -20,8 +21,8 @@ const REFRESH_OPTIONS: { value: string; label: string }[] = [
 ];
 
 const TEMP_OPTIONS: { value: TempUnit; label: string }[] = [
-  { value: "celsius", label: "\u00B0C" },
-  { value: "fahrenheit", label: "\u00B0F" },
+  { value: "celsius", label: "°C" },
+  { value: "fahrenheit", label: "°F" },
 ];
 
 export default function SysmonSettings({
@@ -30,42 +31,33 @@ export default function SysmonSettings({
 }: WidgetConfigPanelProps) {
   const { config, update, setTicker } = useWidgetConfig("sysmon", prefs, onPrefsChange);
 
-  const resetAll = useCallback(() => {
-    update({
-      refreshInterval: 2,
-      tempUnit: "celsius",
-      ticker: { ...DEFAULT_SYSMON_TICKER },
-    });
-  }, [update]);
-
   return (
     <>
-      <Section title="Ticker">
+      <Section title="Stats">
         <ToggleRow
           label="CPU usage"
-          description="Show how busy your processor is on the ticker"
+          description="Track how busy your processor is"
           checked={config.ticker.cpu}
           onChange={(v) => setTicker({ cpu: v })}
         />
         <ToggleRow
           label="Memory usage"
-          description="Show how much memory is being used on the ticker"
+          description="Track how much memory is in use"
           checked={config.ticker.memory}
           onChange={(v) => setTicker({ memory: v })}
         />
         <ToggleRow
           label="GPU usage"
-          description="Show how busy your graphics card is on the ticker"
+          description="Track how busy your graphics card is"
           checked={config.ticker.gpu}
           onChange={(v) => setTicker({ gpu: v })}
         />
         <ToggleRow
           label="GPU power draw"
-          description="Show graphics card wattage on the ticker"
+          description="Track graphics card wattage"
           checked={config.ticker.gpuPower}
           onChange={(v) => setTicker({ gpuPower: v })}
         />
-        <TickerPinSection widgetId="sysmon" prefs={prefs} onPrefsChange={onPrefsChange} />
       </Section>
 
       <Section title="Display">
@@ -83,9 +75,6 @@ export default function SysmonSettings({
           onChange={(v) => update({ tempUnit: v })}
         />
       </Section>
-      <div className="flex items-center justify-end px-3 pb-1 pt-2">
-        <ResetButton onClick={resetAll} />
-      </div>
     </>
   );
 }
