@@ -13,8 +13,6 @@ import SourcePageLayout, { SourceNotFound } from "../components/SourcePageLayout
 import { useQuery } from "@tanstack/react-query";
 import { widgetManifest } from "../marketplace";
 import { dashboardQueryOptions } from "../api/queries";
-import { useShell } from "../shell-context";
-import type { ChannelType } from "../api/client";
 import type { DashboardResponse, ChannelManifest } from "../types";
 
 export const Route = createFileRoute("/channel/$type")({
@@ -33,7 +31,6 @@ function ChannelRoute() {
   // source manifest, which owns the FeedTab. Also resolves legacy coarse ids.
   const channel = widgetManifest(type) as ChannelManifest | undefined;
   const { data: dashboard, isFetching: dashboardFetching } = useQuery(dashboardQueryOptions());
-  const { onDeleteChannel } = useShell();
 
   if (!channel) {
     return <SourceNotFound kind="Channel" name={type} />;
@@ -43,11 +40,6 @@ function ChannelRoute() {
     <SourcePageLayout
       name={channel.name}
       onBack={() => navigate({ to: "/feed" })}
-      onRemove={() => {
-        onDeleteChannel(type as ChannelType);
-        navigate({ to: "/feed" });
-      }}
-      sourceKind="channel"
     >
       <ChannelFeedTab
         type={type}
