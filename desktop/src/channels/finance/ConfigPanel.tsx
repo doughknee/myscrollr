@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import SymbolManager from "./SymbolManager";
 import { useChannelConfig } from "../../hooks/useChannelConfig";
 import { financeCatalogOptions, dashboardQueryOptions } from "../../api/queries";
-import { getLimit } from "../../tierLimits";
 import { assetClassForWidget } from "../../marketplace";
 import type { Channel } from "../../api/client";
 import type { Trade } from "../../types";
@@ -25,7 +24,6 @@ interface FinanceChannelConfig {
 
 export default function FinanceConfigPanel({
   channel,
-  subscriptionTier,
 }: FinanceConfigPanelProps) {
   const channelType = channel.channel_type;
   const assetClass = assetClassForWidget(channelType);
@@ -35,7 +33,6 @@ export default function FinanceConfigPanel({
   const config = channel.config as FinanceChannelConfig;
   const symbols = Array.isArray(config?.symbols) ? config.symbols : [];
   const symbolSet = useMemo(() => new Set(symbols), [symbols]);
-  const maxSymbols = getLimit(subscriptionTier, "symbols");
 
   // ── Queries ────────────────────────────────────────────────────
 
@@ -68,10 +65,9 @@ export default function FinanceConfigPanel({
   const addSymbol = useCallback(
     (sym: string) => {
       if (symbolSet.has(sym)) return;
-      if (symbols.length >= maxSymbols) return;
       updateItems([...symbols, sym]);
     },
-    [symbols, symbolSet, updateItems, maxSymbols],
+    [symbols, symbolSet, updateItems],
   );
 
   const removeSymbol = useCallback(
@@ -112,8 +108,6 @@ export default function FinanceConfigPanel({
           onRemove={removeSymbol}
           loading={catalogLoading}
           error={catalogError}
-          maxSymbols={maxSymbols}
-          subscriptionTier={subscriptionTier}
           saving={saving}
         />
       </div>

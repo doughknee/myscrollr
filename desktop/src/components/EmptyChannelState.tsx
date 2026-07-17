@@ -37,10 +37,15 @@ interface EmptyChannelStateProps {
   /** Hint text for the action (e.g. "choose what to track", "pick your leagues"). */
   actionHint?: string;
   /**
-   * Navigate to the channel's Configure sub-tab. Wired in
-   * `routes/channel.$type.$tab.tsx`. When provided, the hint becomes a
-   * one-tap button; the surrounding copy still teaches the user the
-   * Options-pill path so they can do it themselves next time.
+   * Full button label override. Widgets whose config lives in-widget
+   * (post configure-page) pass this so the CTA doesn't say "Open
+   * Configure" while actually opening an in-feed view.
+   */
+  actionLabel?: string;
+  /**
+   * The CTA action. Historically "navigate to the Configure sub-tab";
+   * in-widget-config channels pass their own in-feed action (with
+   * `actionLabel`). When provided, the hint becomes a one-tap button.
    */
   onConfigure?: () => void;
 }
@@ -53,6 +58,7 @@ export default function EmptyChannelState({
   refreshing,
   loadingNoun,
   actionHint,
+  actionLabel,
   onConfigure,
 }: EmptyChannelStateProps) {
   return (
@@ -82,7 +88,7 @@ export default function EmptyChannelState({
                 "transition-colors active:scale-[0.97]",
               )}
             >
-              Open Configure to {actionHint ?? `add ${noun}`}
+              {actionLabel ?? `Open Configure to ${actionHint ?? `add ${noun}`}`}
             </button>
           ) : null}
           <p className="text-[11px] text-fg-4/80 text-center max-w-sm leading-relaxed">

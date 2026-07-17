@@ -26,13 +26,11 @@ import {
 import clsx from "clsx";
 import { motion } from "motion/react";
 import Tooltip from "../../components/Tooltip";
-import UpgradePrompt from "../../components/UpgradePrompt";
 import EmptySection from "../../components/layout/EmptySection";
-import CategoryFilter from "../rss/CategoryFilter";
+import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { formatPrice, formatChange } from "../../utils/format";
 import type { TrackedSymbol } from "../../api/queries";
 import type { Trade } from "../../types";
-import type { SubscriptionTier } from "../../auth";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -50,9 +48,6 @@ interface SymbolManagerProps {
   /** Catalog query state. */
   loading: boolean;
   error: boolean;
-  /** Tier-limit info. */
-  maxSymbols: number;
-  subscriptionTier: SubscriptionTier;
   /** Whether a save mutation is in-flight (disables row toggles). */
   saving: boolean;
 }
@@ -81,8 +76,6 @@ export default function SymbolManager({
   onRemove,
   loading,
   error,
-  maxSymbols,
-  subscriptionTier,
   saving,
 }: SymbolManagerProps) {
   // ── Local UI state ─────────────────────────────────────────────
@@ -101,7 +94,6 @@ export default function SymbolManager({
     () => new Map(trades.map((t) => [t.symbol, t])),
     [trades],
   );
-  const atLimit = symbols.length >= maxSymbols;
 
   // Categories with counts — drives the dropdown filter.
   const categories = useMemo(() => {
@@ -124,6 +116,15 @@ export default function SymbolManager({
       (s) => catalogSet.has(s) && !trackedSet.has(s),
     );
   }, [catalog, trackedSet, symbols.length]);
+
+  const categoryNames = useMemo(
+    () => categories.map((c) => c.name),
+    [categories],
+  );
+  const categoryCounts = useMemo(
+    () => Object.fromEntries(categories.map((c) => [c.name, c.count])),
+    [categories],
+  );
 
   // Filter + sort the unified list.
   const filtered = useMemo(() => {
@@ -210,11 +211,11 @@ export default function SymbolManager({
       if (saving) return;
       if (trackedSet.has(symbol)) {
         onRemove(symbol);
-      } else if (!atLimit) {
+      } else {
         onAdd(symbol);
       }
     },
-    [trackedSet, atLimit, saving, onAdd, onRemove],
+    [trackedSet, saving, onAdd, onRemove],
   );
 
   const toggleCategory = useCallback((cat: string) => {
@@ -238,45 +239,25 @@ export default function SymbolManager({
     );
   }
 
-  const showAtLimitWarning = atLimit;
-
   return (
     // Fill the available height. Header / controls are pinned via
     // shrink-0; only the list panel scrolls. PageLayout's fillHeight
     // mode disables outer page scroll on the configure route, so this
-    // is the single scrollable region for the user.
+    // is the single scrollable region for the user. Mounted in-feed
+    // (unconstrained height) the list simply grows and the page scrolls.
     <div className="h-full flex flex-col gap-3 pb-5 min-h-0">
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="shrink-0 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <h3 className="text-sm font-semibold text-fg">Symbols</h3>
-          <span
-            className={clsx(
-              "px-1.5 py-px rounded-full text-ui-chip font-medium tabular-nums",
-              atLimit
-                ? "bg-warn/15 text-warn"
-                : "bg-accent/15 text-accent",
-            )}
-          >
+          <span className="px-1.5 py-px rounded-full text-ui-chip font-medium tabular-nums bg-accent/15 text-accent">
             {symbols.length}
-            {maxSymbols !== Infinity && ` / ${maxSymbols}`}
           </span>
         </div>
         <p className="text-ui-meta text-fg-3 truncate">
           Click a row to add or remove
         </p>
       </div>
-
-      {showAtLimitWarning && (
-        <div className="shrink-0">
-          <UpgradePrompt
-            current={symbols.length}
-            max={maxSymbols}
-            noun="symbols"
-            tier={subscriptionTier}
-          />
-        </div>
-      )}
 
       {/* ── Quick-add chips (only on near-empty watchlist) ────── */}
       {quickAddChips.length > 0 && (
@@ -288,7 +269,7 @@ export default function SymbolManager({
             <button
               key={sym}
               onClick={() => onAdd(sym)}
-              disabled={atLimit || saving}
+              disabled={saving}
               className={clsx(
                 "flex items-center gap-1 px-2 py-0.5 rounded-md border text-ui-chip font-mono",
                 "transition-all duration-150 active:scale-90",
@@ -328,12 +309,14 @@ export default function SymbolManager({
           )}
         </div>
 
-        <CategoryFilter
-          categories={categories}
-          selected={selectedCategories}
+        <MultiSelectMenu
+          options={categoryNames}
+          counts={categoryCounts}
+          selected={Array.from(selectedCategories)}
           onToggle={toggleCategory}
-          onClearAll={() => setSelectedCategories(new Set())}
-          alignRight
+          onClear={() => setSelectedCategories(new Set())}
+          noun="categories"
+          ariaLabel="Filter by category"
         />
 
         <Tooltip
@@ -431,7 +414,6 @@ export default function SymbolManager({
               entry={sym}
               tracked={trackedSet.has(sym.symbol)}
               trade={tradeMap.get(sym.symbol)}
-              atLimit={atLimit}
               saving={saving}
               onToggle={() => toggleSymbol(sym.symbol)}
             />
@@ -448,7 +430,6 @@ interface SymbolRowProps {
   entry: TrackedSymbol;
   tracked: boolean;
   trade: Trade | undefined;
-  atLimit: boolean;
   saving: boolean;
   onToggle: () => void;
 }
@@ -457,13 +438,9 @@ function SymbolRow({
   entry,
   tracked,
   trade,
-  atLimit,
   saving,
   onToggle,
 }: SymbolRowProps) {
-  // Untracked rows at the limit are visually muted and click is a
-  // no-op (the toggle handler bails). Tracked rows are always clickable.
-  const blocked = !tracked && atLimit;
   const pctChange =
     trade?.percentage_change != null
       ? parseFloat(String(trade.percentage_change))
@@ -474,22 +451,18 @@ function SymbolRow({
       type="button"
       role="listitem"
       onClick={onToggle}
-      disabled={saving || blocked}
+      disabled={saving}
       aria-label={
         tracked
           ? `Remove ${entry.symbol} from watchlist`
-          : blocked
-            ? `${entry.symbol} — at watchlist limit`
-            : `Add ${entry.symbol} to watchlist`
+          : `Add ${entry.symbol} to watchlist`
       }
       className={clsx(
         "w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all duration-150 group",
         "active:scale-[0.995]",
         tracked
           ? "bg-accent/[0.04] hover:bg-accent/[0.08]"
-          : blocked
-            ? "opacity-40 cursor-not-allowed"
-            : "hover:bg-base-200/50 cursor-pointer",
+          : "hover:bg-base-200/50 cursor-pointer",
         saving && "cursor-wait",
       )}
     >

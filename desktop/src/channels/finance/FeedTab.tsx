@@ -5,23 +5,46 @@
  * via the desktop CDC/SSE pipeline. Supports compact and comfort
  * display modes with price flash animations on change.
  *
- * Controls bar provides direction filter pills (All / Gainers / Losers),
- * sort dropdown, and category filter. Summary bar shows up/down/unchanged
- * counts. Dismissible filter chips appear when category filters are active.
+ * ONE Kalshi-style control bar (widget-bar primitives): Feed/Symbols
+ * segmented view switch · direction pills · sort + category menus ·
+ * symbol search · freshness · gear popover. The Symbols view mounts the
+ * full SymbolManager in-feed — the Configure page's job, in-widget.
+ * Counts live in menu rows (no summary band); filters collapse into one
+ * Filter button at narrow widths.
  */
 import { memo, useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { clsx } from "clsx";
-import { TrendingUp } from "lucide-react";
+import { AnimatePresence } from "motion/react";
+import { TrendingUp, LineChart, ListChecks } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardQueryOptions, financeCatalogOptions } from "../../api/queries";
 import { formatPrice, formatChange, relativeTime } from "../../utils/format";
 import EmptyChannelState from "../../components/EmptyChannelState";
 import FreshnessPill from "../../components/FreshnessPill";
-import CategoryFilter from "../rss/CategoryFilter";
+import { WidgetBar, BarDivider, BarPill } from "../../components/widget-bar/Bar";
+import {
+  useDismiss,
+  MenuPanel,
+  MenuHeading,
+  MenuRow,
+  FilterTrigger,
+} from "../../components/widget-bar/Menu";
+import {
+  Segmented,
+  type SegmentedOption,
+} from "../../components/widget-bar/Segmented";
+import { SearchBox, useSlashFocus } from "../../components/widget-bar/SearchBox";
+import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
+import { SelectMenu } from "../../components/widget-bar/SelectMenu";
+import { GearMenu } from "../../components/widget-bar/GearMenu";
+import DisplayItemsGrid from "../../components/settings/DisplayItemsGrid";
+import SymbolManager from "./SymbolManager";
+import { useChannelConfig } from "../../hooks/useChannelConfig";
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
 import { applyFinancePipeline, type FinanceSortKey, type FinanceDirectionFilter } from "./view";
 import type { Trade, FeedTabProps, ChannelManifest } from "../../types";
+import type { ChannelType } from "../../api/client";
 import { assetClassForWidget } from "../../marketplace";
 import { shouldShowOnFeed } from "../../preferences";
 import type { FinanceDisplayPrefs } from "../../preferences";
@@ -64,6 +87,24 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "price", label: "Price" },
   { value: "change", label: "% Change" },
   { value: "updated", label: "Last Updated" },
+];
+
+type FinanceView = "feed" | "symbols";
+
+/** Feed / Symbols — options for the Segmented view switch. The Symbols
+ *  view is the Configure page's symbol picker, mounted in-feed. */
+const VIEW_OPTIONS: SegmentedOption<FinanceView>[] = [
+  { value: "feed", label: "Feed", icon: LineChart },
+  { value: "symbols", label: "Symbols", icon: ListChecks },
+];
+
+interface FinanceChannelConfig {
+  symbols?: string[];
+}
+
+const DENSITY_OPTIONS: SegmentedOption<"comfort" | "compact">[] = [
+  { value: "comfort", label: "Comfort" },
+  { value: "compact", label: "Compact" },
 ];
 
 const PAGE_SIZE = 20;
@@ -133,7 +174,9 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure, widgetId }
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [trades, categoryMap]);
 
-  // ── Filter / sort state ──────────────────────────────────────
+  // ── Filter / sort / view state ───────────────────────────────
+  const isComfort = mode === "comfort";
+  const [view, setView] = useState<FinanceView>("feed");
   const [directionFilter, setDirectionFilter] = useState<DirectionFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>(() => dp.defaultSort ?? "alpha");
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
@@ -149,24 +192,28 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure, widgetId }
 
   const clearCategories = useCallback(() => setSelectedCategories(new Set()), []);
 
+  // ── Symbol search (plain substring — no fuzzy matcher here) ──
+  const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  useSlashFocus(searchInputRef, isComfort && view === "feed");
+
   const clearAllFilters = useCallback(() => {
     setDirectionFilter("all");
     setSelectedCategories(new Set());
+    setQuery("");
   }, []);
-
-  const hasFilters = directionFilter !== "all" || selectedCategories.size > 0;
 
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [directionFilter, selectedCategories, sortKey]);
+  }, [directionFilter, selectedCategories, sortKey, query]);
 
   // ── Data pipeline ────────────────────────────────────────────
   // Shared with the ticker via `applyFinancePipeline` so `defaultSort`
   // from the Display tab takes effect in both places.
-  const filtered = useMemo(
+  const piped = useMemo(
     () =>
       applyFinancePipeline(trades, {
         directionFilter,
@@ -175,6 +222,15 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure, widgetId }
         sortKey,
       }),
     [trades, directionFilter, selectedCategories, categoryMap, sortKey],
+  );
+
+  const searchQ = query.trim().toLowerCase();
+  const filtered = useMemo(
+    () =>
+      searchQ
+        ? piped.filter((t) => t.symbol.toLowerCase().includes(searchQ))
+        : piped,
+    [piped, searchQ],
   );
 
   // ── Pagination (incremental "load more") ─────────────────────
@@ -196,127 +252,149 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure, widgetId }
     return latest > 0 ? new Date(latest).toISOString() : null;
   }, [filtered]);
 
-  // ── Summary counts ───────────────────────────────────────────
-  const { upCount, downCount, unchangedCount } = useMemo(() => {
+  // ── Direction counts (menu rows — the summary band is gone) ──
+  // Counted over the widget-scoped universe, not the filtered list, so
+  // the Gainers/Losers rows stay stable while a direction is selected.
+  const directionCounts = useMemo(() => {
     let up = 0;
     let down = 0;
-    let unchanged = 0;
-    for (const t of filtered) {
+    for (const t of trades) {
       if (t.direction === "up") up++;
       else if (t.direction === "down") down++;
-      else unchanged++;
     }
-    return { upCount: up, downCount: down, unchangedCount: unchanged };
-  }, [filtered]);
+    return { all: trades.length, gainers: up, losers: down };
+  }, [trades]);
 
-  // ── Empty state (no data at all) ─────────────────────────────
-  if (trades.length === 0) {
-    return (
-      <EmptyChannelState
-        refreshing={Boolean(feedContext.__refreshing)}
-        icon={TrendingUp}
-        noun="stocks or crypto"
-        hasConfig={!!feedContext.__hasConfig}
-        dashboardLoaded={!!feedContext.__dashboardLoaded}
-        loadingNoun="prices"
-        actionHint="choose what to track"
-        onConfigure={onConfigure}
-      />
-    );
-  }
+  const channelType = (widgetId ?? "finance") as ChannelType;
+  const showEmpty = trades.length === 0;
+  const showSymbols = isComfort && view === "symbols";
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full overflow-y-auto">
-      {/* Controls bar */}
-      <div className="sticky top-0 z-20 bg-surface border-b border-edge/30 px-3 py-2 flex items-center gap-2">
-        {/* Direction filter pills — left side */}
-        <div className="flex gap-1">
-          {DIRECTION_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setDirectionFilter(opt.value)}
-              className={clsx(
-                "px-2.5 py-1 rounded-full text-ui-meta font-medium transition-colors cursor-pointer",
-                directionFilter === opt.value
-                  ? "bg-accent/15 text-accent"
-                  : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+    // NO inner scroll container: the Source page (PageLayout) owns the
+    // scroll — an inner scrollport that never scrolls swallows `sticky`
+    // (the bar never actually pinned here before this fix).
+    <div ref={containerRef} className="relative flex min-h-full flex-col">
+      {isComfort && (
+        <WidgetBar>
+          <Segmented
+            ariaLabel="Finance view"
+            value={view}
+            onChange={setView}
+            options={VIEW_OPTIONS}
+          />
 
-        {latestUpdated && <FreshnessPill lastUpdated={latestUpdated} label="price" />}
-
-        {/* Sort + category filter — right side */}
-        <div className="flex items-center gap-2 ml-auto">
-          <select
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="bg-surface-2 border border-edge/40 rounded-md px-2 py-1.5 text-ui-meta text-fg-2 cursor-pointer outline-none focus:border-accent/60"
-          >
-            {SORT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          {categoryList.length > 0 && (
-            <CategoryFilter
-              categories={categoryList}
-              selected={selectedCategories}
-              onToggle={toggleCategory}
-              onClearAll={clearCategories}
-              alignRight
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Filter chips */}
-      {selectedCategories.size > 0 && (
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border-b border-edge/30 flex-wrap">
-          {Array.from(selectedCategories).map((cat) => (
-            <button
-              key={cat}
-              onClick={() => toggleCategory(cat)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-ui-chip hover:bg-accent/25 transition-colors cursor-pointer"
-            >
-              <span className="truncate max-w-[120px]">{cat}</span>
-              <span className="text-accent/60">&times;</span>
-            </button>
-          ))}
-          <button
-            onClick={clearCategories}
-            className="px-2 py-0.5 text-ui-chip text-fg-3 hover:text-fg-2 transition-colors cursor-pointer"
-          >
-            Clear all
-          </button>
-        </div>
-      )}
-
-      {/* Summary bar */}
-      {filtered.length > 0 && (
-        <div className="px-3 py-1 bg-surface border-b border-edge/30 font-mono text-ui-chip tabular-nums flex items-center gap-1.5">
-          <span className="text-fg-3">{filtered.length} symbols</span>
-          <span className="text-fg-3">&middot;</span>
-          <span className="text-up">{upCount} up</span>
-          <span className="text-fg-3">&middot;</span>
-          <span className="text-down">{downCount} down</span>
-          {unchangedCount > 0 && (
+          {view === "feed" && !showEmpty ? (
             <>
-              <span className="text-fg-3">&middot;</span>
-              <span className="text-fg-3">{unchangedCount} unchanged</span>
+              <BarDivider />
+
+              {/* Wide: open direction pills. Collapse BEFORE clipping. */}
+              <div className="scrollbar-none hidden min-w-0 items-center gap-1 overflow-x-auto @5xl:flex">
+                {DIRECTION_OPTIONS.map((opt) => (
+                  <BarPill
+                    key={opt.value}
+                    active={directionFilter === opt.value}
+                    onClick={() => setDirectionFilter(opt.value)}
+                  >
+                    {opt.label}
+                  </BarPill>
+                ))}
+              </div>
+
+              {/* Narrow: direction + sort + categories in one Filter menu. */}
+              <div className="@5xl:hidden">
+                <FinanceFilterMenu
+                  directionFilter={directionFilter}
+                  onPickDirection={setDirectionFilter}
+                  directionCounts={directionCounts}
+                  sortKey={sortKey}
+                  onPickSort={setSortKey}
+                  categories={categoryList}
+                  selectedCategories={selectedCategories}
+                  onToggleCategory={toggleCategory}
+                  onClearCategories={clearCategories}
+                />
+              </div>
+
+              <div className="ml-auto flex min-w-0 shrink items-center gap-2">
+                <span className="hidden @5xl:block">
+                  <SelectMenu
+                    value={sortKey}
+                    options={SORT_OPTIONS}
+                    onChange={setSortKey}
+                    ariaLabel="Sort symbols"
+                    prefix="Sort"
+                  />
+                </span>
+                {categoryList.length > 0 && (
+                  <span className="hidden @5xl:block">
+                    <MultiSelectMenu
+                      options={categoryList.map((c) => c.name)}
+                      counts={Object.fromEntries(
+                        categoryList.map((c) => [c.name, c.count]),
+                      )}
+                      selected={Array.from(selectedCategories)}
+                      onToggle={toggleCategory}
+                      onClear={clearCategories}
+                      noun="categories"
+                      ariaLabel="Filter by category"
+                    />
+                  </span>
+                )}
+                <SearchBox
+                  inputRef={searchInputRef}
+                  query={query}
+                  onQueryChange={setQuery}
+                  resultCount={searchQ ? filtered.length : null}
+                  ariaLabel="Search symbols"
+                  noun="symbols"
+                />
+                {latestUpdated && (
+                  <span className="hidden @xl:block">
+                    <FreshnessPill lastUpdated={latestUpdated} label="price" />
+                  </span>
+                )}
+                <FinanceGear />
+              </div>
             </>
+          ) : (
+            <div className="ml-auto">
+              <FinanceGear />
+            </div>
           )}
+        </WidgetBar>
+      )}
+
+      {/* Compact density has no bar — float the gear so the widget keeps
+          a settings surface (and a way back to comfort) in every mode. */}
+      {!isComfort && (
+        <div className="absolute right-2 top-2 z-10 rounded-lg bg-surface shadow-soft-sm">
+          <FinanceGear />
         </div>
       )}
 
-      {/* Trade grid */}
-      {filtered.length === 0 ? (
+      {showSymbols ? (
+        <FinanceSymbolsPanel channelType={channelType} assetClass={assetClass} />
+      ) : showEmpty ? (
+        <div className="flex flex-1 flex-col justify-center">
+          <EmptyChannelState
+            refreshing={Boolean(feedContext.__refreshing)}
+            icon={TrendingUp}
+            noun="stocks or crypto"
+            hasConfig={!!feedContext.__hasConfig}
+            dashboardLoaded={!!feedContext.__dashboardLoaded}
+            loadingNoun="prices"
+            actionHint="choose what to track"
+            actionLabel={isComfort ? "Choose symbols to track" : undefined}
+            onConfigure={isComfort ? () => setView("symbols") : onConfigure}
+          />
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 gap-3">
-          <p className="text-[12px] text-fg-3">No symbols match your filters</p>
+          <p className="text-[12px] text-fg-3">
+            {searchQ
+              ? `No symbols match “${query.trim()}”`
+              : "No symbols match your filters"}
+          </p>
           <button
             onClick={clearAllFilters}
             className="px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
@@ -364,6 +442,272 @@ function FinanceFeedTab({ mode: callerMode, feedContext, onConfigure, widgetId }
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// ── Filter menu (narrow-width collapse) ─────────────────────────
+
+function FinanceFilterMenu({
+  directionFilter,
+  onPickDirection,
+  directionCounts,
+  sortKey,
+  onPickSort,
+  categories,
+  selectedCategories,
+  onToggleCategory,
+  onClearCategories,
+}: {
+  directionFilter: DirectionFilter;
+  onPickDirection: (d: DirectionFilter) => void;
+  directionCounts: { all: number; gainers: number; losers: number };
+  sortKey: SortKey;
+  onPickSort: (s: SortKey) => void;
+  categories: { name: string; count: number }[];
+  selectedCategories: Set<string>;
+  onToggleCategory: (c: string) => void;
+  onClearCategories: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(rootRef, open, close);
+
+  const activeCount =
+    (directionFilter !== "all" ? 1 : 0) + selectedCategories.size;
+
+  return (
+    // NOT position:relative — the dropdown anchors to the sticky bar so
+    // it spans the channel width instead of clipping at narrow widths.
+    <div ref={rootRef} className="shrink-0 rounded-lg">
+      <FilterTrigger
+        open={open}
+        badgeCount={activeCount}
+        onClick={() => setOpen((o) => !o)}
+      />
+      <AnimatePresence>
+        {open && (
+          <MenuPanel className="inset-x-2">
+            <MenuHeading>Direction</MenuHeading>
+            {DIRECTION_OPTIONS.map((opt) => (
+              <MenuRow
+                key={opt.value}
+                selected={directionFilter === opt.value}
+                onClick={() => onPickDirection(opt.value)}
+                role="menuitemradio"
+                count={directionCounts[opt.value]}
+              >
+                {opt.label}
+              </MenuRow>
+            ))}
+            <MenuHeading>Sort</MenuHeading>
+            {SORT_OPTIONS.map((opt) => (
+              <MenuRow
+                key={opt.value}
+                selected={sortKey === opt.value}
+                onClick={() => onPickSort(opt.value)}
+                role="menuitemradio"
+              >
+                {opt.label}
+              </MenuRow>
+            ))}
+            {categories.length > 0 && (
+              <>
+                <MenuHeading>Category</MenuHeading>
+                <MenuRow
+                  selected={selectedCategories.size === 0}
+                  onClick={onClearCategories}
+                  role="menuitemradio"
+                >
+                  All categories
+                </MenuRow>
+                {categories.map((c) => (
+                  <MenuRow
+                    key={c.name}
+                    selected={selectedCategories.has(c.name)}
+                    onClick={() => onToggleCategory(c.name)}
+                    role="menuitemcheckbox"
+                    count={c.count}
+                  >
+                    {c.name}
+                  </MenuRow>
+                ))}
+              </>
+            )}
+          </MenuPanel>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Gear popover (display prefs — previously orphaned) ──────────
+//
+// showChange / showPrevClose / showLastUpdated, default sort, and feed
+// density had NO edit surface since the per-channel Display pages were
+// removed (2026-06-30) — the ticker and feed read them, nothing wrote
+// them. The gear reclaims them.
+
+function FinanceGear() {
+  const { prefs, onPrefsChange } = useShell();
+  const dp = prefs.channelDisplay.finance;
+
+  const patchDisplay = useCallback(
+    (patch: Partial<FinanceDisplayPrefs>) => {
+      onPrefsChange({
+        ...prefs,
+        channelDisplay: {
+          ...prefs.channelDisplay,
+          finance: { ...prefs.channelDisplay.finance, ...patch },
+        },
+      });
+    },
+    [prefs, onPrefsChange],
+  );
+
+  return (
+    <GearMenu ariaLabel="Finance settings" panelClassName="right-0 w-80">
+      <MenuHeading>Display</MenuHeading>
+      <div className="px-1 pb-1">
+        <DisplayItemsGrid
+          sections={[
+            {
+              rows: [
+                {
+                  key: "showChange",
+                  label: "% change",
+                  description: "Signed percentage move",
+                  value: dp.showChange,
+                },
+                {
+                  key: "showPrevClose",
+                  label: "Previous close",
+                  description: "Prior session's closing price",
+                  value: dp.showPrevClose,
+                },
+                {
+                  key: "showLastUpdated",
+                  label: "Last updated",
+                  description: "Time since the latest price tick",
+                  value: dp.showLastUpdated,
+                },
+              ],
+            },
+          ]}
+          onChange={(changes) =>
+            patchDisplay(changes as Partial<FinanceDisplayPrefs>)
+          }
+        />
+      </div>
+      <MenuHeading>Feed density</MenuHeading>
+      <div className="px-1 pb-1">
+        <Segmented
+          ariaLabel="Feed density"
+          value={dp.feedDensity ?? "comfort"}
+          onChange={(d) => patchDisplay({ feedDensity: d })}
+          options={DENSITY_OPTIONS}
+        />
+      </div>
+      <MenuHeading>Default sort</MenuHeading>
+      {SORT_OPTIONS.map((opt) => (
+        <MenuRow
+          key={opt.value}
+          role="menuitemradio"
+          selected={(dp.defaultSort ?? "alpha") === opt.value}
+          onClick={() => patchDisplay({ defaultSort: opt.value })}
+        >
+          {opt.label}
+        </MenuRow>
+      ))}
+    </GearMenu>
+  );
+}
+
+// ── Symbols view (the Configure page's picker, mounted in-feed) ─
+
+function FinanceSymbolsPanel({
+  channelType,
+  assetClass,
+}: {
+  channelType: ChannelType;
+  assetClass: ReturnType<typeof assetClassForWidget>;
+}) {
+  const { error, setError, saving, updateItems } =
+    useChannelConfig<string[]>(channelType, "symbols");
+
+  const { data: dashboard } = useQuery(dashboardQueryOptions());
+  const {
+    data: fullCatalog = [],
+    isLoading: catalogLoading,
+    isError: catalogError,
+  } = useQuery(financeCatalogOptions());
+
+  const channelRow = (dashboard?.channels ?? []).find(
+    (ch) => ch.channel_type === channelType,
+  );
+  const config = (channelRow?.config ?? {}) as FinanceChannelConfig;
+  const symbols = useMemo(
+    () => (Array.isArray(config.symbols) ? config.symbols : []),
+    [config.symbols],
+  );
+  const symbolSet = useMemo(() => new Set(symbols), [symbols]);
+
+  // Scope the picker to this widget's asset class — the "Crypto" category
+  // for the crypto widget, everything else for stocks.
+  const catalog = useMemo(() => {
+    if (!assetClass) return fullCatalog;
+    return fullCatalog.filter((item) =>
+      assetClass === "crypto"
+        ? item.category === "Crypto"
+        : item.category !== "Crypto",
+    );
+  }, [fullCatalog, assetClass]);
+
+  const trades = useMemo(
+    () => (dashboard?.data?.finance as Trade[] | undefined) ?? [],
+    [dashboard?.data?.finance],
+  );
+
+  const addSymbol = useCallback(
+    (sym: string) => {
+      if (symbolSet.has(sym)) return;
+      updateItems([...symbols, sym]);
+    },
+    [symbols, symbolSet, updateItems],
+  );
+
+  const removeSymbol = useCallback(
+    (sym: string) => {
+      updateItems(symbols.filter((s) => s !== sym));
+    },
+    [symbols, updateItems],
+  );
+
+  return (
+    <div className="flex flex-1 flex-col gap-3 p-3">
+      {error && (
+        <div className="shrink-0 px-3 py-2 rounded-lg bg-error/10 border border-error/20 text-[11px] text-error flex items-center justify-between">
+          <span>{error}</span>
+          <button
+            onClick={() => setError(null)}
+            aria-label="Dismiss error"
+            className="text-error/60 hover:text-error cursor-pointer"
+          >
+            ×
+          </button>
+        </div>
+      )}
+      <SymbolManager
+        symbols={symbols}
+        catalog={catalog}
+        trades={trades}
+        onAdd={addSymbol}
+        onRemove={removeSymbol}
+        loading={catalogLoading}
+        error={catalogError}
+        saving={saving}
+      />
     </div>
   );
 }
