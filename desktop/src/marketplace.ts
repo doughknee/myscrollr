@@ -426,6 +426,9 @@ const WIDGET_LOGO_DOMAINS: Record<string, string> = {
   news_theverge: "theverge.com",
   fantasy_yahoo: "yahoo.com",
   predictions: "kalshi.com",
+  // Utilities that ARE real products get their real marks too.
+  github: "github.com",
+  uptime: "uptime.kuma.pet",
 };
 
 // icon.horse silently returns a *blank* (200 + transparent) image for a few
@@ -489,6 +492,7 @@ export function getCatalogItems(): CatalogItem[] {
     description: w.description,
     icon: w.icon,
     hex: w.hex,
+    logoUrl: widgetLogoUrl(w.id),
     category: "utility" as const,
     kind: "utility" as const,
     info: w.info,

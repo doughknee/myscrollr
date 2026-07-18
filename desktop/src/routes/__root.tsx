@@ -46,7 +46,7 @@ import AuthGate from "../components/onboarding/AuthGate";
 
 // Registries
 import { getAllChannels } from "../channels/registry";
-import { catalogItemById } from "../marketplace";
+import { catalogItemById, widgetLogoUrl } from "../marketplace";
 import { DEMO } from "../config";
 import { getAllWidgets, getWidget } from "../widgets/registry";
 import { CANONICAL_ORDER } from "../marketplace";
@@ -691,6 +691,8 @@ function RootLayout() {
             name: m.name,
             hex: m.hex,
             icon: m.icon,
+            // Product utilities (github, uptime) have real marks too.
+            logoUrl: widgetLogoUrl(id),
             kind: "widget",
             // Effective status, NOT the raw row getter: pinned-zone
             // widgets live in widgetsOnTicker/pinnedWidgets and never

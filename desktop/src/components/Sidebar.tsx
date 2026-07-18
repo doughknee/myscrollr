@@ -66,14 +66,21 @@ export interface SidebarSource {
 }
 
 /** Source row glyph: the brand mark when one exists (matching the
- *  Catalog cards), the colored Lucide icon otherwise or on load error
- *  (offline, CDN blank). Utilities never have a logoUrl. */
+ *  Catalog cards); otherwise an app-icon TILE — the widget's glyph on
+ *  a gradient of its brand hex — so every source reads as a distinct
+ *  logo, not a bare icon. The tile is also the onError fallback
+ *  (offline, CDN blank). */
 function SourceGlyph({ source }: { source: SidebarSource }) {
   const [failed, setFailed] = useState(false);
   if (!source.logoUrl || failed) {
     return (
-      <span style={{ color: source.hex }}>
-        <source.icon size={15} />
+      <span
+        className="flex h-4 w-4 items-center justify-center rounded-[4px] text-white"
+        style={{
+          background: `linear-gradient(135deg, ${source.hex} 0%, ${source.hex}b8 100%)`,
+        }}
+      >
+        <source.icon size={11} />
       </span>
     );
   }
