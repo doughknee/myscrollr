@@ -12,6 +12,7 @@ import { Bug, Lightbulb, MessageSquare, CreditCard, UserCog, Radio, Paperclip, X
 import clsx from "clsx";
 import { toast } from "sonner";
 import { authFetch, ApiError } from "../../api/client";
+import { SelectMenu } from "../widget-bar/SelectMenu";
 import { getUserIdentity, isAuthenticated } from "../../auth";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -651,17 +652,19 @@ export default function ContactForm({ onBack }: ContactFormProps) {
           <>
             <div>
               <label className={labelClass}>Which widget?</label>
-              <select
+              <SelectMenu
                 value={channelSelection}
-                onChange={(e) => setChannelSelection(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">Select a widget...</option>
-                <option value="Finance">Finance</option>
-                <option value="Sports">Sports</option>
-                <option value="RSS">RSS</option>
-                <option value="Fantasy">Fantasy</option>
-              </select>
+                options={[
+                  { value: "", label: "Select a widget..." },
+                  { value: "Finance", label: "Finance" },
+                  { value: "Sports", label: "Sports" },
+                  { value: "RSS", label: "RSS" },
+                  { value: "Fantasy", label: "Fantasy" },
+                ]}
+                onChange={setChannelSelection}
+                ariaLabel="Which widget?"
+                align="left"
+              />
             </div>
             <div>
               <label className={labelClass}>Describe your issue</label>

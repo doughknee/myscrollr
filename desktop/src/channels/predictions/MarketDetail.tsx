@@ -42,6 +42,7 @@ import { getHistory, sparklinePoints, trend } from "./sparkline";
 import { describeAlert, type AlertComparator, type PredictionAlert } from "./watchlist";
 import { outcomeLabel } from "./search";
 import ProbabilityPill from "./ProbabilityPill";
+import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import type { Prediction } from "../../types";
 
 interface MarketDetailProps {
@@ -530,15 +531,16 @@ function AlertForm({ onAdd }: { onAdd: (comparator: AlertComparator, threshold: 
   return (
     <div className="flex items-center gap-1.5">
       <span className="text-[12px] text-fg-3">Alert me when</span>
-      <select
+      <SelectMenu
         value={comparator}
-        onChange={(e) => setComparator(e.target.value as AlertComparator)}
-        aria-label="Alert direction"
-        className="rounded-md border border-edge/50 bg-base-100 px-1.5 py-1 text-[12px] text-fg-2 outline-none focus:border-accent/60 cursor-pointer"
-      >
-        <option value="above">above</option>
-        <option value="below">below</option>
-      </select>
+        options={[
+          { value: "above", label: "above" },
+          { value: "below", label: "below" },
+        ]}
+        onChange={setComparator}
+        ariaLabel="Alert direction"
+        align="left"
+      />
       <div className="flex items-center rounded-md border border-edge/50 bg-base-100 px-1.5 focus-within:border-accent/60">
         <input
           type="number"

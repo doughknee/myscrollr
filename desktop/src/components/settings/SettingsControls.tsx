@@ -1,6 +1,7 @@
 import { clsx } from "clsx";
 import { motion } from "motion/react";
 import Tooltip from "../Tooltip";
+import { SelectMenu } from "../widget-bar/SelectMenu";
 
 // ── Section heading ─────────────────────────────────────────────
 // Open layout: just a label + thin divider. No bordered card.
@@ -208,24 +209,14 @@ export function SelectRow<T extends string>({
       <div className="flex flex-col gap-0.5">
         <SettingLabel label={label} description={description} />
       </div>
-      <select
-        aria-label={label}
-        value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-        className="shrink-0 ml-4 px-2.5 py-1 text-ui-chip font-medium rounded-md bg-base-200 border border-edge/40 text-fg focus:outline-none focus:border-accent/60 transition-colors cursor-pointer appearance-none pr-7 bg-no-repeat bg-right"
-        style={{
-          backgroundImage:
-            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M3 4.5l3 3 3-3' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>\")",
-          backgroundPosition: "right 6px center",
-          backgroundSize: "12px",
-        }}
-      >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+      <div className="shrink-0 ml-4">
+        <SelectMenu
+          value={value}
+          options={options}
+          onChange={onChange}
+          ariaLabel={label}
+        />
+      </div>
     </div>
   );
 }
