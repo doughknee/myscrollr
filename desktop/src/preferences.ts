@@ -1646,7 +1646,7 @@ export function updateWidgetPrefs(
 //
 //     "Where should this source appear?  Off / Row 1 / Row 2 / Row 3"
 //
-// The new RowSelector UI calls these helpers. They keep BOTH data
+// The ticker row editor calls these helpers. They keep BOTH data
 // layers in sync:
 //   - `tickerLayout.rows[i].sources[]` (client-side prefs) — controls
 //     per-row inclusion. Source of truth for which row a source

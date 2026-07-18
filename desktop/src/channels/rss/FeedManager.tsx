@@ -5,7 +5,7 @@
  * group, marked with a "custom" badge and removable like any other.
  *
  * Same chrome shape as Sports LeagueManager / Finance SymbolManager:
- * header + count badge + UpgradePrompt + Quick-add for custom feeds
+ * header + count badge + Quick-add for custom feeds
  * + search/category/tracked/sort controls all pinned at the top;
  * the feed list scrolls inside a fixed pane.
  */

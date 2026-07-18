@@ -1,7 +1,6 @@
 import { clsx } from "clsx";
 import { motion } from "motion/react";
 import Tooltip from "../Tooltip";
-import type { Venue } from "../../preferences";
 
 // ── Section heading ─────────────────────────────────────────────
 // Open layout: just a label + thin divider. No bordered card.
@@ -227,71 +226,6 @@ export function SelectRow<T extends string>({
           </option>
         ))}
       </select>
-    </div>
-  );
-}
-
-// ── Venue row ───────────────────────────────────────────────────
-// @deprecated as of 2026-04-25.
-// Use `<DisplayLocationGrid>` instead — it renders the same persisted
-// `Venue` enum as two checkboxes (Feed | Ticker) under a single column
-// header strip, which dropped the redundant per-row "Off / Feed / Both
-// / Ticker" legend. This component is kept only for backwards-compat
-// with anything still importing it; new code should NOT use it.
-//
-// Original four-state segmented control for visibility settings that
-// can be routed to the feed page, the always-on-top ticker, both, or
-// hidden. See docs/superpowers/specs/2026-04-25-display-venue-toggle-design.md
-// for the venue-routing rationale.
-
-const VENUE_OPTIONS: { value: Venue; label: string }[] = [
-  { value: "off", label: "Off" },
-  { value: "feed", label: "Feed" },
-  { value: "both", label: "Both" },
-  { value: "ticker", label: "Ticker" },
-];
-
-interface VenueRowProps {
-  label: string;
-  description?: string;
-  value: Venue;
-  onChange: (venue: Venue) => void;
-}
-
-export function VenueRow({ label, description, value, onChange }: VenueRowProps) {
-  return (
-    <div className="flex items-center justify-between px-3 py-2 rounded-lg">
-      <div className="flex flex-col gap-0.5">
-        <SettingLabel label={label} description={description} />
-      </div>
-      <div
-        role="radiogroup"
-        aria-label={label}
-        className="inline-flex items-center rounded-lg bg-base-200 p-0.5 shrink-0 ml-4"
-      >
-        {VENUE_OPTIONS.map((opt) => {
-          const selected = value === opt.value;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              onClick={() => onChange(opt.value)}
-              className={clsx(
-                "px-2.5 py-1 text-ui-chip font-medium rounded-md transition-all duration-150 cursor-pointer leading-none",
-                selected && opt.value === "off"
-                  ? "bg-base-300/60 text-fg-3 shadow-sm"
-                  : selected
-                    ? "bg-base-300 text-fg shadow-sm"
-                    : "text-fg-3 hover:text-fg-2",
-              )}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }

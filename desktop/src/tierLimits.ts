@@ -90,7 +90,7 @@ export const TIER_LIMITS: Record<SubscriptionTier, ChannelLimits> = {
 };
 
 // Numeric-only keys (excludes the boolean `maxTickerCustomization` field so
-// downstream `getLimit` / `isUnlimited` / `maxItemsForBrowser` keep their
+// downstream `getLimit` / `isUnlimited` keep their
 // simple `number` signatures). Exported so callers can constrain their own
 // helpers: e.g. `const LIMIT_ROWS: { key: NumericLimitKey }[] = [...]`.
 export type NumericLimitKey = {
@@ -128,14 +128,3 @@ export function isUnlimited(tier: SubscriptionTier, key: LimitKey): boolean {
   return TIER_LIMITS[tier][key] === Infinity;
 }
 
-/**
- * Returns `maxItems` for SetupBrowser: a finite number or undefined (unlimited).
- * Passing undefined means SetupBrowser won't enforce any cap.
- */
-export function maxItemsForBrowser(
-  tier: SubscriptionTier,
-  key: LimitKey
-): number | undefined {
-  const limit = TIER_LIMITS[tier][key];
-  return limit === Infinity ? undefined : limit;
-}

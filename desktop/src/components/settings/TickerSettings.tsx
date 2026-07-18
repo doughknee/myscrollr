@@ -82,7 +82,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
   const tier = getTier();
 
   // Single source of truth for layout state, shared with the Home page
-  // RowSelectors and the tray submenus. `rowCount`, `tierMaxRows`,
+  // the tray submenus. `rowCount`, `tierMaxRows`,
   // `canAddRow`, etc. all flow from this hook so this surface and Home
   // can never drift on what's possible vs what currently exists.
   const tickerLayout = useTickerLayout(prefs, onPrefsChange, tier);

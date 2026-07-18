@@ -7,7 +7,6 @@ import {
   getMaxWidgets,
   getMaxTickerRows,
   canCustomizeTickerRows,
-  maxItemsForBrowser,
 } from "./tierLimits";
 import type { SubscriptionTier } from "./auth";
 
@@ -99,21 +98,6 @@ describe("canCustomizeTickerRows", () => {
   });
 });
 
-// ── maxItemsForBrowser ──────────────────────────────────────────
-
-describe("maxItemsForBrowser", () => {
-  it("returns undefined for every retired depth cap (now unlimited)", () => {
-    for (const tier of ALL_TIERS) {
-      for (const key of DEPTH_KEYS) {
-        expect(maxItemsForBrowser(tier, key)).toBeUndefined();
-      }
-    }
-  });
-
-  it("still returns the finite ticker-row limit", () => {
-    expect(maxItemsForBrowser("free", "maxTickerRows")).toBe(1);
-  });
-});
 
 // ── TIER_LIMITS sanity ─────────────────────────────────────────
 

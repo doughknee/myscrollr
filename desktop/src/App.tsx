@@ -624,7 +624,7 @@ export default function App() {
       items.push(await PredefinedMenuItem.new({ item: "Separator" }));
 
       // Per-source row picker — same mental model as the feed page
-      // RowSelector. Each channel/widget gets its own submenu with
+      // the ticker row editor. Each channel/widget gets its own submenu with
       // [Off, Row 1, Row 2, …] CheckMenuItems where exactly one is
       // checked at any time. The row count is dynamic: we show only
       // the rows the user has actually enabled in their ticker layout
@@ -639,7 +639,7 @@ export default function App() {
       // Whether the layout has headroom for another row. When true, the
       // submenu surfaces a "+ Add row & assign" item so the user can
       // grow the layout without leaving the tray menu — same one-click
-      // affordance as the Home-page RowSelector's [+ Add] button.
+      // affordance as Customize → Ticker's [+ Add] button.
       const canAddRowFromTray = layoutRows < tierMax;
 
       // Build one submenu of row CheckMenuItems for a source. The "Off"
