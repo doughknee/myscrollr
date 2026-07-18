@@ -20,6 +20,8 @@ import { motion, AnimatePresence } from "motion/react";
 import SportsEmptyState from "../channels/sports/EmptyState";
 import RouteError from "../components/RouteError";
 import Tooltip from "../components/Tooltip";
+import FreshnessPill from "../components/FreshnessPill";
+import { WidgetBar, BarPill } from "../components/widget-bar/Bar";
 import TickerLayoutSummary from "../components/TickerLayoutSummary";
 import PageLayout from "../components/layout/PageLayout";
 import EmptySection from "../components/layout/EmptySection";
@@ -177,12 +179,47 @@ function HomePage() {
 
   const hasAnySources = orderedChannels.length > 0 || orderedWidgets.length > 0;
 
+  // Newest item timestamp across every dashboard preview array — one
+  // trust signal for the whole radar, same idiom as the source bars.
+  const latestUpdated = useMemo(() => {
+    let latest = 0;
+    const data = dashboard?.data as Record<string, unknown> | undefined;
+    if (data) {
+      for (const rows of Object.values(data)) {
+        if (!Array.isArray(rows)) continue;
+        for (const r of rows) {
+          const raw = (r as { updated_at?: string })?.updated_at;
+          if (!raw) continue;
+          const ts = new Date(raw).getTime();
+          if (Number.isFinite(ts) && ts > latest) latest = ts;
+        }
+      }
+    }
+    return latest > 0 ? new Date(latest).toISOString() : null;
+  }, [dashboard]);
+
   return (
     <PageLayout
       title="Home"
       subtitle="Your live feed at a glance"
       width="wide"
+      stableChrome
     >
+      {/* WCB — same persistent chrome as every other page. Home has no
+          view switch; its right cluster carries the radar-wide
+          freshness signal and the ticker-manage action. */}
+      {hasAnySources && (
+        <WidgetBar>
+          <div className="ml-auto flex min-w-0 shrink items-center gap-2">
+            {latestUpdated && (
+              <FreshnessPill lastUpdated={latestUpdated} label="data" />
+            )}
+            <BarPill active={false} onClick={openTickerSettings}>
+              Manage ticker
+            </BarPill>
+          </div>
+        </WidgetBar>
+      )}
       {/* Home uses the standard PageLayout chassis (px-5 py-5,
           max-w-6xl) so it lines up with Catalog and every other
           wide route. The inner wrapper just owns vertical rhythm

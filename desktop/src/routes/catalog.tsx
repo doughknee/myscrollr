@@ -34,6 +34,9 @@ import QueryErrorBanner from "../components/QueryErrorBanner";
 import RouteError from "../components/RouteError";
 import PageLayout from "../components/layout/PageLayout";
 import PageSection from "../components/layout/PageSection";
+import { WidgetBar } from "../components/widget-bar/Bar";
+import { Segmented } from "../components/widget-bar/Segmented";
+import { SelectMenu } from "../components/widget-bar/SelectMenu";
 import EmptySection from "../components/layout/EmptySection";
 
 
@@ -170,19 +173,27 @@ function CatalogPage() {
   // two sections: what you have, and what you could add (v1.1.1 r3).
 
   return (
-    <PageLayout
-      title="Catalog"
-      width="wide"
-      tabs={{
-        items: FILTER_TABS.map((t) => ({
-          key: t.key,
-          label: t.label,
-          description: t.hint,
-        })),
-        activeKey: filter,
-        onChange: (key) => setFilter(key as FilterTab),
-      }}
-    >
+    <PageLayout title="Catalog" width="wide" stableChrome>
+      {/* WCB — same persistent chrome as every source page. Category
+          filter (ex-TopBar tab strip) left, sort (ex-slot-band group)
+          right, per the bar grammar. */}
+      <WidgetBar>
+        <Segmented
+          ariaLabel="Filter by category"
+          value={filter}
+          onChange={(k) => setFilter(k)}
+          options={FILTER_TABS.map((t) => ({ value: t.key, label: t.label }))}
+        />
+        <div className="ml-auto">
+          <SelectMenu
+            ariaLabel="Sort widgets"
+            prefix="Sort"
+            value={sort}
+            onChange={setSort}
+            options={SORT_OPTIONS.map((s) => ({ value: s.key, label: s.label }))}
+          />
+        </div>
+      </WidgetBar>
       {dashboardError && (
         <div className="mb-4">
           <QueryErrorBanner error={dashboardError} />
@@ -236,33 +247,8 @@ function CatalogPage() {
               Upgrade
             </button>
           )}
-          {/* Sort control — lives in the header, applies within each
-              section below. */}
-          <div
-            className="flex items-center rounded-lg border border-edge/40 bg-base-150/40 p-0.5"
-            role="group"
-            aria-label="Sort widgets"
-          >
-            {SORT_OPTIONS.map((s) => (
-              <button
-                key={s.key}
-                onClick={() => setSort(s.key)}
-                aria-pressed={sort === s.key}
-                className={clsx(
-                  "flex items-center gap-1 rounded-md px-2.5 py-1 text-ui-chip font-medium transition-colors",
-                  // Accent-tinted active state — bg-surface on bg-base-150
-                  // is near-invisible in the dark themes (v1.1.3 fix).
-                  
-                  sort === s.key
-                    ? "bg-accent/15 font-semibold text-accent"
-                    : "text-fg-4 hover:text-fg-2",
-                )}
-              >
-                <s.icon size={12} />
-                {s.label}
-              </button>
-            ))}
-          </div>
+          {/* Sort control moved to the WCB (bar grammar: config
+              selects live in the bar's right cluster). */}
         </div>
       </motion.div>
 

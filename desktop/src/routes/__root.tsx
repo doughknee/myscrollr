@@ -922,7 +922,14 @@ function RootLayout() {
                 every route. overflow-hidden clips page scroll to the
                 radius. */}
             <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-surface rounded-xl border border-edge/50 shadow-sm">
-             <BarChassisProvider active={route.isChannel || route.isWidget}>
+             <BarChassisProvider
+               active={
+                 route.isChannel ||
+                 route.isWidget ||
+                 route.isFeed ||
+                 route.isMarketplace
+               }
+             >
               <ConnectionBanner deliveryMode={deliveryMode} />
 
               {auth.sessionExpired && (
