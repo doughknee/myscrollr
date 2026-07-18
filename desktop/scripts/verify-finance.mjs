@@ -1,6 +1,7 @@
 /**
- * Playwright verification for the finance widget bar + Symbols view
- * (in-widget config pass, PR 2). Drives the finance preview harness
+ * Playwright verification for the finance widget bar + search-to-add
+ * (the Symbols view is folded into the bar search). Drives the finance
+ * preview harness
  * (real FeedTab + inline fixture) at 1440 / 960 / 720 / 375.
  *
  * Run with the vite dev server on :5174:
@@ -51,7 +52,10 @@ async function run() {
     const { page, consoleErrors } = await newPage(browser, 1440, 900);
     console.log("== 1440px · bar anatomy ==");
 
-    check("view switch renders", (await page.locator('[aria-label="Finance view"] [role="tab"]').count()) === 2);
+    check(
+      "no view switch (Symbols view is gone)",
+      (await page.locator('[aria-label="Finance view"]').count()) === 0,
+    );
     check("direction pills visible", await page.locator('button:has-text("Gainers")').first().isVisible());
     check("sort menu present", (await page.locator('[aria-label="Sort symbols"]').count()) === 1);
     check("category menu present", (await page.locator('[aria-label="Filter by category"]').count()) === 1);
@@ -182,10 +186,8 @@ async function run() {
   }
 
   // ════ 1440px — sticky sort (2026-07-17 unification) ══════════════
-  // The bar's sort choice also writes dp.defaultSort; true cross-launch
-  // persistence rides the shell pref store (code-level), so here we
-  // assert the choice survives a Feed⇄Symbols view switch and keeps
-  // ordering the feed.
+  // The bar's sort choice also writes dp.defaultSort; here we assert
+  // the choice survives a search interaction and keeps ordering the feed.
   {
     const { page, consoleErrors } = await newPage(browser, 1440, 900);
     console.log("== 1440px · sticky sort ==");
@@ -194,44 +196,48 @@ async function run() {
     await page.waitForSelector('[role="menu"]');
     await page.locator('[role="menu"] [role="menuitemradio"]:has-text("% Change")').click();
     await page.waitForTimeout(250);
-    await page.locator('[role="tab"]:has-text("Symbols")').click();
-    await page.waitForSelector("text=Click a row to add or remove");
-    await page.locator('[role="tab"]:has-text("Feed")').click();
-    await page.waitForSelector(ROW);
+    await page.locator(SEARCH).fill("AAPL");
+    await page.waitForTimeout(250);
+    await page.locator(SEARCH).fill("");
+    await page.waitForTimeout(250);
     const sortLabel = await page.locator('[aria-label="Sort symbols"]').innerText();
-    check("sort survives a view round-trip", sortLabel.includes("% Change"), sortLabel);
+    check("sort survives a search round-trip", sortLabel.includes("% Change"), sortLabel);
     const firstRow = await page.locator(ROW).first().innerText();
-    check("feed still sorted by % change", firstRow.includes("+"), firstRow.replace(/\n/g, " | "));
+    check("feed still sorted by % change", firstRow.includes("+"), firstRow.split(String.fromCharCode(10)).join(" | "));
 
     check("no console errors (sticky-sort page)", consoleErrors.length === 0, consoleErrors.join(" | "));
     await page.close();
   }
 
-  // ════ 1440px — Symbols view (render-only) ════════════════════════
+  // ════ 1440px — search-to-add (render-only; writes ride the same
+  // useChannelConfig mutation the Symbols view used) ═════════════════
   {
     const { page, consoleErrors } = await newPage(browser, 1440, 900);
-    console.log("== 1440px · Symbols view ==");
+    console.log("== 1440px · search-to-add ==");
 
-    await page.locator('[role="tab"]:has-text("Symbols")').click();
-    await page.waitForSelector("text=Click a row to add or remove");
-    const listRows = await page.locator('[role="listitem"]').count();
-    check("symbol manager renders rows", listRows > 10, `rows=${listRows}`);
-    check("crypto scoped out (stocks widget)", (await page.locator('[role="listitem"]:has-text("BTC/USD")').count()) === 0);
-    check("no tier cap in header", !(await page.locator("#root").innerText()).includes(" / "));
-    const firstRow = page.locator('[role="listitem"]').first();
-    check(
-      "tracked rows sort first",
-      (await firstRow.getAttribute("aria-label"))?.startsWith("Remove "),
-      await firstRow.getAttribute("aria-label"),
-    );
-    await page.screenshot({ path: `${OUT}/fin-06-symbols-1440.png` });
+    // NVDA is in the catalog but not in the tracked config: an Add row.
+    await page.locator(SEARCH).fill("NVDA");
+    await page.waitForTimeout(300);
+    const addBtns = await page.locator('button:has-text("+ Add")').count();
+    check("untracked catalog match shows an Add action", addBtns >= 1, `addBtns=${addBtns}`);
 
-    // Back to the feed.
-    await page.locator('[role="tab"]:has-text("Feed")').click();
-    await page.waitForSelector(ROW);
-    check("Feed tab returns to the grid", (await page.locator(ROW).count()) > 10);
+    // AAPL is tracked: a Remove row.
+    await page.locator(SEARCH).fill("AAPL");
+    await page.waitForTimeout(300);
+    const removeBtns = await page.locator('button:has-text("Remove")').count();
+    check("tracked catalog match shows a Remove action", removeBtns >= 1, `removeBtns=${removeBtns}`);
 
-    check("no console errors (symbols page)", consoleErrors.length === 0, consoleErrors.join(" | "));
+    // Crypto is scoped out of the stocks widget's matches.
+    await page.locator(SEARCH).fill("BTC");
+    await page.waitForTimeout(300);
+    const bodyText = await page.locator("#root").innerText();
+    check("crypto scoped out (stocks widget)", !bodyText.includes("BTC/USD"));
+
+    await page.locator(SEARCH).fill("NVDA");
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${OUT}/fin-06-search-add-1440.png` });
+
+    check("no console errors (search-add page)", consoleErrors.length === 0, consoleErrors.join(" | "));
     await page.close();
   }
 

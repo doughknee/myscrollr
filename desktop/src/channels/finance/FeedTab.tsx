@@ -5,23 +5,23 @@
  * via the desktop CDC/SSE pipeline. Supports compact and comfort
  * display modes with price flash animations on change.
  *
- * ONE Kalshi-style control bar (widget-bar primitives): Feed/Symbols
- * segmented view switch · direction pills · sort + category menus ·
- * symbol search · freshness. The Symbols view mounts the
- * full SymbolManager in-feed — the Configure page's job, in-widget.
- * Counts live in menu rows (no summary band); filters collapse into one
- * Filter button at narrow widths.
+ * ONE Kalshi-style control bar (widget-bar primitives): direction pills
+ * · sort + category menus · symbol search · freshness. The search is
+ * ALSO the symbol manager: catalog matches surface inline with
+ * Add/Remove actions (the separate Symbols view is gone). Counts live
+ * in menu rows (no summary band); filters collapse into one Filter
+ * button at narrow widths.
  */
 import { memo, useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { clsx } from "clsx";
 import { AnimatePresence } from "motion/react";
-import { TrendingUp, LineChart, ListChecks } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardQueryOptions, financeCatalogOptions } from "../../api/queries";
 import { formatPrice, formatChange, relativeTime } from "../../utils/format";
 import EmptyChannelState from "../../components/EmptyChannelState";
 import FreshnessPill from "../../components/FreshnessPill";
-import { WidgetBar, BarDivider, BarPill } from "../../components/widget-bar/Bar";
+import { WidgetBar, BarPill } from "../../components/widget-bar/Bar";
 import {
   useDismiss,
   MenuPanel,
@@ -29,14 +29,9 @@ import {
   MenuRow,
   FilterTrigger,
 } from "../../components/widget-bar/Menu";
-import {
-  Segmented,
-  type SegmentedOption,
-} from "../../components/widget-bar/Segmented";
 import { SearchBox, useSlashFocus } from "../../components/widget-bar/SearchBox";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
-import SymbolManager from "./SymbolManager";
 import { useChannelConfig } from "../../hooks/useChannelConfig";
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
@@ -61,7 +56,7 @@ export const financeChannel: ChannelManifest = {
       "Track stocks, ETFs, and cryptocurrencies with live price updates. " +
       "Prices update automatically so your feed always shows the latest.",
     usage: [
-      "Open the Symbols view to choose what to track.",
+      "Search in the top bar to add or remove symbols — catalog matches appear as you type.",
       "Prices update automatically when connected.",
       "Click any symbol to view its chart on Google Finance.",
     ],
@@ -85,15 +80,6 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "price", label: "Price" },
   { value: "change", label: "% Change" },
   { value: "updated", label: "Last Updated" },
-];
-
-type FinanceView = "feed" | "symbols";
-
-/** Feed / Symbols — options for the Segmented view switch. The Symbols
- *  view is the Configure page's symbol picker, mounted in-feed. */
-const VIEW_OPTIONS: SegmentedOption<FinanceView>[] = [
-  { value: "feed", label: "Feed", icon: LineChart },
-  { value: "symbols", label: "Symbols", icon: ListChecks },
 ];
 
 interface FinanceChannelConfig {
@@ -165,9 +151,8 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [trades, categoryMap]);
 
-  // ── Filter / sort / view state ───────────────────────────────
+  // ── Filter / sort state ──────────────────────────────────────
   const isComfort = mode === "comfort";
-  const [view, setView] = useState<FinanceView>("feed");
   const [directionFilter, setDirectionFilter] = useState<DirectionFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>(() => dp.defaultSort ?? "alpha");
 
@@ -203,7 +188,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   // ── Symbol search (plain substring — no fuzzy matcher here) ──
   const [query, setQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
-  useSlashFocus(searchInputRef, isComfort && view === "feed");
+  useSlashFocus(searchInputRef, isComfort);
 
   const clearAllFilters = useCallback(() => {
     setDirectionFilter("all");
@@ -275,7 +260,70 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
 
   const channelType = (widgetId ?? "finance") as ChannelType;
   const showEmpty = trades.length === 0;
-  const showSymbols = isComfort && view === "symbols";
+
+  // ── Search-to-add (the Symbols view, folded into the bar) ────
+  // Typing in the bar search filters the tracked grid AND surfaces
+  // catalog matches: untracked ones with an Add action, tracked ones
+  // with Remove — same config.symbols write the Symbols view made.
+  const {
+    error: symbolsError,
+    setError: setSymbolsError,
+    saving: symbolsSaving,
+    updateItems: updateSymbols,
+  } = useChannelConfig<string[]>(channelType, "symbols");
+  const { data: fullCatalog = [] } = useQuery(financeCatalogOptions());
+
+  const channelRow = (dashboard?.channels ?? []).find(
+    (ch) => ch.channel_type === channelType,
+  );
+  const channelConfig = (channelRow?.config ?? {}) as FinanceChannelConfig;
+  const trackedSymbols = useMemo(
+    () => (Array.isArray(channelConfig.symbols) ? channelConfig.symbols : []),
+    [channelConfig.symbols],
+  );
+  const trackedSet = useMemo(() => new Set(trackedSymbols), [trackedSymbols]);
+
+  // Scope catalog matches to this widget's asset class (crypto widget
+  // sees only Crypto; stocks widget everything else).
+  const catalogMatches = useMemo(() => {
+    if (!searchQ) return [];
+    return fullCatalog
+      .filter((item) =>
+        assetClass === "crypto"
+          ? item.category === "Crypto"
+          : assetClass
+            ? item.category !== "Crypto"
+            : true,
+      )
+      .filter(
+        (item) =>
+          item.symbol.toLowerCase().includes(searchQ) ||
+          item.name.toLowerCase().includes(searchQ),
+      )
+      .sort((a, b) => {
+        // Untracked (addable) first — adding is why you searched.
+        const at = trackedSet.has(a.symbol) ? 1 : 0;
+        const bt = trackedSet.has(b.symbol) ? 1 : 0;
+        if (at !== bt) return at - bt;
+        return a.symbol.localeCompare(b.symbol);
+      })
+      .slice(0, 8);
+  }, [searchQ, fullCatalog, assetClass, trackedSet]);
+
+  const addSymbol = useCallback(
+    (sym: string) => {
+      if (trackedSet.has(sym)) return;
+      updateSymbols([...trackedSymbols, sym]);
+    },
+    [trackedSymbols, trackedSet, updateSymbols],
+  );
+
+  const removeSymbol = useCallback(
+    (sym: string) => {
+      updateSymbols(trackedSymbols.filter((s) => s !== sym));
+    },
+    [trackedSymbols, updateSymbols],
+  );
 
   return (
     // NO inner scroll container: the Source page (PageLayout) owns the
@@ -284,17 +332,8 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
     <div ref={containerRef} className="relative flex min-h-full flex-col">
       {isComfort && (
         <WidgetBar>
-          <Segmented
-            ariaLabel="Finance view"
-            value={view}
-            onChange={setView}
-            options={VIEW_OPTIONS}
-          />
-
-          {view === "feed" && !showEmpty ? (
+          {!showEmpty ? (
             <>
-              <BarDivider />
-
               {/* Wide: open direction pills. Collapse BEFORE clipping. */}
               <div className="scrollbar-none hidden min-w-0 items-center gap-1 overflow-x-auto @5xl:flex">
                 {DIRECTION_OPTIONS.map((opt) => (
@@ -363,25 +402,97 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                 )}
               </div>
             </>
-          ) : null}
+          ) : (
+            // Empty feed: the search IS the add mechanism, so it stays.
+            <div className="ml-auto">
+              <SearchBox
+                inputRef={searchInputRef}
+                query={query}
+                onQueryChange={setQuery}
+                resultCount={null}
+                ariaLabel="Search symbols"
+                noun="symbols"
+              />
+            </div>
+          )}
         </WidgetBar>
       )}
 
-      {showSymbols ? (
-        <FinanceSymbolsPanel channelType={channelType} assetClass={assetClass} />
-      ) : showEmpty ? (
+      {/* Config-write error strip (ex-Symbols view). */}
+      {symbolsError && (
+        <div className="mx-3 mt-2 flex items-center justify-between rounded-lg border border-error/20 bg-error/10 px-3 py-2 text-[11px] text-error">
+          <span>{symbolsError}</span>
+          <button
+            onClick={() => setSymbolsError(null)}
+            aria-label="Dismiss error"
+            className="cursor-pointer text-error/60 hover:text-error"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Catalog matches — search-to-add/remove, replaces the Symbols
+          view. Untracked rows add; tracked rows remove. */}
+      {isComfort && searchQ && catalogMatches.length > 0 && (
+        <div className="mx-3 mt-2 overflow-hidden rounded-lg border border-edge/40 bg-surface-2">
+          {catalogMatches.map((item) => {
+            const tracked = trackedSet.has(item.symbol);
+            return (
+              <div
+                key={item.symbol}
+                className="flex items-center justify-between gap-3 border-b border-edge/30 px-3 py-1.5 last:border-b-0"
+              >
+                <div className="flex min-w-0 items-baseline gap-2">
+                  <span className="font-mono text-[12px] font-semibold text-fg">
+                    {item.symbol}
+                  </span>
+                  <span className="truncate text-[11px] text-fg-3">
+                    {item.name}
+                  </span>
+                  <span className="shrink-0 text-[10px] uppercase tracking-wider text-fg-4">
+                    {item.category}
+                  </span>
+                </div>
+                <button
+                  onClick={() =>
+                    tracked ? removeSymbol(item.symbol) : addSymbol(item.symbol)
+                  }
+                  disabled={symbolsSaving}
+                  className={clsx(
+                    "shrink-0 rounded-md px-2.5 py-1 text-ui-chip font-semibold transition-colors disabled:opacity-40",
+                    tracked
+                      ? "text-fg-3 hover:bg-down/10 hover:text-down"
+                      : "bg-accent/10 text-accent hover:bg-accent/20",
+                  )}
+                >
+                  {tracked ? "Remove" : "+ Add"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showEmpty ? (
         <div className="flex flex-1 flex-col justify-center">
-          <EmptyChannelState
-            refreshing={Boolean(feedContext.__refreshing)}
-            icon={TrendingUp}
-            noun="stocks or crypto"
-            hasConfig={!!feedContext.__hasConfig}
-            dashboardLoaded={!!feedContext.__dashboardLoaded}
-            loadingNoun="prices"
-            actionHint="choose what to track"
-            actionLabel={isComfort ? "Choose symbols to track" : undefined}
-            onConfigure={isComfort ? () => setView("symbols") : undefined}
-          />
+          {/* Searching from empty: the matches panel above is the
+              content — don't stack the hero under it. */}
+          {!searchQ && (
+            <EmptyChannelState
+              refreshing={Boolean(feedContext.__refreshing)}
+              icon={TrendingUp}
+              noun="stocks or crypto"
+              hasConfig={!!feedContext.__hasConfig}
+              dashboardLoaded={!!feedContext.__dashboardLoaded}
+              loadingNoun="prices"
+              actionHint="search to add symbols"
+              actionLabel={isComfort ? "Search to add symbols" : undefined}
+              onConfigure={
+                isComfort ? () => searchInputRef.current?.focus() : undefined
+              }
+            />
+          )}
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 gap-3">
@@ -533,94 +644,6 @@ function FinanceFilterMenu({
           </MenuPanel>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-// ── Symbols view (the Configure page's picker, mounted in-feed) ─
-
-function FinanceSymbolsPanel({
-  channelType,
-  assetClass,
-}: {
-  channelType: ChannelType;
-  assetClass: ReturnType<typeof assetClassForWidget>;
-}) {
-  const { error, setError, saving, updateItems } =
-    useChannelConfig<string[]>(channelType, "symbols");
-
-  const { data: dashboard } = useQuery(dashboardQueryOptions());
-  const {
-    data: fullCatalog = [],
-    isLoading: catalogLoading,
-    isError: catalogError,
-  } = useQuery(financeCatalogOptions());
-
-  const channelRow = (dashboard?.channels ?? []).find(
-    (ch) => ch.channel_type === channelType,
-  );
-  const config = (channelRow?.config ?? {}) as FinanceChannelConfig;
-  const symbols = useMemo(
-    () => (Array.isArray(config.symbols) ? config.symbols : []),
-    [config.symbols],
-  );
-  const symbolSet = useMemo(() => new Set(symbols), [symbols]);
-
-  // Scope the picker to this widget's asset class — the "Crypto" category
-  // for the crypto widget, everything else for stocks.
-  const catalog = useMemo(() => {
-    if (!assetClass) return fullCatalog;
-    return fullCatalog.filter((item) =>
-      assetClass === "crypto"
-        ? item.category === "Crypto"
-        : item.category !== "Crypto",
-    );
-  }, [fullCatalog, assetClass]);
-
-  const trades = useMemo(
-    () => (dashboard?.data?.finance as Trade[] | undefined) ?? [],
-    [dashboard?.data?.finance],
-  );
-
-  const addSymbol = useCallback(
-    (sym: string) => {
-      if (symbolSet.has(sym)) return;
-      updateItems([...symbols, sym]);
-    },
-    [symbols, symbolSet, updateItems],
-  );
-
-  const removeSymbol = useCallback(
-    (sym: string) => {
-      updateItems(symbols.filter((s) => s !== sym));
-    },
-    [symbols, updateItems],
-  );
-
-  return (
-    <div className="flex flex-1 flex-col gap-3 p-3">
-      {error && (
-        <div className="shrink-0 px-3 py-2 rounded-lg bg-error/10 border border-error/20 text-[11px] text-error flex items-center justify-between">
-          <span>{error}</span>
-          <button
-            onClick={() => setError(null)}
-            aria-label="Dismiss error"
-            className="text-error/60 hover:text-error cursor-pointer"
-          >
-            ×
-          </button>
-        </div>
-      )}
-      <SymbolManager
-        symbols={symbols}
-        catalog={catalog}
-        trades={trades}
-        onAdd={addSymbol}
-        onRemove={removeSymbol}
-        loading={catalogLoading}
-        error={catalogError}
-        saving={saving}
-      />
     </div>
   );
 }
