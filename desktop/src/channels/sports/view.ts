@@ -214,7 +214,10 @@ export function normalizeSportsDisplayConfig(
       obj.daysAhead,
       legacyUpcoming === "off" ? 0 : SPORTS_WINDOW_DEFAULTS.daysAhead,
     ),
-    showLogos: migrateVenue(obj.showLogos),
-    showTimer: migrateVenue(obj.showTimer),
+    // 2026-07-17 defaults reset: the logo/timer toggles left the UI with
+    // the configure-page teardown — stored values are ignored and every
+    // surface renders the defaults.
+    showLogos: "both",
+    showTimer: "both",
   };
 }

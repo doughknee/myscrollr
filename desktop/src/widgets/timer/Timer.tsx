@@ -5,6 +5,8 @@
  * window close/reopen within the same session.
  */
 import { useState, useEffect, useCallback, useRef } from "react";
+import { clsx } from "clsx";
+import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import { LS_TIMER_STATE } from "../../constants";
 import { getStore, setStore } from "../../lib/store";
 import { loadPrefs } from "../../preferences";
@@ -26,7 +28,7 @@ const COUNTDOWN_PRESETS = [
 
 const TIMER_KEY = LS_TIMER_STATE;
 
-function loadPomodoroTiming() {
+export function loadPomodoroTiming() {
   return getPomodoroTiming(loadPrefs().widgets.timer.pomodoro);
 }
 
@@ -40,11 +42,24 @@ function defaultTimerState(): TimerState {
   };
 }
 
-function loadTimerState(): TimerState {
+export function loadTimerState(): TimerState {
   const s = getStore<TimerState | null>(TIMER_KEY, null);
   return s && typeof s.mode === "string"
     ? reconcileIdlePomodoroTarget(s, loadPomodoroTiming().workSecs)
     : defaultTimerState();
+}
+
+/** Idle state after a mode switch — shared by the bar's tabs (FeedTab)
+ *  and the in-feed confirm dialog so both paths land identically. */
+export function switchedTimerState(p: TimerState, m: TimerMode): TimerState {
+  return {
+    ...p,
+    mode: m,
+    startedAt: null,
+    bankedMs: 0,
+    targetSecs:
+      m === "pomodoro" ? loadPomodoroTiming().workSecs : m === "countdown" ? 300 : 0,
+  };
 }
 
 function saveTimerState(s: TimerState): void {
@@ -247,12 +262,24 @@ function TimerConfirmDialog({
 
 interface TimerProps {
   compact: boolean;
+  /** Mode/run state lives in the FeedTab so the bar's mode tabs and this
+   *  body share one machine (comfort tabs render in the WidgetBar). */
+  state: TimerState;
+  setState: React.Dispatch<React.SetStateAction<TimerState>>;
+  confirmSwitch: TimerMode | null;
+  setConfirmSwitch: (m: TimerMode | null) => void;
+  onRequestSwitchMode: (m: TimerMode) => void;
 }
 
-export function Timer({ compact }: TimerProps) {
-  const [state, setState] = useState(loadTimerState);
+export function Timer({
+  compact,
+  state,
+  setState,
+  confirmSwitch,
+  setConfirmSwitch,
+  onRequestSwitchMode,
+}: TimerProps) {
   const [, setTick] = useState(0);
-  const [confirmSwitch, setConfirmSwitch] = useState<TimerMode | null>(null);
   const [customMinutes, setCustomMinutes] = useState("");
   const [showCustom, setShowCustom] = useState(false);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -345,34 +372,20 @@ export function Timer({ compact }: TimerProps) {
     }));
   }, []);
 
-  const doSwitchMode = useCallback((m: TimerMode) => {
-    const timing = loadPomodoroTiming();
-    setState((p) => ({
-      ...p,
-      mode: m,
-      startedAt: null,
-      bankedMs: 0,
-      targetSecs:
-        m === "pomodoro"
-          ? timing.workSecs
-          : m === "countdown"
-            ? 300
-            : 0,
-    }));
-    setConfirmSwitch(null);
+  const doSwitchMode = useCallback(
+    (m: TimerMode) => {
+      setState((p) => switchedTimerState(p, m));
+      setConfirmSwitch(null);
+    },
+    [setState, setConfirmSwitch],
+  );
+
+  // Bar-driven switches skip this component's callbacks — reset the
+  // local countdown-picker UI whenever the mode actually changes.
+  useEffect(() => {
     setShowCustom(false);
     setCustomMinutes("");
-  }, []);
-
-  const requestSwitchMode = useCallback(
-    (m: TimerMode) => {
-      if (m === stateRef.current.mode) return;
-      if (stateRef.current.startedAt !== null || stateRef.current.bankedMs > 0)
-        setConfirmSwitch(m);
-      else doSwitchMode(m);
-    },
-    [doSwitchMode],
-  );
+  }, [state.mode]);
 
   const setTarget = useCallback((secs: number) => {
     setState((p) => ({ ...p, startedAt: null, bankedMs: 0, targetSecs: secs }));
@@ -444,9 +457,9 @@ export function Timer({ compact }: TimerProps) {
         <TimerModeTabs
           activeMode={state.mode}
           size="sm"
-          onSwitch={requestSwitchMode}
+          onSwitch={onRequestSwitchMode}
         />
-        <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-widget-timer/[0.04] border border-widget-timer/10">
+        <div className={clsx(FEED_CARD, FEED_CARD_STATIC, "flex items-center justify-between")}>
           <div className="flex items-center gap-2">
             {isRunning && (
               <div
@@ -518,14 +531,10 @@ export function Timer({ compact }: TimerProps) {
         }}
       />
 
-      <TimerModeTabs
-        activeMode={state.mode}
-        size="md"
-        onSwitch={requestSwitchMode}
-      />
+      {/* Mode tabs live in the WidgetBar in comfort mode. */}
 
       {/* Display */}
-      <div className="rounded-2xl border border-widget-timer/15 bg-widget-timer/[0.04] px-4 py-5 shadow-[inset_0_1px_0_0_rgba(245,158,11,0.08)]">
+      <div className={clsx(FEED_CARD, FEED_CARD_STATIC, "rounded-2xl px-4 py-5")}>
         <div className="flex flex-col items-center">
           {isCountdown ? (
             <CircularProgress

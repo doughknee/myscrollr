@@ -22,10 +22,10 @@ export default function FeatureGuidesSection() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Data sources */}
       <div>
-        <p className="mb-2 text-ui-section">Data Sources</p>
+        <p className="mb-3 text-ui-section">Data Widgets</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {channels.map((ch) => (
             <GuideCard
@@ -41,7 +41,7 @@ export default function FeatureGuidesSection() {
 
       {/* Widgets */}
       <div>
-        <p className="mb-2 text-ui-section">Widgets</p>
+        <p className="mb-3 text-ui-section">Widgets</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {widgets.map((w) => (
             <GuideCard
@@ -75,7 +75,7 @@ function GuideCard({
     <div className="overflow-hidden rounded-xl border border-edge/35 bg-base-150/35">
       <button
         onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-base-150/50"
+        className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-base-150/50 cursor-pointer"
       >
         <span className="shrink-0" style={{ color: manifest.hex }}>
           <Icon size={18} />

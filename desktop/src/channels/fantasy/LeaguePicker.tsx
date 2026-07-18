@@ -4,10 +4,8 @@ import { clsx } from "clsx";
 import {
   Section,
 } from "../../components/settings/SettingsControls";
-import UpgradePrompt from "../../components/UpgradePrompt";
 import { sportLabel } from "./types";
 import type { DiscoveredLeague } from "./types";
-import type { SubscriptionTier } from "../../auth";
 
 // ── Props ────────────────────────────────────────────────────────
 
@@ -19,11 +17,6 @@ interface LeaguePickerProps {
   onDeselectAll: () => void;
   onImport: () => void;
   onSkip: () => void;
-  atLeagueLimit: boolean;
-  leagueCount: number;
-  maxLeagues: number;
-  remainingCapacity: number;
-  subscriptionTier: SubscriptionTier;
   hex: string;
 }
 
@@ -37,11 +30,6 @@ export function LeaguePicker({
   onDeselectAll,
   onImport,
   onSkip,
-  atLeagueLimit,
-  leagueCount,
-  maxLeagues,
-  remainingCapacity,
-  subscriptionTier,
   hex,
 }: LeaguePickerProps) {
   const pickableActive = pickableLeagues.filter((l) => !l.is_finished);
@@ -54,20 +42,6 @@ export function LeaguePicker({
     >
       <Section title={`Select Leagues (${pickableLeagues.length} found)`}>
         <div className="px-3 space-y-3">
-          {atLeagueLimit ? (
-            <UpgradePrompt
-              current={leagueCount}
-              max={maxLeagues}
-              noun="Fantasy leagues"
-              tier={subscriptionTier}
-            />
-          ) : maxLeagues < Infinity ? (
-            <p className="text-[11px] text-fg-3">
-              {leagueCount}/{maxLeagues} leagues used
-              {" · "}
-              {remainingCapacity} remaining
-            </p>
-          ) : null}
           <div className="flex items-center justify-end gap-3">
             <button
               onClick={onSelectAll}
@@ -122,7 +96,7 @@ export function LeaguePicker({
           <div className="flex gap-2 pt-2">
             <button
               onClick={onImport}
-              disabled={selectedKeys.size === 0 || atLeagueLimit}
+              disabled={selectedKeys.size === 0}
               className="flex-1 px-4 py-2 rounded-lg text-[12px] font-medium text-white transition-colors disabled:opacity-30 cursor-pointer"
               style={{
                 background:

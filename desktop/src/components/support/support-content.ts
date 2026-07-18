@@ -11,7 +11,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Is Scrollr free?",
     answer:
-      "Yes. The free tier gives you real-time data across all four data sources with generous limits and no ads. Upgrade to Uplink for more capacity, or Uplink Ultimate for live streaming data and unlimited everything.",
+      "Yes. The free tier gives you real-time data across all widgets with generous limits and no ads. Upgrade to Uplink for more capacity, or Uplink Ultimate for live streaming data and unlimited everything.",
   },
   {
     question: "Does it affect my computer's performance?",
@@ -21,7 +21,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Is my data private?",
     answer:
-      "Scrollr contains zero analytics, zero tracking pixels, and zero telemetry. Your source configurations and preferences are stored on your device. The only server-side data is your account profile and subscription status.",
+      "Scrollr contains zero analytics, zero tracking pixels, and zero telemetry. Your widget configurations and preferences are stored on your device. The only server-side data is your account profile and subscription status.",
   },
   {
     question: "What platforms are supported?",
@@ -31,17 +31,17 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Do I need an account?",
     answer:
-      "You can browse widgets and explore the app without signing in. An account is needed to add data sources (Finance, Sports, News, Fantasy) and to sync your setup.",
+      "You can browse widgets and explore the app without signing in. An account is needed to add widgets (Finance, Sports, News, Fantasy) and to sync your setup.",
   },
   {
     question: "What data does Scrollr show?",
     answer:
-      "Four data sources: live stock and crypto prices (Finance), scores across 20+ leagues (Sports), articles from RSS feeds (News), and Yahoo Fantasy Sports leagues (Fantasy). Plus utility widgets for weather, clocks, system monitoring, uptime, and GitHub Actions.",
+      "Widgets showing live stock and crypto prices (Finance), scores across 20+ leagues (Sports), articles from RSS feeds (News), and Yahoo Fantasy Sports leagues (Fantasy). Plus utility widgets for weather, clocks, system monitoring, uptime, and GitHub Actions.",
   },
   {
     question: "Can I customize the feed?",
     answer:
-      "Extensively. Move the ticker to the top or bottom of the screen by right-clicking it (or using the up/down chevron in the hover toolbar). In Settings > Ticker you can change the detail level (Compact / Detailed), add ticker rows, and adjust speed. Within each source you can filter, sort, and toggle individual data points on or off under Options > Configure source.",
+      "Extensively. Move the ticker to the top or bottom of the screen by right-clicking it (or using the up/down chevron in the hover toolbar). In Customize > Ticker you can lay out which widgets appear on which ticker rows. And every widget's settings live right in its top bar — filter, sort, and pick what to track from the controls on the widget's own page.",
   },
   {
     question: "Is Scrollr open source?",
@@ -56,7 +56,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Can I use Scrollr on multiple monitors?",
     answer:
-      "Yes. The ticker spans the full width of whichever monitor the Scrollr window is currently on. To move it to a different monitor, drag the main window onto that monitor — the ticker follows. There's no monitor selector inside Settings; the ticker uses your OS's active-monitor placement.",
+      "Yes. The ticker spans the full width of whichever monitor the Scrollr window is currently on. To move it to a different monitor, drag the main window onto that monitor — the ticker follows. There's no monitor selector inside Customize; the ticker uses your OS's active-monitor placement.",
   },
   {
     question: "How does live data work vs. polling?",
@@ -87,7 +87,7 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
     ],
     steps: [
       "Check your internet connection.",
-      "Try signing out (Settings > Account) then signing in again.",
+      "Try signing out (avatar chip in the sidebar footer > Account) then signing in again.",
       "If the browser shows an error page, close it and retry from the app.",
       "If the problem persists, report a bug from the Contact Us section — diagnostics will help us investigate.",
     ],
@@ -95,13 +95,13 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
   {
     title: "Data not loading / feed shows empty",
     symptoms: [
-      "Source added but shows \"No data right now\"",
+      "Widget added but shows \"No data right now\"",
       "Ticker shows empty slots where data should be",
     ],
     steps: [
-      "Open the source and click Options > Configure to verify items are added (symbols, leagues, or feeds).",
-      "Check that you're signed in (Settings > Account).",
-      "Try switching away from and back to the feed tab.",
+      "Open the widget and check its top bar to verify items are added (symbols, leagues, or feeds).",
+      "Check that you're signed in (avatar chip in the sidebar footer > Account).",
+      "Try switching away from and back to the widget's page.",
       "Check your internet connection.",
     ],
   },
@@ -113,7 +113,7 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
     ],
     steps: [
       "Press Ctrl+T (Cmd+T on macOS) to toggle ticker visibility.",
-      "Or go to Settings > Ticker and turn on \"Enable ticker\".",
+      "Or go to Customize > Ticker and turn on \"Enable ticker\".",
       "Or click the Ticker toggle in the title bar (next to the Pin button).",
       "Or right-click the system tray icon and choose \"Toggle Ticker\".",
     ],
@@ -151,14 +151,14 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
     steps: [
       "Scores update via polling based on your plan tier. Free: 60s, Uplink: 30s, Uplink Pro: 10s, Uplink Ultimate: live SSE.",
       "Check your current delivery mode in the title bar (next to the Pin button) — green dot is Live, normal dot is Polling.",
-      "Try switching to a different tab and back.",
+      "Try switching to a different widget and back.",
     ],
   },
   {
-    title: "Can't add sources",
+    title: "Can't add widgets",
     symptoms: [
       "Clicking \"Add\" in the Catalog shows an error toast",
-      "\"Failed to create channel\" message",
+      "An error message appears instead of the new widget",
     ],
     steps: [
       "Sign out and sign back in to refresh your session.",
@@ -172,7 +172,7 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
       "Some feeds show data but others don't",
     ],
     steps: [
-      "Open the News source, then Options > Configure source. Each tracked feed has a colored health dot — green is healthy, amber is stale, red is failing.",
+      "Open the News widget and switch to the Feeds view. Each tracked feed has a colored health dot — green is healthy, amber is stale, red is failing.",
       "Some feeds may be temporarily down. Try adding a different feed to verify your connection works.",
       "Custom feeds must be valid RSS or Atom URLs.",
     ],
@@ -195,7 +195,7 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
       "High CPU usage from Scrollr",
     ],
     steps: [
-      "Try reducing ticker rows in Settings > Ticker.",
+      "Try reducing ticker rows in Customize > Ticker.",
       "Reduce the number of tracked symbols, feeds, or leagues.",
       "Check the System Monitor widget for overall CPU/memory usage.",
       "Restart the app if it has been running for a long time.",
@@ -216,31 +216,31 @@ export const GETTING_STARTED_STEPS: GettingStartedStep[] = [
     title: "Sign In",
     iconName: "LogIn",
     description:
-      "Create an account or sign in to sync your sources and settings. Free accounts get full access to all features with generous limits.",
+      "Create an account or sign in to sync your widgets and settings. Free accounts get full access to all features with generous limits.",
   },
   {
-    title: "Add Sources",
+    title: "Add Widgets",
     iconName: "LayoutGrid",
     description:
-      "Open the Catalog from the sidebar to browse available data sources. Add Finance for stock prices, Sports for live scores, News for RSS feeds, or Fantasy for Yahoo leagues.",
+      "Click \"+ Add widget\" in the sidebar (or open the Catalog) to browse available widgets. Add Finance for stock prices, Sports for live scores, News for RSS feeds, or Fantasy for Yahoo leagues.",
   },
   {
-    title: "Configure Your Feeds",
+    title: "Configure Your Widgets",
     iconName: "Settings",
     description:
-      "Each source has a Configure view where you pick what to track. Open a source, click Options in the title bar, then Configure source — add stock symbols, select sports leagues, subscribe to news feeds, or connect your Yahoo account.",
+      "Every setting lives in the widget's own top bar. Open a widget and use the controls there — type in Finance's search box to add stock symbols, pick a favorite team in Sports, choose feeds and categories in News, or connect your Yahoo account from Fantasy's Account pill.",
   },
   {
     title: "Customize the Ticker",
     iconName: "Monitor",
     description:
-      "The ticker bar runs across your screen showing live data. Open Settings > Ticker to change the detail level (Compact / Detailed), add ticker rows, and adjust speed. To move the ticker to the top or bottom of the screen, right-click it or use the up/down chevron in the hover toolbar.",
+      "The ticker bar runs across your screen showing live data. Open Customize > Ticker (or press Ctrl+,) to lay out which widgets appear on which ticker rows. To move the ticker to the top or bottom of the screen, right-click it or use the up/down chevron in the hover toolbar.",
   },
   {
     title: "Explore Widgets",
     iconName: "Puzzle",
     description:
-      "Add utility widgets like Weather, Clock, System Monitor, Uptime Kuma, or GitHub Actions from the Catalog. Widgets appear on your ticker alongside channel data.",
+      "Add utility widgets like Weather, Clock, System Monitor, Uptime Kuma, or GitHub Actions from the Catalog. They appear on your ticker alongside your other widgets.",
   },
   {
     title: "Upgrade Your Plan",
@@ -256,12 +256,12 @@ export const BILLING_FAQ: FAQItem[] = [
   {
     question: "How do I upgrade my plan?",
     answer:
-      "Open the Catalog or go to Settings > Account and click \"Upgrade\". You'll be directed to our website to complete checkout with Stripe.",
+      "Open the Catalog or go to your Account page (avatar chip in the sidebar footer) and click \"Upgrade\". You'll be directed to our website to complete checkout with Stripe.",
   },
   {
     question: "How do I cancel my subscription?",
     answer:
-      "Go to Settings > Account and click \"Manage Subscription\". Paid subscriptions cancel at the end of the billing period so you keep access until then. Trials cancel immediately.",
+      "Go to your Account page (avatar chip in the sidebar footer) and click \"Manage Subscription\". Paid subscriptions cancel at the end of the billing period so you keep access until then. Trials cancel immediately.",
   },
   {
     question: "What happens when my trial ends?",
@@ -276,7 +276,7 @@ export const BILLING_FAQ: FAQItem[] = [
   {
     question: "How do I update my payment method?",
     answer:
-      "Click \"Manage Subscription\" in Settings > Account to open the Stripe billing portal where you can update your card.",
+      "Click \"Manage Subscription\" on your Account page (avatar chip in the sidebar footer) to open the Stripe billing portal where you can update your card.",
   },
   {
     question: "I was charged incorrectly",

@@ -1,22 +1,28 @@
+/**
+ * YahooConnectFlow — the Yahoo OAuth + league-import state machine
+ * (disconnected → discovering → picking → importing → connected).
+ *
+ * MOVED verbatim from the fantasy ConfigPanel (in-widget config pass,
+ * PR 5) minus tier gating — per-feature caps were retired 2026-07-02,
+ * so maxFantasy/remainingCapacity/atLeagueLimit and the free-tier gate
+ * are gone. Mounted in-feed (page scroll, no inner scrollport); the
+ * Configure page wraps it in its fillHeight scroller until teardown.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Ghost, Link2, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import { open } from "@tauri-apps/plugin-shell";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import UpgradePrompt from "../../components/UpgradePrompt";
 import { authFetch } from "../../api/client";
 import {
   fantasyStatusOptions,
   fantasyLeaguesOptions,
   queryKeys,
 } from "../../api/queries";
-import { getLimit } from "../../tierLimits";
 import { LeaguePicker } from "./LeaguePicker";
 import { ImportProgress } from "./ImportProgress";
 import { ConnectedView } from "./ConnectedView";
-import type { Channel } from "../../api/client";
-import type { SubscriptionTier } from "../../auth";
 import type { LeagueResponse, DiscoveredLeague } from "./types";
 import type { ImportStatus } from "./ImportProgress";
 
@@ -29,21 +35,13 @@ type Phase =
   | "importing"
   | "connected";
 
-// ── Props ────────────────────────────────────────────────────────
-
-interface FantasyConfigPanelProps {
-  channel: Channel;
-  subscriptionTier: SubscriptionTier;
+interface YahooConnectFlowProps {
   hex: string;
 }
 
 // ── Main Component ───────────────────────────────────────────────
 
-export default function FantasyConfigPanel({
-  channel: _channel,
-  subscriptionTier,
-  hex,
-}: FantasyConfigPanelProps) {
+export default function YahooConnectFlow({ hex }: YahooConnectFlowProps) {
   const queryClient = useQueryClient();
   const [phase, setPhase] = useState<Phase>("disconnected");
   const [awaitingYahoo, setAwaitingYahoo] = useState(false);
@@ -60,10 +58,6 @@ export default function FantasyConfigPanel({
 
   const yahooConnected = statusData?.connected ?? false;
   const leagues: LeagueResponse[] = (leaguesData?.leagues ?? []) as LeagueResponse[];
-
-  const maxFantasy = getLimit(subscriptionTier, "fantasy");
-  const remainingCapacity = Math.max(0, maxFantasy - leagues.length);
-  const atLeagueLimit = leagues.length >= maxFantasy;
 
   // Determine initial phase from query data
   const initialPhase = useMemo(
@@ -124,10 +118,7 @@ export default function FantasyConfigPanel({
       }
       setNoLeaguesFound(false);
       const preSelected = new Set(
-        newLeagues
-          .filter((l) => !l.is_finished)
-          .map((l) => l.league_key)
-          .slice(0, remainingCapacity),
+        newLeagues.filter((l) => !l.is_finished).map((l) => l.league_key),
       );
       setSelectedKeys(preSelected);
       setPhase("picking");
@@ -167,7 +158,7 @@ export default function FantasyConfigPanel({
   });
 
   const importSelected = useCallback(async () => {
-    const keys = Array.from(selectedKeys).slice(0, remainingCapacity);
+    const keys = Array.from(selectedKeys);
     if (keys.length === 0) return;
 
     setPhase("importing");
@@ -187,7 +178,7 @@ export default function FantasyConfigPanel({
         const result = await importLeagueMutation.mutateAsync(league);
         statuses[key] = result.error ? "error" : "done";
         // Invalidate the dashboard as soon as each league finishes so the
-        // Feed tab can show the newly-synced data immediately rather than
+        // Feed can show the newly-synced data immediately rather than
         // waiting for the next 120s sync cycle.
         if (!result.error) {
           queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
@@ -208,16 +199,16 @@ export default function FantasyConfigPanel({
       toast.error("League import failed");
     }
 
-    // The dashboard query is what powers the Feed tab — without this
-    // invalidation the user can go from Configure to Feed and see stale
-    // data until the 120s sync cycle or another refetch trigger fires.
+    // The dashboard query is what powers the Feed — without this
+    // invalidation the user could see stale data until the 120s sync
+    // cycle or another refetch trigger fires.
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.fantasy.leagues }),
       queryClient.invalidateQueries({ queryKey: queryKeys.fantasy.status }),
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard }),
     ]);
     setPhase("connected");
-  }, [selectedKeys, discoveredLeagues, queryClient, importLeagueMutation, remainingCapacity]);
+  }, [selectedKeys, discoveredLeagues, queryClient, importLeagueMutation]);
 
   // ── Detect Yahoo connection via polling ─────────────────────────
 
@@ -301,37 +292,21 @@ export default function FantasyConfigPanel({
       const next = new Set(prev);
       if (next.has(key)) {
         next.delete(key);
-      } else if (next.size < remainingCapacity) {
+      } else {
         next.add(key);
       }
       return next;
     });
   };
   const selectAll = () =>
-    setSelectedKeys(
-      new Set(
-        pickableLeagues
-          .map((l) => l.league_key)
-          .slice(0, remainingCapacity),
-      ),
-    );
+    setSelectedKeys(new Set(pickableLeagues.map((l) => l.league_key)));
   const deselectAll = () => setSelectedKeys(new Set());
 
   // ── Render ─────────────────────────────────────────────────────
-
-  // Configure tab is rendered inside PageLayout's `fillHeight` mode,
-  // which disables outer scrolling and expects the child to provide
-  // its own scroll panel (see desktop/src/components/layout/PageLayout.tsx).
-  // Without this wrapper the page becomes uncroppable when the picker
-  // (or ConnectedView with several leagues) grows past the viewport.
-  // Mirrors the Finance/Sports/RSS Manager pattern.
+  // Mounted in-feed the page owns the scroll (no inner scrollport);
+  // the Configure page wraps this in its own fillHeight scroller.
   return (
-    <div className="h-full min-h-0 flex flex-col">
-    {/* Inner wrapper handles its own scroll because PageLayout is in
-        fillHeight mode (see comment block above). Indentation is
-        intentionally one level shallower to avoid re-indenting the
-        rest of this large render. */}
-    <div className="w-full max-w-2xl mx-auto flex-1 min-h-0 overflow-y-auto scrollbar-thin pb-5">
+    <div className="w-full max-w-2xl mx-auto pb-5 pt-1">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6 px-3">
         <div
@@ -344,36 +319,13 @@ export default function FantasyConfigPanel({
           <Ghost size={16} style={{ color: hex }} />
         </div>
         <div>
-          <h2 className="text-sm font-bold text-fg">Fantasy</h2>
+          <h2 className="text-sm font-bold text-fg">Yahoo account &amp; leagues</h2>
           <p className="text-[11px] text-fg-3">Yahoo Fantasy Sports</p>
         </div>
       </div>
 
-      {/* ── FREE TIER GATE ────────────────────────────────────── */}
-      {maxFantasy === 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center py-10 space-y-4 px-3"
-        >
-          <Ghost size={40} className="mx-auto text-fg-3/30" />
-          <div className="space-y-2">
-            <p className="text-sm font-bold text-fg-2">Fantasy Sports</p>
-            <p className="text-[12px] text-fg-3 max-w-xs mx-auto">
-              Track your Yahoo Fantasy leagues with live scores, standings,
-              and rosters.
-            </p>
-          </div>
-          <UpgradePrompt
-            max={0}
-            noun="Fantasy leagues"
-            tier={subscriptionTier}
-          />
-        </motion.div>
-      )}
-
       {/* ── DISCONNECTED ──────────────────────────────────────── */}
-      {maxFantasy > 0 && phase === "disconnected" && (
+      {phase === "disconnected" && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -466,11 +418,6 @@ export default function FantasyConfigPanel({
           onSkip={() =>
             setPhase(leagues.length > 0 ? "connected" : "disconnected")
           }
-          atLeagueLimit={atLeagueLimit}
-          leagueCount={leagues.length}
-          maxLeagues={maxFantasy}
-          remainingCapacity={remainingCapacity}
-          subscriptionTier={subscriptionTier}
           hex={hex}
         />
       )}
@@ -490,16 +437,12 @@ export default function FantasyConfigPanel({
         <ConnectedView
           leagues={leagues}
           yahooConnected={yahooConnected}
-          atLeagueLimit={atLeagueLimit}
-          maxLeagues={maxFantasy}
-          subscriptionTier={subscriptionTier}
           hex={hex}
           noLeaguesFound={noLeaguesFound}
           onStartDiscovery={startDiscovery}
           onDisconnect={handleYahooDisconnect}
         />
       )}
-    </div>
     </div>
   );
 }

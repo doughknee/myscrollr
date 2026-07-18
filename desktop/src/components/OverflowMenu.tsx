@@ -159,7 +159,7 @@ export default function OverflowMenu({
       aria-haspopup="menu"
       aria-expanded={isOpen}
       className={clsx(
-        "flex items-center gap-1.5 h-7 px-2 rounded-md text-[11px] font-medium transition-colors",
+        "flex items-center gap-1.5 h-7 px-2 rounded-md text-ui-chip font-medium transition-colors",
         isOpen
           ? "bg-accent/15 text-accent"
           : "text-fg-3 hover:text-fg hover:bg-surface-hover",
@@ -170,7 +170,7 @@ export default function OverflowMenu({
       <ChevronDown
         size={11}
         style={{
-          transition: "transform 500ms var(--ease-snap)",
+          transition: "transform 300ms var(--ease-snap)",
           transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
         }}
       />
@@ -235,7 +235,7 @@ export default function OverflowMenu({
                       },
                     })}
                     className={clsx(
-                      "flex items-center gap-2.5 w-full px-3 py-2 text-left text-[12px] transition-colors outline-none",
+                      "flex items-center gap-2.5 w-full px-3 py-2 text-left text-ui-meta transition-colors outline-none",
                       item.disabled && "opacity-40 cursor-not-allowed",
                       !item.disabled && item.destructive
                         ? isActive

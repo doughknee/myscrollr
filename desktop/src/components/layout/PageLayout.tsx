@@ -15,10 +15,10 @@
  * Tab band hoisted into the TopBar on 2026-05-11 to reclaim vertical
  * space and consolidate page chrome.
  */
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "motion/react";
-import { useRegisterPageIdentity, type PageTabStrip } from "./page-context";
+import { useRegisterPageIdentity } from "./page-context";
 import type { OverflowMenuItem } from "../OverflowMenu";
 
 // ── Props ───────────────────────────────────────────────────────
@@ -51,14 +51,6 @@ interface PageLayoutProps {
    */
   entityAction?: ReactNode;
 
-  /**
-   * Optional sibling-tab strip. Rendered as a compact segmented
-   * control inline in the TopBar (NOT a full-width band in the
-   * content area). Used by Settings, Catalog, and Support section
-   * views to expose sibling navigation.
-   */
-  tabs?: PageTabStrip;
-
   /** Page content. */
   children: ReactNode;
 
@@ -86,6 +78,17 @@ interface PageLayoutProps {
    * other dashboards that don't want a constrained reading column.
    */
   noContentPadding?: boolean;
+
+  /**
+   * Source-page transition mode: an OVERLAPPING crossfade (popLayout,
+   * no wait gap) that broadcasts `hidden/show/out` variant LABELS
+   * instead of inline values. The widget-bar row (portaled into the
+   * persistent BarChassis, which lives OUTSIDE this subtree and never
+   * animates) consumes the labels to roll its contents out the top and
+   * in from the bottom, while the feed content itself rises in / sinks
+   * out here.
+   */
+  stableChrome?: boolean;
 }
 
 // ── Component ───────────────────────────────────────────────────
@@ -99,12 +102,12 @@ export default function PageLayout({
   menuItems,
   menuLabel,
   entityAction,
-  tabs,
   children,
   footer,
   width = "narrow",
   fillHeight = false,
   noContentPadding = false,
+  stableChrome = false,
 }: PageLayoutProps) {
   // Publish this page's identity to the TopBar.
   useRegisterPageIdentity({
@@ -113,7 +116,6 @@ export default function PageLayout({
     parentLabel,
     onParentClick,
     onTitleClick,
-    tabs,
     menuItems,
     menuLabel,
     entityAction,
@@ -126,7 +128,16 @@ export default function PageLayout({
   //    (subtitle changes).
   //  - Settings/Catalog/Support animate when switching tab pills
   //    (activeKey changes) even though title stays the same.
-  const contentKey = `${title}::${subtitle ?? ""}::${tabs?.activeKey ?? ""}`;
+  const contentKey = `${title}::${subtitle ?? ""}`;
+
+  // Each content identity is a fresh page: reset the scroll container.
+  // Without this the scroller (which persists across same-route source
+  // swaps) carries the previous page's scrollTop, so you could ARRIVE
+  // mid-scroll — with the widget bar's pinned shadow already showing.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    scrollRef.current?.scrollTo(0, 0);
+  }, [contentKey]);
 
   return (
     <div className="flex flex-col h-full">
@@ -176,13 +187,25 @@ export default function PageLayout({
         </div>
       ) : (
         // Default mode: content area scrolls; children stack vertically.
-        <div className="flex-1 overflow-y-auto scrollbar-thin">
-          <AnimatePresence mode="wait">
+        // (`relative` anchors popLayout's absolutely-positioned exits.)
+        <div ref={scrollRef} className="relative flex-1 overflow-y-auto scrollbar-thin">
+          <AnimatePresence mode={stableChrome ? "popLayout" : "wait"}>
             <motion.div
               key={contentKey}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
+              initial={stableChrome ? "hidden" : { opacity: 0, y: 4 }}
+              animate={stableChrome ? "show" : { opacity: 1, y: 0 }}
+              exit={stableChrome ? "out" : { opacity: 0, y: -4 }}
+              variants={
+                stableChrome
+                  ? {
+                      // The bar chrome lives outside this subtree now, so
+                      // the feed content can drift vertically again.
+                      hidden: { opacity: 0, y: 6 },
+                      show: { opacity: 1, y: 0 },
+                      out: { opacity: 0, y: -6 },
+                    }
+                  : undefined
+              }
               transition={{ duration: 0.18, ease: [0.22, 0.61, 0.36, 1] }}
               className={clsx(
                 noContentPadding ? "w-full" : "mx-auto px-5 py-5",

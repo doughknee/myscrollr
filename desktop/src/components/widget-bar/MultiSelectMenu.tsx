@@ -18,6 +18,7 @@ export function MultiSelectMenu({
   noun,
   ariaLabel,
   counts,
+  align = "right",
 }: {
   options: string[];
   selected: string[];
@@ -29,6 +30,9 @@ export function MultiSelectMenu({
   ariaLabel?: string;
   /** Optional per-option counts, right-aligned in the rows. */
   counts?: Record<string, number>;
+  /** Which trigger edge the panel hangs from — use "left" for triggers
+   *  in the bar's left cluster so the panel opens into the page. */
+  align?: "left" | "right";
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -72,7 +76,7 @@ export function MultiSelectMenu({
       </button>
       <AnimatePresence>
         {open && (
-          <MenuPanel className="right-0 w-56">
+          <MenuPanel className={align === "left" ? "left-0 w-56" : "right-0 w-56"}>
             <MenuRow
               selected={selected.length === 0}
               onClick={onClear}

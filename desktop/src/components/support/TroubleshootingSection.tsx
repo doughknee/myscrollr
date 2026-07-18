@@ -61,7 +61,7 @@ export default function TroubleshootingSection() {
                 </div>
                 <div>
                   <p className="text-ui-section">Steps to fix</p>
-                  <ol className="mt-1.5 list-inside list-decimal space-y-1 text-ui-muted">
+                  <ol className="mt-1.5 list-inside list-decimal space-y-1 text-ui-meta">
                     {article.steps.map((step, j) => (
                       <li key={j}>{step}</li>
                     ))}

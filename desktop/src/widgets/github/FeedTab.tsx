@@ -6,9 +6,11 @@
  * cached in the Tauri store for cross-window ticker sync.
  */
 import { useState, useCallback } from "react";
+import { clsx } from "clsx";
 import { Github, Plus, Trash2, ExternalLink, Loader2 } from "lucide-react";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 import Tooltip from "../../components/Tooltip";
+import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import QueryErrorBanner from "../../components/QueryErrorBanner";
 import type { GitHubRepo } from "./types";
 import {
@@ -22,6 +24,13 @@ import {
   CI_STATUS_TEXT,
 } from "./types";
 import { useShell } from "../../shell-context";
+import { WidgetBar } from "../../components/widget-bar/Bar";
+import {
+  SelectMenu,
+  type SelectOption,
+} from "../../components/widget-bar/SelectMenu";
+import { useWidgetConfig } from "../../hooks/useWidgetConfig";
+import { formatPollInterval } from "../../utils/format";
 import { savePrefs, updateWidgetPrefs } from "../../preferences";
 import { useSyncedQuery } from "../../hooks/useSyncedQuery";
 import { LS_GITHUB_REPOS } from "../../constants";
@@ -43,7 +52,7 @@ export const githubWidget: WidgetManifest = {
       "Paste a GitHub repo URL to add it (e.g. https://github.com/org/repo).",
       "Each repo shows its latest GitHub Actions workflow run status.",
       "Click a repo row to open the workflow run on GitHub.",
-      "Hide specific repos from the ticker in the Configure tab.",
+      "Set how often workflows refresh from the top bar.",
     ],
   },
   FeedTab: GitHubFeedTab,
@@ -51,7 +60,40 @@ export const githubWidget: WidgetManifest = {
 
 // ── FeedTab ─────────────────────────────────────────────────────
 
-function GitHubFeedTab({ mode: feedMode }: FeedTabProps) {
+const POLL_OPTIONS: SelectOption<string>[] = Array.from({ length: 9 }, (_, i) => {
+  const v = 60 + i * 30;
+  return { value: String(v), label: formatPollInterval(v) };
+});
+
+function GitHubFeedTab(props: FeedTabProps) {
+  return (
+    <div className="flex min-h-full flex-col">
+      {props.mode === "comfort" && <GitHubBar />}
+      <GitHubFeedBody {...props} />
+    </div>
+  );
+}
+
+function GitHubBar() {
+  const { prefs, onPrefsChange } = useShell();
+  const { config, update } = useWidgetConfig("github", prefs, onPrefsChange);
+  return (
+    <WidgetBar>
+      {/* Config selects live in the right cluster — standard grammar. */}
+      <div className="ml-auto">
+        <SelectMenu
+          ariaLabel="Refresh interval"
+          prefix="Refresh"
+          value={String(config.pollInterval)}
+          options={POLL_OPTIONS}
+          onChange={(v) => update({ pollInterval: Number(v) })}
+        />
+      </div>
+    </WidgetBar>
+  );
+}
+
+function GitHubFeedBody({ mode: feedMode }: FeedTabProps) {
   const compact = feedMode === "compact";
   const shell = useShell();
   const configRepos = shell.prefs.widgets.github.repos;
@@ -251,7 +293,12 @@ function RepoRow({
 
   return (
     <div
-      className={`flex items-center gap-2 px-2 rounded-md border border-edge/50 bg-surface-2/30 ${compact ? "py-1.5" : "py-2"}`}
+      className={clsx(
+        FEED_CARD,
+        FEED_CARD_STATIC,
+        "flex items-center gap-2",
+        compact && "px-2 py-1.5",
+      )}
     >
       {/* Status dot */}
       {isLoading ? (

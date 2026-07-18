@@ -356,7 +356,7 @@ function RowCard({
     <div className="rounded-xl border border-edge/40 bg-surface-2/30 p-3">
       {/* Row header */}
       <div className="flex items-center justify-between mb-2">
-        <span className="text-ui-section font-mono font-semibold uppercase tracking-wider text-fg-3">
+        <span className="text-ui-section font-mono">
           Row {rowIndex + 1}
         </span>
         {canRemove && (
@@ -373,12 +373,12 @@ function RowCard({
 
       {/* Sources grid */}
       <div>
-        <div className="text-ui-section font-mono uppercase tracking-wider text-fg-3 mb-1.5">
+        <div className="text-ui-section font-mono mb-1.5">
           Sources {showingAll && <span className="text-fg-3">(all visible)</span>}
         </div>
         {sources.length === 0 ? (
           <div className="text-ui-meta font-mono text-fg-3 py-2">
-            No sources or widgets enabled. Enable some in the main settings first.
+            No widgets added yet. Add some from the Catalog first.
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-1.5">

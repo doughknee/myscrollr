@@ -14,25 +14,10 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { OverflowMenuItem } from "../OverflowMenu";
 
-export interface PageTabStrip {
-  /** Tab descriptors. */
-  items: Array<{
-    key: string;
-    label: string;
-    /** Optional tooltip / aria description. */
-    description?: string;
-  }>;
-  activeKey: string;
-  onChange: (key: string) => void;
-  /** Aria label for the tab strip nav. Default: "Page sections". */
-  ariaLabel?: string;
-}
-
 export interface PageIdentity {
   /** Page title, e.g. "Sports", "Settings", "Catalog". */
   title: string;
-  /** Optional 1-line subtitle / tagline. Suppressed when `tabs` is
-   *  set — the active tab pill carries the same information. */
+  /** Optional 1-line subtitle / tagline. */
   subtitle?: string;
   /**
    * For source pages, the parent breadcrumb label (e.g. "Home"). Used
@@ -49,13 +34,6 @@ export interface PageIdentity {
    * text.
    */
   onTitleClick?: () => void;
-  /**
-   * Optional sibling-tab navigation rendered inline in the TopBar as a
-   * compact segmented pill group. Used by Settings, Catalog, Support
-   * sections — anywhere a route has sibling views that should be
-   * one-click reachable.
-   */
-  tabs?: PageTabStrip;
   /**
    * Optional contextual menu items. When provided, the TopBar renders
    * an "Options" pill button after the breadcrumb. Clicking the pill
@@ -116,18 +94,12 @@ export function useRegisterPageIdentity(identity: PageIdentity) {
         )
         .join("|")
     : "";
-  const tabsKey = identity.tabs
-    ? `${identity.tabs.activeKey}::${identity.tabs.items
-        .map((t) => `${t.key}:${t.label}`)
-        .join("|")}`
-    : "";
   const key = JSON.stringify({
     title: identity.title,
     subtitle: identity.subtitle,
     parentLabel: identity.parentLabel,
     menuLabel: identity.menuLabel,
     menuKey,
-    tabsKey,
   });
   useEffect(() => {
     ctx?.setIdentity(identity);
@@ -139,6 +111,5 @@ export function useRegisterPageIdentity(identity: PageIdentity) {
     identity.onParentClick,
     identity.onTitleClick,
     identity.menuItems,
-    identity.tabs,
   ]);
 }

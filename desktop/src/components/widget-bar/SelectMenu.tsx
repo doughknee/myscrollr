@@ -6,12 +6,14 @@
 import { useCallback, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { AnimatePresence } from "motion/react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, type LucideIcon } from "lucide-react";
 import { MenuPanel, MenuRow, useDismiss } from "./Menu";
 
 export interface SelectOption<T extends string> {
   value: T;
-  label: string;
+  /** Usually a string; richer nodes (icon + text) render fine in both
+   *  the trigger and the rows. */
+  label: React.ReactNode;
 }
 
 export function SelectMenu<T extends string>({
@@ -20,6 +22,8 @@ export function SelectMenu<T extends string>({
   onChange,
   ariaLabel,
   prefix,
+  icon: Icon,
+  align = "right",
 }: {
   value: T;
   options: SelectOption<T>[];
@@ -27,6 +31,12 @@ export function SelectMenu<T extends string>({
   ariaLabel: string;
   /** Optional quiet label prefix on the trigger (e.g. "Sort"). */
   prefix?: string;
+  /** Optional quiet icon before the value — a glyph in place of (or
+   *  alongside) the text prefix, e.g. CalendarRange for time windows. */
+  icon?: LucideIcon;
+  /** Which trigger edge the panel hangs from — use "left" for triggers
+   *  in the bar's left cluster so the panel opens into the page. */
+  align?: "left" | "right";
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -52,6 +62,7 @@ export function SelectMenu<T extends string>({
             : "border-edge/30 bg-base-150/60 text-fg-3 hover:text-fg-2",
         )}
       >
+        {Icon && <Icon size={12} aria-hidden className="shrink-0 text-fg-4" />}
         {prefix && <span className="shrink-0 text-fg-4">{prefix}</span>}
         <span className="truncate">{current?.label ?? value}</span>
         <ChevronDown
@@ -65,7 +76,7 @@ export function SelectMenu<T extends string>({
       </button>
       <AnimatePresence>
         {open && (
-          <MenuPanel className="right-0 w-56">
+          <MenuPanel className={align === "left" ? "left-0 w-56" : "right-0 w-56"}>
             {options.map((o) => (
               <MenuRow
                 key={o.value}

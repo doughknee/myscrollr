@@ -12,7 +12,7 @@
  * No Tauri APIs are exercised: `isKalshiAvailable()` is false in a browser,
  * and the pref store falls back gracefully. See index.html for usage.
  */
-import { StrictMode } from "react";
+import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "../../../style.css";
@@ -225,19 +225,16 @@ function main(): void {
     }
   }
 
-  const prefs = {
+  const initialPrefs = {
     channelDisplay: {
       predictions: {
         ...migratePredictionsDisplay(undefined),
-        feedDensity: density,
       },
     },
   } as unknown as AppPreferences;
 
   const noop = (): void => {};
-  const shell = {
-    prefs,
-    onPrefsChange: noop,
+  const shellBase = {
     authenticated: false,
     tier: "free",
     subscriptionInfo: null,
@@ -254,7 +251,7 @@ function main(): void {
     onDeleteChannel: noop,
     onToggleWidget: noop,
     onSelectItem: noop,
-  } as unknown as ShellState;
+  };
 
   const feedContext = {
     __hasConfig: true,
@@ -264,8 +261,16 @@ function main(): void {
 
   const FeedTab = predictionsChannel.FeedTab;
 
-  createRoot(document.getElementById("root")!).render(
-    <StrictMode>
+  // Prefs are STATE so the in-widget bar's writes re-render the
+  // feed like the real shell (persistence itself is Tauri-only).
+  function Harness() {
+    const [prefs, setPrefs] = useState<AppPreferences>(initialPrefs);
+    const shell = {
+      ...shellBase,
+      prefs,
+      onPrefsChange: setPrefs,
+    } as unknown as ShellState;
+    return (
       <QueryClientProvider client={queryClient}>
         <ShellContext.Provider value={shell}>
           {/* Page-scroll like the app: PageLayout's feed mode scrolls the
@@ -279,12 +284,17 @@ function main(): void {
             <FeedTab
               mode={density}
               feedContext={feedContext}
-              onConfigure={noop}
               widgetId="predictions"
             />
           </div>
         </ShellContext.Provider>
       </QueryClientProvider>
+    );
+  }
+
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <Harness />
     </StrictMode>,
   );
 }

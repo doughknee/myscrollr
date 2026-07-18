@@ -309,7 +309,7 @@ export default function GeneralSettings({
 // Customization is intentionally out of scope for now.
 
 const SHORTCUTS: { keys: string[]; label: string }[] = [
-  { keys: ["⌘/Ctrl", ","], label: "Open settings" },
+  { keys: ["⌘/Ctrl", ","], label: "Open Customize" },
   { keys: ["⌘/Ctrl", "T"], label: "Toggle ticker visibility" },
   { keys: ["⌘/Ctrl", "Shift", "T"], label: "Cycle theme (light → dark → auto)" },
   { keys: ["Esc"], label: "Back / close current view" },

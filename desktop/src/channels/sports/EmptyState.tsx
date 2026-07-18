@@ -40,7 +40,7 @@ export default function SportsEmptyState({ leagues, onConfigure }: SportsEmptySt
             className="inline-flex items-center gap-1.5 text-[11px] text-accent hover:text-accent/80 transition-colors"
           >
             <Settings size={11} />
-            Open Settings to pick your leagues
+            Open Sports
           </button>
         )}
       </div>

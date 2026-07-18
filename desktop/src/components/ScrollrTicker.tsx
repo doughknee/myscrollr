@@ -113,7 +113,7 @@ interface ScrollrTickerProps {
   /**
    * When true, this row should render the "you have channels installed
    * but none are currently on the ticker" CTA — a row of per-channel
-   * quick-link chips that open each channel's Configure tab. Mutually
+   * quick-link chips that open each channel (ticker toggle lives in-widget). Mutually
    * exclusive with `showSourcelessCTA`; only one fires at a time.
    * Parent (App.tsx) gates this on first row + authenticated + has
    * installed channels + no ticker-enabled channels + no pinned widgets.
@@ -132,7 +132,7 @@ interface ScrollrTickerProps {
     icon: React.ComponentType<{ size?: number; className?: string }>;
   }>;
   /** Click handler for the per-channel quick-link chips (opens Configure). */
-  onConfigureChannel?: (channelId: string) => void;
+  onOpenChannel?: (channelId: string) => void;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -179,7 +179,7 @@ export default function ScrollrTicker({
   onAddSources,
   showInstalledOffCTA = false,
   installedChannels = [],
-  onConfigureChannel,
+  onOpenChannel,
 }: ScrollrTickerProps) {
   // Per-row overrides shadow the globals. The Ultimate-gate is enforced
   // upstream — Settings only lets Ultimate/super_user WRITE these fields,
@@ -814,8 +814,8 @@ export default function ScrollrTicker({
                   <button
                     key={ch.id}
                     type="button"
-                    onClick={() => onConfigureChannel?.(ch.id)}
-                    disabled={!onConfigureChannel}
+                    onClick={() => onOpenChannel?.(ch.id)}
+                    disabled={!onOpenChannel}
                     className={clsx(
                       "inline-flex items-center gap-1.5 shrink-0 rounded-md",
                       "px-2 py-1 text-ui-meta font-semibold",
@@ -827,7 +827,7 @@ export default function ScrollrTicker({
                       backgroundColor: `${ch.hex}14`,   // ~8% alpha
                       borderColor: `${ch.hex}3D`,       // ~24% alpha
                     }}
-                    title={`Configure ${ch.name}`}
+                    title={`Open ${ch.name}`}
                   >
                     <ChannelIcon size={12} className="shrink-0" />
                     <span className="truncate">{ch.name}</span>
@@ -836,29 +836,18 @@ export default function ScrollrTicker({
               })}
             </div>
           </div>
-          {/* Secondary row: teaching tip pointing at the "Options"
-              pill in the TopBar. Hidden on the compact ticker (h-11
-              ≈ 44px) because there's no room for a second line without
-              cramping; comfort mode (h-16 ≈ 64px) has plenty. The
-              equivalent tip is also shown on every channel's empty
-              feed (see EmptyChannelState.tsx), so users still discover
-              the pill there even when this row is suppressed. */}
+          {/* Secondary row: teaching tip pointing at the widget's own
+              top bar (the one settings surface). Hidden on the compact
+              ticker (h-11 ≈ 44px) because there's no room for a second
+              line without cramping; comfort mode (h-16 ≈ 64px) has
+              plenty. */}
           {comfort && (
             <p className="text-[10px] text-fg-4/80 shrink-0 leading-tight hidden md:inline-flex items-center gap-1">
               <span className="text-fg-4">Tip:</span>
-              <span>open a source and click</span>
-              <span
-                className={clsx(
-                  "inline-flex items-center gap-1 align-baseline",
-                  "px-1 py-px rounded",
-                  "bg-fg-4/10 text-fg-2 font-semibold",
-                )}
-              >
-                <Settings2 size={8} strokeWidth={2.5} aria-hidden="true" />
-                Options
-                <ChevronDown size={8} strokeWidth={2.5} aria-hidden="true" />
+              <span>
+                every widget&rsquo;s settings live in the bar at the top of
+                its page.
               </span>
-              <span>in the title bar to do this yourself next time.</span>
             </p>
           )}
         </div>
@@ -871,7 +860,7 @@ export default function ScrollrTicker({
       <div className={containerClass}>
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent z-10" />
         <div className="flex items-center justify-center w-full h-full px-4 text-ui-meta font-mono text-fg-3">
-          <span>This row has no sources to show. Edit it in Settings &rarr; Ticker.</span>
+          <span>This row has no widgets to show. Edit it in Customize &rarr; Ticker.</span>
         </div>
       </div>
     );

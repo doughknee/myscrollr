@@ -39,7 +39,6 @@ const DEFAULT_PREFS: PredictionsDisplayPrefs = {
   showVolume: "both",
   showCloseTime: "both",
   defaultSort: "movers",
-  feedDensity: "comfort",
 };
 
 // ── priceDelta ──────────────────────────────────────────────────

@@ -38,7 +38,7 @@ export default function BillingHelpSection() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-3">
         {/* Manage Subscription */}
@@ -46,7 +46,7 @@ export default function BillingHelpSection() {
           <button
             onClick={handleManageSubscription}
             disabled={portalLoading}
-            className="flex items-start gap-3 rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left transition-colors hover:bg-base-150/55 disabled:opacity-50"
+            className="flex items-start gap-3 rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left transition-colors hover:bg-base-150/55 disabled:opacity-50 cursor-pointer"
           >
             <Settings size={18} className="mt-0.5 shrink-0 text-accent" />
             <div className="min-w-0">
@@ -73,7 +73,7 @@ export default function BillingHelpSection() {
         {/* View Plans */}
         <button
           onClick={handleViewPlans}
-          className="flex items-start gap-3 rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left transition-colors hover:bg-base-150/55"
+          className="flex items-start gap-3 rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left transition-colors hover:bg-base-150/55 cursor-pointer"
         >
           <ExternalLink size={18} className="mt-0.5 shrink-0 text-accent" />
           <div className="min-w-0">
@@ -97,7 +97,7 @@ export default function BillingHelpSection() {
               >
                 <button
                   onClick={() => toggleFaq(i)}
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-base-150/50"
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-base-150/50 cursor-pointer"
                 >
                   <span className="text-ui-body font-medium">
                     {item.question}

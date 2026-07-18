@@ -924,28 +924,30 @@
   color: var(--color-fg);
 }
 
+/* Type tokens: size/leading stay unlayered (nothing competes with
+   them), but each token's COLOR is only a default — it lives in
+   @layer base so real color utilities (text-accent, text-fg…) beat
+   it. Unlayered, these colors silently overrode every `text-accent`
+   paired with a token (grey "selected" states across the widget-bar
+   kit — the invisible-active-tab bug). */
 .text-ui-body {
   font-size: 13px;
   line-height: 20px;
-  color: var(--color-fg);
 }
 
 .text-ui-muted {
   font-size: 13px;
   line-height: 20px;
-  color: var(--color-fg-2);
 }
 
 .text-ui-meta {
   font-size: 12px;
   line-height: 18px;
-  color: var(--color-fg-3);
 }
 
 .text-ui-chip {
   font-size: 11px;
   line-height: 16px;
-  color: var(--color-fg-3);
 }
 
 .text-ui-section {
@@ -954,7 +956,14 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-fg-3);
+}
+
+@layer base {
+  .text-ui-body { color: var(--color-fg); }
+  .text-ui-muted { color: var(--color-fg-2); }
+  .text-ui-meta { color: var(--color-fg-3); }
+  .text-ui-chip { color: var(--color-fg-3); }
+  .text-ui-section { color: var(--color-fg-3); }
 }
 
 /* Legacy compact surfaces still use Tailwind arbitrary micro sizes. Keep

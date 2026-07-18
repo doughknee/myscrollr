@@ -199,6 +199,37 @@ async function run() {
     await page.close();
   }
 
+  // ════ 1440px — Ticker fallback SelectMenu (the gear is retired) ══
+  {
+    const { page, consoleErrors } = await newPage(browser, 1440, 900);
+    console.log("== 1440px · ticker fallback select ==");
+
+    const ticker = page.locator('[aria-label="Ticker fallback when nothing is starred"]');
+    check("Ticker select renders in the bar", (await ticker.count()) === 1);
+    check(
+      "no gear popover remains",
+      (await page.locator('[aria-label="Predictions settings"]').count()) === 0,
+    );
+    await ticker.click();
+    await page.waitForSelector('[role="menu"]');
+    await page.waitForTimeout(250);
+
+    const menuText = (await page.locator('[role="menu"]').innerText()).toUpperCase();
+    check(
+      "menu lists the three fallbacks",
+      menuText.includes("TRENDING") &&
+        menuText.includes("MOVERS") &&
+        menuText.includes("CLOSING SOON"),
+    );
+    await page.screenshot({ path: `${OUT}/vb-18-ticker-select-1440.png` });
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(250);
+    check("Esc closes the menu", (await page.locator('[role="menu"]').count()) === 0);
+
+    check("no console errors (ticker-select page)", consoleErrors.length === 0, consoleErrors.join(" | "));
+    await page.close();
+  }
+
   // ════ 1440px — B4 sticky elevation ═══════════════════════════════
   {
     const { page, consoleErrors } = await newPage(browser, 1440, 900);

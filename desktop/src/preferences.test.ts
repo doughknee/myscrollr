@@ -163,10 +163,10 @@ describe("enumToBools / boolsToEnum (DisplayLocationGrid adapter)", () => {
 });
 
 describe("migrateFinanceDisplay", () => {
-  it("upgrades legacy boolean fields to Venue", () => {
-    // Pretend the stored prefs still use booleans. We type-cast through
-    // `unknown` because the interface changed shape; the whole POINT of
-    // the migration function is tolerating this.
+  it("resets display venues to defaults, preserving functional prefs (2026-07-17)", () => {
+    // The display-item toggles left the UI with the configure-page
+    // teardown: any stored show* value — legacy boolean or Venue — is
+    // deliberately ignored so every install renders the defaults.
     const legacy = {
       showChange: true,
       showPrevClose: false,
@@ -177,7 +177,7 @@ describe("migrateFinanceDisplay", () => {
     const migrated = migrateFinanceDisplay(legacy);
 
     expect(migrated.showChange).toBe("both");
-    expect(migrated.showPrevClose).toBe("off");
+    expect(migrated.showPrevClose).toBe("both"); // stored "off" ignored
     expect(migrated.showLastUpdated).toBe("both");
     expect(migrated.defaultSort).toBe("change"); // preserved
   });
@@ -197,7 +197,7 @@ describe("migrateFinanceDisplay", () => {
     expect(migrated.showChange).toBe("both");
   });
 
-  it("keeps new-shape Venue values unchanged (idempotent re-run)", () => {
+  it("resets even new-shape Venue values (defaults reset is idempotent)", () => {
     const current = {
       showChange: "both",
       showPrevClose: "feed",
@@ -208,14 +208,14 @@ describe("migrateFinanceDisplay", () => {
     const migrated = migrateFinanceDisplay(current);
 
     expect(migrated.showChange).toBe("both");
-    expect(migrated.showPrevClose).toBe("feed");
-    expect(migrated.showLastUpdated).toBe("ticker");
+    expect(migrated.showPrevClose).toBe("both");
+    expect(migrated.showLastUpdated).toBe("both");
     expect(migrated.defaultSort).toBe("change");
   });
 });
 
 describe("migrateRssDisplay", () => {
-  it("upgrades legacy boolean fields to Venue", () => {
+  it("resets display venues to defaults, preserving functional prefs (2026-07-17)", () => {
     const legacy = {
       showDescription: true,
       showSource: false,
@@ -226,7 +226,7 @@ describe("migrateRssDisplay", () => {
     const migrated = migrateRssDisplay(legacy);
 
     expect(migrated.showDescription).toBe("both");
-    expect(migrated.showSource).toBe("off");
+    expect(migrated.showSource).toBe("both"); // stored "off" ignored
     expect(migrated.showTimestamps).toBe("both");
     expect(migrated.articlesPerSource).toBe(3);
   });
@@ -752,16 +752,18 @@ describe("widget timer preference migration", () => {
       },
     }));
 
+    // 2026-07-17 unification: stored per-item ticker values are ignored —
+    // tracked content always reaches the ticker.
     expect(prefs.clock).toMatchObject({
       ticker: {
-        localTime: false,
+        localTime: true,
         showTimezones: true,
-        excludedTimezones: ["America/New_York"],
+        excludedTimezones: [],
       },
     });
     expect("activeTimer" in prefs.clock.ticker).toBe(false);
     expect(prefs.timer).toEqual({
-      ticker: { activeTimer: false },
+      ticker: { activeTimer: true },
       pomodoro: {
         workMins: 50,
         shortBreakMins: 10,
@@ -875,7 +877,9 @@ describe("widget timer preference migration", () => {
 
     expect(prefs.enabledWidgets).toEqual(["clock", "timer"]);
     expect(prefs.widgetsOnTicker).toEqual(["clock"]);
-    expect(prefs.timer.ticker.activeTimer).toBe(false);
+    // 2026-07-17 unification: a running timer always reaches the ticker;
+    // the stored activeTimer:false is deliberately ignored.
+    expect(prefs.timer.ticker.activeTimer).toBe(true);
   });
 
   it("does not auto-add timer visibility when current timer prefs exist", () => {

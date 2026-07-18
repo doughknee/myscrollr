@@ -17,7 +17,6 @@
  *   does not mutate ticker layout; Settings → Ticker is the sole editor.
  */
 import { Settings as SettingsIcon } from "lucide-react";
-import clsx from "clsx";
 import Tooltip from "./Tooltip";
 import type { TickerRowConfig } from "../preferences";
 import type { ChannelManifest, WidgetManifest } from "../types";
@@ -91,12 +90,12 @@ export default function TickerLayoutSummary({
 
         <div className="flex-1" />
 
-        <Tooltip content="Open the full ticker editor in Settings" side="top">
+        <Tooltip content="Open the full ticker editor in Customize" side="top">
           <button
             type="button"
             onClick={onOpenSettings}
             className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-ui-meta font-medium text-fg-3 hover:text-accent transition-colors"
-            aria-label="Open the full ticker layout editor in Settings"
+            aria-label="Open the full ticker layout editor in Customize"
           >
             <SettingsIcon size={11} />
             Manage
@@ -148,7 +147,7 @@ export default function TickerLayoutSummary({
           cap is below the absolute max. If they're on Pro/Ultimate at 3
           rows, no hint (they've already maxed out). */}
       {atTierCap && (
-        <p className={clsx("mt-2 text-ui-chip font-mono text-fg-3")}>
+        <p className="mt-2 text-ui-chip font-mono text-fg-3">
           {tierMaxRows === 1
             ? "Upgrade to Uplink for a second ticker row."
             : "Upgrade to Uplink Pro for a third ticker row."}

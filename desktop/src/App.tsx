@@ -490,13 +490,13 @@ export default function App() {
   }, [navigateMainWindow]);
 
   /**
-   * Installed-but-ticker-off state: open a specific channel's
-   * Configure tab so the user can flip "Show on ticker" for that
-   * channel. Used by the per-channel quick-link chips.
+   * Installed-but-ticker-off state: open a specific channel's feed —
+   * the show-on-ticker toggle lives in the widget's own bar now.
+   * Used by the per-channel quick-link chips.
    */
-  const handleConfigureChannel = useCallback(
+  const handleOpenChannel = useCallback(
     (channelId: string) => {
-      navigateMainWindow(`/channel/${channelId}/configuration`);
+      navigateMainWindow(`/widget/${channelId}`);
     },
     [navigateMainWindow],
   );
@@ -907,7 +907,7 @@ export default function App() {
             //                    component itself; we just pass the flag
             //                    saying "if you have nothing, here's the
             //                    recovery UI to use".  CTA → per-channel
-            //                    chips that jump to each Configure tab.
+            //                    chips that open each channel feed.
             const hasAnyPinnedWidget = Object.values(prefs.widgets.pinnedWidgets ?? {})
               .some((pin) => (pin.row ?? 0) === i);
             const isFirstRow = i === 0;
@@ -949,7 +949,7 @@ export default function App() {
                 onAddSources={handleAddSources}
                 showInstalledOffCTA={showInstalledOffCTA}
                 installedChannels={installedChannelsMeta}
-                onConfigureChannel={handleConfigureChannel}
+                onOpenChannel={handleOpenChannel}
               />
             );
           })}

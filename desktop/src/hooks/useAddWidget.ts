@@ -85,8 +85,8 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
         // Navigate immediately — the channel page's queries will fire
         // in parallel with the create call below.
         navigate({
-          to: "/channel/$type/$tab",
-          params: { type: item.id, tab: "feed" },
+          to: "/widget/$id",
+          params: { id: item.id },
         });
         toast.success(`${item.name} added`);
 
@@ -123,6 +123,15 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
               queryKey: queryKeys.dashboard,
               refetchType: "active",
             });
+            // The sports channel page reads /sports (["sports","full"]),
+            // not /dashboard — without this the mounted MLS/NFL feed
+            // keeps its pre-create empty payload indefinitely (no
+            // refetch trigger ever fires in a single always-focused
+            // Tauri window).
+            queryClient.invalidateQueries({
+              queryKey: ["sports", "full"],
+              refetchType: "active",
+            });
           })
           .catch((err) => {
             // Roll back the optimistic insert.
@@ -131,7 +140,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
               previous,
             );
             const message =
-              err instanceof Error ? err.message : "Failed to add channel";
+              err instanceof Error ? err.message : "Failed to add widget";
             toast.error(`Couldn't add ${item.name}: ${message}`);
           });
       } else {
@@ -156,7 +165,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
           },
         });
         toast.success(`${item.name} added`);
-        navigate({ to: "/widget/$id/$tab", params: { id: item.id, tab: "feed" } });
+        navigate({ to: "/widget/$id", params: { id: item.id } });
       }
     },
     [navigate, queryClient, prefs, onPrefsChange],

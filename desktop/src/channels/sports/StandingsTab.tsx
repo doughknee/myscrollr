@@ -219,7 +219,7 @@ export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
   if (leagues.length === 0) {
     return (
       <div className="flex items-center justify-center py-12 text-fg-3 text-xs">
-        Add leagues in the Configure tab to see standings
+        Add league widgets from the Catalog to see standings
       </div>
     );
   }

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { clsx } from "clsx";
 import { CalendarOff } from "lucide-react";
+import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import TeamLogo from "../../components/TeamLogo";
 import { isPre, formatCountdown, displayTeamCode } from "../../utils/gameHelpers";
 import { shouldShowOnFeed } from "../../preferences";
@@ -101,15 +102,17 @@ export function ScheduleTab({
               {dateGames.length} {dateGames.length === 1 ? "game" : "games"}
             </span>
           </div>
-          <div className="divide-y divide-edge/30">
+          <div className="flex flex-col gap-2 p-3">
             {dateGames.map((g) => {
               const favorite = isFavoriteGame(g, favoriteTeams);
               return (
                 <div
                   key={String(g.id)}
                   className={clsx(
-                    "flex items-center justify-between px-3 py-2 bg-surface text-xs border-l-2 transition-colors",
-                    favorite ? "border-l-[#f97316]/30" : "border-l-transparent",
+                    FEED_CARD,
+                    FEED_CARD_STATIC,
+                    "flex items-center justify-between text-xs",
+                    favorite && "border-l-2 border-l-[#f97316]/30",
                   )}
                 >
                   <div className="flex items-center gap-2 min-w-0">

@@ -9,6 +9,7 @@ import { memo } from "react";
 import { clsx } from "clsx";
 import { Star } from "lucide-react";
 import { isLive, isFinal, getWinner, gameStatusLabel, displayTeamCode } from "../../utils/gameHelpers";
+import { FEED_CARD, FEED_CARD_INTERACTIVE, FEED_CARD_STATIC } from "../../components/feedCard";
 import TeamLogo from "../../components/TeamLogo";
 import { useScoreFlash } from "../../hooks/useScoreFlash";
 import type { Game, FeedMode } from "../../types";
@@ -145,19 +146,30 @@ export const GameItem = memo(function GameItem({
     <CardWrapper
       link={game.link}
       className={clsx(
-        "px-3 py-2 bg-surface border-l-2 transition-colors duration-700",
-        // Border color: favorite+live > live > favorite > transparent
+        FEED_CARD,
+        hasLink ? FEED_CARD_INTERACTIVE : FEED_CARD_STATIC,
+        "relative overflow-hidden",
+        // Accent border layered on the shell: favorite+live > live > favorite
         isFavorite && live
-          ? "border-l-[#f97316]/60"
+          ? "border-l-2 border-l-[#f97316]/60"
           : live
-            ? "border-l-live/40"
+            ? "border-l-2 border-l-live/40"
             : isFavorite
-              ? "border-l-[#f97316]/30"
-              : "border-l-transparent",
-        flash && "bg-live/8",
-        hasLink && "hover:bg-surface-hover cursor-pointer",
+              ? "border-l-2 border-l-[#f97316]/30"
+              : null,
       )}
     >
+      {/* Score-flash tint on its OWN overlay: the slow 700ms fade the
+          cards had pre-unification, decoupled from the shell's 150ms
+          hover transition (a bg class on the card also fought
+          FEED_CARD's bg utility on stylesheet order). */}
+      <span
+        aria-hidden
+        className={clsx(
+          "pointer-events-none absolute inset-0 transition-colors duration-700",
+          flash ? "bg-live/8" : "bg-transparent",
+        )}
+      />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {showLogos && (

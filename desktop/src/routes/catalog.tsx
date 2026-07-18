@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -34,6 +34,16 @@ import QueryErrorBanner from "../components/QueryErrorBanner";
 import RouteError from "../components/RouteError";
 import PageLayout from "../components/layout/PageLayout";
 import PageSection from "../components/layout/PageSection";
+import { WidgetBar } from "../components/widget-bar/Bar";
+import { Segmented } from "../components/widget-bar/Segmented";
+import { SelectMenu } from "../components/widget-bar/SelectMenu";
+import {
+  useDismiss,
+  MenuPanel,
+  MenuHeading,
+  MenuRow,
+  FilterTrigger,
+} from "../components/widget-bar/Menu";
 import EmptySection from "../components/layout/EmptySection";
 
 
@@ -78,6 +88,58 @@ const SORT_OPTIONS: { key: SortMode; label: string; icon: LucideIcon }[] = [
   { key: "az", label: "A–Z", icon: ArrowDownAZ },
 ];
 
+/** Narrow-width collapse of the category Segmented: one Filter button
+ *  (active-filter badge) opening radio rows with counts — same idiom
+ *  as the source bars' filter menus. */
+function CatalogFilterMenu({
+  filter,
+  onPickFilter,
+  counts,
+}: {
+  filter: FilterTab;
+  onPickFilter: (f: FilterTab) => void;
+  counts: Record<string, number>;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(rootRef, open, close);
+
+  return (
+    // NOT position:relative — the dropdown anchors to the bar so it
+    // spans the page width instead of clipping at narrow widths.
+    <div ref={rootRef} className="shrink-0 rounded-lg">
+      <FilterTrigger
+        open={open}
+        badgeCount={filter !== "all" ? 1 : 0}
+        onClick={() => setOpen((o) => !o)}
+        ariaLabel="Filter by category"
+      />
+      <AnimatePresence>
+        {open && (
+          <MenuPanel className="inset-x-2">
+            <MenuHeading>Category</MenuHeading>
+            {FILTER_TABS.map((t) => (
+              <MenuRow
+                key={t.key}
+                selected={filter === t.key}
+                onClick={() => {
+                  onPickFilter(t.key);
+                  close();
+                }}
+                role="menuitemradio"
+                count={counts[t.key] ?? 0}
+              >
+                {t.label}
+              </MenuRow>
+            ))}
+          </MenuPanel>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function orderItems(items: CatalogItem[], sort: SortMode): CatalogItem[] {
   return [...items].sort((a, b) =>
     sort === "az"
@@ -98,6 +160,16 @@ function CatalogPage() {
   const [sort, setSort] = useState<SortMode>("featured");
 
   const allItems = useMemo(() => getCatalogItems(), []);
+
+  // Per-category counts for the collapsed Filter menu rows (counts
+  // live in menu rows, not chrome — bar grammar).
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: allItems.length };
+    for (const item of allItems) {
+      counts[item.category] = (counts[item.category] ?? 0) + 1;
+    }
+    return counts;
+  }, [allItems]);
 
   const enabledChannelIds = useMemo(
     () => new Set(channels.map((ch) => ch.channel_type)),
@@ -170,21 +242,44 @@ function CatalogPage() {
   // two sections: what you have, and what you could add (v1.1.1 r3).
 
   return (
-    <PageLayout
-      title="Catalog"
-      width="wide"
-      tabs={{
-        items: FILTER_TABS.map((t) => ({
-          key: t.key,
-          label: t.label,
-          description: t.hint,
-        })),
-        activeKey: filter,
-        onChange: (key) => setFilter(key as FilterTab),
-      }}
-    >
+    <PageLayout title="Catalog" width="wide" stableChrome>
+      {/* WCB — same persistent chrome as every source page. Category
+          filter (ex-TopBar tab strip) left, sort (ex-slot-band group)
+          right, per the bar grammar. */}
+      <WidgetBar>
+        {/* Wide: the full category Segmented. Narrow: collapse into one
+            Filter menu BEFORE the seven tabs would clip (same
+            collapse-before-clip idiom as the source bars). */}
+        <span className="hidden @3xl:block">
+          <Segmented
+            ariaLabel="Filter by category"
+            value={filter}
+            onChange={(k) => setFilter(k)}
+            options={FILTER_TABS.map((t) => ({ value: t.key, label: t.label }))}
+          />
+        </span>
+        <span className="@3xl:hidden">
+          <CatalogFilterMenu
+            filter={filter}
+            onPickFilter={setFilter}
+            counts={categoryCounts}
+          />
+        </span>
+        <div className="ml-auto">
+          <SelectMenu
+            ariaLabel="Sort widgets"
+            prefix="Sort"
+            value={sort}
+            onChange={setSort}
+            options={SORT_OPTIONS.map((s) => ({ value: s.key, label: s.label }))}
+          />
+        </div>
+      </WidgetBar>
+      {/* mt-4 on the first band(s) = the pt-4 gap every WCB page keeps
+          under the bar (adjacent margins collapse, so both carrying it
+          is safe whichever renders first). */}
       {dashboardError && (
-        <div className="mb-4">
+        <div className="mt-4 mb-5">
           <QueryErrorBanner error={dashboardError} />
         </div>
       )}
@@ -198,7 +293,7 @@ function CatalogPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25, delay: 0.02, ease: [0.22, 0.61, 0.36, 1] }}
         className={clsx(
-          "mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-xl border px-4 py-3",
+          "mt-4 mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-xl border px-4 py-3",
           slots.atCapacity && slots.finite
             ? "border-warn/25 bg-warn/[0.06]"
             : "border-edge/40 bg-base-150/30",
@@ -236,33 +331,8 @@ function CatalogPage() {
               Upgrade
             </button>
           )}
-          {/* Sort control — lives in the header, applies within each
-              section below. */}
-          <div
-            className="flex items-center rounded-lg border border-edge/40 bg-base-150/40 p-0.5"
-            role="group"
-            aria-label="Sort widgets"
-          >
-            {SORT_OPTIONS.map((s) => (
-              <button
-                key={s.key}
-                onClick={() => setSort(s.key)}
-                aria-pressed={sort === s.key}
-                className={clsx(
-                  "flex items-center gap-1 rounded-md px-2.5 py-1 text-ui-chip font-medium transition-colors",
-                  // Accent-tinted active state — bg-surface on bg-base-150
-                  // is near-invisible in the dark themes (v1.1.3 fix,
-                  // matches TimeWindowControl).
-                  sort === s.key
-                    ? "bg-accent/15 font-semibold text-accent"
-                    : "text-fg-4 hover:text-fg-2",
-                )}
-              >
-                <s.icon size={12} />
-                {s.label}
-              </button>
-            ))}
-          </div>
+          {/* Sort control moved to the WCB (bar grammar: config
+              selects live in the bar's right cluster). */}
         </div>
       </motion.div>
 
@@ -282,7 +352,7 @@ function CatalogPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            transition={{ duration: 0.18, ease: [0.22, 0.61, 0.36, 1] }}
           >
             {/* ── Your widgets ── */}
             {yourItems.length > 0 && (

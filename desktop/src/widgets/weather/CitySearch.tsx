@@ -10,23 +10,28 @@ import type { WeatherLocation } from "./types";
 
 interface CitySearchProps {
   onSelect: (location: WeatherLocation) => void;
+  /** When set, the WidgetBar's SearchBox owns the input — this renders
+   *  results only. Absent (compact mode), the internal input renders. */
+  query?: string;
 }
 
-export function CitySearch({ onSelect }: CitySearchProps) {
+export function CitySearch({ onSelect, query: externalQuery }: CitySearchProps) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const barDriven = externalQuery !== undefined;
+  const effectiveQuery = externalQuery ?? query;
 
-  // Focus on mount
+  // Focus on mount (internal input only)
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
   // Debounce the query
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(query), 400);
+    const timer = setTimeout(() => setDebouncedQuery(effectiveQuery), 400);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [effectiveQuery]);
 
   const { data: results = [], isFetching: isSearching } = useQuery(
     citySearchOptions(debouncedQuery),
@@ -34,14 +39,16 @@ export function CitySearch({ onSelect }: CitySearchProps) {
 
   return (
     <div className="space-y-1">
-      <input
-        ref={inputRef}
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search city..."
-        className="w-full px-3 py-1.5 text-xs font-mono bg-surface-2 border border-widget-weather/15 rounded-lg text-fg placeholder:text-fg-3 outline-none focus:border-widget-weather/30 transition-colors"
-      />
+      {!barDriven && (
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search city..."
+          className="w-full px-3 py-1.5 text-xs font-mono bg-surface-2 border border-widget-weather/15 rounded-lg text-fg placeholder:text-fg-3 outline-none focus:border-widget-weather/30 transition-colors"
+        />
+      )}
       {isSearching && (
         <span className="block text-[11px] font-mono text-fg-3 px-1">
           Searching...

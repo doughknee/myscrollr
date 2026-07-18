@@ -7,7 +7,7 @@
  *   │ Sports     │
  *   │ + 2/3      │  ← slot chip: add-source CTA + cap meter in one
  *   │    ⋮       │
- *   │ [Account ▾]│⇤│  ← footer chip: Settings/Ticker/Account/Support
+ *   │ [Account ▾]│⇤│  ← footer chip: Account/Support menu
  *   └────────────┘      menu + collapse toggle
  *
  * Home navigation lives on the Scrollr brand mark in the TopBar;
@@ -31,8 +31,8 @@ import {
   PanelLeftOpen,
   Plus,
   RadioTower,
-  Settings,
   Settings2,
+  SlidersHorizontal,
   Trash2,
   UserCircle,
 } from "lucide-react";
@@ -58,13 +58,49 @@ export interface SidebarSource {
   /** Whether this source currently has chips on the ticker — drives
    *  the context menu's Show/Hide label (v1.1.2). */
   onTicker: boolean;
+  /** Real brand mark (same URL the Catalog cards show). Rendered in
+   *  place of the colored Lucide icon, which stays as the fallback. */
+  logoUrl?: string;
+  /** Render the logo on a light tile (transparent/dark marks). */
+  logoLight?: boolean;
+}
+
+/** Source row glyph: the brand mark when one exists (matching the
+ *  Catalog cards); otherwise an app-icon TILE — the widget's glyph on
+ *  a gradient of its brand hex — so every source reads as a distinct
+ *  logo, not a bare icon. The tile is also the onError fallback
+ *  (offline, CDN blank). */
+function SourceGlyph({ source }: { source: SidebarSource }) {
+  const [failed, setFailed] = useState(false);
+  if (!source.logoUrl || failed) {
+    return (
+      <span
+        className="flex h-4 w-4 items-center justify-center rounded-[4px] text-white"
+        style={{
+          background: `linear-gradient(135deg, ${source.hex} 0%, ${source.hex}b8 100%)`,
+        }}
+      >
+        <source.icon size={11} />
+      </span>
+    );
+  }
+  return (
+    <img
+      src={source.logoUrl}
+      alt=""
+      aria-hidden
+      onError={() => setFailed(true)}
+      className={clsx(
+        "h-4 w-4 rounded-[4px] object-contain",
+        source.logoLight && "bg-white p-px",
+      )}
+    />
+  );
 }
 
 interface SidebarProps {
-  /** Whether the settings page is active. */
-  isSettings: boolean;
-  /** Whether the ticker settings page is active. */
-  isTicker: boolean;
+  /** Whether the Customize page (merged Settings + Ticker) is active. */
+  isCustomize: boolean;
   /** Whether the account page is active. */
   isAccount: boolean;
   /** Whether the catalog page is active. Drives the "+ Add source"
@@ -86,10 +122,8 @@ interface SidebarProps {
   onNavigateHome: () => void;
   /** Navigate to the catalog page (used by "+ Add source"). */
   onNavigateToMarketplace: () => void;
-  /** Navigate to the settings page. */
-  onNavigateToSettings: () => void;
-  /** Navigate to the ticker page. */
-  onNavigateToTicker: () => void;
+  /** Navigate to the Customize page (merged Settings + Ticker). */
+  onNavigateToCustomize: () => void;
   /** Navigate to the account page. */
   onNavigateToAccount: () => void;
   /** Navigate to the support page. */
@@ -98,8 +132,6 @@ interface SidebarProps {
   onSelectItem: (id: string, kind: "channel" | "widget") => void;
 
   // ── Context-menu actions (v1.1.2: right-click a source row) ──
-  /** Open the source's Configure tab. */
-  onConfigureItem: (id: string, kind: "channel" | "widget") => void;
   /** Open the widget's catalog info page. */
   onInfoItem: (id: string) => void;
   /** Toggle the source's presence on the ticker. */
@@ -111,8 +143,7 @@ interface SidebarProps {
 // ── Component ───────────────────────────────────────────────────
 
 export default function Sidebar({
-  isSettings,
-  isTicker,
+  isCustomize,
   isAccount,
   isMarketplace,
   isSupport,
@@ -122,12 +153,10 @@ export default function Sidebar({
   sources,
   onNavigateHome,
   onNavigateToMarketplace,
-  onNavigateToSettings,
-  onNavigateToTicker,
+  onNavigateToCustomize,
   onNavigateToAccount,
   onNavigateToSupport,
   onSelectItem,
-  onConfigureItem,
   onInfoItem,
   onToggleItemTicker,
   onRemoveItem,
@@ -160,17 +189,10 @@ export default function Sidebar({
         collapsed ? "w-[48px]" : "w-[200px]",
       )}
     >
-      {/* ── Sources ─────────────────────────────────────────────
-          The user's enabled channels and widgets in canonical
-          order. Scrollable when long. */}
-      <NavGroup
-        ariaLabel="Sources"
-        heading="Sources"
-        collapsed={collapsed}
-        className="flex-1 overflow-y-auto scrollbar-thin"
-      >
-        {/* Home — pinned above the user's sources so the rail always
-            has an anchor, even with zero sources. */}
+      {/* ── App destinations — Home + Customize above the sources,
+          Claude-desktop style: the rail leads with where you GO, then
+          lists what you FOLLOW. */}
+      <NavGroup ariaLabel="App" heading="" collapsed={collapsed}>
         <NavItem
           icon={<Home size={15} />}
           label="Home"
@@ -178,15 +200,37 @@ export default function Sidebar({
           collapsed={collapsed}
           onClick={onNavigateHome}
         />
+        <NavItem
+          icon={<SlidersHorizontal size={15} />}
+          label="Customize"
+          active={isCustomize}
+          collapsed={collapsed}
+          onClick={onNavigateToCustomize}
+        />
+        {/* Add-widget affordance rides with the app destinations —
+            adding is something you DO, not something you follow. */}
+        <SlotChip
+          collapsed={collapsed}
+          used={sources.length}
+          cap={slotCap}
+          active={isMarketplace}
+          onClick={onNavigateToMarketplace}
+        />
+      </NavGroup>
 
+      {/* ── Sources ─────────────────────────────────────────────
+          The user's enabled channels and widgets in canonical
+          order. Scrollable when long. */}
+      <NavGroup
+        ariaLabel="Widgets"
+        heading="Widgets"
+        collapsed={collapsed}
+        className="flex-1 overflow-y-auto scrollbar-thin"
+      >
         {sources.map((source) => (
           <NavItem
             key={source.id}
-            icon={
-              <span style={{ color: source.hex }}>
-                <source.icon size={15} />
-              </span>
-            }
+            icon={<SourceGlyph source={source} />}
             label={source.name}
             active={activeItem === source.id}
             collapsed={collapsed}
@@ -198,22 +242,12 @@ export default function Sidebar({
           />
         ))}
 
-        {/* Slot chip — the single add-source affordance, with the
-            cap woven in (status + action in one control). */}
-        <SlotChip
-          collapsed={collapsed}
-          used={sources.length}
-          cap={slotCap}
-          active={isMarketplace}
-          onClick={onNavigateToMarketplace}
-        />
       </NavGroup>
 
       {/* ── Workspace ─────────────────────────────────────────── */}
       {/* ── Footer: account chip + collapse ─────────────────────
-          Everything app-level (Settings, Ticker, Account, Support)
-          lives behind one chip menu — the sidebar's rows stay
-          reserved for sources. */}
+          Account + Support live behind one chip menu — Customize is
+          a top-level rail item, and the sources own the rows. */}
       <div
         className={clsx(
           "shrink-0 py-2",
@@ -229,23 +263,10 @@ export default function Sidebar({
             <AccountChip
               collapsed={collapsed}
               tierLabel={TIER_LABELS[tier]}
-              active={isSettings || isTicker || isAccount || isSupport}
+              active={isAccount || isSupport}
             />
           }
           items={[
-            {
-              key: "settings",
-              label: "Settings",
-              icon: Settings,
-              onSelect: onNavigateToSettings,
-            },
-            {
-              key: "ticker",
-              label: "Ticker",
-              icon: RadioTower,
-              onSelect: onNavigateToTicker,
-            },
-            { key: "d1", divider: true },
             {
               key: "account",
               label: "Account",
@@ -293,12 +314,6 @@ export default function Sidebar({
                   label: "Open",
                   icon: ArrowUpRight,
                   onSelect: () => onSelectItem(menu.source.id, menu.source.kind),
-                },
-                {
-                  key: "configure",
-                  label: "Configure",
-                  icon: Settings2,
-                  onSelect: () => onConfigureItem(menu.source.id, menu.source.kind),
                 },
                 {
                   key: "ticker",
@@ -359,7 +374,7 @@ function NavGroup({
         className,
       )}
     >
-      {!collapsed && (
+      {!collapsed && heading && (
         <h2 className="px-2.5 mb-1 text-ui-section">{heading}</h2>
       )}
       {children}
@@ -457,10 +472,10 @@ function SlotChip({
   const showDots = collapsed && finite && cap <= 6;
 
   const label = !finite
-    ? "Add a source"
+    ? "Add a widget"
     : atCap
       ? `All ${cap} slots used — get more slots`
-      : `${used} of ${cap} slots used — add a source`;
+      : `${used} of ${cap} slots used — add a widget`;
 
   return (
     <Tooltip content={collapsed ? label : undefined} side="right">
@@ -474,18 +489,29 @@ function SlotChip({
             ? "justify-center py-1.5 px-0"
             : "gap-2.5 px-2.5 py-1.5 text-ui-body",
           active
-            ? "bg-accent/15 text-accent"
+            ? "text-accent"
             : "text-accent/85 hover:bg-accent/10 hover:text-accent",
         )}
       >
-        <span className="shrink-0 flex items-center justify-center w-5 h-5">
+        {/* Same shared active pill as NavItem — without it, navigating
+            source → catalog unmounted the indicator with no destination
+            (the highlight vanished instead of sliding here). The static
+            bg is dropped while active so the pill is the one fill. */}
+        {active && (
+          <motion.span
+            layoutId="sidebar-active-indicator"
+            transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            className="absolute inset-0 z-0 rounded-lg bg-accent/15"
+          />
+        )}
+        <span className="relative z-10 shrink-0 flex items-center justify-center w-5 h-5">
           <Plus size={15} strokeWidth={2.5} />
         </span>
         {/* Cap dots pinned to the bottom edge inside the padding, so
             the chip stays exactly NavItem-height. */}
         {showDots && (
           <span
-            className="absolute bottom-[3px] left-1/2 -translate-x-1/2 flex items-center gap-[3px]"
+            className="absolute bottom-[3px] left-1/2 -translate-x-1/2 z-10 flex items-center gap-[3px]"
             aria-hidden
           >
             {Array.from({ length: cap }, (_, i) => (
@@ -501,11 +527,11 @@ function SlotChip({
         )}
         {!collapsed && (
           <>
-            <span className="truncate">
-              {atCap ? "Get more slots" : "Add source"}
+            <span className="relative z-10 truncate">
+              {atCap ? "Get more slots" : "Add widget"}
             </span>
             {finite && (
-              <span className="ml-auto shrink-0 text-ui-meta text-fg-4">
+              <span className="relative z-10 ml-auto shrink-0 text-ui-meta text-fg-4">
                 {used}/{cap}
               </span>
             )}
@@ -517,7 +543,7 @@ function SlotChip({
 }
 
 // ── Account chip ────────────────────────────────────────────────
-// Footer trigger for the app-level menu (Settings/Ticker/Account/
+// Footer trigger for the app-level menu (Account/
 // Support). floating-ui injects ref + aria handlers via cloneElement,
 // so this is a forwardRef-compatible button (same pattern as the
 // TopBar's MoreTabsTrigger). `active` marks that one of the menu's
@@ -566,7 +592,7 @@ const AccountChip = forwardRef(function AccountChip(
       <span
         className={clsx(
           "shrink-0 flex items-center justify-center rounded-full",
-          "bg-accent/15 text-accent text-[11px] font-semibold",
+          "bg-accent/15 text-accent text-ui-chip font-semibold",
           collapsed ? "w-6 h-6" : "w-7 h-7",
         )}
       >

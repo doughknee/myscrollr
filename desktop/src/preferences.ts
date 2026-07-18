@@ -386,14 +386,6 @@ export interface FinanceDisplayPrefs {
   showLastUpdated: Venue;
   defaultSort: "alpha" | "price" | "change" | "updated";
   /**
-   * Feed density. "comfort" (default) renders the two-row card with
-   * symbol + category badge + price + change + relative timestamp.
-   * "compact" renders a single-row condensed view — symbol, price,
-   * percent only — and stacks roughly twice as many tickers per
-   * viewport. Drives the per-row component in FeedTab.
-   */
-  feedDensity: "compact" | "comfort";
-  /**
    * Direction marker on the ticker chip. "arrow" uses ▲▼ glyphs,
    * "sign" uses +/− text, "none" hides the marker entirely
    * (% change still renders, just without the leading marker).
@@ -416,20 +408,16 @@ export interface PredictionsDisplayPrefs {
    * volume; legacy saved "volume" values migrate to it.
    */
   defaultSort: "trending" | "movers" | "closing" | "alpha";
-  /**
-   * Feed density. "comfort" (default) renders a responsive card grid
-   * with probability, delta, category badge, volume, and close-time
-   * countdown. "compact" renders a single dense ticker row — market,
-   * probability, delta — packing more markets per viewport. Drives the
-   * per-row component in FeedTab.
-   */
-  feedDensity: "compact" | "comfort";
 }
 
 export interface RssDisplayPrefs {
   showDescription: Venue;
   showSource: Venue;
   showTimestamps: Venue;
+  /** Sticky feed sort (2026-07-17 unification): the bar's sort choice
+   *  persists per widget via the config.display override; this is the
+   *  global fallback. */
+  feedSort: "newest" | "oldest" | "by-source";
   articlesPerSource: number; // 0 = all (the default since v1.1.1); 1/3/5/10 legacy per-source caps
   /** v1.1.3 Time Controls: hide articles older than N days (published_at,
    *  falling back to created_at). 0 = no age filter — every article the
@@ -603,9 +591,16 @@ const DEFAULT_TASKBAR: TaskbarPrefs = {
   pinnedActions: ["showTicker", "width", "pinned"],
 };
 
+// 2026-07-17 settings-model unification: per-item ticker exclusions and
+// the on/off ticker gates left the UI — "if you track it, it's on the
+// ticker". These defaults are FORCED at migration (stored values are
+// ignored); the fields survive so the ticker-data readers stay
+// untouched (empty exclusion lists filter nothing). Sysmon is the one
+// exception: its stat toggles remain user-editable content selection.
 export const DEFAULT_CLOCK_TICKER: ClockTickerConfig = {
   localTime: true,
-  showTimezones: false,
+  // true since the unification — tracked world clocks appear.
+  showTimezones: true,
   excludedTimezones: [],
 };
 
@@ -624,11 +619,14 @@ export const DEFAULT_WEATHER_TICKER: WeatherTickerConfig = {
   excludedCities: [],
 };
 
+// All-on since the unification: the stat toggles are content selection
+// now and gate BOTH the feed cards and the ticker chips, so defaults
+// must match what the feed always showed (everything the hardware has).
 export const DEFAULT_SYSMON_TICKER: SysmonTickerConfig = {
   cpu: true,
   memory: true,
-  gpu: false,
-  gpuPower: false,
+  gpu: true,
+  gpuPower: true,
 };
 
 export const DEFAULT_UPTIME_TICKER: UptimeTickerConfig = {
@@ -645,13 +643,13 @@ const DEFAULT_CHANNEL_DISPLAY: ChannelDisplayPrefs = {
     showPrevClose: "both",
     showLastUpdated: "both",
     defaultSort: "alpha",
-    feedDensity: "comfort",
     tickerDirectionMarker: "arrow",
   },
   rss: {
     showDescription: "both",
     showSource: "both",
     showTimestamps: "both",
+    feedSort: "newest",
     articlesPerSource: 0,
     maxArticleAgeDays: 0,
   },
@@ -661,7 +659,6 @@ const DEFAULT_CHANNEL_DISPLAY: ChannelDisplayPrefs = {
     showVolume: "both",
     showCloseTime: "both",
     defaultSort: "trending",
-    feedDensity: "comfort",
   },
   fantasy: {
     matchupScore: "both",
@@ -820,10 +817,10 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
   const sys = obj(saved.sysmon);
   const upt = obj(saved.uptime);
   const ghb = obj(saved.github);
+  // Only the legacy clock→timer split heuristic still reads the saved
+  // ticker blob; per-item ticker values themselves are forced to
+  // defaults below (2026-07-17 unification).
   const legacyClockTicker = obj(clk?.ticker);
-  const { activeTimer: _legacyActiveTimer, ...clockTicker } = legacyClockTicker ?? {};
-  void _legacyActiveTimer;
-  const timerTicker = obj(tmr?.ticker);
 
   const savedEnabledWidgets = Array.isArray(saved.enabledWidgets) ? saved.enabledWidgets : DEFAULT_WIDGETS.enabledWidgets;
   const savedWidgetsOnTicker = Array.isArray(saved.widgetsOnTicker) ? saved.widgetsOnTicker : savedEnabledWidgets;
@@ -844,19 +841,16 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
     pinnedWidgets: (saved.pinnedWidgets != null && typeof saved.pinnedWidgets === "object" && !Array.isArray(saved.pinnedWidgets))
       ? saved.pinnedWidgets as Record<string, WidgetPinConfig>
       : {},
+    // 2026-07-17 unification reset: clock/timer/weather/uptime/github
+    // ticker configs are forced to defaults — the exclusion/on-off UIs
+    // are gone and tracked content always reaches the ticker. Stored
+    // values are deliberately ignored (idempotent, zero-write; same
+    // idiom as the display-venue reset).
     clock: {
-      ticker: { ...DEFAULT_CLOCK_TICKER, ...clockTicker },
+      ticker: { ...DEFAULT_CLOCK_TICKER },
     },
     timer: {
-      ticker: {
-        ...DEFAULT_TIMER_TICKER,
-        activeTimer:
-          typeof timerTicker?.activeTimer === "boolean"
-            ? Boolean(timerTicker.activeTimer)
-            : typeof legacyClockTicker?.activeTimer === "boolean"
-              ? Boolean(legacyClockTicker.activeTimer)
-              : DEFAULT_TIMER_TICKER.activeTimer,
-      },
+      ticker: { ...DEFAULT_TIMER_TICKER },
       pomodoro: {
         ...DEFAULT_TIMER_POMODORO,
         ...obj(clk?.pomodoro),
@@ -864,7 +858,7 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
       },
     },
     weather: {
-      ticker: { ...DEFAULT_WEATHER_TICKER, ...obj(wth?.ticker) },
+      ticker: { ...DEFAULT_WEATHER_TICKER },
     },
     sysmon: {
       refreshInterval: typeof sys?.refreshInterval === "number" ? sys.refreshInterval : DEFAULT_WIDGETS.sysmon.refreshInterval,
@@ -874,7 +868,7 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
     uptime: {
       url: typeof upt?.url === "string" ? upt.url : DEFAULT_WIDGETS.uptime.url,
       pollInterval: typeof upt?.pollInterval === "number" ? upt.pollInterval : DEFAULT_WIDGETS.uptime.pollInterval,
-      ticker: { ...DEFAULT_UPTIME_TICKER, ...obj(upt?.ticker) },
+      ticker: { ...DEFAULT_UPTIME_TICKER },
     },
     github: {
       repos: Array.isArray(ghb?.repos)
@@ -886,7 +880,7 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
           )
         : DEFAULT_WIDGETS.github.repos,
       pollInterval: typeof ghb?.pollInterval === "number" ? ghb.pollInterval : DEFAULT_WIDGETS.github.pollInterval,
-      ticker: { ...DEFAULT_GITHUB_TICKER, ...obj(ghb?.ticker) },
+      ticker: { ...DEFAULT_GITHUB_TICKER },
     },
   };
 }
@@ -1055,25 +1049,26 @@ export function migrateFinanceDisplay(
   saved: Partial<FinanceDisplayPrefs> | undefined,
 ): FinanceDisplayPrefs {
   const raw = (saved ?? {}) as Record<string, unknown>;
-  const density =
-    raw.feedDensity === "compact" || raw.feedDensity === "comfort"
-      ? raw.feedDensity
-      : DEFAULT_CHANNEL_DISPLAY.finance.feedDensity;
   const dirMarker =
     raw.tickerDirectionMarker === "arrow" ||
     raw.tickerDirectionMarker === "sign" ||
     raw.tickerDirectionMarker === "none"
       ? raw.tickerDirectionMarker
       : DEFAULT_CHANNEL_DISPLAY.finance.tickerDirectionMarker;
+  // 2026-07-17 defaults reset: the display-item toggles left the UI with
+  // the configure-page teardown, so stored show* venues are deliberately
+  // IGNORED — the DEFAULT_CHANNEL_DISPLAY spread supplies them and every
+  // install renders the defaults. Functional prefs (sort, marker) keep
+  // honoring saved values. (feedDensity was deleted outright in the
+  // 2026-07-17 settings unification — feeds always render comfort; the
+  // ticker owns the one density concept.) Sports' equivalents are forced
+  // in normalizeSportsDisplayConfig; rss per-widget overrides are
+  // stripped where they merge (channels/rss/view.ts + FeedTab).
   return {
     ...DEFAULT_CHANNEL_DISPLAY.finance,
-    showChange: migrateVenue(raw.showChange),
-    showPrevClose: migrateVenue(raw.showPrevClose),
-    showLastUpdated: migrateVenue(raw.showLastUpdated),
     defaultSort:
       (raw.defaultSort as FinanceDisplayPrefs["defaultSort"] | undefined) ??
       DEFAULT_CHANNEL_DISPLAY.finance.defaultSort,
-    feedDensity: density,
     tickerDirectionMarker: dirMarker,
   };
 }
@@ -1082,10 +1077,6 @@ export function migratePredictionsDisplay(
   saved: Partial<PredictionsDisplayPrefs> | undefined,
 ): PredictionsDisplayPrefs {
   const raw = (saved ?? {}) as Record<string, unknown>;
-  const density =
-    raw.feedDensity === "compact" || raw.feedDensity === "comfort"
-      ? raw.feedDensity
-      : DEFAULT_CHANNEL_DISPLAY.predictions.feedDensity;
   const defaultSort =
     raw.defaultSort === "trending" ||
     raw.defaultSort === "movers" ||
@@ -1095,14 +1086,10 @@ export function migratePredictionsDisplay(
       : raw.defaultSort === "volume"
         ? ("trending" as const) // v1.1.5: all-time volume sort became Trending (24h)
         : DEFAULT_CHANNEL_DISPLAY.predictions.defaultSort;
+  // 2026-07-17 defaults reset — see migrateFinanceDisplay for the note.
   return {
     ...DEFAULT_CHANNEL_DISPLAY.predictions,
-    showDelta: migrateVenue(raw.showDelta),
-    showCategory: migrateVenue(raw.showCategory),
-    showVolume: migrateVenue(raw.showVolume),
-    showCloseTime: migrateVenue(raw.showCloseTime),
     defaultSort,
-    feedDensity: density,
   };
 }
 
@@ -1110,11 +1097,17 @@ export function migrateRssDisplay(
   saved: Partial<RssDisplayPrefs> | undefined,
 ): RssDisplayPrefs {
   const raw = (saved ?? {}) as Record<string, unknown>;
+  // 2026-07-17 defaults reset — show* venues come from the defaults
+  // spread; see migrateFinanceDisplay for the note.
   return {
     ...DEFAULT_CHANNEL_DISPLAY.rss,
-    showDescription: migrateVenue(raw.showDescription),
-    showSource: migrateVenue(raw.showSource),
-    showTimestamps: migrateVenue(raw.showTimestamps),
+    // Sticky feed sort (2026-07-17 unification).
+    feedSort:
+      raw.feedSort === "newest" ||
+      raw.feedSort === "oldest" ||
+      raw.feedSort === "by-source"
+        ? raw.feedSort
+        : DEFAULT_CHANNEL_DISPLAY.rss.feedSort,
     // One-shot migration (v1.1.1): 4 was the pre-widget-era DEFAULT and
     // never appeared in the picker (1/3/5/10), so a stored 4 is an
     // untouched default, not a user's choice — map it to 0 (all).

@@ -26,8 +26,7 @@ function renderSidebar(opts: {
   }));
   render(
     <Sidebar
-      isSettings={false}
-      isTicker={false}
+      isCustomize={false}
       isAccount={false}
       isMarketplace={false}
       isSupport={false}
@@ -37,12 +36,10 @@ function renderSidebar(opts: {
       sources={sources}
       onNavigateHome={onNavigateHome}
       onNavigateToMarketplace={onNavigateToMarketplace}
-      onNavigateToSettings={() => {}}
-      onNavigateToTicker={() => {}}
+      onNavigateToCustomize={() => {}}
       onNavigateToAccount={() => {}}
       onNavigateToSupport={() => {}}
       onSelectItem={() => {}}
-      onConfigureItem={() => {}}
       onInfoItem={() => {}}
       onToggleItemTicker={() => {}}
       onRemoveItem={() => {}}
@@ -56,7 +53,7 @@ describe("Sidebar slot chip", () => {
     renderSidebar({ tier: "free", sourceCount: 2 });
     expect(
       screen.getByRole("button", {
-        name: "2 of 3 slots used — add a source",
+        name: "2 of 3 slots used — add a widget",
       }),
     ).toBeInTheDocument();
   });
@@ -73,7 +70,7 @@ describe("Sidebar slot chip", () => {
   it("shows a plain add affordance on unlimited tiers", () => {
     renderSidebar({ tier: "uplink_ultimate", sourceCount: 5 });
     expect(
-      screen.getByRole("button", { name: "Add a source" }),
+      screen.getByRole("button", { name: "Add a widget" }),
     ).toBeInTheDocument();
   });
 
@@ -84,7 +81,7 @@ describe("Sidebar slot chip", () => {
     });
     fireEvent.click(
       screen.getByRole("button", {
-        name: "2 of 3 slots used — add a source",
+        name: "2 of 3 slots used — add a widget",
       }),
     );
     expect(onNavigateToMarketplace).toHaveBeenCalledOnce();
@@ -93,7 +90,7 @@ describe("Sidebar slot chip", () => {
   it("renders exactly one add affordance (no ghost rows, no top CTA)", () => {
     renderSidebar({ tier: "free", sourceCount: 1 });
     const addButtons = screen.queryAllByRole("button", {
-      name: /add a source|add source|empty slot/i,
+      name: /add a widget|add source|empty slot/i,
     });
     expect(addButtons).toHaveLength(1);
   });

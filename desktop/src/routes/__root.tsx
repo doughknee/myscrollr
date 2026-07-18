@@ -34,6 +34,10 @@ import { Toaster, toast } from "sonner";
 // Shell components
 import { IS_MACOS } from "../components/WindowControls";
 import Sidebar from "../components/Sidebar";
+import {
+  BarChassisProvider,
+  BarChassisSlot,
+} from "../components/widget-bar/BarChassis";
 import ConnectionBanner from "../components/ConnectionBanner";
 import TopBar from "../components/TopBar";
 
@@ -42,7 +46,7 @@ import AuthGate from "../components/onboarding/AuthGate";
 
 // Registries
 import { getAllChannels } from "../channels/registry";
-import { catalogItemById } from "../marketplace";
+import { catalogItemById, widgetLogoUrl } from "../marketplace";
 import { DEMO } from "../config";
 import { getAllWidgets, getWidget } from "../widgets/registry";
 import { CANONICAL_ORDER } from "../marketplace";
@@ -114,56 +118,49 @@ function parseRoute(pathname: string) {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: true,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
+      isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "channel" && itemId) {
     return {
       activeItem: itemId,
       isChannel: true, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
+      isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "widget" && itemId) {
     return {
       activeItem: itemId,
       isChannel: false, isWidget: true, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
+      isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "catalog") {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: true, isSupport: false, isReleases: false, isStatus: false,
+      isCustomize: false, isAccount: false, isMarketplace: true, isSupport: false, isReleases: false, isStatus: false,
     };
   }
-  if (kind === "settings") {
+  if (kind === "customize") {
     return {
-      activeItem: "settings",
+      activeItem: "customize",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: true, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
-    };
-  }
-  if (kind === "ticker") {
-    return {
-      activeItem: "ticker",
-      isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: true, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
+      isCustomize: true, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "account") {
     return {
       activeItem: "account",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: true, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
+      isCustomize: false, isAccount: true, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "support") {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: true, isReleases: false, isStatus: false,
+      isCustomize: false, isAccount: false, isMarketplace: false, isSupport: true, isReleases: false, isStatus: false,
     };
   }
   // Releases and status need their own branches: the fallback below
@@ -172,20 +169,20 @@ function parseRoute(pathname: string) {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: true, isStatus: false,
+      isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: true, isStatus: false,
     };
   }
   if (kind === "status") {
     return {
       activeItem: "",
       isChannel: false, isWidget: false, isFeed: false,
-      isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: true,
+      isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: true,
     };
   }
   return {
     activeItem: "",
     isChannel: false, isWidget: false, isFeed: true,
-    isSettings: false, isTicker: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
+    isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
   };
 }
 
@@ -551,15 +548,15 @@ function RootLayout() {
   const handleSelectItem = useCallback(
     (id: string) => {
       if (id === "settings") {
-        navigate({ to: "/settings" });
+        navigate({ to: "/customize", search: { tab: "app" } });
         return;
       }
       if (channelsRef.current.some((ch) => ch.channel_type === id)) {
-        navigate({ to: "/channel/$type/$tab", params: { type: id, tab: "feed" } });
+        navigate({ to: "/widget/$id", params: { id: id } });
         return;
       }
       if (getWidget(id)) {
-        navigate({ to: "/widget/$id/$tab", params: { id, tab: "feed" } });
+        navigate({ to: "/widget/$id", params: { id } });
         return;
       }
       navigate({ to: "/feed" });
@@ -570,8 +567,7 @@ function RootLayout() {
   const handleNavigateToFeed = useCallback(() => navigate({ to: "/feed" }), [navigate]);
   const handleNavigateToReleases = useCallback(() => navigate({ to: "/releases" }), [navigate]);
   const handleNavigateToStatus = useCallback(() => navigate({ to: "/status" }), [navigate]);
-  const handleNavigateToSettings = useCallback(() => navigate({ to: "/settings" }), [navigate]);
-  const handleNavigateToTicker = useCallback(() => navigate({ to: "/ticker" }), [navigate]);
+  const handleNavigateToCustomize = useCallback(() => navigate({ to: "/customize" }), [navigate]);
   const handleNavigateToAccount = useCallback(() => navigate({ to: "/account" }), [navigate]);
   const handleNavigateToMarketplace = useCallback(() => navigate({ to: "/catalog" }), [navigate]);
   const handleNavigateToSupport = useCallback(() => navigate({ to: "/support" }), [navigate]);
@@ -579,9 +575,9 @@ function RootLayout() {
   const handleSelectPinned = useCallback(
     (id: string, kind: "channel" | "widget") => {
       if (kind === "channel") {
-        navigate({ to: "/channel/$type/$tab", params: { type: id, tab: "feed" } });
+        navigate({ to: "/widget/$id", params: { id: id } });
       } else {
-        navigate({ to: "/widget/$id/$tab", params: { id, tab: "feed" } });
+        navigate({ to: "/widget/$id", params: { id } });
       }
     },
     [navigate],
@@ -598,16 +594,6 @@ function RootLayout() {
     onPrefsChange: persistPrefs,
   });
 
-  const handleConfigureItem = useCallback(
-    (id: string, kind: "channel" | "widget") => {
-      if (kind === "channel") {
-        navigate({ to: "/channel/$type/$tab", params: { type: id, tab: "configuration" } });
-      } else {
-        navigate({ to: "/widget/$id/$tab", params: { id, tab: "configuration" } });
-      }
-    },
-    [navigate],
-  );
 
   const handleInfoItem = useCallback(
     (id: string) => navigate({ to: "/widget/$id/info", params: { id } }),
@@ -660,6 +646,8 @@ function RootLayout() {
       name: string;
       hex: string;
       icon: React.ComponentType<{ size?: number; className?: string }>;
+      logoUrl?: string;
+      logoLight?: boolean;
       kind: "channel" | "widget";
       onTicker: boolean;
     }> = [];
@@ -674,6 +662,10 @@ function RootLayout() {
             name: m.name,
             hex: m.hex,
             icon: m.icon,
+            // Brand mark — the same URL the Catalog card shows, so the
+            // rail and the catalog speak one visual language.
+            logoUrl: m.logoUrl,
+            logoLight: m.logoLight,
             kind: "channel",
             // EFFECTIVE ticker state (v1.1.2 context menu) — the raw row
             // getter ignores the server ticker_enabled flag, which made
@@ -691,6 +683,8 @@ function RootLayout() {
             name: m.name,
             hex: m.hex,
             icon: m.icon,
+            // Product utilities (github, uptime) have real marks too.
+            logoUrl: widgetLogoUrl(id),
             kind: "widget",
             // Effective status, NOT the raw row getter: pinned-zone
             // widgets live in widgetsOnTicker/pinnedWidgets and never
@@ -715,7 +709,7 @@ function RootLayout() {
       // Ctrl+, → open settings
       if ((e.ctrlKey || e.metaKey) && e.key === ",") {
         e.preventDefault();
-        navigate({ to: "/settings" });
+        navigate({ to: "/customize", search: { tab: "app" } });
         return;
       }
 
@@ -760,16 +754,16 @@ function RootLayout() {
           const tab = segments[2];
           if (tab && tab !== "feed") {
             if (route.isChannel) {
-              navigate({ to: "/channel/$type/$tab", params: { type: route.activeItem, tab: "feed" } });
+              navigate({ to: "/widget/$id", params: { id: route.activeItem } });
             } else {
-              navigate({ to: "/widget/$id/$tab", params: { id: route.activeItem, tab: "feed" } });
+              navigate({ to: "/widget/$id", params: { id: route.activeItem } });
             }
             return;
           }
           navigate({ to: "/feed" });
           return;
         }
-        if (route.isSettings) {
+        if (route.isCustomize) {
           navigate({ to: "/feed" });
         }
       }
@@ -898,10 +892,12 @@ function RootLayout() {
             onToggleTicker={handleTickerToggle}
           />
 
-          <div className="flex flex-1 min-h-0 overflow-hidden gap-1.5 pr-1.5 pb-1.5">
+          {/* Inset gaps on the RIGHT and BOTTOM only — the content
+              panel sits flush against the sidebar and TopBar (the
+              symmetric gap-1.5 read as lopsided padding around both). */}
+          <div className="flex flex-1 min-h-0 overflow-hidden pr-1.5 pb-1.5">
             <Sidebar
-              isSettings={route.isSettings}
-              isTicker={route.isTicker}
+              isCustomize={route.isCustomize}
               isAccount={route.isAccount}
               isMarketplace={route.isMarketplace}
               isSupport={route.isSupport}
@@ -911,12 +907,10 @@ function RootLayout() {
               sources={sidebarSources}
               onNavigateHome={handleNavigateToFeed}
               onNavigateToMarketplace={handleNavigateToMarketplace}
-              onNavigateToSettings={handleNavigateToSettings}
-              onNavigateToTicker={handleNavigateToTicker}
+              onNavigateToCustomize={handleNavigateToCustomize}
               onNavigateToAccount={handleNavigateToAccount}
               onNavigateToSupport={handleNavigateToSupport}
               onSelectItem={handleSelectPinned}
-              onConfigureItem={handleConfigureItem}
               onInfoItem={handleInfoItem}
               onToggleItemTicker={handleToggleItemTicker}
               onRemoveItem={handleRemoveItem}
@@ -926,6 +920,16 @@ function RootLayout() {
                 every route. overflow-hidden clips page scroll to the
                 radius. */}
             <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-surface rounded-xl border border-edge/50 shadow-sm">
+             <BarChassisProvider
+               active={
+                 route.isChannel ||
+                 route.isWidget ||
+                 route.isFeed ||
+                 route.isMarketplace ||
+                 route.isCustomize ||
+                 route.isSupport
+               }
+             >
               <ConnectionBanner deliveryMode={deliveryMode} />
 
               {auth.sessionExpired && (
@@ -1038,6 +1042,12 @@ function RootLayout() {
                 return null;
               })()}
 
+              {/* Persistent widget-bar chassis: the bar SHELL mounts here,
+                  above the routed page, so source swaps can never animate
+                  the bar chrome or its separator line — FeedTabs portal
+                  their control rows into it (widget-bar/BarChassis.tsx). */}
+              <BarChassisSlot />
+
               {/* PageLayout (used by every route) owns its own scroll
                   for its content area. The outer wrapper just provides
                   the flex slot for it to fill. */}
@@ -1050,6 +1060,7 @@ function RootLayout() {
               </div>
 
               <Toaster theme={resolvedToasterTheme} richColors position="bottom-right" />
+             </BarChassisProvider>
             </main>
           </div>
         </PageIdentityProvider>

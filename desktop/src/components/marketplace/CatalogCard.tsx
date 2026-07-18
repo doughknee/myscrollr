@@ -39,7 +39,7 @@ export default function CatalogCard({ item, enabled, onInfo }: CatalogCardProps)
       }}
       className={clsx(
         "group/card relative flex flex-col overflow-hidden rounded-xl border border-edge/40 bg-base-150/30 p-4 cursor-pointer",
-        "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft-sm hover:border-edge/60 hover:bg-base-150/50",
+        "transition-all duration-150 hover:-translate-y-0.5 hover:shadow-soft-sm hover:border-edge/60 hover:bg-base-150/50",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
         // Added cards de-emphasized so new content stays prominent.
         enabled && "opacity-80 hover:opacity-100",
@@ -71,9 +71,14 @@ export default function CatalogCard({ item, enabled, onInfo }: CatalogCardProps)
               onError={() => setLogoFailed(true)}
             />
           ) : (
+            // App-icon tile — same treatment as the sidebar's SourceGlyph
+            // fallback, so brandless widgets read as distinct logos here
+            // too (white glyph on a gradient of the brand hex).
             <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-              style={{ backgroundColor: `${item.hex}20`, color: item.hex }}
+              className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-white"
+              style={{
+                background: `linear-gradient(135deg, ${item.hex} 0%, ${item.hex}b8 100%)`,
+              }}
             >
               <Icon size={22} />
             </div>

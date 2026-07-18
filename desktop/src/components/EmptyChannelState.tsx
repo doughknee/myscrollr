@@ -4,20 +4,11 @@
  * Replaces the repeated empty-state pattern in finance, sports, rss, and
  * fantasy feeds.
  *
- * Copy is pointed at the **"Options" pill in the TopBar** — the
- * Settings2 icon + "Options" label rendered next to the page title.
- * That pill is the canonical menu trigger on source pages (channel +
- * widget). The CTA button still jumps directly to the Configure sub-
- * tab so the one-tap fix is preserved; the surrounding copy teaches
- * the user where the menu lives so they can do it themselves next
- * time.
- *
- * Walkthrough fix 2026-05-11 — previously this tip pointed at a
- * breadcrumb dropdown (channel name + chevron) which no longer exists
- * after the source-page menu was consolidated under the Options pill.
+ * Since the configure-page teardown, every widget's settings live in
+ * its bar; the CTA (when a channel passes one) opens the relevant
+ * in-feed view, and the tip points at the bar.
  */
 import { clsx } from "clsx";
-import { ChevronDown, Settings2 } from "lucide-react";
 
 interface EmptyChannelStateProps {
   icon: React.ComponentType<{ size?: number; className?: string }>;
@@ -37,10 +28,15 @@ interface EmptyChannelStateProps {
   /** Hint text for the action (e.g. "choose what to track", "pick your leagues"). */
   actionHint?: string;
   /**
-   * Navigate to the channel's Configure sub-tab. Wired in
-   * `routes/channel.$type.$tab.tsx`. When provided, the hint becomes a
-   * one-tap button; the surrounding copy still teaches the user the
-   * Options-pill path so they can do it themselves next time.
+   * Full button label override. Widgets whose config lives in-widget
+   * (post configure-page) pass this so the CTA doesn't say "Open
+   * Configure" while actually opening an in-feed view.
+   */
+  actionLabel?: string;
+  /**
+   * The CTA action. Historically "navigate to the Configure sub-tab";
+   * in-widget-config channels pass their own in-feed action (with
+   * `actionLabel`). When provided, the hint becomes a one-tap button.
    */
   onConfigure?: () => void;
 }
@@ -53,6 +49,7 @@ export default function EmptyChannelState({
   refreshing,
   loadingNoun,
   actionHint,
+  actionLabel,
   onConfigure,
 }: EmptyChannelStateProps) {
   return (
@@ -82,27 +79,16 @@ export default function EmptyChannelState({
                 "transition-colors active:scale-[0.97]",
               )}
             >
-              Open Configure to {actionHint ?? `add ${noun}`}
+              {actionLabel ?? actionHint ?? `Add ${noun}`}
             </button>
           ) : null}
           <p className="text-[11px] text-fg-4/80 text-center max-w-sm leading-relaxed">
-            Tip: click{" "}
-            <span
-              className={clsx(
-                "inline-flex items-center gap-1 align-baseline",
-                "px-1 py-px rounded",
-                "bg-fg-4/10 text-fg-2 font-semibold",
-              )}
-            >
-              <Settings2 size={9} strokeWidth={2.5} aria-hidden="true" />
-              Options
-              <ChevronDown size={9} strokeWidth={2.5} aria-hidden="true" />
-            </span>{" "}
-            in the title bar to open this menu yourself next time.
+            Tip: every widget's settings live in the bar at the top of the
+            widget.
           </p>
           <p className="text-[11px] text-fg-4/70 text-center max-w-sm leading-relaxed">
-            Looking for a different source? Use{" "}
-            <span className="text-fg-3 font-semibold">+ Add source</span> in the
+            Looking for a different widget? Use{" "}
+            <span className="text-fg-3 font-semibold">+ Add widget</span> in the
             sidebar to browse the catalog.
           </p>
         </>

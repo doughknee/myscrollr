@@ -29,7 +29,9 @@ import {
   Clock,
   Search,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { channelsApi } from "../../api/client";
 import { dashboardQueryOptions, predictionsCatalogOptions } from "../../api/queries";
 import {
   formatCompactNumber,
@@ -37,6 +39,7 @@ import {
   relativeTime,
 } from "../../utils/format";
 import EmptyChannelState from "../../components/EmptyChannelState";
+import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarDivider, BarPill } from "../../components/widget-bar/Bar";
 import {
@@ -52,6 +55,7 @@ import {
 } from "../../components/widget-bar/Segmented";
 import { SearchBox, useSlashFocus } from "../../components/widget-bar/SearchBox";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
+import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import MyPositionsPanel from "./MyPositionsPanel";
 import MarketDetail from "./MarketDetail";
 import ProbabilityPill from "./ProbabilityPill";
@@ -138,6 +142,23 @@ const VIEW_OPTIONS: SegmentedOption<FeedView>[] = [
   { value: "positions", label: "Positions", icon: Wallet },
 ];
 
+/** Ticker fallback when nothing is starred — bar SelectMenu options
+ *  (mirrors PredictionsDisplayPrefs.defaultSort minus "alpha"). */
+const TICKER_FALLBACKS: {
+  value: NonNullable<PredictionsDisplayPrefs["defaultSort"]>;
+  label: string;
+}[] = [
+  { value: "trending", label: "Trending" },
+  { value: "movers", label: "Movers" },
+  { value: "closing", label: "Closing soon" },
+];
+
+/** Pre-v1.1.5 server-side config keys (see the migration effect). */
+interface LegacyPredictionsConfig {
+  categories?: string[];
+  favorites?: string[];
+}
+
 // ── Display helpers ──────────────────────────────────────────────
 
 /** Signed delta with arrow glyph ("▲ 4" / "▼ 3" / "—"). */
@@ -157,15 +178,14 @@ const LENSES: { value: PredictionsLens; label: string; icon?: typeof Flame }[] =
 
 // ── FeedTab ──────────────────────────────────────────────────────
 
-function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: FeedTabProps) {
-  const { prefs } = useShell();
+function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
+  const { prefs, onPrefsChange } = useShell();
   const dp = prefs.channelDisplay.predictions;
 
-  // The caller (Home or Source page) hints at a default mode, but the
-  // user's per-channel feedDensity pref wins when set — so the same
-  // channel can render compact on Home (caller hint wins for the small
-  // preview) and comfort on the Source page, controlled from Configure.
-  const mode = dp.feedDensity ?? callerMode;
+  // Density is caller-driven only (the per-widget feedDensity pref was
+  // deleted in the 2026-07-17 settings unification — feeds render
+  // comfort; the ticker owns the one density concept).
+  const mode = callerMode;
 
   const { data: dashboard } = useQuery(dashboardQueryOptions());
   const { data: catalog } = useQuery(predictionsCatalogOptions());
@@ -210,6 +230,66 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
     setAlerts(persistRemoveAlert(id));
   }, []);
 
+  // ── One-time legacy config migration (v1.1.5) ─────────────────
+  // Pre-v1.1.5 configs carried `categories` (server-side universe filter)
+  // and `favorites` (hidden watchlist mirror). Import favorites into the
+  // local stars, then clear BOTH keys in one write so the server stops
+  // narrowing this user's payload. Lives on the FEED mount (moved off the
+  // Configure page) so it reaches users who never open Configure — a
+  // lingering server `categories` filter would silently hide markets.
+  const queryClient = useQueryClient();
+  const channelRow = useMemo(
+    () =>
+      (dashboard?.channels ?? []).find(
+        (ch) => ch.channel_type === "predictions",
+      ),
+    [dashboard?.channels],
+  );
+  const migratedRef = useRef(false);
+  useEffect(() => {
+    // Wait for the dashboard row — running before it loads would burn the
+    // once-per-mount guard on a no-op.
+    if (migratedRef.current || !channelRow) return;
+    migratedRef.current = true;
+
+    const config = (channelRow.config ?? {}) as LegacyPredictionsConfig;
+    const favorites = Array.isArray(config.favorites) ? config.favorites : [];
+    const categories = Array.isArray(config.categories) ? config.categories : [];
+    if (favorites.length === 0 && categories.length === 0) return;
+
+    // 1) Absorb legacy pins/mirror into the local watchlist.
+    if (favorites.length > 0) {
+      const current = getWatchlist();
+      const merged = Array.from(new Set([...current, ...favorites]));
+      const imported = merged.length - current.length;
+      if (imported > 0) {
+        saveWatchlist(merged);
+        setWatchlist(merged);
+        toast.success(
+          `Moved ${imported} pinned market${imported === 1 ? "" : "s"} to your watchlist`,
+          { description: "Stars are the one list now — managed right here." },
+        );
+      }
+    }
+
+    // 2) Clear both legacy keys in a single write (two racing updates
+    //    would each send a stale merged config and resurrect the other
+    //    key). The API keeps honoring these fields for old clients; this
+    //    client simply stops using them.
+    void channelsApi
+      .update(channelRow.channel_type, {
+        config: { ...(channelRow.config ?? {}), categories: [], favorites: [] },
+      })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      })
+      .catch(() => {
+        // Non-fatal: the server filter just lingers until the next visit
+        // retries. The feed itself is fully functional either way.
+        migratedRef.current = false;
+      });
+  }, [channelRow, queryClient]);
+
   // ── Lens + category filter + market-detail modal ──────────────
   const [lens, setLens] = useState<PredictionsLens>("trending");
   // Multi-select category filter (empty = all). "View all" on a section
@@ -236,6 +316,21 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
   const resolvedToday = useMemo(
     () => selectResolvedToday(markets, now),
     [markets, now],
+  );
+
+  // Starred tickers with no live row — they left the curated set, so the
+  // lens grid can't show them. A quiet list under the Watchlist lens keeps
+  // them legible (and removable) instead of silently shrinking the stars.
+  const staleStars = useMemo(
+    () => watchlist.filter((t) => !markets.some((m) => m.ticker === t)),
+    [watchlist, markets],
+  );
+  const staleTitleFor = useCallback(
+    (ticker: string): string => {
+      const entry = catalog?.find((c) => c.ticker === ticker);
+      return entry?.title || ticker;
+    },
+    [catalog],
   );
 
   // id → category lookup from the catalog (keyed by Kalshi ticker, which
@@ -475,7 +570,6 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
             dashboardLoaded={!!feedContext.__dashboardLoaded}
             loadingNoun="odds"
             actionHint="manage your watchlist"
-            onConfigure={onConfigure}
           />
         </div>
       </div>
@@ -488,7 +582,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
     // that swallowed the bar's `sticky` in the real app — the bar only
     // pins against the ancestor that actually scrolls. (RSS uses the same
     // page-scroll structure.)
-    <div ref={containerRef} className="flex min-h-full flex-col">
+    <div ref={containerRef} className="relative flex min-h-full flex-col">
       {/* ONE control bar: view switcher (segmented, Tauri-only) · lens
           pills + category select · search · freshness. WidgetBar owns the
           sticky @container shell and the pinned-elevation sentinel. At
@@ -571,9 +665,25 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
                 <FreshnessPill lastUpdated={latestUpdated} label="odds" />
               </span>
             )}
+            <SelectMenu
+              ariaLabel="Ticker fallback when nothing is starred"
+              prefix="Ticker"
+              value={dp.defaultSort ?? "trending"}
+              options={TICKER_FALLBACKS}
+              onChange={(v) =>
+                onPrefsChange({
+                  ...prefs,
+                  channelDisplay: {
+                    ...prefs.channelDisplay,
+                    predictions: { ...dp, defaultSort: v },
+                  },
+                })
+              }
+            />
           </div>
         </WidgetBar>
       )}
+
 
       {/* Market browse / grids */}
       {renderTotal === 0 ? (
@@ -764,6 +874,39 @@ function PredictionsFeedTab({ mode: callerMode, feedContext, onConfigure }: Feed
             </div>
           )}
         </>
+      )}
+
+      {/* Stale stars — starred markets that left the curated set. The
+          lens grid can't render them (no live row), so a quiet list keeps
+          them visible and removable. */}
+      {isComfort && lens === "watchlist" && staleStars.length > 0 && (
+        <div className="flex flex-col gap-1 px-3 pb-3 pt-1">
+          <span className="text-ui-chip font-medium uppercase tracking-wide text-fg-4">
+            No longer tracked
+          </span>
+          {staleStars.map((ticker) => (
+            <div
+              key={ticker}
+              className="flex items-center gap-2 rounded-lg border border-edge/30 bg-base-100/40 px-2.5 py-1.5"
+            >
+              <Star size={12} className="shrink-0 fill-current text-fg-4" />
+              <span
+                className="min-w-0 flex-1 truncate text-ui-meta text-fg-4"
+                title={staleTitleFor(ticker)}
+              >
+                {staleTitleFor(ticker)}
+              </span>
+              <button
+                type="button"
+                onClick={() => toggleWatch(ticker)}
+                aria-label={`Remove ${ticker} from watchlist`}
+                className="shrink-0 rounded-md px-2 py-0.5 text-ui-chip font-medium text-fg-4 transition-colors hover:bg-error/10 hover:text-error cursor-pointer"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Market-detail modal */}
@@ -1009,7 +1152,7 @@ const ResolvedCard = memo(function ResolvedCard({
           openCard();
         }
       }}
-      className="flex h-full cursor-pointer flex-col gap-1.5 rounded-lg border border-edge/40 bg-surface p-3 transition-[border-color,box-shadow,transform,background-color] duration-150 hover:border-edge/80 hover:bg-surface-hover/40 hover:shadow-soft-sm active:scale-[0.99]"
+      className={clsx(FEED_CARD, FEED_CARD_INTERACTIVE, "flex h-full flex-col gap-1.5")}
     >
       {showHeaderCategory && (
         <div className="flex h-5 items-center justify-between gap-2">
@@ -1274,7 +1417,7 @@ const EventCard = memo(function EventCard({
           openCard();
         }
       }}
-      className="flex h-full cursor-pointer flex-col gap-1.5 rounded-lg border border-edge/40 bg-surface p-3 transition-[border-color,box-shadow,transform,background-color] duration-150 hover:border-edge/80 hover:bg-surface-hover/40 hover:shadow-soft-sm active:scale-[0.99]"
+      className={clsx(FEED_CARD, FEED_CARD_INTERACTIVE, "flex h-full flex-col gap-1.5")}
     >
       {/* Header row — category anchors the left so the countdown/star
           never sit alone. */}

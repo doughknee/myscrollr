@@ -6,7 +6,7 @@
  * the primary action, a live-feeling ticker preview, quick facts, usage
  * steps, the plan/slot context, Remove, and related widgets to keep the
  * browse going. Works for ANY widget id (data or utility) — the static
- * `info` segment wins over `/widget/$id/$tab`.
+ * `info` segment wins over the widget index route.
  */
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -148,16 +148,9 @@ function WidgetInfoPage() {
 
   const openWidget = () => {
     if (item.kind === "data") {
-      navigate({ to: "/channel/$type/$tab", params: { type: item.id, tab: "feed" } });
+      navigate({ to: "/widget/$id", params: { id: item.id } });
     } else {
-      navigate({ to: "/widget/$id/$tab", params: { id: item.id, tab: "feed" } });
-    }
-  };
-  const configureWidget = () => {
-    if (item.kind === "data") {
-      navigate({ to: "/channel/$type/$tab", params: { type: item.id, tab: "configuration" } });
-    } else {
-      navigate({ to: "/widget/$id/$tab", params: { id: item.id, tab: "configuration" } });
+      navigate({ to: "/widget/$id", params: { id: item.id } });
     }
   };
 
@@ -280,15 +273,8 @@ function WidgetInfoPage() {
                     Open
                     <ChevronRight
                       size={15}
-                      className="transition-transform duration-200 group-hover/btn:translate-x-0.5"
+                      className="transition-transform duration-150 group-hover/btn:translate-x-0.5"
                     />
-                  </button>
-                  <button
-                    onClick={configureWidget}
-                    className="rounded-lg bg-white/15 px-4 py-2.5 text-ui-body font-semibold backdrop-blur-sm transition-colors hover:bg-white/25"
-                    style={{ color: textOn }}
-                  >
-                    Configure
                   </button>
                 </>
               ) : primaryAction ? (

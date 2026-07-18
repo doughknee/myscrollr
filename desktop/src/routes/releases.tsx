@@ -387,7 +387,7 @@ function EmptyState() {
       </p>
       <button
         onClick={() => open(RELEASES_PAGE_URL).catch(() => {})}
-        className="mt-4 flex items-center gap-1.5 rounded-lg bg-accent/10 px-3.5 py-1.5 text-ui-body font-semibold text-accent transition-all duration-150 hover:bg-accent/[0.16] active:scale-[0.98] cursor-pointer"
+        className="mt-4 flex items-center gap-1.5 rounded-lg bg-accent/10 px-3.5 py-1.5 text-ui-body font-semibold text-accent transition-all duration-150 hover:bg-accent/20 active:scale-[0.98] cursor-pointer"
       >
         <ExternalLink size={14} />
         View releases on GitHub

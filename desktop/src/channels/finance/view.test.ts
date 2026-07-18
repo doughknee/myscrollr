@@ -19,7 +19,6 @@ const DEFAULT_PREFS: FinanceDisplayPrefs = {
   showPrevClose: "both",
   showLastUpdated: "both",
   defaultSort: "alpha",
-  feedDensity: "comfort",
   tickerDirectionMarker: "arrow",
 };
 

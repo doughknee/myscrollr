@@ -10,6 +10,7 @@
  * poll interval, sync results to the store for the ticker.
  */
 import { useState, useCallback } from "react";
+import { clsx } from "clsx";
 import { useQueryClient } from "@tanstack/react-query";
 import { HeartPulse, RefreshCw, Unlink, Loader2 } from "lucide-react";
 import type { FeedTabProps, WidgetManifest } from "../../types";
@@ -19,8 +20,16 @@ import type { KumaMonitor } from "./types";
 import { fetchKumaStatus, loadMonitors, saveMonitors, MONITOR_STATUS_LABELS, MONITOR_STATUS_COLORS, MONITOR_STATUS_TEXT } from "./types";
 import { toast } from "sonner";
 import { useShell } from "../../shell-context";
+import { WidgetBar } from "../../components/widget-bar/Bar";
+import {
+  SelectMenu,
+  type SelectOption,
+} from "../../components/widget-bar/SelectMenu";
+import { useWidgetConfig } from "../../hooks/useWidgetConfig";
+import { formatPollInterval } from "../../utils/format";
 import { savePrefs, updateWidgetPrefs } from "../../preferences";
 import { useSyncedQuery } from "../../hooks/useSyncedQuery";
+import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import { LS_UPTIME_MONITORS } from "../../constants";
 
 // ── Widget manifest ─────────────────────────────────────────────
@@ -39,8 +48,7 @@ export const uptimeWidget: WidgetManifest = {
     usage: [
       "Paste your Uptime Kuma public status page URL to connect.",
       "All monitors from your status page appear with their current status.",
-      "Hide specific monitors from the ticker in the Configure tab.",
-      "Configure the poll interval to control how often statuses refresh.",
+      "Set how often monitors refresh from the top bar.",
     ],
   },
   FeedTab: UptimeFeedTab,
@@ -48,7 +56,40 @@ export const uptimeWidget: WidgetManifest = {
 
 // ── FeedTab ─────────────────────────────────────────────────────
 
-function UptimeFeedTab({ mode: feedMode }: FeedTabProps) {
+const POLL_OPTIONS: SelectOption<string>[] = Array.from({ length: 10 }, (_, i) => {
+  const v = 30 + i * 30;
+  return { value: String(v), label: formatPollInterval(v) };
+});
+
+function UptimeFeedTab(props: FeedTabProps) {
+  return (
+    <div className="flex min-h-full flex-col">
+      {props.mode === "comfort" && <UptimeBar />}
+      <UptimeFeedBody {...props} />
+    </div>
+  );
+}
+
+function UptimeBar() {
+  const { prefs, onPrefsChange } = useShell();
+  const { config, update } = useWidgetConfig("uptime", prefs, onPrefsChange);
+  return (
+    <WidgetBar>
+      {/* Config selects live in the right cluster — standard grammar. */}
+      <div className="ml-auto">
+        <SelectMenu
+          ariaLabel="Refresh interval"
+          prefix="Refresh"
+          value={String(config.pollInterval)}
+          options={POLL_OPTIONS}
+          onChange={(v) => update({ pollInterval: Number(v) })}
+        />
+      </div>
+    </WidgetBar>
+  );
+}
+
+function UptimeFeedBody({ mode: feedMode }: FeedTabProps) {
   const compact = feedMode === "compact";
   const shell = useShell();
   const queryClient = useQueryClient();
@@ -245,7 +286,7 @@ function MonitorRow({
 }) {
   return (
     <div
-      className={`flex items-center gap-2 px-2 rounded-md border border-edge/50 bg-surface-2/30 ${compact ? "py-1.5" : "py-2"}`}
+      className={clsx(FEED_CARD, FEED_CARD_STATIC, "flex items-center gap-2 px-2", compact ? "py-1.5" : "py-2")}
     >
       {/* Status dot */}
       <span className={`w-2 h-2 rounded-full shrink-0 ${MONITOR_STATUS_COLORS[monitor.status]}${monitor.status === "down" ? " animate-pulse" : ""}`} />

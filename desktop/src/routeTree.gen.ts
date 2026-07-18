@@ -15,12 +15,13 @@ import { Route as StatusRouteImport } from './routes/status'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReleasesRouteImport } from './routes/releases'
 import { Route as FeedRouteImport } from './routes/feed'
+import { Route as CustomizeRouteImport } from './routes/customize'
 import { Route as CatalogRouteImport } from './routes/catalog'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ChannelTypeRouteImport } from './routes/channel.$type'
+import { Route as WidgetIdIndexRouteImport } from './routes/widget.$id.index'
 import { Route as WidgetIdInfoRouteImport } from './routes/widget.$id.info'
-import { Route as WidgetIdTabRouteImport } from './routes/widget.$id.$tab'
-import { Route as ChannelTypeTabRouteImport } from './routes/channel.$type.$tab'
 
 const TickerRoute = TickerRouteImport.update({
   id: '/ticker',
@@ -52,6 +53,11 @@ const FeedRoute = FeedRouteImport.update({
   path: '/feed',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CustomizeRoute = CustomizeRouteImport.update({
+  id: '/customize',
+  path: '/customize',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CatalogRoute = CatalogRouteImport.update({
   id: '/catalog',
   path: '/catalog',
@@ -67,19 +73,19 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChannelTypeRoute = ChannelTypeRouteImport.update({
+  id: '/channel/$type',
+  path: '/channel/$type',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WidgetIdIndexRoute = WidgetIdIndexRouteImport.update({
+  id: '/widget/$id/',
+  path: '/widget/$id/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WidgetIdInfoRoute = WidgetIdInfoRouteImport.update({
   id: '/widget/$id/info',
   path: '/widget/$id/info',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const WidgetIdTabRoute = WidgetIdTabRouteImport.update({
-  id: '/widget/$id/$tab',
-  path: '/widget/$id/$tab',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ChannelTypeTabRoute = ChannelTypeTabRouteImport.update({
-  id: '/channel/$type/$tab',
-  path: '/channel/$type/$tab',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -87,44 +93,47 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/catalog': typeof CatalogRoute
+  '/customize': typeof CustomizeRoute
   '/feed': typeof FeedRoute
   '/releases': typeof ReleasesRoute
   '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
   '/ticker': typeof TickerRoute
-  '/channel/$type/$tab': typeof ChannelTypeTabRoute
-  '/widget/$id/$tab': typeof WidgetIdTabRoute
+  '/channel/$type': typeof ChannelTypeRoute
   '/widget/$id/info': typeof WidgetIdInfoRoute
+  '/widget/$id/': typeof WidgetIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/catalog': typeof CatalogRoute
+  '/customize': typeof CustomizeRoute
   '/feed': typeof FeedRoute
   '/releases': typeof ReleasesRoute
   '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
   '/ticker': typeof TickerRoute
-  '/channel/$type/$tab': typeof ChannelTypeTabRoute
-  '/widget/$id/$tab': typeof WidgetIdTabRoute
+  '/channel/$type': typeof ChannelTypeRoute
   '/widget/$id/info': typeof WidgetIdInfoRoute
+  '/widget/$id': typeof WidgetIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/catalog': typeof CatalogRoute
+  '/customize': typeof CustomizeRoute
   '/feed': typeof FeedRoute
   '/releases': typeof ReleasesRoute
   '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
   '/ticker': typeof TickerRoute
-  '/channel/$type/$tab': typeof ChannelTypeTabRoute
-  '/widget/$id/$tab': typeof WidgetIdTabRoute
+  '/channel/$type': typeof ChannelTypeRoute
   '/widget/$id/info': typeof WidgetIdInfoRoute
+  '/widget/$id/': typeof WidgetIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -132,58 +141,62 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/catalog'
+    | '/customize'
     | '/feed'
     | '/releases'
     | '/settings'
     | '/status'
     | '/support'
     | '/ticker'
-    | '/channel/$type/$tab'
-    | '/widget/$id/$tab'
+    | '/channel/$type'
     | '/widget/$id/info'
+    | '/widget/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/account'
     | '/catalog'
+    | '/customize'
     | '/feed'
     | '/releases'
     | '/settings'
     | '/status'
     | '/support'
     | '/ticker'
-    | '/channel/$type/$tab'
-    | '/widget/$id/$tab'
+    | '/channel/$type'
     | '/widget/$id/info'
+    | '/widget/$id'
   id:
     | '__root__'
     | '/'
     | '/account'
     | '/catalog'
+    | '/customize'
     | '/feed'
     | '/releases'
     | '/settings'
     | '/status'
     | '/support'
     | '/ticker'
-    | '/channel/$type/$tab'
-    | '/widget/$id/$tab'
+    | '/channel/$type'
     | '/widget/$id/info'
+    | '/widget/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
   CatalogRoute: typeof CatalogRoute
+  CustomizeRoute: typeof CustomizeRoute
   FeedRoute: typeof FeedRoute
   ReleasesRoute: typeof ReleasesRoute
   SettingsRoute: typeof SettingsRoute
   StatusRoute: typeof StatusRoute
   SupportRoute: typeof SupportRoute
   TickerRoute: typeof TickerRoute
-  ChannelTypeTabRoute: typeof ChannelTypeTabRoute
-  WidgetIdTabRoute: typeof WidgetIdTabRoute
+  ChannelTypeRoute: typeof ChannelTypeRoute
   WidgetIdInfoRoute: typeof WidgetIdInfoRoute
+  WidgetIdIndexRoute: typeof WidgetIdIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -230,6 +243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FeedRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/customize': {
+      id: '/customize'
+      path: '/customize'
+      fullPath: '/customize'
+      preLoaderRoute: typeof CustomizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/catalog': {
       id: '/catalog'
       path: '/catalog'
@@ -251,25 +271,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/channel/$type': {
+      id: '/channel/$type'
+      path: '/channel/$type'
+      fullPath: '/channel/$type'
+      preLoaderRoute: typeof ChannelTypeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/widget/$id/': {
+      id: '/widget/$id/'
+      path: '/widget/$id'
+      fullPath: '/widget/$id/'
+      preLoaderRoute: typeof WidgetIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/widget/$id/info': {
       id: '/widget/$id/info'
       path: '/widget/$id/info'
       fullPath: '/widget/$id/info'
       preLoaderRoute: typeof WidgetIdInfoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/widget/$id/$tab': {
-      id: '/widget/$id/$tab'
-      path: '/widget/$id/$tab'
-      fullPath: '/widget/$id/$tab'
-      preLoaderRoute: typeof WidgetIdTabRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/channel/$type/$tab': {
-      id: '/channel/$type/$tab'
-      path: '/channel/$type/$tab'
-      fullPath: '/channel/$type/$tab'
-      preLoaderRoute: typeof ChannelTypeTabRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -279,15 +299,16 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
   CatalogRoute: CatalogRoute,
+  CustomizeRoute: CustomizeRoute,
   FeedRoute: FeedRoute,
   ReleasesRoute: ReleasesRoute,
   SettingsRoute: SettingsRoute,
   StatusRoute: StatusRoute,
   SupportRoute: SupportRoute,
   TickerRoute: TickerRoute,
-  ChannelTypeTabRoute: ChannelTypeTabRoute,
-  WidgetIdTabRoute: WidgetIdTabRoute,
+  ChannelTypeRoute: ChannelTypeRoute,
   WidgetIdInfoRoute: WidgetIdInfoRoute,
+  WidgetIdIndexRoute: WidgetIdIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
