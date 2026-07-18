@@ -12,7 +12,7 @@
  * /settings and /ticker redirect here (tab preselected).
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import RouteError from "../components/RouteError";
 import PageLayout from "../components/layout/PageLayout";
 import { WidgetBar } from "../components/widget-bar/Bar";
@@ -44,8 +44,14 @@ export const Route = createFileRoute("/customize")({
 function CustomizeRoute() {
   const shell = useShell();
   const { prefs, onPrefsChange } = shell;
-  const { tab: initialTab } = Route.useSearch();
-  const [tab, setTab] = useState<CustomizeTab>(initialTab ?? "ticker");
+  const { tab: searchTab } = Route.useSearch();
+  const [tab, setTab] = useState<CustomizeTab>(searchTab ?? "ticker");
+  // Search-only navigations don't remount the component — without this,
+  // Ctrl+, / the tray Settings item / the /settings shim are no-ops when
+  // the user is already sitting on /customize.
+  useEffect(() => {
+    if (searchTab) setTab(searchTab);
+  }, [searchTab]);
 
   return (
     <PageLayout title="Customize" width="wide" stableChrome>
