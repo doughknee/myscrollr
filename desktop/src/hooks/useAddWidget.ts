@@ -140,7 +140,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
               previous,
             );
             const message =
-              err instanceof Error ? err.message : "Failed to add channel";
+              err instanceof Error ? err.message : "Failed to add widget";
             toast.error(`Couldn't add ${item.name}: ${message}`);
           });
       } else {
