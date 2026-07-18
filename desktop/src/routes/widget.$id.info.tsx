@@ -148,7 +148,7 @@ function WidgetInfoPage() {
 
   const openWidget = () => {
     if (item.kind === "data") {
-      navigate({ to: "/channel/$type", params: { type: item.id } });
+      navigate({ to: "/widget/$id", params: { id: item.id } });
     } else {
       navigate({ to: "/widget/$id", params: { id: item.id } });
     }

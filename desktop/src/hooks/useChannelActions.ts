@@ -55,8 +55,8 @@ export function useChannelActions(): ChannelActions {
         // bug: invalidate it or the mounted feed never refetches.
         queryClient.invalidateQueries({ queryKey: ["sports", "full"] });
         navigate({
-          to: "/channel/$type",
-          params: { type: channelType },
+          to: "/widget/$id",
+          params: { id: channelType },
         });
         toast.success(`${channelName[channelType] ?? channelType} added`);
       } catch (err) {

@@ -148,6 +148,7 @@ export const GameItem = memo(function GameItem({
       className={clsx(
         FEED_CARD,
         hasLink ? FEED_CARD_INTERACTIVE : FEED_CARD_STATIC,
+        "relative overflow-hidden",
         // Accent border layered on the shell: favorite+live > live > favorite
         isFavorite && live
           ? "border-l-2 border-l-[#f97316]/60"
@@ -156,9 +157,19 @@ export const GameItem = memo(function GameItem({
             : isFavorite
               ? "border-l-2 border-l-[#f97316]/30"
               : null,
-        flash && "bg-live/8",
       )}
     >
+      {/* Score-flash tint on its OWN overlay: the slow 700ms fade the
+          cards had pre-unification, decoupled from the shell's 150ms
+          hover transition (a bg class on the card also fought
+          FEED_CARD's bg utility on stylesheet order). */}
+      <span
+        aria-hidden
+        className={clsx(
+          "pointer-events-none absolute inset-0 transition-colors duration-700",
+          flash ? "bg-live/8" : "bg-transparent",
+        )}
+      />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {showLogos && (

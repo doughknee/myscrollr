@@ -85,8 +85,8 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
         // Navigate immediately — the channel page's queries will fire
         // in parallel with the create call below.
         navigate({
-          to: "/channel/$type",
-          params: { type: item.id },
+          to: "/widget/$id",
+          params: { id: item.id },
         });
         toast.success(`${item.name} added`);
 

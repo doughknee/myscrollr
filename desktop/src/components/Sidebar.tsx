@@ -207,14 +207,23 @@ export default function Sidebar({
           collapsed={collapsed}
           onClick={onNavigateToCustomize}
         />
+        {/* Add-widget affordance rides with the app destinations —
+            adding is something you DO, not something you follow. */}
+        <SlotChip
+          collapsed={collapsed}
+          used={sources.length}
+          cap={slotCap}
+          active={isMarketplace}
+          onClick={onNavigateToMarketplace}
+        />
       </NavGroup>
 
       {/* ── Sources ─────────────────────────────────────────────
           The user's enabled channels and widgets in canonical
           order. Scrollable when long. */}
       <NavGroup
-        ariaLabel="Sources"
-        heading="Sources"
+        ariaLabel="Widgets"
+        heading="Widgets"
         collapsed={collapsed}
         className="flex-1 overflow-y-auto scrollbar-thin"
       >
@@ -233,15 +242,6 @@ export default function Sidebar({
           />
         ))}
 
-        {/* Slot chip — the single add-source affordance, with the
-            cap woven in (status + action in one control). */}
-        <SlotChip
-          collapsed={collapsed}
-          used={sources.length}
-          cap={slotCap}
-          active={isMarketplace}
-          onClick={onNavigateToMarketplace}
-        />
       </NavGroup>
 
       {/* ── Workspace ─────────────────────────────────────────── */}
@@ -472,10 +472,10 @@ function SlotChip({
   const showDots = collapsed && finite && cap <= 6;
 
   const label = !finite
-    ? "Add a source"
+    ? "Add a widget"
     : atCap
       ? `All ${cap} slots used — get more slots`
-      : `${used} of ${cap} slots used — add a source`;
+      : `${used} of ${cap} slots used — add a widget`;
 
   return (
     <Tooltip content={collapsed ? label : undefined} side="right">
@@ -528,7 +528,7 @@ function SlotChip({
         {!collapsed && (
           <>
             <span className="relative z-10 truncate">
-              {atCap ? "Get more slots" : "Add source"}
+              {atCap ? "Get more slots" : "Add widget"}
             </span>
             {finite && (
               <span className="relative z-10 ml-auto shrink-0 text-ui-meta text-fg-4">

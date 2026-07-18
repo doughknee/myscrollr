@@ -290,22 +290,22 @@ function HomePage() {
               }
               onViewAll={() =>
                 navigate({
-                  to: "/channel/$type",
-                  params: { type: ch.channel_type },
+                  to: "/widget/$id",
+                  params: { id: ch.channel_type },
                 })
               }
               onRowClick={() =>
                 navigate({
-                  to: "/channel/$type",
-                  params: { type: ch.channel_type },
+                  to: "/widget/$id",
+                  params: { id: ch.channel_type },
                 })
               }
               // Config lives inside the widget now — every CTA lands on
               // the feed, where the bar carries the configuration.
               onConfigure={() =>
                 navigate({
-                  to: "/channel/$type",
-                  params: { type: ch.channel_type },
+                  to: "/widget/$id",
+                  params: { id: ch.channel_type },
                 })
               }
             />

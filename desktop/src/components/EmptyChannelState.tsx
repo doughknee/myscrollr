@@ -87,8 +87,8 @@ export default function EmptyChannelState({
             widget.
           </p>
           <p className="text-[11px] text-fg-4/70 text-center max-w-sm leading-relaxed">
-            Looking for a different source? Use{" "}
-            <span className="text-fg-3 font-semibold">+ Add source</span> in the
+            Looking for a different widget? Use{" "}
+            <span className="text-fg-3 font-semibold">+ Add widget</span> in the
             sidebar to browse the catalog.
           </p>
         </>

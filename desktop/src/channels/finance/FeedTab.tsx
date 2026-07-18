@@ -726,14 +726,27 @@ const TradeItem = memo(function TradeItem({ trade, mode, display, category, now 
       className={clsx(
         FEED_CARD,
         FEED_CARD_INTERACTIVE,
-        "flex items-center justify-between border-l-2",
-        flash === "up" && "bg-up/6",
-        flash === "down" && "bg-down/6",
+        "relative flex items-center justify-between overflow-hidden border-l-2",
         isUp && "border-l-up/40",
         isDown && "border-l-down/40",
         !isUp && !isDown && "border-l-transparent",
       )}
     >
+      {/* Price-flash tint on its OWN overlay: the slow 700ms fade the
+          cards had pre-unification, decoupled from the shell's 150ms
+          hover transition (a bg class on the card also fought
+          FEED_CARD's bg utility on stylesheet order). */}
+      <span
+        aria-hidden
+        className={clsx(
+          "pointer-events-none absolute inset-0 transition-colors duration-700",
+          flash === "up"
+            ? "bg-up/6"
+            : flash === "down"
+              ? "bg-down/6"
+              : "bg-transparent",
+        )}
+      />
       <div className="flex flex-col gap-0.5">
         <span className="font-mono font-bold text-sm text-fg tracking-wide">
           {trade.symbol}
