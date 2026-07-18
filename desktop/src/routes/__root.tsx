@@ -25,7 +25,6 @@ import { useUpdateGate } from "../hooks/useUpdateGate";
 import { UpdateRequiredOverlay } from "../components/UpdateRequiredOverlay";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import clsx from "clsx";
-import { motion, AnimatePresence } from "motion/react";
 import { Toaster, toast } from "sonner";
 // Note: sonner CSS is imported in src/app-main.tsx so it ships in the
 // entry bundle. Importing it here would put it in this route's
@@ -197,28 +196,6 @@ function RootLayout() {
   const navigate = useNavigate();
   const navHistory = useNavHistory();
   const route = parseRoute(location.pathname);
-
-  // Route GROUP for the outer content cross-fade: all source pages
-  // share one group (their shared PageLayout cross-fades internally on
-  // param change), every chrome page is its own.
-  const routeGroupKey =
-    route.isChannel || route.isWidget
-      ? "source"
-      : route.isMarketplace
-        ? "catalog"
-        : route.isSettings
-          ? "settings"
-          : route.isTicker
-            ? "ticker"
-            : route.isAccount
-              ? "account"
-              : route.isSupport
-                ? "support"
-                : route.isReleases
-                  ? "releases"
-                  : route.isStatus
-                    ? "status"
-                    : "feed";
 
   // ── Auth (must be before dashboard query — tier drives refetchInterval) ──
   const auth = useAuthState();
@@ -1055,33 +1032,11 @@ function RootLayout() {
 
               {/* PageLayout (used by every route) owns its own scroll
                   for its content area. The outer wrapper just provides
-                  the flex slot for it to fill.
-
-                  The AnimatePresence cross-fades between route GROUPS
-                  (source pages vs catalog vs settings…). Source→source
-                  swaps share one mounted PageLayout whose internal
-                  cross-fade already animates; without this outer layer,
-                  leaving that group (e.g. source→catalog) unmounted the
-                  page abruptly with no exit. Keyed by group, not
-                  pathname, so intra-group navigation never double-
-                  animates. Do NOT pass initial={false} (the v1.1.1
-                  PresenceContext lesson — it kills every nested mount
-                  animation on boot). */}
+                  the flex slot for it to fill. */}
               <div className="flex-1 min-h-0 overflow-hidden">
                 <ShellContext.Provider value={shellStableValue}>
                   <ShellDataContext.Provider value={shellDataValue}>
-                    <AnimatePresence mode="wait">
-                      <motion.div
-                        key={routeGroupKey}
-                        className="h-full"
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        transition={{ duration: 0.18, ease: [0.22, 0.61, 0.36, 1] }}
-                      >
-                        <Outlet />
-                      </motion.div>
-                    </AnimatePresence>
+                    <Outlet />
                   </ShellDataContext.Provider>
                 </ShellContext.Provider>
               </div>

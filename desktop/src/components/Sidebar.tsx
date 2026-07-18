@@ -465,18 +465,29 @@ function SlotChip({
             ? "justify-center py-1.5 px-0"
             : "gap-2.5 px-2.5 py-1.5 text-ui-body",
           active
-            ? "bg-accent/15 text-accent"
+            ? "text-accent"
             : "text-accent/85 hover:bg-accent/10 hover:text-accent",
         )}
       >
-        <span className="shrink-0 flex items-center justify-center w-5 h-5">
+        {/* Same shared active pill as NavItem — without it, navigating
+            source → catalog unmounted the indicator with no destination
+            (the highlight vanished instead of sliding here). The static
+            bg is dropped while active so the pill is the one fill. */}
+        {active && (
+          <motion.span
+            layoutId="sidebar-active-indicator"
+            transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            className="absolute inset-0 z-0 rounded-lg bg-accent/15"
+          />
+        )}
+        <span className="relative z-10 shrink-0 flex items-center justify-center w-5 h-5">
           <Plus size={15} strokeWidth={2.5} />
         </span>
         {/* Cap dots pinned to the bottom edge inside the padding, so
             the chip stays exactly NavItem-height. */}
         {showDots && (
           <span
-            className="absolute bottom-[3px] left-1/2 -translate-x-1/2 flex items-center gap-[3px]"
+            className="absolute bottom-[3px] left-1/2 -translate-x-1/2 z-10 flex items-center gap-[3px]"
             aria-hidden
           >
             {Array.from({ length: cap }, (_, i) => (
@@ -492,11 +503,11 @@ function SlotChip({
         )}
         {!collapsed && (
           <>
-            <span className="truncate">
+            <span className="relative z-10 truncate">
               {atCap ? "Get more slots" : "Add source"}
             </span>
             {finite && (
-              <span className="ml-auto shrink-0 text-ui-meta text-fg-4">
+              <span className="relative z-10 ml-auto shrink-0 text-ui-meta text-fg-4">
                 {used}/{cap}
               </span>
             )}
