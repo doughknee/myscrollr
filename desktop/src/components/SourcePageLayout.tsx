@@ -3,7 +3,7 @@
  *
  * Renders through the universal `PageLayout`. Since the configure-page
  * teardown the feed is the only page a source has — every setting lives
- * inside the widget itself (bar + gear popover), and source-level
+ * inside the widget itself (its top bar), and source-level
  * removal lives in the sidebar right-click menu and the catalog info
  * page, so the page chrome carries no Options menu at all.
  *

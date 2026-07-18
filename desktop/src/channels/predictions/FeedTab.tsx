@@ -54,7 +54,7 @@ import {
 } from "../../components/widget-bar/Segmented";
 import { SearchBox, useSlashFocus } from "../../components/widget-bar/SearchBox";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
-import { GearMenu } from "../../components/widget-bar/GearMenu";
+import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import MyPositionsPanel from "./MyPositionsPanel";
 import MarketDetail from "./MarketDetail";
 import ProbabilityPill from "./ProbabilityPill";
@@ -141,16 +141,15 @@ const VIEW_OPTIONS: SegmentedOption<FeedView>[] = [
   { value: "positions", label: "Positions", icon: Wallet },
 ];
 
-/** Ticker fallback choices — mirrors PredictionsDisplayPrefs.defaultSort
- *  minus "alpha" (nobody wants an alphabetical ticker rail). */
+/** Ticker fallback when nothing is starred — bar SelectMenu options
+ *  (mirrors PredictionsDisplayPrefs.defaultSort minus "alpha"). */
 const TICKER_FALLBACKS: {
-  value: PredictionsDisplayPrefs["defaultSort"];
+  value: NonNullable<PredictionsDisplayPrefs["defaultSort"]>;
   label: string;
-  hint: string;
 }[] = [
-  { value: "trending", label: "Trending", hint: "hottest by 24h volume" },
-  { value: "movers", label: "Movers", hint: "biggest probability swings" },
-  { value: "closing", label: "Closing soon", hint: "nearest to close" },
+  { value: "trending", label: "Trending" },
+  { value: "movers", label: "Movers" },
+  { value: "closing", label: "Closing soon" },
 ];
 
 /** Pre-v1.1.5 server-side config keys (see the migration effect). */
@@ -179,7 +178,7 @@ const LENSES: { value: PredictionsLens; label: string; icon?: typeof Flame }[] =
 // ── FeedTab ──────────────────────────────────────────────────────
 
 function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
-  const { prefs } = useShell();
+  const { prefs, onPrefsChange } = useShell();
   const dp = prefs.channelDisplay.predictions;
 
   // Density is caller-driven only (the per-widget feedDensity pref was
@@ -665,7 +664,21 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                 <FreshnessPill lastUpdated={latestUpdated} label="odds" />
               </span>
             )}
-            <PredictionsGear />
+            <SelectMenu
+              ariaLabel="Ticker fallback when nothing is starred"
+              prefix="Ticker"
+              value={dp.defaultSort ?? "trending"}
+              options={TICKER_FALLBACKS}
+              onChange={(v) =>
+                onPrefsChange({
+                  ...prefs,
+                  channelDisplay: {
+                    ...prefs.channelDisplay,
+                    predictions: { ...dp, defaultSort: v },
+                  },
+                })
+              }
+            />
           </div>
         </WidgetBar>
       )}
@@ -911,47 +924,6 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
         />
       )}
     </div>
-  );
-}
-
-// ── Gear popover (in-widget settings, PR 1 of the configure-page
-//    retirement) ──────────────────────────────────────────────────
-//
-// The same patchDisplay writes as the Configure page's Display section —
-// the page keeps working (parity) until the teardown PR deletes it.
-
-function PredictionsGear() {
-  const { prefs, onPrefsChange } = useShell();
-  const dp = prefs.channelDisplay.predictions;
-
-  const patchDisplay = useCallback(
-    (patch: Partial<PredictionsDisplayPrefs>) => {
-      onPrefsChange({
-        ...prefs,
-        channelDisplay: {
-          ...prefs.channelDisplay,
-          predictions: { ...prefs.channelDisplay.predictions, ...patch },
-        },
-      });
-    },
-    [prefs, onPrefsChange],
-  );
-
-  return (
-    <GearMenu ariaLabel="Predictions settings" panelClassName="right-0 w-80">
-      <MenuHeading>Ticker without stars</MenuHeading>
-      {TICKER_FALLBACKS.map((opt) => (
-        <MenuRow
-          key={opt.value}
-          role="menuitemradio"
-          selected={(dp.defaultSort ?? "trending") === opt.value}
-          onClick={() => patchDisplay({ defaultSort: opt.value })}
-        >
-          {opt.label}
-          <span className="text-fg-4"> · {opt.hint}</span>
-        </MenuRow>
-      ))}
-    </GearMenu>
   );
 }
 

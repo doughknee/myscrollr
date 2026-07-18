@@ -1,8 +1,15 @@
+import { useCallback } from "react";
 import { Clock } from "lucide-react";
 import { WorldClock } from "./WorldClock";
-import { GearMenu } from "../../components/widget-bar/GearMenu";
-import { useShell } from "../../shell-context";
-import ClockSettings from "./Settings";
+import { WidgetBar } from "../../components/widget-bar/Bar";
+import {
+  Segmented,
+  type SegmentedOption,
+} from "../../components/widget-bar/Segmented";
+import { useStoreData } from "../../hooks/useStoreData";
+import { LS_CLOCK_FORMAT } from "../../constants";
+import { loadFormat, saveFormat } from "./storage";
+import type { TimeFormat } from "./types";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 
 export const clockWidget: WidgetManifest = {
@@ -18,41 +25,44 @@ export const clockWidget: WidgetManifest = {
     usage: [
       "Your local time appears in the Clock feed and can appear on the ticker.",
       "Add world clocks from the feed view to track more time zones.",
-      "Turn on world clocks from the gear menu to include selected time zones on the ticker.",
-      "Use the 12h/24h control to change clock formatting.",
+      "Use the 12h/24h control in the top bar to change clock formatting.",
     ],
   },
   FeedTab: ClockFeedTab,
 };
 
-function ClockFeedTab(props: FeedTabProps) {
+const FORMAT_OPTIONS: SegmentedOption<TimeFormat>[] = [
+  { value: "12h", label: "12h" },
+  { value: "24h", label: "24h" },
+];
+
+function ClockFeedTab({ mode }: FeedTabProps) {
+  // Format lives here (not in the bar or body) because both consume it:
+  // the bar's Segmented writes it, WorldClock renders with it. useStoreData
+  // only relays *cross-window* writes, so in-window siblings would desync.
+  const [format, setFormatState] = useStoreData(LS_CLOCK_FORMAT, loadFormat);
+  const handleFormatChange = useCallback(
+    (v: TimeFormat) => {
+      setFormatState(v);
+      saveFormat(v);
+    },
+    [setFormatState],
+  );
   return (
-    <div className="relative flex min-h-full flex-col">
-      {/* Comfort mode floats the gear top-right — the widget's settings
-          surface once the Configure page dies. */}
-      {props.mode === "comfort" && (
-        <div className="absolute right-3 top-3 z-10">
-          <ClockGear />
-        </div>
+    <div className="flex min-h-full flex-col">
+      {mode === "comfort" && (
+        <WidgetBar>
+          <Segmented
+            ariaLabel="Time format"
+            value={format}
+            onChange={handleFormatChange}
+            options={FORMAT_OPTIONS}
+          />
+        </WidgetBar>
       )}
-      <ClockFeedBody {...props} />
-    </div>
-  );
-}
-
-function ClockGear() {
-  const { prefs, onPrefsChange } = useShell();
-  return (
-    <GearMenu ariaLabel="Clock settings" panelClassName="right-0 w-80">
-      <ClockSettings prefs={prefs} onPrefsChange={onPrefsChange} />
-    </GearMenu>
-  );
-}
-
-function ClockFeedBody({ mode }: FeedTabProps) {
-  return (
-    <div className="p-3">
-      <WorldClock compact={mode === "compact"} />
+      <div className="p-3">
+        <WorldClock compact={mode === "compact"} fmt={format} />
+      </div>
     </div>
   );
 }

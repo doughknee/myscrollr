@@ -3,7 +3,7 @@
  *
  * Mounts the REAL FinanceFeedTab (no mocks of channel code) in a plain
  * browser with the minimum scaffolding it needs: the app stylesheet, a
- * ShellContext with STATEFUL display prefs (gear writes re-render like
+ * ShellContext with STATEFUL display prefs (bar writes re-render like
  * the real shell), and a TanStack Query cache seeded once with a
  * deterministic inline fixture (queries disabled — static data; live
  * behavior is verified in Tauri).

@@ -8,12 +8,10 @@
  *
  * ONE Kalshi-style control bar (widget-bar primitives): Segmented
  * [Scores | Schedule | Standings] · status BarPills (collapsing into a
- * Filter menu at narrow widths, counts in the rows) · freshness · gear
- * popover. The gear IS the per-league Configure page: favorite team
- * (teams fetched on first open), day-range time window, logo/timer
- * toggles — all via useSportsConfig. No league management: per-league
- * widgets have an intrinsic league, and coarse `sports` rows can't
- * exist post-migration-000014.
+ * Filter menu at narrow widths, counts in the rows) · freshness ·
+ * favorite-team and time-window SelectMenus — all via useSportsConfig.
+ * No league management: per-league widgets have an intrinsic league,
+ * and coarse `sports` rows can't exist post-migration-000014.
  */
 import { useState, useMemo, useRef, useCallback } from "react";
 import { Trophy } from "lucide-react";
@@ -39,10 +37,7 @@ import {
   Segmented,
   type SegmentedOption,
 } from "../../components/widget-bar/Segmented";
-import { GearMenu } from "../../components/widget-bar/GearMenu";
-import { SelectRow } from "../../components/settings/SettingsControls";
-import { DayRangeControl } from "../../components/TimeWindowControl";
-import { SPORTS_WINDOW_MAX_DAYS } from "./view";
+import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import { isLive, isPre, isFinal } from "../../utils/gameHelpers";
 import { AnimatePresence } from "motion/react";
 import type { FeedTabProps, ChannelManifest } from "../../types";
@@ -62,7 +57,7 @@ export const sportsChannel: ChannelManifest = {
       "Follow live scores across NFL, NBA, MLB, NHL, MLS, and more. " +
       "Scores update automatically with a visual flash when they change.",
     usage: [
-      "Set your favorite team and time window from the gear menu.",
+      "Set your favorite team and time window from the top bar.",
       "Live games show a pulsing indicator and scores update automatically.",
       "Final scores highlight the winning team in bold.",
     ],
@@ -208,7 +203,7 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
               </span>
             )}
             {scopedLeague && (
-              <SportsGear
+              <SportsBarControls
                 channelType={widgetId ?? "sports"}
                 league={scopedLeague}
               />
@@ -310,47 +305,50 @@ function SportsFilterMenu({
   );
 }
 
-// ── Gear popover (the per-league Configure page, in-widget) ─────
+// ── Bar controls (ex-gear: favorite team + time window) ─────────
 
-function SportsGear({
+/** Time-window choices — the old DayRangeControl presets. A stored
+ *  custom range (its retired steppers) gets a synthetic row so the
+ *  trigger never shows a value the menu doesn't contain. */
+const WINDOW_OPTIONS: { value: string; label: string; back: number; ahead: number }[] = [
+  { value: "0/0", label: "Today", back: 0, ahead: 0 },
+  { value: "1/7", label: "This week", back: 1, ahead: 7 },
+  { value: "7/7", label: "Everything", back: 7, ahead: 7 },
+];
+
+function SportsBarControls({
   channelType,
   league,
 }: {
   channelType: string;
   league: string;
 }) {
-  return (
-    <GearMenu ariaLabel="Sports settings" panelClassName="right-0 w-80">
-      {/* Contents mount when the popover opens — the teams list is only
-          fetched on first open, not on every feed visit. */}
-      <SportsGearContents channelType={channelType} league={league} />
-    </GearMenu>
-  );
-}
-
-function SportsGearContents({
-  channelType,
-  league,
-}: {
-  channelType: string;
-  league: string;
-}) {
-  const { display, favoriteTeams, setDisplay, setFavoriteTeam, saving } =
+  const { display, favoriteTeams, setDisplay, setFavoriteTeam } =
     useSportsConfig(channelType);
 
   const favorite = favoriteTeams[league];
+  // Fetched on feed mount now (the gear lazy-loaded on first open); the
+  // list is small and TanStack caches it per league.
   const { data: teamsData, isLoading: teamsLoading } = useQuery(
     sportsTeamsOptions(league),
   );
   const teams: TeamInfo[] = useMemo(() => teamsData?.teams ?? [], [teamsData]);
 
-  const teamOptions = useMemo(
-    () => [
+  const teamOptions = useMemo(() => {
+    const rows = [
       { value: "", label: teamsLoading ? "Loading teams…" : "No favorite" },
       ...teams.map((t) => ({ value: String(t.external_id), label: t.name })),
-    ],
-    [teams, teamsLoading],
-  );
+    ];
+    // Stored favorite shows its saved name in the trigger before (or
+    // without) the teams list loading.
+    if (
+      favorite &&
+      !teams.some((t) => String(t.external_id) === String(favorite.teamId))
+    ) {
+      rows.push({ value: String(favorite.teamId), label: favorite.teamName });
+    }
+    return rows;
+  }, [teams, teamsLoading, favorite]);
 
   const onPickTeam = useCallback(
     (id: string) => {
@@ -364,26 +362,38 @@ function SportsGearContents({
     [teams, league, setFavoriteTeam],
   );
 
+  const windowValue = `${display.daysBack}/${display.daysAhead}`;
+  const windowOptions = WINDOW_OPTIONS.some((o) => o.value === windowValue)
+    ? WINDOW_OPTIONS
+    : [
+        ...WINDOW_OPTIONS,
+        {
+          value: windowValue,
+          label: `${display.daysBack}d back · ${display.daysAhead}d ahead`,
+          back: display.daysBack,
+          ahead: display.daysAhead,
+        },
+      ];
+
   return (
     <>
-      <MenuHeading>Favorite {league} team</MenuHeading>
-      <SelectRow
-        label="Team"
-        description="Sorts to the top with a highlight"
+      <SelectMenu
+        ariaLabel={`Favorite ${league} team`}
+        prefix="Team"
         value={String(favorite?.teamId ?? "")}
         options={teamOptions}
         onChange={onPickTeam}
       />
-      <MenuHeading>Time window</MenuHeading>
-      <div className="px-1 pb-1">
-        <DayRangeControl
-          daysBack={display.daysBack}
-          daysAhead={display.daysAhead}
-          max={SPORTS_WINDOW_MAX_DAYS}
-          disabled={saving}
-          onChange={(next) => setDisplay(next)}
-        />
-      </div>
+      <SelectMenu
+        ariaLabel="Time window"
+        prefix="Window"
+        value={windowValue}
+        options={windowOptions}
+        onChange={(v) => {
+          const o = windowOptions.find((x) => x.value === v);
+          if (o) setDisplay({ daysBack: o.back, daysAhead: o.ahead });
+        }}
+      />
     </>
   );
 }

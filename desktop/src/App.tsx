@@ -491,7 +491,7 @@ export default function App() {
 
   /**
    * Installed-but-ticker-off state: open a specific channel's feed —
-   * the show-on-ticker toggle lives in the widget's own bar/gear now.
+   * the show-on-ticker toggle lives in the widget's own bar now.
    * Used by the per-channel quick-link chips.
    */
   const handleOpenChannel = useCallback(

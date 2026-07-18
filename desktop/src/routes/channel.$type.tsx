@@ -4,7 +4,7 @@
  * URL: /channel/:type  (type: "finance_stocks", "sports_nfl", …)
  *
  * The configuration tab is gone — every setting lives inside the widget
- * itself (bar + gear popover). Source-level actions (remove) are in the
+ * itself (its top bar). Source-level actions (remove) are in the
  * header bar's Options pill.
  */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";

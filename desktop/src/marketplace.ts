@@ -95,7 +95,7 @@ interface DataWidgetDef {
 // steps, so we name them once and reuse. Per-widget `usage` overrides these.
 const USAGE_TEAM_SPORT = [
   "Live scores and game state update automatically.",
-  "Set a favorite team from the gear menu to keep it front and center.",
+  "Set a favorite team from the top bar to keep it front and center.",
   "Pin it on game days so scores stay on screen.",
 ];
 const USAGE_NEWS = [
@@ -315,7 +315,7 @@ const DATA_WIDGETS: DataWidgetDef[] = [
     description: "Your Yahoo Fantasy leagues, matchups, and standings.",
     about: "Your Yahoo Fantasy leagues in the ticker — live scoring, matchups, and standings without ever opening the app.",
     usage: [
-      "Connect your Yahoo account from the gear menu.",
+      "Connect your Yahoo account from the top bar.",
       "Leagues, matchups, and standings sync automatically.",
       "Live scoring updates while your players are on the field.",
     ],

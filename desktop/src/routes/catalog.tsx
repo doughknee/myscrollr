@@ -251,8 +251,8 @@ function CatalogPage() {
                 className={clsx(
                   "flex items-center gap-1 rounded-md px-2.5 py-1 text-ui-chip font-medium transition-colors",
                   // Accent-tinted active state — bg-surface on bg-base-150
-                  // is near-invisible in the dark themes (v1.1.3 fix,
-                  // matches TimeWindowControl).
+                  // is near-invisible in the dark themes (v1.1.3 fix).
+                  
                   sort === s.key
                     ? "bg-accent/15 font-semibold text-accent"
                     : "text-fg-4 hover:text-fg-2",

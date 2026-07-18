@@ -4,12 +4,11 @@
  * Replaces the repeated empty-state pattern in finance, sports, rss, and
  * fantasy feeds.
  *
- * Since the configure-page teardown, every widget's settings live
- * in-widget (bar + gear popover); the CTA (when a channel passes one)
- * opens the relevant in-feed view, and the tip points at the gear.
+ * Since the configure-page teardown, every widget's settings live in
+ * its bar; the CTA (when a channel passes one) opens the relevant
+ * in-feed view, and the tip points at the bar.
  */
 import { clsx } from "clsx";
-import { Settings2 } from "lucide-react";
 
 interface EmptyChannelStateProps {
   icon: React.ComponentType<{ size?: number; className?: string }>;
@@ -84,18 +83,8 @@ export default function EmptyChannelState({
             </button>
           ) : null}
           <p className="text-[11px] text-fg-4/80 text-center max-w-sm leading-relaxed">
-            Tip: every widget's settings live in its own bar and{" "}
-            <span
-              className={clsx(
-                "inline-flex items-center gap-1 align-baseline",
-                "px-1 py-px rounded",
-                "bg-fg-4/10 text-fg-2 font-semibold",
-              )}
-            >
-              <Settings2 size={9} strokeWidth={2.5} aria-hidden="true" />
-              gear
-            </span>{" "}
-            menu at the top of the widget.
+            Tip: every widget's settings live in the bar at the top of the
+            widget.
           </p>
           <p className="text-[11px] text-fg-4/70 text-center max-w-sm leading-relaxed">
             Looking for a different source? Use{" "}

@@ -8,12 +8,12 @@
  *   - Roster:   user's (or any team's) roster with injury spotlight
  *
  * ONE Kalshi-style control bar (widget-bar primitives): Segmented
- * sub-tabs · league SelectMenu (emoji + name, ★ primary, live dot;
- * hidden on Overview / single league) · "N live" pulse · gear popover
- * (primary league, enabled leagues, default view, and the "Yahoo
- * account & leagues…" entry). The Yahoo OAuth/import wizard
- * (YahooConnectFlow) mounts IN-FEED — as the whole feed when nothing
- * is connected, or as the account view from the gear.
+ * sub-tabs (sticky — picking one is the default view) · league
+ * SelectMenu (emoji + name, ★ primary, live dot; hidden on Overview /
+ * single league) · "N live" pulse · Account pill. The Yahoo
+ * OAuth/import wizard (YahooConnectFlow) mounts IN-FEED — as the whole
+ * feed when nothing is connected, or via the Account pill; primary and
+ * enabled leagues are managed there (ConnectedView).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { clsx } from "clsx";
@@ -30,14 +30,12 @@ import { useQuery } from "@tanstack/react-query";
 import { dashboardQueryOptions } from "../../api/queries";
 import { useShell } from "../../shell-context";
 import EmptyChannelState from "../../components/EmptyChannelState";
-import { WidgetBar } from "../../components/widget-bar/Bar";
-import { MenuHeading, MenuRow } from "../../components/widget-bar/Menu";
+import { WidgetBar, BarPill } from "../../components/widget-bar/Bar";
 import {
   Segmented,
   type SegmentedOption,
 } from "../../components/widget-bar/Segmented";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
-import { GearMenu } from "../../components/widget-bar/GearMenu";
 import { OverviewView } from "./OverviewView";
 import { MatchupView } from "./MatchupView";
 import { StandingsView } from "./StandingsView";
@@ -50,7 +48,7 @@ import {
 } from "./types";
 import { filterEnabledLeagues, resolvePrimaryLeague } from "./view";
 import type { FeedTabProps, ChannelManifest } from "../../types";
-import type { FantasyDisplayPrefs, FantasySubTab } from "../../preferences";
+import type { FantasySubTab } from "../../preferences";
 import type { LeagueResponse, MyLeaguesResponse } from "./types";
 
 /** Channel accent — kept in sync with `fantasyChannel.hex`. */
@@ -71,7 +69,7 @@ export const fantasyChannel: ChannelManifest = {
       "your Yahoo Fantasy leagues. Scores, injuries, and seedings update in " +
       "near real time as games play out.",
     usage: [
-      "Connect Yahoo from the gear menu to import your leagues.",
+      "Connect Yahoo from the Account pill in the top bar to import your leagues.",
       "Pick a primary league to surface as the hero view.",
       "Flip between Overview, Matchup, Standings, and Roster to manage your teams.",
     ],
@@ -156,12 +154,24 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
     setSubTab("matchup");
   }, []);
 
-  // Account view (the Yahoo OAuth/import wizard) — opened from the gear.
+  // Account view (the Yahoo OAuth/import wizard) — opened from the bar.
   const [accountOpen, setAccountOpen] = useState(false);
-  const pickSubTab = useCallback((t: FantasySubTab) => {
-    setSubTab(t);
-    setAccountOpen(false);
-  }, []);
+  // Sticky sub-tab: the pick IS the default view (the gear's explicit
+  // "Default view" radios are gone).
+  const pickSubTab = useCallback(
+    (t: FantasySubTab) => {
+      setSubTab(t);
+      setAccountOpen(false);
+      onPrefsChange({
+        ...prefs,
+        channelDisplay: {
+          ...prefs.channelDisplay,
+          fantasy: { ...prefs.channelDisplay.fantasy, defaultSubTab: t },
+        },
+      });
+    },
+    [prefs, onPrefsChange],
+  );
 
   const enableAllLeagues = useCallback(() => {
     onPrefsChange({
@@ -246,10 +256,12 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
                 {liveCount} live
               </span>
             )}
-            <FantasyGear
-              leagues={leagues}
-              onOpenAccount={() => setAccountOpen(true)}
-            />
+            <BarPill
+              active={accountOpen}
+              onClick={() => setAccountOpen((o) => !o)}
+            >
+              Account
+            </BarPill>
           </div>
         </WidgetBar>
       )}
@@ -277,7 +289,7 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
           </div>
           <p className="max-w-sm text-[11px] text-fg-3">
             Every one of your imported leagues is currently hidden. Enable
-            them in the gear menu, or show them all:
+            them from the Account view, or show them all:
           </p>
           <button
             type="button"
@@ -308,122 +320,6 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
         </motion.div>
       )}
     </div>
-  );
-}
-
-// ── Gear popover (display prefs + account entry) ────────────────
-//
-// primaryLeagueKey / enabledLeagueKeys / defaultSubTab previously had
-// their only edit surface buried in the Configure page's ConnectedView
-// (which keeps them — same prefs, no conflict). The gear puts them one
-// click from the feed, plus the entry into the Yahoo account view.
-
-function FantasyGear({
-  leagues,
-  onOpenAccount,
-}: {
-  leagues: LeagueResponse[];
-  onOpenAccount: () => void;
-}) {
-  const { prefs, onPrefsChange } = useShell();
-  const dp = prefs.channelDisplay.fantasy;
-
-  const patch = useCallback(
-    (partial: Partial<FantasyDisplayPrefs>) => {
-      onPrefsChange({
-        ...prefs,
-        channelDisplay: {
-          ...prefs.channelDisplay,
-          fantasy: { ...prefs.channelDisplay.fantasy, ...partial },
-        },
-      });
-    },
-    [prefs, onPrefsChange],
-  );
-
-  // Empty enabled list means "all" — reflect that as fully enabled.
-  const enabledSet = useMemo(() => {
-    if (!dp.enabledLeagueKeys || dp.enabledLeagueKeys.length === 0) {
-      return new Set(leagues.map((l) => l.league_key));
-    }
-    return new Set(dp.enabledLeagueKeys);
-  }, [dp.enabledLeagueKeys, leagues]);
-
-  const toggleEnabled = useCallback(
-    (key: string) => {
-      const next = new Set(enabledSet);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      // Every league enabled is stored as [] ("all").
-      patch({
-        enabledLeagueKeys:
-          next.size === leagues.length ? [] : Array.from(next),
-      });
-    },
-    [enabledSet, leagues.length, patch],
-  );
-
-  return (
-    <GearMenu ariaLabel="Fantasy settings" panelClassName="right-0 w-80">
-      {(close) => (
-        <>
-          {leagues.length > 0 && (
-            <>
-              <MenuHeading>Primary league</MenuHeading>
-              <MenuRow
-                selected={!dp.primaryLeagueKey}
-                onClick={() => patch({ primaryLeagueKey: null })}
-                role="menuitemradio"
-              >
-                Auto (first active)
-              </MenuRow>
-              {leagues.map((l) => (
-                <MenuRow
-                  key={l.league_key}
-                  selected={dp.primaryLeagueKey === l.league_key}
-                  onClick={() => patch({ primaryLeagueKey: l.league_key })}
-                  role="menuitemradio"
-                >
-                  {SPORT_EMOJI[l.game_code] ?? "🏆"} {l.name}
-                </MenuRow>
-              ))}
-              <MenuHeading>Enabled leagues</MenuHeading>
-              {leagues.map((l) => (
-                <MenuRow
-                  key={l.league_key}
-                  selected={enabledSet.has(l.league_key)}
-                  onClick={() => toggleEnabled(l.league_key)}
-                  role="menuitemcheckbox"
-                >
-                  {SPORT_EMOJI[l.game_code] ?? "🏆"} {l.name}
-                </MenuRow>
-              ))}
-              <MenuHeading>Default view</MenuHeading>
-              {SUB_TABS.map((t) => (
-                <MenuRow
-                  key={t.value}
-                  selected={(dp.defaultSubTab ?? "overview") === t.value}
-                  onClick={() => patch({ defaultSubTab: t.value })}
-                  role="menuitemradio"
-                >
-                  {t.label}
-                </MenuRow>
-              ))}
-              <div aria-hidden className="my-1 h-px bg-edge/40" />
-            </>
-          )}
-          <MenuRow
-            selected={false}
-            onClick={() => {
-              close();
-              onOpenAccount();
-            }}
-          >
-            Yahoo account &amp; leagues…
-          </MenuRow>
-        </>
-      )}
-    </GearMenu>
   );
 }
 

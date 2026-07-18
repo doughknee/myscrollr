@@ -1,9 +1,21 @@
-import { Activity } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { Activity, ChevronDown } from "lucide-react";
 import { clsx } from "clsx";
+import { AnimatePresence } from "motion/react";
 import type { FeedTabProps, WidgetManifest } from "../../types";
-import { GearMenu } from "../../components/widget-bar/GearMenu";
+import { WidgetBar } from "../../components/widget-bar/Bar";
+import {
+  SelectMenu,
+  type SelectOption,
+} from "../../components/widget-bar/SelectMenu";
+import {
+  Segmented,
+  type SegmentedOption,
+} from "../../components/widget-bar/Segmented";
+import { MenuPanel, MenuRow, useDismiss } from "../../components/widget-bar/Menu";
 import { useShell } from "../../shell-context";
-import SysmonSettings from "./Settings";
+import { useWidgetConfig } from "../../hooks/useWidgetConfig";
+import type { SysmonTickerConfig, TempUnit } from "../../preferences";
 import { useSysmonData } from "../../hooks/useSysmonData";
 import { formatBytes, formatUptime } from "../../utils/format";
 import { findCpuTemp, findGpuTemp, usageColor, usageColorClass, tempColorClass, formatFreq, formatWatts, formatRate } from "./utils";
@@ -30,34 +42,131 @@ function DetailLine({ items }: { items: (string | null | undefined)[] }) {
 
 // ── FeedTab Component ───────────────────────────────────────────
 
+type StatKey = "cpu" | "memory" | "gpu" | "gpuPower";
+
+const STAT_ROWS: { key: StatKey; label: string }[] = [
+  { key: "cpu", label: "CPU usage" },
+  { key: "memory", label: "Memory usage" },
+  { key: "gpu", label: "GPU usage" },
+  { key: "gpuPower", label: "GPU power draw" },
+];
+
+const REFRESH_OPTIONS: SelectOption<string>[] = [
+  { value: "1", label: "1s" },
+  { value: "2", label: "2s" },
+  { value: "3", label: "3s" },
+  { value: "5", label: "5s" },
+];
+
+const TEMP_OPTIONS: SegmentedOption<TempUnit>[] = [
+  { value: "fahrenheit", label: "°F" },
+  { value: "celsius", label: "°C" },
+];
+
 function SysmonFeedTab(props: FeedTabProps) {
   return (
-    <div className="relative flex min-h-full flex-col">
-      {/* Comfort mode floats the gear top-right — the widget's settings
-          surface once the Configure page dies. */}
-      {props.mode === "comfort" && (
-        <div className="absolute right-3 top-3 z-10">
-          <SysmonGear />
-        </div>
-      )}
+    <div className="flex min-h-full flex-col">
+      {props.mode === "comfort" && <SysmonBar />}
       <SysmonFeedBody {...props} />
     </div>
   );
 }
 
-function SysmonGear() {
+function SysmonBar() {
   const { prefs, onPrefsChange } = useShell();
+  const { config, update, setTicker } = useWidgetConfig("sysmon", prefs, onPrefsChange);
   return (
-    <GearMenu ariaLabel="System monitor settings" panelClassName="right-0 w-80">
-      <SysmonSettings prefs={prefs} onPrefsChange={onPrefsChange} />
-    </GearMenu>
+    <WidgetBar>
+      <StatsMenu ticker={config.ticker} setTicker={setTicker} />
+      <SelectMenu
+        ariaLabel="Update speed"
+        prefix="Every"
+        align="left"
+        value={String(config.refreshInterval)}
+        options={REFRESH_OPTIONS}
+        onChange={(v) => update({ refreshInterval: Number(v) })}
+      />
+      <div className="ml-auto">
+        <Segmented
+          ariaLabel="Temperature unit"
+          value={config.tempUnit}
+          onChange={(v) => update({ tempUnit: v })}
+          options={TEMP_OPTIONS}
+        />
+      </div>
+    </WidgetBar>
+  );
+}
+
+/** Stats picker — checkbox rows over the shared Menu primitives.
+ *  MultiSelectMenu doesn't fit: its empty selection means "all", while
+ *  these are independent on/off toggles gating feed cards AND ticker chips. */
+function StatsMenu({
+  ticker,
+  setTicker,
+}: {
+  ticker: SysmonTickerConfig;
+  setTicker: (patch: Partial<SysmonTickerConfig>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(rootRef, open, close);
+
+  const onCount = STAT_ROWS.filter(({ key }) => ticker[key]).length;
+
+  return (
+    <div ref={rootRef} className="relative shrink-0 rounded-full">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Choose stats"
+        className={clsx(
+          "flex cursor-pointer items-center gap-1 rounded-full border py-1 pl-2.5 pr-2 text-ui-meta font-medium transition-colors",
+          open
+            ? "border-accent/40 bg-accent/15 text-accent"
+            : "border-edge/30 bg-base-150/60 text-fg-3 hover:text-fg-2",
+        )}
+      >
+        <span>Stats</span>
+        <span className="font-mono text-ui-chip tabular-nums text-fg-4">
+          {onCount}/{STAT_ROWS.length}
+        </span>
+        <ChevronDown
+          size={12}
+          aria-hidden
+          className={clsx(
+            "shrink-0 transition-transform duration-150",
+            open ? "rotate-180 text-accent/70" : "text-fg-4",
+          )}
+        />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <MenuPanel className="left-0 w-56">
+            {STAT_ROWS.map(({ key, label }) => (
+              <MenuRow
+                key={key}
+                role="menuitemcheckbox"
+                selected={ticker[key]}
+                onClick={() => setTicker({ [key]: !ticker[key] })}
+              >
+                {label}
+              </MenuRow>
+            ))}
+          </MenuPanel>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
 function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
   const compact = feedMode === "compact";
   const info = useSysmonData(POLL_INTERVAL);
-  // Stat selection (2026-07-17 unification): the gear's toggles gate
+  // Stat selection (2026-07-17 unification): the bar Stats menu gates
   // BOTH the feed cells and the ticker chips. (Config keys still live
   // under `ticker` for storage compatibility.)
   const { prefs } = useShell();
@@ -189,7 +298,7 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
         </div>
       </div>
 
-      {/* Stats grid — cells follow the gear's stat selection (network
+      {/* Stats grid — cells follow the bar's stat selection (network
           has no toggle and is always on). Borders are computed per index
           so the hairlines stay correct with 1–4 cells; a lone trailing
           cell spans both columns. */}
@@ -382,7 +491,7 @@ export const sysmonWidget: WidgetManifest = {
       "The System Monitor widget shows live stats for your computer on the ticker, including CPU usage, memory, and GPU.",
     usage: [
       "CPU, memory, and GPU usage appear on the ticker.",
-      "Turn individual stats on or off from the gear menu.",
+      "Turn individual stats on or off from the Stats menu in the top bar.",
       "The feed view shows detailed real-time stats including temperatures and a full breakdown.",
       "Pin it to a ticker row from Home to keep it in a fixed spot.",
     ],

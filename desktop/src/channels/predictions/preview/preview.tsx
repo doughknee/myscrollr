@@ -261,7 +261,7 @@ function main(): void {
 
   const FeedTab = predictionsChannel.FeedTab;
 
-  // Prefs are STATE so the in-widget gear popover's writes re-render the
+  // Prefs are STATE so the in-widget bar's writes re-render the
   // feed like the real shell (persistence itself is Tauri-only).
   function Harness() {
     const [prefs, setPrefs] = useState<AppPreferences>(initialPrefs);

@@ -1,8 +1,14 @@
+import { useCallback } from "react";
 import { TimerReset } from "lucide-react";
 import { Timer } from "./Timer";
-import { GearMenu } from "../../components/widget-bar/GearMenu";
+import { WidgetBar } from "../../components/widget-bar/Bar";
+import {
+  SelectMenu,
+  type SelectOption,
+} from "../../components/widget-bar/SelectMenu";
 import { useShell } from "../../shell-context";
-import TimerSettings from "./Settings";
+import { useWidgetConfig } from "../../hooks/useWidgetConfig";
+import type { TimerPomodoroConfig } from "../../preferences";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 
 export const timerWidget: WidgetManifest = {
@@ -18,34 +24,80 @@ export const timerWidget: WidgetManifest = {
     usage: [
       "Choose Pomodoro, Countdown, or Stopwatch from the mode selector.",
       "Use Space to start or pause and R to reset while the timer feed is focused.",
-      "Enable active timer ticker output from the gear menu.",
-      "Adjust Pomodoro session lengths and long-break cadence from the gear menu.",
+      "A running timer automatically appears on the ticker.",
+      "Adjust Pomodoro session lengths and long-break cadence from the top bar.",
     ],
   },
   FeedTab: TimerFeedTab,
 };
 
+const minuteOptions = (from: number, to: number, step: number): SelectOption<string>[] =>
+  Array.from({ length: (to - from) / step + 1 }, (_, i) => {
+    const v = from + i * step;
+    return { value: String(v), label: `${v} min` };
+  });
+
+const WORK_OPTIONS = minuteOptions(10, 60, 5);
+const SHORT_BREAK_OPTIONS = minuteOptions(1, 15, 1);
+const LONG_BREAK_OPTIONS = minuteOptions(5, 30, 5);
+const EVERY_OPTIONS: SelectOption<string>[] = [2, 3, 4, 5, 6].map((n) => ({
+  value: String(n),
+  label: `${n} sessions`,
+}));
+
 function TimerFeedTab(props: FeedTabProps) {
   return (
-    <div className="relative flex min-h-full flex-col">
-      {/* Comfort mode floats the gear top-right — the widget's settings
-          surface once the Configure page dies. */}
-      {props.mode === "comfort" && (
-        <div className="absolute right-3 top-3 z-10">
-          <TimerGear />
-        </div>
-      )}
+    <div className="flex min-h-full flex-col">
+      {props.mode === "comfort" && <TimerBar />}
       <TimerFeedBody {...props} />
     </div>
   );
 }
 
-function TimerGear() {
+function TimerBar() {
   const { prefs, onPrefsChange } = useShell();
+  const { config, update } = useWidgetConfig("timer", prefs, onPrefsChange);
+  const setPomodoro = useCallback(
+    (patch: Partial<TimerPomodoroConfig>) => {
+      update({ pomodoro: { ...config.pomodoro, ...patch } });
+    },
+    [update, config.pomodoro],
+  );
   return (
-    <GearMenu ariaLabel="Timer settings" panelClassName="right-0 w-80">
-      <TimerSettings prefs={prefs} onPrefsChange={onPrefsChange} />
-    </GearMenu>
+    <WidgetBar>
+      <SelectMenu
+        ariaLabel="Work session length"
+        prefix="Work"
+        align="left"
+        value={String(config.pomodoro.workMins)}
+        options={WORK_OPTIONS}
+        onChange={(v) => setPomodoro({ workMins: Number(v) })}
+      />
+      <SelectMenu
+        ariaLabel="Short break length"
+        prefix="Break"
+        align="left"
+        value={String(config.pomodoro.shortBreakMins)}
+        options={SHORT_BREAK_OPTIONS}
+        onChange={(v) => setPomodoro({ shortBreakMins: Number(v) })}
+      />
+      <SelectMenu
+        ariaLabel="Long break length"
+        prefix="Long break"
+        align="left"
+        value={String(config.pomodoro.longBreakMins)}
+        options={LONG_BREAK_OPTIONS}
+        onChange={(v) => setPomodoro({ longBreakMins: Number(v) })}
+      />
+      <SelectMenu
+        ariaLabel="Sessions before a long break"
+        prefix="Every"
+        align="left"
+        value={String(config.pomodoro.longBreakEvery)}
+        options={EVERY_OPTIONS}
+        onChange={(v) => setPomodoro({ longBreakEvery: Number(v) })}
+      />
+    </WidgetBar>
   );
 }
 

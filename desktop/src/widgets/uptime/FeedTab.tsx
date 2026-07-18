@@ -19,8 +19,13 @@ import type { KumaMonitor } from "./types";
 import { fetchKumaStatus, loadMonitors, saveMonitors, MONITOR_STATUS_LABELS, MONITOR_STATUS_COLORS, MONITOR_STATUS_TEXT } from "./types";
 import { toast } from "sonner";
 import { useShell } from "../../shell-context";
-import { GearMenu } from "../../components/widget-bar/GearMenu";
-import UptimeSettings from "./Settings";
+import { WidgetBar } from "../../components/widget-bar/Bar";
+import {
+  SelectMenu,
+  type SelectOption,
+} from "../../components/widget-bar/SelectMenu";
+import { useWidgetConfig } from "../../hooks/useWidgetConfig";
+import { formatPollInterval } from "../../utils/format";
 import { savePrefs, updateWidgetPrefs } from "../../preferences";
 import { useSyncedQuery } from "../../hooks/useSyncedQuery";
 import { LS_UPTIME_MONITORS } from "../../constants";
@@ -41,8 +46,7 @@ export const uptimeWidget: WidgetManifest = {
     usage: [
       "Paste your Uptime Kuma public status page URL to connect.",
       "All monitors from your status page appear with their current status.",
-      "Hide specific monitors from the ticker via the gear menu.",
-      "Configure the poll interval to control how often statuses refresh.",
+      "Set how often monitors refresh from the top bar.",
     ],
   },
   FeedTab: UptimeFeedTab,
@@ -50,27 +54,34 @@ export const uptimeWidget: WidgetManifest = {
 
 // ── FeedTab ─────────────────────────────────────────────────────
 
+const POLL_OPTIONS: SelectOption<string>[] = Array.from({ length: 10 }, (_, i) => {
+  const v = 30 + i * 30;
+  return { value: String(v), label: formatPollInterval(v) };
+});
+
 function UptimeFeedTab(props: FeedTabProps) {
   return (
-    <div className="relative flex min-h-full flex-col">
-      {/* Comfort mode floats the gear top-right — the widget's settings
-          surface once the Configure page dies. */}
-      {props.mode === "comfort" && (
-        <div className="absolute right-3 top-3 z-10">
-          <UptimeGear />
-        </div>
-      )}
+    <div className="flex min-h-full flex-col">
+      {props.mode === "comfort" && <UptimeBar />}
       <UptimeFeedBody {...props} />
     </div>
   );
 }
 
-function UptimeGear() {
+function UptimeBar() {
   const { prefs, onPrefsChange } = useShell();
+  const { config, update } = useWidgetConfig("uptime", prefs, onPrefsChange);
   return (
-    <GearMenu ariaLabel="Uptime settings" panelClassName="right-0 w-80">
-      <UptimeSettings prefs={prefs} onPrefsChange={onPrefsChange} />
-    </GearMenu>
+    <WidgetBar>
+      <SelectMenu
+        ariaLabel="Refresh interval"
+        prefix="Refresh"
+        align="left"
+        value={String(config.pollInterval)}
+        options={POLL_OPTIONS}
+        onChange={(v) => update({ pollInterval: Number(v) })}
+      />
+    </WidgetBar>
   );
 }
 

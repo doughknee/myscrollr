@@ -7,7 +7,7 @@
  *
  * ONE Kalshi-style control bar (widget-bar primitives): Feed/Symbols
  * segmented view switch · direction pills · sort + category menus ·
- * symbol search · freshness · gear popover. The Symbols view mounts the
+ * symbol search · freshness. The Symbols view mounts the
  * full SymbolManager in-feed — the Configure page's job, in-widget.
  * Counts live in menu rows (no summary band); filters collapse into one
  * Filter button at narrow widths.

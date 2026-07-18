@@ -6,7 +6,7 @@
  * Run with the vite dev server on :5174:
  *   node desktop/scripts/verify-rss.mjs
  *
- * Note: gear + Feeds view are asserted render-only — their writes ride
+ * Note: window select + Feeds view are asserted render-only — their writes ride
  * useChannelConfig (authenticated API mutation), which a plain browser
  * can't exercise. showAll / filters / sort are pure client state and
  * are exercised for real.
@@ -58,7 +58,7 @@ async function run() {
     check("sort menu present", (await page.locator('[aria-label="Sort articles"]').count()) === 1);
     check("sources menu present", (await page.locator('[aria-label="Filter by source"]').count()) === 1);
     check("category menu present", (await page.locator('[aria-label="Filter by category"]').count()) === 1);
-    check("gear present", (await page.locator('[aria-label="News settings"]').count()) === 1);
+    check("window select present", (await page.locator('[aria-label="Article time window"]').count()) === 1);
     const bodyText = await page.locator("#root").innerText();
     check("old limit band gone (footer only)", !bodyText.includes("Showing 5 per source"));
     const rowsAll = await page.locator(ROW).count();
@@ -153,22 +153,27 @@ async function run() {
     await page.close();
   }
 
-  // ════ 1440px — gear (render-only) + Feeds view ═══════════════════
+  // ════ 1440px — window select (render-only) + Feeds view ══════════
   {
     const { page, consoleErrors } = await newPage(browser, 1440, 900);
-    console.log("== 1440px · gear + Feeds view ==");
+    console.log("== 1440px · window select + Feeds view ==");
 
-    await page.locator('[aria-label="News settings"]').click();
+    check(
+      "no gear popover remains",
+      (await page.locator('[aria-label="News settings"]').count()) === 0,
+    );
+    await page.locator('[aria-label="Article time window"]').click();
     await page.waitForSelector('[role="menu"]');
     await page.waitForTimeout(250);
-    const gearText = (await page.locator('[role="menu"]').innerText()).toUpperCase();
+    const windowText = (await page.locator('[role="menu"]').innerText()).toUpperCase();
     check(
-      "gear is time window only (display toggles removed)",
-      gearText.includes("TIME WINDOW") &&
-        !gearText.includes("ARTICLE DESCRIPTIONS") &&
-        !gearText.includes("TIMESTAMPS"),
+      "window menu lists the age presets",
+      windowText.includes("TODAY") &&
+        windowText.includes("3 DAYS") &&
+        windowText.includes("WEEK") &&
+        windowText.includes("ALL"),
     );
-    await page.screenshot({ path: `${OUT}/rss-04-gear-1440.png` });
+    await page.screenshot({ path: `${OUT}/rss-04-window-1440.png` });
     await page.keyboard.press("Escape");
     await page.waitForTimeout(250);
 
@@ -185,7 +190,7 @@ async function run() {
     await page.waitForSelector(ROW);
     check("Articles tab returns to the list", (await page.locator(ROW).count()) > 10);
 
-    check("no console errors (gear/feeds page)", consoleErrors.length === 0, consoleErrors.join(" | "));
+    check("no console errors (window/feeds page)", consoleErrors.length === 0, consoleErrors.join(" | "));
     await page.close();
   }
 
@@ -200,7 +205,7 @@ async function run() {
       "NO categories menu (single category — the NASA case)",
       (await page.locator('[aria-label="Filter by category"]').count()) === 0,
     );
-    check("gear still present", (await page.locator('[aria-label="News settings"]').count()) === 1);
+    check("window select still present", (await page.locator('[aria-label="Article time window"]').count()) === 1);
     const rows = await page.locator(ROW).allInnerTexts();
     check("scoped to the widget's feed", rows.length > 0 && rows.every((t) => t.includes("BBC")), `rows=${rows.length}`);
     await page.screenshot({ path: `${OUT}/rss-06-curated-1440.png` });

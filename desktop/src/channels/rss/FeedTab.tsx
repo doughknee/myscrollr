@@ -8,8 +8,8 @@
  * ONE Kalshi-style control bar (widget-bar primitives): Articles/Feeds
  * segmented switch (rss_custom only — curated widgets have an intrinsic
  * feed) · sort SelectMenu · source/category MultiSelectMenus with counts
- * · freshness · gear popover (time window + display toggles, written as
- * the per-widget config.display override). The Feeds view mounts the
+ * · freshness · article-window SelectMenu (written as the per-widget
+ * config.display override). The Feeds view mounts the
  * full FeedManager in-feed. Per-source "Show all" lives at the list
  * FOOTER as content, not chrome.
  */
@@ -36,8 +36,6 @@ import {
 } from "../../components/widget-bar/Segmented";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
-import { GearMenu } from "../../components/widget-bar/GearMenu";
-import { ArticleAgeControl } from "../../components/TimeWindowControl";
 import FeedManager from "./FeedManager";
 import { useChannelConfig } from "../../hooks/useChannelConfig";
 import { useShell } from "../../shell-context";
@@ -235,7 +233,7 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   const channelType = (channel?.channel_type ?? widgetId ?? "rss") as ChannelType;
 
   // Persists the sticky sort into this widget's config.display override
-  // (same slot the time window uses; separate keyed hook from the gear's
+  // (same slot the time window uses; separate keyed hook from the bar's
   // so writes can't clobber each other's reads).
   const { updateItems: persistDisplay } = useChannelConfig<
     Partial<RssDisplayPrefs>
@@ -247,6 +245,13 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
       setShowAll(false);
       setExpandedSources(new Set());
       persistDisplay({ ...displayOverride, feedSort: next });
+    },
+    [displayOverride, persistDisplay],
+  );
+
+  const pickWindow = useCallback(
+    (days: number) => {
+      persistDisplay({ ...displayOverride, maxArticleAgeDays: days });
     },
     [displayOverride, persistDisplay],
   );
@@ -458,20 +463,12 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
                     <FreshnessPill lastUpdated={latestUpdated} label="article" />
                   </span>
                 )}
-                <RssGear
-                  channelType={channelType}
-                  override={displayOverride}
-                  globalRss={prefs.channelDisplay.rss}
-                />
+                <RssWindowSelect days={dp.maxArticleAgeDays} onPick={pickWindow} />
               </div>
             </>
           ) : (
             <div className="ml-auto">
-              <RssGear
-                channelType={channelType}
-                override={displayOverride}
-                globalRss={prefs.channelDisplay.rss}
-              />
+              <RssWindowSelect days={dp.maxArticleAgeDays} onPick={pickWindow} />
             </div>
           )}
         </WidgetBar>
@@ -695,37 +692,39 @@ function RssFilterMenu({
   );
 }
 
-// ── Gear popover (per-widget display override) ──────────────────
+// ── Article window (per-widget display override, in the bar) ────
 //
-// Same writes as the Configure page: the time window + display toggles
-// live in this widget's `config.display` override (NOT the global shell
-// prefs), merged over the global rss display everywhere it's read.
+// Same write the old gear's ArticleAgeControl made: the widget's
+// `config.display` override, merged over the global rss display
+// everywhere it's read. 0 = no age filter.
 
-function RssGear({
-  channelType,
-  override,
-  globalRss,
+const AGE_OPTIONS: { value: string; label: string }[] = [
+  { value: "1", label: "Today" },
+  { value: "3", label: "3 days" },
+  { value: "7", label: "Week" },
+  { value: "0", label: "All" },
+];
+
+function RssWindowSelect({
+  days,
+  onPick,
 }: {
-  channelType: ChannelType;
-  override: Partial<RssDisplayPrefs>;
-  globalRss: RssDisplayPrefs;
+  days: number;
+  onPick: (days: number) => void;
 }) {
-  const { updateItems: updateDisplay } = useChannelConfig<
-    Partial<RssDisplayPrefs>
-  >(channelType, "display");
-
+  // A stored custom window (old gear's stepper) gets its own row so the
+  // trigger never shows a value the menu doesn't contain.
+  const options = AGE_OPTIONS.some((o) => o.value === String(days))
+    ? AGE_OPTIONS
+    : [...AGE_OPTIONS, { value: String(days), label: `${days} days` }];
   return (
-    <GearMenu ariaLabel="News settings" panelClassName="right-0 w-80">
-      <MenuHeading>Time window</MenuHeading>
-      <div className="px-1 pb-1">
-        <ArticleAgeControl
-          maxAgeDays={override.maxArticleAgeDays ?? globalRss.maxArticleAgeDays}
-          onChange={(days) =>
-            updateDisplay({ ...override, maxArticleAgeDays: days })
-          }
-        />
-      </div>
-    </GearMenu>
+    <SelectMenu
+      ariaLabel="Article time window"
+      prefix="Window"
+      value={String(days)}
+      options={options}
+      onChange={(v) => onPick(Number(v))}
+    />
   );
 }
 

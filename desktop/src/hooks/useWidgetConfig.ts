@@ -17,11 +17,6 @@ type WidgetConfig<K extends WidgetConfigKey> = WidgetPrefs[K];
 /** The ticker sub-config for a widget (every widget config has a `ticker` field). */
 type TickerConfig<K extends WidgetConfigKey> = WidgetConfig<K> extends { ticker: infer T } ? T : never;
 
-export interface WidgetConfigPanelProps {
-  prefs: AppPreferences;
-  onPrefsChange: (prefs: AppPreferences) => void;
-}
-
 export interface UseWidgetConfigResult<K extends WidgetConfigKey> {
   config: WidgetConfig<K>;
   update: (patch: Partial<WidgetConfig<K>>) => void;

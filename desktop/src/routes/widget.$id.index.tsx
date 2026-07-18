@@ -4,7 +4,7 @@
  * URL: /widget/:id  (id: "clock" | "weather" | "sysmon" | "uptime" | "github" | "timer")
  *
  * The configuration tab is gone — every setting lives inside the widget
- * itself (gear popover). NOTE: this is deliberately an INDEX route
+ * itself (its top bar). NOTE: this is deliberately an INDEX route
  * (widget.$id.index.tsx, not widget.$id.tsx) so it doesn't become
  * widget.$id.info.tsx's layout parent and demand an Outlet.
  */

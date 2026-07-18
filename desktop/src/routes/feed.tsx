@@ -287,7 +287,7 @@ function HomePage() {
                 })
               }
               // Config lives inside the widget now — every CTA lands on
-              // the feed, where the bar/gear carries the configuration.
+              // the feed, where the bar carries the configuration.
               onConfigure={() =>
                 navigate({
                   to: "/channel/$type",

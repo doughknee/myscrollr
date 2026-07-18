@@ -22,8 +22,13 @@ import {
   CI_STATUS_TEXT,
 } from "./types";
 import { useShell } from "../../shell-context";
-import { GearMenu } from "../../components/widget-bar/GearMenu";
-import GitHubSettings from "./Settings";
+import { WidgetBar } from "../../components/widget-bar/Bar";
+import {
+  SelectMenu,
+  type SelectOption,
+} from "../../components/widget-bar/SelectMenu";
+import { useWidgetConfig } from "../../hooks/useWidgetConfig";
+import { formatPollInterval } from "../../utils/format";
 import { savePrefs, updateWidgetPrefs } from "../../preferences";
 import { useSyncedQuery } from "../../hooks/useSyncedQuery";
 import { LS_GITHUB_REPOS } from "../../constants";
@@ -45,7 +50,7 @@ export const githubWidget: WidgetManifest = {
       "Paste a GitHub repo URL to add it (e.g. https://github.com/org/repo).",
       "Each repo shows its latest GitHub Actions workflow run status.",
       "Click a repo row to open the workflow run on GitHub.",
-      "Hide specific repos from the ticker via the gear menu.",
+      "Set how often workflows refresh from the top bar.",
     ],
   },
   FeedTab: GitHubFeedTab,
@@ -53,27 +58,34 @@ export const githubWidget: WidgetManifest = {
 
 // ── FeedTab ─────────────────────────────────────────────────────
 
+const POLL_OPTIONS: SelectOption<string>[] = Array.from({ length: 9 }, (_, i) => {
+  const v = 60 + i * 30;
+  return { value: String(v), label: formatPollInterval(v) };
+});
+
 function GitHubFeedTab(props: FeedTabProps) {
   return (
-    <div className="relative flex min-h-full flex-col">
-      {/* Comfort mode floats the gear top-right — the widget's settings
-          surface once the Configure page dies. */}
-      {props.mode === "comfort" && (
-        <div className="absolute right-3 top-3 z-10">
-          <GitHubGear />
-        </div>
-      )}
+    <div className="flex min-h-full flex-col">
+      {props.mode === "comfort" && <GitHubBar />}
       <GitHubFeedBody {...props} />
     </div>
   );
 }
 
-function GitHubGear() {
+function GitHubBar() {
   const { prefs, onPrefsChange } = useShell();
+  const { config, update } = useWidgetConfig("github", prefs, onPrefsChange);
   return (
-    <GearMenu ariaLabel="GitHub settings" panelClassName="right-0 w-80">
-      <GitHubSettings prefs={prefs} onPrefsChange={onPrefsChange} />
-    </GearMenu>
+    <WidgetBar>
+      <SelectMenu
+        ariaLabel="Refresh interval"
+        prefix="Refresh"
+        align="left"
+        value={String(config.pollInterval)}
+        options={POLL_OPTIONS}
+        onChange={(v) => update({ pollInterval: Number(v) })}
+      />
+    </WidgetBar>
   );
 }
 

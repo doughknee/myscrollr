@@ -1,12 +1,12 @@
 /**
- * Playwright verification for the sports widget bar + gear popover
+ * Playwright verification for the sports widget bar + its SelectMenus
  * (in-widget config pass, PR 4). Drives the sports preview harness at
  * 1440 / 960 / 720 / 375.
  *
  * Run with the vite dev server on :5174:
  *   node desktop/scripts/verify-sports.mjs
  *
- * Gear contents are asserted render-only (useSportsConfig mutates via
+ * Bar select contents are asserted render-only (useSportsConfig mutates via
  * the authed API); status pills / tabs are pure client state and are
  * exercised for real.
  */
@@ -53,7 +53,8 @@ async function run() {
 
     check("segmented tabs render", (await page.locator('[aria-label="Sports view"] [role="tab"]').count()) === 3);
     check("status pills visible", await page.locator('button:has-text("Upcoming")').first().isVisible());
-    check("gear present", (await page.locator('[aria-label="Sports settings"]').count()) === 1);
+    check("team select present", (await page.locator('[aria-label="Favorite NFL team"]').count()) === 1);
+    check("window select present", (await page.locator('[aria-label="Time window"]').count()) === 1);
     check("no league filter (single-league widget)", (await page.locator('button:has-text("Leagues")').count()) === 0);
     await page.screenshot({ path: `${OUT}/sp-01-bar-1440.png` });
 
@@ -110,38 +111,48 @@ async function run() {
     await page.close();
   }
 
-  // ════ 1440px — gear popover (the per-league Configure page) ══════
+  // ════ 1440px — team + window SelectMenus (the gear is retired) ═══
   {
     const { page, consoleErrors } = await newPage(browser, 1440, 900);
-    console.log("== 1440px · gear popover ==");
+    console.log("== 1440px · team + window selects ==");
 
-    await page.locator('[aria-label="Sports settings"]').click();
-    await page.waitForSelector('[role="menu"]');
-    await page.waitForTimeout(300);
-    const gearText = (await page.locator('[role="menu"]').innerText()).toUpperCase();
     check(
-      "gear is favorite team + window only (display toggles removed)",
-      gearText.includes("FAVORITE NFL TEAM") &&
-        gearText.includes("TIME WINDOW") &&
-        !gearText.includes("TEAM LOGOS") &&
-        !gearText.includes("GAME TIMER"),
+      "no gear popover remains",
+      (await page.locator('[aria-label="Sports settings"]').count()) === 0,
     );
 
-    // Teams fetched (from the seeded cache) on first open: the select
-    // lists the league's teams with the favorite selected.
-    const teamSelect = page.locator('[role="menu"] select[aria-label="Team"]');
-    check("team select renders", (await teamSelect.count()) === 1);
-    const optionCount = await teamSelect.locator("option").count();
-    check("team select lists the league's teams", optionCount === 17, `options=${optionCount}`);
-    const selected = await teamSelect.inputValue();
-    check("favorite team pre-selected", selected === "1", `value=${selected}`);
-    await page.screenshot({ path: `${OUT}/sp-03-gear-1440.png` });
-
+    // Teams come from the seeded cache; the trigger shows the stored
+    // favorite's name, and the menu lists "No favorite" + 16 teams.
+    const teamTrigger = page.locator('[aria-label="Favorite NFL team"]');
+    const triggerText = await teamTrigger.innerText();
+    check(
+      "favorite team pre-selected in the trigger",
+      triggerText.includes("Kansas City Chiefs"),
+      `trigger=${triggerText}`,
+    );
+    await teamTrigger.click();
+    await page.waitForSelector('[role="menu"]');
+    await page.waitForTimeout(300);
+    const teamRows = await page.locator('[role="menu"] [role="menuitemradio"]').count();
+    check("team menu lists the league's teams", teamRows === 17, `rows=${teamRows}`);
+    await page.screenshot({ path: `${OUT}/sp-03-team-select-1440.png` });
     await page.keyboard.press("Escape");
     await page.waitForTimeout(250);
-    check("Esc closes the gear", (await page.locator('[role="menu"]').count()) === 0);
+    check("Esc closes the team menu", (await page.locator('[role="menu"]').count()) === 0);
 
-    check("no console errors (gear page)", consoleErrors.length === 0, consoleErrors.join(" | "));
+    await page.locator('[aria-label="Time window"]').click();
+    await page.waitForSelector('[role="menu"]');
+    const windowText = (await page.locator('[role="menu"]').innerText()).toUpperCase();
+    check(
+      "window menu lists the range presets",
+      windowText.includes("TODAY") &&
+        windowText.includes("THIS WEEK") &&
+        windowText.includes("EVERYTHING"),
+    );
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(250);
+
+    check("no console errors (selects page)", consoleErrors.length === 0, consoleErrors.join(" | "));
     await page.close();
   }
 

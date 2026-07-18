@@ -11,12 +11,16 @@ import Tooltip from "../../components/Tooltip";
 import { CloudSun } from "lucide-react";
 import { WeatherCard } from "./WeatherCard";
 import { CitySearch } from "./CitySearch";
-import { GearMenu } from "../../components/widget-bar/GearMenu";
-import { useShell } from "../../shell-context";
-import WeatherSettings from "./Settings";
+import { WidgetBar } from "../../components/widget-bar/Bar";
+import {
+  Segmented,
+  type SegmentedOption,
+} from "../../components/widget-bar/Segmented";
+import { useStoreData } from "../../hooks/useStoreData";
+import { LS_WEATHER_UNIT } from "../../constants";
 import { weatherQueryOptions, queryKeys } from "../../api/queries";
 import type { FeedTabProps, WidgetManifest } from "../../types";
-import type { WeatherLocation } from "./types";
+import type { TempUnit, WeatherLocation } from "./types";
 import { loadCities, saveCities, loadUnit, saveUnit } from "./types";
 import { toast } from "sonner";
 
@@ -37,7 +41,7 @@ export const weatherWidget: WidgetManifest = {
       "Search for a city in the feed view to add it to your weather locations.",
       "Each location appears on the ticker with temperature, conditions, and an icon.",
       "Add multiple cities to track weather across different locations.",
-      "Hide specific cities from the ticker via the gear menu.",
+      "Use the °F/°C control in the top bar to change units.",
     ],
   },
   FeedTab: WeatherFeedTab,
@@ -45,38 +49,50 @@ export const weatherWidget: WidgetManifest = {
 
 // ── FeedTab ─────────────────────────────────────────────────────
 
+const UNIT_OPTIONS: SegmentedOption<TempUnit>[] = [
+  { value: "fahrenheit", label: "°F" },
+  { value: "celsius", label: "°C" },
+];
+
 function WeatherFeedTab(props: FeedTabProps) {
+  // Unit lives here because both the bar (writes) and the body (reads)
+  // consume it — useStoreData only relays cross-window writes, so bar and
+  // body as siblings would desync in-window.
+  const [unit, setUnitState] = useStoreData(LS_WEATHER_UNIT, loadUnit);
+  const handleUnitChange = useCallback(
+    (v: TempUnit) => {
+      setUnitState(v);
+      saveUnit(v);
+    },
+    [setUnitState],
+  );
   return (
-    <div className="relative flex min-h-full flex-col">
-      {/* Comfort mode floats the gear top-right — the widget's settings
-          surface once the Configure page dies. */}
+    <div className="flex min-h-full flex-col">
       {props.mode === "comfort" && (
-        <div className="absolute right-3 top-3 z-10">
-          <WeatherGear />
-        </div>
+        <WidgetBar>
+          <Segmented
+            ariaLabel="Temperature unit"
+            value={unit}
+            onChange={handleUnitChange}
+            options={UNIT_OPTIONS}
+          />
+        </WidgetBar>
       )}
-      <WeatherFeedBody {...props} />
+      <WeatherFeedBody {...props} unit={unit} />
     </div>
   );
 }
 
-function WeatherGear() {
-  const { prefs, onPrefsChange } = useShell();
-  return (
-    <GearMenu ariaLabel="Weather settings" panelClassName="right-0 w-80">
-      <WeatherSettings prefs={prefs} onPrefsChange={onPrefsChange} />
-    </GearMenu>
-  );
-}
-
-function WeatherFeedBody({ mode: feedMode }: FeedTabProps) {
+function WeatherFeedBody({
+  mode: feedMode,
+  unit,
+}: FeedTabProps & { unit: TempUnit }) {
   const compact = feedMode === "compact";
 
   // Weather data from TanStack Query — shared cache with __root.tsx observer
   const { data: cities = [] } = useQuery(weatherQueryOptions());
   const queryClient = useQueryClient();
 
-  const [unit, setUnit] = useState(loadUnit);
   const [showSearch, setShowSearch] = useState(false);
   const [detecting, setDetecting] = useState(false);
 
@@ -114,15 +130,6 @@ function WeatherFeedBody({ mode: feedMode }: FeedTabProps) {
   const refreshCity = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.weather });
   }, [queryClient]);
-
-  // Toggle unit
-  const toggleUnit = useCallback(() => {
-    setUnit((prev) => {
-      const next = prev === "celsius" ? "fahrenheit" : "celsius";
-      saveUnit(next);
-      return next;
-    });
-  }, []);
 
   // Detect location via IP-based geolocation
   const detectLocation = useCallback(async () => {
@@ -187,17 +194,9 @@ function WeatherFeedBody({ mode: feedMode }: FeedTabProps) {
     <div className="p-3 space-y-2">
       {/* Header */}
       <div className="flex items-center justify-between px-1 mb-1">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-mono font-semibold text-widget-weather/80 uppercase tracking-wider">
-            Weather
-          </span>
-          <button
-            onClick={toggleUnit}
-            className="text-[11px] font-mono text-fg-2 hover:text-fg px-1.5 py-0.5 rounded border border-edge hover:border-edge-2 transition-colors"
-          >
-            {unit === "celsius" ? "\u00B0C" : "\u00B0F"}
-          </button>
-        </div>
+        <span className="text-xs font-mono font-semibold text-widget-weather/80 uppercase tracking-wider">
+          Weather
+        </span>
         <div className="flex items-center gap-2">
           <Tooltip content="Use my location">
             <button

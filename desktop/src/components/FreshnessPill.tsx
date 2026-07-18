@@ -66,7 +66,7 @@ export default memo(function FreshnessPill({
   return (
     <span
       className={clsx(
-        // h-7 matches the widget-bar control height (triggers, gear,
+        // h-7 matches the widget-bar control height (triggers, menus,
         // search) so the pill sits on the same optical line as its
         // neighbors instead of floating shorter between them.
         "inline-flex h-7 items-center gap-1 rounded-full px-2.5 font-mono text-ui-chip tabular-nums",
