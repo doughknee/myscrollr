@@ -654,6 +654,8 @@ function RootLayout() {
       name: string;
       hex: string;
       icon: React.ComponentType<{ size?: number; className?: string }>;
+      logoUrl?: string;
+      logoLight?: boolean;
       kind: "channel" | "widget";
       onTicker: boolean;
     }> = [];
@@ -668,6 +670,10 @@ function RootLayout() {
             name: m.name,
             hex: m.hex,
             icon: m.icon,
+            // Brand mark — the same URL the Catalog card shows, so the
+            // rail and the catalog speak one visual language.
+            logoUrl: m.logoUrl,
+            logoLight: m.logoLight,
             kind: "channel",
             // EFFECTIVE ticker state (v1.1.2 context menu) — the raw row
             // getter ignores the server ticker_enabled flag, which made

@@ -58,6 +58,37 @@ export interface SidebarSource {
   /** Whether this source currently has chips on the ticker — drives
    *  the context menu's Show/Hide label (v1.1.2). */
   onTicker: boolean;
+  /** Real brand mark (same URL the Catalog cards show). Rendered in
+   *  place of the colored Lucide icon, which stays as the fallback. */
+  logoUrl?: string;
+  /** Render the logo on a light tile (transparent/dark marks). */
+  logoLight?: boolean;
+}
+
+/** Source row glyph: the brand mark when one exists (matching the
+ *  Catalog cards), the colored Lucide icon otherwise or on load error
+ *  (offline, CDN blank). Utilities never have a logoUrl. */
+function SourceGlyph({ source }: { source: SidebarSource }) {
+  const [failed, setFailed] = useState(false);
+  if (!source.logoUrl || failed) {
+    return (
+      <span style={{ color: source.hex }}>
+        <source.icon size={15} />
+      </span>
+    );
+  }
+  return (
+    <img
+      src={source.logoUrl}
+      alt=""
+      aria-hidden
+      onError={() => setFailed(true)}
+      className={clsx(
+        "h-4 w-4 rounded-[4px] object-contain",
+        source.logoLight && "bg-white p-px",
+      )}
+    />
+  );
 }
 
 interface SidebarProps {
@@ -179,11 +210,7 @@ export default function Sidebar({
         {sources.map((source) => (
           <NavItem
             key={source.id}
-            icon={
-              <span style={{ color: source.hex }}>
-                <source.icon size={15} />
-              </span>
-            }
+            icon={<SourceGlyph source={source} />}
             label={source.name}
             active={activeItem === source.id}
             collapsed={collapsed}
