@@ -20,6 +20,7 @@ import { useQuery } from "@tanstack/react-query";
 import { dashboardQueryOptions, financeCatalogOptions } from "../../api/queries";
 import { formatPrice, formatChange, relativeTime } from "../../utils/format";
 import EmptyChannelState from "../../components/EmptyChannelState";
+import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarPill } from "../../components/widget-bar/Bar";
 import {
@@ -512,10 +513,9 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
         <>
           <div
             className={clsx(
-              "grid gap-px bg-edge",
               mode === "compact"
-                ? "grid-cols-1"
-                : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+                ? "grid grid-cols-1 gap-px bg-edge"
+                : "grid grid-cols-1 gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
             )}
           >
             {pageItems.map((trade) => (
@@ -724,7 +724,9 @@ const TradeItem = memo(function TradeItem({ trade, mode, display, category, now 
       target="_blank"
       rel="noopener noreferrer"
       className={clsx(
-        "flex items-center justify-between px-3 py-2 bg-surface transition-colors duration-700 hover:bg-surface-hover border-l-2",
+        FEED_CARD,
+        FEED_CARD_INTERACTIVE,
+        "flex items-center justify-between border-l-2",
         flash === "up" && "bg-up/6",
         flash === "down" && "bg-down/6",
         isUp && "border-l-up/40",

@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { dashboardQueryOptions, rssCatalogOptions } from "../../api/queries";
 import { relativeTime, truncate } from "../../utils/format";
 import EmptyChannelState from "../../components/EmptyChannelState";
+import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarDivider } from "../../components/widget-bar/Bar";
 import {
@@ -515,10 +516,9 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
           {visibleItems.length > 0 && (
             <div
               className={clsx(
-                "grid gap-px bg-edge",
                 mode === "compact"
-                  ? "grid-cols-1"
-                  : "grid-cols-1 sm:grid-cols-2",
+                  ? "grid grid-cols-1 gap-px bg-edge"
+                  : "grid grid-cols-1 gap-2 p-3 sm:grid-cols-2",
               )}
             >
               {renderList.map((entry) => {
@@ -914,7 +914,7 @@ const RssArticle = memo(function RssArticle({ item, mode, display, category, now
       href={item.link}
       target="_blank"
       rel="noopener noreferrer"
-      className="block px-3 py-2.5 bg-surface hover:bg-surface-hover transition-colors cursor-pointer border-l-2 border-l-accent/25 hover:border-l-accent/50"
+      className={clsx(FEED_CARD, FEED_CARD_INTERACTIVE, "block")}
     >
       <span className="text-sm font-medium text-fg leading-snug line-clamp-2">
         {item.title}

@@ -6,9 +6,11 @@
  * cached in the Tauri store for cross-window ticker sync.
  */
 import { useState, useCallback } from "react";
+import { clsx } from "clsx";
 import { Github, Plus, Trash2, ExternalLink, Loader2 } from "lucide-react";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 import Tooltip from "../../components/Tooltip";
+import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import QueryErrorBanner from "../../components/QueryErrorBanner";
 import type { GitHubRepo } from "./types";
 import {
@@ -291,7 +293,12 @@ function RepoRow({
 
   return (
     <div
-      className={`flex items-center gap-2 px-2 rounded-md border border-edge/50 bg-surface-2/30 ${compact ? "py-1.5" : "py-2"}`}
+      className={clsx(
+        FEED_CARD,
+        FEED_CARD_STATIC,
+        "flex items-center gap-2",
+        compact && "px-2 py-1.5",
+      )}
     >
       {/* Status dot */}
       {isLoading ? (

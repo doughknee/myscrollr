@@ -81,7 +81,7 @@ export function ScoresTab({
   }
 
   return (
-    <div className="bg-edge">
+    <div>
       {grouped.map(([league, leagueGames]) => (
         <div key={league}>
           <div className="px-3 py-1.5 bg-surface-hover border-b border-edge/30">
@@ -94,10 +94,10 @@ export function ScoresTab({
           </div>
           <div
             className={clsx(
-              "grid gap-px bg-edge",
+              "grid",
               mode === "compact"
-                ? "grid-cols-1"
-                : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+                ? "grid-cols-1 gap-px bg-edge"
+                : "grid-cols-1 gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3",
             )}
           >
             {leagueGames.map((game) => (

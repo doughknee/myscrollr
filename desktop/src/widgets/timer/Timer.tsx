@@ -5,6 +5,8 @@
  * window close/reopen within the same session.
  */
 import { useState, useEffect, useCallback, useRef } from "react";
+import { clsx } from "clsx";
+import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import { LS_TIMER_STATE } from "../../constants";
 import { getStore, setStore } from "../../lib/store";
 import { loadPrefs } from "../../preferences";
@@ -457,7 +459,7 @@ export function Timer({
           size="sm"
           onSwitch={onRequestSwitchMode}
         />
-        <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-widget-timer/[0.04] border border-widget-timer/10">
+        <div className={clsx(FEED_CARD, FEED_CARD_STATIC, "flex items-center justify-between")}>
           <div className="flex items-center gap-2">
             {isRunning && (
               <div
@@ -532,7 +534,7 @@ export function Timer({
       {/* Mode tabs live in the WidgetBar in comfort mode. */}
 
       {/* Display */}
-      <div className="rounded-2xl border border-widget-timer/15 bg-widget-timer/[0.04] px-4 py-5 shadow-[inset_0_1px_0_0_rgba(245,158,11,0.08)]">
+      <div className={clsx(FEED_CARD, FEED_CARD_STATIC, "rounded-2xl px-4 py-5")}>
         <div className="flex flex-col items-center">
           {isCountdown ? (
             <CircularProgress

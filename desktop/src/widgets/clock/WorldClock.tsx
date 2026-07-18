@@ -5,7 +5,9 @@
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { X } from "lucide-react";
+import { clsx } from "clsx";
 import Tooltip from "../../components/Tooltip";
+import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import { loadTimezones, saveTimezones, DEFAULT_TIMEZONES } from "./storage";
 import type { TimeFormat, TimezoneEntry } from "./types";
 
@@ -149,7 +151,7 @@ function ClockCard({
   if (compact) {
     return (
       <div
-        className="group flex items-center justify-between px-3 py-2 rounded-lg bg-widget-clock/[0.04] border border-widget-clock/10 hover:border-widget-clock/25 transition-colors"
+        className={clsx(FEED_CARD, FEED_CARD_STATIC, "group flex items-center justify-between py-2")}
         style={
           animating
             ? { animation: "widget-card-enter 200ms ease-out" }
@@ -183,12 +185,7 @@ function ClockCard({
 
   return (
     <div
-      className={
-        "group relative overflow-hidden px-4 py-3 rounded-xl border transition-colors " +
-        (isLocal
-          ? "bg-widget-clock/[0.07] border-widget-clock/25 shadow-[inset_0_1px_0_0_rgba(99,102,241,0.12)]"
-          : "bg-surface-2/70 border-widget-clock/10 hover:border-widget-clock/25")
-      }
+      className={clsx(FEED_CARD, FEED_CARD_STATIC, "group relative overflow-hidden")}
       style={
         animating
           ? { animation: "widget-card-enter 200ms ease-out" }

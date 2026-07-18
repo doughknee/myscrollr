@@ -4,6 +4,7 @@
  * Supports compact (single-row) and comfort (expanded with
  * humidity, wind, feels-like) display modes.
  */
+import { clsx } from "clsx";
 import { X } from "lucide-react";
 import type { SavedCity, TempUnit } from "./types";
 import {
@@ -14,6 +15,7 @@ import {
   formatWind,
 } from "./types";
 import Tooltip from "../../components/Tooltip";
+import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 
 // ── Inline SVG Icons ────────────────────────────────────────────
 
@@ -61,7 +63,11 @@ export function WeatherCard({
   if (compact) {
     return (
       <div
-        className="group flex items-center justify-between px-3 py-2 rounded-lg bg-widget-weather/[0.04] border border-widget-weather/10 hover:border-widget-weather/20 transition-colors"
+        className={clsx(
+          FEED_CARD,
+          FEED_CARD_STATIC,
+          "group flex items-center justify-between",
+        )}
         style={{ animation: "widget-card-enter 0.25s ease-out both" }}
       >
         <div className="flex items-center gap-3 min-w-0">
@@ -112,7 +118,7 @@ export function WeatherCard({
 
   return (
     <div
-      className="group relative px-4 py-3 rounded-xl bg-widget-weather/[0.04] border border-widget-weather/10 hover:border-widget-weather/20 transition-colors"
+      className={clsx(FEED_CARD, FEED_CARD_STATIC, "group relative")}
       style={{ animation: "widget-card-enter 0.25s ease-out both" }}
     >
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

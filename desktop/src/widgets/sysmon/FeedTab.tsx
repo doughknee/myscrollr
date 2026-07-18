@@ -13,6 +13,7 @@ import {
   type SegmentedOption,
 } from "../../components/widget-bar/Segmented";
 import { MenuPanel, MenuRow, useDismiss } from "../../components/widget-bar/Menu";
+import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import { useShell } from "../../shell-context";
 import { useWidgetConfig } from "../../hooks/useWidgetConfig";
 import type { SysmonTickerConfig, TempUnit } from "../../preferences";
@@ -203,7 +204,7 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
           </span>
         </div>
 
-        <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-widget-sysmon/[0.04] border border-widget-sysmon/10">
+        <div className={clsx(FEED_CARD, FEED_CARD_STATIC, "flex items-center gap-3")}>
           {stats.cpu && (
             <div className="flex items-center gap-1.5 flex-1 min-w-0">
               <span className="text-xs font-mono text-widget-sysmon/70 shrink-0">
@@ -302,10 +303,9 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
       </div>
 
       {/* Stats grid — cells follow the bar's stat selection (network
-          has no toggle and is always on). Borders are computed per index
-          so the hairlines stay correct with 1–4 cells; a lone trailing
-          cell spans both columns. */}
-      <div className="grid grid-cols-2 rounded-xl border border-widget-sysmon/10 overflow-hidden">
+          has no toggle and is always on). A lone trailing cell spans
+          both columns. */}
+      <div className="grid grid-cols-2 gap-2">
         {(() => {
           const cells: { key: string; node: React.ReactNode }[] = [];
           if (stats.cpu) {
@@ -456,18 +456,16 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
             ),
           });
 
-          const lastRowStart =
-            cells.length % 2 === 0 ? cells.length - 2 : cells.length - 1;
           return cells.map((cell, i) => {
             const spanBoth = cells.length % 2 === 1 && i === cells.length - 1;
             return (
               <div
                 key={cell.key}
                 className={clsx(
-                  "p-3 bg-widget-sysmon/[0.03] space-y-1.5 border-widget-sysmon/10",
+                  FEED_CARD,
+                  FEED_CARD_STATIC,
+                  "space-y-1.5",
                   spanBoth && "col-span-2",
-                  i % 2 === 0 && !spanBoth && "border-r",
-                  i < lastRowStart && "border-b",
                 )}
               >
                 {cell.node}

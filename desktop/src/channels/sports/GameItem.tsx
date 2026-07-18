@@ -9,6 +9,7 @@ import { memo } from "react";
 import { clsx } from "clsx";
 import { Star } from "lucide-react";
 import { isLive, isFinal, getWinner, gameStatusLabel, displayTeamCode } from "../../utils/gameHelpers";
+import { FEED_CARD, FEED_CARD_INTERACTIVE, FEED_CARD_STATIC } from "../../components/feedCard";
 import TeamLogo from "../../components/TeamLogo";
 import { useScoreFlash } from "../../hooks/useScoreFlash";
 import type { Game, FeedMode } from "../../types";
@@ -145,17 +146,17 @@ export const GameItem = memo(function GameItem({
     <CardWrapper
       link={game.link}
       className={clsx(
-        "px-3 py-2 bg-surface border-l-2 transition-colors duration-700",
-        // Border color: favorite+live > live > favorite > transparent
+        FEED_CARD,
+        hasLink ? FEED_CARD_INTERACTIVE : FEED_CARD_STATIC,
+        // Accent border layered on the shell: favorite+live > live > favorite
         isFavorite && live
-          ? "border-l-[#f97316]/60"
+          ? "border-l-2 border-l-[#f97316]/60"
           : live
-            ? "border-l-live/40"
+            ? "border-l-2 border-l-live/40"
             : isFavorite
-              ? "border-l-[#f97316]/30"
-              : "border-l-transparent",
+              ? "border-l-2 border-l-[#f97316]/30"
+              : null,
         flash && "bg-live/8",
-        hasLink && "hover:bg-surface-hover cursor-pointer",
       )}
     >
       <div className="flex items-center justify-between">

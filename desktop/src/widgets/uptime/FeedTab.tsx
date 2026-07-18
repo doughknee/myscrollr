@@ -10,6 +10,7 @@
  * poll interval, sync results to the store for the ticker.
  */
 import { useState, useCallback } from "react";
+import { clsx } from "clsx";
 import { useQueryClient } from "@tanstack/react-query";
 import { HeartPulse, RefreshCw, Unlink, Loader2 } from "lucide-react";
 import type { FeedTabProps, WidgetManifest } from "../../types";
@@ -28,6 +29,7 @@ import { useWidgetConfig } from "../../hooks/useWidgetConfig";
 import { formatPollInterval } from "../../utils/format";
 import { savePrefs, updateWidgetPrefs } from "../../preferences";
 import { useSyncedQuery } from "../../hooks/useSyncedQuery";
+import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import { LS_UPTIME_MONITORS } from "../../constants";
 
 // ── Widget manifest ─────────────────────────────────────────────
@@ -284,7 +286,7 @@ function MonitorRow({
 }) {
   return (
     <div
-      className={`flex items-center gap-2 px-2 rounded-md border border-edge/50 bg-surface-2/30 ${compact ? "py-1.5" : "py-2"}`}
+      className={clsx(FEED_CARD, FEED_CARD_STATIC, "flex items-center gap-2 px-2", compact ? "py-1.5" : "py-2")}
     >
       {/* Status dot */}
       <span className={`w-2 h-2 rounded-full shrink-0 ${MONITOR_STATUS_COLORS[monitor.status]}${monitor.status === "down" ? " animate-pulse" : ""}`} />

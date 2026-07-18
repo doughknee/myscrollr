@@ -39,6 +39,7 @@ import {
   relativeTime,
 } from "../../utils/format";
 import EmptyChannelState from "../../components/EmptyChannelState";
+import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarDivider, BarPill } from "../../components/widget-bar/Bar";
 import {
@@ -1151,7 +1152,7 @@ const ResolvedCard = memo(function ResolvedCard({
           openCard();
         }
       }}
-      className="flex h-full cursor-pointer flex-col gap-1.5 rounded-lg border border-edge/40 bg-surface p-3 transition-[border-color,box-shadow,transform,background-color] duration-150 hover:border-edge/80 hover:bg-surface-hover/40 hover:shadow-soft-sm active:scale-[0.99]"
+      className={clsx(FEED_CARD, FEED_CARD_INTERACTIVE, "flex h-full flex-col gap-1.5")}
     >
       {showHeaderCategory && (
         <div className="flex h-5 items-center justify-between gap-2">
@@ -1416,7 +1417,7 @@ const EventCard = memo(function EventCard({
           openCard();
         }
       }}
-      className="flex h-full cursor-pointer flex-col gap-1.5 rounded-lg border border-edge/40 bg-surface p-3 transition-[border-color,box-shadow,transform,background-color] duration-150 hover:border-edge/80 hover:bg-surface-hover/40 hover:shadow-soft-sm active:scale-[0.99]"
+      className={clsx(FEED_CARD, FEED_CARD_INTERACTIVE, "flex h-full flex-col gap-1.5")}
     >
       {/* Header row — category anchors the left so the countdown/star
           never sit alone. */}

@@ -20,6 +20,7 @@ import {
   userRoster,
 } from "./types";
 import { MatchupHero } from "./MatchupHero";
+import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import type { LeagueResponse } from "./types";
 
 interface OverviewViewProps {
@@ -197,8 +198,9 @@ function MiniLeagueTile({
       type="button"
       onClick={onClick}
       className={clsx(
-        "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors cursor-pointer",
-        "bg-surface hover:bg-surface-2 border-edge/40 hover:border-accent/40",
+        FEED_CARD,
+        FEED_CARD_INTERACTIVE,
+        "flex w-full items-center gap-3 text-left",
         live && "border-live/40",
       )}
     >
