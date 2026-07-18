@@ -71,9 +71,14 @@ export default function CatalogCard({ item, enabled, onInfo }: CatalogCardProps)
               onError={() => setLogoFailed(true)}
             />
           ) : (
+            // App-icon tile — same treatment as the sidebar's SourceGlyph
+            // fallback, so brandless widgets read as distinct logos here
+            // too (white glyph on a gradient of the brand hex).
             <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-              style={{ backgroundColor: `${item.hex}20`, color: item.hex }}
+              className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-white"
+              style={{
+                background: `linear-gradient(135deg, ${item.hex} 0%, ${item.hex}b8 100%)`,
+              }}
             >
               <Icon size={22} />
             </div>
