@@ -273,7 +273,7 @@ function WidgetInfoPage() {
                     Open
                     <ChevronRight
                       size={15}
-                      className="transition-transform duration-200 group-hover/btn:translate-x-0.5"
+                      className="transition-transform duration-150 group-hover/btn:translate-x-0.5"
                     />
                   </button>
                 </>

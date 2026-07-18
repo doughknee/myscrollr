@@ -275,8 +275,11 @@ function CatalogPage() {
           />
         </div>
       </WidgetBar>
+      {/* mt-4 on the first band(s) = the pt-4 gap every WCB page keeps
+          under the bar (adjacent margins collapse, so both carrying it
+          is safe whichever renders first). */}
       {dashboardError && (
-        <div className="mb-4">
+        <div className="mt-4 mb-5">
           <QueryErrorBanner error={dashboardError} />
         </div>
       )}
@@ -290,7 +293,7 @@ function CatalogPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25, delay: 0.02, ease: [0.22, 0.61, 0.36, 1] }}
         className={clsx(
-          "mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-xl border px-4 py-3",
+          "mt-4 mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-xl border px-4 py-3",
           slots.atCapacity && slots.finite
             ? "border-warn/25 bg-warn/[0.06]"
             : "border-edge/40 bg-base-150/30",
@@ -349,7 +352,7 @@ function CatalogPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            transition={{ duration: 0.18, ease: [0.22, 0.61, 0.36, 1] }}
           >
             {/* ── Your widgets ── */}
             {yourItems.length > 0 && (

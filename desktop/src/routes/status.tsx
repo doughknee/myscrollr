@@ -241,7 +241,7 @@ function StatusPage() {
                   </span>
                   <span
                     className={clsx(
-                      "flex items-center gap-1.5 h-5 px-2 rounded-full text-[11px] font-medium shrink-0",
+                      "flex items-center gap-1.5 h-5 px-2 rounded-full text-ui-chip font-medium shrink-0",
                       ok
                         ? "bg-success/10 text-success"
                         : "bg-error/10 text-error",

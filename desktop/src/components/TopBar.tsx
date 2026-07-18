@@ -200,7 +200,7 @@ export default function TopBar({
                     initial={{ opacity: 0, x: -6, filter: "blur(2px)" }}
                     animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
                     exit={{ opacity: 0, x: -6, filter: "blur(2px)" }}
-                    transition={{ duration: 0.22, ease: [0.22, 0.61, 0.36, 1] }}
+                    transition={{ duration: 0.18, ease: [0.22, 0.61, 0.36, 1] }}
                     className="flex items-center gap-1.5 min-w-0"
                   >
                     <span className="text-fg-4 shrink-0" aria-hidden>
@@ -251,7 +251,7 @@ export default function TopBar({
             aria-checked={tickerOn}
             onClick={onToggleTicker}
             className={clsx(
-              "flex items-center gap-1.5 h-7 px-2.5 rounded-md text-ui-chip font-medium transition-all duration-200 active:scale-95",
+              "flex items-center gap-1.5 h-7 px-2.5 rounded-md text-ui-chip font-medium transition-all duration-150 active:scale-95",
               tickerOn
                 ? "bg-accent/15 text-accent hover:bg-accent/20"
                 : "text-fg-4 hover:text-fg-2 hover:bg-surface-hover",

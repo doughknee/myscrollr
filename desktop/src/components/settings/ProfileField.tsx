@@ -91,7 +91,7 @@ export default function ProfileField({
               if (e.key === "Enter") handleSave();
               if (e.key === "Escape") handleCancel();
             }}
-            className="flex-1 px-2.5 py-1.5 text-xs bg-base-300 border border-edge rounded-md text-fg focus:outline-none focus:border-accent/60 disabled:opacity-60"
+            className="flex-1 px-2.5 py-1.5 text-ui-meta bg-base-300 border border-edge rounded-md text-fg focus:outline-none focus:border-accent/60 disabled:opacity-60"
           />
           <button
             onClick={handleSave}
@@ -120,7 +120,7 @@ export default function ProfileField({
         </div>
       ) : (
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs text-fg-2 truncate min-w-0 flex-1">
+          <span className="text-ui-meta text-fg-2 truncate min-w-0 flex-1">
             {value || (
               <span className="italic text-fg-4">
                 {placeholder ?? "Not set"}
@@ -129,14 +129,14 @@ export default function ProfileField({
           </span>
           <button
             onClick={() => setEditing(true)}
-            className="shrink-0 flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-fg-4 hover:text-fg-2 hover:bg-base-300 rounded-md transition-colors"
+            className="shrink-0 flex items-center gap-1 px-2 py-1 text-ui-chip font-medium text-fg-4 hover:text-fg-2 hover:bg-base-300 rounded-md transition-colors"
           >
             <Pencil size={10} /> Edit
           </button>
         </div>
       )}
       {error && (
-        <p className="mt-1.5 text-[11px] text-error/80 leading-snug">{error}</p>
+        <p className="mt-1.5 text-ui-chip text-error/80">{error}</p>
       )}
     </div>
   );

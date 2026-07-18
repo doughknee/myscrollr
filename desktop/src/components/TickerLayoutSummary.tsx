@@ -17,7 +17,6 @@
  *   does not mutate ticker layout; Settings → Ticker is the sole editor.
  */
 import { Settings as SettingsIcon } from "lucide-react";
-import clsx from "clsx";
 import Tooltip from "./Tooltip";
 import type { TickerRowConfig } from "../preferences";
 import type { ChannelManifest, WidgetManifest } from "../types";
@@ -148,7 +147,7 @@ export default function TickerLayoutSummary({
           cap is below the absolute max. If they're on Pro/Ultimate at 3
           rows, no hint (they've already maxed out). */}
       {atTierCap && (
-        <p className={clsx("mt-2 text-ui-chip font-mono text-fg-3")}>
+        <p className="mt-2 text-ui-chip font-mono text-fg-3">
           {tierMaxRows === 1
             ? "Upgrade to Uplink for a second ticker row."
             : "Upgrade to Uplink Pro for a third ticker row."}

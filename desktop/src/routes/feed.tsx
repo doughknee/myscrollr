@@ -201,8 +201,9 @@ function HomePage() {
           max-w-6xl) so it lines up with Catalog and every other
           wide route. The inner wrapper just owns vertical rhythm
           between sections (space-y-5, no dangling margin on the
-          last child). */}
-      <div className="space-y-5">
+          last child). Content under the WCB starts at pt-4, same as
+          Customize/Support; the bar-less empty state doesn't. */}
+      <div className={clsx("space-y-5", hasAnySources && "pt-4")}>
       {/* Empty state — hero. Shown when the user has no channels and
           no enabled widgets. Disappears the moment they add their
           first source. This IS the post-wizard first-run experience —
@@ -216,7 +217,7 @@ function HomePage() {
             authenticated ? (
               <button
                 onClick={() => navigate({ to: "/catalog" })}
-                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-surface hover:bg-accent/90 transition-all duration-200 active:scale-95 hover:shadow-glow-sm"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-surface hover:bg-accent/90 transition-all duration-150 active:scale-95 hover:shadow-glow-sm"
               >
                 <Plus size={15} strokeWidth={2.5} />
                 Browse the Catalog
@@ -224,7 +225,7 @@ function HomePage() {
             ) : (
               <button
                 onClick={onLogin}
-                className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-surface hover:bg-accent/90 transition-all duration-200 active:scale-95 hover:shadow-glow-sm"
+                className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-surface hover:bg-accent/90 transition-all duration-150 active:scale-95 hover:shadow-glow-sm"
               >
                 Sign in to get started
               </button>
@@ -253,18 +254,6 @@ function HomePage() {
           page reveals its data instead of slamming everything in
           at once. */}
       {orderedChannels.map(({ ch, manifest }, idx) => {
-        // Normalize the dashboard payload to a flat array per channel.
-        // Most channels are already arrays; Fantasy is { leagues: [...] }
-        // because each league entry carries matchups/standings/rosters at
-        // the top level. Without this unwrap the Home dashboard would
-        // think Fantasy is empty even when leagues are imported, while
-        // the standalone Feed view (which unwraps correctly) shows them.
-        const source = sourceForWidget(ch.channel_type) ?? ch.channel_type;
-        const channelData = scopeSourceData(
-          source,
-          normalizeChannelData(source, dashboard?.data?.[source]),
-          ch.config as Record<string, unknown> | undefined,
-        );
         return (
           <motion.div
             key={ch.channel_type}
@@ -505,12 +494,12 @@ function ChannelSection({
         {!editing && (
           <button
             onClick={onViewAll}
-            className="group flex items-center gap-1 text-[11px] font-medium text-fg-4 hover:text-fg-2 transition-all duration-150 active:scale-95"
+            className="group flex items-center gap-1 text-ui-chip font-medium text-fg-4 hover:text-fg-2 transition-all duration-150 active:scale-95"
           >
             View all
             <ChevronRight
               size={12}
-              className="transition-transform duration-200 group-hover:translate-x-0.5"
+              className="transition-transform duration-150 group-hover:translate-x-0.5"
             />
           </button>
         )}
@@ -530,13 +519,13 @@ function ChannelSection({
             className="rounded-lg border border-accent/20 bg-accent/[0.03] overflow-hidden divide-y divide-edge/10 mb-3"
           >
             <div className="px-4 py-2 flex items-center justify-between">
-              <span className="text-[11px] font-medium text-fg-3">
+              <span className="text-ui-chip font-medium text-fg-3">
                 Choose up to {MAX_PREVIEW} to show on Home
               </span>
               {hasSelections && (
                 <button
                   onClick={() => onSelectionChange([])}
-                  className="text-[11px] font-medium text-fg-4 hover:text-fg-2 transition-colors active:scale-95"
+                  className="text-ui-chip font-medium text-fg-4 hover:text-fg-2 transition-colors active:scale-95"
                 >
                   Clear all
                 </button>
@@ -575,7 +564,7 @@ function ChannelSection({
                       </motion.span>
                     )}
                   </span>
-                  <span className="text-xs text-fg truncate flex-1">
+                  <span className="text-ui-meta text-fg truncate flex-1">
                     {getGroupLabel(source, key, channelData)}
                   </span>
                 </button>
@@ -700,7 +689,7 @@ function PredictionsRows({ data, onConfigure }: { data: unknown; onConfigure: ()
         const isUp = delta > 0;
         return (
           <div key={p.id} className="flex items-center px-4 py-2.5 gap-4">
-            <span className="text-xs text-fg-2 truncate flex-1">
+            <span className="text-ui-meta text-fg-2 truncate flex-1">
               {p.event_title || p.title}
             </span>
             {/* Fixed delta slot + fixed-width pill — the channel's own
@@ -785,13 +774,13 @@ function SportsRows({
                   className="w-4 h-4 shrink-0 object-contain"
                 />
               )}
-              <span className="text-xs text-fg-2 truncate">
+              <span className="text-ui-meta text-fg-2 truncate">
                 {g.away_team_name || g.away_team_code}
               </span>
               <span className="text-xs text-fg-3 tabular-nums shrink-0">
                 {g.away_team_score} – {g.home_team_score}
               </span>
-              <span className="text-xs text-fg-2 truncate">
+              <span className="text-ui-meta text-fg-2 truncate">
                 {g.home_team_name || g.home_team_code}
               </span>
               {g.home_team_logo && (
@@ -838,7 +827,7 @@ function RssRows({ data, filter, onConfigure }: { data: unknown; filter: string[
     <>
       {sorted.map((item) => (
         <div key={item.id} className="flex items-center px-4 py-2.5 gap-3">
-          <span className="text-xs text-fg flex-1 truncate">{item.title}</span>
+          <span className="text-ui-meta text-fg flex-1 truncate">{item.title}</span>
           <span className="text-[10px] text-fg-4 shrink-0">
             {item.source_name}
           </span>
@@ -880,7 +869,7 @@ function FantasyRows({ data, filter, onConfigure }: { data: unknown; filter: str
 
         return (
           <div key={i} className="flex items-center px-4 py-2.5 gap-3">
-            <span className="text-xs text-fg flex-1 truncate">{name}</span>
+            <span className="text-ui-meta text-fg flex-1 truncate">{name}</span>
             {hasMatchup && (
               <span className="text-xs text-fg-3 tabular-nums">
                 {String(myScore)} – {String(oppScore)}
@@ -912,7 +901,7 @@ function EmptyDataRow({
   const hint = channelType ? EMPTY_HINTS[channelType] : undefined;
   return (
     <div className="px-4 py-5 text-center">
-      <p className="text-xs text-fg-3 font-medium mb-1">
+      <p className="text-ui-meta text-fg-3 font-medium mb-1">
         {hint?.message ?? "Nothing to show"}
       </p>
       {hint && onConfigure && (
@@ -921,7 +910,7 @@ function EmptyDataRow({
             e.stopPropagation();
             onConfigure();
           }}
-          className="inline-flex items-center gap-1.5 text-[11px] text-accent hover:text-accent/80 transition-colors"
+          className="inline-flex items-center gap-1.5 text-ui-chip text-accent hover:text-accent/80 transition-colors"
         >
           <Settings size={11} />
           Open {hint.name}
@@ -947,7 +936,7 @@ function WidgetStrip({
   return (
     <section>
       <div className="flex items-center gap-3 mb-3">
-        <h3 className="text-[11px] font-mono font-semibold text-fg-4 uppercase tracking-wider flex-1">
+        <h3 className="text-ui-section font-mono font-semibold text-fg-4 uppercase tracking-wider flex-1">
           Widgets
         </h3>
       </div>
@@ -997,7 +986,7 @@ function WidgetChip({
         <span style={{ color: widget.hex }} className="shrink-0">
           <Icon size={14} />
         </span>
-        <span className="text-xs font-medium text-fg truncate flex-1">
+        <span className="text-ui-meta font-medium text-fg truncate flex-1">
           {widget.tabLabel}
         </span>
         <TickerStatusBadge label={tickerStatus} />

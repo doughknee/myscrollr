@@ -592,7 +592,7 @@ const AccountChip = forwardRef(function AccountChip(
       <span
         className={clsx(
           "shrink-0 flex items-center justify-center rounded-full",
-          "bg-accent/15 text-accent text-[11px] font-semibold",
+          "bg-accent/15 text-accent text-ui-chip font-semibold",
           collapsed ? "w-6 h-6" : "w-7 h-7",
         )}
       >
