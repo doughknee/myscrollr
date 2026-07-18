@@ -1,20 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
-import RouteError from "../components/RouteError";
-import PageLayout from "../components/layout/PageLayout";
-import TickerSettings from "../components/settings/TickerSettings";
-import { useShell } from "../shell-context";
+/**
+ * Ticker route — redirect shim. The page merged into /customize
+ * (Ticker tab, the default) in REL-44; the path survives for stored
+ * lastRoute values, tray/ticker-window deep links, and muscle memory.
+ */
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/ticker")({
-  component: TickerRoute,
-  errorComponent: RouteError,
+  beforeLoad: () => {
+    throw redirect({ to: "/customize" });
+  },
 });
-
-function TickerRoute() {
-  const { prefs, onPrefsChange } = useShell();
-
-  return (
-    <PageLayout title="Ticker" width="wide">
-      <TickerSettings prefs={prefs} onPrefsChange={onPrefsChange} />
-    </PageLayout>
-  );
-}

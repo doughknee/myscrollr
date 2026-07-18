@@ -142,7 +142,7 @@ function HomePage() {
   );
 
   const openTickerSettings = useCallback(() => {
-    navigate({ to: "/ticker" });
+    navigate({ to: "/customize" });
   }, [navigate]);
 
   // Resolve each enabled channel row to a render manifest — the coarse source's

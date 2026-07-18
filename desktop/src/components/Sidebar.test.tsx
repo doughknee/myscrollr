@@ -26,8 +26,7 @@ function renderSidebar(opts: {
   }));
   render(
     <Sidebar
-      isSettings={false}
-      isTicker={false}
+      isCustomize={false}
       isAccount={false}
       isMarketplace={false}
       isSupport={false}
@@ -37,8 +36,7 @@ function renderSidebar(opts: {
       sources={sources}
       onNavigateHome={onNavigateHome}
       onNavigateToMarketplace={onNavigateToMarketplace}
-      onNavigateToSettings={() => {}}
-      onNavigateToTicker={() => {}}
+      onNavigateToCustomize={() => {}}
       onNavigateToAccount={() => {}}
       onNavigateToSupport={() => {}}
       onSelectItem={() => {}}

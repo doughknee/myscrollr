@@ -15,6 +15,7 @@ import { Route as StatusRouteImport } from './routes/status'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReleasesRouteImport } from './routes/releases'
 import { Route as FeedRouteImport } from './routes/feed'
+import { Route as CustomizeRouteImport } from './routes/customize'
 import { Route as CatalogRouteImport } from './routes/catalog'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
@@ -52,6 +53,11 @@ const FeedRoute = FeedRouteImport.update({
   path: '/feed',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CustomizeRoute = CustomizeRouteImport.update({
+  id: '/customize',
+  path: '/customize',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CatalogRoute = CatalogRouteImport.update({
   id: '/catalog',
   path: '/catalog',
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/catalog': typeof CatalogRoute
+  '/customize': typeof CustomizeRoute
   '/feed': typeof FeedRoute
   '/releases': typeof ReleasesRoute
   '/settings': typeof SettingsRoute
@@ -101,6 +108,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/catalog': typeof CatalogRoute
+  '/customize': typeof CustomizeRoute
   '/feed': typeof FeedRoute
   '/releases': typeof ReleasesRoute
   '/settings': typeof SettingsRoute
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/catalog': typeof CatalogRoute
+  '/customize': typeof CustomizeRoute
   '/feed': typeof FeedRoute
   '/releases': typeof ReleasesRoute
   '/settings': typeof SettingsRoute
@@ -132,6 +141,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/catalog'
+    | '/customize'
     | '/feed'
     | '/releases'
     | '/settings'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/catalog'
+    | '/customize'
     | '/feed'
     | '/releases'
     | '/settings'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/catalog'
+    | '/customize'
     | '/feed'
     | '/releases'
     | '/settings'
@@ -175,6 +187,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
   CatalogRoute: typeof CatalogRoute
+  CustomizeRoute: typeof CustomizeRoute
   FeedRoute: typeof FeedRoute
   ReleasesRoute: typeof ReleasesRoute
   SettingsRoute: typeof SettingsRoute
@@ -230,6 +243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FeedRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/customize': {
+      id: '/customize'
+      path: '/customize'
+      fullPath: '/customize'
+      preLoaderRoute: typeof CustomizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/catalog': {
       id: '/catalog'
       path: '/catalog'
@@ -279,6 +299,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
   CatalogRoute: CatalogRoute,
+  CustomizeRoute: CustomizeRoute,
   FeedRoute: FeedRoute,
   ReleasesRoute: ReleasesRoute,
   SettingsRoute: SettingsRoute,

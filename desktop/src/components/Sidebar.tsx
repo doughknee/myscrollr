@@ -7,7 +7,7 @@
  *   │ Sports     │
  *   │ + 2/3      │  ← slot chip: add-source CTA + cap meter in one
  *   │    ⋮       │
- *   │ [Account ▾]│⇤│  ← footer chip: Settings/Ticker/Account/Support
+ *   │ [Account ▾]│⇤│  ← footer chip: Account/Support menu
  *   └────────────┘      menu + collapse toggle
  *
  * Home navigation lives on the Scrollr brand mark in the TopBar;
@@ -31,8 +31,8 @@ import {
   PanelLeftOpen,
   Plus,
   RadioTower,
-  Settings,
   Settings2,
+  SlidersHorizontal,
   Trash2,
   UserCircle,
 } from "lucide-react";
@@ -99,10 +99,8 @@ function SourceGlyph({ source }: { source: SidebarSource }) {
 }
 
 interface SidebarProps {
-  /** Whether the settings page is active. */
-  isSettings: boolean;
-  /** Whether the ticker settings page is active. */
-  isTicker: boolean;
+  /** Whether the Customize page (merged Settings + Ticker) is active. */
+  isCustomize: boolean;
   /** Whether the account page is active. */
   isAccount: boolean;
   /** Whether the catalog page is active. Drives the "+ Add source"
@@ -124,10 +122,8 @@ interface SidebarProps {
   onNavigateHome: () => void;
   /** Navigate to the catalog page (used by "+ Add source"). */
   onNavigateToMarketplace: () => void;
-  /** Navigate to the settings page. */
-  onNavigateToSettings: () => void;
-  /** Navigate to the ticker page. */
-  onNavigateToTicker: () => void;
+  /** Navigate to the Customize page (merged Settings + Ticker). */
+  onNavigateToCustomize: () => void;
   /** Navigate to the account page. */
   onNavigateToAccount: () => void;
   /** Navigate to the support page. */
@@ -147,8 +143,7 @@ interface SidebarProps {
 // ── Component ───────────────────────────────────────────────────
 
 export default function Sidebar({
-  isSettings,
-  isTicker,
+  isCustomize,
   isAccount,
   isMarketplace,
   isSupport,
@@ -158,8 +153,7 @@ export default function Sidebar({
   sources,
   onNavigateHome,
   onNavigateToMarketplace,
-  onNavigateToSettings,
-  onNavigateToTicker,
+  onNavigateToCustomize,
   onNavigateToAccount,
   onNavigateToSupport,
   onSelectItem,
@@ -195,6 +189,26 @@ export default function Sidebar({
         collapsed ? "w-[48px]" : "w-[200px]",
       )}
     >
+      {/* ── App destinations — Home + Customize above the sources,
+          Claude-desktop style: the rail leads with where you GO, then
+          lists what you FOLLOW. */}
+      <NavGroup ariaLabel="App" heading="" collapsed={collapsed}>
+        <NavItem
+          icon={<Home size={15} />}
+          label="Home"
+          active={isFeed}
+          collapsed={collapsed}
+          onClick={onNavigateHome}
+        />
+        <NavItem
+          icon={<SlidersHorizontal size={15} />}
+          label="Customize"
+          active={isCustomize}
+          collapsed={collapsed}
+          onClick={onNavigateToCustomize}
+        />
+      </NavGroup>
+
       {/* ── Sources ─────────────────────────────────────────────
           The user's enabled channels and widgets in canonical
           order. Scrollable when long. */}
@@ -204,16 +218,6 @@ export default function Sidebar({
         collapsed={collapsed}
         className="flex-1 overflow-y-auto scrollbar-thin"
       >
-        {/* Home — pinned above the user's sources so the rail always
-            has an anchor, even with zero sources. */}
-        <NavItem
-          icon={<Home size={15} />}
-          label="Home"
-          active={isFeed}
-          collapsed={collapsed}
-          onClick={onNavigateHome}
-        />
-
         {sources.map((source) => (
           <NavItem
             key={source.id}
@@ -242,9 +246,8 @@ export default function Sidebar({
 
       {/* ── Workspace ─────────────────────────────────────────── */}
       {/* ── Footer: account chip + collapse ─────────────────────
-          Everything app-level (Settings, Ticker, Account, Support)
-          lives behind one chip menu — the sidebar's rows stay
-          reserved for sources. */}
+          Account + Support live behind one chip menu — Customize is
+          a top-level rail item, and the sources own the rows. */}
       <div
         className={clsx(
           "shrink-0 py-2",
@@ -260,23 +263,10 @@ export default function Sidebar({
             <AccountChip
               collapsed={collapsed}
               tierLabel={TIER_LABELS[tier]}
-              active={isSettings || isTicker || isAccount || isSupport}
+              active={isAccount || isSupport}
             />
           }
           items={[
-            {
-              key: "settings",
-              label: "Settings",
-              icon: Settings,
-              onSelect: onNavigateToSettings,
-            },
-            {
-              key: "ticker",
-              label: "Ticker",
-              icon: RadioTower,
-              onSelect: onNavigateToTicker,
-            },
-            { key: "d1", divider: true },
             {
               key: "account",
               label: "Account",
@@ -384,7 +374,7 @@ function NavGroup({
         className,
       )}
     >
-      {!collapsed && (
+      {!collapsed && heading && (
         <h2 className="px-2.5 mb-1 text-ui-section">{heading}</h2>
       )}
       {children}
@@ -553,7 +543,7 @@ function SlotChip({
 }
 
 // ── Account chip ────────────────────────────────────────────────
-// Footer trigger for the app-level menu (Settings/Ticker/Account/
+// Footer trigger for the app-level menu (Account/
 // Support). floating-ui injects ref + aria handlers via cloneElement,
 // so this is a forwardRef-compatible button (same pattern as the
 // TopBar's MoreTabsTrigger). `active` marks that one of the menu's
