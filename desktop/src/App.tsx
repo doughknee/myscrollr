@@ -496,7 +496,7 @@ export default function App() {
    */
   const handleOpenChannel = useCallback(
     (channelId: string) => {
-      navigateMainWindow(`/channel/${channelId}/feed`);
+      navigateMainWindow(`/widget/${channelId}`);
     },
     [navigateMainWindow],
   );
