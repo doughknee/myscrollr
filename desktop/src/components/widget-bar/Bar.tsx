@@ -12,7 +12,7 @@
  * - The bar is a @container: children collapse via @Nxl: variants BEFORE
  *   they'd clip at narrow widths (collapse-before-clip).
  */
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { clsx } from "clsx";
 import { motion, useIsPresent } from "motion/react";
@@ -56,6 +56,17 @@ function BarRow({ children }: { children: React.ReactNode }) {
 export function WidgetBar({ children }: { children: React.ReactNode }) {
   const chassis = useBarChassis();
 
+  // Presence ownership for the SHARED chassis elevation flag: during a
+  // popLayout swap two bars coexist for ~180ms, and the EXITING page's
+  // pinned-absolute sentinel can leave the viewport and fire a late
+  // stuck=true AFTER the incoming bar's correct report — a resting-state
+  // shadow that persists until the live sentinel refires. Exiting bars
+  // simply don't get a vote. (Harnesses: useIsPresent() is true with no
+  // AnimatePresence ancestor, so the standalone path is unchanged.)
+  const isPresent = useIsPresent();
+  const isPresentRef = useRef(isPresent);
+  isPresentRef.current = isPresent;
+
   // Sticky-bar elevation: a 1px sentinel above the bar (in the page's
   // scroll flow either way) leaves view exactly when the bar pins.
   // Default (viewport) root — intersection is clipped through whichever
@@ -78,7 +89,10 @@ export function WidgetBar({ children }: { children: React.ReactNode }) {
       return;
     }
     const io = new IntersectionObserver(
-      ([entry]) => (reportStuck ?? setStuck)(!entry.isIntersecting),
+      ([entry]) => {
+        if (!isPresentRef.current) return;
+        (reportStuck ?? setStuck)(!entry.isIntersecting);
+      },
       { threshold: 0 },
     );
     io.observe(sentinelEl);

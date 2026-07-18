@@ -19,6 +19,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -66,6 +67,13 @@ export function BarChassisProvider({
   const report = useCallback((delta: 1 | -1) => {
     setRowCount((c) => Math.max(0, c + delta));
   }, []);
+
+  // No bars mounted → nothing can be pinned. Clears any elevation a
+  // dying bar's last observer report left behind, so the next page's
+  // bar never inherits a resting shadow.
+  useEffect(() => {
+    if (rowCount === 0) setStuck(false);
+  }, [rowCount]);
 
   const value = useMemo<BarChassisInternal>(
     () => ({ host, setHost, report, setStuck, rowCount, stuck }),

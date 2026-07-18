@@ -15,7 +15,7 @@
  * Tab band hoisted into the TopBar on 2026-05-11 to reclaim vertical
  * space and consolidate page chrome.
  */
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "motion/react";
 import { useRegisterPageIdentity, type PageTabStrip } from "./page-context";
@@ -140,6 +140,15 @@ export default function PageLayout({
   //    (activeKey changes) even though title stays the same.
   const contentKey = `${title}::${subtitle ?? ""}::${tabs?.activeKey ?? ""}`;
 
+  // Each content identity is a fresh page: reset the scroll container.
+  // Without this the scroller (which persists across same-route source
+  // swaps) carries the previous page's scrollTop, so you could ARRIVE
+  // mid-scroll — with the widget bar's pinned shadow already showing.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    scrollRef.current?.scrollTo(0, 0);
+  }, [contentKey]);
+
   return (
     <div className="flex flex-col h-full">
       {/* ── Content stack ────────────────────────────────────
@@ -189,7 +198,7 @@ export default function PageLayout({
       ) : (
         // Default mode: content area scrolls; children stack vertically.
         // (`relative` anchors popLayout's absolutely-positioned exits.)
-        <div className="relative flex-1 overflow-y-auto scrollbar-thin">
+        <div ref={scrollRef} className="relative flex-1 overflow-y-auto scrollbar-thin">
           <AnimatePresence mode={stableChrome ? "popLayout" : "wait"}>
             <motion.div
               key={contentKey}
