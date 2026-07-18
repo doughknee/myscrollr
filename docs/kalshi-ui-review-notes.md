@@ -1,4 +1,14 @@
 <!--
+
+> **Supersession note (2026-07-18, v1.1.9 "One Bar"):** the bar-UX sections
+> below describe the original in-FeedTab sticky bar. Since REL-32..49 the bar
+> is a shared kit (`desktop/src/components/widget-bar/`) whose shell mounts
+> once in the app frame (`BarChassis`) and whose contents are portaled per
+> page — see those files for current behavior. Card anatomy, lens semantics,
+> search matcher, and the A/B root-cause records below remain accurate and
+> valuable; the sticky/collapse mechanics and component inventory are
+> historical.
+
 Salvaged from the untracked ui-review/ working directory (July 15, 2026
 Kalshi polish + version-bump sessions) when that directory was retired
 (REL-9). Screenshot references (iter-*.png, search-*.png) pointed at
