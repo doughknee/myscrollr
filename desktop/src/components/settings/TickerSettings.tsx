@@ -378,7 +378,7 @@ function RowCard({
         </div>
         {sources.length === 0 ? (
           <div className="text-ui-meta font-mono text-fg-3 py-2">
-            No sources or widgets enabled. Enable some in the main settings first.
+            No widgets added yet. Add some from the Catalog first.
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-1.5">

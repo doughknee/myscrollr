@@ -18,7 +18,7 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "motion/react";
-import { useRegisterPageIdentity, type PageTabStrip } from "./page-context";
+import { useRegisterPageIdentity } from "./page-context";
 import type { OverflowMenuItem } from "../OverflowMenu";
 
 // ── Props ───────────────────────────────────────────────────────
@@ -50,14 +50,6 @@ interface PageLayoutProps {
    * need a raw icon button without a menu.
    */
   entityAction?: ReactNode;
-
-  /**
-   * Optional sibling-tab strip. Rendered as a compact segmented
-   * control inline in the TopBar (NOT a full-width band in the
-   * content area). Used by Settings, Catalog, and Support section
-   * views to expose sibling navigation.
-   */
-  tabs?: PageTabStrip;
 
   /** Page content. */
   children: ReactNode;
@@ -110,7 +102,6 @@ export default function PageLayout({
   menuItems,
   menuLabel,
   entityAction,
-  tabs,
   children,
   footer,
   width = "narrow",
@@ -125,7 +116,6 @@ export default function PageLayout({
     parentLabel,
     onParentClick,
     onTitleClick,
-    tabs,
     menuItems,
     menuLabel,
     entityAction,
@@ -138,7 +128,7 @@ export default function PageLayout({
   //    (subtitle changes).
   //  - Settings/Catalog/Support animate when switching tab pills
   //    (activeKey changes) even though title stays the same.
-  const contentKey = `${title}::${subtitle ?? ""}::${tabs?.activeKey ?? ""}`;
+  const contentKey = `${title}::${subtitle ?? ""}`;
 
   // Each content identity is a fresh page: reset the scroll container.
   // Without this the scroller (which persists across same-route source

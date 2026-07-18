@@ -91,12 +91,12 @@ export default function TickerLayoutSummary({
 
         <div className="flex-1" />
 
-        <Tooltip content="Open the full ticker editor in Settings" side="top">
+        <Tooltip content="Open the full ticker editor in Customize" side="top">
           <button
             type="button"
             onClick={onOpenSettings}
             className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-ui-meta font-medium text-fg-3 hover:text-accent transition-colors"
-            aria-label="Open the full ticker layout editor in Settings"
+            aria-label="Open the full ticker layout editor in Customize"
           >
             <SettingsIcon size={11} />
             Manage

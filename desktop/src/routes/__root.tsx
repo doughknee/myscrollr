@@ -926,7 +926,8 @@ function RootLayout() {
                  route.isWidget ||
                  route.isFeed ||
                  route.isMarketplace ||
-                 route.isCustomize
+                 route.isCustomize ||
+                 route.isSupport
                }
              >
               <ConnectionBanner deliveryMode={deliveryMode} />

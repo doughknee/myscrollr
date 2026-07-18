@@ -117,7 +117,7 @@ const DATA_WIDGETS: DataWidgetDef[] = [
     addConfig: { symbols: [], asset_class: "stock" },
     about: "Real-time stock and ETF prices for the tickers you follow. Your watchlist streams live as the market moves — no brokerage app open, no tab to babysit.",
     usage: [
-      "Add the tickers you want to watch from the Symbols view.",
+      "Type a ticker in the top bar's search to add or remove it.",
       "Quotes stream in real time during market hours.",
       "Pin it to keep your watchlist always visible.",
     ],
@@ -128,7 +128,7 @@ const DATA_WIDGETS: DataWidgetDef[] = [
     addConfig: { symbols: [], asset_class: "crypto" },
     about: "Live crypto prices for the coins you track, streamed around the clock. From BTC and ETH to the long tail, your picks update the moment the market does.",
     usage: [
-      "Add the coins you want to watch from the Symbols view.",
+      "Type a coin in the top bar's search to add or remove it.",
       "Prices stream 24/7 — crypto never closes.",
       "Pin it so every big move catches your eye.",
     ],
