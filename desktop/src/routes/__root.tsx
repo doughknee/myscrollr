@@ -34,6 +34,10 @@ import { Toaster, toast } from "sonner";
 // Shell components
 import { IS_MACOS } from "../components/WindowControls";
 import Sidebar from "../components/Sidebar";
+import {
+  BarChassisProvider,
+  BarChassisSlot,
+} from "../components/widget-bar/BarChassis";
 import ConnectionBanner from "../components/ConnectionBanner";
 import TopBar from "../components/TopBar";
 
@@ -918,6 +922,7 @@ function RootLayout() {
                 every route. overflow-hidden clips page scroll to the
                 radius. */}
             <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-surface rounded-xl border border-edge/50 shadow-sm">
+             <BarChassisProvider active={route.isChannel || route.isWidget}>
               <ConnectionBanner deliveryMode={deliveryMode} />
 
               {auth.sessionExpired && (
@@ -1030,6 +1035,12 @@ function RootLayout() {
                 return null;
               })()}
 
+              {/* Persistent widget-bar chassis: the bar SHELL mounts here,
+                  above the routed page, so source swaps can never animate
+                  the bar chrome or its separator line — FeedTabs portal
+                  their control rows into it (widget-bar/BarChassis.tsx). */}
+              <BarChassisSlot />
+
               {/* PageLayout (used by every route) owns its own scroll
                   for its content area. The outer wrapper just provides
                   the flex slot for it to fill. */}
@@ -1042,6 +1053,7 @@ function RootLayout() {
               </div>
 
               <Toaster theme={resolvedToasterTheme} richColors position="bottom-right" />
+             </BarChassisProvider>
             </main>
           </div>
         </PageIdentityProvider>

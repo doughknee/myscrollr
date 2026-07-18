@@ -88,14 +88,13 @@ interface PageLayoutProps {
   noContentPadding?: boolean;
 
   /**
-   * Source-page transition mode: an OVERLAPPING pure-opacity crossfade
-   * (popLayout, no y drift, no wait gap) instead of the sequential
-   * fade+slide. Because every source page renders the identical
-   * WidgetBar shell, the overlapped shells read as ONE stationary bar —
-   * the bar/feed separator never moves. The moving parts are the
-   * layers inside: this container broadcasts `hidden/show/out` variant
-   * labels, and the bar's inner row (widget-bar/Bar.tsx) picks them up
-   * to roll its contents out the top and in from the bottom.
+   * Source-page transition mode: an OVERLAPPING crossfade (popLayout,
+   * no wait gap) that broadcasts `hidden/show/out` variant LABELS
+   * instead of inline values. The widget-bar row (portaled into the
+   * persistent BarChassis, which lives OUTSIDE this subtree and never
+   * animates) consumes the labels to roll its contents out the top and
+   * in from the bottom, while the feed content itself rises in / sinks
+   * out here.
    */
   stableChrome?: boolean;
 }
@@ -200,9 +199,11 @@ export default function PageLayout({
               variants={
                 stableChrome
                   ? {
-                      hidden: { opacity: 0 },
-                      show: { opacity: 1 },
-                      out: { opacity: 0 },
+                      // The bar chrome lives outside this subtree now, so
+                      // the feed content can drift vertically again.
+                      hidden: { opacity: 0, y: 6 },
+                      show: { opacity: 1, y: 0 },
+                      out: { opacity: 0, y: -6 },
                     }
                   : undefined
               }

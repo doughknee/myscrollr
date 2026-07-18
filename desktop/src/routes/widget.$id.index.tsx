@@ -9,7 +9,6 @@
  * widget.$id.info.tsx's layout parent and demand an Outlet.
  */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { motion } from "motion/react";
 import RouteError from "../components/RouteError";
 import SourcePageLayout, { SourceNotFound } from "../components/SourcePageLayout";
 import { getWidget } from "../widgets/registry";
@@ -33,16 +32,14 @@ function WidgetRoute() {
       name={widget.name}
       onBack={() => navigate({ to: "/feed" })}
     >
-      {/* Entrance to match the data-source pages (v1.1.1): utility
-          content fades up instead of popping in. */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25, delay: 0.04, ease: [0.22, 0.61, 0.36, 1] }}
-        className="h-full"
-      >
+      {/* No local entrance wrapper: SourcePageLayout's stableChrome
+          container already provides the fade-up (a second motion.div
+          here compounded the entrance and made widgets feel different
+          from channels). h-full preserved — the stableChrome container
+          doesn't provide it in noContentPadding mode. */}
+      <div className="h-full">
         <widget.FeedTab mode="comfort" feedContext={{ __dashboardLoaded: true }} />
-      </motion.div>
+      </div>
     </SourcePageLayout>
   );
 }
