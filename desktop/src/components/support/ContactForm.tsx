@@ -1,6 +1,6 @@
 /**
  * ContactForm — unified support form with six categories:
- * Bug Report, Feature Request, General Feedback, Billing, Account, and Channel Help.
+ * Bug Report, Feature Request, General Feedback, Billing, Account, and DataWidgetRow Help.
  *
  * Bug reports collect diagnostics via `collect_diagnostics` Tauri command,
  * file attachments, and frequency. Feature requests collect priority.
@@ -139,7 +139,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
   const [featureWhy, setFeatureWhy] = useState("");
   const [priority, setPriority] = useState<Priority | null>(null);
 
-  // Channel-specific fields
+  // DataWidgetRow-specific fields
   const [channelSelection, setChannelSelection] = useState("");
 
   // Attachments (bug only)
@@ -647,7 +647,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
           </div>
         )}
 
-        {/* ── Channel Help fields ───────────────────────────── */}
+        {/* ── DataWidgetRow Help fields ───────────────────────────── */}
         {category === "channel" && (
           <>
             <div>

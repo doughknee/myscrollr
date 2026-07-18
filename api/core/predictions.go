@@ -28,7 +28,7 @@ const (
 	CacheKeyPredictions = "cache:predictions"
 
 	// CacheKeyPredictionsPrefix is the Redis key prefix for per-user market
-	// caches. Must stay in sync with channelUserCacheKeys (redis.go).
+	// caches. Must stay in sync with widgetUserCacheKeys (redis.go).
 	CacheKeyPredictionsPrefix = "cache:predictions:"
 
 	// CacheKeyPredictionsCatalog is the Redis key for the cached market catalog.

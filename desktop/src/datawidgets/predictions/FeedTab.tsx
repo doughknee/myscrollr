@@ -31,14 +31,14 @@ import {
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { channelsApi } from "../../api/client";
+import { dataWidgetsApi } from "../../api/client";
 import { dashboardQueryOptions, predictionsCatalogOptions } from "../../api/queries";
 import {
   formatCompactNumber,
   formatCloseCountdown,
   relativeTime,
 } from "../../utils/format";
-import EmptyChannelState from "../../components/EmptyChannelState";
+import EmptyWidgetState from "../../components/EmptyWidgetState";
 import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarDivider, BarPill } from "../../components/widget-bar/Bar";
@@ -94,13 +94,13 @@ import {
   type EventSearchHit,
   type MatchRange,
 } from "./search";
-import type { Prediction, FeedTabProps, ChannelManifest } from "../../types";
+import type { Prediction, FeedTabProps, DataWidgetManifest } from "../../types";
 import { shouldShowOnFeed } from "../../preferences";
 import type { PredictionsDisplayPrefs } from "../../preferences";
 
-// ── Channel manifest ─────────────────────────────────────────────
+// ── DataWidgetRow manifest ─────────────────────────────────────────────
 
-export const predictionsChannel: ChannelManifest = {
+export const predictionsChannel: DataWidgetManifest = {
   id: "predictions",
   name: "Predictions",
   tabLabel: "Predict",
@@ -127,7 +127,7 @@ export const predictionsChannel: ChannelManifest = {
 const PAGE_SIZE = 20;
 const LOAD_MORE_INCREMENT = 20;
 
-/** Channel accent — kept in sync with `predictionsChannel.hex` and the
+/** DataWidgetRow accent — kept in sync with `predictionsChannel.hex` and the
  *  marketplace catalog color (v1.1.5 unified the old indigo/teal split). */
 const PREDICTIONS_HEX = "#1fc9a0";
 
@@ -180,7 +180,7 @@ const LENSES: { value: PredictionsLens; label: string; icon?: typeof Flame }[] =
 
 function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   const { prefs, onPrefsChange } = useShell();
-  const dp = prefs.channelDisplay.predictions;
+  const dp = prefs.widgetDisplay.predictions;
 
   // Density is caller-driven only (the per-widget feedDensity pref was
   // deleted in the 2026-07-17 settings unification — feeds render
@@ -276,7 +276,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
     //    would each send a stale merged config and resurrect the other
     //    key). The API keeps honoring these fields for old clients; this
     //    client simply stops using them.
-    void channelsApi
+    void dataWidgetsApi
       .update(channelRow.channel_type, {
         config: { ...(channelRow.config ?? {}), categories: [], favorites: [] },
       })
@@ -562,7 +562,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
           </div>
         )}
         <div className="flex flex-1 flex-col justify-center">
-          <EmptyChannelState
+          <EmptyWidgetState
             refreshing={Boolean(feedContext.__refreshing)}
             icon={TrendingUp}
             noun="markets"
@@ -673,8 +673,8 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
               onChange={(v) =>
                 onPrefsChange({
                   ...prefs,
-                  channelDisplay: {
-                    ...prefs.channelDisplay,
+                  widgetDisplay: {
+                    ...prefs.widgetDisplay,
                     predictions: { ...dp, defaultSort: v },
                   },
                 })

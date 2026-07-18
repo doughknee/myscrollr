@@ -45,7 +45,7 @@ import TopBar from "../components/TopBar";
 import AuthGate from "../components/onboarding/AuthGate";
 
 // Registries
-import { getAllChannels } from "../channels/registry";
+import { getAllDataWidgets } from "../datawidgets/registry";
 import { catalogItemById, widgetLogoUrl } from "../marketplace";
 import { DEMO } from "../config";
 import { getAllWidgets, getWidget } from "../widgets/registry";
@@ -63,7 +63,7 @@ import {
   resolveThemeMode,
 } from "../preferences";
 import {
-  getEffectiveChannelTickerRow,
+  getEffectiveDataWidgetTickerRow,
   getEffectiveWidgetTickerStatus,
 } from "../utils/tickerStatus";
 import type { AppPreferences } from "../preferences";
@@ -71,12 +71,12 @@ import { showTipOnce, TIP_IDS } from "../lib/tips";
 
 // Types
 import type { DeliveryMode } from "../types";
-import type { Channel, ChannelType, SubscriptionInfo } from "../api/client";
+import type { DataWidgetRow, DataWidgetType, SubscriptionInfo } from "../api/client";
 
 // Hooks
 import { useTheme } from "../hooks/useTheme";
 import { useAuthState } from "../hooks/useAuthState";
-import { useChannelActions } from "../hooks/useChannelActions";
+import { useDataWidgetActions } from "../hooks/useDataWidgetActions";
 import { useWidgetActions } from "../hooks/useWidgetActions";
 import { useRemoveWidget } from "../hooks/useRemoveWidget";
 import { useDashboardCDC } from "../hooks/useDashboardCDC";
@@ -216,16 +216,16 @@ function RootLayout() {
     }
   }, [dashboard]);
 
-  const channels: Channel[] = useMemo(() => dashboard?.channels ?? [], [dashboard]);
+  const channels: DataWidgetRow[] = useMemo(() => dashboard?.channels ?? [], [dashboard]);
 
   // Filter to enabled channels only — Sidebar handles sorting by CHANNEL_ORDER
-  const enabledChannels = useMemo(
+  const enabledDataWidgets = useMemo(
     () => channels.filter((ch) => ch.enabled),
     [channels],
   );
 
   // ── Manifests ───────────────────────────────────────────────
-  const allChannelManifests = useMemo(() => getAllChannels(), []);
+  const allDataWidgetManifests = useMemo(() => getAllDataWidgets(), []);
   const allWidgets = useMemo(() => getAllWidgets(), []);
 
   // ── Preferences ─────────────────────────────────────────────
@@ -438,7 +438,7 @@ function RootLayout() {
 
   // ── Extracted hooks ─────────────────────────────────────────
 
-  const channelActions = useChannelActions();
+  const channelActions = useDataWidgetActions();
   const widgetActions = useWidgetActions(prefs, setPrefs, route.activeItem);
 
   // Shell-level weather polling — keeps data fresh regardless of which page is visible.
@@ -603,15 +603,15 @@ function RootLayout() {
   const handleToggleItemTicker = useCallback(
     (source: { id: string; kind: "channel" | "widget"; onTicker: boolean }) => {
       if (source.kind === "channel") {
-        channelActions.handleToggleChannel(
-          source.id as ChannelType,
+        channelActions.handleToggleDataWidget(
+          source.id as DataWidgetType,
           !source.onTicker,
         );
       } else {
         widgetActions.handleToggleWidgetTicker(source.id);
       }
     },
-    [channelActions.handleToggleChannel, widgetActions.handleToggleWidgetTicker],
+    [channelActions.handleToggleDataWidget, widgetActions.handleToggleWidgetTicker],
   );
 
   const handleRemoveItem = useCallback(
@@ -630,11 +630,11 @@ function RootLayout() {
   // (filtered to `enabled === true`); widgets come from
   // `prefs.widgets.enabledWidgets`. Both are sorted via the shared
   // CANONICAL_ORDER so the sidebar matches the catalog grid order.
-  // `Channel.ticker_enabled` is intentionally NOT consulted here — that
+  // `DataWidgetRow.ticker_enabled` is intentionally NOT consulted here — that
   // flag controls whether chips appear on the ticker, not whether the
   // channel appears in navigation.
   const sidebarSources = useMemo(() => {
-    const enabledChannels = new Map<string, Channel>(
+    const enabledDataWidgets = new Map<string, DataWidgetRow>(
       (dashboard?.channels ?? [])
         .filter((c) => c.enabled === true)
         .map((c) => [c.channel_type, c]),
@@ -653,7 +653,7 @@ function RootLayout() {
     }> = [];
 
     for (const id of CANONICAL_ORDER) {
-      const channel = enabledChannels.get(id);
+      const channel = enabledDataWidgets.get(id);
       if (channel) {
         const m = catalogItemById(id);
         if (m) {
@@ -672,7 +672,7 @@ function RootLayout() {
             // row-assigned channels read permanently "on" and the menu
             // toggle one-way. The effective helper is what the feed page
             // uses for exactly this question.
-            onTicker: getEffectiveChannelTickerRow(prefs, channel) !== null,
+            onTicker: getEffectiveDataWidgetTickerRow(prefs, channel) !== null,
           });
         }
       } else if (enabledWidgetIds.has(id)) {
@@ -701,7 +701,7 @@ function RootLayout() {
     // prefs.appearance and enabled widgets under prefs.widgets — the
     // list build is cheap, so one broad dep beats two narrow ones
     // that could silently miss a third source of truth later.
-  }, [dashboard?.channels, prefs, allChannelManifests, allWidgets]);
+  }, [dashboard?.channels, prefs, allDataWidgetManifests, allWidgets]);
 
   // ── Keyboard shortcuts ──────────────────────────────────────
   useEffect(() => {
@@ -816,21 +816,21 @@ function RootLayout() {
       autostartEnabled: autostartOn,
       onAutostartChange: handleAutostartChange,
       appVersion,
-      allChannelManifests,
+      allDataWidgetManifests,
       allWidgets,
-      onToggleChannelTicker: channelActions.handleToggleChannel,
+      onToggleChannelTicker: channelActions.handleToggleDataWidget,
       onToggleWidgetTicker: widgetActions.handleToggleWidgetTicker,
-      onAddChannel: channelActions.handleAddChannel,
-      onDeleteChannel: channelActions.handleDeleteChannel,
+      onAddChannel: channelActions.handleAddDataWidget,
+      onDeleteChannel: channelActions.handleDeleteDataWidget,
       onToggleWidget: widgetActions.handleToggleWidget,
       onSelectItem: handleSelectItem,
     }),
     [
       prefs, handlePrefsChange, auth.authenticated, auth.tier, subscriptionInfo,
       auth.handleLogin, auth.handleLogout, autostartOn, handleAutostartChange,
-      appVersion, allChannelManifests, allWidgets,
-      channelActions.handleToggleChannel, widgetActions.handleToggleWidgetTicker,
-      channelActions.handleAddChannel, channelActions.handleDeleteChannel,
+      appVersion, allDataWidgetManifests, allWidgets,
+      channelActions.handleToggleDataWidget, widgetActions.handleToggleWidgetTicker,
+      channelActions.handleAddDataWidget, channelActions.handleDeleteDataWidget,
       widgetActions.handleToggleWidget, handleSelectItem,
     ],
   );

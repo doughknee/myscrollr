@@ -10,11 +10,11 @@ import type {
   TickerDirection,
   ScrollMode,
   WidgetPinConfig,
-  ChannelDisplayPrefs,
+  WidgetDisplayPrefs,
   TickerRowConfig,
 } from "../preferences";
 import { shouldShowOnTicker } from "../preferences";
-import type { LeagueResponse as FantasyLeague } from "../channels/fantasy/types";
+import type { LeagueResponse as FantasyLeague } from "../datawidgets/fantasy/types";
 import TradeChip from "./chips/TradeChip";
 import GameChip from "./chips/GameChip";
 import RssChip from "./chips/RssChip";
@@ -22,18 +22,18 @@ import PredictionChip from "./chips/PredictionChip";
 import FantasyStatChip from "./chips/FantasyStatChip";
 import FollowedPlayerChip from "./chips/FollowedPlayerChip";
 import ConsolidatedChip from "./chips/ConsolidatedChip";
-import { selectRssForTicker, getRssDisplayPrefs } from "../channels/rss/view";
-import { selectFinanceForTicker } from "../channels/finance/view";
-import { selectFantasyForTicker } from "../channels/fantasy/view";
-import { selectSportsForTicker, getSportsDisplayConfig } from "../channels/sports/view";
-import { selectPredictionsForTicker } from "../channels/predictions/view";
-import { getWatchlist, onWatchlistChange } from "../channels/predictions/watchlist";
+import { selectRssForTicker, getRssDisplayPrefs } from "../datawidgets/rss/view";
+import { selectFinanceForTicker } from "../datawidgets/finance/view";
+import { selectFantasyForTicker } from "../datawidgets/fantasy/view";
+import { selectSportsForTicker, getSportsDisplayConfig } from "../datawidgets/sports/view";
+import { selectPredictionsForTicker } from "../datawidgets/predictions/view";
+import { getWatchlist, onWatchlistChange } from "../datawidgets/predictions/watchlist";
 import {
   findTopN,
   findTopBench,
   findWorstStarter,
   findInjuredPlayers,
-} from "../channels/fantasy/playerStats";
+} from "../datawidgets/fantasy/playerStats";
 import { buildYahooLeagueUrl, buildYahooPlayerUrl, chipUrlForFinance, chipUrlForSports, chipUrlForRss } from "../utils/chipUrl";
 import { sourceForWidget } from "../marketplace";
 import { scopeSourceData } from "../utils/widgetScope";
@@ -54,7 +54,7 @@ interface ScrollrTickerProps {
    * underlying chip has an external destination (article link, game
    * page, etc.). When undefined, the consumer should fall back to
    * opening the in-app channel page. */
-  onChipClick?: (channelType: string, itemId: string | number, url?: string) => void;
+  onChipClick?: (widgetType: string, itemId: string | number, url?: string) => void;
   /** Toggle pin state for a widget (hover pin icon). */
   onTogglePin?: (widgetId: string) => void;
   /** Which widgets are pinned (excluded from scrolling ticker). */
@@ -74,7 +74,7 @@ interface ScrollrTickerProps {
   /** Chip color scheme */
   chipColorMode?: ChipColorMode;
   /** Per-channel display preferences (controls what data chips show) */
-  channelDisplay?: ChannelDisplayPrefs;
+  widgetDisplay?: WidgetDisplayPrefs;
   /** Which row this ticker represents (0-indexed, for multi-row splitting) */
   rowIndex?: number;
   /** Total number of ticker rows (items distributed round-robin) */
@@ -166,7 +166,7 @@ export default function ScrollrTicker({
   hoverSpeed = 0.3,
   mixMode = "grouped",
   chipColorMode = "channel",
-  channelDisplay,
+  widgetDisplay,
   comfort = false,
   rowIndex = 0,
   totalRows = 1,
@@ -248,7 +248,7 @@ export default function ScrollrTicker({
         continue;
       }
 
-      // ── Channel tabs ──────────────────────────────────────────
+      // ── DataWidgetRow tabs ──────────────────────────────────────────
       // activeTabs holds widget ids (sports_nfl, finance_stocks, news_bbc), but
       // dashboard.data is keyed by the coarse source (sports/finance/rss).
       // Resolve widget → source for the lookup; scope the payload below. A bare
@@ -268,7 +268,7 @@ export default function ScrollrTicker({
           ? (fantasyPayload.leagues as FantasyLeague[])
           : [];
         if (leagues.length === 0) continue;
-        const fantasyPrefs = channelDisplay?.fantasy;
+        const fantasyPrefs = widgetDisplay?.fantasy;
         if (!fantasyPrefs) continue;
 
         // ── Followed-player chips render FIRST so the user's tracked
@@ -443,7 +443,7 @@ export default function ScrollrTicker({
           // ticker (universal sort). Per-field visibility (showChange,
           // showPrevClose, showLastUpdated) consults the Venue enum —
           // the ticker only renders what's set to "both" or "ticker".
-          const financePrefs = channelDisplay?.finance;
+          const financePrefs = widgetDisplay?.finance;
           if (!financePrefs) continue;
           const sorted = selectFinanceForTicker(data as Trade[], financePrefs);
           for (const trade of sorted) {
@@ -493,7 +493,7 @@ export default function ScrollrTicker({
           // Global Display prefs merged with THIS widget's config.display
           // override (v1.1.3: the per-widget time window must gate ticker
           // chips exactly like the feed — mirror of getSportsDisplayConfig).
-          const rssPrefs = channelDisplay?.rss;
+          const rssPrefs = widgetDisplay?.rss;
           if (!rssPrefs) continue;
           const merged = getRssDisplayPrefs(rssPrefs, dashboard, tab);
           const curated = selectRssForTicker(data as RssItem[], merged);
@@ -522,7 +522,7 @@ export default function ScrollrTicker({
           // any (subscribed state above — live across windows);
           // otherwise the selector falls back to the top rank-1 movers —
           // never again the whole ingested universe.
-          const predictionsPrefs = channelDisplay?.predictions;
+          const predictionsPrefs = widgetDisplay?.predictions;
           if (!predictionsPrefs) continue;
           const sorted = selectPredictionsForTicker(
             data as Prediction[],
@@ -560,7 +560,7 @@ export default function ScrollrTicker({
       : buckets.flat();
 
     return allItems;
-  }, [dashboard, activeTabs, widgetData, onChipClick, onTogglePin, pinnedWidgets, comfort, effectiveMixMode, chipColorMode, channelDisplay, rowIndex, predictionsWatchlist]);
+  }, [dashboard, activeTabs, widgetData, onChipClick, onTogglePin, pinnedWidgets, comfort, effectiveMixMode, chipColorMode, widgetDisplay, rowIndex, predictionsWatchlist]);
 
   // ── Shared refs ─────────────────────────────────────────────────
   const containerRef = useRef<HTMLDivElement>(null);
@@ -809,7 +809,7 @@ export default function ScrollrTicker({
             </span>
             <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto scrollbar-none">
               {installedChannels.map((ch) => {
-                const ChannelIcon = ch.icon;
+                const WidgetGlyphIcon = ch.icon;
                 return (
                   <button
                     key={ch.id}
@@ -829,7 +829,7 @@ export default function ScrollrTicker({
                     }}
                     title={`Open ${ch.name}`}
                   >
-                    <ChannelIcon size={12} className="shrink-0" />
+                    <WidgetGlyphIcon size={12} className="shrink-0" />
                     <span className="truncate">{ch.name}</span>
                   </button>
                 );

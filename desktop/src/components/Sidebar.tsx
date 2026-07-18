@@ -40,7 +40,7 @@ import { motion } from "motion/react";
 import Tooltip from "./Tooltip";
 import ContextMenu from "./ContextMenu";
 import OverflowMenu from "./OverflowMenu";
-import type { ChannelManifest, WidgetManifest } from "../types";
+import type { DataWidgetManifest, WidgetManifest } from "../types";
 import { loadPref, savePref } from "../preferences";
 import { TIER_LABELS, getUserIdentity } from "../auth";
 import type { SubscriptionTier } from "../auth";

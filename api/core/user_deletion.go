@@ -68,8 +68,8 @@ func HandleExportUserData(c *fiber.Ctx) error {
 		log.Printf("[Export] preferences for %s: %v", userID, err)
 	}
 
-	// channels
-	if chans, err := GetUserChannels(userID); err == nil {
+	// widgets (export keeps the legacy "channels" archive key)
+	if chans, err := GetUserWidgets(userID); err == nil {
 		archive["channels"] = chans
 	} else {
 		log.Printf("[Export] channels for %s: %v", userID, err)
@@ -418,7 +418,7 @@ func purgeUserAccount(ctx context.Context, logtoSub string) error {
 	}
 	defer tx.Rollback(ctx)
 
-	// Channel configs
+	// Widget configs (user_channels rows)
 	if _, err := tx.Exec(ctx,
 		`DELETE FROM user_channels WHERE logto_sub = $1`, logtoSub,
 	); err != nil {

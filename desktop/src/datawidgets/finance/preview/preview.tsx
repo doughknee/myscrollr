@@ -11,7 +11,7 @@
  * Mirrors channels/predictions/preview/ — see that harness for the
  * pattern rationale. Symbol ADD/REMOVE mutations are not exercised here
  * (no authenticated API in a browser); the Symbols view is asserted
- * render-only, and persistence rides the same useChannelConfig hook the
+ * render-only, and persistence rides the same useDataWidgetConfig hook the
  * Configure page has always used.
  */
 // FIRST: evaluate the channel registry before ../FeedTab. FinanceFeedTab
@@ -35,7 +35,7 @@ import {
   type AppPreferences,
 } from "../../../preferences";
 import { financeChannel } from "../FeedTab";
-import type { ChannelType } from "../../../api/client";
+import type { DataWidgetType } from "../../../api/client";
 import type { FeedTabProps, Trade } from "../../../types";
 
 const params = new URLSearchParams(window.location.search);
@@ -106,7 +106,7 @@ function main(): void {
     channels: [
       {
         id: 1,
-        channel_type: widgetId as ChannelType,
+        channel_type: widgetId as DataWidgetType,
         enabled: true,
         ticker_enabled: true,
         created_at: "2026-07-17T00:00:00Z",
@@ -119,7 +119,7 @@ function main(): void {
   queryClient.setQueryData(financeCatalogOptions().queryKey, catalog);
 
   const initialPrefs = {
-    channelDisplay: {
+    widgetDisplay: {
       finance: {
         ...migrateFinanceDisplay(undefined),
       },
@@ -136,7 +136,7 @@ function main(): void {
     autostartEnabled: false,
     onAutostartChange: noop,
     appVersion: "preview",
-    allChannelManifests: [],
+    allDataWidgetManifests: [],
     allWidgets: [],
     onToggleChannelTicker: noop,
     onToggleWidgetTicker: noop,

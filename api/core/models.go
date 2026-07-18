@@ -18,30 +18,34 @@ type UserPreferences struct {
 	UpdatedAt        string   `json:"updated_at"`
 }
 
-// Channel represents a user's subscription to a data channel.
+// Widget represents a user's widget subscription — one row of the
+// user_channels table. The wire protocol keeps the legacy "channel"
+// vocabulary (JSON field names like channel_type, the user_channels
+// table, the /users/me/channels routes); only Go identifiers use
+// "widget" (REL-40).
 //
 // The DB column and Go field stay named `Visible` to avoid a migration
 // and to keep wire compatibility with shipped v1.0.3 desktops. The
 // MarshalJSON below also emits `ticker_enabled` so v1.0.4+ clients can
 // read a clearer name. Inbound updates accept both names — see
-// channels.go:UpdateChannel.
-type Channel struct {
-	ID          int                    `json:"id"`
-	LogtoSub    string                 `json:"-"`
-	ChannelType string                 `json:"channel_type"`
-	Enabled     bool                   `json:"enabled"`
-	Visible     bool                   `json:"visible"`
-	Config      map[string]interface{} `json:"config"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
+// channels.go:UpdateWidget.
+type Widget struct {
+	ID         int                    `json:"id"`
+	LogtoSub   string                 `json:"-"`
+	WidgetType string                 `json:"channel_type"`
+	Enabled    bool                   `json:"enabled"`
+	Visible    bool                   `json:"visible"`
+	Config     map[string]interface{} `json:"config"`
+	CreatedAt  time.Time              `json:"created_at"`
+	UpdatedAt  time.Time              `json:"updated_at"`
 }
 
 // MarshalJSON emits both `visible` (legacy) and `ticker_enabled` (clearer
 // modern name) so v1.0.3 desktops and v1.0.4+ desktops both read the
 // same value. The DB column and struct field stay `visible` to avoid a
 // migration; this is wire-format backwards compatibility only.
-func (c Channel) MarshalJSON() ([]byte, error) {
-	type alias Channel
+func (c Widget) MarshalJSON() ([]byte, error) {
+	type alias Widget
 	return json.Marshal(&struct {
 		alias
 		TickerEnabled bool `json:"ticker_enabled"`
@@ -52,11 +56,12 @@ func (c Channel) MarshalJSON() ([]byte, error) {
 }
 
 // DashboardResponse is the aggregated response for the /dashboard endpoint.
-// Data is a generic map keyed by channel name (e.g. "finance", "sports").
+// Data is a generic map keyed by data-source name (e.g. "finance", "sports").
+// The Widgets field keeps its legacy wire name `channels`.
 type DashboardResponse struct {
 	Data        map[string]interface{} `json:"data"`
 	Preferences *UserPreferences       `json:"preferences,omitempty"`
-	Channels    []Channel              `json:"channels,omitempty"`
+	Widgets     []Widget               `json:"channels,omitempty"`
 }
 
 // HealthResponse represents the aggregated health status.

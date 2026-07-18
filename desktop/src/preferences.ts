@@ -91,7 +91,7 @@ export type FontWeight = "normal" | "medium" | "bold";
 /** Content + optional customization for a single ticker row. */
 export interface TickerRowConfig {
   /**
-   * Channel/widget IDs shown on this row. Empty array falls back to
+   * DataWidgetRow/widget IDs shown on this row. Empty array falls back to
    * "all sources visible in activeTabs" — behaves like 1-row mode.
    */
   sources: string[];
@@ -191,7 +191,7 @@ export interface WindowPrefs {
 }
 
 interface TaskbarPrefs {
-  showChannelIcons: boolean;
+  showWidgetGlyphIcons: boolean;
   showConnectionIndicator: boolean;
   showCanvasToggle: boolean;
   taskbarHeight: TaskbarHeight;
@@ -300,7 +300,7 @@ export interface WidgetPrefs {
   github: GitHubWidgetConfig;
 }
 
-// ── Channel display preferences ─────────────────────────────────
+// ── DataWidgetRow display preferences ─────────────────────────────────
 // Controls what data is shown in FeedTabs and ticker chips.
 // Sports display prefs live server-side (useSportsConfig), not here.
 
@@ -496,7 +496,7 @@ export interface FantasyDisplayPrefs {
   enabledLeagueKeys: string[];
 }
 
-export interface ChannelDisplayPrefs {
+export interface WidgetDisplayPrefs {
   finance: FinanceDisplayPrefs;
   rss: RssDisplayPrefs;
   fantasy: FantasyDisplayPrefs;
@@ -519,7 +519,7 @@ export interface AppPreferences {
   window: WindowPrefs;
   taskbar: TaskbarPrefs;
   widgets: WidgetPrefs;
-  channelDisplay: ChannelDisplayPrefs;
+  widgetDisplay: WidgetDisplayPrefs;
   /** Per-channel homepage preview selections (up to 5 group keys). */
   homePreview: HomePreview;
   /**
@@ -584,7 +584,7 @@ const DEFAULT_WINDOW: WindowPrefs = {
 };
 
 const DEFAULT_TASKBAR: TaskbarPrefs = {
-  showChannelIcons: true,
+  showWidgetGlyphIcons: true,
   showConnectionIndicator: true,
   showCanvasToggle: true,
   taskbarHeight: "default",
@@ -637,7 +637,7 @@ export const DEFAULT_GITHUB_TICKER: GitHubTickerConfig = {
   excludedRepos: [],
 };
 
-const DEFAULT_CHANNEL_DISPLAY: ChannelDisplayPrefs = {
+const DEFAULT_WIDGET_DISPLAY: WidgetDisplayPrefs = {
   finance: {
     showChange: "both",
     showPrevClose: "both",
@@ -734,7 +734,7 @@ const DEFAULT_PREFS: AppPreferences = {
   window: DEFAULT_WINDOW,
   taskbar: DEFAULT_TASKBAR,
   widgets: DEFAULT_WIDGETS,
-  channelDisplay: DEFAULT_CHANNEL_DISPLAY,
+  widgetDisplay: DEFAULT_WIDGET_DISPLAY,
   homePreview: {},
   tipsShown: [],
 };
@@ -1037,7 +1037,7 @@ export function consumeTickerLayoutChanged(): TickerLayoutChangedDetails | null 
   return v;
 }
 
-// ── Channel display migrations (v1.0.2 venue-enum migration) ────
+// ── DataWidgetRow display migrations (v1.0.2 venue-enum migration) ────
 //
 // Each channel's display prefs went from all-booleans to `Venue` strings
 // in v1.0.2 (see 2026-04-25-display-venue-toggle-design.md). These
@@ -1054,10 +1054,10 @@ export function migrateFinanceDisplay(
     raw.tickerDirectionMarker === "sign" ||
     raw.tickerDirectionMarker === "none"
       ? raw.tickerDirectionMarker
-      : DEFAULT_CHANNEL_DISPLAY.finance.tickerDirectionMarker;
+      : DEFAULT_WIDGET_DISPLAY.finance.tickerDirectionMarker;
   // 2026-07-17 defaults reset: the display-item toggles left the UI with
   // the configure-page teardown, so stored show* venues are deliberately
-  // IGNORED — the DEFAULT_CHANNEL_DISPLAY spread supplies them and every
+  // IGNORED — the DEFAULT_WIDGET_DISPLAY spread supplies them and every
   // install renders the defaults. Functional prefs (sort, marker) keep
   // honoring saved values. (feedDensity was deleted outright in the
   // 2026-07-17 settings unification — feeds always render comfort; the
@@ -1065,10 +1065,10 @@ export function migrateFinanceDisplay(
   // in normalizeSportsDisplayConfig; rss per-widget overrides are
   // stripped where they merge (channels/rss/view.ts + FeedTab).
   return {
-    ...DEFAULT_CHANNEL_DISPLAY.finance,
+    ...DEFAULT_WIDGET_DISPLAY.finance,
     defaultSort:
       (raw.defaultSort as FinanceDisplayPrefs["defaultSort"] | undefined) ??
-      DEFAULT_CHANNEL_DISPLAY.finance.defaultSort,
+      DEFAULT_WIDGET_DISPLAY.finance.defaultSort,
     tickerDirectionMarker: dirMarker,
   };
 }
@@ -1085,10 +1085,10 @@ export function migratePredictionsDisplay(
       ? raw.defaultSort
       : raw.defaultSort === "volume"
         ? ("trending" as const) // v1.1.5: all-time volume sort became Trending (24h)
-        : DEFAULT_CHANNEL_DISPLAY.predictions.defaultSort;
+        : DEFAULT_WIDGET_DISPLAY.predictions.defaultSort;
   // 2026-07-17 defaults reset — see migrateFinanceDisplay for the note.
   return {
-    ...DEFAULT_CHANNEL_DISPLAY.predictions,
+    ...DEFAULT_WIDGET_DISPLAY.predictions,
     defaultSort,
   };
 }
@@ -1100,14 +1100,14 @@ export function migrateRssDisplay(
   // 2026-07-17 defaults reset — show* venues come from the defaults
   // spread; see migrateFinanceDisplay for the note.
   return {
-    ...DEFAULT_CHANNEL_DISPLAY.rss,
+    ...DEFAULT_WIDGET_DISPLAY.rss,
     // Sticky feed sort (2026-07-17 unification).
     feedSort:
       raw.feedSort === "newest" ||
       raw.feedSort === "oldest" ||
       raw.feedSort === "by-source"
         ? raw.feedSort
-        : DEFAULT_CHANNEL_DISPLAY.rss.feedSort,
+        : DEFAULT_WIDGET_DISPLAY.rss.feedSort,
     // One-shot migration (v1.1.1): 4 was the pre-widget-era DEFAULT and
     // never appeared in the picker (1/3/5/10), so a stored 4 is an
     // untouched default, not a user's choice — map it to 0 (all).
@@ -1115,14 +1115,14 @@ export function migrateRssDisplay(
     articlesPerSource:
       typeof raw.articlesPerSource === "number" && raw.articlesPerSource !== 4
         ? raw.articlesPerSource
-        : DEFAULT_CHANNEL_DISPLAY.rss.articlesPerSource,
+        : DEFAULT_WIDGET_DISPLAY.rss.articlesPerSource,
     // v1.1.3: clamp to a sane range; missing/invalid → 0 (no filter),
     // which is exactly the pre-v1.1.3 behavior.
     maxArticleAgeDays:
       typeof raw.maxArticleAgeDays === "number" &&
       Number.isFinite(raw.maxArticleAgeDays)
         ? Math.min(30, Math.max(0, Math.round(raw.maxArticleAgeDays)))
-        : DEFAULT_CHANNEL_DISPLAY.rss.maxArticleAgeDays,
+        : DEFAULT_WIDGET_DISPLAY.rss.maxArticleAgeDays,
   };
 }
 
@@ -1153,7 +1153,7 @@ export function migrateFantasyDisplay(
       : "both";
 
   return {
-    ...DEFAULT_CHANNEL_DISPLAY.fantasy,
+    ...DEFAULT_WIDGET_DISPLAY.fantasy,
     matchupScore,
     winProbability: migrateVenue(raw.winProbability),
     matchupStatus: migrateVenue(raw.matchupStatus),
@@ -1167,7 +1167,7 @@ export function migrateFantasyDisplay(
     // Phase 1 player-stats fields. New fields default to "both" via
     // migrateVenue's fallback for unknown inputs, so existing prefs
     // files (which won't have these keys) get the new segments
-    // visible by default. The DEFAULT_CHANNEL_DISPLAY values above
+    // visible by default. The DEFAULT_WIDGET_DISPLAY values above
     // are what fresh installs and `handleReset` produce; this
     // migration is what existing users see post-upgrade.
     topThreeScorers: migrateVenue(raw.topThreeScorers),
@@ -1181,28 +1181,28 @@ export function migrateFantasyDisplay(
       ? (raw.followedPlayerKeys as unknown[]).filter(
           (k): k is string => typeof k === "string",
         )
-      : DEFAULT_CHANNEL_DISPLAY.fantasy.followedPlayerKeys,
+      : DEFAULT_WIDGET_DISPLAY.fantasy.followedPlayerKeys,
     showStandings:
       typeof raw.showStandings === "boolean"
         ? raw.showStandings
-        : DEFAULT_CHANNEL_DISPLAY.fantasy.showStandings,
+        : DEFAULT_WIDGET_DISPLAY.fantasy.showStandings,
     showMatchups:
       typeof raw.showMatchups === "boolean"
         ? raw.showMatchups
-        : DEFAULT_CHANNEL_DISPLAY.fantasy.showMatchups,
+        : DEFAULT_WIDGET_DISPLAY.fantasy.showMatchups,
     defaultSort:
       (raw.defaultSort as FantasyDisplayPrefs["defaultSort"] | undefined) ??
-      DEFAULT_CHANNEL_DISPLAY.fantasy.defaultSort,
+      DEFAULT_WIDGET_DISPLAY.fantasy.defaultSort,
     defaultSubTab:
       (raw.defaultSubTab as FantasyDisplayPrefs["defaultSubTab"] | undefined) ??
-      DEFAULT_CHANNEL_DISPLAY.fantasy.defaultSubTab,
+      DEFAULT_WIDGET_DISPLAY.fantasy.defaultSubTab,
     primaryLeagueKey:
       typeof raw.primaryLeagueKey === "string" || raw.primaryLeagueKey === null
         ? (raw.primaryLeagueKey as string | null)
-        : DEFAULT_CHANNEL_DISPLAY.fantasy.primaryLeagueKey,
+        : DEFAULT_WIDGET_DISPLAY.fantasy.primaryLeagueKey,
     enabledLeagueKeys: Array.isArray(raw.enabledLeagueKeys)
       ? (raw.enabledLeagueKeys as string[])
-      : DEFAULT_CHANNEL_DISPLAY.fantasy.enabledLeagueKeys,
+      : DEFAULT_WIDGET_DISPLAY.fantasy.enabledLeagueKeys,
   };
 }
 
@@ -1215,8 +1215,15 @@ export function loadPrefs(): AppPreferences {
     const isV1 = "general" in saved && !("appearance" in saved);
     const source = isV1 ? migrateV1(saved) : (saved as Partial<AppPreferences>);
 
-    // Deep merge with defaults so new keys are always present
-    const savedDisplay = source.channelDisplay as Partial<ChannelDisplayPrefs> | undefined;
+    // Deep merge with defaults so new keys are always present.
+    // REL-40 rename migration: released clients (≤ v1.1.9) persisted
+    // these prefs under "channelDisplay" — read the legacy key when the
+    // new one is absent so nobody loses their display settings. Writes
+    // always use the new key, so this self-heals on first save.
+    const savedDisplay = (source.widgetDisplay ??
+      (source as Record<string, unknown>).channelDisplay) as
+      | Partial<WidgetDisplayPrefs>
+      | undefined;
     const layoutResult = migrateTickerLayout(
       source.appearance as Partial<AppearancePrefs> | undefined,
     );
@@ -1287,7 +1294,7 @@ export function loadPrefs(): AppPreferences {
       window: { ...DEFAULT_WINDOW, ...source.window },
       taskbar: { ...DEFAULT_TASKBAR, ...source.taskbar },
       widgets: mergeWidgetPrefs(source.widgets as Partial<WidgetPrefs> | undefined),
-      channelDisplay: {
+      widgetDisplay: {
         finance: migrateFinanceDisplay(savedDisplay?.finance),
         rss: migrateRssDisplay(savedDisplay?.rss),
         fantasy: migrateFantasyDisplay(savedDisplay?.fantasy),
@@ -1395,7 +1402,7 @@ export function resetAll(): AppPreferences {
     window: { ...DEFAULT_WINDOW },
     taskbar: { ...DEFAULT_TASKBAR },
     widgets: { ...DEFAULT_WIDGETS },
-    channelDisplay: { ...DEFAULT_CHANNEL_DISPLAY },
+    widgetDisplay: { ...DEFAULT_WIDGET_DISPLAY },
     homePreview: {},
     // Reset clears tipsShown — the user explicitly asked for a clean
     // slate, so they'll re-experience first-run discovery hints.
@@ -1651,17 +1658,17 @@ export function updateWidgetPrefs(
 //   - `tickerLayout.rows[i].sources[]` (client-side prefs) — controls
 //     per-row inclusion. Source of truth for which row a source
 //     appears on.
-//   - `Channel.ticker_enabled` (server-side) — controls the master
+//   - `DataWidgetRow.ticker_enabled` (server-side) — controls the master
 //     gate via App.tsx's filter on `ch.enabled && isChannelTickerEnabled`.
 //     Set to true when row != null, false when row == null. Callers
-//     issue `channelsApi.update` separately; these helpers only mutate
+//     issue `dataWidgetsApi.update` separately; these helpers only mutate
 //     the client-side AppPreferences.
 //
 // Widgets also keep `widgets.widgetsOnTicker` in sync because it is the
 // master render gate for widget ticker data.
 // See docs/superpowers/specs/2026-04-28-batch-d-…-design.md §Stream 3.
 
-/** Minimal shape of a Channel record used by `getChannelTickerRow`. */
+/** Minimal shape of a DataWidgetRow record used by `getChannelTickerRow`. */
 interface ChannelTickerInfo {
   channel_type: string;
   ticker_enabled?: boolean;
@@ -1695,7 +1702,7 @@ export function getSourceTickerRow(
     }
   }
 
-  // Step 2: legacy fallback via Channel.ticker_enabled (channels only)
+  // Step 2: legacy fallback via DataWidgetRow.ticker_enabled (channels only)
   if (!channelInfo) return null;
   const tickerEnabled =
     typeof channelInfo.ticker_enabled === "boolean"
@@ -1708,7 +1715,7 @@ export function getSourceTickerRow(
 
 /**
  * Convenience wrapper around `getSourceTickerRow` for channels — accepts
- * a Channel-like object (with `channel_type` + `ticker_enabled`).
+ * a DataWidgetRow-like object (with `channel_type` + `ticker_enabled`).
  */
 export function getChannelTickerRow(
   prefs: AppPreferences,
@@ -1737,7 +1744,7 @@ export function getWidgetTickerRow(
  *   row exists per tier limits).
  *
  * Pure: returns a new AppPreferences. Does NOT issue any API calls;
- * channel-level callers must additionally invoke `channelsApi.update`
+ * channel-level callers must additionally invoke `dataWidgetsApi.update`
  * to flip `ticker_enabled` server-side (true if row !== null).
  */
 export function setSourceTickerRow(
@@ -1769,15 +1776,15 @@ export function setSourceTickerRow(
 
 /**
  * Move a channel to the given row. See `setSourceTickerRow`. Caller is
- * responsible for the matching `channelsApi.update({ ticker_enabled })`
+ * responsible for the matching `dataWidgetsApi.update({ ticker_enabled })`
  * call to keep the server-side flag in sync.
  */
 export function setChannelTickerRow(
   prefs: AppPreferences,
-  channelType: string,
+  widgetType: string,
   row: number | null,
 ): AppPreferences {
-  return setSourceTickerRow(prefs, channelType, row);
+  return setSourceTickerRow(prefs, widgetType, row);
 }
 
 /**

@@ -14,9 +14,9 @@
 // the right league/asset-class/feeds.
 
 import type { ComponentType } from "react";
-import type { SourceInfo, ChannelManifest, WidgetManifest } from "./types";
+import type { SourceInfo, DataWidgetManifest, WidgetManifest } from "./types";
 import type { SubscriptionTier } from "./auth";
-import { getChannel } from "./channels/registry";
+import { getDataWidget } from "./datawidgets/registry";
 import { getAllWidgets, getWidget, WIDGET_ORDER } from "./widgets/registry";
 
 type IconProps = { size?: number; className?: string };
@@ -377,18 +377,18 @@ export function catalogItemById(id: string): CatalogItem | undefined {
  *  a utility manifest. */
 export function widgetManifest(
   id: string,
-): ChannelManifest | WidgetManifest | undefined {
+): DataWidgetManifest | WidgetManifest | undefined {
   const def = dataWidgetDef(id);
   if (!def) {
     const legacy = LEGACY_WIDGET_SOURCES[id];
     if (legacy) {
-      const source = getChannel(legacy.source);
+      const source = getDataWidget(legacy.source);
       if (!source) return undefined;
       return { ...source, id, name: legacy.name, tabLabel: legacy.name };
     }
-    return getChannel(id) ?? getWidget(id);
+    return getDataWidget(id) ?? getWidget(id);
   }
-  const source = getChannel(def.source);
+  const source = getDataWidget(def.source);
   if (!source) return undefined;
   return { ...source, id: def.id, name: def.name, tabLabel: def.name, hex: def.color };
 }
@@ -455,7 +455,7 @@ export function widgetLogoUrl(id: string): string | undefined {
 }
 
 function buildDataItem(def: DataWidgetDef): CatalogItem | null {
-  const src = getChannel(def.source);
+  const src = getDataWidget(def.source);
   if (!src) return null; // source channel not registered — skip
   return {
     id: def.id,

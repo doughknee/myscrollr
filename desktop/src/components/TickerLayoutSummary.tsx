@@ -19,7 +19,7 @@
 import { Settings as SettingsIcon } from "lucide-react";
 import Tooltip from "./Tooltip";
 import type { TickerRowConfig } from "../preferences";
-import type { ChannelManifest, WidgetManifest } from "../types";
+import type { DataWidgetManifest, WidgetManifest } from "../types";
 import { catalogItemById } from "../marketplace";
 
 interface TickerLayoutSummaryProps {
@@ -31,8 +31,8 @@ interface TickerLayoutSummaryProps {
   canAddRow: boolean;
   /** Open the full Settings → Ticker editor. */
   onOpenSettings: () => void;
-  /** Channel manifests, used to color the per-row source bars. */
-  channelManifests: ChannelManifest[];
+  /** DataWidgetRow manifests, used to color the per-row source bars. */
+  channelManifests: DataWidgetManifest[];
   /** Widget manifests, used to color the per-row source bars. */
   widgetManifests: WidgetManifest[];
 }

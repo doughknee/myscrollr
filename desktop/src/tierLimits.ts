@@ -5,7 +5,7 @@ import type { SubscriptionTier } from "./auth";
 //
 // SOURCE OF TRUTH: api/core/tier_limits.go (DefaultTierLimits)
 //
-// Channel config panels and the onboarding wizard read these synchronously
+// DataWidgetRow config panels and the onboarding wizard read these synchronously
 // during render, so we keep a hardcoded mirror of the backend values here
 // rather than fetching them asynchronously from GET /tier-limits. Drift
 // between this file and the Go source becomes a billing-trust problem.
@@ -32,7 +32,7 @@ import type { SubscriptionTier } from "./auth";
 // is reworked.
 // =====================================================================
 
-interface ChannelLimits {
+interface DataWidgetLimits {
   /** Max widgets a tier can run at once — the slot model. Infinity = unlimited. */
   maxWidgets: number;
   symbols: number;
@@ -56,7 +56,7 @@ const UNLIMITED_DEPTH = {
   fantasy: Infinity,
 } as const;
 
-export const TIER_LIMITS: Record<SubscriptionTier, ChannelLimits> = {
+export const TIER_LIMITS: Record<SubscriptionTier, DataWidgetLimits> = {
   free: {
     maxWidgets: 3,
     ...UNLIMITED_DEPTH,
@@ -94,8 +94,8 @@ export const TIER_LIMITS: Record<SubscriptionTier, ChannelLimits> = {
 // simple `number` signatures). Exported so callers can constrain their own
 // helpers: e.g. `const LIMIT_ROWS: { key: NumericLimitKey }[] = [...]`.
 export type NumericLimitKey = {
-  [K in keyof ChannelLimits]: ChannelLimits[K] extends number ? K : never;
-}[keyof ChannelLimits];
+  [K in keyof DataWidgetLimits]: DataWidgetLimits[K] extends number ? K : never;
+}[keyof DataWidgetLimits];
 
 type LimitKey = NumericLimitKey;
 

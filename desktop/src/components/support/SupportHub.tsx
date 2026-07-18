@@ -13,7 +13,7 @@ import {
 import clsx from "clsx";
 import { motion } from "motion/react";
 import { searchSupportContent } from "./support-content";
-import { getAllChannels } from "../../channels/registry";
+import { getAllDataWidgets } from "../../datawidgets/registry";
 import { getAllWidgets } from "../../widgets/registry";
 import type { SearchResult, SearchResultSection } from "./support-content";
 
@@ -94,7 +94,7 @@ function buildFeatureGuideResults(query: string): SearchResult[] {
   const q = query.toLowerCase();
   const results: SearchResult[] = [];
 
-  const channels = getAllChannels();
+  const channels = getAllDataWidgets();
   channels.forEach((ch, i) => {
     const text = `${ch.name} ${ch.info.about} ${ch.info.usage.join(" ")}`.toLowerCase();
     if (text.includes(q)) {

@@ -19,7 +19,7 @@ import { TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardQueryOptions, financeCatalogOptions } from "../../api/queries";
 import { formatPrice, formatChange, relativeTime } from "../../utils/format";
-import EmptyChannelState from "../../components/EmptyChannelState";
+import EmptyWidgetState from "../../components/EmptyWidgetState";
 import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarPill } from "../../components/widget-bar/Bar";
@@ -33,19 +33,19 @@ import {
 import { SearchBox, useSlashFocus } from "../../components/widget-bar/SearchBox";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
-import { useChannelConfig } from "../../hooks/useChannelConfig";
+import { useDataWidgetConfig } from "../../hooks/useDataWidgetConfig";
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
 import { applyFinancePipeline, type FinanceSortKey, type FinanceDirectionFilter } from "./view";
-import type { Trade, FeedTabProps, ChannelManifest } from "../../types";
-import type { ChannelType } from "../../api/client";
+import type { Trade, FeedTabProps, DataWidgetManifest } from "../../types";
+import type { DataWidgetType } from "../../api/client";
 import { assetClassForWidget } from "../../marketplace";
 import { shouldShowOnFeed } from "../../preferences";
 import type { FinanceDisplayPrefs } from "../../preferences";
 
-// ── Channel manifest ─────────────────────────────────────────────
+// ── DataWidgetRow manifest ─────────────────────────────────────────────
 
-export const financeChannel: ChannelManifest = {
+export const financeChannel: DataWidgetManifest = {
   id: "finance",
   name: "Finance",
   tabLabel: "Finance",
@@ -94,7 +94,7 @@ const LOAD_MORE_INCREMENT = 20;
 
 function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProps) {
   const { prefs, onPrefsChange } = useShell();
-  const dp = prefs.channelDisplay.finance;
+  const dp = prefs.widgetDisplay.finance;
 
   // Density is caller-driven only (the per-widget feedDensity pref was
   // deleted in the 2026-07-17 settings unification — feeds render
@@ -165,9 +165,9 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
       setSortKey(next);
       onPrefsChange({
         ...prefs,
-        channelDisplay: {
-          ...prefs.channelDisplay,
-          finance: { ...prefs.channelDisplay.finance, defaultSort: next },
+        widgetDisplay: {
+          ...prefs.widgetDisplay,
+          finance: { ...prefs.widgetDisplay.finance, defaultSort: next },
         },
       });
     },
@@ -259,7 +259,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
     return { all: trades.length, gainers: up, losers: down };
   }, [trades]);
 
-  const channelType = (widgetId ?? "finance") as ChannelType;
+  const widgetType = (widgetId ?? "finance") as DataWidgetType;
   const showEmpty = trades.length === 0;
 
   // ── Search-to-add (the Symbols view, folded into the bar) ────
@@ -271,11 +271,11 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
     setError: setSymbolsError,
     saving: symbolsSaving,
     updateItems: updateSymbols,
-  } = useChannelConfig<string[]>(channelType, "symbols");
+  } = useDataWidgetConfig<string[]>(widgetType, "symbols");
   const { data: fullCatalog = [] } = useQuery(financeCatalogOptions());
 
   const channelRow = (dashboard?.channels ?? []).find(
-    (ch) => ch.channel_type === channelType,
+    (ch) => ch.channel_type === widgetType,
   );
   const channelConfig = (channelRow?.config ?? {}) as FinanceChannelConfig;
   const trackedSymbols = useMemo(
@@ -480,7 +480,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
           {/* Searching from empty: the matches panel above is the
               content — don't stack the hero under it. */}
           {!searchQ && (
-            <EmptyChannelState
+            <EmptyWidgetState
               refreshing={Boolean(feedContext.__refreshing)}
               icon={TrendingUp}
               noun="stocks or crypto"

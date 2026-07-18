@@ -2,7 +2,7 @@
  * Sports view selectors — shared filter/sort pipeline.
  *
  * Sports display prefs live server-side on the dashboard channel config
- * (not in `prefs.channelDisplay`), so this selector accepts the config
+ * (not in `prefs.widgetDisplay`), so this selector accepts the config
  * blob shape. Both `FeedTab` and `ScrollrTicker` call `selectSportsForTicker`
  * to apply the day window (v1.1.3 Time Controls) + engagement sort.
  *

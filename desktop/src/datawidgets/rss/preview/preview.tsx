@@ -18,7 +18,7 @@ import { ShellContext, type ShellState } from "../../../shell-context";
 import { dashboardQueryOptions, rssCatalogOptions } from "../../../api/queries";
 import { migrateRssDisplay, type AppPreferences } from "../../../preferences";
 import { rssChannel } from "../FeedTab";
-import type { ChannelType, TrackedFeed } from "../../../api/client";
+import type { DataWidgetType, TrackedFeed } from "../../../api/client";
 import type { FeedTabProps, RssItem } from "../../../types";
 
 const params = new URLSearchParams(window.location.search);
@@ -87,7 +87,7 @@ function main(): void {
   });
   const channelRow = (type: string, feeds: typeof FEEDS) => ({
     id: 1,
-    channel_type: type as ChannelType,
+    channel_type: type as DataWidgetType,
     enabled: true,
     ticker_enabled: true,
     created_at: "2026-07-17T00:00:00Z",
@@ -111,7 +111,7 @@ function main(): void {
   );
 
   const initialPrefs = {
-    channelDisplay: {
+    widgetDisplay: {
       rss: {
         ...migrateRssDisplay(undefined),
         // Legacy-style per-source cap so the "Show all" footer has
@@ -131,7 +131,7 @@ function main(): void {
     autostartEnabled: false,
     onAutostartChange: noop,
     appVersion: "preview",
-    allChannelManifests: [],
+    allDataWidgetManifests: [],
     allWidgets: [],
     onToggleChannelTicker: noop,
     onToggleWidgetTicker: noop,

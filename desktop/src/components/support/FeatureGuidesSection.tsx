@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
 import { ChevronDown } from "lucide-react";
 import clsx from "clsx";
-import { getAllChannels } from "../../channels/registry";
+import { getAllDataWidgets } from "../../datawidgets/registry";
 import { getAllWidgets } from "../../widgets/registry";
-import type { ChannelManifest, WidgetManifest } from "../../types";
+import type { DataWidgetManifest, WidgetManifest } from "../../types";
 
 const CHANNEL_TIERS: Record<string, string> = {
   finance: "Free",
@@ -13,7 +13,7 @@ const CHANNEL_TIERS: Record<string, string> = {
 };
 
 export default function FeatureGuidesSection() {
-  const channels = useMemo(() => getAllChannels(), []);
+  const channels = useMemo(() => getAllDataWidgets(), []);
   const widgets = useMemo(() => getAllWidgets(), []);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -64,7 +64,7 @@ function GuideCard({
   isOpen,
   onToggle,
 }: {
-  manifest: ChannelManifest | WidgetManifest;
+  manifest: DataWidgetManifest | WidgetManifest;
   tier: string;
   isOpen: boolean;
   onToggle: () => void;

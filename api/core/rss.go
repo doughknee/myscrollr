@@ -21,7 +21,7 @@ import (
 
 const (
 	// CacheKeyRSSPrefix is the Redis key prefix for per-user RSS item
-	// caches. Must stay in sync with channelUserCacheKeys (redis.go).
+	// caches. Must stay in sync with widgetUserCacheKeys (redis.go).
 	CacheKeyRSSPrefix = "cache:rss:"
 
 	// CacheKeyRSSCatalog is the Redis key for the cached feed catalog.

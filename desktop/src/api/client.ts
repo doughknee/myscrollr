@@ -160,13 +160,13 @@ export async function authFetch<T>(
   return handleResponse<T>(response);
 }
 
-// ── Channel Types ───────────────────────────────────────────────
+// ── DataWidgetRow Types ───────────────────────────────────────────────
 
-export type ChannelType = "finance" | "sports" | "fantasy" | "rss" | "predictions";
+export type DataWidgetType = "finance" | "sports" | "fantasy" | "rss" | "predictions";
 
-export interface Channel {
+export interface DataWidgetRow {
   id: number;
-  channel_type: ChannelType;
+  channel_type: DataWidgetType;
   enabled: boolean;
   /** Whether this channel's chips appear on the ticker. Server emits both
    * `ticker_enabled` (preferred) and `visible` (legacy alias) — read either
@@ -201,20 +201,20 @@ export interface RssChannelConfig {
 
 // ── Channels API ────────────────────────────────────────────────
 
-export const channelsApi = {
+export const dataWidgetsApi = {
   getAll: () =>
-    authFetch<{ channels: Array<Channel> }>("/users/me/channels"),
+    authFetch<{ channels: Array<DataWidgetRow> }>("/users/me/channels"),
 
   create: (
-    channelType: ChannelType,
+    widgetType: DataWidgetType,
     config: Record<string, unknown> = {},
     localWidgets?: number,
   ) =>
-    authFetch<Channel>("/users/me/channels", {
+    authFetch<DataWidgetRow>("/users/me/channels", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        channel_type: channelType,
+        channel_type: widgetType,
         config,
         // Report the enabled utility-widget count so the server slot gate
         // counts every widget — utilities live only in local preferences.
@@ -223,27 +223,27 @@ export const channelsApi = {
     }),
 
   update: (
-    channelType: ChannelType,
+    widgetType: DataWidgetType,
     data: {
       enabled?: boolean;
       ticker_enabled?: boolean;
       config?: Record<string, unknown>;
     },
   ) =>
-    authFetch<Channel>(`/users/me/channels/${channelType}`, {
+    authFetch<DataWidgetRow>(`/users/me/channels/${widgetType}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }),
 
-  delete: (channelType: ChannelType) =>
+  delete: (widgetType: DataWidgetType) =>
     authFetch<{ status: string; message: string }>(
-      `/users/me/channels/${channelType}`,
+      `/users/me/channels/${widgetType}`,
       { method: "DELETE" },
     ),
 };
 
-// ── Channel ticker toggle ───────────────────────────────────────
+// ── DataWidgetRow ticker toggle ───────────────────────────────────────
 
 /**
  * Toggle whether a channel's chips appear on the ticker (and optionally
@@ -254,8 +254,8 @@ export const channelsApi = {
  * The wire field is `ticker_enabled` (v1.0.4+); the server also accepts
  * the legacy `visible` field for older clients.
  */
-export async function toggleChannelVisibility(
-  channelType: ChannelType,
+export async function toggleDataWidgetVisibility(
+  widgetType: DataWidgetType,
   tickerEnabled: boolean,
   enabled?: boolean,
 ): Promise<void> {
@@ -263,7 +263,7 @@ export async function toggleChannelVisibility(
     ticker_enabled: tickerEnabled,
   };
   if (enabled !== undefined) payload.enabled = enabled;
-  await channelsApi.update(channelType, payload);
+  await dataWidgetsApi.update(widgetType, payload);
 }
 
 // ── Subscription Types & API ────────────────────────────────────

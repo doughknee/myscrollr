@@ -1,11 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import TickerLayoutSummary from "./TickerLayoutSummary";
-import type { ChannelManifest, WidgetManifest } from "../types";
+import type { DataWidgetManifest, WidgetManifest } from "../types";
 
 const channelManifests = [
   { id: "finance", tabLabel: "Finance", hex: "#22c55e" },
-] as ChannelManifest[];
+] as DataWidgetManifest[];
 
 const widgetManifests = [
   { id: "timer", tabLabel: "Timer", hex: "#38bdf8" },

@@ -23,7 +23,7 @@ import { dataWidgetDef } from "../../marketplace";
 import { ScoresTab } from "./ScoresTab";
 import { ScheduleTab } from "./ScheduleTab";
 import { StandingsTab } from "./StandingsTab";
-import EmptyChannelState from "../../components/EmptyChannelState";
+import EmptyWidgetState from "../../components/EmptyWidgetState";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarDivider, BarPill } from "../../components/widget-bar/Bar";
 import {
@@ -40,12 +40,12 @@ import {
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import { isLive, isPre, isFinal } from "../../utils/gameHelpers";
 import { AnimatePresence } from "motion/react";
-import type { FeedTabProps, ChannelManifest } from "../../types";
+import type { FeedTabProps, DataWidgetManifest } from "../../types";
 import type { FavoriteTeam } from "../../hooks/useSportsConfig";
 
-// ── Channel manifest ─────────────────────────────────────────────
+// ── DataWidgetRow manifest ─────────────────────────────────────────────
 
-export const sportsChannel: ChannelManifest = {
+export const sportsChannel: DataWidgetManifest = {
   id: "sports",
   name: "Sports",
   tabLabel: "Sports",
@@ -204,7 +204,7 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
             )}
             {scopedLeague && (
               <SportsBarControls
-                channelType={widgetId ?? "sports"}
+                widgetType={widgetId ?? "sports"}
                 league={scopedLeague}
               />
             )}
@@ -214,7 +214,7 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
 
       {showEmpty ? (
         <div className="flex flex-1 flex-col justify-center">
-          <EmptyChannelState
+          <EmptyWidgetState
             refreshing={Boolean(feedContext.__refreshing)}
             icon={Trophy}
             noun="leagues"
@@ -317,14 +317,14 @@ const WINDOW_OPTIONS: { value: string; label: string; back: number; ahead: numbe
 ];
 
 function SportsBarControls({
-  channelType,
+  widgetType,
   league,
 }: {
-  channelType: string;
+  widgetType: string;
   league: string;
 }) {
   const { display, favoriteTeams, setDisplay, setFavoriteTeam } =
-    useSportsConfig(channelType);
+    useSportsConfig(widgetType);
 
   const favorite = favoriteTeams[league];
   // Fetched on feed mount now (the gear lazy-loaded on first open); the

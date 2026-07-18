@@ -76,7 +76,7 @@ interface UseTickerLayoutResult {
    * Move a source (channel ID or widget ID) to the given row.
    * `row === null` removes it from every row entirely.
    *
-   * Channel callers must additionally call `channelsApi.update` (or
+   * DataWidgetRow callers must additionally call `dataWidgetsApi.update` (or
    * `onToggleChannelTicker`) to flip the server-side `ticker_enabled`
    * flag — this hook only mutates client-side prefs.
    */

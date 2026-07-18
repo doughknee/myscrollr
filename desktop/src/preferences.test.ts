@@ -162,6 +162,35 @@ describe("enumToBools / boolsToEnum (DisplayLocationGrid adapter)", () => {
   });
 });
 
+describe("REL-40 channelDisplay -> widgetDisplay key migration", () => {
+  it("reads display prefs stored under the legacy channelDisplay key", () => {
+    storeValues.set("scrollr:settings", {
+      appearance: {},
+      channelDisplay: {
+        finance: { defaultSort: "change" },
+      },
+    });
+
+    const prefs = loadPrefs();
+
+    // Released (≤ v1.1.9) clients persisted under channelDisplay; the
+    // loader must fold it into widgetDisplay so nothing is lost.
+    expect(prefs.widgetDisplay.finance.defaultSort).toBe("change");
+  });
+
+  it("prefers the new widgetDisplay key when both exist", () => {
+    storeValues.set("scrollr:settings", {
+      appearance: {},
+      channelDisplay: { finance: { defaultSort: "alpha" } },
+      widgetDisplay: { finance: { defaultSort: "price" } },
+    });
+
+    const prefs = loadPrefs();
+
+    expect(prefs.widgetDisplay.finance.defaultSort).toBe("price");
+  });
+});
+
 describe("migrateFinanceDisplay", () => {
   it("resets display venues to defaults, preserving functional prefs (2026-07-17)", () => {
     // The display-item toggles left the UI with the configure-page
@@ -410,7 +439,7 @@ describe("migrateFantasyDisplay", () => {
 //
 // The helpers must:
 //  - return the correct row for a source explicitly listed in tickerLayout
-//  - fall back to legacy `Channel.ticker_enabled` (or `visible`) when the
+//  - fall back to legacy `DataWidgetRow.ticker_enabled` (or `visible`) when the
 //    source isn't in any row, so users upgrading from pre-multi-deck
 //    builds don't see all their channels suddenly go dark
 //  - move a source between rows atomically (remove from old row, add to new)
@@ -476,7 +505,7 @@ describe("getSourceTickerRow / getChannelTickerRow / getWidgetTickerRow", () => 
   });
 
   it("explicit row assignment beats the legacy ticker_enabled fallback", () => {
-    // Channel has ticker_enabled=true, but it's pinned to row 1 explicitly.
+    // DataWidgetRow has ticker_enabled=true, but it's pinned to row 1 explicitly.
     const prefs = makePrefs([{ sources: [] }, { sources: ["finance"] }]);
     const ch = { channel_type: "finance", ticker_enabled: true };
     expect(getChannelTickerRow(prefs, ch)).toBe(1);

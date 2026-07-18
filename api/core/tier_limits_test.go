@@ -123,7 +123,7 @@ func derefOr(p *int, fallback string) any {
 	return *p
 }
 
-// ─── ValidateChannelConfig ──────────────────────────────────────────
+// ─── ValidateWidgetConfig ──────────────────────────────────────────
 
 // Helper: build a finance config with N symbols.
 func financeCfg(n int) map[string]any {
@@ -144,7 +144,7 @@ func sportsCfg(n int) map[string]any {
 }
 
 // curatedFixtureURL is pinned into the curated-URL cache by
-// TestValidateChannelConfig_Boundaries so is_custom derivation is
+// TestValidateWidgetConfig_Boundaries so is_custom derivation is
 // deterministic (see pinCuratedFixture).
 const curatedFixtureURL = "https://curated.example.com/feed"
 
@@ -185,15 +185,15 @@ func pinCuratedFixture(t *testing.T) {
 	})
 }
 
-// TestValidateChannelConfig_CapsRetired confirms the per-feature depth caps
+// TestValidateWidgetConfig_CapsRetired confirms the per-feature depth caps
 // were retired (2026-07-02): configs of any size pass on EVERY tier. The
 // widget-slot cap (enforced in channels.go, not here) is the only lever now.
-func TestValidateChannelConfig_CapsRetired(t *testing.T) {
+func TestValidateWidgetConfig_CapsRetired(t *testing.T) {
 	pinCuratedFixture(t)
 	cases := []struct {
-		tier        string
-		channelType string
-		config      map[string]any
+		tier       string
+		widgetType string
+		config     map[string]any
 	}{
 		{"free", "finance", financeCfg(1000)},
 		{"free", "sports", sportsCfg(1000)},
@@ -204,17 +204,17 @@ func TestValidateChannelConfig_CapsRetired(t *testing.T) {
 		{"free", "finance", map[string]any{}},
 	}
 	for _, c := range cases {
-		if err := ValidateChannelConfig(c.tier, c.channelType, c.config); err != nil {
-			t.Errorf("%s/%s: caps retired, want nil, got %v", c.tier, c.channelType, err)
+		if err := ValidateWidgetConfig(c.tier, c.widgetType, c.config); err != nil {
+			t.Errorf("%s/%s: caps retired, want nil, got %v", c.tier, c.widgetType, err)
 		}
 	}
 }
 
-// TestValidateChannelConfig_UnknownChannelPasses protects the dynamic
+// TestValidateWidgetConfig_UnknownChannelPasses protects the dynamic
 // channel registry: new channels can roll out without this validator
 // being the thing that blocks them.
-func TestValidateChannelConfig_UnknownChannelPasses(t *testing.T) {
-	err := ValidateChannelConfig("free", "future_channel", map[string]any{"whatever": 1})
+func TestValidateWidgetConfig_UnknownChannelPasses(t *testing.T) {
+	err := ValidateWidgetConfig("free", "future_channel", map[string]any{"whatever": 1})
 	if err != nil {
 		t.Errorf("want nil, got %v", err)
 	}
@@ -224,7 +224,7 @@ func TestValidateChannelConfig_UnknownChannelPasses(t *testing.T) {
 // handler renders into 403 bodies.
 func TestTierLimitError_UserFacingMessage(t *testing.T) {
 	e := &TierLimitError{
-		Tier: "free", ChannelType: "finance", Field: "symbols", Limit: 5, Got: 12,
+		Tier: "free", WidgetType: "finance", Field: "symbols", Limit: 5, Got: 12,
 	}
 	got := e.UserFacingMessage()
 	want := "Your Free plan allows 5 symbols; you tried to save 12."
@@ -239,11 +239,11 @@ func TestTierLimitError_UserFacingMessage(t *testing.T) {
 // prune: keep the oldest enabled widgets up to the slot cap, mark the
 // newest overflow for disabling, and never touch already-disabled rows.
 func TestPartitionWidgetsForCap(t *testing.T) {
-	w := func(name string, enabled bool) Channel {
-		return Channel{ChannelType: name, Enabled: enabled}
+	w := func(name string, enabled bool) Widget {
+		return Widget{WidgetType: name, Enabled: enabled}
 	}
-	// created_at ASC order, matching GetUserChannels.
-	channels := []Channel{
+	// created_at ASC order, matching GetUserWidgets.
+	channels := []Widget{
 		w("sports_nfl", true),
 		w("finance_stocks", true),
 		w("news_bbc", false), // user-disabled — passes through untouched
@@ -267,9 +267,9 @@ func TestPartitionWidgetsForCap(t *testing.T) {
 // TestPartitionWidgetsForCap_UnderCap — nothing to prune when the user
 // fits their slots (the upgrade / no-op path).
 func TestPartitionWidgetsForCap_UnderCap(t *testing.T) {
-	channels := []Channel{
-		{ChannelType: "sports_nfl", Enabled: true},
-		{ChannelType: "news_bbc", Enabled: true},
+	channels := []Widget{
+		{WidgetType: "sports_nfl", Enabled: true},
+		{WidgetType: "news_bbc", Enabled: true},
 	}
 	kept, pruned := partitionWidgetsForCap(channels, 3)
 	if len(kept) != 2 || len(pruned) != 0 {
@@ -277,10 +277,10 @@ func TestPartitionWidgetsForCap_UnderCap(t *testing.T) {
 	}
 }
 
-func widgetNames(chs []Channel) []string {
+func widgetNames(chs []Widget) []string {
 	names := make([]string, len(chs))
 	for i, ch := range chs {
-		names[i] = ch.ChannelType
+		names[i] = ch.WidgetType
 	}
 	return names
 }

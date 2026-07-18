@@ -1,8 +1,39 @@
 package core
 
 import (
+	"net/http/httptest"
 	"testing"
+
+	"github.com/gofiber/fiber/v2"
 )
+
+// TestWidgetRouteAliases confirms the REL-40 /users/me/widgets aliases are
+// registered alongside the legacy /users/me/channels wire routes with the
+// same LogtoAuth gate: every verb on both paths must 401 (registered and
+// auth-gated), never 404 or fall through to /users/:username.
+func TestWidgetRouteAliases(t *testing.T) {
+	s := NewServer()
+	s.setupRoutes()
+
+	for _, tc := range []struct{ method, path string }{
+		{"GET", "/users/me/channels"},
+		{"POST", "/users/me/channels"},
+		{"PUT", "/users/me/channels/finance"},
+		{"DELETE", "/users/me/channels/finance"},
+		{"GET", "/users/me/widgets"},
+		{"POST", "/users/me/widgets"},
+		{"PUT", "/users/me/widgets/finance"},
+		{"DELETE", "/users/me/widgets/finance"},
+	} {
+		resp, err := s.App.Test(httptest.NewRequest(tc.method, tc.path, nil))
+		if err != nil {
+			t.Fatalf("%s %s: %v", tc.method, tc.path, err)
+		}
+		if resp.StatusCode != fiber.StatusUnauthorized {
+			t.Errorf("%s %s: got %d, want 401", tc.method, tc.path, resp.StatusCode)
+		}
+	}
+}
 
 func TestExtractStringArrayLeagues(t *testing.T) {
 	tests := []struct {

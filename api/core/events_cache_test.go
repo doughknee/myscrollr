@@ -29,7 +29,7 @@ func setupMiniRedis(t *testing.T) (*miniredis.Miniredis, func()) {
 // given user, which cache keys must be invalidated on CDC dispatch so no
 // stale reply escapes. Kept as a test-local slice so future additions must
 // update BOTH this slice AND the production `InvalidateUserCaches` /
-// `channelUserCacheKeys`. Mismatch → test fails → we notice the drift.
+// `widgetUserCacheKeys`. Mismatch → test fails → we notice the drift.
 func userCacheKeysFor(userSub string) []string {
 	return []string{
 		RedisDashboardCachePrefix + userSub,
