@@ -2,20 +2,20 @@
  * Atomic config hook for sports channel.
  *
  * Reads the full config, merges changes locally, and writes the complete
- * object to avoid data loss from the partial-write behavior of useChannelConfig.
+ * object to avoid data loss from the partial-write behavior of useDataWidgetConfig.
  */
 import { useCallback, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { channelsApi } from "../api/client";
-import type { ChannelType } from "../api/client";
+import { dataWidgetsApi } from "../api/client";
+import type { DataWidgetType } from "../api/client";
 import type { DashboardResponse } from "../types";
 import { queryKeys } from "../api/queries";
 import { useShellData } from "../shell-context";
 import {
   normalizeSportsDisplayConfig,
   SPORTS_WINDOW_DEFAULTS,
-} from "../channels/sports/view";
+} from "../datawidgets/sports/view";
 import type { Venue } from "../preferences";
 
 export interface FavoriteTeam {
@@ -44,14 +44,14 @@ const DEFAULT_DISPLAY: SportsDisplayPrefs = {
   showTimer: "both",
 };
 
-export function useSportsConfig(channelType: string = "sports") {
+export function useSportsConfig(widgetType: string = "sports") {
   const { channels } = useShellData();
   const queryClient = useQueryClient();
 
   // Read current config from the channels data (comes via dashboard response).
-  // channelType is the specific widget row (e.g. "sports_nfl") post widget-split;
+  // widgetType is the specific widget row (e.g. "sports_nfl") post widget-split;
   // defaults to the legacy coarse "sports" channel for back-compat.
-  const sportsChannel = channels.find((c) => c.channel_type === channelType);
+  const sportsChannel = channels.find((c) => c.channel_type === widgetType);
   const raw = (sportsChannel?.config ?? {}) as Record<string, unknown>;
 
   const config: SportsConfig = useMemo(() => {
@@ -77,7 +77,7 @@ export function useSportsConfig(channelType: string = "sports") {
 
   const mutation = useMutation({
     mutationFn: (next: SportsConfig) =>
-      channelsApi.update(channelType as ChannelType, {
+      dataWidgetsApi.update(widgetType as DataWidgetType, {
         config: next as unknown as Record<string, unknown>,
       }),
     // Optimistic write: patch this channel's config in the dashboard cache
@@ -93,7 +93,7 @@ export function useSportsConfig(channelType: string = "sports") {
       queryClient.setQueryData<DashboardResponse>(queryKeys.dashboard, (old) => {
         if (!old) return old;
         const channels = (old.channels ?? []).map((c) =>
-          c.channel_type === channelType
+          c.channel_type === widgetType
             ? { ...c, config: next as unknown as Record<string, unknown> }
             : c,
         );

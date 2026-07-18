@@ -140,7 +140,7 @@ func IsKnownWidgetType(widgetType string) bool {
 
 // IsUtilityWidgetType reports whether a widget_type is a local-only utility
 // (clock/timer/…). Utilities live in desktop preferences, not user_channels —
-// CreateChannel rejects them so they can't pollute subscriber sets or
+// CreateWidget rejects them so they can't pollute subscriber sets or
 // double-count against the slot cap (once as a row, once via local_widgets).
 func IsUtilityWidgetType(widgetType string) bool {
 	def, ok := widgetByID[widgetType]

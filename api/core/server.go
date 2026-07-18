@@ -254,10 +254,17 @@ func (s *Server) setupRoutes() {
 	// User Routes — specific /users/me/* paths BEFORE parameterized /users/:username
 	s.App.Get("/users/me/preferences", LogtoAuth, HandleGetPreferences)
 	s.App.Put("/users/me/preferences", LogtoAuth, HandleUpdatePreferences)
-	s.App.Get("/users/me/channels", LogtoAuth, GetChannels)
-	s.App.Post("/users/me/channels", LogtoAuth, CreateChannel)
-	s.App.Put("/users/me/channels/:type", LogtoAuth, UpdateChannel)
-	s.App.Delete("/users/me/channels/:type", LogtoAuth, DeleteChannel)
+	// Widget CRUD. The /users/me/channels paths are the legacy wire routes
+	// that shipped v1.1.x clients depend on; /users/me/widgets are aliases
+	// added by REL-40 (same handlers, same middleware). Keep both.
+	s.App.Get("/users/me/channels", LogtoAuth, GetWidgets)
+	s.App.Post("/users/me/channels", LogtoAuth, CreateWidget)
+	s.App.Put("/users/me/channels/:type", LogtoAuth, UpdateWidget)
+	s.App.Delete("/users/me/channels/:type", LogtoAuth, DeleteWidget)
+	s.App.Get("/users/me/widgets", LogtoAuth, GetWidgets)
+	s.App.Post("/users/me/widgets", LogtoAuth, CreateWidget)
+	s.App.Put("/users/me/widgets/:type", LogtoAuth, UpdateWidget)
+	s.App.Delete("/users/me/widgets/:type", LogtoAuth, DeleteWidget)
 
 	// GDPR: data export + 30-day soft-delete lifecycle
 	s.App.Get("/users/me/export", LogtoAuth, HandleExportUserData)
@@ -423,19 +430,19 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 			res.Preferences = prefs
 		}
 
-		// 2. User channels + enabled types
-		channels, err := GetUserChannels(userID)
+		// 2. User widgets + enabled types
+		widgets, err := GetUserWidgets(userID)
 		if err == nil {
-			res.Channels = channels
+			res.Widgets = widgets
 		}
 
 		// Key by data SOURCE, not the exact widget type, so split widgets
 		// (sports_nfl, finance_stocks, …) still select their backing service's
 		// dashboard provider below (matched on intg.Name).
-		enabledChannels := make(map[string]bool)
-		for _, ch := range channels {
+		enabledSources := make(map[string]bool)
+		for _, ch := range widgets {
 			if ch.Enabled {
-				enabledChannels[DataSourceForWidget(ch.ChannelType)] = true
+				enabledSources[DataSourceForWidget(ch.WidgetType)] = true
 			}
 		}
 
@@ -446,7 +453,7 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 			if isLocalSource(intg.Name) {
 				continue
 			}
-			if enabledChannels[intg.Name] && intg.HasCapability("dashboard_provider") {
+			if enabledSources[intg.Name] && intg.HasCapability("dashboard_provider") {
 				targets = append(targets, intg)
 			}
 		}
@@ -490,7 +497,7 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 
 		// Local widget sources (ADR-0002) contribute in-process.
 		for name, src := range localSources {
-			if src.dashboard == nil || !enabledChannels[name] {
+			if src.dashboard == nil || !enabledSources[name] {
 				continue
 			}
 			for k, v := range src.dashboard(context.Background(), userID) {

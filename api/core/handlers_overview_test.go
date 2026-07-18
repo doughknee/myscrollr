@@ -197,7 +197,7 @@ func TestGetChannelSummary_NoChannels(t *testing.T) {
 	userID := makeTestUser()
 	defer cleanupTestUser(t, userID)
 
-	got, err := getChannelSummary(context.Background(), userID)
+	got, err := getWidgetSummary(context.Background(), userID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -219,7 +219,7 @@ func TestGetChannelSummary_MixedEnabledStates(t *testing.T) {
 		($1, 'rss', true, false),
 		($1, 'fantasy', false, false)`, userID)
 
-	got, err := getChannelSummary(context.Background(), userID)
+	got, err := getWidgetSummary(context.Background(), userID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestGetChannelSummary_MixedEnabledStates(t *testing.T) {
 	}
 }
 
-// ─── hasFantasyChannel ──────────────────────────────────────────────
+// ─── hasFantasyWidget ──────────────────────────────────────────────
 
 func TestHasFantasyChannel(t *testing.T) {
 	cases := []struct {
@@ -253,8 +253,8 @@ func TestHasFantasyChannel(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := hasFantasyChannel(tc.in); got != tc.want {
-				t.Errorf("hasFantasyChannel: want %v, got %v", tc.want, got)
+			if got := hasFantasyWidget(tc.in); got != tc.want {
+				t.Errorf("hasFantasyWidget: want %v, got %v", tc.want, got)
 			}
 		})
 	}

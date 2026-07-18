@@ -19,8 +19,8 @@ var lifecycleClient = &http.Client{
 	Timeout: 10 * time.Second,
 }
 
-// GetUserChannels fetches all channels for a user.
-func GetUserChannels(logtoSub string) ([]Channel, error) {
+// GetUserWidgets fetches all of a user's widgets (rows of user_channels).
+func GetUserWidgets(logtoSub string) ([]Widget, error) {
 	rows, err := DBPool.Query(context.Background(), `
 		SELECT id, logto_sub, channel_type, enabled, visible, config, created_at, updated_at
 		FROM user_channels
@@ -32,27 +32,27 @@ func GetUserChannels(logtoSub string) ([]Channel, error) {
 	}
 	defer rows.Close()
 
-	channels := make([]Channel, 0)
+	widgets := make([]Widget, 0)
 	for rows.Next() {
-		var ch Channel
+		var ch Widget
 		var configJSON []byte
-		if err := rows.Scan(&ch.ID, &ch.LogtoSub, &ch.ChannelType, &ch.Enabled, &ch.Visible, &configJSON, &ch.CreatedAt, &ch.UpdatedAt); err != nil {
-			log.Printf("[Channels] Scan error: %v", err)
+		if err := rows.Scan(&ch.ID, &ch.LogtoSub, &ch.WidgetType, &ch.Enabled, &ch.Visible, &configJSON, &ch.CreatedAt, &ch.UpdatedAt); err != nil {
+			log.Printf("[Widgets] Scan error: %v", err)
 			continue
 		}
 		if err := json.Unmarshal(configJSON, &ch.Config); err != nil {
 			ch.Config = map[string]interface{}{}
 		}
-		channels = append(channels, ch)
+		widgets = append(widgets, ch)
 	}
 
-	return channels, nil
+	return widgets, nil
 }
 
-// CountEnabledChannels returns how many enabled channels (widgets) a user
+// CountEnabledWidgets returns how many enabled widgets a user
 // currently has — the "slots in use" for the widget/slot model. Used by
-// CreateChannel to gate new additions against the tier's MaxWidgets cap.
-func CountEnabledChannels(ctx context.Context, logtoSub string) (int, error) {
+// CreateWidget to gate new additions against the tier's MaxWidgets cap.
+func CountEnabledWidgets(ctx context.Context, logtoSub string) (int, error) {
 	var n int
 	err := DBPool.QueryRow(ctx,
 		`SELECT count(*) FROM user_channels WHERE logto_sub = $1 AND enabled = true`,
@@ -60,12 +60,13 @@ func CountEnabledChannels(ctx context.Context, logtoSub string) (int, error) {
 	return n, err
 }
 
-// callChannelLifecycle sends a lifecycle event to a channel if it has the channel_lifecycle capability.
-func callChannelLifecycle(ctx context.Context, channelType, event, userSub string, config, oldConfig map[string]interface{}, enabled *bool) {
+// callWidgetLifecycle sends a widget lifecycle event to the backing service
+// if it has the channel_lifecycle capability (wire name unchanged).
+func callWidgetLifecycle(ctx context.Context, widgetType, event, userSub string, config, oldConfig map[string]interface{}, enabled *bool) {
 	// Resolve to the backing data source so widget types (e.g. "news") reach
 	// the right service's lifecycle hook (rss). Legacy coarse types map to
 	// themselves.
-	source := DataSourceForWidget(channelType)
+	source := DataSourceForWidget(widgetType)
 
 	// Local widget sources (ADR-0002): most sources only need per-user
 	// cache invalidation (the one live behavior of the HTTP lifecycle
@@ -103,34 +104,33 @@ func callChannelLifecycle(ctx context.Context, channelType, event, userSub strin
 
 	reqBody, err := json.Marshal(body)
 	if err != nil {
-		log.Printf("[Channels] Failed to marshal lifecycle request: %v", err)
+		log.Printf("[Widgets] Failed to marshal lifecycle request: %v", err)
 		return
 	}
 
 	url := ch.InternalURL + "/internal/channel-lifecycle"
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqBody))
 	if err != nil {
-		log.Printf("[Channels] Failed to create lifecycle request: %v", err)
+		log.Printf("[Widgets] Failed to create lifecycle request: %v", err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := lifecycleClient.Do(req)
 	if err != nil {
-		log.Printf("[Channels] Lifecycle call to %s/%s failed: %v", ch.Name, event, err)
+		log.Printf("[Widgets] Lifecycle call to %s/%s failed: %v", ch.Name, event, err)
 		return
 	}
 	defer resp.Body.Close()
 	io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode != 200 {
-		log.Printf("[Channels] Lifecycle call to %s/%s returned status %d", ch.Name, event, resp.StatusCode)
+		log.Printf("[Widgets] Lifecycle call to %s/%s returned status %d", ch.Name, event, resp.StatusCode)
 	}
 }
 
-// GetChannels returns all channels for the authenticated user.
-//
-func GetChannels(c *fiber.Ctx) error {
+// GetWidgets returns all widgets for the authenticated user.
+func GetWidgets(c *fiber.Ctx) error {
 	userID := GetUserID(c)
 	if userID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
@@ -139,21 +139,20 @@ func GetChannels(c *fiber.Ctx) error {
 		})
 	}
 
-	channels, err := GetUserChannels(userID)
+	widgets, err := GetUserWidgets(userID)
 	if err != nil {
-		log.Printf("[Channels] Error fetching channels: %v", err)
+		log.Printf("[Widgets] Error fetching widgets: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
 			Status: "error",
 			Error:  "Failed to fetch channels",
 		})
 	}
 
-	return c.JSON(fiber.Map{"channels": channels})
+	return c.JSON(fiber.Map{"channels": widgets})
 }
 
-// CreateChannel adds a new channel for the authenticated user.
-//
-func CreateChannel(c *fiber.Ctx) error {
+// CreateWidget adds a new widget for the authenticated user.
+func CreateWidget(c *fiber.Ctx) error {
 	userID := GetUserID(c)
 	if userID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
@@ -163,13 +162,13 @@ func CreateChannel(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		ChannelType string                 `json:"channel_type"`
-		Config      map[string]interface{} `json:"config"`
+		WidgetType string                 `json:"channel_type"`
+		Config     map[string]interface{} `json:"config"`
 		// LocalWidgets is the client's count of enabled utility widgets
 		// (clock/weather/…). They live in preferences, not user_channels, but
 		// every widget counts toward the slot cap — so the client reports them
-		// and the slot gate adds them to the DB channel count. Absent (older
-		// client) = 0, degrading to a data-channel-only gate.
+		// and the slot gate adds them to the DB widget count. Absent (older
+		// client) = 0, degrading to a data-widget-only gate.
 		LocalWidgets int `json:"local_widgets"`
 	}
 	if err := c.BodyParser(&req); err != nil {
@@ -179,11 +178,12 @@ func CreateChannel(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validate channel type: accept either a registered backend channel
-	// (Redis service discovery) or a known widget type (the code registry in
-	// widgets.go). Additive during the widget/slot transition so legacy
-	// coarse types ("sports") and new split widgets ("sports_nfl") both pass.
-	if !GetValidChannelTypes()[req.ChannelType] && !IsKnownWidgetType(req.ChannelType) {
+	// Validate the widget type (wire: channel_type): accept either a
+	// registered backend channel service (Redis discovery) or a known widget
+	// type (the code registry in widgets.go). Additive during the widget/slot
+	// transition so legacy coarse types ("sports") and new split widgets
+	// ("sports_nfl") both pass.
+	if !GetValidChannelTypes()[req.WidgetType] && !IsKnownWidgetType(req.WidgetType) {
 		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
 			Status: "error",
 			Error:  "Invalid channel type",
@@ -193,7 +193,7 @@ func CreateChannel(c *fiber.Ctx) error {
 	// user_channels. A row for one has no backing data source and would
 	// double-count against the slot cap (once here, once via
 	// local_widgets), so reject it outright.
-	if IsUtilityWidgetType(req.ChannelType) {
+	if IsUtilityWidgetType(req.WidgetType) {
 		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
 			Status: "error",
 			Error:  "Utility widgets are stored locally, not as channels",
@@ -222,25 +222,25 @@ func CreateChannel(c *fiber.Ctx) error {
 	// blocking a legitimate add on a transient DB blip (the per-feature
 	// validation below still runs).
 	if max := MaxWidgetsForTier(tier); max != nil {
-		if count, err := CountEnabledChannels(context.Background(), userID); err != nil {
-			log.Printf("[Channels] slot count failed for %s: %v", userID, err)
+		if count, err := CountEnabledWidgets(context.Background(), userID); err != nil {
+			log.Printf("[Widgets] slot count failed for %s: %v", userID, err)
 		} else {
 			// Every widget counts toward the slot cap. Utility widgets live
 			// client-side (preferences), so add the client-reported count to
-			// the DB channel count.
+			// the DB widget count.
 			used := count + req.LocalWidgets
 			if used >= *max {
-				tle := &TierLimitError{Tier: tier, ChannelType: req.ChannelType, Field: "widgets", Limit: *max, Got: used + 1}
-				log.Printf("[Channels] slot limit reached for %s: %d/%d (incl %d local)", userID, used, *max, req.LocalWidgets)
+				tle := &TierLimitError{Tier: tier, WidgetType: req.WidgetType, Field: "widgets", Limit: *max, Got: used + 1}
+				log.Printf("[Widgets] slot limit reached for %s: %d/%d (incl %d local)", userID, used, *max, req.LocalWidgets)
 				return c.Status(fiber.StatusForbidden).JSON(tierLimitErrorResponse(tle))
 			}
 		}
 	}
 
-	if err := ValidateChannelConfig(tier, req.ChannelType, req.Config); err != nil {
+	if err := ValidateWidgetConfig(tier, req.WidgetType, req.Config); err != nil {
 		var tle *TierLimitError
 		if errors.As(err, &tle) {
-			log.Printf("[Channels] Tier limit exceeded for %s: %s", userID, tle.Error())
+			log.Printf("[Widgets] Tier limit exceeded for %s: %s", userID, tle.Error())
 			return c.Status(fiber.StatusForbidden).JSON(tierLimitErrorResponse(tle))
 		}
 		// Defensive — the validator should only return *TierLimitError.
@@ -252,14 +252,14 @@ func CreateChannel(c *fiber.Ctx) error {
 
 	configJSON, _ := json.Marshal(req.Config)
 
-	var ch Channel
+	var ch Widget
 	var configBytes []byte
 	err := DBPool.QueryRow(context.Background(), `
 		INSERT INTO user_channels (logto_sub, channel_type, config)
 		VALUES ($1, $2, $3)
 		RETURNING id, logto_sub, channel_type, enabled, visible, config, created_at, updated_at
-	`, userID, req.ChannelType, configJSON).Scan(
-		&ch.ID, &ch.LogtoSub, &ch.ChannelType, &ch.Enabled, &ch.Visible,
+	`, userID, req.WidgetType, configJSON).Scan(
+		&ch.ID, &ch.LogtoSub, &ch.WidgetType, &ch.Enabled, &ch.Visible,
 		&configBytes, &ch.CreatedAt, &ch.UpdatedAt,
 	)
 	if err != nil {
@@ -269,7 +269,7 @@ func CreateChannel(c *fiber.Ctx) error {
 				Error:  "Channel of this type already exists",
 			})
 		}
-		log.Printf("[Channels] Create error: %v", err)
+		log.Printf("[Widgets] Create error: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
 			Status: "error",
 			Error:  "Failed to create channel",
@@ -287,21 +287,20 @@ func CreateChannel(c *fiber.Ctx) error {
 		NotifyTopicSubscriptionChange(userID)
 	}
 
-	// Call OnChannelCreated hook (in-process for local sources)
-	callChannelLifecycle(ctx, ch.ChannelType, "created", userID, ch.Config, nil, nil)
+	// Fire the "created" lifecycle hook (in-process for local sources)
+	callWidgetLifecycle(ctx, ch.WidgetType, "created", userID, ch.Config, nil, nil)
 
 	// Invalidate dashboard cache so next poll gets fresh data
 	InvalidateDashboardCache(userID)
-	// Channel summary in the overview response changed — drop the
+	// Widget summary in the overview response changed — drop the
 	// per-user overview cache so the next /users/me/overview rebuilds.
 	InvalidateOverviewCache(ctx, userID)
 
 	return c.Status(fiber.StatusCreated).JSON(ch)
 }
 
-// UpdateChannel updates a channel by type for the authenticated user.
-//
-func UpdateChannel(c *fiber.Ctx) error {
+// UpdateWidget updates a widget by type for the authenticated user.
+func UpdateWidget(c *fiber.Ctx) error {
 	userID := GetUserID(c)
 	if userID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
@@ -310,8 +309,8 @@ func UpdateChannel(c *fiber.Ctx) error {
 		})
 	}
 
-	channelType := c.Params("type")
-	if !GetValidChannelTypes()[channelType] && !IsKnownWidgetType(channelType) {
+	widgetType := c.Params("type")
+	if !GetValidChannelTypes()[widgetType] && !IsKnownWidgetType(widgetType) {
 		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
 			Status: "error",
 			Error:  "Invalid channel type",
@@ -327,7 +326,7 @@ func UpdateChannel(c *fiber.Ctx) error {
 		Visible       *bool                  `json:"visible"`
 		TickerEnabled *bool                  `json:"ticker_enabled"`
 		Config        map[string]interface{} `json:"config"`
-		// LocalWidgets mirrors CreateChannel: the client's count of enabled
+		// LocalWidgets mirrors CreateWidget: the client's count of enabled
 		// utility widgets, added to the DB count when gating a re-enable.
 		// Absent (older client) = 0.
 		LocalWidgets int `json:"local_widgets"`
@@ -346,7 +345,7 @@ func UpdateChannel(c *fiber.Ctx) error {
 	}
 
 	// Gate RE-ENABLING against the widget-slot cap, exactly like
-	// CreateChannel gates new adds. Without this the cap is a one-way door:
+	// CreateWidget gates new adds. Without this the cap is a one-way door:
 	// disable a widget, add a new one in the freed slot, re-enable the old
 	// one ungated — repeat past any tier limit (and past a Stripe-downgrade
 	// prune). Enabling an already-enabled widget stays a no-op passthrough.
@@ -356,15 +355,15 @@ func UpdateChannel(c *fiber.Ctx) error {
 			var currentlyEnabled bool
 			err := DBPool.QueryRow(context.Background(), `
 				SELECT enabled FROM user_channels WHERE logto_sub = $1 AND channel_type = $2
-			`, userID, channelType).Scan(&currentlyEnabled)
+			`, userID, widgetType).Scan(&currentlyEnabled)
 			// Row-lookup errors fall through: a missing row 404s on the
-			// UPDATE below, and transient errors fail open like CreateChannel.
+			// UPDATE below, and transient errors fail open like CreateWidget.
 			if err == nil && !currentlyEnabled {
-				if count, err := CountEnabledChannels(context.Background(), userID); err != nil {
-					log.Printf("[Channels] slot count failed for %s: %v", userID, err)
+				if count, err := CountEnabledWidgets(context.Background(), userID); err != nil {
+					log.Printf("[Widgets] slot count failed for %s: %v", userID, err)
 				} else if used := count + req.LocalWidgets; used >= *max {
-					tle := &TierLimitError{Tier: tier, ChannelType: channelType, Field: "widgets", Limit: *max, Got: used + 1}
-					log.Printf("[Channels] slot limit blocks re-enable for %s: %d/%d (incl %d local)", userID, used, *max, req.LocalWidgets)
+					tle := &TierLimitError{Tier: tier, WidgetType: widgetType, Field: "widgets", Limit: *max, Got: used + 1}
+					log.Printf("[Widgets] slot limit blocks re-enable for %s: %d/%d (incl %d local)", userID, used, *max, req.LocalWidgets)
 					return c.Status(fiber.StatusForbidden).JSON(tierLimitErrorResponse(tle))
 				}
 			}
@@ -374,13 +373,13 @@ func UpdateChannel(c *fiber.Ctx) error {
 	// Tier-gate any incoming config. We only check when config is
 	// provided — updates that only toggle enabled/visible should not
 	// re-validate (they're expected to be cheap + frequent, e.g. pause
-	// the channel).
+	// the widget).
 	if req.Config != nil {
 		tier := tierFromRoles(GetUserRoles(c))
-		if err := ValidateChannelConfig(tier, channelType, req.Config); err != nil {
+		if err := ValidateWidgetConfig(tier, widgetType, req.Config); err != nil {
 			var tle *TierLimitError
 			if errors.As(err, &tle) {
-				log.Printf("[Channels] Tier limit exceeded for %s: %s", userID, tle.Error())
+				log.Printf("[Widgets] Tier limit exceeded for %s: %s", userID, tle.Error())
 				return c.Status(fiber.StatusForbidden).JSON(tierLimitErrorResponse(tle))
 			}
 			return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
@@ -390,13 +389,13 @@ func UpdateChannel(c *fiber.Ctx) error {
 		}
 	}
 
-	// Fetch old config before UPDATE so channels can diff
+	// Fetch old config before UPDATE so lifecycle hooks can diff
 	var oldConfig map[string]interface{}
 	if req.Config != nil {
 		var oldConfigBytes []byte
 		_ = DBPool.QueryRow(context.Background(), `
 			SELECT config FROM user_channels WHERE logto_sub = $1 AND channel_type = $2
-		`, userID, channelType).Scan(&oldConfigBytes)
+		`, userID, widgetType).Scan(&oldConfigBytes)
 		if len(oldConfigBytes) > 0 {
 			json.Unmarshal(oldConfigBytes, &oldConfig)
 		}
@@ -404,7 +403,7 @@ func UpdateChannel(c *fiber.Ctx) error {
 
 	// Build dynamic UPDATE query
 	setClauses := []string{"updated_at = now()"}
-	args := []interface{}{userID, channelType}
+	args := []interface{}{userID, widgetType}
 	argIdx := 3
 
 	if req.Enabled != nil {
@@ -431,10 +430,10 @@ func UpdateChannel(c *fiber.Ctx) error {
 		RETURNING id, logto_sub, channel_type, enabled, visible, config, created_at, updated_at
 	`, strings.Join(setClauses, ", "))
 
-	var ch Channel
+	var ch Widget
 	var configBytes []byte
 	err := DBPool.QueryRow(context.Background(), query, args...).Scan(
-		&ch.ID, &ch.LogtoSub, &ch.ChannelType, &ch.Enabled, &ch.Visible,
+		&ch.ID, &ch.LogtoSub, &ch.WidgetType, &ch.Enabled, &ch.Visible,
 		&configBytes, &ch.CreatedAt, &ch.UpdatedAt,
 	)
 	if err != nil {
@@ -445,7 +444,7 @@ func UpdateChannel(c *fiber.Ctx) error {
 				Error:  "Channel not found",
 			})
 		}
-		log.Printf("[Channels] Update error: %v", err)
+		log.Printf("[Widgets] Update error: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
 			Status: "error",
 			Error:  "Failed to update channel",
@@ -461,8 +460,8 @@ func UpdateChannel(c *fiber.Ctx) error {
 	ctx := context.Background()
 	NotifyTopicSubscriptionChange(userID)
 
-	// Call OnChannelUpdated hook (in-process for local sources)
-	callChannelLifecycle(ctx, channelType, "updated", userID, ch.Config, oldConfig, nil)
+	// Fire the "updated" lifecycle hook (in-process for local sources)
+	callWidgetLifecycle(ctx, widgetType, "updated", userID, ch.Config, oldConfig, nil)
 
 	// Invalidate dashboard cache so next poll gets fresh data
 	InvalidateDashboardCache(userID)
@@ -472,9 +471,8 @@ func UpdateChannel(c *fiber.Ctx) error {
 	return c.JSON(ch)
 }
 
-// DeleteChannel removes a channel by type for the authenticated user.
-//
-func DeleteChannel(c *fiber.Ctx) error {
+// DeleteWidget removes a widget by type for the authenticated user.
+func DeleteWidget(c *fiber.Ctx) error {
 	userID := GetUserID(c)
 	if userID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
@@ -483,19 +481,19 @@ func DeleteChannel(c *fiber.Ctx) error {
 		})
 	}
 
-	channelType := c.Params("type")
+	widgetType := c.Params("type")
 
-	// Fetch the channel config before deleting (needed for cleanup hooks)
+	// Fetch the widget config before deleting (needed for cleanup hooks)
 	var configBytes []byte
 	_ = DBPool.QueryRow(context.Background(), `
 		SELECT config FROM user_channels WHERE logto_sub = $1 AND channel_type = $2
-	`, userID, channelType).Scan(&configBytes)
+	`, userID, widgetType).Scan(&configBytes)
 
 	tag, err := DBPool.Exec(context.Background(), `
 		DELETE FROM user_channels WHERE logto_sub = $1 AND channel_type = $2
-	`, userID, channelType)
+	`, userID, widgetType)
 	if err != nil {
-		log.Printf("[Channels] Delete error: %v", err)
+		log.Printf("[Widgets] Delete error: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{
 			Status: "error",
 			Error:  "Failed to delete channel",
@@ -519,11 +517,11 @@ func DeleteChannel(c *fiber.Ctx) error {
 		config = map[string]interface{}{}
 	}
 	// Rebuild SSE topic subscriptions on every replica so active
-	// connections stop receiving this channel (ADR-0001)
+	// connections stop receiving this widget's data (ADR-0001)
 	NotifyTopicSubscriptionChange(userID)
 
-	// Call OnChannelDeleted hook (in-process for local sources)
-	callChannelLifecycle(ctx, channelType, "deleted", userID, config, nil, nil)
+	// Fire the "deleted" lifecycle hook (in-process for local sources)
+	callWidgetLifecycle(ctx, widgetType, "deleted", userID, config, nil, nil)
 
 	// Invalidate dashboard cache so next poll gets fresh data
 	InvalidateDashboardCache(userID)
@@ -550,12 +548,12 @@ func PruneWidgetsForTier(ctx context.Context, logtoSub, tier string) {
 	if max == nil {
 		return // unlimited slots — nothing to prune
 	}
-	channels, err := GetUserChannels(logtoSub) // ordered created_at ASC
+	widgets, err := GetUserWidgets(logtoSub) // ordered created_at ASC
 	if err != nil {
 		log.Printf("[Prune] Failed to list widgets for %s: %v", logtoSub, err)
 		return
 	}
-	_, pruned := partitionWidgetsForCap(channels, *max)
+	_, pruned := partitionWidgetsForCap(widgets, *max)
 	if len(pruned) == 0 {
 		return
 	}
@@ -564,12 +562,12 @@ func PruneWidgetsForTier(ctx context.Context, logtoSub, tier string) {
 		_, err := DBPool.Exec(ctx, `
 			UPDATE user_channels SET enabled = false, updated_at = now()
 			WHERE logto_sub = $1 AND channel_type = $2
-		`, logtoSub, ch.ChannelType)
+		`, logtoSub, ch.WidgetType)
 		if err != nil {
-			log.Printf("[Prune] Failed to disable %s/%s: %v", logtoSub, ch.ChannelType, err)
+			log.Printf("[Prune] Failed to disable %s/%s: %v", logtoSub, ch.WidgetType, err)
 			continue
 		}
-		log.Printf("[Prune] Disabled %s/%s: tier %s allows %d widget slots", logtoSub, ch.ChannelType, tier, *max)
+		log.Printf("[Prune] Disabled %s/%s: tier %s allows %d widget slots", logtoSub, ch.WidgetType, tier, *max)
 	}
 
 	// Rebuild SSE topics on every replica holding a connection for this
@@ -579,11 +577,11 @@ func PruneWidgetsForTier(ctx context.Context, logtoSub, tier string) {
 	InvalidateOverviewCache(ctx, logtoSub)
 }
 
-// partitionWidgetsForCap splits a created_at-ascending channel list into
+// partitionWidgetsForCap splits a created_at-ascending widget list into
 // the enabled widgets that fit the slot cap (oldest first) and the
 // enabled overflow to disable. Disabled rows pass through untouched.
-func partitionWidgetsForCap(channels []Channel, max int) (kept, pruned []Channel) {
-	for _, ch := range channels {
+func partitionWidgetsForCap(widgets []Widget, max int) (kept, pruned []Widget) {
+	for _, ch := range widgets {
 		if !ch.Enabled {
 			continue
 		}

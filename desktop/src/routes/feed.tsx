@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "motion/react";
-import SportsEmptyState from "../channels/sports/EmptyState";
+import SportsEmptyState from "../datawidgets/sports/EmptyState";
 import RouteError from "../components/RouteError";
 import Tooltip from "../components/Tooltip";
 import { WidgetBar, BarPill } from "../components/widget-bar/Bar";
@@ -45,13 +45,13 @@ import { useTickerLayout } from "../hooks/useTickerLayout";
 import {
   formatEffectiveWidgetTickerStatus,
   formatTickerStatus,
-  getEffectiveChannelTickerRow,
+  getEffectiveDataWidgetTickerRow,
   getEffectiveWidgetTickerStatus,
 } from "../utils/tickerStatus";
-import type { Channel } from "../api/client";
+import type { DataWidgetRow } from "../api/client";
 import type { LeagueMeta } from "../api/queries";
 import type {
-  ChannelManifest,
+  DataWidgetManifest,
   WidgetManifest,
   Trade,
   Game,
@@ -61,8 +61,8 @@ import type {
 import {
   isDisplayable,
   priceDelta,
-} from "../channels/predictions/view";
-import ProbabilityPill from "../channels/predictions/ProbabilityPill";
+} from "../datawidgets/predictions/view";
+import ProbabilityPill from "../datawidgets/predictions/ProbabilityPill";
 import type { TempUnit, HomePreview } from "../preferences";
 import type { SystemInfo } from "../hooks/useSysmonData";
 import type { TimerState } from "../widgets/timer/types";
@@ -112,7 +112,7 @@ function HomePage() {
   const shell = useShell();
   const { channels, dashboard } = useShellData();
   const {
-    allChannelManifests,
+    allDataWidgetManifests,
     allWidgets,
     authenticated,
     onLogin,
@@ -135,8 +135,8 @@ function HomePage() {
   const { rows: layoutRows, tierMaxRows, canAddRow } = tickerLayout;
 
   const setHomePreview = useCallback(
-    (channelType: string, keys: string[]) => {
-      const next: HomePreview = { ...homePreview, [channelType]: keys };
+    (widgetType: string, keys: string[]) => {
+      const next: HomePreview = { ...homePreview, [widgetType]: keys };
       shell.onPrefsChange({ ...shell.prefs, homePreview: next });
     },
     [homePreview, shell],
@@ -149,17 +149,17 @@ function HomePage() {
   // Resolve each enabled channel row to a render manifest — the coarse source's
   // FeedTab carrying the widget's own name/id — then order by the catalog's
   // canonical order. Handles split widgets (sports_mlb, finance_stocks, …).
-  const orderedChannels = useMemo(() => {
+  const orderedDataWidgets = useMemo(() => {
     const items = channels
       .filter((c) => c.enabled)
       .map((ch) => {
         const manifest = widgetManifest(ch.channel_type) as
-          | ChannelManifest
+          | DataWidgetManifest
           | undefined;
         return manifest ? { ch, manifest } : null;
       })
       .filter(
-        (x): x is { ch: Channel; manifest: ChannelManifest } => x !== null,
+        (x): x is { ch: DataWidgetRow; manifest: DataWidgetManifest } => x !== null,
       );
     return items.sort(
       (a, b) =>
@@ -177,7 +177,7 @@ function HomePage() {
     [enabledWidgets, allWidgets],
   );
 
-  const hasAnySources = orderedChannels.length > 0 || orderedWidgets.length > 0;
+  const hasAnySources = orderedDataWidgets.length > 0 || orderedWidgets.length > 0;
 
   return (
     <PageLayout
@@ -246,15 +246,15 @@ function HomePage() {
           tierMaxRows={tierMaxRows}
           canAddRow={canAddRow}
           onOpenSettings={openTickerSettings}
-          channelManifests={allChannelManifests}
+          channelManifests={allDataWidgetManifests}
           widgetManifests={allWidgets}
         />
       )}
 
-      {/* Channel sections — stagger in on first paint so the Home
+      {/* DataWidgetRow sections — stagger in on first paint so the Home
           page reveals its data instead of slamming everything in
           at once. */}
-      {orderedChannels.map(({ ch, manifest }, idx) => {
+      {orderedDataWidgets.map(({ ch, manifest }, idx) => {
         return (
           <motion.div
             key={ch.channel_type}
@@ -271,7 +271,7 @@ function HomePage() {
               manifest={manifest}
               data={dashboard?.data}
               tickerStatus={formatTickerStatus(
-                getEffectiveChannelTickerRow(shell.prefs, ch),
+                getEffectiveDataWidgetTickerRow(shell.prefs, ch),
                 layoutRows.length,
               )}
               selectedKeys={homePreview[ch.channel_type] ?? []}
@@ -310,7 +310,7 @@ function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{
             duration: 0.28,
-            delay: 0.05 + orderedChannels.length * 0.05,
+            delay: 0.05 + orderedDataWidgets.length * 0.05,
             ease: [0.22, 0.61, 0.36, 1],
           }}
         >
@@ -397,11 +397,11 @@ function getGroupLabel(type: string, key: string, data: unknown): string {
     : key;
 }
 
-// ── Channel section ─────────────────────────────────────────────
+// ── DataWidgetRow section ─────────────────────────────────────────────
 
 interface ChannelSectionProps {
-  channel: Channel;
-  manifest: ChannelManifest;
+  channel: DataWidgetRow;
+  manifest: DataWidgetManifest;
   data: Record<string, unknown> | undefined;
   tickerStatus: string;
   selectedKeys: string[];
@@ -608,7 +608,7 @@ function ChannelSection({
               <PredictionsRows data={channelData} onConfigure={onConfigure} />
             )}
             {!["finance", "sports", "rss", "fantasy", "predictions"].includes(source) && (
-              <EmptyDataRow channelType={source} onConfigure={onConfigure} />
+              <EmptyDataRow widgetType={source} onConfigure={onConfigure} />
             )}
           </motion.div>
         )}
@@ -621,7 +621,7 @@ function ChannelSection({
 
 function FinanceRows({ data, filter, onConfigure }: { data: unknown; filter: string[]; onConfigure: () => void }) {
   const trades = Array.isArray(data) ? (data as Trade[]) : [];
-  if (trades.length === 0) return <EmptyDataRow channelType="finance" onConfigure={onConfigure} />;
+  if (trades.length === 0) return <EmptyDataRow widgetType="finance" onConfigure={onConfigure} />;
 
   const filtered =
     filter.length > 0
@@ -637,7 +637,7 @@ function FinanceRows({ data, filter, onConfigure }: { data: unknown; filter: str
     .slice(0, MAX_PREVIEW);
 
   if (sorted.length === 0)
-    return <EmptyDataRow channelType="finance" />;
+    return <EmptyDataRow widgetType="finance" />;
 
   return (
     <>
@@ -676,7 +676,7 @@ function FinanceRows({ data, filter, onConfigure }: { data: unknown; filter: str
 function PredictionsRows({ data, onConfigure }: { data: unknown; onConfigure: () => void }) {
   const markets = Array.isArray(data) ? (data as Prediction[]) : [];
   const live = markets.filter(isDisplayable);
-  if (live.length === 0) return <EmptyDataRow channelType="predictions" onConfigure={onConfigure} />;
+  if (live.length === 0) return <EmptyDataRow widgetType="predictions" onConfigure={onConfigure} />;
 
   // Top movers preview — the same "what changed" glance FinanceRows gives.
   const sorted = [...live]
@@ -806,7 +806,7 @@ function SportsRows({
 
 function RssRows({ data, filter, onConfigure }: { data: unknown; filter: string[]; onConfigure: () => void }) {
   const items = Array.isArray(data) ? (data as RssItem[]) : [];
-  if (items.length === 0) return <EmptyDataRow channelType="rss" onConfigure={onConfigure} />;
+  if (items.length === 0) return <EmptyDataRow widgetType="rss" onConfigure={onConfigure} />;
 
   const filtered =
     filter.length > 0
@@ -822,7 +822,7 @@ function RssRows({ data, filter, onConfigure }: { data: unknown; filter: string[
     .slice(0, MAX_PREVIEW);
 
   if (sorted.length === 0)
-    return <EmptyDataRow channelType="rss" />;
+    return <EmptyDataRow widgetType="rss" />;
 
   return (
     <>
@@ -845,7 +845,7 @@ function RssRows({ data, filter, onConfigure }: { data: unknown; filter: string[
 
 function FantasyRows({ data, filter, onConfigure }: { data: unknown; filter: string[]; onConfigure: () => void }) {
   const leagues = Array.isArray(data) ? data : [];
-  if (leagues.length === 0) return <EmptyDataRow channelType="fantasy" onConfigure={onConfigure} />;
+  if (leagues.length === 0) return <EmptyDataRow widgetType="fantasy" onConfigure={onConfigure} />;
 
   const filtered =
     filter.length > 0
@@ -858,7 +858,7 @@ function FantasyRows({ data, filter, onConfigure }: { data: unknown; filter: str
   const preview = filtered.slice(0, MAX_PREVIEW);
 
   if (preview.length === 0)
-    return <EmptyDataRow channelType="fantasy" />;
+    return <EmptyDataRow widgetType="fantasy" />;
 
   return (
     <>
@@ -893,13 +893,13 @@ const EMPTY_HINTS: Record<string, { message: string; name: string }> = {
 };
 
 function EmptyDataRow({
-  channelType,
+  widgetType,
   onConfigure,
 }: {
-  channelType?: string;
+  widgetType?: string;
   onConfigure?: () => void;
 }) {
-  const hint = channelType ? EMPTY_HINTS[channelType] : undefined;
+  const hint = widgetType ? EMPTY_HINTS[widgetType] : undefined;
   return (
     <div className="px-4 py-5 text-center">
       <p className="text-ui-meta text-fg-3 font-medium mb-1">

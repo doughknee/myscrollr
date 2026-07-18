@@ -2,10 +2,10 @@
  * Desktop-local type definitions.
  *
  * Consolidated from extension/utils/types, extension/channels/types,
- * extension/widgets/types, and myscrollr.com/src/channels/types.
+ * extension/widgets/types, and myscrollr.com/src/datawidgets/types.
  * The desktop is a standalone codebase — no cross-project imports.
  */
-import type { Channel } from "../api/client";
+import type { DataWidgetRow } from "../api/client";
 import type { SportsMeta } from "../api/queries";
 
 // ── Finance ──────────────────────────────────────────────────────
@@ -125,7 +125,7 @@ export interface DashboardResponse {
     subscription_tier?: "anonymous" | "free" | "uplink" | "uplink_pro" | "uplink_ultimate";
     updated_at: string;
   };
-  channels?: Array<Channel & { logto_sub: string }>;
+  channels?: Array<DataWidgetRow & { logto_sub: string }>;
 }
 
 // ── Enums ────────────────────────────────────────────────────────
@@ -162,7 +162,7 @@ export interface SourceInfo {
 }
 
 /** Manifest describing a single channel. */
-export interface ChannelManifest {
+export interface DataWidgetManifest {
   /** Unique channel identifier (matches channel_type). */
   id: string;
   /** Human-readable name. */
@@ -171,7 +171,7 @@ export interface ChannelManifest {
   tabLabel: string;
   /** Brief description. */
   description: string;
-  /** Channel accent hex color for icon badges, active states, and accents. */
+  /** DataWidgetRow accent hex color for icon badges, active states, and accents. */
   hex: string;
   /** Lucide icon component rendered at size 14 for sidebar, 20 for header. */
   icon: React.ComponentType<{ size?: number; className?: string }>;

@@ -17,7 +17,7 @@ export function SourceNotFound({
   kind,
   name,
 }: {
-  kind: "Channel" | "Widget";
+  kind: "Widget";
   name: string;
 }) {
   return (

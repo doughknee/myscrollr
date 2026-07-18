@@ -29,7 +29,7 @@ export function formatEffectiveWidgetTickerStatus(
   return formatTickerStatus(status.row, rowCount);
 }
 
-export function getEffectiveChannelTickerRow(
+export function getEffectiveDataWidgetTickerRow(
   prefs: AppPreferences,
   channel: ChannelTickerInfo,
 ): number | null {

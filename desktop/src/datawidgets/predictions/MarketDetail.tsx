@@ -69,7 +69,7 @@ const SPARK_W = 280;
 const SPARK_H = 56;
 
 /**
- * Channel-owned candlesticks query. The route is `Auth: true`, so this MUST
+ * DataWidgetRow-owned candlesticks query. The route is `Auth: true`, so this MUST
  * go through `authFetch` — the old shared query helper (since deleted) used
  * the unauthenticated `request()` and has 401'd on every call since the
  * #220 auth fix closed the fail-open gateway hole (see ui-review/NOTES.md,

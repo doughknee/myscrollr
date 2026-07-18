@@ -51,7 +51,7 @@ export function ConnectedView({
   onDisconnect,
 }: ConnectedViewProps) {
   const { prefs, onPrefsChange } = useShell();
-  const fantasyPrefs = prefs.channelDisplay.fantasy;
+  const fantasyPrefs = prefs.widgetDisplay.fantasy;
 
   const [visibleCount, setVisibleCount] = useState(LEAGUES_PER_PAGE);
   const [filter, setFilter] = useState<"all" | "active" | "past">("all");
@@ -90,8 +90,8 @@ export function ConnectedView({
     (patch: Partial<typeof fantasyPrefs>) => {
       onPrefsChange({
         ...prefs,
-        channelDisplay: {
-          ...prefs.channelDisplay,
+        widgetDisplay: {
+          ...prefs.widgetDisplay,
           fantasy: { ...fantasyPrefs, ...patch },
         },
       });

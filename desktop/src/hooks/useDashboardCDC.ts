@@ -93,7 +93,7 @@ function mergeChannelRecords(
     } else if (idx !== -1) {
       // CDC payload comes straight from Postgres replication, so the
       // raw column name is still `visible` (the DB column wasn't
-      // renamed). The Channel type's canonical field is now
+      // renamed). The DataWidgetRow type's canonical field is now
       // `ticker_enabled` — map between them here.
       updated[idx] = {
         ...updated[idx],
@@ -160,7 +160,7 @@ export function useDashboardCDC(): void {
           let nextData = old.data;
           let nextChannels = old.channels;
 
-          // 1. Channel data tables (trades, games, rss_items)
+          // 1. DataWidgetRow data tables (trades, games, rss_items)
           for (const config of CDC_TABLES) {
             const relevant = records.filter(
               (r) => r.metadata?.table_name === config.table,

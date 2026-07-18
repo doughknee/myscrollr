@@ -7,22 +7,22 @@
 import { useState, useEffect, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { channelsApi } from "../api/client";
+import { dataWidgetsApi } from "../api/client";
 import { queryKeys } from "../api/queries";
-import type { ChannelType } from "../api/client";
+import type { DataWidgetType } from "../api/client";
 import type { DashboardResponse } from "../types";
 
-interface UseChannelConfigResult<T> {
+interface UseDataWidgetConfigResult<T> {
   error: string | null;
   setError: (error: string | null) => void;
   saving: boolean;
   updateItems: (next: T) => void;
 }
 
-export function useChannelConfig<T>(
-  channelType: ChannelType,
+export function useDataWidgetConfig<T>(
+  widgetType: DataWidgetType,
   configKey: string,
-): UseChannelConfigResult<T> {
+): UseDataWidgetConfigResult<T> {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
@@ -42,9 +42,9 @@ export function useChannelConfig<T>(
         queryKeys.dashboard,
       );
       const current = dash?.channels?.find(
-        (c) => c.channel_type === channelType,
+        (c) => c.channel_type === widgetType,
       )?.config as Record<string, unknown> | undefined;
-      return channelsApi.update(channelType, {
+      return dataWidgetsApi.update(widgetType, {
         config: current ?? { [configKey]: next },
       });
     },
@@ -58,7 +58,7 @@ export function useChannelConfig<T>(
       queryClient.setQueryData<DashboardResponse>(queryKeys.dashboard, (old) => {
         if (!old) return old;
         const channels = (old.channels ?? []).map((c) =>
-          c.channel_type === channelType
+          c.channel_type === widgetType
             ? {
                 ...c,
                 config: {

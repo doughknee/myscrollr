@@ -1,5 +1,5 @@
 /**
- * Channel CRUD actions for the app window.
+ * DataWidgetRow CRUD actions for the app window.
  *
  * Uses TanStack Query mutations with automatic dashboard cache
  * invalidation — no manual fetchDashboard() threading required.
@@ -8,47 +8,47 @@ import { useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { channelsApi, toggleChannelVisibility } from "../api/client";
+import { dataWidgetsApi, toggleDataWidgetVisibility } from "../api/client";
 import { queryKeys } from "../api/queries";
-import type { ChannelType } from "../api/client";
+import type { DataWidgetType } from "../api/client";
 
-const channelName: Record<string, string> = {
+const widgetName: Record<string, string> = {
   finance: "Finance",
   sports: "Sports",
   fantasy: "Fantasy",
   rss: "RSS",
 };
 
-interface ChannelActions {
-  handleToggleChannel: (channelType: ChannelType, visible: boolean) => Promise<void>;
-  handleAddChannel: (channelType: ChannelType) => Promise<void>;
-  handleDeleteChannel: (channelType: ChannelType) => Promise<void>;
+interface DataWidgetActions {
+  handleToggleDataWidget: (widgetType: DataWidgetType, visible: boolean) => Promise<void>;
+  handleAddDataWidget: (widgetType: DataWidgetType) => Promise<void>;
+  handleDeleteDataWidget: (widgetType: DataWidgetType) => Promise<void>;
 }
 
 // `prefs` and `setPrefs` were used to clean up `pinnedSources` on
 // channel delete. With pin-to-sidebar removed, the hook no longer
 // needs them — sidebar updates flow from the dashboard refetch.
-export function useChannelActions(): ChannelActions {
+export function useDataWidgetActions(): DataWidgetActions {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const handleToggleChannel = useCallback(
-    async (channelType: ChannelType, visible: boolean) => {
+  const handleToggleDataWidget = useCallback(
+    async (widgetType: DataWidgetType, visible: boolean) => {
       try {
-        await toggleChannelVisibility(channelType, visible, true);
+        await toggleDataWidgetVisibility(widgetType, visible, true);
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
       } catch (err) {
-        console.error("[Scrollr] Channel toggle failed:", err);
-        toast.error(`Couldn't ${visible ? "show" : "hide"} ${channelName[channelType] ?? channelType}`);
+        console.error("[Scrollr] Widget toggle failed:", err);
+        toast.error(`Couldn't ${visible ? "show" : "hide"} ${widgetName[widgetType] ?? widgetType}`);
       }
     },
     [queryClient],
   );
 
-  const handleAddChannel = useCallback(
-    async (channelType: ChannelType) => {
+  const handleAddDataWidget = useCallback(
+    async (widgetType: DataWidgetType) => {
       try {
-        await channelsApi.create(channelType);
+        await dataWidgetsApi.create(widgetType);
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
         // The sports channel page reads /sports (["sports","full"]), not
         // /dashboard — same lesson as the v1.1.0 "empty until Configure"
@@ -56,35 +56,35 @@ export function useChannelActions(): ChannelActions {
         queryClient.invalidateQueries({ queryKey: ["sports", "full"] });
         navigate({
           to: "/widget/$id",
-          params: { id: channelType },
+          params: { id: widgetType },
         });
-        toast.success(`${channelName[channelType] ?? channelType} added`);
+        toast.success(`${widgetName[widgetType] ?? widgetType} added`);
       } catch (err) {
-        console.error("[Scrollr] Channel add failed:", err);
-        toast.error(`Couldn't add ${channelName[channelType] ?? channelType}`);
+        console.error("[Scrollr] Widget add failed:", err);
+        toast.error(`Couldn't add ${widgetName[widgetType] ?? widgetType}`);
       }
     },
     [queryClient, navigate],
   );
 
-  const handleDeleteChannel = useCallback(
-    async (channelType: ChannelType) => {
+  const handleDeleteDataWidget = useCallback(
+    async (widgetType: DataWidgetType) => {
       try {
-        await channelsApi.delete(channelType);
+        await dataWidgetsApi.delete(widgetType);
         await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
         queryClient.invalidateQueries({ queryKey: ["sports", "full"] });
         // Sidebar now derives from dashboard.channels (filtered to
         // enabled), so no preference cleanup is needed here — the
         // dashboard refetch above triggers the sidebar update.
         navigate({ to: "/feed" });
-        toast.success(`${channelName[channelType] ?? channelType} removed`);
+        toast.success(`${widgetName[widgetType] ?? widgetType} removed`);
       } catch (err) {
-        console.error("[Scrollr] Channel delete failed:", err);
-        toast.error(`Couldn't remove ${channelName[channelType] ?? channelType}`);
+        console.error("[Scrollr] Widget delete failed:", err);
+        toast.error(`Couldn't remove ${widgetName[widgetType] ?? widgetType}`);
       }
     },
     [queryClient, navigate],
   );
 
-  return { handleToggleChannel, handleAddChannel, handleDeleteChannel };
+  return { handleToggleDataWidget, handleAddDataWidget, handleDeleteDataWidget };
 }

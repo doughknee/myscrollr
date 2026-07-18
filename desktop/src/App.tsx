@@ -17,9 +17,9 @@ import {
   getTier,
 } from "./auth";
 import {
-  channelsApi,
+  dataWidgetsApi,
   isChannelTickerEnabled,
-  toggleChannelVisibility,
+  toggleDataWidgetVisibility,
 } from "./api/client";
 import {
   loadPref,
@@ -37,7 +37,7 @@ import {
 } from "./preferences";
 import { getMaxTickerRows } from "./tierLimits";
 import type { SubscriptionTier } from "./auth";
-import type { ChannelType } from "./api/client";
+import type { DataWidgetType } from "./api/client";
 import type { DeliveryMode } from "./types";
 import type { AppPreferences, TickerPosition } from "./preferences";
 import { getCatalogItems, sourceForWidget } from "./marketplace";
@@ -98,7 +98,7 @@ export default function App() {
     [dashboard?.channels],
   );
 
-  const channelTabs = useMemo(() => {
+  const widgetTabs = useMemo(() => {
     if (channels.length === 0) {
       // Demo mode (VITE_DEMO) talks to the local bridge, which serves only the
       // predictions slice and may not surface channels[] on the ticker window
@@ -147,9 +147,9 @@ export default function App() {
   // Persist active tabs when they change (side effect, not in useMemo)
   useEffect(() => {
     if (channels.length > 0) {
-      savePref("activeFeedTabs", channelTabs);
+      savePref("activeFeedTabs", widgetTabs);
     }
-  }, [channelTabs, channels.length]);
+  }, [widgetTabs, channels.length]);
 
   const channelsRef = useRef(channels);
   channelsRef.current = channels;
@@ -446,7 +446,7 @@ export default function App() {
   // ── Chip click → open external URL (or fall back to app) ───────
 
   const handleChipClick = useCallback(
-    (channelType: string, _itemId: string | number, url?: string) => {
+    (widgetType: string, _itemId: string | number, url?: string) => {
       if (url) {
         // Try to open the URL in the system browser. If the shell IPC
         // rejects (e.g. capability not granted, malformed URL), fall
@@ -457,14 +457,14 @@ export default function App() {
           .catch((err) => {
             console.error("[Scrollr] Failed to open external URL:", err);
             // Fallback: bring the main app window forward.
-            savePref("activeItem", channelType);
+            savePref("activeItem", widgetType);
             invoke("show_app_window").catch(() => {});
           });
         return;
       }
       // No URL provided (widget chip, missing data) — open the desktop
       // app on the relevant channel/widget page.
-      savePref("activeItem", channelType);
+      savePref("activeItem", widgetType);
       invoke("show_app_window").catch(() => {});
     },
     [],
@@ -501,7 +501,7 @@ export default function App() {
     [navigateMainWindow],
   );
 
-  // ── Channel quick-toggle (for context menu) ────────────────────
+  // ── DataWidgetRow quick-toggle (for context menu) ────────────────────
 
   // ── Unified row-selector handlers (for tray submenus) ──────────
   // Both feed.tsx and the tray menu now use the same mental model
@@ -510,17 +510,17 @@ export default function App() {
   // See preferences.ts §"Unified ticker row selector helpers".
 
   const handleChannelRowChange = useCallback(
-    async (channelType: ChannelType, row: number | null) => {
+    async (widgetType: DataWidgetType, row: number | null) => {
       // 1) Client-side: assign / unassign in tickerLayout. Optimistic update
       //    so the next tray menu rebuild reflects the change immediately.
       setPrefs((prev) => {
-        const updated = setChannelTickerRow(prev, channelType, row);
+        const updated = setChannelTickerRow(prev, widgetType, row);
         savePrefs(updated);
         return updated;
       });
-      // 2) Server-side: flip Channel.ticker_enabled (true if row is set).
+      // 2) Server-side: flip DataWidgetRow.ticker_enabled (true if row is set).
       try {
-        await toggleChannelVisibility(channelType, row !== null);
+        await toggleDataWidgetVisibility(widgetType, row !== null);
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
       } catch {
         // Silently fail — will sync on next dashboard poll/CDC event.
@@ -720,7 +720,7 @@ export default function App() {
         // Now thread through the existing per-kind handler (channel
         // also flips server-side flag; widget is purely client-side).
         if (kind === "channel") {
-          handleChannelRowChange(sourceId as ChannelType, newIndex);
+          handleChannelRowChange(sourceId as DataWidgetType, newIndex);
         } else {
           handleWidgetRowChange(sourceId, newIndex);
         }
@@ -854,8 +854,8 @@ export default function App() {
 
   // ── Merge channel + widget tabs ──────────────────────────────
   const activeTabs = useMemo(
-    () => [...channelTabs, ...prefs.widgets.widgetsOnTicker],
-    [channelTabs, prefs.widgets.widgetsOnTicker],
+    () => [...widgetTabs, ...prefs.widgets.widgetsOnTicker],
+    [widgetTabs, prefs.widgets.widgetsOnTicker],
   );
 
   // ── Widget ticker data (local polling for clock/weather/sysmon) ──
@@ -936,7 +936,7 @@ export default function App() {
                 hoverSpeed={prefs.ticker.hoverSpeed}
                 mixMode={prefs.ticker.mixMode}
                 chipColorMode={prefs.ticker.chipColors}
-                channelDisplay={prefs.channelDisplay}
+                widgetDisplay={prefs.widgetDisplay}
                 comfort={prefs.ticker.tickerMode === "comfort"}
                 rowIndex={i}
                 totalRows={prefs.appearance.tickerLayout.rows.length}

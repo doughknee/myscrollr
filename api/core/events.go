@@ -239,7 +239,7 @@ func (h *Hub) listenToTopics(ctx context.Context) {
 // listenToTopics so tests can exercise routing without a live Redis
 // subscription loop.
 func (h *Hub) handleTopicMessage(topic string, payload []byte) {
-	// Control message: a user's channel config changed somewhere in the
+	// Control message: a user's widget config changed somewhere in the
 	// fleet (ADR-0001). Rebuild local topic subscriptions; replicas
 	// holding no connection for the user no-op inside
 	// UpdateUserTopicSubscriptions.
@@ -408,7 +408,7 @@ func (h *Hub) unregister(client *Client) {
 // --- Public API ---
 
 // RegisterClient adds an authenticated client to the hub and subscribes
-// them to the correct topics based on their channel configuration.
+// them to the correct topics based on their widget configuration.
 func RegisterClient(userID string) *Client {
 	client := &Client{
 		UserID: userID,
@@ -445,7 +445,7 @@ func UnsubscribeFromTopic(userID, topic string) {
 
 // UpdateUserTopicSubscriptions rebuilds a user's topic subscriptions on
 // THIS replica. Only operates if the user has an active SSE connection
-// here — which is why channel CRUD handlers must not call it directly:
+// here — which is why widget CRUD handlers must not call it directly:
 // with multiple replicas, the HTTP request and the SSE connection can
 // live on different pods. Reached via NotifyTopicSubscriptionChange →
 // Redis control message → handleTopicMessage, so every replica runs it
@@ -459,7 +459,7 @@ func UpdateUserTopicSubscriptions(userID string) {
 }
 
 // NotifyTopicSubscriptionChange tells every replica to rebuild the
-// user's SSE topic subscriptions after a channel config change. Goes
+// user's SSE topic subscriptions after a widget config change. Goes
 // through Redis pub/sub so the replica holding the user's SSE
 // connection refreshes even when this HTTP request was served by a
 // different replica (ADR-0001). Falls back to a local refresh if the
@@ -501,7 +501,7 @@ func TopicForRSSFeed(feedURL string) string {
 	return fmt.Sprintf("%s%08x", TopicPrefixRSS, h.Sum32())
 }
 
-// subscribeUserToTopics reads the user's channel subscriptions from the DB
+// subscribeUserToTopics reads the user's widget subscriptions from the DB
 // and registers them in the Hub's topic registry.
 func subscribeUserToTopics(userID string) {
 	ctx := context.Background()
@@ -509,13 +509,13 @@ func subscribeUserToTopics(userID string) {
 	// Core user-specific topics (user_preferences, user_channels) are handled
 	// by direct dispatch in listenToTopics -- no registry entry needed.
 
-	channels, err := GetUserChannels(userID)
+	widgets, err := GetUserWidgets(userID)
 	if err != nil {
-		log.Printf("[EventHub] Failed to load channels for %s: %v", userID, err)
+		log.Printf("[EventHub] Failed to load widgets for %s: %v", userID, err)
 		return
 	}
 
-	for _, ch := range channels {
+	for _, ch := range widgets {
 		if !ch.Enabled {
 			continue
 		}
@@ -524,7 +524,7 @@ func subscribeUserToTopics(userID string) {
 		// channel_type, so split widgets (sports_nfl, finance_stocks, …)
 		// subscribe through the same per-source logic as the legacy coarse
 		// types. The per-league/per-symbol values still come from config.
-		switch DataSourceForWidget(ch.ChannelType) {
+		switch DataSourceForWidget(ch.WidgetType) {
 		case "finance":
 			symbols := extractStringArray(ch.Config, "symbols")
 			for _, sym := range symbols {
@@ -563,7 +563,7 @@ func subscribeUserToTopics(userID string) {
 	}
 }
 
-// extractStringArray reads a string array under `key` from a channel's
+// extractStringArray reads a string array under `key` from a widget's
 // config JSONB (e.g. {"symbols": ["AAPL", ...]} or {"leagues": ["NFL", ...]}).
 // Empty strings and non-string entries are dropped.
 func extractStringArray(config map[string]interface{}, key string) []string {
@@ -584,7 +584,7 @@ func extractStringArray(config map[string]interface{}, key string) []string {
 	return out
 }
 
-// extractFeedURLsFromConfig reads feed URLs from a channel's config JSONB.
+// extractFeedURLsFromConfig reads feed URLs from a widget's config JSONB.
 // Config shape: {"feeds": [{"url": "https://...", "name": "..."}, ...]}
 func extractFeedURLsFromConfig(config map[string]interface{}) []string {
 	raw, ok := config["feeds"]
@@ -607,7 +607,6 @@ func extractFeedURLsFromConfig(config map[string]interface{}) []string {
 	}
 	return urls
 }
-
 
 // getUserFantasyLeagues returns the Yahoo league keys a user has imported.
 // Uses yahoo_user_leagues junction table (yahoo_leagues.guid was removed).

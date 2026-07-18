@@ -130,7 +130,7 @@ import type { DashboardResponse } from "../../types";
 
 /**
  * Resolve a widget's effective RSS display prefs: the global
- * `prefs.channelDisplay.rss` with the widget row's `config.display`
+ * `prefs.widgetDisplay.rss` with the widget row's `config.display`
  * override merged on top — the same merge FeedTab does. Added in
  * v1.1.3 so the TICKER honors per-widget overrides (time window,
  * per-source limit) instead of only the global prefs; mirror of

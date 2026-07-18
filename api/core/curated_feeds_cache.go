@@ -9,7 +9,7 @@ import (
 
 // Curated-feed URL cache.
 //
-// `tier_limits.go::ValidateChannelConfig` uses this to derive the
+// `tier_limits.go::ValidateWidgetConfig` uses this to derive the
 // `is_custom` flag server-side instead of trusting the client's
 // `is_custom` field. A URL is custom iff it does NOT appear in the
 // curated set (tracked_feeds.is_default = true).
@@ -22,7 +22,7 @@ import (
 // trust the client, so we never DEGRADE on cache failure.
 //
 // Why a package-level cache instead of a parameter passed through
-// the call stack: ValidateChannelConfig is called from multiple
+// the call stack: ValidateWidgetConfig is called from multiple
 // places and is also covered by tests that don't have a context or
 // DB. Adding parameters would force breaking signature changes
 // across the codebase + tests. The cache+fallback is invisible to

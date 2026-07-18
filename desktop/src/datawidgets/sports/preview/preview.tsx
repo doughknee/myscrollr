@@ -27,7 +27,7 @@ import {
 } from "../../../api/queries";
 import type { AppPreferences } from "../../../preferences";
 import { sportsChannel } from "../FeedTab";
-import type { Channel, ChannelType } from "../../../api/client";
+import type { DataWidgetRow, DataWidgetType } from "../../../api/client";
 import type { FeedTabProps, Game } from "../../../types";
 
 const params = new URLSearchParams(window.location.search);
@@ -96,7 +96,7 @@ const games: Game[] = Array.from({ length: 72 }, (_, i) => {
 
 const channelRow = {
   id: 1,
-  channel_type: widgetId as ChannelType,
+  channel_type: widgetId as DataWidgetType,
   enabled: true,
   ticker_enabled: true,
   created_at: "2026-07-17T00:00:00Z",
@@ -108,7 +108,7 @@ const channelRow = {
       NFL: { teamId: 1, teamName: "Kansas City Chiefs" },
     },
   },
-} as unknown as Channel & { logto_sub: string };
+} as unknown as DataWidgetRow & { logto_sub: string };
 
 function main(): void {
   const queryClient = new QueryClient({
@@ -125,7 +125,7 @@ function main(): void {
   queryClient.setQueryData(sportsTeamsOptions("NFL").queryKey, { teams });
 
   const initialPrefs = {
-    channelDisplay: {},
+    widgetDisplay: {},
   } as unknown as AppPreferences;
 
   const noop = (): void => {};
@@ -138,7 +138,7 @@ function main(): void {
     autostartEnabled: false,
     onAutostartChange: noop,
     appVersion: "preview",
-    allChannelManifests: [],
+    allDataWidgetManifests: [],
     allWidgets: [],
     onToggleChannelTicker: noop,
     onToggleWidgetTicker: noop,

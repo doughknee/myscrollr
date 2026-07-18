@@ -2,27 +2,27 @@
  * Desktop-local channel registry.
  *
  * Discovers channel FeedTab components at build time from this
- * directory. Each channel module exports a named `{id}Channel`
- * conforming to ChannelManifest.
+ * directory. Each channel module exports a named `{id}DataWidgetRow`
+ * conforming to DataWidgetManifest.
  */
 import { createRegistry } from "../lib/createRegistry";
-import type { ChannelManifest } from "../types";
+import type { DataWidgetManifest } from "../types";
 
-const modules = import.meta.glob<Record<string, ChannelManifest>>("./*/FeedTab.tsx", {
+const modules = import.meta.glob<Record<string, DataWidgetManifest>>("./*/FeedTab.tsx", {
   eager: true,
 });
 
-const { get, getAll, ORDER } = createRegistry<ChannelManifest>(
+const { get, getAll, ORDER } = createRegistry<DataWidgetManifest>(
   modules,
-  "Channel",
+  "DataWidget",
   ["finance", "sports", "fantasy", "rss", "predictions"],
 );
 
 /** Look up a channel by id. */
-export const getChannel = get;
+export const getDataWidget = get;
 
 /** Get all registered channels in canonical order. */
-export const getAllChannels = getAll;
+export const getAllDataWidgets = getAll;
 
 /** Canonical display order for channel tabs. */
 export const CHANNEL_ORDER = ORDER;

@@ -21,8 +21,8 @@ import { toast } from "sonner";
 
 import { defaultPinForNewWidget } from "../preferences";
 import type { CatalogItem } from "../marketplace";
-import { channelsApi } from "../api/client";
-import type { Channel, ChannelType } from "../api/client";
+import { dataWidgetsApi } from "../api/client";
+import type { DataWidgetRow, DataWidgetType } from "../api/client";
 import { queryKeys } from "../api/queries";
 import type { DashboardResponse } from "../types";
 import { useShell } from "../shell-context";
@@ -35,7 +35,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
   return useCallback(
     async (item: CatalogItem) => {
       if (item.kind === "data") {
-        const channelType = item.id as ChannelType;
+        const widgetType = item.id as DataWidgetType;
 
         // Optimistic insert: write a placeholder channel into the
         // dashboard cache immediately so the Sidebar + CatalogCard
@@ -45,9 +45,9 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
         // the forced `/dashboard` refetch were both on the critical
         // path. CDC + a background refetch reconcile the placeholder
         // with the real row a moment later.
-        const optimisticChannel: Channel & { logto_sub: string } = {
+        const optimisticChannel: DataWidgetRow & { logto_sub: string } = {
           id: -Date.now(), // ephemeral negative id, replaced on reconcile
-          channel_type: channelType,
+          channel_type: widgetType,
           enabled: true,
           ticker_enabled: true,
           config: item.addConfig ?? {},
@@ -72,7 +72,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
             // Don't double-insert if the channel is somehow already
             // present (e.g. CDC raced us).
             const existing = old.channels ?? [];
-            if (existing.some((c) => c.channel_type === channelType)) {
+            if (existing.some((c) => c.channel_type === widgetType)) {
               return old;
             }
             return {
@@ -93,10 +93,10 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
         // Fire the network call without blocking the UI. On success
         // we reconcile the optimistic row with the server response.
         // On failure we roll back and surface the error.
-        channelsApi
+        dataWidgetsApi
           // Report enabled utility-widget count so the server slot gate counts
           // every widget (utilities live only in local preferences).
-          .create(channelType, item.addConfig ?? {}, prefs.widgets.enabledWidgets.length)
+          .create(widgetType, item.addConfig ?? {}, prefs.widgets.enabledWidgets.length)
           .then((created) => {
             queryClient.setQueryData<DashboardResponse>(
               queryKeys.dashboard,
@@ -104,7 +104,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
                 if (!old) return old;
                 const channels = (old.channels ?? []).map((c) =>
                   c.id === optimisticChannel.id
-                    ? ({ ...created, logto_sub: c.logto_sub } as Channel & {
+                    ? ({ ...created, logto_sub: c.logto_sub } as DataWidgetRow & {
                         logto_sub: string;
                       })
                     : c,

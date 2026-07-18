@@ -29,7 +29,7 @@ import { motion } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardQueryOptions } from "../../api/queries";
 import { useShell } from "../../shell-context";
-import EmptyChannelState from "../../components/EmptyChannelState";
+import EmptyWidgetState from "../../components/EmptyWidgetState";
 import { WidgetBar, BarPill } from "../../components/widget-bar/Bar";
 import {
   Segmented,
@@ -47,16 +47,16 @@ import {
   userMatchupContext,
 } from "./types";
 import { filterEnabledLeagues, resolvePrimaryLeague } from "./view";
-import type { FeedTabProps, ChannelManifest } from "../../types";
+import type { FeedTabProps, DataWidgetManifest } from "../../types";
 import type { FantasySubTab } from "../../preferences";
 import type { LeagueResponse, MyLeaguesResponse } from "./types";
 
-/** Channel accent — kept in sync with `fantasyChannel.hex`. */
+/** DataWidgetRow accent — kept in sync with `fantasyChannel.hex`. */
 const FANTASY_HEX = "#6366f1";
 
-// ── Channel manifest ─────────────────────────────────────────────
+// ── DataWidgetRow manifest ─────────────────────────────────────────────
 
-export const fantasyChannel: ChannelManifest = {
+export const fantasyChannel: DataWidgetManifest = {
   id: "fantasy",
   name: "Fantasy",
   tabLabel: "Fantasy",
@@ -99,7 +99,7 @@ const SUB_TABS: SegmentedOption<FantasySubTab>[] = [
 
 function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
   const { prefs, onPrefsChange } = useShell();
-  const dp = prefs.channelDisplay.fantasy;
+  const dp = prefs.widgetDisplay.fantasy;
   const isComfort = mode === "comfort";
 
   const { data: dashboard } = useQuery(dashboardQueryOptions());
@@ -164,9 +164,9 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
       setAccountOpen(false);
       onPrefsChange({
         ...prefs,
-        channelDisplay: {
-          ...prefs.channelDisplay,
-          fantasy: { ...prefs.channelDisplay.fantasy, defaultSubTab: t },
+        widgetDisplay: {
+          ...prefs.widgetDisplay,
+          fantasy: { ...prefs.widgetDisplay.fantasy, defaultSubTab: t },
         },
       });
     },
@@ -176,9 +176,9 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
   const enableAllLeagues = useCallback(() => {
     onPrefsChange({
       ...prefs,
-      channelDisplay: {
-        ...prefs.channelDisplay,
-        fantasy: { ...prefs.channelDisplay.fantasy, enabledLeagueKeys: [] },
+      widgetDisplay: {
+        ...prefs.widgetDisplay,
+        fantasy: { ...prefs.widgetDisplay.fantasy, enabledLeagueKeys: [] },
       },
     });
   }, [prefs, onPrefsChange]);
@@ -268,7 +268,7 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
 
       {showLoading ? (
         <div className="flex flex-1 flex-col justify-center">
-          <EmptyChannelState
+          <EmptyWidgetState
             refreshing={Boolean(feedContext.__refreshing)}
             icon={Swords}
             noun="fantasy leagues"

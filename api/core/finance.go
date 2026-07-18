@@ -24,7 +24,7 @@ const (
 	CacheKeyFinance = "cache:finance"
 
 	// CacheKeyFinancePrefix is the Redis key prefix for per-user trade
-	// caches. Must stay in sync with channelUserCacheKeys (redis.go),
+	// caches. Must stay in sync with widgetUserCacheKeys (redis.go),
 	// which invalidates these on CDC dispatch.
 	CacheKeyFinancePrefix = "cache:finance:"
 

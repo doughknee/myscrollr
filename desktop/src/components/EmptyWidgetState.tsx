@@ -1,5 +1,5 @@
 /**
- * EmptyChannelState — shared empty-state placeholder for channel FeedTabs.
+ * EmptyWidgetState — shared empty-state placeholder for channel FeedTabs.
  *
  * Replaces the repeated empty-state pattern in finance, sports, rss, and
  * fantasy feeds.
@@ -10,7 +10,7 @@
  */
 import { clsx } from "clsx";
 
-interface EmptyChannelStateProps {
+interface EmptyWidgetStateProps {
   icon: React.ComponentType<{ size?: number; className?: string }>;
   /** What hasn't been added yet (e.g. "stocks or crypto", "leagues", "feeds"). */
   noun: string;
@@ -41,7 +41,7 @@ interface EmptyChannelStateProps {
   onConfigure?: () => void;
 }
 
-export default function EmptyChannelState({
+export default function EmptyWidgetState({
   icon: Icon,
   noun,
   hasConfig,
@@ -51,7 +51,7 @@ export default function EmptyChannelState({
   actionHint,
   actionLabel,
   onConfigure,
-}: EmptyChannelStateProps) {
+}: EmptyWidgetStateProps) {
   return (
     <div
       className={clsx(

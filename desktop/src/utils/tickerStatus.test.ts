@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatTickerStatus,
-  getEffectiveChannelTickerRow,
+  getEffectiveDataWidgetTickerRow,
   getEffectiveWidgetTickerStatus,
 } from "./tickerStatus";
 import type { AppPreferences } from "../preferences";
@@ -34,12 +34,12 @@ describe("formatTickerStatus", () => {
   });
 });
 
-describe("getEffectiveChannelTickerRow", () => {
+describe("getEffectiveDataWidgetTickerRow", () => {
   it("returns null for disabled channels even when the legacy fallback would be row 0", () => {
     const prefs = makePrefs([{ sources: ["finance"] }]);
 
     expect(
-      getEffectiveChannelTickerRow(prefs, {
+      getEffectiveDataWidgetTickerRow(prefs, {
         channel_type: "sports",
         enabled: false,
         ticker_enabled: true,
@@ -51,7 +51,7 @@ describe("getEffectiveChannelTickerRow", () => {
     const prefs = makePrefs([{ sources: ["finance"] }]);
 
     expect(
-      getEffectiveChannelTickerRow(prefs, {
+      getEffectiveDataWidgetTickerRow(prefs, {
         channel_type: "sports",
         enabled: true,
         ticker_enabled: true,
@@ -63,7 +63,7 @@ describe("getEffectiveChannelTickerRow", () => {
     const prefs = makePrefs([{ sources: ["finance"] }, { sources: [] }]);
 
     expect(
-      getEffectiveChannelTickerRow(prefs, {
+      getEffectiveDataWidgetTickerRow(prefs, {
         channel_type: "sports",
         enabled: true,
         ticker_enabled: true,

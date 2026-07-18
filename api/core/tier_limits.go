@@ -6,11 +6,11 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// ChannelLimits is the per-tier cap for every channel feature the frontend
+// WidgetLimits is the per-tier cap for every widget feature the frontend
 // lets users configure. A nil pointer means "unlimited" — this lets us
 // round-trip cleanly through JSON (where Go's Infinity has no analogue)
 // and lets clients treat null as "no cap."
-type ChannelLimits struct {
+type WidgetLimits struct {
 	// MaxWidgets caps how many widgets a user may run at once — the slot
 	// model from the 2026-06-30 widget/slot redesign. A nil pointer means
 	// "unlimited". During the transition this lever lives alongside the
@@ -28,7 +28,7 @@ type ChannelLimits struct {
 
 // TierLimitsResponse is the payload of GET /tier-limits.
 type TierLimitsResponse struct {
-	Tiers map[string]ChannelLimits `json:"tiers"`
+	Tiers map[string]WidgetLimits `json:"tiers"`
 }
 
 // DefaultTierLimits is the authoritative source of truth for per-tier caps.
@@ -51,7 +51,7 @@ type TierLimitsResponse struct {
 // RETIRED 2026-07-02 — a nil pointer means unlimited, and every tier now has
 // unlimited depth inside a widget. MaxWidgets (the slot lever) is the only
 // per-tier gate; the ticker-row fields are kept for compatibility.
-var DefaultTierLimits = map[string]ChannelLimits{
+var DefaultTierLimits = map[string]WidgetLimits{
 	"free":            {MaxWidgets: intPtr(3), MaxTickerRows: 1},
 	"uplink":          {MaxWidgets: intPtr(6), MaxTickerRows: 2},
 	"uplink_pro":      {MaxWidgets: intPtr(12), MaxTickerRows: 3},
@@ -81,7 +81,7 @@ func intPtr(n int) *int {
 
 // MaxWidgetsForTier returns the widget-slot cap for a tier (nil =
 // unlimited). Unknown tiers fall back to "free", matching the defensive
-// default ValidateChannelConfig uses, so an unrecognized JWT role can
+// default ValidateWidgetConfig uses, so an unrecognized JWT role can
 // never grant more slots than the free plan.
 func MaxWidgetsForTier(tier string) *int {
 	limits, ok := DefaultTierLimits[tier]
@@ -98,17 +98,17 @@ func MaxWidgetsForTier(tier string) *int {
 // handlers also unwrap it via errors.As to surface a structured 403 body
 // the UI can render a precise message from.
 type TierLimitError struct {
-	Tier        string // "free", "uplink", etc.
-	ChannelType string // "finance", "sports", "rss"
-	Field       string // "symbols" | "feeds" | "custom_feeds" | "leagues"
-	Limit       int
-	Got         int
+	Tier       string // "free", "uplink", etc.
+	WidgetType string // "finance", "sports", "rss"
+	Field      string // "symbols" | "feeds" | "custom_feeds" | "leagues"
+	Limit      int
+	Got        int
 }
 
 func (e *TierLimitError) Error() string {
 	return fmt.Sprintf(
 		"tier %q allows at most %d %s for %s; got %d",
-		e.Tier, e.Limit, e.Field, e.ChannelType, e.Got,
+		e.Tier, e.Limit, e.Field, e.WidgetType, e.Got,
 	)
 }
 
@@ -149,26 +149,26 @@ func TierDisplayName(tier string) string {
 	}
 }
 
-// ValidateChannelConfig rejects configs that exceed the caps for the
+// ValidateWidgetConfig rejects configs that exceed the caps for the
 // given tier. Returns nil on success, a *TierLimitError on violation.
 //
 // Unknown tiers fall back to the "free" row — a defensive default if
-// the JWT ever carries a role we don't recognize. Unknown channel types
-// are not validated (new channels can register dynamically; their shape
+// the JWT ever carries a role we don't recognize. Unknown widget types
+// are not validated (new types can register dynamically; their shape
 // is not yet known to this file, and silently passing is safer than
 // hard-rejecting).
-func ValidateChannelConfig(tier, channelType string, config map[string]any) error {
+func ValidateWidgetConfig(tier, widgetType string, config map[string]any) error {
 	limits, ok := DefaultTierLimits[tier]
 	if !ok {
 		limits = DefaultTierLimits["free"]
 		tier = "free"
 	}
 
-	switch channelType {
+	switch widgetType {
 	case "finance":
-		return validateArrayCap(tier, channelType, "symbols", config["symbols"], limits.Symbols)
+		return validateArrayCap(tier, widgetType, "symbols", config["symbols"], limits.Symbols)
 	case "sports":
-		return validateArrayCap(tier, channelType, "leagues", config["leagues"], limits.Leagues)
+		return validateArrayCap(tier, widgetType, "leagues", config["leagues"], limits.Leagues)
 	case "rss":
 		// RSS caps both total feeds and user-added ("custom") feeds.
 		// The custom cap is tighter than the total cap, so the natural
@@ -196,20 +196,20 @@ func ValidateChannelConfig(tier, channelType string, config map[string]any) erro
 		}
 		if limits.CustomFeeds != nil && customCount > *limits.CustomFeeds {
 			return &TierLimitError{
-				Tier:        tier,
-				ChannelType: channelType,
-				Field:       "custom_feeds",
-				Limit:       *limits.CustomFeeds,
-				Got:         customCount,
+				Tier:       tier,
+				WidgetType: widgetType,
+				Field:      "custom_feeds",
+				Limit:      *limits.CustomFeeds,
+				Got:        customCount,
 			}
 		}
 		if limits.Feeds != nil && totalFeeds > *limits.Feeds {
 			return &TierLimitError{
-				Tier:        tier,
-				ChannelType: channelType,
-				Field:       "feeds",
-				Limit:       *limits.Feeds,
-				Got:         totalFeeds,
+				Tier:       tier,
+				WidgetType: widgetType,
+				Field:      "feeds",
+				Limit:      *limits.Feeds,
+				Got:        totalFeeds,
 			}
 		}
 	}
@@ -243,7 +243,7 @@ func isCustomFeed(item map[string]any, curated map[string]bool) bool {
 // validateArrayCap counts entries in an array-shaped JSONB value and
 // returns a *TierLimitError if it exceeds cap. A nil cap pointer means
 // "unlimited" — common case for Ultimate/super_user tiers.
-func validateArrayCap(tier, channelType, field string, raw any, cap *int) error {
+func validateArrayCap(tier, widgetType, field string, raw any, cap *int) error {
 	if cap == nil {
 		return nil
 	}
@@ -252,11 +252,11 @@ func validateArrayCap(tier, channelType, field string, raw any, cap *int) error 
 		return nil
 	}
 	return &TierLimitError{
-		Tier:        tier,
-		ChannelType: channelType,
-		Field:       field,
-		Limit:       *cap,
-		Got:         len(arr),
+		Tier:       tier,
+		WidgetType: widgetType,
+		Field:      field,
+		Limit:      *cap,
+		Got:        len(arr),
 	}
 }
 
@@ -269,11 +269,10 @@ func tierLimitErrorResponse(e *TierLimitError) fiber.Map {
 		"error":  e.UserFacingMessage(),
 		"detail": fiber.Map{
 			"tier":    e.Tier,
-			"channel": e.ChannelType,
+			"channel": e.WidgetType, // wire key keeps the legacy name
 			"field":   e.Field,
 			"limit":   e.Limit,
 			"got":     e.Got,
 		},
 	}
 }
-

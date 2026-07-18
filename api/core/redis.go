@@ -72,14 +72,14 @@ func PSubscribe(ctx context.Context, patterns ...string) *redis.PubSub {
 }
 
 // InvalidateDashboardCache removes the cached dashboard response for a user.
-// Called after channel CRUD or preference updates to ensure the next poll gets fresh data.
+// Called after widget CRUD or preference updates to ensure the next poll gets fresh data.
 func InvalidateDashboardCache(userSub string) {
 	if err := Rdb.Del(context.Background(), RedisDashboardCachePrefix+userSub).Err(); err != nil {
 		log.Printf("[Cache] Failed to invalidate dashboard cache for %s: %v", userSub, err)
 	}
 }
 
-// channelUserCacheKeys returns all per-user cache keys each channel owns,
+// widgetUserCacheKeys returns all per-user cache keys each widget data source owns,
 // for a given user. Used by `InvalidateUserCaches` on CDC dispatch.
 //
 // The keys follow the convention `cache:<channel>:<userSub>` chosen by
@@ -87,7 +87,7 @@ func InvalidateDashboardCache(userSub string) {
 // only by convention, not by importing — this respects the AGENTS.md
 // channel-isolation rule (no shared Go types) while still letting core
 // keep downstream caches in sync when CDC fires.
-func channelUserCacheKeys(userSub string) []string {
+func widgetUserCacheKeys(userSub string) []string {
 	return []string{
 		"cache:finance:" + userSub,
 		"cache:sports:" + userSub,
@@ -110,7 +110,7 @@ func channelUserCacheKeys(userSub string) []string {
 // ops/sec on Redis — negligible.
 func InvalidateUserCaches(userSub string) {
 	ctx := context.Background()
-	keys := append([]string{RedisDashboardCachePrefix + userSub}, channelUserCacheKeys(userSub)...)
+	keys := append([]string{RedisDashboardCachePrefix + userSub}, widgetUserCacheKeys(userSub)...)
 	if err := Rdb.Del(ctx, keys...).Err(); err != nil {
 		log.Printf("[Cache] Failed to invalidate user caches for %s: %v", userSub, err)
 	}

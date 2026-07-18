@@ -18,7 +18,7 @@ import {
   ResetButton,
 } from "./SettingsControls";
 import { getTier } from "../../auth";
-import { getAllChannels } from "../../channels/registry";
+import { getAllDataWidgets } from "../../datawidgets/registry";
 import { getAllWidgets } from "../../widgets/registry";
 import { useTickerLayout } from "../../hooks/useTickerLayout";
 import { useUndoableAction } from "../../hooks/useUndoableAction";
@@ -70,7 +70,7 @@ const SPACING_OPTIONS: { value: TickerGap; label: string }[] = [
 ];
 
 const CHIP_COLOR_OPTIONS: { value: ChipColorMode; label: string }[] = [
-  { value: "channel", label: "Channel" },
+  { value: "channel", label: "Widget" },
   { value: "accent", label: "Theme" },
   { value: "muted", label: "Subtle" },
 ];
@@ -161,7 +161,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
 
   // ── Available sources (channels + enabled widgets) ────────────
   const availableSources = useMemo(() => {
-    const channels = getAllChannels().map((ch) => ({
+    const channels = getAllDataWidgets().map((ch) => ({
       id: ch.id,
       label: ch.tabLabel,
       hex: ch.hex,

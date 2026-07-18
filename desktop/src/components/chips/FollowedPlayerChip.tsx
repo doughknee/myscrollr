@@ -24,7 +24,7 @@ import type { ChipColorMode } from "../../preferences";
 import type {
   LeagueResponse,
   RosterPlayer,
-} from "../../channels/fantasy/types";
+} from "../../datawidgets/fantasy/types";
 import { getChipColors, chipBaseClasses } from "./chipColors";
 
 /**

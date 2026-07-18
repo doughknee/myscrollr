@@ -2,7 +2,7 @@ import { clsx } from "clsx";
 import { motion } from "motion/react";
 import type { ChipColorMode, FantasyDisplayPrefs } from "../../preferences";
 import { shouldShowOnTicker } from "../../preferences";
-import type { LeagueResponse } from "../../channels/fantasy/types";
+import type { LeagueResponse } from "../../datawidgets/fantasy/types";
 import {
   SPORT_EMOJI,
   countInjuries,
@@ -15,8 +15,8 @@ import {
   userMatchupContext,
   userRoster,
   userStanding,
-} from "../../channels/fantasy/types";
-import { findTopScorer } from "../../channels/fantasy/playerStats";
+} from "../../datawidgets/fantasy/types";
+import { findTopScorer } from "../../datawidgets/fantasy/playerStats";
 import { getChipColors, chipBaseClasses } from "./chipColors";
 
 interface FantasyStatChipProps {

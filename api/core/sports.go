@@ -26,7 +26,7 @@ const (
 	CacheKeySports = "cache:sports"
 
 	// CacheKeySportsPrefix is the Redis key prefix for per-user game
-	// caches. Must stay in sync with channelUserCacheKeys (redis.go).
+	// caches. Must stay in sync with widgetUserCacheKeys (redis.go).
 	CacheKeySportsPrefix = "cache:sports:"
 
 	// CacheKeySportsCatalog is the Redis key for the cached league catalog.

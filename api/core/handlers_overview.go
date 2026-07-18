@@ -21,11 +21,11 @@ import (
 
 // OverviewResponse is the unified read shape for GET /users/me/overview.
 // Single round-trip for the desktop account pane: identity, tier, billing,
-// channel summary, GDPR state, fantasy summary, and useful outbound links.
+// widget summary, GDPR state, fantasy summary, and useful outbound links.
 //
 // The endpoint is cached per-user in Redis for 30s with singleflight in
 // front of the assemble path; cache invalidation hooks fire from the
-// Stripe webhook, channel CRUD handlers, and the GDPR request lifecycle
+// Stripe webhook, widget CRUD handlers, and the GDPR request lifecycle
 // so user-visible state never lags more than one request.
 type OverviewResponse struct {
 	Identity     OverviewIdentity      `json:"identity"`
@@ -50,15 +50,15 @@ type OverviewIdentity struct {
 // OverviewTier resolves the tier from JWT roles and embeds the matching
 // limits row so clients don't need a second `/tier-limits` round-trip.
 type OverviewTier struct {
-	Current     string        `json:"current"`
-	IsSuperUser bool          `json:"is_super_user"`
-	Label       string        `json:"label"`
-	Limits      ChannelLimits `json:"limits"`
+	Current     string       `json:"current"`
+	IsSuperUser bool         `json:"is_super_user"`
+	Label       string       `json:"label"`
+	Limits      WidgetLimits `json:"limits"`
 }
 
 // OverviewChannels summarises the user_channels table for the account
 // pane. `total` and `enabled` drive the headline counts; `by_type` is
-// the per-channel toggle state used to render the channel list.
+// the per-widget toggle state used to render the widget list.
 type OverviewChannels struct {
 	Total   int                  `json:"total"`
 	Enabled int                  `json:"enabled"`
@@ -163,10 +163,10 @@ func buildTierFromContext(c *fiber.Ctx) OverviewTier {
 
 // ─── Channel summary ────────────────────────────────────────────────
 
-// getChannelSummary aggregates user_channels into the headline counts
+// getWidgetSummary aggregates user_channels into the headline counts
 // + per-row toggle state in a single query. Empty users return zero
 // counts and an empty by_type slice.
-func getChannelSummary(ctx context.Context, userID string) (OverviewChannels, error) {
+func getWidgetSummary(ctx context.Context, userID string) (OverviewChannels, error) {
 	const q = `
 		SELECT
 			COUNT(*) AS total,
@@ -187,13 +187,13 @@ func getChannelSummary(ctx context.Context, userID string) (OverviewChannels, er
 	)
 	err := DBPool.QueryRow(ctx, q, userID).Scan(&total, &enabled, &byTypeJSON)
 	if err != nil {
-		return OverviewChannels{}, fmt.Errorf("getChannelSummary query: %w", err)
+		return OverviewChannels{}, fmt.Errorf("getWidgetSummary query: %w", err)
 	}
 
 	byType := []OverviewChannelRow{}
 	if len(byTypeJSON) > 0 {
 		if err := json.Unmarshal(byTypeJSON, &byType); err != nil {
-			return OverviewChannels{}, fmt.Errorf("getChannelSummary unmarshal: %w", err)
+			return OverviewChannels{}, fmt.Errorf("getWidgetSummary unmarshal: %w", err)
 		}
 	}
 
@@ -359,22 +359,22 @@ func buildAccountLinks() OverviewLinks {
 //
 //  1. Identity + tier — pure context reads, no I/O.
 //  2. Subscription — single DB query.
-//  3. Channels — single DB query (also gates the fantasy fan-out).
+//  3. Widgets — single DB query (also gates the fantasy fan-out).
 //  4. GDPR — single DB query.
-//  5. Fantasy — only when the user has an enabled fantasy channel; HTTP
+//  5. Fantasy — only when the user has an enabled fantasy widget; HTTP
 //     call with a 1s timeout so a slow fantasy API can't pin the
 //     overview.
 //
 // Failures in optional sections (subscription, GDPR, fantasy) degrade
 // gracefully to nil/none rather than failing the whole call. The
-// channels query is the only one that can hard-fail — without it the
+// widgets query is the only one that can hard-fail — without it the
 // summary is meaningless.
 func assembleOverview(ctx context.Context, c *fiber.Ctx, userID string) (*OverviewResponse, error) {
 	identity := buildIdentityFromContext(c)
 	tier := buildTierFromContext(c)
 	subscription := getSubscriptionForOverview(ctx, userID)
 
-	channels, err := getChannelSummary(ctx, userID)
+	channels, err := getWidgetSummary(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("assembleOverview: channels: %w", err)
 	}
@@ -382,7 +382,7 @@ func assembleOverview(ctx context.Context, c *fiber.Ctx, userID string) (*Overvi
 	gdpr := getDeletionStatusForOverview(ctx, userID)
 
 	var fantasy *OverviewFantasy
-	if hasFantasyChannel(channels) {
+	if hasFantasyWidget(channels) {
 		fanCtx, cancel := context.WithTimeout(ctx, FantasyFanoutTimeout)
 		defer cancel()
 		fantasy = fetchFantasySummary(fanCtx, userID)
@@ -399,10 +399,10 @@ func assembleOverview(ctx context.Context, c *fiber.Ctx, userID string) (*Overvi
 	}, nil
 }
 
-// hasFantasyChannel returns true when the user has an enabled fantasy
-// channel — the only condition under which the fantasy fan-out is
+// hasFantasyWidget returns true when the user has an enabled fantasy
+// widget — the only condition under which the fantasy fan-out is
 // worth the latency cost.
-func hasFantasyChannel(channels OverviewChannels) bool {
+func hasFantasyWidget(channels OverviewChannels) bool {
 	for _, c := range channels.ByType {
 		// Match the fantasy SOURCE, not the literal — the widget row is
 		// "fantasy_yahoo" (post widget-split), never bare "fantasy".
@@ -417,7 +417,7 @@ func hasFantasyChannel(channels OverviewChannels) bool {
 
 // InvalidateOverviewCache deletes the per-user overview cache key.
 // Called from the Stripe webhook (subscription state changes), the
-// channel CRUD handlers (toggle state changes), and the GDPR request
+// widget CRUD handlers (toggle state changes), and the GDPR request
 // lifecycle (deletion status changes) so the next request always sees
 // fresh data instead of waiting up to OverviewCacheTTL for the cache
 // to expire.

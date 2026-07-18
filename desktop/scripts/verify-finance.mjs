@@ -11,7 +11,7 @@
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 
-const BASE = "http://localhost:5174/src/channels/finance/preview/index.html";
+const BASE = "http://localhost:5174/src/datawidgets/finance/preview/index.html";
 const OUT = process.env.UI_REVIEW_OUT ?? "ui-review-out";
 mkdirSync(OUT, { recursive: true });
 

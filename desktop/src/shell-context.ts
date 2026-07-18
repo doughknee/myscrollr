@@ -15,9 +15,9 @@
 import { createContext, useContext } from "react";
 import type { AppPreferences } from "./preferences";
 import type { SubscriptionTier } from "./auth";
-import type { ChannelType, Channel, SubscriptionInfo } from "./api/client";
+import type { DataWidgetType, DataWidgetRow, SubscriptionInfo } from "./api/client";
 import type { DashboardResponse } from "./types";
-import type { ChannelManifest, WidgetManifest } from "./types";
+import type { DataWidgetManifest, WidgetManifest } from "./types";
 
 // ── Stable context (prefs, auth, callbacks, manifests) ──────────
 
@@ -34,17 +34,17 @@ export interface ShellState {
   appVersion: string;
 
   /** All registered channel manifests (static). */
-  allChannelManifests: ChannelManifest[];
+  allDataWidgetManifests: DataWidgetManifest[];
   /** All registered widget manifests (static). */
   allWidgets: WidgetManifest[];
   /** Toggle a channel's visibility on the ticker. */
-  onToggleChannelTicker: (channelType: ChannelType, visible: boolean) => void;
+  onToggleChannelTicker: (widgetType: DataWidgetType, visible: boolean) => void;
   /** Toggle a widget's presence on the ticker. */
   onToggleWidgetTicker: (widgetId: string) => void;
   /** Add a new channel via API. */
-  onAddChannel: (channelType: ChannelType) => void;
+  onAddChannel: (widgetType: DataWidgetType) => void;
   /** Delete a channel via API. */
-  onDeleteChannel: (channelType: ChannelType) => void;
+  onDeleteChannel: (widgetType: DataWidgetType) => void;
   /** Toggle a widget on/off entirely. */
   onToggleWidget: (widgetId: string) => void;
   /** Navigate to a source by ID. */
@@ -63,7 +63,7 @@ export function useShell(): ShellState {
 
 export interface ShellDataState {
   /** User's channel records from the dashboard API. */
-  channels: Channel[];
+  channels: DataWidgetRow[];
   /** Dashboard query response (for initial data snapshots). */
   dashboard: DashboardResponse | undefined;
 }

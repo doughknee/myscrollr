@@ -20,7 +20,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { dashboardQueryOptions, rssCatalogOptions } from "../../api/queries";
 import { relativeTime, truncate } from "../../utils/format";
-import EmptyChannelState from "../../components/EmptyChannelState";
+import EmptyWidgetState from "../../components/EmptyWidgetState";
 import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarDivider } from "../../components/widget-bar/Bar";
@@ -38,7 +38,7 @@ import {
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import FeedManager from "./FeedManager";
-import { useChannelConfig } from "../../hooks/useChannelConfig";
+import { useDataWidgetConfig } from "../../hooks/useDataWidgetConfig";
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
 import { applyRssPipeline, type RssSortOrder, distinctSourceCount } from "./view";
@@ -46,16 +46,16 @@ import type {
   RssItem as RssItemType,
   FeedTabProps,
   FeedMode,
-  ChannelManifest,
+  DataWidgetManifest,
 } from "../../types";
-import type { ChannelType, RssChannelConfig } from "../../api/client";
+import type { DataWidgetType, RssChannelConfig } from "../../api/client";
 import { shouldShowOnFeed } from "../../preferences";
 import type { RssDisplayPrefs } from "../../preferences";
 import { AnimatePresence } from "motion/react";
 
-// ── Channel manifest ─────────────────────────────────────────────
+// ── DataWidgetRow manifest ─────────────────────────────────────────────
 
-export const rssChannel: ChannelManifest = {
+export const rssChannel: DataWidgetManifest = {
   id: "rss",
   name: "News",
   tabLabel: "News",
@@ -122,15 +122,15 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
     const override = (
       channel?.config as { display?: Partial<RssDisplayPrefs> } | undefined
     )?.display;
-    if (!override) return prefs.channelDisplay.rss;
+    if (!override) return prefs.widgetDisplay.rss;
     const {
       showSource: _source,
       showDescription: _description,
       showTimestamps: _timestamps,
       ...functional
     } = override;
-    return { ...prefs.channelDisplay.rss, ...functional };
-  }, [prefs.channelDisplay.rss, channel?.config]);
+    return { ...prefs.widgetDisplay.rss, ...functional };
+  }, [prefs.widgetDisplay.rss, channel?.config]);
 
   // Scope to this widget's own feeds (news_bbc → only the BBC feed;
   // rss_custom → only the user's added feeds). undefined = a legacy coarse
@@ -231,14 +231,14 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
         ?.display ?? {},
     [channel?.config],
   );
-  const channelType = (channel?.channel_type ?? widgetId ?? "rss") as ChannelType;
+  const widgetType = (channel?.channel_type ?? widgetId ?? "rss") as DataWidgetType;
 
   // Persists the sticky sort into this widget's config.display override
   // (same slot the time window uses; separate keyed hook from the bar's
   // so writes can't clobber each other's reads).
-  const { updateItems: persistDisplay } = useChannelConfig<
+  const { updateItems: persistDisplay } = useDataWidgetConfig<
     Partial<RssDisplayPrefs>
-  >(channelType, "display");
+  >(widgetType, "display");
 
   const pickSort = useCallback(
     (next: SortOrder) => {
@@ -477,12 +477,12 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
 
       {showFeedsView ? (
         <RssFeedsPanel
-          channelType={channelType}
+          widgetType={widgetType}
           channelConfig={channel?.config as RssChannelConfig | undefined}
         />
       ) : showEmpty ? (
         <div className="flex flex-1 flex-col justify-center">
-          <EmptyChannelState
+          <EmptyWidgetState
             refreshing={Boolean(feedContext.__refreshing)}
             icon={Rss}
             noun="feeds"
@@ -731,15 +731,15 @@ function RssWindowSelect({
 // ── Feeds view (the Configure page's manager, mounted in-feed) ──
 
 function RssFeedsPanel({
-  channelType,
+  widgetType,
   channelConfig,
 }: {
-  channelType: ChannelType;
+  widgetType: DataWidgetType;
   channelConfig: RssChannelConfig | undefined;
 }) {
-  const { error, setError, saving, updateItems } = useChannelConfig<
+  const { error, setError, saving, updateItems } = useDataWidgetConfig<
     Array<{ name: string; url: string; is_custom?: boolean }>
-  >(channelType, "feeds");
+  >(widgetType, "feeds");
 
   const feeds = useMemo(
     () => (Array.isArray(channelConfig?.feeds) ? channelConfig.feeds : []),

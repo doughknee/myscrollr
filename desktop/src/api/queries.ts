@@ -70,7 +70,7 @@ async function fetchDashboard(): Promise<DashboardResponse> {
   // Signed-in users with zero channels installed deliberately receive an
   // empty `data` payload — the ticker renders an inline "no sources yet"
   // CTA in that state rather than teasing public-feed data. See
-  // `ScrollrTicker` empty-shell handling and `App.tsx` channelTabs logic.
+  // `ScrollrTicker` empty-shell handling and `App.tsx` widgetTabs logic.
   if (isAuthenticated() || hasRefreshToken()) {
     try {
       const data = await authFetch<{
@@ -289,8 +289,8 @@ interface YahooStatusResponse {
 }
 
 // MyLeaguesResponse imported from canonical source to avoid duplicate types.
-import type { MyLeaguesResponse } from "../channels/fantasy/types";
-export type { MyLeaguesResponse } from "../channels/fantasy/types";
+import type { MyLeaguesResponse } from "../datawidgets/fantasy/types";
+export type { MyLeaguesResponse } from "../datawidgets/fantasy/types";
 
 export function fantasyStatusOptions() {
   return queryOptions({

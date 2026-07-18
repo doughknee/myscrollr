@@ -124,7 +124,7 @@ const WIDGET_GITHUB: ChipColors = {
   textFaint: "text-widget-github/55",
 };
 
-// ── Channel + widget → color mapping ────────────────────────────
+// ── DataWidgetRow + widget → color mapping ────────────────────────────
 
 const CHANNEL_MAP: Record<string, ChipColors> = {
   finance: PRIMARY,

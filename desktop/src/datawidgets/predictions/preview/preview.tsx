@@ -29,7 +29,7 @@ import { predictionsChannel } from "../FeedTab";
 import type { FeedTabProps, Prediction } from "../../../types";
 // Static snapshot of the local predictions API (:8085 has no CORS; the
 // fixture keeps screenshots deterministic anyway). Refresh with:
-//   curl -s http://localhost:8085/predictions > desktop/src/channels/predictions/preview/fixture.json
+//   curl -s http://localhost:8085/predictions > desktop/src/datawidgets/predictions/preview/fixture.json
 import fixture from "./fixture.json";
 
 const params = new URLSearchParams(window.location.search);
@@ -226,7 +226,7 @@ function main(): void {
   }
 
   const initialPrefs = {
-    channelDisplay: {
+    widgetDisplay: {
       predictions: {
         ...migratePredictionsDisplay(undefined),
       },
@@ -243,7 +243,7 @@ function main(): void {
     autostartEnabled: false,
     onAutostartChange: noop,
     appVersion: "preview",
-    allChannelManifests: [],
+    allDataWidgetManifests: [],
     allWidgets: [],
     onToggleChannelTicker: noop,
     onToggleWidgetTicker: noop,

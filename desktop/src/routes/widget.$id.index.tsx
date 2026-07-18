@@ -20,7 +20,7 @@ import SourcePageLayout, { SourceNotFound } from "../components/SourcePageLayout
 import { widgetManifest } from "../marketplace";
 import { getWidget } from "../widgets/registry";
 import { dashboardQueryOptions } from "../api/queries";
-import type { ChannelManifest, WidgetManifest } from "../types";
+import type { DataWidgetManifest, WidgetManifest } from "../types";
 
 export const Route = createFileRoute("/widget/$id/")({
   // Data widgets need the dashboard; ensuring it here is harmless for
@@ -39,7 +39,7 @@ function WidgetRoute() {
   // Resolves data widgets (per-league/per-feed splits + legacy coarse
   // ids) AND local utilities.
   const manifest = widgetManifest(id) as
-    | ChannelManifest
+    | DataWidgetManifest
     | WidgetManifest
     | undefined;
 
@@ -61,7 +61,7 @@ function WidgetFeed({
   manifest,
 }: {
   id: string;
-  manifest: ChannelManifest | WidgetManifest;
+  manifest: DataWidgetManifest | WidgetManifest;
 }) {
   const { data: dashboard, isFetching: dashboardFetching } = useQuery(
     dashboardQueryOptions(),
