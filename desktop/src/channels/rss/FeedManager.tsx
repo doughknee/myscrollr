@@ -23,6 +23,7 @@ import { motion, AnimatePresence } from "motion/react";
 import Tooltip from "../../components/Tooltip";
 import EmptySection from "../../components/layout/EmptySection";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
+import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import type { TrackedFeed } from "../../api/client";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -377,17 +378,18 @@ export default function FeedManager({
           </button>
         </Tooltip>
 
-        <select
+        <SelectMenu
           value={sort}
-          onChange={(e) => setSort(e.target.value as SortKey)}
-          className="px-2 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta text-fg-2 focus:outline-none focus:border-accent/60 transition-colors cursor-pointer appearance-none"
-          aria-label="Sort feeds"
-        >
-          <option value="default">Tracked first</option>
-          <option value="name">Name</option>
-          <option value="category">Category</option>
-          <option value="activity">Last activity</option>
-        </select>
+          options={[
+            { value: "default", label: "Tracked first" },
+            { value: "name", label: "Name" },
+            { value: "category", label: "Category" },
+            { value: "activity", label: "Last activity" },
+          ]}
+          onChange={setSort}
+          ariaLabel="Sort feeds"
+          prefix="Sort"
+        />
       </div>
 
       {selectedCategories.size > 0 && (

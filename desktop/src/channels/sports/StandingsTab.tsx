@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { ChevronDown } from "lucide-react";
 import TeamLogo from "../../components/TeamLogo";
+import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import { standingsOptions } from "../../api/queries";
 import type { Standing } from "../../api/queries";
 
@@ -228,15 +229,14 @@ export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
     <div>
       {/* League selector */}
       <div className="px-3 py-2 border-b border-edge/30 bg-surface">
-        <select
+        <SelectMenu
           value={selected}
-          onChange={(e) => setSelected(e.target.value)}
-          className="bg-surface-hover text-fg-2 text-xs rounded px-2 py-1 border border-edge/30 focus:outline-none focus:border-accent/60"
-        >
-          {leagues.map((l) => (
-            <option key={l} value={l}>{l}</option>
-          ))}
-        </select>
+          options={leagues.map((l) => ({ value: l, label: l }))}
+          onChange={setSelected}
+          ariaLabel="League"
+          prefix="League"
+          align="left"
+        />
       </div>
 
       {/* Content */}

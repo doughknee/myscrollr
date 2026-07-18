@@ -21,6 +21,7 @@ import SportsEmptyState from "../channels/sports/EmptyState";
 import RouteError from "../components/RouteError";
 import Tooltip from "../components/Tooltip";
 import { WidgetBar, BarPill } from "../components/widget-bar/Bar";
+import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../components/feedCard";
 import TickerLayoutSummary from "../components/TickerLayoutSummary";
 import PageLayout from "../components/layout/PageLayout";
 import EmptySection from "../components/layout/EmptySection";
@@ -980,7 +981,11 @@ function WidgetChip({
           onClick();
         }
       }}
-      className="group rounded-lg border bg-base-200/40 border-edge/20 hover:bg-base-200/60 p-3 transition-colors text-left cursor-pointer w-full"
+      className={clsx(
+        FEED_CARD,
+        FEED_CARD_INTERACTIVE,
+        "group w-full text-left",
+      )}
     >
       <div className="flex items-center gap-2 mb-1.5">
         <span style={{ color: widget.hex }} className="shrink-0">
