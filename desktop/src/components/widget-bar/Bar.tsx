@@ -55,15 +55,20 @@ export function WidgetBar({ children }: { children: React.ReactNode }) {
             : "border-edge/30",
         )}
       >
-        {/* The bar's contents animate as their OWN layer: on page/source
-            change the shell stays put while controls drop in from above,
-            countering the feed body's rise (PageLayout's +y fade) so bar
-            and feed read as two planes. The transform lives on this inner
-            row — never on the sticky shell (a transform there would break
-            pinning). */}
+        {/* The bar's contents animate as their OWN layer via the
+            hidden/show/out variant labels PageLayout broadcasts in
+            stableChrome mode: the shell (and its separator line) stays
+            put while old controls roll out the top and new ones roll in
+            from below — AnimateNumber-style, per source swap. No labels
+            in scope (preview harnesses mount FeedTabs bare) → renders
+            static. The transform lives on this inner row — never on the
+            sticky shell (a transform there would break pinning). */}
         <motion.div
-          initial={{ opacity: 0, y: -6 }}
-          animate={{ opacity: 1, y: 0 }}
+          variants={{
+            hidden: { opacity: 0, y: 10 },
+            show: { opacity: 1, y: 0 },
+            out: { opacity: 0, y: -10 },
+          }}
           transition={{ duration: 0.18, ease: [0.22, 0.61, 0.36, 1] }}
           className="flex items-center gap-2"
         >

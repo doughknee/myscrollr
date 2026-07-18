@@ -56,6 +56,10 @@ export default function SourcePageLayout({
       // feed's own components own their padding.
       width="wide"
       noContentPadding
+      // Source→source swaps overlap-crossfade so the (identical)
+      // WidgetBar shell reads as stationary chrome; only the bar's
+      // contents and the feed animate.
+      stableChrome
     >
       {children}
     </PageLayout>

@@ -86,6 +86,18 @@ interface PageLayoutProps {
    * other dashboards that don't want a constrained reading column.
    */
   noContentPadding?: boolean;
+
+  /**
+   * Source-page transition mode: an OVERLAPPING pure-opacity crossfade
+   * (popLayout, no y drift, no wait gap) instead of the sequential
+   * fade+slide. Because every source page renders the identical
+   * WidgetBar shell, the overlapped shells read as ONE stationary bar —
+   * the bar/feed separator never moves. The moving parts are the
+   * layers inside: this container broadcasts `hidden/show/out` variant
+   * labels, and the bar's inner row (widget-bar/Bar.tsx) picks them up
+   * to roll its contents out the top and in from the bottom.
+   */
+  stableChrome?: boolean;
 }
 
 // ── Component ───────────────────────────────────────────────────
@@ -105,6 +117,7 @@ export default function PageLayout({
   width = "narrow",
   fillHeight = false,
   noContentPadding = false,
+  stableChrome = false,
 }: PageLayoutProps) {
   // Publish this page's identity to the TopBar.
   useRegisterPageIdentity({
@@ -176,13 +189,23 @@ export default function PageLayout({
         </div>
       ) : (
         // Default mode: content area scrolls; children stack vertically.
-        <div className="flex-1 overflow-y-auto scrollbar-thin">
-          <AnimatePresence mode="wait">
+        // (`relative` anchors popLayout's absolutely-positioned exits.)
+        <div className="relative flex-1 overflow-y-auto scrollbar-thin">
+          <AnimatePresence mode={stableChrome ? "popLayout" : "wait"}>
             <motion.div
               key={contentKey}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
+              initial={stableChrome ? "hidden" : { opacity: 0, y: 4 }}
+              animate={stableChrome ? "show" : { opacity: 1, y: 0 }}
+              exit={stableChrome ? "out" : { opacity: 0, y: -4 }}
+              variants={
+                stableChrome
+                  ? {
+                      hidden: { opacity: 0 },
+                      show: { opacity: 1 },
+                      out: { opacity: 0 },
+                    }
+                  : undefined
+              }
               transition={{ duration: 0.18, ease: [0.22, 0.61, 0.36, 1] }}
               className={clsx(
                 noContentPadding ? "w-full" : "mx-auto px-5 py-5",
