@@ -271,19 +271,6 @@ export interface PredictionCandlesticksResponse {
   candlesticks?: PredictionCandle[];
 }
 
-/** ~7 days of hourly candles, proxied + Redis-cached server-side (5 min
- *  TTL — staleTime mirrors it so reopening the modal is instant). */
-export function predictionsCandlesticksOptions(ticker: string) {
-  return queryOptions({
-    queryKey: ["predictions-candlesticks", ticker],
-    queryFn: () =>
-      authFetch<PredictionCandlesticksResponse>(
-        `/predictions/candlesticks/${encodeURIComponent(ticker)}`,
-      ),
-    staleTime: 5 * 60 * 1000,
-    enabled: ticker.length > 0,
-  });
-}
 
 export function rssCatalogOptions(opts?: { includeFailing?: boolean }) {
   const includeFailing = opts?.includeFailing ?? false;

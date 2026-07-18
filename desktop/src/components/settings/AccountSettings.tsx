@@ -89,11 +89,9 @@ export default function AccountSettings({
   const [resetState, setResetState] = useState<
     "idle" | "sending" | "sent"
   >("idle");
-  // Export-data state lives here (rather than in AccountExportButton)
-  // so the Data card can use the standard ActionRow chrome and match
-  // every other action row on the page. AccountExportButton still
-  // exists for its own tests; the underlying `exportUserData()` is
-  // the source of truth for the download flow.
+  // Export-data state lives inline so the Data card can use the
+  // standard ActionRow chrome; `exportUserData()` (api/client) is the
+  // source of truth for the download flow.
   const [exportState, setExportState] = useState<"idle" | "loading">("idle");
   // Phase 1 (Apr 26): sign-out used to be one-click. Reset, channel
   // delete, and other destructive actions all confirm — sign-out

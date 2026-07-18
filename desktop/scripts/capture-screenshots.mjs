@@ -19,45 +19,42 @@ const themeFamilies = [
 const routes = [
   { id: "home", path: "/feed", sidebar: true },
   { id: "catalog", path: "/catalog", sidebar: true },
-  { id: "settings", path: "/settings", sidebar: true },
+  { id: "customize-ticker", path: "/customize", sidebar: true },
+  { id: "customize-app", path: "/customize?tab=app", sidebar: true },
   { id: "support", path: "/support", sidebar: true },
-  { id: "finance-feed", path: "/channel/finance/feed", sidebar: true },
-  { id: "finance-config", path: "/channel/finance/configuration", sidebar: true },
-  { id: "finance-display", path: "/channel/finance/display", sidebar: true },
-  { id: "sports-feed", path: "/channel/sports/feed", sidebar: true },
-  { id: "sports-config", path: "/channel/sports/configuration", sidebar: true },
-  { id: "sports-display", path: "/channel/sports/display", sidebar: true },
-  { id: "rss-feed", path: "/channel/rss/feed", sidebar: true },
-  { id: "rss-config", path: "/channel/rss/configuration", sidebar: true },
-  { id: "rss-display", path: "/channel/rss/display", sidebar: true },
-  { id: "fantasy-feed", path: "/channel/fantasy/feed", sidebar: true },
-  { id: "fantasy-config", path: "/channel/fantasy/configuration", sidebar: true },
-  { id: "fantasy-display", path: "/channel/fantasy/display", sidebar: true },
-  { id: "clock-feed", path: "/widget/clock/feed", sidebar: true },
-  { id: "clock-config", path: "/widget/clock/configuration", sidebar: true },
-  { id: "weather-feed", path: "/widget/weather/feed", sidebar: true },
-  { id: "weather-config", path: "/widget/weather/configuration", sidebar: true },
-  { id: "sysmon-feed", path: "/widget/sysmon/feed", sidebar: true },
-  { id: "sysmon-config", path: "/widget/sysmon/configuration", sidebar: true },
-  { id: "uptime-feed", path: "/widget/uptime/feed", sidebar: true },
-  { id: "uptime-config", path: "/widget/uptime/configuration", sidebar: true },
-  { id: "github-feed", path: "/widget/github/feed", sidebar: true },
-  { id: "github-config", path: "/widget/github/configuration", sidebar: true },
+  { id: "stocks", path: "/widget/finance_stocks", sidebar: true },
+  { id: "crypto", path: "/widget/finance_crypto", sidebar: true },
+  { id: "predictions", path: "/widget/predictions", sidebar: true },
+  { id: "sports-nfl", path: "/widget/sports_nfl", sidebar: true },
+  { id: "news-bbc", path: "/widget/news_bbc", sidebar: true },
+  { id: "fantasy", path: "/widget/fantasy_yahoo", sidebar: true },
+  { id: "clock", path: "/widget/clock", sidebar: true },
+  { id: "weather", path: "/widget/weather", sidebar: true },
+  { id: "sysmon", path: "/widget/sysmon", sidebar: true },
+  { id: "timer", path: "/widget/timer", sidebar: true },
+  { id: "uptime", path: "/widget/uptime", sidebar: true },
+  { id: "github", path: "/widget/github", sidebar: true },
 ];
 
-const sourceRoutes = routes.filter((route) => route.id !== "home" && route.id.endsWith("-feed"));
+const CHROME_IDS = new Set(["home", "catalog", "customize-ticker", "customize-app", "support"]);
+const sourceRoutes = routes.filter((route) => !CHROME_IDS.has(route.id));
 const routeById = new Map(routes.map((route) => [route.id, route]));
 
 const sourceAliases = new Map([
-  ["finance", "finance"],
-  ["sports", "sports"],
+  ["finance", "stocks"],
+  ["stocks", "stocks"],
+  ["crypto", "crypto"],
+  ["sports", "sports-nfl"],
   ["fantasy", "fantasy"],
-  ["rss", "rss"],
-  ["news", "rss"],
+  ["rss", "news-bbc"],
+  ["news", "news-bbc"],
+  ["predictions", "predictions"],
+  ["kalshi", "predictions"],
   ["clock", "clock"],
   ["weather", "weather"],
   ["sysmon", "sysmon"],
   ["system", "sysmon"],
+  ["timer", "timer"],
   ["uptime", "uptime"],
   ["github", "github"],
 ]);
@@ -119,7 +116,7 @@ function buildRouteMatrix(options) {
 function buildCurrentSourceRoutes(sources) {
   const wanted = sources.length > 0
     ? new Set(sources)
-    : new Set(sourceRoutes.map((route) => route.id.replace(/-feed$/, "")));
+    : new Set(sourceRoutes.map((route) => route.id));
   const result = [routeById.get("home")];
 
   for (const route of routes) {
@@ -134,7 +131,7 @@ function buildCurrentSourceRoutes(sources) {
 
 function buildTestMatrix(options) {
   const source = parseSources(options.get("source"))[0];
-  const route = source ? routeById.get(`${source}-feed`) : routeById.get("home");
+  const route = source ? routeById.get(source) : routeById.get("home");
   if (!route) {
     process.stderr.write(`Unknown test source: ${source}\n`);
     process.exit(1);

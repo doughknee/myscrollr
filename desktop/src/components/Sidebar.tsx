@@ -31,7 +31,6 @@ import {
   PanelLeftOpen,
   Plus,
   RadioTower,
-  Settings2,
   SlidersHorizontal,
   Trash2,
   UserCircle,

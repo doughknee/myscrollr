@@ -1,6 +1,6 @@
 /**
  * useTickerLayout — single source of truth for the multi-row ticker
- * layout, shared by Home (per-source RowSelector + summary strip) and
+ * layout, shared by Home (summary strip), Customize → Ticker, and
  * Settings → Ticker (row builder).
  *
  * Why this exists:
@@ -55,7 +55,7 @@ interface UseTickerLayoutResult {
   /**
    * Append an empty row to the layout. Optionally seed the new row's
    * sources with a single source ID (useful for "+ Add row" from a
-   * RowSelector — the click should both create the row and assign the
+   * the row editor — the click should both create the row and assign the
    * current source to it).
    *
    * Returns the new row's index, or `null` if the layout is already at
