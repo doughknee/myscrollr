@@ -76,22 +76,24 @@ function SysmonBar() {
   const { prefs, onPrefsChange } = useShell();
   const { config, update, setTicker } = useWidgetConfig("sysmon", prefs, onPrefsChange);
   return (
+    // Standard bar grammar: Segmented first, content menus left,
+    // config selects in the right cluster (matches clock/weather's
+    // unit-first layout and uptime/github's right-side Refresh).
     <WidgetBar>
-      <StatsMenu ticker={config.ticker} setTicker={setTicker} />
-      <SelectMenu
-        ariaLabel="Update speed"
-        prefix="Every"
-        align="left"
-        value={String(config.refreshInterval)}
-        options={REFRESH_OPTIONS}
-        onChange={(v) => update({ refreshInterval: Number(v) })}
+      <Segmented
+        ariaLabel="Temperature unit"
+        value={config.tempUnit}
+        onChange={(v) => update({ tempUnit: v })}
+        options={TEMP_OPTIONS}
       />
+      <StatsMenu ticker={config.ticker} setTicker={setTicker} />
       <div className="ml-auto">
-        <Segmented
-          ariaLabel="Temperature unit"
-          value={config.tempUnit}
-          onChange={(v) => update({ tempUnit: v })}
-          options={TEMP_OPTIONS}
+        <SelectMenu
+          ariaLabel="Update speed"
+          prefix="Every"
+          value={String(config.refreshInterval)}
+          options={REFRESH_OPTIONS}
+          onChange={(v) => update({ refreshInterval: Number(v) })}
         />
       </div>
     </WidgetBar>

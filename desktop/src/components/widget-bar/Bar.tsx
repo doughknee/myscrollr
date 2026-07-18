@@ -14,6 +14,7 @@
  */
 import { useEffect, useState } from "react";
 import { clsx } from "clsx";
+import { motion } from "motion/react";
 
 /** Sticky control-bar shell with pinned-state elevation. */
 export function WidgetBar({ children }: { children: React.ReactNode }) {
@@ -48,13 +49,26 @@ export function WidgetBar({ children }: { children: React.ReactNode }) {
           corner over the panel curve while scrolled. */}
       <div
         className={clsx(
-          "@container sticky top-0 z-20 -mt-px flex items-center gap-2 rounded-t-xl border-b bg-surface px-3 py-1.5 transition-shadow duration-200",
+          "@container sticky top-0 z-20 -mt-px rounded-t-xl border-b bg-surface px-3 py-1.5 transition-shadow duration-200",
           stuck
             ? "border-edge/50 bg-surface/95 shadow-[0_6px_16px_-8px_rgba(0,0,0,0.35)] backdrop-blur-sm"
             : "border-edge/30",
         )}
       >
-        {children}
+        {/* The bar's contents animate as their OWN layer: on page/source
+            change the shell stays put while controls drop in from above,
+            countering the feed body's rise (PageLayout's +y fade) so bar
+            and feed read as two planes. The transform lives on this inner
+            row — never on the sticky shell (a transform there would break
+            pinning). */}
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.18, ease: [0.22, 0.61, 0.36, 1] }}
+          className="flex items-center gap-2"
+        >
+          {children}
+        </motion.div>
       </div>
     </>
   );

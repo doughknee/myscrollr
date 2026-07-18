@@ -69,7 +69,12 @@ export default memo(function FreshnessPill({
         // h-7 = the bar's one control height (28px: trigger border +
         // py-1 + ui-meta line-height). BarPill carries a transparent
         // border for the same reason — every control sits on one rule.
-        "inline-flex h-7 items-center gap-1 rounded-full px-2.5 font-mono text-ui-chip tabular-nums",
+        // align-top: the bars mount this inside `hidden @xl:block`
+        // spans; as inline content the pill sat on the wrapper's text
+        // BASELINE, growing the wrapper by the descender gap (~3px)
+        // and riding ~1.5px low against its neighbors. vertical-align
+        // is inert in flex parents, so this is safe everywhere.
+        "inline-flex h-7 align-top items-center gap-1 rounded-full px-2.5 font-mono text-ui-chip tabular-nums",
         toneClass,
         className,
       )}

@@ -73,14 +73,16 @@ function UptimeBar() {
   const { config, update } = useWidgetConfig("uptime", prefs, onPrefsChange);
   return (
     <WidgetBar>
-      <SelectMenu
-        ariaLabel="Refresh interval"
-        prefix="Refresh"
-        align="left"
-        value={String(config.pollInterval)}
-        options={POLL_OPTIONS}
-        onChange={(v) => update({ pollInterval: Number(v) })}
-      />
+      {/* Config selects live in the right cluster — standard grammar. */}
+      <div className="ml-auto">
+        <SelectMenu
+          ariaLabel="Refresh interval"
+          prefix="Refresh"
+          value={String(config.pollInterval)}
+          options={POLL_OPTIONS}
+          onChange={(v) => update({ pollInterval: Number(v) })}
+        />
+      </div>
     </WidgetBar>
   );
 }

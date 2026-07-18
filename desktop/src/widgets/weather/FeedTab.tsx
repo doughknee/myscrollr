@@ -131,7 +131,17 @@ function WeatherFeedTab(props: FeedTabProps) {
             onChange={handleUnitChange}
             options={UNIT_OPTIONS}
           />
+          {/* Right-cluster grammar: search → action pills last (same
+              order as fantasy's Account pill). */}
           <div className="ml-auto flex min-w-0 shrink items-center gap-2">
+            <SearchBox
+              inputRef={searchRef}
+              query={cityQuery}
+              onQueryChange={setCityQuery}
+              resultCount={null}
+              ariaLabel="Add city"
+              noun="cities"
+            />
             <Tooltip content="Use my location">
               <span>
                 <BarPill active={false} onClick={detectLocation}>
@@ -142,14 +152,6 @@ function WeatherFeedTab(props: FeedTabProps) {
                 </BarPill>
               </span>
             </Tooltip>
-            <SearchBox
-              inputRef={searchRef}
-              query={cityQuery}
-              onQueryChange={setCityQuery}
-              resultCount={null}
-              ariaLabel="Add city"
-              noun="cities"
-            />
           </div>
         </WidgetBar>
       )}
