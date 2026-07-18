@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Clock } from "lucide-react";
 import { WorldClock } from "./WorldClock";
 import { WidgetBar } from "../../components/widget-bar/Bar";
@@ -6,6 +6,7 @@ import {
   Segmented,
   type SegmentedOption,
 } from "../../components/widget-bar/Segmented";
+import { SearchBox } from "../../components/widget-bar/SearchBox";
 import { useStoreData } from "../../hooks/useStoreData";
 import { LS_CLOCK_FORMAT } from "../../constants";
 import { loadFormat, saveFormat } from "./storage";
@@ -37,9 +38,9 @@ const FORMAT_OPTIONS: SegmentedOption<TimeFormat>[] = [
 ];
 
 function ClockFeedTab({ mode }: FeedTabProps) {
-  // Format lives here (not in the bar or body) because both consume it:
-  // the bar's Segmented writes it, WorldClock renders with it. useStoreData
-  // only relays *cross-window* writes, so in-window siblings would desync.
+  // Format and the add-timezone query live here because the bar writes
+  // them and the body renders from them. useStoreData only relays
+  // *cross-window* writes, so in-window siblings would desync.
   const [format, setFormatState] = useStoreData(LS_CLOCK_FORMAT, loadFormat);
   const handleFormatChange = useCallback(
     (v: TimeFormat) => {
@@ -48,9 +49,12 @@ function ClockFeedTab({ mode }: FeedTabProps) {
     },
     [setFormatState],
   );
+  const [addQuery, setAddQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const comfort = mode === "comfort";
   return (
     <div className="flex min-h-full flex-col">
-      {mode === "comfort" && (
+      {comfort && (
         <WidgetBar>
           <Segmented
             ariaLabel="Time format"
@@ -58,10 +62,25 @@ function ClockFeedTab({ mode }: FeedTabProps) {
             onChange={handleFormatChange}
             options={FORMAT_OPTIONS}
           />
+          <div className="ml-auto">
+            <SearchBox
+              inputRef={searchRef}
+              query={addQuery}
+              onQueryChange={setAddQuery}
+              resultCount={null}
+              ariaLabel="Add time zone"
+              noun="time zones"
+            />
+          </div>
         </WidgetBar>
       )}
       <div className="p-3">
-        <WorldClock compact={mode === "compact"} fmt={format} />
+        <WorldClock
+          compact={mode === "compact"}
+          fmt={format}
+          addQuery={comfort ? addQuery : undefined}
+          onAddQueryChange={comfort ? setAddQuery : undefined}
+        />
       </div>
     </div>
   );

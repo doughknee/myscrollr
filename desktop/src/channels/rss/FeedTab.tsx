@@ -14,7 +14,7 @@
  * FOOTER as content, not chrome.
  */
 import { memo, useMemo, useState, useCallback, useRef } from "react";
-import { Rss, ChevronDown, ChevronUp, Newspaper } from "lucide-react";
+import { Rss, ChevronDown, ChevronUp, Newspaper, CalendarRange } from "lucide-react";
 import { clsx } from "clsx";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -720,7 +720,7 @@ function RssWindowSelect({
   return (
     <SelectMenu
       ariaLabel="Article time window"
-      prefix="Window"
+      icon={CalendarRange}
       value={String(days)}
       options={options}
       onChange={(v) => onPick(Number(v))}

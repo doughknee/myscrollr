@@ -1,14 +1,19 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { TimerReset } from "lucide-react";
-import { Timer } from "./Timer";
+import { Timer, loadTimerState, switchedTimerState } from "./Timer";
 import { WidgetBar } from "../../components/widget-bar/Bar";
 import {
   SelectMenu,
   type SelectOption,
 } from "../../components/widget-bar/SelectMenu";
+import {
+  Segmented,
+  type SegmentedOption,
+} from "../../components/widget-bar/Segmented";
 import { useShell } from "../../shell-context";
 import { useWidgetConfig } from "../../hooks/useWidgetConfig";
 import type { TimerPomodoroConfig } from "../../preferences";
+import type { TimerMode } from "./types";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 
 export const timerWidget: WidgetManifest = {
@@ -45,16 +50,57 @@ const EVERY_OPTIONS: SelectOption<string>[] = [2, 3, 4, 5, 6].map((n) => ({
   label: `${n} sessions`,
 }));
 
+const MODE_OPTIONS: SegmentedOption<TimerMode>[] = [
+  { value: "pomodoro", label: "Pomodoro" },
+  { value: "countdown", label: "Countdown" },
+  { value: "stopwatch", label: "Stopwatch" },
+];
+
 function TimerFeedTab(props: FeedTabProps) {
+  // Timer state lives here so the bar's mode tabs and the Timer body
+  // drive one machine (the bar renders only in comfort mode; compact
+  // keeps its in-body tabs).
+  const [timerState, setTimerState] = useState(loadTimerState);
+  const [confirmSwitch, setConfirmSwitch] = useState<TimerMode | null>(null);
+
+  const requestSwitchMode = useCallback(
+    (m: TimerMode) => {
+      if (m === timerState.mode) return;
+      // Running or partially-elapsed timer: confirm before discarding
+      // (the dialog renders inside the Timer body).
+      if (timerState.startedAt !== null || timerState.bankedMs > 0)
+        setConfirmSwitch(m);
+      else setTimerState((p) => switchedTimerState(p, m));
+    },
+    [timerState.mode, timerState.startedAt, timerState.bankedMs],
+  );
+
   return (
     <div className="flex min-h-full flex-col">
-      {props.mode === "comfort" && <TimerBar />}
-      <TimerFeedBody {...props} />
+      {props.mode === "comfort" && (
+        <TimerBar mode={timerState.mode} onSwitchMode={requestSwitchMode} />
+      )}
+      <div className="p-3">
+        <Timer
+          compact={props.mode === "compact"}
+          state={timerState}
+          setState={setTimerState}
+          confirmSwitch={confirmSwitch}
+          setConfirmSwitch={setConfirmSwitch}
+          onRequestSwitchMode={requestSwitchMode}
+        />
+      </div>
     </div>
   );
 }
 
-function TimerBar() {
+function TimerBar({
+  mode,
+  onSwitchMode,
+}: {
+  mode: TimerMode;
+  onSwitchMode: (m: TimerMode) => void;
+}) {
   const { prefs, onPrefsChange } = useShell();
   const { config, update } = useWidgetConfig("timer", prefs, onPrefsChange);
   const setPomodoro = useCallback(
@@ -65,46 +111,44 @@ function TimerBar() {
   );
   return (
     <WidgetBar>
-      <SelectMenu
-        ariaLabel="Work session length"
-        prefix="Work"
-        align="left"
-        value={String(config.pomodoro.workMins)}
-        options={WORK_OPTIONS}
-        onChange={(v) => setPomodoro({ workMins: Number(v) })}
+      <Segmented
+        ariaLabel="Timer mode"
+        value={mode}
+        onChange={onSwitchMode}
+        options={MODE_OPTIONS}
       />
-      <SelectMenu
-        ariaLabel="Short break length"
-        prefix="Break"
-        align="left"
-        value={String(config.pomodoro.shortBreakMins)}
-        options={SHORT_BREAK_OPTIONS}
-        onChange={(v) => setPomodoro({ shortBreakMins: Number(v) })}
-      />
-      <SelectMenu
-        ariaLabel="Long break length"
-        prefix="Long break"
-        align="left"
-        value={String(config.pomodoro.longBreakMins)}
-        options={LONG_BREAK_OPTIONS}
-        onChange={(v) => setPomodoro({ longBreakMins: Number(v) })}
-      />
-      <SelectMenu
-        ariaLabel="Sessions before a long break"
-        prefix="Every"
-        align="left"
-        value={String(config.pomodoro.longBreakEvery)}
-        options={EVERY_OPTIONS}
-        onChange={(v) => setPomodoro({ longBreakEvery: Number(v) })}
-      />
+      {mode === "pomodoro" && (
+        <div className="ml-auto flex min-w-0 shrink items-center gap-2">
+          <SelectMenu
+            ariaLabel="Work session length"
+            prefix="Work"
+            value={String(config.pomodoro.workMins)}
+            options={WORK_OPTIONS}
+            onChange={(v) => setPomodoro({ workMins: Number(v) })}
+          />
+          <SelectMenu
+            ariaLabel="Short break length"
+            prefix="Break"
+            value={String(config.pomodoro.shortBreakMins)}
+            options={SHORT_BREAK_OPTIONS}
+            onChange={(v) => setPomodoro({ shortBreakMins: Number(v) })}
+          />
+          <SelectMenu
+            ariaLabel="Long break length"
+            prefix="Long break"
+            value={String(config.pomodoro.longBreakMins)}
+            options={LONG_BREAK_OPTIONS}
+            onChange={(v) => setPomodoro({ longBreakMins: Number(v) })}
+          />
+          <SelectMenu
+            ariaLabel="Sessions before a long break"
+            prefix="Every"
+            value={String(config.pomodoro.longBreakEvery)}
+            options={EVERY_OPTIONS}
+            onChange={(v) => setPomodoro({ longBreakEvery: Number(v) })}
+          />
+        </div>
+      )}
     </WidgetBar>
-  );
-}
-
-function TimerFeedBody({ mode }: FeedTabProps) {
-  return (
-    <div className="p-3">
-      <Timer compact={mode === "compact"} />
-    </div>
   );
 }

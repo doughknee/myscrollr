@@ -228,7 +228,7 @@ export function sportsFullQueryOptions() {
 export function sportsTeamsOptions(league: string) {
   return queryOptions({
     queryKey: ["teams", league] as const,
-    queryFn: () => request<{ teams: TeamInfo[] }>(`/sports/teams?league=${encodeURIComponent(league)}`),
+    queryFn: () => authFetch<{ teams: TeamInfo[] }>(`/sports/teams?league=${encodeURIComponent(league)}`),
     staleTime: 24 * 60 * 60 * 1000, // 24 hours — teams change infrequently
     enabled: !!league,
   });
@@ -277,7 +277,7 @@ export function predictionsCandlesticksOptions(ticker: string) {
   return queryOptions({
     queryKey: ["predictions-candlesticks", ticker],
     queryFn: () =>
-      request<PredictionCandlesticksResponse>(
+      authFetch<PredictionCandlesticksResponse>(
         `/predictions/candlesticks/${encodeURIComponent(ticker)}`,
       ),
     staleTime: 5 * 60 * 1000,

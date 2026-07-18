@@ -231,12 +231,24 @@ function ClockCard({
 interface WorldClockProps {
   compact: boolean;
   fmt: TimeFormat;
+  /** Comfort mode: the WidgetBar's SearchBox drives the add-timezone
+   *  picker through these; the in-body "+ Add" toggle only renders when
+   *  they're absent (compact, which has no bar). */
+  addQuery?: string;
+  onAddQueryChange?: (q: string) => void;
 }
 
-export function WorldClock({ compact, fmt }: WorldClockProps) {
+export function WorldClock({
+  compact,
+  fmt,
+  addQuery,
+  onAddQueryChange,
+}: WorldClockProps) {
   const [timezones, setTimezones] = useState(loadTimezones);
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState("");
+  const barDriven = addQuery !== undefined;
+  const effectiveSearch = barDriven ? addQuery : search;
   const [recentlyAdded, setRecentlyAdded] = useState<Set<string>>(new Set());
   const searchRef = useRef<HTMLInputElement>(null);
   const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -270,60 +282,65 @@ export function WorldClock({ compact, fmt }: WorldClockProps) {
       });
     }, 300);
     setSearch("");
-  }, []);
+    onAddQueryChange?.("");
+  }, [onAddQueryChange]);
 
   const allZones = [localTz, ...timezones.filter((tz) => tz !== localTz)];
 
   const available = useMemo(() => {
     const added = new Set(allZones);
     const filtered = TIMEZONE_PRESETS.filter((p) => !added.has(p.tz));
-    if (!search.trim()) return filtered;
-    const q = search.toLowerCase();
+    if (!effectiveSearch.trim()) return filtered;
+    const q = effectiveSearch.toLowerCase();
     return filtered.filter(
       (p) =>
         p.label.toLowerCase().includes(q) ||
         p.region.toLowerCase().includes(q) ||
         p.tz.toLowerCase().includes(q),
     );
-  }, [allZones, search]);
+  }, [allZones, effectiveSearch]);
 
   return (
     <>
-      {/* Controls */}
-      <div className="flex items-center justify-end px-1 mb-1">
-        <button
-          onClick={() => setShowAdd(!showAdd)}
-          className={
-            "text-xs font-mono transition-colors " +
-            (showAdd
-              ? "text-widget-clock"
-              : "text-widget-clock/70 hover:text-widget-clock")
-          }
-        >
-          {showAdd ? "Done" : "+ Add"}
-        </button>
-      </div>
+      {/* Controls — the bar's SearchBox replaces this in comfort mode. */}
+      {!barDriven && (
+        <div className="flex items-center justify-end px-1 mb-1">
+          <button
+            onClick={() => setShowAdd(!showAdd)}
+            className={
+              "text-xs font-mono transition-colors " +
+              (showAdd
+                ? "text-widget-clock"
+                : "text-widget-clock/70 hover:text-widget-clock")
+            }
+          >
+            {showAdd ? "Done" : "+ Add"}
+          </button>
+        </div>
+      )}
 
       {/* Add timezone picker */}
-      {showAdd && (
+      {(barDriven ? addQuery.trim().length > 0 : showAdd) && (
         <div
           className="rounded-lg border border-widget-clock/15 bg-surface-2 overflow-hidden"
           style={{ animation: "widget-card-enter 150ms ease-out" }}
         >
-          <div className="px-3 py-2 border-b border-edge/50">
-            <input
-              ref={searchRef}
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search cities..."
-              className="w-full bg-transparent text-xs font-mono text-fg placeholder:text-fg-3 outline-none"
-            />
-          </div>
+          {!barDriven && (
+            <div className="px-3 py-2 border-b border-edge/50">
+              <input
+                ref={searchRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search cities..."
+                className="w-full bg-transparent text-xs font-mono text-fg placeholder:text-fg-3 outline-none"
+              />
+            </div>
+          )}
           <div className="max-h-44 overflow-y-auto scrollbar-thin">
             {available.length === 0 ? (
               <div className="px-3 py-3 text-center text-xs font-mono text-fg-3">
-                {search ? "No matching cities" : "All timezones added"}
+                {effectiveSearch ? "No matching cities" : "All timezones added"}
               </div>
             ) : (
               available.map((preset) => (

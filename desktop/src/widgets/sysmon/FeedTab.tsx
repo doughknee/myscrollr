@@ -17,7 +17,7 @@ import { useShell } from "../../shell-context";
 import { useWidgetConfig } from "../../hooks/useWidgetConfig";
 import type { SysmonTickerConfig, TempUnit } from "../../preferences";
 import { useSysmonData } from "../../hooks/useSysmonData";
-import { formatBytes, formatUptime } from "../../utils/format";
+import { formatBytes, formatTemp, formatUptime } from "../../utils/format";
 import { findCpuTemp, findGpuTemp, usageColor, usageColorClass, tempColorClass, formatFreq, formatWatts, formatRate } from "./utils";
 import type { TempReading } from "./utils";
 
@@ -171,6 +171,7 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
   // under `ticker` for storage compatibility.)
   const { prefs } = useShell();
   const stats = prefs.widgets.sysmon.ticker;
+  const tempUnit = prefs.widgets.sysmon.tempUnit;
 
   // ── Loading state ───────────────────────────────────────────
   if (!info) {
@@ -245,7 +246,7 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
                   <span
                     className={`text-sm font-mono font-semibold tabular-nums ${tempColorClass(gpuTemp.temp, gpuTemp.critical)}`}
                   >
-                    {Math.round(gpuTemp.temp)}&deg;
+                    {formatTemp(gpuTemp.temp, tempUnit)}
                   </span>
                 ) : null}
               </div>
@@ -330,7 +331,7 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
                   <DetailLine
                     items={[
                       info.cpuFreqMhz !== null ? formatFreq(info.cpuFreqMhz) : null,
-                      cpuTemp ? `${Math.round(cpuTemp.temp)}°C` : null,
+                      cpuTemp ? formatTemp(cpuTemp.temp, tempUnit, true) : null,
                     ]}
                   />
                 </>
@@ -398,7 +399,7 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
                           stats.gpuPower && info.gpuPowerWatts !== null
                             ? formatWatts(info.gpuPowerWatts)
                             : null,
-                          gpuTemp ? `${Math.round(gpuTemp.temp)}°C` : null,
+                          gpuTemp ? formatTemp(gpuTemp.temp, tempUnit, true) : null,
                         ]}
                       />
                       {info.gpuVramTotal !== null && info.gpuVramUsed !== null && (
@@ -412,7 +413,7 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
                     <div
                       className={`text-xl font-mono font-bold tabular-nums ${tempColorClass(gpuTemp.temp, gpuTemp.critical)}`}
                     >
-                      {Math.round(gpuTemp.temp)}&deg;C
+                      {formatTemp(gpuTemp.temp, tempUnit, true)}
                     </div>
                   ) : (
                     <div className="text-xs font-mono text-fg-4">No GPU detected</div>

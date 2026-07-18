@@ -14,7 +14,7 @@
  * and coarse `sports` rows can't exist post-migration-000014.
  */
 import { useState, useMemo, useRef, useCallback } from "react";
-import { Trophy } from "lucide-react";
+import { Trophy, CalendarRange } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { sportsFullQueryOptions, sportsTeamsOptions } from "../../api/queries";
 import type { TeamInfo } from "../../api/queries";
@@ -386,7 +386,7 @@ function SportsBarControls({
       />
       <SelectMenu
         ariaLabel="Time window"
-        prefix="Window"
+        icon={CalendarRange}
         value={windowValue}
         options={windowOptions}
         onChange={(v) => {

@@ -6,7 +6,7 @@
 import { useCallback, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { AnimatePresence } from "motion/react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, type LucideIcon } from "lucide-react";
 import { MenuPanel, MenuRow, useDismiss } from "./Menu";
 
 export interface SelectOption<T extends string> {
@@ -22,6 +22,7 @@ export function SelectMenu<T extends string>({
   onChange,
   ariaLabel,
   prefix,
+  icon: Icon,
   align = "right",
 }: {
   value: T;
@@ -30,6 +31,9 @@ export function SelectMenu<T extends string>({
   ariaLabel: string;
   /** Optional quiet label prefix on the trigger (e.g. "Sort"). */
   prefix?: string;
+  /** Optional quiet icon before the value — a glyph in place of (or
+   *  alongside) the text prefix, e.g. CalendarRange for time windows. */
+  icon?: LucideIcon;
   /** Which trigger edge the panel hangs from — use "left" for triggers
    *  in the bar's left cluster so the panel opens into the page. */
   align?: "left" | "right";
@@ -58,6 +62,7 @@ export function SelectMenu<T extends string>({
             : "border-edge/30 bg-base-150/60 text-fg-3 hover:text-fg-2",
         )}
       >
+        {Icon && <Icon size={12} aria-hidden className="shrink-0 text-fg-4" />}
         {prefix && <span className="shrink-0 text-fg-4">{prefix}</span>}
         <span className="truncate">{current?.label ?? value}</span>
         <ChevronDown

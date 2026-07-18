@@ -82,7 +82,9 @@ export function BarPill({
       type="button"
       onClick={onClick}
       className={clsx(
-        "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-ui-meta font-medium transition-colors cursor-pointer",
+        // border-transparent matches the bordered triggers' 28px outer
+        // height so pills and menus sit on one optical rule.
+        "inline-flex shrink-0 items-center gap-1 rounded-full border border-transparent px-2.5 py-1 text-ui-meta font-medium transition-colors cursor-pointer",
         active
           ? "bg-accent/15 text-accent"
           : "text-fg-3 hover:bg-surface-hover hover:text-fg-2",

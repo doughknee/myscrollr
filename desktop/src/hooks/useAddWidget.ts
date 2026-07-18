@@ -123,6 +123,15 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
               queryKey: queryKeys.dashboard,
               refetchType: "active",
             });
+            // The sports channel page reads /sports (["sports","full"]),
+            // not /dashboard — without this the mounted MLS/NFL feed
+            // keeps its pre-create empty payload indefinitely (no
+            // refetch trigger ever fires in a single always-focused
+            // Tauri window).
+            queryClient.invalidateQueries({
+              queryKey: ["sports", "full"],
+              refetchType: "active",
+            });
           })
           .catch((err) => {
             // Roll back the optimistic insert.

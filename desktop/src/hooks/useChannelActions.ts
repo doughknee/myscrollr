@@ -50,6 +50,10 @@ export function useChannelActions(): ChannelActions {
       try {
         await channelsApi.create(channelType);
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+        // The sports channel page reads /sports (["sports","full"]), not
+        // /dashboard — same lesson as the v1.1.0 "empty until Configure"
+        // bug: invalidate it or the mounted feed never refetches.
+        queryClient.invalidateQueries({ queryKey: ["sports", "full"] });
         navigate({
           to: "/channel/$type",
           params: { type: channelType },
@@ -68,6 +72,7 @@ export function useChannelActions(): ChannelActions {
       try {
         await channelsApi.delete(channelType);
         await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+        queryClient.invalidateQueries({ queryKey: ["sports", "full"] });
         // Sidebar now derives from dashboard.channels (filtered to
         // enabled), so no preference cleanup is needed here — the
         // dashboard refetch above triggers the sidebar update.
