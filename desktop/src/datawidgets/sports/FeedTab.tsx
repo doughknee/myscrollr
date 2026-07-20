@@ -45,7 +45,7 @@ import type { FavoriteTeam } from "../../hooks/useSportsConfig";
 
 // ── DataWidgetRow manifest ─────────────────────────────────────────────
 
-export const sportsChannel: DataWidgetManifest = {
+export const sportsDataWidget: DataWidgetManifest = {
   id: "sports",
   name: "Sports",
   tabLabel: "Sports",

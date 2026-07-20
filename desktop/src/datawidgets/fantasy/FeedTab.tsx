@@ -51,12 +51,12 @@ import type { FeedTabProps, DataWidgetManifest } from "../../types";
 import type { FantasySubTab } from "../../preferences";
 import type { LeagueResponse, MyLeaguesResponse } from "./types";
 
-/** DataWidgetRow accent — kept in sync with `fantasyChannel.hex`. */
+/** DataWidgetRow accent — kept in sync with `fantasyDataWidget.hex`. */
 const FANTASY_HEX = "#6366f1";
 
 // ── DataWidgetRow manifest ─────────────────────────────────────────────
 
-export const fantasyChannel: DataWidgetManifest = {
+export const fantasyDataWidget: DataWidgetManifest = {
   id: "fantasy",
   name: "Fantasy",
   tabLabel: "Fantasy",

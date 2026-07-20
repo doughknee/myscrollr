@@ -218,7 +218,7 @@ function RootLayout() {
 
   const channels: DataWidgetRow[] = useMemo(() => dashboard?.channels ?? [], [dashboard]);
 
-  // Filter to enabled channels only — Sidebar handles sorting by CHANNEL_ORDER
+  // Filter to enabled widgets only — Sidebar handles sorting by DATA_WIDGET_ORDER
   const enabledDataWidgets = useMemo(
     () => channels.filter((ch) => ch.enabled),
     [channels],

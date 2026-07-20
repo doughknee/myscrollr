@@ -34,7 +34,7 @@ import {
   migrateFinanceDisplay,
   type AppPreferences,
 } from "../../../preferences";
-import { financeChannel } from "../FeedTab";
+import { financeDataWidget } from "../FeedTab";
 import type { DataWidgetType } from "../../../api/client";
 import type { FeedTabProps, Trade } from "../../../types";
 
@@ -152,7 +152,7 @@ function main(): void {
     __refreshing: false,
   } as FeedTabProps["feedContext"];
 
-  const FeedTab = financeChannel.FeedTab;
+  const FeedTab = financeDataWidget.FeedTab;
 
   function Harness() {
     const [prefs, setPrefs] = useState<AppPreferences>(initialPrefs);

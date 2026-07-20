@@ -25,7 +25,7 @@ import {
   migratePredictionsDisplay,
   type AppPreferences,
 } from "../../../preferences";
-import { predictionsChannel } from "../FeedTab";
+import { predictionsDataWidget } from "../FeedTab";
 import type { FeedTabProps, Prediction } from "../../../types";
 // Static snapshot of the local predictions API (:8085 has no CORS; the
 // fixture keeps screenshots deterministic anyway). Refresh with:
@@ -259,7 +259,7 @@ function main(): void {
     __refreshing: false,
   } as FeedTabProps["feedContext"];
 
-  const FeedTab = predictionsChannel.FeedTab;
+  const FeedTab = predictionsDataWidget.FeedTab;
 
   // Prefs are STATE so the in-widget bar's writes re-render the
   // feed like the real shell (persistence itself is Tauri-only).
