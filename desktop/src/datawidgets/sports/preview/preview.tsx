@@ -26,7 +26,7 @@ import {
   type TeamInfo,
 } from "../../../api/queries";
 import type { AppPreferences } from "../../../preferences";
-import { sportsChannel } from "../FeedTab";
+import { sportsDataWidget } from "../FeedTab";
 import type { DataWidgetRow, DataWidgetType } from "../../../api/client";
 import type { FeedTabProps, Game } from "../../../types";
 
@@ -159,7 +159,7 @@ function main(): void {
     __refreshing: false,
   } as FeedTabProps["feedContext"];
 
-  const FeedTab = sportsChannel.FeedTab;
+  const FeedTab = sportsDataWidget.FeedTab;
 
   function Harness() {
     const [prefs, setPrefs] = useState<AppPreferences>(initialPrefs);

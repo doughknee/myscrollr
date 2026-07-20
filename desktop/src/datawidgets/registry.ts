@@ -1,8 +1,8 @@
 /**
- * Desktop-local channel registry.
+ * Desktop-local data-widget registry.
  *
- * Discovers channel FeedTab components at build time from this
- * directory. Each channel module exports a named `{id}DataWidgetRow`
+ * Discovers data-widget FeedTab components at build time from this
+ * directory. Each module exports a named `{id}DataWidget` manifest
  * conforming to DataWidgetManifest.
  */
 import { createRegistry } from "../lib/createRegistry";
@@ -18,11 +18,11 @@ const { get, getAll, ORDER } = createRegistry<DataWidgetManifest>(
   ["finance", "sports", "fantasy", "rss", "predictions"],
 );
 
-/** Look up a channel by id. */
+/** Look up a data widget by id. */
 export const getDataWidget = get;
 
-/** Get all registered channels in canonical order. */
+/** Get all registered data widgets in canonical order. */
 export const getAllDataWidgets = getAll;
 
-/** Canonical display order for channel tabs. */
-export const CHANNEL_ORDER = ORDER;
+/** Canonical display order for data-widget tabs. */
+export const DATA_WIDGET_ORDER = ORDER;

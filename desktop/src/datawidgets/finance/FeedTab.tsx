@@ -45,7 +45,7 @@ import type { FinanceDisplayPrefs } from "../../preferences";
 
 // ── DataWidgetRow manifest ─────────────────────────────────────────────
 
-export const financeChannel: DataWidgetManifest = {
+export const financeDataWidget: DataWidgetManifest = {
   id: "finance",
   name: "Finance",
   tabLabel: "Finance",

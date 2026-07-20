@@ -55,7 +55,7 @@ import { AnimatePresence } from "motion/react";
 
 // ── DataWidgetRow manifest ─────────────────────────────────────────────
 
-export const rssChannel: DataWidgetManifest = {
+export const rssDataWidget: DataWidgetManifest = {
   id: "rss",
   name: "News",
   tabLabel: "News",

@@ -100,7 +100,7 @@ import type { PredictionsDisplayPrefs } from "../../preferences";
 
 // ── DataWidgetRow manifest ─────────────────────────────────────────────
 
-export const predictionsChannel: DataWidgetManifest = {
+export const predictionsDataWidget: DataWidgetManifest = {
   id: "predictions",
   name: "Predictions",
   tabLabel: "Predict",
@@ -127,7 +127,7 @@ export const predictionsChannel: DataWidgetManifest = {
 const PAGE_SIZE = 20;
 const LOAD_MORE_INCREMENT = 20;
 
-/** DataWidgetRow accent — kept in sync with `predictionsChannel.hex` and the
+/** DataWidgetRow accent — kept in sync with `predictionsDataWidget.hex` and the
  *  marketplace catalog color (v1.1.5 unified the old indigo/teal split). */
 const PREDICTIONS_HEX = "#1fc9a0";
 

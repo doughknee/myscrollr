@@ -17,7 +17,7 @@ import "../../../style.css";
 import { ShellContext, type ShellState } from "../../../shell-context";
 import { dashboardQueryOptions, rssCatalogOptions } from "../../../api/queries";
 import { migrateRssDisplay, type AppPreferences } from "../../../preferences";
-import { rssChannel } from "../FeedTab";
+import { rssDataWidget } from "../FeedTab";
 import type { DataWidgetType, TrackedFeed } from "../../../api/client";
 import type { FeedTabProps, RssItem } from "../../../types";
 
@@ -147,7 +147,7 @@ function main(): void {
     __refreshing: false,
   } as FeedTabProps["feedContext"];
 
-  const FeedTab = rssChannel.FeedTab;
+  const FeedTab = rssDataWidget.FeedTab;
 
   function Harness() {
     const [prefs, setPrefs] = useState<AppPreferences>(initialPrefs);
