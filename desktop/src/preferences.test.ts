@@ -162,32 +162,30 @@ describe("enumToBools / boolsToEnum (DisplayLocationGrid adapter)", () => {
   });
 });
 
-describe("REL-40 channelDisplay -> widgetDisplay key migration", () => {
-  it("reads display prefs stored under the legacy channelDisplay key", () => {
+describe("widgetDisplay prefs", () => {
+  // The REL-40 back-compat read of the legacy `channelDisplay` key is gone.
+  // It existed to carry settings written by clients ≤ v1.1.9; with no users
+  // to carry, keeping it would be exactly the compat debt this rename set
+  // out to avoid. An unknown key is simply ignored and defaults apply.
+  it("reads display prefs from widgetDisplay", () => {
     storeValues.set("scrollr:settings", {
       appearance: {},
-      channelDisplay: {
-        finance: { defaultSort: "change" },
-      },
-    });
-
-    const prefs = loadPrefs();
-
-    // Released (≤ v1.1.9) clients persisted under channelDisplay; the
-    // loader must fold it into widgetDisplay so nothing is lost.
-    expect(prefs.widgetDisplay.finance.defaultSort).toBe("change");
-  });
-
-  it("prefers the new widgetDisplay key when both exist", () => {
-    storeValues.set("scrollr:settings", {
-      appearance: {},
-      channelDisplay: { finance: { defaultSort: "alpha" } },
       widgetDisplay: { finance: { defaultSort: "price" } },
     });
 
-    const prefs = loadPrefs();
+    expect(loadPrefs().widgetDisplay.finance.defaultSort).toBe("price");
+  });
 
-    expect(prefs.widgetDisplay.finance.defaultSort).toBe("price");
+  it("ignores the retired channelDisplay key and falls back to defaults", () => {
+    // "change" specifically because it is NOT the default — asserting
+    // against the default value would pass whether or not the legacy key
+    // was read.
+    storeValues.set("scrollr:settings", {
+      appearance: {},
+      channelDisplay: { finance: { defaultSort: "change" } },
+    });
+
+    expect(loadPrefs().widgetDisplay.finance.defaultSort).not.toBe("change");
   });
 });
 

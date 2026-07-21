@@ -212,7 +212,7 @@ var supportForumTagSpecs = []supportForumTagSpec{
 	{"feedback", "💬"},
 	{"billing", "💳"},
 	{"account", "👤"},
-	{"channel", "📡"},
+	{"widget", "📡"},
 }
 
 // tagIDByName caches the resolved tag IDs after ensureSupportForumTags

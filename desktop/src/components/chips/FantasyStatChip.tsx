@@ -76,7 +76,7 @@ export default function FantasyStatChip({
   league,
   prefs,
   comfort,
-  colorMode = "channel",
+  colorMode = "widget",
   onClick,
 }: FantasyStatChipProps) {
   const c = getChipColors(colorMode, "fantasy");

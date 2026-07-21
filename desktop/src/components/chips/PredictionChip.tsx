@@ -32,7 +32,7 @@ const PredictionChip = memo(
   function PredictionChip({
     prediction: p,
     comfort,
-    colorMode = "channel",
+    colorMode = "widget",
     showDelta = true,
     showCategory = true,
     showVolume = true,

@@ -82,7 +82,7 @@ export default function FollowedPlayerChip({
   leagues,
   leagueKey,
   comfort,
-  colorMode = "channel",
+  colorMode = "widget",
   accent,
   onClick,
 }: FollowedPlayerChipProps) {

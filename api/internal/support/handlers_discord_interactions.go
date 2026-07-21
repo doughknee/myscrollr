@@ -821,7 +821,7 @@ func handleDiscordTicketCommand(c *fiber.Ctx, ix *discordInteraction) error {
 	const q = `
 		SELECT id, ticket_number, user_email, user_name, original_subject,
 			   user_message_html, draft_body_html, ai_summary, ai_category,
-			   ai_priority, ai_channel, ai_duplicate_of, ai_confidence, status,
+			   ai_priority, ai_widget, ai_duplicate_of, ai_confidence, status,
 			   edited_body_html, decided_at, sent_at, created_at, should_close
 		FROM support_drafts
 		WHERE ticket_number = $1
@@ -829,10 +829,10 @@ func handleDiscordTicketCommand(c *fiber.Ctx, ix *discordInteraction) error {
 		LIMIT 1
 	`
 	var d SupportDraft
-	var userName, userMsg, summary, category, priority, channel, dupOf, confidence, editedBody *string
+	var userName, userMsg, summary, category, priority, widget, dupOf, confidence, editedBody *string
 	err := platform.DBPool.QueryRow(ctx, q, ticketNumber).Scan(
 		&d.ID, &d.TicketNumber, &d.UserEmail, &userName, &d.OriginalSubject,
-		&userMsg, &d.DraftBodyHTML, &summary, &category, &priority, &channel,
+		&userMsg, &d.DraftBodyHTML, &summary, &category, &priority, &widget,
 		&dupOf, &confidence, &d.Status, &editedBody,
 		&d.DecidedAt, &d.SentAt, &d.CreatedAt, &d.ShouldClose,
 	)
@@ -860,8 +860,8 @@ func handleDiscordTicketCommand(c *fiber.Ctx, ix *discordInteraction) error {
 	if priority != nil {
 		d.AIPriority = *priority
 	}
-	if channel != nil {
-		d.AIChannel = *channel
+	if widget != nil {
+		d.AIWidget = *widget
 	}
 	if dupOf != nil {
 		d.AIDuplicateOf = *dupOf

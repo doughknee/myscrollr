@@ -32,7 +32,7 @@ type SupportTicketRequest struct {
 	Attachments      []TicketAttachment     `json:"attachments,omitempty"`
 	Email            string                 `json:"email,omitempty"`
 	Name             string                 `json:"name,omitempty"`
-	Channel          string                 `json:"channel,omitempty"`
+	Widget           string                 `json:"widget,omitempty"`
 }
 
 type TicketAttachment struct {
@@ -162,12 +162,12 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 		subjectPrefix = "Billing: "
 	case "account":
 		subjectPrefix = "Account: "
-	case "channel":
-		ch := strings.TrimSpace(req.Channel)
-		if ch != "" {
-			subjectPrefix = fmt.Sprintf("Channel Help (%s): ", ch)
+	case "widget":
+		w := strings.TrimSpace(req.Widget)
+		if w != "" {
+			subjectPrefix = fmt.Sprintf("Widget Help (%s): ", w)
 		} else {
-			subjectPrefix = "Channel Help: "
+			subjectPrefix = "Widget Help: "
 		}
 	default:
 		subjectPrefix = "Bug Report: "
@@ -203,12 +203,12 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 	case "account":
 		body.WriteString("<h3>Account &amp; Login</h3>")
 		body.WriteString(fmt.Sprintf("<p>%s</p>", escapeHTML(req.Description)))
-	case "channel":
-		ch := strings.TrimSpace(req.Channel)
-		if ch != "" {
-			body.WriteString(fmt.Sprintf("<h3>Channel Help — %s</h3>", escapeHTML(ch)))
+	case "widget":
+		w := strings.TrimSpace(req.Widget)
+		if w != "" {
+			body.WriteString(fmt.Sprintf("<h3>Widget Help — %s</h3>", escapeHTML(w)))
 		} else {
-			body.WriteString("<h3>Channel Help</h3>")
+			body.WriteString("<h3>Widget Help</h3>")
 		}
 		body.WriteString(fmt.Sprintf("<p>%s</p>", escapeHTML(req.Description)))
 	default:
@@ -248,7 +248,7 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 		Subject:         subject,
 		Body:            originalBody,
 		RecentSummaries: recentSummaries,
-		Channel:         req.Channel,
+		Widget:          req.Widget,
 	})
 
 	// Resolve effective category — use AI's pick only on high confidence.
@@ -390,7 +390,7 @@ func persistTriageSideEffects(ticketNumber, userEmail, userName, subject, origin
 			AISummary:       triage.Summary,
 			AICategory:      triage.Category,
 			AIPriority:      triage.Priority,
-			AIChannel:       triage.Channel,
+			AIWidget:        triage.Widget,
 			AIDuplicateOf:   triage.DuplicateOf,
 			AIConfidence:    triage.Confidence,
 			ShouldClose:     triage.ShouldClose,

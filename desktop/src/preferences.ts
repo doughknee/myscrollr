@@ -81,7 +81,7 @@ export type TickerGap = "tight" | "normal" | "spacious";
 export type TickerMode = "compact" | "comfort";
 type DefaultView = "feed" | "dashboard" | "last";
 export type MixMode = "grouped" | "weave";
-export type ChipColorMode = "channel" | "accent" | "muted";
+export type ChipColorMode = "widget" | "accent" | "muted";
 export type TickerDirection = "left" | "right";
 export type ScrollMode = "continuous" | "step" | "flip";
 export type PinSide = "left" | "right";
@@ -561,7 +561,7 @@ const DEFAULT_TICKER: TickerPrefs = {
   tickerGap: "tight",
   tickerMode: "comfort",
   mixMode: "weave",
-  chipColors: "channel",
+  chipColors: "widget",
   tickerDirection: "left",
   scrollMode: "continuous",
   stepPause: 5,
@@ -1216,12 +1216,7 @@ export function loadPrefs(): AppPreferences {
     const source = isV1 ? migrateV1(saved) : (saved as Partial<AppPreferences>);
 
     // Deep merge with defaults so new keys are always present.
-    // REL-40 rename migration: released clients (≤ v1.1.9) persisted
-    // these prefs under "channelDisplay" — read the legacy key when the
-    // new one is absent so nobody loses their display settings. Writes
-    // always use the new key, so this self-heals on first save.
-    const savedDisplay = (source.widgetDisplay ??
-      (source as Record<string, unknown>).channelDisplay) as
+    const savedDisplay = source.widgetDisplay as
       | Partial<WidgetDisplayPrefs>
       | undefined;
     const layoutResult = migrateTickerLayout(

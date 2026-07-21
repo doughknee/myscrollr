@@ -42,7 +42,7 @@ type SupportDraft struct {
 	AISummary             string
 	AICategory            string
 	AIPriority            string
-	AIChannel             string
+	AIWidget              string
 	AIDuplicateOf         string
 	AIConfidence          string
 	Status                string
@@ -71,7 +71,7 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 			(ticket_number, user_email, user_name, original_subject,
 			 user_message_html,
 			 draft_body_html, ai_summary, ai_category, ai_priority,
-			 ai_channel, ai_duplicate_of, ai_confidence, status,
+			 ai_widget, ai_duplicate_of, ai_confidence, status,
 			 osticket_thread_entry_id, should_close)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',$13,$14)
 		RETURNING id, created_at
@@ -100,7 +100,7 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 		draft.AISummary,
 		draft.AICategory,
 		draft.AIPriority,
-		draft.AIChannel,
+		draft.AIWidget,
 		draft.AIDuplicateOf,
 		draft.AIConfidence,
 		entryID,
@@ -121,17 +121,17 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 		SELECT id, ticket_number, user_email, user_name, original_subject,
 			   user_message_html,
 			   draft_body_html, ai_summary, ai_category, ai_priority,
-			   ai_channel, ai_duplicate_of, ai_confidence, status,
+			   ai_widget, ai_duplicate_of, ai_confidence, status,
 			   edited_body_html, decided_at, sent_at, created_at,
 			   should_close
 		FROM support_drafts WHERE id = $1
 	`
 	var d SupportDraft
-	var userName, userMsg, summary, category, priority, channel, dupOf, confidence, editedBody *string
+	var userName, userMsg, summary, category, priority, widget, dupOf, confidence, editedBody *string
 	err := platform.DBPool.QueryRow(ctx, q, id).Scan(
 		&d.ID, &d.TicketNumber, &d.UserEmail, &userName, &d.OriginalSubject,
 		&userMsg,
-		&d.DraftBodyHTML, &summary, &category, &priority, &channel,
+		&d.DraftBodyHTML, &summary, &category, &priority, &widget,
 		&dupOf, &confidence, &d.Status,
 		&editedBody, &d.DecidedAt, &d.SentAt, &d.CreatedAt,
 		&d.ShouldClose,
@@ -157,8 +157,8 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 	if priority != nil {
 		d.AIPriority = *priority
 	}
-	if channel != nil {
-		d.AIChannel = *channel
+	if widget != nil {
+		d.AIWidget = *widget
 	}
 	if dupOf != nil {
 		d.AIDuplicateOf = *dupOf

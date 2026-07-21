@@ -16,7 +16,7 @@ interface RssChipProps {
   onClick?: () => void;
 }
 
-const RssChip = memo(function RssChip({ item, comfort, colorMode = "channel", showSource = true, showTimestamps = true, onClick }: RssChipProps) {
+const RssChip = memo(function RssChip({ item, comfort, colorMode = "widget", showSource = true, showTimestamps = true, onClick }: RssChipProps) {
   const c = getChipColors(colorMode, "rss");
   const maxLen = comfort ? 60 : 40;
   const headline = truncate(item.title, maxLen);

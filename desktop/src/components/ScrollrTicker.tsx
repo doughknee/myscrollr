@@ -147,7 +147,7 @@ export default function ScrollrTicker({
   pauseOnHover = true,
   hoverSpeed = 0.3,
   mixMode = "grouped",
-  chipColorMode = "channel",
+  chipColorMode = "widget",
   widgetDisplay,
   comfort = false,
   rowIndex = 0,
