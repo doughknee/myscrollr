@@ -2,7 +2,8 @@
  * Widget route — THE source page. Every widget renders here (REL-49):
  * data widgets (finance_stocks, sports_nfl, news_bbc, predictions, …)
  * and local utilities (clock, weather, sysmon, uptime, github, timer).
- * /channel/$type is a redirect shim onto this route.
+ * The one route for every widget — /channel/$type was retired with the
+ * rest of the "channel" vocabulary.
  *
  * One route for every source means every swap is a same-route swap —
  * PageLayout stays mounted and the full stableChrome choreography

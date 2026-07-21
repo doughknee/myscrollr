@@ -801,7 +801,9 @@ export default function App() {
           text: "Customize Ticker",
           action: () => {
             invoke("show_app_window").catch(() => {});
-            setStore("scrollr:navigate", "/ticker");
+            // /ticker merged into /customize (its default tab); the
+            // redirect shim that used to cover this is gone.
+            setStore("scrollr:navigate", "/customize");
           },
         }),
       );

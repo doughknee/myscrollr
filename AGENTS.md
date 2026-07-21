@@ -10,10 +10,10 @@ MyScrollr aggregates financial market data, sports scores, RSS feeds, and Yahoo 
 
 Monorepo — each component is independently deployable with its own dependencies:
 
-- `api/` — Core gateway API (Go 1.25, Fiber v2, sub-package `core/`)
+- `api/` — Core API (Go 1.25, Fiber v2). Internal packages under `api/internal/`; `api/core` wires them into one binary
 - `myscrollr.com/` — Marketing website + auth/billing (React 19, Vite 7, TanStack Router, Tailwind v4)
 - `desktop/` — Tauri v2 desktop app (React 19, Vite 7, TanStack Router + Query, Tailwind v4, Rust backend) — **primary product**
-- The finance, sports, rss, and predictions Go APIs were folded into `api/core/{finance,sports,rss,predictions}.go` (ADR-0002); fantasy is the one remaining channel Go API
+- The finance, sports, rss, and predictions Go APIs were folded into `api/internal/ingestread/` (ADR-0002); fantasy is the one remaining discovered channel service
 - `channels/{finance,sports,rss,predictions}/service/` — Rust ingestion services (independent crates, edition 2024; predictions holds the Kalshi credentials and WS sweep)
 - `channels/fantasy/api/` — Fantasy Go API (Yahoo OAuth2, Go-native sync, no Rust service)
 
@@ -57,15 +57,15 @@ cargo build --release && cargo run   # finance=3001, sports=3002, rss=3004, pred
 - **Go**: All: `go test ./...`. File: `go test ./path/to/pkg`. Single: `go test -run TestName ./path/to/pkg`.
 - **Rust**: All: `cargo test`. Single: `cargo test test_name`.
 
-Go integration tests in `api/core` (GDPR purge cascade, Stripe webhook idempotency) need a real Postgres and gate on `TEST_DATABASE_URL` — they skip when it's unset, so plain `go test ./...` always works without a database. To run them locally, point the variable at a scratch database (the tests apply the repo's migrations and truncate the tables they touch — never use a database with real data):
+Go integration tests (GDPR purge cascade, Stripe webhook idempotency, fantasy's schema contract) need a real Postgres and gate on `TEST_DATABASE_URL` — they skip when it's unset, so plain `go test ./...` always works without a database. To run them locally, point the variable at a scratch database (the tests apply the repo's migrations and truncate the tables they touch — never use a database with real data):
 
 ```sh
-TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/scrollr_test?sslmode=disable" go test ./core
+TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/scrollr_test?sslmode=disable" go test ./...
 ```
 
 ### CI
 
-- `.github/workflows/backend-tests.yml` — Go + Rust tests on every push/PR touching `api/` or `channels/`. The Go jobs get a Postgres 16 service container with `TEST_DATABASE_URL` set, so the `api/core` integration tests run for real in CI.
+- `.github/workflows/backend-tests.yml` — Go + Rust tests on every push/PR touching `api/` or `channels/`. The Go jobs get a Postgres 16 service container with `TEST_DATABASE_URL` set, so the api integration tests run for real in CI.
 - `.github/workflows/frontend-tests.yml` — Vitest suites for `myscrollr.com/` and `desktop/` on every push/PR touching them.
 - `.github/workflows/desktop-release.yml` — desktop releases. Triggers on push to `main` when `desktop/` changes, or via `workflow_dispatch`. Builds Linux/macOS/Windows via `tauri-action`. Node 22, stable Rust, `npm ci`.
 - `.github/workflows/deploy.yml` — builds and deploys the API, channels, and website to production on push to `main`.
@@ -120,12 +120,12 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 - `gofmt` formatting. No custom linter. Go 1.25 across all modules.
 - All use Fiber v2, pgx v5, go-redis v9.
 - Two Go modules: `api/` (core, incl. the folded widget sources) and `channels/fantasy/api/`. No shared packages between them — fantasy keeps the HTTP-only contract (ADR-0002 retired the old five-module duplication rule).
-- Core API: `core/` sub-package, package-level vars (`DBPool`, `Rdb`), `Server` struct. Widget sources register in `localSources` (`api/core/sources.go`).
+- Core API: internal packages under `api/internal/` (`platform`, `events`, `widgets`, `ingestread`, `accounts`, `billing`, `support`) wired by `api/core`. One binary. `platform` is the leaf — package-level `DBPool`/`Rdb` live there; `core` is the only package that imports everything. Widget sources register in `LocalSources` (`api/internal/ingestread/sources.go`).
 - Fantasy API: flat `main` package, `App` struct holding deps (`db *pgxpool.Pool`, `rdb *redis.Client`).
 - Naming: PascalCase exports, camelCase unexported, short receivers (`s *Server`, `a *App`), `snake_case` JSON tags. Constants are PascalCase, grouped with `=====` comment separators.
 - Error handling: `if err != nil` returns. `fmt.Errorf("context: %w", err)` wrapping. `log.Printf("[Context] message: %v", err)` with bracketed prefixes. `log.Fatalf` for startup failures. HTTP errors via `ErrorResponse` struct.
 - Registration: fantasy self-registers in Redis with 30s TTL, 20s heartbeat.
-- **Keep `api/core/extension_auth.go` and `/extension/token` routes** — the desktop app uses these for PKCE auth despite the legacy naming.
+- **Keep `api/internal/accounts/extension_auth.go` and `/extension/token` routes** — the desktop app uses these for PKCE auth despite the legacy naming.
 
 ## Code Style — Rust
 
@@ -149,7 +149,7 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 
 (Reshaped by [ADR-0002](docs/adr/0002-consolidate-widget-read-apis.md), July 2026.)
 
-1. **Widget read APIs live in core.** Finance, sports, rss, and predictions are served natively by `api/core/{finance,sports,rss,predictions}.go` behind the `localSource` seam (`api/core/sources.go`): native routes registered ahead of the dynamic proxy, plus in-process dashboard/health/lifecycle hooks. Adding a data source = a Go package in core + (usually) a Rust ingester.
+1. **Widget read APIs live in core.** Finance, sports, rss, and predictions are served natively from `api/internal/ingestread/` behind the `localSource` seam (`sources.go`): native routes registered ahead of the dynamic proxy, plus in-process dashboard/health/lifecycle hooks. Adding a data source = a file in `ingestread` + a catalog entry + (usually) a Rust ingester. See `api/CHANNELS.md`.
 2. **Ingestion is isolated.** Each source's poller is a separate Rust service with its own schedule, quota blast radius, and rollout cadence (fantasy ingests in-process in Go). Core reaches ingesters only via `INTERNAL_{SOURCE}_URL` health probes, plus the predictions candlesticks pass-through.
 3. **Fantasy is the one proxied channel service.** It self-registers in Redis (30s TTL heartbeat), is discovered and proxied dynamically, and trusts the `X-User-Sub` header core injects after JWT validation — it never sees tokens. The HTTP-only contract and module isolation still apply to it.
 4. **Topic-based CDC PubSub**: Core maps CDC events to topics in-process and dispatches via Redis PubSub (O(1) per event); every replica fans out to its own SSE clients (ADR-0001).

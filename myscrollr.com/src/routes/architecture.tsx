@@ -228,9 +228,9 @@ const PRINCIPLES: Array<Principle> = [
   },
   {
     Icon: Workflow,
-    title: 'Convention-based UI',
+    title: 'Server-authoritative catalog',
     description:
-      'Desktop app discovers channel components at build time via import.meta.glob. Drop a file in the right folder and it appears.',
+      'One catalog defines every widget, served from the API. The apps fetch it and render generically, so a new widget ships without a new release.',
     hex: HEX.accent,
     Watermark: Workflow,
   },
