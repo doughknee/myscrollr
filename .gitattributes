@@ -9,3 +9,9 @@ Makefile   text eol=lf
 # SQL migrations are embedded and checksummed (sqlx / golang-migrate); pin LF
 # so a Windows CRLF checkout can't drift a migration's checksum vs CI/prod.
 *.sql      text eol=lf
+
+# Generated wire types are compared byte-for-byte against the generator's
+# output by TestGeneratedTypesAreCurrent, which emits LF. Same rule as the
+# migrations above: a CRLF checkout would fail the guard on every Windows
+# clone while passing in CI.
+*.generated.ts  text eol=lf

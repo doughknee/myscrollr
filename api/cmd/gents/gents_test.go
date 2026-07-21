@@ -25,13 +25,26 @@ func TestGeneratedTypesAreCurrent(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v (run `go -C api run ./cmd/gents`)", out, err)
 		}
-		if string(got) == want {
+		if normalizeEOL(string(got)) == want {
 			continue
 		}
 		t.Errorf("%s is stale — a Go wire struct changed but the generated "+
 			"types were not regenerated. Run:\n\n    go -C api run ./cmd/gents\n\n%s",
-			out, firstDiff(string(got), want))
+			out, firstDiff(normalizeEOL(string(got)), want))
 	}
+}
+
+// The generator always emits LF, but git checks these files out with CRLF on
+// Windows (`git ls-files --eol` reports `i/lf w/crlf`). Comparing raw bytes
+// therefore failed on every Windows working tree while passing in CI — a
+// guard that cries wolf on the developer's own machine is a guard that gets
+// ignored. Compare content, not line endings.
+//
+// `.gitattributes` also pins `*.generated.ts` to LF so the checked-out file
+// matches the generator byte-for-byte; this normalization keeps the guard
+// honest regardless of how any given clone is configured.
+func normalizeEOL(s string) string {
+	return strings.ReplaceAll(s, "\r\n", "\n")
 }
 
 // A custom MarshalJSON silently invalidates everything generated from
