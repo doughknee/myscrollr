@@ -179,7 +179,12 @@ func queryUserCatalog(ctx context.Context, userSub string, includeFailing bool) 
 		customClauses += customFeedHealthFilter
 	}
 
-	// $1 = userSub (custom-feeds half), $2 = MaxConsecutiveFailures
+	// $1 = userSub (custom-feeds half). $2 = MaxConsecutiveFailures, but ONLY
+	// when the health filters above are appended — they are the only thing
+	// that references it. Passing it unconditionally made every
+	// includeFailing=true call fail with "expected 1 arguments, got 2", so
+	// the desktop's "show failing feeds" option returned an error and an
+	// empty catalog every time.
 	query := `
 		SELECT url, name, category, is_default, consecutive_failures, last_error, last_success_at
 		FROM tracked_feeds
@@ -202,7 +207,12 @@ func queryUserCatalog(ctx context.Context, userSub string, includeFailing bool) 
 		ORDER BY is_default DESC, category, name
 	`
 
-	rows, qErr := platform.DBPool.Query(ctx, query, userSub, MaxConsecutiveFailures)
+	args := []any{userSub}
+	if !includeFailing {
+		args = append(args, MaxConsecutiveFailures)
+	}
+
+	rows, qErr := platform.DBPool.Query(ctx, query, args...)
 	if qErr != nil {
 		return nil, qErr
 	}
