@@ -26,7 +26,6 @@ doctor: ## Check that Docker is running
 up: doctor prep ## Build + start the full backend in Docker, wait for health
 	@echo "[up] Postgres + Redis..."
 	@$(COMPOSE) up -d --wait postgres redis
-	@bash scripts/dev/migrate-rss.sh
 	@if [ -f secrets/predictions.docker.env ]; then \
 	  echo "[up] building all services (incl. predictions)..."; \
 	  $(COMPOSE_PRED) up -d --build --remove-orphans; \

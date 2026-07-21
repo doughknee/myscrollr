@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -108,7 +107,7 @@ func GetWidgets(c *fiber.Ctx) error {
 		log.Printf("[Widgets] Error fetching widgets: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
 			Status: "error",
-			Error:  "Failed to fetch channels",
+			Error:  "Failed to fetch widgets",
 		})
 	}
 
@@ -142,15 +141,20 @@ func CreateWidget(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validate the widget type (wire: widget_type): accept either a
-	// registered backend channel service (Redis discovery) or a known widget
-	// type (the code registry in widgets.go). Additive during the widget/slot
-	// transition so legacy coarse types ("sports") and new split widgets
-	// ("sports_nfl") both pass.
-	if !platform.GetValidChannelTypes()[req.WidgetType] && !platform.IsKnownWidgetType(req.WidgetType) {
+	// The catalog is the only authority on what a widget is.
+	//
+	// This used to also accept anything in GetValidChannelTypes(), which is the
+	// set of DISCOVERED BACKEND SERVICES — a different concept entirely. It let
+	// widget_type "fantasy" through (the service registers under that name)
+	// while the catalog id is "fantasy_yahoo", producing a row with no catalog
+	// entry: it consumed a slot, resolved to no source, subscribed to no SSE
+	// topic, fired no lifecycle event, and could not render. The OR was added
+	// so coarse types ("sports") kept working during the widget/slot
+	// transition; that transition is over and those types no longer exist.
+	if !platform.IsKnownWidgetType(req.WidgetType) {
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
 			Status: "error",
-			Error:  "Invalid channel type",
+			Error:  "Unknown widget type",
 		})
 	}
 	// Utility widgets (clock/weather/…) live in desktop preferences, not
@@ -160,7 +164,7 @@ func CreateWidget(c *fiber.Ctx) error {
 	if platform.IsUtilityWidgetType(req.WidgetType) {
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
 			Status: "error",
-			Error:  "Utility widgets are stored locally, not as channels",
+			Error:  "Utility widgets are stored locally, not as server-side widgets",
 		})
 	}
 	// The client attests its local utility-widget count; never let a
@@ -173,18 +177,29 @@ func CreateWidget(c *fiber.Ctx) error {
 		req.Config = map[string]interface{}{}
 	}
 
-	// Tier-gate the config shape. Frontend already enforces these caps
-	// but the API is the only place that actually matters — the Rust
-	// ingestion services trust user_widgets.config verbatim.
 	tier := platform.TierFromRoles(platform.GetUserRoles(c))
+
+	// Availability gate: the catalog's required_tier. The desktop already
+	// checks this and renders "Requires <tier> — Upgrade", but only the API
+	// decides what actually gets stored, so a direct POST bypassed it. Every
+	// catalog entry is "free" today, which makes this a no-op right now — and
+	// is exactly why it was worth adding before the first paid widget, rather
+	// than discovering the gate was decorative afterwards.
+	if def, ok := platform.WidgetByID(req.WidgetType); ok && !TierMeets(tier, def.RequiredTier) {
+		log.Printf("[Widgets] %s on %s attempted %s (requires %s)", userID, tier, req.WidgetType, def.RequiredTier)
+		return c.Status(fiber.StatusForbidden).JSON(platform.ErrorResponse{
+			Status: "error",
+			Error: fmt.Sprintf("%s requires the %s plan.",
+				def.Name, TierDisplayName(def.RequiredTier)),
+		})
+	}
 
 	// Slot gate (widget/slot model, 2026-06-30): block adding a *new*
 	// widget once the user is at their tier's MaxWidgets cap. Existing
 	// over-cap users are grandfathered — we never disable what they
 	// already have, we only block new adds. nil cap = unlimited. A count
 	// error is logged but not fatal: failing open here is safer than
-	// blocking a legitimate add on a transient DB blip (the per-feature
-	// validation below still runs).
+	// blocking a legitimate add on a transient DB blip.
 	if max := MaxWidgetsForTier(tier); max != nil {
 		if count, err := CountEnabledWidgets(context.Background(), userID); err != nil {
 			log.Printf("[Widgets] slot count failed for %s: %v", userID, err)
@@ -199,19 +214,6 @@ func CreateWidget(c *fiber.Ctx) error {
 				return c.Status(fiber.StatusForbidden).JSON(tierLimitErrorResponse(tle))
 			}
 		}
-	}
-
-	if err := ValidateWidgetConfig(tier, req.WidgetType, req.Config); err != nil {
-		var tle *TierLimitError
-		if errors.As(err, &tle) {
-			log.Printf("[Widgets] Tier limit exceeded for %s: %s", userID, tle.Error())
-			return c.Status(fiber.StatusForbidden).JSON(tierLimitErrorResponse(tle))
-		}
-		// Defensive — the validator should only return *TierLimitError.
-		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
-			Status: "error",
-			Error:  err.Error(),
-		})
 	}
 
 	configJSON, _ := json.Marshal(req.Config)
@@ -230,13 +232,13 @@ func CreateWidget(c *fiber.Ctx) error {
 		if strings.Contains(err.Error(), "unique") || strings.Contains(err.Error(), "duplicate") {
 			return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{
 				Status: "error",
-				Error:  "Channel of this type already exists",
+				Error:  "That widget is already added",
 			})
 		}
 		log.Printf("[Widgets] Create error: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
 			Status: "error",
-			Error:  "Failed to create channel",
+			Error:  "Failed to create widget",
 		})
 	}
 
@@ -274,10 +276,11 @@ func UpdateWidget(c *fiber.Ctx) error {
 	}
 
 	widgetType := c.Params("type")
-	if !platform.GetValidChannelTypes()[widgetType] && !platform.IsKnownWidgetType(widgetType) {
+	// Catalog-only, same as CreateWidget — see the note there.
+	if !platform.IsKnownWidgetType(widgetType) {
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
 			Status: "error",
-			Error:  "Invalid channel type",
+			Error:  "Unknown widget type",
 		})
 	}
 
@@ -323,25 +326,6 @@ func UpdateWidget(c *fiber.Ctx) error {
 					return c.Status(fiber.StatusForbidden).JSON(tierLimitErrorResponse(tle))
 				}
 			}
-		}
-	}
-
-	// Tier-gate any incoming config. We only check when config is
-	// provided — updates that only toggle enabled/visible should not
-	// re-validate (they're expected to be cheap + frequent, e.g. pause
-	// the widget).
-	if req.Config != nil {
-		tier := platform.TierFromRoles(platform.GetUserRoles(c))
-		if err := ValidateWidgetConfig(tier, widgetType, req.Config); err != nil {
-			var tle *TierLimitError
-			if errors.As(err, &tle) {
-				log.Printf("[Widgets] Tier limit exceeded for %s: %s", userID, tle.Error())
-				return c.Status(fiber.StatusForbidden).JSON(tierLimitErrorResponse(tle))
-			}
-			return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
-				Status: "error",
-				Error:  err.Error(),
-			})
 		}
 	}
 
@@ -397,13 +381,13 @@ func UpdateWidget(c *fiber.Ctx) error {
 		if strings.Contains(errStr, "no rows") {
 			return c.Status(fiber.StatusNotFound).JSON(platform.ErrorResponse{
 				Status: "error",
-				Error:  "Channel not found",
+				Error:  "Widget not found",
 			})
 		}
 		log.Printf("[Widgets] Update error: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
 			Status: "error",
-			Error:  "Failed to update channel",
+			Error:  "Failed to update widget",
 		})
 	}
 
@@ -452,14 +436,14 @@ func DeleteWidget(c *fiber.Ctx) error {
 		log.Printf("[Widgets] Delete error: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
 			Status: "error",
-			Error:  "Failed to delete channel",
+			Error:  "Failed to delete widget",
 		})
 	}
 
 	if tag.RowsAffected() == 0 {
 		return c.Status(fiber.StatusNotFound).JSON(platform.ErrorResponse{
 			Status: "error",
-			Error:  "Channel not found",
+			Error:  "Widget not found",
 		})
 	}
 

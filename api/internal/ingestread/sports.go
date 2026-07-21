@@ -709,7 +709,7 @@ func getUserSportsLeagues(ctx context.Context, logtoSub string) []string {
 	rows, err := platform.DBPool.Query(ctx, `
 		SELECT config FROM user_widgets
 		WHERE logto_sub = $1
-		  AND (widget_type = 'sports' OR widget_type LIKE 'sports\_%')
+		  AND widget_type LIKE 'sports\_%'
 	`, logtoSub)
 	if err != nil {
 		return nil
@@ -742,7 +742,7 @@ func getUserFavoriteTeams(ctx context.Context, logtoSub string) map[string]Favor
 	rows, err := platform.DBPool.Query(ctx, `
 		SELECT config FROM user_widgets
 		WHERE logto_sub = $1
-		  AND (widget_type = 'sports' OR widget_type LIKE 'sports\_%')
+		  AND widget_type LIKE 'sports\_%'
 	`, logtoSub)
 	if err != nil {
 		return nil

@@ -25,8 +25,8 @@ pull request. If you just want to run the project locally, the [root
 | Path | Purpose |
 |---|---|
 | `api/` | Core gateway API (Go / Fiber). The only service that validates JWTs; everything else trusts its `X-User-Sub` header. |
-| `channels/{finance,sports,rss,fantasy}/api/` | Per-channel Go APIs, independent Go modules. Registered dynamically via Redis. |
-| `channels/{finance,sports,rss}/service/` | Rust ingestion services (independent crates, edition 2024). Fantasy is Go-native. |
+| `channels/{finance,sports,rss,predictions}/service/` | Rust ingestion services (independent crates, edition 2024). Pure writers — they run no migrations and serve no app traffic; core reads their tables directly (ADR-0002). |
+| `channels/fantasy/api/` | The one remaining separate service (Go). Stays separate for its Yahoo OAuth session and sync loop; core proxies to it. |
 | `myscrollr.com/` | Marketing site, legal hub, billing portal (React + Vite + TanStack Router). |
 | `desktop/` | Tauri v2 desktop app — the primary product. React frontend in `desktop/src/`, Rust backend in `desktop/src-tauri/`. |
 | `k8s/` | Kubernetes manifests deployed on Coolify-managed DigitalOcean cluster. |
@@ -40,8 +40,8 @@ ports).
 
 - Bug reports with clear reproduction steps.
 - Documentation improvements (typos, clearer wording, missing docs).
-- New channels or widgets — see `api/CHANNELS.md` for the capability
-  registration contract.
+- New widgets — see `api/CHANNELS.md`. Reusing an existing source is a
+  server-only change: one entry in the catalog, no client release.
 - Test coverage. `go test ./...` and `cargo test` work everywhere;
   Vitest is the target for TS.
 - Accessibility and i18n improvements.
@@ -68,7 +68,7 @@ Good bug reports contain:
 2. What actually happened.
 3. A minimal reproduction (exact commands, exact request, exact
    response if relevant).
-4. Your environment — OS, Scrollr version, which channel is involved.
+4. Your environment — OS, Scrollr version, which widget is involved.
 5. Relevant log snippets (scrub any tokens first).
 
 Template:
@@ -90,7 +90,7 @@ One sentence.
 ### Environment
 - OS:
 - Scrollr desktop version:
-- Channel(s) involved:
+- Widget(s) involved:
 ```
 
 ## Feature requests
@@ -165,9 +165,8 @@ cargo test                                      # from each Rust service
 ```
 
 You'll need Logto, Stripe, and Yahoo developer accounts to exercise
-the full stack. For purely backend work, the Docker Compose files
-under each channel bring up Postgres + Redis + the channel's services
-locally.
+the full stack. For purely backend work, `make up` at the root brings up
+Postgres, Redis, core and the ingesters. See LOCAL_SETUP.md.
 
 ## Getting help
 

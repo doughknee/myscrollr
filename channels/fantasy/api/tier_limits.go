@@ -7,7 +7,7 @@ import "github.com/gofiber/fiber/v2"
 // =============================================================================
 //
 // v1.1.2 (2026-07-02): the per-tier league cap is GONE. The widget/slot model
-// made the widget slot — enforced by the core API's CreateChannel — the only
+// made the widget slot — enforced by the core API's widgets.CreateWidget — the only
 // monetization lever, and Yahoo Fantasy is a normal widget on every plan with
 // unlimited depth inside it ("as many leagues as you play"). The old ladder
 // (free 0 / uplink 1 / pro 3 / ultimate 10) predated that model and survived

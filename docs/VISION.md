@@ -57,6 +57,12 @@ Data Source  (invisible: finance, sports, rss, fantasy, predictions)
    └─ Widget   (the ONLY user-facing primitive: "MLB", "Crypto", "Clock")
         ├─ kind: data (CDC-backed) | utility (local-only)
         └─ costs 1 Slot
+
+   SUPERSEDED 2026-07-21 (commit 2403940): the `kind` field is deleted.
+   A widget is data-backed iff it HAS a source, so `source` already carried
+   the distinction and `kind` was a second copy of it that could drift.
+   Verified across all 35 entries: 29 data all have a source, 6 utilities
+   have none, zero disagreements. Ask isUtilityWidget() / IsUtilityWidgetType().
    └─ Catalog / Library  (browse · add · remove · configure)
    └─ Ticker             (the floating bar; also a direct-manipulation surface)
 ```
@@ -78,7 +84,7 @@ A widget is one self-contained thing that owns its identity:
 | Field | Purpose | User-visible? |
 |---|---|---|
 | `id` + identity (`name`, `color`, `icon`) | The widget's own identity ("NFL") — not borrowed from a source | Yes |
-| `kind` = `data` \| `utility` | CDC-backed vs local-only | Indirectly |
+| ~~`kind` = `data` \| `utility`~~ | *Deleted 2026-07-21 — derived from `source` instead; see the note in §3* | — |
 | `source` | Which ingester/CDC topic feeds it (data only). Pure routing. | **No** |
 | `category` *(tag)* | Cosmetic catalog filter/find. **Independent of `source`** ("Trending", "US Markets"). No behavioral effect. | Filter only |
 | `config` schema + defaults | Per-widget settings | Yes |
@@ -132,7 +138,7 @@ Codegen TS types from the Go API's OpenAPI contract so web and desktop **cannot 
 |---|---|---|
 | 1 | One concept, up to 6 names | §4.4 (rename) + §4.1 (model) |
 | 2 | No single owner of the shared DB *(the one deep seam)* | ✅ §4.3 |
-| 3 | Tier limits hand-synced across 4 files | ✅ §4.2 (tiers come from the catalog) |
+| 3 | Tier limits hand-synced across 4 files | ❌ **NOT resolved** — see note below |
 | 4 | Web & desktop = 2 implementations of 1 product | §4.2 (catalog) + §4.6 (types) |
 | 5 | Registry is a facade at the ticker (`ScrollrTicker.tsx` if-ladder) | §4.1 (generic renderer by source) |
 | 6 | 3 widget-definition layers on the client | §4.1 + §4.2 |
@@ -141,6 +147,16 @@ Codegen TS types from the Go API's OpenAPI contract so web and desktop **cannot 
 | 9 | Docs actively lie (`README.md`, `api/CHANNELS.md` describe pre-pivot arch) | *open — see §8* |
 | 10 | Retained-but-dead (coarse-row residue, dual wire fields; *discovery/proxy stays — serves fantasy*) | ✅ §7.10 (delete residue outright) |
 | 11 | `api/` monolith (support + Discord ~4k LOC in product API) | ✅ §4.5 |
+
+> **Backlog #3 correction (2026-07-21).** Marked resolved above; it is not.
+> All four copies still exist and are still hand-synced: `tier_limits.go`,
+> `tier_limits.json`, `desktop/src/tierLimits.ts`, and
+> `myscrollr.com/src/lib/fallbackTierLimits.ts`. The plan cannot work as
+> written, either: `required_tier` answers *"which plan unlocks this widget"*
+> while the synced numbers are `max_widgets`, *"how many slots does this plan
+> get"*. Two different questions, so putting tiers in the catalog does not
+> subsume the table. Closing #3 means making the server the only source of
+> those numbers and having both clients fetch them.
 
 ---
 

@@ -7,7 +7,7 @@
 //! the desktop already expects:
 //!
 //!   GET /public/feed  -> {"data":{"predictions":[…]}}
-//!   GET /dashboard    -> {"data":{"predictions":[…]},"channels":[…]}
+//!   GET /dashboard    -> {"data":{"predictions":[…]},"widgets":[…]}
 //!   GET /events       -> SSE; each frame is {"data":[{action,record,metadata}]}
 //!
 //! All routes are UNAUTHENTICATED (any Authorization header is ignored) and
@@ -160,7 +160,7 @@ async fn main() -> Result<()> {
         .route("/dashboard", get(dashboard))
         .route("/events", get(events))
         .route("/predictions/catalog", get(predictions_catalog))
-        .route("/users/me/channels/predictions", put(update_channel))
+        .route("/users/me/widgets/predictions", put(update_widget))
         .layer(cors)
         .with_state(state);
 
@@ -425,14 +425,12 @@ async fn dashboard(State(state): State<AppState>) -> Json<serde_json::Value> {
     let predictions = snapshot(&state).await;
     Json(json!({
         "data": { "predictions": predictions },
-        "channels": [{
+        "widgets": [{
             "id": 1,
-            "channel_type": "predictions",
+            "widget_type": "predictions",
             "enabled": true,
             "ticker_enabled": true,
             "config": {},
-            "display": {},
-            "logto_sub": "demo",
             "created_at": now_rfc3339(),
             "updated_at": now_rfc3339(),
         }],
@@ -457,19 +455,17 @@ async fn predictions_catalog(State(state): State<AppState>) -> Json<serde_json::
     Json(json!(entries))
 }
 
-/// PUT /users/me/channels/predictions — accept and ignore the config save so
+/// PUT /users/me/widgets/predictions — accept and ignore the config save so
 /// the demo's configure page succeeds (the bridge has no persistence). Returns
-/// a channel object shaped like the one `/dashboard` emits so the desktop's
-/// `authFetch<Channel>` parses it cleanly.
-async fn update_channel() -> Json<serde_json::Value> {
+/// a widget object shaped like the one `/dashboard` emits so the desktop's
+/// `authFetch<DataWidgetRow>` parses it cleanly.
+async fn update_widget() -> Json<serde_json::Value> {
     Json(json!({
         "id": 1,
-        "channel_type": "predictions",
+        "widget_type": "predictions",
         "enabled": true,
         "ticker_enabled": true,
         "config": {},
-        "display": {},
-        "logto_sub": "demo",
         "created_at": now_rfc3339(),
         "updated_at": now_rfc3339(),
     }))

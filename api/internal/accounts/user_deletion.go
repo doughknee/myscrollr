@@ -69,12 +69,12 @@ func HandleExportUserData(c *fiber.Ctx) error {
 		log.Printf("[Export] preferences for %s: %v", userID, err)
 	}
 
-	// widgets (export keeps the legacy "channels" archive key)
+	// widgets
 	if chans, err := platform.GetUserWidgets(userID); err == nil {
-		archive["channels"] = chans
+		archive["widgets"] = chans
 	} else {
-		log.Printf("[Export] channels for %s: %v", userID, err)
-		archive["channels"] = []any{}
+		log.Printf("[Export] widgets for %s: %v", userID, err)
+		archive["widgets"] = []any{}
 	}
 
 	// subscription (stripe_customers minus server-internal IDs)

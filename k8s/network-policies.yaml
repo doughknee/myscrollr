@@ -26,8 +26,9 @@
 #   - cert-manager's HTTP-01 solver pods run in this namespace and must
 #     accept traffic from ingress-nginx, or certificate renewal silently
 #     breaks under default-deny. The last policy covers them.
-#   - Adding a new channel? Copy the channel-API + channel-service pair of
-#     policies and adjust app labels + ports.
+#   - Adding a new ingester? Copy an existing ingester policy and adjust the
+#     app label + port. There is no per-source API to pair it with — those
+#     were folded into core by ADR-0002.
 #   - Rollback: kubectl delete -f k8s/network-policies.yaml
 #
 # The ingress-nginx namespace is matched via the automatic

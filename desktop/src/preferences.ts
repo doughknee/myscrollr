@@ -1667,8 +1667,6 @@ export function updateWidgetPrefs(
 interface DataWidgetTickerInfo {
   widget_type: string;
   ticker_enabled?: boolean;
-  /** @deprecated server-side legacy alias for ticker_enabled. */
-  visible?: boolean;
 }
 
 /**
@@ -1697,14 +1695,14 @@ export function getSourceTickerRow(
     }
   }
 
-  // Step 2: legacy fallback via DataWidgetRow.ticker_enabled (widgets only)
+  // Step 2: fall back to the server's ticker_enabled flag (data widgets only).
+  // The `visible` alias this used to also read was deleted from the wire in
+  // the unification; the server has not emitted it since.
   if (!dataWidgetInfo) return null;
   const tickerEnabled =
     typeof dataWidgetInfo.ticker_enabled === "boolean"
       ? dataWidgetInfo.ticker_enabled
-      : typeof dataWidgetInfo.visible === "boolean"
-        ? dataWidgetInfo.visible
-        : true;
+      : true;
   return tickerEnabled ? 0 : null;
 }
 

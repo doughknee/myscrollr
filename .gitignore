@@ -31,20 +31,14 @@ count.txt
 __pycache__/
 *.pyc
 .venv/
-channels/sports/api/scrollr-sports
-channels/finance/api/scrollr-finance
-channels/rss/api/scrollr-rss
-channels/fantasy/api/scrollr-fantasy
-channels/predictions/api/scrollr-predictions
-# Windows `go build` emits a module-named <name>.exe; keep all channel api/
-# build artifacts out of git regardless of platform/output name.
+# Compiled Go binaries under any channels/*/api/. Only fantasy still has an
+# api/ directory — the rest were folded into core by ADR-0002 — but `go build`
+# names its output after the module, so keep the wildcards rather than a list
+# of per-service names that no longer exist.
 channels/*/api/*.exe
-# Compiled Go binaries inside any channel api/ directory — `go build` in a
-# channel's api/ drops an executable named after the module (e.g. sports_api,
-# finance_api, rss_api, fantasy_api). The wildcard keeps them all out of git
-# regardless of what the local dev names the output file.
 channels/*/api/*_api
-channels/sports/api/sports_api
+channels/*/api/scrollr-*
+
 scaling-changes/
 .worktrees/
 .superpowers/

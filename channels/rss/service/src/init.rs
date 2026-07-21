@@ -6,7 +6,8 @@
 //! Kubernetes restarts the pod, or (b) flips `/health/ready` to return HTTP
 //! 503 so probes can detect the problem.
 //!
-//! Copied into each Rust service (`finance`, `sports`, `rss`) rather than
+//! Copied into each Rust ingester (`finance`, `sports`, `rss`, `predictions`)
+//! rather than
 //! extracted as a shared crate, to match the existing isolation philosophy
 //! in AGENTS.md ("Module isolation is absolute. Each service owns its copy
 //! of database.rs and log.rs.").
@@ -24,8 +25,9 @@ use tokio::sync::RwLock;
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum ReadinessState {
-    /// Initial state. HTTP server is up but init (DB, migrations, config)
-    /// has not finished. `/health/ready` returns 503.
+    /// Initial state. HTTP server is up but init (DB connect, config) has
+    /// not finished. `/health/ready` returns 503. Ingesters run no
+    /// migrations — core owns the only chain (VISION §4.3).
     Starting,
     /// Init finished successfully. `/health/ready` returns 200 as long as
     /// background work stays fresh (see `max_poll_staleness`).

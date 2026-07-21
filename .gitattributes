@@ -6,7 +6,7 @@
 *.mjs      text eol=lf
 Makefile   text eol=lf
 
-# SQL migrations are embedded and checksummed (sqlx / golang-migrate); pin LF
+# SQL migrations are embedded and checksummed by golang-migrate; pin LF
 # so a Windows CRLF checkout can't drift a migration's checksum vs CI/prod.
 *.sql      text eol=lf
 

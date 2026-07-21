@@ -8,7 +8,7 @@ working on. Multi-monitor aware. Zero ads. Zero telemetry.
 
 ![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)
 ![Desktop](https://img.shields.io/badge/desktop-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
-![Status](https://myscrollr.com/status)
+[![Status](https://img.shields.io/badge/status-live-brightgreen)](https://myscrollr.com/status)
 
 ![Scrollr home view — live feed across Finance, Sports, and Fantasy](./docs/images/scrollr-home.png)
 

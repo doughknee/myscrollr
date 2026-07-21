@@ -46,10 +46,10 @@ import AuthGate from "../components/onboarding/AuthGate";
 
 // Registries
 import { getAllDataWidgets } from "../datawidgets/registry";
-import { catalogItemById, widgetLogoUrl } from "../marketplace";
+import { catalogItemById, widgetLogoUrl, isUtilityWidget } from "../marketplace";
 import { DEMO } from "../config";
 import { getAllWidgets, getWidget } from "../widgets/registry";
-import { CANONICAL_ORDER } from "../marketplace";
+import { canonicalOrder } from "../marketplace";
 
 // Data
 import { dashboardQueryOptions } from "../api/queries";
@@ -129,7 +129,7 @@ function parseRoute(pathname: string) {
   // data branch was unreachable and every widget page reported itself as a
   // utility. Ask the catalog instead.
   if (kind === "widget" && itemId) {
-    const utility = !catalogItemById(itemId)?.source;
+    const utility = isUtilityWidget(itemId);
     return {
       activeItem: itemId,
       isDataWidget: !utility, isWidget: utility, isFeed: false,
@@ -198,7 +198,11 @@ function RootLayout() {
   // Sync with the server-authoritative widget catalog. Renders from the
   // bundled snapshot first, then re-renders if the server's differs — so a
   // widget added server-side appears without a desktop release.
-  useCatalog();
+  //
+  // The version is used, not discarded: a catalog swap re-renders this
+  // component, but `sidebarSources` is memoised and would hand back its
+  // cached list unless the version is in its deps.
+  const catalogVersion = useCatalog();
 
   // ── Auth (must be before dashboard query — tier drives refetchInterval) ──
   const auth = useAuthState();
@@ -656,7 +660,7 @@ function RootLayout() {
       onTicker: boolean;
     }> = [];
 
-    for (const id of CANONICAL_ORDER) {
+    for (const id of canonicalOrder()) {
       const widget = enabledDataWidgets.get(id);
       if (widget) {
         const m = catalogItemById(id);
@@ -705,7 +709,7 @@ function RootLayout() {
     // prefs.appearance and enabled widgets under prefs.widgets — the
     // list build is cheap, so one broad dep beats two narrow ones
     // that could silently miss a third source of truth later.
-  }, [dashboard?.widgets, prefs, allDataWidgetManifests, allWidgets]);
+  }, [dashboard?.widgets, prefs, allDataWidgetManifests, allWidgets, catalogVersion]);
 
   // ── Keyboard shortcuts ──────────────────────────────────────
   useEffect(() => {

@@ -9,7 +9,7 @@ Core principles: zero tracking, no ads, no data brokers, source available, runs 
 ## Product
 
 - [Download](https://myscrollr.com/download): Get the Scrollr desktop app for macOS, Windows, or Linux. Free.
-- [Channels](https://myscrollr.com/channels): The data sources Scrollr supports — Finance, Sports, News, Fantasy — plus Clock, Timer, Weather, and System Monitor widgets.
+- [Channels](https://myscrollr.com/channels): The widgets Scrollr offers — individual leagues (NFL, NBA, MLB…), Stocks and Crypto, news outlets, Kalshi prediction markets and Yahoo Fantasy, plus local widgets like Clock, Timer, Weather and System Monitor.
 - [Architecture](https://myscrollr.com/architecture): How Scrollr works under the hood — source APIs through CDC PubSub to your desktop.
 
 ## Pricing

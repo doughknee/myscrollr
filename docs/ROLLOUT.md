@@ -41,8 +41,11 @@ the places the plan's premises turned out to be wrong.
   Go drift-guard test. `useCatalog()` refreshes via `useSyncExternalStore`.
 - **3c, generic ticker dispatch (#5).** The per-source ladder in `ScrollrTicker` is
   replaced by a `source → renderer` registry; each source owns
-  `datawidgets/{source}/ticker.tsx`. 981 → 606 lines, and chip building is now
-  unit-testable (6 new tests covering what could not be reached before).
+  `datawidgets/{source}/ticker.tsx`, and chip building is now unit-testable
+  (6 new tests covering what could not be reached before).
+  *(Correction, 2026-07-21: this said "981 → 606 lines". ScrollrTicker.tsx is
+  668. Net production LOC across the unification rose rather than fell — the
+  win was coherence, not size.)*
 
 - **3d, the wire rename.** `channel_type` → `widget_type`, dashboard/overview
   `channels` → `widgets`, `visible` deleted in favour of `ticker_enabled` (they
@@ -162,6 +165,9 @@ Only cosmetic vocabulary, deliberately deferred as low-value churn:
    exactly what §4.1 says to keep as the `source → renderer` registry. What actually
    gets deleted is the widget-*definition* layer: `datawidgets/registry.ts` (23 lines,
    a build-time `import.meta.glob`) and `marketplace.ts DATA_WIDGETS` (~230 lines).
+   *(Correction, 2026-07-21: `DATA_WIDGETS` went; `datawidgets/registry.ts` did
+   not — it survives at 28 lines as the source → renderer registry, which is
+   what §4.1 wanted all along.)*
 
 ## Work order at a glance
 
@@ -179,7 +185,7 @@ One principle still holds: **structure before names is easier, so build the unif
 
 ## Phase 1 — Backend package split (D4.5)
 
-Break the flat `api/core` package (~55 files) into internal Go packages: `widgets`, `billing`, `accounts`, `events` (SSE/CDC), `support`, `discord`, `ingestread`, `platform` (db/redis/auth/sentry). **One binary, no behavior change.** `main.go` wires them together.
+Break the flat `api/core` package (~55 files) into internal Go packages: `widgets`, `billing`, `accounts`, `events` (SSE/CDC), `support`, `ingestread`, `platform` (db/redis/auth/sentry). *(As built there is no separate `discord` package — the Discord surface lives inside `support`.)* **One binary, no behavior change.** `main.go` wires them together.
 
 **Verify:** tests pass, binary builds, smoke passes. **Why first:** zero-risk warm-up that makes every later backend change readable.
 
@@ -205,6 +211,15 @@ The heart of the work — unify the model and name it correctly in one pass.
 
 **Server:**
 - Extend `widgets.go` into the full catalog authority: `id`, identity (`name`,`color`,`icon`), `kind`, `source`, `category` (cosmetic tag), `requiredTier`, `configSchema`, `order`. Expose `GET /catalog`. Tier limits now come from the catalog → **removes the 4-file tier sync (#3)**.
+
+  *(Correction, 2026-07-21: backlog #3 is NOT resolved. All four copies still
+  exist and are still hand-synced — `tier_limits.go`, `tier_limits.json`,
+  `desktop/src/tierLimits.ts`, `myscrollr.com/src/lib/fallbackTierLimits.ts`.
+  It cannot work as written either: `required_tier` answers "which plan unlocks
+  this widget", while the synced numbers are `max_widgets` — "how many slots
+  does this plan get". Different questions, so the catalog cannot subsume the
+  table. Closing #3 needs the server to be the only source of the numbers, not
+  the catalog to absorb them.)*
 - Rename the wire outright: `widget_type`, `widgets`, `ticker_enabled`, `/users/me/widgets`. **Delete** the old `channel_type`/`channels`/`visible`/`/channels` names — no alias.
 - Confirm predictions/Kalshi is a first-class catalog entry.
 

@@ -44,8 +44,7 @@ type TierLimitsResponse struct {
 //   - api/internal/widgets/tier_limits_test.go  (assertion protecting this table
 //     from silent edits — run `go test ./core/...` after any change)
 //
-// Once Sprint 3 wires backend enforcement on POST/PUT /users/me/channels,
-// these values directly gate what the DB will accept, so drift is
+// MaxWidgets gates what POST /users/me/widgets accepts, so drift here is
 // unforgiving.
 // Per-feature depth caps (Symbols/Feeds/CustomFeeds/Leagues/Fantasy) were
 // RETIRED 2026-07-02 — a nil pointer means unlimited, and every tier now has
@@ -81,8 +80,8 @@ func intPtr(n int) *int {
 
 // MaxWidgetsForTier returns the widget-slot cap for a tier (nil =
 // unlimited). Unknown tiers fall back to "free", matching the defensive
-// default ValidateWidgetConfig uses, so an unrecognized JWT role can
-// never grant more slots than the free plan.
+// default used elsewhere, so an unrecognized JWT role can never grant
+// more slots than the free plan.
 func MaxWidgetsForTier(tier string) *int {
 	limits, ok := DefaultTierLimits[tier]
 	if !ok {
@@ -99,8 +98,8 @@ func MaxWidgetsForTier(tier string) *int {
 // the UI can render a precise message from.
 type TierLimitError struct {
 	Tier       string // "free", "uplink", etc.
-	WidgetType string // "finance", "sports", "rss"
-	Field      string // "symbols" | "feeds" | "custom_feeds" | "leagues"
+	WidgetType string // catalog id, e.g. "sports_nfl"
+	Field      string // "widgets" — the slot cap is the only lever left
 	Limit      int
 	Got        int
 }
@@ -129,6 +128,25 @@ func (e *TierLimitError) UserFacingMessage() string {
 	)
 }
 
+// tierOrder is the subscription ladder, cheapest first. Mirrors TIER_ORDER in
+// desktop/src/routes/widget.$id.info.tsx; both must agree or the client would
+// offer an upgrade the server rejects (or vice versa).
+var tierOrder = []string{"free", "uplink", "uplink_pro", "uplink_ultimate", "super_user"}
+
+func tierRank(tier string) int {
+	for i, t := range tierOrder {
+		if t == tier {
+			return i
+		}
+	}
+	return 0 // unknown tier is treated as free, never as privileged
+}
+
+// TierMeets reports whether `current` is at least `required`.
+func TierMeets(current, required string) bool {
+	return tierRank(current) >= tierRank(required)
+}
+
 // TierDisplayName maps a tier slug to the short name used in user-facing
 // copy. Unknown tiers fall back to the slug itself so we never silently
 // drop a label.
@@ -149,117 +167,6 @@ func TierDisplayName(tier string) string {
 	}
 }
 
-// ValidateWidgetConfig rejects configs that exceed the caps for the
-// given tier. Returns nil on success, a *TierLimitError on violation.
-//
-// Unknown tiers fall back to the "free" row — a defensive default if
-// the JWT ever carries a role we don't recognize. Unknown widget types
-// are not validated (new types can register dynamically; their shape
-// is not yet known to this file, and silently passing is safer than
-// hard-rejecting).
-func ValidateWidgetConfig(tier, widgetType string, config map[string]any) error {
-	limits, ok := DefaultTierLimits[tier]
-	if !ok {
-		limits = DefaultTierLimits["free"]
-		tier = "free"
-	}
-
-	switch widgetType {
-	case "finance":
-		return validateArrayCap(tier, widgetType, "symbols", config["symbols"], limits.Symbols)
-	case "sports":
-		return validateArrayCap(tier, widgetType, "leagues", config["leagues"], limits.Leagues)
-	case "rss":
-		// RSS caps both total feeds and user-added ("custom") feeds.
-		// The custom cap is tighter than the total cap, so the natural
-		// error mode is custom-first when both are breached.
-		//
-		// `is_custom` is determined SERVER-SIDE in production: a URL is
-		// considered custom iff it's NOT in the curated catalog
-		// (tracked_feeds.is_default = true). Falling back to the
-		// client-asserted `is_custom` flag when the curated set is
-		// unavailable (e.g. running without DB in unit tests) keeps
-		// tests deterministic without weakening prod safety.
-		feedsRaw, _ := config["feeds"].([]any)
-		totalFeeds := len(feedsRaw)
-		curated := getCuratedFeedURLs() // nil when DB unavailable / test mode
-		customCount := 0
-		for _, item := range feedsRaw {
-			m, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
-			isCustom := isCustomFeed(m, curated)
-			if isCustom {
-				customCount++
-			}
-		}
-		if limits.CustomFeeds != nil && customCount > *limits.CustomFeeds {
-			return &TierLimitError{
-				Tier:       tier,
-				WidgetType: widgetType,
-				Field:      "custom_feeds",
-				Limit:      *limits.CustomFeeds,
-				Got:        customCount,
-			}
-		}
-		if limits.Feeds != nil && totalFeeds > *limits.Feeds {
-			return &TierLimitError{
-				Tier:       tier,
-				WidgetType: widgetType,
-				Field:      "feeds",
-				Limit:      *limits.Feeds,
-				Got:        totalFeeds,
-			}
-		}
-	}
-	return nil
-}
-
-// isCustomFeed decides whether a feeds[] item is a user-added (custom)
-// feed.
-//
-// Resolution order:
-//
-//  1. If a curated URL set is provided AND the item has a non-empty
-//     URL, the answer is server-derived: custom iff URL not in curated.
-//     This is the production path.
-//
-//  2. Otherwise, fall back to the client-asserted `is_custom` flag.
-//     This is the test path (no DBPool, so no curated set) and the
-//     graceful-degradation path (DB query failed, so we trust the
-//     client; this is no worse than the pre-derivation behavior).
-//
-// Returning true means "counts against the custom_feeds tier cap".
-func isCustomFeed(item map[string]any, curated map[string]bool) bool {
-	urlStr, _ := item["url"].(string)
-	if curated != nil && urlStr != "" {
-		return !curated[urlStr]
-	}
-	flag, _ := item["is_custom"].(bool)
-	return flag
-}
-
-// validateArrayCap counts entries in an array-shaped JSONB value and
-// returns a *TierLimitError if it exceeds cap. A nil cap pointer means
-// "unlimited" — common case for Ultimate/super_user tiers.
-func validateArrayCap(tier, widgetType, field string, raw any, cap *int) error {
-	if cap == nil {
-		return nil
-	}
-	arr, _ := raw.([]any)
-	if len(arr) <= *cap {
-		return nil
-	}
-	return &TierLimitError{
-		Tier:       tier,
-		WidgetType: widgetType,
-		Field:      field,
-		Limit:      *cap,
-		Got:        len(arr),
-	}
-}
-
 // tierLimitErrorResponse builds the structured 403 body for a
 // *TierLimitError. Handlers use this so the UI can render a precise
 // message and, if desired, drill into the structured `detail` field.
@@ -269,7 +176,7 @@ func tierLimitErrorResponse(e *TierLimitError) fiber.Map {
 		"error":  e.UserFacingMessage(),
 		"detail": fiber.Map{
 			"tier":    e.Tier,
-			"channel": e.WidgetType, // wire key keeps the legacy name
+			"widget":  e.WidgetType,
 			"field":   e.Field,
 			"limit":   e.Limit,
 			"got":     e.Got,

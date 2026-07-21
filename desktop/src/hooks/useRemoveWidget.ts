@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { dataWidgetsApi } from "../api/client";
 import type { WidgetId } from "../api/client";
 import { queryKeys } from "../api/queries";
+import { isUtilityWidget } from "../marketplace";
 import type { CatalogItem } from "../marketplace";
 import { disableWidget } from "../preferences";
 import { useUndoableAction } from "./useUndoableAction";
@@ -33,7 +34,7 @@ export function useRemoveWidget(
 
   return useCallback(
     async (item: CatalogItem) => {
-      if (item.source) {
+      if (!isUtilityWidget(item.id)) {
         try {
           await dataWidgetsApi.delete(item.id);
           queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });

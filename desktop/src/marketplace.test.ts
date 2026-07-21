@@ -10,7 +10,7 @@ import {
   addConfigForWidget,
   refreshCatalog,
   subscribeCatalog,
-  CANONICAL_ORDER,
+  canonicalOrder,
 } from "./marketplace";
 import type { CatalogPayload } from "./types";
 
@@ -56,10 +56,9 @@ describe("bundled snapshot", () => {
   });
 
   it("orders by the server's declaration order", () => {
-    expect(CANONICAL_ORDER.indexOf("finance_stocks")).toBeLessThan(
-      CANONICAL_ORDER.indexOf("clock"),
-    );
-    expect(CANONICAL_ORDER).toContain("predictions");
+    const order = canonicalOrder();
+    expect(order.indexOf("finance_stocks")).toBeLessThan(order.indexOf("clock"));
+    expect(order).toContain("predictions");
   });
 });
 
@@ -69,7 +68,7 @@ describe("refreshCatalog", () => {
     const changed = await refreshCatalog(() =>
       Promise.reject(new Error("offline")),
     );
-    expect(changed).toBe(false);
+    expect(changed).toBe("failed");
     expect(catalogVersion()).toBe(before);
     expect(catalogWidgets().length).toBeGreaterThan(0);
   });
@@ -80,7 +79,7 @@ describe("refreshCatalog", () => {
       version: "empty",
       widgets: [],
     }));
-    expect(changed).toBe(false);
+    expect(changed).toBe("failed");
     expect(catalogVersion()).toBe(before);
   });
 
@@ -106,7 +105,7 @@ describe("refreshCatalog", () => {
     };
 
     const changed = await refreshCatalog(async () => next);
-    expect(changed).toBe(true);
+    expect(changed).toBe("updated");
     expect(notified).toHaveBeenCalledTimes(1);
 
     // A server-side rename reaches the UI with no client release.
@@ -116,9 +115,60 @@ describe("refreshCatalog", () => {
 
     // Re-fetching the same version is a no-op, so no needless re-render.
     const again = await refreshCatalog(async () => next);
-    expect(again).toBe(false);
+    expect(again).toBe("unchanged");
     expect(notified).toHaveBeenCalledTimes(1);
 
     unsubscribe();
+  });
+});
+
+// The whole point of a server-authoritative catalog: add a widget server-side
+// and it appears with no client release. That did not work. `CANONICAL_ORDER`
+// was a module-load const built from the bundled snapshot, so a refresh could
+// never extend it — and the sidebar builds nav by iterating that list and
+// silently skipping ids it does not contain, so a server-added widget was
+// invisible in navigation even once the Library knew about it.
+describe("a widget the bundled snapshot has never seen", () => {
+  it("appears in the catalog, the order, and the sidebar's lookup", async () => {
+    const result = await refreshCatalog(async () => ({
+      version: "with-a-new-league",
+      widgets: [
+        {
+          id: "sports_nfl",
+          name: "NFL",
+          description: "already shipped",
+          source: "sports",
+          category: "sports",
+          color: "#013369",
+          required_tier: "free",
+          order: 0,
+        },
+        {
+          // Not in catalog.snapshot.json. Reuses the sports renderer, which
+          // is what makes it a server-only addition in the first place.
+          id: "sports_cfl",
+          name: "CFL",
+          description: "added server-side, after this client shipped",
+          source: "sports",
+          category: "sports",
+          color: "#a6192e",
+          required_tier: "free",
+          order: 1,
+        },
+      ],
+    }));
+    expect(result).toBe("updated");
+
+    expect(getCatalogItems().map((i) => i.id)).toContain("sports_cfl");
+
+    // The sidebar's exact mechanism, without rendering it: iterate the order,
+    // resolve each id. Both steps have to work or the widget has no nav entry.
+    const order = canonicalOrder();
+    expect(order).toContain("sports_cfl");
+    expect(catalogItemById("sports_cfl")).toBeDefined();
+    expect(catalogItemById("sports_cfl")!.name).toBe("CFL");
+
+    // Locally-registered utilities the server does not list still survive.
+    expect(order).toContain("clock");
   });
 });

@@ -73,12 +73,19 @@ func ConnectDB() {
 	// writers. golang-migrate uses the pq driver, which requires sslmode to
 	// be explicit; the table name is kept from before the consolidation so
 	// existing databases don't re-run the chain.
+	//
+	// Default to `require`, not `disable`. pgx (the pool above) negotiates TLS
+	// on its own, so a DATABASE_URL without an explicit sslmode still gave an
+	// encrypted app connection — but this appended `disable`, so the entire DDL
+	// chain ran in the clear against managed Postgres. A database that genuinely
+	// has no TLS opts out by setting sslmode explicitly — docker-compose.dev.yml
+	// already does (`...?sslmode=disable`), so local dev is unaffected.
 	migrateURL := databaseURL
 	if !strings.Contains(migrateURL, "sslmode=") {
 		if strings.Contains(migrateURL, "?") {
-			migrateURL += "&sslmode=disable"
+			migrateURL += "&sslmode=require"
 		} else {
-			migrateURL += "?sslmode=disable"
+			migrateURL += "?sslmode=require"
 		}
 	}
 	if strings.Contains(migrateURL, "?") {

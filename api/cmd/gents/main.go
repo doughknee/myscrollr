@@ -239,13 +239,27 @@ func (g *generator) emit(named *types.Named) error {
 		if skip || !f.Exported() {
 			continue
 		}
-		tsType, optional, err := g.tsType(f.Type())
+		tsType, nullable, err := g.tsType(f.Type())
 		if err != nil {
 			return fmt.Errorf("%s.%s: %w", name, f.Name(), err)
 		}
+		// `nullable` means the Go field is a pointer. Pointers and omitempty
+		// pull in OPPOSITE directions and this used to conflate them, emitting
+		// `field?: T` for both:
+		//
+		//   *T with omitempty     nil is omitted entirely  ->  field?: T
+		//   *T without omitempty  nil is written as null   ->  field: T | null
+		//
+		// The second case was the lie: the key is always present, so `?` told
+		// consumers it might be missing while nothing warned them it could be
+		// null. `max_widgets`, `subscription`, `fantasy`, `requested_at` and
+		// `purge_at` all serialize null on a free/unlinked account.
 		q := ""
-		if omitempty || optional {
+		switch {
+		case omitempty:
 			q = "?"
+		case nullable:
+			tsType += " | null"
 		}
 		fmt.Fprintf(&b, "  %s%s: %s;\n", jsonName, q, tsType)
 	}
@@ -284,8 +298,7 @@ func (g *generator) tsType(t types.Type) (string, bool, error) {
 			}
 			return v.Obj().Name(), false, nil
 		}
-		// A defined string type with declared constants (e.g. WidgetKind,
-		// whose values are "data" and "utility") becomes a union, so the
+		// A defined string type with declared constants becomes a union, so the
 		// clients get the same exhaustiveness the Go side has instead of a
 		// bare `string`.
 		if u, ok := v.Underlying().(*types.Basic); ok && u.Info()&types.IsString != 0 {

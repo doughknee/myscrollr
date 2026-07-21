@@ -20,6 +20,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { defaultPinForNewWidget } from "../preferences";
+import { isUtilityWidget } from "../marketplace";
 import type { CatalogItem } from "../marketplace";
 import { dataWidgetsApi } from "../api/client";
 import type { DataWidgetRow, WidgetId } from "../api/client";
@@ -34,7 +35,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
 
   return useCallback(
     async (item: CatalogItem) => {
-      if (item.source) {
+      if (!isUtilityWidget(item.id)) {
         const widgetType = item.id;
 
         // Optimistic insert: write a placeholder widget into the

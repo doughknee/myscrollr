@@ -263,7 +263,7 @@ func getUserFinanceSymbols(ctx context.Context, logtoSub string) []string {
 	rows, err := platform.DBPool.Query(ctx, `
 		SELECT config FROM user_widgets
 		WHERE logto_sub = $1
-		  AND (widget_type = 'finance' OR widget_type LIKE 'finance\_%')
+		  AND widget_type LIKE 'finance\_%'
 	`, logtoSub)
 	if err != nil {
 		return nil
