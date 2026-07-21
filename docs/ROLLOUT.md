@@ -119,11 +119,15 @@ Only cosmetic vocabulary, deliberately deferred as low-value churn:
   `desktop/src/datawidgets/` folder still carry "datawidget". Renaming the folder
   to `sources/` would match what it actually holds (the `source → renderer`
   registry), at the cost of touching every import path.
-- **`ChannelInfo`, `ChannelRoute`, `GetValidChannelTypes` and `channel_lifecycle`
-  should NOT be renamed.** They name *discovered backend services*, not widgets —
+- **`ChannelInfo`, `ChannelRoute` and `channel_lifecycle` should NOT be
+  renamed.** They name *discovered backend services*, not widgets —
   a different concept that the charter explicitly keeps (discovery/proxy stays for
   fantasy). VISION §2's complaint was that one *concept* carried six names; this is
   a second concept that legitimately owns the word.
+  *(`GetValidChannelTypes` was on this list until 2026-07-21. It is gone — not
+  renamed, deleted: its only callers were the widget create/update validators,
+  which had no business asking a service registry what a widget is. Nothing
+  else ever called it.)*
 
 **Deferred out of Phase 2, with reasons:**
 
