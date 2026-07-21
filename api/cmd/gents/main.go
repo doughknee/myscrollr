@@ -298,8 +298,7 @@ func (g *generator) tsType(t types.Type) (string, bool, error) {
 			}
 			return v.Obj().Name(), false, nil
 		}
-		// A defined string type with declared constants (e.g. WidgetKind,
-		// whose values are "data" and "utility") becomes a union, so the
+		// A defined string type with declared constants becomes a union, so the
 		// clients get the same exhaustiveness the Go side has instead of a
 		// bare `string`.
 		if u, ok := v.Underlying().(*types.Basic); ok && u.Info()&types.IsString != 0 {

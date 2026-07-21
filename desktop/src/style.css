@@ -1158,8 +1158,8 @@ body {
 }
 
 /* ── Unlimited tier glow animations ─────────────────────────────── */
-/* Copied from myscrollr.com/src/styles.css — used by ChannelHeader
-   and InfoCard in @/channels/shared for uplink_ultimate users. */
+/* Copied from myscrollr.com/src/styles.css — used by the widget page
+   header and InfoCard for uplink_ultimate users. */
 
 @keyframes unlimited-glow-pulse {
   0%,

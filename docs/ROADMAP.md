@@ -127,8 +127,9 @@ sold as "4 months free."
 query ranked finals after ALL pre rows, so a high-volume league (MLB) filled
 its payload share with upcoming fixtures and the ticker's "days back"
 under-delivered. Fixed in v1.1.4 by splitting each league share between
-soonest-pre and newest-final (`fairShareSideSplit` in
-channels/sports/api/sports.go).
+soonest-pre and newest-final (`fairShareSideSplit`, now in
+api/internal/ingestread/sports.go — the sports read API moved into core
+with ADR-0002).
 
 **Original scope notes (historical)**
 

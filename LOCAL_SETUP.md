@@ -71,11 +71,10 @@ thing, not part of this stack. (See the note at the end of this doc.)
 `make up` automates everything below; this section is the fallback and explains
 what the containers actually do.
 
-- **Milestone 1 — Core + auth** (below): sign in, manage channels/widgets.
-  Exercises slot-gating, Configure-from-catalog, the removed Display pages,
-  server-side slot enforcement, and the `000014` channel→widget migration.
-  Channels show empty (no data services yet).
-- **Milestone 2 — Live channel data**: run the channel services for real
+- **Milestone 1 — Core + auth** (below): sign in, manage widgets. Exercises
+  slot-gating, Configure-from-catalog and server-side slot enforcement.
+  Widgets show empty (no ingesters running yet).
+- **Milestone 2 — Live widget data**: run the ingesters for real
   stock/score/feed data. Needs provider API keys. See the bottom.
 
 ## What runs where
@@ -156,7 +155,7 @@ rows). Fantasy is Go-native (in-process sync).
 
 ### Ports & secrets
 
-| Channel | Go API | Rust ingester | Provider secret |
+| Source | Go API | Rust ingester | Provider secret |
 |---|---|---|---|
 | rss     | (in core) | 3004 | none (public feeds) |
 | finance | (in core) | 3001 | `TWELVEDATA_API_KEY` |
@@ -205,22 +204,14 @@ within ~10s of the fantasy API starting.
 
 ### Gotchas (hit and fixed)
 
-- **RSS migrations are mis-ordered on a fresh DB.** `130000000001_user_custom_feeds`
-  sorts *before* `20250601000001_initial` (which creates `tracked_feeds`), so a
-  fresh DB fails. All four are idempotent — apply them once in dependency order,
-  then the ingester's boot re-run is a clean no-op:
-  ```bash
-  for f in 20250601000001_initial 20250601000002_add_failure_tracking \
-           130000000001_user_custom_feeds 130000000002_cleanup_dup_user_custom_feeds; do
-    docker exec -i scrollr-postgres psql -U scrollr -d scrollr -v ON_ERROR_STOP=1 \
-      < channels/rss/service/migrations/$f.up.sql
-  done
-  ```
-  (finance `110…` and sports `120…` migrations are correctly ordered — no manual step.)
-- **Shared `_sqlx_migrations`.** All Rust services share it by design
-  (`set_ignore_missing(true)`), so their different version ranges coexist. The
-  Core (golang-migrate) and fantasy (`schema_migrations_fantasy`) use their own
-  tables, so no collision.
+- **Migrations: core runs all of them, nothing else runs any.** The
+  per-ingester `migrations/` directories, their version bands and the
+  shared `_sqlx_migrations` table with `set_ignore_missing(true)` were
+  deleted when core became the single schema owner (VISION §4.3). The
+  ingesters are pure writers. One chain — `api/migrations/`, tracked in
+  `schema_migrations_core`. If a table is missing locally, core failed to
+  migrate; read its logs rather than hunting for an ingester migration to
+  apply by hand.
 - **Fantasy Yahoo OAuth callback.** The connect flow redirects to
   `http://localhost:8084/fantasy/callback`; that URI must be registered in the
   Yahoo app or token exchange fails. The service runs regardless.

@@ -8,9 +8,9 @@ This digest contains the product overview, pricing details, and consolidated FAQ
 
 ## What Scrollr Is
 
-Scrollr is a quiet ticker at the edge of your screen with live sports, markets, news, and fantasy data. It runs as a thin always-on-top bar (top or bottom of any screen), plus a full dashboard for configuration. The four data channels — Finance, Sports, News, Fantasy — stream from source APIs through a Change-Data-Capture PubSub pipeline to your desktop. Free tier polls; paid tiers can stream via Server-Sent Events.
+Scrollr is a quiet ticker at the edge of your screen with live sports, markets, news, and fantasy data. It runs as a thin always-on-top bar (top or bottom of any screen), plus a full dashboard for configuration. Five data sources — Finance, Sports, News, Predictions and Fantasy — stream from source APIs through a Change-Data-Capture PubSub pipeline to your desktop. Real-time streaming over Server-Sent Events is available on every tier, including Free.
 
-Built with: Go (gateway + channel APIs), Rust (ingestion services, Tauri desktop core), React (web + Tauri webview), PostgreSQL (state), Redis (channel registry + PubSub), Logto (auth), Stripe (billing).
+Built with: Go (one gateway API serving every widget route), Rust (ingestion services, Tauri desktop core), React (web + Tauri webview), PostgreSQL (state), Redis (PubSub fan-out), Logto (auth), Stripe (billing).
 
 Core principles: zero tracking, no ads, no data brokers, source available under GNU AGPL v3.0, runs locally.
 

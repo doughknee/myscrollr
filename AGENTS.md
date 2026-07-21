@@ -38,7 +38,7 @@ npm run tauri:dev    # Full Tauri dev (Vite + Rust backend)
 npm run tauri:build  # Production build (native binary)
 ```
 
-### Go APIs (`api/` and `channels/{name}/api/`)
+### Go APIs (`api/` and `channels/fantasy/api/`)
 
 ```sh
 go build -o scrollr_api && ./scrollr_api   # Core: port 8080
@@ -169,7 +169,7 @@ Every component has Sentry wired in. **Privacy is the hard constraint** — see 
 | `api/` (core Go) | `sentry-go@v0.46` + `sentry-go/fiber` | `scrollr-core-api` |
 | `channels/fantasy/api/` | `sentry-go@v0.46` + `sentry-go/fiber` | `scrollr-fantasy-api` (finance/sports/rss/predictions report under `scrollr-core-api` since ADR-0002) |
 | `channels/{finance,sports,rss}/service/` | `sentry@0.42` + `sentry-anyhow@0.42` Rust crates | `scrollr-{name}-svc` |
-| `channels/predictions/{api,service}/` | same wiring as the other channels | none yet — `PREDICTIONS_*_SENTRY_DSN` env vars exist but are unset (no Sentry project created) |
+| `channels/predictions/service/` | same wiring as the other ingesters | none yet — `PREDICTIONS_*_SENTRY_DSN` env vars exist but are unset (no Sentry project created) |
 
 ### Adding a new error capture site
 
