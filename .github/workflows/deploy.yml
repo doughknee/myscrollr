@@ -329,9 +329,14 @@ jobs:
           for svc in core-api website finance-service sports-service rss-service fantasy-api predictions-service; do
             img="$(kubectl get deployment/${svc} -n scrollr \
               -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
+            # Preserve anything that is not the `:latest` placeholder: the
+            # `:sha-<commit>` tags this pipeline pushes, a `@sha256:` digest,
+            # or a tag pinned by hand during an incident. An image with no
+            # tag at all is implicitly `:latest`, so it counts as unpinned.
             case "$img" in
-              *:sha-*) echo "${svc}=${img}" >> /tmp/live-images.env ;;
-              *) echo "${svc}: not pinned (running '${img:-nothing}') — nothing to preserve" ;;
+              ""|*:latest) echo "${svc}: not pinned (running '${img:-nothing}') — nothing to preserve" ;;
+              *:*) echo "${svc}=${img}" >> /tmp/live-images.env ;;
+              *) echo "${svc}: untagged (implicitly :latest) — nothing to preserve" ;;
             esac
           done
           echo "Recorded pins:"; cat /tmp/live-images.env
