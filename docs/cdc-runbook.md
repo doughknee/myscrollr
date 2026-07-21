@@ -7,7 +7,7 @@ dashboard updates from Postgres to the core API's SSE endpoint.
 
 ```
 Postgres (DO Managed, scrollr-db)
-  └── publication: sequin_pub (23 tables)
+  └── publication: sequin_pub (10 routed tables)
   └── replication slot: sequin_slot (logical, pgoutput)
         │
         │  WAL replication stream
@@ -172,12 +172,11 @@ Watch core-api logs — you should see the corresponding
 
 ## Which tables should the Sequin sink forward?
 
-The `sequin_pub` publication covers all 23 user tables, but **only 9 of
-them produce CDC events that core-api actually routes to an SSE topic**.
-The rest are silently dropped in `api/core/handlers_webhook.go`'s
+The `sequin_pub` publication should cover exactly the tables below — **only these 10 produce CDC events that core-api actually routes to an SSE topic**.
+The rest are silently dropped in `api/internal/events/handlers_webhook.go`'s
 `topicForRecord` function (`default: return ""`).
 
-The sink in Sequin should be configured to forward only these 9 tables,
+The sink in Sequin should forward only these 10 tables,
 which keeps webhook volume low without losing functionality:
 
 | Table | Topic produced | Purpose |
@@ -190,7 +189,8 @@ which keeps webhook volume low without losing functionality:
 | `yahoo_matchups` | `cdc:fantasy:{league_key}` | Fantasy matchup scores |
 | `yahoo_rosters` | `cdc:fantasy:{league_key}` | Fantasy roster moves |
 | `user_preferences` | `cdc:core:user:{logto_sub}` | Cross-device pref sync |
-| `user_channels` | `cdc:core:user:{logto_sub}` | Channel enable/disable sync |
+| `user_widgets` | `cdc:core:user:{logto_sub}` | Widget enable/disable sync |
+| `markets` | `cdc:predictions:all` | Prediction-market updates |
 
 ### Why not forward everything?
 
@@ -220,7 +220,7 @@ Postgres publication change required.
 When you want a new table to stream via CDC:
 
 1. Add a case to `topicForRecord` in
-   `api/core/handlers_webhook.go` and define a topic prefix constant
+   `api/internal/events/handlers_webhook.go` and define a topic prefix constant
    in `api/core/constants.go` if needed.
 2. Add the table to the Sequin sink's table-filter list.
 3. Verify via `kubectl logs deploy/core-api | grep '[Sequin]'` after
@@ -257,7 +257,7 @@ flagged it):
 
 | Table | Replica identity | Reason |
 |---|---|---|
-| `user_channels` | `FULL` | Enabled for CDC diagnostics |
+| `user_widgets` | `FULL` | Enabled for CDC diagnostics |
 | `user_preferences` | `FULL` | Enabled for CDC diagnostics |
 | `yahoo_leagues` | `FULL` | Enabled for CDC diagnostics |
 | `yahoo_matchups` | `FULL` | Enabled for CDC diagnostics |
@@ -300,6 +300,63 @@ partitions, which is almost always what downstream consumers want.
 
 Sequin's health check explicitly requires this setting and will
 report the publication as unhealthy without it.
+
+### Mode 3: dropped tables silently empty the publication
+
+**This is the nastiest failure mode in this document, because every
+health signal stays green while CDC is completely dead.**
+
+`sequin_pub` is `FOR TABLE <explicit list>`, not `FOR ALL TABLES`.
+Postgres removes a table from a publication when the table is dropped —
+so anything that recreates the schema empties the publication:
+
+- `DROP SCHEMA public CASCADE` (the database-reset runbook)
+- a migration that drops and recreates a routed table
+- restoring into a fresh database
+
+What it looks like afterwards, and why it fools you:
+
+| Signal | Reads as |
+|---|---|
+| Sequin's replication slot | `active = true`, small lag — it *is* consuming WAL |
+| Sequin's console | connected, healthy |
+| core-api logs | silent (the CDC path only logs on error) |
+| Every API endpoint | 200 |
+| Actual CDC delivery | **zero events, forever** |
+
+Confirm it in one query:
+
+```sql
+SELECT count(*), string_agg(tablename, ', ' ORDER BY tablename)
+FROM pg_publication_tables WHERE pubname = 'sequin_pub';
+```
+
+`0 tables` means this happened. Updating the table selection in Sequin's
+UI will *not* fix it — the gap is in Postgres, one layer below.
+
+Fix by re-adding the routed tables (the 10 from the table above):
+
+```sql
+ALTER PUBLICATION sequin_pub ADD TABLE
+  user_widgets, user_preferences, trades, games, rss_items, markets,
+  yahoo_leagues, yahoo_standings, yahoo_matchups, yahoo_rosters;
+```
+
+Then verify events actually flow — don't trust the slot:
+
+```sh
+# subscribe for 30s; finance alone should produce dozens during market hours
+kubectl -n scrollr run cdcwatch --rm -i --restart=Never --image=redis:7-alpine -- \
+  redis-cli -u "$REDIS_URL" psubscribe 'cdc:*'
+```
+
+**Add this to any database-reset checklist.** A reset that verifies the
+schema came back is not finished: replication is separate state, and it
+does not come back with it. Observed 2026-07-21, when the unification
+reset dropped CDC for the ~40 minutes it took to notice.
+
+Replica identity survives a reset if the recreated tables declare it, but
+check anyway — see [Replica identity](#replica-identity).
 
 ## Prevention: bounding WAL growth
 
@@ -363,5 +420,5 @@ migrated, re-apply and re-verify.
 - PR #106 — removed the ESPN `TRUNCATE games` on startup, the code
   path that likely wrote the poisoned WAL record behind the 2026-04-23
   incident.
-- `api/core/handlers_webhook.go` — the webhook receiver.
+- `api/internal/events/handlers_webhook.go` — the webhook receiver.
 - `api/core/constants.go` — CDC topic prefixes.
