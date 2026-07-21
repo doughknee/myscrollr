@@ -313,6 +313,29 @@ jobs:
       - name: Configure kubectl
         run: doctl kubernetes cluster kubeconfig save scrollr-cluster
 
+      # Every deployment manifest hardcodes `:latest` as its image, which is
+      # only meaningful when creating a deployment on a fresh cluster. On an
+      # existing cluster `kubectl apply` rewrites the running image back to
+      # `:latest`, silently unpinning it: both the old and new ReplicaSets
+      # then record `:latest`, so `kubectl rollout undo` resolves to the
+      # newest image and a rollback does nothing. Only services this build
+      # also rebuilt get re-pinned by "Roll out updated images", so a
+      # k8s-only change unpins everything else. Record what is actually
+      # running so the rollout step can restore it.
+      - name: Record live image tags
+        if: needs.detect-changes.outputs.k8s == 'true'
+        run: |
+          : > /tmp/live-images.env
+          for svc in core-api website finance-service sports-service rss-service fantasy-api predictions-service; do
+            img="$(kubectl get deployment/${svc} -n scrollr \
+              -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
+            case "$img" in
+              *:sha-*) echo "${svc}=${img}" >> /tmp/live-images.env ;;
+              *) echo "${svc}: not pinned (running '${img:-nothing}') — nothing to preserve" ;;
+            esac
+          done
+          echo "Recorded pins:"; cat /tmp/live-images.env
+
       - name: Apply K8s config changes
         if: needs.detect-changes.outputs.k8s == 'true'
         run: |
@@ -416,8 +439,28 @@ jobs:
             fi
 
             if [ "$K8S_CHANGED" = "true" ]; then
-              echo "Restarting ${service} to pick up Kubernetes config changes"
-              kubectl rollout restart deployment/${service} -n scrollr
+              # `kubectl apply` just reset this service to `:latest`. Restore
+              # the tag it was actually running (recorded before the apply);
+              # that is itself a spec change, so it rolls the pods and picks
+              # up the config change we applied. Only fall back to a bare
+              # restart when there was no pinned tag to restore.
+              pinned=""
+              if [ -f /tmp/live-images.env ]; then
+                pinned="$(sed -n "s|^${service}=||p" /tmp/live-images.env)"
+              fi
+
+              if [ -n "$pinned" ]; then
+                echo "Re-pinning ${service} to ${pinned} (apply had reset it to :latest)"
+                kubectl set image deployment/${service} \
+                  ${service}="${pinned}" \
+                  -n scrollr
+                # If the image already matched, no new rollout is triggered
+                # and the config change still needs a restart.
+                kubectl rollout restart deployment/${service} -n scrollr
+              else
+                echo "Restarting ${service} to pick up Kubernetes config changes"
+                kubectl rollout restart deployment/${service} -n scrollr
+              fi
               wait_for_rollout "$service"
             fi
           }
