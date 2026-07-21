@@ -15,28 +15,10 @@ import type {
 } from "../preferences";
 import { shouldShowOnTicker } from "../preferences";
 import type { LeagueResponse as FantasyLeague } from "../datawidgets/fantasy/types";
-import TradeChip from "./chips/TradeChip";
-import GameChip from "./chips/GameChip";
-import RssChip from "./chips/RssChip";
-import PredictionChip from "./chips/PredictionChip";
-import FantasyStatChip from "./chips/FantasyStatChip";
-import FollowedPlayerChip from "./chips/FollowedPlayerChip";
 import ConsolidatedChip from "./chips/ConsolidatedChip";
-import { selectRssForTicker, getRssDisplayPrefs } from "../datawidgets/rss/view";
-import { selectFinanceForTicker } from "../datawidgets/finance/view";
-import { selectFantasyForTicker } from "../datawidgets/fantasy/view";
-import { selectSportsForTicker, getSportsDisplayConfig } from "../datawidgets/sports/view";
-import { selectPredictionsForTicker } from "../datawidgets/predictions/view";
 import { getWatchlist, onWatchlistChange } from "../datawidgets/predictions/watchlist";
-import {
-  findTopN,
-  findTopBench,
-  findWorstStarter,
-  findInjuredPlayers,
-} from "../datawidgets/fantasy/playerStats";
-import { buildYahooLeagueUrl, buildYahooPlayerUrl, chipUrlForFinance, chipUrlForSports, chipUrlForRss } from "../utils/chipUrl";
 import { sourceForWidget } from "../marketplace";
-import { scopeSourceData } from "../utils/widgetScope";
+import { getTickerSource } from "../datawidgets/tickerRegistry";
 
 // ── Module-level constants ───────────────────────────────────────
 
@@ -248,309 +230,36 @@ export default function ScrollrTicker({
         continue;
       }
 
-      // ── DataWidgetRow tabs ──────────────────────────────────────────
-      // activeTabs holds widget ids (sports_nfl, finance_stocks, news_bbc), but
-      // dashboard.data is keyed by the coarse source (sports/finance/rss).
-      // Resolve widget → source for the lookup; scope the payload below. A bare
-      // coarse/legacy tab (source undefined) shows everything.
+      // ── Data-widget tabs ────────────────────────────────────────────
+      // activeTabs holds widget ids (sports_nfl, finance_stocks, news_bbc),
+      // but dashboard.data is keyed by the source (sports/finance/rss), so
+      // resolve widget → source for the lookup. Each source owns its own chip
+      // building (datawidgets/{source}/ticker.tsx); a source this client has
+      // no renderer for contributes nothing rather than falling through.
       const source = sourceForWidget(tab);
       const effectiveSource = source ?? tab;
       const rawData = dashboard?.data?.[effectiveSource];
 
-      // Fantasy arrives as a structured { leagues: [...] } object, so it
-      // needs its own branch before the generic array check below.
-      // Uses `selectFantasyForTicker` which honours enabledLeagueKeys +
-      // primaryLeagueKey from Display prefs — so the ticker stays in sync
-      // with the Fantasy feed page.
-      if (effectiveSource === "fantasy") {
-        const fantasyPayload = rawData as { leagues?: unknown } | undefined;
-        const leagues = Array.isArray(fantasyPayload?.leagues)
-          ? (fantasyPayload.leagues as FantasyLeague[])
-          : [];
-        if (leagues.length === 0) continue;
-        const fantasyPrefs = widgetDisplay?.fantasy;
-        if (!fantasyPrefs) continue;
+      const tickerSource = getTickerSource(effectiveSource);
+      if (!tickerSource) continue;
 
-        // ── Followed-player chips render FIRST so the user's tracked
-        //    players lead the fantasy bucket. They render even when
-        //    the league-summary chips are gated off (the user
-        //    explicitly opted in to per-player tracking).
-        // Pre-build a player → owning-league lookup so we can resolve
-        // each player's `game_code` (canonical Yahoo sport name like
-        // "nfl") for URL construction. Yahoo's `player_key` prefix is
-        // a numeric game id, not the sport name, so we MUST use the
-        // owning league's `game_code` field to build a working URL.
-        const playerToLeagueGameCode = new Map<string, string>();
-        for (const lg of leagues) {
-          if (!lg.rosters) continue;
-          for (const roster of lg.rosters) {
-            for (const player of roster.data.players) {
-              if (player.player_key) {
-                playerToLeagueGameCode.set(player.player_key, lg.game_code);
-              }
-            }
-          }
-        }
-        for (const playerKey of fantasyPrefs.followedPlayerKeys ?? []) {
-          const playerGameCode = playerToLeagueGameCode.get(playerKey);
-          bucket.push(
-            wrap(`follow-${playerKey}`,
-              <FollowedPlayerChip
-                playerKey={playerKey}
-                leagues={leagues}
-                comfort={comfort}
-                colorMode={chipColorMode}
-                onClick={() => onChipClick?.("fantasy", playerKey, buildYahooPlayerUrl(playerKey, playerGameCode))}
-              />
-            )
-          );
-        }
-
-        const ranked = selectFantasyForTicker(leagues, fantasyPrefs);
-        for (const league of ranked) {
-          // 1. The league summary chip itself (matchup-level: score,
-          //    week, win-prob, record, standings, top scorer, etc).
-          bucket.push(
-            wrap(`fan-${league.league_key}`,
-              <FantasyStatChip
-                league={league}
-                prefs={fantasyPrefs}
-                comfort={comfort}
-                colorMode={chipColorMode}
-                onClick={() => onChipClick?.("fantasy", league.league_key, buildYahooLeagueUrl(league.league_key, league.game_code))}
-              />
-            )
-          );
-
-          // 2. Per-player chips derived from the user's roster in this
-          //    league. Each "Player stats" venue toggle that's enabled
-          //    on the ticker spawns one FollowedPlayerChip per derived
-          //    player. Render order mirrors the Display prefs grouping:
-          //    top scorers (top3), worst starter, bench leader,
-          //    injury report.
-          //
-          //    Skip this whole block if the league has no roster (rare
-          //    pre-import or partial-sync state).
-          const userTeam = league.rosters?.find((r) => r.team_key === league.team_key);
-          if (!userTeam) continue;
-          const players = userTeam.data.players;
-
-          if (shouldShowOnTicker(fantasyPrefs.topThreeScorers)) {
-            const top3 = findTopN(players, 3, { startersOnly: true });
-            // Skip top1 if topScorer is also enabled — it's already on
-            // the league chip as "★ Mahomes 32" and would duplicate.
-            const startIdx = shouldShowOnTicker(fantasyPrefs.topScorer) && top3.length > 0 ? 1 : 0;
-            for (let i = startIdx; i < top3.length; i++) {
-              const p = top3[i];
-              bucket.push(
-                wrap(`fan-${league.league_key}-top-${p.player_key}`,
-                  <FollowedPlayerChip
-                    playerKey={p.player_key}
-                    leagueKey={league.league_key}
-                    leagues={leagues}
-                    comfort={comfort}
-                    colorMode={chipColorMode}
-                    accent="top"
-                    onClick={() => onChipClick?.("fantasy", p.player_key, buildYahooPlayerUrl(p.player_key, league.game_code))}
-                  />
-                )
-              );
-            }
-          }
-
-          if (shouldShowOnTicker(fantasyPrefs.worstStarter)) {
-            const worst = findWorstStarter(players);
-            if (worst) {
-              bucket.push(
-                wrap(`fan-${league.league_key}-worst-${worst.player_key}`,
-                  <FollowedPlayerChip
-                    playerKey={worst.player_key}
-                    leagueKey={league.league_key}
-                    leagues={leagues}
-                    comfort={comfort}
-                    colorMode={chipColorMode}
-                    accent="worst"
-                    onClick={() => onChipClick?.("fantasy", worst.player_key, buildYahooPlayerUrl(worst.player_key, league.game_code))}
-                  />
-                )
-              );
-            }
-          }
-
-          if (shouldShowOnTicker(fantasyPrefs.benchOpportunity)) {
-            const topBench = findTopBench(players);
-            if (topBench) {
-              bucket.push(
-                wrap(`fan-${league.league_key}-bench-${topBench.player_key}`,
-                  <FollowedPlayerChip
-                    playerKey={topBench.player_key}
-                    leagueKey={league.league_key}
-                    leagues={leagues}
-                    comfort={comfort}
-                    colorMode={chipColorMode}
-                    accent="bench"
-                    onClick={() => onChipClick?.("fantasy", topBench.player_key, buildYahooPlayerUrl(topBench.player_key, league.game_code))}
-                  />
-                )
-              );
-            }
-          }
-
-          if (shouldShowOnTicker(fantasyPrefs.injuryDetail)) {
-            const injured = findInjuredPlayers(players);
-            for (const p of injured) {
-              bucket.push(
-                wrap(`fan-${league.league_key}-inj-${p.player_key}`,
-                  <FollowedPlayerChip
-                    playerKey={p.player_key}
-                    leagueKey={league.league_key}
-                    leagues={leagues}
-                    comfort={comfort}
-                    colorMode={chipColorMode}
-                    accent="injury"
-                    onClick={() => onChipClick?.("fantasy", p.player_key, buildYahooPlayerUrl(p.player_key, league.game_code))}
-                  />
-                )
-              );
-            }
-          }
-        }
-
-        // Only push the bucket when something is actually in it (no
-        // league chips AND no followed players → empty bucket → skip).
-        if (bucket.length > 0) buckets.push(bucket);
-        continue;
+      for (const chip of tickerSource.chips(rawData, {
+        tab,
+        source: effectiveSource,
+        dashboard,
+        comfort,
+        chipColorMode,
+        widgetDisplay,
+        predictionsWatchlist,
+        onChipClick,
+      })) {
+        bucket.push(wrap(chip.key, chip.node));
       }
 
-      if (!Array.isArray(rawData) || rawData.length === 0) continue;
+      // Only push a bucket that actually has chips in it.
+      if (bucket.length > 0) buckets.push(bucket);
+      continue;
 
-      // Scope the payload to this widget's own config (leagues / symbols / feed
-      // URLs). Legacy coarse tabs (no source) show everything.
-      const data = source
-        ? scopeSourceData(
-            source,
-            rawData,
-            dashboard?.channels?.find((c) => c.channel_type === tab)?.config as
-              | Record<string, unknown>
-              | undefined,
-          )
-        : rawData;
-      if (data.length === 0) continue;
-
-      switch (effectiveSource) {
-        case "finance": {
-          // Apply Display prefs: `defaultSort` affects both feed and
-          // ticker (universal sort). Per-field visibility (showChange,
-          // showPrevClose, showLastUpdated) consults the Venue enum —
-          // the ticker only renders what's set to "both" or "ticker".
-          const financePrefs = widgetDisplay?.finance;
-          if (!financePrefs) continue;
-          const sorted = selectFinanceForTicker(data as Trade[], financePrefs);
-          for (const trade of sorted) {
-            bucket.push(
-              wrap(`fin-${trade.symbol}`,
-                <TradeChip
-                  trade={trade}
-                  comfort={comfort}
-                  colorMode={chipColorMode}
-                  showChange={shouldShowOnTicker(financePrefs.showChange)}
-                  directionMarker={financePrefs.tickerDirectionMarker ?? "arrow"}
-                  onClick={() => onChipClick?.("finance", trade.symbol, chipUrlForFinance(trade))}
-                />
-              )
-            );
-          }
-          break;
-        }
-
-        case "sports": {
-          // Sports display prefs live server-side on the WIDGET row's
-          // config.display (per-league toggles since the 000014 split);
-          // pass the tab so an NFL widget's toggles gate NFL chips. Per-
-          // field visibility uses the Venue enum via shouldShowOnTicker.
-          const sportsConfig = getSportsDisplayConfig(dashboard, tab);
-          const showLogos = shouldShowOnTicker(sportsConfig.showLogos ?? "both");
-          const showTimer = shouldShowOnTicker(sportsConfig.showTimer ?? "both");
-          const sorted = selectSportsForTicker(data as Game[], sportsConfig);
-          for (const game of sorted) {
-            bucket.push(
-              wrap(`spo-${game.id}`,
-                <GameChip
-                  game={game}
-                  comfort={comfort}
-                  colorMode={chipColorMode}
-                  showLogos={showLogos}
-                  showTimer={showTimer}
-                  onClick={() => onChipClick?.("sports", game.id, chipUrlForSports(game))}
-                />
-              )
-            );
-          }
-          break;
-        }
-
-        case "rss": {
-          // Global Display prefs merged with THIS widget's config.display
-          // override (v1.1.3: the per-widget time window must gate ticker
-          // chips exactly like the feed — mirror of getSportsDisplayConfig).
-          const rssPrefs = widgetDisplay?.rss;
-          if (!rssPrefs) continue;
-          const merged = getRssDisplayPrefs(rssPrefs, dashboard, tab);
-          const curated = selectRssForTicker(data as RssItem[], merged);
-          for (const item of curated) {
-            bucket.push(
-              wrap(`rss-${item.id}`,
-                <RssChip
-                  item={item}
-                  comfort={comfort}
-                  colorMode={chipColorMode}
-                  showSource={shouldShowOnTicker(rssPrefs.showSource)}
-                  showTimestamps={shouldShowOnTicker(rssPrefs.showTimestamps)}
-                  onClick={() => onChipClick?.("rss", item.id, chipUrlForRss(item))}
-                />
-              )
-            );
-          }
-          break;
-        }
-
-        case "predictions": {
-          // Premier prediction-markets channel. Implied probability +
-          // ▲/▼ delta is the "heartbeat"; the universal `defaultSort`
-          // (movers/volume/closing) governs ordering on both surfaces.
-          // v1.1.4 scoping: starred markets only when the watchlist has
-          // any (subscribed state above — live across windows);
-          // otherwise the selector falls back to the top rank-1 movers —
-          // never again the whole ingested universe.
-          const predictionsPrefs = widgetDisplay?.predictions;
-          if (!predictionsPrefs) continue;
-          const sorted = selectPredictionsForTicker(
-            data as Prediction[],
-            predictionsPrefs,
-            predictionsWatchlist,
-          );
-          for (const p of sorted) {
-            bucket.push(
-              wrap(`pred-${p.id}`,
-                <PredictionChip
-                  prediction={p}
-                  comfort={comfort}
-                  colorMode={chipColorMode}
-                  showDelta={shouldShowOnTicker(predictionsPrefs.showDelta)}
-                  showCategory={shouldShowOnTicker(predictionsPrefs.showCategory)}
-                  showVolume={shouldShowOnTicker(predictionsPrefs.showVolume)}
-                  showCloseTime={shouldShowOnTicker(predictionsPrefs.showCloseTime)}
-                  onClick={() => onChipClick?.("predictions", p.id, p.link)}
-                />
-              )
-            );
-          }
-          break;
-        }
-
-      }
-
-      buckets.push(bucket);
     }
 
     // Combine based on mix mode. Row filtering is handled upstream now,

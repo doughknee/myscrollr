@@ -637,7 +637,7 @@ export const DEFAULT_GITHUB_TICKER: GitHubTickerConfig = {
   excludedRepos: [],
 };
 
-const DEFAULT_WIDGET_DISPLAY: WidgetDisplayPrefs = {
+export const DEFAULT_WIDGET_DISPLAY: WidgetDisplayPrefs = {
   finance: {
     showChange: "both",
     showPrevClose: "both",
