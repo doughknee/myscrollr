@@ -21,9 +21,45 @@ Because there's no compat to preserve, the phases below are a **sensible work-or
 |---|---|
 | 1 — backend package split | ✅ **done** — `api/core` split into 8 internal packages + core wiring, acyclic, one binary |
 | 2 — DB schema authority + final names | ✅ **done** — one squashed baseline in `api/migrations`, ingesters are pure writers, `user_widgets`/`widget_type` |
-| 3 — server catalog + generic client + rename | ⬜ not started — see the findings below before starting |
-| 4 — shared TS types | ⬜ not started |
+| 3 — server catalog + generic client + rename | 🟡 **partly done** — catalog + generic client landed; **the wire/vocabulary rename has not** (see below) |
+| 4 — shared TS types | ⬜ not started (blocked on Phase 3's rename — codegen should run against final names) |
 | 5 — cleanup + docs | ⬜ not started (AGENTS.md "Database Migrations" already rewritten, since Phase 2 made it actively wrong) |
+
+### Phase 3 — what landed
+
+- **3a, server catalog.** `GET /catalog` is the single authority. It now carries all
+  35 shipped widgets with full identity (name, description, category, color, logo,
+  default config, tier, about/usage, order) — the server previously enumerated 11.
+  The pre-split coarse types (`finance`/`sports`/`rss`/`fantasy`/`news`) are gone.
+- **3b, desktop renders from it.** `marketplace.ts DATA_WIDGETS` is deleted;
+  `marketplace.ts` is a view over the catalog. Every exported helper kept its
+  signature, so ~110 call sites were untouched. `catalog.snapshot.json` is the
+  offline fallback (constraint 1), generated from the server and pinned to it by a
+  Go drift-guard test. `useCatalog()` refreshes via `useSyncExternalStore`.
+- **3c, generic ticker dispatch (#5).** The per-source ladder in `ScrollrTicker` is
+  replaced by a `source → renderer` registry; each source owns
+  `datawidgets/{source}/ticker.tsx`. 981 → 606 lines, and chip building is now
+  unit-testable (6 new tests covering what could not be reached before).
+
+### Phase 3 — what remains: the wire + vocabulary rename
+
+This is the whole of ROLLOUT's "rename the wire outright" bullet, and it is
+deliberately **not** half-done — it only works as one atomic change across server
+and client:
+
+- **Server:** `channel_type` → `widget_type`, `channels` → `widgets` in the
+  dashboard payload, drop the `visible`/`ticker_enabled` duplicate, and delete the
+  `/users/me/channels` routes in favour of `/users/me/widgets` (no alias).
+- **Clients:** ~150 `channel_type` references across desktop and web, plus
+  `DataWidget*`/`Channel*` type and folder vocabulary.
+
+Do it by renaming the **TypeScript types first** (`DataWidgetRow.channel_type` →
+`widget_type`), so every read becomes a compile error until fixed — otherwise a
+missed rename compiles cleanly and only fails at runtime, which the type checker
+cannot catch for a JSON wire.
+
+Note that `DATA_WIDGETS` being gone removes one of the two sides that used to drift,
+so the rename is now a smaller job than the raw reference count suggests.
 
 **Deferred out of Phase 2, with reasons:**
 
