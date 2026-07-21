@@ -22,7 +22,7 @@ Because there's no compat to preserve, the phases below are a **sensible work-or
 | 1 — backend package split | ✅ **done** — `api/core` split into 8 internal packages + core wiring, acyclic, one binary |
 | 2 — DB schema authority + final names | ✅ **done** — one squashed baseline in `api/migrations`, ingesters are pure writers, `user_widgets`/`widget_type` |
 | 3 — server catalog + generic client + rename | ✅ **done** — catalog, generic client, and the wire rename all landed |
-| 4 — shared TS types | ⬜ not started (blocked on Phase 3's rename — codegen should run against final names) |
+| 4 — shared TS types | ✅ **done** — `api/cmd/gents` generates them from the Go structs; a Go test pins both clients to it |
 | 5 — cleanup + docs | ⬜ not started (AGENTS.md "Database Migrations" already rewritten, since Phase 2 made it actively wrong) |
 
 ### Phase 3 — what landed
@@ -54,6 +54,35 @@ Because there's no compat to preserve, the phases below are a **sensible work-or
   where no type applies, and it had two silent bugs (filtering CDC events on
   `table_name === "user_channels"`, and reading `cdc.record.visible`). Anything
   reading raw CDC payloads has to be checked by hand.
+
+### Phase 4 — deviation from the plan, on purpose
+
+This phase says "generate TS types from the Go OpenAPI". **There is no OpenAPI
+spec** — the api module has a swaggo header on `main()` and zero handler
+annotations, so the premise was wrong. Producing one would mean adding the
+dependency and annotating ~50 handlers to describe shapes the Go structs already
+define exactly.
+
+`api/cmd/gents` reads the same source of truth directly and emits
+`api.generated.ts` into both clients, with a Go test pinning them to it. That
+delivers §4.6's stated purpose ("types generated from the Go contract so web and
+desktop cannot drift... no monorepo tooling required") with no new dependency and
+no intermediate document to keep current. Revisit if anything other than the two
+TS clients ever needs the contract.
+
+Two properties worth preserving if this is ever rewritten:
+
+- **A type with a custom `MarshalJSON` is refused, not emitted.** Struct tags stop
+  describing the JSON there, so generating from them would silently lie. `Widget`
+  carried exactly that hazard until the wire rename removed its dual-emit.
+- **A Go named string type with constants becomes a union** (`WidgetKind` →
+  `"data" | "utility"`), so the clients keep the exhaustiveness Go has.
+
+Adopting the contract immediately found three lies in the hand-written types,
+including four optimistic-update hooks still writing a `channels` key after the
+Phase 3d rename — silent, because TypeScript's excess-property check does not
+apply through a spread. There is now a source-text test for that specific blind
+spot in `desktop/src/hooks/optimisticDashboard.test.ts`.
 
 ### Phase 3 — what remains
 
