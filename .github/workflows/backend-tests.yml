@@ -87,7 +87,7 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/scrollr_test?sslmode=disable
 
-  # ── Rust tests (3 independent jobs, run in parallel) ───────────
+  # ── Rust tests (4 independent jobs, run in parallel) ───────────
   rust-tests:
     strategy:
       fail-fast: false
@@ -103,6 +103,29 @@ jobs:
       run:
         working-directory: ${{ matrix.dir }}
 
+    # Postgres for tests/schema_contract.rs. These services write with runtime
+    # `sqlx::query`, so a core column rename compiles fine and fails only at
+    # runtime — where the error is logged, the poll loop continues, reads
+    # return an empty Vec, and /health/ready stays 200. Without a database
+    # here the contract test skips and the drift stays invisible.
+    #
+    # Each matrix entry gets its own container, so the four jobs cannot see
+    # each other's schema. The test applies core's migrations itself.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: scrollr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v6
 
@@ -113,3 +136,5 @@ jobs:
           cache-on-failure: "true"
 
       - run: cargo test --quiet
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/scrollr_test?sslmode=disable

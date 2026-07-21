@@ -2,31 +2,62 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Fantasy no longer runs migrations — core-api owns every shared table
-// (VISION 4.3). The Rust ingesters get their drift guard from sqlx's
-// compile-time query checking; Go has no equivalent, so this test is
-// fantasy's: it asserts every column this service reads or writes still
-// exists, with a compatible type.
+// (VISION 4.3), so a core migration can silently remove something this
+// service depends on. This test is how it finds out.
+//
+// The header here used to say the Rust ingesters were covered by "sqlx's
+// compile-time query checking". They are not: they use runtime
+// `sqlx::query`, not the `query!` macro, so nothing is checked at compile
+// time. They now have tests/schema_contract.rs, built on this file's shape.
 //
 // Skips without TEST_DATABASE_URL, like the other integration tests. CI
 // provides one (.github/workflows/backend-tests.yml), so a core migration
 // that drops a column fantasy depends on fails the build there.
 //
 // When you add a column to a query in this service, add it here too.
-var schemaContract = map[string][]string{
-	"yahoo_users":        {"guid", "logto_sub", "refresh_token", "last_sync", "created_at"},
-	"yahoo_leagues":      {"league_key", "name", "game_code", "season", "data", "updated_at"},
-	"yahoo_user_leagues": {"guid", "league_key", "team_key", "team_name", "created_at"},
-	"yahoo_matchups":     {"league_key", "week", "data", "updated_at"},
-	"yahoo_rosters":      {"team_key", "league_key", "data", "updated_at"},
-	"yahoo_standings":    {"league_key", "data", "updated_at"},
+//
+// Columns carry their expected information_schema.data_type. Existence alone
+// is not enough: widening `week` from smallint or retyping `data` off jsonb
+// breaks this service just as surely as dropping the column, and an
+// existence-only check waves both through.
+var schemaContract = map[string]map[string]string{
+	"yahoo_users": {
+		"guid": "character varying", "logto_sub": "character varying",
+		"refresh_token": "text", "last_sync": "timestamp with time zone",
+		"created_at": "timestamp with time zone",
+	},
+	"yahoo_leagues": {
+		"league_key": "character varying", "name": "character varying",
+		"game_code": "character varying", "season": "character varying",
+		"data": "jsonb", "updated_at": "timestamp with time zone",
+	},
+	"yahoo_user_leagues": {
+		"guid": "character varying", "league_key": "character varying",
+		"team_key": "character varying", "team_name": "character varying",
+		"created_at": "timestamp with time zone",
+	},
+	"yahoo_matchups": {
+		"league_key": "character varying", "week": "smallint",
+		"data": "jsonb", "updated_at": "timestamp with time zone",
+	},
+	"yahoo_rosters": {
+		"team_key": "character varying", "league_key": "character varying",
+		"data": "jsonb", "updated_at": "timestamp with time zone",
+	},
+	"yahoo_standings": {
+		"league_key": "character varying", "data": "jsonb",
+		"updated_at": "timestamp with time zone",
+	},
 }
 
 func TestSchemaContract(t *testing.T) {
@@ -67,20 +98,24 @@ func TestSchemaContract(t *testing.T) {
 
 	for table, columns := range schemaContract {
 		t.Run(table, func(t *testing.T) {
-			for _, col := range columns {
-				var exists bool
+			for col, wantType := range columns {
+				var gotType string
 				err := pool.QueryRow(ctx, `
-					SELECT EXISTS (
-						SELECT 1 FROM information_schema.columns
-						WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
-					)`, table, col).Scan(&exists)
-				if err != nil {
-					t.Fatalf("query information_schema for %s.%s: %v", table, col, err)
-				}
-				if !exists {
+					SELECT data_type FROM information_schema.columns
+					WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+				`, table, col).Scan(&gotType)
+				if errors.Is(err, pgx.ErrNoRows) {
 					t.Errorf("%s.%s is missing — fantasy reads or writes it, but core's "+
 						"migrations no longer create it. Add it back in api/migrations, "+
 						"or update this service and the contract above.", table, col)
+					continue
+				}
+				if err != nil {
+					t.Fatalf("query information_schema for %s.%s: %v", table, col, err)
+				}
+				if gotType != wantType {
+					t.Errorf("%s.%s is %q, expected %q — a core migration retyped a column "+
+						"fantasy depends on.", table, col, gotType, wantType)
 				}
 			}
 		})
