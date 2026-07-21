@@ -110,8 +110,8 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
 
   // This widget's channel row — source of its feed scope + display overrides.
   const channel = useMemo(
-    () => dashboard?.channels?.find((c) => c.channel_type === widgetId),
-    [dashboard?.channels, widgetId],
+    () => dashboard?.widgets?.find((c) => c.widget_type === widgetId),
+    [dashboard?.widgets, widgetId],
   );
 
   // Per-widget display overrides the global rss display where set —
@@ -231,7 +231,7 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
         ?.display ?? {},
     [channel?.config],
   );
-  const widgetType = (channel?.channel_type ?? widgetId ?? "rss") as DataWidgetType;
+  const widgetType = (channel?.widget_type ?? widgetId ?? "rss") as DataWidgetType;
 
   // Persists the sticky sort into this widget's config.display override
   // (same slot the time window uses; separate keyed hook from the bar's

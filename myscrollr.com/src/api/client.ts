@@ -91,7 +91,7 @@ export type TierKey =
   | 'uplink_ultimate'
   | 'super_user'
 
-export interface ChannelLimits {
+export interface WidgetLimits {
   /** Widget-slot cap — how many widgets a tier runs at once. null = unlimited. */
   max_widgets: number | null
   symbols: number | null
@@ -104,107 +104,12 @@ export interface ChannelLimits {
 }
 
 export interface TierLimitsResponse {
-  tiers: Record<TierKey, ChannelLimits>
+  tiers: Record<TierKey, WidgetLimits>
 }
 
 export const tierLimitsApi = {
   /** Fetch tier limits from the backend. Cached by the CDN for 5 min. */
   get: () => request<TierLimitsResponse>('/tier-limits'),
-}
-
-// ── Channel Types ────────────────────────────────────────────────
-
-export type ChannelType = 'finance' | 'sports' | 'fantasy' | 'rss'
-
-export interface Channel {
-  id: number
-  channel_type: ChannelType
-  enabled: boolean
-  visible: boolean
-  config: Record<string, unknown>
-  created_at: string
-  updated_at: string
-}
-
-export interface RssChannelConfig {
-  feeds?: Array<{ name: string; url: string }>
-}
-
-// ── Channels API ─────────────────────────────────────────────────
-
-export const channelsApi = {
-  getAll: (getToken: () => Promise<string | null>) =>
-    authenticatedFetch<{ channels: Array<Channel> }>(
-      '/users/me/channels',
-      {},
-      getToken,
-    ),
-
-  create: (
-    channelType: ChannelType,
-    config: Record<string, unknown>,
-    getToken: () => Promise<string | null>,
-  ) =>
-    authenticatedFetch<Channel>(
-      '/users/me/channels',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel_type: channelType, config }),
-      },
-      getToken,
-    ),
-
-  update: (
-    channelType: ChannelType,
-    data: {
-      enabled?: boolean
-      visible?: boolean
-      config?: Record<string, unknown>
-    },
-    getToken: () => Promise<string | null>,
-  ) =>
-    authenticatedFetch<Channel>(
-      `/users/me/channels/${channelType}`,
-      {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      },
-      getToken,
-    ),
-
-  delete: (channelType: ChannelType, getToken: () => Promise<string | null>) =>
-    authenticatedFetch<{
-      status: string
-      message: string
-    }>(`/users/me/channels/${channelType}`, { method: 'DELETE' }, getToken),
-}
-
-// ── RSS Types & API ──────────────────────────────────────────────
-
-export interface TrackedFeed {
-  url: string
-  name: string
-  category: string
-  is_default: boolean
-}
-
-export const rssApi = {
-  /** Fetch the public feed catalog (no auth required) */
-  getCatalog: () => request<Array<TrackedFeed>>('/rss/feeds'),
-
-  /** Delete a custom (non-default) feed from the catalog */
-  deleteFeed: (url: string, getToken: () => Promise<string | null>) =>
-    authenticatedFetch<{ status: string; message: string }>(
-      '/rss/feeds',
-      {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      },
-      getToken,
-    ),
 }
 
 // ── Preferences API ───────────────────────────────────────────────
@@ -455,19 +360,19 @@ export interface UserOverviewTier {
   current: string
   is_super_user: boolean
   label: string
-  limits: ChannelLimits
+  limits: WidgetLimits
 }
 
-export interface UserOverviewChannelRow {
-  type: ChannelType
+export interface UserOverviewWidgetRow {
+  type: string
   enabled: boolean
-  visible: boolean
+  ticker_enabled: boolean
 }
 
-export interface UserOverviewChannels {
+export interface UserOverviewWidgets {
   total: number
   enabled: number
-  by_type: Array<UserOverviewChannelRow>
+  by_type: Array<UserOverviewWidgetRow>
 }
 
 export interface UserOverviewFantasy {
@@ -490,7 +395,7 @@ export interface UserOverview {
   identity: UserOverviewIdentity
   tier: UserOverviewTier
   subscription: SubscriptionStatus | null
-  channels: UserOverviewChannels
+  widgets: UserOverviewWidgets
   fantasy: UserOverviewFantasy | null
   gdpr: UserOverviewGDPR
   links: UserOverviewLinks
@@ -503,7 +408,7 @@ export interface UpdateProfileResponse {
 }
 
 export const userApi = {
-  /** Unified read for the /account hub — identity, tier, channels, GDPR, fantasy. */
+  /** Unified read for the /account hub — identity, tier, widgets, GDPR, fantasy. */
   overview: (getToken: () => Promise<string | null>) =>
     authenticatedFetch<UserOverview>('/users/me/overview', {}, getToken),
 

@@ -87,7 +87,7 @@ function main(): void {
   });
   const channelRow = (type: string, feeds: typeof FEEDS) => ({
     id: 1,
-    channel_type: type as DataWidgetType,
+    widget_type: type as DataWidgetType,
     enabled: true,
     ticker_enabled: true,
     created_at: "2026-07-17T00:00:00Z",
@@ -99,7 +99,7 @@ function main(): void {
   });
   queryClient.setQueryData(dashboardQueryOptions().queryKey, {
     data: { rss: rssItems },
-    channels: [
+    widgets: [
       channelRow("rss_custom", FEEDS),
       channelRow("news_bbc", FEEDS.slice(0, 1)),
     ],

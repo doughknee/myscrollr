@@ -178,33 +178,26 @@ export type DataWidgetType = "finance" | "sports" | "fantasy" | "rss" | "predict
 
 export interface DataWidgetRow {
   id: number;
-  channel_type: DataWidgetType;
+  widget_type: DataWidgetType;
   enabled: boolean;
-  /** Whether this channel's chips appear on the ticker. Server emits both
-   * `ticker_enabled` (preferred) and `visible` (legacy alias) — read either
-   * via {@link isChannelTickerEnabled}. */
+  /** Whether this widget's chips appear on the ticker. */
   ticker_enabled: boolean;
-  /** @deprecated Use {@link ticker_enabled}. Server still emits this for
-   *  v1.0.3 compatibility; will be removed in a future release. */
-  visible?: boolean;
   config: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
 
 /**
- * Read the ticker-enabled flag, tolerant of both the new
- * (`ticker_enabled`) and legacy (`visible`) field names. Returns `true`
- * by default if neither is set so freshly-added channels appear on the
- * ticker.
+ * Read the ticker-enabled flag, defaulting to `true` when absent so a
+ * freshly-added widget appears on the ticker.
+ *
+ * The `visible` alias this used to tolerate is gone: the server now emits
+ * only `ticker_enabled` (VISION §4.4).
  */
-export function isChannelTickerEnabled(ch: {
+export function isWidgetTickerEnabled(w: {
   ticker_enabled?: boolean;
-  visible?: boolean;
 }): boolean {
-  if (typeof ch.ticker_enabled === "boolean") return ch.ticker_enabled;
-  if (typeof ch.visible === "boolean") return ch.visible;
-  return true;
+  return typeof w.ticker_enabled === "boolean" ? w.ticker_enabled : true;
 }
 
 export interface RssChannelConfig {
@@ -215,18 +208,18 @@ export interface RssChannelConfig {
 
 export const dataWidgetsApi = {
   getAll: () =>
-    authFetch<{ channels: Array<DataWidgetRow> }>("/users/me/channels"),
+    authFetch<{ widgets: Array<DataWidgetRow> }>("/users/me/widgets"),
 
   create: (
     widgetType: DataWidgetType,
     config: Record<string, unknown> = {},
     localWidgets?: number,
   ) =>
-    authFetch<DataWidgetRow>("/users/me/channels", {
+    authFetch<DataWidgetRow>("/users/me/widgets", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        channel_type: widgetType,
+        widget_type: widgetType,
         config,
         // Report the enabled utility-widget count so the server slot gate
         // counts every widget — utilities live only in local preferences.
@@ -242,7 +235,7 @@ export const dataWidgetsApi = {
       config?: Record<string, unknown>;
     },
   ) =>
-    authFetch<DataWidgetRow>(`/users/me/channels/${widgetType}`, {
+    authFetch<DataWidgetRow>(`/users/me/widgets/${widgetType}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -250,7 +243,7 @@ export const dataWidgetsApi = {
 
   delete: (widgetType: DataWidgetType) =>
     authFetch<{ status: string; message: string }>(
-      `/users/me/channels/${widgetType}`,
+      `/users/me/widgets/${widgetType}`,
       { method: "DELETE" },
     ),
 };
@@ -263,8 +256,7 @@ export const dataWidgetsApi = {
  * when the API call completes. Callers are responsible for invalidating
  * queries afterward.
  *
- * The wire field is `ticker_enabled` (v1.0.4+); the server also accepts
- * the legacy `visible` field for older clients.
+ * The wire field is `ticker_enabled` — the only name the server accepts.
  */
 export async function toggleDataWidgetVisibility(
   widgetType: DataWidgetType,

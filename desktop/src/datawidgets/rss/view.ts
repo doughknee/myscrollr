@@ -141,16 +141,16 @@ export function getRssDisplayPrefs(
   dashboard: DashboardResponse | null | undefined,
   widgetType?: string,
 ): RssDisplayPrefs {
-  const channels = dashboard?.channels ?? [];
-  // channel_type is a widget id at runtime (news_bbc, rss_custom, …);
+  const channels = dashboard?.widgets ?? [];
+  // widget_type is a widget id at runtime (news_bbc, rss_custom, …);
   // compare as string so the legacy coarse rows ("rss" pre-000014,
   // "news" post-rename) both resolve as the fallback.
   const channel =
     (widgetType
-      ? channels.find((c) => (c.channel_type as string) === widgetType)
+      ? channels.find((c) => (c.widget_type as string) === widgetType)
       : undefined) ??
     channels.find((c) => {
-      const t = c.channel_type as string;
+      const t = c.widget_type as string;
       return t === "rss" || t === "news";
     });
   const override = (

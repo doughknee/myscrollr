@@ -125,7 +125,7 @@ export interface DashboardResponse {
     subscription_tier?: "anonymous" | "free" | "uplink" | "uplink_pro" | "uplink_ultimate";
     updated_at: string;
   };
-  channels?: Array<DataWidgetRow & { logto_sub: string }>;
+  widgets?: Array<DataWidgetRow & { logto_sub: string }>;
 }
 
 // ── Enums ────────────────────────────────────────────────────────
@@ -140,7 +140,7 @@ export interface FeedTabProps {
   /** Display density — 'comfort' shows more detail, 'compact' is denser. */
   mode: FeedMode;
   /**
-   * Per-channel JSONB config from user_channels.config.
+   * Per-widget JSONB config from user_widgets.config.
    * Each channel decides what goes here (e.g., selected RSS feeds).
    */
   feedContext: Record<string, unknown>;
@@ -163,7 +163,7 @@ export interface SourceInfo {
 
 /** Manifest describing a single channel. */
 export interface DataWidgetManifest {
-  /** Unique channel identifier (matches channel_type). */
+  /** Unique channel identifier (matches widget_type). */
   id: string;
   /** Human-readable name. */
   name: string;

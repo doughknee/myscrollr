@@ -3,7 +3,7 @@
  *
  * Adds either kind of widget from one entry point so the Catalog and the
  * per-widget Info page stay in lockstep:
- *   - DATA widget → POST /users/me/channels (with the widget's addConfig),
+ *   - DATA widget → POST /users/me/widgets (with the widget's addConfig),
  *     optimistically inserted into the dashboard cache so the Sidebar +
  *     "Added" badge flip on the next paint, then reconciled with the server.
  *   - UTILITY widget → written into preferences (enabled + on-ticker +
@@ -41,13 +41,13 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
         // dashboard cache immediately so the Sidebar + CatalogCard
         // "Added" badge flip on the next paint. Without this the user
         // saw a 0.5-1s gap between click and any visible state change
-        // — the network round-trip to `POST /users/me/channels` plus
+        // — the network round-trip to `POST /users/me/widgets` plus
         // the forced `/dashboard` refetch were both on the critical
         // path. CDC + a background refetch reconcile the placeholder
         // with the real row a moment later.
         const optimisticChannel: DataWidgetRow & { logto_sub: string } = {
           id: -Date.now(), // ephemeral negative id, replaced on reconcile
-          channel_type: widgetType,
+          widget_type: widgetType,
           enabled: true,
           ticker_enabled: true,
           config: item.addConfig ?? {},
@@ -71,8 +71,8 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
             }
             // Don't double-insert if the channel is somehow already
             // present (e.g. CDC raced us).
-            const existing = old.channels ?? [];
-            if (existing.some((c) => c.channel_type === widgetType)) {
+            const existing = old.widgets ?? [];
+            if (existing.some((c) => c.widget_type === widgetType)) {
               return old;
             }
             return {
@@ -102,7 +102,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
               queryKeys.dashboard,
               (old) => {
                 if (!old) return old;
-                const channels = (old.channels ?? []).map((c) =>
+                const channels = (old.widgets ?? []).map((c) =>
                   c.id === optimisticChannel.id
                     ? ({ ...created, logto_sub: c.logto_sub } as DataWidgetRow & {
                         logto_sub: string;

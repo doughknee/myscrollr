@@ -40,7 +40,7 @@ describe("getEffectiveDataWidgetTickerRow", () => {
 
     expect(
       getEffectiveDataWidgetTickerRow(prefs, {
-        channel_type: "sports",
+        widget_type: "sports",
         enabled: false,
         ticker_enabled: true,
       }),
@@ -52,7 +52,7 @@ describe("getEffectiveDataWidgetTickerRow", () => {
 
     expect(
       getEffectiveDataWidgetTickerRow(prefs, {
-        channel_type: "sports",
+        widget_type: "sports",
         enabled: true,
         ticker_enabled: true,
       }),
@@ -64,7 +64,7 @@ describe("getEffectiveDataWidgetTickerRow", () => {
 
     expect(
       getEffectiveDataWidgetTickerRow(prefs, {
-        channel_type: "sports",
+        widget_type: "sports",
         enabled: true,
         ticker_enabled: true,
       }),

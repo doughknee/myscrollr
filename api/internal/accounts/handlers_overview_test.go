@@ -179,7 +179,7 @@ func TestGetChannelSummary_MixedEnabledStates(t *testing.T) {
 	userID := makeTestUser()
 	defer cleanupTestUser(t, userID)
 
-	testsupport.MustExec(t, `INSERT INTO user_widgets (logto_sub, widget_type, enabled, visible) VALUES
+	testsupport.MustExec(t, `INSERT INTO user_widgets (logto_sub, widget_type, enabled, ticker_enabled) VALUES
 		($1, 'finance', true, true),
 		($1, 'sports', true, true),
 		($1, 'rss', true, false),
@@ -205,19 +205,19 @@ func TestGetChannelSummary_MixedEnabledStates(t *testing.T) {
 func TestHasFantasyChannel(t *testing.T) {
 	cases := []struct {
 		name string
-		in   OverviewChannels
+		in   OverviewWidgets
 		want bool
 	}{
-		{"no rows", OverviewChannels{}, false},
+		{"no rows", OverviewWidgets{}, false},
 		// The row is "fantasy_yahoo" — resolved through the catalog's source,
 		// never by matching a bare "fantasy" literal.
-		{"fantasy_yahoo enabled", OverviewChannels{ByType: []OverviewChannelRow{{Type: "fantasy_yahoo", Enabled: true}}}, true},
-		{"fantasy_yahoo disabled", OverviewChannels{ByType: []OverviewChannelRow{{Type: "fantasy_yahoo", Enabled: false}}}, false},
+		{"fantasy_yahoo enabled", OverviewWidgets{ByType: []OverviewWidgetRow{{Type: "fantasy_yahoo", Enabled: true}}}, true},
+		{"fantasy_yahoo disabled", OverviewWidgets{ByType: []OverviewWidgetRow{{Type: "fantasy_yahoo", Enabled: false}}}, false},
 		// A hypothetical second fantasy provider routes by source prefix.
-		{"fantasy_espn enabled", OverviewChannels{ByType: []OverviewChannelRow{{Type: "fantasy_espn", Enabled: true}}}, true},
-		{"only finance", OverviewChannels{ByType: []OverviewChannelRow{{Type: "finance_stocks", Enabled: true}}}, false},
+		{"fantasy_espn enabled", OverviewWidgets{ByType: []OverviewWidgetRow{{Type: "fantasy_espn", Enabled: true}}}, true},
+		{"only finance", OverviewWidgets{ByType: []OverviewWidgetRow{{Type: "finance_stocks", Enabled: true}}}, false},
 		// The pre-split coarse type is no longer a valid widget id.
-		{"legacy coarse fantasy is not a widget", OverviewChannels{ByType: []OverviewChannelRow{{Type: "fantasy", Enabled: true}}}, false},
+		{"legacy coarse fantasy is not a widget", OverviewWidgets{ByType: []OverviewWidgetRow{{Type: "fantasy", Enabled: true}}}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -269,7 +269,7 @@ func TestHandleGetOverview_CacheRoundtrip(t *testing.T) {
 	userID := makeTestUser()
 	defer cleanupTestUser(t, userID)
 
-	testsupport.MustExec(t, `INSERT INTO user_widgets (logto_sub, widget_type, enabled, visible)
+	testsupport.MustExec(t, `INSERT INTO user_widgets (logto_sub, widget_type, enabled, ticker_enabled)
 		VALUES ($1, 'finance', true, true)`, userID)
 
 	// Ensure no stale entry from a previous run.

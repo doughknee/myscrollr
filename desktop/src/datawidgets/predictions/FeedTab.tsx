@@ -240,10 +240,10 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   const queryClient = useQueryClient();
   const channelRow = useMemo(
     () =>
-      (dashboard?.channels ?? []).find(
-        (ch) => ch.channel_type === "predictions",
+      (dashboard?.widgets ?? []).find(
+        (ch) => ch.widget_type === "predictions",
       ),
-    [dashboard?.channels],
+    [dashboard?.widgets],
   );
   const migratedRef = useRef(false);
   useEffect(() => {
@@ -277,7 +277,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
     //    key). The API keeps honoring these fields for old clients; this
     //    client simply stops using them.
     void dataWidgetsApi
-      .update(channelRow.channel_type, {
+      .update(channelRow.widget_type, {
         config: { ...(channelRow.config ?? {}), categories: [], favorites: [] },
       })
       .then(() => {

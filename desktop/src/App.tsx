@@ -18,7 +18,7 @@ import {
 } from "./auth";
 import {
   dataWidgetsApi,
-  isChannelTickerEnabled,
+  isWidgetTickerEnabled,
   toggleDataWidgetVisibility,
 } from "./api/client";
 import {
@@ -99,8 +99,8 @@ export default function App() {
 
   // Derive channels and active tabs from query data
   const channels = useMemo(
-    () => dashboard?.channels ?? [],
-    [dashboard?.channels],
+    () => dashboard?.widgets ?? [],
+    [dashboard?.widgets],
   );
 
   const widgetTabs = useMemo(() => {
@@ -120,8 +120,8 @@ export default function App() {
         : loadPref("activeFeedTabs", ["finance", "sports"]);
     }
     return channels
-      .filter((ch) => ch.enabled && isChannelTickerEnabled(ch))
-      .map((ch) => ch.channel_type);
+      .filter((ch) => ch.enabled && isWidgetTickerEnabled(ch))
+      .map((ch) => ch.widget_type);
   }, [channels, authenticated]);
 
   // Visual metadata for installed channels — used by the ticker's
@@ -139,7 +139,7 @@ export default function App() {
     const metaById = new Map(getCatalogItems().map((it) => [it.id, it]));
     return channels
       .filter((ch) => ch.enabled)
-      .map((ch) => metaById.get(ch.channel_type))
+      .map((ch) => metaById.get(ch.widget_type))
       .filter((m): m is NonNullable<typeof m> => Boolean(m))
       .map((m) => ({
         id: m.id,
@@ -738,12 +738,12 @@ export default function App() {
       const widgetSubmenus: Submenu[] = [];
 
       // Data widgets — the user's enabled channels, labeled by their catalog
-      // name ("NFL", "Stocks", "BBC News"), not the raw channel_type.
+      // name ("NFL", "Stocks", "BBC News"), not the raw widget_type.
       const metaById = new Map(getCatalogItems().map((it) => [it.id, it]));
       for (const ch of chs) {
         const label =
-          metaById.get(ch.channel_type)?.name ??
-          `${ch.channel_type.charAt(0).toUpperCase()}${ch.channel_type.slice(1)}`;
+          metaById.get(ch.widget_type)?.name ??
+          `${ch.widget_type.charAt(0).toUpperCase()}${ch.widget_type.slice(1)}`;
         const currentRow = getChannelTickerRow(prefsRef.current, ch);
         const rowItems = await buildRowSubmenuItems(
           currentRow,
@@ -751,13 +751,13 @@ export default function App() {
             // Optimistic update — flip the ref immediately so the next
             // menu build reflects the change without waiting for the API.
             const target = channelsRef.current.find(
-              (c) => c.channel_type === ch.channel_type,
+              (c) => c.widget_type === ch.widget_type,
             );
             if (target) target.ticker_enabled = row !== null;
-            handleChannelRowChange(ch.channel_type, row);
+            handleChannelRowChange(ch.widget_type, row);
           },
           !ch.enabled,
-          () => addRowAndAssign(ch.channel_type, "channel"),
+          () => addRowAndAssign(ch.widget_type, "channel"),
         );
         widgetSubmenus.push(
           await Submenu.new({ text: label, items: rowItems }),

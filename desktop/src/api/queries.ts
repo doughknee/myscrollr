@@ -58,9 +58,9 @@ async function fetchDashboard(): Promise<DashboardResponse> {
   if (DEMO) {
     const demo = await request<{
       data: DashboardResponse["data"];
-      channels?: DashboardResponse["channels"];
+      widgets?: DashboardResponse["widgets"];
     }>("/dashboard");
-    return { data: demo.data, channels: demo.channels } as DashboardResponse;
+    return { data: demo.data, channels: demo.widgets } as DashboardResponse;
   }
 
   // Try authenticated path if token is valid OR a refresh token can restore the session.
@@ -75,12 +75,12 @@ async function fetchDashboard(): Promise<DashboardResponse> {
     try {
       const data = await authFetch<{
         data: DashboardResponse["data"];
-        channels?: DashboardResponse["channels"];
+        widgets?: DashboardResponse["widgets"];
         preferences?: DashboardResponse["preferences"];
       }>("/dashboard");
       return {
         data: data.data,
-        channels: data.channels,
+        channels: data.widgets,
         preferences: data.preferences,
       } as DashboardResponse;
     } catch {

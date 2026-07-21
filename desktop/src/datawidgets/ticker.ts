@@ -64,8 +64,8 @@ export interface TickerSource {
  */
 export function scopedRows<T>(raw: unknown, ctx: TickerContext): T[] {
   if (!Array.isArray(raw) || raw.length === 0) return [];
-  const config = ctx.dashboard?.channels?.find(
-    (c) => c.channel_type === ctx.tab,
+  const config = ctx.dashboard?.widgets?.find(
+    (c) => c.widget_type === ctx.tab,
   )?.config as Record<string, unknown> | undefined;
   return scopeSourceData(ctx.source, raw, config) as T[];
 }

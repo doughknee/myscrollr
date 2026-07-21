@@ -41,8 +41,8 @@ export function useDataWidgetConfig<T>(
       const dash = queryClient.getQueryData<DashboardResponse>(
         queryKeys.dashboard,
       );
-      const current = dash?.channels?.find(
-        (c) => c.channel_type === widgetType,
+      const current = dash?.widgets?.find(
+        (c) => c.widget_type === widgetType,
       )?.config as Record<string, unknown> | undefined;
       return dataWidgetsApi.update(widgetType, {
         config: current ?? { [configKey]: next },
@@ -57,8 +57,8 @@ export function useDataWidgetConfig<T>(
       );
       queryClient.setQueryData<DashboardResponse>(queryKeys.dashboard, (old) => {
         if (!old) return old;
-        const channels = (old.channels ?? []).map((c) =>
-          c.channel_type === widgetType
+        const channels = (old.widgets ?? []).map((c) =>
+          c.widget_type === widgetType
             ? {
                 ...c,
                 config: {

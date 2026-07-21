@@ -263,13 +263,8 @@ func (s *Server) setupRoutes() {
 	// User Routes — specific /users/me/* paths BEFORE parameterized /users/:username
 	s.App.Get("/users/me/preferences", platform.LogtoAuth, accounts.HandleGetPreferences)
 	s.App.Put("/users/me/preferences", platform.LogtoAuth, accounts.HandleUpdatePreferences)
-	// Widget CRUD. The /users/me/channels paths are the legacy wire routes
-	// that shipped v1.1.x clients depend on; /users/me/widgets are aliases
-	// added by REL-40 (same handlers, same middleware). Keep both.
-	s.App.Get("/users/me/channels", platform.LogtoAuth, widgets.GetWidgets)
-	s.App.Post("/users/me/channels", platform.LogtoAuth, widgets.CreateWidget)
-	s.App.Put("/users/me/channels/:type", platform.LogtoAuth, widgets.UpdateWidget)
-	s.App.Delete("/users/me/channels/:type", platform.LogtoAuth, widgets.DeleteWidget)
+	// Widget CRUD. The /users/me/channels aliases were deleted with the wire
+	// rename (VISION §4.4) — one name, no compat seam.
 	s.App.Get("/users/me/widgets", platform.LogtoAuth, widgets.GetWidgets)
 	s.App.Post("/users/me/widgets", platform.LogtoAuth, widgets.CreateWidget)
 	s.App.Put("/users/me/widgets/:type", platform.LogtoAuth, widgets.UpdateWidget)

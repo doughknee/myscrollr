@@ -12,7 +12,7 @@ import (
 // because the SSE hub also reads it to build a user's topic subscriptions.
 func GetUserWidgets(logtoSub string) ([]Widget, error) {
 	rows, err := DBPool.Query(context.Background(), `
-		SELECT id, logto_sub, widget_type, enabled, visible, config, created_at, updated_at
+		SELECT id, logto_sub, widget_type, enabled, ticker_enabled, config, created_at, updated_at
 		FROM user_widgets
 		WHERE logto_sub = $1
 		ORDER BY created_at ASC, id ASC
@@ -26,7 +26,7 @@ func GetUserWidgets(logtoSub string) ([]Widget, error) {
 	for rows.Next() {
 		var ch Widget
 		var configJSON []byte
-		if err := rows.Scan(&ch.ID, &ch.LogtoSub, &ch.WidgetType, &ch.Enabled, &ch.Visible, &configJSON, &ch.CreatedAt, &ch.UpdatedAt); err != nil {
+		if err := rows.Scan(&ch.ID, &ch.LogtoSub, &ch.WidgetType, &ch.Enabled, &ch.TickerEnabled, &configJSON, &ch.CreatedAt, &ch.UpdatedAt); err != nil {
 			log.Printf("[Widgets] Scan error: %v", err)
 			continue
 		}
@@ -55,47 +55,27 @@ type UserPreferences struct {
 // Widget represents a user's widget subscription — one row of the
 // user_widgets table.
 //
-// The DB and Go identifiers now say "widget" (Phase 2). The *wire* still
-// speaks the old vocabulary — the JSON tag below is `channel_type`, and
-// the routes are still /users/me/channels — because renaming the wire is
-// Phase 3, done in one pass with the client.
-//
-// `Visible` is likewise a wire holdover; MarshalJSON also emits
-// `ticker_enabled` and inbound updates accept both names (see
-// channels.go:UpdateWidget). Phase 5 deletes the duplicate.
+// One vocabulary, all the way down (VISION §4.4): the DB column, the Go
+// field, and the JSON tag all say "widget" and "ticker_enabled". There is
+// no compat seam and no dual-emit — Scrollr had no users when this landed,
+// so the old names were deleted rather than aliased.
 type Widget struct {
-	ID         int                    `json:"id"`
-	LogtoSub   string                 `json:"-"`
-	WidgetType string                 `json:"channel_type"`
-	Enabled    bool                   `json:"enabled"`
-	Visible    bool                   `json:"visible"`
-	Config     map[string]interface{} `json:"config"`
-	CreatedAt  time.Time              `json:"created_at"`
-	UpdatedAt  time.Time              `json:"updated_at"`
-}
-
-// MarshalJSON emits both `visible` (legacy) and `ticker_enabled` (clearer
-// modern name) so v1.0.3 desktops and v1.0.4+ desktops both read the
-// same value. The DB column and struct field stay `visible` to avoid a
-// migration; this is wire-format backwards compatibility only.
-func (c Widget) MarshalJSON() ([]byte, error) {
-	type alias Widget
-	return json.Marshal(&struct {
-		alias
-		TickerEnabled bool `json:"ticker_enabled"`
-	}{
-		alias:         alias(c),
-		TickerEnabled: c.Visible,
-	})
+	ID            int                    `json:"id"`
+	LogtoSub      string                 `json:"-"`
+	WidgetType    string                 `json:"widget_type"`
+	Enabled       bool                   `json:"enabled"`
+	TickerEnabled bool                   `json:"ticker_enabled"`
+	Config        map[string]interface{} `json:"config"`
+	CreatedAt     time.Time              `json:"created_at"`
+	UpdatedAt     time.Time              `json:"updated_at"`
 }
 
 // DashboardResponse is the aggregated response for the /dashboard endpoint.
 // Data is a generic map keyed by data-source name (e.g. "finance", "sports").
-// The Widgets field keeps its legacy wire name `channels`.
 type DashboardResponse struct {
 	Data        map[string]interface{} `json:"data"`
 	Preferences *UserPreferences       `json:"preferences,omitempty"`
-	Widgets     []Widget               `json:"channels,omitempty"`
+	Widgets     []Widget               `json:"widgets,omitempty"`
 }
 
 // HealthResponse represents the aggregated health status.

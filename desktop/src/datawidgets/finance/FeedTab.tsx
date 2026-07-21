@@ -274,8 +274,8 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   } = useDataWidgetConfig<string[]>(widgetType, "symbols");
   const { data: fullCatalog = [] } = useQuery(financeCatalogOptions());
 
-  const channelRow = (dashboard?.channels ?? []).find(
-    (ch) => ch.channel_type === widgetType,
+  const channelRow = (dashboard?.widgets ?? []).find(
+    (ch) => ch.widget_type === widgetType,
   );
   const channelConfig = (channelRow?.config ?? {}) as FinanceChannelConfig;
   const trackedSymbols = useMemo(

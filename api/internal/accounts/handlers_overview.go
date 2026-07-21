@@ -33,7 +33,7 @@ type OverviewResponse struct {
 	Identity     OverviewIdentity               `json:"identity"`
 	Tier         OverviewTier                   `json:"tier"`
 	Subscription *platform.SubscriptionResponse `json:"subscription"`
-	Channels     OverviewChannels               `json:"channels"`
+	Widgets      OverviewWidgets                `json:"widgets"`
 	Fantasy      *OverviewFantasy               `json:"fantasy"`
 	GDPR         OverviewGDPR                   `json:"gdpr"`
 	Links        OverviewLinks                  `json:"links"`
@@ -58,16 +58,16 @@ type OverviewTier struct {
 	Limits      widgets.WidgetLimits `json:"limits"`
 }
 
-// OverviewChannels summarises the user_widgets table for the account
+// OverviewWidgets summarises the user_widgets table for the account
 // pane. `total` and `enabled` drive the headline counts; `by_type` is
 // the per-widget toggle state used to render the widget list.
-type OverviewChannels struct {
-	Total   int                  `json:"total"`
-	Enabled int                  `json:"enabled"`
-	ByType  []OverviewChannelRow `json:"by_type"`
+type OverviewWidgets struct {
+	Total   int                 `json:"total"`
+	Enabled int                 `json:"enabled"`
+	ByType  []OverviewWidgetRow `json:"by_type"`
 }
 
-type OverviewChannelRow struct {
+type OverviewWidgetRow struct {
 	Type          string `json:"type"`
 	Enabled       bool   `json:"enabled"`
 	TickerEnabled bool   `json:"ticker_enabled"`
@@ -164,7 +164,7 @@ func buildTierFromContext(c *fiber.Ctx) OverviewTier {
 // getWidgetSummary aggregates user_widgets into the headline counts
 // + per-row toggle state in a single query. Empty users return zero
 // counts and an empty by_type slice.
-func getWidgetSummary(ctx context.Context, userID string) (OverviewChannels, error) {
+func getWidgetSummary(ctx context.Context, userID string) (OverviewWidgets, error) {
 	const q = `
 		SELECT
 			COUNT(*) AS total,
@@ -172,7 +172,7 @@ func getWidgetSummary(ctx context.Context, userID string) (OverviewChannels, err
 			COALESCE(json_agg(json_build_object(
 				'type', widget_type,
 				'enabled', enabled,
-				'ticker_enabled', visible
+				'ticker_enabled', ticker_enabled
 			) ORDER BY widget_type) FILTER (WHERE widget_type IS NOT NULL), '[]'::json) AS by_type
 		FROM user_widgets
 		WHERE logto_sub = $1
@@ -185,17 +185,17 @@ func getWidgetSummary(ctx context.Context, userID string) (OverviewChannels, err
 	)
 	err := platform.DBPool.QueryRow(ctx, q, userID).Scan(&total, &enabled, &byTypeJSON)
 	if err != nil {
-		return OverviewChannels{}, fmt.Errorf("getWidgetSummary query: %w", err)
+		return OverviewWidgets{}, fmt.Errorf("getWidgetSummary query: %w", err)
 	}
 
-	byType := []OverviewChannelRow{}
+	byType := []OverviewWidgetRow{}
 	if len(byTypeJSON) > 0 {
 		if err := json.Unmarshal(byTypeJSON, &byType); err != nil {
-			return OverviewChannels{}, fmt.Errorf("getWidgetSummary unmarshal: %w", err)
+			return OverviewWidgets{}, fmt.Errorf("getWidgetSummary unmarshal: %w", err)
 		}
 	}
 
-	return OverviewChannels{
+	return OverviewWidgets{
 		Total:   total,
 		Enabled: enabled,
 		ByType:  byType,
@@ -372,15 +372,15 @@ func assembleOverview(ctx context.Context, c *fiber.Ctx, userID string) (*Overvi
 	tier := buildTierFromContext(c)
 	subscription := getSubscriptionForOverview(ctx, userID)
 
-	channels, err := getWidgetSummary(ctx, userID)
+	widgets, err := getWidgetSummary(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("assembleOverview: channels: %w", err)
+		return nil, fmt.Errorf("assembleOverview: widgets: %w", err)
 	}
 
 	gdpr := getDeletionStatusForOverview(ctx, userID)
 
 	var fantasy *OverviewFantasy
-	if hasFantasyWidget(channels) {
+	if hasFantasyWidget(widgets) {
 		fanCtx, cancel := context.WithTimeout(ctx, FantasyFanoutTimeout)
 		defer cancel()
 		fantasy = fetchFantasySummary(fanCtx, userID)
@@ -390,7 +390,7 @@ func assembleOverview(ctx context.Context, c *fiber.Ctx, userID string) (*Overvi
 		Identity:     identity,
 		Tier:         tier,
 		Subscription: subscription,
-		Channels:     channels,
+		Widgets:      widgets,
 		Fantasy:      fantasy,
 		GDPR:         gdpr,
 		Links:        buildAccountLinks(),
@@ -400,8 +400,8 @@ func assembleOverview(ctx context.Context, c *fiber.Ctx, userID string) (*Overvi
 // hasFantasyWidget returns true when the user has an enabled fantasy
 // widget — the only condition under which the fantasy fan-out is
 // worth the latency cost.
-func hasFantasyWidget(channels OverviewChannels) bool {
-	for _, c := range channels.ByType {
+func hasFantasyWidget(widgets OverviewWidgets) bool {
+	for _, c := range widgets.ByType {
 		// Match the fantasy SOURCE, not the literal — the widget row is
 		// "fantasy_yahoo" (post widget-split), never bare "fantasy".
 		if platform.DataSourceForWidget(c.Type) == "fantasy" && c.Enabled {

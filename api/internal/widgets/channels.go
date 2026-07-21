@@ -112,7 +112,7 @@ func GetWidgets(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(fiber.Map{"channels": widgets})
+	return c.JSON(fiber.Map{"widgets": widgets})
 }
 
 // CreateWidget adds a new widget for the authenticated user.
@@ -126,7 +126,7 @@ func CreateWidget(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		WidgetType string                 `json:"channel_type"`
+		WidgetType string                 `json:"widget_type"`
 		Config     map[string]interface{} `json:"config"`
 		// LocalWidgets is the client's count of enabled utility widgets
 		// (clock/weather/…). They live in preferences, not user_widgets, but
@@ -221,9 +221,9 @@ func CreateWidget(c *fiber.Ctx) error {
 	err := platform.DBPool.QueryRow(context.Background(), `
 		INSERT INTO user_widgets (logto_sub, widget_type, config)
 		VALUES ($1, $2, $3)
-		RETURNING id, logto_sub, widget_type, enabled, visible, config, created_at, updated_at
+		RETURNING id, logto_sub, widget_type, enabled, ticker_enabled, config, created_at, updated_at
 	`, userID, req.WidgetType, configJSON).Scan(
-		&ch.ID, &ch.LogtoSub, &ch.WidgetType, &ch.Enabled, &ch.Visible,
+		&ch.ID, &ch.LogtoSub, &ch.WidgetType, &ch.Enabled, &ch.TickerEnabled,
 		&configBytes, &ch.CreatedAt, &ch.UpdatedAt,
 	)
 	if err != nil {
@@ -281,13 +281,8 @@ func UpdateWidget(c *fiber.Ctx) error {
 		})
 	}
 
-	// Both `visible` (legacy, v1.0.3 and earlier) and `ticker_enabled`
-	// (modern, v1.0.4+) are accepted. Whichever is set non-nil wins;
-	// `ticker_enabled` takes precedence if both are sent. The DB column
-	// is still `visible` — the rename is wire-format only.
 	var req struct {
 		Enabled       *bool                  `json:"enabled"`
-		Visible       *bool                  `json:"visible"`
 		TickerEnabled *bool                  `json:"ticker_enabled"`
 		Config        map[string]interface{} `json:"config"`
 		// LocalWidgets mirrors CreateWidget: the client's count of enabled
@@ -300,9 +295,6 @@ func UpdateWidget(c *fiber.Ctx) error {
 			Status: "error",
 			Error:  "Invalid request body",
 		})
-	}
-	if req.TickerEnabled != nil {
-		req.Visible = req.TickerEnabled
 	}
 	if req.LocalWidgets < 0 {
 		req.LocalWidgets = 0
@@ -375,9 +367,9 @@ func UpdateWidget(c *fiber.Ctx) error {
 		args = append(args, *req.Enabled)
 		argIdx++
 	}
-	if req.Visible != nil {
-		setClauses = append(setClauses, fmt.Sprintf("visible = $%d", argIdx))
-		args = append(args, *req.Visible)
+	if req.TickerEnabled != nil {
+		setClauses = append(setClauses, fmt.Sprintf("ticker_enabled = $%d", argIdx))
+		args = append(args, *req.TickerEnabled)
 		argIdx++
 	}
 	if req.Config != nil {
@@ -391,13 +383,13 @@ func UpdateWidget(c *fiber.Ctx) error {
 		UPDATE user_widgets
 		SET %s
 		WHERE logto_sub = $1 AND widget_type = $2
-		RETURNING id, logto_sub, widget_type, enabled, visible, config, created_at, updated_at
+		RETURNING id, logto_sub, widget_type, enabled, ticker_enabled, config, created_at, updated_at
 	`, strings.Join(setClauses, ", "))
 
 	var ch platform.Widget
 	var configBytes []byte
 	err := platform.DBPool.QueryRow(context.Background(), query, args...).Scan(
-		&ch.ID, &ch.LogtoSub, &ch.WidgetType, &ch.Enabled, &ch.Visible,
+		&ch.ID, &ch.LogtoSub, &ch.WidgetType, &ch.Enabled, &ch.TickerEnabled,
 		&configBytes, &ch.CreatedAt, &ch.UpdatedAt,
 	)
 	if err != nil {

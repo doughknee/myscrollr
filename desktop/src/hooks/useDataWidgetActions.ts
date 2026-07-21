@@ -73,7 +73,7 @@ export function useDataWidgetActions(): DataWidgetActions {
         await dataWidgetsApi.delete(widgetType);
         await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
         queryClient.invalidateQueries({ queryKey: ["sports", "full"] });
-        // Sidebar now derives from dashboard.channels (filtered to
+        // Sidebar now derives from dashboard.widgets (filtered to
         // enabled), so no preference cleanup is needed here — the
         // dashboard refetch above triggers the sidebar update.
         navigate({ to: "/feed" });

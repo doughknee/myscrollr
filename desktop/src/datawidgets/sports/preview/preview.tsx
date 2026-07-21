@@ -96,7 +96,7 @@ const games: Game[] = Array.from({ length: 72 }, (_, i) => {
 
 const channelRow = {
   id: 1,
-  channel_type: widgetId as DataWidgetType,
+  widget_type: widgetId as DataWidgetType,
   enabled: true,
   ticker_enabled: true,
   created_at: "2026-07-17T00:00:00Z",
@@ -116,7 +116,7 @@ function main(): void {
   });
   queryClient.setQueryData(dashboardQueryOptions().queryKey, {
     data: {},
-    channels: [channelRow],
+    widgets: [channelRow],
   });
   queryClient.setQueryData(sportsFullQueryOptions().queryKey, {
     sports: games,

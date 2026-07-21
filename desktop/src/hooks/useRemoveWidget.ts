@@ -2,7 +2,7 @@
  * useRemoveWidget — the single "remove a widget" flow, shared by the
  * per-widget info page and the sidebar context menu (v1.1.2) so the two
  * surfaces can't drift:
- *   - DATA widget → DELETE /users/me/channels/{type}, dashboard refetch,
+ *   - DATA widget → DELETE /users/me/widgets/{type}, dashboard refetch,
  *     success toast. The slot frees immediately.
  *   - UTILITY widget → disabled via the undoable prefs path (settings
  *     preserved, Undo in the toast).

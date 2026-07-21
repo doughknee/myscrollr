@@ -475,21 +475,21 @@ describe("getSourceTickerRow / getChannelTickerRow / getWidgetTickerRow", () => 
 
   it("falls back to ticker_enabled=true for channels missing from rows", () => {
     const prefs = makePrefs([{ sources: [] }]);
-    const ch = { channel_type: "finance", ticker_enabled: true };
+    const ch = { widget_type: "finance", ticker_enabled: true };
     expect(getSourceTickerRow(prefs, ch, "finance")).toBe(0);
     expect(getChannelTickerRow(prefs, ch)).toBe(0);
   });
 
   it("returns null when ticker_enabled is false and the channel isn't in any row", () => {
     const prefs = makePrefs([{ sources: [] }]);
-    const ch = { channel_type: "finance", ticker_enabled: false };
+    const ch = { widget_type: "finance", ticker_enabled: false };
     expect(getSourceTickerRow(prefs, ch, "finance")).toBeNull();
     expect(getChannelTickerRow(prefs, ch)).toBeNull();
   });
 
   it("honours the legacy `visible` alias when ticker_enabled is missing", () => {
     const prefs = makePrefs([{ sources: [] }]);
-    const ch = { channel_type: "finance", visible: false };
+    const ch = { widget_type: "finance", visible: false };
     expect(getSourceTickerRow(prefs, ch, "finance")).toBeNull();
     expect(getChannelTickerRow(prefs, ch)).toBeNull();
   });
@@ -507,7 +507,7 @@ describe("getSourceTickerRow / getChannelTickerRow / getWidgetTickerRow", () => 
   it("explicit row assignment beats the legacy ticker_enabled fallback", () => {
     // DataWidgetRow has ticker_enabled=true, but it's pinned to row 1 explicitly.
     const prefs = makePrefs([{ sources: [] }, { sources: ["finance"] }]);
-    const ch = { channel_type: "finance", ticker_enabled: true };
+    const ch = { widget_type: "finance", ticker_enabled: true };
     expect(getChannelTickerRow(prefs, ch)).toBe(1);
   });
 });

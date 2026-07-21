@@ -1,8 +1,8 @@
-import { isChannelTickerEnabled } from "../api/client";
+import { isWidgetTickerEnabled } from "../api/client";
 import type { AppPreferences } from "../preferences";
 
 interface ChannelTickerInfo {
-  channel_type: string;
+  widget_type: string;
   enabled?: boolean;
   ticker_enabled?: boolean;
   visible?: boolean;
@@ -33,8 +33,8 @@ export function getEffectiveDataWidgetTickerRow(
   prefs: AppPreferences,
   channel: ChannelTickerInfo,
 ): number | null {
-  if (channel.enabled === false || !isChannelTickerEnabled(channel)) return null;
-  return getEffectiveSourceRow(prefs, channel.channel_type);
+  if (channel.enabled === false || !isWidgetTickerEnabled(channel)) return null;
+  return getEffectiveSourceRow(prefs, channel.widget_type);
 }
 
 export function getEffectiveWidgetTickerStatus(
