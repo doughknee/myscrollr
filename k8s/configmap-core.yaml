@@ -15,7 +15,7 @@ data:
   #   the retired `channels` key, leaving the sidebar and account page
   #   empty, so it is gated too.
   # Bump on future breaking deploys.
-  MIN_DESKTOP_VERSION: "1.1.11"
+  MIN_DESKTOP_VERSION: "1.1.12"
   LOGTO_URL: "https://auth.myscrollr.com/oidc"
   LOGTO_JWKS_URL: "https://auth.myscrollr.com/oidc/jwks"
   LOGTO_ENDPOINT: "https://auth.myscrollr.com"
