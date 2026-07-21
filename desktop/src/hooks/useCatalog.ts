@@ -30,7 +30,20 @@ export function useCatalog(): string {
   useEffect(() => {
     if (started) return;
     started = true;
-    void refreshCatalog(fetchCatalog);
+
+    // Retry when the machine comes back online. `started` latches before the
+    // fetch so the two windows don't both fetch — but nothing reset it on
+    // failure, so an app launched offline kept the bundled snapshot for the
+    // whole session even after the network returned. "unchanged" is a success
+    // (the server agrees with the snapshot); only "failed" is worth retrying.
+    const attempt = () => {
+      void refreshCatalog(fetchCatalog).then((result) => {
+        if (result !== "failed") window.removeEventListener("online", attempt);
+      });
+    };
+    window.addEventListener("online", attempt);
+    attempt();
+    return () => window.removeEventListener("online", attempt);
   }, []);
 
   return version;

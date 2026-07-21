@@ -26,7 +26,8 @@ import TickerLayoutSummary from "../components/TickerLayoutSummary";
 import PageLayout from "../components/layout/PageLayout";
 import EmptySection from "../components/layout/EmptySection";
 import { useShell, useShellData } from "../shell-context";
-import { widgetManifest, sourceForWidget, CANONICAL_ORDER } from "../marketplace";
+import { useCatalog } from "../hooks/useCatalog";
+import { widgetManifest, sourceForWidget, canonicalOrder } from "../marketplace";
 import { scopeSourceData } from "../utils/widgetScope";
 import { WIDGET_ORDER } from "../widgets/registry";
 import { getStore } from "../lib/store";
@@ -111,6 +112,9 @@ function HomePage() {
   const navigate = useNavigate();
   const shell = useShell();
   const { widgets, dashboard } = useShellData();
+  // Sort order comes from the catalog, so the memo below must re-run when it
+  // changes — otherwise a server-added widget sorts by a stale index.
+  const catalogVersion = useCatalog();
   const {
     allDataWidgetManifests,
     allWidgets,
@@ -161,12 +165,12 @@ function HomePage() {
       .filter(
         (x): x is { ch: DataWidgetRow; manifest: DataWidgetManifest } => x !== null,
       );
+    const order = canonicalOrder();
     return items.sort(
       (a, b) =>
-        CANONICAL_ORDER.indexOf(a.ch.widget_type) -
-        CANONICAL_ORDER.indexOf(b.ch.widget_type),
+        order.indexOf(a.ch.widget_type) - order.indexOf(b.ch.widget_type),
     );
-  }, [widgets]);
+  }, [widgets, catalogVersion]);
 
   const orderedWidgets = useMemo(
     () =>

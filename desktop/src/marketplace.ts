@@ -95,19 +95,26 @@ export function catalogWidgets(): CatalogWidget[] {
  * Fails soft: an offline or erroring server leaves the snapshot in place,
  * which is the entire point of bundling it.
  */
+export type CatalogRefresh = "updated" | "unchanged" | "failed";
+
 export async function refreshCatalog(
   fetchCatalog: () => Promise<CatalogPayload>,
-): Promise<boolean> {
+): Promise<CatalogRefresh> {
+  // Three outcomes, not two. "unchanged" and "failed" both used to return
+  // false, which meant a caller could not tell "the server agrees with the
+  // snapshot" from "there is no server" — and so could not decide whether
+  // retrying was worth anything.
+  let next: CatalogPayload;
   try {
-    const next = await fetchCatalog();
-    if (!next?.widgets?.length) return false;
-    if (next.version === payload.version) return false; // already current
-    payload = next;
-    listeners.forEach((fn) => fn());
-    return true;
+    next = await fetchCatalog();
   } catch {
-    return false;
+    return "failed";
   }
+  if (!next?.widgets?.length) return "failed";
+  if (next.version === payload.version) return "unchanged";
+  payload = next;
+  listeners.forEach((fn) => fn());
+  return "updated";
 }
 
 function byId(id: string): CatalogWidget | undefined {
@@ -252,14 +259,25 @@ export function getCatalogItems(): CatalogItem[] {
     .filter((x): x is CatalogItem => x !== null);
 }
 
-/** Canonical order for sorting: the server's order, with any locally
- *  registered utility the catalog doesn't know about appended. */
-export const CANONICAL_ORDER: string[] = [
-  ...(snapshot as CatalogPayload).widgets.map((w) => w.id),
-  ...WIDGET_ORDER.filter(
-    (id) => !(snapshot as CatalogPayload).widgets.some((w) => w.id === id),
-  ),
-];
+/**
+ * Canonical order for sorting: the server's order, with any locally
+ * registered utility the catalog doesn't know about appended.
+ *
+ * A function, not a module-load const. It used to be built once from the
+ * bundled `snapshot`, so `refreshCatalog()` could swap `payload` and this
+ * would still describe the shipped snapshot forever. A widget added
+ * server-side therefore sorted as unknown (`indexOf` → -1, so it sorted
+ * first) and vanished from the sidebar entirely, because __root.tsx builds
+ * the nav by iterating this list and silently drops ids it does not contain.
+ * That is most of why "add a widget server-side, no client release" did not
+ * actually work.
+ */
+export function canonicalOrder(): string[] {
+  return [
+    ...payload.widgets.map((w) => w.id),
+    ...WIDGET_ORDER.filter((id) => !payload.widgets.some((w) => w.id === id)),
+  ];
+}
 
 /** Pick a readable text color (near-black or white) for a solid brand-colored
  *  surface, from the color's perceived luminance — so a light brand (gold,

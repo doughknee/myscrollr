@@ -19,10 +19,11 @@ import { motion, AnimatePresence } from "motion/react";
 import { open } from "@tauri-apps/plugin-shell";
 import clsx from "clsx";
 
-import { getCatalogItems, CATEGORY_LABELS, CANONICAL_ORDER } from "../marketplace";
+import { getCatalogItems, CATEGORY_LABELS, canonicalOrder } from "../marketplace";
 import type { WidgetCategory, CatalogItem } from "../marketplace";
 import { dashboardQueryOptions } from "../api/queries";
 import { useShell, useShellData } from "../shell-context";
+import { useCatalog } from "../hooks/useCatalog";
 import {
   SlotPills,
   slotHeadline,
@@ -141,11 +142,10 @@ function CatalogFilterMenu({
 }
 
 function orderItems(items: CatalogItem[], sort: SortMode): CatalogItem[] {
-  return [...items].sort((a, b) =>
-    sort === "az"
-      ? a.name.localeCompare(b.name)
-      : CANONICAL_ORDER.indexOf(a.id) - CANONICAL_ORDER.indexOf(b.id),
-  );
+  if (sort === "az") return [...items].sort((a, b) => a.name.localeCompare(b.name));
+  // Resolved once per call rather than once per comparison.
+  const order = canonicalOrder();
+  return [...items].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
 }
 
 // ── Page component ──────────────────────────────────────────────
@@ -159,7 +159,13 @@ function CatalogPage() {
   const [filter, setFilter] = useState<FilterTab>("all");
   const [sort, setSort] = useState<SortMode>("featured");
 
-  const allItems = useMemo(() => getCatalogItems(), []);
+  // The Library is the one surface whose entire content IS the catalog, and
+  // it was the one surface not subscribed to it: an empty dep array pinned
+  // `allItems` to whatever the bundled snapshot held at mount, so a refresh
+  // swapped the catalog underneath and this never re-read it. The version
+  // string changes exactly when the catalog does.
+  const catalogVersion = useCatalog();
+  const allItems = useMemo(() => getCatalogItems(), [catalogVersion]);
 
   // Per-category counts for the collapsed Filter menu rows (counts
   // live in menu rows, not chrome — bar grammar).
