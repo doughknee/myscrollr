@@ -125,6 +125,7 @@ func (s *Server) setupMiddleware() {
 		"/webhooks/discord/interactions":    true, // Discord retries on rate-limit and we want them to succeed
 		"/webhooks/github/pr-closed":        true, // GitHub Action calls this when a PR with [fixes #N] tags merges
 		"/channels":                         true,
+		"/catalog":                          true,
 		"/tier-limits":                      true,
 		"/extension/token":                  true,
 		"/extension/token/refresh":          true,
@@ -208,6 +209,8 @@ func (s *Server) setupRoutes() {
 	s.App.Post("/extension/token/refresh", accounts.HandleExtensionTokenRefresh)
 
 	s.App.Get("/channels", s.listChannels)
+	// The widget catalog — the single authority clients render from.
+	s.App.Get("/catalog", widgets.HandleGetCatalog)
 	s.App.Get("/tier-limits", widgets.HandleGetTierLimits)
 	s.App.Get("/app/min-version", HandleGetMinDesktopVersion)
 	s.App.Get("/", s.landingPage)

@@ -209,13 +209,15 @@ func TestHasFantasyChannel(t *testing.T) {
 		want bool
 	}{
 		{"no rows", OverviewChannels{}, false},
-		{"fantasy disabled", OverviewChannels{ByType: []OverviewChannelRow{{Type: "fantasy", Enabled: false}}}, false},
-		{"fantasy enabled", OverviewChannels{ByType: []OverviewChannelRow{{Type: "fantasy", Enabled: true}}}, true},
-		// Post widget-split, the row is "fantasy_yahoo" — must resolve to the
-		// fantasy source, not require the bare "fantasy" literal.
+		// The row is "fantasy_yahoo" — resolved through the catalog's source,
+		// never by matching a bare "fantasy" literal.
 		{"fantasy_yahoo enabled", OverviewChannels{ByType: []OverviewChannelRow{{Type: "fantasy_yahoo", Enabled: true}}}, true},
 		{"fantasy_yahoo disabled", OverviewChannels{ByType: []OverviewChannelRow{{Type: "fantasy_yahoo", Enabled: false}}}, false},
-		{"only finance", OverviewChannels{ByType: []OverviewChannelRow{{Type: "finance", Enabled: true}}}, false},
+		// A hypothetical second fantasy provider routes by source prefix.
+		{"fantasy_espn enabled", OverviewChannels{ByType: []OverviewChannelRow{{Type: "fantasy_espn", Enabled: true}}}, true},
+		{"only finance", OverviewChannels{ByType: []OverviewChannelRow{{Type: "finance_stocks", Enabled: true}}}, false},
+		// The pre-split coarse type is no longer a valid widget id.
+		{"legacy coarse fantasy is not a widget", OverviewChannels{ByType: []OverviewChannelRow{{Type: "fantasy", Enabled: true}}}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
