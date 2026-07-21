@@ -463,8 +463,8 @@ func scanMarkets(rows pgx.Rows, err error) []Prediction {
 func getUserPredictionsConfig(ctx context.Context, logtoSub string) (favorites, categories []string) {
 	var configJSON []byte
 	err := platform.DBPool.QueryRow(ctx, `
-		SELECT config FROM user_channels
-		WHERE logto_sub = $1 AND channel_type = 'predictions'
+		SELECT config FROM user_widgets
+		WHERE logto_sub = $1 AND widget_type = 'predictions'
 	`, logtoSub).Scan(&configJSON)
 	if err != nil {
 		return nil, nil
@@ -472,8 +472,8 @@ func getUserPredictionsConfig(ctx context.Context, logtoSub string) (favorites, 
 	return extractFavoritesFromConfig(configJSON), extractCategoriesFromConfig(configJSON)
 }
 
-// predictionsConfig mirrors the user_channels.config JSONB shape for
-// channel_type=predictions: {"categories": [...], "favorites": [...]}.
+// predictionsConfig mirrors the user_widgets.config JSONB shape for
+// widget_type=predictions: {"categories": [...], "favorites": [...]}.
 type predictionsConfig struct {
 	Categories []string `json:"categories"`
 	Favorites  []string `json:"favorites"`

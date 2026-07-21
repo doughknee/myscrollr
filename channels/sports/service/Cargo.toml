@@ -21,7 +21,7 @@ dotenv = "0.15"
 log = "0.4"
 anyhow = "1.0"
 futures-util = "0.3"
-sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "chrono", "migrate"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "chrono"] }
 
 # Sentry — error monitoring. send_default_pii=false by default; we add
 # explicit scrubbing in before_send (see main.rs init_sentry).

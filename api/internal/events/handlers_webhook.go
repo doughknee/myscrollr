@@ -114,7 +114,7 @@ func routeCDCRecord(ctx context.Context, rec CDCRecord) {
 func topicForRecord(table string, record map[string]interface{}) string {
 	switch table {
 	// Core-owned tables: route to specific user
-	case "user_preferences", "user_channels":
+	case "user_preferences", "user_widgets":
 		sub, ok := record["logto_sub"].(string)
 		if !ok || sub == "" {
 			return ""

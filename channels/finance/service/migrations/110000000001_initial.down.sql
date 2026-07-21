@@ -1,2 +1,0 @@
-DROP TABLE IF EXISTS tracked_symbols;
-DROP TABLE IF EXISTS trades;

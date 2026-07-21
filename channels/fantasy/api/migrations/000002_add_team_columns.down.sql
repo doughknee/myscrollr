@@ -1,2 +1,0 @@
--- team_key and team_name columns cannot be dropped via down migration
--- as they are part of the 000001_init schema

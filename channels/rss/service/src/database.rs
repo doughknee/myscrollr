@@ -6,36 +6,6 @@ use sqlx::{FromRow, query, query_as};
 use serde::Deserialize;
 use chrono::{DateTime, Utc};
 
-/// Build the sqlx migrator for this service.
-///
-/// `set_ignore_missing(true)` is required because all three Rust services
-/// (finance, sports, rss) share a single `_sqlx_migrations` table in the
-/// scrollr Postgres DB — sqlx 0.8.x has no API to name the table per
-/// service (see PRs #106 / #107). Without this flag, each service sees
-/// the other services' rows and errors out with `VersionMissing` because
-/// e.g. rss has no `11*` files on disk.
-///
-/// With each service on a unique numeric version prefix (finance 11*,
-/// sports 12*, rss 20250601*/13*), the flag tolerates "versions recorded
-/// for *other* services" without hiding checksum drift on *this*
-/// service's own rows — VersionMismatch (drift on an applied row whose
-/// file *is* on disk) still fires and fails the boot loudly, which is
-/// the behavior PR #106 was after.
-fn migrator() -> sqlx::migrate::Migrator {
-    let mut m = sqlx::migrate!("./migrations");
-    m.set_ignore_missing(true);
-    m
-}
-
-/// RSS has two legitimate numeric ranges because of the pre-cleanup legacy
-/// `20250601*` migrations that are already applied in production. Any new
-/// rss migration lives in `13*`. Both ranges must be counted for the
-/// invariant check below. Must stay in sync with `tests/migration_versions.rs`.
-pub const RSS_MIGRATION_LEGACY_MIN: i64 = 20_250_601_000_000;
-pub const RSS_MIGRATION_LEGACY_MAX: i64 = 20_250_601_999_999;
-pub const RSS_MIGRATION_NEW_MIN: i64 = 130_000_000_000;
-pub const RSS_MIGRATION_NEW_MAX: i64 = 139_999_999_999;
-
 pub async fn initialize_pool() -> Result<PgPool> {
     let pool_options = PgPoolOptions::new()
         // Pool sizing rationale: rss runs up to 20 concurrent feed polls
@@ -86,69 +56,10 @@ pub async fn initialize_pool() -> Result<PgPool> {
     .await
     .map_err(|_| anyhow::anyhow!("Connection attempt timed out (15s)"))?
     .context("Failed to connect to the PostgreSQL database")?;
-    eprintln!("[DB] Connected successfully, running migrations...");
+    eprintln!("[DB] Connected successfully");
 
-    // Run migrations. A previous iteration of this code caught migration
-    // errors, wiped `_sqlx_migrations`, and re-ran the migrator — that path
-    // was data-unsafe. Failed migrations now propagate with the full sqlx
-    // error chain (including `VersionMismatch(version)` and the colliding
-    // file name) so an on-call engineer can diagnose without having to
-    // re-run the binary under a debugger. See the long troubleshooting
-    // note in AGENTS.md under "Database Migrations".
-    let m = migrator();
-    if let Err(err) = m.run(&pool).await {
-        eprintln!("[DB] Migration failure: {err}");
-        eprintln!("[DB] Underlying error chain: {err:?}");
-        return Err(anyhow::Error::new(err)
-            .context("Failed to run migrations. No automatic recovery — inspect _sqlx_migrations"));
-    }
-    eprintln!("[DB] Migrations complete");
-
-    // Startup invariant: every on-disk migration for *this* service's
-    // version range(s) must have a corresponding recorded row in
-    // `_sqlx_migrations`. Guards against "file deleted but row still in DB"
-    // drift that `set_ignore_missing(true)` silently tolerates.
-    //
-    // IMPORTANT: only count UP migrations. `migrator().iter()` yields both
-    // halves of each reversible migration (`ReversibleUp` + `ReversibleDown`),
-    // so `.up.sql` + `.down.sql` pairs each contribute 2 entries to the
-    // iterator while the DB records only 1 row per pair. See finance
-    // database.rs + commit 2cb0e90.
-    let on_disk: i64 = migrator()
-        .iter()
-        .filter(|m| m.migration_type.is_up_migration())
-        .count() as i64;
-    let recorded: i64 = sqlx::query_scalar::<_, i64>(
-        "SELECT count(*) FROM _sqlx_migrations \
-         WHERE (version >= $1 AND version <= $2) OR (version >= $3 AND version <= $4)",
-    )
-    .bind(RSS_MIGRATION_LEGACY_MIN)
-    .bind(RSS_MIGRATION_LEGACY_MAX)
-    .bind(RSS_MIGRATION_NEW_MIN)
-    .bind(RSS_MIGRATION_NEW_MAX)
-    .fetch_one(&pool)
-    .await
-    .context("query migration count")?;
-
-    if recorded != on_disk {
-        anyhow::bail!(
-            "migration invariant violated: {} up-migrations on disk but {} recorded in DB \
-             (rss legacy {}-{} / new {}-{}). Someone deleted a migration file, or this \
-             service is pointing at a DB whose migrations haven't been applied.",
-            on_disk,
-            recorded,
-            RSS_MIGRATION_LEGACY_MIN,
-            RSS_MIGRATION_LEGACY_MAX,
-            RSS_MIGRATION_NEW_MIN,
-            RSS_MIGRATION_NEW_MAX
-        );
-    }
-
-    eprintln!(
-        "[DB] Migration invariant check ok: {on_disk} up-migrations on disk / \
-         {recorded} recorded in legacy {RSS_MIGRATION_LEGACY_MIN}..={RSS_MIGRATION_LEGACY_MAX} \
-         + new {RSS_MIGRATION_NEW_MIN}..={RSS_MIGRATION_NEW_MAX}"
-    );
+    // No migrations here. core-api owns every shared table and runs the
+    // single migration chain (VISION 4.3); this service is a pure writer.
 
     Ok(pool)
 }

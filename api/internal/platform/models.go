@@ -7,13 +7,13 @@ import (
 	"time"
 )
 
-// GetUserWidgets fetches all of a user's widgets (rows of user_channels).
+// GetUserWidgets fetches all of a user's widgets (rows of user_widgets).
 // Lives beside the Widget model rather than with the widget CRUD handlers
 // because the SSE hub also reads it to build a user's topic subscriptions.
 func GetUserWidgets(logtoSub string) ([]Widget, error) {
 	rows, err := DBPool.Query(context.Background(), `
-		SELECT id, logto_sub, channel_type, enabled, visible, config, created_at, updated_at
-		FROM user_channels
+		SELECT id, logto_sub, widget_type, enabled, visible, config, created_at, updated_at
+		FROM user_widgets
 		WHERE logto_sub = $1
 		ORDER BY created_at ASC, id ASC
 	`, logtoSub)
@@ -53,16 +53,16 @@ type UserPreferences struct {
 }
 
 // Widget represents a user's widget subscription — one row of the
-// user_channels table. The wire protocol keeps the legacy "channel"
-// vocabulary (JSON field names like channel_type, the user_channels
-// table, the /users/me/channels routes); only Go identifiers use
-// "widget" (REL-40).
+// user_widgets table.
 //
-// The DB column and Go field stay named `Visible` to avoid a migration
-// and to keep wire compatibility with shipped v1.0.3 desktops. The
-// MarshalJSON below also emits `ticker_enabled` so v1.0.4+ clients can
-// read a clearer name. Inbound updates accept both names — see
-// channels.go:UpdateWidget.
+// The DB and Go identifiers now say "widget" (Phase 2). The *wire* still
+// speaks the old vocabulary — the JSON tag below is `channel_type`, and
+// the routes are still /users/me/channels — because renaming the wire is
+// Phase 3, done in one pass with the client.
+//
+// `Visible` is likewise a wire holdover; MarshalJSON also emits
+// `ticker_enabled` and inbound updates accept both names (see
+// channels.go:UpdateWidget). Phase 5 deletes the duplicate.
 type Widget struct {
 	ID         int                    `json:"id"`
 	LogtoSub   string                 `json:"-"`

@@ -68,9 +68,11 @@ func ConnectDB() {
 	DBPool = pool
 	log.Println("[Database] Connected to PostgreSQL")
 
-	// golang-migrate uses pq driver which requires sslmode to be explicit.
-	// Use a dedicated migrations table so core and channel APIs (e.g. fantasy)
-	// sharing the same database don't collide on the default schema_migrations.
+	// core is the single owner of the shared schema (VISION 4.3): this is
+	// the only migration chain that runs anywhere. The ingesters are pure
+	// writers. golang-migrate uses the pq driver, which requires sslmode to
+	// be explicit; the table name is kept from before the consolidation so
+	// existing databases don't re-run the chain.
 	migrateURL := databaseURL
 	if !strings.Contains(migrateURL, "sslmode=") {
 		if strings.Contains(migrateURL, "?") {

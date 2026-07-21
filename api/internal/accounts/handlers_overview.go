@@ -58,7 +58,7 @@ type OverviewTier struct {
 	Limits      widgets.WidgetLimits `json:"limits"`
 }
 
-// OverviewChannels summarises the user_channels table for the account
+// OverviewChannels summarises the user_widgets table for the account
 // pane. `total` and `enabled` drive the headline counts; `by_type` is
 // the per-widget toggle state used to render the widget list.
 type OverviewChannels struct {
@@ -161,7 +161,7 @@ func buildTierFromContext(c *fiber.Ctx) OverviewTier {
 
 // ─── Channel summary ────────────────────────────────────────────────
 
-// getWidgetSummary aggregates user_channels into the headline counts
+// getWidgetSummary aggregates user_widgets into the headline counts
 // + per-row toggle state in a single query. Empty users return zero
 // counts and an empty by_type slice.
 func getWidgetSummary(ctx context.Context, userID string) (OverviewChannels, error) {
@@ -170,11 +170,11 @@ func getWidgetSummary(ctx context.Context, userID string) (OverviewChannels, err
 			COUNT(*) AS total,
 			COUNT(*) FILTER (WHERE enabled = true) AS enabled_count,
 			COALESCE(json_agg(json_build_object(
-				'type', channel_type,
+				'type', widget_type,
 				'enabled', enabled,
 				'ticker_enabled', visible
-			) ORDER BY channel_type) FILTER (WHERE channel_type IS NOT NULL), '[]'::json) AS by_type
-		FROM user_channels
+			) ORDER BY widget_type) FILTER (WHERE widget_type IS NOT NULL), '[]'::json) AS by_type
+		FROM user_widgets
 		WHERE logto_sub = $1
 	`
 

@@ -1,7 +1,9 @@
 package main
 
-import "encoding/json"
-import "encoding/xml"
+import (
+	"encoding/json"
+	"encoding/xml"
+)
 
 // =============================================================================
 // Yahoo Fantasy XML Types — Parsed from Yahoo API responses

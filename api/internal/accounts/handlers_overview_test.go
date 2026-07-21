@@ -28,7 +28,7 @@ func cleanupTestUser(_ *testing.T, userID string) {
 		return
 	}
 	_, _ = platform.DBPool.Exec(context.Background(),
-		`DELETE FROM user_channels WHERE logto_sub = $1`, userID)
+		`DELETE FROM user_widgets WHERE logto_sub = $1`, userID)
 }
 
 // runWithLocals stands up a minimal Fiber app, registers a single GET
@@ -179,7 +179,7 @@ func TestGetChannelSummary_MixedEnabledStates(t *testing.T) {
 	userID := makeTestUser()
 	defer cleanupTestUser(t, userID)
 
-	testsupport.MustExec(t, `INSERT INTO user_channels (logto_sub, channel_type, enabled, visible) VALUES
+	testsupport.MustExec(t, `INSERT INTO user_widgets (logto_sub, widget_type, enabled, visible) VALUES
 		($1, 'finance', true, true),
 		($1, 'sports', true, true),
 		($1, 'rss', true, false),
@@ -267,7 +267,7 @@ func TestHandleGetOverview_CacheRoundtrip(t *testing.T) {
 	userID := makeTestUser()
 	defer cleanupTestUser(t, userID)
 
-	testsupport.MustExec(t, `INSERT INTO user_channels (logto_sub, channel_type, enabled, visible)
+	testsupport.MustExec(t, `INSERT INTO user_widgets (logto_sub, widget_type, enabled, visible)
 		VALUES ($1, 'finance', true, true)`, userID)
 
 	// Ensure no stale entry from a previous run.

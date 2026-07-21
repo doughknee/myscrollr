@@ -10,7 +10,7 @@ import "strings"
 // service registered a channel of that exact name.
 //
 // Two responsibilities on the API side:
-//  1. Validate `channel_type` on create/update (IsKnownWidgetType), additive
+//  1. Validate `widget_type` on create/update (IsKnownWidgetType), additive
 //     alongside the legacy service-discovery validation during the transition.
 //  2. Map a widget to its backing data source (DataSourceForWidget) so the
 //     CDC subscription logic in events.go / channels.go stays source-driven
@@ -90,7 +90,7 @@ var widgetSourcePrefixes = map[string]string{
 	"rss_":  "rss",
 }
 
-// legacyChannelTypes are the pre-migration coarse channel_type values. They
+// legacyChannelTypes are the pre-migration coarse widget_type values. They
 // remain valid (existing rows, and they ARE the service names) and map to
 // themselves so the transition is seamless.
 var legacyChannelTypes = map[string]string{
@@ -139,7 +139,7 @@ func IsKnownWidgetType(widgetType string) bool {
 }
 
 // IsUtilityWidgetType reports whether a widget_type is a local-only utility
-// (clock/timer/…). Utilities live in desktop preferences, not user_channels —
+// (clock/timer/…). Utilities live in desktop preferences, not user_widgets —
 // CreateWidget rejects them so they can't pollute subscriber sets or
 // double-count against the slot cap (once as a row, once via local_widgets).
 func IsUtilityWidgetType(widgetType string) bool {

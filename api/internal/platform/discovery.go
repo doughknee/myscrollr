@@ -149,7 +149,7 @@ func GetChannel(name string) *ChannelInfo {
 }
 
 // GetValidChannelTypes returns a set of all registered channel names.
-// These are the valid channel types for user_channels.
+// These are the valid channel types for user_widgets.
 func GetValidChannelTypes() map[string]bool {
 	GlobalDiscovery.mu.RLock()
 	defer GlobalDiscovery.mu.RUnlock()

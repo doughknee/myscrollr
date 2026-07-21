@@ -38,7 +38,7 @@ func setupIntegrationDB(t *testing.T) {
 		testsupport.SharedMiniRedis.FlushAll()
 	}
 	_, err := platform.DBPool.Exec(context.Background(), `
-		TRUNCATE TABLE user_channels, user_preferences, stripe_customers,
+		TRUNCATE TABLE user_widgets, user_preferences, stripe_customers,
 		               stripe_webhook_events, user_deletion_requests,
 		               yahoo_user_leagues, yahoo_users, yahoo_leagues CASCADE
 	`)
@@ -163,7 +163,7 @@ func queryCount(t *testing.T, sql string, args ...any) int {
 // grace window and the 24h floor guard.
 func seedPurgeableUser(t *testing.T, sub string, lifetime bool) {
 	t.Helper()
-	testsupport.MustExec(t, `INSERT INTO user_channels (logto_sub, channel_type, config) VALUES ($1, 'finance', '{}')`, sub)
+	testsupport.MustExec(t, `INSERT INTO user_widgets (logto_sub, widget_type, config) VALUES ($1, 'finance', '{}')`, sub)
 	testsupport.MustExec(t, `INSERT INTO user_preferences (logto_sub) VALUES ($1)`, sub)
 	testsupport.MustExec(t, `INSERT INTO stripe_customers (logto_sub, stripe_customer_id, plan, status, lifetime)
 	             VALUES ($1, $2, $3, 'canceled', $4)`,
@@ -194,7 +194,7 @@ func TestIntegrationPurgeUserAccountFullCascade(t *testing.T) {
 
 	// Every user-owned row is gone.
 	for _, q := range []struct{ name, sql string }{
-		{"user_channels", `SELECT count(*) FROM user_channels WHERE logto_sub = $1`},
+		{"user_widgets", `SELECT count(*) FROM user_widgets WHERE logto_sub = $1`},
 		{"user_preferences", `SELECT count(*) FROM user_preferences WHERE logto_sub = $1`},
 		{"stripe_customers", `SELECT count(*) FROM stripe_customers WHERE logto_sub = $1`},
 		{"yahoo_users", `SELECT count(*) FROM yahoo_users WHERE logto_sub = $1`},
@@ -266,7 +266,7 @@ func TestIntegrationPurgeAbortsWhenLogtoFails(t *testing.T) {
 	// Logto-first ordering: nothing local may be deleted if revoking
 	// sign-in failed, so the next pass can retry the full cascade.
 	for _, q := range []struct{ name, sql string }{
-		{"user_channels", `SELECT count(*) FROM user_channels WHERE logto_sub = $1`},
+		{"user_widgets", `SELECT count(*) FROM user_widgets WHERE logto_sub = $1`},
 		{"user_preferences", `SELECT count(*) FROM user_preferences WHERE logto_sub = $1`},
 		{"stripe_customers", `SELECT count(*) FROM stripe_customers WHERE logto_sub = $1`},
 		{"yahoo_users", `SELECT count(*) FROM yahoo_users WHERE logto_sub = $1`},

@@ -250,7 +250,7 @@ func (h *Hub) handleTopicMessage(topic string, payload []byte) {
 		return
 	}
 
-	// Special case: core user-specific topics (user_preferences, user_channels).
+	// Special case: core user-specific topics (user_preferences, user_widgets).
 	// These target a single user directly -- no registry lookup needed.
 	if strings.HasPrefix(topic, platform.TopicPrefixCore) {
 		userID := topic[len(platform.TopicPrefixCore):]
@@ -514,7 +514,7 @@ func TopicForRSSFeed(feedURL string) string {
 func subscribeUserToTopics(userID string) {
 	ctx := context.Background()
 
-	// Core user-specific topics (user_preferences, user_channels) are handled
+	// Core user-specific topics (user_preferences, user_widgets) are handled
 	// by direct dispatch in listenToTopics -- no registry entry needed.
 
 	widgets, err := platform.GetUserWidgets(userID)
@@ -529,7 +529,7 @@ func subscribeUserToTopics(userID string) {
 		}
 
 		// Route by the widget's backing data source, not its exact
-		// channel_type, so split widgets (sports_nfl, finance_stocks, …)
+		// widget_type, so split widgets (sports_nfl, finance_stocks, …)
 		// subscribe through the same per-source logic as the legacy coarse
 		// types. The per-league/per-symbol values still come from config.
 		switch platform.DataSourceForWidget(ch.WidgetType) {

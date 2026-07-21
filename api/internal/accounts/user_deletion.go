@@ -419,11 +419,11 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 	}
 	defer tx.Rollback(ctx)
 
-	// Widget configs (user_channels rows)
+	// Widget configs (user_widgets rows)
 	if _, err := tx.Exec(ctx,
-		`DELETE FROM user_channels WHERE logto_sub = $1`, logtoSub,
+		`DELETE FROM user_widgets WHERE logto_sub = $1`, logtoSub,
 	); err != nil {
-		return fmt.Errorf("delete user_channels: %w", err)
+		return fmt.Errorf("delete user_widgets: %w", err)
 	}
 
 	// Fantasy junction + OAuth tokens. Junction row is keyed on guid,

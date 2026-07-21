@@ -24,9 +24,8 @@ ENV GIT_SHA=${GIT_SHA}
 # Install curl for health checks
 RUN apk --no-cache add curl
 
-# Copy the binary and migrations from the builder
+# Copy the binary. No migrations — core-api owns the schema (VISION 4.3).
 COPY --from=builder /app/fantasy-api .
-COPY --from=builder /app/migrations ./migrations
 
 EXPOSE 8084
 

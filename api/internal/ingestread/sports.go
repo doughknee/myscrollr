@@ -702,14 +702,14 @@ func scanGames(rows pgx.Rows) []Game {
 
 // getUserSportsLeagues extracts the league list across a user's sports
 // widget channels. Post-widget-split (migration 000014) a user has one row
-// per league (channel_type = 'sports_nfl', …) rather than a single
+// per league (widget_type = 'sports_nfl', …) rather than a single
 // 'sports' row, so we gather every sports_* channel (plus any legacy
 // coarse 'sports' row) and union their leagues.
 func getUserSportsLeagues(ctx context.Context, logtoSub string) []string {
 	rows, err := platform.DBPool.Query(ctx, `
-		SELECT config FROM user_channels
+		SELECT config FROM user_widgets
 		WHERE logto_sub = $1
-		  AND (channel_type = 'sports' OR channel_type LIKE 'sports\_%')
+		  AND (widget_type = 'sports' OR widget_type LIKE 'sports\_%')
 	`, logtoSub)
 	if err != nil {
 		return nil
@@ -740,9 +740,9 @@ func getUserSportsLeagues(ctx context.Context, logtoSub string) []string {
 // channels (keyed by league, so per-widget entries don't collide).
 func getUserFavoriteTeams(ctx context.Context, logtoSub string) map[string]FavoriteTeam {
 	rows, err := platform.DBPool.Query(ctx, `
-		SELECT config FROM user_channels
+		SELECT config FROM user_widgets
 		WHERE logto_sub = $1
-		  AND (channel_type = 'sports' OR channel_type LIKE 'sports\_%')
+		  AND (widget_type = 'sports' OR widget_type LIKE 'sports\_%')
 	`, logtoSub)
 	if err != nil {
 		return nil

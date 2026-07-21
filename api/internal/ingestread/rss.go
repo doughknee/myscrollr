@@ -421,15 +421,15 @@ func rssLifecycle(event, userSub string, config, oldConfig map[string]interface{
 
 // getUserRSSFeedURLs unions the feed URLs across a user's news/rss widget
 // channels. Post-widget-split a user has one row per curated feed
-// (channel_type = 'news_bbc', …) plus 'rss_custom' for their own feeds —
+// (widget_type = 'news_bbc', …) plus 'rss_custom' for their own feeds —
 // and a legacy coarse 'rss'/'news' row may still exist. Gather them all.
 func getUserRSSFeedURLs(ctx context.Context, logtoSub string) []string {
 	rows, err := platform.DBPool.Query(ctx, `
-		SELECT config FROM user_channels
+		SELECT config FROM user_widgets
 		WHERE logto_sub = $1
-		  AND (channel_type IN ('rss', 'news')
-		       OR channel_type LIKE 'news\_%'
-		       OR channel_type LIKE 'rss\_%')
+		  AND (widget_type IN ('rss', 'news')
+		       OR widget_type LIKE 'news\_%'
+		       OR widget_type LIKE 'rss\_%')
 	`, logtoSub)
 	if err != nil {
 		return nil
@@ -594,7 +594,7 @@ func syncRSSFeedsToTracked(userSub string, config map[string]interface{}) {
 // 24h quarantine threshold, because this one auto-REMOVES).
 //
 // Custom feeds are fully removed (user_custom_feeds + tracked_feeds +
-// cascaded rss_items + each subscriber's user_channels.config.feeds[]);
+// cascaded rss_items + each subscriber's user_widgets.config.feeds[]);
 // curated feeds are only disabled for operator follow-up.
 //
 // Runs on startup and every JanitorInterval. Idempotent. Core runs 2
@@ -729,7 +729,7 @@ func disableBrokenCuratedFeeds(ctx context.Context) (int, error) {
 
 // removeBrokenCustomFeeds finds custom feeds past the broken threshold
 // and removes them everywhere: each subscriber's
-// user_channels.config.feeds[] is pruned, user_custom_feeds rows are
+// user_widgets.config.feeds[] is pruned, user_custom_feeds rows are
 // deleted, and the tracked_feeds row is dropped (rss_items cascades).
 // Returns the count of unique URLs removed.
 func removeBrokenCustomFeeds(ctx context.Context) (int, error) {
@@ -760,12 +760,12 @@ func removeBrokenCustomFeeds(ctx context.Context) (int, error) {
 	}
 
 	for _, url := range urls {
-		// Prune user_channels.config.feeds[] for each subscribing user.
+		// Prune user_widgets.config.feeds[] for each subscribing user.
 		// The COALESCE handles filtering down to an empty set (jsonb_agg
 		// returns NULL on empty input, but config.feeds must stay a JSON
 		// array).
 		if _, pruneErr := platform.DBPool.Exec(ctx, `
-			UPDATE user_channels
+			UPDATE user_widgets
 			   SET config = jsonb_set(
 				   config,
 				   '{feeds}',
@@ -776,13 +776,13 @@ func removeBrokenCustomFeeds(ctx context.Context) (int, error) {
 				       '[]'::jsonb
 				   )
 			   )
-			 WHERE (channel_type IN ('rss', 'news')
-			        OR channel_type LIKE 'news\_%'
-			        OR channel_type LIKE 'rss\_%')
+			 WHERE (widget_type IN ('rss', 'news')
+			        OR widget_type LIKE 'news\_%'
+			        OR widget_type LIKE 'rss\_%')
 			   AND config ? 'feeds'
 			   AND config->'feeds' @> jsonb_build_array(jsonb_build_object('url', $2::text))
 		`, MaxConsecutiveFailuresJanitor, url); pruneErr != nil {
-			log.Printf("[RSS Janitor] prune user_channels for %s failed: %v", url, pruneErr)
+			log.Printf("[RSS Janitor] prune user_widgets for %s failed: %v", url, pruneErr)
 			// Continue — better to remove tracked_feeds with a few stale
 			// user configs than skip the URL entirely.
 		}

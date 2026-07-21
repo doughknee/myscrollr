@@ -227,7 +227,7 @@ func TestIntegrationSubscriptionDeletedResetsAndPrunes(t *testing.T) {
 	// slot cap of three. Staggered created_at pins the prune order.
 	widgets := []string{"sports_nfl", "finance_stocks", "news_bbc", "sports_nba", "predictions"}
 	for i, w := range widgets {
-		testsupport.MustExec(t, `INSERT INTO user_channels (logto_sub, channel_type, enabled, config, created_at)
+		testsupport.MustExec(t, `INSERT INTO user_widgets (logto_sub, widget_type, enabled, config, created_at)
 		             VALUES ($1, $2, true, '{}', now() + make_interval(secs => $3))`, sub, w, i)
 	}
 
@@ -246,7 +246,7 @@ func TestIntegrationSubscriptionDeletedResetsAndPrunes(t *testing.T) {
 	// The downgrade safety net must disable (never delete) the newest
 	// widgets over the free slot cap; the oldest three keep running.
 	rows, err := platform.DBPool.Query(context.Background(),
-		`SELECT channel_type, enabled FROM user_channels
+		`SELECT widget_type, enabled FROM user_widgets
 		 WHERE logto_sub = $1 ORDER BY created_at ASC`, sub)
 	if err != nil {
 		t.Fatalf("read widgets after prune: %v", err)

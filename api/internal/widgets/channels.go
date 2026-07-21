@@ -28,7 +28,7 @@ var lifecycleClient = &http.Client{
 func CountEnabledWidgets(ctx context.Context, logtoSub string) (int, error) {
 	var n int
 	err := platform.DBPool.QueryRow(ctx,
-		`SELECT count(*) FROM user_channels WHERE logto_sub = $1 AND enabled = true`,
+		`SELECT count(*) FROM user_widgets WHERE logto_sub = $1 AND enabled = true`,
 		logtoSub).Scan(&n)
 	return n, err
 }
@@ -129,7 +129,7 @@ func CreateWidget(c *fiber.Ctx) error {
 		WidgetType string                 `json:"channel_type"`
 		Config     map[string]interface{} `json:"config"`
 		// LocalWidgets is the client's count of enabled utility widgets
-		// (clock/weather/…). They live in preferences, not user_channels, but
+		// (clock/weather/…). They live in preferences, not user_widgets, but
 		// every widget counts toward the slot cap — so the client reports them
 		// and the slot gate adds them to the DB widget count. Absent (older
 		// client) = 0, degrading to a data-widget-only gate.
@@ -142,7 +142,7 @@ func CreateWidget(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validate the widget type (wire: channel_type): accept either a
+	// Validate the widget type (wire: widget_type): accept either a
 	// registered backend channel service (Redis discovery) or a known widget
 	// type (the code registry in widgets.go). Additive during the widget/slot
 	// transition so legacy coarse types ("sports") and new split widgets
@@ -154,7 +154,7 @@ func CreateWidget(c *fiber.Ctx) error {
 		})
 	}
 	// Utility widgets (clock/weather/…) live in desktop preferences, not
-	// user_channels. A row for one has no backing data source and would
+	// user_widgets. A row for one has no backing data source and would
 	// double-count against the slot cap (once here, once via
 	// local_widgets), so reject it outright.
 	if platform.IsUtilityWidgetType(req.WidgetType) {
@@ -175,7 +175,7 @@ func CreateWidget(c *fiber.Ctx) error {
 
 	// Tier-gate the config shape. Frontend already enforces these caps
 	// but the API is the only place that actually matters — the Rust
-	// ingestion services trust user_channels.config verbatim.
+	// ingestion services trust user_widgets.config verbatim.
 	tier := platform.TierFromRoles(platform.GetUserRoles(c))
 
 	// Slot gate (widget/slot model, 2026-06-30): block adding a *new*
@@ -219,9 +219,9 @@ func CreateWidget(c *fiber.Ctx) error {
 	var ch platform.Widget
 	var configBytes []byte
 	err := platform.DBPool.QueryRow(context.Background(), `
-		INSERT INTO user_channels (logto_sub, channel_type, config)
+		INSERT INTO user_widgets (logto_sub, widget_type, config)
 		VALUES ($1, $2, $3)
-		RETURNING id, logto_sub, channel_type, enabled, visible, config, created_at, updated_at
+		RETURNING id, logto_sub, widget_type, enabled, visible, config, created_at, updated_at
 	`, userID, req.WidgetType, configJSON).Scan(
 		&ch.ID, &ch.LogtoSub, &ch.WidgetType, &ch.Enabled, &ch.Visible,
 		&configBytes, &ch.CreatedAt, &ch.UpdatedAt,
@@ -318,7 +318,7 @@ func UpdateWidget(c *fiber.Ctx) error {
 		if max := MaxWidgetsForTier(tier); max != nil {
 			var currentlyEnabled bool
 			err := platform.DBPool.QueryRow(context.Background(), `
-				SELECT enabled FROM user_channels WHERE logto_sub = $1 AND channel_type = $2
+				SELECT enabled FROM user_widgets WHERE logto_sub = $1 AND widget_type = $2
 			`, userID, widgetType).Scan(&currentlyEnabled)
 			// Row-lookup errors fall through: a missing row 404s on the
 			// UPDATE below, and transient errors fail open like CreateWidget.
@@ -358,7 +358,7 @@ func UpdateWidget(c *fiber.Ctx) error {
 	if req.Config != nil {
 		var oldConfigBytes []byte
 		_ = platform.DBPool.QueryRow(context.Background(), `
-			SELECT config FROM user_channels WHERE logto_sub = $1 AND channel_type = $2
+			SELECT config FROM user_widgets WHERE logto_sub = $1 AND widget_type = $2
 		`, userID, widgetType).Scan(&oldConfigBytes)
 		if len(oldConfigBytes) > 0 {
 			json.Unmarshal(oldConfigBytes, &oldConfig)
@@ -388,10 +388,10 @@ func UpdateWidget(c *fiber.Ctx) error {
 	}
 
 	query := fmt.Sprintf(`
-		UPDATE user_channels
+		UPDATE user_widgets
 		SET %s
-		WHERE logto_sub = $1 AND channel_type = $2
-		RETURNING id, logto_sub, channel_type, enabled, visible, config, created_at, updated_at
+		WHERE logto_sub = $1 AND widget_type = $2
+		RETURNING id, logto_sub, widget_type, enabled, visible, config, created_at, updated_at
 	`, strings.Join(setClauses, ", "))
 
 	var ch platform.Widget
@@ -450,11 +450,11 @@ func DeleteWidget(c *fiber.Ctx) error {
 	// Fetch the widget config before deleting (needed for cleanup hooks)
 	var configBytes []byte
 	_ = platform.DBPool.QueryRow(context.Background(), `
-		SELECT config FROM user_channels WHERE logto_sub = $1 AND channel_type = $2
+		SELECT config FROM user_widgets WHERE logto_sub = $1 AND widget_type = $2
 	`, userID, widgetType).Scan(&configBytes)
 
 	tag, err := platform.DBPool.Exec(context.Background(), `
-		DELETE FROM user_channels WHERE logto_sub = $1 AND channel_type = $2
+		DELETE FROM user_widgets WHERE logto_sub = $1 AND widget_type = $2
 	`, userID, widgetType)
 	if err != nil {
 		log.Printf("[Widgets] Delete error: %v", err)
@@ -498,7 +498,7 @@ func DeleteWidget(c *fiber.Ctx) error {
 // PruneWidgetsForTier disables (never deletes) a user's newest enabled
 // widgets until the count fits the tier's slot cap — the downgrade
 // safety net of the widget/slot model. Oldest widgets survive
-// (created_at ASC); rows stay in user_channels so the user can
+// (created_at ASC); rows stay in user_widgets so the user can
 // re-enable them after re-upgrading. Intended to be called from the
 // Stripe webhook whenever a subscription change demotes the user to a
 // lower tier. Local utility widgets live client-side and are enforced
@@ -524,8 +524,8 @@ func PruneWidgetsForTier(ctx context.Context, logtoSub, tier string) {
 
 	for _, ch := range pruned {
 		_, err := platform.DBPool.Exec(ctx, `
-			UPDATE user_channels SET enabled = false, updated_at = now()
-			WHERE logto_sub = $1 AND channel_type = $2
+			UPDATE user_widgets SET enabled = false, updated_at = now()
+			WHERE logto_sub = $1 AND widget_type = $2
 		`, logtoSub, ch.WidgetType)
 		if err != nil {
 			log.Printf("[Prune] Failed to disable %s/%s: %v", logtoSub, ch.WidgetType, err)

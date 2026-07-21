@@ -142,21 +142,19 @@ func Main(m *testing.M) int {
 		return m.Run()
 	}
 
-	root := apiRoot()
-	for _, src := range []struct{ path, table string }{
-		{"file://" + filepath.ToSlash(filepath.Join(root, "migrations")), "schema_migrations_core"},
-		{"file://" + filepath.ToSlash(filepath.Join(root, "..", "channels", "fantasy", "api", "migrations")), "schema_migrations_fantasy"},
-	} {
-		mig, err := migrate.New(src.path, migrateURL(dbURL, src.table))
-		if err != nil {
-			log.Fatalf("[TestMain] create migrator for %s: %v", src.path, err)
-		}
-		if err := mig.Up(); err != nil && err != migrate.ErrNoChange {
-			mig.Close()
-			log.Fatalf("[TestMain] migrate %s: %v", src.path, err)
-		}
-		mig.Close()
+	// One chain, one authority (VISION 4.3): core's migrations create every
+	// table the tests touch, including the content tables the ingesters
+	// write and the yahoo_* tables the GDPR purge cascade deletes from.
+	src := "file://" + filepath.ToSlash(filepath.Join(apiRoot(), "migrations"))
+	mig, err := migrate.New(src, migrateURL(dbURL, "schema_migrations_core"))
+	if err != nil {
+		log.Fatalf("[TestMain] create migrator for %s: %v", src, err)
 	}
+	if err := mig.Up(); err != nil && err != migrate.ErrNoChange {
+		mig.Close()
+		log.Fatalf("[TestMain] migrate %s: %v", src, err)
+	}
+	mig.Close()
 
 	pool, err := pgxpool.New(context.Background(), dbURL)
 	if err != nil {
@@ -164,29 +162,6 @@ func Main(m *testing.M) int {
 	}
 	defer pool.Close()
 	platform.DBPool = pool
-
-	// The overview handler reads the curated-feeds catalog from the rss
-	// service's tables (production shares one database across services).
-	// The rss migration directory mixes a legacy timestamp prefix with
-	// the newer 13* prefix, so a version-ordered migrator would run the
-	// 13* backfill before the table it reads exists — apply the files in
-	// historical order instead. All four are idempotent (IF NOT EXISTS /
-	// ON CONFLICT DO NOTHING / re-runnable DELETE).
-	for _, f := range []string{
-		"20250601000001_initial.up.sql",
-		"20250601000002_add_failure_tracking.up.sql",
-		"130000000001_user_custom_feeds.up.sql",
-		"130000000002_cleanup_dup_user_custom_feeds.up.sql",
-	} {
-		path := filepath.Join(root, "..", "channels", "rss", "service", "migrations", f)
-		sqlBytes, err := os.ReadFile(path)
-		if err != nil {
-			log.Fatalf("[TestMain] read rss migration %s: %v", path, err)
-		}
-		if _, err := pool.Exec(context.Background(), string(sqlBytes)); err != nil {
-			log.Fatalf("[TestMain] apply rss migration %s: %v", path, err)
-		}
-	}
 
 	mr, err := miniredis.Run()
 	if err != nil {
