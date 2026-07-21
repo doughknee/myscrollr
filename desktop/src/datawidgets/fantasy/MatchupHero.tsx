@@ -1,10 +1,10 @@
 /**
- * MatchupHero — the tentpole element of the Fantasy channel.
+ * MatchupHero — the tentpole element of the Fantasy widget.
  *
  * Renders the user's current head-to-head matchup as a large, animated
  * card. Live scores pulse on update, the win-probability bar slides with
  * each refresh, and projected finals are shown as faint numbers next to
- * the live score. This is the single visual that sells the channel.
+ * the live score. This is the single visual that sells the widget.
  */
 import { useEffect, useRef } from "react";
 import { clsx } from "clsx";

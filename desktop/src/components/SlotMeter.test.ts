@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { computeSlotUsage, slotHeadline, slotSubline } from "./SlotMeter";
 
 describe("computeSlotUsage", () => {
-  it("sums enabled channels and enabled local widgets", () => {
+  it("sums enabled widgets and enabled local widgets", () => {
     const u = computeSlotUsage(2, 1, 6);
     expect(u).toEqual({ used: 3, max: 6, finite: true, atCapacity: false });
   });

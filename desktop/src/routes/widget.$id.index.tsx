@@ -3,7 +3,7 @@
  * data widgets (finance_stocks, sports_nfl, news_bbc, predictions, …)
  * and local utilities (clock, weather, sysmon, uptime, github, timer).
  * The one route for every widget — /channel/$type was retired with the
- * rest of the "channel" vocabulary.
+ * rest of the "widget" vocabulary.
  *
  * One route for every source means every swap is a same-route swap —
  * PageLayout stays mounted and the full stableChrome choreography

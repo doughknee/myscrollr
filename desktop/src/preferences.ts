@@ -305,7 +305,7 @@ export interface WidgetPrefs {
 // Sports display prefs live server-side (useSportsConfig), not here.
 
 /**
- * Four-state visibility control for channel display settings.
+ * Four-state visibility control for widget display settings.
  *
  *   off     — hidden everywhere
  *   feed    — shown on the feed page only; hidden from the ticker
@@ -504,7 +504,7 @@ export interface WidgetDisplayPrefs {
 }
 
 /**
- * Per-channel homepage preview filter.
+ * Per-widget homepage preview filter.
  *
  * Keys are group identifiers: symbols for finance, league names for
  * sports, source names for rss, and league keys for fantasy.
@@ -520,7 +520,7 @@ export interface AppPreferences {
   taskbar: TaskbarPrefs;
   widgets: WidgetPrefs;
   widgetDisplay: WidgetDisplayPrefs;
-  /** Per-channel homepage preview selections (up to 5 group keys). */
+  /** Per-widget homepage preview selections (up to 5 group keys). */
   homePreview: HomePreview;
   /**
    * IDs of one-time discovery tips the user has already seen.
@@ -1039,11 +1039,11 @@ export function consumeTickerLayoutChanged(): TickerLayoutChangedDetails | null 
 
 // ── DataWidgetRow display migrations (v1.0.2 venue-enum migration) ────
 //
-// Each channel's display prefs went from all-booleans to `Venue` strings
+// Each widget's display prefs went from all-booleans to `Venue` strings
 // in v1.0.2 (see 2026-04-25-display-venue-toggle-design.md). These
 // helpers run `migrateVenue` on every field that was previously a
 // boolean; unknown and never-seen fields get the `"both"` default so new
-// channels and new fields are visible immediately post-upgrade.
+// widgets and new fields are visible immediately post-upgrade.
 
 export function migrateFinanceDisplay(
   saved: Partial<FinanceDisplayPrefs> | undefined,
@@ -1063,7 +1063,7 @@ export function migrateFinanceDisplay(
   // 2026-07-17 settings unification — feeds always render comfort; the
   // ticker owns the one density concept.) Sports' equivalents are forced
   // in normalizeSportsDisplayConfig; rss per-widget overrides are
-  // stripped where they merge (channels/rss/view.ts + FeedTab).
+  // stripped where they merge (datawidgets/rss/view.ts + FeedTab).
   return {
     ...DEFAULT_WIDGET_DISPLAY.finance,
     defaultSort:
@@ -1648,7 +1648,7 @@ export function updateWidgetPrefs(
 // ── Unified ticker row selector helpers ─────────────────────────
 //
 // Stream 3 of Batch D collapses three duplicate ticker visibility
-// surfaces (tray Channels submenu, feed page Eye/EyeOff button,
+// surfaces (tray Widgets submenu, feed page Eye/EyeOff button,
 // Settings source picker) into a single mental model:
 //
 //     "Where should this source appear?  Off / Row 1 / Row 2 / Row 3"
@@ -1668,8 +1668,8 @@ export function updateWidgetPrefs(
 // master render gate for widget ticker data.
 // See docs/superpowers/specs/2026-04-28-batch-d-…-design.md §Stream 3.
 
-/** Minimal shape of a DataWidgetRow record used by `getChannelTickerRow`. */
-interface ChannelTickerInfo {
+/** Minimal shape of a DataWidgetRow record used by `getDataWidgetTickerRow`. */
+interface DataWidgetTickerInfo {
   widget_type: string;
   ticker_enabled?: boolean;
   /** @deprecated server-side legacy alias for ticker_enabled. */
@@ -1682,16 +1682,16 @@ interface ChannelTickerInfo {
  * Resolution order:
  *   1. If `sourceId` appears in any `tickerLayout.rows[i].sources[]`,
  *      return that row index `i`.
- *   2. Else, if `channelInfo` is provided and its `ticker_enabled` flag
+ *   2. Else, if `dataWidgetInfo` is provided and its `ticker_enabled` flag
  *      is true (legacy default), return 0.
  *   3. Else return null (off).
  *
- * `channelInfo` is optional because widgets don't have a server-side
+ * `dataWidgetInfo` is optional because widgets don't have a server-side
  * ticker_enabled flag — pass `null` for widget IDs.
  */
 export function getSourceTickerRow(
   prefs: AppPreferences,
-  channelInfo: ChannelTickerInfo | null,
+  dataWidgetInfo: DataWidgetTickerInfo | null,
   sourceId: string,
 ): number | null {
   // Step 1: explicit assignment in tickerLayout
@@ -1702,26 +1702,26 @@ export function getSourceTickerRow(
     }
   }
 
-  // Step 2: legacy fallback via DataWidgetRow.ticker_enabled (channels only)
-  if (!channelInfo) return null;
+  // Step 2: legacy fallback via DataWidgetRow.ticker_enabled (widgets only)
+  if (!dataWidgetInfo) return null;
   const tickerEnabled =
-    typeof channelInfo.ticker_enabled === "boolean"
-      ? channelInfo.ticker_enabled
-      : typeof channelInfo.visible === "boolean"
-        ? channelInfo.visible
+    typeof dataWidgetInfo.ticker_enabled === "boolean"
+      ? dataWidgetInfo.ticker_enabled
+      : typeof dataWidgetInfo.visible === "boolean"
+        ? dataWidgetInfo.visible
         : true;
   return tickerEnabled ? 0 : null;
 }
 
 /**
- * Convenience wrapper around `getSourceTickerRow` for channels — accepts
+ * Convenience wrapper around `getSourceTickerRow` for widgets — accepts
  * a DataWidgetRow-like object (with `widget_type` + `ticker_enabled`).
  */
-export function getChannelTickerRow(
+export function getDataWidgetTickerRow(
   prefs: AppPreferences,
-  channel: ChannelTickerInfo,
+  widget: DataWidgetTickerInfo,
 ): number | null {
-  return getSourceTickerRow(prefs, channel, channel.widget_type);
+  return getSourceTickerRow(prefs, widget, widget.widget_type);
 }
 
 /**
@@ -1744,7 +1744,7 @@ export function getWidgetTickerRow(
  *   row exists per tier limits).
  *
  * Pure: returns a new AppPreferences. Does NOT issue any API calls;
- * channel-level callers must additionally invoke `dataWidgetsApi.update`
+ * widget-level callers must additionally invoke `dataWidgetsApi.update`
  * to flip `ticker_enabled` server-side (true if row !== null).
  */
 export function setSourceTickerRow(
@@ -1775,11 +1775,11 @@ export function setSourceTickerRow(
 }
 
 /**
- * Move a channel to the given row. See `setSourceTickerRow`. Caller is
+ * Move a widget to the given row. See `setSourceTickerRow`. Caller is
  * responsible for the matching `dataWidgetsApi.update({ ticker_enabled })`
  * call to keep the server-side flag in sync.
  */
-export function setChannelTickerRow(
+export function setDataWidgetTickerRow(
   prefs: AppPreferences,
   widgetType: string,
   row: number | null,

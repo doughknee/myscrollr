@@ -4,7 +4,7 @@
  * Split into two contexts for render performance:
  *   - ShellContext  (stable)  — prefs, auth, callbacks, manifests. Changes
  *     only on explicit user action. Consumed by all routes.
- *   - ShellDataContext (volatile) — channels and dashboard data. Changes on
+ *   - ShellDataContext (volatile) — widgets and dashboard data. Changes on
  *     every TanStack Query refetch / CDC event. Only consumed by routes
  *     that actually need live data (feed, ticker).
  *
@@ -33,18 +33,18 @@ export interface ShellState {
   onAutostartChange: (enabled: boolean) => void;
   appVersion: string;
 
-  /** All registered channel manifests (static). */
+  /** All registered widget manifests (static). */
   allDataWidgetManifests: DataWidgetManifest[];
   /** All registered widget manifests (static). */
   allWidgets: WidgetManifest[];
-  /** Toggle a channel's visibility on the ticker. */
-  onToggleChannelTicker: (widgetType: WidgetId, visible: boolean) => void;
+  /** Toggle a widget's visibility on the ticker. */
+  onToggleDataWidgetTicker: (widgetType: WidgetId, visible: boolean) => void;
   /** Toggle a widget's presence on the ticker. */
   onToggleWidgetTicker: (widgetId: string) => void;
-  /** Add a new channel via API. */
-  onAddChannel: (widgetType: WidgetId) => void;
-  /** Delete a channel via API. */
-  onDeleteChannel: (widgetType: WidgetId) => void;
+  /** Add a new widget via API. */
+  onAddWidget: (widgetType: WidgetId) => void;
+  /** Delete a widget via API. */
+  onDeleteWidget: (widgetType: WidgetId) => void;
   /** Toggle a widget on/off entirely. */
   onToggleWidget: (widgetId: string) => void;
   /** Navigate to a source by ID. */
@@ -59,11 +59,11 @@ export function useShell(): ShellState {
   return ctx;
 }
 
-// ── Volatile data context (channels + dashboard) ────────────────
+// ── Volatile data context (widgets + dashboard) ────────────────
 
 export interface ShellDataState {
-  /** User's channel records from the dashboard API. */
-  channels: DataWidgetRow[];
+  /** User's widget records from the dashboard API. */
+  widgets: DataWidgetRow[];
   /** Dashboard query response (for initial data snapshots). */
   dashboard: DashboardResponse | undefined;
 }

@@ -48,7 +48,7 @@ import type {
   FeedMode,
   DataWidgetManifest,
 } from "../../types";
-import type { WidgetId, RssChannelConfig } from "../../api/client";
+import type { WidgetId, RssWidgetConfig } from "../../api/client";
 import { shouldShowOnFeed } from "../../preferences";
 import type { RssDisplayPrefs } from "../../preferences";
 import { AnimatePresence } from "motion/react";
@@ -108,8 +108,8 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   // sync without each row spawning its own timer.
   const now = useNow();
 
-  // This widget's channel row — source of its feed scope + display overrides.
-  const channel = useMemo(
+  // This widget's widget row — source of its feed scope + display overrides.
+  const widget = useMemo(
     () => dashboard?.widgets?.find((c) => c.widget_type === widgetId),
     [dashboard?.widgets, widgetId],
   );
@@ -120,7 +120,7 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   // (mirrors getRssDisplayPrefs in ./view.ts).
   const dp = useMemo(() => {
     const override = (
-      channel?.config as { display?: Partial<RssDisplayPrefs> } | undefined
+      widget?.config as { display?: Partial<RssDisplayPrefs> } | undefined
     )?.display;
     if (!override) return prefs.widgetDisplay.rss;
     const {
@@ -130,21 +130,21 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
       ...functional
     } = override;
     return { ...prefs.widgetDisplay.rss, ...functional };
-  }, [prefs.widgetDisplay.rss, channel?.config]);
+  }, [prefs.widgetDisplay.rss, widget?.config]);
 
   // Scope to this widget's own feeds (news_bbc → only the BBC feed;
   // rss_custom → only the user's added feeds). undefined = a legacy coarse
-  // channel, which shows everything.
+  // widget, which shows everything.
   const widgetFeedUrls = useMemo(() => {
     if (!widgetId || widgetId === "rss" || widgetId === "news") return undefined;
     const feeds = (
-      channel?.config as { feeds?: Array<{ url?: string }> } | undefined
+      widget?.config as { feeds?: Array<{ url?: string }> } | undefined
     )?.feeds;
     const urls = (Array.isArray(feeds) ? feeds : [])
       .map((f) => f.url)
       .filter((u): u is string => !!u);
     return new Set(urls);
-  }, [channel?.config, widgetId]);
+  }, [widget?.config, widgetId]);
 
   const rssItems = useMemo(() => {
     const all = (dashboard?.data?.rss as RssItemType[] | undefined) ?? [];
@@ -227,11 +227,11 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
 
   const displayOverride = useMemo(
     () =>
-      (channel?.config as { display?: Partial<RssDisplayPrefs> } | undefined)
+      (widget?.config as { display?: Partial<RssDisplayPrefs> } | undefined)
         ?.display ?? {},
-    [channel?.config],
+    [widget?.config],
   );
-  const widgetType = (channel?.widget_type ?? widgetId ?? "rss");
+  const widgetType = (widget?.widget_type ?? widgetId ?? "rss");
 
   // Persists the sticky sort into this widget's config.display override
   // (same slot the time window uses; separate keyed hook from the bar's
@@ -478,7 +478,7 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
       {showFeedsView ? (
         <RssFeedsPanel
           widgetType={widgetType}
-          channelConfig={channel?.config as RssChannelConfig | undefined}
+          widgetConfig={widget?.config as RssWidgetConfig | undefined}
         />
       ) : showEmpty ? (
         <div className="flex flex-1 flex-col justify-center">
@@ -618,7 +618,7 @@ function RssFilterMenu({
 
   return (
     // NOT position:relative — the dropdown anchors to the sticky bar so
-    // it spans the channel width instead of clipping at narrow widths.
+    // it spans the widget width instead of clipping at narrow widths.
     <div ref={rootRef} className="shrink-0 rounded-lg">
       <FilterTrigger
         open={open}
@@ -732,18 +732,18 @@ function RssWindowSelect({
 
 function RssFeedsPanel({
   widgetType,
-  channelConfig,
+  widgetConfig,
 }: {
   widgetType: WidgetId;
-  channelConfig: RssChannelConfig | undefined;
+  widgetConfig: RssWidgetConfig | undefined;
 }) {
   const { error, setError, saving, updateItems } = useDataWidgetConfig<
     Array<{ name: string; url: string; is_custom?: boolean }>
   >(widgetType, "feeds");
 
   const feeds = useMemo(
-    () => (Array.isArray(channelConfig?.feeds) ? channelConfig.feeds : []),
-    [channelConfig?.feeds],
+    () => (Array.isArray(widgetConfig?.feeds) ? widgetConfig.feeds : []),
+    [widgetConfig?.feeds],
   );
   const feedUrlSet = useMemo(() => new Set(feeds.map((f) => f.url)), [feeds]);
 

@@ -1,12 +1,12 @@
 /**
- * Sports channel preview harness — dev-only, browser-only entry.
+ * Sports widget preview harness — dev-only, browser-only entry.
  *
- * Mirrors channels/finance/preview/ (see that harness for the pattern
+ * Mirrors datawidgets/finance/preview/ (see that harness for the pattern
  * rationale). Sports additionally needs ShellDataContext: useSportsConfig
- * reads the channel rows from it, not from ShellContext. Gear writes are
+ * reads the widget rows from it, not from ShellContext. Gear writes are
  * asserted render-only (useSportsConfig mutates via the authed API).
  */
-// FIRST: evaluate the channel registry before ../FeedTab (module-cycle
+// FIRST: evaluate the widget registry before ../FeedTab (module-cycle
 // guard — see the finance harness for the full explanation).
 import "../../registry";
 import { StrictMode, useState } from "react";
@@ -94,7 +94,7 @@ const games: Game[] = Array.from({ length: 72 }, (_, i) => {
   };
 });
 
-const channelRow = {
+const widgetRow = {
   id: 1,
   widget_type: widgetId,
   enabled: true,
@@ -115,7 +115,7 @@ function main(): void {
   });
   queryClient.setQueryData(dashboardQueryOptions().queryKey, {
     data: {},
-    widgets: [channelRow],
+    widgets: [widgetRow],
   });
   queryClient.setQueryData(sportsFullQueryOptions().queryKey, {
     sports: games,
@@ -139,16 +139,16 @@ function main(): void {
     appVersion: "preview",
     allDataWidgetManifests: [],
     allWidgets: [],
-    onToggleChannelTicker: noop,
+    onToggleDataWidgetTicker: noop,
     onToggleWidgetTicker: noop,
-    onAddChannel: noop,
-    onDeleteChannel: noop,
+    onAddWidget: noop,
+    onDeleteWidget: noop,
     onToggleWidget: noop,
     onSelectItem: noop,
   };
 
   const shellData: ShellDataState = {
-    channels: [channelRow],
+    widgets: [widgetRow],
     dashboard: undefined,
   };
 

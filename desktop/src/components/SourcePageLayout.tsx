@@ -1,5 +1,5 @@
 /**
- * SourcePageLayout — page chassis for channel and widget routes.
+ * SourcePageLayout — page chassis for widget and widget routes.
  *
  * Renders through the universal `PageLayout`. Since the configure-page
  * teardown the feed is the only page a source has — every setting lives
@@ -12,7 +12,7 @@
  */
 import PageLayout from "./layout/PageLayout";
 
-/** Fallback for when a source (channel or widget) is not found. */
+/** Fallback for when a source (widget or widget) is not found. */
 export function SourceNotFound({
   kind,
   name,

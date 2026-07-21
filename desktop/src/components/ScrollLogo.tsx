@@ -1,7 +1,7 @@
 /**
  * ScrollLogo — the Scrollr brand glyph.
  *
- * Solid mint when idle; animated channel-color gradient + glow when
+ * Solid mint when idle; animated widget-color gradient + glow when
  * the ticker is alive. Used in the TopBar (always-visible chrome) and
  * in any other surface that wants the brand mark.
  *

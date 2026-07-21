@@ -141,7 +141,7 @@ export interface CatalogItem {
   requiredTier: SubscriptionTier;
 }
 
-/** The source channel id for a data-widget id, or undefined for a utility /
+/** The source widget id for a data-widget id, or undefined for a utility /
  *  unknown id. E.g. "sports_nfl" → "sports". */
 export function sourceForWidget(id: string): string | undefined {
   return byId(id)?.source;

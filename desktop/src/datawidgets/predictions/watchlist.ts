@@ -1,5 +1,5 @@
 /**
- * Personal watchlist + local price alerts for the predictions channel.
+ * Personal watchlist + local price alerts for the predictions widget.
  *
  * Entirely local + account-free: the watchlist is a list of starred market
  * tickers and alerts are "ticker crosses N%" rules, both persisted via the

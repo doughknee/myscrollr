@@ -94,8 +94,8 @@ function buildFeatureGuideResults(query: string): SearchResult[] {
   const q = query.toLowerCase();
   const results: SearchResult[] = [];
 
-  const channels = getAllDataWidgets();
-  channels.forEach((ch, i) => {
+  const dataWidgets = getAllDataWidgets();
+  dataWidgets.forEach((ch, i) => {
     const text = `${ch.name} ${ch.info.about} ${ch.info.usage.join(" ")}`.toLowerCase();
     if (text.includes(q)) {
       results.push({
@@ -117,7 +117,7 @@ function buildFeatureGuideResults(query: string): SearchResult[] {
         sectionLabel: "Feature Guides",
         title: w.name,
         preview: w.info.about.slice(0, 120),
-        index: channels.length + i,
+        index: dataWidgets.length + i,
       });
     }
   });

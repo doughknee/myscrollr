@@ -266,7 +266,7 @@ export default function FantasyStatChip({
 //
 // Per-player selection helpers (findTopN / findWorstStarter /
 // findTopBench / findInjuredPlayers / shortStatus / formatPts) used to
-// live here. They moved to ../../channels/fantasy/playerStats.ts when
+// live here. They moved to ../../datawidgets/fantasy/playerStats.ts when
 // the player-stat segments were extracted to standalone ticker chips
 // — both this file and ScrollrTicker now share them.
 

@@ -53,7 +53,7 @@ export interface SidebarSource {
   name: string;
   hex: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
-  kind: "channel" | "widget";
+  kind: "data" | "utility";
   /** Whether this source currently has chips on the ticker — drives
    *  the context menu's Show/Hide label (v1.1.2). */
   onTicker: boolean;
@@ -109,7 +109,7 @@ interface SidebarProps {
   isSupport: boolean;
   /** Whether the home feed is active. Drives the pinned Home row. */
   isFeed: boolean;
-  /** Currently active channel or widget ID (for highlighting). */
+  /** Currently active widget or widget ID (for highlighting). */
   activeItem: string;
   /** Subscription tier — shown on the footer account chip. */
   tier: SubscriptionTier;
@@ -127,8 +127,8 @@ interface SidebarProps {
   onNavigateToAccount: () => void;
   /** Navigate to the support page. */
   onNavigateToSupport: () => void;
-  /** Navigate to a specific source (channel or widget) feed. */
-  onSelectItem: (id: string, kind: "channel" | "widget") => void;
+  /** Navigate to a specific source (widget or widget) feed. */
+  onSelectItem: (id: string) => void;
 
   // ── Context-menu actions (v1.1.2: right-click a source row) ──
   /** Open the widget's catalog info page. */
@@ -218,7 +218,7 @@ export default function Sidebar({
       </NavGroup>
 
       {/* ── Sources ─────────────────────────────────────────────
-          The user's enabled channels and widgets in canonical
+          The user's enabled widgets and widgets in canonical
           order. Scrollable when long. */}
       <NavGroup
         ariaLabel="Widgets"
@@ -233,7 +233,7 @@ export default function Sidebar({
             label={source.name}
             active={activeItem === source.id}
             collapsed={collapsed}
-            onClick={() => onSelectItem(source.id, source.kind)}
+            onClick={() => onSelectItem(source.id)}
             onContextMenu={(e) => {
               e.preventDefault();
               setMenu({ source, x: e.clientX, y: e.clientY });
@@ -312,7 +312,7 @@ export default function Sidebar({
                   key: "open",
                   label: "Open",
                   icon: ArrowUpRight,
-                  onSelect: () => onSelectItem(menu.source.id, menu.source.kind),
+                  onSelect: () => onSelectItem(menu.source.id),
                 },
                 {
                   key: "ticker",

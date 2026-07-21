@@ -35,7 +35,7 @@ describe("formatTickerStatus", () => {
 });
 
 describe("getEffectiveDataWidgetTickerRow", () => {
-  it("returns null for disabled channels even when the legacy fallback would be row 0", () => {
+  it("returns null for disabled widgets even when the legacy fallback would be row 0", () => {
     const prefs = makePrefs([{ sources: ["finance"] }]);
 
     expect(
@@ -47,7 +47,7 @@ describe("getEffectiveDataWidgetTickerRow", () => {
     ).toBeNull();
   });
 
-  it("returns null for enabled channels excluded from explicit rows", () => {
+  it("returns null for enabled widgets excluded from explicit rows", () => {
     const prefs = makePrefs([{ sources: ["finance"] }]);
 
     expect(
@@ -59,7 +59,7 @@ describe("getEffectiveDataWidgetTickerRow", () => {
     ).toBeNull();
   });
 
-  it("uses the first empty row for ticker-enabled channels when a row shows all sources", () => {
+  it("uses the first empty row for ticker-enabled widgets when a row shows all sources", () => {
     const prefs = makePrefs([{ sources: ["finance"] }, { sources: [] }]);
 
     expect(

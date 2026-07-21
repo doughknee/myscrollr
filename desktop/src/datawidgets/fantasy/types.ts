@@ -1,5 +1,5 @@
 /**
- * Fantasy channel types — canonical source of truth.
+ * Fantasy widget types — canonical source of truth.
  *
  * Mirrors the Go API's MyLeaguesResponse shape. Fields are nullable
  * where the API may omit them (e.g. during discovery, before import,

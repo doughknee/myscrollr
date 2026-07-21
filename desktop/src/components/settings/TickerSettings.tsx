@@ -159,9 +159,9 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
     [rows, undoable],
   );
 
-  // ── Available sources (channels + enabled widgets) ────────────
+  // ── Available sources (data widgets + enabled utility widgets) ──
   const availableSources = useMemo(() => {
-    const channels = getAllDataWidgets().map((ch) => ({
+    const dataWidgets = getAllDataWidgets().map((ch) => ({
       id: ch.id,
       label: ch.tabLabel,
       hex: ch.hex,
@@ -173,7 +173,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
         label: w.tabLabel,
         hex: w.hex,
       }));
-    return [...channels, ...widgets];
+    return [...dataWidgets, ...widgets];
   }, [prefs.widgets.enabledWidgets]);
 
   return (

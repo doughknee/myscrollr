@@ -83,7 +83,7 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "updated", label: "Last Updated" },
 ];
 
-interface FinanceChannelConfig {
+interface FinanceWidgetConfig {
   symbols?: string[];
 }
 
@@ -274,13 +274,13 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   } = useDataWidgetConfig<string[]>(widgetType, "symbols");
   const { data: fullCatalog = [] } = useQuery(financeCatalogOptions());
 
-  const channelRow = (dashboard?.widgets ?? []).find(
+  const widgetRow = (dashboard?.widgets ?? []).find(
     (ch) => ch.widget_type === widgetType,
   );
-  const channelConfig = (channelRow?.config ?? {}) as FinanceChannelConfig;
+  const widgetConfig = (widgetRow?.config ?? {}) as FinanceWidgetConfig;
   const trackedSymbols = useMemo(
-    () => (Array.isArray(channelConfig.symbols) ? channelConfig.symbols : []),
-    [channelConfig.symbols],
+    () => (Array.isArray(widgetConfig.symbols) ? widgetConfig.symbols : []),
+    [widgetConfig.symbols],
   );
   const trackedSet = useMemo(() => new Set(trackedSymbols), [trackedSymbols]);
 
@@ -585,7 +585,7 @@ function FinanceFilterMenu({
 
   return (
     // NOT position:relative — the dropdown anchors to the sticky bar so
-    // it spans the channel width instead of clipping at narrow widths.
+    // it spans the widget width instead of clipping at narrow widths.
     <div ref={rootRef} className="shrink-0 rounded-lg">
       <FilterTrigger
         open={open}

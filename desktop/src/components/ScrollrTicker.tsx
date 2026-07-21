@@ -35,7 +35,7 @@ interface ScrollrTickerProps {
   /** Click handler. The optional `url` argument is set when the
    * underlying chip has an external destination (article link, game
    * page, etc.). When undefined, the consumer should fall back to
-   * opening the in-app channel page. */
+   * opening the in-app widget page. */
   onChipClick?: (widgetType: string, itemId: string | number, url?: string) => void;
   /** Toggle pin state for a widget (hover pin icon). */
   onTogglePin?: (widgetId: string) => void;
@@ -51,11 +51,11 @@ interface ScrollrTickerProps {
   hoverSpeed?: number;
   /** Show 2-row comfort chips with extra detail */
   comfort?: boolean;
-  /** How items from different channels are ordered */
+  /** How items from different widgets are ordered */
   mixMode?: MixMode;
   /** Chip color scheme */
   chipColorMode?: ChipColorMode;
-  /** Per-channel display preferences (controls what data chips show) */
+  /** Per-widget display preferences (controls what data chips show) */
   widgetDisplay?: WidgetDisplayPrefs;
   /** Which row this ticker represents (0-indexed, for multi-row splitting) */
   rowIndex?: number;
@@ -83,7 +83,7 @@ interface ScrollrTickerProps {
   /**
    * When true, this row should render the "no sources installed yet"
    * empty-shell CTA instead of returning null. Only the parent
-   * (App.tsx) knows whether the user is signed-in with zero channels
+   * (App.tsx) knows whether the user is signed-in with zero widgets
    * vs. a row that legitimately has nothing to show right now, so the
    * decision is hoisted up there. The parent should set this only on
    * the first row to avoid stacking duplicate CTAs in multi-row
@@ -93,28 +93,28 @@ interface ScrollrTickerProps {
   /** Click handler for the sourceless CTA (opens the catalog). */
   onAddSources?: () => void;
   /**
-   * When true, this row should render the "you have channels installed
-   * but none are currently on the ticker" CTA — a row of per-channel
-   * quick-link chips that open each channel (ticker toggle lives in-widget). Mutually
+   * When true, this row should render the "you have widgets installed
+   * but none are currently on the ticker" CTA — a row of per-widget
+   * quick-link chips that open each widget (ticker toggle lives in-widget). Mutually
    * exclusive with `showSourcelessCTA`; only one fires at a time.
    * Parent (App.tsx) gates this on first row + authenticated + has
-   * installed channels + no ticker-enabled channels + no pinned widgets.
+   * installed widgets + no ticker-enabled widgets + no pinned widgets.
    */
   showInstalledOffCTA?: boolean;
   /**
-   * Visual metadata for each installed channel, used to render the
-   * per-channel quick-link chips. Empty when `showInstalledOffCTA` is
+   * Visual metadata for each installed widget, used to render the
+   * per-widget quick-link chips. Empty when `showInstalledOffCTA` is
    * false; non-empty when true. Order should match the canonical
-   * channel order from the registry.
+   * widget order from the registry.
    */
-  installedChannels?: Array<{
+  installedWidgets?: Array<{
     id: string;
     name: string;
     hex: string;
     icon: React.ComponentType<{ size?: number; className?: string }>;
   }>;
-  /** Click handler for the per-channel quick-link chips (opens Configure). */
-  onOpenChannel?: (channelId: string) => void;
+  /** Click handler for the per-widget quick-link chips (opens Configure). */
+  onOpenWidget?: (widgetId: string) => void;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -160,8 +160,8 @@ export default function ScrollrTicker({
   showSourcelessCTA = false,
   onAddSources,
   showInstalledOffCTA = false,
-  installedChannels = [],
-  onOpenChannel,
+  installedWidgets = [],
+  onOpenWidget,
 }: ScrollrTickerProps) {
   // Per-row overrides shadow the globals. The Ultimate-gate is enforced
   // upstream — Settings only lets Ultimate/super_user WRITE these fields,
@@ -186,7 +186,7 @@ export default function ScrollrTicker({
     [],
   );
 
-  // Build chip arrays per channel/widget, then combine based on mixMode.
+  // Build chip arrays per widget, then combine based on mixMode.
   // Row filtering (multi-deck) happens UPSTREAM in App.tsx — activeTabs
   // here is already the per-row source list. No round-robin split.
   const chips = useMemo(() => {
@@ -419,13 +419,13 @@ export default function ScrollrTicker({
   const hasScrollingChips = chips.length > 0;
 
   // Empty-row CTA: the user explicitly configured sources for this row
-  // but none of them produced any chips (e.g. they deleted the channel
+  // but none of them produced any chips (e.g. they deleted the widget
   // from their subscription). Show a dismissible CTA rather than silently
   // pretending the row doesn't exist — per spec §Edge Cases #1.
   const isEmptyRowWithExplicitSources =
     !hasScrollingChips && !hasPinnedLeft && !hasPinnedRight && rowHasExplicitSources;
 
-  // Sourceless CTA: signed-in user has zero channels installed and zero
+  // Sourceless CTA: signed-in user has zero widgets installed and zero
   // pinned widgets, so there's literally nothing to put on the ticker.
   // Instead of returning `null` (which makes the ticker invisible and
   // the user wonder what they're supposed to do next), render an empty
@@ -434,10 +434,10 @@ export default function ScrollrTicker({
   const isSourceless =
     !hasScrollingChips && !hasPinnedLeft && !hasPinnedRight && showSourcelessCTA;
 
-  // Installed-but-ticker-off CTA: signed-in user has channels installed
-  // but none are currently flagged for the ticker (every channel's
-  // `ticker_enabled` is false). Show a row of per-channel quick-link
-  // chips so the user can jump straight to that channel's Configure
+  // Installed-but-ticker-off CTA: signed-in user has widgets installed
+  // but none are currently flagged for the ticker (every widget's
+  // `ticker_enabled` is false). Show a row of per-widget quick-link
+  // chips so the user can jump straight to that widget's Configure
   // tab and flip the toggle. This is the "you have stuff, you just
   // turned it off" recovery state.
   const isInstalledButTickerOff =
@@ -445,7 +445,7 @@ export default function ScrollrTicker({
     && !hasPinnedLeft
     && !hasPinnedRight
     && showInstalledOffCTA
-    && installedChannels.length > 0;
+    && installedWidgets.length > 0;
 
   const containerClass = `ticker-container ${comfort ? "h-16" : "h-11"} flex items-center bg-base-150 border-b border-edge/50 flex-shrink-0 relative w-full overflow-hidden`;
 
@@ -508,7 +508,7 @@ export default function ScrollrTicker({
       <div className={containerClass}>
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent z-10" />
         <div className="flex flex-col items-center justify-center gap-0.5 w-full h-full px-4 min-w-0">
-          {/* Primary row: headline + action hint + per-channel chips */}
+          {/* Primary row: headline + action hint + per-widget chips */}
           <div className="flex items-center justify-center gap-2 min-w-0">
             <span className="text-ui-meta font-medium text-fg-2 shrink-0">
               Your ticker is empty right now.
@@ -517,14 +517,14 @@ export default function ScrollrTicker({
               Open a source to pick what shows up here:
             </span>
             <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto scrollbar-none">
-              {installedChannels.map((ch) => {
+              {installedWidgets.map((ch) => {
                 const WidgetGlyphIcon = ch.icon;
                 return (
                   <button
                     key={ch.id}
                     type="button"
-                    onClick={() => onOpenChannel?.(ch.id)}
-                    disabled={!onOpenChannel}
+                    onClick={() => onOpenWidget?.(ch.id)}
+                    disabled={!onOpenWidget}
                     className={clsx(
                       "inline-flex items-center gap-1.5 shrink-0 rounded-md",
                       "px-2 py-1 text-ui-meta font-semibold",

@@ -26,7 +26,7 @@ interface DataWidgetActions {
 }
 
 // `prefs` and `setPrefs` were used to clean up `pinnedSources` on
-// channel delete. With pin-to-sidebar removed, the hook no longer
+// widget delete. With pin-to-sidebar removed, the hook no longer
 // needs them — sidebar updates flow from the dashboard refetch.
 export function useDataWidgetActions(): DataWidgetActions {
   const navigate = useNavigate();
@@ -50,7 +50,7 @@ export function useDataWidgetActions(): DataWidgetActions {
       try {
         await dataWidgetsApi.create(widgetType);
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
-        // The sports channel page reads /sports (["sports","full"]), not
+        // The sports widget page reads /sports (["sports","full"]), not
         // /dashboard — same lesson as the v1.1.0 "empty until Configure"
         // bug: invalidate it or the mounted feed never refetches.
         queryClient.invalidateQueries({ queryKey: ["sports", "full"] });

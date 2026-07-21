@@ -36,7 +36,7 @@ export function formatSignedUsdCents(cents: number): string {
 
 /**
  * Build a `ticker → yes_price (cents)` map from the live predictions feed, so
- * positions can be marked-to-market against the same prices the channel
+ * positions can be marked-to-market against the same prices the widget
  * already streams. Predictions ids are `kalshi:<ticker>`; we key by both the
  * bare ticker and the namespaced id for robust lookup.
  */

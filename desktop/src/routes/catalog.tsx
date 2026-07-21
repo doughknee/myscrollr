@@ -153,7 +153,7 @@ function orderItems(items: CatalogItem[], sort: SortMode): CatalogItem[] {
 function CatalogPage() {
   const navigate = useNavigate();
   const { prefs } = useShell();
-  const { channels } = useShellData();
+  const { widgets } = useShellData();
   const { error: dashboardError } = useQuery(dashboardQueryOptions());
 
   const [filter, setFilter] = useState<FilterTab>("all");
@@ -171,17 +171,17 @@ function CatalogPage() {
     return counts;
   }, [allItems]);
 
-  const enabledChannelIds = useMemo(
-    () => new Set(channels.map((ch) => ch.widget_type)),
-    [channels],
+  const enabledDataWidgetIds = useMemo(
+    () => new Set(widgets.map((ch) => ch.widget_type)),
+    [widgets],
   );
   const enabledWidgetIds = useMemo(
     () => new Set(prefs.widgets.enabledWidgets),
     [prefs.widgets.enabledWidgets],
   );
   const allEnabledIds = useMemo(
-    () => new Set([...enabledChannelIds, ...enabledWidgetIds]),
-    [enabledChannelIds, enabledWidgetIds],
+    () => new Set([...enabledDataWidgetIds, ...enabledWidgetIds]),
+    [enabledDataWidgetIds, enabledWidgetIds],
   );
 
   // Widget/slot model: slot math + meter live in SlotMeter.tsx, shared

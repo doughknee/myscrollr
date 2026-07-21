@@ -1,7 +1,7 @@
 /**
  * FreshnessPill — compact "updated Xs ago" indicator with tone color.
  *
- * Provides a single trust signal per channel: users can glance at the
+ * Provides a single trust signal per widget: users can glance at the
  * feed's control bar and see how recent the most-recent item is, and
  * whether the pipeline appears healthy. The tone shifts as data ages:
  *

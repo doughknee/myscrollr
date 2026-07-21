@@ -238,7 +238,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   // Configure page) so it reaches users who never open Configure — a
   // lingering server `categories` filter would silently hide markets.
   const queryClient = useQueryClient();
-  const channelRow = useMemo(
+  const widgetRow = useMemo(
     () =>
       (dashboard?.widgets ?? []).find(
         (ch) => ch.widget_type === "predictions",
@@ -249,10 +249,10 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   useEffect(() => {
     // Wait for the dashboard row — running before it loads would burn the
     // once-per-mount guard on a no-op.
-    if (migratedRef.current || !channelRow) return;
+    if (migratedRef.current || !widgetRow) return;
     migratedRef.current = true;
 
-    const config = (channelRow.config ?? {}) as LegacyPredictionsConfig;
+    const config = (widgetRow.config ?? {}) as LegacyPredictionsConfig;
     const favorites = Array.isArray(config.favorites) ? config.favorites : [];
     const categories = Array.isArray(config.categories) ? config.categories : [];
     if (favorites.length === 0 && categories.length === 0) return;
@@ -277,8 +277,8 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
     //    key). The API keeps honoring these fields for old clients; this
     //    client simply stops using them.
     void dataWidgetsApi
-      .update(channelRow.widget_type, {
-        config: { ...(channelRow.config ?? {}), categories: [], favorites: [] },
+      .update(widgetRow.widget_type, {
+        config: { ...(widgetRow.config ?? {}), categories: [], favorites: [] },
       })
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -288,7 +288,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
         // retries. The feed itself is fully functional either way.
         migratedRef.current = false;
       });
-  }, [channelRow, queryClient]);
+  }, [widgetRow, queryClient]);
 
   // ── Lens + category filter + market-detail modal ──────────────
   const [lens, setLens] = useState<PredictionsLens>("trending");
@@ -494,7 +494,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
     [navEvents],
   );
 
-  // "/" focuses search from anywhere in the channel (unless typing, or
+  // "/" focuses search from anywhere in the widget (unless typing, or
   // the market-detail modal is open).
   useSlashFocus(searchInputRef, isComfort && view === "markets");
 
@@ -586,7 +586,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
       {/* ONE control bar: view switcher (segmented, Tauri-only) · lens
           pills + category select · search · freshness. WidgetBar owns the
           sticky @container shell and the pinned-elevation sentinel. At
-          narrow channel widths the lens pills + category select collapse
+          narrow widget widths the lens pills + category select collapse
           into a single Filter button so nothing clips (B4/B5). */}
       {isComfort && (
         <WidgetBar>
@@ -961,7 +961,7 @@ function FilterMenu({
 
   return (
     // NOT position:relative — the dropdown anchors to the sticky bar (the
-    // nearest positioned ancestor) so it spans the channel width instead of
+    // nearest positioned ancestor) so it spans the widget width instead of
     // clipping off-screen at narrow widths. rounded-lg feeds the global
     // focus rule's `border-radius: inherit` for the button's ring.
     <div ref={rootRef} className="shrink-0 rounded-lg">

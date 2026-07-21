@@ -118,49 +118,49 @@ function parseRoute(pathname: string) {
   if (kind === "feed" || pathname === "/") {
     return {
       activeItem: "",
-      isChannel: false, isWidget: false, isFeed: true,
+      isDataWidget: false, isWidget: false, isFeed: true,
       isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
-  if (kind === "channel" && itemId) {
-    return {
-      activeItem: itemId,
-      isChannel: true, isWidget: false, isFeed: false,
-      isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
-    };
-  }
+  // Data and utility widgets share one route shape (`/widget/$id`), so the
+  // path cannot tell them apart — only the id can. This used to be two
+  // branches keyed on `/channel/` vs `/widget/`; the `/channel/` prefix has
+  // not existed since the unification deleted the redirect shims, so the
+  // data branch was unreachable and every widget page reported itself as a
+  // utility. Ask the catalog instead.
   if (kind === "widget" && itemId) {
+    const utility = catalogItemById(itemId)?.kind === "utility";
     return {
       activeItem: itemId,
-      isChannel: false, isWidget: true, isFeed: false,
+      isDataWidget: !utility, isWidget: utility, isFeed: false,
       isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "catalog") {
     return {
       activeItem: "",
-      isChannel: false, isWidget: false, isFeed: false,
+      isDataWidget: false, isWidget: false, isFeed: false,
       isCustomize: false, isAccount: false, isMarketplace: true, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "customize") {
     return {
       activeItem: "customize",
-      isChannel: false, isWidget: false, isFeed: false,
+      isDataWidget: false, isWidget: false, isFeed: false,
       isCustomize: true, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "account") {
     return {
       activeItem: "account",
-      isChannel: false, isWidget: false, isFeed: false,
+      isDataWidget: false, isWidget: false, isFeed: false,
       isCustomize: false, isAccount: true, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
     };
   }
   if (kind === "support") {
     return {
       activeItem: "",
-      isChannel: false, isWidget: false, isFeed: false,
+      isDataWidget: false, isWidget: false, isFeed: false,
       isCustomize: false, isAccount: false, isMarketplace: false, isSupport: true, isReleases: false, isStatus: false,
     };
   }
@@ -169,20 +169,20 @@ function parseRoute(pathname: string) {
   if (kind === "releases") {
     return {
       activeItem: "",
-      isChannel: false, isWidget: false, isFeed: false,
+      isDataWidget: false, isWidget: false, isFeed: false,
       isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: true, isStatus: false,
     };
   }
   if (kind === "status") {
     return {
       activeItem: "",
-      isChannel: false, isWidget: false, isFeed: false,
+      isDataWidget: false, isWidget: false, isFeed: false,
       isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: true,
     };
   }
   return {
     activeItem: "",
-    isChannel: false, isWidget: false, isFeed: true,
+    isDataWidget: false, isWidget: false, isFeed: true,
     isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
   };
 }
@@ -222,12 +222,12 @@ function RootLayout() {
     }
   }, [dashboard]);
 
-  const channels: DataWidgetRow[] = useMemo(() => dashboard?.widgets ?? [], [dashboard]);
+  const widgets: DataWidgetRow[] = useMemo(() => dashboard?.widgets ?? [], [dashboard]);
 
   // Filter to enabled widgets only — Sidebar handles sorting by DATA_WIDGET_ORDER
   const enabledDataWidgets = useMemo(
-    () => channels.filter((ch) => ch.enabled),
-    [channels],
+    () => widgets.filter((ch) => ch.enabled),
+    [widgets],
   );
 
   // ── Manifests ───────────────────────────────────────────────
@@ -270,7 +270,7 @@ function RootLayout() {
     // Snapshot the *current* (post-clamp) prefs into the Undo
     // closure before the toast fires. If the user clicks Undo we
     // splice the saved pre-clamp rows back into that snapshot so the
-    // rest of the prefs (theme, widgets, channels) stay current.
+    // rest of the prefs (theme, widgets, widgets) stay current.
     const snapshot = structuredClone(prefs);
 
     toast.message("Your ticker layout was simplified to fit your plan.", {
@@ -333,7 +333,7 @@ function RootLayout() {
   }, []);
 
   // ── First-run discovery tip: right-click the ticker ─────────
-  // Surfaces the ticker context menu (channels, widgets, position,
+  // Surfaces the ticker context menu (widgets, widgets, position,
   // "Customize Ticker") to users who would never know it exists.
   // Fires exactly once per install, gated on `prefs.tipsShown`. We
   // delay 4 seconds to let the wizard close and the dashboard paint
@@ -444,7 +444,7 @@ function RootLayout() {
 
   // ── Extracted hooks ─────────────────────────────────────────
 
-  const channelActions = useDataWidgetActions();
+  const dataWidgetActions = useDataWidgetActions();
   const widgetActions = useWidgetActions(prefs, setPrefs, route.activeItem);
 
   // Shell-level weather polling — keeps data fresh regardless of which page is visible.
@@ -546,10 +546,10 @@ function RootLayout() {
 
   // ── Navigation handlers ─────────────────────────────────────
 
-  // Keep a ref to channels so handleSelectItem doesn't depend on
-  // the volatile `channels` array, which changes every dashboard refetch.
-  const channelsRef = useRef(channels);
-  channelsRef.current = channels;
+  // Keep a ref to widgets so handleSelectItem doesn't depend on
+  // the volatile `widgets` array, which changes every dashboard refetch.
+  const widgetsRef = useRef(widgets);
+  widgetsRef.current = widgets;
 
   const handleSelectItem = useCallback(
     (id: string) => {
@@ -557,7 +557,7 @@ function RootLayout() {
         navigate({ to: "/customize", search: { tab: "app" } });
         return;
       }
-      if (channelsRef.current.some((ch) => ch.widget_type === id)) {
+      if (widgetsRef.current.some((ch) => ch.widget_type === id)) {
         navigate({ to: "/widget/$id", params: { id: id } });
         return;
       }
@@ -578,13 +578,11 @@ function RootLayout() {
   const handleNavigateToMarketplace = useCallback(() => navigate({ to: "/catalog" }), [navigate]);
   const handleNavigateToSupport = useCallback(() => navigate({ to: "/support" }), [navigate]);
 
+  // Both kinds resolve to the same route now, so the id is all we need —
+  // this used to branch to /channel/$type vs /widget/$id.
   const handleSelectPinned = useCallback(
-    (id: string, kind: "channel" | "widget") => {
-      if (kind === "channel") {
-        navigate({ to: "/widget/$id", params: { id: id } });
-      } else {
-        navigate({ to: "/widget/$id", params: { id } });
-      }
+    (id: string) => {
+      navigate({ to: "/widget/$id", params: { id } });
     },
     [navigate],
   );
@@ -607,9 +605,9 @@ function RootLayout() {
   );
 
   const handleToggleItemTicker = useCallback(
-    (source: { id: string; kind: "channel" | "widget"; onTicker: boolean }) => {
-      if (source.kind === "channel") {
-        channelActions.handleToggleDataWidget(
+    (source: { id: string; kind: "data" | "utility"; onTicker: boolean }) => {
+      if (source.kind === "data") {
+        dataWidgetActions.handleToggleDataWidget(
           source.id,
           !source.onTicker,
         );
@@ -617,7 +615,7 @@ function RootLayout() {
         widgetActions.handleToggleWidgetTicker(source.id);
       }
     },
-    [channelActions.handleToggleDataWidget, widgetActions.handleToggleWidgetTicker],
+    [dataWidgetActions.handleToggleDataWidget, widgetActions.handleToggleWidgetTicker],
   );
 
   const handleRemoveItem = useCallback(
@@ -631,14 +629,14 @@ function RootLayout() {
     [navigate, removeWidgetShared, route.activeItem],
   );
 
-  // Build the sidebar source list from the user's enabled channels and
-  // widgets. Channels come from the live `dashboard.widgets` payload
+  // Build the sidebar source list from the user's enabled widgets and
+  // widgets. Widgets come from the live `dashboard.widgets` payload
   // (filtered to `enabled === true`); widgets come from
   // `prefs.widgets.enabledWidgets`. Both are sorted via the shared
   // CANONICAL_ORDER so the sidebar matches the catalog grid order.
   // `DataWidgetRow.ticker_enabled` is intentionally NOT consulted here — that
   // flag controls whether chips appear on the ticker, not whether the
-  // channel appears in navigation.
+  // widget appears in navigation.
   const sidebarSources = useMemo(() => {
     const enabledDataWidgets = new Map<string, DataWidgetRow>(
       (dashboard?.widgets ?? [])
@@ -654,13 +652,13 @@ function RootLayout() {
       icon: React.ComponentType<{ size?: number; className?: string }>;
       logoUrl?: string;
       logoLight?: boolean;
-      kind: "channel" | "widget";
+      kind: "data" | "utility";
       onTicker: boolean;
     }> = [];
 
     for (const id of CANONICAL_ORDER) {
-      const channel = enabledDataWidgets.get(id);
-      if (channel) {
+      const widget = enabledDataWidgets.get(id);
+      if (widget) {
         const m = catalogItemById(id);
         if (m) {
           sources.push({
@@ -672,13 +670,13 @@ function RootLayout() {
             // rail and the catalog speak one visual language.
             logoUrl: m.logoUrl,
             logoLight: m.logoLight,
-            kind: "channel",
+            kind: "data",
             // EFFECTIVE ticker state (v1.1.2 context menu) — the raw row
             // getter ignores the server ticker_enabled flag, which made
-            // row-assigned channels read permanently "on" and the menu
+            // row-assigned widgets read permanently "on" and the menu
             // toggle one-way. The effective helper is what the feed page
             // uses for exactly this question.
-            onTicker: getEffectiveDataWidgetTickerRow(prefs, channel) !== null,
+            onTicker: getEffectiveDataWidgetTickerRow(prefs, widget) !== null,
           });
         }
       } else if (enabledWidgetIds.has(id)) {
@@ -691,7 +689,7 @@ function RootLayout() {
             icon: m.icon,
             // Product utilities (github, uptime) have real marks too.
             logoUrl: widgetLogoUrl(id),
-            kind: "widget",
+            kind: "utility",
             // Effective status, NOT the raw row getter: pinned-zone
             // widgets live in widgetsOnTicker/pinnedWidgets and never
             // appear in rows[].sources — the raw getter read them as
@@ -755,15 +753,11 @@ function RootLayout() {
       if (e.key === "Escape") {
         if (auth.loggingIn) { auth.setLoggingIn(false); return; }
         if (auth.sessionExpired) { auth.setSessionExpired(false); return; }
-        if (route.isChannel || route.isWidget) {
+        if (route.isDataWidget || route.isWidget) {
           const segments = location.pathname.split("/").filter(Boolean);
           const tab = segments[2];
           if (tab && tab !== "feed") {
-            if (route.isChannel) {
-              navigate({ to: "/widget/$id", params: { id: route.activeItem } });
-            } else {
-              navigate({ to: "/widget/$id", params: { id: route.activeItem } });
-            }
+            navigate({ to: "/widget/$id", params: { id: route.activeItem } });
             return;
           }
           navigate({ to: "/feed" });
@@ -824,10 +818,10 @@ function RootLayout() {
       appVersion,
       allDataWidgetManifests,
       allWidgets,
-      onToggleChannelTicker: channelActions.handleToggleDataWidget,
+      onToggleDataWidgetTicker: dataWidgetActions.handleToggleDataWidget,
       onToggleWidgetTicker: widgetActions.handleToggleWidgetTicker,
-      onAddChannel: channelActions.handleAddDataWidget,
-      onDeleteChannel: channelActions.handleDeleteDataWidget,
+      onAddWidget: dataWidgetActions.handleAddDataWidget,
+      onDeleteWidget: dataWidgetActions.handleDeleteDataWidget,
       onToggleWidget: widgetActions.handleToggleWidget,
       onSelectItem: handleSelectItem,
     }),
@@ -835,15 +829,15 @@ function RootLayout() {
       prefs, handlePrefsChange, auth.authenticated, auth.tier, subscriptionInfo,
       auth.handleLogin, auth.handleLogout, autostartOn, handleAutostartChange,
       appVersion, allDataWidgetManifests, allWidgets,
-      channelActions.handleToggleDataWidget, widgetActions.handleToggleWidgetTicker,
-      channelActions.handleAddDataWidget, channelActions.handleDeleteDataWidget,
+      dataWidgetActions.handleToggleDataWidget, widgetActions.handleToggleWidgetTicker,
+      dataWidgetActions.handleAddDataWidget, dataWidgetActions.handleDeleteDataWidget,
       widgetActions.handleToggleWidget, handleSelectItem,
     ],
   );
 
   const shellDataValue = useMemo(
-    () => ({ channels, dashboard }),
-    [channels, dashboard],
+    () => ({ widgets, dashboard }),
+    [widgets, dashboard],
   );
 
   // ── Render ──────────────────────────────────────────────────
@@ -928,7 +922,7 @@ function RootLayout() {
             <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-surface rounded-xl border border-edge/50 shadow-sm">
              <BarChassisProvider
                active={
-                 route.isChannel ||
+                 route.isDataWidget ||
                  route.isWidget ||
                  route.isFeed ||
                  route.isMarketplace ||
@@ -941,7 +935,7 @@ function RootLayout() {
               {auth.sessionExpired && (
                 <div className="flex items-center justify-between px-4 py-2 bg-warn/10 border-b border-warn/20 shrink-0">
                   <span className="text-xs text-warn">
-                    Your session has expired. Sign in again to access your channels.
+                    Your session has expired. Sign in again to access your widgets.
                   </span>
                   <div className="flex items-center gap-2 shrink-0 ml-4">
                     <button

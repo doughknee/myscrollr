@@ -2,7 +2,7 @@
  * SlotMeter — the widget-slot budget, shared by the Catalog header and
  * the Account page so the two surfaces can't drift (v1.1.2).
  *
- * Slots in use = ENABLED channels + enabled local widgets — the server
+ * Slots in use = ENABLED widgets + enabled local widgets — the server
  * gate counts `WHERE enabled = true`, and the downgrade prune disables
  * (never deletes) over-cap rows, so counting disabled rows here would
  * claim slots the server would happily accept.
@@ -21,11 +21,11 @@ export interface SlotUsage {
 
 /** Pure slot math — exported for tests. */
 export function computeSlotUsage(
-  enabledChannelCount: number,
+  enabledDataWidgetCount: number,
   enabledWidgetCount: number,
   max: number,
 ): SlotUsage {
-  const used = enabledChannelCount + enabledWidgetCount;
+  const used = enabledDataWidgetCount + enabledWidgetCount;
   return {
     used,
     max,
@@ -36,15 +36,15 @@ export function computeSlotUsage(
 
 export function useSlotUsage(): SlotUsage {
   const { prefs, tier } = useShell();
-  const { channels } = useShellData();
+  const { widgets } = useShellData();
   return useMemo(
     () =>
       computeSlotUsage(
-        channels.filter((ch) => ch.enabled).length,
+        widgets.filter((ch) => ch.enabled).length,
         prefs.widgets.enabledWidgets.length,
         getMaxWidgets(tier),
       ),
-    [channels, prefs.widgets.enabledWidgets.length, tier],
+    [widgets, prefs.widgets.enabledWidgets.length, tier],
   );
 }
 

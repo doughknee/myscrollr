@@ -1,11 +1,11 @@
 /**
- * EmptyWidgetState — shared empty-state placeholder for channel FeedTabs.
+ * EmptyWidgetState — shared empty-state placeholder for widget FeedTabs.
  *
  * Replaces the repeated empty-state pattern in finance, sports, rss, and
  * fantasy feeds.
  *
  * Since the configure-page teardown, every widget's settings live in
- * its bar; the CTA (when a channel passes one) opens the relevant
+ * its bar; the CTA (when a widget passes one) opens the relevant
  * in-feed view, and the tip points at the bar.
  */
 import { clsx } from "clsx";
@@ -14,7 +14,7 @@ interface EmptyWidgetStateProps {
   icon: React.ComponentType<{ size?: number; className?: string }>;
   /** What hasn't been added yet (e.g. "stocks or crypto", "leagues", "feeds"). */
   noun: string;
-  /** Whether the channel has config (i.e. user has picked items to track). */
+  /** Whether the widget has config (i.e. user has picked items to track). */
   hasConfig: boolean;
   /** Whether the dashboard has loaded. */
   dashboardLoaded?: boolean;
@@ -35,7 +35,7 @@ interface EmptyWidgetStateProps {
   actionLabel?: string;
   /**
    * The CTA action. Historically "navigate to the Configure sub-tab";
-   * in-widget-config channels pass their own in-feed action (with
+   * in-widget-config widgets pass their own in-feed action (with
    * `actionLabel`). When provided, the hint becomes a one-tap button.
    */
   onConfigure?: () => void;

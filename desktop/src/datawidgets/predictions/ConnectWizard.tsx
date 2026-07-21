@@ -361,7 +361,7 @@ function GuideStep({
   );
 }
 
-/** Small inline mark so the header doesn't depend on the channel icon import. */
+/** Small inline mark so the header doesn't depend on the widget icon import. */
 function TrendingUpMark() {
   return (
     <svg
