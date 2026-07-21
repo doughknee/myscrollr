@@ -128,11 +128,16 @@ export interface CatalogItem {
   /** Render the logo on a light tile (transparent/dark marks like UFC). */
   logoLight?: boolean;
   category: WidgetCategory;
-  /** "data" → a backend-connected widget (created via the widgets API);
-   *  "utility" → a local-only widget (stored in preferences). */
-  kind: "data" | "utility";
-  /** For data widgets: the source that owns the renderer + data
-   *  (finance | sports | rss | fantasy | predictions). */
+  /**
+   * The source that owns the renderer + data
+   * (finance | sports | rss | fantasy | predictions), or undefined for a
+   * local-only utility widget.
+   *
+   * Its presence IS the data/utility distinction — a data widget is created
+   * via the widgets API and fed by CDC, a utility lives in preferences. A
+   * separate `kind` field used to carry the same fact; two fields encoding
+   * one thing can only drift, so ask `isUtilityWidget()` instead.
+   */
   source?: string;
   /** For data widgets: config POSTed to the API on add so the backend
    *  subscribes correctly (league / asset class / feeds). */
@@ -145,6 +150,13 @@ export interface CatalogItem {
  *  unknown id. E.g. "sports_nfl" → "sports". */
 export function sourceForWidget(id: string): string | undefined {
   return byId(id)?.source;
+}
+
+/** True for a local-only widget (clock, weather, …): one with no source, so
+ *  it has no server row and no CDC feed. Unknown ids are not utilities. */
+export function isUtilityWidget(id: string): boolean {
+  const w = byId(id);
+  return w !== undefined && !w.source;
 }
 
 /** The fixed asset class ("stock" | "crypto") for a finance widget, or
@@ -188,8 +200,7 @@ export function widgetManifest(
     // is how a client newer than the catalog still renders something.
     return getDataWidget(id) ?? getWidget(id);
   }
-  if (w.kind === "utility") return getWidget(w.id);
-  if (!w.source) return undefined;
+  if (!w.source) return getWidget(w.id);
   const renderer = getDataWidget(w.source);
   if (!renderer) return undefined; // renderer this client lacks — skip
   return {
@@ -206,8 +217,7 @@ export function widgetManifest(
 function buildItem(w: CatalogWidget): CatalogItem | null {
   // Utilities own their renderer directly; data widgets borrow their
   // source's. Either way the client supplies only the icon + FeedTab.
-  const renderer =
-    w.kind === "utility" ? getWidget(w.id) : w.source && getDataWidget(w.source);
+  const renderer = !w.source ? getWidget(w.id) : getDataWidget(w.source);
   if (!renderer) return null; // renderer not registered in this client — skip
 
   return {
@@ -222,7 +232,6 @@ function buildItem(w: CatalogWidget): CatalogItem | null {
     // or tier without a client release. Narrow here, defaulting anything this
     // client doesn't recognise rather than rendering an unlabelled group.
     category: isKnownCategory(w.category) ? w.category : "utility",
-    kind: w.kind,
     source: w.source,
     addConfig: w.default_config,
     info: {

@@ -178,7 +178,6 @@ export interface WidgetDef {
   id: string;
   name: string;
   description: string;
-  kind: "data" | "utility";
   source?: string;
   category: string;
   color: string;

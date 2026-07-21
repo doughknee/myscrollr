@@ -33,7 +33,7 @@ export function useRemoveWidget(
 
   return useCallback(
     async (item: CatalogItem) => {
-      if (item.kind === "data") {
+      if (item.source) {
         try {
           await dataWidgetsApi.delete(item.id);
           queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });

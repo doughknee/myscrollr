@@ -34,7 +34,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
 
   return useCallback(
     async (item: CatalogItem) => {
-      if (item.kind === "data") {
+      if (item.source) {
         const widgetType = item.id;
 
         // Optimistic insert: write a placeholder widget into the

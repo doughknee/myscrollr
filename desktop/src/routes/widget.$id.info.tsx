@@ -114,7 +114,7 @@ function WidgetInfoPage() {
   const textOn = readableTextOn(item.hex);
 
   const enabled =
-    item.kind === "data"
+    Boolean(item.source)
       ? widgets.some((c) => c.widget_type === item.id)
       : prefs.widgets.enabledWidgets.includes(item.id);
 
@@ -147,7 +147,7 @@ function WidgetInfoPage() {
   };
 
   const openWidget = () => {
-    if (item.kind === "data") {
+    if (item.source) {
       navigate({ to: "/widget/$id", params: { id: item.id } });
     } else {
       navigate({ to: "/widget/$id", params: { id: item.id } });
@@ -163,7 +163,7 @@ function WidgetInfoPage() {
     disabled?: boolean;
   };
   const primaryAction: HeroAction | null = !enabled
-    ? !authenticated && item.kind === "data"
+    ? !authenticated && Boolean(item.source)
       ? { label: "Sign in to add", onClick: onLogin }
       : tierLocked
         ? {
@@ -181,7 +181,7 @@ function WidgetInfoPage() {
               label: `Add ${item.name}`,
               onClick: () => void addWidget(item),
               add: true,
-              disabled: dashboardLoading && item.kind === "data",
+              disabled: dashboardLoading && Boolean(item.source),
             }
     : null;
 

@@ -14,7 +14,6 @@ One user-facing primitive, one price lever:
 ```
 Source  (invisible plumbing: finance, sports, rss, predictions, fantasy)
    └─ Widget   (the ONLY thing a user picks: "NFL", "Crypto", "BBC News")
-        ├─ kind: data (CDC-backed) | utility (local-only)
         └─ costs exactly 1 slot
 ```
 
@@ -23,13 +22,21 @@ is which ingester feeds it and which renderer draws it — routing, never a
 grouping the user perceives. `category` is a cosmetic filter tag on a
 widget, deliberately independent of its source.
 
+**A widget is data-backed iff it has a source.** One with a source gets a
+`user_widgets` row and a CDC feed; one without (clock, weather, …) lives in
+desktop preferences. There is no separate `kind` field — it existed, carried
+exactly this fact, and meant two things to keep in sync plus a third name
+for the same idea (the cosmetic `utility` category). Ask
+`IsUtilityWidgetType(id)` server-side or `isUtilityWidget(id)` in the
+client.
+
 Full reasoning in [`../docs/VISION.md`](../docs/VISION.md); this is the
 practical version.
 
 ## The catalog is the authority
 
 `api/internal/platform/widgets.go` holds every widget — id, name,
-description, kind, source, category, color, logo, default config, required
+description, source, category, color, logo, default config, required
 tier, and copy. `GET /catalog` serves it. Both clients fetch it and render
 generically.
 
@@ -53,7 +60,7 @@ Two artifacts ride along, both generated and both guarded by a Go test:
    `api/internal/platform/widgets.go`.
 2. Regenerate the snapshot and types:
    ```sh
-   curl -s localhost:8080/catalog | python -m json.tool > desktop/src/catalog.snapshot.json
+   go -C api test ./internal/widgets -run TestCatalogSnapshot -update
    go -C api run ./cmd/gents
    ```
 3. `go -C api test ./...` — the drift guards check both.

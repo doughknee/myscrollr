@@ -27,25 +27,19 @@ func TestCatalogIsWellFormed(t *testing.T) {
 			t.Errorf("catalog[%d] (%q): Order = %d, want %d", i, w.ID, w.Order, i)
 		}
 
-		switch w.Kind {
-		case WidgetData:
-			// Source is the renderer key AND the CDC route; without it the
-			// widget cannot render or receive data.
-			if w.Source == "" {
-				t.Errorf("catalog %q: data widget has no source", w.ID)
-			}
+		// Source is the whole data/utility distinction: a data widget has
+		// one (it is the renderer key AND the CDC route), a utility does
+		// not. This used to switch on a separate `kind` field and assert
+		// the two agreed; with `kind` gone there is nothing to disagree.
+		if w.Source != "" {
 			if got := DataSourceForWidget(w.ID); got != w.Source {
 				t.Errorf("catalog %q: DataSourceForWidget = %q, want %q", w.ID, got, w.Source)
 			}
-		case WidgetUtility:
-			if w.Source != "" {
-				t.Errorf("catalog %q: utility must have no source, got %q", w.ID, w.Source)
+			if IsUtilityWidgetType(w.ID) {
+				t.Errorf("catalog %q: has source %q but reports as a utility", w.ID, w.Source)
 			}
-			if !IsUtilityWidgetType(w.ID) {
-				t.Errorf("catalog %q: not reported as a utility", w.ID)
-			}
-		default:
-			t.Errorf("catalog %q: unknown kind %q", w.ID, w.Kind)
+		} else if !IsUtilityWidgetType(w.ID) {
+			t.Errorf("catalog %q: has no source but does not report as a utility", w.ID)
 		}
 
 		if !IsKnownWidgetType(w.ID) {
