@@ -7,9 +7,13 @@ data:
   # Derived URLs (replaces COOLIFY_FQDN build arg)
   API_URL: "https://api.myscrollr.com"
   # Oldest desktop version the API supports; served at /app/min-version.
-  # 1.1.0 = the widget/slot release (migration 000014 reshapes user data
-  # in ways older clients can't render). Bump on future breaking deploys.
-  MIN_DESKTOP_VERSION: "1.1.0"
+  # 1.1.10 = the unification release. The wire was renamed with no compat
+  # seam (channel_type -> widget_type, channels -> widgets, ticker_enabled,
+  # /users/me/widgets), so anything older cannot talk to this API at all —
+  # it 404s on widget CRUD and misreads every dashboard payload. Gating here
+  # turns that into the update overlay instead of a silently broken app.
+  # Bump on future breaking deploys.
+  MIN_DESKTOP_VERSION: "1.1.10"
   LOGTO_URL: "https://auth.myscrollr.com/oidc"
   LOGTO_JWKS_URL: "https://auth.myscrollr.com/oidc/jwks"
   LOGTO_ENDPOINT: "https://auth.myscrollr.com"

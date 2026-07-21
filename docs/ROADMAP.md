@@ -5,8 +5,12 @@ first-pass runthrough of the live release. Versions are intent, not promises —
 can merge or split as work reveals itself.*
 
 **The through-line:** v1.1.0 shipped the widget *model*; these releases make every
-surface actually behave like it. None of them are breaking — `MIN_DESKTOP_VERSION`
-stays at 1.1.0 and nobody gets force-updated.
+surface actually behave like it.
+
+v1.1.1–v1.1.9 were all non-breaking, with `MIN_DESKTOP_VERSION` pinned at 1.1.0.
+**v1.1.10 breaks that.** The unification renamed the wire with no compat seam, so
+`MIN_DESKTOP_VERSION` moves to 1.1.10 and every older install is force-updated —
+it has to be, since older builds cannot talk to the API at all.
 
 | Version | Codename | Theme | Size |
 |---|---|---|---|
@@ -19,6 +23,7 @@ stays at 1.1.0 and nobody gets force-updated.
 | ~~v1.1.7~~ | Spring Cleaning | ✅ **Shipped 2026-07-16** — under-the-hood release: backend consolidated into core (ADR-0002), simpler undo, Kalshi connect slimmed to prod-only, compact-number polish | S |
 | ~~v1.1.8~~ | A Fresh Coat | ✅ **Shipped 2026-07-17** — Claude-desktop-style chrome (single-row title bar, inset canvas, icon-dock sidebar + account chip), Home row + What's New, status page, and realtime SSE unlocked for every tier (client gate fix) | M |
 | ~~v1.1.9~~ | One Bar | ✅ **Shipped 2026-07-18** — Configure pages and gear menus retired: every widget's controls live in its own persistent top bar; Customize page (Settings+Ticker merged), search-to-add symbols, unified feed cards + brand logos, everything-is-a-widget IA, Support rewritten | L |
+| ~~v1.1.10~~ | The Unification | ✅ **Shipped 2026-07-21** — one vocabulary end to end: server-authoritative widget catalog (`GET /catalog`), core owns all schema, wire renamed with no compat seam, generic ticker dispatch, TS types generated from the Go structs. **Forced update** — older builds cannot reach this API | L |
 | v1.2.0 | Double-Decker 2.0 | Multi-row ticker rebuilt around widgets | L |
 | — | Website rides along | Pricing rewrite shipped with v1.1.2–3; screenshots now unblocked (post-v1.1.4) | S–M |
 
