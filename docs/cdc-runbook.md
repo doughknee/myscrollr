@@ -252,36 +252,37 @@ Sequin populates the `changes` field in its webhook payload from the
 values to WAL when the table's `REPLICA IDENTITY` is set to `FULL`
 (otherwise only the primary key is logged).
 
-**Current state** (set 2026-04-23 after Sequin's health check
-flagged it):
+**Current state**, verified against production 2026-07-21:
 
-| Table | Replica identity | Reason |
-|---|---|---|
-| `user_widgets` | `FULL` | Enabled for CDC diagnostics |
-| `user_preferences` | `FULL` | Enabled for CDC diagnostics |
-| `yahoo_leagues` | `FULL` | Enabled for CDC diagnostics |
-| `yahoo_matchups` | `FULL` | Enabled for CDC diagnostics |
-| `yahoo_rosters` | `FULL` | Enabled for CDC diagnostics |
-| `yahoo_standings` | `FULL` | Enabled for CDC diagnostics |
-| `trades`, `games`, `rss_items` | default | High write volume; the `changes` field isn't used by the client anyway |
+| Table | Replica identity |
+|---|---|
+| `markets` | `FULL` |
+| everything else, published or not | default |
 
-**Why not all tables?** `REPLICA IDENTITY FULL` makes Postgres log
-the full old row on every UPDATE/DELETE. On `trades` that's ~40
-writes/second, and the extra WAL is non-trivial. The desktop client
-(`desktop/src/hooks/useDashboardCDC.ts`) only reads `cdc.record` and
-`cdc.action`, not `cdc.changes`, so enabling FULL on high-volume
-tables would be pure waste.
+An earlier version of this table claimed `user_widgets`,
+`user_preferences` and the four `yahoo_*` tables were `FULL`. They were,
+set 2026-04-23 to silence a Sequin health-check warning. The 2026-07-21
+database reset cleared them, **and nothing broke** — which is the useful
+data point.
 
-If you add a new CDC table to the sink and Sequin's health check
-flags it:
+**Nothing needs `FULL`.** It exists so logical decoding can populate
+Sequin's `changes` field, and no consumer reads that field: the desktop
+(`desktop/src/hooks/useDashboardCDC.ts`) reads `cdc.record` and
+`cdc.action` only. `FULL` makes Postgres log the entire old row on every
+UPDATE/DELETE — on `trades` that is ~40 writes/second of WAL whose output
+is discarded.
+
+So if Sequin's health check flags a table, the default answer is **accept
+the warning**. Only set it if you have a concrete reader for `changes`:
 
 ```sql
 ALTER TABLE public.<table> REPLICA IDENTITY FULL;
 ```
 
-Only run this on low-volume tables (user settings, fantasy sync
-state). For high-throughput tables, accept the warning — the app
-doesn't need the `changes` field.
+Migration `000004` dropped `FULL` from `standings` and `teams`, which are
+not in `sequin_pub` at all — they were paying the WAL cost with no
+possible decoder. (`yahoo_standings` is published; plain `standings` is
+the sports-side table. Easy to confuse.)
 
 ## Publication settings
 
