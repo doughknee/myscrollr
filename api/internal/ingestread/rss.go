@@ -427,8 +427,7 @@ func getUserRSSFeedURLs(ctx context.Context, logtoSub string) []string {
 	rows, err := platform.DBPool.Query(ctx, `
 		SELECT config FROM user_widgets
 		WHERE logto_sub = $1
-		  AND (widget_type IN ('rss', 'news')
-		       OR widget_type LIKE 'news\_%'
+		  AND (widget_type LIKE 'news\_%'
 		       OR widget_type LIKE 'rss\_%')
 	`, logtoSub)
 	if err != nil {
@@ -776,8 +775,7 @@ func removeBrokenCustomFeeds(ctx context.Context) (int, error) {
 				       '[]'::jsonb
 				   )
 			   )
-			 WHERE (widget_type IN ('rss', 'news')
-			        OR widget_type LIKE 'news\_%'
+			 WHERE (widget_type LIKE 'news\_%'
 			        OR widget_type LIKE 'rss\_%')
 			   AND config ? 'feeds'
 			   AND config->'feeds' @> jsonb_build_array(jsonb_build_object('url', $2::text))

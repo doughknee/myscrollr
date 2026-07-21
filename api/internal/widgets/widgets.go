@@ -107,7 +107,7 @@ func GetWidgets(c *fiber.Ctx) error {
 		log.Printf("[Widgets] Error fetching widgets: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
 			Status: "error",
-			Error:  "Failed to fetch channels",
+			Error:  "Failed to fetch widgets",
 		})
 	}
 
@@ -164,7 +164,7 @@ func CreateWidget(c *fiber.Ctx) error {
 	if platform.IsUtilityWidgetType(req.WidgetType) {
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
 			Status: "error",
-			Error:  "Utility widgets are stored locally, not as channels",
+			Error:  "Utility widgets are stored locally, not as server-side widgets",
 		})
 	}
 	// The client attests its local utility-widget count; never let a
@@ -232,13 +232,13 @@ func CreateWidget(c *fiber.Ctx) error {
 		if strings.Contains(err.Error(), "unique") || strings.Contains(err.Error(), "duplicate") {
 			return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{
 				Status: "error",
-				Error:  "Channel of this type already exists",
+				Error:  "That widget is already added",
 			})
 		}
 		log.Printf("[Widgets] Create error: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
 			Status: "error",
-			Error:  "Failed to create channel",
+			Error:  "Failed to create widget",
 		})
 	}
 
@@ -381,13 +381,13 @@ func UpdateWidget(c *fiber.Ctx) error {
 		if strings.Contains(errStr, "no rows") {
 			return c.Status(fiber.StatusNotFound).JSON(platform.ErrorResponse{
 				Status: "error",
-				Error:  "Channel not found",
+				Error:  "Widget not found",
 			})
 		}
 		log.Printf("[Widgets] Update error: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
 			Status: "error",
-			Error:  "Failed to update channel",
+			Error:  "Failed to update widget",
 		})
 	}
 
@@ -436,14 +436,14 @@ func DeleteWidget(c *fiber.Ctx) error {
 		log.Printf("[Widgets] Delete error: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
 			Status: "error",
-			Error:  "Failed to delete channel",
+			Error:  "Failed to delete widget",
 		})
 	}
 
 	if tag.RowsAffected() == 0 {
 		return c.Status(fiber.StatusNotFound).JSON(platform.ErrorResponse{
 			Status: "error",
-			Error:  "Channel not found",
+			Error:  "Widget not found",
 		})
 	}
 

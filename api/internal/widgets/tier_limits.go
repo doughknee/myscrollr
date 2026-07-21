@@ -44,8 +44,7 @@ type TierLimitsResponse struct {
 //   - api/internal/widgets/tier_limits_test.go  (assertion protecting this table
 //     from silent edits — run `go test ./core/...` after any change)
 //
-// Once Sprint 3 wires backend enforcement on POST/PUT /users/me/channels,
-// these values directly gate what the DB will accept, so drift is
+// MaxWidgets gates what POST /users/me/widgets accepts, so drift here is
 // unforgiving.
 // Per-feature depth caps (Symbols/Feeds/CustomFeeds/Leagues/Fantasy) were
 // RETIRED 2026-07-02 — a nil pointer means unlimited, and every tier now has
@@ -81,8 +80,8 @@ func intPtr(n int) *int {
 
 // MaxWidgetsForTier returns the widget-slot cap for a tier (nil =
 // unlimited). Unknown tiers fall back to "free", matching the defensive
-// default ValidateWidgetConfig uses, so an unrecognized JWT role can
-// never grant more slots than the free plan.
+// default used elsewhere, so an unrecognized JWT role can never grant
+// more slots than the free plan.
 func MaxWidgetsForTier(tier string) *int {
 	limits, ok := DefaultTierLimits[tier]
 	if !ok {
@@ -99,8 +98,8 @@ func MaxWidgetsForTier(tier string) *int {
 // the UI can render a precise message from.
 type TierLimitError struct {
 	Tier       string // "free", "uplink", etc.
-	WidgetType string // "finance", "sports", "rss"
-	Field      string // "symbols" | "feeds" | "custom_feeds" | "leagues"
+	WidgetType string // catalog id, e.g. "sports_nfl"
+	Field      string // "widgets" — the slot cap is the only lever left
 	Limit      int
 	Got        int
 }
@@ -177,7 +176,7 @@ func tierLimitErrorResponse(e *TierLimitError) fiber.Map {
 		"error":  e.UserFacingMessage(),
 		"detail": fiber.Map{
 			"tier":    e.Tier,
-			"channel": e.WidgetType, // wire key keeps the legacy name
+			"widget":  e.WidgetType,
 			"field":   e.Field,
 			"limit":   e.Limit,
 			"got":     e.Got,

@@ -485,11 +485,18 @@ describe("getSourceTickerRow / getDataWidgetTickerRow / getWidgetTickerRow", () 
     expect(getDataWidgetTickerRow(prefs, ch)).toBeNull();
   });
 
-  it("honours the legacy `visible` alias when ticker_enabled is missing", () => {
+  it("ignores the retired `visible` alias", () => {
+    // The server stopped emitting `visible` in the unification, so a row
+    // carrying it is not a row we can receive. If one somehow arrives, the
+    // absence of ticker_enabled is what decides — defaulting to on — rather
+    // than a field the wire no longer has.
     const prefs = makePrefs([{ sources: [] }]);
-    const ch = { widget_type: "finance", visible: false };
-    expect(getSourceTickerRow(prefs, ch, "finance")).toBeNull();
-    expect(getDataWidgetTickerRow(prefs, ch)).toBeNull();
+    const ch = { widget_type: "finance", visible: false } as {
+      widget_type: string;
+      ticker_enabled?: boolean;
+    };
+    expect(getSourceTickerRow(prefs, ch, "finance")).toBe(0);
+    expect(getDataWidgetTickerRow(prefs, ch)).toBe(0);
   });
 
   it("returns null for widgets that aren't in any row", () => {
