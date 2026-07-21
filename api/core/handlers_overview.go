@@ -102,10 +102,6 @@ type OverviewLinks struct {
 // ─── Cache constants ────────────────────────────────────────────────
 
 const (
-	// RedisOverviewCachePrefix is the per-user key prefix for the
-	// overview cache. Format: overview:{logto_sub}.
-	RedisOverviewCachePrefix = "overview:"
-
 	// OverviewCacheTTL caps stale reads at 30s. Invalidation hooks fire
 	// on every state-changing endpoint that affects the response, so
 	// the TTL is a safety net rather than the primary correctness lever.
@@ -411,28 +407,6 @@ func hasFantasyWidget(channels OverviewChannels) bool {
 		}
 	}
 	return false
-}
-
-// ─── Cache invalidation ─────────────────────────────────────────────
-
-// InvalidateOverviewCache deletes the per-user overview cache key.
-// Called from the Stripe webhook (subscription state changes), the
-// widget CRUD handlers (toggle state changes), and the GDPR request
-// lifecycle (deletion status changes) so the next request always sees
-// fresh data instead of waiting up to OverviewCacheTTL for the cache
-// to expire.
-//
-// Failures are logged and swallowed — the caller's primary write has
-// already succeeded; an invalidation miss only delays the visible
-// effect by OverviewCacheTTL, which is acceptable.
-func InvalidateOverviewCache(ctx context.Context, userID string) {
-	if userID == "" || Rdb == nil {
-		return
-	}
-	key := RedisOverviewCachePrefix + userID
-	if err := Rdb.Del(ctx, key).Err(); err != nil {
-		log.Printf("[Overview] cache invalidate failed for %s: %v", userID, err)
-	}
 }
 
 // ─── Handler ────────────────────────────────────────────────────────

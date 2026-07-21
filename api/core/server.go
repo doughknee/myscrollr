@@ -23,7 +23,6 @@ import (
 // Multiple concurrent requests for the same key coalesce into one.
 var (
 	dashboardGroup   singleflight.Group
-	publicFeedGroup  singleflight.Group
 	healthCheckGroup singleflight.Group
 )
 

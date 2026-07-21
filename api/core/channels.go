@@ -19,36 +19,6 @@ var lifecycleClient = &http.Client{
 	Timeout: 10 * time.Second,
 }
 
-// GetUserWidgets fetches all of a user's widgets (rows of user_channels).
-func GetUserWidgets(logtoSub string) ([]Widget, error) {
-	rows, err := DBPool.Query(context.Background(), `
-		SELECT id, logto_sub, channel_type, enabled, visible, config, created_at, updated_at
-		FROM user_channels
-		WHERE logto_sub = $1
-		ORDER BY created_at ASC, id ASC
-	`, logtoSub)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	widgets := make([]Widget, 0)
-	for rows.Next() {
-		var ch Widget
-		var configJSON []byte
-		if err := rows.Scan(&ch.ID, &ch.LogtoSub, &ch.WidgetType, &ch.Enabled, &ch.Visible, &configJSON, &ch.CreatedAt, &ch.UpdatedAt); err != nil {
-			log.Printf("[Widgets] Scan error: %v", err)
-			continue
-		}
-		if err := json.Unmarshal(configJSON, &ch.Config); err != nil {
-			ch.Config = map[string]interface{}{}
-		}
-		widgets = append(widgets, ch)
-	}
-
-	return widgets, nil
-}
-
 // CountEnabledWidgets returns how many enabled widgets a user
 // currently has — the "slots in use" for the widget/slot model. Used by
 // CreateWidget to gate new additions against the tier's MaxWidgets cap.

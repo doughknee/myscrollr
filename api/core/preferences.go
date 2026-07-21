@@ -9,29 +9,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// tierFromRoles determines the subscription tier based on JWT roles.
-// Priority: super_user > uplink_ultimate > uplink_pro > uplink > free.
-func tierFromRoles(roles []string) string {
-	tier := "free"
-	for _, r := range roles {
-		switch r {
-		case "super_user":
-			return "super_user" // highest — return immediately
-		case "uplink_ultimate":
-			return "uplink_ultimate"
-		case "uplink_pro":
-			if tier != "uplink_ultimate" {
-				tier = "uplink_pro"
-			}
-		case "uplink":
-			if tier == "free" {
-				tier = "uplink"
-			}
-		}
-	}
-	return tier
-}
-
 // GetOrCreatePreferences fetches preferences for a user, creating defaults if none exist.
 // If roles are provided, the subscription_tier is synced from JWT roles → DB.
 func GetOrCreatePreferences(logtoSub string, roles ...[]string) (*UserPreferences, error) {

@@ -10,7 +10,12 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"golang.org/x/sync/singleflight"
 )
+
+// publicFeedGroup coalesces concurrent cache misses for the public feed
+// into a single upstream fetch.
+var publicFeedGroup singleflight.Group
 
 const (
 	// PublicFeedCacheKey is the Redis key for the cached public feed.

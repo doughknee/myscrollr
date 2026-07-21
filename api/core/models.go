@@ -1,9 +1,43 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
+	"log"
 	"time"
 )
+
+// GetUserWidgets fetches all of a user's widgets (rows of user_channels).
+// Lives beside the Widget model rather than with the widget CRUD handlers
+// because the SSE hub also reads it to build a user's topic subscriptions.
+func GetUserWidgets(logtoSub string) ([]Widget, error) {
+	rows, err := DBPool.Query(context.Background(), `
+		SELECT id, logto_sub, channel_type, enabled, visible, config, created_at, updated_at
+		FROM user_channels
+		WHERE logto_sub = $1
+		ORDER BY created_at ASC, id ASC
+	`, logtoSub)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	widgets := make([]Widget, 0)
+	for rows.Next() {
+		var ch Widget
+		var configJSON []byte
+		if err := rows.Scan(&ch.ID, &ch.LogtoSub, &ch.WidgetType, &ch.Enabled, &ch.Visible, &configJSON, &ch.CreatedAt, &ch.UpdatedAt); err != nil {
+			log.Printf("[Widgets] Scan error: %v", err)
+			continue
+		}
+		if err := json.Unmarshal(configJSON, &ch.Config); err != nil {
+			ch.Config = map[string]interface{}{}
+		}
+		widgets = append(widgets, ch)
+	}
+
+	return widgets, nil
+}
 
 // UserPreferences represents a user's extension display preferences.
 type UserPreferences struct {

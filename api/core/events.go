@@ -451,6 +451,12 @@ func UnsubscribeFromTopic(userID, topic string) {
 // Redis control message → handleTopicMessage, so every replica runs it
 // (ADR-0001).
 func UpdateUserTopicSubscriptions(userID string) {
+	// The hub only exists after InitHub. Widget writes can reach this
+	// (via the NotifyTopicSubscriptionChange fallback) from contexts that
+	// never start the hub — notably tests — so no-op instead of panicking.
+	if globalHub == nil {
+		return
+	}
 	if _, ok := globalHub.clients.Load(userID); !ok {
 		return // No active connection on this replica, nothing to update
 	}
@@ -561,51 +567,6 @@ func subscribeUserToTopics(userID string) {
 			globalHub.registry.subscribe(userID, TopicPrefixPredictions+"all")
 		}
 	}
-}
-
-// extractStringArray reads a string array under `key` from a widget's
-// config JSONB (e.g. {"symbols": ["AAPL", ...]} or {"leagues": ["NFL", ...]}).
-// Empty strings and non-string entries are dropped.
-func extractStringArray(config map[string]interface{}, key string) []string {
-	raw, ok := config[key]
-	if !ok {
-		return nil
-	}
-	arr, ok := raw.([]interface{})
-	if !ok {
-		return nil
-	}
-	out := make([]string, 0, len(arr))
-	for _, v := range arr {
-		if s, ok := v.(string); ok && s != "" {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-// extractFeedURLsFromConfig reads feed URLs from a widget's config JSONB.
-// Config shape: {"feeds": [{"url": "https://...", "name": "..."}, ...]}
-func extractFeedURLsFromConfig(config map[string]interface{}) []string {
-	raw, ok := config["feeds"]
-	if !ok {
-		return nil
-	}
-	arr, ok := raw.([]interface{})
-	if !ok {
-		return nil
-	}
-	urls := make([]string, 0, len(arr))
-	for _, v := range arr {
-		feed, ok := v.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		if u, ok := feed["url"].(string); ok && u != "" {
-			urls = append(urls, u)
-		}
-	}
-	return urls
 }
 
 // getUserFantasyLeagues returns the Yahoo league keys a user has imported.

@@ -135,10 +135,7 @@ func newLogtoStub(t *testing.T) *logtoStub {
 
 	// Drop any M2M token cached by a previous test so this test's stub
 	// issues its own.
-	m2mMu.Lock()
-	m2mToken = ""
-	m2mTokenExpiry = time.Time{}
-	m2mMu.Unlock()
+	ResetM2MTokenCache()
 
 	return s
 }

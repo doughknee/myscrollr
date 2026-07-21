@@ -133,6 +133,16 @@ func refreshM2MToken() (string, error) {
 // Concurrent callers share a single in-flight refresh via singleflight,
 // so a burst of webhooks during role assignment doesn't fan out into
 // parallel /oidc/token calls.
+// ResetM2MTokenCache clears the cached Logto management token. Exported
+// for integration tests, which swap the Logto stub between cases and must
+// not reuse a token minted against the previous stub.
+func ResetM2MTokenCache() {
+	m2mMu.Lock()
+	m2mToken = ""
+	m2mTokenExpiry = time.Time{}
+	m2mMu.Unlock()
+}
+
 func getM2MToken() (string, error) {
 	// Fast path: cache hit under read lock.
 	if token := readCachedM2MToken(); token != "" {

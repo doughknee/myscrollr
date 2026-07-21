@@ -20,6 +20,29 @@ func GetUserRoles(c *fiber.Ctx) []string {
 	return nil
 }
 
+// tierFromRoles determines the subscription tier based on JWT roles.
+// Priority: super_user > uplink_ultimate > uplink_pro > uplink > free.
+func tierFromRoles(roles []string) string {
+	tier := "free"
+	for _, r := range roles {
+		switch r {
+		case "super_user":
+			return "super_user" // highest — return immediately
+		case "uplink_ultimate":
+			return "uplink_ultimate"
+		case "uplink_pro":
+			if tier != "uplink_ultimate" {
+				tier = "uplink_pro"
+			}
+		case "uplink":
+			if tier == "free" {
+				tier = "uplink"
+			}
+		}
+	}
+	return tier
+}
+
 // GetProfileByUsername returns basic profile info (Logto-sourced username).
 func GetProfileByUsername(c *fiber.Ctx) error {
 	username := c.Params("username")
