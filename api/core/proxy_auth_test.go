@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -17,16 +18,11 @@ import (
 
 // seedTestChannel installs a fake channel in the discovery registry and
 // returns a restore func. Tests using it must not run in parallel.
-func seedTestChannel(t *testing.T, info *ChannelInfo) func() {
+func seedTestChannel(t *testing.T, info *platform.ChannelInfo) func() {
 	t.Helper()
-	globalDiscovery.mu.Lock()
-	prev := globalDiscovery.channels
-	globalDiscovery.channels = map[string]*ChannelInfo{info.Name: info}
-	globalDiscovery.mu.Unlock()
+	prev := platform.GlobalDiscovery.SwapChannels(map[string]*platform.ChannelInfo{info.Name: info})
 	return func() {
-		globalDiscovery.mu.Lock()
-		globalDiscovery.channels = prev
-		globalDiscovery.mu.Unlock()
+		platform.GlobalDiscovery.SwapChannels(prev)
 	}
 }
 
@@ -39,10 +35,10 @@ func TestDynamicProxyRejectsUnauthenticated(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	restore := seedTestChannel(t, &ChannelInfo{
+	restore := seedTestChannel(t, &platform.ChannelInfo{
 		Name:        "testchan",
 		InternalURL: upstream.URL,
-		Routes: []ChannelRoute{
+		Routes: []platform.ChannelRoute{
 			{Method: "GET", Path: "/testchan/private", Auth: true},
 			{Method: "GET", Path: "/testchan/public", Auth: false},
 		},
@@ -83,7 +79,7 @@ func TestLogtoAuthBlocksHandlerWhenUnauthenticated(t *testing.T) {
 	var handlerRan atomic.Bool
 
 	app := fiber.New()
-	app.Get("/protected", LogtoAuth, func(c *fiber.Ctx) error {
+	app.Get("/protected", platform.LogtoAuth, func(c *fiber.Ctx) error {
 		handlerRan.Store(true)
 		return c.SendString("secret")
 	})

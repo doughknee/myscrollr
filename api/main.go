@@ -12,6 +12,11 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/brandon-relentnet/myscrollr/api/core"
+	"github.com/brandon-relentnet/myscrollr/api/internal/accounts"
+	"github.com/brandon-relentnet/myscrollr/api/internal/events"
+	"github.com/brandon-relentnet/myscrollr/api/internal/ingestread"
+	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
+	"github.com/brandon-relentnet/myscrollr/api/internal/support"
 )
 
 // envOr returns the env value or fallback when unset.
@@ -47,7 +52,7 @@ func main() {
 			AttachStacktrace: true,
 			SendDefaultPII:   false,
 			BeforeSend: func(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
-				core.ScrubSentryEvent(event)
+				platform.ScrubSentryEvent(event)
 				return event
 			},
 		})
@@ -67,34 +72,34 @@ func main() {
 	defer cancel()
 
 	// Infrastructure
-	core.ConnectDB()
-	defer core.DBPool.Close()
+	platform.ConnectDB()
+	defer platform.DBPool.Close()
 
-	core.ConnectRedis()
-	defer core.Rdb.Close()
+	platform.ConnectRedis()
+	defer platform.Rdb.Close()
 
-	core.InitHub(ctx)
-	core.InitAuth()
+	events.InitHub(ctx)
+	platform.InitAuth()
 
 	// Start Redis-based channel discovery (ctx-aware)
-	core.StartDiscovery(ctx)
+	platform.StartDiscovery(ctx)
 
 	// Start GDPR purge worker — scans user_deletion_requests hourly for
 	// rows that have aged past their purge_at and cascades the permanent
 	// delete across local DB + Logto.
-	core.StartGDPRPurgeWorker(ctx)
+	accounts.StartGDPRPurgeWorker(ctx)
 
 	// Periodic prune of the Stripe webhook idempotency table. Long-lived
 	// pods otherwise grow this table unboundedly between restarts.
-	core.StartWebhookEventsPruner(ctx)
+	platform.StartWebhookEventsPruner(ctx)
 
 	// RSS auto-cleanup janitor (moved in-process with the rss fold,
 	// ADR-0002 REL-16). Redis-locked so only one replica sweeps.
-	core.StartRSSJanitor(ctx)
+	ingestread.StartRSSJanitor(ctx)
 
 	// Register Discord slash commands (idempotent on every boot when
 	// configured). No-op if Discord env vars aren't set.
-	core.RegisterDiscordSlashCommandsAtBoot(ctx)
+	support.RegisterDiscordSlashCommandsAtBoot(ctx)
 
 	// Build and start the gateway server
 	srv := core.NewServer()

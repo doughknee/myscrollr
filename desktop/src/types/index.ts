@@ -125,7 +125,10 @@ export interface DashboardResponse {
     subscription_tier?: "anonymous" | "free" | "uplink" | "uplink_pro" | "uplink_ultimate";
     updated_at: string;
   };
-  channels?: Array<DataWidgetRow & { logto_sub: string }>;
+  // Generated from the Go struct — the row shape is the server's to define.
+  // (The `& { logto_sub: string }` this used to carry was fiction: Go tags
+  // that field `json:"-"`, so it is never on the wire.)
+  widgets?: Widget[];
 }
 
 // ── Enums ────────────────────────────────────────────────────────
@@ -140,7 +143,7 @@ export interface FeedTabProps {
   /** Display density — 'comfort' shows more detail, 'compact' is denser. */
   mode: FeedMode;
   /**
-   * Per-channel JSONB config from user_channels.config.
+   * Per-widget JSONB config from user_widgets.config.
    * Each channel decides what goes here (e.g., selected RSS feeds).
    */
   feedContext: Record<string, unknown>;
@@ -163,7 +166,7 @@ export interface SourceInfo {
 
 /** Manifest describing a single channel. */
 export interface DataWidgetManifest {
-  /** Unique channel identifier (matches channel_type). */
+  /** Unique channel identifier (matches widget_type). */
   id: string;
   /** Human-readable name. */
   name: string;
@@ -256,3 +259,21 @@ export interface WidgetTickerData {
   uptime: UptimeChipData[];
   github: GitHubChipData[];
 }
+
+import type {
+  Widget,
+  WidgetDef,
+  CatalogResponse,
+} from "./api.generated";
+
+// ── Widget catalog (wire types for GET /catalog) ─────────────────
+// These are aliases onto the generated contract (VISION §4.6) — the names
+// the client code already uses, pointed at the Go structs that actually
+// serialize the response. Change the Go struct, run `go -C api run
+// ./cmd/gents`, and every consumer here follows.
+
+/** One entry of GET /catalog. */
+export type CatalogWidget = WidgetDef;
+
+/** The GET /catalog response. */
+export type CatalogPayload = CatalogResponse;

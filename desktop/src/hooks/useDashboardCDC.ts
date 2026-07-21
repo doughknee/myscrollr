@@ -75,30 +75,28 @@ export function mergeTableRecords(
   return next;
 }
 
-/** Apply CDC records for user_channels into the channels array. */
-function mergeChannelRecords(
-  channels: DashboardResponse["channels"],
+/** Apply CDC records for user_widgets into the widgets array. */
+function mergeWidgetRecords(
+  widgets: DashboardResponse["widgets"],
   records: CDCRecord[],
-): NonNullable<DashboardResponse["channels"]> {
-  const updated = [...(channels ?? [])];
+): NonNullable<DashboardResponse["widgets"]> {
+  const updated = [...(widgets ?? [])];
 
   for (const cdc of records) {
-    const type = cdc.record.channel_type as string | undefined;
+    const type = cdc.record.widget_type as string | undefined;
     if (!type) continue;
 
-    const idx = updated.findIndex((ch) => ch.channel_type === type);
+    const idx = updated.findIndex((ch) => ch.widget_type === type);
 
     if (cdc.action === "delete") {
       if (idx !== -1) updated.splice(idx, 1);
     } else if (idx !== -1) {
-      // CDC payload comes straight from Postgres replication, so the
-      // raw column name is still `visible` (the DB column wasn't
-      // renamed). The DataWidgetRow type's canonical field is now
-      // `ticker_enabled` — map between them here.
+      // CDC payloads come straight from Postgres replication, so these are
+      // raw column names. Since the rename they match the wire exactly.
       updated[idx] = {
         ...updated[idx],
         enabled: cdc.record.enabled as boolean,
-        ticker_enabled: cdc.record.visible as boolean,
+        ticker_enabled: cdc.record.ticker_enabled as boolean,
       };
     }
   }
@@ -158,7 +156,7 @@ export function useDashboardCDC(): void {
 
           let dataChanged = false;
           let nextData = old.data;
-          let nextChannels = old.channels;
+          let nextWidgets = old.widgets;
 
           // 1. DataWidgetRow data tables (trades, games, rss_items)
           for (const config of CDC_TABLES) {
@@ -175,12 +173,12 @@ export function useDashboardCDC(): void {
             dataChanged = true;
           }
 
-          // 2. user_channels table
-          const channelRecords = records.filter(
-            (r) => r.metadata?.table_name === "user_channels",
+          // 2. user_widgets table
+          const widgetRecords = records.filter(
+            (r) => r.metadata?.table_name === "user_widgets",
           );
-          if (channelRecords.length > 0 && nextChannels) {
-            nextChannels = mergeChannelRecords(nextChannels, channelRecords);
+          if (widgetRecords.length > 0 && nextWidgets) {
+            nextWidgets = mergeWidgetRecords(nextWidgets, widgetRecords);
             dataChanged = true;
           }
 
@@ -189,7 +187,7 @@ export function useDashboardCDC(): void {
           return {
             ...old,
             data: nextData,
-            channels: nextChannels,
+            widgets: nextWidgets,
           };
         },
       );

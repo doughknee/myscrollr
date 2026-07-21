@@ -5,42 +5,6 @@ pub use sqlx::PgPool;
 use sqlx::{FromRow, query, query_as};
 pub use chrono::Utc;
 
-/// Build the sqlx migrator for this service.
-///
-/// `set_ignore_missing(true)` is required because all Rust services
-/// (finance, sports, rss, predictions) share a single `_sqlx_migrations`
-/// table in the scrollr Postgres DB — sqlx 0.8.x has no API to name the
-/// table per service (see PRs #106 / #107). Without this flag, each service
-/// sees the other services' rows and errors out with `VersionMissing` because
-/// e.g. predictions has no `11*` files on disk.
-///
-/// With each service on a unique numeric version prefix (finance 11*,
-/// sports 12*, rss 20250601*/13*, predictions 14*), the flag tolerates
-/// "versions recorded for *other* services" without hiding checksum drift on
-/// *this* service's own rows — VersionMismatch (drift on an applied row whose
-/// file *is* on disk) still fires and fails the boot loudly, which is
-/// the behavior PR #106 was after.
-fn migrator() -> sqlx::migrate::Migrator {
-    let mut m = sqlx::migrate!("./migrations");
-    m.set_ignore_missing(true);
-    m
-}
-
-/// Numeric version range that uniquely identifies predictions-service
-/// migrations in the shared `_sqlx_migrations` table. Must match the prefix
-/// enforced by `tests/migration_versions.rs` (PREFIX_LO / PREFIX_HI).
-///
-/// Predictions migration filenames start with `14` and are 12 digits long,
-/// e.g. `140000000001_initial.up.sql`. That's a version of 140_000_000_001
-/// (one hundred forty billion and one), so the prefix range is 140B..<150B.
-/// An earlier (finance) version of these constants was off by exactly 10×
-/// (e.g. `14_000_000_000` — TEN zeros, not eleven) which silently matches
-/// NO real migration rows; that caused the invariant check below to reliably
-/// fail on production boot because `recorded` was always 0. See
-/// tests/migration_versions.rs for the matching test-side constants.
-pub const PREDICTIONS_MIGRATION_MIN: i64 = 140_000_000_000;
-pub const PREDICTIONS_MIGRATION_MAX: i64 = 149_999_999_999;
-
 pub async fn initialize_pool() -> Result<PgPool> {
     let pool_options = PgPoolOptions::new()
         // Pool sizing rationale: on a busy minute predictions can run many WS
@@ -91,73 +55,10 @@ pub async fn initialize_pool() -> Result<PgPool> {
     .await
     .map_err(|_| anyhow::anyhow!("Connection attempt timed out (15s)"))?
     .context("Failed to connect to the PostgreSQL database")?;
-    eprintln!("[DB] Connected successfully, running migrations...");
+    eprintln!("[DB] Connected successfully");
 
-    // Run migrations. A previous iteration of this code caught migration
-    // errors, wiped `_sqlx_migrations`, and re-ran the migrator — that path
-    // was data-unsafe. Failed migrations now propagate with the full sqlx
-    // error chain (including `VersionMismatch(version)` and the colliding
-    // file name) so an on-call engineer can diagnose without having to
-    // re-run the binary under a debugger. See the long troubleshooting
-    // note in AGENTS.md under "Database Migrations".
-    let m = migrator();
-    if let Err(err) = m.run(&pool).await {
-        eprintln!("[DB] Migration failure: {err}");
-        eprintln!("[DB] Underlying error chain: {err:?}");
-        return Err(anyhow::Error::new(err)
-            .context("Failed to run migrations. No automatic recovery — inspect _sqlx_migrations"));
-    }
-    eprintln!("[DB] Migrations complete");
-
-    // Startup invariant: every on-disk migration for *this* service's
-    // version range must have a corresponding recorded row in
-    // `_sqlx_migrations`. We use `set_ignore_missing(true)` on the migrator
-    // so it tolerates rows for *other* services, but that same flag would
-    // also silently hide "someone deleted a migration file locally but the
-    // row is still in the DB" — which is exactly the kind of drift that
-    // caused the April 2026 silent migration failure. This check catches
-    // the mismatch loudly and refuses to boot.
-    //
-    // IMPORTANT: only count UP migrations. `migrator().iter()` yields both
-    // halves of each reversible migration (`ReversibleUp` + `ReversibleDown`),
-    // so for 3 `.up.sql` + 3 `.down.sql` files the iter returns 6 entries
-    // while `_sqlx_migrations` records only 3 rows (one per UP apply). The
-    // initial version of this check compared 6 ≠ 3 and crashed every pod;
-    // see commit 2cb0e90 (advisory-only), 2026-04-24 fix.
-    let on_disk: i64 = migrator()
-        .iter()
-        .filter(|m| m.migration_type.is_up_migration())
-        .count() as i64;
-    let recorded: i64 = sqlx::query_scalar::<_, i64>(
-        "SELECT count(*) FROM _sqlx_migrations WHERE version >= $1 AND version <= $2",
-    )
-    .bind(PREDICTIONS_MIGRATION_MIN)
-    .bind(PREDICTIONS_MIGRATION_MAX)
-    .fetch_one(&pool)
-    .await
-    .context("query migration count")?;
-
-    if recorded != on_disk {
-        anyhow::bail!(
-            "migration invariant violated: {} up-migrations on disk but {} recorded in DB \
-             (predictions prefix {}-{}). Someone deleted a migration file, or this service is \
-             pointing at a DB whose migrations haven't been applied. Run \
-             `kubectl exec deploy/predictions-service -- /bin/sh -c 'ls migrations/'` and \
-             compare against `SELECT version, description FROM _sqlx_migrations WHERE \
-             version BETWEEN {} AND {}`.",
-            on_disk,
-            recorded,
-            PREDICTIONS_MIGRATION_MIN,
-            PREDICTIONS_MIGRATION_MAX,
-            PREDICTIONS_MIGRATION_MIN,
-            PREDICTIONS_MIGRATION_MAX
-        );
-    }
-
-    eprintln!(
-        "[DB] Migration invariant check ok: {on_disk} up-migrations on disk / \
-         {recorded} recorded in {PREDICTIONS_MIGRATION_MIN}..={PREDICTIONS_MIGRATION_MAX}"
-    );
+    // No migrations here. core-api owns every shared table and runs the
+    // single migration chain (VISION 4.3); this service is a pure writer.
 
     Ok(pool)
 }

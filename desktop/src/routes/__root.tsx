@@ -71,10 +71,11 @@ import { showTipOnce, TIP_IDS } from "../lib/tips";
 
 // Types
 import type { DeliveryMode } from "../types";
-import type { DataWidgetRow, DataWidgetType, SubscriptionInfo } from "../api/client";
+import type { DataWidgetRow, WidgetId, SubscriptionInfo } from "../api/client";
 
 // Hooks
 import { useTheme } from "../hooks/useTheme";
+import { useCatalog } from "../hooks/useCatalog";
 import { useAuthState } from "../hooks/useAuthState";
 import { useDataWidgetActions } from "../hooks/useDataWidgetActions";
 import { useWidgetActions } from "../hooks/useWidgetActions";
@@ -194,6 +195,11 @@ function RootLayout() {
   const navHistory = useNavHistory();
   const route = parseRoute(location.pathname);
 
+  // Sync with the server-authoritative widget catalog. Renders from the
+  // bundled snapshot first, then re-renders if the server's differs — so a
+  // widget added server-side appears without a desktop release.
+  useCatalog();
+
   // ── Auth (must be before dashboard query — tier drives refetchInterval) ──
   const auth = useAuthState();
 
@@ -216,7 +222,7 @@ function RootLayout() {
     }
   }, [dashboard]);
 
-  const channels: DataWidgetRow[] = useMemo(() => dashboard?.channels ?? [], [dashboard]);
+  const channels: DataWidgetRow[] = useMemo(() => dashboard?.widgets ?? [], [dashboard]);
 
   // Filter to enabled widgets only — Sidebar handles sorting by DATA_WIDGET_ORDER
   const enabledDataWidgets = useMemo(
@@ -551,7 +557,7 @@ function RootLayout() {
         navigate({ to: "/customize", search: { tab: "app" } });
         return;
       }
-      if (channelsRef.current.some((ch) => ch.channel_type === id)) {
+      if (channelsRef.current.some((ch) => ch.widget_type === id)) {
         navigate({ to: "/widget/$id", params: { id: id } });
         return;
       }
@@ -604,7 +610,7 @@ function RootLayout() {
     (source: { id: string; kind: "channel" | "widget"; onTicker: boolean }) => {
       if (source.kind === "channel") {
         channelActions.handleToggleDataWidget(
-          source.id as DataWidgetType,
+          source.id,
           !source.onTicker,
         );
       } else {
@@ -626,7 +632,7 @@ function RootLayout() {
   );
 
   // Build the sidebar source list from the user's enabled channels and
-  // widgets. Channels come from the live `dashboard.channels` payload
+  // widgets. Channels come from the live `dashboard.widgets` payload
   // (filtered to `enabled === true`); widgets come from
   // `prefs.widgets.enabledWidgets`. Both are sorted via the shared
   // CANONICAL_ORDER so the sidebar matches the catalog grid order.
@@ -635,9 +641,9 @@ function RootLayout() {
   // channel appears in navigation.
   const sidebarSources = useMemo(() => {
     const enabledDataWidgets = new Map<string, DataWidgetRow>(
-      (dashboard?.channels ?? [])
+      (dashboard?.widgets ?? [])
         .filter((c) => c.enabled === true)
-        .map((c) => [c.channel_type, c]),
+        .map((c) => [c.widget_type, c]),
     );
     const enabledWidgetIds = new Set(prefs.widgets.enabledWidgets);
 
@@ -701,7 +707,7 @@ function RootLayout() {
     // prefs.appearance and enabled widgets under prefs.widgets — the
     // list build is cheap, so one broad dep beats two narrow ones
     // that could silently miss a third source of truth later.
-  }, [dashboard?.channels, prefs, allDataWidgetManifests, allWidgets]);
+  }, [dashboard?.widgets, prefs, allDataWidgetManifests, allWidgets]);
 
   // ── Keyboard shortcuts ──────────────────────────────────────
   useEffect(() => {

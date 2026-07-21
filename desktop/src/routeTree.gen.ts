@@ -9,25 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TickerRouteImport } from './routes/ticker'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as StatusRouteImport } from './routes/status'
-import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReleasesRouteImport } from './routes/releases'
 import { Route as FeedRouteImport } from './routes/feed'
 import { Route as CustomizeRouteImport } from './routes/customize'
 import { Route as CatalogRouteImport } from './routes/catalog'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ChannelTypeRouteImport } from './routes/channel.$type'
 import { Route as WidgetIdIndexRouteImport } from './routes/widget.$id.index'
 import { Route as WidgetIdInfoRouteImport } from './routes/widget.$id.info'
 
-const TickerRoute = TickerRouteImport.update({
-  id: '/ticker',
-  path: '/ticker',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
   path: '/support',
@@ -36,11 +28,6 @@ const SupportRoute = SupportRouteImport.update({
 const StatusRoute = StatusRouteImport.update({
   id: '/status',
   path: '/status',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReleasesRoute = ReleasesRouteImport.update({
@@ -73,11 +60,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ChannelTypeRoute = ChannelTypeRouteImport.update({
-  id: '/channel/$type',
-  path: '/channel/$type',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const WidgetIdIndexRoute = WidgetIdIndexRouteImport.update({
   id: '/widget/$id/',
   path: '/widget/$id/',
@@ -96,11 +78,8 @@ export interface FileRoutesByFullPath {
   '/customize': typeof CustomizeRoute
   '/feed': typeof FeedRoute
   '/releases': typeof ReleasesRoute
-  '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
-  '/ticker': typeof TickerRoute
-  '/channel/$type': typeof ChannelTypeRoute
   '/widget/$id/info': typeof WidgetIdInfoRoute
   '/widget/$id/': typeof WidgetIdIndexRoute
 }
@@ -111,11 +90,8 @@ export interface FileRoutesByTo {
   '/customize': typeof CustomizeRoute
   '/feed': typeof FeedRoute
   '/releases': typeof ReleasesRoute
-  '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
-  '/ticker': typeof TickerRoute
-  '/channel/$type': typeof ChannelTypeRoute
   '/widget/$id/info': typeof WidgetIdInfoRoute
   '/widget/$id': typeof WidgetIdIndexRoute
 }
@@ -127,11 +103,8 @@ export interface FileRoutesById {
   '/customize': typeof CustomizeRoute
   '/feed': typeof FeedRoute
   '/releases': typeof ReleasesRoute
-  '/settings': typeof SettingsRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
-  '/ticker': typeof TickerRoute
-  '/channel/$type': typeof ChannelTypeRoute
   '/widget/$id/info': typeof WidgetIdInfoRoute
   '/widget/$id/': typeof WidgetIdIndexRoute
 }
@@ -144,11 +117,8 @@ export interface FileRouteTypes {
     | '/customize'
     | '/feed'
     | '/releases'
-    | '/settings'
     | '/status'
     | '/support'
-    | '/ticker'
-    | '/channel/$type'
     | '/widget/$id/info'
     | '/widget/$id/'
   fileRoutesByTo: FileRoutesByTo
@@ -159,11 +129,8 @@ export interface FileRouteTypes {
     | '/customize'
     | '/feed'
     | '/releases'
-    | '/settings'
     | '/status'
     | '/support'
-    | '/ticker'
-    | '/channel/$type'
     | '/widget/$id/info'
     | '/widget/$id'
   id:
@@ -174,11 +141,8 @@ export interface FileRouteTypes {
     | '/customize'
     | '/feed'
     | '/releases'
-    | '/settings'
     | '/status'
     | '/support'
-    | '/ticker'
-    | '/channel/$type'
     | '/widget/$id/info'
     | '/widget/$id/'
   fileRoutesById: FileRoutesById
@@ -190,24 +154,14 @@ export interface RootRouteChildren {
   CustomizeRoute: typeof CustomizeRoute
   FeedRoute: typeof FeedRoute
   ReleasesRoute: typeof ReleasesRoute
-  SettingsRoute: typeof SettingsRoute
   StatusRoute: typeof StatusRoute
   SupportRoute: typeof SupportRoute
-  TickerRoute: typeof TickerRoute
-  ChannelTypeRoute: typeof ChannelTypeRoute
   WidgetIdInfoRoute: typeof WidgetIdInfoRoute
   WidgetIdIndexRoute: typeof WidgetIdIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/ticker': {
-      id: '/ticker'
-      path: '/ticker'
-      fullPath: '/ticker'
-      preLoaderRoute: typeof TickerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/support': {
       id: '/support'
       path: '/support'
@@ -220,13 +174,6 @@ declare module '@tanstack/react-router' {
       path: '/status'
       fullPath: '/status'
       preLoaderRoute: typeof StatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/releases': {
@@ -271,13 +218,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/channel/$type': {
-      id: '/channel/$type'
-      path: '/channel/$type'
-      fullPath: '/channel/$type'
-      preLoaderRoute: typeof ChannelTypeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/widget/$id/': {
       id: '/widget/$id/'
       path: '/widget/$id'
@@ -302,11 +242,8 @@ const rootRouteChildren: RootRouteChildren = {
   CustomizeRoute: CustomizeRoute,
   FeedRoute: FeedRoute,
   ReleasesRoute: ReleasesRoute,
-  SettingsRoute: SettingsRoute,
   StatusRoute: StatusRoute,
   SupportRoute: SupportRoute,
-  TickerRoute: TickerRoute,
-  ChannelTypeRoute: ChannelTypeRoute,
   WidgetIdInfoRoute: WidgetIdInfoRoute,
   WidgetIdIndexRoute: WidgetIdIndexRoute,
 }

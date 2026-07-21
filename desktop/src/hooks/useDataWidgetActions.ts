@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { dataWidgetsApi, toggleDataWidgetVisibility } from "../api/client";
 import { queryKeys } from "../api/queries";
-import type { DataWidgetType } from "../api/client";
+import type { WidgetId } from "../api/client";
 
 const widgetName: Record<string, string> = {
   finance: "Finance",
@@ -20,9 +20,9 @@ const widgetName: Record<string, string> = {
 };
 
 interface DataWidgetActions {
-  handleToggleDataWidget: (widgetType: DataWidgetType, visible: boolean) => Promise<void>;
-  handleAddDataWidget: (widgetType: DataWidgetType) => Promise<void>;
-  handleDeleteDataWidget: (widgetType: DataWidgetType) => Promise<void>;
+  handleToggleDataWidget: (widgetType: WidgetId, visible: boolean) => Promise<void>;
+  handleAddDataWidget: (widgetType: WidgetId) => Promise<void>;
+  handleDeleteDataWidget: (widgetType: WidgetId) => Promise<void>;
 }
 
 // `prefs` and `setPrefs` were used to clean up `pinnedSources` on
@@ -33,7 +33,7 @@ export function useDataWidgetActions(): DataWidgetActions {
   const queryClient = useQueryClient();
 
   const handleToggleDataWidget = useCallback(
-    async (widgetType: DataWidgetType, visible: boolean) => {
+    async (widgetType: WidgetId, visible: boolean) => {
       try {
         await toggleDataWidgetVisibility(widgetType, visible, true);
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
@@ -46,7 +46,7 @@ export function useDataWidgetActions(): DataWidgetActions {
   );
 
   const handleAddDataWidget = useCallback(
-    async (widgetType: DataWidgetType) => {
+    async (widgetType: WidgetId) => {
       try {
         await dataWidgetsApi.create(widgetType);
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
@@ -68,12 +68,12 @@ export function useDataWidgetActions(): DataWidgetActions {
   );
 
   const handleDeleteDataWidget = useCallback(
-    async (widgetType: DataWidgetType) => {
+    async (widgetType: WidgetId) => {
       try {
         await dataWidgetsApi.delete(widgetType);
         await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
         queryClient.invalidateQueries({ queryKey: ["sports", "full"] });
-        // Sidebar now derives from dashboard.channels (filtered to
+        // Sidebar now derives from dashboard.widgets (filtered to
         // enabled), so no preference cleanup is needed here — the
         // dashboard refetch above triggers the sidebar update.
         navigate({ to: "/feed" });

@@ -18,7 +18,7 @@ import { ShellContext, type ShellState } from "../../../shell-context";
 import { dashboardQueryOptions, rssCatalogOptions } from "../../../api/queries";
 import { migrateRssDisplay, type AppPreferences } from "../../../preferences";
 import { rssDataWidget } from "../FeedTab";
-import type { DataWidgetType, TrackedFeed } from "../../../api/client";
+import type { WidgetId, TrackedFeed } from "../../../api/client";
 import type { FeedTabProps, RssItem } from "../../../types";
 
 const params = new URLSearchParams(window.location.search);
@@ -87,19 +87,18 @@ function main(): void {
   });
   const channelRow = (type: string, feeds: typeof FEEDS) => ({
     id: 1,
-    channel_type: type as DataWidgetType,
+    widget_type: type,
     enabled: true,
     ticker_enabled: true,
     created_at: "2026-07-17T00:00:00Z",
     updated_at: "2026-07-17T00:00:00Z",
-    logto_sub: "preview",
     config: {
       feeds: feeds.map((f) => ({ name: f.name, url: f.url, is_custom: f.custom })),
     },
   });
   queryClient.setQueryData(dashboardQueryOptions().queryKey, {
     data: { rss: rssItems },
-    channels: [
+    widgets: [
       channelRow("rss_custom", FEEDS),
       channelRow("news_bbc", FEEDS.slice(0, 1)),
     ],

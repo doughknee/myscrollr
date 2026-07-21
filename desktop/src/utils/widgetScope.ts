@@ -5,7 +5,7 @@ import type { Game, Trade, RssItem } from "../types";
  *
  * `dashboard.data` is keyed by coarse source (finance / sports / rss / …), but
  * each widget (sports_nfl, finance_stocks, news_bbc) shows only its own data —
- * its leagues / symbols / feed URLs, read from the widget's user_channels
+ * its leagues / symbols / feed URLs, read from the widget's user_widgets
  * `config`. Shared by the ticker (ScrollrTicker) and the Home feed so both
  * surfaces scope identically. A nullish config (a legacy coarse channel row)
  * returns the payload unscoped. Sources without a per-widget dimension

@@ -2,7 +2,8 @@
  * Widget route — THE source page. Every widget renders here (REL-49):
  * data widgets (finance_stocks, sports_nfl, news_bbc, predictions, …)
  * and local utilities (clock, weather, sysmon, uptime, github, timer).
- * /channel/$type is a redirect shim onto this route.
+ * The one route for every widget — /channel/$type was retired with the
+ * rest of the "channel" vocabulary.
  *
  * One route for every source means every swap is a same-route swap —
  * PageLayout stays mounted and the full stableChrome choreography
@@ -79,15 +80,15 @@ function WidgetFeed({
   // flight) can't have data yet — treat it as refreshing so the
   // empty-state CTA never flashes in the gap before the post-create
   // refetch starts (v1.1.1 round 3).
-  const pendingAdd = (dashboard?.channels ?? []).some(
-    (ch) => ch.channel_type === id && ch.id < 0,
+  const pendingAdd = (dashboard?.widgets ?? []).some(
+    (ch) => ch.widget_type === id && ch.id < 0,
   );
 
   const feedContext = {
     __dashboardLoaded: dashboard !== undefined,
     __refreshing: dashboardFetching || pendingAdd,
-    __hasConfig: (dashboard?.channels ?? []).some(
-      (ch) => ch.channel_type === id && ch.enabled,
+    __hasConfig: (dashboard?.widgets ?? []).some(
+      (ch) => ch.widget_type === id && ch.enabled,
     ),
   };
 

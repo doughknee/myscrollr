@@ -31,22 +31,22 @@ pinned ticker streams the same data across the top of your screen.
 
 ## What's in this repo
 
-Scrollr is a monorepo of independently deployable services. Every
-component has its own `go.mod` / `Cargo.toml` / `package.json` and no
-shared source libraries — the only contract between services is HTTP.
+Scrollr is a monorepo. The desktop app is the product; everything else
+exists to feed it.
 
 | Path | Service | Stack |
 |---|---|---|
 | [`desktop/`](./desktop/) | Desktop app (the primary product) | Tauri v2 + React 19 + Vite 7 |
-| [`myscrollr.com/`](./myscrollr.com/) | Marketing site, pricing, billing | React 19 + Vite + TanStack Router |
-| [`api/`](./api/) | Core gateway API | Go 1.22 + Fiber v2 + Postgres + Redis |
-| [`channels/finance/`](./channels/finance/) | Live market data (via TwelveData) | Go API + Rust ingestion service |
-| [`channels/sports/`](./channels/sports/) | Scores + schedules (via api-sports.io) | Go API + Rust ingestion service |
-| [`channels/rss/`](./channels/rss/) | RSS/Atom feeds | Go API + Rust ingestion service |
-| [`channels/fantasy/`](./channels/fantasy/) | Yahoo Fantasy Sports (OAuth) | Go-native (no Rust service) |
-| [`k8s/`](./k8s/) | Production manifests | Kubernetes on DigitalOcean / Coolify |
+| [`myscrollr.com/`](./myscrollr.com/) | Marketing, auth, billing — *not* where widgets are configured | React 19 + Vite + TanStack Router |
+| [`api/`](./api/) | Core API: widget catalog, reads, SSE, billing, accounts, support | Go 1.25 + Fiber v2 + Postgres + Redis |
+| [`channels/finance/`](./channels/finance/) | Market-data ingester (TwelveData) | Rust |
+| [`channels/sports/`](./channels/sports/) | Scores + schedules ingester (api-sports.io) | Rust |
+| [`channels/rss/`](./channels/rss/) | RSS/Atom ingester | Rust |
+| [`channels/predictions/`](./channels/predictions/) | Prediction-market ingester (Kalshi) | Rust |
+| [`channels/fantasy/`](./channels/fantasy/) | Yahoo Fantasy (OAuth + sync) | Go |
+| [`k8s/`](./k8s/) | Production manifests | Kubernetes on DigitalOcean |
 | [`scripts/`](./scripts/) | Operational tooling | Mixed Go / shell |
-| [`docs/superpowers/specs/`](./docs/superpowers/) | Design specs that predate every merge | Markdown |
+| [`docs/`](./docs/) | Charter, rollout plan, ADRs, design specs | Markdown |
 
 ## How it fits together
 
@@ -58,35 +58,40 @@ shared source libraries — the only contract between services is HTTP.
          │                          │
          │   JWTs via Logto         │
          ▼                          ▼
-    ┌────────────────────────────────────┐
-    │   Core API  (api/ · Go · Fiber)    │  ← only JWT validator
-    │   /users/me, /dashboard, /events,  │
-    │   /checkout, /tier-limits, …       │
-    └──┬─────────────────────────────────┘
-       │ X-User-Sub header, HTTP only
-       │
-       ├─────────┬──────────┬────────────┐
-       ▼         ▼          ▼            ▼
-    Finance   Sports      RSS         Fantasy
-    Go API    Go API      Go API      Go API
-       │         │          │            │
-       ▼         ▼          ▼            (in-process
-    Rust       Rust       Rust            Yahoo sync,
-    ingestion  ingestion  ingestion       no separate
-    (TwelveD.) (api-spt)  (feed-rs)       Rust service)
+   ┌─────────────────────────────────────────┐
+   │  Core API  (api/ · Go · Fiber)          │  ← only JWT validator
+   │  GET /catalog        the widget catalog │  ← owns every shared table
+   │  /users/me/widgets   widget CRUD        │
+   │  /dashboard /events  reads + SSE        │
+   │  /checkout           billing            │
+   │  finance · sports · rss · predictions   │  ← served in-process
+   └──┬───────────────────────────────┬──────┘
+      │ writes                        │ proxied, X-User-Sub
+      │                               ▼
+      │                            Fantasy (Go)
+      │                            Yahoo OAuth + sync
+      ▼
+   shared Postgres  ◀── Rust ingesters: finance · sports · rss · predictions
+      │                 (pure writers — they run no migrations)
+      └── Sequin CDC → Redis pub/sub → SSE → ticker
 ```
 
-- **Core API is the only service that validates JWTs.** Channel APIs
-  trust the `X-User-Sub` header set by the proxy.
-- **Channels self-register in Redis.** Adding a new channel means
-  adding a service; the core API discovers it dynamically and proxies
-  `/{channel}/*` traffic.
-- **Data flow back is CDC-based.** Sequin streams Postgres changes to
-  Redis topics; the core API fans them out to connected desktops over
-  SSE.
+- **Core API is the only service that validates JWTs**, and the only
+  thing that migrates the database. The ingesters are pure writers.
+- **The widget catalog is server-authoritative.** `GET /catalog` is the
+  single definition of what widgets exist; both clients fetch it and
+  render generically. Adding a widget that reuses an existing renderer
+  is a server-only change — no client release.
+- **Only fantasy is still a proxied service.** Finance, sports, rss and
+  predictions were folded into core by
+  [ADR-0002](./docs/adr/0002-consolidate-widget-read-apis.md); Redis
+  service discovery survives for fantasy alone.
+- **Data flows back via CDC.** Sequin streams Postgres changes to Redis
+  topics; every core replica fans them out to connected desktops over
+  SSE ([ADR-0001](./docs/adr/0001-sse-multi-replica.md)).
 
-Read [`api/CHANNELS.md`](./api/CHANNELS.md) for the full capability /
-registration / lifecycle contract.
+Read [`api/CHANNELS.md`](./api/CHANNELS.md) for the widget/source model
+and how to add one.
 
 ## Quick start — just run the desktop app
 
@@ -101,45 +106,53 @@ Full command reference is in [`AGENTS.md`](./AGENTS.md). Shortest path
 to a running stack:
 
 ```sh
-# 0. Prereqs: Node 22, Go 1.22, Rust stable, Postgres 15+, Redis 7+.
+# 0. Prereqs: Node 22, Go 1.25, Rust stable, Postgres 16, Redis 7.
 #    Plus Logto (auth) + Stripe (billing) dev projects.
 
-# 1. Core API (runs on :8080)
+# 1. Postgres + Redis
+docker compose -f docker-compose.local.yml up -d
+
+# 2. Core API (:8080) — applies every migration, serves the catalog
 cd api
 cp .env.example .env && $EDITOR .env
 go build ./... && go test ./...
 go run .
 
-# 2. Each channel you want to run — e.g. sports
-cd channels/sports/api
-go build ./... && go run .   # :8082
+# 3. Any ingester you want live data from — e.g. sports
+cd channels/sports/service
+cargo run --release
 
-cd ../service
-cargo run --release          # :3002
+# 4. Pick a client surface:
 
-# 3. Pick a client surface to point at the API:
-
-# a) Marketing site (http://localhost:3000)
-cd myscrollr.com
-cp .env.example .env && $EDITOR .env
-npm install && npm run dev
-
-# b) Desktop app
+# a) Desktop app (the product)
 cd desktop
 cp .env.example .env && $EDITOR .env
 npm install && npm run tauri:dev
+
+# b) Marketing site (http://localhost:3000)
+cd myscrollr.com
+cp .env.example .env && $EDITOR .env
+npm install && npm run dev
 ```
 
-Each channel directory has its own `docker-compose.dev.yml` that
-spins up Postgres, Redis, and the channel's services together if you
-don't want to manage those yourself.
+`docker-compose.dev.yml` builds and runs the whole stack in containers
+instead, if you'd rather not manage the processes. See
+[`LOCAL_SETUP.md`](./LOCAL_SETUP.md) for the full topology.
 
 ## Testing
 
 - **TypeScript**: `npm run build` (includes `tsc` typecheck) in
   `myscrollr.com/` and `desktop/`.
-- **Go**: `go test ./...` in `api/` and each `channels/*/api/`.
-- **Rust**: `cargo test` in each `channels/{finance,sports,rss}/service/`.
+- **Go**: `go test ./...` in `api/` and `channels/fantasy/api/`.
+- **Rust**: `cargo test` in each
+  `channels/{finance,sports,rss,predictions}/service/`.
+
+Integration tests (GDPR purge cascade, Stripe webhook idempotency,
+fantasy's schema contract) need a real Postgres and skip without it:
+
+```sh
+TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/scrollr_test?sslmode=disable" go -C api test ./...
+```
 
 CI mirrors this: `.github/workflows/backend-tests.yml` runs Go + Rust
 in a matrix on every push; `.github/workflows/desktop-release.yml`
@@ -148,21 +161,21 @@ ships the API and website to production.
 
 ## Conventions
 
-- **No shared source libraries between services.** Duplicated code
-  across channels is *intentional* — do not extract. The only contract
-  is HTTP.
+- **The server is the authority; clients are projections.** The widget
+  catalog, the database schema, and the TS wire types all have exactly
+  one definition in `api/`. Where a client needs a copy — the offline
+  catalog snapshot, the generated types, the tier-limit table — it is
+  *generated* and pinned by a test that fails CI on drift. Don't
+  hand-edit a generated file; change the Go and regenerate.
 - **No analytics, tracking pixels, or telemetry.** This is a public
   product promise, documented in the Privacy Policy. Don't add them.
-- **Tier limits have one source of truth** — `DefaultTierLimits` in
-  `api/core/tier_limits.go`. The desktop mirrors the numbers in
-  `desktop/src/tierLimits.ts`; the marketing site fetches them at
-  runtime from `/tier-limits`. Changing any of the three requires
-  updating all three in the same PR.
-- **Database migrations are versioned.** `golang-migrate` for Go
-  modules, `sqlx::migrate` for Rust crates. Both run on startup — a
-  failed migration crashes the container.
+- **Only core migrates.** All schema lives in `api/migrations/`; the
+  ingesters are pure writers. A failed migration crashes the container.
 - **Rollbacks via rolling forward.** We prefer forward-only migrations
   once deployed; the schema is additive wherever possible.
+- **Ingesters stay independent.** Each Rust service owns its polling and
+  parsing; that duplication is intentional. What's shared is the schema
+  and the wire contract, not ingest logic.
 - **Package manager is npm.** Not pnpm, not yarn.
 
 Per-service style (semis, quotes, path aliases) varies — see
@@ -172,15 +185,22 @@ Per-service style (semis, quotes, path aliases) varies — see
 
 - [`AGENTS.md`](./AGENTS.md) — the one-page cheatsheet: commands, ports,
   conventions, per-language rules.
-- [`api/CHANNELS.md`](./api/CHANNELS.md) — channel framework + capability
-  contract, with architecture diagram.
+- [`docs/VISION.md`](./docs/VISION.md) — the charter: what Scrollr is,
+  the widget/slot model, and the ten decisions behind the current
+  architecture. Start here to understand *why*.
+- [`docs/ROLLOUT.md`](./docs/ROLLOUT.md) — how that charter was
+  executed, phase by phase, including the deviations and why.
+- [`api/CHANNELS.md`](./api/CHANNELS.md) — the widget/source model and
+  how to add one.
+- [`docs/adr/`](./docs/adr/) — numbered architecture decision records.
+- [`LOCAL_SETUP.md`](./LOCAL_SETUP.md) — the local stack topology.
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) — how to report issues, how
   to send PRs, what we do and don't merge.
 - [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) — community rules.
 - [`SECURITY.md`](./SECURITY.md) — vulnerability reporting.
-- [`docs/superpowers/specs/`](./docs/superpowers/specs/) — every
-  feature in this repo has a dated spec that was written before it
-  shipped. Best place to understand *why* something is the way it is.
+- [`docs/superpowers/specs/`](./docs/superpowers/specs/) — dated design
+  specs written before each feature shipped. Historical: several predate
+  the widget pivot, so trust `VISION.md` where they disagree.
 
 ## License
 
@@ -208,5 +228,5 @@ please read the [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) and the
 - Fantasy data from [Yahoo Fantasy Sports API](https://developer.yahoo.com/fantasysports/).
 - Auth by [Logto](https://logto.io).
 - Billing by [Stripe](https://stripe.com).
-- Infrastructure on [DigitalOcean](https://digitalocean.com) via
-  [Coolify](https://coolify.io).
+- Prediction markets from [Kalshi](https://kalshi.com).
+- Infrastructure on [DigitalOcean](https://digitalocean.com) Kubernetes.

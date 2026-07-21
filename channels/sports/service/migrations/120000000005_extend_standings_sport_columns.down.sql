@@ -1,9 +1,0 @@
-ALTER TABLE standings DROP COLUMN IF EXISTS sport_api;
-ALTER TABLE standings DROP COLUMN IF EXISTS pct;
-ALTER TABLE standings DROP COLUMN IF EXISTS games_behind;
-ALTER TABLE standings DROP COLUMN IF EXISTS otl;
-ALTER TABLE standings DROP COLUMN IF EXISTS goals_for;
-ALTER TABLE standings DROP COLUMN IF EXISTS goals_against;
-ALTER TABLE standings DROP COLUMN IF EXISTS points_for;
-ALTER TABLE standings DROP COLUMN IF EXISTS points_against;
-ALTER TABLE standings DROP COLUMN IF EXISTS streak;

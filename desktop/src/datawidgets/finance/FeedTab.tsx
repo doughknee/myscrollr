@@ -38,7 +38,7 @@ import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
 import { applyFinancePipeline, type FinanceSortKey, type FinanceDirectionFilter } from "./view";
 import type { Trade, FeedTabProps, DataWidgetManifest } from "../../types";
-import type { DataWidgetType } from "../../api/client";
+import type { WidgetId } from "../../api/client";
 import { assetClassForWidget } from "../../marketplace";
 import { shouldShowOnFeed } from "../../preferences";
 import type { FinanceDisplayPrefs } from "../../preferences";
@@ -259,7 +259,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
     return { all: trades.length, gainers: up, losers: down };
   }, [trades]);
 
-  const widgetType = (widgetId ?? "finance") as DataWidgetType;
+  const widgetType = (widgetId ?? "finance");
   const showEmpty = trades.length === 0;
 
   // ── Search-to-add (the Symbols view, folded into the bar) ────
@@ -274,8 +274,8 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   } = useDataWidgetConfig<string[]>(widgetType, "symbols");
   const { data: fullCatalog = [] } = useQuery(financeCatalogOptions());
 
-  const channelRow = (dashboard?.channels ?? []).find(
-    (ch) => ch.channel_type === widgetType,
+  const channelRow = (dashboard?.widgets ?? []).find(
+    (ch) => ch.widget_type === widgetType,
   );
   const channelConfig = (channelRow?.config ?? {}) as FinanceChannelConfig;
   const trackedSymbols = useMemo(

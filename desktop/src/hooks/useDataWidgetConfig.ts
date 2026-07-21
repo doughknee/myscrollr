@@ -9,7 +9,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { dataWidgetsApi } from "../api/client";
 import { queryKeys } from "../api/queries";
-import type { DataWidgetType } from "../api/client";
+import type { WidgetId } from "../api/client";
 import type { DashboardResponse } from "../types";
 
 interface UseDataWidgetConfigResult<T> {
@@ -20,7 +20,7 @@ interface UseDataWidgetConfigResult<T> {
 }
 
 export function useDataWidgetConfig<T>(
-  widgetType: DataWidgetType,
+  widgetType: WidgetId,
   configKey: string,
 ): UseDataWidgetConfigResult<T> {
   const queryClient = useQueryClient();
@@ -41,8 +41,8 @@ export function useDataWidgetConfig<T>(
       const dash = queryClient.getQueryData<DashboardResponse>(
         queryKeys.dashboard,
       );
-      const current = dash?.channels?.find(
-        (c) => c.channel_type === widgetType,
+      const current = dash?.widgets?.find(
+        (c) => c.widget_type === widgetType,
       )?.config as Record<string, unknown> | undefined;
       return dataWidgetsApi.update(widgetType, {
         config: current ?? { [configKey]: next },
@@ -57,8 +57,8 @@ export function useDataWidgetConfig<T>(
       );
       queryClient.setQueryData<DashboardResponse>(queryKeys.dashboard, (old) => {
         if (!old) return old;
-        const channels = (old.channels ?? []).map((c) =>
-          c.channel_type === widgetType
+        const widgets = (old.widgets ?? []).map((c) =>
+          c.widget_type === widgetType
             ? {
                 ...c,
                 config: {
@@ -68,7 +68,7 @@ export function useDataWidgetConfig<T>(
               }
             : c,
         );
-        return { ...old, channels };
+        return { ...old, widgets };
       });
       return { previous };
     },

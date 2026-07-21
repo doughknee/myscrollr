@@ -11,23 +11,19 @@ import {
 } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 import { getStore, setStore } from "./lib/store";
-import { resolveInitialEntry } from "./routeCompat";
+import { isMountable } from "./lib/routePaths";
 import type { QueryClient } from "@tanstack/react-query";
 
 // ── Persistence ──────────────────────────────────────────────────
 
 const HISTORY_KEY = "scrollr:lastRoute";
 
-function getInitialEntry(): string {
-  return resolveInitialEntry(getStore<string | null>(HISTORY_KEY, null));
-}
-
 // ── Router factory ───────────────────────────────────────────────
 
 export function createAppRouter(queryClient: QueryClient) {
-  const memoryHistory = createMemoryHistory({
-    initialEntries: [getInitialEntry()],
-  });
+  // Start at home, then restore the persisted route only once the router
+  // exists and can be asked whether that route still exists.
+  const memoryHistory = createMemoryHistory({ initialEntries: ["/"] });
 
   const router = createRouter({
     routeTree,
@@ -35,6 +31,11 @@ export function createAppRouter(queryClient: QueryClient) {
     context: { queryClient },
     defaultPreload: "intent",
   });
+
+  const saved = getStore<string | null>(HISTORY_KEY, null);
+  if (saved && saved !== "/" && isMountable(saved, Object.keys(router.routesById))) {
+    memoryHistory.push(saved);
+  }
 
   // Persist the current route on every navigation
   router.subscribe("onResolved", () => {

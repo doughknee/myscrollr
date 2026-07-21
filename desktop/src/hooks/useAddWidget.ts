@@ -3,7 +3,7 @@
  *
  * Adds either kind of widget from one entry point so the Catalog and the
  * per-widget Info page stay in lockstep:
- *   - DATA widget → POST /users/me/channels (with the widget's addConfig),
+ *   - DATA widget → POST /users/me/widgets (with the widget's addConfig),
  *     optimistically inserted into the dashboard cache so the Sidebar +
  *     "Added" badge flip on the next paint, then reconciled with the server.
  *   - UTILITY widget → written into preferences (enabled + on-ticker +
@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import { defaultPinForNewWidget } from "../preferences";
 import type { CatalogItem } from "../marketplace";
 import { dataWidgetsApi } from "../api/client";
-import type { DataWidgetRow, DataWidgetType } from "../api/client";
+import type { DataWidgetRow, WidgetId } from "../api/client";
 import { queryKeys } from "../api/queries";
 import type { DashboardResponse } from "../types";
 import { useShell } from "../shell-context";
@@ -35,25 +35,24 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
   return useCallback(
     async (item: CatalogItem) => {
       if (item.kind === "data") {
-        const widgetType = item.id as DataWidgetType;
+        const widgetType = item.id;
 
         // Optimistic insert: write a placeholder channel into the
         // dashboard cache immediately so the Sidebar + CatalogCard
         // "Added" badge flip on the next paint. Without this the user
         // saw a 0.5-1s gap between click and any visible state change
-        // — the network round-trip to `POST /users/me/channels` plus
+        // — the network round-trip to `POST /users/me/widgets` plus
         // the forced `/dashboard` refetch were both on the critical
         // path. CDC + a background refetch reconcile the placeholder
         // with the real row a moment later.
-        const optimisticChannel: DataWidgetRow & { logto_sub: string } = {
+        const optimisticWidget: DataWidgetRow = {
           id: -Date.now(), // ephemeral negative id, replaced on reconcile
-          channel_type: widgetType,
+          widget_type: widgetType,
           enabled: true,
           ticker_enabled: true,
           config: item.addConfig ?? {},
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          logto_sub: "",
         };
 
         const previous = queryClient.getQueryData<DashboardResponse>(
@@ -66,18 +65,18 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
             if (!old) {
               return {
                 data: {},
-                channels: [optimisticChannel],
+                widgets: [optimisticWidget],
               } as DashboardResponse;
             }
             // Don't double-insert if the channel is somehow already
             // present (e.g. CDC raced us).
-            const existing = old.channels ?? [];
-            if (existing.some((c) => c.channel_type === widgetType)) {
+            const existing = old.widgets ?? [];
+            if (existing.some((c) => c.widget_type === widgetType)) {
               return old;
             }
             return {
               ...old,
-              channels: [...existing, optimisticChannel],
+              widgets: [...existing, optimisticWidget],
             };
           },
         );
@@ -102,14 +101,12 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
               queryKeys.dashboard,
               (old) => {
                 if (!old) return old;
-                const channels = (old.channels ?? []).map((c) =>
-                  c.id === optimisticChannel.id
-                    ? ({ ...created, logto_sub: c.logto_sub } as DataWidgetRow & {
-                        logto_sub: string;
-                      })
+                const widgets = (old.widgets ?? []).map((c) =>
+                  c.id === optimisticWidget.id
+                    ? created
                     : c,
                 );
-                return { ...old, channels };
+                return { ...old, widgets };
               },
             );
             // Resync NOW, refetching mounted queries: the user is

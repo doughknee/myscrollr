@@ -172,7 +172,7 @@ function CatalogPage() {
   }, [allItems]);
 
   const enabledChannelIds = useMemo(
-    () => new Set(channels.map((ch) => ch.channel_type)),
+    () => new Set(channels.map((ch) => ch.widget_type)),
     [channels],
   );
   const enabledWidgetIds = useMemo(

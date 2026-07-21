@@ -1,2 +1,0 @@
-DROP TABLE IF EXISTS standings;
-DROP TABLE IF EXISTS teams;

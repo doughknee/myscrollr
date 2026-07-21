@@ -1,0 +1,30 @@
+-- Reverses 000001_baseline: drops every table core owns.
+
+DROP TABLE IF EXISTS
+    business_leads,
+    games,
+    markets,
+    osticket_message_ids,
+    rss_items,
+    standings,
+    stripe_customers,
+    stripe_webhook_events,
+    support_drafts,
+    support_ticket_threads,
+    teams,
+    tracked_feeds,
+    tracked_leagues,
+    tracked_markets,
+    tracked_symbols,
+    trades,
+    user_custom_feeds,
+    user_deletion_requests,
+    user_preferences,
+    user_widgets,
+    yahoo_leagues,
+    yahoo_matchups,
+    yahoo_rosters,
+    yahoo_standings,
+    yahoo_user_leagues,
+    yahoo_users
+CASCADE;

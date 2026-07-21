@@ -153,7 +153,7 @@ function HomePage() {
     const items = channels
       .filter((c) => c.enabled)
       .map((ch) => {
-        const manifest = widgetManifest(ch.channel_type) as
+        const manifest = widgetManifest(ch.widget_type) as
           | DataWidgetManifest
           | undefined;
         return manifest ? { ch, manifest } : null;
@@ -163,8 +163,8 @@ function HomePage() {
       );
     return items.sort(
       (a, b) =>
-        CANONICAL_ORDER.indexOf(a.ch.channel_type) -
-        CANONICAL_ORDER.indexOf(b.ch.channel_type),
+        CANONICAL_ORDER.indexOf(a.ch.widget_type) -
+        CANONICAL_ORDER.indexOf(b.ch.widget_type),
     );
   }, [channels]);
 
@@ -257,7 +257,7 @@ function HomePage() {
       {orderedDataWidgets.map(({ ch, manifest }, idx) => {
         return (
           <motion.div
-            key={ch.channel_type}
+            key={ch.widget_type}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{
@@ -274,20 +274,20 @@ function HomePage() {
                 getEffectiveDataWidgetTickerRow(shell.prefs, ch),
                 layoutRows.length,
               )}
-              selectedKeys={homePreview[ch.channel_type] ?? []}
+              selectedKeys={homePreview[ch.widget_type] ?? []}
               onSelectionChange={(keys) =>
-                setHomePreview(ch.channel_type, keys)
+                setHomePreview(ch.widget_type, keys)
               }
               onViewAll={() =>
                 navigate({
                   to: "/widget/$id",
-                  params: { id: ch.channel_type },
+                  params: { id: ch.widget_type },
                 })
               }
               onRowClick={() =>
                 navigate({
                   to: "/widget/$id",
-                  params: { id: ch.channel_type },
+                  params: { id: ch.widget_type },
                 })
               }
               // Config lives inside the widget now — every CTA lands on
@@ -295,7 +295,7 @@ function HomePage() {
               onConfigure={() =>
                 navigate({
                   to: "/widget/$id",
-                  params: { id: ch.channel_type },
+                  params: { id: ch.widget_type },
                 })
               }
             />
@@ -424,7 +424,7 @@ function ChannelSection({
 }: ChannelSectionProps) {
   const [editing, setEditing] = useState(false);
   const Icon = manifest.icon;
-  const type = channel.channel_type;
+  const type = channel.widget_type;
   // Resolve the widget id to its coarse source (dashboard.data is source-keyed)
   // and scope the payload to this one widget's config — an NFL widget shows only
   // NFL, finance_stocks only stocks, news_bbc only BBC. Mirrors the ticker.

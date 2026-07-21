@@ -48,23 +48,6 @@ export async function initStore(): Promise<void> {
     await store.save();
   }
 
-  // One-time cleanup of orphaned updater suppression keys. v1.0.16
-  // removed the pub_date suppression machinery (see lib.rs comment
-  // near the updater plugin init). The keys are dead weight on
-  // existing installs — purge them once per install so scrollr.json
-  // stays tidy and a future search for these keys doesn't find stale
-  // references. Gated by its own flag so we don't fight against
-  // future updater work that might reintroduce different keys.
-  if (!cache.has("scrollr:update-keys-cleaned-v2")) {
-    cache.delete("scrollr:lastUpdateDate");
-    cache.delete("scrollr:pendingUpdate");
-    store.delete("scrollr:lastUpdateDate").catch(logWriteError);
-    store.delete("scrollr:pendingUpdate").catch(logWriteError);
-    cache.set("scrollr:update-keys-cleaned-v2", true);
-    store.set("scrollr:update-keys-cleaned-v2", true).catch(logWriteError);
-    await store.save();
-  }
-
   initialized = true;
 }
 

@@ -8,6 +8,7 @@
  */
 import { fetch } from "@tauri-apps/plugin-http";
 import { getValidToken } from "../auth";
+import type { Widget, HealthResponse } from "../types/api.generated";
 
 // ── Constants ────────────────────────────────────────────────────
 
@@ -93,15 +94,22 @@ export async function request<T>(
   return handleResponse<T>(response);
 }
 
+// ── Widget catalog ──────────────────────────────────────────────
+
+/**
+ * GET /catalog — the server-authoritative widget catalog (VISION §4.2).
+ *
+ * Public, like /tier-limits: the catalog is identical for everyone and a
+ * first-run desktop with no session still has to render the Library.
+ */
+export async function fetchCatalog(): Promise<import("../types").CatalogPayload> {
+  return request<import("../types").CatalogPayload>("/catalog");
+}
+
 // ── Health ──────────────────────────────────────────────────────
 
-/** Core's own view of its dependencies (public — no auth). */
-export interface HealthResponse {
-  status: string;
-  database: string;
-  redis: string;
-  services: Record<string, string>;
-}
+/** Core's own view of its dependencies (public — no auth). Generated. */
+export type { HealthResponse };
 
 /**
  * GET /health — deliberately does NOT go through `request()`.
@@ -160,39 +168,34 @@ export async function authFetch<T>(
   return handleResponse<T>(response);
 }
 
-// ── DataWidgetRow Types ───────────────────────────────────────────────
-
-export type DataWidgetType = "finance" | "sports" | "fantasy" | "rss" | "predictions";
-
-export interface DataWidgetRow {
-  id: number;
-  channel_type: DataWidgetType;
-  enabled: boolean;
-  /** Whether this channel's chips appear on the ticker. Server emits both
-   * `ticker_enabled` (preferred) and `visible` (legacy alias) — read either
-   * via {@link isChannelTickerEnabled}. */
-  ticker_enabled: boolean;
-  /** @deprecated Use {@link ticker_enabled}. Server still emits this for
-   *  v1.0.3 compatibility; will be removed in a future release. */
-  visible?: boolean;
-  config: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
-}
+// ── Widget row types ──────────────────────────────────────────────────
 
 /**
- * Read the ticker-enabled flag, tolerant of both the new
- * (`ticker_enabled`) and legacy (`visible`) field names. Returns `true`
- * by default if neither is set so freshly-added channels appear on the
- * ticker.
+ * A widget id from the catalog ("sports_nfl", "news_bbc", "predictions").
+ *
+ * Deliberately an open string, not a union. This used to be
+ * `"finance" | "sports" | "fantasy" | "rss" | "predictions"` — the five
+ * SOURCES, not widget ids — which stopped being true at the widget split
+ * and survived only because call sites cast to it. Widget ids are defined
+ * by the server catalog and new ones must appear without a client release
+ * (VISION §4.2), so the client cannot enumerate them.
  */
-export function isChannelTickerEnabled(ch: {
+export type WidgetId = string;
+
+/** A row of user_widgets. Generated from the Go struct (VISION §4.6). */
+export type DataWidgetRow = Widget;
+
+/**
+ * Read the ticker-enabled flag, defaulting to `true` when absent so a
+ * freshly-added widget appears on the ticker.
+ *
+ * The `visible` alias this used to tolerate is gone: the server now emits
+ * only `ticker_enabled` (VISION §4.4).
+ */
+export function isWidgetTickerEnabled(w: {
   ticker_enabled?: boolean;
-  visible?: boolean;
 }): boolean {
-  if (typeof ch.ticker_enabled === "boolean") return ch.ticker_enabled;
-  if (typeof ch.visible === "boolean") return ch.visible;
-  return true;
+  return typeof w.ticker_enabled === "boolean" ? w.ticker_enabled : true;
 }
 
 export interface RssChannelConfig {
@@ -203,18 +206,18 @@ export interface RssChannelConfig {
 
 export const dataWidgetsApi = {
   getAll: () =>
-    authFetch<{ channels: Array<DataWidgetRow> }>("/users/me/channels"),
+    authFetch<{ widgets: Array<DataWidgetRow> }>("/users/me/widgets"),
 
   create: (
-    widgetType: DataWidgetType,
+    widgetType: WidgetId,
     config: Record<string, unknown> = {},
     localWidgets?: number,
   ) =>
-    authFetch<DataWidgetRow>("/users/me/channels", {
+    authFetch<DataWidgetRow>("/users/me/widgets", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        channel_type: widgetType,
+        widget_type: widgetType,
         config,
         // Report the enabled utility-widget count so the server slot gate
         // counts every widget — utilities live only in local preferences.
@@ -223,22 +226,22 @@ export const dataWidgetsApi = {
     }),
 
   update: (
-    widgetType: DataWidgetType,
+    widgetType: WidgetId,
     data: {
       enabled?: boolean;
       ticker_enabled?: boolean;
       config?: Record<string, unknown>;
     },
   ) =>
-    authFetch<DataWidgetRow>(`/users/me/channels/${widgetType}`, {
+    authFetch<DataWidgetRow>(`/users/me/widgets/${widgetType}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }),
 
-  delete: (widgetType: DataWidgetType) =>
+  delete: (widgetType: WidgetId) =>
     authFetch<{ status: string; message: string }>(
-      `/users/me/channels/${widgetType}`,
+      `/users/me/widgets/${widgetType}`,
       { method: "DELETE" },
     ),
 };
@@ -251,11 +254,10 @@ export const dataWidgetsApi = {
  * when the API call completes. Callers are responsible for invalidating
  * queries afterward.
  *
- * The wire field is `ticker_enabled` (v1.0.4+); the server also accepts
- * the legacy `visible` field for older clients.
+ * The wire field is `ticker_enabled` — the only name the server accepts.
  */
 export async function toggleDataWidgetVisibility(
-  widgetType: DataWidgetType,
+  widgetType: WidgetId,
   tickerEnabled: boolean,
   enabled?: boolean,
 ): Promise<void> {

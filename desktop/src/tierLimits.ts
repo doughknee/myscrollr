@@ -3,7 +3,7 @@ import type { SubscriptionTier } from "./auth";
 // =====================================================================
 // Tier Limits
 //
-// SOURCE OF TRUTH: api/core/tier_limits.go (DefaultTierLimits)
+// SOURCE OF TRUTH: api/internal/widgets/tier_limits.go (DefaultTierLimits)
 //
 // DataWidgetRow config panels and the onboarding wizard read these synchronously
 // during render, so we keep a hardcoded mirror of the backend values here
@@ -11,10 +11,10 @@ import type { SubscriptionTier } from "./auth";
 // between this file and the Go source becomes a billing-trust problem.
 //
 // If you change a number here, you MUST also update:
-//   - api/core/tier_limits.go        (the Go map)
-//   - api/core/tier_limits.json      (shared sync snapshot — the test in
+//   - api/internal/widgets/tier_limits.go        (the Go map)
+//   - api/internal/widgets/tier_limits.json      (shared sync snapshot — the test in
 //     tierLimits.test.ts pins this file to it, so CI catches drift)
-//   - api/core/tier_limits_test.go   (the assertion)
+//   - api/internal/widgets/tier_limits_test.go   (the assertion)
 //   - myscrollr.com/src/lib/fallbackTierLimits.ts (the FALLBACK_LIMITS
 //     constant, for first-paint before the runtime fetch resolves)
 //

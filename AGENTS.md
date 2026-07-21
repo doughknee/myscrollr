@@ -10,10 +10,10 @@ MyScrollr aggregates financial market data, sports scores, RSS feeds, and Yahoo 
 
 Monorepo — each component is independently deployable with its own dependencies:
 
-- `api/` — Core gateway API (Go 1.25, Fiber v2, sub-package `core/`)
+- `api/` — Core API (Go 1.25, Fiber v2). Internal packages under `api/internal/`; `api/core` wires them into one binary
 - `myscrollr.com/` — Marketing website + auth/billing (React 19, Vite 7, TanStack Router, Tailwind v4)
 - `desktop/` — Tauri v2 desktop app (React 19, Vite 7, TanStack Router + Query, Tailwind v4, Rust backend) — **primary product**
-- The finance, sports, rss, and predictions Go APIs were folded into `api/core/{finance,sports,rss,predictions}.go` (ADR-0002); fantasy is the one remaining channel Go API
+- The finance, sports, rss, and predictions Go APIs were folded into `api/internal/ingestread/` (ADR-0002); fantasy is the one remaining discovered channel service
 - `channels/{finance,sports,rss,predictions}/service/` — Rust ingestion services (independent crates, edition 2024; predictions holds the Kalshi credentials and WS sweep)
 - `channels/fantasy/api/` — Fantasy Go API (Yahoo OAuth2, Go-native sync, no Rust service)
 
@@ -57,15 +57,15 @@ cargo build --release && cargo run   # finance=3001, sports=3002, rss=3004, pred
 - **Go**: All: `go test ./...`. File: `go test ./path/to/pkg`. Single: `go test -run TestName ./path/to/pkg`.
 - **Rust**: All: `cargo test`. Single: `cargo test test_name`.
 
-Go integration tests in `api/core` (GDPR purge cascade, Stripe webhook idempotency) need a real Postgres and gate on `TEST_DATABASE_URL` — they skip when it's unset, so plain `go test ./...` always works without a database. To run them locally, point the variable at a scratch database (the tests apply the repo's migrations and truncate the tables they touch — never use a database with real data):
+Go integration tests (GDPR purge cascade, Stripe webhook idempotency, fantasy's schema contract) need a real Postgres and gate on `TEST_DATABASE_URL` — they skip when it's unset, so plain `go test ./...` always works without a database. To run them locally, point the variable at a scratch database (the tests apply the repo's migrations and truncate the tables they touch — never use a database with real data):
 
 ```sh
-TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/scrollr_test?sslmode=disable" go test ./core
+TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/scrollr_test?sslmode=disable" go test ./...
 ```
 
 ### CI
 
-- `.github/workflows/backend-tests.yml` — Go + Rust tests on every push/PR touching `api/` or `channels/`. The Go jobs get a Postgres 16 service container with `TEST_DATABASE_URL` set, so the `api/core` integration tests run for real in CI.
+- `.github/workflows/backend-tests.yml` — Go + Rust tests on every push/PR touching `api/` or `channels/`. The Go jobs get a Postgres 16 service container with `TEST_DATABASE_URL` set, so the api integration tests run for real in CI.
 - `.github/workflows/frontend-tests.yml` — Vitest suites for `myscrollr.com/` and `desktop/` on every push/PR touching them.
 - `.github/workflows/desktop-release.yml` — desktop releases. Triggers on push to `main` when `desktop/` changes, or via `workflow_dispatch`. Builds Linux/macOS/Windows via `tauri-action`. Node 22, stable Rust, `npm ci`.
 - `.github/workflows/deploy.yml` — builds and deploys the API, channels, and website to production on push to `main`.
@@ -120,12 +120,12 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 - `gofmt` formatting. No custom linter. Go 1.25 across all modules.
 - All use Fiber v2, pgx v5, go-redis v9.
 - Two Go modules: `api/` (core, incl. the folded widget sources) and `channels/fantasy/api/`. No shared packages between them — fantasy keeps the HTTP-only contract (ADR-0002 retired the old five-module duplication rule).
-- Core API: `core/` sub-package, package-level vars (`DBPool`, `Rdb`), `Server` struct. Widget sources register in `localSources` (`api/core/sources.go`).
+- Core API: internal packages under `api/internal/` (`platform`, `events`, `widgets`, `ingestread`, `accounts`, `billing`, `support`) wired by `api/core`. One binary. `platform` is the leaf — package-level `DBPool`/`Rdb` live there; `core` is the only package that imports everything. Widget sources register in `LocalSources` (`api/internal/ingestread/sources.go`).
 - Fantasy API: flat `main` package, `App` struct holding deps (`db *pgxpool.Pool`, `rdb *redis.Client`).
 - Naming: PascalCase exports, camelCase unexported, short receivers (`s *Server`, `a *App`), `snake_case` JSON tags. Constants are PascalCase, grouped with `=====` comment separators.
 - Error handling: `if err != nil` returns. `fmt.Errorf("context: %w", err)` wrapping. `log.Printf("[Context] message: %v", err)` with bracketed prefixes. `log.Fatalf` for startup failures. HTTP errors via `ErrorResponse` struct.
 - Registration: fantasy self-registers in Redis with 30s TTL, 20s heartbeat.
-- **Keep `api/core/extension_auth.go` and `/extension/token` routes** — the desktop app uses these for PKCE auth despite the legacy naming.
+- **Keep `api/internal/accounts/extension_auth.go` and `/extension/token` routes** — the desktop app uses these for PKCE auth despite the legacy naming.
 
 ## Code Style — Rust
 
@@ -149,7 +149,7 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 
 (Reshaped by [ADR-0002](docs/adr/0002-consolidate-widget-read-apis.md), July 2026.)
 
-1. **Widget read APIs live in core.** Finance, sports, rss, and predictions are served natively by `api/core/{finance,sports,rss,predictions}.go` behind the `localSource` seam (`api/core/sources.go`): native routes registered ahead of the dynamic proxy, plus in-process dashboard/health/lifecycle hooks. Adding a data source = a Go package in core + (usually) a Rust ingester.
+1. **Widget read APIs live in core.** Finance, sports, rss, and predictions are served natively from `api/internal/ingestread/` behind the `localSource` seam (`sources.go`): native routes registered ahead of the dynamic proxy, plus in-process dashboard/health/lifecycle hooks. Adding a data source = a file in `ingestread` + a catalog entry + (usually) a Rust ingester. See `api/CHANNELS.md`.
 2. **Ingestion is isolated.** Each source's poller is a separate Rust service with its own schedule, quota blast radius, and rollout cadence (fantasy ingests in-process in Go). Core reaches ingesters only via `INTERNAL_{SOURCE}_URL` health probes, plus the predictions candlesticks pass-through.
 3. **Fantasy is the one proxied channel service.** It self-registers in Redis (30s TTL heartbeat), is discovered and proxied dynamically, and trusts the `X-User-Sub` header core injects after JWT validation — it never sees tokens. The HTTP-only contract and module isolation still apply to it.
 4. **Topic-based CDC PubSub**: Core maps CDC events to topics in-process and dispatches via Redis PubSub (O(1) per event); every replica fans out to its own SSE clients (ADR-0001).
@@ -210,78 +210,51 @@ When in doubt, run the audit checklist in the rollout plan.
 
 ## Database Migrations
 
-All systems use formal migrations. Inline `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE` blocks have been replaced.
+**core-api owns every shared table. It is the only thing that migrates.**
+(VISION §4.3, landed 2026-07-20.) The four Rust ingesters and the fantasy Go
+API are pure writers: they connect and write, and run no migrations at all.
 
-| System | Tool | Driver |
-|--------|------|--------|
-| Core API (`api/`) | golang-migrate v4 | postgres |
-| Fantasy API (`channels/fantasy/api/`) | golang-migrate v4 | postgres |
-| Finance service (`channels/finance/service/`) | sqlx::migrate | postgres |
-| Sports service (`channels/sports/service/`) | sqlx::migrate | postgres |
-| RSS service (`channels/rss/service/`) | sqlx::migrate | postgres |
+| | |
+|---|---|
+| Migrations live in | `api/migrations/` — nowhere else |
+| Tool | golang-migrate v4, one version line (`schema_migrations_core`) |
+| Runs | on core-api startup, in `platform.ConnectDB()` |
 
-**Migrations run on startup** — no manual steps or CI scripts required. A failed migration calls `log.Fatalf` / propagates the error, preventing the app from serving traffic with a half-applied schema.
+`api/migrations/000001_baseline.up.sql` is a squashed baseline covering all
+26 tables — core's own plus every content table (`trades`, `games`,
+`standings`, `teams`, `markets`, `rss_items`, `tracked_*`, `yahoo_*`). Do not
+edit it; write new migrations on top.
 
-### Go APIs (golang-migrate)
+### Adding a migration
 
-Migration files live in `{module}/migrations/` with naming convention `000NNN_description.up.sql` / `000NNN_description.down.sql`. The migrator is initialized in `ConnectDB()` (Core) and `main()` (Fantasy):
+Create `000NNN_description.up.sql` + `.down.sql` in `api/migrations/`. That's
+it — there is no per-service prefix, no `_sqlx_migrations`, no version band.
+Adding a column an ingester needs is a core migration, same as any other.
 
-```go
-m, err := migrate.New("file://migrations", databaseURL)
-if err != nil { log.Fatalf("create migrator: %v", err) }
-if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-    m.Close()
-    log.Fatalf("migration failed: %v", err)
-}
-m.Close()
+Verify against a scratch database (never one with real data):
+
+```bash
+TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/scrollr_test?sslmode=disable" go -C api test ./...
 ```
 
-### Rust Services (sqlx::migrate)
+### Drift guards
 
-All three Rust services share a single PostgreSQL database and a single `_sqlx_migrations` table (sqlx 0.8.x has no API to rename the migration table). To keep their versions from colliding, each service owns a **numeric version prefix**:
+Nothing stops a core migration from dropping a column an ingester depends on,
+so each writer carries its own guard:
 
-| Service | Version prefix | Filename pattern |
-|---|---|---|
-| `channels/finance/service/` | `11*` | `110000000001_initial.up.sql`, `110000000002_add_name_category.up.sql`, … |
-| `channels/sports/service/` | `12*` | `120000000001_initial.up.sql`, `120000000002_add_columns.up.sql`, … |
-| `channels/rss/service/` | `20250601*` (legacy) → `13*` (new) | Existing rows stay; new rss migrations use `130000000001_*` and up. |
-
-The migrator is run inside `initialize_pool()`:
-
-```rust
-fn migrator() -> sqlx::migrate::Migrator {
-    let mut m = sqlx::migrate!("./migrations");
-    m.set_ignore_missing(true);
-    m
-}
-
-// inside initialize_pool():
-let m = migrator();
-if let Err(err) = m.run(&pool).await {
-    eprintln!("[DB] Migration failure: {err}");
-    eprintln!("[DB] Underlying error chain: {err:?}");
-    return Err(anyhow::Error::new(err).context("Failed to run migrations. No automatic recovery — inspect _sqlx_migrations"));
-}
-```
-
-**`set_ignore_missing(true)` is required** because all three services share the `_sqlx_migrations` table. Without it, each service errors out with `VersionMissing` when it sees rows for other services' version prefixes (e.g. finance seeing sports' `12*` rows). The flag only tolerates versions recorded in the DB that have no matching local file; it does NOT suppress `VersionMismatch` (checksum drift on a row whose file *is* on disk), so the 3-day silent-failure mode from April 2026 stays fixed. See PRs #106 and #107.
-
-Each service has a `tests/migration_versions.rs` that asserts every on-disk migration falls inside its assigned numeric range. This runs as part of `cargo test` and fails the build if someone accidentally copy-pastes a filename across services.
-
-### Adding a New Migration
-
-**Go**: Create `000NNN_description.up.sql` and `000NNN_description.down.sql` in the module's `migrations/` directory. Test with `migrate -path migrations -database "$DATABASE_URL" up` locally, then commit.
-
-**Rust**: Create `<prefix>NNNNNNNNNN_description.up.sql` and `.down.sql` in the crate's `migrations/` directory, using your service's numeric prefix (`11*` for finance, `12*` for sports, `13*` for new rss). Sequence numbers must increase. Run `cargo test` — the `migration_versions.rs` test will reject any version outside your service's range.
+- **Rust ingesters** — sqlx is the intended guard (compile-time `query!`
+  macros, so a mismatch fails the build). Not yet adopted; see the deferred
+  note in ROLLOUT Phase 2.
+- **Fantasy (Go)** — `channels/fantasy/api/schema_contract_test.go` asserts
+  every `yahoo_*` column the service reads or writes still exists. Add to it
+  when you add a column to a query there.
 
 ### Rules
 
-- **Never mix inline SQL and migration files.** All schema changes go through migrations.
-- **Initial migration uses `CREATE TABLE IF NOT EXISTS`** for idempotency — existing tables are preserved, new ones are created.
-- **Catch-up migrations** use `ADD COLUMN IF NOT EXISTS` / `DO $$` blocks to handle existing deployments safely.
-- **Down migrations** are written for development/testing. Down migrations that drop tables are documented but rarely needed in production.
-- **Data-only operations** (e.g., cleanup, pruning) stay as inline code — they don't need versioning.
-- **Coordinated changes** that touch both a Go API and a Rust service need matching migrations in both systems.
+- **Never mix inline SQL and migration files.** All schema changes go through `api/migrations/`.
+- **Down migrations** are written for development/testing.
+- **Data-only operations** (cleanup, pruning) stay as inline code — they don't need versioning.
+- **A schema change that an ingester depends on is still a core migration** — update the ingester's drift guard in the same change.
 
 ## Docker & Deployment
 

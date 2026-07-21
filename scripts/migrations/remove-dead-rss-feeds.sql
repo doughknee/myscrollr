@@ -22,7 +22,7 @@
 -- `rss_items_feed_url_fkey ON DELETE CASCADE` foreign key, so all ingested
 -- items for these feeds are removed as well.
 --
--- User-channel cleanup: one user had Reuters in their `user_channels.config`
+-- User-widget cleanup: one user had Reuters in their `user_widgets.config`
 -- JSONB. This script scrubs the URL from their saved config so they don't
 -- see a broken tile. The scrub is idempotent and no-op for other users.
 --
@@ -84,15 +84,15 @@ WHERE feed_url IN (
 GROUP BY feed_url
 ORDER BY feed_url;
 
--- 3) Scrub the dead URLs from any user_channels.config JSONB that
+-- 3) Scrub the dead URLs from any user_widgets.config JSONB that
 --    mentions them. Operates on every rss-type channel; a filter that
 --    removes nothing is a no-op.
 --
 --    The `config` shape is `{"feeds": [{"url": "...", "name": "...", ...}, ...]}`
 --    so we rebuild the feeds array, keeping only entries whose `url` is not
 --    in the dead-feed set.
-\echo === Scrubbing dead URLs from user_channels.config ===
-UPDATE user_channels
+\echo === Scrubbing dead URLs from user_widgets.config ===
+UPDATE user_widgets
 SET
     config = jsonb_set(
         config,
@@ -117,7 +117,7 @@ SET
         false
     ),
     updated_at = NOW()
-WHERE channel_type = 'rss'
+WHERE widget_type = 'rss'
   AND config -> 'feeds' @> ANY(ARRAY[
       jsonb_build_array(jsonb_build_object('url', 'https://www.nerdwallet.com/blog/feed/')),
       jsonb_build_array(jsonb_build_object('url', 'https://www.reutersagency.com/feed/')),

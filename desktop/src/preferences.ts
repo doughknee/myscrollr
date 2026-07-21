@@ -637,7 +637,7 @@ export const DEFAULT_GITHUB_TICKER: GitHubTickerConfig = {
   excludedRepos: [],
 };
 
-const DEFAULT_WIDGET_DISPLAY: WidgetDisplayPrefs = {
+export const DEFAULT_WIDGET_DISPLAY: WidgetDisplayPrefs = {
   finance: {
     showChange: "both",
     showPrevClose: "both",
@@ -1659,7 +1659,7 @@ export function updateWidgetPrefs(
 //     per-row inclusion. Source of truth for which row a source
 //     appears on.
 //   - `DataWidgetRow.ticker_enabled` (server-side) — controls the master
-//     gate via App.tsx's filter on `ch.enabled && isChannelTickerEnabled`.
+//     gate via App.tsx's filter on `ch.enabled && isWidgetTickerEnabled`.
 //     Set to true when row != null, false when row == null. Callers
 //     issue `dataWidgetsApi.update` separately; these helpers only mutate
 //     the client-side AppPreferences.
@@ -1670,7 +1670,7 @@ export function updateWidgetPrefs(
 
 /** Minimal shape of a DataWidgetRow record used by `getChannelTickerRow`. */
 interface ChannelTickerInfo {
-  channel_type: string;
+  widget_type: string;
   ticker_enabled?: boolean;
   /** @deprecated server-side legacy alias for ticker_enabled. */
   visible?: boolean;
@@ -1715,13 +1715,13 @@ export function getSourceTickerRow(
 
 /**
  * Convenience wrapper around `getSourceTickerRow` for channels — accepts
- * a DataWidgetRow-like object (with `channel_type` + `ticker_enabled`).
+ * a DataWidgetRow-like object (with `widget_type` + `ticker_enabled`).
  */
 export function getChannelTickerRow(
   prefs: AppPreferences,
   channel: ChannelTickerInfo,
 ): number | null {
-  return getSourceTickerRow(prefs, channel, channel.channel_type);
+  return getSourceTickerRow(prefs, channel, channel.widget_type);
 }
 
 /**

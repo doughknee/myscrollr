@@ -12,9 +12,6 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gofiber/fiber/v2"
-	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
@@ -180,39 +177,10 @@ func main() {
 		RedirectURL: redirectURL,
 	}
 
-	// -------------------------------------------------------------------------
-	// Run database migrations
-	// -------------------------------------------------------------------------
-	// golang-migrate uses lib/pq which requires explicit sslmode parameter
-	// Append sslmode=disable if not already specified (internal Docker network)
-	migrateURL := dbURL
-	if !strings.Contains(migrateURL, "sslmode=") {
-		if strings.Contains(migrateURL, "?") {
-			migrateURL += "&sslmode=disable"
-		} else {
-			migrateURL += "?sslmode=disable"
-		}
-	}
-	if strings.Contains(migrateURL, "?") {
-		migrateURL += "&x-migrations-table=schema_migrations_fantasy"
-	} else {
-		migrateURL += "?x-migrations-table=schema_migrations_fantasy"
-	}
-
-	m, err := migrate.New(
-		"file://migrations",
-		migrateURL,
-	)
-	if err != nil {
-		log.Fatalf("[Fantasy] Failed to create migrator: %v", err)
-	}
-
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		m.Close()
-		log.Fatalf("[Fantasy] Migration failed: %v", err)
-	}
-	m.Close()
-	log.Println("[Fantasy] Database migrations applied")
+	// No migrations here. core-api owns every shared table, including the
+	// yahoo_* tables this service writes, and runs the single migration
+	// chain (VISION 4.3). Fantasy is a pure writer; schema_contract_test.go
+	// fails fast if the schema it expects isn't there.
 
 	// -------------------------------------------------------------------------
 	// Start Redis self-registration heartbeat

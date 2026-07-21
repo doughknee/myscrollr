@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -68,7 +69,7 @@ func HandleGitHubPRClosed(c *fiber.Ctx) error {
 	expected := os.Getenv("GITHUB_PR_WEBHOOK_SECRET")
 	if expected == "" {
 		log.Println("[GitHubWebhook] GITHUB_PR_WEBHOOK_SECRET not set; rejecting")
-		return c.Status(fiber.StatusServiceUnavailable).JSON(ErrorResponse{
+		return c.Status(fiber.StatusServiceUnavailable).JSON(platform.ErrorResponse{
 			Status: "error",
 			Error:  "webhook secret not configured",
 		})
@@ -76,7 +77,7 @@ func HandleGitHubPRClosed(c *fiber.Ctx) error {
 	provided := c.Get("X-GitHub-Webhook-Secret")
 	if provided == "" || subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) != 1 {
 		log.Println("[GitHubWebhook] missing or invalid X-GitHub-Webhook-Secret")
-		return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
+		return c.Status(fiber.StatusUnauthorized).JSON(platform.ErrorResponse{
 			Status: "unauthorized",
 			Error:  "invalid webhook secret",
 		})
@@ -86,7 +87,7 @@ func HandleGitHubPRClosed(c *fiber.Ctx) error {
 	var ev githubPRClosedEvent
 	if err := json.Unmarshal(c.Body(), &ev); err != nil {
 		log.Printf("[GitHubWebhook] body parse error: %v", err)
-		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{
+		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
 			Status: "error",
 			Error:  "invalid JSON body",
 		})

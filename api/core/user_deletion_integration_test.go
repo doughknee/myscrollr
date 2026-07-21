@@ -9,6 +9,12 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/brandon-relentnet/myscrollr/api/internal/billing"
+	"github.com/brandon-relentnet/myscrollr/api/internal/testsupport"
+
+	"github.com/brandon-relentnet/myscrollr/api/internal/accounts"
+	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 )
 
 // =============================================================================
@@ -25,14 +31,14 @@ import (
 // test starts clean.
 func setupIntegrationDB(t *testing.T) {
 	t.Helper()
-	if DBPool == nil {
+	if platform.DBPool == nil {
 		t.Skip("TEST_DATABASE_URL not set — skipping integration test")
 	}
-	if testMiniRedis != nil {
-		testMiniRedis.FlushAll()
+	if testsupport.SharedMiniRedis != nil {
+		testsupport.SharedMiniRedis.FlushAll()
 	}
-	_, err := DBPool.Exec(context.Background(), `
-		TRUNCATE TABLE user_channels, user_preferences, stripe_customers,
+	_, err := platform.DBPool.Exec(context.Background(), `
+		TRUNCATE TABLE user_widgets, user_preferences, stripe_customers,
 		               stripe_webhook_events, user_deletion_requests,
 		               yahoo_user_leagues, yahoo_users, yahoo_leagues CASCADE
 	`)
@@ -135,10 +141,7 @@ func newLogtoStub(t *testing.T) *logtoStub {
 
 	// Drop any M2M token cached by a previous test so this test's stub
 	// issues its own.
-	m2mMu.Lock()
-	m2mToken = ""
-	m2mTokenExpiry = time.Time{}
-	m2mMu.Unlock()
+	accounts.ResetM2MTokenCache()
 
 	return s
 }
@@ -148,7 +151,7 @@ func newLogtoStub(t *testing.T) *logtoStub {
 func queryCount(t *testing.T, sql string, args ...any) int {
 	t.Helper()
 	var n int
-	if err := DBPool.QueryRow(context.Background(), sql, args...).Scan(&n); err != nil {
+	if err := platform.DBPool.QueryRow(context.Background(), sql, args...).Scan(&n); err != nil {
 		t.Fatalf("count %q: %v", sql, err)
 	}
 	return n
@@ -160,17 +163,17 @@ func queryCount(t *testing.T, sql string, args ...any) int {
 // grace window and the 24h floor guard.
 func seedPurgeableUser(t *testing.T, sub string, lifetime bool) {
 	t.Helper()
-	mustExec(t, `INSERT INTO user_channels (logto_sub, channel_type, config) VALUES ($1, 'finance', '{}')`, sub)
-	mustExec(t, `INSERT INTO user_preferences (logto_sub) VALUES ($1)`, sub)
-	mustExec(t, `INSERT INTO stripe_customers (logto_sub, stripe_customer_id, plan, status, lifetime)
+	testsupport.MustExec(t, `INSERT INTO user_widgets (logto_sub, widget_type, config) VALUES ($1, 'finance', '{}')`, sub)
+	testsupport.MustExec(t, `INSERT INTO user_preferences (logto_sub) VALUES ($1)`, sub)
+	testsupport.MustExec(t, `INSERT INTO stripe_customers (logto_sub, stripe_customer_id, plan, status, lifetime)
 	             VALUES ($1, $2, $3, 'canceled', $4)`,
 		sub, "cus_"+sub, map[bool]string{true: "lifetime", false: "monthly"}[lifetime], lifetime)
-	mustExec(t, `INSERT INTO yahoo_leagues (league_key, name, game_code, season, data)
+	testsupport.MustExec(t, `INSERT INTO yahoo_leagues (league_key, name, game_code, season, data)
 	             VALUES ('nfl.l.12345', 'Test League', 'nfl', '2025', '{}')
 	             ON CONFLICT (league_key) DO NOTHING`)
-	mustExec(t, `INSERT INTO yahoo_users (guid, logto_sub, refresh_token) VALUES ($1, $2, 'refresh-token')`, "guid-"+sub, sub)
-	mustExec(t, `INSERT INTO yahoo_user_leagues (guid, league_key) VALUES ($1, 'nfl.l.12345')`, "guid-"+sub)
-	mustExec(t, `INSERT INTO user_deletion_requests (logto_sub, requested_at, purge_at, status)
+	testsupport.MustExec(t, `INSERT INTO yahoo_users (guid, logto_sub, refresh_token) VALUES ($1, $2, 'refresh-token')`, "guid-"+sub, sub)
+	testsupport.MustExec(t, `INSERT INTO yahoo_user_leagues (guid, league_key) VALUES ($1, 'nfl.l.12345')`, "guid-"+sub)
+	testsupport.MustExec(t, `INSERT INTO user_deletion_requests (logto_sub, requested_at, purge_at, status)
 	             VALUES ($1, now() - interval '31 days', now() - interval '1 day', 'pending')`, sub)
 }
 
@@ -180,7 +183,7 @@ func TestIntegrationPurgeUserAccountFullCascade(t *testing.T) {
 	const sub = "user_purge_full"
 	seedPurgeableUser(t, sub, false)
 
-	if err := purgeUserAccount(context.Background(), sub); err != nil {
+	if err := accounts.PurgeUserAccount(context.Background(), sub); err != nil {
 		t.Fatalf("purgeUserAccount: %v", err)
 	}
 
@@ -191,7 +194,7 @@ func TestIntegrationPurgeUserAccountFullCascade(t *testing.T) {
 
 	// Every user-owned row is gone.
 	for _, q := range []struct{ name, sql string }{
-		{"user_channels", `SELECT count(*) FROM user_channels WHERE logto_sub = $1`},
+		{"user_widgets", `SELECT count(*) FROM user_widgets WHERE logto_sub = $1`},
 		{"user_preferences", `SELECT count(*) FROM user_preferences WHERE logto_sub = $1`},
 		{"stripe_customers", `SELECT count(*) FROM stripe_customers WHERE logto_sub = $1`},
 		{"yahoo_users", `SELECT count(*) FROM yahoo_users WHERE logto_sub = $1`},
@@ -207,7 +210,7 @@ func TestIntegrationPurgeUserAccountFullCascade(t *testing.T) {
 	// The request row is marked purged with a timestamp.
 	var status string
 	var purgedAt *time.Time
-	err := DBPool.QueryRow(context.Background(),
+	err := platform.DBPool.QueryRow(context.Background(),
 		`SELECT status, purged_at FROM user_deletion_requests WHERE logto_sub = $1`, sub,
 	).Scan(&status, &purgedAt)
 	if err != nil {
@@ -224,7 +227,7 @@ func TestIntegrationPurgeLifetimeAnonymizesStripe(t *testing.T) {
 	const sub = "user_purge_lifetime"
 	seedPurgeableUser(t, sub, true)
 
-	if err := purgeUserAccount(context.Background(), sub); err != nil {
+	if err := accounts.PurgeUserAccount(context.Background(), sub); err != nil {
 		t.Fatalf("purgeUserAccount: %v", err)
 	}
 
@@ -232,7 +235,7 @@ func TestIntegrationPurgeLifetimeAnonymizesStripe(t *testing.T) {
 	// the user.
 	var anonSub string
 	var lifetime bool
-	err := DBPool.QueryRow(context.Background(),
+	err := platform.DBPool.QueryRow(context.Background(),
 		`SELECT logto_sub, lifetime FROM stripe_customers WHERE stripe_customer_id = $1`, "cus_"+sub,
 	).Scan(&anonSub, &lifetime)
 	if err != nil {
@@ -256,14 +259,14 @@ func TestIntegrationPurgeAbortsWhenLogtoFails(t *testing.T) {
 	const sub = "user_purge_logto_down"
 	seedPurgeableUser(t, sub, false)
 
-	if err := purgeUserAccount(context.Background(), sub); err == nil {
+	if err := accounts.PurgeUserAccount(context.Background(), sub); err == nil {
 		t.Fatal("purgeUserAccount should fail when Logto delete fails")
 	}
 
 	// Logto-first ordering: nothing local may be deleted if revoking
 	// sign-in failed, so the next pass can retry the full cascade.
 	for _, q := range []struct{ name, sql string }{
-		{"user_channels", `SELECT count(*) FROM user_channels WHERE logto_sub = $1`},
+		{"user_widgets", `SELECT count(*) FROM user_widgets WHERE logto_sub = $1`},
 		{"user_preferences", `SELECT count(*) FROM user_preferences WHERE logto_sub = $1`},
 		{"stripe_customers", `SELECT count(*) FROM stripe_customers WHERE logto_sub = $1`},
 		{"yahoo_users", `SELECT count(*) FROM yahoo_users WHERE logto_sub = $1`},
@@ -273,7 +276,7 @@ func TestIntegrationPurgeAbortsWhenLogtoFails(t *testing.T) {
 		}
 	}
 	var status string
-	if err := DBPool.QueryRow(context.Background(),
+	if err := platform.DBPool.QueryRow(context.Background(),
 		`SELECT status FROM user_deletion_requests WHERE logto_sub = $1`, sub,
 	).Scan(&status); err != nil || status != "pending" {
 		t.Errorf("deletion request after failed purge: status=%q err=%v, want pending", status, err)
@@ -292,25 +295,25 @@ func TestIntegrationPurgePassEligibility(t *testing.T) {
 	// block it.
 	const tooFresh = "user_too_fresh"
 	seedPurgeableUser(t, tooFresh, false)
-	mustExec(t, `UPDATE user_deletion_requests
+	testsupport.MustExec(t, `UPDATE user_deletion_requests
 	             SET requested_at = now() - interval '1 hour'
 	             WHERE logto_sub = $1`, tooFresh)
 
 	// Still inside the grace window.
 	const notDue = "user_not_due"
 	seedPurgeableUser(t, notDue, false)
-	mustExec(t, `UPDATE user_deletion_requests
+	testsupport.MustExec(t, `UPDATE user_deletion_requests
 	             SET purge_at = now() + interval '10 days'
 	             WHERE logto_sub = $1`, notDue)
 
 	// Canceled requests are never purged.
 	const canceled = "user_canceled"
 	seedPurgeableUser(t, canceled, false)
-	mustExec(t, `UPDATE user_deletion_requests
+	testsupport.MustExec(t, `UPDATE user_deletion_requests
 	             SET status = 'canceled', canceled_at = now()
 	             WHERE logto_sub = $1`, canceled)
 
-	runGDPRPurgePass(context.Background())
+	accounts.RunGDPRPurgePass(context.Background())
 
 	if got := stub.deletedSubs(); len(got) != 1 || got[0] != eligible {
 		t.Errorf("purge pass deleted %v from Logto, want exactly [%s]", got, eligible)
@@ -324,7 +327,7 @@ func TestIntegrationPurgePassEligibility(t *testing.T) {
 	}
 	for sub, want := range wantStatus {
 		var status string
-		if err := DBPool.QueryRow(context.Background(),
+		if err := platform.DBPool.QueryRow(context.Background(),
 			`SELECT status FROM user_deletion_requests WHERE logto_sub = $1`, sub,
 		).Scan(&status); err != nil {
 			t.Errorf("read status for %s: %v", sub, err)
@@ -351,12 +354,12 @@ func TestIntegrationStripeWebhookIdempotency(t *testing.T) {
 	setupIntegrationDB(t)
 	t.Setenv("STRIPE_WEBHOOK_SECRET", "whsec_test_secret")
 
-	app := newWebhookTestApp()
+	app := testsupport.NewWebhookTestApp(billing.HandleStripeWebhook)
 	payload := []byte(`{"id":"evt_integration_dup","object":"event","type":"product.created","data":{"object":{}}}`)
-	sig := signStripePayload(t, payload, "whsec_test_secret", time.Now())
+	sig := testsupport.SignStripePayload(t, payload, "whsec_test_secret", time.Now())
 
 	for i := 0; i < 2; i++ {
-		if status := postWebhook(t, app, payload, sig); status != 200 {
+		if status := testsupport.PostWebhook(t, app, payload, sig); status != 200 {
 			t.Fatalf("webhook delivery %d: status = %d, want 200", i+1, status)
 		}
 	}

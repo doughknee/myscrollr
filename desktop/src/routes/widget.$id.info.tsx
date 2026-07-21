@@ -115,7 +115,7 @@ function WidgetInfoPage() {
 
   const enabled =
     item.kind === "data"
-      ? channels.some((c) => c.channel_type === item.id)
+      ? channels.some((c) => c.widget_type === item.id)
       : prefs.widgets.enabledWidgets.includes(item.id);
 
   const tierLocked =

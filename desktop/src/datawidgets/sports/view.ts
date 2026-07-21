@@ -183,11 +183,11 @@ export function getSportsDisplayConfig(
   dashboard: DashboardResponse | null | undefined,
   widgetType?: string,
 ): SportsDisplayConfig {
-  const channels = dashboard?.channels ?? [];
+  const channels = dashboard?.widgets ?? [];
   const channel =
     (widgetType
-      ? channels.find((c) => c.channel_type === widgetType)
-      : undefined) ?? channels.find((c) => c.channel_type === "sports");
+      ? channels.find((c) => c.widget_type === widgetType)
+      : undefined) ?? channels.find((c) => c.widget_type === "sports");
   return normalizeSportsDisplayConfig(channel?.config?.display);
 }
 

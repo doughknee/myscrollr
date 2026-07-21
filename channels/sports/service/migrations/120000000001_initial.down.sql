@@ -1,2 +1,0 @@
-DROP TABLE IF EXISTS tracked_leagues;
-DROP TABLE IF EXISTS games;
