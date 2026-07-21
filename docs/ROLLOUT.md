@@ -1,122 +1,88 @@
 # Scrollr Unification — Rollout Plan
 
-> Execution plan for the decisions in [VISION.md](./VISION.md). Companion to the charter: the charter is stable, this changes as phases land.
-> **Guiding rule:** every phase is independently shippable, independently reversible, and preserves the §6 non-negotiables — above all **wire-compat for shipped desktop clients** (`MIN_DESKTOP_VERSION` = 1.1.0).
+> Execution plan for the decisions in [VISION.md](./VISION.md). Companion to the charter: the charter is stable, this changes as work lands.
 > **Created:** 2026-07-20.
 
 ---
 
-## Sequencing at a glance
+## Assumption: zero users (current state)
 
-| Phase | What | Depends on | Size | Risk | User-visible? |
-|---|---|---|---|---|---|
-| 0 | Guardrails: pin the current contract | — | S | — | no |
-| 1 | Backend package split (D4.5) | 0 | M | low | no |
-| 2 | DB schema authority, **current names** (D4.3) | 0 | M | **med** (deploy ordering) | no |
-| 3 | Server catalog + generic client (D4.2 + D4.1) | 1,2 | L | med | yes (desktop bump) |
-| 4 | Full rename, dual-speak wire (D4.4) | 3 | L | **high** (shipped clients) | yes (desktop bump) |
-| 5 | Shared types from Go contract (D4.6) | 4 | S | low | no |
-| 6 | Retire compat + final doc sweep (gated) | 4, update-gate | M | med | no |
+Scrollr has **no users yet**, so **breaking changes are free** — and *now* is the only moment they'll ever be free. There is **no backward-compat, no dual-speak, no deprecation window, no gated retirement.** Rename outright; reset the database if convenient; delete old names on sight.
 
-**Two hard principles baked into the order:**
-- **Separate *ownership* from *renaming*.** Phase 2 makes core own the schema under the *current* names; Phase 4 renames. Never do both to one table in one step.
-- **Structure before rename.** Unify the model (Phase 3) *then* rename it (Phase 4) — you rename fewer, cleaner things, and the riskiest wire change ships last, onto a stable base.
+The prize for doing this pre-launch: you establish clean names once and never accrue the compat debt that created today's mess. **The moment you ship to real users, this window closes** — see the compat discipline in VISION §6, which activates then.
+
+Because there's no compat to preserve, the phases below are a **sensible work-order**, not release-gated increments. Do them in this order so each builds on a stable base and `main` keeps working; merge as you go or do it on one branch — your call.
 
 ---
 
-## Phase 0 — Guardrails
+## Work order at a glance
 
-**Goal:** make the current behavior a fixture so every later phase can prove it didn't break anything.
+| Phase | What | Depends on | Size | Notes |
+|---|---|---|---|---|
+| 1 | Backend package split (D4.5) | — | M | pure internal reorg, one binary |
+| 2 | DB schema authority + final names (D4.3 + DB half of D4.4) | — | M | reset DB freely; core owns schema |
+| 3 | Server catalog + generic client + rename everywhere (D4.2 + D4.1 + D4.4) | 1, 2 | L | the big one; the rename folds in here |
+| 4 | Shared types from Go contract (D4.6) | 3 | S | codegen against final names |
+| 5 | Cleanup: dead code + doc rewrite | 3 | M | delete residue; fix the lying docs |
 
-- Add contract tests pinning the **current wire shape**: snapshot responses for `/users/me/channels`, `/dashboard`, `/events` frames, and each `/{source}` + `/{source}/public` endpoint (finance/sports/rss/predictions).
-- Confirm `scripts/smoke/production-readiness.sh` exercises the add-widget → dashboard → SSE path end to end.
-- These snapshots are what Phase 4's dual-speak is verified against.
-
-**Verify:** tests green on `main`. **Rollback:** n/a (additive).
+One principle still holds: **structure before names is easier, so build the unified model and name it right in the same pass** (Phase 3) rather than renaming a still-messy model.
 
 ---
 
 ## Phase 1 — Backend package split (D4.5)
 
-**Goal:** break the flat `api/core` package (~55 files) into internal packages along real seams. Pure legibility; **one binary**, no wire/DB/client change.
+Break the flat `api/core` package (~55 files) into internal Go packages: `widgets`, `billing`, `accounts`, `events` (SSE/CDC), `support`, `discord`, `ingestread`, `platform` (db/redis/auth/sentry). **One binary, no behavior change.** `main.go` wires them together.
 
-- Introduce packages: `widgets`, `billing`, `accounts`, `events` (SSE/CDC), `support`, `discord`, `ingestread` (the folded finance/sports/rss/predictions read layers), `platform` (db/redis/auth/sentry plumbing).
-- Move files; adjust imports; no behavior change. `main.go` wires the packages together.
-
-**Verify:** all tests pass, binary builds, smoke passes, response snapshots (Phase 0) unchanged. **Rollback:** trivial (revert the reorg commit). **Why first:** zero-risk warm-up that makes every later backend change readable.
+**Verify:** tests pass, binary builds, smoke passes. **Why first:** zero-risk warm-up that makes every later backend change readable.
 
 ---
 
-## Phase 2 — DB schema authority, current names (D4.3)
+## Phase 2 — DB schema authority + final names (D4.3, and the DB half of D4.4)
 
-**Goal:** core becomes the single schema owner. Ingesters stop migrating. **No renames yet.**
+core-api becomes the single schema owner **and** you use the right names from the start — no two-step, because there's no compat to stage.
 
-- Baseline: capture the current prod schema of all content tables (`trades`, `tracked_symbols`, `games`, `standings`, `teams`, `tracked_leagues`, `markets`, `tracked_markets`, `rss_items`, `tracked_feeds`, `yahoo_*`) into core's golang-migrate history as **adopt/no-op** migrations (`CREATE TABLE IF NOT EXISTS`-safe; do **not** re-create live tables).
-- Remove startup migrations from all five ingesters (`sqlx::migrate!` in the 4 Rust services; golang-migrate in fantasy).
-- Rust ingesters adopt sqlx compile-time `query!` macros → schema drift fails the build. Fantasy (Go) gets a schema-contract integration test.
-- Delete the version-band convention (`11*/12*/13*/14*`), `set_ignore_missing(true)`, shared `_sqlx_migrations` juggling, and the `migration_versions.rs` fencing tests.
-- *Opportunistic (backlog #8):* while in the ingesters, extract the byte-identical `init.rs`/`log.rs`/`main.rs` chassis into a shared Rust `common` crate.
+- All content-table DDL moves into core's golang-migrate migrations, authored with **final names** (`user_widgets`, `widget_type`, etc.).
+- Since data is disposable (content tables re-ingest; user tables ~empty), **reset the database** and let core create everything fresh. No baseline-adopt ceremony, no coordinated rollback — worst case, drop and re-migrate.
+- All five ingesters stop running migrations and become pure writers. Rust adopts sqlx compile-time `query!` macros (drift fails the build); fantasy (Go) gets a schema-contract test.
+- Delete the version-band convention (`11*/12*/13*/14*`), `set_ignore_missing(true)`, the shared `_sqlx_migrations` juggling, and the `migration_versions.rs` fencing tests.
+- *Opportunistic (backlog #8):* extract the byte-identical Rust `init.rs`/`log.rs`/`main.rs` chassis into a shared `common` crate while you're in here.
 
-**Deploy ordering (the risk):** ship as **one coordinated release** — core's baseline migrations must be applied (and confirmed no-op against live schema) *before* ingesters stop migrating. **Rollback:** re-enable ingester migrations; core baseline is no-op so it leaves data untouched. **Verify:** run migrations against a prod-clone; confirm ingesters still write; CDC still flows to SSE.
+**Verify:** fresh migrate on a clean DB; ingesters write; CDC flows to SSE.
 
 ---
 
-## Phase 3 — Server-authoritative catalog + generic client (D4.2 + D4.1)
+## Phase 3 — Server catalog + generic client + rename everywhere (D4.2 + D4.1 + D4.4)
 
-**Goal:** one catalog in core; clients fetch and render generically. The widget becomes the true atom. **Still wire-compatible** (`channel_type` unchanged).
+The heart of the work — unify the model and name it correctly in one pass.
 
 **Server:**
-- Extend `widgets.go` into the full catalog authority: `id`, identity (`name`,`color`,`icon`), `kind`, `source`, `category` (cosmetic tag), `requiredTier`, `configSchema`, `order`.
-- Expose `GET /catalog`. Tier requirements now come *from* the catalog → **removes the 4-file tier-limit sync (#3)**.
-- Confirm predictions/Kalshi is a fully first-class catalog entry here (VISION §8 flag) — *before names freeze in Phase 4.*
+- Extend `widgets.go` into the full catalog authority: `id`, identity (`name`,`color`,`icon`), `kind`, `source`, `category` (cosmetic tag), `requiredTier`, `configSchema`, `order`. Expose `GET /catalog`. Tier limits now come from the catalog → **removes the 4-file tier sync (#3)**.
+- Rename the wire outright: `widget_type`, `widgets`, `ticker_enabled`, `/users/me/widgets`. **Delete** the old `channel_type`/`channels`/`visible`/`/channels` names — no alias.
+- Confirm predictions/Kalshi is a first-class catalog entry.
 
 **Client (desktop + web):**
-- Fetch the catalog; build a `source → renderer` registry; delete `desktop/src/datawidgets/` tree and `marketplace.ts DATA_WIDGETS`. A widget is declared once (server); the client only supplies renderers.
-- Replace the `ScrollrTicker.tsx` per-source `if`-ladder with generic dispatch keyed on `source` (**backlog #5**).
-- **Constraint 1 — offline fallback:** bundle a cached catalog snapshot; refresh when online, with a staleness policy.
-- **Constraint 2 — renderer skew:** gracefully skip catalog entries whose renderer this client version lacks (never crash); honor a min-client hint.
+- Fetch the catalog; build a `source → renderer` registry; **delete** `desktop/src/datawidgets/` and `marketplace.ts DATA_WIDGETS`. A widget is declared once (server); the client only supplies renderers.
+- Replace the `ScrollrTicker.tsx` per-source `if`-ladder with generic dispatch keyed on `source` (**#5**).
+- Kill `DataWidget*`/`source`/`Channel*` vocabulary — "widget" everywhere.
+- **Constraint 1 — offline fallback:** bundle a cached catalog snapshot; refresh when online, with a staleness policy. *(Still real even with no users — the ticker must run offline.)*
+- **Constraint 2 — renderer skew:** *(deprioritized while pre-users; matters once multiple client versions exist)* eventually, skip catalog entries whose renderer a client lacks.
 
-**Verify:** catalog renders identically to today; offline fallback works; all existing widgets add/render/stream. **Rollback:** client falls back to bundled catalog; server `/catalog` is additive. **Ships as a desktop version bump** — older clients keep their built-in catalog (they don't call `/catalog`), so they're unaffected.
-
----
-
-## Phase 4 — Full rename, dual-speak wire (D4.4)
-
-**Goal:** "widget" everywhere — client, Go, wire, DB, docs — without breaking shipped 1.1.x clients.
-
-**Order within the phase (backward-compatible first):**
-1. **Server dual-speak, shipped first.** Accept **both** inbound name sets; emit **both** in responses (extend the existing `visible`/`ticker_enabled` dual-emit pattern): `channel_type`↔`widget_type`, `channels`↔`widgets`, `visible`↔`ticker_enabled`. Add canonical `/users/me/widgets`; keep `/users/me/channels` as an alias.
-2. **DB rename** as a core-owned migration (now that core owns schema): `user_channels`→`user_widgets`, `channel_type`→`widget_type`. The dual-speak layer maps old wire ↔ new columns.
-3. **Rename Go internals** (`Widget` already; drop `channel` vars, `DataSourceForWidget` stays but on clean names).
-4. **Clients switch to new wire** (new desktop version + web) — kill `DataWidget*`/`source`/`Channel*` vocabulary.
-5. **Docs** updated to new vocabulary (partial #9).
-
-**Verify:** replay Phase 0 snapshots — a simulated **old-wire** client and a **new-wire** client both succeed against the dual-speak server. **Rollback:** dual-speak is symmetric; revert clients without touching the server. **This is the delicate phase** — server ships and soaks before clients switch.
+**Verify:** catalog renders; every widget adds/renders/streams; offline fallback works.
 
 ---
 
-## Phase 5 — Shared types from the Go contract (D4.6)
+## Phase 4 — Shared types from the Go contract (D4.6)
 
-**Goal:** web and desktop can't drift on the wire shape.
+Generate TS types from the Go OpenAPI (final names); web + desktop import them. Keep per-platform transport (Tauri HTTP vs browser fetch).
 
-- Generate TS types from the Go OpenAPI (now emitting **final** names). Web + desktop import the generated types; keep per-platform transport (Tauri HTTP vs browser fetch).
-- *(Optional earlier start:* codegen can run against the current contract in Phase 3 purely as a drift-guard, then regenerate here once names settle.)*
-
-**Verify:** type-check passes both surfaces; generated types match the live contract. **Rollback:** drop the generated import, revert to hand types.
+**Verify:** type-check passes both surfaces; generated types match the live contract.
 
 ---
 
-## Phase 6 — Retire compat + final doc sweep (gated on the update gate)
+## Phase 5 — Cleanup: dead code + docs
 
-**Goal:** delete the scaffolding once old clients are gone.
-
-- **The lever, not telemetry:** raise `MIN_DESKTOP_VERSION` past the last old-wire desktop version. The existing update gate **forces** old clients to update, so you don't need analytics to know they're gone — after a conservative soak, they can't run without updating.
-- Then delete: the dual-speak emission, the `/channels` alias, the deprecated `visible` field, and the coarse-row/legacy-type residue (`legacyWidgetTypes`, migration `000014–000016` grandfather rows) — **backlog #10**.
-- **Final doc sweep (#9):** rewrite `README.md` and `api/CHANNELS.md` to the real post-pivot architecture; add ADR-0002 to the ADR index; fix the marketing architecture page.
-
-**Note — discovery/proxy stays.** It still serves fantasy (a proxied service by decision). It retires only if fantasy is ever absorbed — out of scope here.
-
-**Verify:** nothing speaks old wire; smoke passes; a fresh install works. **Rollback:** the compat deletion is the only irreversible step — gate it behind confirmed adoption of the forced-update version.
+- **Dead code (#10):** with no users to grandfather, drop the coarse-row/legacy-type residue immediately (`legacyWidgetTypes`, migration `000014–000016` grandfather rows, the deprecated `visible` field — gone in Phase 3 anyway). **Discovery/proxy stays** — it still serves fantasy (a proxied service by decision).
+- **Docs (#9):** rewrite `README.md` and `api/CHANNELS.md` to the real post-pivot architecture; add ADR-0002 to the ADR index; fix the marketing architecture page.
 
 ---
 
@@ -124,5 +90,5 @@
 
 - No rebuild, no framework swap, no new deployed service (package split stays one binary).
 - No DB split — one shared Postgres + the CDC pipeline stay.
-- No touching the realtime pipeline beyond names.
-- Ingester `common` crate (#8) is opportunistic in Phase 2, not a blocker; skip if it fights the schedule.
+- No backward-compat machinery — unnecessary pre-users, and re-introduced only when you have users to protect.
+- Ingester `common` crate (#8) is opportunistic, not a blocker.

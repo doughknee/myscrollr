@@ -106,13 +106,15 @@ core-api is the single owner of **all** shared schema — its own tables *and* e
 - **Deletes** the per-ingester migration folders, the version-band convention (`11*/12*/13*/14*`), `set_ignore_missing(true)`, the shared `_sqlx_migrations` juggling, the fencing tests, and the dual-tool split. *The coordination overhead vanishes because there's nothing left to coordinate.* Relaxes the `COALESCE`-everywhere defensive style.
 - **Transition = reorg, not data migration** (tables already exist in prod): baseline current schema into core's history (adopt, don't re-`CREATE`); remove ingester startup-migrations in one coordinated release; core must own before ingesters stop — ship with a tested rollback.
 
-### 4.4 One vocabulary: "widget" everywhere (full rename, dual-speak window)
+### 4.4 One vocabulary: "widget" everywhere (rename outright — pre-users)
 
 Kill "channel"/"datawidget"/"source" as vocabulary across **every** layer: client folders/types, Go internals, wire fields, DB (`user_channels`→`user_widgets`, `channel_type`→`widget_type`), routes, and docs.
 
-- **Wire/DB rename ships behind a compat seam:** the server **dual-speaks** old and new names (`channel_type`↔`widget_type`, `channels`↔`widgets`, `visible`↔`ticker_enabled`; `/users/me/channels` alias retained) so shipped 1.1.x desktop clients keep working.
-- The window closes — and the dual-speak + aliases get deleted — once `MIN_DESKTOP_VERSION` advances past the last version speaking old names.
-- This is the largest *mechanical* effort in the plan (touches every layer) but is no longer a decision — it's execution.
+**With zero users (current state), this is a straight rename — no compat seam, no dual-speak, no deprecation window.** Rename every layer in one pass and delete the old names. This is the ideal moment: breaking changes are free now and never again once you launch, so cashing this in pre-launch is exactly how you avoid ever needing the compat machinery that shipped shims never got retired.
+
+*(If this ever slips past first launch, the server would instead **dual-speak** old↔new names — `channel_type`↔`widget_type`, `channels`↔`widgets`, `visible`↔`ticker_enabled`, `/channels` alias — until `MIN_DESKTOP_VERSION` advances. Avoid needing that by renaming now.)*
+
+It's the largest *mechanical* effort in the plan, but no longer a risky one.
 
 ### 4.5 Backend package boundaries (one binary)
 
@@ -147,7 +149,7 @@ Codegen TS types from the Go API's OpenAPI contract so web and desktop **cannot 
 - Desktop is the product; website stays marketing/auth/billing only.
 - Zero telemetry (public promise + enforced by tests).
 - Slots-only monetization; one price lever.
-- **Wire-compat for already-shipped desktop versions** — every rename/contract change ships behind a compat seam, never a breaking change. (`MIN_DESKTOP_VERSION` = 1.1.0.)
+- **Wire-compat — *activates at first real user, suspended until then.*** Scrollr currently has **no users**, so breaking changes are free and should be taken now to establish clean names. Once you ship to real users, this becomes a hard rule: every rename/contract change goes behind a compat seam, never a breaking change (`MIN_DESKTOP_VERSION` gates retirement).
 - The CDC → Redis → SSE realtime pipeline works and is replica-safe; keep it.
 
 ---
@@ -161,7 +163,7 @@ Codegen TS types from the Go API's OpenAPI contract so web and desktop **cannot 
 3. **`category` is a cosmetic filter tag, orthogonal to `source`** — findability only, no behavior (§4.1).
 4. **Server-authoritative widget catalog** — one catalog in core; clients fetch + render generically; offline fallback + skip unknown renderers (§4.2).
 5. **Core owns all database schema** — single authority; five ingesters become pure writers; sqlx compile-time drift guard; fantasy folded in (§4.3).
-6. **Full rename to "widget" everywhere**, wire/DB included, behind a dual-speak deprecation window (§4.4).
+6. **Full rename to "widget" everywhere**, wire/DB included. Pre-users → straight rename, no compat seam (§4.4). *(Refined 2026-07-20: no users yet, so the dual-speak window is unnecessary — cash the breaking change in now.)*
 7. **Backend: split the flat package into internal packages, one binary** — not a separate service (§4.5).
 8. **Shared TS types generated from the Go contract; transports stay per-platform** (§4.6).
 
@@ -171,7 +173,7 @@ Codegen TS types from the Go API's OpenAPI contract so web and desktop **cannot 
 
 The *design* is settled. What remains is execution and the lower-tier cleanups:
 
-- **Rollout plan → [ROLLOUT.md](./ROLLOUT.md)** — the sequencing is fully detailed there as 7 phases (0–6), each independently shippable and reversible, with compat mechanics and rollback per phase. Summary order: ⓪ guardrails → ① backend package split → ② DB schema authority (current names) → ③ server catalog + generic client → ④ full rename with dual-speak → ⑤ shared-types codegen → ⑥ retire compat (gated on the update gate).
+- **Rollout plan → [ROLLOUT.md](./ROLLOUT.md)** — detailed there. **Pre-users, so no backward-compat machinery** (no dual-speak, no gated retirement); the phases are a sensible work-order, not compat-gated releases. Summary order: ① backend package split → ② DB schema authority + final names (reset DB freely) → ③ server catalog + generic client + rename everywhere → ④ shared-types codegen → ⑤ cleanup (dead code + doc rewrite).
 - **Backlog #8** — ingesters share no framework (4 copy-paste Rust forks, already drifting). Extract a `common` crate, or leave? *(undecided)*
 - **Backlog #9** — `README.md` and `api/CHANNELS.md` still describe the pre-pivot channel/extension architecture. Rewrite as part of #4.4, plus the ADR index (missing ADR-0002) and the marketing architecture page.
 - **Backlog #10** — retire the discovery/proxy machinery (serves only fantasy) if fantasy stops being proxied; drop coarse-row residue once old clients age out.
