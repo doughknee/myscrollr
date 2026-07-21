@@ -23,7 +23,10 @@ Because there's no compat to preserve, the phases below are a **sensible work-or
 | 2 — DB schema authority + final names | ✅ **done** — one squashed baseline in `api/migrations`, ingesters are pure writers, `user_widgets`/`widget_type` |
 | 3 — server catalog + generic client + rename | ✅ **done** — catalog, generic client, and the wire rename all landed |
 | 4 — shared TS types | ✅ **done** — `api/cmd/gents` generates them from the Go structs; a Go test pins both clients to it |
-| 5 — cleanup + docs | ⬜ not started (AGENTS.md "Database Migrations" already rewritten, since Phase 2 made it actively wrong) |
+| 5 — cleanup + docs | ✅ **done** — residue deleted, README/CHANNELS.md/AGENTS.md rewritten, ADR index updated, kickoff deleted |
+
+**All five phases are complete.** What follows is the record of how, including
+the places the plan's premises turned out to be wrong.
 
 ### Phase 3 — what landed
 
@@ -83,6 +86,27 @@ including four optimistic-update hooks still writing a `channels` key after the
 Phase 3d rename — silent, because TypeScript's excess-property check does not
 apply through a spread. There is now a source-text test for that specific blind
 spot in `desktop/src/hooks/optimisticDashboard.test.ts`.
+
+### Phase 5 — what landed
+
+Most of §7.10's delete-list had already fallen out of earlier phases. What was
+left: `routeCompat.ts` and the `/channel/$type`, `/ticker`, `/settings` redirect
+shims; `store.ts`'s v1.0.16 updater-key cleanup; `.cta.json`.
+
+The shims were replaced by `isMountable()`, which checks a persisted route
+against the router's own route ids rather than a hand-kept redirect table — it
+covers every dead path, not just the enumerated ones, and cannot go stale.
+Deleting them exposed a live break: the tray menu still navigated to `/ticker`
+through an untyped store key.
+
+`README.md` and `api/CHANNELS.md` described an architecture two ADRs out of
+date — per-channel Go APIs, a browser-extension layer, per-crate sqlx
+migrations, "no shared source libraries". Both rewritten; `AGENTS.md` repointed
+at the internal packages.
+
+**Left alone deliberately:** the marketing site's public `/channels` URL.
+Renaming a public route is not a doc fix, and the link text already reads
+"Browse widgets".
 
 ### Phase 3 — what remains
 
