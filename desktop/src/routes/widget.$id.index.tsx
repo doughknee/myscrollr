@@ -18,8 +18,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import RouteError from "../components/RouteError";
 import SourcePageLayout, { SourceNotFound } from "../components/SourcePageLayout";
-import { widgetManifest } from "../marketplace";
-import { getWidget } from "../widgets/registry";
+import { widgetManifest, isUtilityWidget } from "../marketplace";
 import { dashboardQueryOptions } from "../api/queries";
 import type { DataWidgetManifest, WidgetManifest } from "../types";
 
@@ -69,7 +68,10 @@ function WidgetFeed({
   );
 
   // Local utilities have no server row — their data is always "loaded".
-  if (getWidget(id)) {
+  // Asked of the catalog, not of the renderer registry: registry presence is
+  // a different question, and substituting it is what made every utility
+  // widget vanish in v1.1.11.
+  if (isUtilityWidget(id)) {
     return (
       <manifest.FeedTab mode="comfort" feedContext={{ __dashboardLoaded: true }} />
     );

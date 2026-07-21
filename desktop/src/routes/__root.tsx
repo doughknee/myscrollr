@@ -46,7 +46,7 @@ import AuthGate from "../components/onboarding/AuthGate";
 
 // Registries
 import { getAllDataWidgets } from "../datawidgets/registry";
-import { catalogItemById, widgetLogoUrl } from "../marketplace";
+import { catalogItemById, widgetLogoUrl, isUtilityWidget } from "../marketplace";
 import { DEMO } from "../config";
 import { getAllWidgets, getWidget } from "../widgets/registry";
 import { canonicalOrder } from "../marketplace";
@@ -129,7 +129,7 @@ function parseRoute(pathname: string) {
   // data branch was unreachable and every widget page reported itself as a
   // utility. Ask the catalog instead.
   if (kind === "widget" && itemId) {
-    const utility = !catalogItemById(itemId)?.source;
+    const utility = isUtilityWidget(itemId);
     return {
       activeItem: itemId,
       isDataWidget: !utility, isWidget: utility, isFeed: false,
