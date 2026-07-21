@@ -21,7 +21,7 @@ Because there's no compat to preserve, the phases below are a **sensible work-or
 |---|---|
 | 1 — backend package split | ✅ **done** — `api/core` split into 8 internal packages + core wiring, acyclic, one binary |
 | 2 — DB schema authority + final names | ✅ **done** — one squashed baseline in `api/migrations`, ingesters are pure writers, `user_widgets`/`widget_type` |
-| 3 — server catalog + generic client + rename | 🟡 **partly done** — catalog + generic client landed; **the wire/vocabulary rename has not** (see below) |
+| 3 — server catalog + generic client + rename | ✅ **done** — catalog, generic client, and the wire rename all landed |
 | 4 — shared TS types | ⬜ not started (blocked on Phase 3's rename — codegen should run against final names) |
 | 5 — cleanup + docs | ⬜ not started (AGENTS.md "Database Migrations" already rewritten, since Phase 2 made it actively wrong) |
 
@@ -41,25 +41,33 @@ Because there's no compat to preserve, the phases below are a **sensible work-or
   `datawidgets/{source}/ticker.tsx`. 981 → 606 lines, and chip building is now
   unit-testable (6 new tests covering what could not be reached before).
 
-### Phase 3 — what remains: the wire + vocabulary rename
+- **3d, the wire rename.** `channel_type` → `widget_type`, dashboard/overview
+  `channels` → `widgets`, `visible` deleted in favour of `ticker_enabled` (they
+  were dual-emitted), and `/users/me/channels` removed with no alias. Migration
+  `000002` renames the DB column plus the sequence/PK/constraint that Postgres
+  left carrying `user_channels_*` names.
 
-This is the whole of ROLLOUT's "rename the wire outright" bullet, and it is
-deliberately **not** half-done — it only works as one atomic change across server
-and client:
+  Two lessons worth keeping. First, renaming the **TypeScript types first** turned
+  every stale read into a compile error — the only way to catch a JSON-wire rename,
+  since a missed one compiles cleanly and fails at runtime. Second, that still
+  isn't sufficient: `useDashboardCDC` reads *raw Postgres replication records*,
+  where no type applies, and it had two silent bugs (filtering CDC events on
+  `table_name === "user_channels"`, and reading `cdc.record.visible`). Anything
+  reading raw CDC payloads has to be checked by hand.
 
-- **Server:** `channel_type` → `widget_type`, `channels` → `widgets` in the
-  dashboard payload, drop the `visible`/`ticker_enabled` duplicate, and delete the
-  `/users/me/channels` routes in favour of `/users/me/widgets` (no alias).
-- **Clients:** ~150 `channel_type` references across desktop and web, plus
-  `DataWidget*`/`Channel*` type and folder vocabulary.
+### Phase 3 — what remains
 
-Do it by renaming the **TypeScript types first** (`DataWidgetRow.channel_type` →
-`widget_type`), so every read becomes a compile error until fixed — otherwise a
-missed rename compiles cleanly and only fails at runtime, which the type checker
-cannot catch for a JSON wire.
+Only cosmetic vocabulary, deliberately deferred as low-value churn:
 
-Note that `DATA_WIDGETS` being gone removes one of the two sides that used to drift,
-so the rename is now a smaller job than the raw reference count suggests.
+- `DataWidgetRow` / `dataWidgetsApi` / `DataWidgetManifest` and the
+  `desktop/src/datawidgets/` folder still carry "datawidget". Renaming the folder
+  to `sources/` would match what it actually holds (the `source → renderer`
+  registry), at the cost of touching every import path.
+- **`ChannelInfo`, `ChannelRoute`, `GetValidChannelTypes` and `channel_lifecycle`
+  should NOT be renamed.** They name *discovered backend services*, not widgets —
+  a different concept that the charter explicitly keeps (discovery/proxy stays for
+  fantasy). VISION §2's complaint was that one *concept* carried six names; this is
+  a second concept that legitimately owns the word.
 
 **Deferred out of Phase 2, with reasons:**
 
