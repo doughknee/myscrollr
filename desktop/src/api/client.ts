@@ -320,7 +320,7 @@ export interface UserOverview {
     };
   };
   subscription: SubscriptionInfo | null;
-  channels: {
+  widgets: {
     total: number;
     enabled: number;
     by_type: Array<{

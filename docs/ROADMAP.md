@@ -24,6 +24,7 @@ it has to be, since older builds cannot talk to the API at all.
 | ~~v1.1.8~~ | A Fresh Coat | ✅ **Shipped 2026-07-17** — Claude-desktop-style chrome (single-row title bar, inset canvas, icon-dock sidebar + account chip), Home row + What's New, status page, and realtime SSE unlocked for every tier (client gate fix) | M |
 | ~~v1.1.9~~ | One Bar | ✅ **Shipped 2026-07-18** — Configure pages and gear menus retired: every widget's controls live in its own persistent top bar; Customize page (Settings+Ticker merged), search-to-add symbols, unified feed cards + brand logos, everything-is-a-widget IA, Support rewritten | L |
 | ~~v1.1.10~~ | The Unification | ✅ **Shipped 2026-07-21** — one vocabulary end to end: server-authoritative widget catalog (`GET /catalog`), core owns all schema, wire renamed with no compat seam, generic ticker dispatch, TS types generated from the Go structs. **Forced update** — older builds cannot reach this API | L |
+| ~~v1.1.11~~ | The Unification, actually working | ✅ **Shipped 2026-07-21** — fixes the v1.1.10 regression that stored the dashboard payload under the retired `channels` key, leaving the sidebar and account page empty. **Forced update** — v1.1.10 is unusable | XS |
 | v1.2.0 | Double-Decker 2.0 | Multi-row ticker rebuilt around widgets | L |
 | — | Website rides along | Pricing rewrite shipped with v1.1.2–3; screenshots now unblocked (post-v1.1.4) | S–M |
 

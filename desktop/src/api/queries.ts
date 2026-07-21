@@ -53,14 +53,14 @@ export function userOverviewQueryOptions() {
 
 async function fetchDashboard(): Promise<DashboardResponse> {
   // Demo mode: talk to the no-auth bridge directly (it serves /dashboard with
-  // channels[] and ignores Authorization), so the live Kalshi demo works
+  // widgets[] and ignores Authorization), so the live Kalshi demo works
   // signed-out with zero infra. See channels/predictions/LOCAL_DEV.md.
   if (DEMO) {
     const demo = await request<{
       data: DashboardResponse["data"];
       widgets?: DashboardResponse["widgets"];
     }>("/dashboard");
-    return { data: demo.data, channels: demo.widgets } as DashboardResponse;
+    return { data: demo.data, widgets: demo.widgets } as DashboardResponse;
   }
 
   // Try authenticated path if token is valid OR a refresh token can restore the session.
@@ -80,7 +80,7 @@ async function fetchDashboard(): Promise<DashboardResponse> {
       }>("/dashboard");
       return {
         data: data.data,
-        channels: data.widgets,
+        widgets: data.widgets,
         preferences: data.preferences,
       } as DashboardResponse;
     } catch {
