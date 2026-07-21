@@ -129,7 +129,7 @@ function parseRoute(pathname: string) {
   // data branch was unreachable and every widget page reported itself as a
   // utility. Ask the catalog instead.
   if (kind === "widget" && itemId) {
-    const utility = catalogItemById(itemId)?.kind === "utility";
+    const utility = !catalogItemById(itemId)?.source;
     return {
       activeItem: itemId,
       isDataWidget: !utility, isWidget: utility, isFeed: false,

@@ -95,7 +95,7 @@ describe("refreshCatalog", () => {
           id: "sports_nfl",
           name: "Renamed NFL",
           description: "from the server",
-          kind: "data",
+
           source: "sports",
           category: "sports",
           color: "#123456",

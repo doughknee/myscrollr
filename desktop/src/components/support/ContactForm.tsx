@@ -1,12 +1,12 @@
 /**
  * ContactForm — unified support form with six categories:
- * Bug Report, Feature Request, General Feedback, Billing, Account, and DataWidgetRow Help.
+ * Bug Report, Feature Request, General Feedback, Billing, Account, and Widget Help.
  *
  * Bug reports collect diagnostics via `collect_diagnostics` Tauri command,
  * file attachments, and frequency. Feature requests collect priority.
  * All categories pre-fill user identity from the auth JWT when available.
  */
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Bug, Lightbulb, MessageSquare, CreditCard, UserCog, Radio, Paperclip, X, Loader2 } from "lucide-react";
 import clsx from "clsx";
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { authFetch, ApiError } from "../../api/client";
 import { SelectMenu } from "../widget-bar/SelectMenu";
 import { getUserIdentity, isAuthenticated } from "../../auth";
+import { getCatalogItems } from "../../marketplace";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -21,7 +22,7 @@ interface ContactFormProps {
   onBack: () => void;
 }
 
-type Category = "bug" | "feature" | "feedback" | "billing" | "account" | "channel";
+type Category = "bug" | "feature" | "feedback" | "billing" | "account" | "widget";
 
 interface Attachment {
   filename: string;
@@ -40,7 +41,7 @@ const CATEGORY_OPTIONS: { value: Category; label: string; icon: typeof Bug }[] =
   { value: "feedback", label: "General Feedback", icon: MessageSquare },
   { value: "billing", label: "Billing & Subscription", icon: CreditCard },
   { value: "account", label: "Account & Login", icon: UserCog },
-  { value: "channel", label: "Widget Help", icon: Radio },
+  { value: "widget", label: "Widget Help", icon: Radio },
 ];
 
 const FREQUENCY_OPTIONS: { value: Frequency; label: string }[] = [
@@ -76,7 +77,7 @@ const HEADER_CONFIG: Record<Category, { title: string; subtitle: string }> = {
     title: "Account & Login Help",
     subtitle: "Issues with signing in, password, or account settings",
   },
-  channel: {
+  widget: {
     title: "Widget Help",
     subtitle: "Issues with a specific widget",
   },
@@ -88,7 +89,7 @@ const SUBMIT_LABELS: Record<Category, string> = {
   feedback: "Submit Feedback",
   billing: "Submit Billing Question",
   account: "Submit Account Question",
-  channel: "Submit Widget Issue",
+  widget: "Submit Widget Issue",
 };
 
 const SUCCESS_MESSAGES: Record<Category, string> = {
@@ -97,7 +98,7 @@ const SUCCESS_MESSAGES: Record<Category, string> = {
   feedback: "Feedback submitted — thanks for sharing",
   billing: "Billing question submitted — we'll follow up by email",
   account: "Account question submitted — we'll follow up by email",
-  channel: "Widget issue submitted — we'll follow up by email",
+  widget: "Widget issue submitted — we'll follow up by email",
 };
 
 const MAX_FILES = 5;
@@ -140,7 +141,20 @@ export default function ContactForm({ onBack }: ContactFormProps) {
   const [priority, setPriority] = useState<Priority | null>(null);
 
   // DataWidgetRow-specific fields
-  const [channelSelection, setChannelSelection] = useState("");
+  const [widgetSelection, setWidgetSelection] = useState("");
+
+  // Driven by the catalog rather than a hardcoded list. The old options were
+  // the four coarse sources (Finance/Sports/RSS/Fantasy) under a label that
+  // already asked "Which widget?" — so a user reporting a broken NFL feed had
+  // to pick "Sports". The catalog is the authority on what a widget is, and
+  // this stays correct as widgets are added server-side.
+  const widgetOptions = useMemo(
+    () => [
+      { value: "", label: "Select a widget..." },
+      ...getCatalogItems().map((w) => ({ value: w.name, label: w.name })),
+    ],
+    [],
+  );
 
   // Attachments (bug only)
   const [files, setFiles] = useState<File[]>([]);
@@ -234,8 +248,8 @@ export default function ContactForm({ onBack }: ContactFormProps) {
       case "billing":
       case "account":
         return description.trim().length > 0;
-      case "channel":
-        return description.trim().length > 0 && channelSelection !== "";
+      case "widget":
+        return description.trim().length > 0 && widgetSelection !== "";
     }
   })();
 
@@ -280,10 +294,10 @@ export default function ContactForm({ onBack }: ContactFormProps) {
           email: email.trim() || undefined,
           name: name.trim() || undefined,
         };
-      } else if (category === "channel") {
+      } else if (category === "widget") {
         payload = {
-          category: "channel",
-          channel: channelSelection,
+          category: "widget",
+          widget: widgetSelection,
           description: description.trim(),
           email: email.trim() || undefined,
           name: name.trim() || undefined,
@@ -647,21 +661,15 @@ export default function ContactForm({ onBack }: ContactFormProps) {
           </div>
         )}
 
-        {/* ── DataWidgetRow Help fields ───────────────────────────── */}
-        {category === "channel" && (
+        {/* ── Widget Help fields ───────────────────────────── */}
+        {category === "widget" && (
           <>
             <div>
               <label className={labelClass}>Which widget?</label>
               <SelectMenu
-                value={channelSelection}
-                options={[
-                  { value: "", label: "Select a widget..." },
-                  { value: "Finance", label: "Finance" },
-                  { value: "Sports", label: "Sports" },
-                  { value: "RSS", label: "RSS" },
-                  { value: "Fantasy", label: "Fantasy" },
-                ]}
-                onChange={setChannelSelection}
+                value={widgetSelection}
+                options={widgetOptions}
+                onChange={setWidgetSelection}
                 ariaLabel="Which widget?"
                 align="left"
               />

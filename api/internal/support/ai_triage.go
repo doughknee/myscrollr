@@ -88,7 +88,7 @@ const (
 // category.
 type TriageResult struct {
 	Category       string `json:"category"`
-	Channel        string `json:"channel,omitempty"`
+	Widget         string `json:"widget,omitempty"`
 	Priority       string `json:"priority"`
 	Summary        string `json:"summary"`
 	DuplicateOf    string `json:"duplicate_of,omitempty"`
@@ -112,7 +112,7 @@ type TriageInput struct {
 	Subject         string
 	Body            string
 	RecentSummaries []RecentTicketSummary
-	Channel         string // user-picked channel hint, if any
+	Widget          string // user-picked widget hint, if any
 
 	// Reply-loop fields. Populated when this triage is for a user's
 	// follow-up message on an existing ticket (via the osTicket
@@ -251,9 +251,9 @@ func buildTriagePrompt(input TriageInput, body string) string {
 		recentJSON = []byte("[]")
 	}
 
-	channelHint := ""
-	if input.Channel != "" {
-		channelHint = fmt.Sprintf("Channel hint from user: %s\n", input.Channel)
+	widgetHint := ""
+	if input.Widget != "" {
+		widgetHint = fmt.Sprintf("Widget hint from user: %s\n", input.Widget)
 	}
 
 	// Reply-context block. When this triage is for a user follow-up
@@ -353,8 +353,8 @@ OUTPUT FORMAT — STRICT:
 
 JSON SCHEMA:
 {
-  "category": "bug|feature|feedback|billing|account|channel",
-  "channel": "finance|sports|rss|fantasy" or null,
+  "category": "bug|feature|feedback|billing|account|widget",
+  "widget": "the widget catalog name, e.g. NFL / Crypto / BBC News" or null,
   "priority": "low|normal|high|emergency",
   "summary": "...",
   "duplicate_of": "ticket-number" or null,
@@ -383,7 +383,7 @@ Body:
 		input.UserEmail,
 		input.UserName,
 		input.UserCategory,
-		channelHint,
+		widgetHint,
 		input.Subject,
 		body,
 	)

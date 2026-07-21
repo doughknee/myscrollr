@@ -21,7 +21,7 @@ interface TradeChipProps {
 const TradeChip = memo(function TradeChip({
   trade,
   comfort,
-  colorMode = "channel",
+  colorMode = "widget",
   showChange = true,
   directionMarker = "arrow",
   onClick,

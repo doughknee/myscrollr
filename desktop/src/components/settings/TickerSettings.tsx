@@ -70,7 +70,7 @@ const SPACING_OPTIONS: { value: TickerGap; label: string }[] = [
 ];
 
 const CHIP_COLOR_OPTIONS: { value: ChipColorMode; label: string }[] = [
-  { value: "channel", label: "Widget" },
+  { value: "widget", label: "Widget" },
   { value: "accent", label: "Theme" },
   { value: "muted", label: "Subtle" },
 ];

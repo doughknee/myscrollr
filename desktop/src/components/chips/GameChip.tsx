@@ -29,7 +29,7 @@ interface GameChipProps {
 const GameChip = memo(function GameChip({
   game,
   comfort,
-  colorMode = "channel",
+  colorMode = "widget",
   showLogos = true,
   showTimer = true,
   onClick,

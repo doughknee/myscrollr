@@ -186,7 +186,7 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 		AISummary:             triage.Summary,
 		AICategory:            triage.Category,
 		AIPriority:            triage.Priority,
-		AIChannel:             triage.Channel,
+		AIWidget:              triage.Widget,
 		AIDuplicateOf:         triage.DuplicateOf,
 		AIConfidence:          triage.Confidence,
 		OSTicketThreadEntryID: ev.ThreadEntryID,

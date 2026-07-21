@@ -81,7 +81,7 @@ export default function ConsolidatedChip({
   type,
   items,
   comfort,
-  colorMode = "channel",
+  colorMode = "widget",
   pinned = false,
   onTogglePin,
   onClick,
