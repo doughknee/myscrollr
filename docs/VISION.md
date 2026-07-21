@@ -137,9 +137,9 @@ Codegen TS types from the Go API's OpenAPI contract so web and desktop **cannot 
 | 5 | Registry is a facade at the ticker (`ScrollrTicker.tsx` if-ladder) | §4.1 (generic renderer by source) |
 | 6 | 3 widget-definition layers on the client | §4.1 + §4.2 |
 | 7 | Split hook seams (add/remove unified, toggle/configure split) | §4.1 (one widget model) |
-| 8 | Ingesters: no shared framework (4 copy-paste Rust forks) | *open — see §8* |
+| 8 | Ingesters: no shared framework (4 copy-paste Rust forks) | ✅ §7.9 (minimal `common` crate, chassis only) |
 | 9 | Docs actively lie (`README.md`, `api/CHANNELS.md` describe pre-pivot arch) | *open — see §8* |
-| 10 | Retained-but-dead (discovery/proxy for 1 consumer, coarse-row residue, dual wire fields) | partly §4.3/§4.4; rest §8 |
+| 10 | Retained-but-dead (coarse-row residue, dual wire fields; *discovery/proxy stays — serves fantasy*) | ✅ §7.10 (delete residue outright) |
 | 11 | `api/` monolith (support + Discord ~4k LOC in product API) | ✅ §4.5 |
 
 ---
@@ -166,15 +166,17 @@ Codegen TS types from the Go API's OpenAPI contract so web and desktop **cannot 
 6. **Full rename to "widget" everywhere**, wire/DB included. Pre-users → straight rename, no compat seam (§4.4). *(Refined 2026-07-20: no users yet, so the dual-speak window is unnecessary — cash the breaking change in now.)*
 7. **Backend: split the flat package into internal packages, one binary** — not a separate service (§4.5).
 8. **Shared TS types generated from the Go contract; transports stay per-platform** (§4.6).
+9. **Ingesters share a minimal `common` crate (backlog #8).** Extract only the byte-identical chassis (`init.rs`/`log.rs`/`main.rs` skeleton, Sentry/readiness/health wiring) into `channels/common` under a Cargo workspace; per-source ingest logic (`lib.rs`/`database.rs`/`types.rs`) stays per-service — sharing it would be the wrong abstraction. Opportunistic in Phase 2; the most deferrable item.
+10. **Delete all legacy/grandfather residue (backlog #10).** Zero users → nothing to grandfather: remove `legacyWidgetTypes`/coarse-row support, the deprecated `visible` dual field, `LEGACY_WIDGET_SOURCES` (news→rss), the route redirect shims, the `store.ts` v1.0.16 cleanup, and the stale `.cta.json`. **Discovery/proxy stays — it serves fantasy.** Lands in Phase 3 + Phase 5.
 
 ---
 
-## 8. Not yet decided — execution & loose ends
+## 8. Open items — execution only
 
-The *design* is settled. What remains is execution and the lower-tier cleanups:
+**All design decisions are settled (§7 — ten decisions).** What remains is execution plus one verification; no open forks:
 
 - **Rollout plan → [ROLLOUT.md](./ROLLOUT.md)** — detailed there. **Pre-users, so no backward-compat machinery** (no dual-speak, no gated retirement); the phases are a sensible work-order, not compat-gated releases. Summary order: ① backend package split → ② DB schema authority + final names (reset DB freely) → ③ server catalog + generic client + rename everywhere → ④ shared-types codegen → ⑤ cleanup (dead code + doc rewrite).
-- **Backlog #8** — ingesters share no framework (4 copy-paste Rust forks, already drifting). Extract a `common` crate, or leave? *(undecided)*
-- **Backlog #9** — `README.md` and `api/CHANNELS.md` still describe the pre-pivot channel/extension architecture. Rewrite as part of #4.4, plus the ADR index (missing ADR-0002) and the marketing architecture page.
-- **Backlog #10** — retire the discovery/proxy machinery (serves only fantasy) if fantasy stops being proxied; drop coarse-row residue once old clients age out.
-- **Predictions/Kalshi** — the newest, heaviest source, absent from `api/CHANNELS.md`, carries demo mode + dev bridges. Confirm it's fully first-class before the rename freezes names.
+- **Docs rewrite (backlog #9)** — not a decision, just work: rewrite `README.md` + `api/CHANNELS.md` to the post-pivot architecture, add ADR-0002 to the ADR index, fix the marketing architecture page. Lands in Phase 5.
+- **Verify before names freeze:** confirm predictions/Kalshi is a fully first-class catalog entry — it was absent from `api/CHANNELS.md` and carries demo-mode + dev bridges. Check during Phase 3.
+
+*No unresolved decisions remain — see §7 (10 decisions) and [ROLLOUT.md](./ROLLOUT.md).*

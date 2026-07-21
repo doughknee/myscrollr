@@ -45,7 +45,7 @@ core-api becomes the single schema owner **and** you use the right names from th
 - Since data is disposable (content tables re-ingest; user tables ~empty), **reset the database** and let core create everything fresh. No baseline-adopt ceremony, no coordinated rollback — worst case, drop and re-migrate.
 - All five ingesters stop running migrations and become pure writers. Rust adopts sqlx compile-time `query!` macros (drift fails the build); fantasy (Go) gets a schema-contract test.
 - Delete the version-band convention (`11*/12*/13*/14*`), `set_ignore_missing(true)`, the shared `_sqlx_migrations` juggling, and the `migration_versions.rs` fencing tests.
-- *Opportunistic (backlog #8):* extract the byte-identical Rust `init.rs`/`log.rs`/`main.rs` chassis into a shared `common` crate while you're in here.
+- **Decided — minimal `common` crate (VISION §7.9):** move the byte-identical Rust chassis (`init.rs`/`log.rs`/`main.rs` skeleton, Sentry/readiness/health wiring) into a shared `channels/common` crate under a new Cargo workspace; per-source `lib.rs`/`database.rs`/`types.rs` stay per-service (chassis only). Do it here while the ingesters are open — most deferrable item if time-constrained.
 
 **Verify:** fresh migrate on a clean DB; ingesters write; CDC flows to SSE.
 
@@ -81,7 +81,7 @@ Generate TS types from the Go OpenAPI (final names); web + desktop import them. 
 
 ## Phase 5 — Cleanup: dead code + docs
 
-- **Dead code (#10):** with no users to grandfather, drop the coarse-row/legacy-type residue immediately (`legacyWidgetTypes`, migration `000014–000016` grandfather rows, the deprecated `visible` field — gone in Phase 3 anyway). **Discovery/proxy stays** — it still serves fantasy (a proxied service by decision).
+- **Dead code (decided — VISION §7.10):** no users to grandfather, so delete all residue outright — `legacyWidgetTypes` + migration `000014–000016` grandfather rows, the deprecated `visible` field, `LEGACY_WIDGET_SOURCES` (news→rss), the route redirect shims (`routeCompat.ts`, `channel.$type`/`ticker`/`settings`), `store.ts`'s v1.0.16 updater-key cleanup, and the stale `.cta.json` scaffold. **Discovery/proxy stays** — it still serves fantasy (a proxied service by decision).
 - **Docs (#9):** rewrite `README.md` and `api/CHANNELS.md` to the real post-pivot architecture; add ADR-0002 to the ADR index; fix the marketing architecture page.
 
 ---
