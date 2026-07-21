@@ -1,13 +1,13 @@
 import type { TierLimitsResponse } from '@/api/client'
 
-// FALLBACK_LIMITS mirrors api/core/tier_limits.go DefaultTierLimits. It
+// FALLBACK_LIMITS mirrors api/internal/widgets/tier_limits.go DefaultTierLimits. It
 // only renders during the ~20-50ms between component mount and the
 // /tier-limits fetch response — after that the real API values take over.
 //
 // SYNC GUARD: fallbackTierLimits.test.ts asserts this constant equals
-// api/core/tier_limits.json (the cross-language snapshot also pinned by
+// api/internal/widgets/tier_limits.json (the cross-language snapshot also pinned by
 // Go and desktop tests). If you edit a limit, update all four copies in
-// the same PR: api/core/tier_limits.go, api/core/tier_limits.json,
+// the same PR: api/internal/widgets/tier_limits.go, api/internal/widgets/tier_limits.json,
 // desktop/src/tierLimits.ts, and this file. Drift is billing-trust damage.
 export const FALLBACK_LIMITS: TierLimitsResponse = {
   tiers: {

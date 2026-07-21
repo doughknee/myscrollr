@@ -8,6 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/brandon-relentnet/myscrollr/api/internal/testsupport"
+
+	"github.com/brandon-relentnet/myscrollr/api/internal/billing"
+	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/stripe/stripe-go/v82"
 )
 
@@ -74,7 +78,7 @@ type stripeCustomerRow struct {
 func readStripeCustomer(t *testing.T, sub string) stripeCustomerRow {
 	t.Helper()
 	var row stripeCustomerRow
-	err := DBPool.QueryRow(context.Background(),
+	err := platform.DBPool.QueryRow(context.Background(),
 		`SELECT stripe_customer_id, stripe_subscription_id, plan, status,
 		        current_period_end, lifetime
 		   FROM stripe_customers WHERE logto_sub = $1`, sub,
@@ -88,7 +92,7 @@ func readStripeCustomer(t *testing.T, sub string) stripeCustomerRow {
 
 func seedStripeCustomer(t *testing.T, sub, customerID, plan, status string, lifetime bool) {
 	t.Helper()
-	mustExec(t, `INSERT INTO stripe_customers
+	testsupport.MustExec(t, `INSERT INTO stripe_customers
 	             (logto_sub, stripe_customer_id, plan, status, lifetime)
 	             VALUES ($1, $2, $3, $4, $5)`,
 		sub, customerID, plan, status, lifetime)
@@ -98,7 +102,7 @@ func TestIntegrationCheckoutCompletedLifetime(t *testing.T) {
 	setupIntegrationDB(t)
 	stub := newLogtoStub(t)
 
-	handleCheckoutCompleted(stripeEvent("checkout.session.completed", `{
+	billing.HandleCheckoutCompleted(stripeEvent("checkout.session.completed", `{
 		"id": "cs_life_1", "object": "checkout.session", "mode": "payment",
 		"customer": "cus_life_1",
 		"metadata": {"logto_sub": "user_hook_life", "plan": "lifetime"}
@@ -127,7 +131,7 @@ func TestIntegrationCheckoutCompletedTrialGrantsUltimate(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"sub_trial_1","object":"subscription","status":"trialing"}`))
 	})
 
-	handleCheckoutCompleted(stripeEvent("checkout.session.completed", `{
+	billing.HandleCheckoutCompleted(stripeEvent("checkout.session.completed", `{
 		"id": "cs_trial_1", "object": "checkout.session", "mode": "subscription",
 		"customer": "cus_trial_1", "subscription": "sub_trial_1",
 		"metadata": {"logto_sub": "user_hook_trial", "plan": "monthly"}
@@ -154,7 +158,7 @@ func TestIntegrationSubscriptionUpdatedPlanChange(t *testing.T) {
 	seedStripeCustomer(t, sub, "cus_up_1", "monthly", "active", false)
 
 	periodEnd := int64(1781136000)
-	handleSubscriptionUpdated(stripeEvent("customer.subscription.updated", `{
+	billing.HandleSubscriptionUpdated(stripeEvent("customer.subscription.updated", `{
 		"id": "sub_up_1", "object": "subscription", "status": "active",
 		"cancel_at_period_end": false, "customer": "cus_up_1",
 		"items": {"object": "list", "data": [{
@@ -191,7 +195,7 @@ func TestIntegrationSubscriptionUpdatedCancelAtPeriodEnd(t *testing.T) {
 	const sub = "user_hook_cancel"
 	seedStripeCustomer(t, sub, "cus_cancel_1", "pro_monthly", "active", false)
 
-	handleSubscriptionUpdated(stripeEvent("customer.subscription.updated", `{
+	billing.HandleSubscriptionUpdated(stripeEvent("customer.subscription.updated", `{
 		"id": "sub_cancel_1", "object": "subscription", "status": "active",
 		"cancel_at_period_end": true, "customer": "cus_cancel_1",
 		"items": {"object": "list", "data": [{
@@ -223,11 +227,11 @@ func TestIntegrationSubscriptionDeletedResetsAndPrunes(t *testing.T) {
 	// slot cap of three. Staggered created_at pins the prune order.
 	widgets := []string{"sports_nfl", "finance_stocks", "news_bbc", "sports_nba", "predictions"}
 	for i, w := range widgets {
-		mustExec(t, `INSERT INTO user_channels (logto_sub, channel_type, enabled, config, created_at)
+		testsupport.MustExec(t, `INSERT INTO user_channels (logto_sub, channel_type, enabled, config, created_at)
 		             VALUES ($1, $2, true, '{}', now() + make_interval(secs => $3))`, sub, w, i)
 	}
 
-	handleSubscriptionDeleted(stripeEvent("customer.subscription.deleted", `{
+	billing.HandleSubscriptionDeleted(stripeEvent("customer.subscription.deleted", `{
 		"id": "sub_del_1", "object": "subscription", "customer": "cus_del_1"
 	}`))
 
@@ -241,7 +245,7 @@ func TestIntegrationSubscriptionDeletedResetsAndPrunes(t *testing.T) {
 
 	// The downgrade safety net must disable (never delete) the newest
 	// widgets over the free slot cap; the oldest three keep running.
-	rows, err := DBPool.Query(context.Background(),
+	rows, err := platform.DBPool.Query(context.Background(),
 		`SELECT channel_type, enabled FROM user_channels
 		 WHERE logto_sub = $1 ORDER BY created_at ASC`, sub)
 	if err != nil {
@@ -280,7 +284,7 @@ func TestIntegrationSubscriptionDeletedLifetimeKeepsAccess(t *testing.T) {
 	const sub = "user_hook_del_life"
 	seedStripeCustomer(t, sub, "cus_del_life_1", "lifetime", "active", true)
 
-	handleSubscriptionDeleted(stripeEvent("customer.subscription.deleted", `{
+	billing.HandleSubscriptionDeleted(stripeEvent("customer.subscription.deleted", `{
 		"id": "sub_del_life_1", "object": "subscription", "customer": "cus_del_life_1"
 	}`))
 
@@ -299,7 +303,7 @@ func TestIntegrationInvoicePaidRecoversPastDue(t *testing.T) {
 	const sub = "user_hook_paid"
 	seedStripeCustomer(t, sub, "cus_paid_1", "monthly", "past_due", false)
 
-	handleInvoicePaid(stripeEvent("invoice.paid", `{
+	billing.HandleInvoicePaid(stripeEvent("invoice.paid", `{
 		"customer": "cus_paid_1", "subscription": "sub_paid_1"
 	}`))
 
@@ -321,10 +325,10 @@ func TestIntegrationInvoicePaymentFailedMarksPastDue(t *testing.T) {
 	const lifetimeSub = "user_hook_fail_life"
 	seedStripeCustomer(t, lifetimeSub, "cus_fail_life_1", "lifetime", "active", true)
 
-	handleInvoicePaymentFailed(stripeEvent("invoice.payment_failed", `{
+	billing.HandleInvoicePaymentFailed(stripeEvent("invoice.payment_failed", `{
 		"customer": "cus_fail_1", "subscription": "sub_fail_1", "attempt_count": 2
 	}`))
-	handleInvoicePaymentFailed(stripeEvent("invoice.payment_failed", `{
+	billing.HandleInvoicePaymentFailed(stripeEvent("invoice.payment_failed", `{
 		"customer": "cus_fail_life_1", "subscription": "sub_fail_life_1", "attempt_count": 1
 	}`))
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import snapshot from "../../api/core/tier_limits.json";
+import snapshot from "../../api/internal/widgets/tier_limits.json";
 import {
   TIER_LIMITS,
   getLimit,
@@ -115,12 +115,12 @@ describe("TIER_LIMITS table", () => {
     }
   });
 
-  // Cross-language drift guard. api/core/tier_limits.json is the shared
-  // snapshot of the backend's DefaultTierLimits (api/core/tier_limits.go);
+  // Cross-language drift guard. api/internal/widgets/tier_limits.json is the shared
+  // snapshot of the backend's DefaultTierLimits (api/internal/widgets/tier_limits.go);
   // a Go test pins the Go map to it and a myscrollr.com test pins the
   // pricing page's FALLBACK_LIMITS to it. This test closes the loop for
   // the desktop mirror. Infinity here corresponds to null on the wire.
-  it("matches the shared snapshot api/core/tier_limits.json exactly", () => {
+  it("matches the shared snapshot api/internal/widgets/tier_limits.json exactly", () => {
     const toWire = (n: number) => (n === Infinity ? null : n);
     const wire = Object.fromEntries(
       Object.entries(TIER_LIMITS).map(([tier, l]) => [

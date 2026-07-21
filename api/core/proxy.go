@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -36,7 +37,7 @@ func dynamicProxyHandler(c *fiber.Ctx) error {
 	requestMethod := c.Method()
 
 	// Find a matching channel route
-	routes := GetChannelRoutes()
+	routes := platform.GetChannelRoutes()
 
 	for _, entry := range routes {
 		route := entry.Route
@@ -54,7 +55,7 @@ func dynamicProxyHandler(c *fiber.Ctx) error {
 
 		// If auth is required, validate the JWT inline (without c.Next())
 		if route.Auth {
-			if err := ValidateAuth(c); err != nil {
+			if err := platform.ValidateAuth(c); err != nil {
 				log.Printf("[Proxy] Auth failed for %s %s: %v", requestMethod, requestPath, err)
 				// ValidateAuth already wrote the 401 — returning nil keeps
 				// it. Proxying anyway would let the upstream response
@@ -133,7 +134,7 @@ func matchRoute(pattern, path string) (map[string]string, bool) {
 }
 
 // proxyRequest forwards the request to the channel service.
-func proxyRequest(c *fiber.Ctx, intg *ChannelInfo, route ChannelRoute, targetPath string) error {
+func proxyRequest(c *fiber.Ctx, intg *platform.ChannelInfo, route platform.ChannelRoute, targetPath string) error {
 	targetURL := intg.InternalURL + targetPath
 
 	// Forward query string
@@ -193,11 +194,11 @@ func proxyRequest(c *fiber.Ctx, intg *ChannelInfo, route ChannelRoute, targetPat
 
 	// Add user identity and tier for authenticated routes
 	if route.Auth {
-		userID := GetUserID(c)
+		userID := platform.GetUserID(c)
 		if userID != "" {
 			req.Header.Set("X-User-Sub", userID)
 		}
-		req.Header.Set("X-User-Tier", tierFromRoles(GetUserRoles(c)))
+		req.Header.Set("X-User-Tier", platform.TierFromRoles(platform.GetUserRoles(c)))
 	}
 
 	// Execute the proxy request

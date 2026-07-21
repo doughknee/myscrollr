@@ -12,6 +12,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/brandon-relentnet/myscrollr/api/internal/accounts"
+	"github.com/brandon-relentnet/myscrollr/api/internal/billing"
+	"github.com/brandon-relentnet/myscrollr/api/internal/events"
+	"github.com/brandon-relentnet/myscrollr/api/internal/ingestread"
+	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
+	"github.com/brandon-relentnet/myscrollr/api/internal/support"
+	"github.com/brandon-relentnet/myscrollr/api/internal/widgets"
 	sentryfiber "github.com/getsentry/sentry-go/fiber"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -50,7 +57,7 @@ func NewServer() *Server {
 // Setup configures middleware, registers all routes, and sets up channel
 // proxying based on Redis discovery.
 func (s *Server) Setup() {
-	initStripe()
+	billing.InitStripe()
 	s.setupMiddleware()
 	s.setupRoutes()
 
@@ -78,7 +85,7 @@ func (s *Server) setupMiddleware() {
 		c.Set("X-XSS-Protection", "1; mode=block")
 		c.Set("X-Content-Type-Options", "nosniff")
 		c.Set("X-Download-Options", "noopen")
-		c.Set("Strict-Transport-Security", fmt.Sprintf("max-age=%d; includeSubDomains", HSTSMaxAge))
+		c.Set("Strict-Transport-Security", fmt.Sprintf("max-age=%d; includeSubDomains", platform.HSTSMaxAge))
 		c.Set("X-DNS-Prefetch-Control", "off")
 		if c.Path() == "/yahoo/callback" {
 			// Yahoo OAuth callback returns HTML with inline <script> (postMessage + window.close)
@@ -93,11 +100,11 @@ func (s *Server) setupMiddleware() {
 	// CORS
 	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
 	if allowedOrigins == "" {
-		allowedOrigins = DefaultAllowedOrigins
+		allowedOrigins = platform.DefaultAllowedOrigins
 	} else {
 		origins := strings.Split(allowedOrigins, ",")
 		for i, o := range origins {
-			origins[i] = ValidateURL(o, "")
+			origins[i] = platform.ValidateURL(o, "")
 		}
 		allowedOrigins = strings.Join(origins, ",")
 	}
@@ -127,7 +134,7 @@ func (s *Server) setupMiddleware() {
 	// Counters live in Redis so all replicas share one per-IP budget
 	// (ADR-0001); the limiters' KeyGenerators keep their keys disjoint
 	// ("oauth:"-prefixed vs bare IP) within the shared prefix.
-	limiterStorage := newRedisLimiterStorage("ratelimit:")
+	limiterStorage := platform.NewRedisLimiterStorage("ratelimit:")
 
 	// Stricter rate limiter for OAuth initiation endpoints (e.g. /yahoo/start).
 	// Applied BEFORE the general rate limiter so it runs first.
@@ -135,8 +142,8 @@ func (s *Server) setupMiddleware() {
 		"/yahoo/start": true,
 	}
 	s.App.Use(limiter.New(limiter.Config{
-		Max:        OAuthRateLimitMax,
-		Expiration: OAuthRateLimitExpiration,
+		Max:        platform.OAuthRateLimitMax,
+		Expiration: platform.OAuthRateLimitExpiration,
 		Storage:    limiterStorage,
 		KeyGenerator: func(c *fiber.Ctx) string {
 			return "oauth:" + c.IP()
@@ -147,8 +154,8 @@ func (s *Server) setupMiddleware() {
 	}))
 
 	s.App.Use(limiter.New(limiter.Config{
-		Max:        RateLimitMax,
-		Expiration: RateLimitExpiration,
+		Max:        platform.RateLimitMax,
+		Expiration: platform.RateLimitExpiration,
 		Storage:    limiterStorage,
 		KeyGenerator: func(c *fiber.Ctx) string {
 			return c.IP()
@@ -160,7 +167,7 @@ func (s *Server) setupMiddleware() {
 				return true
 			}
 			// Dynamically check channel routes (handles late-discovered channels)
-			for _, entry := range GetChannelRoutes() {
+			for _, entry := range platform.GetChannelRoutes() {
 				if !entry.Route.Auth {
 					if _, ok := matchRoute(entry.Route.Path, path); ok {
 						return true
@@ -178,100 +185,100 @@ func (s *Server) setupRoutes() {
 	// Local widget sources (ADR-0002) — served in-process, registered
 	// ahead of the dynamic proxy so they win over any still-registered
 	// legacy channel service during cutover.
-	RegisterFinanceRoutes(s.App)
-	RegisterSportsRoutes(s.App)
-	RegisterPredictionsRoutes(s.App)
-	RegisterRSSRoutes(s.App)
+	ingestread.RegisterFinanceRoutes(s.App)
+	ingestread.RegisterSportsRoutes(s.App)
+	ingestread.RegisterPredictionsRoutes(s.App)
+	ingestread.RegisterRSSRoutes(s.App)
 
 	// --- Public Routes ---
 	s.App.Get("/health", s.healthCheck)
-	s.App.Get("/public/feed", HandlePublicFeed)
-	s.App.Get("/events", StreamEvents)
-	s.App.Get("/events/count", GetActiveViewers)
-	s.App.Post("/webhooks/sequin", HandleSequinWebhook)
-	s.App.Post("/webhooks/stripe", HandleStripeWebhook)
-	s.App.Post("/webhooks/osticket/thread-message", HandleOSTicketThreadMessage)
-	s.App.Post("/webhooks/discord/interactions", HandleDiscordInteractions)
+	s.App.Get("/public/feed", ingestread.HandlePublicFeed)
+	s.App.Get("/events", events.StreamEvents)
+	s.App.Get("/events/count", events.GetActiveViewers)
+	s.App.Post("/webhooks/sequin", events.HandleSequinWebhook)
+	s.App.Post("/webhooks/stripe", billing.HandleStripeWebhook)
+	s.App.Post("/webhooks/osticket/thread-message", support.HandleOSTicketThreadMessage)
+	s.App.Post("/webhooks/discord/interactions", support.HandleDiscordInteractions)
 	s.App.Post("/webhooks/github/pr-closed", HandleGitHubPRClosed)
 
 	// Extension auth proxy
-	s.App.Options("/extension/token", HandleExtensionAuthPreflight)
-	s.App.Post("/extension/token", HandleExtensionTokenExchange)
-	s.App.Options("/extension/token/refresh", HandleExtensionAuthPreflight)
-	s.App.Post("/extension/token/refresh", HandleExtensionTokenRefresh)
+	s.App.Options("/extension/token", accounts.HandleExtensionAuthPreflight)
+	s.App.Post("/extension/token", accounts.HandleExtensionTokenExchange)
+	s.App.Options("/extension/token/refresh", accounts.HandleExtensionAuthPreflight)
+	s.App.Post("/extension/token/refresh", accounts.HandleExtensionTokenRefresh)
 
 	s.App.Get("/channels", s.listChannels)
-	s.App.Get("/tier-limits", HandleGetTierLimits)
+	s.App.Get("/tier-limits", widgets.HandleGetTierLimits)
 	s.App.Get("/app/min-version", HandleGetMinDesktopVersion)
 	s.App.Get("/", s.landingPage)
 
 	// --- Protected Routes ---
-	s.App.Get("/dashboard", LogtoAuth, s.getDashboard)
+	s.App.Get("/dashboard", platform.LogtoAuth, s.getDashboard)
 
 	// Support
-	s.App.Post("/support/ticket", LogtoAuth, HandleSubmitSupportTicket)
+	s.App.Post("/support/ticket", platform.LogtoAuth, support.HandleSubmitSupportTicket)
 	// Anonymous support endpoint for the marketing /support page. NOT
 	// added to coreExemptPaths — the IP rate limiter + the per-IP
 	// hourly Redis counter inside the handler both protect this route.
-	s.App.Post("/support/ticket/public", HandleSubmitPublicSupportTicket)
+	s.App.Post("/support/ticket/public", support.HandleSubmitPublicSupportTicket)
 
 	// B2B lead capture from the marketing /business page. Same
 	// abuse-protection model as /support/ticket/public: Fiber IP
 	// limiter on the outside, per-IP hourly Redis counter inside
 	// the handler.
-	s.App.Post("/business-leads", HandleSubmitBusinessLead)
+	s.App.Post("/business-leads", support.HandleSubmitBusinessLead)
 
 	// Partner-approval URLs for AI-drafted replies. No auth — these are
 	// HMAC-signed single-use tokens that the partner clicks from email.
-	s.App.Get("/support/send", HandleSupportSend)
-	s.App.Get("/support/edit", HandleSupportEdit)
-	s.App.Get("/support/skip", HandleSupportSkip)
-	s.App.Post("/support/edit/submit", HandleSupportEditSubmit)
+	s.App.Get("/support/send", support.HandleSupportSend)
+	s.App.Get("/support/edit", support.HandleSupportEdit)
+	s.App.Get("/support/skip", support.HandleSupportSkip)
+	s.App.Post("/support/edit/submit", support.HandleSupportEditSubmit)
 
 	// Invite (no auth — user isn't logged in yet, token-verified server-side)
-	s.App.Post("/invite/complete", HandleCompleteInvite)
-	s.App.Get("/invite/username-available", HandleCheckUsernameAvailable)
+	s.App.Post("/invite/complete", accounts.HandleCompleteInvite)
+	s.App.Get("/invite/username-available", accounts.HandleCheckUsernameAvailable)
 
 	// Billing Routes
-	s.App.Post("/checkout/session", LogtoAuth, HandleCreateCheckoutSession)
-	s.App.Post("/checkout/lifetime", LogtoAuth, HandleCreateLifetimeCheckout)
-	s.App.Post("/checkout/setup-intent", LogtoAuth, HandleCreateSetupIntent)
-	s.App.Post("/checkout/subscribe", LogtoAuth, HandleConfirmSubscription)
-	s.App.Post("/checkout/payment-intent", LogtoAuth, HandleCreatePaymentIntent)
-	s.App.Get("/checkout/return", LogtoAuth, HandleCheckoutReturn)
-	s.App.Get("/users/me/subscription", LogtoAuth, HandleGetSubscription)
-	s.App.Get("/users/me/overview", LogtoAuth, HandleGetOverview)
-	s.App.Get("/users/me/subscription/preview", LogtoAuth, HandlePreviewPlanChange)
-	s.App.Put("/users/me/subscription/plan", LogtoAuth, HandleChangePlan)
-	s.App.Post("/users/me/subscription/cancel", LogtoAuth, HandleCancelSubscription)
-	s.App.Post("/users/me/subscription/portal", LogtoAuth, HandleCreatePortalSession)
+	s.App.Post("/checkout/session", platform.LogtoAuth, billing.HandleCreateCheckoutSession)
+	s.App.Post("/checkout/lifetime", platform.LogtoAuth, billing.HandleCreateLifetimeCheckout)
+	s.App.Post("/checkout/setup-intent", platform.LogtoAuth, billing.HandleCreateSetupIntent)
+	s.App.Post("/checkout/subscribe", platform.LogtoAuth, billing.HandleConfirmSubscription)
+	s.App.Post("/checkout/payment-intent", platform.LogtoAuth, billing.HandleCreatePaymentIntent)
+	s.App.Get("/checkout/return", platform.LogtoAuth, billing.HandleCheckoutReturn)
+	s.App.Get("/users/me/subscription", platform.LogtoAuth, billing.HandleGetSubscription)
+	s.App.Get("/users/me/overview", platform.LogtoAuth, accounts.HandleGetOverview)
+	s.App.Get("/users/me/subscription/preview", platform.LogtoAuth, billing.HandlePreviewPlanChange)
+	s.App.Put("/users/me/subscription/plan", platform.LogtoAuth, billing.HandleChangePlan)
+	s.App.Post("/users/me/subscription/cancel", platform.LogtoAuth, billing.HandleCancelSubscription)
+	s.App.Post("/users/me/subscription/portal", platform.LogtoAuth, billing.HandleCreatePortalSession)
 
 	// Account self-service: profile (name/email) + password reset email
-	s.App.Put("/users/me/profile", LogtoAuth, HandleUpdateProfile)
-	s.App.Post("/users/me/password/reset", LogtoAuth, HandleRequestPasswordReset)
+	s.App.Put("/users/me/profile", platform.LogtoAuth, accounts.HandleUpdateProfile)
+	s.App.Post("/users/me/password/reset", platform.LogtoAuth, accounts.HandleRequestPasswordReset)
 
 	// User Routes — specific /users/me/* paths BEFORE parameterized /users/:username
-	s.App.Get("/users/me/preferences", LogtoAuth, HandleGetPreferences)
-	s.App.Put("/users/me/preferences", LogtoAuth, HandleUpdatePreferences)
+	s.App.Get("/users/me/preferences", platform.LogtoAuth, accounts.HandleGetPreferences)
+	s.App.Put("/users/me/preferences", platform.LogtoAuth, accounts.HandleUpdatePreferences)
 	// Widget CRUD. The /users/me/channels paths are the legacy wire routes
 	// that shipped v1.1.x clients depend on; /users/me/widgets are aliases
 	// added by REL-40 (same handlers, same middleware). Keep both.
-	s.App.Get("/users/me/channels", LogtoAuth, GetWidgets)
-	s.App.Post("/users/me/channels", LogtoAuth, CreateWidget)
-	s.App.Put("/users/me/channels/:type", LogtoAuth, UpdateWidget)
-	s.App.Delete("/users/me/channels/:type", LogtoAuth, DeleteWidget)
-	s.App.Get("/users/me/widgets", LogtoAuth, GetWidgets)
-	s.App.Post("/users/me/widgets", LogtoAuth, CreateWidget)
-	s.App.Put("/users/me/widgets/:type", LogtoAuth, UpdateWidget)
-	s.App.Delete("/users/me/widgets/:type", LogtoAuth, DeleteWidget)
+	s.App.Get("/users/me/channels", platform.LogtoAuth, widgets.GetWidgets)
+	s.App.Post("/users/me/channels", platform.LogtoAuth, widgets.CreateWidget)
+	s.App.Put("/users/me/channels/:type", platform.LogtoAuth, widgets.UpdateWidget)
+	s.App.Delete("/users/me/channels/:type", platform.LogtoAuth, widgets.DeleteWidget)
+	s.App.Get("/users/me/widgets", platform.LogtoAuth, widgets.GetWidgets)
+	s.App.Post("/users/me/widgets", platform.LogtoAuth, widgets.CreateWidget)
+	s.App.Put("/users/me/widgets/:type", platform.LogtoAuth, widgets.UpdateWidget)
+	s.App.Delete("/users/me/widgets/:type", platform.LogtoAuth, widgets.DeleteWidget)
 
 	// GDPR: data export + 30-day soft-delete lifecycle
-	s.App.Get("/users/me/export", LogtoAuth, HandleExportUserData)
-	s.App.Post("/users/me/delete", LogtoAuth, HandleRequestAccountDeletion)
-	s.App.Post("/users/me/delete/cancel", LogtoAuth, HandleCancelAccountDeletion)
-	s.App.Get("/users/me/delete/status", LogtoAuth, HandleAccountDeletionStatus)
+	s.App.Get("/users/me/export", platform.LogtoAuth, accounts.HandleExportUserData)
+	s.App.Post("/users/me/delete", platform.LogtoAuth, accounts.HandleRequestAccountDeletion)
+	s.App.Post("/users/me/delete/cancel", platform.LogtoAuth, accounts.HandleCancelAccountDeletion)
+	s.App.Get("/users/me/delete/status", platform.LogtoAuth, accounts.HandleAccountDeletionStatus)
 
-	s.App.Get("/users/:username", GetProfileByUsername)
+	s.App.Get("/users/:username", platform.GetProfileByUsername)
 }
 
 // healthCheck returns the aggregated health status.
@@ -285,36 +292,36 @@ func (s *Server) setupRoutes() {
 // differs.
 func (s *Server) healthCheck(c *fiber.Ctx) error {
 	// Check Redis cache first
-	if val, err := Rdb.Get(context.Background(), HealthCacheKey).Result(); err == nil {
+	if val, err := platform.Rdb.Get(context.Background(), platform.HealthCacheKey).Result(); err == nil {
 		return sendHealthCached(c, []byte(val), "HIT")
 	}
 
 	// Singleflight: only one goroutine computes; others wait and share the result
 	result, err, _ := healthCheckGroup.Do("health", func() (interface{}, error) {
 		// Double-check cache (another goroutine may have populated it)
-		if val, err := Rdb.Get(context.Background(), HealthCacheKey).Result(); err == nil {
+		if val, err := platform.Rdb.Get(context.Background(), platform.HealthCacheKey).Result(); err == nil {
 			return []byte(val), nil
 		}
 
-		res := HealthResponse{Status: "healthy", Services: make(map[string]string)}
+		res := platform.HealthResponse{Status: "healthy", Services: make(map[string]string)}
 
-		if err := DBPool.Ping(context.Background()); err != nil {
+		if err := platform.DBPool.Ping(context.Background()); err != nil {
 			res.Database = "unhealthy"
 			res.Status = "degraded"
 		} else {
 			res.Database = "healthy"
 		}
-		if err := Rdb.Ping(context.Background()).Err(); err != nil {
+		if err := platform.Rdb.Ping(context.Background()).Err(); err != nil {
 			res.Redis = "unhealthy"
 			res.Status = "degraded"
 		} else {
 			res.Redis = "healthy"
 		}
 
-		httpClient := &http.Client{Timeout: HealthCheckTimeout}
-		var healthTargets []*ChannelInfo
-		for _, intg := range GetAllChannels() {
-			if isLocalSource(intg.Name) {
+		httpClient := &http.Client{Timeout: platform.HealthCheckTimeout}
+		var healthTargets []*platform.ChannelInfo
+		for _, intg := range platform.GetAllChannels() {
+			if ingestread.IsLocalSource(intg.Name) {
 				continue
 			}
 			if intg.HasCapability("health_checker") {
@@ -326,7 +333,7 @@ func (s *Server) healthCheck(c *fiber.Ctx) error {
 		var wg sync.WaitGroup
 		wg.Add(len(healthTargets))
 		for _, intg := range healthTargets {
-			go func(ch *ChannelInfo) {
+			go func(ch *platform.ChannelInfo) {
 				defer wg.Done()
 				targetURL := ch.InternalURL + "/internal/health"
 				resp, err := httpClient.Get(targetURL)
@@ -344,13 +351,9 @@ func (s *Server) healthCheck(c *fiber.Ctx) error {
 		wg.Wait()
 
 		// Local widget sources (ADR-0002) report in-process.
-		for name, src := range localSources {
-			if src.health == nil {
-				continue
-			}
-			status, healthy := src.health(context.Background())
-			res.Services[name] = status
-			if !healthy {
+		for name, h := range ingestread.LocalHealth(context.Background()) {
+			res.Services[name] = h.Status
+			if !h.Healthy {
 				res.Status = "degraded"
 			}
 		}
@@ -361,13 +364,13 @@ func (s *Server) healthCheck(c *fiber.Ctx) error {
 		// immediately instead of waiting up to HealthCacheTTL for a stale
 		// "healthy" cache entry to expire.
 		if res.Status == "healthy" {
-			Rdb.Set(context.Background(), HealthCacheKey, cacheData, HealthCacheTTL)
+			platform.Rdb.Set(context.Background(), platform.HealthCacheKey, cacheData, platform.HealthCacheTTL)
 		}
 		return cacheData, nil
 	})
 
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Error: "health check failed"})
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Error: "health check failed"})
 	}
 
 	return sendHealthCached(c, result.([]byte), "MISS")
@@ -393,18 +396,18 @@ func sendHealthCached(c *fiber.Ctx, body []byte, cacheHeader string) error {
 // getDashboard retrieves aggregated data for the user dashboard.
 // Results are cached per-user in Redis for 30s to support efficient polling.
 func (s *Server) getDashboard(c *fiber.Ctx) error {
-	userID := GetUserID(c)
+	userID := platform.GetUserID(c)
 	if userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(ErrorResponse{
+		return c.Status(fiber.StatusUnauthorized).JSON(platform.ErrorResponse{
 			Status: "unauthorized",
 			Error:  "Authentication required",
 		})
 	}
 
 	// Check per-user Redis cache first
-	cacheKey := RedisDashboardCachePrefix + userID
-	if val, err := Rdb.Get(context.Background(), cacheKey).Result(); err == nil {
-		var cached DashboardResponse
+	cacheKey := platform.RedisDashboardCachePrefix + userID
+	if val, err := platform.Rdb.Get(context.Background(), cacheKey).Result(); err == nil {
+		var cached platform.DashboardResponse
 		if json.Unmarshal([]byte(val), &cached) == nil {
 			c.Set("X-Cache", "HIT")
 			return c.JSON(cached)
@@ -412,25 +415,25 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 	}
 
 	// Singleflight: coalesce concurrent cache misses for the same user
-	userRoles := GetUserRoles(c)
+	userRoles := platform.GetUserRoles(c)
 	result, err, _ := dashboardGroup.Do(userID, func() (interface{}, error) {
 		// Double-check cache
-		if val, err := Rdb.Get(context.Background(), cacheKey).Result(); err == nil {
+		if val, err := platform.Rdb.Get(context.Background(), cacheKey).Result(); err == nil {
 			return []byte(val), nil
 		}
 
-		res := DashboardResponse{
+		res := platform.DashboardResponse{
 			Data: make(map[string]interface{}),
 		}
 
 		// 1. User preferences (sync tier from JWT roles)
-		prefs, err := GetOrCreatePreferences(userID, userRoles)
+		prefs, err := accounts.GetOrCreatePreferences(userID, userRoles)
 		if err == nil {
 			res.Preferences = prefs
 		}
 
 		// 2. User widgets + enabled types
-		widgets, err := GetUserWidgets(userID)
+		widgets, err := platform.GetUserWidgets(userID)
 		if err == nil {
 			res.Widgets = widgets
 		}
@@ -441,15 +444,15 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 		enabledSources := make(map[string]bool)
 		for _, ch := range widgets {
 			if ch.Enabled {
-				enabledSources[DataSourceForWidget(ch.WidgetType)] = true
+				enabledSources[platform.DataSourceForWidget(ch.WidgetType)] = true
 			}
 		}
 
 		// 3. Fetch dashboard data from each enabled channel via HTTP (parallel)
-		dashboardClient := &http.Client{Timeout: HealthCheckTimeout}
-		var targets []*ChannelInfo
-		for _, intg := range GetAllChannels() {
-			if isLocalSource(intg.Name) {
+		dashboardClient := &http.Client{Timeout: platform.HealthCheckTimeout}
+		var targets []*platform.ChannelInfo
+		for _, intg := range platform.GetAllChannels() {
+			if ingestread.IsLocalSource(intg.Name) {
 				continue
 			}
 			if enabledSources[intg.Name] && intg.HasCapability("dashboard_provider") {
@@ -464,7 +467,7 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 		var wg sync.WaitGroup
 		wg.Add(len(targets))
 		for i, intg := range targets {
-			go func(idx int, ch *ChannelInfo) {
+			go func(idx int, ch *platform.ChannelInfo) {
 				defer wg.Done()
 				url := fmt.Sprintf("%s/internal/dashboard?user=%s", ch.InternalURL, userID)
 				resp, err := dashboardClient.Get(url)
@@ -495,22 +498,17 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 		}
 
 		// Local widget sources (ADR-0002) contribute in-process.
-		for name, src := range localSources {
-			if src.dashboard == nil || !enabledSources[name] {
-				continue
-			}
-			for k, v := range src.dashboard(context.Background(), userID) {
-				res.Data[k] = v
-			}
+		for k, v := range ingestread.LocalDashboard(context.Background(), userID, enabledSources) {
+			res.Data[k] = v
 		}
 
 		cacheData, _ := json.Marshal(res)
-		Rdb.Set(context.Background(), cacheKey, cacheData, DashboardCacheTTL)
+		platform.Rdb.Set(context.Background(), cacheKey, cacheData, platform.DashboardCacheTTL)
 		return cacheData, nil
 	})
 
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Error: "dashboard fetch failed"})
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Error: "dashboard fetch failed"})
 	}
 
 	c.Set("Content-Type", "application/json")
@@ -520,7 +518,7 @@ func (s *Server) getDashboard(c *fiber.Ctx) error {
 
 // listChannels returns all discovered channels and their capabilities.
 func (s *Server) listChannels(c *fiber.Ctx) error {
-	channels := GetAllChannels()
+	channels := platform.GetAllChannels()
 	infos := make([]fiber.Map, 0, len(channels))
 	for _, ch := range channels {
 		infos = append(infos, fiber.Map{
@@ -536,7 +534,7 @@ func (s *Server) listChannels(c *fiber.Ctx) error {
 func (s *Server) landingPage(c *fiber.Ctx) error {
 	frontendURL := os.Getenv("FRONTEND_URL")
 	if frontendURL == "" {
-		frontendURL = DefaultFrontendURL
+		frontendURL = platform.DefaultFrontendURL
 	}
 
 	return c.JSON(fiber.Map{
@@ -556,7 +554,7 @@ func (s *Server) landingPage(c *fiber.Ctx) error {
 func (s *Server) Listen() error {
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = DefaultPort
+		port = platform.DefaultPort
 	}
 
 	log.Printf("Starting server on port %s", port)

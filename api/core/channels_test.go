@@ -4,6 +4,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -111,7 +112,7 @@ func TestExtractStringArrayLeagues(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := extractStringArray(tc.config, "leagues")
+			got := platform.ExtractStringArray(tc.config, "leagues")
 			if tc.want == nil {
 				if got != nil {
 					t.Errorf("extractStringArray = %v, want nil", got)

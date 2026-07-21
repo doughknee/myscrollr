@@ -27,8 +27,9 @@ jobs:
       matrix:
         include:
           # `dir` is where tests run; `modroot` is the module root holding
-          # go.mod/go.sum (api/core is a package inside the api module).
-          - dir: api/core
+          # go.mod/go.sum. The core API's packages live under api/core and
+          # api/internal/*, so tests run from the module root.
+          - dir: api
             modroot: api
             module: github.com/brandon-relentnet/myscrollr/api
           - dir: channels/fantasy/api
@@ -40,8 +41,8 @@ jobs:
       run:
         working-directory: ${{ matrix.dir }}
 
-    # Real Postgres for integration tests (currently only api/core has
-    # them — the GDPR purge cascade and Stripe webhook idempotency).
+    # Real Postgres for integration tests (currently only the api module
+    # has them — the GDPR purge cascade and Stripe webhook idempotency).
     # Tests gate on TEST_DATABASE_URL and skip when it's unset, so
     # `go test ./...` still works locally without a database.
     services:

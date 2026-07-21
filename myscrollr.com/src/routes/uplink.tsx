@@ -519,7 +519,7 @@ function tierFromPlan(plan: string): TierKey | null {
 // ── Tier Limits (fetched from /tier-limits, fallback for first paint) ──
 //
 // FALLBACK_LIMITS lives in @/lib/fallbackTierLimits, where a Vitest sync
-// test pins it to api/core/tier_limits.json (the shared snapshot of the
+// test pins it to api/internal/widgets/tier_limits.json (the shared snapshot of the
 // backend's DefaultTierLimits).
 
 /** Hook: fetch tier limits once on mount, fall back to embedded constant. */
