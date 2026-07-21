@@ -75,6 +75,7 @@ import type { DataWidgetRow, DataWidgetType, SubscriptionInfo } from "../api/cli
 
 // Hooks
 import { useTheme } from "../hooks/useTheme";
+import { useCatalog } from "../hooks/useCatalog";
 import { useAuthState } from "../hooks/useAuthState";
 import { useDataWidgetActions } from "../hooks/useDataWidgetActions";
 import { useWidgetActions } from "../hooks/useWidgetActions";
@@ -193,6 +194,11 @@ function RootLayout() {
   const navigate = useNavigate();
   const navHistory = useNavHistory();
   const route = parseRoute(location.pathname);
+
+  // Sync with the server-authoritative widget catalog. Renders from the
+  // bundled snapshot first, then re-renders if the server's differs — so a
+  // widget added server-side appears without a desktop release.
+  useCatalog();
 
   // ── Auth (must be before dashboard query — tier drives refetchInterval) ──
   const auth = useAuthState();

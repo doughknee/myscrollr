@@ -44,6 +44,7 @@ import { getCatalogItems, sourceForWidget } from "./marketplace";
 import { getAllWidgets } from "./widgets/registry";
 import { useWidgetTickerData } from "./hooks/useWidgetTickerData";
 import { useTheme } from "./hooks/useTheme";
+import { useCatalog } from "./hooks/useCatalog";
 
 
 // ── Constants ────────────────────────────────────────────────────
@@ -54,6 +55,10 @@ import { API_BASE as API_URL, DEMO } from "./config";
 
 export default function App() {
   const queryClient = useQueryClient();
+
+  // Keep the ticker's widget metadata in sync with the server catalog; falls
+  // back to the bundled snapshot when offline.
+  useCatalog();
 
   // Auth + tier state (drives refetchInterval)
   const [authenticated, setAuthenticated] = useState(() => checkAuth());

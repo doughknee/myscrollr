@@ -93,6 +93,18 @@ export async function request<T>(
   return handleResponse<T>(response);
 }
 
+// ── Widget catalog ──────────────────────────────────────────────
+
+/**
+ * GET /catalog — the server-authoritative widget catalog (VISION §4.2).
+ *
+ * Public, like /tier-limits: the catalog is identical for everyone and a
+ * first-run desktop with no session still has to render the Library.
+ */
+export async function fetchCatalog(): Promise<import("../types").CatalogPayload> {
+  return request<import("../types").CatalogPayload>("/catalog");
+}
+
 // ── Health ──────────────────────────────────────────────────────
 
 /** Core's own view of its dependencies (public — no auth). */

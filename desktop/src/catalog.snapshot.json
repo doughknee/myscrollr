@@ -1,0 +1,748 @@
+{
+  "version": "b829a2836f8fd6fe",
+  "widgets": [
+    {
+      "id": "finance_stocks",
+      "name": "Stocks",
+      "description": "Live stock & ETF prices for the symbols you pick.",
+      "kind": "data",
+      "source": "finance",
+      "category": "finance",
+      "color": "#16a34a",
+      "default_config": {
+        "asset_class": "stock",
+        "symbols": []
+      },
+      "required_tier": "free",
+      "about": "Real-time stock and ETF prices for the tickers you follow. Your watchlist streams live as the market moves — no brokerage app open, no tab to babysit.",
+      "usage": [
+        "Type a ticker in the top bar's search to add or remove it.",
+        "Quotes stream in real time during market hours.",
+        "Pin it to keep your watchlist always visible."
+      ],
+      "order": 0
+    },
+    {
+      "id": "finance_crypto",
+      "name": "Crypto",
+      "description": "Live crypto prices for the coins you pick.",
+      "kind": "data",
+      "source": "finance",
+      "category": "finance",
+      "color": "#f7931a",
+      "default_config": {
+        "asset_class": "crypto",
+        "symbols": []
+      },
+      "required_tier": "free",
+      "about": "Live crypto prices for the coins you track, streamed around the clock. From BTC and ETH to the long tail, your picks update the moment the market does.",
+      "usage": [
+        "Type a coin in the top bar's search to add or remove it.",
+        "Prices stream 24/7 — crypto never closes.",
+        "Pin it so every big move catches your eye."
+      ],
+      "order": 1
+    },
+    {
+      "id": "sports_nfl",
+      "name": "NFL",
+      "description": "Live NFL scores and game states.",
+      "kind": "data",
+      "source": "sports",
+      "category": "sports",
+      "color": "#013369",
+      "logo_url": "https://icon.horse/icon/nfl.com",
+      "default_config": {
+        "leagues": [
+          "NFL"
+        ]
+      },
+      "required_tier": "free",
+      "about": "Live NFL scores, quarters, and game clock for every matchup on the slate. Follow the whole week or zero in on your team.",
+      "usage": [
+        "Live scores and game state update automatically.",
+        "Set a favorite team from the top bar to keep it front and center.",
+        "Pin it on game days so scores stay on screen."
+      ],
+      "order": 2
+    },
+    {
+      "id": "sports_nba",
+      "name": "NBA",
+      "description": "Live NBA scores and game states.",
+      "kind": "data",
+      "source": "sports",
+      "category": "sports",
+      "color": "#c9082a",
+      "logo_url": "https://icon.horse/icon/nba.com",
+      "default_config": {
+        "leagues": [
+          "NBA"
+        ]
+      },
+      "required_tier": "free",
+      "about": "Live NBA scores and game state across the association — every quarter, every buzzer-beater, as it happens.",
+      "usage": [
+        "Live scores and game state update automatically.",
+        "Set a favorite team from the top bar to keep it front and center.",
+        "Pin it on game days so scores stay on screen."
+      ],
+      "order": 3
+    },
+    {
+      "id": "sports_nhl",
+      "name": "NHL",
+      "description": "Live NHL scores and game states.",
+      "kind": "data",
+      "source": "sports",
+      "category": "sports",
+      "color": "#111827",
+      "logo_url": "https://icon.horse/icon/nhl.com",
+      "default_config": {
+        "leagues": [
+          "NHL"
+        ]
+      },
+      "required_tier": "free",
+      "about": "Live NHL scores and period-by-period game state for every game on the ice.",
+      "usage": [
+        "Live scores and game state update automatically.",
+        "Set a favorite team from the top bar to keep it front and center.",
+        "Pin it on game days so scores stay on screen."
+      ],
+      "order": 4
+    },
+    {
+      "id": "sports_mlb",
+      "name": "MLB",
+      "description": "Live MLB scores and game states.",
+      "kind": "data",
+      "source": "sports",
+      "category": "sports",
+      "color": "#002d72",
+      "logo_url": "https://icon.horse/icon/mlb.com",
+      "default_config": {
+        "leagues": [
+          "MLB"
+        ]
+      },
+      "required_tier": "free",
+      "about": "Live MLB scores, innings, and game state across the league, all season long.",
+      "usage": [
+        "Live scores and game state update automatically.",
+        "Set a favorite team from the top bar to keep it front and center.",
+        "Pin it on game days so scores stay on screen."
+      ],
+      "order": 5
+    },
+    {
+      "id": "sports_f1",
+      "name": "F1",
+      "description": "Formula 1 race weekends and results.",
+      "kind": "data",
+      "source": "sports",
+      "category": "sports",
+      "color": "#e10600",
+      "logo_url": "https://icon.horse/icon/formula1.com",
+      "default_config": {
+        "leagues": [
+          "Formula 1"
+        ]
+      },
+      "required_tier": "free",
+      "about": "Formula 1 race weekends — practice, qualifying, and the Grand Prix result the moment the checkered flag drops.",
+      "usage": [
+        "Practice, qualifying, and race results update through the weekend.",
+        "See the podium the second the race ends.",
+        "Pin it during a Grand Prix to follow every session."
+      ],
+      "order": 6
+    },
+    {
+      "id": "sports_worldcup",
+      "name": "World Cup",
+      "description": "FIFA World Cup fixtures and scores.",
+      "kind": "data",
+      "source": "sports",
+      "category": "sports",
+      "color": "#2e7d46",
+      "logo_url": "https://icon.horse/icon/fifa.com",
+      "default_config": {
+        "leagues": [
+          "FIFA World Cup"
+        ]
+      },
+      "required_tier": "free",
+      "about": "Every FIFA World Cup fixture and live score, through the group stage and into the knockouts.",
+      "usage": [
+        "Live scores through the group stage and knockout rounds.",
+        "Every fixture on the calendar, updated automatically.",
+        "Pin it during the tournament so you never miss a goal."
+      ],
+      "order": 7
+    },
+    {
+      "id": "sports_ncaaf",
+      "name": "NCAA Football",
+      "description": "Live college football scores across the FBS.",
+      "kind": "data",
+      "source": "sports",
+      "category": "sports",
+      "color": "#0b427a",
+      "logo_url": "https://icon.horse/icon/ncaa.com",
+      "default_config": {
+        "leagues": [
+          "NCAA Football"
+        ]
+      },
+      "required_tier": "free",
+      "about": "Live college football scores across the FBS — Saturday slates, rivalry week, and bowl season.",
+      "usage": [
+        "Live scores and game state update automatically.",
+        "Set a favorite team from the top bar to keep it front and center.",
+        "Pin it on game days so scores stay on screen."
+      ],
+      "order": 8
+    },
+    {
+      "id": "sports_ncaab",
+      "name": "NCAA Basketball",
+      "description": "Live college basketball scores and the road to March.",
+      "kind": "data",
+      "source": "sports",
+      "category": "sports",
+      "color": "#d2691e",
+      "logo_url": "https://icon.horse/icon/ncaa.com",
+      "default_config": {
+        "leagues": [
+          "NCAA Basketball"
+        ]
+      },
+      "required_tier": "free",
+      "about": "Live college basketball scores through conference play and all the way into March Madness.",
+      "usage": [
+        "Live scores and game state update automatically.",
+        "Set a favorite team from the top bar to keep it front and center.",
+        "Pin it on game days so scores stay on screen."
+      ],
+      "order": 9
+    },
+    {
+      "id": "sports_premierleague",
+      "name": "Premier League",
+      "description": "Live scores from England's Premier League.",
+      "kind": "data",
+      "source": "sports",
+      "category": "sports",
+      "color": "#37003c",
+      "logo_url": "https://icon.horse/icon/premierleague.com",
+      "default_config": {
+        "leagues": [
+          "Premier League"
+        ]
+      },
+      "required_tier": "free",
+      "about": "Live scores from England's Premier League — all 20 clubs, every matchweek.",
+      "usage": [
+        "Live scores and game state update automatically.",
+        "Set a favorite team from the top bar to keep it front and center.",
+        "Pin it on game days so scores stay on screen."
+      ],
+      "order": 10
+    },
+    {
+      "id": "sports_laliga",
+      "name": "La Liga",
+      "description": "Live scores from Spain's La Liga.",
+      "kind": "data",
+      "source": "sports",
+      "category": "sports",
+      "color": "#e2001a",
+      "logo_url": "https://icon.horse/icon/laliga.com",
+      "default_config": {
+        "leagues": [
+          "La Liga"
+        ]
+      },
+      "required_tier": "free",
+      "about": "Live scores from Spain's La Liga, from the title race to the relegation scrap.",
+      "usage": [
+        "Live scores and game state update automatically.",
+        "Set a favorite team from the top bar to keep it front and center.",
+        "Pin it on game days so scores stay on screen."
+      ],
+      "order": 11
+    },
+    {
+      "id": "sports_mls",
+      "name": "MLS",
+      "description": "Live Major League Soccer scores.",
+      "kind": "data",
+      "source": "sports",
+      "category": "sports",
+      "color": "#001838",
+      "logo_url": "https://icon.horse/icon/mlssoccer.com",
+      "default_config": {
+        "leagues": [
+          "MLS"
+        ]
+      },
+      "required_tier": "free",
+      "about": "Live Major League Soccer scores across the Eastern and Western conferences.",
+      "usage": [
+        "Live scores and game state update automatically.",
+        "Set a favorite team from the top bar to keep it front and center.",
+        "Pin it on game days so scores stay on screen."
+      ],
+      "order": 12
+    },
+    {
+      "id": "sports_championsleague",
+      "name": "Champions League",
+      "description": "Live UEFA Champions League scores.",
+      "kind": "data",
+      "source": "sports",
+      "category": "sports",
+      "color": "#0e1e5b",
+      "logo_url": "https://icon.horse/icon/uefa.com",
+      "default_config": {
+        "leagues": [
+          "Champions League"
+        ]
+      },
+      "required_tier": "free",
+      "about": "Live UEFA Champions League scores through the league phase and into the knockout rounds.",
+      "usage": [
+        "Live scores and game state update automatically.",
+        "Set a favorite team from the top bar to keep it front and center.",
+        "Pin it on game days so scores stay on screen."
+      ],
+      "order": 13
+    },
+    {
+      "id": "sports_ufc",
+      "name": "UFC",
+      "description": "UFC fight cards and results.",
+      "kind": "data",
+      "source": "sports",
+      "category": "sports",
+      "color": "#d20a0a",
+      "logo_url": "https://icons.duckduckgo.com/ip3/ufc.com.ico",
+      "logo_light": true,
+      "default_config": {
+        "leagues": [
+          "UFC"
+        ]
+      },
+      "required_tier": "free",
+      "about": "UFC fight cards and results — main card and prelims, bout by bout on event nights.",
+      "usage": [
+        "Fight results update bout by bout on event nights.",
+        "Follow the main card and prelims in one place.",
+        "Pin it during an event to catch every finish."
+      ],
+      "order": 14
+    },
+    {
+      "id": "sports_afl",
+      "name": "AFL",
+      "description": "Live Australian Football League scores.",
+      "kind": "data",
+      "source": "sports",
+      "category": "sports",
+      "color": "#003da5",
+      "logo_url": "https://icon.horse/icon/afl.com.au",
+      "default_config": {
+        "leagues": [
+          "AFL"
+        ]
+      },
+      "required_tier": "free",
+      "about": "Live Australian Football League scores across the home-and-away season and finals.",
+      "usage": [
+        "Live scores and game state update automatically.",
+        "Set a favorite team from the top bar to keep it front and center.",
+        "Pin it on game days so scores stay on screen."
+      ],
+      "order": 15
+    },
+    {
+      "id": "news_bbc",
+      "name": "BBC News",
+      "description": "World, UK and breaking news from the BBC.",
+      "kind": "data",
+      "source": "rss",
+      "category": "news",
+      "color": "#b80000",
+      "logo_url": "https://icon.horse/icon/bbc.com",
+      "default_config": {
+        "feeds": [
+          {
+            "name": "BBC News",
+            "url": "https://feeds.bbci.co.uk/news/rss.xml"
+          }
+        ]
+      },
+      "required_tier": "free",
+      "about": "Headlines from the BBC — world, UK, and breaking news from one of the most-read newsrooms on the planet.",
+      "usage": [
+        "Headlines refresh automatically as new stories publish.",
+        "Open any headline from the feed to read the full story.",
+        "Pin it to keep the latest news in view."
+      ],
+      "order": 16
+    },
+    {
+      "id": "news_npr",
+      "name": "NPR",
+      "description": "US and world news, analysis and reporting from NPR.",
+      "kind": "data",
+      "source": "rss",
+      "category": "news",
+      "color": "#4667de",
+      "logo_url": "https://icon.horse/icon/npr.org",
+      "default_config": {
+        "feeds": [
+          {
+            "name": "NPR News",
+            "url": "https://feeds.npr.org/1001/rss.xml"
+          }
+        ]
+      },
+      "required_tier": "free",
+      "about": "News, analysis, and reporting from NPR, spanning US and world coverage.",
+      "usage": [
+        "Headlines refresh automatically as new stories publish.",
+        "Open any headline from the feed to read the full story.",
+        "Pin it to keep the latest news in view."
+      ],
+      "order": 17
+    },
+    {
+      "id": "news_guardian",
+      "name": "The Guardian",
+      "description": "Independent world news, opinion and reporting.",
+      "kind": "data",
+      "source": "rss",
+      "category": "news",
+      "color": "#052962",
+      "logo_url": "https://icon.horse/icon/theguardian.com",
+      "default_config": {
+        "feeds": [
+          {
+            "name": "The Guardian",
+            "url": "https://www.theguardian.com/world/rss"
+          }
+        ]
+      },
+      "required_tier": "free",
+      "about": "Independent world news, opinion, and reporting from The Guardian.",
+      "usage": [
+        "Headlines refresh automatically as new stories publish.",
+        "Open any headline from the feed to read the full story.",
+        "Pin it to keep the latest news in view."
+      ],
+      "order": 18
+    },
+    {
+      "id": "news_aljazeera",
+      "name": "Al Jazeera",
+      "description": "Breaking news from the Middle East and around the world.",
+      "kind": "data",
+      "source": "rss",
+      "category": "news",
+      "color": "#e8a33d",
+      "logo_url": "https://icon.horse/icon/aljazeera.com",
+      "default_config": {
+        "feeds": [
+          {
+            "name": "Al Jazeera",
+            "url": "https://www.aljazeera.com/xml/rss/all.xml"
+          }
+        ]
+      },
+      "required_tier": "free",
+      "about": "Breaking news from Al Jazeera, with deep coverage of the Middle East and the Global South.",
+      "usage": [
+        "Headlines refresh automatically as new stories publish.",
+        "Open any headline from the feed to read the full story.",
+        "Pin it to keep the latest news in view."
+      ],
+      "order": 19
+    },
+    {
+      "id": "news_propublica",
+      "name": "ProPublica",
+      "description": "Investigative journalism in the public interest.",
+      "kind": "data",
+      "source": "rss",
+      "category": "news",
+      "color": "#c8102e",
+      "logo_url": "https://icon.horse/icon/propublica.org",
+      "default_config": {
+        "feeds": [
+          {
+            "name": "ProPublica",
+            "url": "https://feeds.propublica.org/propublica/main"
+          }
+        ]
+      },
+      "required_tier": "free",
+      "about": "Investigative journalism in the public interest from the nonprofit newsroom ProPublica.",
+      "usage": [
+        "Headlines refresh automatically as new stories publish.",
+        "Open any headline from the feed to read the full story.",
+        "Pin it to keep the latest news in view."
+      ],
+      "order": 20
+    },
+    {
+      "id": "news_bloomberg",
+      "name": "Bloomberg",
+      "description": "Global markets, finance and business news.",
+      "kind": "data",
+      "source": "rss",
+      "category": "news",
+      "color": "#1a1a2e",
+      "logo_url": "https://icon.horse/icon/bloomberg.com",
+      "default_config": {
+        "feeds": [
+          {
+            "name": "Bloomberg Markets",
+            "url": "https://feeds.bloomberg.com/markets/news.rss"
+          }
+        ]
+      },
+      "required_tier": "free",
+      "about": "Markets, finance, and business news from Bloomberg.",
+      "usage": [
+        "Headlines refresh automatically as new stories publish.",
+        "Open any headline from the feed to read the full story.",
+        "Pin it to keep the latest news in view."
+      ],
+      "order": 21
+    },
+    {
+      "id": "news_cnbc",
+      "name": "CNBC",
+      "description": "Markets, business and finance headlines.",
+      "kind": "data",
+      "source": "rss",
+      "category": "news",
+      "color": "#005594",
+      "logo_url": "https://icon.horse/icon/cnbc.com",
+      "default_config": {
+        "feeds": [
+          {
+            "name": "CNBC Top News",
+            "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"
+          }
+        ]
+      },
+      "required_tier": "free",
+      "about": "Markets, business, and finance headlines from CNBC.",
+      "usage": [
+        "Headlines refresh automatically as new stories publish.",
+        "Open any headline from the feed to read the full story.",
+        "Pin it to keep the latest news in view."
+      ],
+      "order": 22
+    },
+    {
+      "id": "news_nasa",
+      "name": "NASA",
+      "description": "Space, science and mission news from NASA.",
+      "kind": "data",
+      "source": "rss",
+      "category": "news",
+      "color": "#0b3d91",
+      "logo_url": "https://icon.horse/icon/nasa.gov",
+      "default_config": {
+        "feeds": [
+          {
+            "name": "NASA Breaking News",
+            "url": "https://www.nasa.gov/news-release/feed/"
+          }
+        ]
+      },
+      "required_tier": "free",
+      "about": "Space, science, and mission news straight from NASA.",
+      "usage": [
+        "Headlines refresh automatically as new stories publish.",
+        "Open any headline from the feed to read the full story.",
+        "Pin it to keep the latest news in view."
+      ],
+      "order": 23
+    },
+    {
+      "id": "news_hackernews",
+      "name": "Hacker News",
+      "description": "Top stories from the Hacker News front page.",
+      "kind": "data",
+      "source": "rss",
+      "category": "news",
+      "color": "#ff6600",
+      "logo_url": "https://icon.horse/icon/news.ycombinator.com",
+      "default_config": {
+        "feeds": [
+          {
+            "name": "Hacker News",
+            "url": "https://hnrss.org/frontpage"
+          }
+        ]
+      },
+      "required_tier": "free",
+      "about": "Top stories from the Hacker News front page — tech, startups, and programming.",
+      "usage": [
+        "Headlines refresh automatically as new stories publish.",
+        "Open any headline from the feed to read the full story.",
+        "Pin it to keep the latest news in view."
+      ],
+      "order": 24
+    },
+    {
+      "id": "news_theverge",
+      "name": "The Verge",
+      "description": "Technology, science, art and culture.",
+      "kind": "data",
+      "source": "rss",
+      "category": "news",
+      "color": "#5200ff",
+      "logo_url": "https://icon.horse/icon/theverge.com",
+      "default_config": {
+        "feeds": [
+          {
+            "name": "The Verge",
+            "url": "https://www.theverge.com/rss/index.xml"
+          }
+        ]
+      },
+      "required_tier": "free",
+      "about": "Technology, science, art, and culture from The Verge.",
+      "usage": [
+        "Headlines refresh automatically as new stories publish.",
+        "Open any headline from the feed to read the full story.",
+        "Pin it to keep the latest news in view."
+      ],
+      "order": 25
+    },
+    {
+      "id": "rss_custom",
+      "name": "Custom RSS",
+      "description": "Follow any RSS or Atom feed by pasting its URL.",
+      "kind": "data",
+      "source": "rss",
+      "category": "news",
+      "color": "#ee802f",
+      "default_config": {
+        "feeds": []
+      },
+      "required_tier": "free",
+      "about": "Bring your own feeds. Paste any RSS or Atom URL and Scrollr streams its latest items alongside everything else.",
+      "usage": [
+        "Paste any RSS or Atom feed URL in the Feeds view.",
+        "Add as many feeds as you like — they merge into one stream.",
+        "Perfect for niche blogs, newsletters, or subreddits with a feed."
+      ],
+      "order": 26
+    },
+    {
+      "id": "fantasy_yahoo",
+      "name": "Yahoo Fantasy",
+      "description": "Your Yahoo Fantasy leagues, matchups, and standings.",
+      "kind": "data",
+      "source": "fantasy",
+      "category": "fantasy",
+      "color": "#6001d2",
+      "logo_url": "https://icon.horse/icon/yahoo.com",
+      "required_tier": "free",
+      "about": "Your Yahoo Fantasy leagues in the ticker — live scoring, matchups, and standings without ever opening the app.",
+      "usage": [
+        "Connect your Yahoo account from the top bar.",
+        "Leagues, matchups, and standings sync automatically.",
+        "Live scoring updates while your players are on the field."
+      ],
+      "order": 27
+    },
+    {
+      "id": "predictions",
+      "name": "Kalshi",
+      "description": "Live odds from the Kalshi prediction market.",
+      "kind": "data",
+      "source": "predictions",
+      "category": "predictions",
+      "color": "#1fc9a0",
+      "logo_url": "https://icons.duckduckgo.com/ip3/kalshi.com.ico",
+      "required_tier": "free",
+      "about": "Live odds from Kalshi, the regulated US prediction market — a real-time read on elections, economic prints, and the events in the news.",
+      "usage": [
+        "Live market odds update as money moves.",
+        "Follow the events and questions you care about.",
+        "Display-only — Scrollr shows the market, it never places a trade."
+      ],
+      "order": 28
+    },
+    {
+      "id": "clock",
+      "name": "Clock",
+      "description": "Local time and world clocks",
+      "kind": "utility",
+      "category": "utility",
+      "color": "#6366f1",
+      "required_tier": "free",
+      "order": 29
+    },
+    {
+      "id": "timer",
+      "name": "Timer",
+      "description": "Pomodoro, countdown, and stopwatch tools",
+      "kind": "utility",
+      "category": "utility",
+      "color": "#f59e0b",
+      "required_tier": "free",
+      "order": 30
+    },
+    {
+      "id": "weather",
+      "name": "Weather",
+      "description": "Current conditions for your locations",
+      "kind": "utility",
+      "category": "utility",
+      "color": "#0ea5e9",
+      "required_tier": "free",
+      "order": 31
+    },
+    {
+      "id": "sysmon",
+      "name": "System Monitor",
+      "description": "Live CPU, memory, and GPU stats",
+      "kind": "utility",
+      "category": "utility",
+      "color": "#06b6d4",
+      "required_tier": "free",
+      "order": 32
+    },
+    {
+      "id": "uptime",
+      "name": "Uptime",
+      "description": "Monitor status from Uptime Kuma",
+      "kind": "utility",
+      "category": "utility",
+      "color": "#10b981",
+      "logo_url": "https://icon.horse/icon/uptime.kuma.pet",
+      "required_tier": "free",
+      "order": 33
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "description": "CI/Actions status for your repos",
+      "kind": "utility",
+      "category": "utility",
+      "color": "#f97316",
+      "logo_url": "https://icon.horse/icon/github.com",
+      "required_tier": "free",
+      "order": 34
+    }
+  ]
+}

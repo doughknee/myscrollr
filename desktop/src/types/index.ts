@@ -256,3 +256,35 @@ export interface WidgetTickerData {
   uptime: UptimeChipData[];
   github: GitHubChipData[];
 }
+
+// ── Widget catalog (wire types for GET /catalog) ─────────────────
+// The catalog is server-owned (VISION §4.2); these mirror
+// platform.WidgetDef in Go. They live here rather than in marketplace.ts
+// so api/client.ts can type the fetch without importing marketplace
+// (which imports the renderer registries, and through them api/client).
+
+/** One entry of GET /catalog. */
+export interface CatalogWidget {
+  id: string;
+  name: string;
+  description: string;
+  kind: "data" | "utility";
+  /** Renderer key + CDC route. Absent for utilities. Never shown to users. */
+  source?: string;
+  category: string;
+  color: string;
+  logo_url?: string;
+  logo_light?: boolean;
+  /** POSTed as the widget's config on add (league / asset class / feeds). */
+  default_config?: Record<string, unknown>;
+  required_tier: string;
+  about?: string;
+  usage?: string[];
+  order: number;
+}
+
+/** The GET /catalog response. */
+export interface CatalogPayload {
+  version: string;
+  widgets: CatalogWidget[];
+}
