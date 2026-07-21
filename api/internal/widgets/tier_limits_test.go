@@ -2,9 +2,7 @@ package widgets
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 )
@@ -123,103 +121,6 @@ func derefOr(p *int, fallback string) any {
 		return fallback
 	}
 	return *p
-}
-
-// ─── ValidateWidgetConfig ──────────────────────────────────────────
-
-// Helper: build a finance config with N symbols.
-func financeCfg(n int) map[string]any {
-	syms := make([]any, n)
-	for i := range syms {
-		syms[i] = "SYM" // duplicate strings are fine; we only count.
-	}
-	return map[string]any{"symbols": syms}
-}
-
-// Helper: build a sports config with N leagues.
-func sportsCfg(n int) map[string]any {
-	lgs := make([]any, n)
-	for i := range lgs {
-		lgs[i] = "NFL"
-	}
-	return map[string]any{"leagues": lgs}
-}
-
-// curatedFixtureURL is pinned into the curated-URL cache by
-// TestValidateWidgetConfig_Boundaries so is_custom derivation is
-// deterministic (see pinCuratedFixture).
-const curatedFixtureURL = "https://curated.example.com/feed"
-
-// Helper: build an RSS config with `total` feeds where `custom` of them are
-// user-added. Custom feeds get distinct non-curated URLs so the server-side
-// derivation (URL ∉ curated set → custom) classifies them the same way the
-// client-asserted flag does.
-func rssCfg(total, custom int) map[string]any {
-	feeds := make([]any, total)
-	for i := range feeds {
-		m := map[string]any{"name": "F", "url": curatedFixtureURL}
-		if i < custom {
-			m["is_custom"] = true
-			m["url"] = fmt.Sprintf("https://custom.example.com/feed/%d", i)
-		}
-		feeds[i] = m
-	}
-	return map[string]any{"feeds": feeds}
-}
-
-// pinCuratedFixture pins the curated-URL cache to exactly the fixture URL
-// for the duration of the test. This makes the rss cases exercise the
-// production path (server-side is_custom derivation from the curated
-// catalog) identically in unit mode (no DB → cache would be nil and fall
-// back to client trust) and integration mode (DB present but tracked_feeds
-// empty → every URL would look custom).
-func pinCuratedFixture(t *testing.T) {
-	t.Helper()
-	curatedFeedURLsMu.Lock()
-	prevCache, prevExpires := curatedFeedURLsCache, curatedFeedURLsExpires
-	curatedFeedURLsCache = map[string]bool{curatedFixtureURL: true}
-	curatedFeedURLsExpires = time.Now().Add(time.Hour)
-	curatedFeedURLsMu.Unlock()
-	t.Cleanup(func() {
-		curatedFeedURLsMu.Lock()
-		curatedFeedURLsCache, curatedFeedURLsExpires = prevCache, prevExpires
-		curatedFeedURLsMu.Unlock()
-	})
-}
-
-// TestValidateWidgetConfig_CapsRetired confirms the per-feature depth caps
-// were retired (2026-07-02): configs of any size pass on EVERY tier. The
-// widget-slot cap (enforced in channels.go, not here) is the only lever now.
-func TestValidateWidgetConfig_CapsRetired(t *testing.T) {
-	pinCuratedFixture(t)
-	cases := []struct {
-		tier       string
-		widgetType string
-		config     map[string]any
-	}{
-		{"free", "finance", financeCfg(1000)},
-		{"free", "sports", sportsCfg(1000)},
-		{"free", "rss", rssCfg(1000, 500)},
-		{"uplink", "finance", financeCfg(10000)},
-		{"uplink_pro", "rss", rssCfg(10000, 9000)},
-		{"bogus_tier", "finance", financeCfg(1000)}, // unknown → free → still no cap
-		{"free", "finance", map[string]any{}},
-	}
-	for _, c := range cases {
-		if err := ValidateWidgetConfig(c.tier, c.widgetType, c.config); err != nil {
-			t.Errorf("%s/%s: caps retired, want nil, got %v", c.tier, c.widgetType, err)
-		}
-	}
-}
-
-// TestValidateWidgetConfig_UnknownChannelPasses protects the dynamic
-// channel registry: new channels can roll out without this validator
-// being the thing that blocks them.
-func TestValidateWidgetConfig_UnknownChannelPasses(t *testing.T) {
-	err := ValidateWidgetConfig("free", "future_channel", map[string]any{"whatever": 1})
-	if err != nil {
-		t.Errorf("want nil, got %v", err)
-	}
 }
 
 // TestTierLimitError_UserFacingMessage sanity-checks the copy path the

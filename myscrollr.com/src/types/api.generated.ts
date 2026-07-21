@@ -56,8 +56,8 @@ export interface OverviewFantasy {
 
 export interface OverviewGDPR {
   deletion_status: string;
-  requested_at?: string;
-  purge_at?: string;
+  requested_at: string | null;
+  purge_at: string | null;
 }
 
 export interface OverviewIdentity {
@@ -74,9 +74,9 @@ export interface OverviewLinks {
 export interface OverviewResponse {
   identity: OverviewIdentity;
   tier: OverviewTier;
-  subscription?: SubscriptionResponse;
+  subscription: SubscriptionResponse | null;
   widgets: OverviewWidgets;
-  fantasy?: OverviewFantasy;
+  fantasy: OverviewFantasy | null;
   gdpr: OverviewGDPR;
   links: OverviewLinks;
 }
@@ -191,12 +191,12 @@ export interface WidgetDef {
 }
 
 export interface WidgetLimits {
-  max_widgets?: number;
-  symbols?: number;
-  feeds?: number;
-  custom_feeds?: number;
-  leagues?: number;
-  fantasy?: number;
+  max_widgets: number | null;
+  symbols: number | null;
+  feeds: number | null;
+  custom_feeds: number | null;
+  leagues: number | null;
+  fantasy: number | null;
   max_ticker_rows: number;
   max_ticker_customization: boolean;
 }
