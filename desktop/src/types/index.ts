@@ -125,7 +125,10 @@ export interface DashboardResponse {
     subscription_tier?: "anonymous" | "free" | "uplink" | "uplink_pro" | "uplink_ultimate";
     updated_at: string;
   };
-  widgets?: Array<DataWidgetRow & { logto_sub: string }>;
+  // Generated from the Go struct — the row shape is the server's to define.
+  // (The `& { logto_sub: string }` this used to carry was fiction: Go tags
+  // that field `json:"-"`, so it is never on the wire.)
+  widgets?: Widget[];
 }
 
 // ── Enums ────────────────────────────────────────────────────────
@@ -257,34 +260,20 @@ export interface WidgetTickerData {
   github: GitHubChipData[];
 }
 
+import type {
+  Widget,
+  WidgetDef,
+  CatalogResponse,
+} from "./api.generated";
+
 // ── Widget catalog (wire types for GET /catalog) ─────────────────
-// The catalog is server-owned (VISION §4.2); these mirror
-// platform.WidgetDef in Go. They live here rather than in marketplace.ts
-// so api/client.ts can type the fetch without importing marketplace
-// (which imports the renderer registries, and through them api/client).
+// These are aliases onto the generated contract (VISION §4.6) — the names
+// the client code already uses, pointed at the Go structs that actually
+// serialize the response. Change the Go struct, run `go -C api run
+// ./cmd/gents`, and every consumer here follows.
 
 /** One entry of GET /catalog. */
-export interface CatalogWidget {
-  id: string;
-  name: string;
-  description: string;
-  kind: "data" | "utility";
-  /** Renderer key + CDC route. Absent for utilities. Never shown to users. */
-  source?: string;
-  category: string;
-  color: string;
-  logo_url?: string;
-  logo_light?: boolean;
-  /** POSTed as the widget's config on add (league / asset class / feeds). */
-  default_config?: Record<string, unknown>;
-  required_tier: string;
-  about?: string;
-  usage?: string[];
-  order: number;
-}
+export type CatalogWidget = WidgetDef;
 
 /** The GET /catalog response. */
-export interface CatalogPayload {
-  version: string;
-  widgets: CatalogWidget[];
-}
+export type CatalogPayload = CatalogResponse;

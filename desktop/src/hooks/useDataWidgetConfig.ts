@@ -57,7 +57,7 @@ export function useDataWidgetConfig<T>(
       );
       queryClient.setQueryData<DashboardResponse>(queryKeys.dashboard, (old) => {
         if (!old) return old;
-        const channels = (old.widgets ?? []).map((c) =>
+        const widgets = (old.widgets ?? []).map((c) =>
           c.widget_type === widgetType
             ? {
                 ...c,
@@ -68,7 +68,7 @@ export function useDataWidgetConfig<T>(
               }
             : c,
         );
-        return { ...old, channels };
+        return { ...old, widgets };
       });
       return { previous };
     },

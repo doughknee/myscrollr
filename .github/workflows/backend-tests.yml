@@ -7,6 +7,11 @@ on:
       - "api/**"
       - "channels/**/*.go"
       - "channels/**/*.rs"
+      # Generated wire types (VISION 4.6): a Go test pins these to the Go
+      # structs, so a hand-edit here must re-run it — same reason the
+      # tier-limits snapshot triggers the frontend suite.
+      - "desktop/src/types/api.generated.ts"
+      - "myscrollr.com/src/types/api.generated.ts"
       # Run on edits to this workflow itself — the setup-go@v6 bump broke
       # all five Go jobs and nothing noticed until an unrelated PR touched
       # api/**.
@@ -17,6 +22,11 @@ on:
       - "api/**"
       - "channels/**/*.go"
       - "channels/**/*.rs"
+      # Generated wire types (VISION 4.6): a Go test pins these to the Go
+      # structs, so a hand-edit here must re-run it — same reason the
+      # tier-limits snapshot triggers the frontend suite.
+      - "desktop/src/types/api.generated.ts"
+      - "myscrollr.com/src/types/api.generated.ts"
       - ".github/workflows/backend-tests.yml"
 
 jobs:

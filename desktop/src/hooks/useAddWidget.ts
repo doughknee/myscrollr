@@ -45,7 +45,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
         // the forced `/dashboard` refetch were both on the critical
         // path. CDC + a background refetch reconcile the placeholder
         // with the real row a moment later.
-        const optimisticChannel: DataWidgetRow & { logto_sub: string } = {
+        const optimisticWidget: DataWidgetRow = {
           id: -Date.now(), // ephemeral negative id, replaced on reconcile
           widget_type: widgetType,
           enabled: true,
@@ -53,7 +53,6 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
           config: item.addConfig ?? {},
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          logto_sub: "",
         };
 
         const previous = queryClient.getQueryData<DashboardResponse>(
@@ -66,7 +65,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
             if (!old) {
               return {
                 data: {},
-                channels: [optimisticChannel],
+                widgets: [optimisticWidget],
               } as DashboardResponse;
             }
             // Don't double-insert if the channel is somehow already
@@ -77,7 +76,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
             }
             return {
               ...old,
-              channels: [...existing, optimisticChannel],
+              widgets: [...existing, optimisticWidget],
             };
           },
         );
@@ -102,14 +101,12 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
               queryKeys.dashboard,
               (old) => {
                 if (!old) return old;
-                const channels = (old.widgets ?? []).map((c) =>
-                  c.id === optimisticChannel.id
-                    ? ({ ...created, logto_sub: c.logto_sub } as DataWidgetRow & {
-                        logto_sub: string;
-                      })
+                const widgets = (old.widgets ?? []).map((c) =>
+                  c.id === optimisticWidget.id
+                    ? created
                     : c,
                 );
-                return { ...old, channels };
+                return { ...old, widgets };
               },
             );
             // Resync NOW, refetching mounted queries: the user is

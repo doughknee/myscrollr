@@ -8,6 +8,7 @@
  */
 import { fetch } from "@tauri-apps/plugin-http";
 import { getValidToken } from "../auth";
+import type { Widget, HealthResponse } from "../types/api.generated";
 
 // ── Constants ────────────────────────────────────────────────────
 
@@ -107,13 +108,8 @@ export async function fetchCatalog(): Promise<import("../types").CatalogPayload>
 
 // ── Health ──────────────────────────────────────────────────────
 
-/** Core's own view of its dependencies (public — no auth). */
-export interface HealthResponse {
-  status: string;
-  database: string;
-  redis: string;
-  services: Record<string, string>;
-}
+/** Core's own view of its dependencies (public — no auth). Generated. */
+export type { HealthResponse };
 
 /**
  * GET /health — deliberately does NOT go through `request()`.
@@ -186,16 +182,8 @@ export async function authFetch<T>(
  */
 export type WidgetId = string;
 
-export interface DataWidgetRow {
-  id: number;
-  widget_type: WidgetId;
-  enabled: boolean;
-  /** Whether this widget's chips appear on the ticker. */
-  ticker_enabled: boolean;
-  config: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
-}
+/** A row of user_widgets. Generated from the Go struct (VISION §4.6). */
+export type DataWidgetRow = Widget;
 
 /**
  * Read the ticker-enabled flag, defaulting to `true` when absent so a

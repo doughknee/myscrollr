@@ -92,12 +92,12 @@ export function useSportsConfig(widgetType: string = "sports") {
       );
       queryClient.setQueryData<DashboardResponse>(queryKeys.dashboard, (old) => {
         if (!old) return old;
-        const channels = (old.widgets ?? []).map((c) =>
+        const widgets = (old.widgets ?? []).map((c) =>
           c.widget_type === widgetType
             ? { ...c, config: next as unknown as Record<string, unknown> }
             : c,
         );
-        return { ...old, channels };
+        return { ...old, widgets };
       });
       return { previous };
     },

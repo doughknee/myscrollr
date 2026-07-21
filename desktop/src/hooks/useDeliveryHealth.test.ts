@@ -35,7 +35,7 @@ function buildHarness(opts: {
     // queryKey here MUST match `dashboardQueryOptions().queryKey`.
     client.setQueryData(
       ["dashboard"],
-      { channels: [], data: {} },
+      { widgets: [], data: {} },
       { updatedAt: opts.dataUpdatedAt ?? Date.now() },
     );
   }

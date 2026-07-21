@@ -92,7 +92,6 @@ function main(): void {
     ticker_enabled: true,
     created_at: "2026-07-17T00:00:00Z",
     updated_at: "2026-07-17T00:00:00Z",
-    logto_sub: "preview",
     config: {
       feeds: feeds.map((f) => ({ name: f.name, url: f.url, is_custom: f.custom })),
     },
