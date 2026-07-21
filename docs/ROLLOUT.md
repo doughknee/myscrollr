@@ -15,6 +15,57 @@ Because there's no compat to preserve, the phases below are a **sensible work-or
 
 ---
 
+## Status (updated 2026-07-20)
+
+| Phase | State |
+|---|---|
+| 1 — backend package split | ✅ **done** — `api/core` split into 8 internal packages + core wiring, acyclic, one binary |
+| 2 — DB schema authority + final names | ✅ **done** — one squashed baseline in `api/migrations`, ingesters are pure writers, `user_widgets`/`widget_type` |
+| 3 — server catalog + generic client + rename | ⬜ not started — see the findings below before starting |
+| 4 — shared TS types | ⬜ not started |
+| 5 — cleanup + docs | ⬜ not started (AGENTS.md "Database Migrations" already rewritten, since Phase 2 made it actively wrong) |
+
+**Deferred out of Phase 2, with reasons:**
+
+- **sqlx compile-time `query!` macros** (the Rust drift guard). Converting every
+  call site needs a live database at build time or committed `.sqlx` offline data
+  plus CI work to regenerate it. The schema consolidation stands without it;
+  fantasy's `schema_contract_test.go` is the pattern to copy if you want a guard
+  sooner and cheaper.
+- **The shared Rust `common` crate** (§7.9). Measured: `init.rs` is byte-identical
+  across all four services (297 lines × 4). `log.rs` is same-length but differs
+  (service name). `main.rs` genuinely differs per service (308–437 lines) and is
+  *not* shareable. So the real prize is ~900 duplicate lines, against a Cargo
+  workspace plus reworked build contexts for four deployed services. Still
+  opportunistic, as this plan always said.
+
+**Phase 3 findings from the pre-work survey — read these first:**
+
+1. **The server catalog is missing 12 of the 29 shipped widgets.** `api/internal/platform/widgets.go`
+   enumerates 11 data widgets; `desktop/src/marketplace.ts DATA_WIDGETS` has 29 ids.
+   The extra 12 (8 sports leagues: `sports_ncaaf`, `sports_ncaab`, `sports_premierleague`,
+   `sports_laliga`, `sports_mls`, `sports_championsleague`, `sports_ufc`, `sports_afl`;
+   and the per-feed news split: `news_bbc`, `news_npr`, … `rss_custom`) are valid only
+   via the *prefix* rules (`sports_` → sports, `news_` → rss), so they work but the
+   server has no label/identity for them. **The server catalog must absorb all 29
+   with identity (name, color, icon, category, tier, order) before any client can
+   fetch it** — that transcription is the bulk of Phase 3's server half.
+2. **Kalshi/predictions IS first-class** (the §8 item to verify before names freeze).
+   It is a real entry in both the server registry and desktop `DATA_WIDGETS`, with a
+   full renderer set under `desktop/src/datawidgets/predictions/`. Its demo bridges
+   (`KALSHI_ENV=demo`, `VITE_DEMO`, `serve_bridge.rs`, `kalshi_probe.rs`) are dev-only
+   binaries and do not make it second-class. **No blocker to freezing names.**
+3. **The web has no parallel widget catalog to delete.** §4.2 says to delete "the
+   web's parallel catalog"; in fact `myscrollr.com` contains zero widget ids — its
+   "widget" mentions are marketing copy in landing/FAQ/support components. This is
+   consistent with the charter (website = marketing/auth/billing only). Scope Phase 3's
+   client work to desktop, plus the wire rename where the web calls the API.
+4. **"Delete `desktop/src/datawidgets/`" needs re-reading.** That tree is ~16k lines and
+   is almost entirely *renderers* (`FeedTab.tsx`, `view.ts`, per-source components) —
+   exactly what §4.1 says to keep as the `source → renderer` registry. What actually
+   gets deleted is the widget-*definition* layer: `datawidgets/registry.ts` (23 lines,
+   a build-time `import.meta.glob`) and `marketplace.ts DATA_WIDGETS` (~230 lines).
+
 ## Work order at a glance
 
 | Phase | What | Depends on | Size | Notes |
