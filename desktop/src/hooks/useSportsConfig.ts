@@ -1,5 +1,5 @@
 /**
- * Atomic config hook for sports channel.
+ * Atomic config hook for sports widget.
  *
  * Reads the full config, merges changes locally, and writes the complete
  * object to avoid data loss from the partial-write behavior of useDataWidgetConfig.
@@ -45,14 +45,14 @@ const DEFAULT_DISPLAY: SportsDisplayPrefs = {
 };
 
 export function useSportsConfig(widgetType: string = "sports") {
-  const { channels } = useShellData();
+  const { widgets } = useShellData();
   const queryClient = useQueryClient();
 
-  // Read current config from the channels data (comes via dashboard response).
+  // Read current config from the widgets data (comes via dashboard response).
   // widgetType is the specific widget row (e.g. "sports_nfl") post widget-split;
-  // defaults to the legacy coarse "sports" channel for back-compat.
-  const sportsChannel = channels.find((c) => c.widget_type === widgetType);
-  const raw = (sportsChannel?.config ?? {}) as Record<string, unknown>;
+  // defaults to the legacy coarse "sports" widget for back-compat.
+  const sportsWidget = widgets.find((c) => c.widget_type === widgetType);
+  const raw = (sportsWidget?.config ?? {}) as Record<string, unknown>;
 
   const config: SportsConfig = useMemo(() => {
     // `normalizeSportsDisplayConfig` handles both legacy migrations:
@@ -80,7 +80,7 @@ export function useSportsConfig(widgetType: string = "sports") {
       dataWidgetsApi.update(widgetType, {
         config: next as unknown as Record<string, unknown>,
       }),
-    // Optimistic write: patch this channel's config in the dashboard cache
+    // Optimistic write: patch this widget's config in the dashboard cache
     // immediately so toggles/team/league changes flip on the next paint
     // instead of waiting on the POST + dashboard refetch (the old behavior
     // felt like the control "took forever" to respond). Roll back on error;

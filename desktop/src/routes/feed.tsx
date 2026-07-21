@@ -1,7 +1,7 @@
 /**
  * Home route — live status dashboard.
  *
- * Shows a glanceable overview of live data from each active channel,
+ * Shows a glanceable overview of live data from each active widget,
  * plus a compact widget status strip. Discovery and add/remove happen
  * in the Catalog (/catalog), not here.
  */
@@ -110,7 +110,7 @@ export const Route = createFileRoute("/feed")({
 function HomePage() {
   const navigate = useNavigate();
   const shell = useShell();
-  const { channels, dashboard } = useShellData();
+  const { widgets, dashboard } = useShellData();
   const {
     allDataWidgetManifests,
     allWidgets,
@@ -146,11 +146,11 @@ function HomePage() {
     navigate({ to: "/customize" });
   }, [navigate]);
 
-  // Resolve each enabled channel row to a render manifest — the coarse source's
+  // Resolve each enabled widget row to a render manifest — the coarse source's
   // FeedTab carrying the widget's own name/id — then order by the catalog's
   // canonical order. Handles split widgets (sports_mlb, finance_stocks, …).
   const orderedDataWidgets = useMemo(() => {
-    const items = channels
+    const items = widgets
       .filter((c) => c.enabled)
       .map((ch) => {
         const manifest = widgetManifest(ch.widget_type) as
@@ -166,7 +166,7 @@ function HomePage() {
         CANONICAL_ORDER.indexOf(a.ch.widget_type) -
         CANONICAL_ORDER.indexOf(b.ch.widget_type),
     );
-  }, [channels]);
+  }, [widgets]);
 
   const orderedWidgets = useMemo(
     () =>
@@ -205,7 +205,7 @@ function HomePage() {
           last child). Content under the WCB starts at pt-4, same as
           Customize/Support; the bar-less empty state doesn't. */}
       <div className={clsx("space-y-5", hasAnySources && "pt-4")}>
-      {/* Empty state — hero. Shown when the user has no channels and
+      {/* Empty state — hero. Shown when the user has no widgets and
           no enabled widgets. Disappears the moment they add their
           first source. This IS the post-wizard first-run experience —
           a single primary CTA, no opinionated defaults. */}
@@ -246,7 +246,7 @@ function HomePage() {
           tierMaxRows={tierMaxRows}
           canAddRow={canAddRow}
           onOpenSettings={openTickerSettings}
-          channelManifests={allDataWidgetManifests}
+          dataWidgetManifests={allDataWidgetManifests}
           widgetManifests={allWidgets}
         />
       )}
@@ -266,8 +266,8 @@ function HomePage() {
               ease: [0.22, 0.61, 0.36, 1],
             }}
           >
-            <ChannelSection
-              channel={ch}
+            <WidgetSection
+              widget={ch}
               manifest={manifest}
               data={dashboard?.data}
               tickerStatus={formatTickerStatus(
@@ -339,9 +339,9 @@ function HomePage() {
 // ── Dashboard payload normalizer ────────────────────────────────
 
 /**
- * Coerce a per-channel `/dashboard` payload to a flat array.
+ * Coerce a per-widget `/dashboard` payload to a flat array.
  *
- * Most channels (`finance`, `sports`, `rss`) return an array directly.
+ * Most widgets (`finance`, `sports`, `rss`) return an array directly.
  * Fantasy returns `{ leagues: [...] }` because each league entry
  * carries matchups/standings/rosters/standings at the top level and
  * the wrapper leaves room for additional sibling metadata in the
@@ -355,7 +355,7 @@ function HomePage() {
  * unwrap here keeps all Home-side consumers (group extractors, row
  * renderers, hasData checks) consistent.
  */
-function normalizeChannelData(type: string, raw: unknown): unknown[] {
+function normalizeWidgetData(type: string, raw: unknown): unknown[] {
   if (type === "fantasy") {
     const obj = raw as { leagues?: unknown } | undefined;
     return Array.isArray(obj?.leagues) ? (obj.leagues as unknown[]) : [];
@@ -399,8 +399,8 @@ function getGroupLabel(type: string, key: string, data: unknown): string {
 
 // ── DataWidgetRow section ─────────────────────────────────────────────
 
-interface ChannelSectionProps {
-  channel: DataWidgetRow;
+interface WidgetSectionProps {
+  widget: DataWidgetRow;
   manifest: DataWidgetManifest;
   data: Record<string, unknown> | undefined;
   tickerStatus: string;
@@ -411,8 +411,8 @@ interface ChannelSectionProps {
   onConfigure: () => void;
 }
 
-function ChannelSection({
-  channel,
+function WidgetSection({
+  widget,
   manifest,
   data,
   tickerStatus,
@@ -421,24 +421,24 @@ function ChannelSection({
   onViewAll,
   onRowClick,
   onConfigure,
-}: ChannelSectionProps) {
+}: WidgetSectionProps) {
   const [editing, setEditing] = useState(false);
   const Icon = manifest.icon;
-  const type = channel.widget_type;
+  const type = widget.widget_type;
   // Resolve the widget id to its coarse source (dashboard.data is source-keyed)
   // and scope the payload to this one widget's config — an NFL widget shows only
   // NFL, finance_stocks only stocks, news_bbc only BBC. Mirrors the ticker.
   const source = sourceForWidget(type) ?? type;
-  const channelData = useMemo(
+  const widgetData = useMemo(
     () =>
       scopeSourceData(
         source,
-        normalizeChannelData(source, data?.[source]),
-        channel.config as Record<string, unknown> | undefined,
+        normalizeWidgetData(source, data?.[source]),
+        widget.config as Record<string, unknown> | undefined,
       ),
-    [source, data, channel.config],
+    [source, data, widget.config],
   );
-  const groups = useMemo(() => getGroups(source, channelData), [source, channelData]);
+  const groups = useMemo(() => getGroups(source, widgetData), [source, widgetData]);
   const hasSelections = selectedKeys.length > 0;
 
   function toggleGroup(key: string) {
@@ -566,7 +566,7 @@ function ChannelSection({
                     )}
                   </span>
                   <span className="text-ui-meta text-fg truncate flex-1">
-                    {getGroupLabel(source, key, channelData)}
+                    {getGroupLabel(source, key, widgetData)}
                   </span>
                 </button>
               );
@@ -588,24 +588,24 @@ function ChannelSection({
             }}
           >
             {source === "finance" && (
-              <FinanceRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
+              <FinanceRows data={widgetData} filter={selectedKeys} onConfigure={onConfigure} />
             )}
             {source === "sports" && (
               <SportsRows
-                data={channelData}
+                data={widgetData}
                 meta={(data?.sports_meta as { leagues?: LeagueMeta[] } | undefined)?.leagues}
                 filter={selectedKeys}
                 onConfigure={onConfigure}
               />
             )}
             {source === "rss" && (
-              <RssRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
+              <RssRows data={widgetData} filter={selectedKeys} onConfigure={onConfigure} />
             )}
             {source === "fantasy" && (
-              <FantasyRows data={channelData} filter={selectedKeys} onConfigure={onConfigure} />
+              <FantasyRows data={widgetData} filter={selectedKeys} onConfigure={onConfigure} />
             )}
             {source === "predictions" && (
-              <PredictionsRows data={channelData} onConfigure={onConfigure} />
+              <PredictionsRows data={widgetData} onConfigure={onConfigure} />
             )}
             {!["finance", "sports", "rss", "fantasy", "predictions"].includes(source) && (
               <EmptyDataRow widgetType={source} onConfigure={onConfigure} />
@@ -693,7 +693,7 @@ function PredictionsRows({ data, onConfigure }: { data: unknown; onConfigure: ()
             <span className="text-ui-meta text-fg-2 truncate flex-1">
               {p.event_title || p.title}
             </span>
-            {/* Fixed delta slot + fixed-width pill — the channel's own
+            {/* Fixed delta slot + fixed-width pill — the widget's own
                 column treatment, so Home previews match the feed. */}
             <span
               className={clsx(

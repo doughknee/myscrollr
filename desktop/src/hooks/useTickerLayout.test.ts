@@ -251,7 +251,7 @@ describe("useTickerLayout — setSourceRow / removeRow", () => {
     expect(harness.prefs.widgets.widgetsOnTicker).toEqual(["clock"]);
   });
 
-  it("setSourceRow preserves channel widgetsOnTicker behavior", () => {
+  it("setSourceRow preserves widget widgetsOnTicker behavior", () => {
     const harness = setupHook(
       [{ sources: [] }, { sources: [] }],
       "uplink",

@@ -37,7 +37,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
       if (item.kind === "data") {
         const widgetType = item.id;
 
-        // Optimistic insert: write a placeholder channel into the
+        // Optimistic insert: write a placeholder widget into the
         // dashboard cache immediately so the Sidebar + CatalogCard
         // "Added" badge flip on the next paint. Without this the user
         // saw a 0.5-1s gap between click and any visible state change
@@ -68,7 +68,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
                 widgets: [optimisticWidget],
               } as DashboardResponse;
             }
-            // Don't double-insert if the channel is somehow already
+            // Don't double-insert if the widget is somehow already
             // present (e.g. CDC raced us).
             const existing = old.widgets ?? [];
             if (existing.some((c) => c.widget_type === widgetType)) {
@@ -81,7 +81,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
           },
         );
 
-        // Navigate immediately — the channel page's queries will fire
+        // Navigate immediately — the widget page's queries will fire
         // in parallel with the create call below.
         navigate({
           to: "/widget/$id",
@@ -120,7 +120,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
               queryKey: queryKeys.dashboard,
               refetchType: "active",
             });
-            // The sports channel page reads /sports (["sports","full"]),
+            // The sports widget page reads /sports (["sports","full"]),
             // not /dashboard — without this the mounted MLS/NFL feed
             // keeps its pre-create empty payload indefinitely (no
             // refetch trigger ever fires in a single always-focused

@@ -5,7 +5,7 @@ import { getAllDataWidgets } from "../../datawidgets/registry";
 import { getAllWidgets } from "../../widgets/registry";
 import type { DataWidgetManifest, WidgetManifest } from "../../types";
 
-const CHANNEL_TIERS: Record<string, string> = {
+const WIDGET_TIERS: Record<string, string> = {
   finance: "Free",
   sports: "Free",
   rss: "Free",
@@ -13,7 +13,7 @@ const CHANNEL_TIERS: Record<string, string> = {
 };
 
 export default function FeatureGuidesSection() {
-  const channels = useMemo(() => getAllDataWidgets(), []);
+  const dataWidgets = useMemo(() => getAllDataWidgets(), []);
   const widgets = useMemo(() => getAllWidgets(), []);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -27,11 +27,11 @@ export default function FeatureGuidesSection() {
       <div>
         <p className="mb-3 text-ui-section">Data Widgets</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {channels.map((ch) => (
+          {dataWidgets.map((ch) => (
             <GuideCard
               key={ch.id}
               manifest={ch}
-              tier={CHANNEL_TIERS[ch.id] ?? "Free"}
+              tier={WIDGET_TIERS[ch.id] ?? "Free"}
               isOpen={expandedId === ch.id}
               onToggle={() => toggle(ch.id)}
             />

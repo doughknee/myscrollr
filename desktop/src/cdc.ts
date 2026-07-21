@@ -5,7 +5,7 @@
  * Both the ticker window (App.tsx) and the main window (__root.tsx)
  * import this registry so CDC merge behaviour is identical everywhere.
  *
- * Adding a new CDC-backed channel = add one entry to CDC_TABLES.
+ * Adding a new CDC-backed widget = add one entry to CDC_TABLES.
  */
 import type { Trade, Game, RssItem, Prediction } from "./types";
 import type { SubscriptionTier } from "./auth";

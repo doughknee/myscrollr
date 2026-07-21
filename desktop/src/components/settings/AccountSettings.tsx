@@ -93,7 +93,7 @@ export default function AccountSettings({
   // standard ActionRow chrome; `exportUserData()` (api/client) is the
   // source of truth for the download flow.
   const [exportState, setExportState] = useState<"idle" | "loading">("idle");
-  // Phase 1 (Apr 26): sign-out used to be one-click. Reset, channel
+  // Phase 1 (Apr 26): sign-out used to be one-click. Reset, widget
   // delete, and other destructive actions all confirm — sign-out
   // shouldn't be the odd one out, especially given how disruptive
   // the post-logout state is (loses ticker SSE, drops cached data,
@@ -107,7 +107,7 @@ export default function AccountSettings({
   const navigate = useNavigate();
   const slots = useSlotUsage();
 
-  // Aggregated overview: channels count, fantasy summary, GDPR state.
+  // Aggregated overview: widgets count, fantasy summary, GDPR state.
   // Only fires when authenticated; query is cheap (cached server-side, 30s stale).
   const { data: overview } = useQuery({
     ...userOverviewQueryOptions(),

@@ -1,13 +1,13 @@
 /**
- * News/RSS channel preview harness — dev-only, browser-only entry.
+ * News/RSS widget preview harness — dev-only, browser-only entry.
  *
- * Mirrors channels/finance/preview/ (see that harness + the predictions
+ * Mirrors datawidgets/finance/preview/ (see that harness + the predictions
  * one for the pattern rationale): the REAL RssFeedTab with STATEFUL
  * prefs and a seeded, disabled query cache. Feed ADD/REMOVE mutations
  * are not exercised (no authenticated API in a browser) — the Feeds
  * view is asserted render-only.
  */
-// FIRST: evaluate the channel registry before ../FeedTab (module-cycle
+// FIRST: evaluate the widget registry before ../FeedTab (module-cycle
 // guard — see the finance harness for the full explanation).
 import "../../registry";
 import { StrictMode, useState } from "react";
@@ -85,7 +85,7 @@ function main(): void {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { enabled: false, retry: false } },
   });
-  const channelRow = (type: string, feeds: typeof FEEDS) => ({
+  const widgetRow = (type: string, feeds: typeof FEEDS) => ({
     id: 1,
     widget_type: type,
     enabled: true,
@@ -99,8 +99,8 @@ function main(): void {
   queryClient.setQueryData(dashboardQueryOptions().queryKey, {
     data: { rss: rssItems },
     widgets: [
-      channelRow("rss_custom", FEEDS),
-      channelRow("news_bbc", FEEDS.slice(0, 1)),
+      widgetRow("rss_custom", FEEDS),
+      widgetRow("news_bbc", FEEDS.slice(0, 1)),
     ],
   });
   queryClient.setQueryData(rssCatalogOptions().queryKey, catalog);
@@ -132,10 +132,10 @@ function main(): void {
     appVersion: "preview",
     allDataWidgetManifests: [],
     allWidgets: [],
-    onToggleChannelTicker: noop,
+    onToggleDataWidgetTicker: noop,
     onToggleWidgetTicker: noop,
-    onAddChannel: noop,
-    onDeleteChannel: noop,
+    onAddWidget: noop,
+    onDeleteWidget: noop,
     onToggleWidget: noop,
     onSelectItem: noop,
   };

@@ -1,13 +1,13 @@
 /**
- * MyPositionsPanel — the "My Positions" surface for the predictions channel.
+ * MyPositionsPanel — the "My Positions" surface for the predictions widget.
  *
  * When the user hasn't linked Kalshi, this renders the {@link ConnectWizard}.
  * Once linked, it shows their balance, open positions with LIVE profit & loss
- * (marked to market against the same prices the channel already streams),
+ * (marked to market against the same prices the widget already streams),
  * recent fills, and resting orders — plus an easy Disconnect.
  *
  * Live updates come from two places:
- *   1. Market prices tick in via the channel's existing dashboard feed
+ *   1. Market prices tick in via the widget's existing dashboard feed
  *      (`markets`), so unrealized P&L re-computes on every price change with no
  *      extra network calls.
  *   2. The authenticated read-only WS stream (`kalshi-user-event`) tells us when

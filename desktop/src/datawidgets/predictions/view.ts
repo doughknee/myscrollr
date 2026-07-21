@@ -316,7 +316,7 @@ export function cardOutcomes(
 
 /**
  * NO payload today carries an event start time (see ui-review/NOTES.md, B3
- * findings) — this optional field is typed channel-locally so the indicator
+ * findings) — this optional field is typed widget-locally so the indicator
  * logic is ready the day the backend ships one. Never derived or guessed.
  */
 export type MaybeStarts = Prediction & { start_time?: string | null };

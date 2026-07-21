@@ -1,5 +1,5 @@
 /**
- * ProbabilityPill — the predictions channel's signature element (v1.1.5).
+ * ProbabilityPill — the predictions widget's signature element (v1.1.5).
  *
  * A rounded mono pill showing implied probability ("62%"), tinted by the
  * market's direction and flashing briefly when the value changes — the

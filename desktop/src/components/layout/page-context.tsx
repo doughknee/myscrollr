@@ -28,8 +28,8 @@ export interface PageIdentity {
   onParentClick?: () => void;
   /**
    * Optional click handler for the title itself. Used when the page
-   * has sub-routes (e.g. on `/channel/sports/configuration`, clicking
-   * "Sports" should go back to `/channel/sports/feed`). When omitted,
+   * has sub-routes (e.g. on `/widget/sports_nfl/info`, clicking
+   * "Sports" should go back to `/widget/sports_nfl`). When omitted,
    * and no menuItems make the title a menu, the title renders as plain
    * text.
    */

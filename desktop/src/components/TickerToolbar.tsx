@@ -34,7 +34,7 @@ export default function TickerToolbar({
     <>
       {/* Persistent right-click hint — always visible on the right
           edge of the ticker. Without this, the right-click context
-          menu (channels / widgets / position / Customize) is
+          menu (widgets / widgets / position / Customize) is
           completely undiscoverable. The icon fades to ~25% opacity
           when the user isn't hovering so it doesn't compete with
           chip content, but stays visible enough to invite curiosity.

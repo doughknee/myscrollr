@@ -1,7 +1,7 @@
 /**
  * OverflowMenu — accessible "..." dropdown menu for contextual actions.
  *
- * Used on source pages (channels and widgets) to expose Configure,
+ * Used on source pages (widgets and widgets) to expose Configure,
  * Display preferences, ticker management, and Remove without
  * stealing screen real estate via a tab band. Feed becomes the
  * single visible page; secondary actions live behind the menu.

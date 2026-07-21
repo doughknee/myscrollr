@@ -35,7 +35,7 @@ export const queryKeys = {
 
 /**
  * Aggregated account view: identity + tier + subscription summary +
- * channel counts + fantasy summary + GDPR state. Backed by the core
+ * widget counts + fantasy summary + GDPR state. Backed by the core
  * API's singleflight cache (~30s).
  */
 export function userOverviewQueryOptions() {
@@ -67,7 +67,7 @@ async function fetchDashboard(): Promise<DashboardResponse> {
   // This prevents the deadlock where an expired access token blocked the only code path
   // that could trigger a refresh via getValidToken().
   //
-  // Signed-in users with zero channels installed deliberately receive an
+  // Signed-in users with zero widgets installed deliberately receive an
   // empty `data` payload — the ticker renders an inline "no sources yet"
   // CTA in that state rather than teasing public-feed data. See
   // `ScrollrTicker` empty-shell handling and `App.tsx` widgetTabs logic.
@@ -145,7 +145,7 @@ export interface TrackedSymbol {
 }
 
 /**
- * Catalog entry for the Predictions channel — one row per trackable
+ * Catalog entry for the Predictions widget — one row per trackable
  * Kalshi market, surfaced by `GET /predictions/catalog`. Drives the
  * the predictions Configure page's category chips + counts.
  */
@@ -210,8 +210,8 @@ export function sportsCatalogOptions() {
 
 /**
  * Full sports games payload — every game for the user's selected leagues,
- * no per-league fair-share cap. Used by the full channel page
- * (`/channel/sports/feed`), where the user has filter chips to narrow down
+ * no per-league fair-share cap. Used by the full widget page
+ * (`/widget/sports_nfl`), where the user has filter chips to narrow down
  * by hand.
  *
  * The home feed reads from `dashboardQueryOptions` instead, which serves a

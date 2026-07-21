@@ -198,11 +198,11 @@ export function isWidgetTickerEnabled(w: {
   return typeof w.ticker_enabled === "boolean" ? w.ticker_enabled : true;
 }
 
-export interface RssChannelConfig {
+export interface RssWidgetConfig {
   feeds?: Array<{ name: string; url: string; is_custom?: boolean }>;
 }
 
-// ── Channels API ────────────────────────────────────────────────
+// ── Widgets API ────────────────────────────────────────────────
 
 export const dataWidgetsApi = {
   getAll: () =>
@@ -249,8 +249,8 @@ export const dataWidgetsApi = {
 // ── DataWidgetRow ticker toggle ───────────────────────────────────────
 
 /**
- * Toggle whether a channel's chips appear on the ticker (and optionally
- * mark the channel itself enabled). Returns a promise that resolves
+ * Toggle whether a widget's chips appear on the ticker (and optionally
+ * mark the widget itself enabled). Returns a promise that resolves
  * when the API call completes. Callers are responsible for invalidating
  * queries afterward.
  *

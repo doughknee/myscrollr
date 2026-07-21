@@ -1,21 +1,21 @@
 /**
- * Finance channel preview harness — dev-only, browser-only entry.
+ * Finance widget preview harness — dev-only, browser-only entry.
  *
- * Mounts the REAL FinanceFeedTab (no mocks of channel code) in a plain
+ * Mounts the REAL FinanceFeedTab (no mocks of widget code) in a plain
  * browser with the minimum scaffolding it needs: the app stylesheet, a
  * ShellContext with STATEFUL display prefs (bar writes re-render like
  * the real shell), and a TanStack Query cache seeded once with a
  * deterministic inline fixture (queries disabled — static data; live
  * behavior is verified in Tauri).
  *
- * Mirrors channels/predictions/preview/ — see that harness for the
+ * Mirrors datawidgets/predictions/preview/ — see that harness for the
  * pattern rationale. Symbol ADD/REMOVE mutations are not exercised here
  * (no authenticated API in a browser); the Symbols view is asserted
  * render-only, and persistence rides the same useDataWidgetConfig hook the
  * Configure page has always used.
  */
-// FIRST: evaluate the channel registry before ../FeedTab. FinanceFeedTab
-// imports marketplace → registry → (eager glob) every channel FeedTab; if
+// FIRST: evaluate the widget registry before ../FeedTab. FinanceFeedTab
+// imports marketplace → registry → (eager glob) every widget FeedTab; if
 // this entry starts at ../FeedTab instead, that cycle re-enters the
 // half-evaluated module and throws a TDZ ReferenceError. The real app
 // always evaluates the registry first — mirror it.
@@ -137,10 +137,10 @@ function main(): void {
     appVersion: "preview",
     allDataWidgetManifests: [],
     allWidgets: [],
-    onToggleChannelTicker: noop,
+    onToggleDataWidgetTicker: noop,
     onToggleWidgetTicker: noop,
-    onAddChannel: noop,
-    onDeleteChannel: noop,
+    onAddWidget: noop,
+    onDeleteWidget: noop,
     onToggleWidget: noop,
     onSelectItem: noop,
   };

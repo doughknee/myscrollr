@@ -32,7 +32,7 @@ interface TickerLayoutSummaryProps {
   /** Open the full Settings → Ticker editor. */
   onOpenSettings: () => void;
   /** DataWidgetRow manifests, used to color the per-row source bars. */
-  channelManifests: DataWidgetManifest[];
+  dataWidgetManifests: DataWidgetManifest[];
   /** Widget manifests, used to color the per-row source bars. */
   widgetManifests: WidgetManifest[];
 }
@@ -42,7 +42,7 @@ export default function TickerLayoutSummary({
   tierMaxRows,
   canAddRow,
   onOpenSettings,
-  channelManifests,
+  dataWidgetManifests,
   widgetManifests,
 }: TickerLayoutSummaryProps) {
   const rowCount = rows.length;
@@ -53,10 +53,10 @@ export default function TickerLayoutSummary({
   // grey for unknown ids (shouldn't happen in practice).
   const sourceColor = (id: string): string => {
     // Split data widgets (sports_nfl, finance_stocks, news_bbc) resolve via the
-    // flat catalog — the coarse channelManifests only know "sports"/"finance".
+    // flat catalog — the coarse dataWidgetManifests only know "sports"/"finance".
     const item = catalogItemById(id);
     if (item) return item.hex;
-    const ch = channelManifests.find((c) => c.id === id);
+    const ch = dataWidgetManifests.find((c) => c.id === id);
     if (ch) return ch.hex;
     const w = widgetManifests.find((mf) => mf.id === id);
     if (w) return w.hex;
@@ -66,7 +66,7 @@ export default function TickerLayoutSummary({
   const sourceLabel = (id: string): string => {
     const item = catalogItemById(id);
     if (item) return item.name;
-    const ch = channelManifests.find((c) => c.id === id);
+    const ch = dataWidgetManifests.find((c) => c.id === id);
     if (ch) return ch.tabLabel || ch.name || id;
     const w = widgetManifests.find((mf) => mf.id === id);
     if (w) return w.tabLabel || w.name || id;

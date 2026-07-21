@@ -123,7 +123,7 @@ this bit us during the `visible` → `ticker_enabled` rename.
 |---|---|
 | `api/internal/platform/widgets.go` | The widget catalog — the authority |
 | `api/internal/widgets/catalog.go` | `GET /catalog` |
-| `api/internal/widgets/channels.go` | Widget CRUD (`/users/me/widgets`) |
+| `api/internal/widgets/widgets.go` | Widget CRUD (`/users/me/widgets`) |
 | `api/internal/ingestread/sources.go` | `LocalSources` seam: health, dashboard, lifecycle |
 | `api/internal/platform/discovery.go` | Redis service discovery (fantasy) |
 | `api/core/proxy.go` | Dynamic proxy for discovered services |

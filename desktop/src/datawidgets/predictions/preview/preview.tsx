@@ -1,7 +1,7 @@
 /**
- * Kalshi channel preview harness — dev-only, browser-only entry.
+ * Kalshi widget preview harness — dev-only, browser-only entry.
  *
- * Mounts the REAL PredictionsFeedTab (no mocks of channel code) in a plain
+ * Mounts the REAL PredictionsFeedTab (no mocks of widget code) in a plain
  * browser with the minimum scaffolding the component needs:
  *   - the app stylesheet + a themed #app-shell wrapper (tokens attach to
  *     `#app-shell[data-theme]`),
@@ -46,7 +46,7 @@ const demo = params.get("demo") === "1";
 // Makes `isKalshiAvailable()` true in the browser so the Markets/Positions
 // switcher renders and the My Positions panel is drivable with a mocked
 // open-position portfolio (A2 verification). Unknown commands reject —
-// every channel caller already tolerates that.
+// every widget caller already tolerates that.
 function installTauriMock(predictions: Prediction[]): void {
   const lead = predictions[0];
   const second =
@@ -121,7 +121,7 @@ function installTauriMock(predictions: Prediction[]): void {
   };
 
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
-    // @tauri-apps/api v2 entry points used by the channel.
+    // @tauri-apps/api v2 entry points used by the widget.
     invoke: (cmd: string) =>
       cmd in commands
         ? Promise.resolve(commands[cmd]())
@@ -245,10 +245,10 @@ function main(): void {
     appVersion: "preview",
     allDataWidgetManifests: [],
     allWidgets: [],
-    onToggleChannelTicker: noop,
+    onToggleDataWidgetTicker: noop,
     onToggleWidgetTicker: noop,
-    onAddChannel: noop,
-    onDeleteChannel: noop,
+    onAddWidget: noop,
+    onDeleteWidget: noop,
     onToggleWidget: noop,
     onSelectItem: noop,
   };

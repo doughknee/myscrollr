@@ -29,10 +29,10 @@ import {
   TICKER_GAPS,
   TICKER_HEIGHTS,
   toggleWidgetPin,
-  setChannelTickerRow,
+  setDataWidgetTickerRow,
   setWidgetTickerRow,
   setTickerLayout,
-  getChannelTickerRow,
+  getDataWidgetTickerRow,
   getWidgetTickerRow,
 } from "./preferences";
 import { getMaxTickerRows } from "./tierLimits";
@@ -97,47 +97,47 @@ export default function App() {
     return unsub;
   }, [queryClient]);
 
-  // Derive channels and active tabs from query data
-  const channels = useMemo(
+  // Derive widgets and active tabs from query data
+  const widgets = useMemo(
     () => dashboard?.widgets ?? [],
     [dashboard?.widgets],
   );
 
   const widgetTabs = useMemo(() => {
-    if (channels.length === 0) {
+    if (widgets.length === 0) {
       // Demo mode (VITE_DEMO) talks to the local bridge, which serves only the
-      // predictions slice and may not surface channels[] on the ticker window
+      // predictions slice and may not surface widgets[] on the ticker window
       // in time — show predictions rather than the finance/sports teaser the
       // bridge can't fill.
       if (DEMO) return ["predictions"];
       // Signed-out users get the finance + sports demo tabs so the
       // public-feed teaser renders on the ticker. Signed-in users with
-      // zero channels deliberately get an empty tab list so the ticker
+      // zero widgets deliberately get an empty tab list so the ticker
       // renders its inline "no sources yet" CTA instead of pretending
       // to have data the user never opted into.
       return authenticated
         ? []
         : loadPref("activeFeedTabs", ["finance", "sports"]);
     }
-    return channels
+    return widgets
       .filter((ch) => ch.enabled && isWidgetTickerEnabled(ch))
       .map((ch) => ch.widget_type);
-  }, [channels, authenticated]);
+  }, [widgets, authenticated]);
 
-  // Visual metadata for installed channels — used by the ticker's
+  // Visual metadata for installed widgets — used by the ticker's
   // "installed but nothing ticker-enabled" empty CTA so it can render
-  // one quick-link chip per installed channel. We join the dashboard's
-  // `channels` (which gives us the truthy install state) with the
-  // build-time channel registry (which gives us the display name, icon,
+  // one quick-link chip per installed widget. We join the dashboard's
+  // `widgets` (which gives us the truthy install state) with the
+  // build-time widget registry (which gives us the display name, icon,
   // and brand hex). Memoized to keep referential equality stable across
-  // renders that don't change the channel set.
-  const installedChannelsMeta = useMemo(() => {
-    if (channels.length === 0) return [];
-    // Resolve each enabled channel row to its WIDGET display (name/icon/hex)
+  // renders that don't change the widget set.
+  const installedWidgetsMeta = useMemo(() => {
+    if (widgets.length === 0) return [];
+    // Resolve each enabled widget row to its WIDGET display (name/icon/hex)
     // from the flat catalog, so split widgets show as "MLB"/"Stocks" — not
     // the coarse "Sports"/"Finance" source they read from.
     const metaById = new Map(getCatalogItems().map((it) => [it.id, it]));
-    return channels
+    return widgets
       .filter((ch) => ch.enabled)
       .map((ch) => metaById.get(ch.widget_type))
       .filter((m): m is NonNullable<typeof m> => Boolean(m))
@@ -147,17 +147,17 @@ export default function App() {
         hex: m.hex,
         icon: m.icon,
       }));
-  }, [channels]);
+  }, [widgets]);
 
   // Persist active tabs when they change (side effect, not in useMemo)
   useEffect(() => {
-    if (channels.length > 0) {
+    if (widgets.length > 0) {
       savePref("activeFeedTabs", widgetTabs);
     }
-  }, [widgetTabs, channels.length]);
+  }, [widgetTabs, widgets.length]);
 
-  const channelsRef = useRef(channels);
-  channelsRef.current = channels;
+  const widgetsRef = useRef(widgets);
+  widgetsRef.current = widgets;
 
   // Pin (always-on-top) state
   const [pinned, setPinned] = useState(() => loadPref("feedPinned", true));
@@ -468,7 +468,7 @@ export default function App() {
         return;
       }
       // No URL provided (widget chip, missing data) — open the desktop
-      // app on the relevant channel/widget page.
+      // app on the relevant widget page.
       savePref("activeItem", widgetType);
       invoke("show_app_window").catch(() => {});
     },
@@ -477,7 +477,7 @@ export default function App() {
 
   // ── Empty-ticker CTAs → open the main window on a specific route ──
   //
-  // Both empty-ticker states (no channels installed; channels installed
+  // Both empty-ticker states (no widgets installed; widgets installed
   // but none ticker-enabled) need to navigate the main window to a
   // specific route and bring it forward. We use the existing
   // cross-window `scrollr:navigate` store key (already listened to in
@@ -495,13 +495,13 @@ export default function App() {
   }, [navigateMainWindow]);
 
   /**
-   * Installed-but-ticker-off state: open a specific channel's feed —
+   * Installed-but-ticker-off state: open a specific widget's feed —
    * the show-on-ticker toggle lives in the widget's own bar now.
-   * Used by the per-channel quick-link chips.
+   * Used by the per-widget quick-link chips.
    */
-  const handleOpenChannel = useCallback(
-    (channelId: string) => {
-      navigateMainWindow(`/widget/${channelId}`);
+  const handleOpenWidget = useCallback(
+    (widgetId: string) => {
+      navigateMainWindow(`/widget/${widgetId}`);
     },
     [navigateMainWindow],
   );
@@ -514,12 +514,12 @@ export default function App() {
   // handlers mirror the row-change logic in routes/feed.tsx exactly.
   // See preferences.ts §"Unified ticker row selector helpers".
 
-  const handleChannelRowChange = useCallback(
+  const handleDataWidgetRowChange = useCallback(
     async (widgetType: WidgetId, row: number | null) => {
       // 1) Client-side: assign / unassign in tickerLayout. Optimistic update
       //    so the next tray menu rebuild reflects the change immediately.
       setPrefs((prev) => {
-        const updated = setChannelTickerRow(prev, widgetType, row);
+        const updated = setDataWidgetTickerRow(prev, widgetType, row);
         savePrefs(updated);
         return updated;
       });
@@ -614,7 +614,7 @@ export default function App() {
       e.preventDefault();
 
       const items: (Submenu | CheckMenuItem | MenuItem | PredefinedMenuItem)[] = [];
-      const chs = channelsRef.current;
+      const chs = widgetsRef.current;
 
       // Open Scrollr — most common action, top of menu
       items.push(
@@ -629,7 +629,7 @@ export default function App() {
       items.push(await PredefinedMenuItem.new({ item: "Separator" }));
 
       // Per-source row picker — same mental model as the feed page
-      // the ticker row editor. Each channel/widget gets its own submenu with
+      // the ticker row editor. Each widget gets its own submenu with
       // [Off, Row 1, Row 2, …] CheckMenuItems where exactly one is
       // checked at any time. The row count is dynamic: we show only
       // the rows the user has actually enabled in their ticker layout
@@ -701,13 +701,16 @@ export default function App() {
 
       // Append an empty row to the layout, then optimistically assign
       // `sourceId` to it. We do the assignment via a follow-up call to
-      // setChannelTickerRow / setWidgetTickerRow rather than seeding
-      // the layout in one step, because the channel branch also needs
+      // setDataWidgetTickerRow / setWidgetTickerRow rather than seeding
+      // the layout in one step, because the data branch also needs
       // to flip the server-side `ticker_enabled` flag — reusing the
       // existing handlers keeps that logic in one place.
+      //
+      // `kind` mirrors the catalog's own kind field: a data widget is
+      // CDC-backed and has a server row, a utility widget is local-only.
       function addRowAndAssign(
         sourceId: string,
-        kind: "channel" | "widget",
+        kind: "data" | "utility",
       ): void {
         const current = prefsRef.current.appearance.tickerLayout;
         const tier = tierRef.current;
@@ -722,42 +725,42 @@ export default function App() {
         prefsRef.current = withRow;
         setPrefs(withRow);
         savePrefs(withRow);
-        // Now thread through the existing per-kind handler (channel
-        // also flips server-side flag; widget is purely client-side).
-        if (kind === "channel") {
-          handleChannelRowChange(sourceId, newIndex);
+        // Now thread through the existing per-kind handler (data also
+        // flips the server-side flag; utility is purely client-side).
+        if (kind === "data") {
+          handleDataWidgetRowChange(sourceId, newIndex);
         } else {
           handleWidgetRowChange(sourceId, newIndex);
         }
       }
 
       // Widgets submenu — one unified row-picker list. The widget/slot model
-      // has no coarse "channels": server-backed data widgets (sports_nfl,
+      // has no coarse "widgets": server-backed data widgets (sports_nfl,
       // finance_stocks, …) and local widgets (clock, weather, …) sit together,
       // each labeled by its catalog name.
       const widgetSubmenus: Submenu[] = [];
 
-      // Data widgets — the user's enabled channels, labeled by their catalog
+      // Data widgets — the user's enabled widgets, labeled by their catalog
       // name ("NFL", "Stocks", "BBC News"), not the raw widget_type.
       const metaById = new Map(getCatalogItems().map((it) => [it.id, it]));
       for (const ch of chs) {
         const label =
           metaById.get(ch.widget_type)?.name ??
           `${ch.widget_type.charAt(0).toUpperCase()}${ch.widget_type.slice(1)}`;
-        const currentRow = getChannelTickerRow(prefsRef.current, ch);
+        const currentRow = getDataWidgetTickerRow(prefsRef.current, ch);
         const rowItems = await buildRowSubmenuItems(
           currentRow,
           (row) => {
             // Optimistic update — flip the ref immediately so the next
             // menu build reflects the change without waiting for the API.
-            const target = channelsRef.current.find(
+            const target = widgetsRef.current.find(
               (c) => c.widget_type === ch.widget_type,
             );
             if (target) target.ticker_enabled = row !== null;
-            handleChannelRowChange(ch.widget_type, row);
+            handleDataWidgetRowChange(ch.widget_type, row);
           },
           !ch.enabled,
-          () => addRowAndAssign(ch.widget_type, "channel"),
+          () => addRowAndAssign(ch.widget_type, "data"),
         );
         widgetSubmenus.push(
           await Submenu.new({ text: label, items: rowItems }),
@@ -771,7 +774,7 @@ export default function App() {
           currentRow,
           (row) => handleWidgetRowChange(widget.id, row),
           false,
-          () => addRowAndAssign(widget.id, "widget"),
+          () => addRowAndAssign(widget.id, "utility"),
         );
         widgetSubmenus.push(
           await Submenu.new({ text: widget.name, items: rowItems }),
@@ -857,9 +860,9 @@ export default function App() {
     }
     document.addEventListener("contextmenu", onContextMenu);
     return () => document.removeEventListener("contextmenu", onContextMenu);
-  }, [handleChannelRowChange, handleWidgetRowChange, handleTogglePosition]);
+  }, [handleDataWidgetRowChange, handleWidgetRowChange, handleTogglePosition]);
 
-  // ── Merge channel + widget tabs ──────────────────────────────
+  // ── Merge widget + widget tabs ──────────────────────────────
   const activeTabs = useMemo(
     () => [...widgetTabs, ...prefs.widgets.widgetsOnTicker],
     [widgetTabs, prefs.widgets.widgetsOnTicker],
@@ -903,30 +906,30 @@ export default function App() {
             // Empty-state CTAs are anchored to the first row only, so
             // multi-row layouts don't stack duplicate banners. Two
             // mutually exclusive states:
-            //   - Sourceless:    signed in, ZERO installed channels.
+            //   - Sourceless:    signed in, ZERO installed widgets.
             //                    CTA → Browse catalog.
-            //   - InstalledOff:  signed in, has installed channels, but
+            //   - InstalledOff:  signed in, has installed widgets, but
             //                    the ticker would otherwise render nothing
-            //                    for ANY reason — channels turned off,
+            //                    for ANY reason — widgets turned off,
             //                    nothing picked yet (e.g. Finance on but
             //                    no symbols), offseason, etc. The actual
             //                    "has no chips" gate lives in the ticker
             //                    component itself; we just pass the flag
             //                    saying "if you have nothing, here's the
-            //                    recovery UI to use".  CTA → per-channel
-            //                    chips that open each channel feed.
+            //                    recovery UI to use".  CTA → per-widget
+            //                    chips that open each widget feed.
             const hasAnyPinnedWidget = Object.values(prefs.widgets.pinnedWidgets ?? {})
               .some((pin) => (pin.row ?? 0) === i);
             const isFirstRow = i === 0;
             const showSourcelessCTA =
               isFirstRow &&
               authenticated &&
-              channels.length === 0 &&
+              widgets.length === 0 &&
               !hasAnyPinnedWidget;
             const showInstalledOffCTA =
               isFirstRow &&
               authenticated &&
-              installedChannelsMeta.length > 0 &&
+              installedWidgetsMeta.length > 0 &&
               !hasAnyPinnedWidget;
             return (
               <ScrollrTicker
@@ -955,8 +958,8 @@ export default function App() {
                 showSourcelessCTA={showSourcelessCTA}
                 onAddSources={handleAddSources}
                 showInstalledOffCTA={showInstalledOffCTA}
-                installedChannels={installedChannelsMeta}
-                onOpenChannel={handleOpenChannel}
+                installedWidgets={installedWidgetsMeta}
+                onOpenWidget={handleOpenWidget}
               />
             );
           })}

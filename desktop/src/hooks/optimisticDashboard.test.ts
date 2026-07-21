@@ -27,15 +27,11 @@ const sources = import.meta.glob<string>("../**/*.{ts,tsx}", {
 });
 
 /**
- * `ShellDataState` has its own legitimate `channels` field, unrelated to
- * the wire. Anything else assigning a `channels:` key alongside
- * DashboardResponse is the bug.
+ * There is no allow-list. `ShellDataState` used to carry its own unrelated
+ * `channels` field, which forced two exemptions here; the vocabulary rename
+ * made it `widgets` like everything else, so every `channels:` key in a file
+ * that touches DashboardResponse is now unambiguously the bug.
  */
-const ALLOWED = new Set([
-  "../shell-context.ts",
-  "../datawidgets/sports/preview/preview.tsx",
-]);
-
 const builders = Object.entries(sources).filter(
   ([path, src]) => src.includes("DashboardResponse") && !path.endsWith(".test.ts"),
 );
@@ -47,7 +43,6 @@ describe("dashboard payload keys", () => {
   });
 
   for (const [path, src] of builders) {
-    if (ALLOWED.has(path)) continue;
     it(`${path} uses the widgets key, not the retired channels one`, () => {
       const stale = src.match(/\bchannels\s*:/g);
       expect(

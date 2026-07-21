@@ -55,7 +55,7 @@ export function BarChassisProvider({
   active,
   children,
 }: {
-  /** True on source routes (channel/widget feeds). When false the
+  /** True on source routes (widget feeds). When false the
    *  context is null and any WidgetBar renders standalone. */
   active: boolean;
   children: React.ReactNode;

@@ -3,7 +3,7 @@
  *
  * Kalshi candlestick history needs a signed API call (and the public data
  * pipeline isn't wired for it yet), so the market-detail sparkline is built
- * from the prices the channel already streams: every observed `yes_price` for a
+ * from the prices the widget already streams: every observed `yes_price` for a
  * market is appended to a capped ring buffer, and we render that. History is
  * in-memory (resets on reload) — it fills in live, which suits the "heartbeat"
  * feel. All geometry is pure + unit-tested.

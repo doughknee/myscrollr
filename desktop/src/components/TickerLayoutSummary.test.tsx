@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import TickerLayoutSummary from "./TickerLayoutSummary";
 import type { DataWidgetManifest, WidgetManifest } from "../types";
 
-const channelManifests = [
+const dataWidgetManifests = [
   { id: "finance", tabLabel: "Finance", hex: "#22c55e" },
 ] as DataWidgetManifest[];
 
@@ -19,7 +19,7 @@ describe("TickerLayoutSummary", () => {
         tierMaxRows={3}
         canAddRow={true}
         onOpenSettings={vi.fn()}
-        channelManifests={channelManifests}
+        dataWidgetManifests={dataWidgetManifests}
         widgetManifests={widgetManifests}
       />,
     );
@@ -37,7 +37,7 @@ describe("TickerLayoutSummary", () => {
         tierMaxRows={1}
         canAddRow={false}
         onOpenSettings={vi.fn()}
-        channelManifests={channelManifests}
+        dataWidgetManifests={dataWidgetManifests}
         widgetManifests={widgetManifests}
       />,
     );

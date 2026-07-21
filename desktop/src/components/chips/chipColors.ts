@@ -124,15 +124,15 @@ const WIDGET_GITHUB: ChipColors = {
   textFaint: "text-widget-github/55",
 };
 
-// ── DataWidgetRow + widget → color mapping ────────────────────────────
+// ── Widget id → color mapping (data + utility alike) ────────────
 
-const CHANNEL_MAP: Record<string, ChipColors> = {
+const WIDGET_MAP: Record<string, ChipColors> = {
   finance: PRIMARY,
   sports: SECONDARY,
   rss: INFO,
   fantasy: PURPLE,
   // Predictions brand teal (#1fc9a0, v1.1.5) — its own static token so the
-  // ticker chip matches the catalog card and the channel accent everywhere.
+  // ticker chip matches the catalog card and the widget accent everywhere.
   predictions: PREDICTIONS,
   clock: WIDGET_CLOCK,
   timer: WIDGET_TIMER,
@@ -144,10 +144,10 @@ const CHANNEL_MAP: Record<string, ChipColors> = {
 
 // ── Resolver ────────────────────────────────────────────────────
 
-export function getChipColors(mode: ChipColorMode, channel: string): ChipColors {
+export function getChipColors(mode: ChipColorMode, widget: string): ChipColors {
   if (mode === "accent") return PRIMARY;
   if (mode === "muted") return MUTED;
-  return CHANNEL_MAP[channel] ?? PURPLE;
+  return WIDGET_MAP[widget] ?? PURPLE;
 }
 
 // ── Shared chip base classes ────────────────────────────────────

@@ -1,5 +1,5 @@
 /**
- * Shared hook for channel ConfigPanel state management.
+ * Shared hook for widget ConfigPanel state management.
  *
  * Handles the error state, auto-dismiss timer, and update mutation
  * that are identical across Finance, Sports, and RSS ConfigPanels.

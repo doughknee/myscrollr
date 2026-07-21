@@ -80,7 +80,7 @@ function WidgetInfoPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const { prefs, tier, authenticated, onLogin } = useShell();
-  const { channels } = useShellData();
+  const { widgets } = useShellData();
   const { isLoading: dashboardLoading } = useQuery(dashboardQueryOptions());
   const addWidget = useAddWidget();
   const removeWidgetShared = useRemoveWidget();
@@ -115,7 +115,7 @@ function WidgetInfoPage() {
 
   const enabled =
     item.kind === "data"
-      ? channels.some((c) => c.widget_type === item.id)
+      ? widgets.some((c) => c.widget_type === item.id)
       : prefs.widgets.enabledWidgets.includes(item.id);
 
   const tierLocked =
@@ -125,7 +125,7 @@ function WidgetInfoPage() {
 
   // Enabled rows only — matches the server gate (WHERE enabled = true).
   const used =
-    channels.filter((ch) => ch.enabled).length +
+    widgets.filter((ch) => ch.enabled).length +
     prefs.widgets.enabledWidgets.length;
   const maxSlots = getMaxWidgets(tier);
   const slotLocked = used >= maxSlots && !enabled && !tierLocked;

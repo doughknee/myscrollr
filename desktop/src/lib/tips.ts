@@ -4,7 +4,7 @@
  * Why this exists:
  *   The desktop app has several powerful affordances that brand-new
  *   users have no way to find without prior knowledge — most notably
- *   the ticker's right-click context menu (channels, widgets, position,
+ *   the ticker's right-click context menu (widgets, widgets, position,
  *   "Customize Ticker") and the system-tray icon's role as the only
  *   way back to the app once the main window is closed. Pre-Phase-2
  *   users had to either accidentally discover these or be told. This

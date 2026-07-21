@@ -116,7 +116,7 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
     return Array.isArray(l) && typeof l[0] === "string" ? (l[0] as string) : undefined;
   }, [widgetId]);
 
-  // Full channel page reads from /sports directly (not /dashboard), which
+  // Full widget page reads from /sports directly (not /dashboard), which
   // returns every game for the user's selected leagues without per-league
   // fair-share capping. The bar's status pills narrow down by hand.
   const { data: sportsData } = useQuery(sportsFullQueryOptions());
@@ -276,7 +276,7 @@ function SportsFilterMenu({
 
   return (
     // NOT position:relative — the dropdown anchors to the sticky bar so
-    // it spans the channel width instead of clipping at narrow widths.
+    // it spans the widget width instead of clipping at narrow widths.
     <div ref={rootRef} className="shrink-0 rounded-lg">
       <FilterTrigger
         open={open}

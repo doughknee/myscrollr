@@ -118,7 +118,7 @@ export function truncate(text: string, maxLen: number): string {
 /**
  * Abbreviate a large count with a K/M/B suffix (e.g. 12_400 → "12.4K",
  * 3_000_000 → "3M"). Values below 1,000 render as-is. Used by the
- * Predictions channel to keep volume glanceable in dense rows.
+ * Predictions widget to keep volume glanceable in dense rows.
  *
  * Locale is pinned to en-US so the suffixes stay K/M/B (matching the
  * rest of the app's hand-formatted output) regardless of OS locale.

@@ -138,20 +138,20 @@ export type DeliveryMode = "polling" | "sse";
 
 // ── Component Contracts ──────────────────────────────────────────
 
-/** Props passed to every FeedTab component (channels and widgets). */
+/** Props passed to every FeedTab component (widgets and widgets). */
 export interface FeedTabProps {
   /** Display density — 'comfort' shows more detail, 'compact' is denser. */
   mode: FeedMode;
   /**
    * Per-widget JSONB config from user_widgets.config.
-   * Each channel decides what goes here (e.g., selected RSS feeds).
+   * Each widget decides what goes here (e.g., selected RSS feeds).
    */
   feedContext: Record<string, unknown>;
   /**
-   * The specific widget/channel id being rendered (e.g. "sports_nfl",
+   * The specific widget/widget id being rendered (e.g. "sports_nfl",
    * "finance_crypto"). Lets a shared source FeedTab scope itself to that one
    * widget's fixed dimension (league / asset class / feed). Undefined for a
-   * legacy coarse channel, where the FeedTab shows the whole source.
+   * legacy coarse widget, where the FeedTab shows the whole source.
    */
   widgetId?: string;
 }
@@ -164,9 +164,9 @@ export interface SourceInfo {
   usage: string[];
 }
 
-/** Manifest describing a single channel. */
+/** Manifest describing a single widget. */
 export interface DataWidgetManifest {
-  /** Unique channel identifier (matches widget_type). */
+  /** Unique widget identifier (matches widget_type). */
   id: string;
   /** Human-readable name. */
   name: string;
@@ -178,15 +178,15 @@ export interface DataWidgetManifest {
   hex: string;
   /** Lucide icon component rendered at size 14 for sidebar, 20 for header. */
   icon: React.ComponentType<{ size?: number; className?: string }>;
-  /** Info tab content — what this channel is and how to use it. */
+  /** Info tab content — what this widget is and how to use it. */
   info: SourceInfo;
-  /** The React component rendered for this channel's feed view. */
+  /** The React component rendered for this widget's feed view. */
   FeedTab: React.ComponentType<FeedTabProps>;
 }
 
 /** Manifest describing a single widget. */
 export interface WidgetManifest {
-  /** Unique identifier (e.g. "clock", "weather"). Must not collide with channel IDs. */
+  /** Unique identifier (e.g. "clock", "weather"). Must not collide with widget IDs. */
   id: string;
   /** Human-readable name. */
   name: string;

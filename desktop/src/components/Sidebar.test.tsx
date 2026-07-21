@@ -21,7 +21,7 @@ function renderSidebar(opts: {
     name: `Source ${i}`,
     hex: "#34d399",
     icon: TrendingUp,
-    kind: "channel" as const,
+    kind: "data" as const,
     onTicker: false,
   }));
   render(

@@ -6,7 +6,7 @@ import (
 )
 
 // TestUnregisterConcurrentNoDoubleClose is a regression guard for the SSE
-// crash (handlers_channel.go stream writer): unregister used to close a
+// crash (handlers_sse.go stream writer): unregister used to close a
 // client's channel INSIDE its CAS-retry loop. When two connections for the
 // same user unregistered concurrently, one CAS lost, the loser retried, and
 // re-closed an already-closed channel → "panic: close of closed channel".

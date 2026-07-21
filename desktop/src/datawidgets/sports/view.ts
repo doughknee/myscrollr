@@ -1,7 +1,7 @@
 /**
  * Sports view selectors — shared filter/sort pipeline.
  *
- * Sports display prefs live server-side on the dashboard channel config
+ * Sports display prefs live server-side on the dashboard widget config
  * (not in `prefs.widgetDisplay`), so this selector accepts the config
  * blob shape. Both `FeedTab` and `ScrollrTicker` call `selectSportsForTicker`
  * to apply the day window (v1.1.3 Time Controls) + engagement sort.
@@ -13,9 +13,9 @@ import { isLive, isCloseGame } from "../../utils/gameHelpers";
 import { migrateVenue } from "../../preferences";
 import type { Venue } from "../../preferences";
 
-// ── Display prefs shape (mirrors server-side channel config.display) ─
+// ── Display prefs shape (mirrors server-side widget config.display) ─
 //
-// Stored per-user in `user_channels.config.display` as JSONB. v1.0.2
+// Stored per-user in `user_widgets.config.display` as JSONB. v1.0.2
 // switched each field from boolean → Venue. Old boolean-era values still
 // deserialize correctly because `normalizeSportsDisplayConfig` runs the
 // read through `migrateVenue`.
@@ -110,7 +110,7 @@ export function gameEngagement(g: Game): number {
 
 /**
  * Baseline pipeline used by the ticker: applies the day window from the
- * channel config.display blob (v1.1.3 Time Controls — live games always
+ * widget config.display blob (v1.1.3 Time Controls — live games always
  * pass), then sorts by engagement (live games first, then upcoming, then
  * finals) with a deterministic tie-break on `start_time` so the ticker
  * rail stays stable across dashboard refetches.
@@ -183,12 +183,12 @@ export function getSportsDisplayConfig(
   dashboard: DashboardResponse | null | undefined,
   widgetType?: string,
 ): SportsDisplayConfig {
-  const channels = dashboard?.widgets ?? [];
-  const channel =
+  const widgets = dashboard?.widgets ?? [];
+  const widget =
     (widgetType
-      ? channels.find((c) => c.widget_type === widgetType)
-      : undefined) ?? channels.find((c) => c.widget_type === "sports");
-  return normalizeSportsDisplayConfig(channel?.config?.display);
+      ? widgets.find((c) => c.widget_type === widgetType)
+      : undefined) ?? widgets.find((c) => c.widget_type === "sports");
+  return normalizeSportsDisplayConfig(widget?.config?.display);
 }
 
 export function normalizeSportsDisplayConfig(

@@ -118,7 +118,7 @@ export function canCustomizeTickerRows(tier: SubscriptionTier): boolean {
   return TIER_LIMITS[tier].maxTickerCustomization;
 }
 
-/** Get the numeric limit for a tier + channel feature. */
+/** Get the numeric limit for a tier + widget feature. */
 export function getLimit(tier: SubscriptionTier, key: LimitKey): number {
   return TIER_LIMITS[tier][key];
 }

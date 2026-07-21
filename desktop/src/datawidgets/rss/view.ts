@@ -141,20 +141,20 @@ export function getRssDisplayPrefs(
   dashboard: DashboardResponse | null | undefined,
   widgetType?: string,
 ): RssDisplayPrefs {
-  const channels = dashboard?.widgets ?? [];
+  const widgets = dashboard?.widgets ?? [];
   // widget_type is a widget id at runtime (news_bbc, rss_custom, …);
   // compare as string so the legacy coarse rows ("rss" pre-000014,
   // "news" post-rename) both resolve as the fallback.
-  const channel =
+  const widget =
     (widgetType
-      ? channels.find((c) => (c.widget_type as string) === widgetType)
+      ? widgets.find((c) => (c.widget_type as string) === widgetType)
       : undefined) ??
-    channels.find((c) => {
+    widgets.find((c) => {
       const t = c.widget_type as string;
       return t === "rss" || t === "news";
     });
   const override = (
-    channel?.config as { display?: Partial<RssDisplayPrefs> } | undefined
+    widget?.config as { display?: Partial<RssDisplayPrefs> } | undefined
   )?.display;
   if (!override) return globalPrefs;
   // 2026-07-17 defaults reset: the description/timestamp toggles left

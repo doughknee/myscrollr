@@ -24,10 +24,10 @@ import {
   migratePredictionsDisplay,
   migrateFantasyDisplay,
   getSourceTickerRow,
-  getChannelTickerRow,
+  getDataWidgetTickerRow,
   getWidgetTickerRow,
   setSourceTickerRow,
-  setChannelTickerRow,
+  setDataWidgetTickerRow,
   setWidgetTickerRow,
   setTickerRowSourceMembership,
   migrateAppearanceTheme,
@@ -441,7 +441,7 @@ describe("migrateFantasyDisplay", () => {
 //  - return the correct row for a source explicitly listed in tickerLayout
 //  - fall back to legacy `DataWidgetRow.ticker_enabled` (or `visible`) when the
 //    source isn't in any row, so users upgrading from pre-multi-deck
-//    builds don't see all their channels suddenly go dark
+//    builds don't see all their widgets suddenly go dark
 //  - move a source between rows atomically (remove from old row, add to new)
 //  - silently ignore out-of-bounds row indices (caller's job to clamp to tier)
 
@@ -462,7 +462,7 @@ function makePrefs(rows: { sources: string[] }[]): AppPreferences {
   } as unknown as AppPreferences;
 }
 
-describe("getSourceTickerRow / getChannelTickerRow / getWidgetTickerRow", () => {
+describe("getSourceTickerRow / getDataWidgetTickerRow / getWidgetTickerRow", () => {
   it("returns the row index when the source is in tickerLayout sources", () => {
     const prefs = makePrefs([
       { sources: ["finance"] },
@@ -473,25 +473,25 @@ describe("getSourceTickerRow / getChannelTickerRow / getWidgetTickerRow", () => 
     expect(getSourceTickerRow(prefs, null, "sports")).toBe(1);
   });
 
-  it("falls back to ticker_enabled=true for channels missing from rows", () => {
+  it("falls back to ticker_enabled=true for widgets missing from rows", () => {
     const prefs = makePrefs([{ sources: [] }]);
     const ch = { widget_type: "finance", ticker_enabled: true };
     expect(getSourceTickerRow(prefs, ch, "finance")).toBe(0);
-    expect(getChannelTickerRow(prefs, ch)).toBe(0);
+    expect(getDataWidgetTickerRow(prefs, ch)).toBe(0);
   });
 
-  it("returns null when ticker_enabled is false and the channel isn't in any row", () => {
+  it("returns null when ticker_enabled is false and the widget isn't in any row", () => {
     const prefs = makePrefs([{ sources: [] }]);
     const ch = { widget_type: "finance", ticker_enabled: false };
     expect(getSourceTickerRow(prefs, ch, "finance")).toBeNull();
-    expect(getChannelTickerRow(prefs, ch)).toBeNull();
+    expect(getDataWidgetTickerRow(prefs, ch)).toBeNull();
   });
 
   it("honours the legacy `visible` alias when ticker_enabled is missing", () => {
     const prefs = makePrefs([{ sources: [] }]);
     const ch = { widget_type: "finance", visible: false };
     expect(getSourceTickerRow(prefs, ch, "finance")).toBeNull();
-    expect(getChannelTickerRow(prefs, ch)).toBeNull();
+    expect(getDataWidgetTickerRow(prefs, ch)).toBeNull();
   });
 
   it("returns null for widgets that aren't in any row", () => {
@@ -508,11 +508,11 @@ describe("getSourceTickerRow / getChannelTickerRow / getWidgetTickerRow", () => 
     // DataWidgetRow has ticker_enabled=true, but it's pinned to row 1 explicitly.
     const prefs = makePrefs([{ sources: [] }, { sources: ["finance"] }]);
     const ch = { widget_type: "finance", ticker_enabled: true };
-    expect(getChannelTickerRow(prefs, ch)).toBe(1);
+    expect(getDataWidgetTickerRow(prefs, ch)).toBe(1);
   });
 });
 
-describe("setSourceTickerRow / setChannelTickerRow / setWidgetTickerRow", () => {
+describe("setSourceTickerRow / setDataWidgetTickerRow / setWidgetTickerRow", () => {
   it("removes the source from any other row when moving it", () => {
     const prefs = makePrefs([
       { sources: ["finance", "sports"] },
@@ -545,13 +545,13 @@ describe("setSourceTickerRow / setChannelTickerRow / setWidgetTickerRow", () => 
     expect(next).toBe(prefs);
   });
 
-  it("setChannelTickerRow forwards to setSourceTickerRow", () => {
+  it("setDataWidgetTickerRow forwards to setSourceTickerRow", () => {
     const prefs = makePrefs([{ sources: [] }, { sources: [] }]);
-    const next = setChannelTickerRow(prefs, "sports", 1);
+    const next = setDataWidgetTickerRow(prefs, "sports", 1);
     expect(next.appearance.tickerLayout.rows[1].sources).toEqual(["sports"]);
   });
 
-  it("setWidgetTickerRow places a widget id alongside channels in the same sources array", () => {
+  it("setWidgetTickerRow places a widget id alongside widgets in the same sources array", () => {
     const prefs = makePrefs([{ sources: ["finance"] }]);
     const next = setWidgetTickerRow(prefs, "clock", 0);
     expect(next.appearance.tickerLayout.rows[0].sources).toEqual([

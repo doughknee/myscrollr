@@ -7,7 +7,7 @@ import type { Game, Trade, RssItem } from "../types";
  * each widget (sports_nfl, finance_stocks, news_bbc) shows only its own data —
  * its leagues / symbols / feed URLs, read from the widget's user_widgets
  * `config`. Shared by the ticker (ScrollrTicker) and the Home feed so both
- * surfaces scope identically. A nullish config (a legacy coarse channel row)
+ * surfaces scope identically. A nullish config (a legacy coarse widget row)
  * returns the payload unscoped. Sources without a per-widget dimension
  * (fantasy, predictions — single widgets) fall through and return everything.
  */
