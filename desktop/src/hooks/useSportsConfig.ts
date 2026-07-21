@@ -8,7 +8,7 @@ import { useCallback, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { dataWidgetsApi } from "../api/client";
-import type { DataWidgetType } from "../api/client";
+import type { WidgetId } from "../api/client";
 import type { DashboardResponse } from "../types";
 import { queryKeys } from "../api/queries";
 import { useShellData } from "../shell-context";
@@ -77,7 +77,7 @@ export function useSportsConfig(widgetType: string = "sports") {
 
   const mutation = useMutation({
     mutationFn: (next: SportsConfig) =>
-      dataWidgetsApi.update(widgetType as DataWidgetType, {
+      dataWidgetsApi.update(widgetType, {
         config: next as unknown as Record<string, unknown>,
       }),
     // Optimistic write: patch this channel's config in the dashboard cache

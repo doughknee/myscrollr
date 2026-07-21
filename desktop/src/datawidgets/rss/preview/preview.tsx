@@ -18,7 +18,7 @@ import { ShellContext, type ShellState } from "../../../shell-context";
 import { dashboardQueryOptions, rssCatalogOptions } from "../../../api/queries";
 import { migrateRssDisplay, type AppPreferences } from "../../../preferences";
 import { rssDataWidget } from "../FeedTab";
-import type { DataWidgetType, TrackedFeed } from "../../../api/client";
+import type { WidgetId, TrackedFeed } from "../../../api/client";
 import type { FeedTabProps, RssItem } from "../../../types";
 
 const params = new URLSearchParams(window.location.search);
@@ -87,7 +87,7 @@ function main(): void {
   });
   const channelRow = (type: string, feeds: typeof FEEDS) => ({
     id: 1,
-    widget_type: type as DataWidgetType,
+    widget_type: type,
     enabled: true,
     ticker_enabled: true,
     created_at: "2026-07-17T00:00:00Z",

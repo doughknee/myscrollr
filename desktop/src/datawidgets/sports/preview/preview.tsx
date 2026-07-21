@@ -27,7 +27,7 @@ import {
 } from "../../../api/queries";
 import type { AppPreferences } from "../../../preferences";
 import { sportsDataWidget } from "../FeedTab";
-import type { DataWidgetRow, DataWidgetType } from "../../../api/client";
+import type { DataWidgetRow, WidgetId } from "../../../api/client";
 import type { FeedTabProps, Game } from "../../../types";
 
 const params = new URLSearchParams(window.location.search);
@@ -96,7 +96,7 @@ const games: Game[] = Array.from({ length: 72 }, (_, i) => {
 
 const channelRow = {
   id: 1,
-  widget_type: widgetId as DataWidgetType,
+  widget_type: widgetId,
   enabled: true,
   ticker_enabled: true,
   created_at: "2026-07-17T00:00:00Z",

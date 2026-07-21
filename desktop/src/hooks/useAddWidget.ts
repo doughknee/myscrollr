@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import { defaultPinForNewWidget } from "../preferences";
 import type { CatalogItem } from "../marketplace";
 import { dataWidgetsApi } from "../api/client";
-import type { DataWidgetRow, DataWidgetType } from "../api/client";
+import type { DataWidgetRow, WidgetId } from "../api/client";
 import { queryKeys } from "../api/queries";
 import type { DashboardResponse } from "../types";
 import { useShell } from "../shell-context";
@@ -35,7 +35,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
   return useCallback(
     async (item: CatalogItem) => {
       if (item.kind === "data") {
-        const widgetType = item.id as DataWidgetType;
+        const widgetType = item.id;
 
         // Optimistic insert: write a placeholder channel into the
         // dashboard cache immediately so the Sidebar + CatalogCard

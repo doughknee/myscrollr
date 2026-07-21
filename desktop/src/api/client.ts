@@ -172,13 +172,23 @@ export async function authFetch<T>(
   return handleResponse<T>(response);
 }
 
-// ── DataWidgetRow Types ───────────────────────────────────────────────
+// ── Widget row types ──────────────────────────────────────────────────
 
-export type DataWidgetType = "finance" | "sports" | "fantasy" | "rss" | "predictions";
+/**
+ * A widget id from the catalog ("sports_nfl", "news_bbc", "predictions").
+ *
+ * Deliberately an open string, not a union. This used to be
+ * `"finance" | "sports" | "fantasy" | "rss" | "predictions"` — the five
+ * SOURCES, not widget ids — which stopped being true at the widget split
+ * and survived only because call sites cast to it. Widget ids are defined
+ * by the server catalog and new ones must appear without a client release
+ * (VISION §4.2), so the client cannot enumerate them.
+ */
+export type WidgetId = string;
 
 export interface DataWidgetRow {
   id: number;
-  widget_type: DataWidgetType;
+  widget_type: WidgetId;
   enabled: boolean;
   /** Whether this widget's chips appear on the ticker. */
   ticker_enabled: boolean;
@@ -211,7 +221,7 @@ export const dataWidgetsApi = {
     authFetch<{ widgets: Array<DataWidgetRow> }>("/users/me/widgets"),
 
   create: (
-    widgetType: DataWidgetType,
+    widgetType: WidgetId,
     config: Record<string, unknown> = {},
     localWidgets?: number,
   ) =>
@@ -228,7 +238,7 @@ export const dataWidgetsApi = {
     }),
 
   update: (
-    widgetType: DataWidgetType,
+    widgetType: WidgetId,
     data: {
       enabled?: boolean;
       ticker_enabled?: boolean;
@@ -241,7 +251,7 @@ export const dataWidgetsApi = {
       body: JSON.stringify(data),
     }),
 
-  delete: (widgetType: DataWidgetType) =>
+  delete: (widgetType: WidgetId) =>
     authFetch<{ status: string; message: string }>(
       `/users/me/widgets/${widgetType}`,
       { method: "DELETE" },
@@ -259,7 +269,7 @@ export const dataWidgetsApi = {
  * The wire field is `ticker_enabled` — the only name the server accepts.
  */
 export async function toggleDataWidgetVisibility(
-  widgetType: DataWidgetType,
+  widgetType: WidgetId,
   tickerEnabled: boolean,
   enabled?: boolean,
 ): Promise<void> {

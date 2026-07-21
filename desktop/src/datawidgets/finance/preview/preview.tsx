@@ -35,7 +35,7 @@ import {
   type AppPreferences,
 } from "../../../preferences";
 import { financeDataWidget } from "../FeedTab";
-import type { DataWidgetType } from "../../../api/client";
+import type { WidgetId } from "../../../api/client";
 import type { FeedTabProps, Trade } from "../../../types";
 
 const params = new URLSearchParams(window.location.search);
@@ -106,7 +106,7 @@ function main(): void {
     widgets: [
       {
         id: 1,
-        widget_type: widgetId as DataWidgetType,
+        widget_type: widgetId,
         enabled: true,
         ticker_enabled: true,
         created_at: "2026-07-17T00:00:00Z",

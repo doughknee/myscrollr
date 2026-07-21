@@ -37,7 +37,7 @@ import {
 } from "./preferences";
 import { getMaxTickerRows } from "./tierLimits";
 import type { SubscriptionTier } from "./auth";
-import type { DataWidgetType } from "./api/client";
+import type { WidgetId } from "./api/client";
 import type { DeliveryMode } from "./types";
 import type { AppPreferences, TickerPosition } from "./preferences";
 import { getCatalogItems, sourceForWidget } from "./marketplace";
@@ -515,7 +515,7 @@ export default function App() {
   // See preferences.ts §"Unified ticker row selector helpers".
 
   const handleChannelRowChange = useCallback(
-    async (widgetType: DataWidgetType, row: number | null) => {
+    async (widgetType: WidgetId, row: number | null) => {
       // 1) Client-side: assign / unassign in tickerLayout. Optimistic update
       //    so the next tray menu rebuild reflects the change immediately.
       setPrefs((prev) => {
@@ -725,7 +725,7 @@ export default function App() {
         // Now thread through the existing per-kind handler (channel
         // also flips server-side flag; widget is purely client-side).
         if (kind === "channel") {
-          handleChannelRowChange(sourceId as DataWidgetType, newIndex);
+          handleChannelRowChange(sourceId, newIndex);
         } else {
           handleWidgetRowChange(sourceId, newIndex);
         }

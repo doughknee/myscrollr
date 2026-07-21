@@ -48,7 +48,7 @@ import type {
   FeedMode,
   DataWidgetManifest,
 } from "../../types";
-import type { DataWidgetType, RssChannelConfig } from "../../api/client";
+import type { WidgetId, RssChannelConfig } from "../../api/client";
 import { shouldShowOnFeed } from "../../preferences";
 import type { RssDisplayPrefs } from "../../preferences";
 import { AnimatePresence } from "motion/react";
@@ -231,7 +231,7 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
         ?.display ?? {},
     [channel?.config],
   );
-  const widgetType = (channel?.widget_type ?? widgetId ?? "rss") as DataWidgetType;
+  const widgetType = (channel?.widget_type ?? widgetId ?? "rss");
 
   // Persists the sticky sort into this widget's config.display override
   // (same slot the time window uses; separate keyed hook from the bar's
@@ -734,7 +734,7 @@ function RssFeedsPanel({
   widgetType,
   channelConfig,
 }: {
-  widgetType: DataWidgetType;
+  widgetType: WidgetId;
   channelConfig: RssChannelConfig | undefined;
 }) {
   const { error, setError, saving, updateItems } = useDataWidgetConfig<

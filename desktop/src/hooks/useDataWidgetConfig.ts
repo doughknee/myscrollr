@@ -9,7 +9,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { dataWidgetsApi } from "../api/client";
 import { queryKeys } from "../api/queries";
-import type { DataWidgetType } from "../api/client";
+import type { WidgetId } from "../api/client";
 import type { DashboardResponse } from "../types";
 
 interface UseDataWidgetConfigResult<T> {
@@ -20,7 +20,7 @@ interface UseDataWidgetConfigResult<T> {
 }
 
 export function useDataWidgetConfig<T>(
-  widgetType: DataWidgetType,
+  widgetType: WidgetId,
   configKey: string,
 ): UseDataWidgetConfigResult<T> {
   const queryClient = useQueryClient();

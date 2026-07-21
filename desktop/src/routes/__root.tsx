@@ -71,7 +71,7 @@ import { showTipOnce, TIP_IDS } from "../lib/tips";
 
 // Types
 import type { DeliveryMode } from "../types";
-import type { DataWidgetRow, DataWidgetType, SubscriptionInfo } from "../api/client";
+import type { DataWidgetRow, WidgetId, SubscriptionInfo } from "../api/client";
 
 // Hooks
 import { useTheme } from "../hooks/useTheme";
@@ -610,7 +610,7 @@ function RootLayout() {
     (source: { id: string; kind: "channel" | "widget"; onTicker: boolean }) => {
       if (source.kind === "channel") {
         channelActions.handleToggleDataWidget(
-          source.id as DataWidgetType,
+          source.id,
           !source.onTicker,
         );
       } else {

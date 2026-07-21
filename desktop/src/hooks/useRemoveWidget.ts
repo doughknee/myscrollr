@@ -14,7 +14,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { dataWidgetsApi } from "../api/client";
-import type { DataWidgetType } from "../api/client";
+import type { WidgetId } from "../api/client";
 import { queryKeys } from "../api/queries";
 import type { CatalogItem } from "../marketplace";
 import { disableWidget } from "../preferences";
@@ -35,7 +35,7 @@ export function useRemoveWidget(
     async (item: CatalogItem) => {
       if (item.kind === "data") {
         try {
-          await dataWidgetsApi.delete(item.id as DataWidgetType);
+          await dataWidgetsApi.delete(item.id);
           queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
           toast.success(`${item.name} removed`, {
             description: "Its slot is free for another widget.",
