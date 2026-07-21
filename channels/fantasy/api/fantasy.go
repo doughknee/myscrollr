@@ -59,7 +59,7 @@ func resolveFrontendURL() string {
 	}
 
 	// ALLOWED_ORIGINS is a comma-separated list of origins the core gateway
-	// accepts (e.g. "https://myscrollr.relentnet.dev,https://myscrollr.com").
+	// accepts (e.g. "https://myscrollr.com,https://api.myscrollr.com").
 	// The first entry is typically the primary frontend.
 	if origins := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS")); origins != "" {
 		first := strings.SplitN(origins, ",", 2)[0]

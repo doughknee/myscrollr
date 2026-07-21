@@ -11,7 +11,7 @@ declare const __APP_VERSION__: string
  * - No request bodies or headers
  * - No user emails or usernames
  * - Filesystem paths in stack frames are scrubbed to `~`
- * - Trace propagation locked to api.myscrollr.relentnet.dev — never to
+ * - Trace propagation locked to api.myscrollr.com — never to
  *   Stripe, Logto, or any third party
  *
  * SSR safety: the entire init body is gated on `typeof window !== 'undefined'`

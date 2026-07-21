@@ -29,8 +29,8 @@ func envOr(key, fallback string) string {
 
 // @title Scrollr API
 // @version 2.0
-// @description Gateway API for Scrollr — routes requests to self-registered channel services.
-// @host api.myscrollr.relentnet.dev
+// @description Core API for Scrollr — serves the widget catalog, widget CRUD, reads, SSE, billing and accounts. Proxies the one remaining discovered service (fantasy).
+// @host api.myscrollr.com
 // @BasePath /
 // @securityDefinitions.apikey LogtoAuth
 // @in header
