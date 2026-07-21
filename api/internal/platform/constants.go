@@ -127,6 +127,6 @@ const (
 const (
 	HSTSMaxAge            = 5184000
 	DefaultPort           = "8080"
-	DefaultAllowedOrigins = "https://myscrollr.com,https://api.myscrollr.relentnet.dev"
+	DefaultAllowedOrigins = "https://myscrollr.com,https://api.myscrollr.com"
 	DefaultFrontendURL    = "https://myscrollr.com"
 )
