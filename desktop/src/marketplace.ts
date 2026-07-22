@@ -159,11 +159,25 @@ export function sourceForWidget(id: string): string | undefined {
   return byId(id)?.source;
 }
 
-/** True for a local-only widget (clock, weather, …): one with no source, so
- *  it has no server row and no CDC feed. Unknown ids are not utilities. */
+/**
+ * True for a local-only widget (clock, weather, …): one with no server row and
+ * no CDC feed.
+ *
+ * Answered from the catalog first — that is the authority, and asking the
+ * renderer registry instead is what made every utility vanish in v1.1.11.
+ * But the catalog is server-owned and refreshes at runtime, so it can legally
+ * not know about a widget this build registers locally; `canonicalOrder()`
+ * appends exactly those. Requiring a catalog hit meant such a widget fell
+ * through to the data-widget path, where it renders an "add this widget"
+ * empty state instead of itself.
+ *
+ * So: catalog if it knows the id, local registry if it does not. An id
+ * neither knows is not a utility.
+ */
 export function isUtilityWidget(id: string): boolean {
   const w = byId(id);
-  return w !== undefined && !w.source;
+  if (w) return !w.source;
+  return getWidget(id) !== undefined;
 }
 
 /** The fixed asset class ("stock" | "crypto") for a finance widget, or

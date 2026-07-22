@@ -11,6 +11,7 @@ import {
   refreshCatalog,
   subscribeCatalog,
   canonicalOrder,
+  isUtilityWidget,
 } from "./marketplace";
 import type { CatalogPayload } from "./types";
 
@@ -170,5 +171,54 @@ describe("a widget the bundled snapshot has never seen", () => {
 
     // Locally-registered utilities the server does not list still survive.
     expect(order).toContain("clock");
+  });
+});
+
+// isUtilityWidget is the single answer to "does this widget have a server row?"
+// It routes widget pages, the add/remove flows and the shell's route parsing,
+// and it had no test at all until it already had four callers.
+describe("isUtilityWidget", () => {
+  it("distinguishes utilities from data widgets in the catalog", async () => {
+    await refreshCatalog(async () => ({
+      version: "utility-cases",
+      widgets: [
+        {
+          id: "sports_nfl", name: "NFL", description: "d", source: "sports",
+          category: "sports", color: "#013369", required_tier: "free", order: 0,
+        },
+        {
+          id: "clock", name: "Clock", description: "d",
+          category: "utility", color: "#6366f1", required_tier: "free", order: 1,
+        },
+      ],
+    }));
+
+    expect(isUtilityWidget("clock")).toBe(true);
+    expect(isUtilityWidget("sports_nfl")).toBe(false);
+  });
+
+  it("still recognises a utility the catalog has never heard of", async () => {
+    // The catalog is server-owned and refreshes at runtime, so it may legally
+    // omit a widget this build registers locally — canonicalOrder() appends
+    // exactly those. Requiring a catalog hit sent them down the data-widget
+    // path, where the page renders an "add this widget" empty state instead of
+    // the widget. Falls back to the local renderer registry.
+    await refreshCatalog(async () => ({
+      version: "catalog-without-clock",
+      widgets: [
+        {
+          id: "sports_nfl", name: "NFL", description: "d", source: "sports",
+          category: "sports", color: "#013369", required_tier: "free", order: 0,
+        },
+      ],
+    }));
+
+    expect(catalogItemById("clock")).toBeUndefined();
+    expect(isUtilityWidget("clock")).toBe(true);
+  });
+
+  it("does not claim ids nothing knows about", () => {
+    expect(isUtilityWidget("not_a_real_widget")).toBe(false);
+    expect(isUtilityWidget("")).toBe(false);
   });
 });

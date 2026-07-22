@@ -122,7 +122,8 @@ cd api
 go run .
 ```
 Watch for: `[Auth] Initialized Logto JWKS from https://auth.myscrollr.com/oidc/jwks`,
-the migrations applying, and the server listening on `:8080`.
+the migrations applying, and the server listening on `:18080` (api/.env sets
+PORT=18080).
 Sanity check (new terminal): `curl http://localhost:18080/health`.
 
 ### 4. Start the desktop app
@@ -135,11 +136,12 @@ back to the app (PKCE callback on `127.0.0.1:19284`). You're now authenticated
 against the **local** API with your real account + tier.
 
 ### 5. Try it
-- **Add channels** from the Catalog — this hits the local API's slot check.
+- **Add widgets** from the Catalog — this hits the local API's slot check.
   Add up to your tier's cap; the next one shows **"Widget limit reached"**.
   (On an unlimited tier you won't hit it — temporarily lower a number in
-  `desktop/src/tierLimits.ts` + `api/core/tier_limits.go` to test the cap.)
-- **Configure** an added channel straight from its catalog card.
+  `desktop/src/tierLimits.ts` + `api/internal/widgets/tier_limits.go` to test
+  the cap.)
+- **Configure** an added widget straight from its catalog card.
 - Open a source page → the **Options** menu has no "Display preferences".
 
 ---
@@ -213,7 +215,7 @@ within ~10s of the fantasy API starting.
   migrate; read its logs rather than hunting for an ingester migration to
   apply by hand.
 - **Fantasy Yahoo OAuth callback.** The connect flow redirects to
-  `http://localhost:8084/fantasy/callback`; that URI must be registered in the
+  `http://localhost:8084/yahoo/callback`; that URI must be registered in the
   Yahoo app or token exchange fails. The service runs regardless.
 - **No Sequin locally** → no real-time SSE push; the desktop polls for updates.
 

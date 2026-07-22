@@ -11,7 +11,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Is Scrollr free?",
     answer:
-      "Yes. The free tier gives you real-time data across all widgets with generous limits and no ads. Upgrade to Uplink for more capacity, or Uplink Ultimate for live streaming data and unlimited everything.",
+      "Yes. The free tier streams real-time data to 3 widgets at once, with no ads and no cap on what goes inside each one. Paid plans add widget slots and ticker rows — they do not unlock data, widgets, or live streaming.",
   },
   {
     question: "Does it affect my computer's performance?",
@@ -36,7 +36,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "What data does Scrollr show?",
     answer:
-      "Widgets showing live stock and crypto prices (Finance), scores across 20+ leagues (Sports), articles from RSS feeds (News), and Yahoo Fantasy Sports leagues (Fantasy). Plus utility widgets for weather, clocks, system monitoring, uptime, and GitHub Actions.",
+      "Widgets showing live stock and crypto prices (Finance), scores across 14 leagues (Sports), articles from RSS feeds (News), and Yahoo Fantasy Sports leagues (Fantasy). Plus utility widgets for weather, clocks, system monitoring, uptime, and GitHub Actions.",
   },
   {
     question: "Can I customize the feed?",
@@ -61,12 +61,12 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "How does live data work vs. polling?",
     answer:
-      "Free, Uplink, and Uplink Pro tiers use polling — the app fetches fresh data at regular intervals (60s on Free, 30s on Uplink, 10s on Uplink Pro). Uplink Ultimate uses a persistent SSE connection for instant live updates as data changes on the server. The current mode (Live or Polling) shows in the title bar next to the Pin button — a green dot means Live, a normal dot means Polling.",
+      "Every plan gets the same persistent SSE connection, so updates arrive the instant data changes on the server. Polling is the fallback for when that connection drops, and it is faster on paid plans: 60s on Free, 30s on Uplink, 10s on Uplink Pro (Ultimate polls at 30s because SSE carries it). The current mode shows in the title bar next to the Pin button — a green dot means Live, a normal dot means Polling.",
   },
   {
     question: "What's the difference between Uplink tiers?",
     answer:
-      "Free: 5 stock/crypto symbols, 1 news feed, 1 sports league, no fantasy leagues, 60s polling. Uplink: 25 symbols, 25 feeds, 8 sports leagues, 1 fantasy league, 30s polling. Uplink Pro: 75 symbols, 100 feeds, 20 sports leagues, 3 fantasy leagues, 10s polling. Uplink Ultimate: unlimited symbols/feeds/sports leagues, 10 fantasy leagues, live SSE streaming.",
+      "Plans differ by how many widgets run at once, and how many ticker rows you get. Free: 3 widgets, 1 row. Uplink: 6 widgets, 2 rows. Uplink Pro: 12 widgets, 3 rows. Uplink Ultimate: unlimited widgets, 3 rows with per-row speed and direction. Every plan gets every widget and unlimited items inside each one.",
   },
 ];
 
@@ -149,7 +149,7 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
       "Yesterday's games still showing as live",
     ],
     steps: [
-      "Scores update via polling based on your plan tier. Free: 60s, Uplink: 30s, Uplink Pro: 10s, Uplink Ultimate: live SSE.",
+      "Scores stream live over SSE on every plan. If that connection drops the app falls back to polling, which is plan-based: 60s on Free, 30s on Uplink, 10s on Uplink Pro.",
       "Check your current delivery mode in the title bar (next to the Pin button) — green dot is Live, normal dot is Polling.",
       "Try switching to a different widget and back.",
     ],
@@ -246,7 +246,7 @@ export const GETTING_STARTED_STEPS: GettingStartedStep[] = [
     title: "Upgrade Your Plan",
     iconName: "Zap",
     description:
-      "Free accounts have limits on symbols, feeds, and leagues. Upgrade to Uplink for more capacity, or Uplink Ultimate for live streaming data and unlimited everything.",
+      "Free accounts run 3 widgets at once. There is no limit on symbols, feeds or leagues inside a widget. Upgrade for more widget slots and ticker rows.",
   },
 ];
 

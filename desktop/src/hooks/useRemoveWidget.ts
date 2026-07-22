@@ -16,7 +16,6 @@ import { toast } from "sonner";
 import { dataWidgetsApi } from "../api/client";
 import type { WidgetId } from "../api/client";
 import { queryKeys } from "../api/queries";
-import { isUtilityWidget } from "../marketplace";
 import type { CatalogItem } from "../marketplace";
 import { disableWidget } from "../preferences";
 import { useUndoableAction } from "./useUndoableAction";
@@ -34,7 +33,12 @@ export function useRemoveWidget(
 
   return useCallback(
     async (item: CatalogItem) => {
-      if (!isUtilityWidget(item.id)) {
+      // `item.source` rather than isUtilityWidget(item.id): the CatalogItem is
+      // already in hand, so this reads the widget the user actually clicked.
+      // Looking it up by id again would re-query mutable module state, and a
+      // catalog refresh landing between render and click would answer about a
+      // different catalog than the one that produced this item.
+      if (item.source) {
         try {
           await dataWidgetsApi.delete(item.id);
           queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });

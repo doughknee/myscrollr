@@ -46,7 +46,7 @@ import AuthGate from "../components/onboarding/AuthGate";
 
 // Registries
 import { getAllDataWidgets } from "../datawidgets/registry";
-import { catalogItemById, widgetLogoUrl, isUtilityWidget } from "../marketplace";
+import { catalogItemById, widgetLogoUrl, isUtilityWidget, widgetManifest } from "../marketplace";
 import { DEMO } from "../config";
 import { getAllWidgets, getWidget } from "../widgets/registry";
 import { canonicalOrder } from "../marketplace";
@@ -561,11 +561,17 @@ function RootLayout() {
         navigate({ to: "/customize", search: { tab: "app" } });
         return;
       }
-      if (widgetsRef.current.some((ch) => ch.widget_type === id)) {
-        navigate({ to: "/widget/$id", params: { id: id } });
-        return;
-      }
-      if (getWidget(id)) {
+      // Guarded on the same resolver the destination page renders with, so
+      // "can I navigate there" and "can that page draw something" cannot
+      // disagree. This used to be two branches that navigated identically,
+      // the second asking the RENDERER REGISTRY whether the id was known —
+      // the substitution behind the v1.1.11 regression. It also meant a
+      // widget added server-side, which the registry has never heard of,
+      // bounced the user to /feed instead of opening.
+      if (
+        widgetsRef.current.some((ch) => ch.widget_type === id) ||
+        widgetManifest(id)
+      ) {
         navigate({ to: "/widget/$id", params: { id } });
         return;
       }

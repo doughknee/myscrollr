@@ -3,6 +3,7 @@ package platform
 import (
 	"context"
 	"log"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -74,19 +75,26 @@ func ConnectDB() {
 	// be explicit; the table name is kept from before the consolidation so
 	// existing databases don't re-run the chain.
 	//
-	// Default to `require`, not `disable`. pgx (the pool above) negotiates TLS
-	// on its own, so a DATABASE_URL without an explicit sslmode still gave an
-	// encrypted app connection — but this appended `disable`, so the entire DDL
-	// chain ran in the clear against managed Postgres. A database that genuinely
-	// has no TLS opts out by setting sslmode explicitly — docker-compose.dev.yml
-	// already does (`...?sslmode=disable`), so local dev is unaffected.
+	// sslmode has to be inferred when the URL omits it, and the safe answer
+	// differs by host. This used to append `disable` unconditionally, which
+	// would run the whole DDL chain in the clear against a remote database.
+	// Appending `require` unconditionally is the opposite mistake: a local
+	// Postgres has no TLS, so `go run .` against localhost fails outright with
+	// nothing in the docs to explain it.
+	//
+	// So: remote defaults to require, loopback defaults to disable. An explicit
+	// sslmode in DATABASE_URL always wins (docker-compose.dev.yml sets one).
 	migrateURL := databaseURL
 	if !strings.Contains(migrateURL, "sslmode=") {
-		if strings.Contains(migrateURL, "?") {
-			migrateURL += "&sslmode=require"
-		} else {
-			migrateURL += "?sslmode=require"
+		mode := "require"
+		if isLoopbackDB(migrateURL) {
+			mode = "disable"
 		}
+		sep := "?"
+		if strings.Contains(migrateURL, "?") {
+			sep = "&"
+		}
+		migrateURL += sep + "sslmode=" + mode
 	}
 	if strings.Contains(migrateURL, "?") {
 		migrateURL += "&x-migrations-table=schema_migrations_core"
@@ -112,6 +120,24 @@ func ConnectDB() {
 	// Best-effort initial prune so the table doesn't sit with stale rows
 	// until the first periodic tick fires. Errors are logged inside.
 	pruneWebhookEvents(context.Background())
+}
+
+// isLoopbackDB reports whether a Postgres URL points at this machine, where
+// TLS is not expected. Parsed rather than substring-matched so a remote host
+// that merely contains "localhost" in a database name or password cannot be
+// mistaken for local — that would silently downgrade a production connection.
+func isLoopbackDB(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false // unparseable: assume remote, keep the secure default
+	}
+	switch h := u.Hostname(); h {
+	case "localhost", "127.0.0.1", "::1", "0.0.0.0":
+		return true
+	default:
+		// Docker's host aliases resolve to the developer's own machine.
+		return h == "host.docker.internal" || h == "postgres"
+	}
 }
 
 // pruneWebhookEvents deletes Stripe webhook event rows older than 7 days.

@@ -1,7 +1,8 @@
 # MyScrollr — local dev orchestration.
 #
 #   make up        Build + start the whole backend in Docker (Postgres, Redis,
-#                  Core API, and every channel), then wait until it's healthy.
+#                  Core API, fantasy-api and the four Rust ingesters), then
+#                  wait until it's healthy.
 #   make down      Stop the backend (keeps your local database).
 #   make web       Run the marketing site natively (Vite :3000).
 #   make desktop   Run the Tauri desktop app natively.

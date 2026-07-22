@@ -19,8 +19,8 @@ Core principles: zero tracking, no ads, no data brokers, source available under 
 Live data channels:
 
 - Finance: real-time stock and crypto prices from TwelveData.
-- Sports: live scores across NFL, NBA, MLB, NHL, MLS, Premier League, NCAAF, NCAAM (college sports require a paid tier).
-- News: articles from any RSS feed — built-in catalog plus custom user-added feeds (paid tiers).
+- Sports: live scores across 14 leagues — NFL, NBA, MLB, NHL, F1, UFC, AFL, World Cup, Champions League, Premier League, La Liga, MLS, NCAAF and NCAAM. All available on every tier.
+- News: articles from any RSS feed — a built-in catalog of 11 outlets plus your own URLs, on every tier.
 - Fantasy: Yahoo Fantasy Sports league standings, matchups, and roster updates.
 
 Utility widgets (no API costs, included on every tier):
@@ -34,35 +34,39 @@ Utility widgets (no API costs, included on every tier):
 
 All tiers include the full dashboard at myscrollr.com.
 
+Every tier gets every widget, real-time streaming, and unlimited depth inside
+each widget (as many symbols, feeds, leagues or fantasy teams as you like).
+Plans differ by how many widgets you can run at once — a slot — and how many
+ticker rows you get.
+
 ### Free
 
-- 5 stock/crypto symbols
-- 1 RSS feed
-- 1 sports league
-- No fantasy leagues
-- 60s polling refresh
+- 3 widget slots
+- 1 ticker row
+- Real-time streaming (Server-Sent Events); 60s polling fallback
+- Every widget in the catalog, including college sports and Yahoo Fantasy
 - Site filtering: blacklist only
 
 ### Uplink — $9.99/month or $79.99/year
 
-- 25 symbols, 25 RSS feeds, 1 custom RSS feed
-- 8 sports leagues, 1 Yahoo fantasy league
-- 30s polling refresh
+- 6 widget slots
+- 2 ticker rows
+- 30s polling fallback
 - Early access to new features
 
 ### Uplink Pro — $24.99/month or $199.99/year
 
-- 75 symbols, 100 RSS feeds, 3 custom RSS feeds
-- 20 sports leagues, 3 Yahoo fantasy leagues
-- 10s polling refresh
+- 12 widget slots
+- 3 ticker rows
+- 10s polling fallback
 - Custom alerts (price targets, score thresholds, keyword triggers)
 - Feed profiles, advanced controls, site filtering: blacklist + whitelist
 
 ### Uplink Ultimate — $49.99/month or $399.99/year
 
-- Unlimited symbols, RSS feeds, and sports leagues
-- 10 custom RSS feeds, 10 Yahoo fantasy leagues
-- Real-time Server-Sent Events delivery (no polling)
+- Unlimited widget slots
+- 3 ticker rows, with per-row scroll speed, direction and mode
+
 - Webhooks push alerts to Discord, Slack, or any URL
 - Data export (CSV / JSON)
 - API access for personal dashboards or automation
@@ -90,7 +94,7 @@ The questions and answers below are aggregated from the live FAQ sections on mys
 
 #### Is Scrollr free?
 
-Yes. The free tier gives you real-time data across all four channels with generous limits and no ads. Upgrade to Uplink for more capacity, or Uplink Ultimate for live streaming data and unlimited everything.
+Yes. The free tier gives you real-time streaming across every source, three widget slots, and no ads. Paid tiers add slots and ticker rows; they do not unlock data, widgets, or streaming.
 
 #### Does it affect my computer's performance?
 
@@ -126,37 +130,37 @@ Scrollr checks for updates automatically on launch. When an update is available,
 
 #### How does live data work vs. polling?
 
-Free, Uplink, and Uplink Pro tiers use polling — the app fetches fresh data at regular intervals (60s on Free, 30s on Uplink, 10s on Uplink Pro). Uplink Ultimate uses a persistent SSE connection for instant live updates as data changes on the server.
+Every tier gets the same persistent Server-Sent Events connection, so updates arrive the instant data changes on the server. Polling is the fallback for when that connection drops, and its interval does vary by plan: 60s on Free, 30s on Uplink, 10s on Uplink Pro. Ultimate polls at 30s because SSE carries it.
 
 #### What's the difference between Uplink tiers?
 
-Free: 5 stock/crypto symbols, 1 news feed, 1 sports league, no fantasy leagues, 60s polling. Uplink: 25 symbols, 25 feeds, 8 sports leagues, 1 fantasy league, 30s polling. Uplink Pro: 75 symbols, 100 feeds, 20 sports leagues, 3 fantasy leagues, 10s polling. Uplink Ultimate: unlimited symbols/feeds/sports leagues, 10 fantasy leagues, live SSE streaming.
+Free: 3 widget slots, 1 ticker row. Uplink: 6 slots, 2 rows. Uplink Pro: 12 slots, 3 rows. Uplink Ultimate: unlimited slots, 3 rows with per-row customisation. Every tier gets every widget, real-time streaming, and unlimited depth inside each widget.
 
 ### Uplink pricing
 
 #### What does "data delivery" mean?
 
-Free users get data refreshed every 60 seconds via polling. Uplink cuts that to 30 seconds. Pro pushes it to 10 seconds. Ultimate eliminates polling entirely — data arrives the instant it changes via Server-Sent Events (SSE), the same technology used by stock trading platforms.
+Data arrives the instant it changes via Server-Sent Events (SSE), the same technology used by stock trading platforms — on every tier, including Free. Polling only matters when that connection drops, and paid plans fall back faster: 60s on Free, 30s on Uplink, 10s on Uplink Pro.
 
 #### How many symbols can I track?
 
-Tracked symbols are the stocks, ETFs, and crypto tickers that appear in your finance feed. Free accounts can follow up to 5 at a time. Uplink raises that to 25. Pro gives you 75 — enough for a serious portfolio. With Ultimate, there is no cap — add every ticker you care about and they all stream in real time.
+Tracked symbols are the stocks, ETFs, and crypto tickers that appear in your finance feed. There is no cap on any tier — add every ticker you care about and they all stream in real time. What a plan limits is how many widgets you run at once, not how much you put in one.
 
 #### How many RSS feeds can I follow?
 
-RSS feeds power the news channel. Free accounts can subscribe to 1 feed from the default catalog. Uplink expands that to 25, Pro to 100, giving you broad coverage across topics. Ultimate removes the limit entirely — subscribe to as many sources as you want.
+RSS feeds power the news widgets. Subscribe to as many as you want on any tier, from the built-in catalog or your own URLs.
 
 #### What are custom RSS feeds?
 
-Beyond the built-in catalog, custom feeds let you paste any RSS or Atom URL. Free accounts cannot add custom feeds. Uplink gives you 1, Pro gives you 3 — enough for niche industry sources, personal blogs, or company news. Ultimate removes the cap so you can add every source you follow.
+Beyond the built-in catalog, custom feeds let you paste any RSS or Atom URL. Available on every tier, with no cap.
 
 #### What sports leagues are included?
 
-Every tier includes live scores from the NFL, NBA, MLB, NHL, MLS, and Premier League. All paid tiers add college football (NCAAF) and college basketball (NCAAM), with scores updating at the delivery speed of your tier.
+Every tier includes live scores from all 14 league widgets — NFL, NBA, MLB, NHL, F1, UFC, AFL, World Cup, Champions League, Premier League, La Liga, MLS, and college football and basketball. No league is behind a paid tier.
 
 #### How many fantasy leagues can I connect?
 
-Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. Free accounts cannot connect Yahoo leagues. Uplink supports up to 1. Pro gives you 3 — enough for multi-sport managers. Ultimate raises the cap to 10 leagues across every sport.
+Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. Available on every tier, with no cap on leagues.
 
 #### What are custom alerts?
 

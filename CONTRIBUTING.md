@@ -29,9 +29,9 @@ pull request. If you just want to run the project locally, the [root
 | `channels/fantasy/api/` | The one remaining separate service (Go). Stays separate for its Yahoo OAuth session and sync loop; core proxies to it. |
 | `myscrollr.com/` | Marketing site, legal hub, billing portal (React + Vite + TanStack Router). |
 | `desktop/` | Tauri v2 desktop app — the primary product. React frontend in `desktop/src/`, Rust backend in `desktop/src-tauri/`. |
-| `k8s/` | Kubernetes manifests deployed on Coolify-managed DigitalOcean cluster. |
+| `k8s/` | Kubernetes manifests, applied to DOKS by `.github/workflows/deploy.yml`. |
 | `docs/superpowers/specs/` | Written specs for in-flight features; predate every merge. |
-| `scripts/` | Operational tooling (invite CLI, Yahoo probe, etc.). |
+| `scripts/` | Dev + ops shell tooling: local-stack helpers, Kalshi key pull, smoke tests. |
 
 `AGENTS.md` at the root has the full commands cheatsheet (build, test,
 ports).
@@ -42,8 +42,9 @@ ports).
 - Documentation improvements (typos, clearer wording, missing docs).
 - New widgets — see `api/CHANNELS.md`. Reusing an existing source is a
   server-only change: one entry in the catalog, no client release.
-- Test coverage. `go test ./...` and `cargo test` work everywhere;
-  Vitest is the target for TS.
+- Test coverage. `go test ./...` runs in the two Go modules (`api/`,
+  `channels/fantasy/api/`) and `cargo test` in each Rust crate — there is no
+  workspace at the root for either. Vitest is the target for TS.
 - Accessibility and i18n improvements.
 
 ## What we probably won't merge
@@ -160,7 +161,7 @@ per-service commands are in `AGENTS.md`. In short:
 ```sh
 cp .env.example .env                            # fill in real values
 npm install                                     # from website / desktop dirs
-go build ./... && go test ./...                 # from api / channels dirs
+go build ./... && go test ./...                 # from api/ or channels/fantasy/api/
 cargo test                                      # from each Rust service
 ```
 

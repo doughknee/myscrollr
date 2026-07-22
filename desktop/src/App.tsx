@@ -58,7 +58,13 @@ export default function App() {
 
   // Keep the ticker's widget metadata in sync with the server catalog; falls
   // back to the bundled snapshot when offline.
-  useCatalog();
+  //
+  // The version is used, not discarded. A catalog swap re-renders this
+  // component, but `installedWidgetsMeta` below is memoised on [widgets]
+  // alone — without the version in its deps it hands back the pre-refresh
+  // names, colors and icons forever. This is the fourth instance of that
+  // shape; __root.tsx, catalog.tsx and feed.tsx were the first three.
+  const catalogVersion = useCatalog();
 
   // Auth + tier state (drives refetchInterval)
   const [authenticated, setAuthenticated] = useState(() => checkAuth());
@@ -147,7 +153,7 @@ export default function App() {
         hex: m.hex,
         icon: m.icon,
       }));
-  }, [widgets]);
+  }, [widgets, catalogVersion]);
 
   // Persist active tabs when they change (side effect, not in useMemo)
   useEffect(() => {

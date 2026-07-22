@@ -19,6 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 import RouteError from "../components/RouteError";
 import SourcePageLayout, { SourceNotFound } from "../components/SourcePageLayout";
 import { widgetManifest, isUtilityWidget } from "../marketplace";
+import { useCatalog } from "../hooks/useCatalog";
 import { dashboardQueryOptions } from "../api/queries";
 import type { DataWidgetManifest, WidgetManifest } from "../types";
 
@@ -38,6 +39,11 @@ function WidgetRoute() {
 
   // Resolves data widgets (per-league/per-feed splits + legacy coarse
   // ids) AND local utilities.
+  // Subscribing re-renders this page on a catalog swap; widgetManifest and
+  // isUtilityWidget below then read the current catalog rather than the one
+  // that happened to be loaded at mount.
+  useCatalog();
+
   const manifest = widgetManifest(id) as
     | DataWidgetManifest
     | WidgetManifest

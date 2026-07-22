@@ -45,7 +45,7 @@ exists to feed it.
 | [`channels/predictions/`](./channels/predictions/) | Prediction-market ingester (Kalshi) | Rust |
 | [`channels/fantasy/`](./channels/fantasy/) | Yahoo Fantasy (OAuth + sync) | Go |
 | [`k8s/`](./k8s/) | Production manifests | Kubernetes on DigitalOcean |
-| [`scripts/`](./scripts/) | Operational tooling | Mixed Go / shell |
+| [`scripts/`](./scripts/) | Operational tooling | Shell, one Node script |
 | [`docs/`](./docs/) | Charter, rollout plan, ADRs, design specs | Markdown |
 
 ## How it fits together
@@ -79,9 +79,10 @@ exists to feed it.
 - **Core API is the only service that validates JWTs**, and the only
   thing that migrates the database. The ingesters are pure writers.
 - **The widget catalog is server-authoritative.** `GET /catalog` is the
-  single definition of what widgets exist; both clients fetch it and
-  render generically. Adding a widget that reuses an existing renderer
-  is a server-only change — no client release.
+  single definition of what widgets exist. The desktop fetches it and
+  renders generically, so adding a widget that reuses an existing renderer
+  is a server-only change — no client release. The marketing site does not
+  fetch it; its widget counts are hardcoded and updated by hand.
 - **Only fantasy is still a proxied service.** Finance, sports, rss and
   predictions were folded into core by
   [ADR-0002](./docs/adr/0002-consolidate-widget-read-apis.md); Redis
@@ -114,7 +115,8 @@ docker compose -f docker-compose.local.yml up -d
 
 # 2. Core API (:8080) — applies every migration, serves the catalog
 cd api
-cp .env.example .env && $EDITOR .env
+# api/.env has no template — LOCAL_SETUP.md lists what it needs
+$EDITOR .env
 go build ./... && go test ./...
 go run .
 

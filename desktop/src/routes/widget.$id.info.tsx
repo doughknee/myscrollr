@@ -38,6 +38,7 @@ import { TIER_LABELS } from "../auth";
 import { dashboardQueryOptions } from "../api/queries";
 import { useShell, useShellData } from "../shell-context";
 import { getMaxWidgets } from "../tierLimits";
+import { useCatalog } from "../hooks/useCatalog";
 import { useAddWidget } from "../hooks/useAddWidget";
 import { useRemoveWidget } from "../hooks/useRemoveWidget";
 import PageLayout from "../components/layout/PageLayout";
@@ -86,6 +87,10 @@ function WidgetInfoPage() {
   const removeWidgetShared = useRemoveWidget();
   const [removing, setRemoving] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
+
+  // Subscribing is what makes the read below re-run: a catalog swap has to
+  // re-render this component or it keeps rendering the pre-refresh catalog.
+  useCatalog();
 
   const item = catalogItemById(id);
   const backToCatalog = () => navigate({ to: "/catalog" });
