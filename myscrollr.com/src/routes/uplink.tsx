@@ -120,13 +120,16 @@ function AnimatedPrice({ value }: { value: number }) {
 
 // Static JSON-LD source data for the /uplink route. Kept module-scope
 // so it serializes cleanly inside head() during prerender. Pricing
-// mirrors the in-file PRICING constant; cap numbers mirror
-// FALLBACK_LIMITS — keep all three in sync.
+// mirrors the in-file PRICING constant; widget counts mirror
+// FALLBACK_LIMITS.max_widgets — keep all three in sync.
 //
-// FAQ answers cite the same fallback caps the visible FAQ shows on
-// first paint (buildUplinkFAQ reads FALLBACK_LIMITS before the API
-// responds), so Google's FAQPage rich-result policy holds: schema
-// answer text matches what crawlers see in the static HTML.
+// The per-feature depth caps this used to also mirror (symbols, feeds,
+// leagues, fantasy) were retired 2026-07-02 and are null on every tier.
+//
+// FAQ answers match what the visible FAQ shows on first paint
+// (buildUplinkFAQ reads FALLBACK_LIMITS before the API responds), so
+// Google's FAQPage rich-result policy holds: schema answer text matches
+// what crawlers see in the static HTML.
 const STATIC_TIERS = [
   {
     name: 'Uplink',
@@ -410,7 +413,7 @@ function buildTierShowcases(limits: TierLimitsResponse): Array<TierShowcase> {
         `${uplink.max_widgets} widgets at once`,
         'Priority support',
         'Unlimited items per widget',
-        'Every sports & news widget',
+        'Two ticker rows',
         'Blacklist site filtering',
         'Early access to features',
       ],
@@ -429,7 +432,7 @@ function buildTierShowcases(limits: TierLimitsResponse): Array<TierShowcase> {
         `${pro.max_widgets} widgets at once`,
         'Custom alerts & notifications',
         'Feed profiles & advanced controls',
-        'Priority RSS refresh',
+        'Three ticker rows',
         'Blacklist + Whitelist filtering',
         'Everything in Uplink',
       ],
@@ -446,6 +449,7 @@ function buildTierShowcases(limits: TierLimitsResponse): Array<TierShowcase> {
         'Every widget you follow, all running at once. Webhooks push alerts to your Discord. You export weekly market data to a spreadsheet. Your personal dashboard pulls from the API. Scrollr becomes infrastructure, not just a feed.',
       features: [
         'Unlimited widgets at once',
+        'Per-row ticker controls',
         'Webhooks & integrations',
         'Data export (CSV / JSON)',
         'API access',
@@ -1514,8 +1518,8 @@ function UplinkPage() {
                 </span>
                 <p className="text-base text-base-content/40 leading-relaxed">
                   Scrollr is free and open source. Three paid tiers for power
-                  users who want more — more widgets at once, Yahoo Fantasy
-                  sync, custom alerts, and power-user integrations.
+                  users who want more — more widgets at once, more ticker rows,
+                  custom alerts, and power-user integrations.
                 </p>
               </motion.div>
 
@@ -3948,10 +3952,10 @@ function UplinkPage() {
                   </div>
                 </div>
                 <p className="text-xs text-base-content/45 leading-relaxed">
-                  When you hit a free tier cap — like trying to add an 11th
-                  symbol or 6th RSS feed — the app shows a quiet prompt with
-                  what the next tier unlocks. No pop-ups, no dark patterns. Just
-                  context when it matters.
+                  When you hit the free plan's limit — trying to run a 4th
+                  widget at once — the app shows a quiet prompt with what the
+                  next tier unlocks. No pop-ups, no dark patterns. Just context
+                  when it matters.
                 </p>
               </div>
             </motion.div>
