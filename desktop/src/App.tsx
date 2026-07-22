@@ -773,8 +773,28 @@ export default function App() {
         );
       }
 
-      // Local widgets (clock, weather, …) — same row-picker pattern.
-      for (const widget of getAllWidgets()) {
+      // Local widgets (clock, weather, …) — same row-picker pattern, over the
+      // ones the user actually added.
+      //
+      // This used to iterate the whole renderer registry, which asks "does
+      // this build ship the widget" when the question is "did the user add
+      // it". A fresh install enables only `clock`, so the tray offered rows
+      // for the other five — and picking one routes through
+      // setWidgetTickerRow, which writes tickerLayout and widgetsOnTicker but
+      // never enabledWidgets. activeTabs is widgetTabs + widgetsOnTicker, so
+      // the chip really renders (sysmon needs no config to produce data)
+      // while every slot count reads enabledWidgets.length — including the
+      // one useAddWidget reports to the server. A widget on the ticker that
+      // no cap can see.
+      //
+      // The widgetsOnTicker term keeps any pre-existing orphan listed, so it
+      // stays removable rather than stranding its chip.
+      const wp = prefsRef.current.widgets;
+      for (const widget of getAllWidgets().filter(
+        (mf) =>
+          wp.enabledWidgets.includes(mf.id) ||
+          wp.widgetsOnTicker.includes(mf.id),
+      )) {
         const currentRow = getWidgetTickerRow(prefsRef.current, widget.id);
         const rowItems = await buildRowSubmenuItems(
           currentRow,

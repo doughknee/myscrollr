@@ -160,6 +160,29 @@ export function sourceForWidget(id: string): string | undefined {
 }
 
 /**
+ * FOUR QUESTIONS THAT LOOK ALIKE. An audit once counted 23 "competing
+ * derivations" of this predicate across the client and proposed collapsing
+ * them onto this function. Nineteen of the twenty-one that were analysed
+ * turned out to be asking something else, and rewriting them would have
+ * introduced bugs. Before you consolidate one, work out which it needs:
+ *
+ *   (a) is this widget a utility?      -> this function. Kind, from the catalog.
+ *   (b) has the user ADDED it?         -> prefs.widgets.enabledWidgets. What the
+ *                                         slot cap counts and what nav lists.
+ *   (c) does this build have code for it?
+ *                                      -> widgets/registry.ts, or a narrower
+ *                                         local roster (ScrollrTicker's
+ *                                         WIDGET_TYPES is the key set of
+ *                                         WidgetTickerData; chipColors' map must
+ *                                         stay literal for Tailwind to scan it).
+ *   (d) is it on the ticker right now? -> prefs.widgets.widgetsOnTicker.
+ *
+ * (b), (c) and (d) are not weaker forms of (a) — a utility can be catalogued
+ * but not added, added but unrenderable, or renderable but off the ticker. The
+ * one genuine bug this analysis found was a site that needed (b) and asked (c):
+ * the tray listed every widget this build ships rather than the ones the user
+ * added, which put chips on the ticker that no slot cap could see.
+ *
  * True for a local-only widget (clock, weather, …): one with no server row and
  * no CDC feed.
  *
