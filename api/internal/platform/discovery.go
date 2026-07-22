@@ -148,19 +148,6 @@ func GetChannel(name string) *ChannelInfo {
 	return GlobalDiscovery.channels[name]
 }
 
-// GetValidChannelTypes returns a set of all registered channel names.
-// These are the valid channel types for user_widgets.
-func GetValidChannelTypes() map[string]bool {
-	GlobalDiscovery.mu.RLock()
-	defer GlobalDiscovery.mu.RUnlock()
-
-	types := make(map[string]bool, len(GlobalDiscovery.channels))
-	for name := range GlobalDiscovery.channels {
-		types[name] = true
-	}
-	return types
-}
-
 // GetChannelRoutes returns all routes from all discovered channels.
 func GetChannelRoutes() []struct {
 	Channel *ChannelInfo

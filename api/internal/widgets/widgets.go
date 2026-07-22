@@ -143,8 +143,8 @@ func CreateWidget(c *fiber.Ctx) error {
 
 	// The catalog is the only authority on what a widget is.
 	//
-	// This used to also accept anything in GetValidChannelTypes(), which is the
-	// set of DISCOVERED BACKEND SERVICES — a different concept entirely. It let
+	// This used to also accept anything registered in Redis service discovery
+	// — a different concept entirely, and a set of BACKEND SERVICES. It let
 	// widget_type "fantasy" through (the service registers under that name)
 	// while the catalog id is "fantasy_yahoo", producing a row with no catalog
 	// entry: it consumed a slot, resolved to no source, subscribed to no SSE
