@@ -66,7 +66,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: "What's the difference between Uplink tiers?",
     answer:
-      'Your plan sets how many widgets run at once: Free 3, Uplink 6, Uplink Pro 12, Uplink Ultimate unlimited — with unlimited items inside every widget on every plan. Yahoo Fantasy requires Uplink or higher. Pro adds custom alerts, feed profiles, and whitelist filtering; Ultimate adds webhooks, data export, and API access.',
+      'Your plan sets how many widgets run at once: Free 3, Uplink 6, Uplink Pro 12, Uplink Ultimate unlimited — with unlimited items inside every widget on every plan. Every widget is available on every plan, Yahoo Fantasy included. Uplink adds a second ticker row, Pro a third plus custom alerts, feed profiles and whitelist filtering; Ultimate adds per-row ticker customisation, webhooks, data export, and API access.',
   },
 ]
 
