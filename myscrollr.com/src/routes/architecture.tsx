@@ -230,7 +230,7 @@ const PRINCIPLES: Array<Principle> = [
     Icon: Workflow,
     title: 'Server-authoritative catalog',
     description:
-      'One catalog defines every widget, served from the API. The apps fetch it and render generically, so a new widget ships without a new release.',
+      'One catalog defines every widget, served from the API. The desktop fetches it and renders generically, so a new widget ships without a new release.',
     hex: HEX.accent,
     Watermark: Workflow,
   },

@@ -43,7 +43,7 @@ ticker rows you get.
 
 - 3 widget slots
 - 1 ticker row
-- Real-time streaming (Server-Sent Events)
+- Real-time streaming (Server-Sent Events); 60s polling fallback
 - Every widget in the catalog, including college sports and Yahoo Fantasy
 - Site filtering: blacklist only
 
@@ -51,12 +51,14 @@ ticker rows you get.
 
 - 6 widget slots
 - 2 ticker rows
+- 30s polling fallback
 - Early access to new features
 
 ### Uplink Pro — $24.99/month or $199.99/year
 
 - 12 widget slots
 - 3 ticker rows
+- 10s polling fallback
 - Custom alerts (price targets, score thresholds, keyword triggers)
 - Feed profiles, advanced controls, site filtering: blacklist + whitelist
 
@@ -128,7 +130,7 @@ Scrollr checks for updates automatically on launch. When an update is available,
 
 #### How does live data work vs. polling?
 
-Every tier uses the same persistent Server-Sent Events connection for instant updates as data changes on the server, with polling as the fallback when that connection drops. Delivery speed is not a paid feature.
+Every tier gets the same persistent Server-Sent Events connection, so updates arrive the instant data changes on the server. Polling is the fallback for when that connection drops, and its interval does vary by plan: 60s on Free, 30s on Uplink, 10s on Uplink Pro. Ultimate polls at 30s because SSE carries it.
 
 #### What's the difference between Uplink tiers?
 
@@ -138,7 +140,7 @@ Free: 3 widget slots, 1 ticker row. Uplink: 6 slots, 2 rows. Uplink Pro: 12 slot
 
 #### What does "data delivery" mean?
 
-Data arrives the instant it changes via Server-Sent Events (SSE), the same technology used by stock trading platforms — on every tier, including Free. Polling is only the fallback if that connection drops.
+Data arrives the instant it changes via Server-Sent Events (SSE), the same technology used by stock trading platforms — on every tier, including Free. Polling only matters when that connection drops, and paid plans fall back faster: 60s on Free, 30s on Uplink, 10s on Uplink Pro.
 
 #### How many symbols can I track?
 

@@ -7,11 +7,20 @@ import {
   subscribeCatalog,
 } from "../marketplace";
 
-// The catalog refresh is a once-per-session, process-wide concern: both the
-// ticker window and the main window mount this hook, and neither should
-// trigger a second fetch. Guarded here rather than in marketplace so the
-// module stays a pure view over the catalog.
-let started = false;
+// One fetch per window, not per component. The ticker and the main window are
+// separate Tauri webviews — separate JavaScript realms with their own copy of
+// every module — so this cannot and does not dedupe across them; each window
+// fetches once. (An earlier comment here claimed otherwise.) Within a window
+// it matters, because several components call this hook.
+let fetched = false;
+
+// Bound once per window and never removed. The retry is a process-wide
+// concern, not any one component's: binding it inside the same effect that
+// owns `fetched` meant the FIRST caller registered it and that same caller's
+// unmount tore it down for everyone. Under StrictMode's mount/unmount/remount
+// that happened immediately — the listener was gone before the app finished
+// starting, and the remount saw `fetched` already true and bound nothing.
+let retryBound = false;
 
 /**
  * Keeps a component in sync with the server-authoritative widget catalog.
@@ -28,22 +37,23 @@ export function useCatalog(): string {
   const version = useSyncExternalStore(subscribeCatalog, catalogVersion);
 
   useEffect(() => {
-    if (started) return;
-    started = true;
-
-    // Retry when the machine comes back online. `started` latches before the
-    // fetch so the two windows don't both fetch — but nothing reset it on
-    // failure, so an app launched offline kept the bundled snapshot for the
-    // whole session even after the network returned. "unchanged" is a success
-    // (the server agrees with the snapshot); only "failed" is worth retrying.
-    const attempt = () => {
-      void refreshCatalog(fetchCatalog).then((result) => {
-        if (result !== "failed") window.removeEventListener("online", attempt);
+    if (!retryBound) {
+      retryBound = true;
+      // Reaching the network again is the one event worth retrying on: an app
+      // launched offline otherwise keeps the bundled snapshot for the whole
+      // session. Deliberately not cleaned up — see the note above.
+      window.addEventListener("online", () => {
+        void refreshCatalog(fetchCatalog);
       });
-    };
-    window.addEventListener("online", attempt);
-    attempt();
-    return () => window.removeEventListener("online", attempt);
+    }
+
+    if (fetched) return;
+    fetched = true;
+    void refreshCatalog(fetchCatalog).then((result) => {
+      // "unchanged" is a success — the server agrees with the snapshot. Only
+      // a real failure should let a later mount try again.
+      if (result === "failed") fetched = false;
+    });
   }, []);
 
   return version;

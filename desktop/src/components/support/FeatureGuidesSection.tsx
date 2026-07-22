@@ -5,11 +5,15 @@ import { getAllDataWidgets } from "../../datawidgets/registry";
 import { getAllWidgets } from "../../widgets/registry";
 import type { DataWidgetManifest, WidgetManifest } from "../../types";
 
+// Every widget is free — the catalog sets no RequiredTier on any of the 35
+// entries, and fantasy_yahoo carries "the tier gate was retired in v1.1.2".
+// This table said fantasy: "Uplink" and rendered an amber "Uplink required"
+// badge on the Fantasy card, telling free users to pay for what they have.
 const WIDGET_TIERS: Record<string, string> = {
   finance: "Free",
   sports: "Free",
   rss: "Free",
-  fantasy: "Uplink",
+  fantasy: "Free",
 };
 
 export default function FeatureGuidesSection() {
