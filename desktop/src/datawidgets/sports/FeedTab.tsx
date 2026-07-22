@@ -19,6 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 import { sportsFullQueryOptions, sportsTeamsOptions } from "../../api/queries";
 import type { TeamInfo } from "../../api/queries";
 import { useSportsConfig } from "../../hooks/useSportsConfig";
+import { useCatalog } from "../../hooks/useCatalog";
 import { addConfigForWidget } from "../../marketplace";
 import { ScoresTab } from "./ScoresTab";
 import { ScheduleTab } from "./ScheduleTab";
@@ -111,10 +112,11 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
 
   // A per-league widget (sports_nfl) scopes the whole page to its one league:
   // its league is intrinsic, so we filter the shared /sports payload down.
+  const catalogVersion = useCatalog();
   const scopedLeague = useMemo(() => {
     const l = widgetId ? addConfigForWidget(widgetId)?.leagues : undefined;
     return Array.isArray(l) && typeof l[0] === "string" ? (l[0] as string) : undefined;
-  }, [widgetId]);
+  }, [widgetId, catalogVersion]);
 
   // Full widget page reads from /sports directly (not /dashboard), which
   // returns every game for the user's selected leagues without per-league

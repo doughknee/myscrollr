@@ -15,6 +15,7 @@ import { authFetch, ApiError } from "../../api/client";
 import { SelectMenu } from "../widget-bar/SelectMenu";
 import { getUserIdentity, isAuthenticated } from "../../auth";
 import { getCatalogItems } from "../../marketplace";
+import { useCatalog } from "../../hooks/useCatalog";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -148,12 +149,16 @@ export default function ContactForm({ onBack }: ContactFormProps) {
   // already asked "Which widget?" — so a user reporting a broken NFL feed had
   // to pick "Sports". The catalog is the authority on what a widget is, and
   // this stays correct as widgets are added server-side.
+  // Keyed on the catalog version: with `[]` this pinned the option list to
+  // whatever the bundled snapshot held at mount, so a widget added
+  // server-side never became reportable.
+  const catalogVersion = useCatalog();
   const widgetOptions = useMemo(
     () => [
       { value: "", label: "Select a widget..." },
       ...getCatalogItems().map((w) => ({ value: w.name, label: w.name })),
     ],
-    [],
+    [catalogVersion],
   );
 
   // Attachments (bug only)

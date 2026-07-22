@@ -36,6 +36,7 @@ import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import { useDataWidgetConfig } from "../../hooks/useDataWidgetConfig";
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
+import { useCatalog } from "../../hooks/useCatalog";
 import { applyFinancePipeline, type FinanceSortKey, type FinanceDirectionFilter } from "./view";
 import type { Trade, FeedTabProps, DataWidgetManifest } from "../../types";
 import type { WidgetId } from "../../api/client";
@@ -93,6 +94,9 @@ const LOAD_MORE_INCREMENT = 20;
 // ── FeedTab ──────────────────────────────────────────────────────
 
 function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProps) {
+  // assetClassForWidget is read in the render body, so subscribing is all
+  // this needs — the re-render re-reads the current catalog.
+  useCatalog();
   const { prefs, onPrefsChange } = useShell();
   const dp = prefs.widgetDisplay.finance;
 

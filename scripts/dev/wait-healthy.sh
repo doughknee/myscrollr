@@ -37,5 +37,7 @@ for _ in $(seq 1 30); do
 done
 
 echo ""
-echo "[ready] Backend is up. Ports: core 18080 · rss 8083 · finance 8181 · sports 8082 · fantasy 8084 · predictions 8085"
+echo "[ready] Backend is up."
+echo "[ready] API:       core 18080 (serves every widget route)  ·  fantasy 8084"
+echo "[ready] Ingesters: finance 3001 · sports 3002 · rss 3004 · predictions 3005"
 echo "[ready] Front-ends:  make web   (marketing site :3000)   |   make desktop   (Tauri app)"

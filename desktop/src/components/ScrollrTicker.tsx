@@ -18,6 +18,7 @@ import type { LeagueResponse as FantasyLeague } from "../datawidgets/fantasy/typ
 import ConsolidatedChip from "./chips/ConsolidatedChip";
 import { getWatchlist, onWatchlistChange } from "../datawidgets/predictions/watchlist";
 import { sourceForWidget } from "../marketplace";
+import { useCatalog } from "../hooks/useCatalog";
 import { getTickerSource } from "../datawidgets/tickerRegistry";
 
 // ── Module-level constants ───────────────────────────────────────
@@ -189,6 +190,10 @@ export default function ScrollrTicker({
   // Build chip arrays per widget, then combine based on mixMode.
   // Row filtering (multi-deck) happens UPSTREAM in App.tsx — activeTabs
   // here is already the per-row source list. No round-robin split.
+  // The chip builder resolves each tab through sourceForWidget(); without
+  // subscribing, a server-added widget renders with no source and is skipped.
+  const catalogVersion = useCatalog();
+
   const chips = useMemo(() => {
     const wrap = (key: string, chip: React.ReactNode) => (
       <div key={key} className="py-1">
@@ -269,7 +274,7 @@ export default function ScrollrTicker({
       : buckets.flat();
 
     return allItems;
-  }, [dashboard, activeTabs, widgetData, onChipClick, onTogglePin, pinnedWidgets, comfort, effectiveMixMode, chipColorMode, widgetDisplay, rowIndex, predictionsWatchlist]);
+  }, [dashboard, activeTabs, widgetData, onChipClick, onTogglePin, pinnedWidgets, comfort, effectiveMixMode, chipColorMode, widgetDisplay, rowIndex, predictionsWatchlist, catalogVersion]);
 
   // ── Shared refs ─────────────────────────────────────────────────
   const containerRef = useRef<HTMLDivElement>(null);
