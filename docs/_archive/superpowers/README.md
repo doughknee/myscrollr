@@ -1,6 +1,13 @@
-# Superpowers
+# Superpowers (historical archive)
 
-Every non-trivial feature in Scrollr ships with a dated design document. This
+> ⚠️ **Archived, not maintained. Do not treat as current state.**
+> These are dated design docs, frozen at merge time and never updated since.
+> Most are weeks-to-months stale. For how the system works *now*, read the
+> code plus `AGENTS.md`, `docs/VISION.md`, and `docs/adr/`. Use this folder
+> only for backstory on *why* a past decision was made — and verify anything
+> load-bearing against the code before relying on it.
+
+Every non-trivial feature in Scrollr shipped with a dated design document. This
 folder is the archive — written *before* the code, kept *after* the merge.
 
 ## Layout
@@ -13,12 +20,11 @@ folder is the archive — written *before* the code, kept *after* the merge.
   an ordered list of edits. Tracks file-by-file responsibilities, ordering
   constraints, and test strategy. Usually paired 1-to-1 with a spec.
 
-## Why these are public
+## What these are for
 
-These documents are the single best way to understand *why* the codebase looks
-the way it does. If you're trying to decide whether to file a bug, propose a
-change, or understand an unusual pattern, the relevant spec usually answers
-the question faster than the code does.
+Backstory only: the problem a feature was solving and the alternatives weighed
+at the time. They are *not* a description of current behavior — where an
+archived doc and the code disagree, the code wins, every time.
 
 Anything in `handoffs/` is local rolling session state and is intentionally
 gitignored.

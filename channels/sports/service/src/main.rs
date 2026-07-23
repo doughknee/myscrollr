@@ -57,7 +57,7 @@ const SPORTS_DAILY_QUOTA: u32 = 7500;
 /// initialize before the Tokio runtime starts (the crate's docs forbid
 /// `#[tokio::main]` for this reason).
 ///
-/// Privacy posture (see docs/superpowers/plans/2026-05-12-sentry-rollout.md):
+/// Privacy posture (see AGENTS.md "Error Monitoring — Sentry"):
 /// - send_default_pii=false: no IPs, no auto-attached user info
 /// - before_send strips request bodies, headers, query strings, user
 /// - stack frame filenames have $HOME scrubbed to ~

@@ -63,7 +63,7 @@ struct ReadyPayload {
 /// That's why this entire file uses a synchronous `main` that builds
 /// the runtime by hand.
 ///
-/// Privacy posture (see docs/superpowers/plans/2026-05-12-sentry-rollout.md):
+/// Privacy posture (see AGENTS.md "Error Monitoring — Sentry"):
 /// - send_default_pii=false: no IPs, no auto-attached user info
 /// - before_send strips request bodies, headers, query strings, user
 /// - stack frame filenames have $HOME scrubbed to ~

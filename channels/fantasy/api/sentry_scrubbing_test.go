@@ -11,7 +11,7 @@ import (
 // of sensitive data the privacy spec requires. If this test fails, the
 // Sentry integration is leaking PII and must NOT be deployed.
 //
-// See docs/superpowers/plans/2026-05-12-sentry-rollout.md for invariants.
+// See AGENTS.md "Error Monitoring — Sentry" for invariants.
 func TestScrubSentryEventRemovesPII(t *testing.T) {
 	event := &sentry.Event{
 		Request: &sentry.Request{

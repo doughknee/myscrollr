@@ -200,9 +200,10 @@ Per-service style (semis, quotes, path aliases) varies — see
   to send PRs, what we do and don't merge.
 - [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) — community rules.
 - [`SECURITY.md`](./SECURITY.md) — vulnerability reporting.
-- [`docs/superpowers/specs/`](./docs/superpowers/specs/) — dated design
-  specs written before each feature shipped. Historical: several predate
-  the widget pivot, so trust `VISION.md` where they disagree.
+- [`docs/_archive/superpowers/`](./docs/_archive/superpowers/) — **historical
+  archive** of dated design specs and plans, one per shipped feature. Not
+  maintained and often stale — the code, `AGENTS.md`, `docs/VISION.md`, and
+  `docs/adr/` are authoritative. Read the archive for backstory only.
 
 ## License
 

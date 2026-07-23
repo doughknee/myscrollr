@@ -8,7 +8,7 @@ declare const __APP_VERSION__: string;
  * Two windows, one DSN, one project. The `window` tag distinguishes
  * which window an event came from.
  *
- * Privacy posture (see docs/superpowers/plans/2026-05-12-sentry-rollout.md):
+ * Privacy posture (see AGENTS.md "Error Monitoring — Sentry"):
  * - No IPs, cookies, query strings, headers, or request bodies
  * - No user info (Sentry would normally infer some — we strip it)
  * - Filesystem paths in stack frames scrubbed to ~ (Tauri webviews can
