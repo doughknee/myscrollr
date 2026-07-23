@@ -263,6 +263,68 @@ impl RateLimiter {
         if let Some(counter) = self.host_remaining.get(sport) {
             counter.store(remaining, Ordering::Relaxed);
         }
+        self.clamp_to_host_remaining(sport, remaining);
+    }
+
+    /// Shrink a host's per-league buckets so they never promise more requests
+    /// than upstream says are left.
+    ///
+    /// The buckets are seeded to a full `daily_total` at construction, but the
+    /// api-sports.io counter only rolls at UTC midnight. A pod restart at noon
+    /// therefore handed the limiter a fresh 7,500/day while upstream had a few
+    /// hundred left — the service would happily blow straight through the
+    /// quota (root-cause family of the June 11 soccer outage; #211 fixed the
+    /// off-season half of it).
+    ///
+    /// `x-ratelimit-requests-remaining` is upstream's own count and arrives on
+    /// every response, so it is the authoritative number. Every bucket on the
+    /// host is scaled by `remaining / sum` (integer floor, so the post-clamp
+    /// sum is ≤ remaining), which preserves the fair-share ratios rather than
+    /// letting whichever league polls first drain what is left.
+    ///
+    /// This only ever shrinks. Buckets are refilled solely by `reset_daily`,
+    /// so a transiently large header can't inflate the day's budget.
+    ///
+    /// It also closes a gap that predates restarts: the standings and teams
+    /// polls gate on `has_budget` and spend upstream quota without touching
+    /// any per-league bucket. Their spend now pulls the live-poll budget down
+    /// too, instead of being invisible to it.
+    fn clamp_to_host_remaining(&self, host: &str, remaining: u32) {
+        // ponytail: not atomic across buckets — a concurrent `try_consume` can
+        // slip between the read and the store, so the post-clamp sum can be off
+        // by the number of in-flight requests. It only ever shrinks and polls
+        // are sequential today; take a lock if that stops being true.
+        let leagues: Vec<&String> = self.league_to_host.iter()
+            .filter(|(_, h)| h.as_str() == host)
+            .map(|(l, _)| l)
+            .collect();
+        // Legacy constructor has no per-league buckets — nothing to clamp.
+        if leagues.is_empty() {
+            return;
+        }
+
+        let shared = self.host_shared.get(host);
+        let sum: u64 = leagues.iter()
+            .filter_map(|l| self.league_reserved.get(*l))
+            .map(|c| c.load(Ordering::Relaxed) as u64)
+            .sum::<u64>()
+            + shared.map(|c| c.load(Ordering::Relaxed) as u64).unwrap_or(0);
+
+        // Already within what upstream reports (also covers sum == 0, which
+        // would divide by zero below).
+        if sum <= remaining as u64 {
+            return;
+        }
+
+        let scale = |cur: u32| -> u32 { (cur as u64 * remaining as u64 / sum) as u32 };
+        for l in &leagues {
+            if let Some(c) = self.league_reserved.get(*l) {
+                c.store(scale(c.load(Ordering::Relaxed)), Ordering::Relaxed);
+            }
+        }
+        if let Some(c) = shared {
+            c.store(scale(c.load(Ordering::Relaxed)), Ordering::Relaxed);
+        }
     }
 
     pub fn remaining(&self, sport: &str) -> u32 {
@@ -481,5 +543,96 @@ mod tests {
         // Reset
         rl.reset_daily(&leagues, 100);
         assert_eq!(rl.reserved("Premier League"), 100);
+    }
+
+    // ── Header clamp: the restart-overshoot guard (REL-52) ──────────────────
+
+    #[test]
+    fn test_clamp_stops_restart_overshoot() {
+        // The actual bug. A pod restarts at noon; the limiter rebuilds with a
+        // full day's budget, but upstream has only 400 requests left.
+        let leagues = vec![
+            make_league("Premier League", "football", None),
+            make_league("La Liga", "football", None),
+        ];
+        let rl = RateLimiter::new_per_league(&leagues, 7500);
+        assert_eq!(rl.reserved("Premier League"), 3750);
+
+        // First response of the new pod carries the authoritative header.
+        rl.update("football", 400);
+
+        // Buckets now sum to at most what upstream will actually serve,
+        // and the fair-share ratio survives.
+        let total = rl.reserved("Premier League")
+            + rl.reserved("La Liga")
+            + rl.shared_remaining("football");
+        assert!(total <= 400, "post-clamp sum {} exceeds upstream 400", total);
+        assert_eq!(rl.reserved("Premier League"), 200);
+        assert_eq!(rl.reserved("La Liga"), 200);
+
+        // And the limiter actually stops there — pre-fix this ran to 7500.
+        let mut served = 0;
+        while rl.try_consume("Premier League") || rl.try_consume("La Liga") {
+            served += 1;
+            assert!(served <= 400, "consumed past the clamped budget");
+        }
+        assert_eq!(served, 400);
+    }
+
+    #[test]
+    fn test_clamp_scales_shared_pool_and_never_grows() {
+        use chrono::Datelike;
+        let current_month = chrono::Utc::now().month() as i32;
+        let leagues = vec![
+            make_league("Premier League", "football", None),
+            make_league("Off", "football", Some(vec![current_month])),
+        ];
+        let rl = RateLimiter::new_per_league(&leagues, 1000);
+        assert_eq!(rl.reserved("Premier League"), 500);
+        assert_eq!(rl.shared_remaining("football"), 500); // donated
+
+        rl.update("football", 100); // sum 1000 → 100, each halved share
+        assert_eq!(rl.reserved("Premier League"), 50);
+        assert_eq!(rl.shared_remaining("football"), 50);
+
+        // A larger header must not hand back budget the day has already spent.
+        rl.update("football", 9000);
+        assert_eq!(rl.reserved("Premier League"), 50);
+        assert_eq!(rl.shared_remaining("football"), 50);
+
+        // Only the daily reset refills.
+        rl.reset_daily(&leagues, 1000);
+        assert_eq!(rl.reserved("Premier League"), 500);
+    }
+
+    #[test]
+    fn test_clamp_is_noop_for_legacy_limiter() {
+        // The legacy constructor has no per-league buckets; `update` must stay
+        // the plain header store the health endpoint expects.
+        let rl = RateLimiter::new(&["basketball".to_string()], 1000);
+        rl.update("basketball", 42);
+        assert_eq!(rl.remaining("basketball"), 42);
+        assert_eq!(rl.reserved("basketball"), 0);
+    }
+
+    #[test]
+    fn test_clamp_to_zero_denies_everything() {
+        let leagues = vec![make_league("Premier League", "football", None)];
+        let rl = RateLimiter::new_per_league(&leagues, 1000);
+        rl.update("football", 0);
+        assert_eq!(rl.reserved("Premier League"), 0);
+        assert!(!rl.try_consume("Premier League"));
+    }
+
+    #[test]
+    fn test_clamp_leaves_other_hosts_alone() {
+        let leagues = vec![
+            make_league("Premier League", "football", None),
+            make_league("NBA", "basketball", None),
+        ];
+        let rl = RateLimiter::new_per_league(&leagues, 1000);
+        rl.update("football", 10);
+        assert_eq!(rl.reserved("Premier League"), 10);
+        assert_eq!(rl.reserved("NBA"), 1000); // untouched
     }
 }
