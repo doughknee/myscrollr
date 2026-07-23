@@ -5,7 +5,7 @@ declare const __APP_VERSION__: string
 /**
  * Initialize Sentry for the marketing site.
  *
- * Privacy posture (see docs/superpowers/plans/2026-05-12-sentry-rollout.md):
+ * Privacy posture (see AGENTS.md "Error Monitoring — Sentry"):
  * - No IPs, no cookies, no query strings (Logto auth flow includes
  *   `code=` / `state=` in URLs)
  * - No request bodies or headers

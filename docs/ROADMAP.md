@@ -281,7 +281,7 @@ Biggest item on the list; gets its own design pass before any code.
   that source" on first run, then users refine.
 - **Design questions to settle first:** does a widget live on exactly one row or
   many? Is row 1 special (pinned zone)? What's the empty-row experience? Worth a
-  short spec in `docs/superpowers/specs/` before building.
+  short design note before building.
 
 ---
 

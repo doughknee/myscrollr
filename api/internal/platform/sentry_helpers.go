@@ -12,7 +12,7 @@ import (
 // =============================================================================
 // Sentry helpers
 //
-// Privacy invariants (see docs/superpowers/plans/2026-05-12-sentry-rollout.md):
+// Privacy invariants (see AGENTS.md "Error Monitoring — Sentry"):
 //   - No IPs, no cookies, no query strings, no request bodies
 //   - No user emails, no usernames
 //   - User IDs (if any) are an 8-byte hex hash of (logto_sub + SENTRY_USER_SALT)

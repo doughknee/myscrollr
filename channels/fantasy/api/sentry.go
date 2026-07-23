@@ -17,7 +17,7 @@ import (
 // Sentry helpers — duplicated per channel (channels are independent modules
 // per AGENTS.md; do NOT extract a shared library).
 //
-// Privacy invariants (see docs/superpowers/plans/2026-05-12-sentry-rollout.md):
+// Privacy invariants (see AGENTS.md "Error Monitoring — Sentry"):
 //   - No IPs, cookies, query strings, request bodies, or arbitrary headers
 //   - User IDs are an 8-byte hex hash of (sub + SENTRY_USER_SALT)
 //   - Only User-Agent, Content-Type, X-Request-Id headers are preserved

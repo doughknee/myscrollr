@@ -157,7 +157,7 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 
 ## Error Monitoring — Sentry
 
-Every component has Sentry wired in. **Privacy is the hard constraint** — see [`docs/superpowers/plans/2026-05-12-sentry-rollout.md`](docs/superpowers/plans/2026-05-12-sentry-rollout.md) for the full plan and the privacy audit checklist.
+Every component has Sentry wired in. **Privacy is the hard constraint** — the invariants below are canonical (this section, not any dated doc). The original rollout plan and privacy audit checklist are archived at [`docs/_archive/superpowers/plans/2026-05-12-sentry-rollout.md`](docs/_archive/superpowers/plans/2026-05-12-sentry-rollout.md) for historical context only.
 
 ### What's instrumented
 

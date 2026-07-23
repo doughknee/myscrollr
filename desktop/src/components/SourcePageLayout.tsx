@@ -8,7 +8,7 @@
  * page, so the page chrome carries no Options menu at all.
  *
  * IA refactor 2026-05-09 — see
- * docs/superpowers/specs/2026-05-09-desktop-ia-refactor-design.md
+ * docs/_archive/superpowers/specs/2026-05-09-desktop-ia-refactor-design.md
  */
 import PageLayout from "./layout/PageLayout";
 

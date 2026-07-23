@@ -61,9 +61,9 @@ ss/manual_screenshots/
 ss/ticker_screenshots_manual/
 
 # Active session handoffs — rolling local state per the global AGENTS.md
-# convention. Specs and plans under docs/superpowers/ remain committed
+# convention. Specs and plans under docs/_archive/superpowers/ remain committed
 # as engineering history; only the in-flight handoff notes are local.
-docs/superpowers/handoffs/
+docs/_archive/superpowers/handoffs/
 
 # Local dev (docker-compose.dev.yml): the predictions channel's Kalshi
 # credentials, extracted from channels/predictions/.env by `make prep` (or
