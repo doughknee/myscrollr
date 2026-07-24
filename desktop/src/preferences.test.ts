@@ -17,17 +17,12 @@ import {
   migrateVenue,
   shouldShowOnFeed,
   shouldShowOnTicker,
-  enumToBools,
-  boolsToEnum,
   migrateFinanceDisplay,
   migrateRssDisplay,
   migratePredictionsDisplay,
   migrateFantasyDisplay,
   getSourceTickerRow,
-  getDataWidgetTickerRow,
-  getWidgetTickerRow,
   setSourceTickerRow,
-  setDataWidgetTickerRow,
   setWidgetTickerRow,
   setTickerRowSourceMembership,
   migrateAppearanceTheme,
@@ -38,7 +33,7 @@ import {
   mergeWidgetPrefs,
   loadPrefs,
 } from "./preferences";
-import type { Venue, AppPreferences, WidgetPrefs } from "./preferences";
+import type { AppPreferences, WidgetPrefs } from "./preferences";
 
 const storeValues = vi.hoisted(() => new Map<string, unknown>());
 
@@ -106,62 +101,6 @@ describe("shouldShowOnFeed / shouldShowOnTicker", () => {
   });
 });
 
-describe("enumToBools / boolsToEnum (DisplayLocationGrid adapter)", () => {
-  // The two-checkbox grid component reads via enumToBools and writes back
-  // via boolsToEnum. Drift between these two functions would silently
-  // corrupt user prefs on every interaction, so the test pins down all
-  // four cases explicitly AND confirms a round trip is identity.
-
-  it("enumToBools — off maps to {feed: false, ticker: false}", () => {
-    expect(enumToBools("off")).toEqual({ feed: false, ticker: false });
-  });
-
-  it("enumToBools — feed maps to {feed: true, ticker: false}", () => {
-    expect(enumToBools("feed")).toEqual({ feed: true, ticker: false });
-  });
-
-  it("enumToBools — ticker maps to {feed: false, ticker: true}", () => {
-    expect(enumToBools("ticker")).toEqual({ feed: false, ticker: true });
-  });
-
-  it("enumToBools — both maps to {feed: true, ticker: true}", () => {
-    expect(enumToBools("both")).toEqual({ feed: true, ticker: true });
-  });
-
-  it("boolsToEnum — false/false maps to off", () => {
-    expect(boolsToEnum(false, false)).toBe("off");
-  });
-
-  it("boolsToEnum — true/false maps to feed", () => {
-    expect(boolsToEnum(true, false)).toBe("feed");
-  });
-
-  it("boolsToEnum — false/true maps to ticker", () => {
-    expect(boolsToEnum(false, true)).toBe("ticker");
-  });
-
-  it("boolsToEnum — true/true maps to both", () => {
-    expect(boolsToEnum(true, true)).toBe("both");
-  });
-
-  it("round-trip: enumToBools → boolsToEnum is the identity for every Venue", () => {
-    const venues: Venue[] = ["off", "feed", "ticker", "both"];
-    for (const v of venues) {
-      const { feed, ticker } = enumToBools(v);
-      expect(boolsToEnum(feed, ticker)).toBe(v);
-    }
-  });
-
-  it("round-trip: boolsToEnum → enumToBools is the identity for every (feed, ticker) pair", () => {
-    for (const feed of [false, true]) {
-      for (const ticker of [false, true]) {
-        const venue = boolsToEnum(feed, ticker);
-        expect(enumToBools(venue)).toEqual({ feed, ticker });
-      }
-    }
-  });
-});
-
 describe("widgetDisplay prefs", () => {
   // The REL-40 back-compat read of the legacy `channelDisplay` key is gone.
   // It existed to carry settings written by clients ≤ v1.1.9; with no users
@@ -190,78 +129,31 @@ describe("widgetDisplay prefs", () => {
 });
 
 describe("migrateFinanceDisplay", () => {
-  it("resets display venues to defaults, preserving functional prefs (2026-07-17)", () => {
-    // The display-item toggles left the UI with the configure-page
-    // teardown: any stored show* value — legacy boolean or Venue — is
-    // deliberately ignored so every install renders the defaults.
+  it("preserves functional prefs and ignores unknown stored keys", () => {
     const legacy = {
       showChange: true,
       showPrevClose: false,
-      showLastUpdated: true,
       defaultSort: "change",
     } as unknown as Parameters<typeof migrateFinanceDisplay>[0];
 
-    const migrated = migrateFinanceDisplay(legacy);
-
-    expect(migrated.showChange).toBe("both");
-    expect(migrated.showPrevClose).toBe("both"); // stored "off" ignored
-    expect(migrated.showLastUpdated).toBe("both");
-    expect(migrated.defaultSort).toBe("change"); // preserved
+    expect(migrateFinanceDisplay(legacy).defaultSort).toBe("change");
   });
 
-  it("returns defaults for a completely empty input", () => {
-    const migrated = migrateFinanceDisplay({});
-    // Unknown → "both" per migrateVenue's fallback.
-    expect(migrated.showChange).toBe("both");
-    expect(migrated.showPrevClose).toBe("both");
-    expect(migrated.showLastUpdated).toBe("both");
-    expect(migrated.defaultSort).toBe("alpha");
-  });
-
-  it("gracefully handles undefined input", () => {
-    const migrated = migrateFinanceDisplay(undefined);
-    expect(migrated.defaultSort).toBe("alpha");
-    expect(migrated.showChange).toBe("both");
-  });
-
-  it("resets even new-shape Venue values (defaults reset is idempotent)", () => {
-    const current = {
-      showChange: "both",
-      showPrevClose: "feed",
-      showLastUpdated: "ticker",
-      defaultSort: "change",
-    } as Parameters<typeof migrateFinanceDisplay>[0];
-
-    const migrated = migrateFinanceDisplay(current);
-
-    expect(migrated.showChange).toBe("both");
-    expect(migrated.showPrevClose).toBe("both");
-    expect(migrated.showLastUpdated).toBe("both");
-    expect(migrated.defaultSort).toBe("change");
+  it("returns defaults for empty or undefined input", () => {
+    expect(migrateFinanceDisplay({}).defaultSort).toBe("alpha");
+    expect(migrateFinanceDisplay(undefined).defaultSort).toBe("alpha");
   });
 });
 
 describe("migrateRssDisplay", () => {
-  it("resets display venues to defaults, preserving functional prefs (2026-07-17)", () => {
+  it("preserves articlesPerSource and ignores unknown stored keys", () => {
     const legacy = {
       showDescription: true,
       showSource: false,
-      showTimestamps: true,
       articlesPerSource: 3,
     } as unknown as Parameters<typeof migrateRssDisplay>[0];
 
-    const migrated = migrateRssDisplay(legacy);
-
-    expect(migrated.showDescription).toBe("both");
-    expect(migrated.showSource).toBe("both"); // stored "off" ignored
-    expect(migrated.showTimestamps).toBe("both");
-    expect(migrated.articlesPerSource).toBe(3);
-  });
-
-  it("preserves articlesPerSource and uses 'both' for missing venue fields", () => {
-    const migrated = migrateRssDisplay({ articlesPerSource: 7 });
-    expect(migrated.articlesPerSource).toBe(7);
-    expect(migrated.showSource).toBe("both");
+    expect(migrateRssDisplay(legacy).articlesPerSource).toBe(3);
   });
 
   it("falls back to default for non-number articlesPerSource", () => {
@@ -460,7 +352,7 @@ function makePrefs(rows: { sources: string[] }[]): AppPreferences {
   } as unknown as AppPreferences;
 }
 
-describe("getSourceTickerRow / getDataWidgetTickerRow / getWidgetTickerRow", () => {
+describe("getSourceTickerRow", () => {
   it("returns the row index when the source is in tickerLayout sources", () => {
     const prefs = makePrefs([
       { sources: ["finance"] },
@@ -475,14 +367,12 @@ describe("getSourceTickerRow / getDataWidgetTickerRow / getWidgetTickerRow", () 
     const prefs = makePrefs([{ sources: [] }]);
     const ch = { widget_type: "finance", ticker_enabled: true };
     expect(getSourceTickerRow(prefs, ch, "finance")).toBe(0);
-    expect(getDataWidgetTickerRow(prefs, ch)).toBe(0);
   });
 
   it("returns null when ticker_enabled is false and the widget isn't in any row", () => {
     const prefs = makePrefs([{ sources: [] }]);
     const ch = { widget_type: "finance", ticker_enabled: false };
     expect(getSourceTickerRow(prefs, ch, "finance")).toBeNull();
-    expect(getDataWidgetTickerRow(prefs, ch)).toBeNull();
   });
 
   it("ignores the retired `visible` alias", () => {
@@ -496,28 +386,27 @@ describe("getSourceTickerRow / getDataWidgetTickerRow / getWidgetTickerRow", () 
       ticker_enabled?: boolean;
     };
     expect(getSourceTickerRow(prefs, ch, "finance")).toBe(0);
-    expect(getDataWidgetTickerRow(prefs, ch)).toBe(0);
   });
 
   it("returns null for widgets that aren't in any row", () => {
     const prefs = makePrefs([{ sources: ["finance"] }]);
-    expect(getWidgetTickerRow(prefs, "clock")).toBeNull();
+    expect(getSourceTickerRow(prefs, null, "clock")).toBeNull();
   });
 
   it("returns the row index for widgets that are in a row", () => {
     const prefs = makePrefs([{ sources: ["finance"] }, { sources: ["clock"] }]);
-    expect(getWidgetTickerRow(prefs, "clock")).toBe(1);
+    expect(getSourceTickerRow(prefs, null, "clock")).toBe(1);
   });
 
   it("explicit row assignment beats the legacy ticker_enabled fallback", () => {
     // DataWidgetRow has ticker_enabled=true, but it's pinned to row 1 explicitly.
     const prefs = makePrefs([{ sources: [] }, { sources: ["finance"] }]);
     const ch = { widget_type: "finance", ticker_enabled: true };
-    expect(getDataWidgetTickerRow(prefs, ch)).toBe(1);
+    expect(getSourceTickerRow(prefs, ch, "finance")).toBe(1);
   });
 });
 
-describe("setSourceTickerRow / setDataWidgetTickerRow / setWidgetTickerRow", () => {
+describe("setSourceTickerRow / setWidgetTickerRow", () => {
   it("removes the source from any other row when moving it", () => {
     const prefs = makePrefs([
       { sources: ["finance", "sports"] },
@@ -548,12 +437,6 @@ describe("setSourceTickerRow / setDataWidgetTickerRow / setWidgetTickerRow", () 
     const prefs = makePrefs([{ sources: [] }]);
     const next = setSourceTickerRow(prefs, "finance", -1);
     expect(next).toBe(prefs);
-  });
-
-  it("setDataWidgetTickerRow forwards to setSourceTickerRow", () => {
-    const prefs = makePrefs([{ sources: [] }, { sources: [] }]);
-    const next = setDataWidgetTickerRow(prefs, "sports", 1);
-    expect(next.appearance.tickerLayout.rows[1].sources).toEqual(["sports"]);
   });
 
   it("setWidgetTickerRow places a widget id alongside widgets in the same sources array", () => {
@@ -1069,5 +952,32 @@ describe("widget timer preference migration", () => {
     const prefs = loadPrefs();
 
     expect(prefs.appearance.tickerLayout.rows[0].sources).toEqual(["clock"]);
+  });
+
+  // Pins a deliberate unification: a legacy blob with a `widgets` object but
+  // neither enabledWidgets nor widgetsOnTicker arrays now falls back to the
+  // default widget list (["clock"]) for BOTH the widget-list and ticker-row
+  // halves of the migration. Previously the rows half fell back to [] and
+  // left clock rows without a timer while the list half added one.
+  it("adds timer to clock rows for legacy blobs missing both widget arrays", () => {
+    storeValues.set("scrollr:settings", {
+      appearance: {
+        tickerLayout: {
+          rows: [{ sources: ["clock"] }],
+        },
+      },
+      widgets: legacyWidgetPrefs({
+        clock: {
+          ticker: {},
+        },
+      }),
+    });
+
+    const prefs = loadPrefs();
+
+    expect(prefs.appearance.tickerLayout.rows[0].sources).toEqual([
+      "clock",
+      "timer",
+    ]);
   });
 });

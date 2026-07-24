@@ -245,11 +245,6 @@ fn read_vram_from_registry(name: Option<&str>) -> Option<u64> {
     let want = name?;
 
     // Use `reg query` rather than pulling in a registry crate.
-    // Output format (per subkey):
-    //   HKEY_LOCAL_MACHINE\...\0000
-    //       DriverDesc    REG_SZ    AMD Radeon RX 7900 XTX
-    //       HardwareInformation.qwMemorySize    REG_QWORD    0x600000000
-    //       ...
     let out = crate::commands::system_info::quiet_command("reg")
         .args([
             "query",
@@ -270,29 +265,28 @@ fn read_vram_from_registry(name: Option<&str>) -> Option<u64> {
     let text = String::from_utf8_lossy(&out.stdout);
 
     // Walk the output in subkey blocks. Each block starts with a
-    // "HKEY_LOCAL_MACHINE\..." header, then has indented value lines.
-    // We need the qwMemorySize value from the block whose DriverDesc
-    // matches our adapter name. But /v limits output to JUST the
-    // queried value — we don't get DriverDesc. So we have to do TWO
-    // queries: first to find candidate subkeys, then per-subkey for
-    // DriverDesc and the qword.
-
-    // Simpler approach: iterate the per-block headers (subkey paths
-    // like ...\0000, ...\0001), and for each one with a qwMemorySize,
-    // separately query DriverDesc.
-    let mut subkeys: Vec<String> = Vec::new();
+    // "HKEY_LOCAL_MACHINE\..." header (subkey paths like ...\0000),
+    // followed by the matching value line:
+    //   "    HardwareInformation.qwMemorySize    REG_QWORD    0x600000000"
+    // /v limits output to JUST the queried value — we don't get
+    // DriverDesc — so each candidate still needs one query to match
+    // the adapter name.
+    let mut candidates: Vec<(String, u64)> = Vec::new();
     let mut current: Option<String> = None;
     for line in text.lines() {
         if line.starts_with("HKEY_LOCAL_MACHINE") {
             current = Some(line.trim().to_string());
         } else if line.contains("HardwareInformation.qwMemorySize") {
-            if let Some(ref sub) = current {
-                subkeys.push(sub.clone());
+            if let (Some(sub), Some((_, hex))) = (current.as_ref(), line.split_once("REG_QWORD")) {
+                let hex = hex.trim().trim_start_matches("0x");
+                if let Ok(bytes) = u64::from_str_radix(hex, 16) {
+                    candidates.push((sub.clone(), bytes));
+                }
             }
         }
     }
 
-    for sub in subkeys {
+    for (sub, bytes) in candidates {
         // Query DriverDesc for this subkey
         let desc_out = crate::commands::system_info::quiet_command("reg")
             .args(["query", &sub, "/v", "DriverDesc"])
@@ -311,28 +305,11 @@ fn read_vram_from_registry(name: Option<&str>) -> Option<u64> {
             continue;
         }
 
-        // Query the qword size
-        let qw_out = crate::commands::system_info::quiet_command("reg")
-            .args(["query", &sub, "/v", "HardwareInformation.qwMemorySize"])
-            .output()
-            .ok()?;
-        if !qw_out.status.success() {
-            continue;
-        }
-        let qw_text = String::from_utf8_lossy(&qw_out.stdout);
-        for line in qw_text.lines() {
-            // Format: "    HardwareInformation.qwMemorySize    REG_QWORD    0x600000000"
-            if let Some((_, hex)) = line.split_once("REG_QWORD") {
-                let hex = hex.trim().trim_start_matches("0x");
-                if let Ok(bytes) = u64::from_str_radix(hex, 16) {
-                    log::info!(
-                        "[gpu_win] registry VRAM for '{}': {} bytes ({} MB)",
-                        want, bytes, bytes / 1024 / 1024
-                    );
-                    return Some(bytes);
-                }
-            }
-        }
+        log::info!(
+            "[gpu_win] registry VRAM for '{}': {} bytes ({} MB)",
+            want, bytes, bytes / 1024 / 1024
+        );
+        return Some(bytes);
     }
 
     None

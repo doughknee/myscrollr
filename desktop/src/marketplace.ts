@@ -28,7 +28,7 @@ import type {
 } from "./types";
 import type { SubscriptionTier } from "./auth";
 import { getDataWidget } from "./datawidgets/registry";
-import { getAllWidgets, getWidget, WIDGET_ORDER } from "./widgets/registry";
+import { getWidget, WIDGET_ORDER } from "./widgets/registry";
 import snapshot from "./catalog.snapshot.json";
 
 type IconProps = { size?: number; className?: string };
@@ -329,7 +329,3 @@ export function readableTextOn(hex: string): string {
   const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return lum > 0.62 ? "#111827" : "#ffffff";
 }
-
-// `getAllWidgets` stays exported through here for callers that want the
-// local utility renderers without going through the catalog.
-export { getAllWidgets };

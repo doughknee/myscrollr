@@ -13,14 +13,6 @@ interface GameChipProps {
   game: Game;
   comfort?: boolean;
   colorMode?: ChipColorMode;
-  showLogos?: boolean;
-  /**
-   * Hide the per-game status (Q3 4:32, Final, in 2h) when false.
-   * Matches the ticker-side `showTimer` Venue toggle. Defaults to
-   * true to preserve existing behavior for callers that don't pass
-   * the prop explicitly.
-   */
-  showTimer?: boolean;
   onClick?: () => void;
 }
 
@@ -30,8 +22,6 @@ const GameChip = memo(function GameChip({
   game,
   comfort,
   colorMode = "widget",
-  showLogos = true,
-  showTimer = true,
   onClick,
 }: GameChipProps) {
   const c = getChipColors(colorMode, "sports");
@@ -66,13 +56,11 @@ const GameChip = memo(function GameChip({
         className={clsx("flex items-center gap-1.5", comfort && "text-ui-body")}
       >
         {/* Away team */}
-        {showLogos && (
-          <TeamLogo
-            src={game.away_team_logo}
-            alt={game.away_team_name}
-            size={comfort ? "sm" : "xs"}
-          />
-        )}
+        <TeamLogo
+          src={game.away_team_logo}
+          alt={game.away_team_name}
+          size={comfort ? "sm" : "xs"}
+        />
         <span
           className={clsx(
             c.text,
@@ -115,16 +103,14 @@ const GameChip = memo(function GameChip({
         >
           {displayTeamCode(game.home_team_code, game.home_team_name)}
         </span>
-        {showLogos && (
-          <TeamLogo
-            src={game.home_team_logo}
-            alt={game.home_team_name}
-            size={comfort ? "sm" : "xs"}
-          />
-        )}
+        <TeamLogo
+          src={game.home_team_logo}
+          alt={game.home_team_name}
+          size={comfort ? "sm" : "xs"}
+        />
 
         {/* Status (compact only) */}
-        {!comfort && showTimer && status && (
+        {!comfort && status && (
           <span
             className={clsx(
               "flex items-center gap-1 text-ui-chip uppercase tracking-wider ml-0.5",
@@ -150,7 +136,7 @@ const GameChip = memo(function GameChip({
           {game.league && (
             <span className="uppercase font-semibold">{game.league}</span>
           )}
-          {showTimer && status && (
+          {status && (
             <>
               <span className="text-fg-3">&middot;</span>
               <span
@@ -179,8 +165,6 @@ const GameChip = memo(function GameChip({
 }, (prev, next) =>
   prev.comfort === next.comfort &&
   prev.colorMode === next.colorMode &&
-  prev.showLogos === next.showLogos &&
-  prev.showTimer === next.showTimer &&
   prev.onClick === next.onClick &&
   prev.game.id === next.game.id &&
   prev.game.sport === next.game.sport &&

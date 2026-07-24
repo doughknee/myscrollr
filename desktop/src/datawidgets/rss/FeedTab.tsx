@@ -13,7 +13,7 @@
  * full FeedManager in-feed. Per-source "Show all" lives at the list
  * FOOTER as content, not chrome.
  */
-import { memo, useMemo, useState, useCallback, useRef } from "react";
+import { memo, useMemo, useState, useCallback } from "react";
 import { Rss, ChevronDown, ChevronUp, Newspaper, CalendarRange } from "lucide-react";
 import { clsx } from "clsx";
 import { useQuery } from "@tanstack/react-query";
@@ -25,11 +25,9 @@ import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarDivider } from "../../components/widget-bar/Bar";
 import {
-  useDismiss,
-  MenuPanel,
+  FilterMenuShell,
   MenuHeading,
   MenuRow,
-  FilterTrigger,
 } from "../../components/widget-bar/Menu";
 import {
   Segmented,
@@ -41,7 +39,13 @@ import FeedManager from "./FeedManager";
 import { useDataWidgetConfig } from "../../hooks/useDataWidgetConfig";
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
-import { applyRssPipeline, type RssSortOrder, distinctSourceCount } from "./view";
+import { useSetToggle, latestTimestamp } from "../feedHooks";
+import {
+  applyRssPipeline,
+  type RssSortOrder,
+  distinctSourceCount,
+  getRssDisplayPrefs,
+} from "./view";
 import type {
   RssItem as RssItemType,
   FeedTabProps,
@@ -49,9 +53,7 @@ import type {
   DataWidgetManifest,
 } from "../../types";
 import type { WidgetId, RssWidgetConfig } from "../../api/client";
-import { shouldShowOnFeed } from "../../preferences";
 import type { RssDisplayPrefs } from "../../preferences";
-import { AnimatePresence } from "motion/react";
 
 // ── DataWidgetRow manifest ─────────────────────────────────────────────
 
@@ -114,23 +116,12 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
     [dashboard?.widgets, widgetId],
   );
 
-  // Per-widget display overrides the global rss display where set —
-  // functional overrides only (time window, per-source limit): stored
-  // show* venues are ignored since the 2026-07-17 defaults reset
-  // (mirrors getRssDisplayPrefs in ./view.ts).
-  const dp = useMemo(() => {
-    const override = (
-      widget?.config as { display?: Partial<RssDisplayPrefs> } | undefined
-    )?.display;
-    if (!override) return prefs.widgetDisplay.rss;
-    const {
-      showSource: _source,
-      showDescription: _description,
-      showTimestamps: _timestamps,
-      ...functional
-    } = override;
-    return { ...prefs.widgetDisplay.rss, ...functional };
-  }, [prefs.widgetDisplay.rss, widget?.config]);
+  // Per-widget display overrides merged over the global rss display —
+  // the same selector the ticker uses.
+  const dp = useMemo(
+    () => getRssDisplayPrefs(prefs.widgetDisplay.rss, dashboard, widgetId),
+    [prefs.widgetDisplay.rss, dashboard, widgetId],
+  );
 
   // Scope to this widget's own feeds (news_bbc → only the BBC feed;
   // rss_custom → only the user's added feeds). undefined = a legacy coarse
@@ -206,14 +197,14 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   // 000015/000016 — they can't exist).
   const isCustom = widgetId === "rss_custom";
   const [view, setView] = useState<RssView>("articles");
-  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [selectedSources, toggleSource, clearSources] = useSetToggle();
+  const [selectedCategories, toggleCategory, clearCategories] = useSetToggle();
   // Sticky sort (2026-07-17 unification): initialized from the persisted
   // per-widget override (dp merges it); filters deliberately reset.
   const [sortOrder, setSortOrder] = useState<SortOrder>(
     () => dp.feedSort ?? "newest",
   );
-  const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
+  const [expandedSources, toggleExpanded, clearExpanded] = useSetToggle();
   const [showAll, setShowAll] = useState(false);
 
   // Per-source article counts — menu rows carry the numbers now.
@@ -244,10 +235,10 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
     (next: SortOrder) => {
       setSortOrder(next);
       setShowAll(false);
-      setExpandedSources(new Set());
+      clearExpanded();
       persistDisplay({ ...displayOverride, feedSort: next });
     },
-    [displayOverride, persistDisplay],
+    [displayOverride, persistDisplay, clearExpanded],
   );
 
   const pickWindow = useCallback(
@@ -257,55 +248,17 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
     [displayOverride, persistDisplay],
   );
 
-  const toggleSource = useCallback((source: string) => {
-    setSelectedSources((prev) => {
-      const next = new Set(prev);
-      if (next.has(source)) next.delete(source);
-      else next.add(source);
-      return next;
-    });
-  }, []);
-
-  const clearSources = useCallback(() => setSelectedSources(new Set()), []);
-
-  const toggleCategory = useCallback((cat: string) => {
-    setSelectedCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat);
-      else next.add(cat);
-      return next;
-    });
-  }, []);
-
-  const clearCategories = useCallback(() => setSelectedCategories(new Set()), []);
-
   const clearAllFilters = useCallback(() => {
-    setSelectedSources(new Set());
-    setSelectedCategories(new Set());
-  }, []);
-
-  const toggleExpanded = useCallback((source: string) => {
-    setExpandedSources((prev) => {
-      const next = new Set(prev);
-      if (next.has(source)) next.delete(source);
-      else next.add(source);
-      return next;
-    });
-  }, []);
+    clearSources();
+    clearCategories();
+  }, [clearSources, clearCategories]);
 
   const hasFilters = selectedSources.size > 0 || selectedCategories.size > 0;
 
-  // Most-recent item timestamp (published_at ?? created_at) — drives the FreshnessPill.
-  const latestUpdated = useMemo(() => {
-    let latest = 0;
-    for (const item of rssItems) {
-      const raw = item.published_at ?? item.created_at;
-      if (!raw) continue;
-      const ts = new Date(raw).getTime();
-      if (Number.isFinite(ts) && ts > latest) latest = ts;
-    }
-    return latest > 0 ? new Date(latest).toISOString() : null;
-  }, [rssItems]);
+  const latestUpdated = useMemo(
+    () => latestTimestamp(rssItems, (i) => i.published_at ?? i.created_at),
+    [rssItems],
+  );
 
   // ── Data pipeline ────────────────────────────────────────────
   // Delegates to the shared `applyRssPipeline` selector so the feed page
@@ -541,7 +494,6 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
                     key={`${entry.item.feed_url}:${entry.item.guid}`}
                     item={entry.item}
                     mode={mode}
-                    display={dp}
                     category={entry.category}
                     now={now}
                   />
@@ -609,86 +561,68 @@ function RssFilterMenu({
   onToggleCategory: (c: string) => void;
   onClearCategories: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
-  useDismiss(rootRef, open, close);
-
   const activeCount = selectedSources.size + selectedCategories.size;
 
   return (
-    // NOT position:relative — the dropdown anchors to the sticky bar so
-    // it spans the widget width instead of clipping at narrow widths.
-    <div ref={rootRef} className="shrink-0 rounded-lg">
-      <FilterTrigger
-        open={open}
-        badgeCount={activeCount}
-        onClick={() => setOpen((o) => !o)}
-      />
-      <AnimatePresence>
-        {open && (
-          <MenuPanel className="inset-x-2">
-            <MenuHeading>Sort</MenuHeading>
-            {SORT_OPTIONS.map((opt) => (
-              <MenuRow
-                key={opt.value}
-                selected={sortOrder === opt.value}
-                onClick={() => onPickSort(opt.value)}
-                role="menuitemradio"
-              >
-                {opt.label}
-              </MenuRow>
-            ))}
-            {sources.length > 1 && (
-              <>
-                <MenuHeading>Sources</MenuHeading>
-                <MenuRow
-                  selected={selectedSources.size === 0}
-                  onClick={onClearSources}
-                  role="menuitemradio"
-                >
-                  All sources
-                </MenuRow>
-                {sources.map((s) => (
-                  <MenuRow
-                    key={s}
-                    selected={selectedSources.has(s)}
-                    onClick={() => onToggleSource(s)}
-                    role="menuitemcheckbox"
-                    count={sourceCounts[s]}
-                  >
-                    {s}
-                  </MenuRow>
-                ))}
-              </>
-            )}
-            {categories.length > 1 && (
-              <>
-                <MenuHeading>Category</MenuHeading>
-                <MenuRow
-                  selected={selectedCategories.size === 0}
-                  onClick={onClearCategories}
-                  role="menuitemradio"
-                >
-                  All categories
-                </MenuRow>
-                {categories.map((c) => (
-                  <MenuRow
-                    key={c.name}
-                    selected={selectedCategories.has(c.name)}
-                    onClick={() => onToggleCategory(c.name)}
-                    role="menuitemcheckbox"
-                    count={c.count}
-                  >
-                    {c.name}
-                  </MenuRow>
-                ))}
-              </>
-            )}
-          </MenuPanel>
-        )}
-      </AnimatePresence>
-    </div>
+    <FilterMenuShell badgeCount={activeCount}>
+      <MenuHeading>Sort</MenuHeading>
+      {SORT_OPTIONS.map((opt) => (
+        <MenuRow
+          key={opt.value}
+          selected={sortOrder === opt.value}
+          onClick={() => onPickSort(opt.value)}
+          role="menuitemradio"
+        >
+          {opt.label}
+        </MenuRow>
+      ))}
+      {sources.length > 1 && (
+        <>
+          <MenuHeading>Sources</MenuHeading>
+          <MenuRow
+            selected={selectedSources.size === 0}
+            onClick={onClearSources}
+            role="menuitemradio"
+          >
+            All sources
+          </MenuRow>
+          {sources.map((s) => (
+            <MenuRow
+              key={s}
+              selected={selectedSources.has(s)}
+              onClick={() => onToggleSource(s)}
+              role="menuitemcheckbox"
+              count={sourceCounts[s]}
+            >
+              {s}
+            </MenuRow>
+          ))}
+        </>
+      )}
+      {categories.length > 1 && (
+        <>
+          <MenuHeading>Category</MenuHeading>
+          <MenuRow
+            selected={selectedCategories.size === 0}
+            onClick={onClearCategories}
+            role="menuitemradio"
+          >
+            All categories
+          </MenuRow>
+          {categories.map((c) => (
+            <MenuRow
+              key={c.name}
+              selected={selectedCategories.has(c.name)}
+              onClick={() => onToggleCategory(c.name)}
+              role="menuitemcheckbox"
+              count={c.count}
+            >
+              {c.name}
+            </MenuRow>
+          ))}
+        </>
+      )}
+    </FilterMenuShell>
   );
 }
 
@@ -866,19 +800,15 @@ function SourceHeader({ source, category, overflow, expanded, onToggle }: Source
 interface RssArticleProps {
   item: RssItemType;
   mode: FeedMode;
-  display: RssDisplayPrefs;
   category?: string;
   /** Shared "now" from `useNow()` so the "Xm ago" label advances between renders. */
   now: number;
 }
 
-const RssArticle = memo(function RssArticle({ item, mode, display, category, now }: RssArticleProps) {
-  const showSource = shouldShowOnFeed(display.showSource);
-  const showTimestamps = shouldShowOnFeed(display.showTimestamps);
-  const showDescription = shouldShowOnFeed(display.showDescription);
-  const ago = showTimestamps ? relativeTime(item.published_at, now) : null;
+const RssArticle = memo(function RssArticle({ item, mode, category, now }: RssArticleProps) {
+  const ago = relativeTime(item.published_at, now);
 
-  const categoryBadge = showSource && category ? (
+  const categoryBadge = category ? (
     <span className="px-1.5 py-px rounded text-ui-chip text-fg-3 bg-accent/10 shrink-0 whitespace-nowrap">
       {category}
     </span>
@@ -892,11 +822,9 @@ const RssArticle = memo(function RssArticle({ item, mode, display, category, now
         rel="noopener noreferrer"
         className="flex items-center gap-2 px-3 py-1.5 bg-surface text-xs hover:bg-surface-hover transition-colors cursor-pointer"
       >
-        {showSource && (
-          <span className="font-mono text-ui-section text-accent shrink-0 min-w-[56px] max-w-[80px] truncate uppercase tracking-wider font-bold">
-            {item.source_name}
-          </span>
-        )}
+        <span className="font-mono text-ui-section text-accent shrink-0 min-w-[56px] max-w-[80px] truncate uppercase tracking-wider font-bold">
+          {item.source_name}
+        </span>
         {categoryBadge}
         <span className="text-fg truncate flex-1">{item.title}</span>
         {ago && (
@@ -919,36 +847,28 @@ const RssArticle = memo(function RssArticle({ item, mode, display, category, now
       <span className="text-sm font-medium text-fg leading-snug line-clamp-2">
         {item.title}
       </span>
-      {showDescription && item.description && (
+      {item.description && (
         <p className="mt-1 text-xs text-fg-2 leading-relaxed line-clamp-2">
           {truncate(item.description, 160)}
         </p>
       )}
-      {(showSource || ago) && (
-        <div className="flex items-center gap-2 mt-1.5">
-          {showSource && (
-            <span className="text-ui-section font-mono font-bold text-accent uppercase tracking-wider">
-              {item.source_name}
-            </span>
-          )}
-          {categoryBadge}
-          {ago && (
-            <span className="text-ui-chip font-mono text-fg-3 tabular-nums">
-              {ago}
-            </span>
-          )}
-        </div>
-      )}
+      <div className="flex items-center gap-2 mt-1.5">
+        <span className="text-ui-section font-mono font-bold text-accent uppercase tracking-wider">
+          {item.source_name}
+        </span>
+        {categoryBadge}
+        {ago && (
+          <span className="text-ui-chip font-mono text-fg-3 tabular-nums">
+            {ago}
+          </span>
+        )}
+      </div>
     </a>
   );
 }, (prev, next) =>
   prev.mode === next.mode &&
-  prev.display === next.display &&
   prev.category === next.category &&
-  // Only re-render on the `now` tick when this row actually renders
-  // a timestamp — otherwise the tick would churn the whole list for
-  // no visible change.
-  (!shouldShowOnFeed(next.display.showTimestamps) || prev.now === next.now) &&
+  prev.now === next.now &&
   prev.item.guid === next.item.guid &&
   prev.item.feed_url === next.item.feed_url &&
   prev.item.title === next.item.title &&

@@ -43,11 +43,9 @@ import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarDivider, BarPill } from "../../components/widget-bar/Bar";
 import {
-  useDismiss,
-  MenuPanel,
+  FilterMenuShell,
   MenuHeading,
   MenuRow,
-  FilterTrigger,
 } from "../../components/widget-bar/Menu";
 import {
   Segmented,
@@ -74,6 +72,12 @@ import {
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
 import {
+  useLoadMore,
+  usePriceFlash,
+  useSetToggle,
+  latestTimestamp,
+} from "../feedHooks";
+import {
   selectLens,
   selectResolvedToday,
   groupByEvent,
@@ -95,7 +99,6 @@ import {
   type MatchRange,
 } from "./search";
 import type { Prediction, FeedTabProps, DataWidgetManifest } from "../../types";
-import { shouldShowOnFeed } from "../../preferences";
 import type { PredictionsDisplayPrefs } from "../../preferences";
 
 // ── DataWidgetRow manifest ─────────────────────────────────────────────
@@ -123,9 +126,6 @@ export const predictionsDataWidget: DataWidgetManifest = {
 };
 
 // ── Constants ────────────────────────────────────────────────────
-
-const PAGE_SIZE = 20;
-const LOAD_MORE_INCREMENT = 20;
 
 /** DataWidgetRow accent — kept in sync with `predictionsDataWidget.hex` and the
  *  marketplace catalog color (v1.1.5 unified the old indigo/teal split). */
@@ -294,23 +294,26 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   const [lens, setLens] = useState<PredictionsLens>("trending");
   // Multi-select category filter (empty = all). "View all" on a section
   // focuses exactly that category; the menu toggles combine freely.
-  const [selectedCats, setSelectedCats] = useState<string[]>([]);
+  const [selectedCats, toggleCat, clearCats] = useSetToggle();
   const [detailMarket, setDetailMarket] = useState<Prediction | null>(null);
   const openDetail = useCallback((m: Prediction) => setDetailMarket(m), []);
   const closeDetail = useCallback(() => setDetailMarket(null), []);
 
-  const toggleCat = useCallback((c: string) => {
-    setSelectedCats((prev) =>
-      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
-    );
-  }, []);
-  const clearCats = useCallback(() => setSelectedCats([]), []);
-  const focusCategory = useCallback((c: string) => setSelectedCats([c]), []);
+  const focusCategory = useCallback(
+    (c: string) => {
+      clearCats();
+      toggleCat(c);
+    },
+    [clearCats, toggleCat],
+  );
 
-  const pickLens = useCallback((next: PredictionsLens) => {
-    setLens(next);
-    setSelectedCats([]);
-  }, []);
+  const pickLens = useCallback(
+    (next: PredictionsLens) => {
+      setLens(next);
+      clearCats();
+    },
+    [clearCats],
+  );
 
   // Resolved-today recap (trailing 24h), refreshed as `now` ticks.
   const resolvedToday = useMemo(
@@ -365,8 +368,8 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
 
   const focusedItems = useMemo(
     () =>
-      selectedCats.length > 0
-        ? lensItems.filter((m) => selectedCats.includes(categoryOf(m)))
+      selectedCats.size > 0
+        ? lensItems.filter((m) => selectedCats.has(categoryOf(m)))
         : lensItems,
     [lensItems, selectedCats, categoryOf],
   );
@@ -408,36 +411,28 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   // Browse mode: Trending with no category filter = Kalshi-style sections.
   const sections: CategorySection[] | null = useMemo(
     () =>
-      isComfort && lens === "trending" && selectedCats.length === 0
+      isComfort && lens === "trending" && selectedCats.size === 0
         ? groupEventsByCategory(shownEvents)
         : null,
     [isComfort, lens, selectedCats, shownEvents],
   );
 
   // ── Pagination (flat modes only — sections self-cap) ─────────
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [lens, selectedCats, watchlist, query]);
-
   const renderTotal = isComfort ? shownEvents.length : focusedItems.length;
-  const visible = Math.min(visibleCount, renderTotal);
+  const { visible, footer } = useLoadMore(
+    renderTotal,
+    [lens, selectedCats, watchlist, query],
+    "px-3 pb-3",
+  );
   const pageItems = focusedItems.slice(0, visible);
   const pageEvents = shownEvents.slice(0, visible);
-  const remaining = Math.max(0, renderTotal - visible);
 
-  // Most-recent update across visible markets — drives the FreshnessPill.
-  const latestUpdated = useMemo(() => {
-    let latest = 0;
-    for (const m of lensItems) {
-      if (!m.updated_at) continue;
-      const ts = new Date(m.updated_at).getTime();
-      if (Number.isFinite(ts) && ts > latest) latest = ts;
-    }
-    return latest > 0 ? new Date(latest).toISOString() : null;
-  }, [lensItems]);
+  const latestUpdated = useMemo(
+    () => latestTimestamp(lensItems, (m) => m.updated_at),
+    [lensItems],
+  );
 
   // Live version of the open market (so the modal reflects price ticks).
   const liveDetail = useMemo(
@@ -609,7 +604,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
           <div className="scrollbar-none hidden min-w-0 items-center gap-1 overflow-x-auto @5xl:flex">
             {LENSES.map((l) => {
               const Icon = l.icon;
-              const active = lens === l.value && selectedCats.length === 0;
+              const active = lens === l.value && selectedCats.size === 0;
               return (
                 <BarPill key={l.value} active={active} onClick={() => pickLens(l.value)}>
                   {Icon && (
@@ -644,7 +639,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
             <span className="hidden @5xl:block">
               <MultiSelectMenu
                 options={categories}
-                selected={selectedCats}
+                selected={Array.from(selectedCats)}
                 onToggle={toggleCat}
                 onClear={clearCats}
                 noun="categories"
@@ -785,7 +780,6 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                       >
                         <EventCard
                           event={ev}
-                          display={dp}
                           category={categoryOf(ev.outcomes[0])}
                           now={now}
                           watchedSet={watchedSet}
@@ -816,7 +810,6 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                 <MarketItem
                   key={market.id}
                   market={market}
-                  display={dp}
                   now={now}
                 />
               ))
@@ -831,7 +824,6 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                     {lens === "resolved" ? (
                       <ResolvedCard
                         event={ev}
-                        display={dp}
                         category={categoryOf(ev.outcomes[0])}
                         now={now}
                         watchedSet={watchedSet}
@@ -842,7 +834,6 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                     ) : (
                       <EventCard
                         event={ev}
-                        display={dp}
                         category={categoryOf(ev.outcomes[0])}
                         now={now}
                         watchedSet={watchedSet}
@@ -856,23 +847,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
               </AnimatePresence>
             )}
           </div>
-          {remaining > 0 && (
-            <div className="flex items-center justify-center gap-3 px-3 pb-3">
-              <button
-                onClick={() =>
-                  setVisibleCount((c) =>
-                    Math.min(renderTotal, c + LOAD_MORE_INCREMENT),
-                  )
-                }
-                className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
-              >
-                Load more
-              </button>
-              <span className="text-xs text-fg-3 tabular-nums font-mono">
-                {visible} of {renderTotal}
-              </span>
-            </div>
-          )}
+          {footer}
         </>
       )}
 
@@ -948,70 +923,49 @@ function FilterMenu({
   watchlistCount: number;
   resolvedCount: number;
   categories: string[];
-  selectedCats: string[];
+  selectedCats: Set<string>;
   onToggleCategory: (c: string) => void;
   onClearCategories: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
-  useDismiss(rootRef, open, close);
-
-  const activeCount = (lens !== "trending" ? 1 : 0) + selectedCats.length;
+  const activeCount = (lens !== "trending" ? 1 : 0) + selectedCats.size;
 
   return (
-    // NOT position:relative — the dropdown anchors to the sticky bar (the
-    // nearest positioned ancestor) so it spans the widget width instead of
-    // clipping off-screen at narrow widths. rounded-lg feeds the global
-    // focus rule's `border-radius: inherit` for the button's ring.
-    <div ref={rootRef} className="shrink-0 rounded-lg">
-      <FilterTrigger
-        open={open}
-        badgeCount={activeCount}
-        onClick={() => setOpen((o) => !o)}
-      />
-
-      <AnimatePresence>
-        {open && (
-          <MenuPanel className="inset-x-2">
-            <MenuHeading>View</MenuHeading>
-            {LENSES.map((l) => (
-              <MenuRow
-                key={l.value}
-                selected={lens === l.value}
-                onClick={() => onPickLens(l.value)}
-                role="menuitemradio"
-              >
-                {l.label}
-                {l.value === "watchlist" && watchlistCount > 0
-                  ? ` ${watchlistCount}`
-                  : l.value === "resolved" && resolvedCount > 0
-                    ? ` ${resolvedCount}`
-                    : ""}
-              </MenuRow>
-            ))}
-            <MenuHeading>Category</MenuHeading>
-            <MenuRow
-              selected={selectedCats.length === 0}
-              onClick={onClearCategories}
-              role="menuitemradio"
-            >
-              All categories
-            </MenuRow>
-            {categories.map((c) => (
-              <MenuRow
-                key={c}
-                selected={selectedCats.includes(c)}
-                onClick={() => onToggleCategory(c)}
-                role="menuitemcheckbox"
-              >
-                {c}
-              </MenuRow>
-            ))}
-          </MenuPanel>
-        )}
-      </AnimatePresence>
-    </div>
+    <FilterMenuShell badgeCount={activeCount}>
+      <MenuHeading>View</MenuHeading>
+      {LENSES.map((l) => (
+        <MenuRow
+          key={l.value}
+          selected={lens === l.value}
+          onClick={() => onPickLens(l.value)}
+          role="menuitemradio"
+        >
+          {l.label}
+          {l.value === "watchlist" && watchlistCount > 0
+            ? ` ${watchlistCount}`
+            : l.value === "resolved" && resolvedCount > 0
+              ? ` ${resolvedCount}`
+              : ""}
+        </MenuRow>
+      ))}
+      <MenuHeading>Category</MenuHeading>
+      <MenuRow
+        selected={selectedCats.size === 0}
+        onClick={onClearCategories}
+        role="menuitemradio"
+      >
+        All categories
+      </MenuRow>
+      {categories.map((c) => (
+        <MenuRow
+          key={c}
+          selected={selectedCats.has(c)}
+          onClick={() => onToggleCategory(c)}
+          role="menuitemcheckbox"
+        >
+          {c}
+        </MenuRow>
+      ))}
+    </FilterMenuShell>
   );
 }
 
@@ -1079,7 +1033,6 @@ function Highlight({
 
 interface ResolvedCardProps {
   event: PredictionEvent;
-  display: PredictionsDisplayPrefs;
   category?: string;
   now: number;
   watchedSet: Set<string>;
@@ -1095,7 +1048,6 @@ function resolvedStamp(p: Prediction | undefined): string | undefined {
 
 const ResolvedCard = memo(function ResolvedCard({
   event,
-  display,
   category,
   now,
   watchedSet,
@@ -1107,8 +1059,7 @@ const ResolvedCard = memo(function ResolvedCard({
   const watched = lead ? watchedSet.has(lead.ticker) : false;
   const stamp = resolvedStamp(lead);
   const settledLabel = stamp ? `Settled ${relativeTime(stamp, now)}` : "Settled";
-  const showHeaderCategory =
-    shouldShowOnFeed(display.showCategory) && Boolean(category);
+  const showHeaderCategory = Boolean(category);
 
   const metaGroup = (
     <span className="flex shrink-0 items-center gap-1">
@@ -1206,7 +1157,7 @@ const ResolvedCard = memo(function ResolvedCard({
         })}
       </div>
 
-      {shouldShowOnFeed(display.showVolume) && event.volume > 0 && (
+      {event.volume > 0 && (
         <div className="mt-auto pt-0.5 font-mono text-ui-chip tabular-nums text-fg-3">
           Vol {formatCompactNumber(event.volume)}
           <span className="text-fg-4"> · total</span>
@@ -1224,42 +1175,22 @@ const ResolvedCard = memo(function ResolvedCard({
 
 interface MarketItemProps {
   market: Prediction;
-  display: PredictionsDisplayPrefs;
   /** Shared "now" from `useNow()` in the parent list — drives the countdown. */
   now: number;
 }
 
 const MarketItem = memo(function MarketItem({
   market,
-  display,
   now,
 }: MarketItemProps) {
   const delta = priceDelta(market);
   const isUp = delta > 0;
   const isDown = delta < 0;
 
-  // Track previous probability for the flash animation. A single effect
-  // owns the ref so rapid back-to-back CDC events can't swallow a flash.
-  const prevPriceRef = useRef<number | null>(null);
-  const [flash, setFlash] = useState<"up" | "down" | null>(null);
-
-  useEffect(() => {
-    const current = typeof market.yes_price === "number" ? market.yes_price : NaN;
-    const prev = prevPriceRef.current;
-    prevPriceRef.current = current;
-
-    if (prev === null || isNaN(current) || current === prev) {
-      return;
-    }
-
-    setFlash(current > prev ? "up" : "down");
-    const timer = setTimeout(() => setFlash(null), 800);
-    return () => clearTimeout(timer);
-  }, [market.yes_price]);
+  const flash = usePriceFlash(market.yes_price);
 
   const dirColor = isUp ? "text-up" : isDown ? "text-down" : "text-fg-3";
   const countdown = formatCloseCountdown(market.close_time, now);
-  const ind = timeIndicator(market, now);
 
   return (
     <a
@@ -1274,39 +1205,30 @@ const MarketItem = memo(function MarketItem({
     >
       <ProbabilityPill pct={market.yes_price} delta={delta} size="sm" />
       {/* Fixed slot; empty (not "—") when unmoved, matching card rows. */}
-      {shouldShowOnFeed(display.showDelta) && (
-        <span className={clsx("tabular-nums min-w-[40px]", dirColor)}>
-          {delta !== 0 ? formatDelta(delta) : ""}
-        </span>
-      )}
+      <span className={clsx("tabular-nums min-w-[40px]", dirColor)}>
+        {delta !== 0 ? formatDelta(delta) : ""}
+      </span>
       <span className="text-fg-2 truncate flex-1 font-sans">
         {market.event_title || market.title}
       </span>
-      {shouldShowOnFeed(display.showVolume) && market.volume != null && (
+      {market.volume != null && (
         <span className="text-fg-3 tabular-nums shrink-0">
           {formatCompactNumber(market.volume_24h ?? market.volume)}
         </span>
       )}
-      {/* Compact rows share the indicator logic: LIVE badge when live,
-          else the terse countdown in a reserved slot (no tick reflow). */}
-      {shouldShowOnFeed(display.showCloseTime) &&
-        (ind.kind === "live" ? (
-          <TimeBadge ind={ind} />
-        ) : (
-          countdown && (
-            <span className="inline-block min-w-[4ch] shrink-0 text-right tabular-nums text-fg-3">
-              {countdown}
-            </span>
-          )
-        ))}
+      {/* Terse countdown in a reserved slot (no tick reflow). */}
+      {countdown && (
+        <span className="inline-block min-w-[4ch] shrink-0 text-right tabular-nums text-fg-3">
+          {countdown}
+        </span>
+      )}
     </a>
   );
 }, (prev, next) =>
-  prev.display === next.display &&
   // `now` must trigger a re-render while the close-time countdown is
-  // visible so it advances on every tick. When the countdown is hidden
+  // visible so it advances on every tick. When there is no close time
   // the tick is irrelevant — skip it to avoid churning the whole list.
-  (!shouldShowOnFeed(next.display.showCloseTime) || !next.market.close_time || prev.now === next.now) &&
+  (!next.market.close_time || prev.now === next.now) &&
   prev.market.id === next.market.id &&
   prev.market.yes_price === next.market.yes_price &&
   prev.market.prev_yes_price === next.market.prev_yes_price &&
@@ -1335,7 +1257,6 @@ const MarketItem = memo(function MarketItem({
 
 interface EventCardProps {
   event: PredictionEvent;
-  display: PredictionsDisplayPrefs;
   category?: string;
   now: number;
   watchedSet: Set<string>;
@@ -1347,7 +1268,6 @@ interface EventCardProps {
 
 const EventCard = memo(function EventCard({
   event,
-  display,
   category,
   now,
   watchedSet,
@@ -1357,17 +1277,15 @@ const EventCard = memo(function EventCard({
 }: EventCardProps) {
   const lead = event.outcomes[0];
   const watched = lead ? watchedSet.has(lead.ticker) : false;
-  // Time indicator (B3) — evaluated against the event's close time; the
-  // lead leg carries any (future) start_time field.
+  // Time indicator (B3) — evaluated against the event's close time.
   const ind: TimeIndicator = lead
     ? timeIndicator(
         { ...lead, close_time: event.closeTime ?? lead.close_time },
         now,
       )
     : { kind: "none" };
-  const showHeaderCategory =
-    shouldShowOnFeed(display.showCategory) && Boolean(category);
-  const showTime = shouldShowOnFeed(display.showCloseTime) && ind.kind !== "none";
+  const showHeaderCategory = Boolean(category);
+  const showTime = ind.kind !== "none";
 
   // Top outcomes by price + the hidden count (B2). Detail shows them all.
   const { visible, extra } = cardOutcomes(event.outcomes);
@@ -1449,7 +1367,6 @@ const EventCard = memo(function EventCard({
           <OutcomeRow
             key={m.id}
             market={m}
-            display={display}
             onOpenDetail={onOpenDetail}
             ranges={hit?.outcomeRanges[m.id]}
           />
@@ -1457,7 +1374,6 @@ const EventCard = memo(function EventCard({
         {event.outcomes.length === 1 && (
           <OutcomeRow
             market={event.outcomes[0]}
-            display={display}
             onOpenDetail={onOpenDetail}
             syntheticNo
           />
@@ -1478,7 +1394,7 @@ const EventCard = memo(function EventCard({
 
       {/* Footer: 24h volume, quiet and left-anchored. mt-auto pins it to
           the card bottom so footers align across a row. */}
-      {shouldShowOnFeed(display.showVolume) && (event.volume24h > 0 || event.volume > 0) && (
+      {(event.volume24h > 0 || event.volume > 0) && (
         <div className="mt-auto pt-0.5 font-mono text-ui-chip tabular-nums text-fg-3">
           Vol {formatCompactNumber(event.volume24h || event.volume)}
           <span className="text-fg-4"> · 24h</span>
@@ -1488,35 +1404,18 @@ const EventCard = memo(function EventCard({
   );
 });
 
-/** The card's time indicator (B3): a LIVE badge, a reserved-width
- *  countdown ("Starts in 3h" / "Closes 5d"), or a muted "Closed". Reserved
- *  widths (ch, mono) mean the 1s tick can shorten the text without ever
- *  reflowing the card. */
+/** The card's time indicator (B3): a reserved-width countdown
+ *  ("Closes 5d") or a muted "Closed". Reserved widths (ch, mono) mean the
+ *  1s tick can shorten the text without ever reflowing the card. */
 function TimeBadge({ ind }: { ind: TimeIndicator }) {
   if (ind.kind === "none") return null;
-  if (ind.kind === "live") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-error/10 px-1.5 py-px font-mono text-ui-chip font-bold uppercase tracking-wide text-error">
-        <span
-          aria-hidden
-          className="h-1.5 w-1.5 rounded-full bg-error motion-safe:animate-pulse"
-        />
-        Live
-      </span>
-    );
-  }
   if (ind.kind === "closed") {
     return (
       <span className="font-mono text-ui-chip tabular-nums text-fg-4">Closed</span>
     );
   }
   return (
-    <span
-      className={clsx(
-        "inline-block whitespace-nowrap text-right font-mono text-ui-chip tabular-nums text-fg-3",
-        ind.kind === "starts" ? "min-w-[13ch]" : "min-w-[11ch]",
-      )}
-    >
+    <span className="inline-block min-w-[11ch] whitespace-nowrap text-right font-mono text-ui-chip tabular-nums text-fg-3">
       {ind.label}
     </span>
   );
@@ -1535,13 +1434,11 @@ function TimeBadge({ ind }: { ind: TimeIndicator }) {
  *  detail click belong to the Yes row / card. */
 function OutcomeRow({
   market,
-  display,
   onOpenDetail,
   syntheticNo = false,
   ranges,
 }: {
   market: Prediction;
-  display: PredictionsDisplayPrefs;
   onOpenDetail: (market: Prediction) => void;
   syntheticNo?: boolean;
   /** Search-match ranges within the (non-synthetic) leg label. */
@@ -1576,17 +1473,15 @@ function OutcomeRow({
       <span className="min-w-0 flex-1 truncate text-ui-meta text-fg-2">
         <Highlight text={legLabel} ranges={syntheticNo ? undefined : ranges} />
       </span>
-      {shouldShowOnFeed(display.showDelta) && (
-        <span
-          className={clsx(
-            "w-9 shrink-0 text-right font-mono text-ui-chip font-semibold tabular-nums",
-            isUp && "text-up",
-            isDown && "text-down",
-          )}
-        >
-          {delta !== 0 ? formatDelta(delta) : ""}
-        </span>
-      )}
+      <span
+        className={clsx(
+          "w-9 shrink-0 text-right font-mono text-ui-chip font-semibold tabular-nums",
+          isUp && "text-up",
+          isDown && "text-down",
+        )}
+      >
+        {delta !== 0 ? formatDelta(delta) : ""}
+      </span>
       <ProbabilityPill pct={shownPct} delta={delta} size="sm" />
     </button>
   );

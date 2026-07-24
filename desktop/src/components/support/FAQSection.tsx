@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
 import clsx from "clsx";
+import Disclosure from "./Disclosure";
 import { FAQ_ITEMS } from "./support-content";
 
 export default function FAQSection() {
@@ -23,42 +23,27 @@ export default function FAQSection() {
   // instead of a flat divider stack.
   return (
     <div className="rounded-xl border border-edge/35 bg-base-150/35 overflow-hidden">
-      {FAQ_ITEMS.map((item, i) => {
-        const isOpen = expanded.has(i);
-        return (
-          <div
-            key={i}
-            className={clsx(
-              i > 0 && "border-t border-edge/35",
-            )}
-          >
-            <button
-              onClick={() => toggle(i)}
-              aria-expanded={isOpen}
-              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-base-150/50 cursor-pointer"
-            >
+      {FAQ_ITEMS.map((item, i) => (
+        <div
+          key={i}
+          className={clsx(
+            i > 0 && "border-t border-edge/35",
+          )}
+        >
+          <Disclosure
+            open={expanded.has(i)}
+            onToggle={() => toggle(i)}
+            className="justify-between"
+            header={
               <span className="text-ui-body font-medium">
                 {item.question}
               </span>
-              <ChevronDown
-                size={16}
-                className={clsx(
-                  "shrink-0 text-fg-3 transition-transform duration-200",
-                  isOpen && "rotate-180",
-                )}
-              />
-            </button>
-            <div
-              className={clsx(
-                "overflow-hidden transition-all duration-200",
-                isOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0",
-              )}
-            >
-              <p className="px-4 pb-4 pt-1 text-ui-meta">{item.answer}</p>
-            </div>
-          </div>
-        );
-      })}
+            }
+          >
+            <p className="px-4 pb-4 pt-1 text-ui-meta">{item.answer}</p>
+          </Disclosure>
+        </div>
+      ))}
     </div>
   );
 }

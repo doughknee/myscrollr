@@ -60,6 +60,14 @@ interface OverflowMenuProps {
   trigger?: ReactElement<{ ref?: Ref<HTMLElement> }>;
   /** Preferred menu placement. Default: "bottom-end". */
   placement?: Placement;
+  /**
+   * Context-menu mode: viewport point to anchor the menu at (a
+   * right-click's clientX/Y). When this prop is present the menu is
+   * controlled — open while non-null — and no trigger renders.
+   */
+  anchorPoint?: { x: number; y: number } | null;
+  /** Close request in context-menu mode (dismiss, item select). */
+  onClose?: () => void;
 }
 
 // ── Component ───────────────────────────────────────────────────
@@ -69,8 +77,19 @@ export default function OverflowMenu({
   triggerLabel = "Options",
   trigger,
   placement = "bottom-end",
+  anchorPoint,
+  onClose,
 }: OverflowMenuProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const contextMode = anchorPoint !== undefined;
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isOpen = contextMode ? anchorPoint !== null : uncontrolledOpen;
+  const setIsOpen = (next: boolean) => {
+    if (contextMode) {
+      if (!next) onClose?.();
+    } else {
+      setUncontrolledOpen(next);
+    }
+  };
 
   // useListNavigation index tracks position within `items`. Dividers
   // and disabled rows have null refs so keyboard nav skips them.
@@ -103,6 +122,35 @@ export default function OverflowMenu({
     ],
     whileElementsMounted: autoUpdate,
   });
+
+  // Context-menu mode positions against a zero-size virtual element at
+  // the right-click point; flip/shift keep it inside the viewport.
+  useEffect(() => {
+    if (!anchorPoint) return;
+    const { x, y } = anchorPoint;
+    refs.setPositionReference({
+      getBoundingClientRect: () => ({
+        x,
+        y,
+        top: y,
+        left: x,
+        right: x,
+        bottom: y,
+        width: 0,
+        height: 0,
+      }),
+    });
+  }, [anchorPoint, refs]);
+
+  useEffect(() => {
+    if (!contextMode || !isOpen || !onClose) return;
+    window.addEventListener("blur", onClose);
+    window.addEventListener("resize", onClose);
+    return () => {
+      window.removeEventListener("blur", onClose);
+      window.removeEventListener("resize", onClose);
+    };
+  }, [contextMode, isOpen, onClose]);
 
   const click = useClick(context);
   const dismiss = useDismiss(context);
@@ -179,13 +227,14 @@ export default function OverflowMenu({
 
   return (
     <>
-      {cloneElement(
-        (trigger ?? defaultTrigger) as ReactElement<{ ref?: Ref<HTMLElement> }>,
-        {
-          ref: refs.setReference,
-          ...getReferenceProps(),
-        },
-      )}
+      {!contextMode &&
+        cloneElement(
+          (trigger ?? defaultTrigger) as ReactElement<{ ref?: Ref<HTMLElement> }>,
+          {
+            ref: refs.setReference,
+            ...getReferenceProps(),
+          },
+        )}
 
       {/* Portal root is #app-shell so the menu inherits the active
           theme's CSS variables (the light-mode overrides are scoped to

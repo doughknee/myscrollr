@@ -60,8 +60,6 @@ interface ScrollrTickerProps {
   widgetDisplay?: WidgetDisplayPrefs;
   /** Which row this ticker represents (0-indexed, for multi-row splitting) */
   rowIndex?: number;
-  /** Total number of ticker rows (items distributed round-robin) */
-  totalRows?: number;
   /** Scroll direction: left (default) or right */
   direction?: TickerDirection;
   /** Scroll mode: continuous, step, or flip */
@@ -120,6 +118,35 @@ interface ScrollrTickerProps {
 
 // ── Helpers ──────────────────────────────────────────────────────
 
+/** Empty-ticker shell: accent hairline + centered stack, with an
+ *  optional comfort-only teaching tip beneath the primary row. */
+function EmptyTickerRow({
+  containerClass,
+  tip,
+  children,
+}: {
+  containerClass: string;
+  tip?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={containerClass}>
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent z-10" />
+      <div className="flex flex-col items-center justify-center gap-0.5 w-full h-full px-4 min-w-0">
+        <div className="flex items-center justify-center gap-2 min-w-0">
+          {children}
+        </div>
+        {tip && (
+          <p className="text-[10px] text-fg-4/80 shrink-0 leading-tight hidden md:inline-flex items-center gap-1">
+            <span className="text-fg-4">Tip:</span>
+            {tip}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Round-robin interleave across buckets:
  *  bucket0[0], bucket1[0], bucket2[0], bucket0[1], bucket1[1], ... */
 function weave<T>(buckets: T[][]): T[] {
@@ -152,7 +179,6 @@ export default function ScrollrTicker({
   widgetDisplay,
   comfort = false,
   rowIndex = 0,
-  totalRows = 1,
   direction = "left",
   scrollMode = "continuous",
   stepPause = 5,
@@ -456,40 +482,11 @@ export default function ScrollrTicker({
 
   if (isSourceless) {
     return (
-      <div className={containerClass}>
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent z-10" />
-        <div className="flex flex-col items-center justify-center gap-0.5 w-full h-full px-4 min-w-0">
-          {/* Primary row: headline + action hint + catalog button */}
-          <div className="flex items-center justify-center gap-2 min-w-0">
-            <span className="text-ui-meta font-medium text-fg-2 shrink-0">
-              You haven&rsquo;t added any sources yet.
-            </span>
-            <span className="text-ui-meta text-fg-4 shrink-0 hidden sm:inline">
-              Browse the catalog to add one:
-            </span>
-            <button
-              type="button"
-              onClick={onAddSources}
-              disabled={!onAddSources}
-              className={clsx(
-                "inline-flex items-center gap-1.5 rounded-md shrink-0",
-                "px-2.5 py-1 text-ui-meta font-semibold",
-                "text-accent bg-accent/10 hover:bg-accent/15",
-                "border border-accent/25 hover:border-accent/40",
-                "transition-colors active:scale-[0.97]",
-                "disabled:opacity-50 disabled:pointer-events-none",
-              )}
-            >
-              <Plus size={11} strokeWidth={2.5} aria-hidden="true" />
-              Browse the catalog
-            </button>
-          </div>
-          {/* Secondary row: teaching tip pointing at the sidebar's
-              + Add source button. Same suppression rule as the
-              installed-off variant — compact ticker hides it for room. */}
-          {comfort && (
-            <p className="text-[10px] text-fg-4/80 shrink-0 leading-tight hidden md:inline-flex items-center gap-1">
-              <span className="text-fg-4">Tip:</span>
+      <EmptyTickerRow
+        containerClass={containerClass}
+        tip={
+          comfort && (
+            <>
               <span>use</span>
               <span
                 className={clsx(
@@ -501,82 +498,94 @@ export default function ScrollrTicker({
                 + Add source
               </span>
               <span>in the sidebar to do this yourself next time.</span>
-            </p>
+            </>
+          )
+        }
+      >
+        <span className="text-ui-meta font-medium text-fg-2 shrink-0">
+          You haven&rsquo;t added any sources yet.
+        </span>
+        <span className="text-ui-meta text-fg-4 shrink-0 hidden sm:inline">
+          Browse the catalog to add one:
+        </span>
+        <button
+          type="button"
+          onClick={onAddSources}
+          disabled={!onAddSources}
+          className={clsx(
+            "inline-flex items-center gap-1.5 rounded-md shrink-0",
+            "px-2.5 py-1 text-ui-meta font-semibold",
+            "text-accent bg-accent/10 hover:bg-accent/15",
+            "border border-accent/25 hover:border-accent/40",
+            "transition-colors active:scale-[0.97]",
+            "disabled:opacity-50 disabled:pointer-events-none",
           )}
-        </div>
-      </div>
+        >
+          <Plus size={11} strokeWidth={2.5} aria-hidden="true" />
+          Browse the catalog
+        </button>
+      </EmptyTickerRow>
     );
   }
 
   if (isInstalledButTickerOff) {
     return (
-      <div className={containerClass}>
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent z-10" />
-        <div className="flex flex-col items-center justify-center gap-0.5 w-full h-full px-4 min-w-0">
-          {/* Primary row: headline + action hint + per-widget chips */}
-          <div className="flex items-center justify-center gap-2 min-w-0">
-            <span className="text-ui-meta font-medium text-fg-2 shrink-0">
-              Your ticker is empty right now.
+      <EmptyTickerRow
+        containerClass={containerClass}
+        tip={
+          comfort && (
+            <span>
+              every widget&rsquo;s settings live in the bar at the top of
+              its page.
             </span>
-            <span className="text-ui-meta text-fg-4 shrink-0 hidden sm:inline">
-              Open a source to pick what shows up here:
-            </span>
-            <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto scrollbar-none">
-              {installedWidgets.map((ch) => {
-                const WidgetGlyphIcon = ch.icon;
-                return (
-                  <button
-                    key={ch.id}
-                    type="button"
-                    onClick={() => onOpenWidget?.(ch.id)}
-                    disabled={!onOpenWidget}
-                    className={clsx(
-                      "inline-flex items-center gap-1.5 shrink-0 rounded-md",
-                      "px-2 py-1 text-ui-meta font-semibold",
-                      "border transition-colors active:scale-[0.97]",
-                      "disabled:opacity-50 disabled:pointer-events-none",
-                    )}
-                    style={{
-                      color: ch.hex,
-                      backgroundColor: `${ch.hex}14`,   // ~8% alpha
-                      borderColor: `${ch.hex}3D`,       // ~24% alpha
-                    }}
-                    title={`Open ${ch.name}`}
-                  >
-                    <WidgetGlyphIcon size={12} className="shrink-0" />
-                    <span className="truncate">{ch.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          {/* Secondary row: teaching tip pointing at the widget's own
-              top bar (the one settings surface). Hidden on the compact
-              ticker (h-11 ≈ 44px) because there's no room for a second
-              line without cramping; comfort mode (h-16 ≈ 64px) has
-              plenty. */}
-          {comfort && (
-            <p className="text-[10px] text-fg-4/80 shrink-0 leading-tight hidden md:inline-flex items-center gap-1">
-              <span className="text-fg-4">Tip:</span>
-              <span>
-                every widget&rsquo;s settings live in the bar at the top of
-                its page.
-              </span>
-            </p>
-          )}
+          )
+        }
+      >
+        <span className="text-ui-meta font-medium text-fg-2 shrink-0">
+          Your ticker is empty right now.
+        </span>
+        <span className="text-ui-meta text-fg-4 shrink-0 hidden sm:inline">
+          Open a source to pick what shows up here:
+        </span>
+        <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto scrollbar-none">
+          {installedWidgets.map((ch) => {
+            const WidgetGlyphIcon = ch.icon;
+            return (
+              <button
+                key={ch.id}
+                type="button"
+                onClick={() => onOpenWidget?.(ch.id)}
+                disabled={!onOpenWidget}
+                className={clsx(
+                  "inline-flex items-center gap-1.5 shrink-0 rounded-md",
+                  "px-2 py-1 text-ui-meta font-semibold",
+                  "border transition-colors active:scale-[0.97]",
+                  "disabled:opacity-50 disabled:pointer-events-none",
+                )}
+                style={{
+                  color: ch.hex,
+                  backgroundColor: `${ch.hex}14`,   // ~8% alpha
+                  borderColor: `${ch.hex}3D`,       // ~24% alpha
+                }}
+                title={`Open ${ch.name}`}
+              >
+                <WidgetGlyphIcon size={12} className="shrink-0" />
+                <span className="truncate">{ch.name}</span>
+              </button>
+            );
+          })}
         </div>
-      </div>
+      </EmptyTickerRow>
     );
   }
 
   if (isEmptyRowWithExplicitSources) {
     return (
-      <div className={containerClass}>
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent z-10" />
-        <div className="flex items-center justify-center w-full h-full px-4 text-ui-meta font-mono text-fg-3">
-          <span>This row has no widgets to show. Edit it in Customize &rarr; Ticker.</span>
-        </div>
-      </div>
+      <EmptyTickerRow containerClass={containerClass}>
+        <span className="text-ui-meta font-mono text-fg-3">
+          This row has no widgets to show. Edit it in Customize &rarr; Ticker.
+        </span>
+      </EmptyTickerRow>
     );
   }
 

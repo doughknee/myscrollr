@@ -25,6 +25,7 @@ import type {
   LeagueResponse,
   RosterPlayer,
 } from "../../datawidgets/fantasy/types";
+import { isInjured, shortStatus } from "../../datawidgets/fantasy/playerStats";
 import { getChipColors, chipBaseClasses } from "./chipColors";
 
 /**
@@ -93,7 +94,7 @@ export default function FollowedPlayerChip({
   const c = getChipColors(colorMode, "fantasy");
   const points = player.player_points;
   const hasPoints = points !== null && points !== undefined;
-  const injured = isInjuredStatus(player.status);
+  const injured = isInjured(player.status);
   // `accent` overrides the default tone calculation so worst/injury chips
   // feel emphatically down even when the player has positive points.
   const tone: "up" | "down" | "neutral" =
@@ -165,7 +166,7 @@ export default function FollowedPlayerChip({
         // chip exists ("Top scorer", "Bench leader", etc) so the accent
         // glyph isn't the only hint. ~70-110px instead of ~368px.
         <div className={clsx("text-ui-chip uppercase tracking-wider", c.textFaint)}>
-          {ACCENT_LABEL[accent]}
+          {ACCENT[accent].label}
         </div>
       ) : comfort ? (
         // User-followed-players chip: no surrounding league context,
@@ -197,30 +198,22 @@ export default function FollowedPlayerChip({
 
 // ── Accent badge ─────────────────────────────────────────────────
 
-const ACCENT_GLYPH: Record<FollowedPlayerAccent, string> = {
-  top: "↑",
-  worst: "↓",
-  bench: "BN",
-  injury: "🚨",
-};
-
-const ACCENT_TITLE: Record<FollowedPlayerAccent, string> = {
-  top: "Top scorer this week",
-  worst: "Lowest-scoring starter",
-  bench: "Bench player outscoring a starter",
-  injury: "Injured / unavailable",
-};
-
-/** Short ALL-CAPS bottom-row label for per-league player-stat chips.
- *  The accent glyph (↑ / ↓ / BN / 🚨) on the top row is the primary
- *  signal; this label is the redundant-but-clear secondary signal so
- *  users who haven't memorized the glyphs still know what each chip
- *  represents. Kept terse to keep chip width tight on the rail. */
-const ACCENT_LABEL: Record<FollowedPlayerAccent, string> = {
-  top: "Top scorer",
-  worst: "Worst starter",
-  bench: "Bench leader",
-  injury: "Injured",
+/** Per-accent display strings: the top-row glyph (primary signal), its
+ *  hover/aria title, and the short ALL-CAPS bottom-row label — the
+ *  redundant-but-clear secondary signal for users who haven't memorized
+ *  the glyphs. Labels kept terse to keep chip width tight on the rail. */
+const ACCENT: Record<
+  FollowedPlayerAccent,
+  { glyph: string; title: string; label: string }
+> = {
+  top: { glyph: "↑", title: "Top scorer this week", label: "Top scorer" },
+  worst: { glyph: "↓", title: "Lowest-scoring starter", label: "Worst starter" },
+  bench: {
+    glyph: "BN",
+    title: "Bench player outscoring a starter",
+    label: "Bench leader",
+  },
+  injury: { glyph: "🚨", title: "Injured / unavailable", label: "Injured" },
 };
 
 function AccentBadge({
@@ -239,10 +232,10 @@ function AccentBadge({
         accent !== "injury" && colorClass,
         accent !== "injury" && "bg-fg-3/15",
       )}
-      title={ACCENT_TITLE[accent]}
-      aria-label={ACCENT_TITLE[accent]}
+      title={ACCENT[accent].title}
+      aria-label={ACCENT[accent].title}
     >
-      {ACCENT_GLYPH[accent]}
+      {ACCENT[accent].glyph}
     </span>
   );
 }
@@ -310,20 +303,4 @@ export function findPlayerByKey(
 function positionLabel(selected: string, display: string | undefined): string {
   if (selected) return selected.toUpperCase();
   return (display ?? "?").toUpperCase();
-}
-
-/** Match the same logic as FantasyStatChip's isInjured to stay in
- *  visual sync with the league chip's injury detail segment. */
-function isInjuredStatus(status: string | null | undefined): boolean {
-  if (!status) return false;
-  const s = status.trim().toUpperCase();
-  if (s === "" || s === "HEALTHY" || s === "P") return false;
-  return true;
-}
-
-function shortStatus(status: string | null | undefined): string {
-  if (!status) return "";
-  const s = status.trim().toUpperCase();
-  if (s.startsWith("IR")) return "IR";
-  return s;
 }

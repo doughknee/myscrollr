@@ -38,7 +38,7 @@ fn init_sentry() -> sentry::ClientInitGuard {
 
         before_send: Some(std::sync::Arc::new(|mut event| {
             // Strip the user's home directory from stack frame filenames.
-            let home = dirs::home_dir()
+            let home = std::env::home_dir()
                 .map(|h| h.to_string_lossy().into_owned())
                 .unwrap_or_default();
             for exc in event.exception.iter_mut() {

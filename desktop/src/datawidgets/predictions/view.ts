@@ -314,52 +314,21 @@ export function cardOutcomes(
 
 // ── Time indicators (B3, version-bump pass) ──────────────────────
 
-/**
- * NO payload today carries an event start time (see ui-review/NOTES.md, B3
- * findings) — this optional field is typed widget-locally so the indicator
- * logic is ready the day the backend ships one. Never derived or guessed.
- */
-export type MaybeStarts = Prediction & { start_time?: string | null };
-
 export type TimeIndicator =
-  | { kind: "live" }
-  | { kind: "starts"; label: string }
   | { kind: "closes"; label: string }
   | { kind: "closed" }
   | { kind: "none" };
 
-const STARTS_SOON_WINDOW_MS = 24 * 60 * 60 * 1000;
-
 /**
- * Pick the card's time indicator, in priority order:
- *   1. LIVE — the event has started (`start_time` ≤ now) and the market
- *      hasn't closed or resolved. Close/settlement is the only end signal
- *      the data has, so LIVE persists until one of them arrives.
- *   2. "Starts in 3h" — a known start within the next 24h.
- *   3. "Closes 5d" / "Closed" — the existing close label; ALWAYS the
- *      fallback when no start-time field exists for a market (the
- *      no-fabrication rule).
- * Resolved markets get "none" — settlement stamps are their own row.
+ * Pick the card's time indicator: "Closes 5d" while trading, "Closed"
+ * once the close has passed. Resolved markets get "none" — settlement
+ * stamps are their own row.
  */
-export function timeIndicator(p: MaybeStarts, now: number): TimeIndicator {
+export function timeIndicator(p: Prediction, now: number): TimeIndicator {
   if (isResolved(p)) return { kind: "none" };
 
   const closeLabel = formatCloseCountdown(p.close_time, now);
   if (closeLabel === "Closed") return { kind: "closed" };
-
-  if (p.start_time) {
-    const start = new Date(p.start_time).getTime();
-    if (Number.isFinite(start)) {
-      const untilStart = start - now;
-      if (untilStart <= 0) return { kind: "live" };
-      if (untilStart <= STARTS_SOON_WINDOW_MS) {
-        return {
-          kind: "starts",
-          label: `Starts in ${formatCloseCountdown(p.start_time, now)}`,
-        };
-      }
-    }
-  }
 
   return closeLabel
     ? { kind: "closes", label: `Closes ${closeLabel}` }

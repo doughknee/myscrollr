@@ -151,13 +151,8 @@ function WidgetInfoPage() {
     }
   };
 
-  const openWidget = () => {
-    if (item.source) {
-      navigate({ to: "/widget/$id", params: { id: item.id } });
-    } else {
-      navigate({ to: "/widget/$id", params: { id: item.id } });
-    }
-  };
+  const openWidget = () =>
+    navigate({ to: "/widget/$id", params: { id: item.id } });
 
   // Primary hero action for a widget that is NOT yet added.
   type HeroAction = {

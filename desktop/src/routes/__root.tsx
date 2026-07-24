@@ -14,7 +14,7 @@ import {
 } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   enable as enableAutostart,
   disable as disableAutostart,
@@ -46,9 +46,9 @@ import AuthGate from "../components/onboarding/AuthGate";
 
 // Registries
 import { getAllDataWidgets } from "../datawidgets/registry";
-import { catalogItemById, widgetLogoUrl, isUtilityWidget, widgetManifest } from "../marketplace";
+import { catalogItemById, widgetLogoUrl, isUtilityWidget } from "../marketplace";
 import { DEMO } from "../config";
-import { getAllWidgets, getWidget } from "../widgets/registry";
+import { getAllWidgets } from "../widgets/registry";
 import { canonicalOrder } from "../marketplace";
 
 // Data
@@ -71,7 +71,7 @@ import { showTipOnce, TIP_IDS } from "../lib/tips";
 
 // Types
 import type { DeliveryMode } from "../types";
-import type { DataWidgetRow, WidgetId, SubscriptionInfo } from "../api/client";
+import type { DataWidgetRow, SubscriptionInfo } from "../api/client";
 
 // Hooks
 import { useTheme } from "../hooks/useTheme";
@@ -112,79 +112,80 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 // ── URL helpers ─────────────────────────────────────────────────
 
 function parseRoute(pathname: string) {
-  const segments = pathname.split("/").filter(Boolean);
-  const [kind, itemId] = segments;
+  const [kind, itemId] = pathname.split("/").filter(Boolean);
 
-  if (kind === "feed" || pathname === "/") {
-    return {
-      activeItem: "",
-      isDataWidget: false, isWidget: false, isFeed: true,
-      isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
-    };
-  }
   // Data and utility widgets share one route shape (`/widget/$id`), so the
   // path cannot tell them apart — only the id can. This used to be two
   // branches keyed on `/channel/` vs `/widget/`; the `/channel/` prefix has
   // not existed since the unification deleted the redirect shims, so the
   // data branch was unreachable and every widget page reported itself as a
   // utility. Ask the catalog instead.
-  if (kind === "widget" && itemId) {
-    const utility = isUtilityWidget(itemId);
-    return {
-      activeItem: itemId,
-      isDataWidget: !utility, isWidget: utility, isFeed: false,
-      isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
-    };
-  }
-  if (kind === "catalog") {
-    return {
-      activeItem: "",
-      isDataWidget: false, isWidget: false, isFeed: false,
-      isCustomize: false, isAccount: false, isMarketplace: true, isSupport: false, isReleases: false, isStatus: false,
-    };
-  }
-  if (kind === "customize") {
-    return {
-      activeItem: "customize",
-      isDataWidget: false, isWidget: false, isFeed: false,
-      isCustomize: true, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
-    };
-  }
-  if (kind === "account") {
-    return {
-      activeItem: "account",
-      isDataWidget: false, isWidget: false, isFeed: false,
-      isCustomize: false, isAccount: true, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
-    };
-  }
-  if (kind === "support") {
-    return {
-      activeItem: "",
-      isDataWidget: false, isWidget: false, isFeed: false,
-      isCustomize: false, isAccount: false, isMarketplace: false, isSupport: true, isReleases: false, isStatus: false,
-    };
-  }
-  // Releases and status need their own branches: the fallback below
-  // reports isFeed, which would light up the sidebar's Home row there.
-  if (kind === "releases") {
-    return {
-      activeItem: "",
-      isDataWidget: false, isWidget: false, isFeed: false,
-      isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: true, isStatus: false,
-    };
-  }
-  if (kind === "status") {
-    return {
-      activeItem: "",
-      isDataWidget: false, isWidget: false, isFeed: false,
-      isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: true,
-    };
-  }
+  const widgetId = (kind === "widget" && itemId) || "";
+  const isUtility = widgetId !== "" && isUtilityWidget(widgetId);
+
+  // Releases and status must not fall through to the isFeed default,
+  // which would light up the sidebar's Home row there.
+  const isFeed =
+    widgetId === "" &&
+    !["catalog", "customize", "account", "support", "releases", "status"].includes(kind ?? "");
+
   return {
-    activeItem: "",
-    isDataWidget: false, isWidget: false, isFeed: true,
-    isCustomize: false, isAccount: false, isMarketplace: false, isSupport: false, isReleases: false, isStatus: false,
+    activeItem:
+      widgetId || (kind === "customize" || kind === "account" ? kind : ""),
+    isDataWidget: widgetId !== "" && !isUtility,
+    isWidget: isUtility,
+    isFeed,
+    isCustomize: kind === "customize",
+    isAccount: kind === "account",
+    isMarketplace: kind === "catalog",
+    isSupport: kind === "support",
+    isReleases: kind === "releases",
+    isStatus: kind === "status",
   };
+}
+
+// ── Status banners ──────────────────────────────────────────────
+
+const BANNER_TONES = {
+  warn: { bar: "bg-warn/10 border-warn/20", text: "text-warn", cta: "text-warn" },
+  info: { bar: "bg-info/10 border-info/20", text: "text-info", cta: "text-info" },
+  error: { bar: "bg-error/10 border-error/20", text: "text-error", cta: "text-error" },
+} as const;
+
+function BillingBanner({
+  tone,
+  cta,
+  onCta,
+  onDismiss,
+  children,
+}: {
+  tone: keyof typeof BANNER_TONES;
+  cta: string;
+  onCta: () => void;
+  onDismiss: () => void;
+  children: React.ReactNode;
+}) {
+  const t = BANNER_TONES[tone];
+  return (
+    <div className={clsx("flex items-center justify-between px-4 py-2 border-b shrink-0", t.bar)}>
+      <span className={clsx("text-xs", t.text)}>{children}</span>
+      <div className="flex items-center gap-2 shrink-0 ml-4">
+        <button
+          onClick={onCta}
+          className={clsx("text-xs font-medium hover:text-fg transition-colors", t.cta)}
+        >
+          {cta}
+        </button>
+        <button
+          onClick={onDismiss}
+          className="text-xs text-fg-4 hover:text-fg-3 transition-colors"
+          aria-label="Dismiss"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ── Root Layout ─────────────────────────────────────────────────
@@ -208,10 +209,7 @@ function RootLayout() {
   const auth = useAuthState();
 
   // ── Dashboard data (TanStack Query) ─────────────────────────
-  const {
-    data: dashboard,
-    isLoading: loading,
-  } = useQuery({
+  const { data: dashboard } = useQuery({
     ...dashboardQueryOptions(),
     refetchInterval: POLL_INTERVALS[auth.tier],
   });
@@ -227,12 +225,6 @@ function RootLayout() {
   }, [dashboard]);
 
   const widgets: DataWidgetRow[] = useMemo(() => dashboard?.widgets ?? [], [dashboard]);
-
-  // Filter to enabled widgets only — Sidebar handles sorting by DATA_WIDGET_ORDER
-  const enabledDataWidgets = useMemo(
-    () => widgets.filter((ch) => ch.enabled),
-    [widgets],
-  );
 
   // ── Manifests ───────────────────────────────────────────────
   const allDataWidgetManifests = useMemo(() => getAllDataWidgets(), []);
@@ -327,10 +319,8 @@ function RootLayout() {
   // any fetch/parse error — see useUpdateGate.
   const updateGate = useUpdateGate(appVersion);
 
-  // Inline persist helper used by the tip-firing effects below — we
-  // can't reach `handlePrefsChange` here because it's declared further
-  // down (after Sidebar / Outlet). Tip effects live up here so they
-  // can subscribe to authentication early.
+  // Persist helper shared by the tip-firing effects, the shell
+  // context, and the TopBar toggles.
   const persistPrefs = useCallback((next: AppPreferences) => {
     setPrefs(next);
     savePrefs(next);
@@ -449,7 +439,7 @@ function RootLayout() {
   // ── Extracted hooks ─────────────────────────────────────────
 
   const dataWidgetActions = useDataWidgetActions();
-  const widgetActions = useWidgetActions(prefs, setPrefs, route.activeItem);
+  const widgetActions = useWidgetActions(prefs, setPrefs);
 
   // Shell-level weather polling — keeps data fresh regardless of which page is visible.
   // Permanent observer so refetchInterval runs even when WeatherFeedTab is unmounted.
@@ -520,13 +510,6 @@ function RootLayout() {
     auth.syncAuthFromDashboard(dashboard);
   }, [dashboard]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Resolve empty route — redirect / to /feed ───────────────
-  useEffect(() => {
-    if (location.pathname === "/" && !loading) {
-      navigate({ to: "/feed" });
-    }
-  }, [location.pathname, loading, navigate]);
-
   // ── Cross-window sync ───────────────────────────────────────
   // Delivery mode is now synced via the direct sse-status Tauri listener above.
   useEffect(() => {
@@ -549,36 +532,6 @@ function RootLayout() {
   }, []);
 
   // ── Navigation handlers ─────────────────────────────────────
-
-  // Keep a ref to widgets so handleSelectItem doesn't depend on
-  // the volatile `widgets` array, which changes every dashboard refetch.
-  const widgetsRef = useRef(widgets);
-  widgetsRef.current = widgets;
-
-  const handleSelectItem = useCallback(
-    (id: string) => {
-      if (id === "settings") {
-        navigate({ to: "/customize", search: { tab: "app" } });
-        return;
-      }
-      // Guarded on the same resolver the destination page renders with, so
-      // "can I navigate there" and "can that page draw something" cannot
-      // disagree. This used to be two branches that navigated identically,
-      // the second asking the RENDERER REGISTRY whether the id was known —
-      // the substitution behind the v1.1.11 regression. It also meant a
-      // widget added server-side, which the registry has never heard of,
-      // bounced the user to /feed instead of opening.
-      if (
-        widgetsRef.current.some((ch) => ch.widget_type === id) ||
-        widgetManifest(id)
-      ) {
-        navigate({ to: "/widget/$id", params: { id } });
-        return;
-      }
-      navigate({ to: "/feed" });
-    },
-    [navigate],
-  );
 
   const handleNavigateToFeed = useCallback(() => navigate({ to: "/feed" }), [navigate]);
   const handleNavigateToReleases = useCallback(() => navigate({ to: "/releases" }), [navigate]);
@@ -784,11 +737,6 @@ function RootLayout() {
 
   // ── Settings handlers ───────────────────────────────────────
 
-  // Alias for the inline `persistPrefs` declared earlier in this
-  // component — kept under its original name so all the existing
-  // shell-context wiring further down continues to read naturally.
-  const handlePrefsChange = persistPrefs;
-
   const handleAutostartChange = useCallback(async (enabled: boolean) => {
     try {
       if (enabled) await enableAutostart();
@@ -817,7 +765,7 @@ function RootLayout() {
   const shellStableValue = useMemo(
     () => ({
       prefs,
-      onPrefsChange: handlePrefsChange,
+      onPrefsChange: persistPrefs,
       authenticated: auth.authenticated,
       tier: auth.tier,
       subscriptionInfo,
@@ -828,20 +776,11 @@ function RootLayout() {
       appVersion,
       allDataWidgetManifests,
       allWidgets,
-      onToggleDataWidgetTicker: dataWidgetActions.handleToggleDataWidget,
-      onToggleWidgetTicker: widgetActions.handleToggleWidgetTicker,
-      onAddWidget: dataWidgetActions.handleAddDataWidget,
-      onDeleteWidget: dataWidgetActions.handleDeleteDataWidget,
-      onToggleWidget: widgetActions.handleToggleWidget,
-      onSelectItem: handleSelectItem,
     }),
     [
-      prefs, handlePrefsChange, auth.authenticated, auth.tier, subscriptionInfo,
+      prefs, persistPrefs, auth.authenticated, auth.tier, subscriptionInfo,
       auth.handleLogin, auth.handleLogout, autostartOn, handleAutostartChange,
       appVersion, allDataWidgetManifests, allWidgets,
-      dataWidgetActions.handleToggleDataWidget, widgetActions.handleToggleWidgetTicker,
-      dataWidgetActions.handleAddDataWidget, dataWidgetActions.handleDeleteDataWidget,
-      widgetActions.handleToggleWidget, handleSelectItem,
     ],
   );
 
@@ -943,110 +882,47 @@ function RootLayout() {
               <ConnectionBanner deliveryMode={deliveryMode} />
 
               {auth.sessionExpired && (
-                <div className="flex items-center justify-between px-4 py-2 bg-warn/10 border-b border-warn/20 shrink-0">
-                  <span className="text-xs text-warn">
-                    Your session has expired. Sign in again to access your widgets.
-                  </span>
-                  <div className="flex items-center gap-2 shrink-0 ml-4">
-                    <button
-                      onClick={auth.handleLogin}
-                      className="text-xs font-medium text-warn hover:text-fg transition-colors"
-                    >
-                      Sign in
-                    </button>
-                    <button
-                      onClick={() => auth.setSessionExpired(false)}
-                      className="text-xs text-fg-4 hover:text-fg-3 transition-colors"
-                      aria-label="Dismiss"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
+                <BillingBanner
+                  tone="warn"
+                  cta="Sign in"
+                  onCta={auth.handleLogin}
+                  onDismiss={() => auth.setSessionExpired(false)}
+                >
+                  Your session has expired. Sign in again to access your widgets.
+                </BillingBanner>
               )}
 
               {/* Billing banner — trial ending, past-due, or canceling */}
               {auth.authenticated && !billingBannerDismissed && (() => {
                 const s = subscriptionInfo;
                 if (!s) return null;
+                const toAccount = () => navigate({ to: "/account" });
+                const dismiss = () => setBillingBannerDismissed(true);
                 // Trial ending in ≤3 days
                 if (s.status === "trialing" && s.trial_end) {
                   const days = Math.max(0, Math.ceil((s.trial_end * 1000 - Date.now()) / 86_400_000));
                   if (days <= 3) {
                     return (
-                      <div className="flex items-center justify-between px-4 py-2 bg-info/10 border-b border-info/20 shrink-0">
-                        <span className="text-xs text-info">
-                          {days === 0 ? "Your trial ends today." : `Your trial ends in ${days} day${days === 1 ? "" : "s"}.`}
-                          {" "}Your card will be charged automatically.
-                        </span>
-                        <div className="flex items-center gap-2 shrink-0 ml-4">
-                          <button
-                            onClick={() => navigate({ to: "/account" })}
-                            className="text-xs font-medium text-info hover:text-fg transition-colors"
-                          >
-                            View plan
-                          </button>
-                          <button
-                            onClick={() => setBillingBannerDismissed(true)}
-                            className="text-xs text-fg-4 hover:text-fg-3 transition-colors"
-                            aria-label="Dismiss"
-                          >
-                            Dismiss
-                          </button>
-                        </div>
-                      </div>
+                      <BillingBanner tone="info" cta="View plan" onCta={toAccount} onDismiss={dismiss}>
+                        {days === 0 ? "Your trial ends today." : `Your trial ends in ${days} day${days === 1 ? "" : "s"}.`}
+                        {" "}Your card will be charged automatically.
+                      </BillingBanner>
                     );
                   }
                 }
-                // Past due
                 if (s.status === "past_due") {
                   return (
-                    <div className="flex items-center justify-between px-4 py-2 bg-error/10 border-b border-error/20 shrink-0">
-                      <span className="text-xs text-error">
-                        Your payment failed. Update your payment method to keep your plan.
-                      </span>
-                      <div className="flex items-center gap-2 shrink-0 ml-4">
-                        <button
-                          onClick={() => navigate({ to: "/account" })}
-                          className="text-xs font-medium text-error hover:text-fg transition-colors"
-                        >
-                          Fix payment
-                        </button>
-                        <button
-                          onClick={() => setBillingBannerDismissed(true)}
-                          className="text-xs text-fg-4 hover:text-fg-3 transition-colors"
-                          aria-label="Dismiss"
-                        >
-                          Dismiss
-                        </button>
-                      </div>
-                    </div>
+                    <BillingBanner tone="error" cta="Fix payment" onCta={toAccount} onDismiss={dismiss}>
+                      Your payment failed. Update your payment method to keep your plan.
+                    </BillingBanner>
                   );
                 }
-                // Canceling
                 if (s.status === "canceling") {
                   return (
-                    <div className="flex items-center justify-between px-4 py-2 bg-warn/10 border-b border-warn/20 shrink-0">
-                      <span className="text-xs text-warn">
-                        Your subscription is set to cancel.
-                        {s.current_period_end && ` Access until ${new Date(s.current_period_end).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`}
-                      </span>
-                      <div className="flex items-center gap-2 shrink-0 ml-4">
-                        <button
-                          onClick={() => navigate({ to: "/account" })}
-                          className="text-xs font-medium text-warn hover:text-fg transition-colors"
-                        >
-                          Manage
-                        </button>
-                        <button
-                          onClick={() => setBillingBannerDismissed(true)}
-                          className="text-xs text-fg-4 hover:text-fg-3 transition-colors"
-                          aria-label="Dismiss"
-                        >
-                          Dismiss
-                        </button>
-                      </div>
-                    </div>
+                    <BillingBanner tone="warn" cta="Manage" onCta={toAccount} onDismiss={dismiss}>
+                      Your subscription is set to cancel.
+                      {s.current_period_end && ` Access until ${new Date(s.current_period_end).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`}
+                    </BillingBanner>
                   );
                 }
                 return null;

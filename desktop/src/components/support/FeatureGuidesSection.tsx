@@ -1,20 +1,8 @@
 import { useState, useMemo } from "react";
-import { ChevronDown } from "lucide-react";
-import clsx from "clsx";
+import Disclosure from "./Disclosure";
 import { getAllDataWidgets } from "../../datawidgets/registry";
 import { getAllWidgets } from "../../widgets/registry";
 import type { DataWidgetManifest, WidgetManifest } from "../../types";
-
-// Every widget is free — the catalog sets no RequiredTier on any of the 35
-// entries, and fantasy_yahoo carries "the tier gate was retired in v1.1.2".
-// This table said fantasy: "Uplink" and rendered an amber "Uplink required"
-// badge on the Fantasy card, telling free users to pay for what they have.
-const WIDGET_TIERS: Record<string, string> = {
-  finance: "Free",
-  sports: "Free",
-  rss: "Free",
-  fantasy: "Free",
-};
 
 export default function FeatureGuidesSection() {
   const dataWidgets = useMemo(() => getAllDataWidgets(), []);
@@ -35,7 +23,6 @@ export default function FeatureGuidesSection() {
             <GuideCard
               key={ch.id}
               manifest={ch}
-              tier={WIDGET_TIERS[ch.id] ?? "Free"}
               isOpen={expandedId === ch.id}
               onToggle={() => toggle(ch.id)}
             />
@@ -51,7 +38,6 @@ export default function FeatureGuidesSection() {
             <GuideCard
               key={w.id}
               manifest={w}
-              tier="Free"
               isOpen={expandedId === w.id}
               onToggle={() => toggle(w.id)}
             />
@@ -64,12 +50,10 @@ export default function FeatureGuidesSection() {
 
 function GuideCard({
   manifest,
-  tier,
   isOpen,
   onToggle,
 }: {
   manifest: DataWidgetManifest | WidgetManifest;
-  tier: string;
   isOpen: boolean;
   onToggle: () => void;
 }) {
@@ -77,44 +61,27 @@ function GuideCard({
 
   return (
     <div className="overflow-hidden rounded-xl border border-edge/35 bg-base-150/35">
-      <button
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-base-150/50 cursor-pointer"
-      >
-        <span className="shrink-0" style={{ color: manifest.hex }}>
-          <Icon size={18} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-ui-body font-semibold">{manifest.name}</span>
-            <span
-              className={clsx(
-                "rounded-full px-1.5 py-0.5 text-ui-chip font-medium leading-none",
-                tier === "Free"
-                  ? "bg-accent/10 text-accent"
-                  : "bg-amber-500/10 text-amber-400",
-              )}
-            >
-              {tier === "Free" ? "Free" : "Uplink required"}
+      <Disclosure
+        open={isOpen}
+        onToggle={onToggle}
+        header={
+          <>
+            <span className="shrink-0" style={{ color: manifest.hex }}>
+              <Icon size={18} />
             </span>
-          </div>
-          <p className="mt-0.5 truncate text-ui-meta">
-            {manifest.description}
-          </p>
-        </div>
-        <ChevronDown
-          size={16}
-          className={clsx(
-            "shrink-0 text-fg-3 transition-transform duration-200",
-            isOpen && "rotate-180",
-          )}
-        />
-      </button>
-      <div
-        className={clsx(
-          "overflow-hidden transition-all duration-200",
-          isOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0",
-        )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-ui-body font-semibold">{manifest.name}</span>
+                <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-ui-chip font-medium leading-none text-accent">
+                  Free
+                </span>
+              </div>
+              <p className="mt-0.5 truncate text-ui-meta">
+                {manifest.description}
+              </p>
+            </div>
+          </>
+        }
       >
         <div className="space-y-3 px-4 pb-4 pt-1">
           <p className="text-ui-meta">{manifest.info.about}</p>
@@ -127,7 +94,7 @@ function GuideCard({
             </ul>
           </div>
         </div>
-      </div>
+      </Disclosure>
     </div>
   );
 }

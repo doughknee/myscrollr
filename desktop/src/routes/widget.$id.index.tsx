@@ -50,7 +50,7 @@ function WidgetRoute() {
     | undefined;
 
   if (!manifest) {
-    return <SourceNotFound kind="Widget" name={id} />;
+    return <SourceNotFound name={id} />;
   }
 
   return (

@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { clsx } from "clsx";
 import { GameItem } from "./GameItem";
 import { isLive, isPre, isFinal } from "../../utils/gameHelpers";
-import { shouldShowOnFeed } from "../../preferences";
 import { selectSportsForFeed } from "./view";
 import type { Game, FeedMode } from "../../types";
 import type { SportsDisplayPrefs } from "../../hooks/useSportsConfig";
@@ -13,7 +12,6 @@ interface ScoresTabProps {
   mode: FeedMode;
   display: SportsDisplayPrefs;
   favoriteTeams: Set<string>;
-  leagueFilter: Set<string>;
   statusFilter: StatusFilter;
 }
 
@@ -26,7 +24,6 @@ export function ScoresTab({
   mode,
   display,
   favoriteTeams,
-  leagueFilter,
   statusFilter,
 }: ScoresTabProps) {
   const filtered = useMemo(() => {
@@ -34,16 +31,13 @@ export function ScoresTab({
     // then the transient in-page filters on top.
     const windowed = selectSportsForFeed(games, display);
     return windowed.filter((g) => {
-      // League filter
-      if (leagueFilter.size > 0 && !leagueFilter.has(g.league)) return false;
-
       // Status quick-filter narrows within the window when not "all"
       if (statusFilter === "live") return isLive(g);
       if (statusFilter === "upcoming") return isPre(g);
       if (statusFilter === "final") return isFinal(g);
       return true;
     });
-  }, [games, display, leagueFilter, statusFilter]);
+  }, [games, display, statusFilter]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, Game[]>();
@@ -106,8 +100,6 @@ export function ScoresTab({
                 game={game}
                 mode={mode}
                 isFavorite={isFavoriteGame(game, favoriteTeams)}
-                showLogos={shouldShowOnFeed(display.showLogos)}
-                showTimer={shouldShowOnFeed(display.showTimer)}
               />
             ))}
           </div>

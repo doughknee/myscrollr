@@ -9,19 +9,15 @@ interface RssChipProps {
   item: RssItem;
   comfort?: boolean;
   colorMode?: ChipColorMode;
-  /** Hide source name label (default: shown) */
-  showSource?: boolean;
-  /** Hide published timestamp (default: shown) */
-  showTimestamps?: boolean;
   onClick?: () => void;
 }
 
-const RssChip = memo(function RssChip({ item, comfort, colorMode = "widget", showSource = true, showTimestamps = true, onClick }: RssChipProps) {
+const RssChip = memo(function RssChip({ item, comfort, colorMode = "widget", onClick }: RssChipProps) {
   const c = getChipColors(colorMode, "rss");
   const maxLen = comfort ? 60 : 40;
   const headline = truncate(item.title, maxLen);
-  const hasSource = showSource && item.source_name;
-  const hasTime = showTimestamps && item.published_at;
+  const hasSource = item.source_name;
+  const hasTime = item.published_at;
 
   return (
     <button
@@ -54,8 +50,6 @@ const RssChip = memo(function RssChip({ item, comfort, colorMode = "widget", sho
 }, (prev, next) =>
   prev.comfort === next.comfort &&
   prev.colorMode === next.colorMode &&
-  prev.showSource === next.showSource &&
-  prev.showTimestamps === next.showTimestamps &&
   prev.onClick === next.onClick &&
   prev.item.guid === next.item.guid &&
   prev.item.feed_url === next.item.feed_url &&

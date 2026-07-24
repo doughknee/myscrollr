@@ -1,5 +1,4 @@
 import type { Game } from "../../types";
-import { shouldShowOnTicker } from "../../preferences";
 import GameChip from "../../components/chips/GameChip";
 import { chipUrlForSports } from "../../utils/chipUrl";
 import type { TickerChip, TickerContext, TickerSource } from "../ticker";
@@ -16,8 +15,6 @@ import { selectSportsForTicker, getSportsDisplayConfig } from "./view";
 export const sportsTickerSource: TickerSource = {
   chips(raw: unknown, ctx: TickerContext): TickerChip[] {
     const config = getSportsDisplayConfig(ctx.dashboard, ctx.tab);
-    const showLogos = shouldShowOnTicker(config.showLogos ?? "both");
-    const showTimer = shouldShowOnTicker(config.showTimer ?? "both");
 
     const rows = scopedRows<Game>(raw, ctx);
     return selectSportsForTicker(rows, config).map((game) => ({
@@ -27,8 +24,6 @@ export const sportsTickerSource: TickerSource = {
           game={game}
           comfort={ctx.comfort}
           colorMode={ctx.chipColorMode}
-          showLogos={showLogos}
-          showTimer={showTimer}
           onClick={() =>
             ctx.onChipClick?.("sports", game.id, chipUrlForSports(game))
           }

@@ -9,14 +9,6 @@ interface PredictionChipProps {
   prediction: Prediction;
   comfort?: boolean;
   colorMode?: ChipColorMode;
-  /** Show the ▲/▼ implied-probability delta (default: shown). */
-  showDelta?: boolean;
-  /** Show the category badge in comfort mode (default: shown). */
-  showCategory?: boolean;
-  /** Show abbreviated volume in comfort mode (default: shown). */
-  showVolume?: boolean;
-  /** Show the close-time countdown in comfort mode (default: shown). */
-  showCloseTime?: boolean;
   onClick?: () => void;
 }
 
@@ -33,10 +25,6 @@ const PredictionChip = memo(
     prediction: p,
     comfort,
     colorMode = "widget",
-    showDelta = true,
-    showCategory = true,
-    showVolume = true,
-    showCloseTime = true,
     onClick,
   }: PredictionChipProps) {
     const c = getChipColors(colorMode, "predictions");
@@ -55,9 +43,7 @@ const PredictionChip = memo(
       p.event_title && p.title && p.title.toLowerCase() !== "yes"
         ? p.title
         : "";
-    const countdown = showCloseTime
-      ? formatCloseCountdown(p.close_time, Date.now())
-      : "";
+    const countdown = formatCloseCountdown(p.close_time, Date.now());
 
     return (
       <button
@@ -80,14 +66,14 @@ const PredictionChip = memo(
           <span
             className={clsx(
               "inline-flex items-center rounded-full border px-1.5 font-mono font-bold tabular-nums text-ui-chip",
-              showDelta && delta > 0 && "border-up/40 text-up",
-              showDelta && delta < 0 && "border-down/40 text-down",
-              (!showDelta || delta === 0) && clsx("border-edge", c.textDim),
+              delta > 0 && "border-up/40 text-up",
+              delta < 0 && "border-down/40 text-down",
+              delta === 0 && clsx("border-edge", c.textDim),
             )}
           >
             {pct}
           </span>
-          {showDelta && delta !== 0 && (
+          {delta !== 0 && (
             <span
               className={clsx(
                 "font-mono font-medium text-ui-meta",
@@ -103,16 +89,16 @@ const PredictionChip = memo(
         {/* Row 2 (comfort only): category · volume · close countdown */}
         {comfort && (
           <div className={clsx("flex items-center gap-1.5 text-ui-chip", c.textFaint)}>
-            {showCategory && p.category && (
+            {p.category && (
               <span className="uppercase tracking-wide">{p.category}</span>
             )}
-            {showVolume && (p.volume_24h ?? p.volume) != null && (
+            {(p.volume_24h ?? p.volume) != null && (
               <>
-                {showCategory && p.category && <span className="text-fg-3">&middot;</span>}
+                {p.category && <span className="text-fg-3">&middot;</span>}
                 <span>Vol {formatCompactNumber(p.volume_24h ?? p.volume ?? 0)}</span>
               </>
             )}
-            {showCloseTime && countdown && (
+            {countdown && (
               <>
                 <span className="text-fg-3">&middot;</span>
                 <span>{countdown}</span>
@@ -126,10 +112,6 @@ const PredictionChip = memo(
   (prev, next) =>
     prev.comfort === next.comfort &&
     prev.colorMode === next.colorMode &&
-    prev.showDelta === next.showDelta &&
-    prev.showCategory === next.showCategory &&
-    prev.showVolume === next.showVolume &&
-    prev.showCloseTime === next.showCloseTime &&
     prev.onClick === next.onClick &&
     prev.prediction.id === next.prediction.id &&
     prev.prediction.yes_price === next.prediction.yes_price &&

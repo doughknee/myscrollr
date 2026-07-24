@@ -2,6 +2,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, join, relative } from "node:path";
+import { parseArgs } from "node:util";
 
 const themeFamilies = [
   "scrollr",
@@ -117,16 +118,7 @@ function buildCurrentSourceRoutes(sources) {
   const wanted = sources.length > 0
     ? new Set(sources)
     : new Set(sourceRoutes.map((route) => route.id));
-  const result = [routeById.get("home")];
-
-  for (const route of routes) {
-    if (route.id === "home") continue;
-    const [source, tab] = route.id.match(/^(.+)-(feed|config)$/)?.slice(1) ?? [];
-    if (!source || !tab) continue;
-    if (wanted.has(source)) result.push(route);
-  }
-
-  return result.filter(Boolean);
+  return [routeById.get("home"), ...sourceRoutes.filter((route) => wanted.has(route.id))];
 }
 
 function buildTestMatrix(options) {
@@ -214,20 +206,17 @@ function setSystemMode(mode) {
 }
 
 function parseOptions(values) {
-  const options = new Map();
-  for (let index = 0; index < values.length; index += 1) {
-    const key = values[index];
-    if (!key.startsWith("--")) continue;
-    const name = key.slice(2);
-    const next = values[index + 1];
-    if (!next || next.startsWith("--")) {
-      options.set(name, true);
-      continue;
-    }
-    options.set(name, next);
-    index += 1;
-  }
-  return options;
+  const stringOptions = ["mode", "sidebar", "sources", "source", "input", "output", "crop", "top", "right", "bottom", "left"];
+  const parsed = parseArgs({
+    args: values,
+    strict: false,
+    options: {
+      json: { type: "boolean" },
+      all: { type: "boolean" },
+      ...Object.fromEntries(stringOptions.map((name) => [name, { type: "string" }])),
+    },
+  });
+  return new Map(Object.entries(parsed.values));
 }
 
 function parseModes(value) {

@@ -11,7 +11,6 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { recordPrice } from "./sparkline";
 import { evaluateAlerts, describeAlert, type PredictionAlert } from "./watchlist";
-import { buildPriceMap } from "./positions";
 import type { Prediction } from "../../types";
 
 export function usePredictionAlerts(
@@ -53,12 +52,9 @@ export function usePredictionAlerts(
 
 /** Ticker→yes_price map (cents). Separate from positions' id-keyed map. */
 function buildPriceMapByTicker(markets: Prediction[]): Map<string, number> {
-  // Reuse the shared builder, then keep only bare-ticker keys we need here.
-  const full = buildPriceMap(markets);
   const byTicker = new Map<string, number>();
   for (const m of markets) {
-    const v = full.get(m.ticker);
-    if (typeof v === "number") byTicker.set(m.ticker, v);
+    if (typeof m.yes_price === "number") byTicker.set(m.ticker, m.yes_price);
   }
   return byTicker;
 }

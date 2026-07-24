@@ -31,8 +31,6 @@ interface TooltipProps {
   content: string | undefined;
   /** Preferred placement. Auto-flips if near viewport edge. Default "top". */
   side?: Placement;
-  /** Hover delay in ms. Default 150. */
-  delay?: number;
   /** The trigger element. Must be a single React element. */
   children: ReactElement<{ ref?: Ref<HTMLElement> }>;
 }
@@ -48,7 +46,6 @@ const SLIDE: Record<Side, string> = {
 export default function Tooltip({
   content,
   side = "top",
-  delay = 150,
   children,
 }: TooltipProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -69,7 +66,7 @@ export default function Tooltip({
     whileElementsMounted: autoUpdate,
   });
 
-  const hover = useHover(context, { move: false, delay: { open: delay } });
+  const hover = useHover(context, { move: false, delay: { open: 150 } });
   const focus = useFocus(context);
   const dismiss = useDismiss(context);
   const role = useRole(context, { role: "tooltip" });

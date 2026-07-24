@@ -13,7 +13,6 @@ import type { Widget, HealthResponse } from "../types/api.generated";
 // ── Constants ────────────────────────────────────────────────────
 
 import { API_BASE } from "../config";
-export { API_BASE };
 
 // ── Request helpers ─────────────────────────────────────────────
 

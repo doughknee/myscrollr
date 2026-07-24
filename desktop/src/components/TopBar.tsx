@@ -16,9 +16,7 @@
  * route's content area in a chunky 4-row header. It's now in the
  * TopBar, freeing the entire content area for actual content.
  */
-import { forwardRef, useLayoutEffect, useRef, useState } from "react";
-import type { ButtonHTMLAttributes, Ref } from "react";
-import { ArrowLeft, ArrowRight, ChevronDown, Radio, RadioTower } from "lucide-react";
+import { ArrowLeft, ArrowRight, Radio, RadioTower } from "lucide-react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "motion/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";

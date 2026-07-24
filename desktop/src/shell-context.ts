@@ -15,7 +15,7 @@
 import { createContext, useContext } from "react";
 import type { AppPreferences } from "./preferences";
 import type { SubscriptionTier } from "./auth";
-import type { WidgetId, DataWidgetRow, SubscriptionInfo } from "./api/client";
+import type { DataWidgetRow, SubscriptionInfo } from "./api/client";
 import type { DashboardResponse } from "./types";
 import type { DataWidgetManifest, WidgetManifest } from "./types";
 
@@ -37,18 +37,6 @@ export interface ShellState {
   allDataWidgetManifests: DataWidgetManifest[];
   /** All registered widget manifests (static). */
   allWidgets: WidgetManifest[];
-  /** Toggle a widget's visibility on the ticker. */
-  onToggleDataWidgetTicker: (widgetType: WidgetId, visible: boolean) => void;
-  /** Toggle a widget's presence on the ticker. */
-  onToggleWidgetTicker: (widgetId: string) => void;
-  /** Add a new widget via API. */
-  onAddWidget: (widgetType: WidgetId) => void;
-  /** Delete a widget via API. */
-  onDeleteWidget: (widgetType: WidgetId) => void;
-  /** Toggle a widget on/off entirely. */
-  onToggleWidget: (widgetId: string) => void;
-  /** Navigate to a source by ID. */
-  onSelectItem: (id: string) => void;
 }
 
 export const ShellContext = createContext<ShellState | null>(null);

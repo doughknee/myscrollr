@@ -161,26 +161,18 @@ export function formatReleaseDate(iso: string): string {
 
 /**
  * Coarse relative age: "today", "yesterday", "5 days ago",
- * "3 weeks ago", "2 months ago", "1 year ago". `now` is injectable
+ * "3 weeks ago", "2 months ago", "last year". `now` is injectable
  * for tests. "" for unparseable input.
  */
 export function relativeTime(iso: string, now: number = Date.now()): string {
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return "";
   const days = Math.floor(Math.max(0, now - t) / 86_400_000);
-  if (days === 0) return "today";
-  if (days === 1) return "yesterday";
-  if (days < 7) return `${days} days ago`;
-  if (days < 30) {
-    const weeks = Math.floor(days / 7);
-    return weeks === 1 ? "1 week ago" : `${weeks} weeks ago`;
-  }
-  if (days < 365) {
-    const months = Math.floor(days / 30);
-    return months === 1 ? "1 month ago" : `${months} months ago`;
-  }
-  const years = Math.floor(days / 365);
-  return years === 1 ? "1 year ago" : `${years} years ago`;
+  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+  if (days < 7) return rtf.format(-days, "day");
+  if (days < 30) return rtf.format(-Math.floor(days / 7), "week");
+  if (days < 365) return rtf.format(-Math.floor(days / 30), "month");
+  return rtf.format(-Math.floor(days / 365), "year");
 }
 
 // ── Markdown rendering ──────────────────────────────────────────

@@ -2,10 +2,10 @@
  * Popover-menu primitives for widget bars — one look + one entrance for
  * every bar menu (extracted from the predictions FeedTab, v1.1.6).
  */
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
-import { motion } from "motion/react";
-import { Check, SlidersHorizontal } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 
 /** Close an open popover on outside-mousedown or Escape. */
 export function useDismiss<T extends HTMLElement>(
@@ -137,6 +137,81 @@ export function FilterTrigger({
           {badgeCount}
         </span>
       )}
+    </button>
+  );
+}
+
+/** Narrow-width collapse shell: FilterTrigger + full-width MenuPanel with
+ *  the open/dismiss wiring. Hosts render only the menu rows as children. */
+export function FilterMenuShell({
+  badgeCount,
+  children,
+}: {
+  badgeCount: number;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(rootRef, open, close);
+
+  return (
+    // NOT position:relative — the dropdown anchors to the sticky bar so
+    // it spans the widget width instead of clipping at narrow widths.
+    <div ref={rootRef} className="shrink-0 rounded-lg">
+      <FilterTrigger
+        open={open}
+        badgeCount={badgeCount}
+        onClick={() => setOpen((o) => !o)}
+      />
+      <AnimatePresence>
+        {open && <MenuPanel className="inset-x-2">{children}</MenuPanel>}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/** Rounded trigger pill shared by SelectMenu/MultiSelectMenu: accent when
+ *  open (or `active`), truncated content, rotating chevron. */
+export function MenuTrigger({
+  open,
+  active,
+  onClick,
+  ariaLabel,
+  children,
+}: {
+  open: boolean;
+  /** Accent the pill beyond the open state (e.g. a non-empty selection). */
+  active?: boolean;
+  onClick: () => void;
+  ariaLabel: string;
+  children: React.ReactNode;
+}) {
+  const lit = open || active;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={open}
+      aria-haspopup="menu"
+      aria-label={ariaLabel}
+      className={clsx(
+        "flex max-w-40 cursor-pointer items-center gap-1 rounded-full border py-1 pl-2.5 pr-2 text-ui-meta font-medium transition-colors",
+        lit
+          ? "border-accent/40 bg-accent/15 text-accent"
+          : "border-edge/30 bg-base-150/60 text-fg-3 hover:text-fg-2",
+      )}
+    >
+      {children}
+      <ChevronDown
+        size={12}
+        aria-hidden
+        className={clsx(
+          "shrink-0 transition-transform duration-150",
+          open && "rotate-180",
+          lit ? "text-accent/70" : "text-fg-4",
+        )}
+      />
     </button>
   );
 }

@@ -11,25 +11,25 @@ import type { Prediction } from "../../types";
 
 // ── Money formatting ─────────────────────────────────────────────
 
+const USD = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
+const SIGNED_USD = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  signDisplay: "exceptZero",
+});
+
 /** Format integer cents as USD ("$12.34", "-$5.00"). */
 export function formatUsdCents(cents: number): string {
-  const sign = cents < 0 ? "-" : "";
-  const dollars = Math.abs(cents) / 100;
-  return `${sign}$${dollars.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  return USD.format(cents / 100);
 }
 
 /** Format integer cents as a signed USD delta ("+$1.20", "-$0.50", "$0.00"). */
 export function formatSignedUsdCents(cents: number): string {
-  if (cents === 0) return "$0.00";
-  const sign = cents > 0 ? "+" : "-";
-  const dollars = Math.abs(cents) / 100;
-  return `${sign}$${dollars.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  return SIGNED_USD.format(cents / 100);
 }
 
 // ── Live price lookup ────────────────────────────────────────────

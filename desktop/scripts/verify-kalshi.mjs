@@ -10,41 +10,15 @@
  *   node desktop/scripts/verify-kalshi.mjs  (needs `npm i playwright` somewhere on the resolve path)
  */
 import { chromium } from "playwright";
-import { mkdirSync } from "node:fs";
+import { OUT, check, pageFactory, finish } from "./harness.mjs";
 
 const BASE = "http://localhost:5174/src/datawidgets/predictions/preview/index.html";
-const OUT = process.env.UI_REVIEW_OUT ?? "ui-review-out";
-mkdirSync(OUT, { recursive: true });
-
-let failures = 0;
-function check(name, cond, extra = "") {
-  if (cond) console.log(`  PASS ${name}`);
-  else {
-    failures++;
-    console.log(`  FAIL ${name} ${extra}`);
-  }
-}
 
 const CARD = '[role="button"][aria-label^="Open "]';
 const DIALOG = '[role="dialog"]';
 const SEARCH_INPUT = '[aria-label="Search markets"]';
 
-function watchConsole(page, consoleErrors) {
-  const benign = /Failed to load resource|Store write failed|mock: unhandled command|Token unavailable/;
-  page.on("console", (msg) => {
-    if (msg.type() === "error" && !benign.test(msg.text())) consoleErrors.push(msg.text());
-  });
-  page.on("pageerror", (err) => consoleErrors.push(String(err)));
-}
-
-async function newPage(browser, width, height, query = "") {
-  const page = await browser.newPage({ viewport: { width, height } });
-  const consoleErrors = [];
-  watchConsole(page, consoleErrors);
-  await page.goto(`${BASE}${query}`, { waitUntil: "networkidle" });
-  await page.waitForSelector("[data-section-title]");
-  return { page, consoleErrors };
-}
+const newPage = pageFactory(BASE, "[data-section-title]", /mock: unhandled command|Token unavailable/);
 
 async function run() {
   const browser = await chromium.launch({ channel: "msedge", headless: true });
@@ -481,9 +455,7 @@ async function run() {
     await page.close();
   }
 
-  await browser.close();
-  console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);
-  process.exit(failures === 0 ? 0 : 1);
+  await finish(browser);
 }
 
 run().catch((e) => {

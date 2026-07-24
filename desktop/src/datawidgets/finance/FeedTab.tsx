@@ -12,9 +12,8 @@
  * in menu rows (no summary band); filters collapse into one Filter
  * button at narrow widths.
  */
-import { memo, useMemo, useRef, useEffect, useState, useCallback } from "react";
+import { memo, useMemo, useRef, useState, useCallback } from "react";
 import { clsx } from "clsx";
-import { AnimatePresence } from "motion/react";
 import { TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardQueryOptions, financeCatalogOptions } from "../../api/queries";
@@ -24,11 +23,9 @@ import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarPill } from "../../components/widget-bar/Bar";
 import {
-  useDismiss,
-  MenuPanel,
+  FilterMenuShell,
   MenuHeading,
   MenuRow,
-  FilterTrigger,
 } from "../../components/widget-bar/Menu";
 import { SearchBox, useSlashFocus } from "../../components/widget-bar/SearchBox";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
@@ -37,12 +34,16 @@ import { useDataWidgetConfig } from "../../hooks/useDataWidgetConfig";
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
 import { useCatalog } from "../../hooks/useCatalog";
+import {
+  useLoadMore,
+  usePriceFlash,
+  useSetToggle,
+  latestTimestamp,
+} from "../feedHooks";
 import { applyFinancePipeline, type FinanceSortKey, type FinanceDirectionFilter } from "./view";
 import type { Trade, FeedTabProps, DataWidgetManifest } from "../../types";
 import type { WidgetId } from "../../api/client";
 import { assetClassForWidget } from "../../marketplace";
-import { shouldShowOnFeed } from "../../preferences";
-import type { FinanceDisplayPrefs } from "../../preferences";
 
 // ── DataWidgetRow manifest ─────────────────────────────────────────────
 
@@ -87,9 +88,6 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 interface FinanceWidgetConfig {
   symbols?: string[];
 }
-
-const PAGE_SIZE = 20;
-const LOAD_MORE_INCREMENT = 20;
 
 // ── FeedTab ──────────────────────────────────────────────────────
 
@@ -177,18 +175,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
     },
     [prefs, onPrefsChange],
   );
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
-
-  const toggleCategory = useCallback((cat: string) => {
-    setSelectedCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat);
-      else next.add(cat);
-      return next;
-    });
-  }, []);
-
-  const clearCategories = useCallback(() => setSelectedCategories(new Set()), []);
+  const [selectedCategories, toggleCategory, clearCategories] = useSetToggle();
 
   // ── Symbol search (plain substring — no fuzzy matcher here) ──
   const [query, setQuery] = useState("");
@@ -197,16 +184,11 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
 
   const clearAllFilters = useCallback(() => {
     setDirectionFilter("all");
-    setSelectedCategories(new Set());
+    clearCategories();
     setQuery("");
-  }, []);
+  }, [clearCategories]);
 
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [directionFilter, selectedCategories, sortKey, query]);
 
   // ── Data pipeline ────────────────────────────────────────────
   // Shared with the ticker via `applyFinancePipeline` so `defaultSort`
@@ -231,24 +213,17 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
     [piped, searchQ],
   );
 
-  // ── Pagination (incremental "load more") ─────────────────────
-  // Vertical-monitor friendly: instead of paging, we render a
-  // progressively larger slice and append more on click. This keeps
-  // scroll position stable as users continue down the list.
-  const visible = Math.min(visibleCount, filtered.length);
+  const { visible, footer } = useLoadMore(
+    filtered.length,
+    [directionFilter, selectedCategories, sortKey, query],
+    "px-3 py-3 bg-surface border-t border-edge/30",
+  );
   const pageItems = filtered.slice(0, visible);
-  const remaining = Math.max(0, filtered.length - visible);
 
-  // Most-recent update across filtered trades — drives the FreshnessPill.
-  const latestUpdated = useMemo(() => {
-    let latest = 0;
-    for (const t of filtered) {
-      if (!t.last_updated) continue;
-      const ts = new Date(t.last_updated).getTime();
-      if (Number.isFinite(ts) && ts > latest) latest = ts;
-    }
-    return latest > 0 ? new Date(latest).toISOString() : null;
-  }, [filtered]);
+  const latestUpdated = useMemo(
+    () => latestTimestamp(filtered, (t) => t.last_updated),
+    [filtered],
+  );
 
   // ── Direction counts (menu rows — the summary band is gone) ──
   // Counted over the widget-scoped universe, not the filtered list, so
@@ -276,7 +251,6 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
     saving: symbolsSaving,
     updateItems: updateSymbols,
   } = useDataWidgetConfig<string[]>(widgetType, "symbols");
-  const { data: fullCatalog = [] } = useQuery(financeCatalogOptions());
 
   const widgetRow = (dashboard?.widgets ?? []).find(
     (ch) => ch.widget_type === widgetType,
@@ -292,7 +266,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   // sees only Crypto; stocks widget everything else).
   const catalogMatches = useMemo(() => {
     if (!searchQ) return [];
-    return fullCatalog
+    return (catalog ?? [])
       .filter((item) =>
         assetClass === "crypto"
           ? item.category === "Crypto"
@@ -313,7 +287,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
         return a.symbol.localeCompare(b.symbol);
       })
       .slice(0, 8);
-  }, [searchQ, fullCatalog, assetClass, trackedSet]);
+  }, [searchQ, catalog, assetClass, trackedSet]);
 
   const addSymbol = useCallback(
     (sym: string) => {
@@ -527,29 +501,12 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                 key={trade.symbol}
                 trade={trade}
                 mode={mode}
-                display={dp}
                 category={categoryMap.get(trade.symbol)}
                 now={now}
               />
             ))}
           </div>
-          {remaining > 0 && (
-            <div className="flex items-center justify-center gap-3 px-3 py-3 bg-surface border-t border-edge/30">
-              <button
-                onClick={() =>
-                  setVisibleCount((c) =>
-                    Math.min(filtered.length, c + LOAD_MORE_INCREMENT),
-                  )
-                }
-                className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
-              >
-                Load more
-              </button>
-              <span className="text-xs text-fg-3 tabular-nums font-mono">
-                {visible} of {filtered.length}
-              </span>
-            </div>
-          )}
+          {footer}
         </>
       )}
     </div>
@@ -579,76 +536,58 @@ function FinanceFilterMenu({
   onToggleCategory: (c: string) => void;
   onClearCategories: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
-  useDismiss(rootRef, open, close);
-
   const activeCount =
     (directionFilter !== "all" ? 1 : 0) + selectedCategories.size;
 
   return (
-    // NOT position:relative — the dropdown anchors to the sticky bar so
-    // it spans the widget width instead of clipping at narrow widths.
-    <div ref={rootRef} className="shrink-0 rounded-lg">
-      <FilterTrigger
-        open={open}
-        badgeCount={activeCount}
-        onClick={() => setOpen((o) => !o)}
-      />
-      <AnimatePresence>
-        {open && (
-          <MenuPanel className="inset-x-2">
-            <MenuHeading>Direction</MenuHeading>
-            {DIRECTION_OPTIONS.map((opt) => (
-              <MenuRow
-                key={opt.value}
-                selected={directionFilter === opt.value}
-                onClick={() => onPickDirection(opt.value)}
-                role="menuitemradio"
-                count={directionCounts[opt.value]}
-              >
-                {opt.label}
-              </MenuRow>
-            ))}
-            <MenuHeading>Sort</MenuHeading>
-            {SORT_OPTIONS.map((opt) => (
-              <MenuRow
-                key={opt.value}
-                selected={sortKey === opt.value}
-                onClick={() => onPickSort(opt.value)}
-                role="menuitemradio"
-              >
-                {opt.label}
-              </MenuRow>
-            ))}
-            {categories.length > 0 && (
-              <>
-                <MenuHeading>Category</MenuHeading>
-                <MenuRow
-                  selected={selectedCategories.size === 0}
-                  onClick={onClearCategories}
-                  role="menuitemradio"
-                >
-                  All categories
-                </MenuRow>
-                {categories.map((c) => (
-                  <MenuRow
-                    key={c.name}
-                    selected={selectedCategories.has(c.name)}
-                    onClick={() => onToggleCategory(c.name)}
-                    role="menuitemcheckbox"
-                    count={c.count}
-                  >
-                    {c.name}
-                  </MenuRow>
-                ))}
-              </>
-            )}
-          </MenuPanel>
-        )}
-      </AnimatePresence>
-    </div>
+    <FilterMenuShell badgeCount={activeCount}>
+      <MenuHeading>Direction</MenuHeading>
+      {DIRECTION_OPTIONS.map((opt) => (
+        <MenuRow
+          key={opt.value}
+          selected={directionFilter === opt.value}
+          onClick={() => onPickDirection(opt.value)}
+          role="menuitemradio"
+          count={directionCounts[opt.value]}
+        >
+          {opt.label}
+        </MenuRow>
+      ))}
+      <MenuHeading>Sort</MenuHeading>
+      {SORT_OPTIONS.map((opt) => (
+        <MenuRow
+          key={opt.value}
+          selected={sortKey === opt.value}
+          onClick={() => onPickSort(opt.value)}
+          role="menuitemradio"
+        >
+          {opt.label}
+        </MenuRow>
+      ))}
+      {categories.length > 0 && (
+        <>
+          <MenuHeading>Category</MenuHeading>
+          <MenuRow
+            selected={selectedCategories.size === 0}
+            onClick={onClearCategories}
+            role="menuitemradio"
+          >
+            All categories
+          </MenuRow>
+          {categories.map((c) => (
+            <MenuRow
+              key={c.name}
+              selected={selectedCategories.has(c.name)}
+              onClick={() => onToggleCategory(c.name)}
+              role="menuitemcheckbox"
+              count={c.count}
+            >
+              {c.name}
+            </MenuRow>
+          ))}
+        </>
+      )}
+    </FilterMenuShell>
   );
 }
 
@@ -657,40 +596,18 @@ function FinanceFilterMenu({
 interface TradeItemProps {
   trade: Trade;
   mode: "comfort" | "compact";
-  display: FinanceDisplayPrefs;
   category?: string;
   /** Shared "now" from `useNow()` in the parent list — drives the `Xs ago` label. */
   now: number;
 }
 
-const TradeItem = memo(function TradeItem({ trade, mode, display, category, now }: TradeItemProps) {
+const TradeItem = memo(function TradeItem({ trade, mode, category, now }: TradeItemProps) {
   const isUp = trade.direction === "up";
   const isDown = trade.direction === "down";
 
-  // Track previous price for flash animation. Single effect owns the ref —
-  // the previous split-effect version could overwrite the ref before the
-  // flash branch ran on rapid back-to-back CDC events, swallowing flashes.
-  const prevPriceRef = useRef<number | null>(null);
-  const [flash, setFlash] = useState<"up" | "down" | null>(null);
-
-  useEffect(() => {
-    const currentPrice =
-      typeof trade.price === "string" ? parseFloat(trade.price) : trade.price;
-    const prevPrice = prevPriceRef.current;
-    prevPriceRef.current = currentPrice;
-
-    if (
-      prevPrice === null ||
-      isNaN(currentPrice) ||
-      currentPrice === prevPrice
-    ) {
-      return;
-    }
-
-    setFlash(currentPrice > prevPrice ? "up" : "down");
-    const timer = setTimeout(() => setFlash(null), 800);
-    return () => clearTimeout(timer);
-  }, [trade.price]);
+  const flash = usePriceFlash(
+    typeof trade.price === "string" ? parseFloat(trade.price) : trade.price,
+  );
 
   const dirColor = isUp ? "text-up" : isDown ? "text-down" : "text-fg-3";
 
@@ -712,11 +629,9 @@ const TradeItem = memo(function TradeItem({ trade, mode, display, category, now 
         <span className="text-fg-2 tabular-nums">
           {formatPrice(trade.price)}
         </span>
-        {shouldShowOnFeed(display.showChange) && (
-          <span className={clsx("tabular-nums", dirColor)}>
-            {formatChange(trade.percentage_change)}
-          </span>
-        )}
+        <span className={clsx("tabular-nums", dirColor)}>
+          {formatChange(trade.percentage_change)}
+        </span>
       </a>
     );
   }
@@ -760,7 +675,7 @@ const TradeItem = memo(function TradeItem({ trade, mode, display, category, now 
             {category}
           </span>
         )}
-        {shouldShowOnFeed(display.showPrevClose) && trade.previous_close != null && Number(trade.previous_close) > 0 && (
+        {trade.previous_close != null && Number(trade.previous_close) > 0 && (
           <span className="text-ui-chip font-mono text-fg-3 tabular-nums">
             Prev close {formatPrice(trade.previous_close)}
           </span>
@@ -772,17 +687,15 @@ const TradeItem = memo(function TradeItem({ trade, mode, display, category, now 
           {formatPrice(trade.price)}
         </span>
         <div className="flex items-center gap-2">
-          {shouldShowOnFeed(display.showChange) && (
-            <span
-              className={clsx(
-                "text-ui-meta font-mono font-medium tabular-nums",
-                dirColor,
-              )}
-            >
-              {formatChange(trade.percentage_change)}
-            </span>
-          )}
-          {shouldShowOnFeed(display.showLastUpdated) && trade.last_updated && (
+          <span
+            className={clsx(
+              "text-ui-meta font-mono font-medium tabular-nums",
+              dirColor,
+            )}
+          >
+            {formatChange(trade.percentage_change)}
+          </span>
+          {trade.last_updated && (
             <span
               className="text-ui-chip font-mono text-fg-3 tabular-nums"
               title="Last price update"
@@ -796,12 +709,11 @@ const TradeItem = memo(function TradeItem({ trade, mode, display, category, now 
   );
 }, (prev, next) =>
   prev.mode === next.mode &&
-  prev.display === next.display &&
   prev.category === next.category &&
   // `now` must trigger a re-render while the "Xs ago" label is visible
-  // so it advances on every tick. When the label is hidden the tick
-  // is irrelevant — skip it to avoid churning the whole list.
-  (!shouldShowOnFeed(next.display.showLastUpdated) || next.mode !== "comfort" || prev.now === next.now) &&
+  // so it advances on every tick. Compact mode has no label — skip the
+  // tick there to avoid churning the whole list.
+  (next.mode !== "comfort" || prev.now === next.now) &&
   prev.trade.symbol === next.trade.symbol &&
   prev.trade.price === next.trade.price &&
   prev.trade.percentage_change === next.trade.percentage_change &&

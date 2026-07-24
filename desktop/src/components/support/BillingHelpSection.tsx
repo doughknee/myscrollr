@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Settings, ExternalLink, ChevronDown } from "lucide-react";
+import { Settings, ExternalLink } from "lucide-react";
 import clsx from "clsx";
 import { open } from "@tauri-apps/plugin-shell";
 import { toast } from "sonner";
 import { isAuthenticated } from "../../auth";
 import { authFetch } from "../../api/client";
+import Disclosure from "./Disclosure";
 import { BILLING_FAQ } from "./support-content";
 
 export default function BillingHelpSection() {
@@ -88,43 +89,27 @@ export default function BillingHelpSection() {
       <div>
         <p className="mb-3 text-ui-section">Common Questions</p>
         <div className="rounded-xl border border-edge/35 bg-base-150/35 overflow-hidden">
-          {BILLING_FAQ.map((item, i) => {
-            const isOpen = expandedIndex === i;
-            return (
-              <div
-                key={i}
-                className={clsx(i > 0 && "border-t border-edge/35")}
-              >
-                <button
-                  onClick={() => toggleFaq(i)}
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-base-150/50 cursor-pointer"
-                >
+          {BILLING_FAQ.map((item, i) => (
+            <div
+              key={i}
+              className={clsx(i > 0 && "border-t border-edge/35")}
+            >
+              <Disclosure
+                open={expandedIndex === i}
+                onToggle={() => toggleFaq(i)}
+                className="justify-between"
+                header={
                   <span className="text-ui-body font-medium">
                     {item.question}
                   </span>
-                  <ChevronDown
-                    size={16}
-                    className={clsx(
-                      "shrink-0 text-fg-3 transition-transform duration-200",
-                      isOpen && "rotate-180",
-                    )}
-                  />
-                </button>
-                <div
-                  className={clsx(
-                    "overflow-hidden transition-all duration-200",
-                    isOpen
-                      ? "max-h-[500px] opacity-100"
-                      : "max-h-0 opacity-0",
-                  )}
-                >
-                  <p className="px-4 pb-4 pt-1 text-ui-meta">
-                    {item.answer}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
+                }
+              >
+                <p className="px-4 pb-4 pt-1 text-ui-meta">
+                  {item.answer}
+                </p>
+              </Disclosure>
+            </div>
+          ))}
         </div>
       </div>
     </div>

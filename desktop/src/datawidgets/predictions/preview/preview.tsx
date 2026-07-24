@@ -36,10 +36,10 @@ const params = new URLSearchParams(window.location.search);
 const theme = params.get("theme") ?? "scrollr-light";
 const density =
   params.get("density") === "compact" ? ("compact" as const) : ("comfort" as const);
-/** `?demo=1`: inject synthetic start_times, a >2-leg event and a candles
- *  fetch shim so the LIVE badge, "Starts in" countdown, "+N more" and the
- *  history chart are photographable — states today's payload can't produce
- *  (see ui-review/NOTES.md, B3 + shared-code log). Dev harness only. */
+/** `?demo=1`: inject a >2-leg event and a candles fetch shim so the
+ *  "+N more" truncation and the history chart are photographable — states
+ *  today's payload can't produce (see ui-review/NOTES.md, shared-code
+ *  log). Dev harness only. */
 const demo = params.get("demo") === "1";
 
 // ── Tauri bridge mock (harness-only) ─────────────────────────────
@@ -134,11 +134,7 @@ function installTauriMock(predictions: Prediction[]): void {
 // ── Demo-state injection (?demo=1) ───────────────────────────────
 
 function injectDemoStates(predictions: Prediction[]): Prediction[] {
-  const now = Date.now();
-  const iso = (offsetMs: number) => new Date(now + offsetMs).toISOString();
-  const rows = predictions.map((p) => ({ ...p })) as (Prediction & {
-    start_time?: string;
-  })[];
+  const rows = predictions.map((p) => ({ ...p }));
 
   // Group indices per event, in payload order.
   const byEvent = new Map<string, number[]>();
@@ -148,28 +144,12 @@ function injectDemoStates(predictions: Prediction[]): Prediction[] {
   });
   const twoLeg = [...byEvent.values()].filter((idx) => idx.length === 2);
 
-  // 1. LIVE: first two-leg event — started 30m ago, closes in 3h.
+  // Multi-outcome: the first two-leg event gains two synthetic legs so the
+  // card truncates ("+2 more") and the detail lists all four by price.
   if (twoLeg[0]) {
-    for (const i of twoLeg[0]) {
-      rows[i].start_time = iso(-30 * 60_000);
-      rows[i].close_time = iso(3 * 3600_000);
-    }
-  }
-  // 2. Starts soon: second two-leg event — starts in 3h.
-  if (twoLeg[1]) {
-    for (const i of twoLeg[1]) {
-      rows[i].start_time = iso(3 * 3600_000);
-      rows[i].close_time = iso(2 * 24 * 3600_000);
-    }
-  }
-  // 3. Multi-outcome: third two-leg event gains two synthetic legs so the
-  //    card truncates ("+2 more") and the detail lists all four by price.
-  if (twoLeg[2]) {
-    const [a] = twoLeg[2];
+    const [a] = twoLeg[0];
     const base = rows[a];
-    const clone = (n: number, title: string, price: number): Prediction & {
-      start_time?: string;
-    } => ({
+    const clone = (n: number, title: string, price: number): Prediction => ({
       ...base,
       id: `${base.id}-demo${n}`,
       ticker: `${base.ticker}-DEMO${n}`,
@@ -245,12 +225,6 @@ function main(): void {
     appVersion: "preview",
     allDataWidgetManifests: [],
     allWidgets: [],
-    onToggleDataWidgetTicker: noop,
-    onToggleWidgetTicker: noop,
-    onAddWidget: noop,
-    onDeleteWidget: noop,
-    onToggleWidget: noop,
-    onSelectItem: noop,
   };
 
   const feedContext = {

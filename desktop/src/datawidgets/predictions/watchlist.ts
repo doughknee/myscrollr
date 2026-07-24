@@ -44,13 +44,6 @@ export function withToggled(list: string[], ticker: string): string[] {
     : [...list, ticker];
 }
 
-/** Toggle + persist; returns the new list. */
-export function toggleWatch(ticker: string): string[] {
-  const next = withToggled(getWatchlist(), ticker);
-  saveWatchlist(next);
-  return next;
-}
-
 // ── Alerts ───────────────────────────────────────────────────────
 
 export type AlertComparator = "above" | "below";
@@ -64,8 +57,6 @@ export interface PredictionAlert {
   /** Implied-probability threshold in cents (0–100). */
   threshold: number;
   enabled: boolean;
-  /** Epoch-ms of the last time this alert fired (for de-dupe/UX). */
-  lastTriggeredAt?: number;
 }
 
 export function getAlerts(): PredictionAlert[] {
@@ -99,15 +90,6 @@ export function withAlertRemoved(list: PredictionAlert[], id: string): Predictio
   return list.filter((a) => a.id !== id);
 }
 
-/** Pure: patch one alert by id. */
-export function withAlertPatched(
-  list: PredictionAlert[],
-  id: string,
-  patch: Partial<PredictionAlert>,
-): PredictionAlert[] {
-  return list.map((a) => (a.id === id ? { ...a, ...patch } : a));
-}
-
 /** Create + persist a new alert; returns the new list. */
 export function addAlert(input: {
   ticker: string;
@@ -116,10 +98,7 @@ export function addAlert(input: {
   threshold: number;
 }): PredictionAlert[] {
   const alert: PredictionAlert = {
-    id:
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${input.ticker}-${input.comparator}-${input.threshold}`,
+    id: crypto.randomUUID(),
     ticker: input.ticker,
     label: input.label,
     comparator: input.comparator,

@@ -141,12 +141,3 @@ export function shortStatus(status: string | null | undefined): string {
   if (s.startsWith("IR")) return "IR";
   return s;
 }
-
-/**
- * Compact one-decimal fixed-point that matches `fmtPlayerPoints` for
- * individual-player segments. Centralized so all per-player segments
- * format identically.
- */
-export function formatPts(points: number): string {
-  return points.toFixed(1);
-}
