@@ -11,6 +11,21 @@ COPY . .
 
 # Build the binary
 RUN CGO_ENABLED=0 GOOS=linux go build -o fantasy-api .
+# ── Dev stage: hot reload (NOT the default build target) ─────────────
+# Deliberately placed BEFORE the runtime stage: deploy.yml runs
+# `docker build` with no --target, which builds the LAST stage. Keeping the
+# production runtime last means the deploy pipeline is unaffected by this.
+# docker/compose.yml selects this one explicitly with `target: dev`.
+#
+# Source is bind-mounted from the host, so `air` rebuilds the binary in
+# place on save — no image rebuild per edit.
+FROM golang:1.25-alpine AS dev
+WORKDIR /app
+RUN apk add --no-cache git curl && go install github.com/air-verse/air@latest
+ENV GOFLAGS=-buildvcs=false
+EXPOSE 8084
+CMD ["air", "-c", ".air.toml"]
+
 
 # --- Runtime stage ---
 FROM alpine:latest

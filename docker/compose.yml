@@ -1,0 +1,211 @@
+# MyScrollr — the local backend stack. Everything runs in Docker.
+#
+# Don't invoke this directly; the Makefile at the repo root is the entry
+# point (`make help`). It sets the right -f and profile flags for you.
+#
+# ── How the edit→run loop works ──────────────────────────────────────
+# Every service builds its Dockerfile's `dev` stage, which runs a file
+# watcher (air for Go, cargo-watch for Rust) instead of a prebuilt binary.
+# Source is bind-mounted from the host, so saving a file rebuilds that one
+# service inside its container in seconds. You do NOT rebuild images to see
+# a code change — only `make rebuild` when a dependency changes.
+#
+# The `dev` stage sits BEFORE the production runtime stage in each
+# Dockerfile on purpose: deploy.yml runs `docker build` with no --target,
+# which builds the LAST stage. Keep the production stage last or you will
+# ship hot-reload containers.
+#
+# ── Volumes ──────────────────────────────────────────────────────────
+# Build artifacts live in named volumes, never on the bind mount:
+#   - Rust `target/` would otherwise mix Linux objects into the host tree
+#     and force a full rebuild every time you switch between them.
+#   - Go module cache would re-download on every container start.
+#
+# `name:` and the postgres/redis volume names match the pre-2026-07 compose
+# files exactly, so an existing local database is picked up, not orphaned.
+name: scrollr-local
+
+# ── Shared anchors ───────────────────────────────────────────────────
+x-db-url: &db-url "postgres://scrollr:scrollr@postgres:5432/scrollr?sslmode=disable"
+x-redis-url: &redis-url "redis://redis:6379"
+
+x-needs-db: &needs-db
+  postgres:
+    condition: service_healthy
+
+x-needs-db-redis: &needs-db-redis
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+
+# Rust ingesters are identical apart from name, port and source path.
+x-rust-ingester: &rust-ingester
+  depends_on: *needs-db
+  restart: unless-stopped
+  environment: &rust-env
+    DATABASE_URL: *db-url
+    CARGO_TARGET_DIR: /build/target
+
+services:
+  # ── Infrastructure ─────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: scrollr-postgres
+    environment:
+      POSTGRES_USER: scrollr
+      POSTGRES_PASSWORD: scrollr
+      POSTGRES_DB: scrollr
+    ports: ["5432:5432"]
+    volumes:
+      - scrollr_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scrollr -d scrollr"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    container_name: scrollr-redis
+    ports: ["6379:6379"]
+    volumes:
+      - scrollr_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # ── Core API ───────────────────────────────────────────────────────
+  # Published on 18080, not 8080 — Steam's CEF debugger claims localhost:8080
+  # on Windows. The desktop app and browser hit http://localhost:18080.
+  core-api:
+    build:
+      context: ../api
+      target: dev
+    container_name: scrollr-core
+    env_file: [../api/.env]
+    environment:
+      PORT: "8080"
+      DATABASE_URL: *db-url
+      REDIS_URL: *redis-url
+      GOCACHE: /build/go-cache
+      GOMODCACHE: /build/go-mod
+      # Widget sources live inside core (ADR-0002, REL-14/15/16)
+      INTERNAL_FINANCE_URL: "http://finance-service:3001"
+      INTERNAL_SPORTS_URL: "http://sports-service:3002"
+      INTERNAL_RSS_URL: "http://rss-service:3004"
+      INTERNAL_PREDICTIONS_URL: "http://predictions-service:3005"
+    volumes:
+      - ../api:/app
+      - core_build:/build
+    ports: ["18080:8080"]
+    depends_on: *needs-db-redis
+    restart: unless-stopped
+
+  # ── Fantasy (Go — the one remaining separate service) ──────────────
+  # YAHOO_CALLBACK_URL in its .env points at http://localhost:8084/fantasy/
+  # callback, published below, so the browser OAuth redirect lands.
+  fantasy-api:
+    build:
+      context: ../channels/fantasy/api
+      target: dev
+    container_name: scrollr-fantasy-api
+    env_file: [../channels/fantasy/.env]
+    environment:
+      PORT: "8084"
+      DATABASE_URL: *db-url
+      REDIS_URL: *redis-url
+      CHANNEL_URL: "http://fantasy-api:8084"
+      GOCACHE: /build/go-cache
+      GOMODCACHE: /build/go-mod
+    volumes:
+      - ../channels/fantasy/api:/app
+      - fantasy_build:/build
+    ports: ["8084:8084"]
+    depends_on: *needs-db-redis
+    restart: unless-stopped
+
+  # ── Rust ingesters (pure writers — ADR-0002) ───────────────────────
+  finance-service:
+    <<: *rust-ingester
+    build:
+      context: ../channels/finance/service
+      target: dev
+    container_name: scrollr-finance-svc
+    env_file: [../channels/finance/.env]
+    environment:
+      <<: *rust-env
+      PORT: "3001"
+    volumes:
+      - ../channels/finance/service:/app
+      - finance_build:/build
+    ports: ["3001:3001"]
+
+  sports-service:
+    <<: *rust-ingester
+    build:
+      context: ../channels/sports/service
+      target: dev
+    container_name: scrollr-sports-svc
+    env_file: [../channels/sports/.env]
+    environment:
+      <<: *rust-env
+      PORT: "3002"
+    volumes:
+      - ../channels/sports/service:/app
+      - sports_build:/build
+    ports: ["3002:3002"]
+
+  rss-service:
+    <<: *rust-ingester
+    build:
+      context: ../channels/rss/service
+      target: dev
+    container_name: scrollr-rss-svc
+    env_file: [../channels/rss/.env]
+    environment:
+      <<: *rust-env
+      PORT: "3004"
+    volumes:
+      - ../channels/rss/service:/app
+      - rss_build:/build
+    ports: ["3004:3004"]
+
+  # Opt-in: needs a Kalshi key. `make kalshi-key` pulls one, `make setup`
+  # generates the env file. Without it the profile stays off and the rest
+  # of the stack runs fine.
+  predictions-service:
+    <<: *rust-ingester
+    build:
+      context: ../channels/predictions/service
+      target: dev
+    container_name: scrollr-predictions-svc
+    profiles: ["predictions"]
+    # The Kalshi private key is a multiline PEM that Docker's env_file
+    # cannot parse, so `make setup` writes it to a file mounted below and
+    # the service reads KALSHI_PRIVATE_KEY_PATH instead of an inline var.
+    env_file: [../secrets/predictions.docker.env]
+    environment:
+      <<: *rust-env
+      PORT: "3005"
+      KALSHI_PRIVATE_KEY_PATH: "/run/secrets/kalshi.pem"
+    volumes:
+      - ../channels/predictions/service:/app
+      - predictions_build:/build
+      - ../secrets/kalshi-private-key.pem:/run/secrets/kalshi.pem:ro
+    ports: ["3005:3005"]
+
+volumes:
+  # Names match the pre-unification compose files — an existing local
+  # database survives the switch.
+  scrollr_pg:
+  scrollr_redis:
+  # Build caches. Wiped by `make reset`, never by `make down`.
+  core_build:
+  fantasy_build:
+  finance_build:
+  sports_build:
+  rss_build:
+  predictions_build:

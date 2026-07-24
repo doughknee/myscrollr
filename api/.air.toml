@@ -1,0 +1,27 @@
+# air — rebuild-on-save for the containerized dev stage (docker/compose.yml).
+# Only read inside the `dev` Docker target; the production image never sees it.
+
+root = "."
+tmp_dir = "/tmp/air"
+
+[build]
+  cmd = "go build -o /tmp/air/main ."
+  bin = "/tmp/air/main"
+  include_ext = ["go"]
+  exclude_dir = ["migrations", "cmd/gents"]
+  exclude_regex = ["_test\.go"]
+  # Bind mounts on Windows/macOS don't deliver inotify events reliably.
+  # Polling costs a little CPU and is the difference between hot reload
+  # working and silently never firing.
+  poll = true
+  poll_interval = 500
+  delay = 200
+  stop_on_error = false
+  send_interrupt = true
+  kill_delay = 2000
+
+[log]
+  time = true
+
+[misc]
+  clean_on_exit = true
