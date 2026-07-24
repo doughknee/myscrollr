@@ -185,6 +185,9 @@ Per-service style (semis, quotes, path aliases) varies — see
 
 ## Documentation
 
+**[`docs/README.md`](./docs/README.md) indexes every doc in the repo** and says
+which ones win when they disagree. The essentials:
+
 - [`AGENTS.md`](./AGENTS.md) — the one-page cheatsheet: commands, ports,
   conventions, per-language rules.
 - [`docs/VISION.md`](./docs/VISION.md) — the charter: what Scrollr is,

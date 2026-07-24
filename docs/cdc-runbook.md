@@ -118,7 +118,9 @@ FROM pg_replication_slots;
 **Note:** DO will not shrink the volume after this. You'll stop
 accumulating bills for new auto-scales but the already-allocated
 storage stays. To shrink, you'd need to fork or restore to a smaller
-cluster (see `k8s-migration-runbook.md` for swap procedure).
+cluster — DigitalOcean's fork/restore flow, then repoint `DATABASE_URL` in
+the `scrollr-secrets` Secret and restart the affected deployments. (This
+pointed at a `k8s-migration-runbook.md` that has never existed in the repo.)
 
 ### Step 2 — Recreate the Sequin connector
 

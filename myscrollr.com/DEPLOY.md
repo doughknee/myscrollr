@@ -75,8 +75,18 @@ npm run build
 
 Runs:
 
-1. `prebuild` — `scripts/fetch-latest-version.mjs` (pins the latest desktop version into `src/lib/latestVersion.generated.ts`).
+1. `prebuild` — four scripts in order:
+   - `fetch-latest-version.mjs` → `src/lib/latestVersion.generated.ts` (pins the latest desktop version)
+   - `fetch-releases.mjs` → `src/lib/releases.generated.ts` (feeds the `/releases` page)
+   - `generate-sitemap.mjs` → `public/sitemap.xml`
+   - `optimize-screenshots.mjs`
+
+   Both `*.generated.ts` files are gitignored — they do not exist in a clean
+   checkout and are rebuilt every time. `predev` runs `fetch-latest-version`
+   alone, so `npm run dev` works without the rest.
 2. `vite build` — builds the client + SSR bundles, runs the Start prerender phase, then runs the `copyShellToIndex()` plugin.
 3. `tsc` — final type check.
+4. `postbuild` — three gates that fail the build: `check-sentry-tunnel.mjs`,
+   `check-prerender.mjs`, `check-mobile-viewport.mjs`.
 
 Output: `dist/client/` and `dist/server/`. Only `dist/client/` is shipped.
