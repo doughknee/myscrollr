@@ -8,9 +8,17 @@ can merge or split as work reveals itself.*
 surface actually behave like it.
 
 v1.1.1–v1.1.9 were all non-breaking, with `MIN_DESKTOP_VERSION` pinned at 1.1.0.
-**v1.1.10 breaks that.** The unification renamed the wire with no compat seam, so
-`MIN_DESKTOP_VERSION` moves to 1.1.10 and every older install is force-updated —
-it has to be, since older builds cannot talk to the API at all.
+**v1.1.10 broke that.** The unification renamed the wire with no compat seam, so
+every older install is force-updated — it has to be, since older builds cannot
+talk to the API at all. The gate has moved twice since, once per client-visible
+server change: it currently sits at **1.1.12** (`k8s/configmap-core.yaml`), which
+is the live value to check rather than anything written here.
+
+> **Where the record lives.** Detailed per-release sections below stop at v1.1.6.
+> From v1.1.7 on, the summary table is the roadmap's record and the full account
+> lives elsewhere: [GitHub Releases](https://github.com/doughknee/myscrollr/releases)
+> for user-facing notes, `docs/adr/` for the architectural decisions (ADR-0002 is
+> the v1.1.7 consolidation), and Linear for per-issue history.
 
 | Version | Codename | Theme | Size |
 |---|---|---|---|
@@ -25,6 +33,8 @@ it has to be, since older builds cannot talk to the API at all.
 | ~~v1.1.9~~ | One Bar | ✅ **Shipped 2026-07-18** — Configure pages and gear menus retired: every widget's controls live in its own persistent top bar; Customize page (Settings+Ticker merged), search-to-add symbols, unified feed cards + brand logos, everything-is-a-widget IA, Support rewritten | L |
 | ~~v1.1.10~~ | The Unification | ✅ **Shipped 2026-07-21** — one vocabulary end to end: server-authoritative widget catalog (`GET /catalog`), core owns all schema, wire renamed with no compat seam, generic ticker dispatch, TS types generated from the Go structs. **Forced update** — older builds cannot reach this API | L |
 | ~~v1.1.11~~ | The Unification, actually working | ✅ **Shipped 2026-07-21** — fixes the v1.1.10 regression that stored the dashboard payload under the retired `channels` key, leaving the sidebar and account page empty. **Forced update** — v1.1.10 is unusable | XS |
+| ~~v1.1.12~~ | Utility widgets are back | ✅ **Shipped 2026-07-21** — the server dropped a redundant `kind` label the client still needed to resolve renderers, so Clock/Timer/Weather/Sysmon/Uptime/GitHub silently vanished from the Library. Client now derives it from what the server still sends. **Forced update** — `MIN_DESKTOP_VERSION` moves to 1.1.12 | XS |
+| ~~v1.1.13~~ | Spring cleaning | ✅ **Shipped 2026-07-24** — Home ticker strip restyled, right-click menus reposition near screen edges + full keyboard nav, locale-independent currency in Predictions, screen-reader fixes; two ponytail audit passes (REL-58/60) cut ~4,300 lines and a dead-CI gap (REL-62) | S |
 | v1.2.0 | Double-Decker 2.0 | Multi-row ticker rebuilt around widgets | L |
 | — | Website rides along | Pricing rewrite shipped with v1.1.2–3; screenshots now unblocked (post-v1.1.4) | S–M |
 
@@ -235,8 +245,8 @@ the watchlist labels it "no longer tracked".
 ## ✅ v1.1.6 — Kalshi Fixed Up (shipped 2026-07-15, `desktop-v1.1.6`)
 
 Two production bugs root-caused and fixed, plus the browse-UX pass —
-all inside the channel/widget scope (full evidence trail lives in the
-local `ui-review/NOTES.md` decision log; follow-ups filed as REL-5/6/7):
+all inside the channel/widget scope (follow-ups filed as REL-5/6/7; the
+full evidence trail was a local, never-committed decision log):
 
 - **History charts were 401ing on every market** — the candlesticks fetch
   never sent auth against an `Auth: true` route; it only ever worked
