@@ -273,7 +273,7 @@ func hasDraftForThreadEntry(ctx context.Context, threadEntryID int64) bool {
 // as a NOTE (type='N'), not a reply, AND does NOT trigger an outbound
 // user notification. The plugin path is the only way to get a real
 // agent reply with a real outbound email through osTicket's mailer.
-// See osticket-plugins/scrollr-reply-api/README.md for the rationale.
+// See scripts/osticket-plugin/README.md for the rationale.
 func doSendApprovedReply(ctx context.Context, draft *SupportDraft, body string) error {
 	// Decorate the AI-drafted body with a small CTA footer that gives
 	// users a clear path to either continue the conversation or signal

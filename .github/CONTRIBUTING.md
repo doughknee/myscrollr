@@ -5,7 +5,7 @@ outside hands.
 
 This document covers what to expect when you open an issue or send a
 pull request. If you just want to run the project locally, the [root
-`README.md`](./README.md) has the fastest path.
+`README.md`](../README.md) has the fastest path.
 
 ## Before you start
 
@@ -30,7 +30,15 @@ pull request. If you just want to run the project locally, the [root
 | `myscrollr.com/` | Marketing site, legal hub, billing portal (React + Vite + TanStack Router). |
 | `desktop/` | Tauri v2 desktop app — the primary product. React frontend in `desktop/src/`, Rust backend in `desktop/src-tauri/`. |
 | `k8s/` | Kubernetes manifests, applied to DOKS by `.github/workflows/deploy.yml`. |
-| `scripts/` | Dev + ops shell tooling: local-stack helpers, Kalshi key pull, smoke tests. |
+| `scripts/` | Dev + ops tooling: local-stack helpers, Kalshi key pull, smoke tests, osTicket bug triage, and the osTicket plugin source deployed to the support box. |
+| `docs/` | Everything else — see [`docs/README.md`](../docs/README.md) for the index and which docs are authoritative. |
+
+**Why `channels/` still says "channel."** Those folders hold *backend
+services*, not widgets — one ingester feeds many widgets (`channels/sports/`
+serves 14 of them, `channels/rss/` serves 11). Renaming it `widgets/` would
+claim a one-to-one mapping that does not exist, which is exactly the confusion
+the unification removed. "Channel" naming a discovered backend service is a
+deliberate carve-out; see [VISION §4.4](../docs/VISION.md#44-one-vocabulary-widget-everywhere-rename-outright--pre-users).
 
 `AGENTS.md` at the root has the full commands cheatsheet (build, test,
 ports).
@@ -154,7 +162,7 @@ iterate. Once approved:
 
 ## Running the project locally
 
-See the [root `README.md`](./README.md) for the quick path. Full
+See the [root `README.md`](../README.md) for the quick path. Full
 per-service commands are in `AGENTS.md`. In short:
 
 ```sh
@@ -166,7 +174,7 @@ cargo test                                      # from each Rust service
 
 You'll need Logto, Stripe, and Yahoo developer accounts to exercise
 the full stack. For purely backend work, `make up` at the root brings up
-Postgres, Redis, core and the ingesters. See LOCAL_SETUP.md.
+Postgres, Redis, core and the ingesters. See [`docs/LOCAL_SETUP.md`](../docs/LOCAL_SETUP.md).
 
 ## Getting help
 

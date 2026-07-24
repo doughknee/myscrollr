@@ -258,7 +258,7 @@ so each writer carries its own guard:
 
 ## Docker & Deployment
 
-Local dev is driven by the root `Makefile`: `docker-compose.local.yml` runs infra only (Postgres + Redis) for native backend work; `docker-compose.dev.yml` includes it and adds the full containerized backend (see `LOCAL_SETUP.md`). The per-channel `docker-compose.yml` files are legacy standalone artifacts not wired to the Makefile. Production uses standalone Dockerfiles built and pushed to DigitalOcean Container Registry (`registry.digitalocean.com/scrollr/*`) by `.github/workflows/deploy.yml`, then rolled out to a DigitalOcean Kubernetes cluster (`scrollr-cluster`) via `kubectl apply -f k8s/`. Secrets live in the `scrollr-secrets` Kubernetes Secret (template in `k8s/secrets.yaml.template`). ConfigMaps in `k8s/configmap-*.yaml` hold non-sensitive runtime config. Ingress + TLS via nginx-ingress + cert-manager.
+Local dev is driven by the root `Makefile`: `docker-compose.local.yml` runs infra only (Postgres + Redis) for native backend work; `docker-compose.dev.yml` includes it and adds the full containerized backend (see `docs/LOCAL_SETUP.md`). The per-channel `docker-compose.yml` files are legacy standalone artifacts not wired to the Makefile. Production uses standalone Dockerfiles built and pushed to DigitalOcean Container Registry (`registry.digitalocean.com/scrollr/*`) by `.github/workflows/deploy.yml`, then rolled out to a DigitalOcean Kubernetes cluster (`scrollr-cluster`) via `kubectl apply -f k8s/`. Secrets live in the `scrollr-secrets` Kubernetes Secret (template in `k8s/secrets.yaml.template`). ConfigMaps in `k8s/configmap-*.yaml` hold non-sensitive runtime config. Ingress + TLS via nginx-ingress + cert-manager.
 
 ## Git Workflow
 

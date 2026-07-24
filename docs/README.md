@@ -20,8 +20,8 @@ made it wrong. That is how this list stays true.
 |---|---|
 | [`README.md`](../README.md) | What Scrollr is, how the pieces fit, quick start. |
 | [`AGENTS.md`](../AGENTS.md) | The one-page cheatsheet — commands, ports, conventions, per-language style. **Authoritative for how to work in this repo.** |
-| [`LOCAL_SETUP.md`](../LOCAL_SETUP.md) | Local full-stack topology: what runs where, on which port, with which env. **Source of truth for local dev** — the README quick start is the short version. |
-| [`CONTRIBUTING.md`](../CONTRIBUTING.md) | Repo layout, what gets merged, how to send a PR. |
+| [`LOCAL_SETUP.md`](./LOCAL_SETUP.md) | Local full-stack topology: what runs where, on which port, with which env. **Source of truth for local dev** — the README quick start is the short version. |
+| [`CONTRIBUTING.md`](../.github/CONTRIBUTING.md) | Repo layout, what gets merged, how to send a PR. |
 
 ## Architecture
 
@@ -65,14 +65,18 @@ made it wrong. That is how this list stays true.
 | Doc | What it's for |
 |---|---|
 | [`scripts/bug-tools/README.md`](../scripts/bug-tools/README.md) | osTicket bug triage helpers. |
-| [`osticket-plugins/scrollr-reply-api/README.md`](../osticket-plugins/scrollr-reply-api/README.md) | The osTicket reply-API plugin. |
+| [`scripts/osticket-plugin/README.md`](../scripts/osticket-plugin/README.md) | The osTicket reply-API plugin — source for what runs on support.myscrollr.com. Installed by hand, not by CI. |
 
 ## Policy
 
+Community-health files live in `.github/`, which GitHub treats identically to
+the repo root — the sidebar links, Community Standards checklist, and the
+contributing prompt on PR creation all still work.
+
 | Doc | What it's for |
 |---|---|
-| [`SECURITY.md`](../SECURITY.md) | Vulnerability reporting. |
-| [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md) | Community rules. |
+| [`SECURITY.md`](../.github/SECURITY.md) | Vulnerability reporting. |
+| [`CODE_OF_CONDUCT.md`](../.github/CODE_OF_CONDUCT.md) | Community rules. |
 
 ---
 

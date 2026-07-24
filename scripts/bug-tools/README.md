@@ -201,11 +201,11 @@ symlinks at `~/.local/bin/bugs` + `~/.local/bin/bug` automatically
 pick up the latest versions (no reinstall needed).
 
 The plugin endpoints they hit (`api.list.php` etc.) are deployed to
-osTicket separately — see `osticket-plugins/scrollr-reply-api/README.md`
+osTicket separately — see `scripts/osticket-plugin/README.md`
 for the plugin install instructions.
 
 ## Related
 
-- **osTicket plugin source**: `osticket-plugins/scrollr-reply-api/`
+- **osTicket plugin source**: `scripts/osticket-plugin/`
 - **GitHub Action for auto-close**: `.github/workflows/auto-close-osticket.yml`
 - **Existing reply API endpoint** (POST replies via core-api): see plugin's `api.reply.php`

@@ -10,7 +10,7 @@
 #
 # The desktop app + website stay NATIVE on purpose — a GUI window can't run
 # inside a Linux container, and both hot-reload better on the host. The
-# backend runs in Docker so start/stop is one clean command. See LOCAL_SETUP.md.
+# backend runs in Docker so start/stop is one clean command. See docs/LOCAL_SETUP.md.
 
 COMPOSE      := docker compose -f docker-compose.dev.yml
 COMPOSE_PRED := docker compose -f docker-compose.dev.yml --profile predictions
