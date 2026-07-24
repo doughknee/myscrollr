@@ -263,7 +263,7 @@ interface PlayerLookup {
  *  Returns the league context AND the owning fantasy-team name so
  *  callers can surface "this player is on Big Thumps in Stanton
  *  League" in chip comfort mode. */
-export function findPlayerByKey(
+function findPlayerByKey(
   playerKey: string,
   leagues: LeagueResponse[],
   preferLeagueKey?: string,

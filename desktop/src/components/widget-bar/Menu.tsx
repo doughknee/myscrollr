@@ -222,7 +222,7 @@ export function FilterMenuShell({
 
 /** Rounded trigger pill shared by SelectMenu/MultiSelectMenu: accent when
  *  open (or `active`), truncated content, rotating chevron. */
-export function MenuTrigger({
+function MenuTrigger({
   open,
   active,
   onClick,
