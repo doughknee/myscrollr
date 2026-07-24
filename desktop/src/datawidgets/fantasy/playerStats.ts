@@ -113,7 +113,7 @@ export function findInjuredPlayers(players: RosterPlayer[]): RosterPlayer[] {
  * slots ("BN"), not injured-reserve / not-active slots. Use this when
  * the question is "could the user have started this player?"
  */
-export function isStrictBench(pos: string): boolean {
+function isStrictBench(pos: string): boolean {
   return pos.toUpperCase() === "BN";
 }
 

@@ -100,6 +100,55 @@ export function MenuRow({
   );
 }
 
+/** Trigger-pill popover shell shared by SelectMenu and MultiSelectMenu:
+ *  open state, outside/Esc dismiss, entrance, panel alignment. `children`
+ *  is a render prop so a single-select menu can close on pick.
+ *
+ *  rounded-full on the WRAPPER matters: the app's global focus rule draws
+ *  its ring with `border-radius: inherit` (from the parent). */
+export function MenuPopover({
+  ariaLabel,
+  active,
+  align = "right",
+  trigger,
+  children,
+}: {
+  ariaLabel: string;
+  /** Accent the pill beyond the open state (e.g. a non-empty selection). */
+  active?: boolean;
+  /** Which trigger edge the panel hangs from — use "left" for triggers in
+   *  the bar's left cluster so the panel opens into the page. */
+  align?: "left" | "right";
+  /** Contents of the trigger pill (label, icon, prefix). */
+  trigger: React.ReactNode;
+  children: (close: () => void) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(rootRef, open, close);
+
+  return (
+    <div ref={rootRef} className="relative shrink-0 rounded-full">
+      <MenuTrigger
+        open={open}
+        active={active}
+        onClick={() => setOpen((o) => !o)}
+        ariaLabel={ariaLabel}
+      >
+        {trigger}
+      </MenuTrigger>
+      <AnimatePresence>
+        {open && (
+          <MenuPanel className={align === "left" ? "left-0 w-56" : "right-0 w-56"}>
+            {children(close)}
+          </MenuPanel>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 /** Narrow-width collapse trigger: one Filter button with an active-count
  *  badge. The host owns the open state + panel; its root should NOT be
  *  position:relative — the panel then anchors to the sticky bar (the
@@ -173,7 +222,7 @@ export function FilterMenuShell({
 
 /** Rounded trigger pill shared by SelectMenu/MultiSelectMenu: accent when
  *  open (or `active`), truncated content, rotating chevron. */
-export function MenuTrigger({
+function MenuTrigger({
   open,
   active,
   onClick,

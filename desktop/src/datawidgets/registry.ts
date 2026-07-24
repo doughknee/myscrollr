@@ -5,24 +5,34 @@
  * directory. Each module exports a named `{id}DataWidget` manifest
  * conforming to DataWidgetManifest.
  */
-import { createRegistry } from "../lib/createRegistry";
 import type { DataWidgetManifest } from "../types";
 
 const modules = import.meta.glob<Record<string, DataWidgetManifest>>("./*/FeedTab.tsx", {
   eager: true,
 });
 
-const { get, getAll, ORDER } = createRegistry<DataWidgetManifest>(
-  modules,
-  "DataWidget",
-  ["finance", "sports", "fantasy", "rss", "predictions"],
-);
+/** Canonical display order. Anything not listed sorts by id after these. */
+const ORDER = ["finance", "sports", "fantasy", "rss", "predictions"];
+
+const registry = new Map<string, DataWidgetManifest>();
+for (const mod of Object.values(modules)) {
+  for (const [name, value] of Object.entries(mod)) {
+    if (name.endsWith("DataWidget") && value && "id" in value && "FeedTab" in value) {
+      registry.set(value.id, value);
+    }
+  }
+}
 
 /** Look up a data widget by id. */
-export const getDataWidget = get;
+export function getDataWidget(id: string): DataWidgetManifest | undefined {
+  return registry.get(id);
+}
 
 /** Get all registered data widgets in canonical order. */
-export const getAllDataWidgets = getAll;
-
-/** Canonical display order for data-widget tabs. */
-export const DATA_WIDGET_ORDER = ORDER;
+export function getAllDataWidgets(): DataWidgetManifest[] {
+  const known = ORDER.filter((id) => registry.has(id)).map((id) => registry.get(id)!);
+  const rest = [...registry.values()]
+    .filter((m) => !ORDER.includes(m.id))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  return [...known, ...rest];
+}

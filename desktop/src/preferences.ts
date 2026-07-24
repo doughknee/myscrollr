@@ -327,12 +327,26 @@ export function shouldShowOnFeed(venue: Venue): boolean {
  *   other → "both"   (unknown / new setting → default visible)
  */
 export function migrateVenue(raw: unknown): Venue {
-  if (raw === "off" || raw === "feed" || raw === "both" || raw === "ticker") {
-    return raw;
-  }
   if (raw === true) return "both";
   if (raw === false) return "off";
-  return "both";
+  return oneOf(raw, ["off", "feed", "both", "ticker"], "both");
+}
+
+/**
+ * Coerce a persisted value to one of `allowed`, falling back when the prefs
+ * file holds something stale, hand-edited, or from a future version.
+ *
+ * Every `migrate*Display` field below routes through this rather than an
+ * inline `raw.x === "a" || raw.x === "b" ? …` chain — those were written
+ * four different ways across the four migrations, and one of them (finance's
+ * `defaultSort`) was a bare cast that validated nothing.
+ */
+function oneOf<T extends string>(
+  raw: unknown,
+  allowed: readonly T[],
+  fallback: T,
+): T {
+  return allowed.includes(raw as T) ? (raw as T) : fallback;
 }
 
 export interface FinanceDisplayPrefs {
@@ -993,18 +1007,18 @@ export function migrateFinanceDisplay(
   saved: Partial<FinanceDisplayPrefs> | undefined,
 ): FinanceDisplayPrefs {
   const raw = (saved ?? {}) as Record<string, unknown>;
-  const dirMarker =
-    raw.tickerDirectionMarker === "arrow" ||
-    raw.tickerDirectionMarker === "sign" ||
-    raw.tickerDirectionMarker === "none"
-      ? raw.tickerDirectionMarker
-      : DEFAULT_WIDGET_DISPLAY.finance.tickerDirectionMarker;
   return {
     ...DEFAULT_WIDGET_DISPLAY.finance,
-    defaultSort:
-      (raw.defaultSort as FinanceDisplayPrefs["defaultSort"] | undefined) ??
+    defaultSort: oneOf(
+      raw.defaultSort,
+      ["alpha", "price", "change", "updated"],
       DEFAULT_WIDGET_DISPLAY.finance.defaultSort,
-    tickerDirectionMarker: dirMarker,
+    ),
+    tickerDirectionMarker: oneOf(
+      raw.tickerDirectionMarker,
+      ["arrow", "sign", "none"],
+      DEFAULT_WIDGET_DISPLAY.finance.tickerDirectionMarker,
+    ),
   };
 }
 
@@ -1012,18 +1026,15 @@ export function migratePredictionsDisplay(
   saved: Partial<PredictionsDisplayPrefs> | undefined,
 ): PredictionsDisplayPrefs {
   const raw = (saved ?? {}) as Record<string, unknown>;
-  const defaultSort =
-    raw.defaultSort === "trending" ||
-    raw.defaultSort === "movers" ||
-    raw.defaultSort === "closing" ||
-    raw.defaultSort === "alpha"
-      ? raw.defaultSort
-      : raw.defaultSort === "volume"
-        ? ("trending" as const) // v1.1.5: all-time volume sort became Trending (24h)
-        : DEFAULT_WIDGET_DISPLAY.predictions.defaultSort;
+  // v1.1.5: the all-time volume sort became Trending (24h).
+  const stored = raw.defaultSort === "volume" ? "trending" : raw.defaultSort;
   return {
     ...DEFAULT_WIDGET_DISPLAY.predictions,
-    defaultSort,
+    defaultSort: oneOf(
+      stored,
+      ["trending", "movers", "closing", "alpha"],
+      DEFAULT_WIDGET_DISPLAY.predictions.defaultSort,
+    ),
   };
 }
 
@@ -1034,12 +1045,11 @@ export function migrateRssDisplay(
   return {
     ...DEFAULT_WIDGET_DISPLAY.rss,
     // Sticky feed sort (2026-07-17 unification).
-    feedSort:
-      raw.feedSort === "newest" ||
-      raw.feedSort === "oldest" ||
-      raw.feedSort === "by-source"
-        ? raw.feedSort
-        : DEFAULT_WIDGET_DISPLAY.rss.feedSort,
+    feedSort: oneOf(
+      raw.feedSort,
+      ["newest", "oldest", "by-source"],
+      DEFAULT_WIDGET_DISPLAY.rss.feedSort,
+    ),
     // One-shot migration (v1.1.1): 4 was the pre-widget-era DEFAULT and
     // never appeared in the picker (1/3/5/10), so a stored 4 is an
     // untouched default, not a user's choice — map it to 0 (all).
@@ -1122,12 +1132,16 @@ export function migrateFantasyDisplay(
       typeof raw.showMatchups === "boolean"
         ? raw.showMatchups
         : DEFAULT_WIDGET_DISPLAY.fantasy.showMatchups,
-    defaultSort:
-      (raw.defaultSort as FantasyDisplayPrefs["defaultSort"] | undefined) ??
+    defaultSort: oneOf(
+      raw.defaultSort,
+      ["name", "season", "record", "matchup"],
       DEFAULT_WIDGET_DISPLAY.fantasy.defaultSort,
-    defaultSubTab:
-      (raw.defaultSubTab as FantasyDisplayPrefs["defaultSubTab"] | undefined) ??
+    ),
+    defaultSubTab: oneOf(
+      raw.defaultSubTab,
+      ["overview", "matchup", "standings", "roster"],
       DEFAULT_WIDGET_DISPLAY.fantasy.defaultSubTab,
+    ),
     primaryLeagueKey:
       typeof raw.primaryLeagueKey === "string" || raw.primaryLeagueKey === null
         ? (raw.primaryLeagueKey as string | null)

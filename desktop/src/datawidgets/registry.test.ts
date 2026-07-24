@@ -3,8 +3,8 @@ import { describe, it, expect } from "vitest";
 import { getDataWidget, getAllDataWidgets } from "./registry";
 import { getCatalogItems } from "../marketplace";
 
-// Regression guard for REL-50: the registry matches manifest exports by name
-// suffix (createRegistry(..., "DataWidget", ...)). If the suffix and the
+// Regression guard for REL-50: the registry matches manifest exports by the
+// name suffix "DataWidget". If the suffix and the
 // `*DataWidget` export names ever drift apart again, NO data-widget source
 // registers, and every data catalog item is silently dropped — the Catalog
 // page collapses to Utilities only. tsc can't see this (runtime glob match),

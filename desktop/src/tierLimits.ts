@@ -23,67 +23,48 @@ import type { SubscriptionTier } from "./auth";
 //
 // WIDGET/SLOT REDESIGN (2026-06-30): `maxWidgets` is the ONLY monetization
 // lever — how many widgets a tier runs at once. The per-feature depth caps
-// (symbols/feeds/customFeeds/leagues/fantasy) were RETIRED on 2026-07-02:
-// every tier now has unlimited depth inside a widget ("track a hundred stocks
-// in one Stocks widget"), so they're all Infinity. The fields remain only for
-// wire/type compatibility. Provider-quota protection moves to rate limiting,
-// not per-user caps. `maxTickerRows`/`maxTickerCustomization` are free in the
-// product model; kept only so existing consumers compile until the ticker UI
-// is reworked.
+// (symbols/feeds/custom_feeds/leagues/fantasy) were RETIRED on 2026-07-02:
+// every tier has unlimited depth inside a widget ("track a hundred stocks in
+// one Stocks widget"), and the desktop mirror stopped carrying them entirely
+// (REL-60) — the backend still sends the keys as `null`, which the drift test
+// asserts. Provider-quota protection moves to rate limiting, not per-user
+// caps. `maxTickerRows`/`maxTickerCustomization` are free in the product
+// model; kept only so existing consumers compile until the ticker UI is
+// reworked.
 // =====================================================================
 
 interface DataWidgetLimits {
   /** Max widgets a tier can run at once — the slot model. Infinity = unlimited. */
   maxWidgets: number;
-  symbols: number;
-  feeds: number;
-  customFeeds: number;
-  leagues: number;
-  fantasy: number;
   /** Max simultaneous ticker rows this tier can configure (1..3). */
   maxTickerRows: number;
   /** Can configure per-row scroll mode/direction/speed/mix overrides. */
   maxTickerCustomization: boolean;
 }
 
-// Per-feature depth caps are all Infinity (retired) — `maxWidgets` is the only
-// gating lever. Only maxWidgets + the ticker-row fields still vary by tier.
-const UNLIMITED_DEPTH = {
-  symbols: Infinity,
-  feeds: Infinity,
-  customFeeds: Infinity,
-  leagues: Infinity,
-  fantasy: Infinity,
-} as const;
-
 export const TIER_LIMITS: Record<SubscriptionTier, DataWidgetLimits> = {
   free: {
     maxWidgets: 3,
-    ...UNLIMITED_DEPTH,
     maxTickerRows: 1,
     maxTickerCustomization: false,
   },
   uplink: {
     maxWidgets: 6,
-    ...UNLIMITED_DEPTH,
     maxTickerRows: 2,
     maxTickerCustomization: false,
   },
   uplink_pro: {
     maxWidgets: 12,
-    ...UNLIMITED_DEPTH,
     maxTickerRows: 3,
     maxTickerCustomization: false,
   },
   uplink_ultimate: {
     maxWidgets: Infinity,
-    ...UNLIMITED_DEPTH,
     maxTickerRows: 3,
     maxTickerCustomization: true,
   },
   super_user: {
     maxWidgets: Infinity,
-    ...UNLIMITED_DEPTH,
     maxTickerRows: 3,
     maxTickerCustomization: true,
   },

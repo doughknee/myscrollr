@@ -17,7 +17,6 @@ export const queryKeys = {
   dashboard: ["dashboard"] as const,
   weather: ["weather"] as const,
   catalogs: {
-    sports: ["catalogs", "sports"] as const,
     finance: ["catalogs", "finance"] as const,
     rss: ["catalogs", "rss"] as const,
     rssAll: ["catalogs", "rss", "all"] as const,
@@ -103,24 +102,6 @@ export function dashboardQueryOptions() {
 
 // ── Catalog Queries ──────────────────────────────────────────────
 
-export interface TrackedLeague {
-  name: string;
-  sport_api: string;
-  category: string;
-  country: string;
-  logo_url: string;
-  game_count: number;
-  live_count: number;
-  next_game: string | null;
-  is_offseason: boolean;
-  /** ISO timestamp of the most recent poll attempt (success or failure). */
-  last_polled_at?: string | null;
-  /** ISO timestamp of the most recent successful poll. */
-  last_poll_success_at?: string | null;
-  /** True if last_poll_success_at is recent OR the league is off-season. */
-  polling_healthy: boolean;
-}
-
 /**
  * Per-league meta attached to the dashboard + public sports responses.
  * Lets the empty-state component explain WHY a league has no games.
@@ -197,14 +178,6 @@ export function standingsOptions(league: string) {
     queryFn: () => authFetch<{ standings: Standing[] }>(`/sports/standings?league=${encodeURIComponent(league)}`),
     staleTime: 60 * 60 * 1000, // 1 hour
     enabled: !!league,
-  });
-}
-
-export function sportsCatalogOptions() {
-  return queryOptions({
-    queryKey: queryKeys.catalogs.sports,
-    queryFn: () => request<TrackedLeague[]>("/sports/leagues"),
-    staleTime: 5 * 60 * 1000, // 5 min — catalogs change infrequently
   });
 }
 

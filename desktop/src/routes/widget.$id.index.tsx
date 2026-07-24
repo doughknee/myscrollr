@@ -17,7 +17,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import RouteError from "../components/RouteError";
-import SourcePageLayout, { SourceNotFound } from "../components/SourcePageLayout";
+import PageLayout from "../components/layout/PageLayout";
 import { widgetManifest, isUtilityWidget } from "../marketplace";
 import { useCatalog } from "../hooks/useCatalog";
 import { dashboardQueryOptions } from "../api/queries";
@@ -50,15 +50,36 @@ function WidgetRoute() {
     | undefined;
 
   if (!manifest) {
-    return <SourceNotFound name={id} />;
+    return (
+      <PageLayout title="Widget not found" width="narrow">
+        <div className="flex flex-col items-center justify-center text-center max-w-sm mx-auto gap-3 py-12">
+          <p className="text-sm text-fg-3">
+            The widget &ldquo;{id}&rdquo; is not installed.
+          </p>
+        </div>
+      </PageLayout>
+    );
   }
 
   return (
-    <SourcePageLayout name={manifest.name} onBack={() => navigate({ to: "/feed" })}>
+    <PageLayout
+      title={manifest.name}
+      parentLabel="Home"
+      onParentClick={() => navigate({ to: "/feed" })}
+      // The feed is data-dense (grids of trade cards, score cards, RSS
+      // articles): full width, flush to the content area — the feed's own
+      // components own their padding.
+      width="wide"
+      noContentPadding
+      // Source→source swaps overlap-crossfade so the (identical) WidgetBar
+      // shell reads as stationary chrome; only the bar's contents and the
+      // feed animate.
+      stableChrome
+    >
       <div className="h-full">
         <WidgetFeed id={id} manifest={manifest} />
       </div>
-    </SourcePageLayout>
+    </PageLayout>
   );
 }
 

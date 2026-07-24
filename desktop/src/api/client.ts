@@ -87,7 +87,7 @@ export async function request<T>(
 ): Promise<T> {
   const response = await fetchWithTimeout(`${API_BASE}${path}`, {
     ...options,
-    headers: { ...options.headers },
+    headers: options.headers,
   });
 
   return handleResponse<T>(response);

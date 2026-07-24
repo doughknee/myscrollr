@@ -200,7 +200,7 @@ async function refreshTokenRequest(
 
 // ── JWT decode ───────────────────────────────────────────────────
 
-export function decodeJwtPayload(jwt: string): Record<string, unknown> | null {
+function decodeJwtPayload(jwt: string): Record<string, unknown> | null {
   try {
     const part = jwt.split(".")[1];
     // base64url → base64: swap URL-safe chars and restore padding

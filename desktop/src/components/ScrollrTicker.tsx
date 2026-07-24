@@ -19,12 +19,8 @@ import ConsolidatedChip from "./chips/ConsolidatedChip";
 import { getWatchlist, onWatchlistChange } from "../datawidgets/predictions/watchlist";
 import { sourceForWidget } from "../marketplace";
 import { useCatalog } from "../hooks/useCatalog";
-import { getTickerSource } from "../datawidgets/tickerRegistry";
-
-// ── Module-level constants ───────────────────────────────────────
-
-const WIDGET_TYPES = ["clock", "timer", "weather", "sysmon", "uptime", "github"] as const;
-type WidgetType = (typeof WIDGET_TYPES)[number];
+import { TICKER_SOURCES } from "../datawidgets/tickerRegistry";
+import { WIDGET_ORDER } from "../widgets/registry";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -237,8 +233,10 @@ export default function ScrollrTicker({
       const isPinnedAnywhere = !!pinnedWidgets[tab];
 
       // ── Widget tabs: consolidated chips (skip if pinned) ────────
-      if (WIDGET_TYPES.includes(tab as WidgetType)) {
-        const wt = tab as WidgetType;
+      // Membership comes from the widget registry, not a second list
+      // maintained by hand here.
+      if (WIDGET_ORDER.includes(tab)) {
+        const wt = tab as keyof WidgetTickerData;
         const items = widgetData?.[wt];
         if (items?.length && !isPinnedAnywhere) {
           bucket.push(
@@ -271,7 +269,7 @@ export default function ScrollrTicker({
       const effectiveSource = source ?? tab;
       const rawData = dashboard?.data?.[effectiveSource];
 
-      const tickerSource = getTickerSource(effectiveSource);
+      const tickerSource = TICKER_SOURCES[effectiveSource];
       if (!tickerSource) continue;
 
       for (const chip of tickerSource.chips(rawData, {
@@ -421,8 +419,8 @@ export default function ScrollrTicker({
     if (!activeTabs.includes(widgetId)) continue;
     const target = pin.side === "left" ? pinnedLeft : pinnedRight;
 
-    if (WIDGET_TYPES.includes(widgetId as WidgetType)) {
-      const wt = widgetId as WidgetType;
+    if (WIDGET_ORDER.includes(widgetId)) {
+      const wt = widgetId as keyof WidgetTickerData;
       const items = widgetData?.[wt];
       if (items?.length) {
         target.push(

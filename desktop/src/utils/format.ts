@@ -188,10 +188,7 @@ export function formatPollInterval(secs: number): string {
   return `${secs}s`;
 }
 
-/**
- * Convert Celsius to Fahrenheit.
- */
-export function toFahrenheit(celsius: number): number {
+function toFahrenheit(celsius: number): number {
   return (celsius * 9) / 5 + 32;
 }
 

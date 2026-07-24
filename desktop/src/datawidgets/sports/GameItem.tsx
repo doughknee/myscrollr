@@ -8,7 +8,7 @@
 import { memo } from "react";
 import { clsx } from "clsx";
 import { Star } from "lucide-react";
-import { isLive, isFinal, getWinner, gameStatusLabel, displayTeamCode } from "../../utils/gameHelpers";
+import { isLive, isFinal, getWinner, gameStatusLabel, displayTeamCode, sameGame } from "../../utils/gameHelpers";
 import { FEED_CARD, FEED_CARD_INTERACTIVE, FEED_CARD_STATIC } from "../../components/feedCard";
 import TeamLogo from "../../components/TeamLogo";
 import { useScoreFlash } from "../../hooks/useScoreFlash";
@@ -230,19 +230,5 @@ export const GameItem = memo(function GameItem({
 }, (prev, next) =>
   prev.mode === next.mode &&
   prev.isFavorite === next.isFavorite &&
-  prev.game.id === next.game.id &&
-  prev.game.link === next.game.link &&
-  prev.game.away_team_name === next.game.away_team_name &&
-  prev.game.away_team_logo === next.game.away_team_logo &&
-  prev.game.away_team_score === next.game.away_team_score &&
-  prev.game.home_team_name === next.game.home_team_name &&
-  prev.game.home_team_logo === next.game.home_team_logo &&
-  prev.game.home_team_score === next.game.home_team_score &&
-  prev.game.home_team_code === next.game.home_team_code &&
-  prev.game.away_team_code === next.game.away_team_code &&
-  prev.game.state === next.game.state &&
-  prev.game.timer === next.game.timer &&
-  prev.game.status_long === next.game.status_long &&
-  prev.game.status_short === next.game.status_short &&
-  prev.game.short_detail === next.game.short_detail
+  sameGame(prev.game, next.game)
 );

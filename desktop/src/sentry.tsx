@@ -72,3 +72,17 @@ export function initSentry(window: "ticker" | "app") {
     },
   });
 }
+
+/**
+ * Error-boundary fallback for both window entry points. Deliberately
+ * inline-styled: the boundary catches render crashes that may predate
+ * (or be caused by) the stylesheet, so it can't rely on app CSS.
+ */
+export const SentryFallback = (
+  <div style={{ padding: 24, fontFamily: "system-ui" }}>
+    <h1 style={{ fontSize: 20, fontWeight: 600 }}>Something went wrong</h1>
+    <p style={{ marginTop: 8, opacity: 0.7 }}>
+      Reload to recover. The team has been notified.
+    </p>
+  </div>
+);

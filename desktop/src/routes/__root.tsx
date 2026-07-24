@@ -12,7 +12,7 @@ import {
   useLocation,
   useNavigate,
 } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
@@ -59,6 +59,7 @@ import {
   loadPref,
   loadPrefs,
   savePrefs,
+  toggleWidgetOnTicker,
   consumeTickerLayoutChanged,
   resolveThemeMode,
 } from "../preferences";
@@ -77,8 +78,6 @@ import type { DataWidgetRow, SubscriptionInfo } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
 import { useCatalog } from "../hooks/useCatalog";
 import { useAuthState } from "../hooks/useAuthState";
-import { useDataWidgetActions } from "../hooks/useDataWidgetActions";
-import { useWidgetActions } from "../hooks/useWidgetActions";
 import { useRemoveWidget } from "../hooks/useRemoveWidget";
 import { useDashboardCDC } from "../hooks/useDashboardCDC";
 import { useTauriListener } from "../hooks/useTauriListener";
@@ -86,7 +85,9 @@ import { useDeliveryHealth } from "../hooks/useDeliveryHealth";
 import { useNavHistory } from "../hooks/useNavHistory";
 import { useStartupUpdateCheck } from "../hooks/useStartupUpdateCheck";
 import { weatherQueryOptions } from "../api/queries";
-import { fetchSubscription } from "../api/client";
+import { fetchSubscription, toggleDataWidgetVisibility } from "../api/client";
+import type { WidgetId } from "../api/client";
+import { queryKeys } from "../api/queries";
 import { getValidToken } from "../auth";
 
 // CDC
@@ -436,10 +437,7 @@ function RootLayout() {
     }
   });
 
-  // ── Extracted hooks ─────────────────────────────────────────
-
-  const dataWidgetActions = useDataWidgetActions();
-  const widgetActions = useWidgetActions(prefs, setPrefs);
+  const queryClient = useQueryClient();
 
   // Shell-level weather polling — keeps data fresh regardless of which page is visible.
   // Permanent observer so refetchInterval runs even when WeatherFeedTab is unmounted.
@@ -568,17 +566,23 @@ function RootLayout() {
   );
 
   const handleToggleItemTicker = useCallback(
-    (source: { id: string; kind: "data" | "utility"; onTicker: boolean }) => {
-      if (source.kind === "data") {
-        dataWidgetActions.handleToggleDataWidget(
-          source.id,
-          !source.onTicker,
+    async (source: { id: string; kind: "data" | "utility"; onTicker: boolean }) => {
+      if (source.kind !== "data") {
+        persistPrefs(toggleWidgetOnTicker(prefs, source.id));
+        return;
+      }
+      const visible = !source.onTicker;
+      try {
+        await toggleDataWidgetVisibility(source.id as WidgetId, visible, true);
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+      } catch (err) {
+        console.error("[Scrollr] Widget toggle failed:", err);
+        toast.error(
+          `Couldn't ${visible ? "show" : "hide"} ${catalogItemById(source.id)?.name ?? source.id}`,
         );
-      } else {
-        widgetActions.handleToggleWidgetTicker(source.id);
       }
     },
-    [dataWidgetActions.handleToggleDataWidget, widgetActions.handleToggleWidgetTicker],
+    [prefs, persistPrefs, queryClient],
   );
 
   const handleRemoveItem = useCallback(

@@ -1157,62 +1157,6 @@ body {
   background: var(--color-base-350);
 }
 
-/* ── Unlimited tier glow animations ─────────────────────────────── */
-/* Copied from myscrollr.com/src/styles.css — used by the widget page
-   header and InfoCard for uplink_ultimate users. */
-
-@keyframes unlimited-glow-pulse {
-  0%,
-  100% {
-    box-shadow:
-      0 0 8px rgba(52, 211, 153, 0.12),
-      0 0 24px rgba(52, 211, 153, 0.04),
-      inset 0 0 8px rgba(52, 211, 153, 0.02);
-  }
-  50% {
-    box-shadow:
-      0 0 14px rgba(52, 211, 153, 0.25),
-      0 0 40px rgba(52, 211, 153, 0.08),
-      inset 0 0 14px rgba(52, 211, 153, 0.04);
-  }
-}
-
-@keyframes unlimited-text-glow {
-  0%,
-  100% {
-    text-shadow: 0 0 6px rgba(52, 211, 153, 0.2);
-  }
-  50% {
-    text-shadow: 0 0 14px rgba(52, 211, 153, 0.45);
-  }
-}
-
-@keyframes unlimited-dot-glow {
-  0%,
-  100% {
-    box-shadow:
-      0 0 4px rgba(52, 211, 153, 0.3),
-      0 0 10px rgba(52, 211, 153, 0.1);
-  }
-  50% {
-    box-shadow:
-      0 0 7px rgba(52, 211, 153, 0.55),
-      0 0 16px rgba(52, 211, 153, 0.2);
-  }
-}
-
-.unlimited-glow {
-  animation: unlimited-glow-pulse 3s ease-in-out infinite;
-}
-
-.unlimited-text-glow {
-  animation: unlimited-text-glow 3s ease-in-out infinite;
-}
-
-.unlimited-dot-glow {
-  animation: unlimited-dot-glow 2s ease-in-out infinite;
-}
-
 /* Rounded corners for custom-chrome windows (Linux/Windows).
    macOS uses native decorations which handle rounding themselves. */
 #app-shell.custom-chrome {

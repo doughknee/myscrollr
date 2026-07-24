@@ -649,44 +649,41 @@ export default function App() {
         disabled: boolean,
         onAddNewRow?: () => void,
       ): Promise<(CheckMenuItem | MenuItem | PredefinedMenuItem)[]> {
-        const rowItems: (CheckMenuItem | MenuItem | PredefinedMenuItem)[] = [];
-        rowItems.push(
-          await CheckMenuItem.new({
+        // Single-row layouts read as a plain [Off, On] toggle; multi-row
+        // layouts list every row the user actually has.
+        const rows =
+          pickerRows === 1
+            ? [{ text: "On", row: 0 }]
+            : Array.from({ length: pickerRows }, (_, i) => ({
+                text: `Row ${i + 1}`,
+                row: i,
+              }));
+
+        const rowItems = await Promise.all([
+          CheckMenuItem.new({
             text: "Off",
             checked: currentRow === null,
             enabled: !disabled,
             action: () => onPick(null),
           }),
-        );
-        if (pickerRows === 1) {
-          rowItems.push(
-            await CheckMenuItem.new({
-              text: "On",
-              checked: currentRow === 0,
+          ...rows.map((r) =>
+            CheckMenuItem.new({
+              text: r.text,
+              checked: currentRow === r.row,
               enabled: !disabled,
-              action: () => onPick(0),
+              action: () => onPick(r.row),
             }),
-          );
-        } else {
-          for (let i = 0; i < pickerRows; i++) {
-            rowItems.push(
-              await CheckMenuItem.new({
-                text: `Row ${i + 1}`,
-                checked: currentRow === i,
-                enabled: !disabled,
-                action: () => onPick(i),
-              }),
-            );
-          }
-        }
+          ),
+        ]);
+
         if (canAddRowFromTray && onAddNewRow && !disabled) {
-          rowItems.push(await PredefinedMenuItem.new({ item: "Separator" }));
-          rowItems.push(
-            await MenuItem.new({
-              text: "Add row & assign",
-              action: onAddNewRow,
-            }),
-          );
+          return [
+            ...rowItems,
+            ...(await Promise.all([
+              PredefinedMenuItem.new({ item: "Separator" }),
+              MenuItem.new({ text: "Add row & assign", action: onAddNewRow }),
+            ])),
+          ];
         }
         return rowItems;
       }
