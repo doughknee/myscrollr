@@ -7,6 +7,10 @@ on:
       - "api/**"
       - "channels/**/*.go"
       - "channels/**/*.rs"
+      # The desktop app's native half (REL-62). It is Rust, so its gate
+      # lives here with every other cargo job rather than in the npm-only
+      # frontend workflow.
+      - "desktop/src-tauri/**"
       # Generated wire types (VISION 4.6): a Go test pins these to the Go
       # structs, so a hand-edit here must re-run it — same reason the
       # tier-limits snapshot triggers the frontend suite.
@@ -22,6 +26,10 @@ on:
       - "api/**"
       - "channels/**/*.go"
       - "channels/**/*.rs"
+      # The desktop app's native half (REL-62). It is Rust, so its gate
+      # lives here with every other cargo job rather than in the npm-only
+      # frontend workflow.
+      - "desktop/src-tauri/**"
       # Generated wire types (VISION 4.6): a Go test pins these to the Go
       # structs, so a hand-edit here must re-run it — same reason the
       # tier-limits snapshot triggers the frontend suite.
@@ -138,3 +146,45 @@ jobs:
       - run: cargo test --quiet
         env:
           TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/scrollr_test?sslmode=disable
+
+  # ── Desktop native tests ───────────────────────────────────────
+  # desktop/src-tauri is the app's native half — the OAuth loopback
+  # server, the window/tray commands, and the on-device Kalshi signer.
+  # It sat outside every matrix until REL-62, so its four auth-server
+  # tests ran nowhere: not here, and not on the Windows dev box either,
+  # where the test binary aborts with STATUS_ENTRYPOINT_NOT_FOUND before
+  # a single test starts.
+  #
+  # Its own job rather than a `rust-tests` matrix entry, because it needs
+  # the webkit dev headers to link and needs no Postgres — the crate
+  # never touches the database.
+  #
+  # No frontend build step: tauri.conf.json points frontendDist at
+  # ../dist, which is gitignored and absent on a fresh checkout, but
+  # tauri_build::build() compiles fine without it (verified). Adding
+  # `npm ci && npm run build` here would just duplicate the vitest job
+  # for no gain.
+  desktop-rust-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop/src-tauri
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # Same package set desktop-release.yml installs for its Linux build.
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # Not at the repo root, so point the cache at the crate.
+          workspaces: desktop/src-tauri
+          cache-on-failure: "true"
+
+      - run: cargo test --quiet
