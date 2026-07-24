@@ -301,8 +301,7 @@ export interface WidgetPrefs {
  *   both    — shown in both places (default for migrated `true` booleans)
  *   ticker  — shown on the always-on-top ticker only; hidden from the feed
  *
- * See docs/_archive/superpowers/specs/2026-04-25-display-venue-toggle-design.md
- * for the rationale. The `VenueRow` component in SettingsControls
+ * The `VenueRow` component in SettingsControls
  * renders a segmented control for switching between these states.
  */
 export type Venue = "off" | "feed" | "both" | "ticker";
@@ -1589,7 +1588,6 @@ export function updateWidgetPrefs(
 //
 // Widgets also keep `widgets.widgetsOnTicker` in sync because it is the
 // master render gate for widget ticker data.
-// See docs/_archive/superpowers/specs/2026-04-28-batch-d-…-design.md §Stream 3.
 
 /** Minimal shape of a DataWidgetRow record used by `getSourceTickerRow`. */
 interface DataWidgetTickerInfo {
