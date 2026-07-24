@@ -27,7 +27,7 @@ COMPOSE_AUTO  = $(shell [ -f secrets/predictions.docker.env ] && echo "$(COMPOSE
 # Targets are documented with `##<group>: description` and grouped below.
 help:
 	@echo ""
-	@echo "  MyScrollr — local development"
+	@echo "  MyScrollr - local development"
 	@echo ""
 	@awk 'BEGIN {FS = ":.*##"} \
 	  /^[a-zA-Z_-]+:.*?##[a-z]+:/ { \
@@ -39,8 +39,8 @@ help:
 	@echo ""
 	@echo "  First time?  make setup  &&  make up"
 	@echo ""
-	@echo "  Ports  core 18080 · fantasy 8084 · postgres 5432 · redis 6379"
-	@echo "         finance 3001 · sports 3002 · rss 3004 · predictions 3005"
+	@echo "  Ports  core 18080 | fantasy 8084 | postgres 5432 | redis 6379"
+	@echo "         finance 3001 | sports 3002 | rss 3004 | predictions 3005"
 	@echo "         web 3000 and the desktop app run natively, not in Docker"
 	@echo ""
 
@@ -63,7 +63,7 @@ up: ##run: Start the backend, wait until healthy
 	@if [ -f secrets/predictions.docker.env ]; then \
 	  echo "[up] services (incl. predictions)..."; \
 	else \
-	  echo "[up] services (predictions off — run 'make kalshi-key' to enable)..."; \
+	  echo "[up] services (predictions off - run 'make kalshi-key' to enable)..."; \
 	fi
 	@$(COMPOSE_AUTO) up -d --build --remove-orphans
 	@bash scripts/dev/wait-healthy.sh
@@ -85,17 +85,17 @@ desktop: ##run: Desktop app only, natively (Tauri)
 # ── Iterate ──────────────────────────────────────────────────────────
 # Editing Go/Rust source needs NO command here — the containers watch and
 # rebuild. `rebuild` is for dependency changes (go.mod, Cargo.toml).
-rebuild: ##iterate: Rebuild images after a dependency change — one with svc=
+rebuild: ##iterate: Rebuild images after a dependency change (svc= for one)
 	@$(COMPOSE_AUTO) build $(svc)
 	@$(COMPOSE_AUTO) up -d --remove-orphans $(svc)
 
-logs: ##iterate: Tail logs — all, or one with svc=core-api
+logs: ##iterate: Tail logs, all or one with svc=core-api
 	@$(COMPOSE_AUTO) logs -f --tail=80 $(svc)
 
 ps: ##iterate: Show what's running
 	@$(COMPOSE_AUTO) ps
 
-shell: ##iterate: Open a shell in a service — svc=core-api
+shell: ##iterate: Open a shell in a service, svc=core-api
 	@test -n "$(svc)" || { echo "usage: make shell svc=core-api"; exit 1; }
 	@$(COMPOSE_AUTO) exec $(svc) sh
 
@@ -104,6 +104,6 @@ reset: ##reset: Stop and wipe the database, Redis and build caches
 	@$(COMPOSE_PRED) down -v
 
 check: ##reset: Run the test suites that can run locally
-	@echo "── desktop ──"       && cd desktop        && npm test --silent
-	@echo "── myscrollr.com ──" && cd myscrollr.com  && npm test --silent
-	@echo "note: Go and Rust suites run in CI — no local toolchain needed."
+	@echo "-- desktop --"       && cd desktop        && npm test --silent
+	@echo "-- myscrollr.com --" && cd myscrollr.com  && npm test --silent
+	@echo "note: Go and Rust suites run in CI, no local toolchain needed."
