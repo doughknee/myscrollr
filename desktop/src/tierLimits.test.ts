@@ -80,21 +80,37 @@ describe("TIER_LIMITS table", () => {
         tier,
         {
           max_widgets: toWire(l.maxWidgets),
-          symbols: toWire(l.symbols),
-          feeds: toWire(l.feeds),
-          custom_feeds: toWire(l.customFeeds),
-          leagues: toWire(l.leagues),
-          fantasy: toWire(l.fantasy),
           max_ticker_rows: l.maxTickerRows,
           max_ticker_customization: l.maxTickerCustomization,
         },
       ])
     );
-    expect(wire).toEqual(snapshot.tiers);
+    const live = Object.fromEntries(
+      Object.entries(snapshot.tiers).map(([tier, t]) => [
+        tier,
+        {
+          max_widgets: t.max_widgets,
+          max_ticker_rows: t.max_ticker_rows,
+          max_ticker_customization: t.max_ticker_customization,
+        },
+      ])
+    );
+    expect(wire).toEqual(live);
+  });
+
+  // The desktop mirror dropped the retired depth caps (REL-60). It may only
+  // do that while the backend keeps sending them as "unlimited" — if a cap
+  // ever comes back, this fires and the field has to be mirrored again.
+  it("the retired depth caps are still null on every tier in the snapshot", () => {
+    for (const [tier, t] of Object.entries(snapshot.tiers)) {
+      for (const key of ["symbols", "feeds", "custom_feeds", "leagues", "fantasy"] as const) {
+        expect(t[key], `${tier}.${key}`).toBeNull();
+      }
+    }
   });
 
   it("super_user matches or exceeds every other tier on every numeric key", () => {
-    const keys = ["maxWidgets", "symbols", "feeds", "customFeeds", "leagues", "fantasy", "maxTickerRows"] as const;
+    const keys = ["maxWidgets", "maxTickerRows"] as const;
     const tiers: SubscriptionTier[] = ["free", "uplink", "uplink_pro", "uplink_ultimate"];
     for (const key of keys) {
       const superVal = TIER_LIMITS.super_user[key];

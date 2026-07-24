@@ -14,21 +14,12 @@ import { rssTickerSource } from "./rss/ticker";
 import { predictionsTickerSource } from "./predictions/ticker";
 import { fantasyTickerSource } from "./fantasy/ticker";
 
-const registry: Record<string, TickerSource> = {
+/** Chip renderers by data source. Indexing an unknown source yields
+ *  undefined, so it renders nothing rather than throwing. */
+export const TICKER_SOURCES: Record<string, TickerSource | undefined> = {
   finance: financeTickerSource,
   sports: sportsTickerSource,
   rss: rssTickerSource,
   predictions: predictionsTickerSource,
   fantasy: fantasyTickerSource,
 };
-
-/** The chip renderer for a data source, or undefined when this client has
- *  none — an unknown source renders nothing rather than throwing. */
-export function getTickerSource(source: string): TickerSource | undefined {
-  return registry[source];
-}
-
-/** Data sources this client can render. Exported for tests. */
-export function tickerSourceIds(): string[] {
-  return Object.keys(registry);
-}

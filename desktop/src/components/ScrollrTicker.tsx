@@ -19,7 +19,7 @@ import ConsolidatedChip from "./chips/ConsolidatedChip";
 import { getWatchlist, onWatchlistChange } from "../datawidgets/predictions/watchlist";
 import { sourceForWidget } from "../marketplace";
 import { useCatalog } from "../hooks/useCatalog";
-import { getTickerSource } from "../datawidgets/tickerRegistry";
+import { TICKER_SOURCES } from "../datawidgets/tickerRegistry";
 
 // ── Module-level constants ───────────────────────────────────────
 
@@ -271,7 +271,7 @@ export default function ScrollrTicker({
       const effectiveSource = source ?? tab;
       const rawData = dashboard?.data?.[effectiveSource];
 
-      const tickerSource = getTickerSource(effectiveSource);
+      const tickerSource = TICKER_SOURCES[effectiveSource];
       if (!tickerSource) continue;
 
       for (const chip of tickerSource.chips(rawData, {
