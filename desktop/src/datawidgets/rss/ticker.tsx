@@ -1,5 +1,4 @@
 import type { RssItem } from "../../types";
-import { shouldShowOnTicker } from "../../preferences";
 import RssChip from "../../components/chips/RssChip";
 import { chipUrlForRss } from "../../utils/chipUrl";
 import type { TickerChip, TickerContext, TickerSource } from "../ticker";
@@ -27,8 +26,6 @@ export const rssTickerSource: TickerSource = {
           item={item}
           comfort={ctx.comfort}
           colorMode={ctx.chipColorMode}
-          showSource={shouldShowOnTicker(prefs.showSource)}
-          showTimestamps={shouldShowOnTicker(prefs.showTimestamps)}
           onClick={() => ctx.onChipClick?.("rss", item.id, chipUrlForRss(item))}
         />
       ),

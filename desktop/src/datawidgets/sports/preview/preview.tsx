@@ -139,12 +139,6 @@ function main(): void {
     appVersion: "preview",
     allDataWidgetManifests: [],
     allWidgets: [],
-    onToggleDataWidgetTicker: noop,
-    onToggleWidgetTicker: noop,
-    onAddWidget: noop,
-    onDeleteWidget: noop,
-    onToggleWidget: noop,
-    onSelectItem: noop,
   };
 
   const shellData: ShellDataState = {

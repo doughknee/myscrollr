@@ -57,30 +57,32 @@ const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
   { value: "critical", label: "Critical" },
 ];
 
-const HEADER_CONFIG: Record<Category, { title: string; subtitle: string }> = {
-  bug: {
-    title: "Report a Bug",
-    subtitle: "Describe the issue and we'll include diagnostics automatically",
-  },
-  feature: {
-    title: "Request a Feature",
-    subtitle: "Tell us what you'd like to see in Scrollr",
-  },
+const CATEGORY_SUBTITLES: Record<Category, string> = {
+  bug: "Describe the issue and we'll include diagnostics automatically",
+  feature: "Tell us what you'd like to see in Scrollr",
+  feedback: "Share your thoughts and suggestions",
+  billing: "Questions about charges, plan changes, or cancellations",
+  account: "Issues with signing in, password, or account settings",
+  widget: "Issues with a specific widget",
+};
+
+// Categories whose form is a single description textarea — only the
+// copy differs.
+const SIMPLE_FIELDS: Partial<
+  Record<Category, { label: string; placeholder: string; hint?: string }>
+> = {
   feedback: {
-    title: "Send Feedback",
-    subtitle: "Share your thoughts and suggestions",
+    label: "Your feedback",
+    placeholder: "What's on your mind?",
+    hint: "Share suggestions, thoughts, or anything else",
   },
   billing: {
-    title: "Billing & Subscription Help",
-    subtitle: "Questions about charges, plan changes, or cancellations",
+    label: "Describe your billing question",
+    placeholder: "Questions about charges, plan changes, cancellations...",
   },
   account: {
-    title: "Account & Login Help",
-    subtitle: "Issues with signing in, password, or account settings",
-  },
-  widget: {
-    title: "Widget Help",
-    subtitle: "Issues with a specific widget",
+    label: "Describe your account issue",
+    placeholder: "Issues with signing in, password, account settings...",
   },
 };
 
@@ -367,7 +369,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
   // a short subtitle inside the card so users still see context for
   // the current category they picked. The form body lives inside a
   // dense card to match the surface chrome used everywhere else.
-  const header = HEADER_CONFIG[category];
+  const simpleField = SIMPLE_FIELDS[category];
   const inputClass =
     "w-full bg-base-200 border border-edge/40 rounded-lg px-3 py-2 text-ui-body text-fg resize-none focus:border-accent/60 focus:outline-none placeholder:text-fg-4";
   const labelClass = "block text-ui-meta font-medium text-fg-2 mb-1.5";
@@ -379,7 +381,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
       onSubmit={handleSubmit}
       className="rounded-xl border border-edge/35 bg-base-150/35 p-5 max-w-2xl mx-auto"
     >
-      <p className="text-ui-meta mb-5">{header.subtitle}</p>
+      <p className="text-ui-meta mb-5">{CATEGORY_SUBTITLES[category]}</p>
 
       <div className="space-y-5">
         {/* Category picker */}
@@ -618,51 +620,21 @@ export default function ContactForm({ onBack }: ContactFormProps) {
           </>
         )}
 
-        {/* ── General Feedback fields ───────────────────────────── */}
-        {category === "feedback" && (
+        {/* ── Feedback / Billing / Account fields ───────────────── */}
+        {simpleField && (
           <div>
-            <label className={labelClass}>Your feedback</label>
+            <label className={labelClass}>{simpleField.label}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={5}
               required
-              placeholder="What's on your mind?"
+              placeholder={simpleField.placeholder}
               className={inputClass}
             />
-            <p className="text-fg-3 text-xs mt-1.5">
-              Share suggestions, thoughts, or anything else
-            </p>
-          </div>
-        )}
-
-        {/* ── Billing fields ────────────────────────────────── */}
-        {category === "billing" && (
-          <div>
-            <label className={labelClass}>Describe your billing question</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={5}
-              required
-              placeholder="Questions about charges, plan changes, cancellations..."
-              className={inputClass}
-            />
-          </div>
-        )}
-
-        {/* ── Account fields ────────────────────────────────── */}
-        {category === "account" && (
-          <div>
-            <label className={labelClass}>Describe your account issue</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={5}
-              required
-              placeholder="Issues with signing in, password, account settings..."
-              className={inputClass}
-            />
+            {simpleField.hint && (
+              <p className="text-fg-3 text-xs mt-1.5">{simpleField.hint}</p>
+            )}
           </div>
         )}
 

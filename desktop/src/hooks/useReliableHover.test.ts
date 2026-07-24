@@ -6,7 +6,6 @@
  *   - Pointer enter/leave flips state correctly.
  *   - window.blur clears hover (alt-tab).
  *   - document.visibilitychange when hidden clears hover (Space switch).
- *   - forceClear resets state from outside.
  *   - Pointer move re-arms after a stale clear.
  *
  * The grace-poll backstop is tricky to test deterministically with
@@ -94,12 +93,3 @@ describe("useReliableHover — focus loss layer", () => {
   });
 });
 
-describe("useReliableHover — forceClear", () => {
-  it("imperatively resets the hovered state", () => {
-    const { result } = renderHook(() => useReliableHover());
-    act(() => result.current.bind.onPointerEnter());
-    expect(result.current.hovered).toBe(true);
-    act(() => result.current.forceClear());
-    expect(result.current.hovered).toBe(false);
-  });
-});

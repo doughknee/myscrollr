@@ -43,15 +43,12 @@ interface ConnectionIndicatorProps {
   onClick: () => void;
   /** Whether the status page is the current route. */
   active?: boolean;
-  /** Optional className appended to the wrapper. */
-  className?: string;
 }
 
 export default function ConnectionIndicator({
   health,
   onClick,
   active,
-  className,
 }: ConnectionIndicatorProps) {
   const meta = DELIVERY_STATE_META[health.state];
   const Icon = meta.icon;
@@ -74,7 +71,6 @@ export default function ConnectionIndicator({
           // status page's tile, which is a hero, not chrome).
           degraded ? meta.text : "text-fg-4 hover:text-fg-2",
           active ? "bg-surface-hover" : "hover:bg-surface-hover",
-          className,
         )}
       >
         <Icon size={13} strokeWidth={2.2} />

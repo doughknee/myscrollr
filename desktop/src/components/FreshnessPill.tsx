@@ -21,14 +21,12 @@ import { relativeTime } from "../utils/format";
 interface FreshnessPillProps {
   /** ISO timestamp of last update. */
   lastUpdated: string | null | undefined;
-  /** Override the default thresholds (all in ms). */
-  thresholds?: { fresh: number; stale: number; verystale: number };
   /** Custom label for the tooltip (defaults to "updated"). */
   label?: string;
   className?: string;
 }
 
-const DEFAULT_THRESHOLDS = { fresh: 30_000, stale: 90_000, verystale: 300_000 };
+const THRESHOLDS = { fresh: 30_000, stale: 90_000, verystale: 300_000 };
 
 /**
  * Shows "updated Xs ago" with a color transition that escalates as the
@@ -38,7 +36,6 @@ const DEFAULT_THRESHOLDS = { fresh: 30_000, stale: 90_000, verystale: 300_000 };
  */
 export default memo(function FreshnessPill({
   lastUpdated,
-  thresholds = DEFAULT_THRESHOLDS,
   label = "updated",
   className,
 }: FreshnessPillProps) {
@@ -50,9 +47,9 @@ export default memo(function FreshnessPill({
 
   const age = now - ts;
   let tone: "fresh" | "neutral" | "stale" | "very-stale" = "fresh";
-  if (age >= thresholds.verystale) tone = "very-stale";
-  else if (age >= thresholds.stale) tone = "stale";
-  else if (age >= thresholds.fresh) tone = "neutral";
+  if (age >= THRESHOLDS.verystale) tone = "very-stale";
+  else if (age >= THRESHOLDS.stale) tone = "stale";
+  else if (age >= THRESHOLDS.fresh) tone = "neutral";
 
   const toneClass = {
     "fresh": "text-up/80 bg-up/10",

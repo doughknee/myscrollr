@@ -8,7 +8,7 @@ import { X } from "lucide-react";
 import { clsx } from "clsx";
 import Tooltip from "../../components/Tooltip";
 import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
-import { loadTimezones, saveTimezones, DEFAULT_TIMEZONES } from "./storage";
+import { loadTimezones, saveTimezones, tzLabel } from "./storage";
 import type { TimeFormat, TimezoneEntry } from "./types";
 
 // ── Timezone presets ────────────────────────────────────────────
@@ -98,20 +98,6 @@ function getUtcOffset(tz: string): string {
     timeZoneName: "shortOffset",
   }).formatToParts(new Date());
   return parts.find((p) => p.type === "timeZoneName")?.value ?? "";
-}
-
-function getLocalLabel(): string {
-  try {
-    return (
-      Intl.DateTimeFormat()
-        .resolvedOptions()
-        .timeZone.split("/")
-        .pop()
-        ?.replace(/_/g, " ") ?? "Local"
-    );
-  } catch {
-    return "Local";
-  }
 }
 
 // ── Clock Card ──────────────────────────────────────────────────
@@ -369,12 +355,7 @@ export function WorldClock({
         {allZones.map((tz) => {
           const isLocal = tz === localTz;
           const preset = TIMEZONE_PRESETS.find((p) => p.tz === tz);
-          const label =
-            isLocal
-              ? getLocalLabel()
-              : (preset?.label ??
-                tz.split("/").pop()?.replace(/_/g, " ") ??
-                tz);
+          const label = isLocal ? tzLabel(localTz) : (preset?.label ?? tzLabel(tz));
           return (
             <ClockCard
               key={tz}

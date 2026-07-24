@@ -11,17 +11,8 @@ import { getMaxTickerRows } from "./tierLimits";
 /**
  * Color mode controls light/dark resolution, independent of the
  * selected theme family. "system" follows the OS preference.
- *
- * Historically this type was called `Theme` and lived on
- * `appearance.theme`. As of the multi-theme refactor, the field is
- * `appearance.themeMode` and is paired with `appearance.themeFamily`.
- * The legacy `Theme` alias is kept as a deprecated export for any
- * consumer that hasn't been migrated yet.
  */
 export type ThemeMode = "light" | "dark" | "system";
-
-/** @deprecated Use `ThemeMode` instead. */
-export type Theme = ThemeMode;
 
 /**
  * The ten built-in theme families. Each family carries its own light
@@ -52,8 +43,6 @@ export const THEME_FAMILIES: ThemeFamily[] = [
   "one",
   "everforest",
 ];
-
-export const THEME_MODES: ThemeMode[] = ["light", "dark", "system"];
 
 /** Display label for the theme family selector. */
 export const THEME_FAMILY_LABELS: Record<ThemeFamily, string> = {
@@ -346,44 +335,7 @@ export function migrateVenue(raw: unknown): Venue {
   return "both";
 }
 
-/**
- * Decompose a `Venue` enum into the two booleans used by
- * `<DisplayLocationGrid>` (one checkbox per surface). The grid renders
- * each row as `[Feed checkbox] [Ticker checkbox]` and writes back via
- * `boolsToEnum`. Keeping the conversion in one place prevents drift
- * between the persisted enum and the UI's two-checkbox view.
- */
-export function enumToBools(venue: Venue): {
-  feed: boolean;
-  ticker: boolean;
-} {
-  return {
-    feed: shouldShowOnFeed(venue),
-    ticker: shouldShowOnTicker(venue),
-  };
-}
-
-/**
- * Inverse of `enumToBools`. Combines the two surface checkboxes back
- * into a single `Venue` for storage. The four combinations exhaust
- * the enum:
- *
- *   feed=false ticker=false → "off"
- *   feed=true  ticker=false → "feed"
- *   feed=false ticker=true  → "ticker"
- *   feed=true  ticker=true  → "both"
- */
-export function boolsToEnum(feed: boolean, ticker: boolean): Venue {
-  if (feed && ticker) return "both";
-  if (feed) return "feed";
-  if (ticker) return "ticker";
-  return "off";
-}
-
 export interface FinanceDisplayPrefs {
-  showChange: Venue;
-  showPrevClose: Venue;
-  showLastUpdated: Venue;
   defaultSort: "alpha" | "price" | "change" | "updated";
   /**
    * Direction marker on the ticker chip. "arrow" uses ▲▼ glyphs,
@@ -394,14 +346,6 @@ export interface FinanceDisplayPrefs {
 }
 
 export interface PredictionsDisplayPrefs {
-  /** Implied-probability delta vs prev_yes_price (▲/▼ with up/down color). */
-  showDelta: Venue;
-  /** Category badge (Politics/Sports/Economics/…). */
-  showCategory: Venue;
-  /** Abbreviated trade volume. */
-  showVolume: Venue;
-  /** Countdown to market close. */
-  showCloseTime: Venue;
   /**
    * v1.1.5: drives the TICKER's no-stars fallback ordering (the feed is
    * lens-driven and owns its own ordering). "trending" = trailing-24h
@@ -411,9 +355,6 @@ export interface PredictionsDisplayPrefs {
 }
 
 export interface RssDisplayPrefs {
-  showDescription: Venue;
-  showSource: Venue;
-  showTimestamps: Venue;
   /** Sticky feed sort (2026-07-17 unification): the bar's sort choice
    *  persists per widget via the config.display override; this is the
    *  global fallback. */
@@ -639,25 +580,15 @@ export const DEFAULT_GITHUB_TICKER: GitHubTickerConfig = {
 
 export const DEFAULT_WIDGET_DISPLAY: WidgetDisplayPrefs = {
   finance: {
-    showChange: "both",
-    showPrevClose: "both",
-    showLastUpdated: "both",
     defaultSort: "alpha",
     tickerDirectionMarker: "arrow",
   },
   rss: {
-    showDescription: "both",
-    showSource: "both",
-    showTimestamps: "both",
     feedSort: "newest",
     articlesPerSource: 0,
     maxArticleAgeDays: 0,
   },
   predictions: {
-    showDelta: "both",
-    showCategory: "both",
-    showVolume: "both",
-    showCloseTime: "both",
     defaultSort: "trending",
   },
   fantasy: {
@@ -802,6 +733,25 @@ export function savePref<T>(key: string, value: T): void {
 
 // ── Structured preferences ─────────────────────────────────────
 
+/**
+ * Legacy clock→timer split: true when the saved blob predates the timer
+ * widget and its active-timer chip should follow clock onto the ticker.
+ * The single predicate behind both halves of the migration — the
+ * `widgetsOnTicker` list (mergeWidgetPrefs) and the explicit ticker
+ * layout rows (loadPrefs).
+ */
+function shouldAddLegacyTimerToTicker(saved: Partial<WidgetPrefs> | undefined): boolean {
+  if (!saved) return false;
+  if (saved.timer != null && typeof saved.timer === "object") return false;
+  const clockTicker = (
+    saved.clock as unknown as { ticker?: { activeTimer?: unknown } } | null | undefined
+  )?.ticker;
+  if (clockTicker?.activeTimer === false) return false;
+  const enabled = Array.isArray(saved.enabledWidgets) ? saved.enabledWidgets : DEFAULT_WIDGETS.enabledWidgets;
+  const onTicker = Array.isArray(saved.widgetsOnTicker) ? saved.widgetsOnTicker : enabled;
+  return onTicker.includes("clock") && !onTicker.includes("timer");
+}
+
 /** Deep-merge saved widget prefs with defaults.
  *  Handles migration from the old flat shape gracefully. */
 export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
@@ -817,20 +767,14 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
   const sys = obj(saved.sysmon);
   const upt = obj(saved.uptime);
   const ghb = obj(saved.github);
-  // Only the legacy clock→timer split heuristic still reads the saved
-  // ticker blob; per-item ticker values themselves are forced to
-  // defaults below (2026-07-17 unification).
-  const legacyClockTicker = obj(clk?.ticker);
 
   const savedEnabledWidgets = Array.isArray(saved.enabledWidgets) ? saved.enabledWidgets : DEFAULT_WIDGETS.enabledWidgets;
   const savedWidgetsOnTicker = Array.isArray(saved.widgetsOnTicker) ? saved.widgetsOnTicker : savedEnabledWidgets;
-  const hasLegacyTimerPrefs = !tmr;
-  const shouldEnableLegacyTimer = hasLegacyTimerPrefs && savedEnabledWidgets.includes("clock");
-  const shouldShowLegacyTimerOnTicker = hasLegacyTimerPrefs && legacyClockTicker?.activeTimer !== false && savedWidgetsOnTicker.includes("clock");
+  const shouldEnableLegacyTimer = !tmr && savedEnabledWidgets.includes("clock");
   const enabledWidgets = shouldEnableLegacyTimer && !savedEnabledWidgets.includes("timer")
     ? [...savedEnabledWidgets, "timer"]
     : savedEnabledWidgets;
-  const widgetsOnTicker = shouldShowLegacyTimerOnTicker && !savedWidgetsOnTicker.includes("timer")
+  const widgetsOnTicker = shouldAddLegacyTimerToTicker(saved)
     ? [...savedWidgetsOnTicker, "timer"]
     : savedWidgetsOnTicker;
 
@@ -1055,15 +999,6 @@ export function migrateFinanceDisplay(
     raw.tickerDirectionMarker === "none"
       ? raw.tickerDirectionMarker
       : DEFAULT_WIDGET_DISPLAY.finance.tickerDirectionMarker;
-  // 2026-07-17 defaults reset: the display-item toggles left the UI with
-  // the configure-page teardown, so stored show* venues are deliberately
-  // IGNORED — the DEFAULT_WIDGET_DISPLAY spread supplies them and every
-  // install renders the defaults. Functional prefs (sort, marker) keep
-  // honoring saved values. (feedDensity was deleted outright in the
-  // 2026-07-17 settings unification — feeds always render comfort; the
-  // ticker owns the one density concept.) Sports' equivalents are forced
-  // in normalizeSportsDisplayConfig; rss per-widget overrides are
-  // stripped where they merge (datawidgets/rss/view.ts + FeedTab).
   return {
     ...DEFAULT_WIDGET_DISPLAY.finance,
     defaultSort:
@@ -1086,7 +1021,6 @@ export function migratePredictionsDisplay(
       : raw.defaultSort === "volume"
         ? ("trending" as const) // v1.1.5: all-time volume sort became Trending (24h)
         : DEFAULT_WIDGET_DISPLAY.predictions.defaultSort;
-  // 2026-07-17 defaults reset — see migrateFinanceDisplay for the note.
   return {
     ...DEFAULT_WIDGET_DISPLAY.predictions,
     defaultSort,
@@ -1097,8 +1031,6 @@ export function migrateRssDisplay(
   saved: Partial<RssDisplayPrefs> | undefined,
 ): RssDisplayPrefs {
   const raw = (saved ?? {}) as Record<string, unknown>;
-  // 2026-07-17 defaults reset — show* venues come from the defaults
-  // spread; see migrateFinanceDisplay for the note.
   return {
     ...DEFAULT_WIDGET_DISPLAY.rss,
     // Sticky feed sort (2026-07-17 unification).
@@ -1307,25 +1239,7 @@ export function loadPrefs(): AppPreferences {
         : [],
     };
 
-    const savedWidgets = source.widgets as Record<string, unknown> | undefined;
-    const savedClock = savedWidgets?.clock != null && typeof savedWidgets.clock === "object"
-      ? (savedWidgets.clock as Record<string, unknown>)
-      : undefined;
-    const savedClockTicker = savedClock?.ticker != null && typeof savedClock.ticker === "object"
-      ? (savedClock.ticker as Record<string, unknown>)
-      : undefined;
-    const hasSavedTimerPrefs = savedWidgets?.timer != null && typeof savedWidgets.timer === "object";
-    const savedWidgetIdsOnTicker = Array.isArray(savedWidgets?.widgetsOnTicker)
-      ? (savedWidgets.widgetsOnTicker as unknown[]).filter((id): id is string => typeof id === "string")
-      : Array.isArray(savedWidgets?.enabledWidgets)
-        ? (savedWidgets.enabledWidgets as unknown[]).filter((id): id is string => typeof id === "string")
-        : [];
-    const shouldMigrateTimerRows =
-      !hasSavedTimerPrefs &&
-      savedClockTicker?.activeTimer !== false &&
-      savedWidgetIdsOnTicker.includes("clock") &&
-      !savedWidgetIdsOnTicker.includes("timer");
-    if (shouldMigrateTimerRows) {
+    if (shouldAddLegacyTimerToTicker(source.widgets as Partial<WidgetPrefs> | undefined)) {
       let rowsChanged = false;
       const rows = merged.appearance.tickerLayout.rows.map((row) => {
         if (!row.sources.includes("clock") || row.sources.includes("timer")) return row;
@@ -1663,7 +1577,7 @@ export function updateWidgetPrefs(
 // master render gate for widget ticker data.
 // See docs/_archive/superpowers/specs/2026-04-28-batch-d-…-design.md §Stream 3.
 
-/** Minimal shape of a DataWidgetRow record used by `getDataWidgetTickerRow`. */
+/** Minimal shape of a DataWidgetRow record used by `getSourceTickerRow`. */
 interface DataWidgetTickerInfo {
   widget_type: string;
   ticker_enabled?: boolean;
@@ -1707,28 +1621,6 @@ export function getSourceTickerRow(
 }
 
 /**
- * Convenience wrapper around `getSourceTickerRow` for widgets — accepts
- * a DataWidgetRow-like object (with `widget_type` + `ticker_enabled`).
- */
-export function getDataWidgetTickerRow(
-  prefs: AppPreferences,
-  widget: DataWidgetTickerInfo,
-): number | null {
-  return getSourceTickerRow(prefs, widget, widget.widget_type);
-}
-
-/**
- * Convenience wrapper around `getSourceTickerRow` for widgets — widgets
- * only check the client-side `tickerLayout.rows[i].sources[]` layer.
- */
-export function getWidgetTickerRow(
-  prefs: AppPreferences,
-  widgetId: string,
-): number | null {
-  return getSourceTickerRow(prefs, null, widgetId);
-}
-
-/**
  * Move a source to the given row, removing it from any other row first.
  *
  * - `row = null` removes the source from every row (off).
@@ -1765,19 +1657,6 @@ export function setSourceTickerRow(
   }
 
   return setTickerLayout(prefs, { rows: cleanedRows });
-}
-
-/**
- * Move a widget to the given row. See `setSourceTickerRow`. Caller is
- * responsible for the matching `dataWidgetsApi.update({ ticker_enabled })`
- * call to keep the server-side flag in sync.
- */
-export function setDataWidgetTickerRow(
-  prefs: AppPreferences,
-  widgetType: string,
-  row: number | null,
-): AppPreferences {
-  return setSourceTickerRow(prefs, widgetType, row);
 }
 
 /**

@@ -29,11 +29,10 @@ import {
   TICKER_GAPS,
   TICKER_HEIGHTS,
   toggleWidgetPin,
-  setDataWidgetTickerRow,
+  setSourceTickerRow,
   setWidgetTickerRow,
   setTickerLayout,
-  getDataWidgetTickerRow,
-  getWidgetTickerRow,
+  getSourceTickerRow,
 } from "./preferences";
 import { getMaxTickerRows } from "./tierLimits";
 import type { SubscriptionTier } from "./auth";
@@ -50,6 +49,15 @@ import { useCatalog } from "./hooks/useCatalog";
 // ── Constants ────────────────────────────────────────────────────
 
 import { API_BASE as API_URL, DEMO } from "./config";
+
+/** Ticker window height in px: per-mode row height × rows × scale. */
+function tickerHeight(p: AppPreferences): number {
+  return Math.round(
+    TICKER_HEIGHTS[p.ticker.tickerMode] *
+      p.appearance.tickerLayout.rows.length *
+      (p.appearance.tickerScale / 100),
+  );
+}
 
 // ── App (Ticker Window) ─────────────────────────────────────────
 
@@ -69,6 +77,8 @@ export default function App() {
   // Auth + tier state (drives refetchInterval)
   const [authenticated, setAuthenticated] = useState(() => checkAuth());
   const [tier, setTier] = useState<SubscriptionTier>(() =>
+    // getTier() decodes the stored JWT even when expired — gate on live auth
+    // so an overnight-expired token starts at "free", not a stale paid tier.
     checkAuth() ? getTier() : "free",
   );
 
@@ -230,20 +240,11 @@ export default function App() {
         case "connected":
           setDeliveryMode("sse");
           break;
-        case "auth-expired": {
+        case "auth-expired":
           sseActiveRef.current = false;
           setDeliveryMode("polling");
-          const newToken = await getValidToken();
-          if (newToken) {
-            sseActiveRef.current = true;
-            setDeliveryMode("sse");
-            invoke("start_sse", { token: newToken, apiBase: API_URL }).catch(() => {
-              sseActiveRef.current = false;
-              setDeliveryMode("polling");
-            });
-          }
+          await startSSE();
           break;
-        }
         case "disconnected":
         case "error":
           setDeliveryMode("polling");
@@ -344,9 +345,7 @@ export default function App() {
       if (next.window.tickerPosition !== prev.window.tickerPosition) {
         setTickerPosition(next.window.tickerPosition);
         savePref("tickerPosition", next.window.tickerPosition);
-        const rowCount = next.appearance.tickerLayout.rows.length;
-        const h = Math.round(TICKER_HEIGHTS[next.ticker.tickerMode] * rowCount * (next.appearance.tickerScale / 100));
-        invoke("position_ticker", { position: next.window.tickerPosition, height: h }).catch(() => {});
+        invoke("position_ticker", { position: next.window.tickerPosition, height: tickerHeight(next) }).catch(() => {});
       }
 
     });
@@ -373,10 +372,7 @@ export default function App() {
   // ── Initial setup ────────────────────────────────────────────
 
   useEffect(() => {
-    const rowCount = prefs.appearance.tickerLayout.rows.length;
-    const tickerH = prefs.ticker.showTicker
-      ? Math.round(TICKER_HEIGHTS[prefs.ticker.tickerMode] * rowCount * (prefs.appearance.tickerScale / 100))
-      : 0;
+    const tickerH = prefs.ticker.showTicker ? tickerHeight(prefs) : 0;
     if (tickerH > 0) {
       // position_ticker sets size + position atomically via compositor
       invoke("position_ticker", { position: tickerPosition, height: tickerH })
@@ -402,10 +398,7 @@ export default function App() {
   // position calculation reads the old height.
 
   useEffect(() => {
-    const rowCount = prefs.appearance.tickerLayout.rows.length;
-    const tickerH = prefs.ticker.showTicker
-      ? Math.round(TICKER_HEIGHTS[prefs.ticker.tickerMode] * rowCount * (prefs.appearance.tickerScale / 100))
-      : 0;
+    const tickerH = prefs.ticker.showTicker ? tickerHeight(prefs) : 0;
     if (tickerH > 0) {
       invoke("position_ticker", { position: tickerPosition, height: tickerH }).catch(() => {});
     }
@@ -434,12 +427,7 @@ export default function App() {
       // just set (effect ordering: position runs before this one).
       win.show()
         .then(() => {
-          const rowCount = prefsRef.current.appearance.tickerLayout.rows.length;
-          const h = Math.round(
-            TICKER_HEIGHTS[prefsRef.current.ticker.tickerMode] *
-              rowCount *
-              (prefsRef.current.appearance.tickerScale / 100),
-          );
+          const h = tickerHeight(prefsRef.current);
           if (h > 0) {
             invoke("position_ticker", {
               position: prefsRef.current.window.tickerPosition,
@@ -525,7 +513,7 @@ export default function App() {
       // 1) Client-side: assign / unassign in tickerLayout. Optimistic update
       //    so the next tray menu rebuild reflects the change immediately.
       setPrefs((prev) => {
-        const updated = setDataWidgetTickerRow(prev, widgetType, row);
+        const updated = setSourceTickerRow(prev, widgetType, row);
         savePrefs(updated);
         return updated;
       });
@@ -573,9 +561,7 @@ export default function App() {
     };
     setPrefs(updated);
     savePrefs(updated);
-    const rowCount = updated.appearance.tickerLayout.rows.length;
-    const h = Math.round(TICKER_HEIGHTS[updated.ticker.tickerMode] * rowCount * (updated.appearance.tickerScale / 100));
-    invoke("position_ticker", { position: next, height: h }).catch(() => {});
+    invoke("position_ticker", { position: next, height: tickerHeight(updated) }).catch(() => {});
   }, [tickerPosition]);
 
   // ── Toggle ticker visibility ─────────────────────────────────
@@ -707,7 +693,7 @@ export default function App() {
 
       // Append an empty row to the layout, then optimistically assign
       // `sourceId` to it. We do the assignment via a follow-up call to
-      // setDataWidgetTickerRow / setWidgetTickerRow rather than seeding
+      // setSourceTickerRow / setWidgetTickerRow rather than seeding
       // the layout in one step, because the data branch also needs
       // to flip the server-side `ticker_enabled` flag — reusing the
       // existing handlers keeps that logic in one place.
@@ -753,7 +739,7 @@ export default function App() {
         const label =
           metaById.get(ch.widget_type)?.name ??
           `${ch.widget_type.charAt(0).toUpperCase()}${ch.widget_type.slice(1)}`;
-        const currentRow = getDataWidgetTickerRow(prefsRef.current, ch);
+        const currentRow = getSourceTickerRow(prefsRef.current, ch, ch.widget_type);
         const rowItems = await buildRowSubmenuItems(
           currentRow,
           (row) => {
@@ -795,7 +781,7 @@ export default function App() {
           wp.enabledWidgets.includes(mf.id) ||
           wp.widgetsOnTicker.includes(mf.id),
       )) {
-        const currentRow = getWidgetTickerRow(prefsRef.current, widget.id);
+        const currentRow = getSourceTickerRow(prefsRef.current, null, widget.id);
         const rowItems = await buildRowSubmenuItems(
           currentRow,
           (row) => handleWidgetRowChange(widget.id, row),
@@ -975,7 +961,6 @@ export default function App() {
                 widgetDisplay={prefs.widgetDisplay}
                 comfort={prefs.ticker.tickerMode === "comfort"}
                 rowIndex={i}
-                totalRows={prefs.appearance.tickerLayout.rows.length}
                 direction={prefs.ticker.tickerDirection}
                 scrollMode={prefs.ticker.scrollMode}
                 stepPause={prefs.ticker.stepPause}

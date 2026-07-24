@@ -5,22 +5,10 @@
  * ui-review/. Exits non-zero on the first failed assertion.
  */
 import { chromium } from "playwright";
-import { mkdirSync } from "node:fs";
+import { OUT, check, watchConsole, finish } from "./harness.mjs";
 
 const BASE =
   "http://localhost:5174/src/datawidgets/predictions/preview/index.html";
-const OUT = process.env.UI_REVIEW_OUT ?? "ui-review-out";
-mkdirSync(OUT, { recursive: true });
-
-let failures = 0;
-function check(name, cond, extra = "") {
-  if (cond) {
-    console.log(`  PASS ${name}`);
-  } else {
-    failures++;
-    console.log(`  FAIL ${name} ${extra}`);
-  }
-}
 
 const INPUT = '[aria-label="Search markets"]';
 
@@ -46,14 +34,7 @@ async function run() {
   {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     const consoleErrors = [];
-    // Known-benign in the browser-only harness: asset 404s and the Tauri
-    // pref-store fallback (no keychain/IPC outside the desktop shell).
-    const benign = /Failed to load resource|Store write failed/;
-    page.on("console", (msg) => {
-      if (msg.type() === "error" && !benign.test(msg.text()))
-        consoleErrors.push(msg.text());
-    });
-    page.on("pageerror", (err) => consoleErrors.push(String(err)));
+    watchConsole(page, consoleErrors);
     await page.goto(BASE, { waitUntil: "networkidle" });
     await page.waitForSelector("[data-section-title]"); // category sections rendered
     console.log("== 1440px ==");
@@ -192,9 +173,7 @@ async function run() {
     await page.close();
   }
 
-  await browser.close();
-  console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);
-  process.exit(failures === 0 ? 0 : 1);
+  await finish(browser);
 }
 
 run().catch((err) => {

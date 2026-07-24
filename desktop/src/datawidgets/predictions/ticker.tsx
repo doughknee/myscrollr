@@ -1,5 +1,4 @@
 import type { Prediction } from "../../types";
-import { shouldShowOnTicker } from "../../preferences";
 import PredictionChip from "../../components/chips/PredictionChip";
 import type { TickerChip, TickerContext, TickerSource } from "../ticker";
 import { scopedRows } from "../ticker";
@@ -28,10 +27,6 @@ export const predictionsTickerSource: TickerSource = {
             prediction={p}
             comfort={ctx.comfort}
             colorMode={ctx.chipColorMode}
-            showDelta={shouldShowOnTicker(prefs.showDelta)}
-            showCategory={shouldShowOnTicker(prefs.showCategory)}
-            showVolume={shouldShowOnTicker(prefs.showVolume)}
-            showCloseTime={shouldShowOnTicker(prefs.showCloseTime)}
             onClick={() => ctx.onChipClick?.("predictions", p.id, p.link)}
           />
         ),

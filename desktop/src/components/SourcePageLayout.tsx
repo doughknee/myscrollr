@@ -12,19 +12,13 @@
  */
 import PageLayout from "./layout/PageLayout";
 
-/** Fallback for when a source (widget or widget) is not found. */
-export function SourceNotFound({
-  kind,
-  name,
-}: {
-  kind: "Widget";
-  name: string;
-}) {
+/** Fallback for when a widget is not found. */
+export function SourceNotFound({ name }: { name: string }) {
   return (
-    <PageLayout title={kind + " not found"} width="narrow">
+    <PageLayout title="Widget not found" width="narrow">
       <div className="flex flex-col items-center justify-center text-center max-w-sm mx-auto gap-3 py-12">
         <p className="text-sm text-fg-3">
-          The {kind.toLowerCase()} &ldquo;{name}&rdquo; is not installed.
+          The widget &ldquo;{name}&rdquo; is not installed.
         </p>
       </div>
     </PageLayout>

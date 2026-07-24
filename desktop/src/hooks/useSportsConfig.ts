@@ -16,7 +16,6 @@ import {
   normalizeSportsDisplayConfig,
   SPORTS_WINDOW_DEFAULTS,
 } from "../datawidgets/sports/view";
-import type { Venue } from "../preferences";
 
 export interface FavoriteTeam {
   teamId: number;
@@ -27,8 +26,6 @@ export interface SportsDisplayPrefs {
   /** Day window (v1.1.3 Time Controls) — see SportsDisplayConfig. */
   daysBack: number;
   daysAhead: number;
-  showLogos: Venue;
-  showTimer: Venue;
 }
 
 export interface SportsConfig {
@@ -40,8 +37,6 @@ export interface SportsConfig {
 const DEFAULT_DISPLAY: SportsDisplayPrefs = {
   daysBack: SPORTS_WINDOW_DEFAULTS.daysBack,
   daysAhead: SPORTS_WINDOW_DEFAULTS.daysAhead,
-  showLogos: "both",
-  showTimer: "both",
 };
 
 export function useSportsConfig(widgetType: string = "sports") {
@@ -55,8 +50,7 @@ export function useSportsConfig(widgetType: string = "sports") {
   const raw = (sportsWidget?.config ?? {}) as Record<string, unknown>;
 
   const config: SportsConfig = useMemo(() => {
-    // `normalizeSportsDisplayConfig` handles both legacy migrations:
-    // v1.0.2 boolean→Venue for the cosmetic toggles, and v1.1.3
+    // `normalizeSportsDisplayConfig` handles the v1.1.3 legacy
     // showUpcoming/showFinal→day-window mapping (an "off" toggle
     // becomes 0 days on that side).
     const normalizedDisplay = normalizeSportsDisplayConfig(raw.display);
@@ -65,8 +59,6 @@ export function useSportsConfig(widgetType: string = "sports") {
       display: {
         daysBack: normalizedDisplay.daysBack ?? DEFAULT_DISPLAY.daysBack,
         daysAhead: normalizedDisplay.daysAhead ?? DEFAULT_DISPLAY.daysAhead,
-        showLogos: normalizedDisplay.showLogos ?? DEFAULT_DISPLAY.showLogos,
-        showTimer: normalizedDisplay.showTimer ?? DEFAULT_DISPLAY.showTimer,
       },
       favoriteTeams:
         typeof raw.favoriteTeams === "object" && raw.favoriteTeams !== null

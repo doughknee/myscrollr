@@ -15,7 +15,6 @@ import {
   cardOutcomes,
   timeIndicator,
   TICKER_FALLBACK_LIMIT,
-  type MaybeStarts,
 } from "./view";
 import type { Prediction } from "../../types";
 import type { PredictionsDisplayPrefs } from "../../preferences";
@@ -34,10 +33,6 @@ function mk(partial: Partial<Prediction> & { id: string }): Prediction {
 }
 
 const DEFAULT_PREFS: PredictionsDisplayPrefs = {
-  showDelta: "both",
-  showCategory: "both",
-  showVolume: "both",
-  showCloseTime: "both",
   defaultSort: "movers",
 };
 
@@ -129,61 +124,23 @@ describe("timeIndicator", () => {
   const now = Date.parse("2026-07-15T12:00:00Z");
   const hours = (n: number) =>
     new Date(now + n * 3600 * 1000).toISOString();
-  const withStart = (
-    partial: Partial<Prediction> & { id: string },
-    start?: string,
-  ): MaybeStarts => ({ ...mk(partial), start_time: start });
 
-  it("LIVE once the event started and the market hasn't closed", () => {
-    const m = withStart({ id: "m", close_time: hours(2) }, hours(-1));
-    expect(timeIndicator(m, now)).toEqual({ kind: "live" });
-  });
-
-  it("LIVE with a start but no close_time (still in progress)", () => {
-    const m = withStart({ id: "m", close_time: undefined }, hours(-1));
-    expect(timeIndicator(m, now)).toEqual({ kind: "live" });
-  });
-
-  it("counts down to starts within 24h", () => {
-    const m = withStart({ id: "m", close_time: hours(48) }, hours(3));
-    expect(timeIndicator(m, now)).toEqual({
-      kind: "starts",
-      label: "Starts in 3h",
-    });
-  });
-
-  it("beyond the 24h window the close label wins", () => {
-    const m = withStart({ id: "m", close_time: hours(48) }, hours(25));
-    expect(timeIndicator(m, now)).toEqual({
-      kind: "closes",
-      label: "Closes 2d",
-    });
-  });
-
-  it("NO start_time → always the close label (no fabricated starts)", () => {
+  it("counts down to close", () => {
     const m = mk({ id: "m", close_time: hours(3) });
     expect(timeIndicator(m, now)).toEqual({ kind: "closes", label: "Closes 3h" });
   });
 
-  it("an unparseable start_time falls back to the close label", () => {
-    const m = withStart({ id: "m", close_time: hours(5) }, "not-a-date");
-    expect(timeIndicator(m, now)).toEqual({ kind: "closes", label: "Closes 5h" });
-  });
-
-  it("Closed beats LIVE once the market's close has passed", () => {
-    const m = withStart({ id: "m", close_time: hours(-1) }, hours(-3));
+  it("Closed once the market's close has passed", () => {
+    const m = mk({ id: "m", close_time: hours(-1) });
     expect(timeIndicator(m, now)).toEqual({ kind: "closed" });
   });
 
   it("resolved markets get no indicator (settlement is its own row)", () => {
-    const m = withStart(
-      { id: "m", result: "yes", close_time: hours(2) },
-      hours(-1),
-    );
+    const m = mk({ id: "m", result: "yes", close_time: hours(2) });
     expect(timeIndicator(m, now)).toEqual({ kind: "none" });
   });
 
-  it("no close_time and no start_time → none", () => {
+  it("no close_time → none", () => {
     expect(timeIndicator(mk({ id: "m", close_time: undefined }), now)).toEqual({
       kind: "none",
     });

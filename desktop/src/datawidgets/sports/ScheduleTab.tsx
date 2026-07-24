@@ -4,16 +4,12 @@ import { CalendarOff } from "lucide-react";
 import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import TeamLogo from "../../components/TeamLogo";
 import { isPre, formatCountdown, displayTeamCode } from "../../utils/gameHelpers";
-import { shouldShowOnFeed } from "../../preferences";
 import type { Game } from "../../types";
-import type { SportsDisplayPrefs } from "../../hooks/useSportsConfig";
 import type { StatusFilter } from "./FeedTab";
 
 interface ScheduleTabProps {
   games: Game[];
-  display: SportsDisplayPrefs;
   favoriteTeams: Set<string>;
-  leagueFilter: Set<string>;
   statusFilter: StatusFilter;
 }
 
@@ -42,9 +38,7 @@ function isFavoriteGame(game: Game, favorites: Set<string>): boolean {
 
 export function ScheduleTab({
   games,
-  display,
   favoriteTeams,
-  leagueFilter,
   statusFilter,
 }: ScheduleTabProps) {
   const upcoming = useMemo(() => {
@@ -53,7 +47,6 @@ export function ScheduleTab({
         // When statusFilter is "upcoming", show only pre games (already handled by ScoresTab
         // but ScheduleTab only cares about pre games anyway)
         if (statusFilter !== "all" && statusFilter !== "upcoming") return false;
-        if (leagueFilter.size > 0 && !leagueFilter.has(g.league)) return false;
         return isPre(g);
       })
       .sort((a, b) => {
@@ -63,7 +56,7 @@ export function ScheduleTab({
         if (aFav !== bFav) return bFav - aFav;
         return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
       });
-  }, [games, favoriteTeams, leagueFilter, statusFilter]);
+  }, [games, favoriteTeams, statusFilter]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, Game[]>();
@@ -82,9 +75,7 @@ export function ScheduleTab({
         <p className="text-fg-3 text-xs">
           {statusFilter !== "all" && statusFilter !== "upcoming"
             ? "Schedule only shows upcoming games"
-            : leagueFilter.size > 0
-              ? "No upcoming games in the selected leagues"
-              : "No upcoming games scheduled"}
+            : "No upcoming games scheduled"}
         </p>
       </div>
     );
@@ -116,9 +107,7 @@ export function ScheduleTab({
                   )}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    {shouldShowOnFeed(display.showLogos) && (
-                      <TeamLogo src={g.away_team_logo} alt={g.away_team_name} size="md" />
-                    )}
+                    <TeamLogo src={g.away_team_logo} alt={g.away_team_name} size="md" />
                     <span className="font-mono font-bold text-fg-2">
                       {displayTeamCode(g.away_team_code, g.away_team_name)}
                     </span>
@@ -126,9 +115,7 @@ export function ScheduleTab({
                     <span className="font-mono font-bold text-fg-2">
                       {displayTeamCode(g.home_team_code, g.home_team_name)}
                     </span>
-                    {shouldShowOnFeed(display.showLogos) && (
-                      <TeamLogo src={g.home_team_logo} alt={g.home_team_name} size="md" />
-                    )}
+                    <TeamLogo src={g.home_team_logo} alt={g.home_team_name} size="md" />
                   </div>
                   <div className="text-right shrink-0 ml-3">
                     <div className="text-fg-2 font-mono text-[10px]">

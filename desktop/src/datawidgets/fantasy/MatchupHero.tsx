@@ -24,18 +24,16 @@ import type { LeagueResponse, MatchupTeam } from "./types";
 
 interface MatchupHeroProps {
   league: LeagueResponse;
-  /** Compact variant for multi-league Overview grids. */
-  compact?: boolean;
   /** Optional click handler — links the hero to a deeper view. */
   onClick?: () => void;
 }
 
-export function MatchupHero({ league, compact = false, onClick }: MatchupHeroProps) {
+export function MatchupHero({ league, onClick }: MatchupHeroProps) {
   const ctx = userMatchupContext(league);
   const previous = userPreviousMatchup(league);
 
   if (!ctx) {
-    return <MatchupHeroEmpty league={league} compact={compact} />;
+    return <MatchupHeroEmpty league={league} />;
   }
 
   const { matchup, user, opponent } = ctx;
@@ -85,7 +83,7 @@ export function MatchupHero({ league, compact = false, onClick }: MatchupHeroPro
         "bg-gradient-to-br from-surface-2 via-surface to-surface-2",
         "border-edge/50 hover:border-accent/40",
         onClick && "cursor-pointer",
-        compact ? "p-3" : "p-4 md:p-5",
+        "p-4 md:p-5",
       )}
       disabled={!onClick}
       type="button"
@@ -130,22 +128,11 @@ export function MatchupHero({ league, compact = false, onClick }: MatchupHeroPro
         )}
       >
         {/* User team */}
-        <TeamSide
-          team={user}
-          compact={compact}
-          align="left"
-          isUser
-          colorClass={myColor}
-        />
+        <TeamSide team={user} align="left" isUser colorClass={myColor} />
 
         {/* Center score */}
-        <div
-          className={clsx(
-            "flex flex-col items-center tabular-nums font-mono",
-            compact ? "gap-0.5" : "gap-1",
-          )}
-        >
-          <div className={clsx("font-bold", compact ? "text-xl" : "text-3xl")}>
+        <div className="flex flex-col items-center gap-1 tabular-nums font-mono">
+          <div className="font-bold text-3xl">
             <AnimatedScore value={myPts} colorClass={myColor} />
             <span className="mx-1 text-fg-3">–</span>
             <AnimatedScore value={oppPts} colorClass={oppColor} />
@@ -161,12 +148,7 @@ export function MatchupHero({ league, compact = false, onClick }: MatchupHeroPro
         </div>
 
         {/* Opponent team */}
-        <TeamSide
-          team={opponent}
-          compact={compact}
-          align="right"
-          colorClass={oppColor}
-        />
+        <TeamSide team={opponent} align="right" colorClass={oppColor} />
       </div>
 
       {/* Win probability bar */}
@@ -181,7 +163,7 @@ export function MatchupHero({ league, compact = false, onClick }: MatchupHeroPro
       )}
 
       {/* Last week footnote */}
-      {previous && !compact && (
+      {previous && (
         <div className="relative z-10 mt-3 flex items-center gap-2 border-t border-edge/40 pt-2 font-mono text-[10px] text-fg-3">
           <Zap size={10} className="text-fg-3" />
           <span>
@@ -201,13 +183,11 @@ export function MatchupHero({ league, compact = false, onClick }: MatchupHeroPro
 
 function TeamSide({
   team,
-  compact,
   align,
   colorClass,
   isUser,
 }: {
   team: MatchupTeam;
-  compact: boolean;
   align: "left" | "right";
   colorClass: string;
   isUser?: boolean;
@@ -223,18 +203,10 @@ function TeamSide({
         <img
           src={team.team_logo}
           alt=""
-          className={clsx(
-            "shrink-0 rounded-md object-cover",
-            compact ? "h-7 w-7" : "h-10 w-10",
-          )}
+          className="h-10 w-10 shrink-0 rounded-md object-cover"
         />
       ) : (
-        <div
-          className={clsx(
-            "shrink-0 rounded-md bg-surface-3",
-            compact ? "h-7 w-7" : "h-10 w-10",
-          )}
-        />
+        <div className="h-10 w-10 shrink-0 rounded-md bg-surface-3" />
       )}
       <div
         className={clsx(
@@ -328,20 +300,9 @@ function WinProbabilityBar({ probability }: { probability: number }) {
 
 // ── Empty state variant ──────────────────────────────────────────
 
-function MatchupHeroEmpty({
-  league,
-  compact,
-}: {
-  league: LeagueResponse;
-  compact: boolean;
-}) {
+function MatchupHeroEmpty({ league }: { league: LeagueResponse }) {
   return (
-    <div
-      className={clsx(
-        "rounded-xl border border-edge/40 bg-surface-2/50",
-        compact ? "p-3" : "p-4",
-      )}
-    >
+    <div className="rounded-xl border border-edge/40 bg-surface-2/50 p-4">
       <div className="flex items-center gap-2">
         <span aria-hidden className="text-[15px]">
           {SPORT_EMOJI[league.game_code] ?? "🏆"}

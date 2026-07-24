@@ -4,7 +4,7 @@
  * Used by both the sysmon FeedTab and the ticker data hook.
  */
 import type { SystemInfo } from "../../hooks/useSysmonData";
-import { formatTemp } from "../../utils/format";
+import { formatBytes } from "../../utils/format";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -71,22 +71,5 @@ export function formatWatts(w: number): string {
 
 /** Format network throughput from bytes per interval. */
 export function formatRate(bytesPerInterval: number, intervalMs: number): string {
-  const bytesPerSec = bytesPerInterval / (intervalMs / 1000);
-  if (bytesPerSec < 1024) return `${Math.round(bytesPerSec)} B/s`;
-  const kbps = bytesPerSec / 1024;
-  if (kbps < 1024) return `${kbps.toFixed(1)} KB/s`;
-  const mbps = kbps / 1024;
-  return `${mbps.toFixed(1)} MB/s`;
-}
-
-/**
- * Format a component temperature with unit conversion.
- * Returns e.g. "72°C" or "162°F".
- * @deprecated Use `formatTemp(celsius, unit, true)` from `utils/format` instead.
- */
-export function formatComponentTemp(
-  tempCelsius: number,
-  unit: "celsius" | "fahrenheit",
-): string {
-  return formatTemp(tempCelsius, unit, true);
+  return `${formatBytes(Math.round(bytesPerInterval / (intervalMs / 1000)))}/s`;
 }

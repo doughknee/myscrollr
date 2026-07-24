@@ -5,7 +5,7 @@ import { fetchSysmonData } from "./useSysmonData";
 import type { SystemInfo } from "./useSysmonData";
 import { LS_CLOCK_TIMEZONES, LS_CLOCK_FORMAT, LS_TIMER_STATE, LS_WEATHER_CITIES, LS_WEATHER_UNIT, LS_UPTIME_MONITORS, LS_GITHUB_REPOS } from "../constants";
 import { getStore, onStoreChange } from "../lib/store";
-import { formatBytes, timeAgo } from "../utils/format";
+import { formatBytes, timeAgo, truncate } from "../utils/format";
 import { weatherCodeToIcon, weatherCodeToLabel, formatTemp } from "../widgets/weather/types";
 import { findCpuTemp, findGpuTemp } from "../widgets/sysmon/utils";
 import { tzLabel } from "../widgets/clock/storage";
@@ -170,7 +170,7 @@ export function useWidgetTickerData(
 
       chips.push({
         id: `weather-${name}`,
-        label: name.length > 12 ? name.slice(0, 10) + "\u2026" : name,
+        label: truncate(name, 12),
         temp,
         icon,
         detail: condition ? `${condition} \u00B7 Feels ${feelsLike}` : undefined,
@@ -269,7 +269,7 @@ export function useWidgetTickerData(
 
       chips.push({
         id: `uptime-${mon.id}`,
-        label: mon.name.length > 20 ? mon.name.slice(0, 18) + "\u2026" : mon.name,
+        label: truncate(mon.name, 20),
         status: mon.status,
         uptime: uptimeStr,
         detail: detail || undefined,
@@ -293,12 +293,12 @@ export function useWidgetTickerData(
       const key = repoKey(repo);
       if (cfg.ticker.excludedRepos.includes(key)) continue;
 
-      const repoLabel = repo.repo.length > 20 ? repo.repo.slice(0, 18) + "\u2026" : repo.repo;
+      const repoLabel = truncate(repo.repo, 20);
       const workflow = repo.workflowName ?? "CI";
 
       // Comfort detail: first line of commit message + time ago
       const firstLine = repo.commitMessage?.split("\n")[0] ?? "";
-      const commit = firstLine.length > 30 ? firstLine.slice(0, 28) + "\u2026" : firstLine;
+      const commit = truncate(firstLine, 30);
       const checked = timeAgo(repo.updatedAt, { suffix: true });
       const detail = [commit, checked].filter(Boolean).join(" \u00B7 ");
 

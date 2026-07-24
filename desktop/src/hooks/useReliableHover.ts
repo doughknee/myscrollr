@@ -37,8 +37,6 @@
  * Returned API:
  *   `bind` — props to spread on the element you want to track.
  *   `hovered` — current state.
- *   `forceClear` — manually reset (e.g. after an action moves focus
- *     to the main window programmatically).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -51,7 +49,6 @@ interface ReliableHoverBind {
 interface UseReliableHoverResult {
   hovered: boolean;
   bind: ReliableHoverBind;
-  forceClear: () => void;
 }
 
 /**
@@ -74,10 +71,6 @@ export function useReliableHover(): UseReliableHoverResult {
   // the polling backstop.
   const hoveredRef = useRef(false);
   hoveredRef.current = hovered;
-
-  const forceClear = useCallback(() => {
-    setHovered(false);
-  }, []);
 
   const bind: ReliableHoverBind = {
     onPointerEnter: useCallback(() => {
@@ -132,5 +125,5 @@ export function useReliableHover(): UseReliableHoverResult {
     return () => clearInterval(id);
   }, [hovered]);
 
-  return { hovered, bind, forceClear };
+  return { hovered, bind };
 }

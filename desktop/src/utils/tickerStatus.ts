@@ -5,7 +5,6 @@ interface DataWidgetTickerInfo {
   widget_type: string;
   enabled?: boolean;
   ticker_enabled?: boolean;
-  visible?: boolean;
 }
 
 export interface EffectiveWidgetTickerStatus {

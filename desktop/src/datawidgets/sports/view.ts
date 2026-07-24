@@ -11,14 +11,10 @@
 import type { Game } from "../../types";
 import { isLive, isCloseGame } from "../../utils/gameHelpers";
 import { migrateVenue } from "../../preferences";
-import type { Venue } from "../../preferences";
 
 // ── Display prefs shape (mirrors server-side widget config.display) ─
 //
-// Stored per-user in `user_widgets.config.display` as JSONB. v1.0.2
-// switched each field from boolean → Venue. Old boolean-era values still
-// deserialize correctly because `normalizeSportsDisplayConfig` runs the
-// read through `migrateVenue`.
+// Stored per-user in `user_widgets.config.display` as JSONB.
 
 export interface SportsDisplayConfig {
   /**
@@ -30,8 +26,6 @@ export interface SportsDisplayConfig {
    */
   daysBack?: number;
   daysAhead?: number;
-  showLogos?: Venue;
-  showTimer?: Venue;
 }
 
 /** Defaults: yesterday's finals through next week's slate. */
@@ -169,10 +163,7 @@ export function selectSportsForFeed(
 import type { DashboardResponse } from "../../types";
 
 /**
- * Read a sports widget's display config from the dashboard payload
- * and normalize every field through `migrateVenue` so old boolean-era
- * configs (stored by clients before v1.0.2) still deserialize to valid
- * Venue values.
+ * Read a sports widget's display config from the dashboard payload.
  *
  * Post-split (migration 000014) each sports league is its own row
  * (sports_nfl, sports_nba, ...) carrying its own display toggles, so the
@@ -214,10 +205,5 @@ export function normalizeSportsDisplayConfig(
       obj.daysAhead,
       legacyUpcoming === "off" ? 0 : SPORTS_WINDOW_DEFAULTS.daysAhead,
     ),
-    // 2026-07-17 defaults reset: the logo/timer toggles left the UI with
-    // the configure-page teardown — stored values are ignored and every
-    // surface renders the defaults.
-    showLogos: "both",
-    showTimer: "both",
   };
 }

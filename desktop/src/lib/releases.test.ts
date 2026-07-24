@@ -188,11 +188,11 @@ describe("relativeTime", () => {
     ["2026-07-02T09:00:00Z", "today"],
     ["2026-07-01T09:00:00Z", "yesterday"],
     ["2026-06-27T12:00:00Z", "5 days ago"],
-    ["2026-06-24T12:00:00Z", "1 week ago"],
+    ["2026-06-24T12:00:00Z", "last week"],
     ["2026-06-11T12:00:00Z", "3 weeks ago"],
-    ["2026-05-15T12:00:00Z", "1 month ago"],
+    ["2026-05-15T12:00:00Z", "last month"],
     ["2026-01-02T12:00:00Z", "6 months ago"],
-    ["2025-06-01T12:00:00Z", "1 year ago"],
+    ["2025-06-01T12:00:00Z", "last year"],
     ["2023-06-01T12:00:00Z", "3 years ago"],
   ])("%s → %s", (iso, expected) => {
     expect(relativeTime(iso, NOW)).toBe(expected);

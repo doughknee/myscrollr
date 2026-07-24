@@ -89,16 +89,6 @@ export const TIER_LIMITS: Record<SubscriptionTier, DataWidgetLimits> = {
   },
 };
 
-// Numeric-only keys (excludes the boolean `maxTickerCustomization` field so
-// downstream `getLimit` / `isUnlimited` keep their
-// simple `number` signatures). Exported so callers can constrain their own
-// helpers: e.g. `const LIMIT_ROWS: { key: NumericLimitKey }[] = [...]`.
-export type NumericLimitKey = {
-  [K in keyof DataWidgetLimits]: DataWidgetLimits[K] extends number ? K : never;
-}[keyof DataWidgetLimits];
-
-type LimitKey = NumericLimitKey;
-
 /**
  * Max widgets the tier can run at once (the slot model). Infinity means
  * unlimited. This is the lever the Catalog reads to decide when to show a
@@ -116,15 +106,5 @@ export function getMaxTickerRows(tier: SubscriptionTier): number {
 /** Whether the tier may configure per-row scroll prefs. */
 export function canCustomizeTickerRows(tier: SubscriptionTier): boolean {
   return TIER_LIMITS[tier].maxTickerCustomization;
-}
-
-/** Get the numeric limit for a tier + widget feature. */
-export function getLimit(tier: SubscriptionTier, key: LimitKey): number {
-  return TIER_LIMITS[tier][key];
-}
-
-/** True when the tier has no cap (Infinity) for the given feature. */
-export function isUnlimited(tier: SubscriptionTier, key: LimitKey): boolean {
-  return TIER_LIMITS[tier][key] === Infinity;
 }
 

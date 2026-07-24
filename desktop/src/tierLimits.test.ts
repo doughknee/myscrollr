@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import snapshot from "../../api/internal/widgets/tier_limits.json";
 import {
   TIER_LIMITS,
-  getLimit,
-  isUnlimited,
   getMaxWidgets,
   getMaxTickerRows,
   canCustomizeTickerRows,
@@ -21,51 +19,6 @@ describe("getMaxWidgets", () => {
     ["super_user", Infinity],
   ])("returns %s = %d", (tier, expected) => {
     expect(getMaxWidgets(tier)).toBe(expected);
-  });
-});
-
-// ── getLimit ────────────────────────────────────────────────────
-
-const DEPTH_KEYS = ["symbols", "feeds", "customFeeds", "leagues", "fantasy"] as const;
-const ALL_TIERS: SubscriptionTier[] = [
-  "free",
-  "uplink",
-  "uplink_pro",
-  "uplink_ultimate",
-  "super_user",
-];
-
-describe("getLimit", () => {
-  // Per-feature depth caps were retired 2026-07-02 — unlimited on every tier.
-  it("returns Infinity for every depth cap on every tier", () => {
-    for (const tier of ALL_TIERS) {
-      for (const key of DEPTH_KEYS) {
-        expect(getLimit(tier, key)).toBe(Infinity);
-      }
-    }
-  });
-
-  it("still returns finite, tiered ticker-row limits", () => {
-    expect(getLimit("free", "maxTickerRows")).toBe(1);
-    expect(getLimit("uplink", "maxTickerRows")).toBe(2);
-    expect(getLimit("uplink_pro", "maxTickerRows")).toBe(3);
-  });
-});
-
-// ── isUnlimited ─────────────────────────────────────────────────
-
-describe("isUnlimited", () => {
-  it("returns true for every retired depth cap on every tier", () => {
-    for (const tier of ALL_TIERS) {
-      for (const key of DEPTH_KEYS) {
-        expect(isUnlimited(tier, key)).toBe(true);
-      }
-    }
-  });
-
-  it("returns false for the finite ticker-row limits", () => {
-    expect(isUnlimited("free", "maxTickerRows")).toBe(false);
-    expect(isUnlimited("uplink_pro", "maxTickerRows")).toBe(false);
   });
 });
 

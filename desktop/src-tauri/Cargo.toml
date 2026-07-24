@@ -2,6 +2,8 @@
 name = "scrollr-desktop"
 version = "1.1.12"
 edition = "2021"
+# std::env::home_dir (Sentry path scrubber) is only correct on Windows from 1.85+
+rust-version = "1.85"
 description = "Scrollr desktop app — pinned live ticker for sports, finance, RSS, and Yahoo Fantasy."
 authors = ["Brandon Ruth <brandon@myscrollr.com>"]
 license = "AGPL-3.0-or-later"
@@ -55,9 +57,6 @@ sentry = { version = "0.42", default-features = false, features = [
     "rustls",
     "release-health",
 ] }
-# Used to resolve $HOME for scrubbing it from stack-frame filenames before
-# events are sent. Small, well-maintained dependency.
-dirs = "5"
 
 # ── Client-side Kalshi account link (on-device, read-only) ──────────
 # The user's Kalshi key never leaves the machine: we sign their requests
@@ -97,7 +96,6 @@ windows-sys = { version = "0.59", features = [
     "Win32_Foundation",
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
-    "Win32_Graphics_Gdi",
     "Win32_Graphics_Dwm",
 ] }
 # wmi: queries Windows Management Instrumentation. Used by the System

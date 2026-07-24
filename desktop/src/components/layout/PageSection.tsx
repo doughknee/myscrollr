@@ -5,9 +5,6 @@
  *   - "card"  (default for forms / settings / config) — bordered
  *     surface with padding. Good for chunky controls and discrete
  *     control surfaces.
- *   - "plain" (used on Home / dashboards) — borderless, looser
- *     vertical rhythm with a subtle divider between sections. Lets
- *     dense data breathe.
  *   - "grid"  (used on Catalog) — no internal padding, content
  *     handles its own grid layout.
  *
@@ -38,7 +35,7 @@ interface PageSectionProps {
   /** Body of the section. */
   children: ReactNode;
   /** Visual treatment. See file header. */
-  variant?: "card" | "plain" | "grid";
+  variant?: "card" | "grid";
   /** Extra classes on the outer wrapper (rare; prefer composition). */
   className?: string;
 }
@@ -56,24 +53,16 @@ export default function PageSection({
 }: PageSectionProps) {
   const wrapperClasses = clsx(
     variant === "card" && "rounded-xl border border-edge/30 bg-base-200/30",
-    variant === "plain" && "border-b border-edge/20 last:border-b-0 pb-6 last:pb-0",
-    variant === "grid" && "",
     "mb-5 last:mb-0",
     className,
   );
 
   const headerClasses = clsx(
     "flex items-start justify-between gap-3",
-    variant === "card" && "px-4 pt-3.5 pb-3",
-    variant === "plain" && "mb-3",
-    variant === "grid" && "mb-3",
+    variant === "card" ? "px-4 pt-3.5 pb-3" : "mb-3",
   );
 
-  const bodyClasses = clsx(
-    variant === "card" && "px-4 pb-4",
-    variant === "plain" && "",
-    variant === "grid" && "",
-  );
+  const bodyClasses = clsx(variant === "card" && "px-4 pb-4");
 
   return (
     <section className={wrapperClasses}>

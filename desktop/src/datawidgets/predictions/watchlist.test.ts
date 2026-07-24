@@ -3,7 +3,6 @@ import {
   withToggled,
   withAlertAdded,
   withAlertRemoved,
-  withAlertPatched,
   crossed,
   evaluateAlerts,
   describeAlert,
@@ -30,16 +29,12 @@ describe("watchlist (pure)", () => {
 });
 
 describe("alert list ops (pure)", () => {
-  it("adds, removes, and patches by id", () => {
+  it("adds and removes by id", () => {
     const a = alert({ id: "1" });
     const b = alert({ id: "2", ticker: "X" });
     let list = withAlertAdded([], a);
     list = withAlertAdded(list, b);
     expect(list.map((x) => x.id)).toEqual(["1", "2"]);
-
-    list = withAlertPatched(list, "1", { enabled: false });
-    expect(list.find((x) => x.id === "1")!.enabled).toBe(false);
-    expect(list.find((x) => x.id === "2")!.enabled).toBe(true);
 
     list = withAlertRemoved(list, "1");
     expect(list.map((x) => x.id)).toEqual(["2"]);

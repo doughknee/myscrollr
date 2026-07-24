@@ -18,8 +18,6 @@ interface GameItemProps {
   game: Game;
   mode: FeedMode;
   isFavorite?: boolean;
-  showLogos?: boolean;
-  showTimer?: boolean;
 }
 
 function formatScore(score: number | string | null | undefined): string {
@@ -58,8 +56,6 @@ export const GameItem = memo(function GameItem({
   game,
   mode,
   isFavorite = false,
-  showLogos = true,
-  showTimer = true,
 }: GameItemProps) {
   const live = isLive(game);
   const final_ = isFinal(game);
@@ -77,9 +73,7 @@ export const GameItem = memo(function GameItem({
           hasLink && "hover:bg-surface-hover cursor-pointer",
         )}
       >
-        {showLogos && (
-          <TeamLogo src={game.away_team_logo} alt={game.away_team_name} size="md" />
-        )}
+        <TeamLogo src={game.away_team_logo} alt={game.away_team_name} size="md" />
         <span
           className={clsx(
             "font-mono font-medium min-w-[28px]",
@@ -117,26 +111,22 @@ export const GameItem = memo(function GameItem({
         >
           {displayTeamCode(game.home_team_code, game.home_team_name)}
         </span>
-        {showLogos && (
-          <TeamLogo src={game.home_team_logo} alt={game.home_team_name} size="md" />
-        )}
+        <TeamLogo src={game.home_team_logo} alt={game.home_team_name} size="md" />
         {isFavorite && (
           <Star size={10} className="text-[#f97316]/60 fill-[#f97316]/40 shrink-0" />
         )}
-        {showTimer && (
-          <span
-            className={clsx(
-              "ml-auto text-[9px] font-mono uppercase tracking-wider",
-              live && "text-live font-bold",
-              !live && "text-fg-3",
-            )}
-          >
-            {live && (
-              <span className="inline-block w-1 h-1 rounded-full bg-live mr-1 align-middle animate-pulse" />
-            )}
-            {gameStatusLabel(game)}
-          </span>
-        )}
+        <span
+          className={clsx(
+            "ml-auto text-[9px] font-mono uppercase tracking-wider",
+            live && "text-live font-bold",
+            !live && "text-fg-3",
+          )}
+        >
+          {live && (
+            <span className="inline-block w-1 h-1 rounded-full bg-live mr-1 align-middle animate-pulse" />
+          )}
+          {gameStatusLabel(game)}
+        </span>
       </CardWrapper>
     );
   }
@@ -172,9 +162,7 @@ export const GameItem = memo(function GameItem({
       />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {showLogos && (
-            <TeamLogo src={game.away_team_logo} alt={game.away_team_name} size="lg" />
-          )}
+          <TeamLogo src={game.away_team_logo} alt={game.away_team_name} size="lg" />
           <span
             className={clsx(
               "text-sm",
@@ -197,9 +185,7 @@ export const GameItem = memo(function GameItem({
 
       <div className="flex items-center justify-between mt-0.5">
         <div className="flex items-center gap-2">
-          {showLogos && (
-            <TeamLogo src={game.home_team_logo} alt={game.home_team_name} size="lg" />
-          )}
+          <TeamLogo src={game.home_team_logo} alt={game.home_team_name} size="lg" />
           <span
             className={clsx(
               "text-sm",
@@ -225,22 +211,18 @@ export const GameItem = memo(function GameItem({
           <Star size={10} className="text-[#f97316]/60 fill-[#f97316]/40" />
         )}
         <div className={clsx("flex items-center gap-1.5", !isFavorite && "ml-auto")}>
-          {showTimer && (
-            <>
-              {live && (
-                <span className="inline-block w-1 h-1 rounded-full bg-live animate-pulse" />
-              )}
-              <span
-                className={clsx(
-                  "text-[9px] font-mono uppercase tracking-wider",
-                  live && "text-live font-bold",
-                  !live && "text-fg-3",
-                )}
-              >
-                {gameStatusLabel(game)}
-              </span>
-            </>
+          {live && (
+            <span className="inline-block w-1 h-1 rounded-full bg-live animate-pulse" />
           )}
+          <span
+            className={clsx(
+              "text-[9px] font-mono uppercase tracking-wider",
+              live && "text-live font-bold",
+              !live && "text-fg-3",
+            )}
+          >
+            {gameStatusLabel(game)}
+          </span>
         </div>
       </div>
     </CardWrapper>
@@ -248,8 +230,6 @@ export const GameItem = memo(function GameItem({
 }, (prev, next) =>
   prev.mode === next.mode &&
   prev.isFavorite === next.isFavorite &&
-  prev.showLogos === next.showLogos &&
-  prev.showTimer === next.showTimer &&
   prev.game.id === next.game.id &&
   prev.game.link === next.game.link &&
   prev.game.away_team_name === next.game.away_team_name &&

@@ -13,7 +13,7 @@
  * No league management: per-league widgets have an intrinsic league,
  * and coarse `sports` rows can't exist post-migration-000014.
  */
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Trophy, CalendarRange } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { sportsFullQueryOptions, sportsTeamsOptions } from "../../api/queries";
@@ -28,11 +28,9 @@ import EmptyWidgetState from "../../components/EmptyWidgetState";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarDivider, BarPill } from "../../components/widget-bar/Bar";
 import {
-  useDismiss,
-  MenuPanel,
+  FilterMenuShell,
   MenuHeading,
   MenuRow,
-  FilterTrigger,
 } from "../../components/widget-bar/Menu";
 import {
   Segmented,
@@ -40,7 +38,7 @@ import {
 } from "../../components/widget-bar/Segmented";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import { isLive, isPre, isFinal } from "../../utils/gameHelpers";
-import { AnimatePresence } from "motion/react";
+import { latestTimestamp } from "../feedHooks";
 import type { FeedTabProps, DataWidgetManifest } from "../../types";
 import type { FavoriteTeam } from "../../hooks/useSportsConfig";
 
@@ -86,12 +84,6 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "final", label: "Final" },
 ];
 
-// Per-league widgets are single-league by construction (and coarse
-// `sports` rows can't exist post-migration-000014), so the old in-feed
-// league filter is gone; the tab components still accept a set — always
-// empty until their props get slimmed in the teardown pass.
-const EMPTY_LEAGUE_FILTER = new Set<string>();
-
 // ── Helper: build set of favorite team names ─────────────────────
 
 function buildFavoriteSet(favorites: Record<string, FavoriteTeam>): Set<string> {
@@ -133,16 +125,10 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
     [favoriteTeams],
   );
 
-  // Most-recent update across all games — drives the FreshnessPill.
-  const latestUpdated = useMemo(() => {
-    let latest = 0;
-    for (const g of games) {
-      if (!g.updated_at) continue;
-      const ts = new Date(g.updated_at).getTime();
-      if (Number.isFinite(ts) && ts > latest) latest = ts;
-    }
-    return latest > 0 ? new Date(latest).toISOString() : null;
-  }, [games]);
+  const latestUpdated = useMemo(
+    () => latestTimestamp(games, (g) => g.updated_at),
+    [games],
+  );
 
   // Status counts for the collapsed Filter menu rows.
   const statusCounts = useMemo(() => {
@@ -235,16 +221,13 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
               mode={mode}
               display={display}
               favoriteTeams={favoriteTeamNames}
-              leagueFilter={EMPTY_LEAGUE_FILTER}
               statusFilter={statusFilter}
             />
           )}
           {tab === "schedule" && (
             <ScheduleTab
               games={games}
-              display={display}
               favoriteTeams={favoriteTeamNames}
-              leagueFilter={EMPTY_LEAGUE_FILTER}
               statusFilter={statusFilter}
             />
           )}
@@ -271,39 +254,21 @@ function SportsFilterMenu({
   onPickStatus: (s: StatusFilter) => void;
   counts: { all: number; live: number; upcoming: number; final: number };
 }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
-  useDismiss(rootRef, open, close);
-
   return (
-    // NOT position:relative — the dropdown anchors to the sticky bar so
-    // it spans the widget width instead of clipping at narrow widths.
-    <div ref={rootRef} className="shrink-0 rounded-lg">
-      <FilterTrigger
-        open={open}
-        badgeCount={statusFilter !== "all" ? 1 : 0}
-        onClick={() => setOpen((o) => !o)}
-      />
-      <AnimatePresence>
-        {open && (
-          <MenuPanel className="inset-x-2">
-            <MenuHeading>Status</MenuHeading>
-            {STATUS_OPTIONS.map((opt) => (
-              <MenuRow
-                key={opt.value}
-                selected={statusFilter === opt.value}
-                onClick={() => onPickStatus(opt.value)}
-                role="menuitemradio"
-                count={counts[opt.value]}
-              >
-                {opt.label}
-              </MenuRow>
-            ))}
-          </MenuPanel>
-        )}
-      </AnimatePresence>
-    </div>
+    <FilterMenuShell badgeCount={statusFilter !== "all" ? 1 : 0}>
+      <MenuHeading>Status</MenuHeading>
+      {STATUS_OPTIONS.map((opt) => (
+        <MenuRow
+          key={opt.value}
+          selected={statusFilter === opt.value}
+          onClick={() => onPickStatus(opt.value)}
+          role="menuitemradio"
+          count={counts[opt.value]}
+        >
+          {opt.label}
+        </MenuRow>
+      ))}
+    </FilterMenuShell>
   );
 }
 

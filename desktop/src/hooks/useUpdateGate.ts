@@ -13,21 +13,7 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "../config";
-
-/** Compare dotted numeric versions: -1 / 0 / 1 for a < b / a == b / a > b.
- *  Non-numeric segments compare as 0 (fail-open for exotic tags). */
-export function compareVersions(a: string, b: string): number {
-  const pa = a.split(".").map((s) => parseInt(s, 10) || 0);
-  const pb = b.split(".").map((s) => parseInt(s, 10) || 0);
-  const len = Math.max(pa.length, pb.length);
-  for (let i = 0; i < len; i++) {
-    const da = pa[i] ?? 0;
-    const db = pb[i] ?? 0;
-    if (da < db) return -1;
-    if (da > db) return 1;
-  }
-  return 0;
-}
+import { compareVersions } from "../lib/releases";
 
 interface UpdateGate {
   /** True when the server's minimum is newer than the installed version. */

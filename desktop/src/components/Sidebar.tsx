@@ -38,7 +38,6 @@ import {
 import clsx from "clsx";
 import { motion } from "motion/react";
 import Tooltip from "./Tooltip";
-import ContextMenu from "./ContextMenu";
 import OverflowMenu from "./OverflowMenu";
 import type { DataWidgetManifest, WidgetManifest } from "../types";
 import { loadPref, savePref } from "../preferences";
@@ -300,10 +299,9 @@ export default function Sidebar({
           open, configure, ticker visibility, its catalog page, and
           remove. Actions resolve in the shell layer — the same paths
           the info page and ticker settings use. */}
-      <ContextMenu
-        open={menu !== null}
-        x={menu?.x ?? 0}
-        y={menu?.y ?? 0}
+      <OverflowMenu
+        anchorPoint={menu && { x: menu.x, y: menu.y }}
+        placement="bottom-start"
         onClose={() => setMenu(null)}
         items={
           menu
@@ -328,12 +326,12 @@ export default function Sidebar({
                   icon: Info,
                   onSelect: () => onInfoItem(menu.source.id),
                 },
+                { key: "remove-divider", divider: true },
                 {
                   key: "remove",
                   label: "Remove",
                   icon: Trash2,
                   destructive: true,
-                  dividerBefore: true,
                   onSelect: () => onRemoveItem(menu.source),
                 },
               ]
@@ -388,7 +386,6 @@ function NavItem({
   label,
   active,
   collapsed,
-  accent = false,
   onClick,
   onContextMenu,
 }: {
@@ -396,8 +393,6 @@ function NavItem({
   label: string;
   active: boolean;
   collapsed?: boolean;
-  /** Accent variant for CTA-like items (currently "Add source"). */
-  accent?: boolean;
   onClick: () => void;
   /** Right-click handler — source rows open their context menu. */
   onContextMenu?: (e: React.MouseEvent) => void;
@@ -415,22 +410,14 @@ function NavItem({
           collapsed
             ? "justify-center py-1.5 px-0"
             : "gap-2.5 px-2.5 py-1.5 text-ui-body",
-          active
-            ? accent
-              ? "bg-accent/15 text-accent"
-              : "text-fg"
-            : accent
-              ? "text-accent/85 hover:bg-accent/10 hover:text-accent"
-              : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
+          active ? "text-fg" : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
         )}
       >
         {/* Active indicator — filled pill behind the row. layoutId
             makes it slide between nav items when the active page
             changes (same pattern as the TopBar tab pill; z-0 fill +
-            z-10 content so labels stay above it mid-flight). The
-            accent CTA carries its own active treatment so the pill
-            is suppressed there to avoid double-emphasis. */}
-        {active && !accent && (
+            z-10 content so labels stay above it mid-flight). */}
+        {active && (
           <motion.span
             layoutId="sidebar-active-indicator"
             transition={{ type: "spring", stiffness: 380, damping: 30 }}
