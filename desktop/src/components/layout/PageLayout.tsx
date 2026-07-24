@@ -10,8 +10,6 @@
  *   1. Content stack — children, cross-faded on tab/route changes
  *   2. Footer — optional destructive/peripheral page-level actions
  *
- * IA refactor 2026-05-09 polish pass — see
- * docs/_archive/superpowers/specs/2026-05-09-desktop-ia-refactor-design.md
  * Tab band hoisted into the TopBar on 2026-05-11 to reclaim vertical
  * space and consolidate page chrome.
  */

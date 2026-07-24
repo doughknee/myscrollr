@@ -118,7 +118,9 @@ FROM pg_replication_slots;
 **Note:** DO will not shrink the volume after this. You'll stop
 accumulating bills for new auto-scales but the already-allocated
 storage stays. To shrink, you'd need to fork or restore to a smaller
-cluster (see `k8s-migration-runbook.md` for swap procedure).
+cluster — DigitalOcean's fork/restore flow, then repoint `DATABASE_URL` in
+the `scrollr-secrets` Secret and restart the affected deployments. (This
+pointed at a `k8s-migration-runbook.md` that has never existed in the repo.)
 
 ### Step 2 — Recreate the Sequin connector
 
@@ -221,7 +223,7 @@ When you want a new table to stream via CDC:
 
 1. Add a case to `topicForRecord` in
    `api/internal/events/handlers_webhook.go` and define a topic prefix constant
-   in `api/core/constants.go` if needed.
+   in `api/internal/platform/constants.go` if needed.
 2. Add the table to the Sequin sink's table-filter list.
 3. Verify via `kubectl logs deploy/core-api | grep '[Sequin]'` after
    triggering a write to the table.
@@ -422,4 +424,4 @@ migrated, re-apply and re-verify.
   path that likely wrote the poisoned WAL record behind the 2026-04-23
   incident.
 - `api/internal/events/handlers_webhook.go` — the webhook receiver.
-- `api/core/constants.go` — CDC topic prefixes.
+- `api/internal/platform/constants.go` — CDC topic prefixes.

@@ -30,7 +30,6 @@ pull request. If you just want to run the project locally, the [root
 | `myscrollr.com/` | Marketing site, legal hub, billing portal (React + Vite + TanStack Router). |
 | `desktop/` | Tauri v2 desktop app — the primary product. React frontend in `desktop/src/`, Rust backend in `desktop/src-tauri/`. |
 | `k8s/` | Kubernetes manifests, applied to DOKS by `.github/workflows/deploy.yml`. |
-| `docs/_archive/superpowers/` | Historical design specs/plans, one per shipped feature. Archived, not maintained — trust the code and `AGENTS.md` over it. |
 | `scripts/` | Dev + ops shell tooling: local-stack helpers, Kalshi key pull, smoke tests. |
 
 `AGENTS.md` at the root has the full commands cheatsheet (build, test,

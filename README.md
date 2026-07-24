@@ -185,6 +185,9 @@ Per-service style (semis, quotes, path aliases) varies — see
 
 ## Documentation
 
+**[`docs/README.md`](./docs/README.md) indexes every doc in the repo** and says
+which ones win when they disagree. The essentials:
+
 - [`AGENTS.md`](./AGENTS.md) — the one-page cheatsheet: commands, ports,
   conventions, per-language rules.
 - [`docs/VISION.md`](./docs/VISION.md) — the charter: what Scrollr is,
@@ -200,10 +203,6 @@ Per-service style (semis, quotes, path aliases) varies — see
   to send PRs, what we do and don't merge.
 - [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) — community rules.
 - [`SECURITY.md`](./SECURITY.md) — vulnerability reporting.
-- [`docs/_archive/superpowers/`](./docs/_archive/superpowers/) — **historical
-  archive** of dated design specs and plans, one per shipped feature. Not
-  maintained and often stale — the code, `AGENTS.md`, `docs/VISION.md`, and
-  `docs/adr/` are authoritative. Read the archive for backstory only.
 
 ## License
 

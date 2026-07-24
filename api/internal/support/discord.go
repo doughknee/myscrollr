@@ -41,8 +41,6 @@ import (
 //
 // Failure mode is fail-open: if Discord calls fail, we log and continue.
 // The email notification path stays active as a backup.
-//
-// See docs/_archive/superpowers/specs/2026-05-01-discord-triage-integration-design.md
 
 const (
 	discordAPIBase     = "https://discord.com/api/v10"
