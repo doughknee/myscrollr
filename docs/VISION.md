@@ -122,6 +122,24 @@ Kill "channel"/"datawidget"/"source" as vocabulary across **every** layer: clien
 
 It's the largest *mechanical* effort in the plan, but no longer a risky one.
 
+**✅ Done as of v1.1.10.** Two carve-outs survive on purpose — do not "finish" the
+rename by removing them:
+
+- **`ChannelInfo`, `ChannelRoute`, `channel_lifecycle` stay.** They name
+  *discovered backend services*, not widgets — a separate concept the charter
+  keeps (discovery/proxy remains for fantasy). The complaint in §2 was that one
+  *concept* carried six names; this is a second concept that legitimately owns
+  the word.
+- **The marketing site's public `/channels` URL stays.** Renaming a public route
+  is a redirect problem, not a doc fix, and its link text already reads "Browse
+  widgets".
+
+Deliberately deferred as low-value churn: `DataWidgetRow` / `dataWidgetsApi` /
+`DataWidgetManifest` and the `desktop/src/datawidgets/` folder still carry
+"datawidget". Renaming the folder to `sources/` would better describe what it
+holds (the `source → renderer` registry) at the cost of touching every import
+path.
+
 ### 4.5 Backend package boundaries (one binary)
 
 Break the flat `core` package (~55 files) into internal Go packages along real seams: `widgets`, `billing`, `accounts`, `events`, `support`, `discord`, `ingest-read`. **Same binary, same deployment** — this is legibility and blast-radius, not a new workload (keeps ADR-0002's consolidation). The package boundary makes a future service-extraction cheap *if* support/Discord ever earn it.
@@ -187,12 +205,23 @@ Codegen TS types from the Go API's OpenAPI contract so web and desktop **cannot 
 
 ---
 
-## 8. Open items — execution only
+## 8. Execution status
 
-**All design decisions are settled (§7 — ten decisions).** What remains is execution plus one verification; no open forks:
+**All design decisions are settled (§7 — ten decisions), and the unification
+that carried them shipped in v1.1.10.** Nothing in this charter is outstanding.
 
-- **Rollout plan → [ROLLOUT.md](./ROLLOUT.md)** — detailed there. **Pre-users, so no backward-compat machinery** (no dual-speak, no gated retirement); the phases are a sensible work-order, not compat-gated releases. Summary order: ① backend package split → ② DB schema authority + final names (reset DB freely) → ③ server catalog + generic client + rename everywhere → ④ shared-types codegen → ⑤ cleanup (dead code + doc rewrite).
-- **Docs rewrite (backlog #9)** — not a decision, just work: rewrite `README.md` + `api/CHANNELS.md` to the post-pivot architecture, add ADR-0002 to the ADR index, fix the marketing architecture page. Lands in Phase 5.
-- **Verify before names freeze:** confirm predictions/Kalshi is a fully first-class catalog entry — it was absent from `api/CHANNELS.md` and carries demo-mode + dev bridges. Check during Phase 3.
+The five-phase execution — backend package split → DB schema authority + final
+names → server catalog + generic client + rename → shared-types codegen →
+cleanup — is recorded in **[ROLLOUT.md](./ROLLOUT.md)**, including where the
+plan's premises turned out to be wrong (most notably Phase 4: there was no
+OpenAPI spec to generate from, so `api/cmd/gents` reads the Go structs
+directly). The three items this section previously tracked as open — the
+rollout itself, the docs rewrite (backlog #9), and verifying predictions/Kalshi
+as a first-class catalog entry — all landed with it.
 
-*No unresolved decisions remain — see §7 (10 decisions) and [ROLLOUT.md](./ROLLOUT.md).*
+What's still live from this document: the non-negotiables in §6, the carve-outs
+in §4.4, and the compat discipline that activates the moment Scrollr ships to
+real users. The "breaking changes are free" window in §4.4 and ROLLOUT is a
+**pre-launch** condition — it closes at first launch, and §6 takes over.
+
+Forward-looking product work lives in [ROADMAP.md](./ROADMAP.md), not here.

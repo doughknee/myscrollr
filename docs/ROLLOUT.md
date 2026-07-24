@@ -1,11 +1,19 @@
-# Scrollr Unification — Rollout Plan
+# Scrollr Unification — Execution Log
 
-> Execution plan for the decisions in [VISION.md](./VISION.md). Companion to the charter: the charter is stable, this changes as work lands.
-> **Created:** 2026-07-20.
+> **This is a completed record, not a plan.** All five phases shipped in
+> v1.1.10; nothing here is outstanding work. Kept as the execution log for the
+> repo's largest refactor — what landed, and where the plan's premises turned
+> out to be wrong.
+>
+> For current guidance read [VISION.md](./VISION.md) (the charter, still live)
+> and `docs/adr/`. Anything below that reads like an instruction has already
+> been carried out.
+>
+> **Created:** 2026-07-20. **Completed:** 2026-07-21 (v1.1.10).
 
 ---
 
-## Assumption: zero users (current state)
+## Assumption at the time: zero users
 
 Scrollr has **no users yet**, so **breaking changes are free** — and *now* is the only moment they'll ever be free. There is **no backward-compat, no dual-speak, no deprecation window, no gated retirement.** Rename outright; reset the database if convenient; delete old names on sight.
 
@@ -113,65 +121,13 @@ Renaming a public route is not a doc fix, and the link text already reads
 
 ### Phase 3 — what remains
 
-Only cosmetic vocabulary, deliberately deferred as low-value churn:
-
-- `DataWidgetRow` / `dataWidgetsApi` / `DataWidgetManifest` and the
-  `desktop/src/datawidgets/` folder still carry "datawidget". Renaming the folder
-  to `sources/` would match what it actually holds (the `source → renderer`
-  registry), at the cost of touching every import path.
-- **`ChannelInfo`, `ChannelRoute` and `channel_lifecycle` should NOT be
-  renamed.** They name *discovered backend services*, not widgets —
-  a different concept that the charter explicitly keeps (discovery/proxy stays for
-  fantasy). VISION §2's complaint was that one *concept* carried six names; this is
-  a second concept that legitimately owns the word.
-  *(`GetValidChannelTypes` was on this list until 2026-07-21. It is gone — not
-  renamed, deleted: its only callers were the widget create/update validators,
-  which had no business asking a service registry what a widget is. Nothing
-  else ever called it.)*
-
-**Deferred out of Phase 2, with reasons:**
-
-- **sqlx compile-time `query!` macros** (the Rust drift guard). Converting every
-  call site needs a live database at build time or committed `.sqlx` offline data
-  plus CI work to regenerate it. The schema consolidation stands without it;
-  fantasy's `schema_contract_test.go` is the pattern to copy if you want a guard
-  sooner and cheaper.
-- **The shared Rust `common` crate** (§7.9). Measured: `init.rs` is byte-identical
-  across all four services (297 lines × 4). `log.rs` is same-length but differs
-  (service name). `main.rs` genuinely differs per service (308–437 lines) and is
-  *not* shareable. So the real prize is ~900 duplicate lines, against a Cargo
-  workspace plus reworked build contexts for four deployed services. Still
-  opportunistic, as this plan always said.
-
-**Phase 3 findings from the pre-work survey — read these first:**
-
-1. **The server catalog is missing 12 of the 29 shipped widgets.** `api/internal/platform/widgets.go`
-   enumerates 11 data widgets; `desktop/src/marketplace.ts DATA_WIDGETS` has 29 ids.
-   The extra 12 (8 sports leagues: `sports_ncaaf`, `sports_ncaab`, `sports_premierleague`,
-   `sports_laliga`, `sports_mls`, `sports_championsleague`, `sports_ufc`, `sports_afl`;
-   and the per-feed news split: `news_bbc`, `news_npr`, … `rss_custom`) are valid only
-   via the *prefix* rules (`sports_` → sports, `news_` → rss), so they work but the
-   server has no label/identity for them. **The server catalog must absorb all 29
-   with identity (name, color, icon, category, tier, order) before any client can
-   fetch it** — that transcription is the bulk of Phase 3's server half.
-2. **Kalshi/predictions IS first-class** (the §8 item to verify before names freeze).
-   It is a real entry in both the server registry and desktop `DATA_WIDGETS`, with a
-   full renderer set under `desktop/src/datawidgets/predictions/`. Its demo bridges
-   (`KALSHI_ENV=demo`, `VITE_DEMO`, `serve_bridge.rs`, `kalshi_probe.rs`) are dev-only
-   binaries and do not make it second-class. **No blocker to freezing names.**
-3. **The web has no parallel widget catalog to delete.** §4.2 says to delete "the
-   web's parallel catalog"; in fact `myscrollr.com` contains zero widget ids — its
-   "widget" mentions are marketing copy in landing/FAQ/support components. This is
-   consistent with the charter (website = marketing/auth/billing only). Scope Phase 3's
-   client work to desktop, plus the wire rename where the web calls the API.
-4. **"Delete `desktop/src/datawidgets/`" needs re-reading.** That tree is ~16k lines and
-   is almost entirely *renderers* (`FeedTab.tsx`, `view.ts`, per-source components) —
-   exactly what §4.1 says to keep as the `source → renderer` registry. What actually
-   gets deleted is the widget-*definition* layer: `datawidgets/registry.ts` (23 lines,
-   a build-time `import.meta.glob`) and `marketplace.ts DATA_WIDGETS` (~230 lines).
-   *(Correction, 2026-07-21: `DATA_WIDGETS` went; `datawidgets/registry.ts` did
-   not — it survives at 28 lines as the source → renderer registry, which is
-   what §4.1 wanted all along.)*
+The two deliberate carve-outs from the rename (`ChannelInfo`/`ChannelRoute`/
+`channel_lifecycle`, and the marketing site's public `/channels` URL) plus the
+deferred `datawidget` naming now live in **[VISION §4.4](./VISION.md#44-one-vocabulary-widget-everywhere-rename-outright--pre-users)**,
+so the guardrail sits with the charter rather than at the end of a completed
+plan. `GetValidChannelTypes` was on this list until 2026-07-21; it is gone —
+not renamed, deleted. Its only callers were the widget create/update
+validators, which had no business asking a service registry what a widget is.
 
 ## Work order at a glance
 
