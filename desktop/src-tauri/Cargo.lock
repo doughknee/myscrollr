@@ -4628,6 +4628,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tokio",
  "tokio-tungstenite",
+ "url",
  "windows-sys 0.59.0",
  "wmi",
 ]

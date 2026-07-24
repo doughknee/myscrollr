@@ -388,47 +388,22 @@ fn finish_auth_server(running_handle: &AuthServerRunning, stop_requested: &AuthS
 
 /// Extract a query parameter from a raw HTTP request line.
 /// Parses "GET /callback?code=xxx&state=yyy HTTP/1.1".
+///
+/// Percent- and plus-decoding come from `url`, which reqwest already pulls
+/// in and compiles into this binary. The hand-rolled decoder this replaced
+/// silently mangled malformed input — `%X` with no second hex digit
+/// consumed the next byte and substituted '0' for it — where `url` follows
+/// the WHATWG rules and leaves an invalid escape intact.
+///
+/// The request line carries only a path, so it is resolved against a dummy
+/// base to make the absolute URL the parser needs.
 fn extract_query_param(request: &str, key: &str) -> Option<String> {
     let first_line = request.lines().next()?;
     let path = first_line.split_whitespace().nth(1)?;
-    let query = path.split('?').nth(1)?;
-
-    for pair in query.split('&') {
-        let mut kv = pair.splitn(2, '=');
-        if kv.next()? == key {
-            return kv.next().map(percent_decode);
-        }
-    }
-    None
-}
-
-/// Minimal percent-decoding for OAuth callback parameters.
-/// Accumulates raw bytes so multi-byte UTF-8 sequences (e.g. %C3%A9 → é)
-/// decode correctly instead of being treated as individual codepoints.
-fn percent_decode(input: &str) -> String {
-    let mut bytes = Vec::with_capacity(input.len());
-    let mut iter = input.bytes();
-    while let Some(b) = iter.next() {
-        if b == b'%' {
-            let hi = iter.next().unwrap_or(b'0');
-            let lo = iter.next().unwrap_or(b'0');
-            let hex = [hi, lo];
-            if let Ok(s) = std::str::from_utf8(&hex) {
-                if let Ok(val) = u8::from_str_radix(s, 16) {
-                    bytes.push(val);
-                    continue;
-                }
-            }
-            bytes.push(b'%');
-            bytes.push(hi);
-            bytes.push(lo);
-        } else if b == b'+' {
-            bytes.push(b' ');
-        } else {
-            bytes.push(b);
-        }
-    }
-    String::from_utf8(bytes).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
+    let url = url::Url::parse("http://127.0.0.1").ok()?.join(path).ok()?;
+    url.query_pairs()
+        .find(|(k, _)| k == key)
+        .map(|(_, v)| v.into_owned())
 }
 
 #[cfg(test)]
@@ -439,6 +414,42 @@ mod tests {
     use std::sync::{atomic::AtomicBool, Arc, Mutex};
     use std::thread;
     use std::time::Duration;
+
+    // The auth-server tests below reach extract_query_param through a real
+    // socket, which only ever exercises the simple unescaped path. These
+    // cover the decoding directly — the part that moved to `url`.
+    #[test]
+    fn extract_query_param_decodes_escapes() {
+        let line = |q: &str| format!("GET /callback?{q} HTTP/1.1\r\n\r\n");
+
+        // Plain value, and a key that isn't present.
+        assert_eq!(
+            extract_query_param(&line("code=abc&state=xyz"), "code").as_deref(),
+            Some("abc")
+        );
+        assert_eq!(extract_query_param(&line("code=abc"), "state"), None);
+
+        // Percent-escapes, including a multi-byte UTF-8 sequence and an
+        // escaped '&' that must not split the pair.
+        assert_eq!(
+            extract_query_param(&line("code=a%26b&state=s"), "code").as_deref(),
+            Some("a&b")
+        );
+        assert_eq!(
+            extract_query_param(&line("code=caf%C3%A9"), "code").as_deref(),
+            Some("café")
+        );
+
+        // '+' is a space in form-encoded query strings.
+        assert_eq!(
+            extract_query_param(&line("code=a+b"), "code").as_deref(),
+            Some("a b")
+        );
+
+        // No query string at all, and a malformed request line.
+        assert_eq!(extract_query_param(&line(""), "code"), None);
+        assert_eq!(extract_query_param("GET\r\n\r\n", "code"), None);
+    }
 
     #[test]
     fn auth_server_stops_when_stop_is_requested() {
