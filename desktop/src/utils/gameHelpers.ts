@@ -87,3 +87,36 @@ export function formatCountdown(startTime: string): string {
   if (m > 0) return `in ${m}m`;
   return "Soon";
 }
+
+/**
+ * True when every game field either chip or card renders is unchanged.
+ *
+ * Both `GameChip` (ticker) and `GameItem` (feed card) are memoized on a
+ * hand-listed field comparison; they had two near-identical 16-line lists
+ * that drifted (one checked sport/league/start_time, the other
+ * link/short_detail). One list means a new rendered field can't be added
+ * to one comparator and forgotten in the other. The union is all cheap
+ * string/number equality on the same object.
+ */
+export function sameGame(a: Game, b: Game): boolean {
+  return (
+    a.id === b.id &&
+    a.sport === b.sport &&
+    a.league === b.league &&
+    a.link === b.link &&
+    a.away_team_name === b.away_team_name &&
+    a.away_team_logo === b.away_team_logo &&
+    a.away_team_score === b.away_team_score &&
+    a.away_team_code === b.away_team_code &&
+    a.home_team_name === b.home_team_name &&
+    a.home_team_logo === b.home_team_logo &&
+    a.home_team_score === b.home_team_score &&
+    a.home_team_code === b.home_team_code &&
+    a.state === b.state &&
+    a.timer === b.timer &&
+    a.status_short === b.status_short &&
+    a.status_long === b.status_long &&
+    a.short_detail === b.short_detail &&
+    a.start_time === b.start_time
+  );
+}

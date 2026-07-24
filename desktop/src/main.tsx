@@ -1,6 +1,6 @@
 // Sentry must initialize before any other module imports so the SDK can
 // attach to browser globals before React/Tauri plugins start running.
-import { initSentry } from "./sentry";
+import { initSentry, SentryFallback } from "./sentry";
 initSentry("ticker");
 
 import { StrictMode } from "react";
@@ -15,15 +15,6 @@ import App from "./App";
 import "./style.css";
 
 const queryClient = createQueryClient();
-
-const SentryFallback = (
-  <div style={{ padding: 24, fontFamily: "system-ui" }}>
-    <h1 style={{ fontSize: 20, fontWeight: 600 }}>Something went wrong</h1>
-    <p style={{ marginTop: 8, opacity: 0.7 }}>
-      Reload to recover. The team has been notified.
-    </p>
-  </div>
-);
 
 initStore().catch((err) => console.error("[Scrollr] Store init failed:", err)).then(() => {
   ReactDOM.createRoot(document.getElementById("root")!).render(

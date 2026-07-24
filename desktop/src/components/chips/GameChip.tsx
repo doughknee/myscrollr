@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { clsx } from "clsx";
-import { isLive, isFinal, isPre, isCloseGame, getWinner, gameStatusLabel, displayTeamCode } from "../../utils/gameHelpers";
+import { isLive, isFinal, isPre, isCloseGame, getWinner, gameStatusLabel, displayTeamCode, sameGame } from "../../utils/gameHelpers";
 import { useScoreFlash } from "../../hooks/useScoreFlash";
 import { getChipColors } from "./chipColors";
 import TeamLogo from "../TeamLogo";
@@ -166,22 +166,7 @@ const GameChip = memo(function GameChip({
   prev.comfort === next.comfort &&
   prev.colorMode === next.colorMode &&
   prev.onClick === next.onClick &&
-  prev.game.id === next.game.id &&
-  prev.game.sport === next.game.sport &&
-  prev.game.league === next.game.league &&
-  prev.game.away_team_name === next.game.away_team_name &&
-  prev.game.away_team_logo === next.game.away_team_logo &&
-  prev.game.away_team_score === next.game.away_team_score &&
-  prev.game.home_team_name === next.game.home_team_name &&
-  prev.game.home_team_logo === next.game.home_team_logo &&
-  prev.game.home_team_score === next.game.home_team_score &&
-  prev.game.home_team_code === next.game.home_team_code &&
-  prev.game.away_team_code === next.game.away_team_code &&
-  prev.game.state === next.game.state &&
-  prev.game.timer === next.game.timer &&
-  prev.game.status_short === next.game.status_short &&
-  prev.game.status_long === next.game.status_long &&
-  prev.game.start_time === next.game.start_time
+  sameGame(prev.game, next.game)
 );
 
 export default GameChip;
