@@ -43,6 +43,22 @@ on Windows. Containers still reach core on 8080 over the compose network.
 The two front-ends stay native on purpose: a GUI window can't run in a Linux
 container, and both hot-reload better on the host.
 
+## Disk footprint
+
+Roughly **12-15 GB** once everything is built: Docker Desktop itself (~2.5 GB),
+the base images (~1.5 GB), and the Rust build caches (~8 GB, the bulk of it).
+WSL2 with `--no-distribution` adds only ~150 MB -- it is not the expensive part.
+
+Two levers if that matters:
+
+- `make up svc=core-api` starts one service and whatever it depends on,
+  instead of all seven. Each Rust ingester you skip is ~2 GB of build cache
+  you never create.
+- `make reset` wipes the caches (and your database) when they go stale.
+
+The four Rust services share one `cargo_registry` volume, so overlapping
+crate sources are downloaded once rather than four times.
+
 ## Editing backend code
 
 **You don't rebuild anything.** Each service's container runs a file watcher

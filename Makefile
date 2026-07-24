@@ -56,16 +56,21 @@ kalshi-key: ##setup: Pull the Kalshi key from the cluster (needs kubectl)
 	@node scripts/dev/setup.mjs --predictions-only
 
 # ── Run ──────────────────────────────────────────────────────────────
-up: ##run: Start the backend, wait until healthy
+up: ##run: Start the backend, wait until healthy (svc= for a subset)
 	@node scripts/dev/doctor.mjs --quiet
 	@echo "[up] infrastructure..."
 	@$(COMPOSE) up -d --wait postgres redis
-	@if [ -f secrets/predictions.docker.env ]; then \
-	  echo "[up] services (incl. predictions)..."; \
+	@if [ -n "$(svc)" ]; then \
+	  echo "[up] $(svc) only (compose pulls in what it depends on)..."; \
+	  $(COMPOSE_AUTO) up -d --build $(svc); \
 	else \
-	  echo "[up] services (predictions off - run 'make kalshi-key' to enable)..."; \
+	  if [ -f secrets/predictions.docker.env ]; then \
+	    echo "[up] all services (incl. predictions)..."; \
+	  else \
+	    echo "[up] all services (predictions off - run 'make kalshi-key' to enable)..."; \
+	  fi; \
+	  $(COMPOSE_AUTO) up -d --build --remove-orphans; \
 	fi
-	@$(COMPOSE_AUTO) up -d --build --remove-orphans
 	@bash scripts/dev/wait-healthy.sh
 
 down: ##run: Stop the backend (keeps your database)

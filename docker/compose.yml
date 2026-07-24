@@ -45,7 +45,12 @@ x-rust-ingester: &rust-ingester
   restart: unless-stopped
   environment: &rust-env
     DATABASE_URL: *db-url
+    # Compiled artifacts stay per-service (they're different crates), but the
+    # downloaded crate SOURCES are identical across all four and go in one
+    # shared volume — tokio, serde, sqlx et al are fetched once, not 4x.
+    # Cargo file-locks the registry, so concurrent builds are safe.
     CARGO_TARGET_DIR: /build/target
+    CARGO_HOME: /cargo
 
 services:
   # ── Infrastructure ─────────────────────────────────────────────────
@@ -141,6 +146,7 @@ services:
     volumes:
       - ../channels/finance/service:/app
       - finance_build:/build
+      - cargo_registry:/cargo
     ports: ["3001:3001"]
 
   sports-service:
@@ -156,6 +162,7 @@ services:
     volumes:
       - ../channels/sports/service:/app
       - sports_build:/build
+      - cargo_registry:/cargo
     ports: ["3002:3002"]
 
   rss-service:
@@ -171,6 +178,7 @@ services:
     volumes:
       - ../channels/rss/service:/app
       - rss_build:/build
+      - cargo_registry:/cargo
     ports: ["3004:3004"]
 
   # Opt-in: needs a Kalshi key. `make kalshi-key` pulls one, `make setup`
@@ -194,6 +202,7 @@ services:
     volumes:
       - ../channels/predictions/service:/app
       - predictions_build:/build
+      - cargo_registry:/cargo
       - ../secrets/kalshi-private-key.pem:/run/secrets/kalshi.pem:ro
     ports: ["3005:3005"]
 
@@ -203,6 +212,7 @@ volumes:
   scrollr_pg:
   scrollr_redis:
   # Build caches. Wiped by `make reset`, never by `make down`.
+  cargo_registry:
   core_build:
   fantasy_build:
   finance_build:
