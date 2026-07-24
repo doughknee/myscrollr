@@ -80,12 +80,9 @@ export default function TickerLayoutSummary({
     >
       {/* Header row: count badge + CTAs */}
       <div className="flex items-center gap-3 mb-2">
-        <span className="text-ui-section font-mono font-semibold text-fg-3 uppercase tracking-wider">
-          Ticker layout
-        </span>
-        <span className="text-ui-meta font-mono text-fg-3">
-          {rowCount === 1 ? "1 row" : `${rowCount} rows`}
-          <span className="text-fg-3"> / {tierMaxRows} max</span>
+        <span className="text-ui-section">Ticker layout</span>
+        <span className="text-ui-meta text-fg-4">
+          {rowCount} of {tierMaxRows} row{tierMaxRows === 1 ? "" : "s"}
         </span>
 
         <div className="flex-1" />
@@ -110,15 +107,13 @@ export default function TickerLayoutSummary({
         {rows.map((row, idx) => (
           <li
             key={idx}
-            className="flex items-center gap-2 text-ui-meta font-mono text-fg-3"
+            className="flex items-center gap-2 text-ui-meta"
           >
-            <span className="w-12 shrink-0 text-fg-3">
+            <span className="w-12 shrink-0 text-fg-4">
               {rowCount === 1 ? "Row" : `Row ${idx + 1}`}
             </span>
             {row.sources.length === 0 ? (
-              <span className="italic text-fg-3">
-                All ticker-enabled sources
-              </span>
+              <span className="text-fg-4">All ticker-enabled sources</span>
             ) : (
               <div className="flex items-center gap-1 flex-wrap">
                 {row.sources.map((id) => (
@@ -147,7 +142,7 @@ export default function TickerLayoutSummary({
           cap is below the absolute max. If they're on Pro/Ultimate at 3
           rows, no hint (they've already maxed out). */}
       {atTierCap && (
-        <p className="mt-2 text-ui-chip font-mono text-fg-3">
+        <p className="mt-2 text-ui-meta text-fg-4">
           {tierMaxRows === 1
             ? "Upgrade to Uplink for a second ticker row."
             : "Upgrade to Uplink Pro for a third ticker row."}
