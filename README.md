@@ -103,43 +103,23 @@ it.
 
 ## Quick start — local development
 
-Full command reference is in [`AGENTS.md`](./AGENTS.md). Shortest path
-to a running stack:
-
 ```sh
-# 0. Prereqs: Node 22, Go 1.25, Rust stable, Postgres 16, Redis 7.
-#    Plus Logto (auth) + Stripe (billing) dev projects.
-
-# 1. Postgres + Redis
-docker compose -f docker-compose.local.yml up -d
-
-# 2. Core API (:8080) — applies every migration, serves the catalog
-cd api
-# api/.env has no template — docs/LOCAL_SETUP.md lists what it needs
-$EDITOR .env
-go build ./... && go test ./...
-go run .
-
-# 3. Any ingester you want live data from — e.g. sports
-cd channels/sports/service
-cargo run --release
-
-# 4. Pick a client surface:
-
-# a) Desktop app (the product)
-cd desktop
-cp .env.example .env && $EDITOR .env
-npm install && npm run tauri:dev
-
-# b) Marketing site (http://localhost:3000)
-cd myscrollr.com
-cp .env.example .env && $EDITOR .env
-npm install && npm run dev
+make setup   # generate every .env file (once)
+make up      # start the whole backend in Docker
+make dev     # ...and open the site + desktop app
 ```
 
-`docker-compose.dev.yml` builds and runs the whole stack in containers
-instead, if you'd rather not manage the processes. See
-[`docs/LOCAL_SETUP.md`](./docs/LOCAL_SETUP.md) for the full topology.
+`make` on its own lists every command, grouped.
+
+You need **Docker Desktop**, **Node 22+** and **make** — that's it. No Go
+or Rust toolchain: the backend compiles inside its containers, and editing
+a `.go` or `.rs` file hot-reloads that service in place rather than
+requiring a rebuild. `make doctor` checks your machine and names the fix
+for anything missing.
+
+The two front-ends run natively (a GUI window can't live in a Linux
+container). Full topology, ports and troubleshooting:
+[`docs/LOCAL_SETUP.md`](./docs/LOCAL_SETUP.md).
 
 ## Testing
 

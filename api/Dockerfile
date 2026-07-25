@@ -17,6 +17,25 @@ RUN go mod download
 
 # Build the Go app
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+# ── Dev stage: hot reload (NOT the default build target) ─────────────
+# Deliberately placed BEFORE the runtime stage: deploy.yml runs
+# `docker build` with no --target, which builds the LAST stage. Keeping the
+# production runtime last means the deploy pipeline is unaffected by this.
+# docker/compose.yml selects this one explicitly with `target: dev`.
+#
+# Source is bind-mounted from the host, so `air` rebuilds the binary in
+# place on save — no image rebuild per edit.
+FROM golang:1.25-alpine AS dev
+WORKDIR /app
+# air is PINNED, not @latest: v1.67.2 raised its minimum to Go 1.26 and
+# broke this build with no warning. v1.67.1 is the last release that
+# builds on the Go 1.25 this image pins to match go.mod. Bump both
+# together or not at all.
+RUN apk add --no-cache git curl && go install github.com/air-verse/air@v1.67.1
+ENV GOFLAGS=-buildvcs=false
+EXPOSE 8080
+CMD ["air", "-c", ".air.toml"]
+
 
 ######## Start a new stage from scratch #######
 FROM alpine:latest
