@@ -41,23 +41,7 @@ COMPOSE_AUTO  = $(shell [ -f secrets/predictions.docker.env ] && echo "$(COMPOSE
 # ── Help ─────────────────────────────────────────────────────────────
 # Targets are documented with `##<group>: description` and grouped below.
 help:
-	@echo ""
-	@echo "  MyScrollr - local development"
-	@echo ""
-	@awk 'BEGIN {FS = ":.*##"} \
-	  /^[a-zA-Z_-]+:.*?##[a-z]+:/ { \
-	    split($$2, p, ":"); grp = p[1]; \
-	    desc = substr($$2, length(grp) + 2); \
-	    if (grp != last) { printf "\033[1m  %s\033[0m\n", toupper(grp); last = grp } \
-	    printf "    \033[36m%-14s\033[0m %s\n", $$1, desc \
-	  }' $(MAKEFILE_LIST)
-	@echo ""
-	@echo "  First time?  make setup  &&  make up"
-	@echo ""
-	@echo "  Ports  core 18080 | fantasy 8084 | postgres 5432 | redis 6379"
-	@echo "         finance 3001 | sports 3002 | rss 3004 | predictions 3005"
-	@echo "         web 3000 and the desktop app run natively, not in Docker"
-	@echo ""
+	@node scripts/dev/help.mjs
 
 # ── Setup ────────────────────────────────────────────────────────────
 setup: ##setup: Generate every .env file (run this first)
