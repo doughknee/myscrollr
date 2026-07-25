@@ -182,6 +182,49 @@ export interface DataWidgetManifest {
   info: SourceInfo;
   /** The React component rendered for this widget's feed view. */
   FeedTab: React.ComponentType<FeedTabProps>;
+
+  // ── Home preview (see datawidgets/home.tsx) ───────────────────
+  // Each source owns how it renders on Home. Required, so adding a
+  // source cannot silently produce a blank card — TypeScript asks for
+  // it. `routes/feed.tsx` used to switch on the source name instead.
+
+  /** The preview rows for this source on the Home feed. */
+  HomeRows: React.ComponentType<HomeRowsProps>;
+
+  /**
+   * Coerce this source's raw `/dashboard` payload to a flat array.
+   * Omit when the payload is already an array (most sources); fantasy
+   * wraps its rows in `{ leagues: [...] }`.
+   */
+  normalizeHome?: (raw: unknown) => unknown[];
+
+  /**
+   * Distinct group keys for the Home filter chips — symbols, leagues,
+   * feed names. Omit for sources with no meaningful grouping and the
+   * chips are hidden.
+   */
+  homeGroups?: (rows: unknown[]) => string[];
+
+  /**
+   * Display label for a group key. Omit when the key is already
+   * human-readable; fantasy keys on `league_key` and labels by name.
+   */
+  homeGroupLabel?: (key: string, rows: unknown[]) => string;
+}
+
+/** Props every source's `HomeRows` receives. */
+export interface HomeRowsProps {
+  /** This widget's rows: normalized, then scoped to its own config. */
+  data: unknown[];
+  /** Group keys the user pinned. Empty means "no filter". */
+  filter: string[];
+  /**
+   * The whole `dashboard.data`, for the rare source that needs a sibling
+   * key — sports reads `sports_meta` to explain an empty league.
+   */
+  dashboard?: Record<string, unknown>;
+  /** Navigates to the widget's own page. */
+  onConfigure?: () => void;
 }
 
 /** Manifest describing a single widget. */

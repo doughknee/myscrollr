@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "motion/react";
-import SportsEmptyState from "../datawidgets/sports/EmptyState";
 import RouteError from "../components/RouteError";
 import Tooltip from "../components/Tooltip";
 import { WidgetBar, BarPill } from "../components/widget-bar/Bar";
@@ -31,7 +30,6 @@ import { widgetManifest, sourceForWidget, canonicalOrder } from "../marketplace"
 import { scopeSourceData } from "../utils/widgetScope";
 import { WIDGET_ORDER } from "../widgets/registry";
 import { getStore } from "../lib/store";
-import { timeAgo } from "../utils/format";
 import { formatTemp, weatherCodeToIcon } from "../widgets/weather/types";
 import { loadMonitors } from "../widgets/uptime/types";
 import { loadRepoData } from "../widgets/github/types";
@@ -50,20 +48,7 @@ import {
   getEffectiveWidgetTickerStatus,
 } from "../utils/tickerStatus";
 import type { DataWidgetRow } from "../api/client";
-import type { LeagueMeta } from "../api/queries";
-import type {
-  DataWidgetManifest,
-  WidgetManifest,
-  Trade,
-  Game,
-  RssItem,
-  Prediction,
-} from "../types";
-import {
-  isDisplayable,
-  priceDelta,
-} from "../datawidgets/predictions/view";
-import ProbabilityPill from "../datawidgets/predictions/ProbabilityPill";
+import type { DataWidgetManifest, WidgetManifest } from "../types";
 import type { TempUnit, HomePreview } from "../preferences";
 import type { SystemInfo } from "../hooks/useSysmonData";
 import type { TimerState } from "../widgets/timer/types";
@@ -340,67 +325,6 @@ function HomePage() {
   );
 }
 
-// ── Dashboard payload normalizer ────────────────────────────────
-
-/**
- * Coerce a per-widget `/dashboard` payload to a flat array.
- *
- * Most widgets (`finance`, `sports`, `rss`) return an array directly.
- * Fantasy returns `{ leagues: [...] }` because each league entry
- * carries matchups/standings/rosters/standings at the top level and
- * the wrapper leaves room for additional sibling metadata in the
- * future.
- *
- * Other Fantasy consumers (`ScrollrTicker`, `FantasyFeedTab`,
- * `FollowedPlayersPicker`, `FantasyDisplayPanel`) already do this
- * unwrap. The Home dashboard used to treat the payload as a flat
- * array uniformly, which produced a "No leagues imported yet" empty
- * state even when the user had connected leagues. Centralizing the
- * unwrap here keeps all Home-side consumers (group extractors, row
- * renderers, hasData checks) consistent.
- */
-function normalizeWidgetData(type: string, raw: unknown): unknown[] {
-  if (type === "fantasy") {
-    const obj = raw as { leagues?: unknown } | undefined;
-    return Array.isArray(obj?.leagues) ? (obj.leagues as unknown[]) : [];
-  }
-  return Array.isArray(raw) ? (raw as unknown[]) : [];
-}
-
-// ── Group key extractors ────────────────────────────────────────
-
-function getGroups(type: string, data: unknown): string[] {
-  const arr = Array.isArray(data) ? data : [];
-  switch (type) {
-    case "finance":
-      return [...new Set((arr as Trade[]).map((t) => t.symbol))];
-    case "sports":
-      return [...new Set((arr as Game[]).map((g) => g.league))];
-    case "rss":
-      return [...new Set((arr as RssItem[]).map((i) => i.source_name))];
-    case "fantasy":
-      return [...new Set(
-        arr.map((l: Record<string, unknown>) =>
-          String(l.league_key ?? l.league_name ?? l.name ?? ""),
-        ).filter(Boolean),
-      )];
-    default:
-      return [];
-  }
-}
-
-function getGroupLabel(type: string, key: string, data: unknown): string {
-  if (type !== "fantasy") return key;
-  const arr = Array.isArray(data) ? data : [];
-  const league = arr.find(
-    (l: Record<string, unknown>) =>
-      String(l.league_key ?? "") === key || String(l.league_name ?? "") === key,
-  ) as Record<string, unknown> | undefined;
-  return league
-    ? String(league.league_name ?? league.name ?? key)
-    : key;
-}
-
 // ── DataWidgetRow section ─────────────────────────────────────────────
 
 interface WidgetSectionProps {
@@ -433,16 +357,25 @@ function WidgetSection({
   // and scope the payload to this one widget's config — an NFL widget shows only
   // NFL, finance_stocks only stocks, news_bbc only BBC. Mirrors the ticker.
   const source = sourceForWidget(type) ?? type;
-  const widgetData = useMemo(
-    () =>
-      scopeSourceData(
-        source,
-        normalizeWidgetData(source, data?.[source]),
-        widget.config as Record<string, unknown> | undefined,
-      ),
-    [source, data, widget.config],
+  // Normalizing, grouping and rendering all come off the manifest now — a
+  // source owns its own Home preview in datawidgets/{source}/home.tsx.
+  const widgetData = useMemo(() => {
+    const raw = data?.[source];
+    const rows = manifest.normalizeHome
+      ? manifest.normalizeHome(raw)
+      : Array.isArray(raw)
+        ? (raw as unknown[])
+        : [];
+    return scopeSourceData(
+      source,
+      rows,
+      widget.config as Record<string, unknown> | undefined,
+    );
+  }, [source, data, widget.config, manifest]);
+  const groups = useMemo(
+    () => manifest.homeGroups?.(widgetData) ?? [],
+    [manifest, widgetData],
   );
-  const groups = useMemo(() => getGroups(source, widgetData), [source, widgetData]);
   const hasSelections = selectedKeys.length > 0;
 
   function toggleGroup(key: string) {
@@ -570,7 +503,7 @@ function WidgetSection({
                     )}
                   </span>
                   <span className="text-ui-meta text-fg truncate flex-1">
-                    {getGroupLabel(source, key, widgetData)}
+                    {manifest.homeGroupLabel?.(key, widgetData) ?? key}
                   </span>
                 </button>
               );
@@ -591,337 +524,16 @@ function WidgetSection({
               if (e.key === "Enter") onRowClick();
             }}
           >
-            {source === "finance" && (
-              <FinanceRows data={widgetData} filter={selectedKeys} onConfigure={onConfigure} />
-            )}
-            {source === "sports" && (
-              <SportsRows
-                data={widgetData}
-                meta={(data?.sports_meta as { leagues?: LeagueMeta[] } | undefined)?.leagues}
-                filter={selectedKeys}
-                onConfigure={onConfigure}
-              />
-            )}
-            {source === "rss" && (
-              <RssRows data={widgetData} filter={selectedKeys} onConfigure={onConfigure} />
-            )}
-            {source === "fantasy" && (
-              <FantasyRows data={widgetData} filter={selectedKeys} onConfigure={onConfigure} />
-            )}
-            {source === "predictions" && (
-              <PredictionsRows data={widgetData} onConfigure={onConfigure} />
-            )}
-            {!["finance", "sports", "rss", "fantasy", "predictions"].includes(source) && (
-              <EmptyDataRow widgetType={source} onConfigure={onConfigure} />
-            )}
+            <manifest.HomeRows
+              data={widgetData}
+              filter={selectedKeys}
+              dashboard={data}
+              onConfigure={onConfigure}
+            />
           </motion.div>
         )}
       </AnimatePresence>
     </section>
-  );
-}
-
-// ── Finance rows ────────────────────────────────────────────────
-
-function FinanceRows({ data, filter, onConfigure }: { data: unknown; filter: string[]; onConfigure: () => void }) {
-  const trades = Array.isArray(data) ? (data as Trade[]) : [];
-  if (trades.length === 0) return <EmptyDataRow widgetType="finance" onConfigure={onConfigure} />;
-
-  const filtered =
-    filter.length > 0
-      ? trades.filter((t) => filter.includes(t.symbol))
-      : trades;
-
-  const sorted = [...filtered]
-    .sort(
-      (a, b) =>
-        Math.abs(Number(b.percentage_change ?? 0)) -
-        Math.abs(Number(a.percentage_change ?? 0)),
-    )
-    .slice(0, MAX_PREVIEW);
-
-  if (sorted.length === 0)
-    return <EmptyDataRow widgetType="finance" />;
-
-  return (
-    <>
-      {sorted.map((t) => {
-        const pct = Number(t.percentage_change ?? 0);
-        const isUp = pct >= 0;
-        return (
-          <div key={t.symbol} className="flex items-center px-4 py-2.5 gap-4">
-            <span className="text-xs font-mono font-semibold text-fg w-20 truncate">
-              {t.symbol}
-            </span>
-            <span className="text-xs text-fg-2 tabular-nums">
-              $
-              {Number(t.price).toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
-            <span
-              className={clsx(
-                "text-xs font-medium tabular-nums ml-auto",
-                isUp ? "text-green-400" : "text-red-400",
-              )}
-            >
-              {isUp ? "▲" : "▼"} {Math.abs(pct).toFixed(2)}%
-            </span>
-          </div>
-        );
-      })}
-    </>
-  );
-}
-
-// ── Predictions rows ────────────────────────────────────────────
-
-function PredictionsRows({ data, onConfigure }: { data: unknown; onConfigure: () => void }) {
-  const markets = Array.isArray(data) ? (data as Prediction[]) : [];
-  const live = markets.filter(isDisplayable);
-  if (live.length === 0) return <EmptyDataRow widgetType="predictions" onConfigure={onConfigure} />;
-
-  // Top movers preview — the same "what changed" glance FinanceRows gives.
-  const sorted = [...live]
-    .sort((a, b) => Math.abs(priceDelta(b)) - Math.abs(priceDelta(a)))
-    .slice(0, MAX_PREVIEW);
-
-  return (
-    <>
-      {sorted.map((p) => {
-        const delta = priceDelta(p);
-        const isUp = delta > 0;
-        return (
-          <div key={p.id} className="flex items-center px-4 py-2.5 gap-4">
-            <span className="text-ui-meta text-fg-2 truncate flex-1">
-              {p.event_title || p.title}
-            </span>
-            {/* Fixed delta slot + fixed-width pill — the widget's own
-                column treatment, so Home previews match the feed. */}
-            <span
-              className={clsx(
-                "text-xs font-medium tabular-nums w-10 text-right",
-                isUp ? "text-green-400" : "text-red-400",
-              )}
-            >
-              {delta !== 0 ? `${isUp ? "▲" : "▼"} ${Math.abs(delta)}` : ""}
-            </span>
-            <ProbabilityPill pct={p.yes_price} delta={delta} size="sm" />
-          </div>
-        );
-      })}
-    </>
-  );
-}
-
-// ── Sports rows ─────────────────────────────────────────────────
-
-function SportsRows({
-  data,
-  meta,
-  filter,
-  onConfigure,
-}: {
-  data: unknown;
-  meta: LeagueMeta[] | undefined;
-  filter: string[];
-  onConfigure: () => void;
-}) {
-  const games = Array.isArray(data) ? (data as Game[]) : [];
-  // Restrict meta to the user's filter selection so the empty-state speaks
-  // only about leagues the user has configured.
-  const visibleMeta: LeagueMeta[] = (meta ?? []).filter(
-    (m) => filter.length === 0 || filter.includes(m.name),
-  );
-
-  if (games.length === 0) {
-    return <SportsEmptyState leagues={visibleMeta} onConfigure={onConfigure} />;
-  }
-
-  const filtered =
-    filter.length > 0
-      ? games.filter((g) => filter.includes(g.league))
-      : games;
-
-  // State priority matches the API contract: in > pre > final > postponed.
-  // Earlier versions used the legacy "post" state from the ESPN era — that
-  // never matched anything the api-sports.io ingestion produces.
-  const priority: Record<string, number> = { in: 0, pre: 1, final: 2, postponed: 3 };
-  const sorted = [...filtered]
-    .sort(
-      (a, b) =>
-        (priority[a.state ?? ""] ?? 4) - (priority[b.state ?? ""] ?? 4),
-    )
-    .slice(0, MAX_PREVIEW);
-
-  if (sorted.length === 0) {
-    return <SportsEmptyState leagues={visibleMeta} onConfigure={onConfigure} />;
-  }
-
-  return (
-    <>
-      {sorted.map((g) => {
-        const isLive = g.state === "in";
-        return (
-          <div key={g.id} className="flex items-center px-4 py-2.5 gap-3">
-            {isLive && (
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
-            )}
-            <span className="text-[10px] font-mono font-semibold text-fg-4 uppercase w-10 shrink-0 truncate">
-              {g.league}
-            </span>
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              {g.away_team_logo && (
-                <img
-                  src={g.away_team_logo}
-                  alt=""
-                  className="w-4 h-4 shrink-0 object-contain"
-                />
-              )}
-              <span className="text-ui-meta text-fg-2 truncate">
-                {g.away_team_name || g.away_team_code}
-              </span>
-              <span className="text-xs text-fg-3 tabular-nums shrink-0">
-                {g.away_team_score} – {g.home_team_score}
-              </span>
-              <span className="text-ui-meta text-fg-2 truncate">
-                {g.home_team_name || g.home_team_code}
-              </span>
-              {g.home_team_logo && (
-                <img
-                  src={g.home_team_logo}
-                  alt=""
-                  className="w-4 h-4 shrink-0 object-contain"
-                />
-              )}
-            </div>
-            <span className="text-[10px] text-fg-4 shrink-0 truncate max-w-24">
-              {g.short_detail ?? g.status_short ?? ""}
-            </span>
-          </div>
-        );
-      })}
-    </>
-  );
-}
-
-// ── RSS rows ────────────────────────────────────────────────────
-
-function RssRows({ data, filter, onConfigure }: { data: unknown; filter: string[]; onConfigure: () => void }) {
-  const items = Array.isArray(data) ? (data as RssItem[]) : [];
-  if (items.length === 0) return <EmptyDataRow widgetType="rss" onConfigure={onConfigure} />;
-
-  const filtered =
-    filter.length > 0
-      ? items.filter((i) => filter.includes(i.source_name))
-      : items;
-
-  const sorted = [...filtered]
-    .sort((a, b) => {
-      const aTime = a.published_at ? new Date(a.published_at).getTime() : 0;
-      const bTime = b.published_at ? new Date(b.published_at).getTime() : 0;
-      return bTime - aTime;
-    })
-    .slice(0, MAX_PREVIEW);
-
-  if (sorted.length === 0)
-    return <EmptyDataRow widgetType="rss" />;
-
-  return (
-    <>
-      {sorted.map((item) => (
-        <div key={item.id} className="flex items-center px-4 py-2.5 gap-3">
-          <span className="text-ui-meta text-fg flex-1 truncate">{item.title}</span>
-          <span className="text-[10px] text-fg-4 shrink-0">
-            {item.source_name}
-          </span>
-          <span className="text-[10px] text-fg-4/60 shrink-0 w-8 text-right">
-            {timeAgo(item.published_at)}
-          </span>
-        </div>
-      ))}
-    </>
-  );
-}
-
-// ── Fantasy rows ────────────────────────────────────────────────
-
-function FantasyRows({ data, filter, onConfigure }: { data: unknown; filter: string[]; onConfigure: () => void }) {
-  const leagues = Array.isArray(data) ? data : [];
-  if (leagues.length === 0) return <EmptyDataRow widgetType="fantasy" onConfigure={onConfigure} />;
-
-  const filtered =
-    filter.length > 0
-      ? leagues.filter((l: Record<string, unknown>) => {
-          const key = String(l.league_key ?? l.league_name ?? l.name ?? "");
-          return filter.includes(key);
-        })
-      : leagues;
-
-  const preview = filtered.slice(0, MAX_PREVIEW);
-
-  if (preview.length === 0)
-    return <EmptyDataRow widgetType="fantasy" />;
-
-  return (
-    <>
-      {preview.map((league: Record<string, unknown>, i: number) => {
-        const name = (league.league_name ?? league.name ?? "League") as string;
-        const myScore = league.my_score ?? league.team_points;
-        const oppScore = league.opp_score ?? league.opponent_points;
-        const hasMatchup = myScore != null && oppScore != null;
-
-        return (
-          <div key={i} className="flex items-center px-4 py-2.5 gap-3">
-            <span className="text-ui-meta text-fg flex-1 truncate">{name}</span>
-            {hasMatchup && (
-              <span className="text-xs text-fg-3 tabular-nums">
-                {String(myScore)} – {String(oppScore)}
-              </span>
-            )}
-          </div>
-        );
-      })}
-    </>
-  );
-}
-
-// ── Empty data row ──────────────────────────────────────────────
-
-const EMPTY_HINTS: Record<string, { message: string; name: string }> = {
-  finance: { message: "No stocks configured yet", name: "Finance" },
-  sports: { message: "No leagues configured yet", name: "Sports" },
-  rss: { message: "No feeds configured yet", name: "News" },
-  fantasy: { message: "No leagues imported yet", name: "Fantasy" },
-};
-
-function EmptyDataRow({
-  widgetType,
-  onConfigure,
-}: {
-  widgetType?: string;
-  onConfigure?: () => void;
-}) {
-  const hint = widgetType ? EMPTY_HINTS[widgetType] : undefined;
-  return (
-    <div className="px-4 py-5 text-center">
-      <p className="text-ui-meta text-fg-3 font-medium mb-1">
-        {hint?.message ?? "Nothing to show"}
-      </p>
-      {hint && onConfigure && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onConfigure();
-          }}
-          className="inline-flex items-center gap-1.5 text-ui-chip text-accent hover:text-accent/80 transition-colors"
-        >
-          <Settings size={11} />
-          Open {hint.name}
-        </button>
-      )}
-    </div>
   );
 }
 

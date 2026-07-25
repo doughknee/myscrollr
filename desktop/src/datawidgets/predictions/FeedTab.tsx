@@ -100,6 +100,7 @@ import {
 } from "./search";
 import type { Prediction, FeedTabProps, DataWidgetManifest } from "../../types";
 import type { PredictionsDisplayPrefs } from "../../preferences";
+import { PredictionsHomeRows } from "./home";
 
 // ── DataWidgetRow manifest ─────────────────────────────────────────────
 
@@ -123,6 +124,7 @@ export const predictionsDataWidget: DataWidgetManifest = {
     ],
   },
   FeedTab: PredictionsFeedTab,
+  HomeRows: PredictionsHomeRows,
 };
 
 // ── Constants ────────────────────────────────────────────────────
