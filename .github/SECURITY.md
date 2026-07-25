@@ -6,12 +6,15 @@ Thanks for helping keep Scrollr safe for its users.
 
 | Area               | Supported branch | Supported releases                                |
 |--------------------|------------------|---------------------------------------------------|
-| Desktop app        | `main`           | Most recent two minor versions (e.g. 1.0.x, 0.9.x) |
+| Desktop app        | `main`           | Most recent two minor versions (currently 1.1.x, 1.0.x) |
 | Server & channels  | `main`           | Whatever is running in production                 |
 | Marketing site     | `main`           | Whatever is running at `myscrollr.com`            |
 
-Older releases are out of support. If you find a vulnerability that
-only affects an older desktop build, upgrade first and re-verify before
+Older releases are out of support. Note that the server enforces a floor
+independently: `MIN_DESKTOP_VERSION` (in `k8s/configmap-core.yaml`) force-
+updates anything below it, so builds under that version cannot reach the
+API at all. If you find a vulnerability that only affects an older desktop
+build, upgrade first and re-verify before
 reporting.
 
 ## Reporting a vulnerability

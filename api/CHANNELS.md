@@ -73,9 +73,16 @@ Two artifacts ride along, both generated and both guarded by a Go test:
    implementing `TickerSource`, registered in
    `desktop/src/datawidgets/tickerRegistry.ts`. The ticker dispatches
    generically on source — there is no per-source branching to edit.
-6. Read handlers in `api/internal/ingestread/`, registered in the
+6. A Home preview `desktop/src/datawidgets/<source>/home.tsx` exporting
+   `HomeRows`, wired into the manifest in that source's `FeedTab.tsx`
+   (REL-63). `HomeRows` is **required** — tsc will ask for it. Optional
+   alongside it: `normalizeHome` (if the dashboard payload isn't a bare
+   array), `homeGroups` (filter chips), `homeGroupLabel` (if the group key
+   isn't human-readable). Like the ticker, `routes/feed.tsx` dispatches
+   generically and never names a source.
+7. Read handlers in `api/internal/ingestread/`, registered in the
    `LocalSources` map so `/health` and `/dashboard` include them.
-7. Usually a Rust ingester under `channels/<source>/service/` that writes
+8. Usually a Rust ingester under `channels/<source>/service/` that writes
    rows. It runs no migrations — see below.
 
 ## Schema
@@ -139,3 +146,4 @@ this bit us during the `visible` → `ticker_enabled` rename.
 | `desktop/src/marketplace.ts` | Client view over the fetched catalog |
 | `desktop/src/datawidgets/registry.ts` | source → feed renderer |
 | `desktop/src/datawidgets/tickerRegistry.ts` | source → ticker renderer |
+| `desktop/src/datawidgets/<source>/home.tsx` | source → Home preview renderer |

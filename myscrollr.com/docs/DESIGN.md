@@ -1,5 +1,9 @@
 # Scrollr Design System
 
+> Written 2026-02-18. Audited 2026-07-25: every color token, the type
+> scale, and the component patterns still match `src/styles.css`. Two stack
+> rows were corrected (TanStack Start, and where fonts are actually loaded).
+
 Canonical design reference extracted from the homepage. Every new page, component, or feature must follow these principles. The homepage is the gold standard — when in doubt, match it.
 
 ---
@@ -32,12 +36,12 @@ Canonical design reference extracted from the homepage. Every new page, componen
 | --------- | ----------------------------------------------- |
 | Framework | React 19                                        |
 | Bundler   | Vite 7                                          |
-| Router    | TanStack Router (file-based)                    |
+| Router    | TanStack Start (file-based routes, static prerender) |
 | Styling   | Tailwind CSS v4                                 |
 | Animation | Motion (framer-motion successor)                |
 | Icons     | Lucide React                                    |
 | Auth      | Logto (via `useScrollrAuth` hook)               |
-| Fonts     | Self-hosted (no CDN, preloaded in `index.html`) |
+| Fonts     | Self-hosted via `@font-face` in `src/styles.css` (no CDN) |
 
 Dark mode is **class-based** (`html.dark`), toggled via `ThemeToggle` component, with smooth 300ms transitions applied through a temporary `theme-transition` class on `<html>`.
 
