@@ -115,7 +115,7 @@ docker compose -f docker-compose.local.yml up -d
 
 # 2. Core API (:8080) — applies every migration, serves the catalog
 cd api
-# api/.env has no template — LOCAL_SETUP.md lists what it needs
+# api/.env has no template — docs/LOCAL_SETUP.md lists what it needs
 $EDITOR .env
 go build ./... && go test ./...
 go run .
@@ -139,7 +139,7 @@ npm install && npm run dev
 
 `docker-compose.dev.yml` builds and runs the whole stack in containers
 instead, if you'd rather not manage the processes. See
-[`LOCAL_SETUP.md`](./LOCAL_SETUP.md) for the full topology.
+[`docs/LOCAL_SETUP.md`](./docs/LOCAL_SETUP.md) for the full topology.
 
 ## Testing
 
@@ -198,11 +198,11 @@ which ones win when they disagree. The essentials:
 - [`api/CHANNELS.md`](./api/CHANNELS.md) — the widget/source model and
   how to add one.
 - [`docs/adr/`](./docs/adr/) — numbered architecture decision records.
-- [`LOCAL_SETUP.md`](./LOCAL_SETUP.md) — the local stack topology.
-- [`CONTRIBUTING.md`](./CONTRIBUTING.md) — how to report issues, how
+- [`docs/LOCAL_SETUP.md`](./docs/LOCAL_SETUP.md) — the local stack topology.
+- [`CONTRIBUTING.md`](./.github/CONTRIBUTING.md) — how to report issues, how
   to send PRs, what we do and don't merge.
-- [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) — community rules.
-- [`SECURITY.md`](./SECURITY.md) — vulnerability reporting.
+- [`CODE_OF_CONDUCT.md`](./.github/CODE_OF_CONDUCT.md) — community rules.
+- [`SECURITY.md`](./.github/SECURITY.md) — vulnerability reporting.
 
 ## License
 
@@ -217,9 +217,9 @@ operated remotely.
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Before your first PR,
-please read the [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) and the
-[`SECURITY.md`](./SECURITY.md).
+See [`CONTRIBUTING.md`](./.github/CONTRIBUTING.md). Before your first PR,
+please read the [`CODE_OF_CONDUCT.md`](./.github/CODE_OF_CONDUCT.md) and the
+[`SECURITY.md`](./.github/SECURITY.md).
 
 ## Credits
 

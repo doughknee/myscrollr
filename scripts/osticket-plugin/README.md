@@ -86,7 +86,7 @@ Use this if you don't control the osTicket Dockerfile or want a fast hot-deploy.
 
 ```sh
 # Copy the plugin into the running osTicket pod
-kubectl cp osticket-plugins/scrollr-reply-api \
+kubectl cp scripts/osticket-plugin \
   <namespace>/<osticket-pod>:/var/www/html/include/plugins/scrollr-reply-api
 
 # Or if you already have a shell open in the pod:
@@ -106,13 +106,13 @@ Add to your osTicket Dockerfile:
 
 ```dockerfile
 # Bake the Scrollr Reply API plugin into the image
-COPY ./osticket-plugins/scrollr-reply-api /var/www/html/include/plugins/scrollr-reply-api
+COPY ./scripts/osticket-plugin /var/www/html/include/plugins/scrollr-reply-api
 RUN chown -R www-data:www-data /var/www/html/include/plugins/scrollr-reply-api
 ```
 
 Adjust the `COPY` source path to wherever you stage the plugin during the build. If you maintain osTicket in a separate repo, you can either:
 
-- Submodule this repo's `osticket-plugins/scrollr-reply-api` directory, or
+- Submodule this repo's `scripts/osticket-plugin` directory, or
 - Copy the four files (`plugin.php`, `class.ScrollrReplyPlugin.php`, `api.reply.php`, `README.md`) into your osTicket repo at `include/plugins/scrollr-reply-api/`.
 
 ### After install (both paths)
@@ -273,7 +273,7 @@ For deeper debugging:
 ## Source code in this repo
 
 ```
-osticket-plugins/scrollr-reply-api/
+scripts/osticket-plugin/
 ├── plugin.php                       # Manifest (osTicket-discoverable)
 ├── class.ScrollrReplyPlugin.php     # Plugin subclass; hooks Signal::connect('api', ...)
 ├── config.php                       # Stub PluginConfig (required by osTicket bootstrap chain)

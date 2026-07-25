@@ -5,8 +5,8 @@ ingesters into core). It stays separate because it owns a stateful Yahoo OAuth
 session and a sync loop; core proxies to it rather than absorbing it.
 
 Go + Fiber, port `8084`. Run it with the rest of the stack — see
-[`LOCAL_SETUP.md`](../../LOCAL_SETUP.md); the short version is
-`cd channels/fantasy/api && go run .` with `channels/.env` loaded. It needs
+[`LOCAL_SETUP.md`](../../docs/LOCAL_SETUP.md); the short version is
+`cd channels/fantasy/api && go run .` with `channels/fantasy/.env` loaded. It needs
 `YAHOO_CLIENT_ID` / `YAHOO_CLIENT_SECRET`, and its `ENCRYPTION_KEY` must match
 core's.
 

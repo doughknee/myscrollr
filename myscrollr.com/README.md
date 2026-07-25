@@ -108,4 +108,4 @@ AGPL-3.0-or-later. See the [root LICENSE](../LICENSE).
 
 ## Contributing
 
-See the [root `CONTRIBUTING.md`](../CONTRIBUTING.md).
+See the [`CONTRIBUTING.md`](../.github/CONTRIBUTING.md).

@@ -29,7 +29,7 @@ import (
 // human.
 //
 // This handler closes that loop. The scrollr-reply-api plugin
-// (osticket-plugins/scrollr-reply-api/notify.message.php) listens for
+// (scripts/osticket-plugin/notify.message.php) listens for
 // osTicket's `threadentry.created` signal, filters to user messages
 // that are NOT the first message on a ticket, and POSTs a payload
 // here. We:

@@ -109,7 +109,7 @@ data:
   # /webhooks/osticket/thread-message with X-Scrollr-Webhook-Secret
   # header. Core API runs AI triage on the new message, creates a
   # support_drafts row, and notifies the partner — same approval flow
-  # as initial-ticket triage. See osticket-plugins/scrollr-reply-api/
+  # as initial-ticket triage. See scripts/osticket-plugin/
   # README.md for plugin install + config.
   AI_TRIAGE_ENABLED: "true"                       # set "false" to bypass triage and fall back to legacy flow
   SUPPORT_AGENT_EMAIL: "doni@myscrollr.com"       # partner's email for approval notifications

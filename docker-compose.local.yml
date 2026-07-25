@@ -10,7 +10,7 @@
 #   Stop (keep data):  docker compose -f docker-compose.local.yml down
 #   Wipe all data:     docker compose -f docker-compose.local.yml down -v
 #
-# See LOCAL_SETUP.md for the full runbook.
+# See docs/LOCAL_SETUP.md for the full runbook.
 name: scrollr-local
 
 services:
