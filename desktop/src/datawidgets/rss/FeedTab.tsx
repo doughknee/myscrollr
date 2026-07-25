@@ -54,6 +54,7 @@ import type {
 } from "../../types";
 import type { WidgetId, RssWidgetConfig } from "../../api/client";
 import type { RssDisplayPrefs } from "../../preferences";
+import { RssHomeRows, rssHomeGroups } from "./home";
 
 // ── DataWidgetRow manifest ─────────────────────────────────────────────
 
@@ -75,6 +76,8 @@ export const rssDataWidget: DataWidgetManifest = {
     ],
   },
   FeedTab: RssFeedTab,
+  HomeRows: RssHomeRows,
+  homeGroups: rssHomeGroups,
 };
 
 // ── Sort type ────────────────────────────────────────────────────

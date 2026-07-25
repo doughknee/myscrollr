@@ -41,6 +41,7 @@ import { isLive, isPre, isFinal } from "../../utils/gameHelpers";
 import { latestTimestamp } from "../feedHooks";
 import type { FeedTabProps, DataWidgetManifest } from "../../types";
 import type { FavoriteTeam } from "../../hooks/useSportsConfig";
+import { SportsHomeRows, sportsHomeGroups } from "./home";
 
 // ── DataWidgetRow manifest ─────────────────────────────────────────────
 
@@ -62,6 +63,8 @@ export const sportsDataWidget: DataWidgetManifest = {
     ],
   },
   FeedTab: SportsFeedTab,
+  HomeRows: SportsHomeRows,
+  homeGroups: sportsHomeGroups,
 };
 
 // ── Types ────────────────────────────────────────────────────────

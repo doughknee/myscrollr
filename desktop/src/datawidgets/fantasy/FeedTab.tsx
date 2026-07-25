@@ -50,6 +50,12 @@ import { filterEnabledLeagues, resolvePrimaryLeague } from "./view";
 import type { FeedTabProps, DataWidgetManifest } from "../../types";
 import type { FantasySubTab } from "../../preferences";
 import type { LeagueResponse, MyLeaguesResponse } from "./types";
+import {
+  FantasyHomeRows,
+  fantasyHomeGroups,
+  fantasyHomeGroupLabel,
+  normalizeFantasyHome,
+} from "./home";
 
 /** DataWidgetRow accent — kept in sync with `fantasyDataWidget.hex`. */
 const FANTASY_HEX = "#6366f1";
@@ -75,6 +81,10 @@ export const fantasyDataWidget: DataWidgetManifest = {
     ],
   },
   FeedTab: FantasyFeedTab,
+  HomeRows: FantasyHomeRows,
+  normalizeHome: normalizeFantasyHome,
+  homeGroups: fantasyHomeGroups,
+  homeGroupLabel: fantasyHomeGroupLabel,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────

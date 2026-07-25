@@ -44,6 +44,7 @@ import { applyFinancePipeline, type FinanceSortKey, type FinanceDirectionFilter 
 import type { Trade, FeedTabProps, DataWidgetManifest } from "../../types";
 import type { WidgetId } from "../../api/client";
 import { assetClassForWidget } from "../../marketplace";
+import { FinanceHomeRows, financeHomeGroups } from "./home";
 
 // ── DataWidgetRow manifest ─────────────────────────────────────────────
 
@@ -65,6 +66,8 @@ export const financeDataWidget: DataWidgetManifest = {
     ],
   },
   FeedTab: FinanceFeedTab,
+  HomeRows: FinanceHomeRows,
+  homeGroups: financeHomeGroups,
 };
 
 // ── Types ────────────────────────────────────────────────────────
