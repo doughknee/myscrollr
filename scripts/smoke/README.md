@@ -28,6 +28,7 @@ READINESS_TIMEOUT=30 scripts/smoke/production-readiness.sh
 | `finance-service` | `/health/ready` | 3001 |
 | `rss-service` | `/health/ready` | 3004 |
 | `fantasy-api` | `/internal/health` | 8084 |
+| `predictions-service` | `/health/ready` | 3005 |
 
 These are the same endpoints Kubernetes' `readinessProbe` hits for each
 deployment (see `k8s/*.yaml`). If the smoke test passes, the probes pass too.
@@ -45,7 +46,7 @@ sports-service       /health/ready        FAIL (HTTP 404, readiness timeout)
 …
 
 ==================================================
-3 OF 8 SERVICES NOT READY
+2 OF 6 SERVICES NOT READY
 ==================================================
 ```
 

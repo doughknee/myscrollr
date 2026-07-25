@@ -230,7 +230,7 @@ The v1.1.4 follow-through, in two stacked PRs (#223 backend, #224 desktop):
   Watchlist — with a single control bar (segmented view switcher + lens
   pills). Configure is one page: watchlist, ticker fallback, display grid.
 - **Polish pass** (Playwright-verified at 1440/375 against a checked-in
-  browser harness, `channels/predictions/preview/`): card anatomy with
+  browser harness, since deleted in REL-60): card anatomy with
   category-anchored headers, uniform heights, fixed delta/pill columns,
   probability-pill chip restyle, `--color-predictions` teal unification,
   Home preview rows.

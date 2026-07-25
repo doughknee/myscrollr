@@ -84,6 +84,25 @@ YAHOO_CLIENT_ID=
 YAHOO_CLIENT_SECRET=
 YAHOO_CALLBACK_URL=http://localhost:8084/yahoo/callback
 `,
+  // The marketing site. Stripe price ids are the real test-mode ones from
+  // .env.example — they're not secret and the pricing page needs them to
+  // render. The publishable key is a placeholder; billing flows won't work
+  // until you supply a real pk_test_.
+  "myscrollr.com/.env": `VITE_API_URL=http://localhost:18080
+VITE_LOGTO_ENDPOINT=${logto.url}
+VITE_LOGTO_APP_ID=${logto.webAppId}
+VITE_LOGTO_RESOURCE=https://api.myscrollr.com
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_REPLACE_ME
+VITE_STRIPE_PRICE_MONTHLY=price_1TMyBUFk6czwHVgrocQKaBHD
+VITE_STRIPE_PRICE_ANNUAL=price_1TMyBUFk6czwHVgr2AysFrfL
+VITE_STRIPE_PRICE_PRO_MONTHLY=price_1TMyBUFk6czwHVgrc6YHoQoj
+VITE_STRIPE_PRICE_PRO_ANNUAL=price_1TMyBVFk6czwHVgrN2oUq6fx
+VITE_STRIPE_PRICE_ULTIMATE_MONTHLY=price_1TMyBVFk6czwHVgriAztoY86
+VITE_STRIPE_PRICE_ULTIMATE_ANNUAL=price_1TMyBVFk6czwHVgr9ntOrMXf
+VITE_SENTRY_DSN=
+SENTRY_ORG=
+SENTRY_AUTH_TOKEN=
+`,
   "desktop/.env": `# The desktop app talks to the LOCAL core API.
 VITE_API_URL=http://localhost:18080
 VITE_AUTH_ENDPOINT=${logto.url}
@@ -172,6 +191,7 @@ const logto = {
   jwks: "",
   appId: await ask("Logto extension app id", ""),
   desktopAppId: await ask("Logto DESKTOP app id", ""),
+  webAppId: await ask("Logto WEBSITE app id", ""),
 };
 // JWKS is always <logto>/oidc/jwks — derive it rather than asking twice.
 logto.jwks = logto.url ? `${logto.url.replace(/\/$/, "")}/oidc/jwks` : "";
