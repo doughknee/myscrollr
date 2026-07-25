@@ -17,6 +17,44 @@ Monorepo — each component is independently deployable with its own dependencie
 - `channels/{finance,sports,rss,predictions}/service/` — Rust ingestion services (independent crates, edition 2024; predictions holds the Kalshi credentials and WS sweep)
 - `channels/fantasy/api/` — Fantasy Go API (Yahoo OAuth2, Go-native sync, no Rust service)
 
+## Running it locally
+
+**Two commands from a fresh clone.** Everything below assumes you did this.
+
+```sh
+make setup   # generate every .env file (once)
+make up      # start the whole backend in Docker, wait until healthy
+```
+
+`make` on its own prints every command, grouped. `make doctor` diagnoses a
+broken machine and names the fix for each problem.
+
+You need **Docker Desktop**, **Node 22+** and **make**. You do **not** need a
+Go or Rust toolchain — the backend compiles inside its containers. Do not tell
+a user to install Go or Rust to run this project.
+
+| What | Where | Port |
+|---|---|---|
+| Postgres, Redis | Docker | 5432, 6379 |
+| Core API | Docker | **18080** |
+| Fantasy API | Docker | 8084 |
+| finance / sports / rss ingesters | Docker | 3001 / 3002 / 3004 |
+| predictions ingester (opt-in) | Docker | 3005 |
+| Marketing site | native — `make web` | 3000 |
+| Desktop app | native — `make desktop` | — |
+
+**Core is published on 18080, not 8080.** Steam's CEF debugger claims
+localhost:8080 on Windows. Inside the compose network services still reach core
+on 8080; anything on the host uses 18080.
+
+**Editing backend code needs no command.** Each container runs a file watcher
+against bind-mounted source (`air` for Go, `cargo watch` for Rust), so saving a
+`.go` or `.rs` file rebuilds that one service in place. `make rebuild` is only
+for dependency changes (`go.mod`, `Cargo.toml`). `make logs svc=core-api` tails
+one service; `make down` stops and keeps data; `make reset` wipes it.
+
+Full runbook, including the Windows-specific traps: `docs/LOCAL_SETUP.md`.
+
 ## Build, Lint, Test Commands
 
 ### Website (`myscrollr.com/`)
@@ -38,18 +76,15 @@ npm run tauri:dev    # Full Tauri dev (Vite + Rust backend)
 npm run tauri:build  # Production build (native binary)
 ```
 
-### Go APIs (`api/` and `channels/fantasy/api/`)
+### Backend (Go and Rust)
 
-```sh
-go build -o scrollr_api && ./scrollr_api   # Core: port 8080
-go build -o fantasy_api && ./fantasy_api   # fantasy=8084 (finance/sports/rss/predictions live in core)
-```
+**You don't run these by hand.** `make up` builds and runs every backend
+service in Docker, and the containers hot-reload on save. There is no
+supported native workflow and no host toolchain requirement.
 
-### Rust Services (`channels/{finance,sports,rss,predictions}/service/`)
-
-```sh
-cargo build --release && cargo run   # finance=3001, sports=3002, rss=3004, predictions=3005
-```
+To compile-check or test a specific service without a local toolchain, use its
+container: `make shell svc=core-api` then `go build ./...`, or
+`make shell svc=rss-service` then `cargo check`.
 
 ### Tests
 
@@ -65,9 +100,10 @@ TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/scrollr_test?sslmode=disab
 
 ### CI
 
-- `.github/workflows/backend-tests.yml` — Go + Rust tests on every push/PR touching `api/` or `channels/`. The Go jobs get a Postgres 16 service container with `TEST_DATABASE_URL` set, so the api integration tests run for real in CI.
+- `.github/workflows/backend-tests.yml` — three job groups: `go-tests` (api, fantasy), `rust-tests` (the four channel service crates), and `desktop-rust-tests` (`desktop/src-tauri`, added 2026-07-24 — that crate was in no matrix and its 18 tests ran nowhere). Triggers on `api/**`, `channels/**/*.{go,rs}`, and `desktop/src-tauri/**`. The Go and channel jobs get a Postgres 16 service container with `TEST_DATABASE_URL` set, so the integration tests run for real. `desktop-rust-tests` needs no database but does need the webkit dev headers to link, which is why it's its own job.
 - `.github/workflows/frontend-tests.yml` — Vitest suites for `myscrollr.com/` and `desktop/` on every push/PR touching them.
 - `.github/workflows/desktop-release.yml` — desktop releases. Triggers on push to `main` when `desktop/` changes, or via `workflow_dispatch`. Builds Linux/macOS/Windows via `tauri-action`. Node 22, stable Rust, `npm ci`.
+  **A `preflight` job gates the build**: it skips when the version in `tauri.conf.json` already has a *published* release, because `tauri-action` would otherwise upload into it and silently replace the live binaries. So a push to `main` touching `desktop/` usually builds nothing — that's correct, not a failure. To actually cut a release, bump the version.
 - `.github/workflows/deploy.yml` — builds and deploys the API, channels, and website to production on push to `main`.
 
 ## Code Style — TypeScript
@@ -120,7 +156,7 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 - `gofmt` formatting. No custom linter. Go 1.25 across all modules.
 - All use Fiber v2, pgx v5, go-redis v9.
 - Two Go modules: `api/` (core, incl. the folded widget sources) and `channels/fantasy/api/`. No shared packages between them — fantasy keeps the HTTP-only contract (ADR-0002 retired the old five-module duplication rule).
-- Core API: internal packages under `api/internal/` (`platform`, `events`, `widgets`, `ingestread`, `accounts`, `billing`, `support`) wired by `api/core`. One binary. `platform` is the leaf — package-level `DBPool`/`Rdb` live there; `core` is the only package that imports everything. Widget sources register in `LocalSources` (`api/internal/ingestread/sources.go`).
+- Core API: internal packages under `api/internal/` (`platform`, `events`, `widgets`, `ingestread`, `accounts`, `billing`, `support`, plus `testsupport` for test helpers) wired by `api/core`. One binary. `platform` is the leaf — package-level `DBPool`/`Rdb` live there; `core` is the only package that imports everything. Widget sources register in `LocalSources` (`api/internal/ingestread/sources.go`).
 - Fantasy API: flat `main` package, `App` struct holding deps (`db *pgxpool.Pool`, `rdb *redis.Client`).
 - Naming: PascalCase exports, camelCase unexported, short receivers (`s *Server`, `a *App`), `snake_case` JSON tags. Constants are PascalCase, grouped with `=====` comment separators.
 - Error handling: `if err != nil` returns. `fmt.Errorf("context: %w", err)` wrapping. `log.Printf("[Context] message: %v", err)` with bracketed prefixes. `log.Fatalf` for startup failures. HTTP errors via `ErrorResponse` struct.
@@ -140,10 +176,10 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 
 ### Desktop Tauri (`desktop/src-tauri/`)
 
-- Edition 2021 (not 2024). `lib.rs` is the main entry point (~1200 lines).
+- Edition 2021 (not 2024). `lib.rs` is the entry point (~280 lines); commands live under `src/commands/`, the Kalshi client under `src/kalshi/`, and the Wayland shims under `src/compositor/`.
 - Commands: `#[tauri::command]`, `Result<(), String>` + `.map_err(|e| format!("context: {e}"))`.
 - State: custom structs via `app.manage()`. Two windows: `ticker` (always-on-top, 1920x228) and `main` (960x640 default). Close hides instead of destroying.
-- MCP bridge plugin: dev-only, non-Windows (`#[cfg(all(debug_assertions, not(target_os = "windows")))]`).
+- MCP bridge plugin: opt-in behind the `dev-mcp-bridge` Cargo feature, dev-only, non-Windows — `#[cfg(all(feature = "dev-mcp-bridge", debug_assertions, not(target_os = "windows")))]`. Release builds never link the crate. Run it with `npm run tauri:dev:mcp`.
 
 ## Architecture Rules
 
@@ -206,7 +242,7 @@ if hub != nil {
 
 Each Go service ships a `sentry_scrubbing_test.go` that constructs a worst-case event (auth headers, OAuth code/state, refresh token in body, IP/email/username) and asserts the scrubber strips it all. If that test ever fails, the integration is leaking — do NOT deploy.
 
-When in doubt, run the audit checklist in the rollout plan.
+This section is the whole contract — the rollout plan that used to hold a longer audit checklist was archived material and has been deleted. If a case isn't covered above, treat it as forbidden until someone decides otherwise.
 
 ## Database Migrations
 
@@ -266,4 +302,10 @@ Branch off `main`: `git checkout -b <prefix>/short-description`. PR back into `m
 
 ## Environment
 
-Copy `.env.example` to `.env`. Frontend env in `myscrollr.com/.env` and `desktop/.env` (both use `VITE_API_URL`). Never commit `.env` files. Package manager is **npm** throughout (not pnpm/yarn).
+`make setup` generates every `.env` file — do not hand-assemble them, and do not tell a user to copy a root `.env.example` (there isn't one; it was a Coolify-era fossil, deleted 2026-07-24).
+
+Per-component templates that DO exist: `api/`, `channels/{finance,sports,rss,fantasy}/`, `desktop/`, `myscrollr.com/`, `scripts/`. `api/.env.example` documents the 16 vars needed locally; the API reads ~65 in total, but the rest drive production-only integrations that all degrade gracefully when unset.
+
+`ENCRYPTION_KEY` must be **identical** across `api/.env` and every `channels/*/.env` — core encrypts third-party tokens and the channels decrypt them. `make setup` generates one value and writes it everywhere.
+
+Never commit `.env` files. Package manager is **npm** throughout (not pnpm/yarn).
