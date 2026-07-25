@@ -13,6 +13,21 @@
 #
 # Full runbook: docs/LOCAL_SETUP.md
 
+# ── Shell ────────────────────────────────────────────────────────────
+# On Windows, make defaults to cmd.exe, which cannot parse the POSIX tests
+# in the recipes below (`[ -f ... ]`, if/fi). Force a real shell.
+#
+# It has to be Git Bash by absolute path, NOT plain `bash`: on Windows
+# `bash` resolves to the WSL launcher stub in WindowsApps, which
+# fails outright when WSL has no distro installed (the recommended
+# `wsl --install --no-distribution` leaves it that way). The failure looks
+# nothing like a shell problem.
+ifeq ($(OS),Windows_NT)
+  SHELL := C:/Program Files/Git/bin/bash.exe
+else
+  SHELL := /bin/bash
+endif
+
 COMPOSE      := docker compose -f docker/compose.yml
 COMPOSE_PRED := $(COMPOSE) --profile predictions
 # Predictions is opt-in: it needs a Kalshi key. The profile turns on only
@@ -52,7 +67,7 @@ doctor: ##setup: Check Docker, ports and required tooling
 	@node scripts/dev/doctor.mjs
 
 kalshi-key: ##setup: Pull the Kalshi key from the cluster (needs kubectl)
-	@bash scripts/dev/pull-kalshi-key.sh
+	@$(SHELL) scripts/dev/pull-kalshi-key.sh
 	@node scripts/dev/setup.mjs --predictions-only
 
 # ── Run ──────────────────────────────────────────────────────────────
@@ -71,7 +86,7 @@ up: ##run: Start the backend, wait until healthy (svc= for a subset)
 	  fi; \
 	  $(COMPOSE_AUTO) up -d --build --remove-orphans; \
 	fi
-	@bash scripts/dev/wait-healthy.sh
+	@$(SHELL) scripts/dev/wait-healthy.sh
 
 down: ##run: Stop the backend (keeps your database)
 	@$(COMPOSE_PRED) down
@@ -79,7 +94,7 @@ down: ##run: Stop the backend (keeps your database)
 restart: down up ##run: Stop and start again
 
 dev: up ##run: Backend, then web + desktop in their own windows
-	@bash scripts/dev/launch-frontends.sh
+	@$(SHELL) scripts/dev/launch-frontends.sh
 
 web: ##run: Marketing site only, natively (Vite :3000)
 	@cd myscrollr.com && npm run dev

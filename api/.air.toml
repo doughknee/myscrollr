@@ -9,7 +9,10 @@ tmp_dir = "/tmp/air"
   bin = "/tmp/air/main"
   include_ext = ["go"]
   exclude_dir = ["migrations", "cmd/gents"]
-  exclude_regex = ["_test\.go"]
+  # Single-quoted TOML literal string: escapes are NOT processed, which is
+  # what a regex wants. A basic "..." string rejects \. as an invalid escape
+  # and air refuses to start.
+  exclude_regex = ['_test\.go']
   # Bind mounts on Windows/macOS don't deliver inotify events reliably.
   # Polling costs a little CPU and is the difference between hot reload
   # working and silently never firing.

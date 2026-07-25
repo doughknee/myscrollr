@@ -27,7 +27,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 # place on save — no image rebuild per edit.
 FROM golang:1.25-alpine AS dev
 WORKDIR /app
-RUN apk add --no-cache git curl && go install github.com/air-verse/air@latest
+# air is PINNED, not @latest: v1.67.2 raised its minimum to Go 1.26 and
+# broke this build with no warning. v1.67.1 is the last release that
+# builds on the Go 1.25 this image pins to match go.mod. Bump both
+# together or not at all.
+RUN apk add --no-cache git curl && go install github.com/air-verse/air@v1.67.1
 ENV GOFLAGS=-buildvcs=false
 EXPOSE 8080
 CMD ["air", "-c", ".air.toml"]
