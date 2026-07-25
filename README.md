@@ -37,7 +37,7 @@ exists to feed it.
 | Path | Service | Stack |
 |---|---|---|
 | [`desktop/`](./desktop/) | Desktop app (the primary product) | Tauri v2 + React 19 + Vite 7 |
-| [`myscrollr.com/`](./myscrollr.com/) | Marketing, auth, billing — *not* where widgets are configured | React 19 + Vite + TanStack Router |
+| [`myscrollr.com/`](./myscrollr.com/) | Marketing, auth, billing — *not* where widgets are configured | React 19 + Vite 7 + TanStack Start (static prerender) |
 | [`api/`](./api/) | Core API: widget catalog, reads, SSE, billing, accounts, support | Go 1.25 + Fiber v2 + Postgres + Redis |
 | [`channels/finance/`](./channels/finance/) | Market-data ingester (TwelveData) | Rust |
 | [`channels/sports/`](./channels/sports/) | Scores + schedules ingester (api-sports.io) | Rust |
@@ -45,8 +45,8 @@ exists to feed it.
 | [`channels/predictions/`](./channels/predictions/) | Prediction-market ingester (Kalshi) | Rust |
 | [`channels/fantasy/`](./channels/fantasy/) | Yahoo Fantasy (OAuth + sync) | Go |
 | [`k8s/`](./k8s/) | Production manifests | Kubernetes on DigitalOcean |
-| [`scripts/`](./scripts/) | Operational tooling | Shell, one Node script |
-| [`docs/`](./docs/) | Charter, rollout plan, ADRs, design specs | Markdown |
+| [`scripts/`](./scripts/) | Dev + ops tooling: `make` helpers, smoke tests, osTicket plugin | Node, Shell, PHP |
+| [`docs/`](./docs/) | Charter, ADRs, roadmap, runbooks — [indexed here](./docs/README.md) | Markdown |
 
 ## How it fits together
 
@@ -123,32 +123,45 @@ container). Full topology, ports and troubleshooting:
 
 ## Testing
 
-- **TypeScript**: `npm run build` (includes `tsc` typecheck) in
-  `myscrollr.com/` and `desktop/`.
-- **Go**: `go test ./...` in `api/` and `channels/fantasy/api/`.
-- **Rust**: `cargo test` in each
-  `channels/{finance,sports,rss,predictions}/service/`.
-
-Integration tests (GDPR purge cascade, Stripe webhook idempotency,
-fantasy's schema contract) need a real Postgres and skip without it:
-
 ```sh
-TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/scrollr_test?sslmode=disable" go -C api test ./...
+make check   # both TypeScript suites — the ones that run without a toolchain
 ```
 
-CI mirrors this: `.github/workflows/backend-tests.yml` runs Go + Rust
-in a matrix on every push; `.github/workflows/desktop-release.yml`
-builds and releases desktop binaries; `.github/workflows/deploy.yml`
-ships the API and website to production.
+- **TypeScript**: `npm test` in `myscrollr.com/` and `desktop/`, or
+  `npm run build` for a `tsc` typecheck.
+- **Go and Rust**: no host toolchain is required to *run* this project, so
+  the backend suites run in CI. To run them locally, use the containers the
+  stack already builds — `make shell svc=core-api` then `go test ./...`, or
+  `make shell svc=rss-service` then `cargo test`. Installing Go or Rust on
+  the host also works, but nothing here needs it.
+
+Integration tests (GDPR purge cascade, Stripe webhook idempotency,
+fantasy's schema contract) need a real Postgres and skip without it, so
+`go test ./...` is always safe. To run them, point `TEST_DATABASE_URL` at a
+scratch database — never one with real data:
+
+```sh
+TEST_DATABASE_URL="postgres://scrollr:scrollr@postgres:5432/scrollr?sslmode=disable" go test ./...
+```
+
+CI runs all of it: `.github/workflows/backend-tests.yml` covers Go
+(`api`, fantasy), the four Rust ingesters, and `desktop/src-tauri`;
+`frontend-tests.yml` runs both Vitest suites;
+`desktop-release.yml` builds and releases desktop binaries — though a
+preflight job skips the build unless the version in `tauri.conf.json` is
+unreleased; `deploy.yml` ships the API and website to production.
 
 ## Conventions
 
 - **The server is the authority; clients are projections.** The widget
   catalog, the database schema, and the TS wire types all have exactly
-  one definition in `api/`. Where a client needs a copy — the offline
-  catalog snapshot, the generated types, the tier-limit table — it is
-  *generated* and pinned by a test that fails CI on drift. Don't
-  hand-edit a generated file; change the Go and regenerate.
+  one definition in `api/`. Every client copy is pinned by a test that
+  fails CI on drift — but they differ in how they're produced:
+  `desktop/src/types/api.generated.ts` and `catalog.snapshot.json` are
+  **generated** (`api/cmd/gents`, and `go test ./internal/widgets -update`),
+  so change the Go and regenerate. `desktop/src/tierLimits.ts` is a
+  **hand-kept mirror** — there is no generator; edit it and the Go map
+  together, as its header comment lists.
 - **No analytics, tracking pixels, or telemetry.** This is a public
   product promise, documented in the Privacy Policy. Don't add them.
 - **Only core migrates.** All schema lives in `api/migrations/`; the
