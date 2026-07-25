@@ -15,19 +15,11 @@ Captured 2026-05-10 from a live dev build with real data flowing through the rea
 | `05-ticker-bar.png` | Standalone ticker bar — fantasy intel + game chips (no chrome, fills width) | "Always-on ticker" feature, top of README |
 | `06-display-preferences.png` | Sports display preferences — live preview of Feed vs Ticker | Customization / "your data, your way" section |
 
-### ⚠️ Stale — do not use (`07`–`12`)
-
-`07-configure-sports.png`, `08-configure-fantasy.png`, `09-configure-news.png`,
-`10-configure-finance.png`, `11-configure-clock.png`, `12-configure-weather.png`
-
-These show the **Configure pages, which were retired in v1.1.9** ("One Bar" —
-every widget's controls moved into its own persistent top bar; there is no
-`configure` route any more). They are six screenshots of a UI that no longer
-exists. Publishing one would misrepresent the product.
-
-They were left undocumented in this inventory for two months, which is how a
-stale asset gets used by accident. Kept for now as a historical record of the
-pre-v1.1.9 IA — delete them if that's not worth the confusion risk.
+> **Six `configure-*` captures (07–12) were deleted 2026-07-25.** They showed
+> the Configure pages, retired in v1.1.9 when every widget's controls moved
+> into its own top bar. They had sat undocumented in this inventory for two
+> months, which is how a screenshot of a dead UI reaches a marketing page.
+> Recoverable from git history if the pre-v1.1.9 IA is ever worth showing.
 
 ## How these were made
 
