@@ -1,6 +1,6 @@
 [package]
 name = "scrollr-desktop"
-version = "1.1.13"
+version = "1.1.14"
 edition = "2021"
 # std::env::home_dir (Sentry path scrubber) is only correct on Windows from 1.85+
 rust-version = "1.85"
