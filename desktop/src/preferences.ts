@@ -301,8 +301,11 @@ export interface WidgetPrefs {
  *   both    — shown in both places (default for migrated `true` booleans)
  *   ticker  — shown on the always-on-top ticker only; hidden from the feed
  *
- * The `VenueRow` component in SettingsControls
- * renders a segmented control for switching between these states.
+ * There is no longer a UI for switching these: the `VenueRow` segmented
+ * control lived on the Configure pages, which v1.1.9 retired. The values
+ * still drive rendering — `shouldShowOnTicker` / `shouldShowOnFeed` are read
+ * by the ticker and the chips — they just come from stored prefs and the
+ * per-widget defaults now, not from a settings screen.
  */
 export type Venue = "off" | "feed" | "both" | "ticker";
 
