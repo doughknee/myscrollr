@@ -938,9 +938,6 @@ function RootLayout() {
                   their control rows into it (widget-bar/BarChassis.tsx). */}
               <BarChassisSlot />
 
-              {/* PageLayout (used by every route) owns its own scroll
-                  for its content area. The outer wrapper just provides
-                  the flex slot for it to fill. */}
               <div className="flex-1 min-h-0 overflow-hidden">
                 <ShellContext.Provider value={shellStableValue}>
                   <ShellDataContext.Provider value={shellDataValue}>

@@ -15,7 +15,7 @@ import {
   Trophy,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
+import { AnimatePresence } from "motion/react";
 import { open } from "@tauri-apps/plugin-shell";
 import clsx from "clsx";
 
@@ -33,6 +33,7 @@ import {
 import CatalogCard from "../components/marketplace/CatalogCard";
 import QueryErrorBanner from "../components/QueryErrorBanner";
 import RouteError from "../components/RouteError";
+import ContentTransition from "../components/layout/ContentTransition";
 import PageLayout from "../components/layout/PageLayout";
 import PageSection from "../components/layout/PageSection";
 import { WidgetBar } from "../components/widget-bar/Bar";
@@ -214,17 +215,8 @@ function CatalogPage() {
     };
   }, [allItems, filter, sort, allEnabledIds]);
 
-  const cardFor = (item: CatalogItem, i: number) => (
-    <motion.div
-      key={item.id}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{
-        duration: 0.22,
-        delay: Math.min(0.06 + i * 0.018, 0.3),
-        ease: [0.22, 0.61, 0.36, 1],
-      }}
-    >
+  const cardFor = (item: CatalogItem) => (
+    <div key={item.id}>
       <CatalogCard
         item={item}
         enabled={allEnabledIds.has(item.id)}
@@ -232,7 +224,7 @@ function CatalogPage() {
           navigate({ to: "/widget/$id/info", params: { id: it.id } })
         }
       />
-    </motion.div>
+    </div>
   );
 
   const countChip = (n: number) => (
@@ -294,10 +286,7 @@ function CatalogPage() {
           The counter lives HERE now — cards never nag, and the old
           at-capacity banner folded into this band (warn tint +
           Upgrade button when full). ── */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25, delay: 0.02, ease: [0.22, 0.61, 0.36, 1] }}
+      <div
         className={clsx(
           "mt-4 mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-xl border px-4 py-3",
           slots.atCapacity && slots.finite
@@ -340,26 +329,17 @@ function CatalogPage() {
           {/* Sort control moved to the WCB (bar grammar: config
               selects live in the bar's right cluster). */}
         </div>
-      </motion.div>
+      </div>
 
-      {yourItems.length === 0 && discoverItems.length === 0 ? (
-        <EmptySection
-          icon={Search}
-          title="Nothing here"
-          description="No items match this filter. Try a different category."
-        />
-      ) : (
-        // No initial={false} here — it would propagate presence-context
-        // suppression and block the card entrances on page arrival
-        // (same bug PageLayout had until v1.1.1).
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={`${filter}-${sort}`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18, ease: [0.22, 0.61, 0.36, 1] }}
-          >
+      <ContentTransition id={`${filter}-${sort}`}>
+        {yourItems.length === 0 && discoverItems.length === 0 ? (
+          <EmptySection
+            icon={Search}
+            title="Nothing here"
+            description="No items match this filter. Try a different category."
+          />
+        ) : (
+          <>
             {/* ── Your widgets ── */}
             {yourItems.length > 0 && (
               <PageSection
@@ -383,9 +363,7 @@ function CatalogPage() {
             >
               {discoverItems.length > 0 ? (
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                  {discoverItems.map((item, i) =>
-                    cardFor(item, yourItems.length + i),
-                  )}
+                  {discoverItems.map(cardFor)}
                 </div>
               ) : (
                 <EmptySection
@@ -396,9 +374,9 @@ function CatalogPage() {
                 />
               )}
             </PageSection>
-          </motion.div>
-        </AnimatePresence>
-      )}
+          </>
+        )}
+      </ContentTransition>
     </PageLayout>
   );
 }

@@ -16,6 +16,7 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import clsx from "clsx";
 import { motion, AnimatePresence } from "motion/react";
+import { ROUTE_VARIANTS } from "../../lib/motion";
 import { useRegisterPageIdentity } from "./page-context";
 import type { OverflowMenuItem } from "../OverflowMenu";
 
@@ -140,33 +141,20 @@ export default function PageLayout({
   return (
     <div className="flex flex-col h-full">
       {/* ── Content stack ────────────────────────────────────
-          Children are wrapped in an AnimatePresence + motion.div
-          keyed on title+subtitle+active-tab so navigating between
-          sub-routes (e.g. Feed → Configure → Display on a source
-          page) or sibling tabs (Appearance → Ticker → Account in
-          Settings) cross-fades the content while the TopBar chrome
-          stays stable. The cross-fade uses 'wait' mode for a clean
-          one-at-a-time transition without overlap during route
-          changes.
-
-          Do NOT pass initial={false} here: AnimatePresence sets
-          PresenceContext.initial=false for its first render, which
-          silently blocks the mount animation of EVERY nested motion
-          component — it killed all page entrance choreography
-          (catalog cards, settings sections, support hub) until
-          v1.1.1. Initial animations on page arrival are a feature. */}
+          This is the shared entry transition for every page and for
+          identity changes while a route stays mounted. */}
       {fillHeight ? (
         // Fill-height mode: content area is a flex column with no
         // outer scroll. Children manage their own scrollable panel.
         // Used by Configure routes that have a long inner list.
-        <div className="flex-1 min-h-0 flex flex-col">
-          <AnimatePresence mode="wait">
+        <div className="relative flex-1 min-h-0 flex flex-col">
+          <AnimatePresence mode="popLayout">
             <motion.div
               key={contentKey}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.18, ease: [0.22, 0.61, 0.36, 1] }}
+              variants={ROUTE_VARIANTS}
+              initial="hidden"
+              animate="show"
+              exit="out"
               className={clsx(
                 "mx-auto px-5 pt-5 pb-0 w-full flex-1 min-h-0 flex flex-col",
                 widthClass,
@@ -186,25 +174,14 @@ export default function PageLayout({
       ) : (
         // Default mode: content area scrolls; children stack vertically.
         // (`relative` anchors popLayout's absolutely-positioned exits.)
-        <div ref={scrollRef} className="relative flex-1 overflow-y-auto scrollbar-thin">
-          <AnimatePresence mode={stableChrome ? "popLayout" : "wait"}>
+        <div ref={scrollRef} className="relative flex-1 overflow-y-auto scrollbar-thin [scrollbar-gutter:stable]">
+          <AnimatePresence mode="popLayout">
             <motion.div
               key={contentKey}
-              initial={stableChrome ? "hidden" : { opacity: 0, y: 4 }}
-              animate={stableChrome ? "show" : { opacity: 1, y: 0 }}
-              exit={stableChrome ? "out" : { opacity: 0, y: -4 }}
-              variants={
-                stableChrome
-                  ? {
-                      // The bar chrome lives outside this subtree now, so
-                      // the feed content can drift vertically again.
-                      hidden: { opacity: 0, y: 6 },
-                      show: { opacity: 1, y: 0 },
-                      out: { opacity: 0, y: -6 },
-                    }
-                  : undefined
-              }
-              transition={{ duration: 0.18, ease: [0.22, 0.61, 0.36, 1] }}
+              initial={stableChrome ? "hidden" : ROUTE_VARIANTS.hidden}
+              animate={stableChrome ? "show" : ROUTE_VARIANTS.show}
+              exit={stableChrome ? "out" : ROUTE_VARIANTS.out}
+              variants={stableChrome ? ROUTE_VARIANTS : undefined}
               className={clsx(
                 noContentPadding ? "w-full" : "mx-auto px-5 py-5",
                 !noContentPadding && widthClass,

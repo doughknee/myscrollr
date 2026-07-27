@@ -16,35 +16,12 @@ interface SectionProps {
   action?: React.ReactNode;
   /** Card sections are used by the compact flat Settings page. */
   variant?: "open" | "card";
-  /**
-   * Entrance-stagger position. When set, the section fades up on mount
-   * with the same timing as the Support hub / widget pages
-   * (0.25s, 0.04 + index * 0.04 delay), so Settings / Ticker / Account
-   * match the rest of the app when switching destinations (v1.1.1).
-   */
-  index?: number;
 }
 
-export function Section({ title, children, action, variant = "open", index }: SectionProps) {
-  const entrance =
-    index === undefined
-      ? {}
-      : {
-          initial: { opacity: 0, y: 8 },
-          animate: { opacity: 1, y: 0 },
-          transition: {
-            duration: 0.25,
-            delay: 0.04 + index * 0.04,
-            ease: [0.22, 0.61, 0.36, 1] as const,
-          },
-        };
-
+export function Section({ title, children, action, variant = "open" }: SectionProps) {
   if (variant === "card") {
     return (
-      <motion.section
-        {...entrance}
-        className="rounded-xl border border-edge/35 bg-base-150/35 overflow-hidden"
-      >
+      <section className="rounded-xl border border-edge/35 bg-base-150/35 overflow-hidden">
         <div className="flex items-center justify-between px-4 pt-3.5 pb-2">
           <h3 className="text-ui-section font-mono">
             {title}
@@ -52,15 +29,12 @@ export function Section({ title, children, action, variant = "open", index }: Se
           {action && <div className="shrink-0">{action}</div>}
         </div>
         <div className="px-1 pb-2">{children}</div>
-      </motion.section>
+      </section>
     );
   }
 
   return (
-    <motion.div
-      {...entrance}
-      className="mb-6 pb-5 border-b border-edge/30 last:border-b-0 last:mb-0 last:pb-0"
-    >
+    <div className="mb-6 pb-5 border-b border-edge/30 last:border-b-0 last:mb-0 last:pb-0">
       <div className="flex items-center justify-between mb-3 px-3">
         <h3 className="text-ui-section font-mono">
           {title}
@@ -68,7 +42,7 @@ export function Section({ title, children, action, variant = "open", index }: Se
         {action && <div className="shrink-0">{action}</div>}
       </div>
       <div className="space-y-0.5">{children}</div>
-    </motion.div>
+    </div>
   );
 }
 

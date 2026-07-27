@@ -14,6 +14,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import RouteError from "../components/RouteError";
+import ContentTransition from "../components/layout/ContentTransition";
 import PageLayout from "../components/layout/PageLayout";
 import { WidgetBar } from "../components/widget-bar/Bar";
 import {
@@ -66,7 +67,7 @@ function CustomizeRoute() {
         />
       </WidgetBar>
 
-      <div className="pt-4">
+      <ContentTransition id={tab} className="pt-4">
         {tab === "ticker" ? (
           <TickerSettings prefs={prefs} onPrefsChange={onPrefsChange} />
         ) : (
@@ -91,7 +92,7 @@ function CustomizeRoute() {
             appVersion={shell.appVersion}
           />
         )}
-      </div>
+      </ContentTransition>
     </PageLayout>
   );
 }
