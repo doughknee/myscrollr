@@ -238,9 +238,9 @@ export default function MyPositionsPanel({ markets, hex }: MyPositionsPanelProps
               onClick={() => refetch()}
               title="Refresh"
               aria-label="Refresh portfolio"
-              className="flex h-7 w-7 items-center justify-center rounded-md border border-edge/40 text-fg-3 transition-colors hover:text-fg cursor-pointer"
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-edge/40 text-fg-3  hover:text-fg cursor-pointer"
             >
-              <RefreshCw size={13} className={clsx(isFetching && "animate-spin")} />
+              <RefreshCw size={13} />
             </button>
           </div>
         </div>
@@ -346,7 +346,7 @@ export default function MyPositionsPanel({ markets, hex }: MyPositionsPanelProps
         <button
           type="button"
           onClick={handleDisconnect}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-error/10 px-3 py-1.5 text-[12px] font-medium text-error transition-colors hover:bg-error/20 cursor-pointer"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-error/10 px-3 py-1.5 text-[12px] font-medium text-error  hover:bg-error/20 cursor-pointer"
         >
           <Unplug size={13} />
           Disconnect
@@ -376,7 +376,7 @@ function PositionRow({
       type="button"
       onClick={() => open(link).catch(() => {})}
       title="Open on Kalshi"
-      className="flex w-full items-center gap-3 bg-surface px-4 py-2.5 text-left transition-colors hover:bg-surface-hover cursor-pointer"
+      className="flex w-full items-center gap-3 bg-surface px-4 py-2.5 text-left  hover:bg-surface-hover cursor-pointer"
     >
       <SideTag side={pos.side} />
       <div className="min-w-0 flex-1">
@@ -509,11 +509,11 @@ function Section({
 function PanelSkeleton() {
   return (
     <div className="flex flex-col gap-3 p-4">
-      <div className="h-8 w-40 rounded bg-surface-2 motion-safe:animate-pulse" />
+      <div className="h-8 w-40 rounded bg-surface-2 " />
       {Array.from({ length: 4 }, (_, i) => (
         <div
           key={i}
-          className="h-12 rounded bg-surface-2/60 motion-safe:animate-pulse"
+          className="h-12 rounded bg-surface-2/60 "
         />
       ))}
     </div>

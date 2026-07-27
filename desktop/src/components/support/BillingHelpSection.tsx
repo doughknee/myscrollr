@@ -47,7 +47,7 @@ export default function BillingHelpSection() {
           <button
             onClick={handleManageSubscription}
             disabled={portalLoading}
-            className="flex items-start gap-3 rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left transition-colors hover:bg-base-150/55 disabled:opacity-50 cursor-pointer"
+            className="flex items-start gap-3 rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left hover:bg-base-150/55 disabled:opacity-50 cursor-pointer"
           >
             <Settings size={18} className="mt-0.5 shrink-0 text-accent" />
             <div className="min-w-0">
@@ -74,7 +74,7 @@ export default function BillingHelpSection() {
         {/* View Plans */}
         <button
           onClick={handleViewPlans}
-          className="flex items-start gap-3 rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left transition-colors hover:bg-base-150/55 cursor-pointer"
+          className="flex items-start gap-3 rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left hover:bg-base-150/55 cursor-pointer"
         >
           <ExternalLink size={18} className="mt-0.5 shrink-0 text-accent" />
           <div className="min-w-0">

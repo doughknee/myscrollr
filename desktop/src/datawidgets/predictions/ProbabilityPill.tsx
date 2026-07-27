@@ -56,7 +56,7 @@ export default function ProbabilityPill({
   return (
     <span
       className={clsx(
-        "inline-flex shrink-0 items-center justify-center rounded-full font-mono font-bold tabular-nums transition-colors duration-700",
+        "inline-flex shrink-0 items-center justify-center rounded-full font-mono font-bold tabular-nums  ",
         SIZE_CLASSES[size],
         isUp && "bg-up/10 text-up",
         isDown && "bg-down/10 text-down",

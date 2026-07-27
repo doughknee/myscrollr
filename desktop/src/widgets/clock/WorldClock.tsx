@@ -109,7 +109,6 @@ function ClockCard({
   compact,
   fmt,
   onRemove,
-  animating,
 }: {
   tz: string;
   label: string;
@@ -117,7 +116,6 @@ function ClockCard({
   compact: boolean;
   fmt: TimeFormat;
   onRemove?: () => void;
-  animating?: boolean;
 }) {
   const [time, setTime] = useState(fmtTime(tz, fmt));
   const [date, setDate] = useState(fmtDate(tz));
@@ -138,11 +136,6 @@ function ClockCard({
     return (
       <div
         className={clsx(FEED_CARD, FEED_CARD_STATIC, "group flex items-center justify-between py-2")}
-        style={
-          animating
-            ? { animation: "widget-card-enter 200ms ease-out" }
-            : undefined
-        }
       >
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-xs font-mono text-widget-clock/80 uppercase tracking-wider shrink-0 w-20 truncate">
@@ -158,7 +151,7 @@ function ClockCard({
             <Tooltip content="Remove timezone">
               <button
                 onClick={onRemove}
-                className="text-fg-3 hover:text-error opacity-0 group-hover:opacity-100 transition-all"
+                className="text-fg-3 hover:text-error opacity-0 group-hover:opacity-100 "
               >
                 <X size={11} />
               </button>
@@ -172,17 +165,12 @@ function ClockCard({
   return (
     <div
       className={clsx(FEED_CARD, FEED_CARD_STATIC, "group relative overflow-hidden")}
-      style={
-        animating
-          ? { animation: "widget-card-enter 200ms ease-out" }
-          : undefined
-      }
     >
       {!isLocal && onRemove && (
         <Tooltip content="Remove timezone">
           <button
             onClick={onRemove}
-            className="absolute top-2.5 right-2.5 w-5 h-5 flex items-center justify-center rounded text-fg-3 hover:text-error hover:bg-error/10 opacity-0 group-hover:opacity-100 transition-all"
+            className="absolute top-2.5 right-2.5 w-5 h-5 flex items-center justify-center rounded text-fg-3 hover:text-error hover:bg-error/10 opacity-0 group-hover:opacity-100 "
           >
             <X size={11} />
           </button>
@@ -232,7 +220,6 @@ export function WorldClock({
   const [search, setSearch] = useState("");
   const barDriven = addQuery !== undefined;
   const effectiveSearch = barDriven ? addQuery : search;
-  const [recentlyAdded, setRecentlyAdded] = useState<Set<string>>(new Set());
   const searchRef = useRef<HTMLInputElement>(null);
   const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -256,14 +243,6 @@ export function WorldClock({
       saveTimezones(n);
       return n;
     });
-    setRecentlyAdded((p) => new Set(p).add(tz));
-    setTimeout(() => {
-      setRecentlyAdded((p) => {
-        const n = new Set(p);
-        n.delete(tz);
-        return n;
-      });
-    }, 300);
     setSearch("");
     onAddQueryChange?.("");
   }, [onAddQueryChange]);
@@ -291,7 +270,7 @@ export function WorldClock({
           <button
             onClick={() => setShowAdd(!showAdd)}
             className={
-              "text-xs font-mono transition-colors " +
+              "text-xs font-mono  " +
               (showAdd
                 ? "text-widget-clock"
                 : "text-widget-clock/70 hover:text-widget-clock")
@@ -306,7 +285,6 @@ export function WorldClock({
       {(barDriven ? addQuery.trim().length > 0 : showAdd) && (
         <div
           className="rounded-lg border border-widget-clock/15 bg-surface-2 overflow-hidden"
-          style={{ animation: "widget-card-enter 150ms ease-out" }}
         >
           {!barDriven && (
             <div className="px-3 py-2 border-b border-edge/50">
@@ -330,7 +308,7 @@ export function WorldClock({
                 <button
                   key={preset.tz}
                   onClick={() => handleAdd(preset.tz)}
-                  className="flex items-center justify-between w-full px-3 py-1.5 text-left hover:bg-widget-clock/[0.06] transition-colors"
+                  className="flex items-center justify-between w-full px-3 py-1.5 text-left hover:bg-widget-clock/[0.06] "
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-xs font-mono text-fg">
@@ -365,7 +343,6 @@ export function WorldClock({
               compact={compact}
               fmt={fmt}
               onRemove={isLocal ? undefined : () => handleRemove(tz)}
-              animating={recentlyAdded.has(tz)}
             />
           );
         })}

@@ -1,7 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { Activity, ChevronDown } from "lucide-react";
 import { clsx } from "clsx";
-import { AnimatePresence } from "motion/react";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 import { WidgetBar } from "../../components/widget-bar/Bar";
 import {
@@ -127,7 +126,7 @@ function StatsMenu({
         aria-haspopup="menu"
         aria-label="Choose stats"
         className={clsx(
-          "flex cursor-pointer items-center gap-1 rounded-full border py-1 pl-2.5 pr-2 text-ui-meta font-medium transition-colors",
+          "flex cursor-pointer items-center gap-1 rounded-full border py-1 pl-2.5 pr-2 text-ui-meta font-medium ",
           open
             ? "border-accent/40 bg-accent/15 text-accent"
             : "border-edge/30 bg-base-150/60 text-fg-3 hover:text-fg-2",
@@ -141,27 +140,25 @@ function StatsMenu({
           size={12}
           aria-hidden
           className={clsx(
-            "shrink-0 transition-transform duration-150",
+            "shrink-0  ",
             open ? "rotate-180 text-accent/70" : "text-fg-4",
           )}
         />
       </button>
-      <AnimatePresence>
-        {open && (
-          <MenuPanel className="left-0 w-56">
-            {STAT_ROWS.map(({ key, label }) => (
-              <MenuRow
-                key={key}
-                role="menuitemcheckbox"
-                selected={ticker[key]}
-                onClick={() => setTicker({ [key]: !ticker[key] })}
-              >
-                {label}
-              </MenuRow>
-            ))}
-          </MenuPanel>
-        )}
-      </AnimatePresence>
+      {open && (
+        <MenuPanel className="left-0 w-56">
+          {STAT_ROWS.map(({ key, label }) => (
+            <MenuRow
+              key={key}
+              role="menuitemcheckbox"
+              selected={ticker[key]}
+              onClick={() => setTicker({ [key]: !ticker[key] })}
+            >
+              {label}
+            </MenuRow>
+          ))}
+        </MenuPanel>
+      )}
     </div>
   );
 }
@@ -323,7 +320,7 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
                   </div>
                   <div className="h-1.5 rounded-full bg-widget-sysmon/10 overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all duration-500"
+                      className="h-full rounded-full  "
                       style={{
                         width: `${Math.min(100, info.cpuUsage)}%`,
                         background: `linear-gradient(90deg, #34d399, ${usageColor(info.cpuUsage)})`,
@@ -355,7 +352,7 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
                   </div>
                   <div className="h-1.5 rounded-full bg-widget-sysmon/10 overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all duration-500"
+                      className="h-full rounded-full  "
                       style={{
                         width: `${Math.min(100, memPct)}%`,
                         background: `linear-gradient(90deg, #34d399, ${usageColor(memPct)})`,
@@ -386,7 +383,7 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
                       </div>
                       <div className="h-1.5 rounded-full bg-widget-sysmon/10 overflow-hidden">
                         <div
-                          className="h-full rounded-full transition-all duration-500"
+                          className="h-full rounded-full  "
                           style={{
                             width: `${Math.min(100, info.gpuUsage)}%`,
                             background: `linear-gradient(90deg, #34d399, ${usageColor(info.gpuUsage)})`,

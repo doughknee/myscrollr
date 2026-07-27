@@ -8,7 +8,6 @@
  */
 import { useMemo } from "react";
 import { clsx } from "clsx";
-import { motion } from "motion/react";
 import { Flame, Medal, TrendingDown, TrendingUp } from "lucide-react";
 import {
   isMatchupFinal,
@@ -68,10 +67,7 @@ export function OverviewView({
     <div className="flex flex-col gap-4 p-4">
       {/* Scorecard — only relevant with 2+ leagues */}
       {showScorecard && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 320, damping: 32 }}
+        <div
           className="rounded-xl border border-edge/40 bg-surface-2/80 p-4"
         >
           <div className="flex items-center gap-3">
@@ -114,18 +110,15 @@ export function OverviewView({
             </div>
             <RecordMedal record={week} />
           </div>
-        </motion.div>
+        </div>
       )}
 
       {/* Primary league hero */}
       {primary && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 320, damping: 32, delay: 0.05 }}
+        <div
         >
           <MatchupHero league={primary} onClick={onOpenMatchup} />
-        </motion.div>
+        </div>
       )}
 
       {/* Other leagues strip */}
@@ -136,22 +129,14 @@ export function OverviewView({
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {others.map((l, i) => (
-              <motion.div
+              <div
                 key={l.league_key}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 380,
-                  damping: 34,
-                  delay: 0.08 + i * 0.03,
-                }}
               >
                 <MiniLeagueTile
                   league={l}
                   onClick={() => onSelectLeague(l.league_key)}
                 />
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>

@@ -394,7 +394,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
                 type="button"
                 onClick={() => setCategory(opt.value)}
                 className={clsx(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-ui-chip font-medium transition-colors cursor-pointer border",
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-ui-chip font-medium cursor-pointer border",
                   category === opt.value
                     ? "bg-accent/15 text-accent border-accent/30"
                     : "bg-base-200 text-fg-3 border-edge/40 hover:text-fg-2",
@@ -475,7 +475,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
                     type="button"
                     onClick={() => setFrequency(opt.value)}
                     className={clsx(
-                      "px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer",
+                      "px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer",
                       frequency === opt.value
                         ? "bg-accent/15 text-accent"
                         : "bg-surface-2 text-fg-3 hover:text-fg-2",
@@ -503,7 +503,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={files.length >= MAX_FILES}
                 className={clsx(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer",
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer",
                   files.length >= MAX_FILES
                     ? "bg-surface-2 text-fg-4 cursor-not-allowed"
                     : "bg-surface-2 text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
@@ -528,7 +528,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
                       <button
                         type="button"
                         onClick={() => removeFile(i)}
-                        className="text-fg-4 hover:text-fg-2 transition-colors cursor-pointer"
+                        className="text-fg-4 hover:text-fg-2 cursor-pointer"
                         aria-label={`Remove ${file.name}`}
                       >
                         <X size={11} />
@@ -541,7 +541,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
 
             {/* Diagnostic Info */}
             <details className="group">
-              <summary className="text-xs font-medium text-fg-3 cursor-pointer hover:text-fg-2 transition-colors select-none">
+              <summary className="text-xs font-medium text-fg-3 cursor-pointer hover:text-fg-2 select-none">
                 {diagnosticsLoading
                   ? "Collecting system diagnostics..."
                   : "System diagnostics will be included"}
@@ -549,7 +549,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
               <div className="mt-2">
                 {diagnosticsLoading ? (
                   <div className="flex items-center gap-2 text-xs text-fg-4 py-3">
-                    <Loader2 size={13} className="animate-spin" />
+                    <Loader2 size={13} />
                     Collecting diagnostics...
                   </div>
                 ) : diagnostics ? (
@@ -606,7 +606,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
                     type="button"
                     onClick={() => setPriority(opt.value)}
                     className={clsx(
-                      "px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer",
+                      "px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer",
                       priority === opt.value
                         ? "bg-accent/15 text-accent"
                         : "bg-surface-2 text-fg-3 hover:text-fg-2",
@@ -670,7 +670,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
           type="submit"
           disabled={!canSubmit}
           className={clsx(
-            "w-full py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer",
+            "w-full py-2 rounded-lg text-sm font-medium cursor-pointer",
             canSubmit
               ? "bg-accent text-white hover:bg-accent/90"
               : "bg-surface-2 text-fg-4 cursor-not-allowed",
@@ -678,7 +678,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
         >
           {submitting ? (
             <span className="flex items-center justify-center gap-2">
-              <Loader2 size={14} className="animate-spin" />
+              <Loader2 size={14} />
               Submitting...
             </span>
           ) : cooldown > 0 ? (

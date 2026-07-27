@@ -442,7 +442,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                   }
                   disabled={symbolsSaving}
                   className={clsx(
-                    "shrink-0 rounded-md px-2.5 py-1 text-ui-chip font-semibold transition-colors disabled:opacity-40",
+                    "shrink-0 rounded-md px-2.5 py-1 text-ui-chip font-semibold  disabled:opacity-40",
                     tracked
                       ? "text-fg-3 hover:bg-down/10 hover:text-down"
                       : "bg-accent/10 text-accent hover:bg-accent/20",
@@ -485,7 +485,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
           </p>
           <button
             onClick={clearAllFilters}
-            className="px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
+            className="px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20  cursor-pointer"
           >
             Clear filters
           </button>
@@ -621,7 +621,7 @@ const TradeItem = memo(function TradeItem({ trade, mode, category, now }: TradeI
         target="_blank"
         rel="noopener noreferrer"
         className={clsx(
-          "flex items-center gap-2 px-3 py-1.5 bg-surface text-xs font-mono transition-colors duration-700 hover:bg-surface-hover",
+          "flex items-center gap-2 px-3 py-1.5 bg-surface text-xs font-mono   hover:bg-surface-hover",
           flash === "up" && "bg-up/8",
           flash === "down" && "bg-down/8",
         )}
@@ -656,12 +656,12 @@ const TradeItem = memo(function TradeItem({ trade, mode, category, now }: TradeI
     >
       {/* Price-flash tint on its OWN overlay: the slow 700ms fade the
           cards had pre-unification, decoupled from the shell's 150ms
-          hover transition (a bg class on the card also fought
+          hover  (a bg class on the card also fought
           FEED_CARD's bg utility on stylesheet order). */}
       <span
         aria-hidden
         className={clsx(
-          "pointer-events-none absolute inset-0 transition-colors duration-700",
+          "pointer-events-none absolute inset-0  ",
           flash === "up"
             ? "bg-up/6"
             : flash === "down"

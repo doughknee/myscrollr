@@ -139,7 +139,7 @@ function PlayerRow({
   return (
     <tr
       className={clsx(
-        "border-t border-edge/20 transition-colors",
+        "border-t border-edge/20 ",
         highlighted && "bg-accent/[0.06]",
         !subdued && "hover:bg-surface-hover",
       )}

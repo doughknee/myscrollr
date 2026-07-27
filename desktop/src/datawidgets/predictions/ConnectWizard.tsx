@@ -16,7 +16,6 @@ import { useCallback, useEffect, useState } from "react";
 import { clsx } from "clsx";
 import { open } from "@tauri-apps/plugin-shell";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { motion } from "motion/react";
 import {
   ShieldCheck,
   ExternalLink,
@@ -183,7 +182,7 @@ export default function ConnectWizard({ onConnected, hex }: ConnectWizardProps) 
             placeholder="e.g. 1a2b3c4d-5e6f-7a8b-…"
             spellCheck={false}
             autoComplete="off"
-            className="rounded-lg border border-edge/50 bg-base-100 px-3 py-2 font-mono text-[12px] text-fg outline-none transition-colors focus:border-accent/60"
+            className="rounded-lg border border-edge/50 bg-base-100 px-3 py-2 font-mono text-[12px] text-fg outline-none  focus:border-accent/60"
           />
           <span className="text-[11px] text-fg-4">
             Kalshi shows this next to the connection you just created.
@@ -197,7 +196,7 @@ export default function ConnectWizard({ onConnected, hex }: ConnectWizardProps) 
           // user where to drop. We intentionally never ask them to paste the
           // file's contents.
           className={clsx(
-            "flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors",
+            "flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 text-center ",
             dragging
               ? "border-accent/70 bg-accent/[0.07]"
               : filePath
@@ -241,14 +240,12 @@ export default function ConnectWizard({ onConnected, hex }: ConnectWizardProps) 
 
         {/* Success */}
         {status === "ok" && balanceCents != null && (
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
+          <div
             className="flex items-center gap-2 rounded-lg border border-up/30 bg-up/10 px-3 py-2 text-[13px] font-medium text-up"
           >
             <CheckCircle2 size={16} className="shrink-0" />
             <span>Connected — {formatUsdCents(balanceCents)} in your Kalshi account</span>
-          </motion.div>
+          </div>
         )}
 
         {/* Connect button */}
@@ -257,7 +254,7 @@ export default function ConnectWizard({ onConnected, hex }: ConnectWizardProps) 
           onClick={handleConnect}
           disabled={!canConnect}
           className={clsx(
-            "flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[13px] font-semibold transition-all cursor-pointer",
+            "flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[13px] font-semibold  cursor-pointer",
             canConnect
               ? "text-white hover:-translate-y-px"
               : "cursor-not-allowed bg-surface-2 text-fg-4",
@@ -266,7 +263,7 @@ export default function ConnectWizard({ onConnected, hex }: ConnectWizardProps) 
         >
           {status === "checking" ? (
             <>
-              <Loader2 size={15} className="animate-spin" />
+              <Loader2 size={15} />
               Checking with Kalshi…
             </>
           ) : status === "ok" ? (
@@ -286,13 +283,13 @@ export default function ConnectWizard({ onConnected, hex }: ConnectWizardProps) 
           type="button"
           onClick={toggleHelp}
           aria-expanded={helpOpen}
-          className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-[12.5px] font-medium text-fg-2 transition-colors hover:text-fg cursor-pointer"
+          className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-[12.5px] font-medium text-fg-2  hover:text-fg cursor-pointer"
         >
           <HelpCircle size={15} className="shrink-0 text-fg-3" />
           How do I get my Key ID and connection file?
           <ChevronDown
             size={15}
-            className={clsx("ml-auto shrink-0 text-fg-3 transition-transform", helpOpen ? "" : "-rotate-90")}
+            className={clsx("ml-auto shrink-0 text-fg-3 ", helpOpen ? "" : "-rotate-90")}
           />
         </button>
 
@@ -306,7 +303,7 @@ export default function ConnectWizard({ onConnected, hex }: ConnectWizardProps) 
                 <button
                   type="button"
                   onClick={() => open(KALSHI_PROFILE_URL).catch(() => {})}
-                  className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium text-white transition-transform hover:-translate-y-px cursor-pointer"
+                  className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium text-white  hover:-translate-y-px cursor-pointer"
                   style={{ background: hex }}
                 >
                   <ExternalLink size={13} />

@@ -1,5 +1,4 @@
 import { Check, Loader2 } from "lucide-react";
-import { motion } from "motion/react";
 import { Section } from "../../components/settings/SettingsControls";
 import { sportLabel } from "./types";
 import type { DiscoveredLeague } from "./types";
@@ -26,9 +25,7 @@ export function ImportProgress({
   hex,
 }: ImportProgressProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
+    <div
     >
       <Section title="Adding Leagues">
         <div className="px-3 space-y-1.5">
@@ -40,10 +37,8 @@ export function ImportProgress({
             const sport = sportLabel(league?.game_code || "");
 
             return (
-              <motion.div
+              <div
                 key={key}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
                 className="flex items-center gap-3 p-2.5 rounded-lg border border-edge/30 bg-base-250/30"
               >
                 <div className="w-5 h-5 flex items-center justify-center shrink-0">
@@ -53,7 +48,6 @@ export function ImportProgress({
                   {status === "importing" && (
                     <Loader2
                       size={14}
-                      className="animate-spin"
                       style={{ color: hex }}
                     />
                   )}
@@ -95,11 +89,11 @@ export function ImportProgress({
                         ? "Failed"
                         : "Waiting"}
                 </span>
-              </motion.div>
+              </div>
             );
           })}
         </div>
       </Section>
-    </motion.div>
+    </div>
   );
 }

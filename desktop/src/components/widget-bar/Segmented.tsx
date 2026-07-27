@@ -43,7 +43,7 @@ export function Segmented<T extends string>({
               // py-0.5 (not py-1): with the wrapper's p-0.5 + border this
               // lands on the same outer height as the SelectMenu/filter
               // triggers, so bars read as one rule regardless of contents.
-              "inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-ui-meta font-medium transition-colors cursor-pointer",
+              "inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-ui-meta font-medium cursor-pointer",
               // Accent-tinted active state — bg-surface on bg-base-150 is
               // near-invisible in the dark themes (same v1.1.3 lesson as
               // the catalog sort pills).

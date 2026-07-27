@@ -16,7 +16,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import clsx from "clsx";
-import { motion, AnimatePresence } from "motion/react";
 import RouteError from "../components/RouteError";
 import Tooltip from "../components/Tooltip";
 import { WidgetBar, BarPill } from "../components/widget-bar/Bar";
@@ -173,7 +172,6 @@ function HomePage() {
       title="Home"
       subtitle="Your live feed at a glance"
       width="wide"
-      stableChrome
     >
       {/* WCB — same persistent chrome as every other page. Home has no
           view switch; its right cluster carries the ticker-manage
@@ -207,7 +205,7 @@ function HomePage() {
             authenticated ? (
               <button
                 onClick={() => navigate({ to: "/catalog" })}
-                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-surface hover:bg-accent/90 transition-all duration-150 active:scale-95 hover:shadow-glow-sm"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-surface hover:bg-accent/90 active:scale-95 hover:shadow-glow-sm"
               >
                 <Plus size={15} strokeWidth={2.5} />
                 Browse the Catalog
@@ -215,7 +213,7 @@ function HomePage() {
             ) : (
               <button
                 onClick={onLogin}
-                className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-surface hover:bg-accent/90 transition-all duration-150 active:scale-95 hover:shadow-glow-sm"
+                className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-surface hover:bg-accent/90 active:scale-95 hover:shadow-glow-sm"
               >
                 Sign in to get started
               </button>
@@ -245,15 +243,8 @@ function HomePage() {
           at once. */}
       {orderedDataWidgets.map(({ ch, manifest }, idx) => {
         return (
-          <motion.div
+          <div
             key={ch.widget_type}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{
-              duration: 0.28,
-              delay: 0.05 + idx * 0.05,
-              ease: [0.22, 0.61, 0.36, 1],
-            }}
           >
             <WidgetSection
               widget={ch}
@@ -288,20 +279,13 @@ function HomePage() {
                 })
               }
             />
-          </motion.div>
+          </div>
         );
       })}
 
       {/* Widget strip */}
       {orderedWidgets.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            duration: 0.28,
-            delay: 0.05 + orderedDataWidgets.length * 0.05,
-            ease: [0.22, 0.61, 0.36, 1],
-          }}
+        <div
         >
           <WidgetStrip
             widgets={orderedWidgets}
@@ -318,7 +302,7 @@ function HomePage() {
               })
             }
           />
-        </motion.div>
+        </div>
       )}
       </div>
     </PageLayout>
@@ -408,7 +392,7 @@ function WidgetSection({
               onClick={() => setEditing(!editing)}
               aria-label={editing ? "Done editing" : `Edit ${manifest.name} preview`}
               className={clsx(
-                "w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 active:scale-90",
+                "w-7 h-7 flex items-center justify-center rounded-lg active:scale-90",
                 editing
                   ? "text-accent bg-accent/10"
                   : hasSelections
@@ -416,14 +400,11 @@ function WidgetSection({
                     : "text-fg-4/60 hover:text-fg-2 hover:bg-surface-hover",
               )}
             >
-              <motion.span
+              <span
                 key={editing ? "check" : "pencil"}
-                initial={{ opacity: 0, scale: 0.7, rotate: -30 }}
-                animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                transition={{ type: "spring", stiffness: 380, damping: 22 }}
               >
                 {editing ? <Check size={14} /> : <Pencil size={14} />}
-              </motion.span>
+              </span>
             </button>
           </Tooltip>
         )}
@@ -432,28 +413,21 @@ function WidgetSection({
         {!editing && (
           <button
             onClick={onViewAll}
-            className="group flex items-center gap-1 text-ui-chip font-medium text-fg-4 hover:text-fg-2 transition-all duration-150 active:scale-95"
+            className="group flex items-center gap-1 text-ui-chip font-medium text-fg-4 hover:text-fg-2 active:scale-95"
           >
             View all
             <ChevronRight
               size={12}
-              className="transition-transform duration-150 group-hover:translate-x-0.5"
+              className="group-hover:translate-x-0.5"
             />
           </button>
         )}
       </div>
 
-      {/* Edit mode picker / data rows cross-fade. Wrapped in
-          AnimatePresence with mode='wait' so toggling the Pencil/Check
-          button transitions one panel out before the other in. */}
-      <AnimatePresence mode="wait" initial={false}>
+      {/* Edit mode picker / data rows. */}
         {editing ? (
-          <motion.div
+          <div
             key="edit"
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.16, ease: [0.22, 0.61, 0.36, 1] }}
             className="rounded-lg border border-accent/20 bg-accent/[0.03] overflow-hidden divide-y divide-edge/10 mb-3"
           >
             <div className="px-4 py-2 flex items-center justify-between">
@@ -463,7 +437,7 @@ function WidgetSection({
               {hasSelections && (
                 <button
                   onClick={() => onSelectionChange([])}
-                  className="text-ui-chip font-medium text-fg-4 hover:text-fg-2 transition-colors active:scale-95"
+                  className="text-ui-chip font-medium text-fg-4 hover:text-fg-2 active:scale-95"
                 >
                   Clear all
                 </button>
@@ -478,7 +452,7 @@ function WidgetSection({
                   onClick={() => toggleGroup(key)}
                   disabled={atLimit}
                   className={clsx(
-                    "flex items-center gap-3 px-4 py-2.5 w-full text-left transition-all duration-150 active:scale-[0.99]",
+                    "flex items-center gap-3 px-4 py-2.5 w-full text-left active:scale-[0.99]",
                     atLimit
                       ? "opacity-40 cursor-not-allowed"
                       : "hover:bg-accent/[0.04] cursor-pointer",
@@ -486,20 +460,17 @@ function WidgetSection({
                 >
                   <span
                     className={clsx(
-                      "w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+                      "w-4 h-4 rounded border flex items-center justify-center shrink-0 ",
                       isSelected
                         ? "bg-accent border-accent"
                         : "border-edge/40",
                     )}
                   >
                     {isSelected && (
-                      <motion.span
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                      <span
                       >
                         <Check size={10} className="text-surface" strokeWidth={3} />
-                      </motion.span>
+                      </span>
                     )}
                   </span>
                   <span className="text-ui-meta text-fg truncate flex-1">
@@ -508,15 +479,11 @@ function WidgetSection({
                 </button>
               );
             })}
-          </motion.div>
+          </div>
         ) : (
-          <motion.div
+          <div
             key="data"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.16 }}
-            className="rounded-lg border border-edge/20 overflow-hidden divide-y divide-edge/10 cursor-pointer hover:bg-base-200/30 transition-colors"
+            className="rounded-lg border border-edge/20 overflow-hidden divide-y divide-edge/10 cursor-pointer hover:bg-base-200/30 "
             onClick={onRowClick}
             role="button"
             tabIndex={0}
@@ -530,9 +497,8 @@ function WidgetSection({
               dashboard={data}
               onConfigure={onConfigure}
             />
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
     </section>
   );
 }

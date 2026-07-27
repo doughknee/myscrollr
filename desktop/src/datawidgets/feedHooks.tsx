@@ -41,7 +41,7 @@ export function useLoadMore(
           onClick={() =>
             setVisibleCount((c) => Math.min(total, c + LOAD_MORE_INCREMENT))
           }
-          className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
+          className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20  cursor-pointer"
         >
           Load more
         </button>

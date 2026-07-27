@@ -68,7 +68,7 @@ export const GameItem = memo(function GameItem({
       <CardWrapper
         link={game.link}
         className={clsx(
-          "flex items-center gap-2 px-3 py-1.5 bg-surface text-xs transition-colors duration-700",
+          "flex items-center gap-2 px-3 py-1.5 bg-surface text-xs  ",
           flash && "bg-live/10",
           hasLink && "hover:bg-surface-hover cursor-pointer",
         )}
@@ -123,7 +123,7 @@ export const GameItem = memo(function GameItem({
           )}
         >
           {live && (
-            <span className="inline-block w-1 h-1 rounded-full bg-live mr-1 align-middle animate-pulse" />
+            <span className="inline-block w-1 h-1 rounded-full bg-live mr-1 align-middle " />
           )}
           {gameStatusLabel(game)}
         </span>
@@ -151,12 +151,12 @@ export const GameItem = memo(function GameItem({
     >
       {/* Score-flash tint on its OWN overlay: the slow 700ms fade the
           cards had pre-unification, decoupled from the shell's 150ms
-          hover transition (a bg class on the card also fought
+          hover  (a bg class on the card also fought
           FEED_CARD's bg utility on stylesheet order). */}
       <span
         aria-hidden
         className={clsx(
-          "pointer-events-none absolute inset-0 transition-colors duration-700",
+          "pointer-events-none absolute inset-0  ",
           flash ? "bg-live/8" : "bg-transparent",
         )}
       />
@@ -212,7 +212,7 @@ export const GameItem = memo(function GameItem({
         )}
         <div className={clsx("flex items-center gap-1.5", !isFavorite && "ml-auto")}>
           {live && (
-            <span className="inline-block w-1 h-1 rounded-full bg-live animate-pulse" />
+            <span className="inline-block w-1 h-1 rounded-full bg-live " />
           )}
           <span
             className={clsx(

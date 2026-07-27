@@ -36,7 +36,6 @@ import {
   UserCircle,
 } from "lucide-react";
 import clsx from "clsx";
-import { motion } from "motion/react";
 import Tooltip from "./Tooltip";
 import OverflowMenu from "./OverflowMenu";
 import type { DataWidgetManifest, WidgetManifest } from "../types";
@@ -183,7 +182,7 @@ export default function Sidebar({
   return (
     <aside
       className={clsx(
-        "flex flex-col shrink-0 h-full overflow-hidden select-none transition-[width] duration-200 ease-out",
+        "flex flex-col shrink-0 h-full overflow-hidden select-none ",
         collapsed ? "w-[48px]" : "w-[200px]",
       )}
     >
@@ -285,7 +284,7 @@ export default function Sidebar({
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={clsx(
               "flex items-center justify-center shrink-0 rounded-lg text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
-              "transition-all duration-150 active:scale-[0.97]",
+              "active:scale-[0.97]",
               collapsed ? "w-full py-1.5" : "w-7 h-7",
             )}
           >
@@ -406,7 +405,7 @@ function NavItem({
         aria-label={collapsed ? label : undefined}
         className={clsx(
           "relative flex items-center w-full rounded-lg font-medium",
-          "transition-all duration-150 active:scale-[0.97]",
+          "active:scale-[0.97]",
           collapsed
             ? "justify-center py-1.5 px-0"
             : "gap-2.5 px-2.5 py-1.5 text-ui-body",
@@ -418,11 +417,7 @@ function NavItem({
             changes (same pattern as the TopBar tab pill; z-0 fill +
             z-10 content so labels stay above it mid-flight). */}
         {active && (
-          <motion.span
-            layoutId="sidebar-active-indicator"
-            transition={{ type: "spring", stiffness: 380, damping: 30 }}
-            className="absolute inset-0 z-0 rounded-lg bg-accent/10"
-          />
+          <span className="absolute inset-0 z-0 rounded-lg bg-accent/10" />
         )}
         <span className="relative z-10 shrink-0 flex items-center justify-center w-5 h-5">
           {icon}
@@ -470,7 +465,7 @@ function SlotChip({
         aria-label={label}
         className={clsx(
           "relative flex items-center w-full rounded-lg font-medium",
-          "transition-all duration-150 active:scale-[0.97]",
+          "active:scale-[0.97]",
           collapsed
             ? "justify-center py-1.5 px-0"
             : "gap-2.5 px-2.5 py-1.5 text-ui-body",
@@ -484,11 +479,7 @@ function SlotChip({
             (the highlight vanished instead of sliding here). The static
             bg is dropped while active so the pill is the one fill. */}
         {active && (
-          <motion.span
-            layoutId="sidebar-active-indicator"
-            transition={{ type: "spring", stiffness: 380, damping: 30 }}
-            className="absolute inset-0 z-0 rounded-lg bg-accent/15"
-          />
+          <span className="absolute inset-0 z-0 rounded-lg bg-accent/15" />
         )}
         <span className="relative z-10 shrink-0 flex items-center justify-center w-5 h-5">
           <Plus size={15} strokeWidth={2.5} />
@@ -565,7 +556,7 @@ const AccountChip = forwardRef(function AccountChip(
       {...props}
       className={clsx(
         "flex items-center rounded-lg min-w-0",
-        "transition-all duration-150 active:scale-[0.97]",
+        "active:scale-[0.97]",
         collapsed
           ? "w-full justify-center py-1.5"
           : "flex-1 gap-2 px-1.5 py-1",
@@ -598,7 +589,6 @@ const AccountChip = forwardRef(function AccountChip(
             size={11}
             className="ml-auto shrink-0 text-fg-4"
             style={{
-              transition: "transform 300ms var(--ease-snap)",
               transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
             }}
           />

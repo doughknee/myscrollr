@@ -15,7 +15,7 @@ export const IS_MACOS =
 const appWindow = getCurrentWindow();
 
 const btnBase =
-  "flex items-center justify-center w-11 h-full transition-colors duration-150";
+  "flex items-center justify-center w-11 h-full ";
 
 export default function WindowControls() {
   const [maximized, setMaximized] = useState(false);

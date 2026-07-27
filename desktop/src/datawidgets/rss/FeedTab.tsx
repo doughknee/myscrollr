@@ -461,7 +461,7 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
               <p className="text-sm text-fg-4">No articles match your filters</p>
               <button
                 onClick={clearAllFilters}
-                className="text-xs text-accent hover:text-accent/80 transition-colors cursor-pointer"
+                className="text-xs text-accent hover:text-accent/80  cursor-pointer"
               >
                 Clear filters
               </button>
@@ -512,7 +512,7 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
             <div className="flex items-center justify-center gap-3 px-3 py-3">
               <button
                 onClick={() => setShowAll(true)}
-                className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
+                className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20  cursor-pointer"
               >
                 Show all
               </button>
@@ -525,7 +525,7 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
             <div className="flex items-center justify-center px-3 py-3">
               <button
                 onClick={() => setShowAll(false)}
-                className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
+                className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20  cursor-pointer"
               >
                 Limit to {dp.articlesPerSource} per source
               </button>
@@ -779,7 +779,7 @@ function SourceHeader({ source, category, overflow, expanded, onToggle }: Source
       {hasAction && (
         <button
           onClick={onToggle}
-          className="ml-auto flex items-center gap-1 text-ui-chip text-accent hover:text-accent/80 transition-colors cursor-pointer"
+          className="ml-auto flex items-center gap-1 text-ui-chip text-accent hover:text-accent/80  cursor-pointer"
         >
           {overflow > 0 ? (
             <>
@@ -823,7 +823,7 @@ const RssArticle = memo(function RssArticle({ item, mode, category, now }: RssAr
         href={item.link}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-2 px-3 py-1.5 bg-surface text-xs hover:bg-surface-hover transition-colors cursor-pointer"
+        className="flex items-center gap-2 px-3 py-1.5 bg-surface text-xs hover:bg-surface-hover  cursor-pointer"
       >
         <span className="font-mono text-ui-section text-accent shrink-0 min-w-[56px] max-w-[80px] truncate uppercase tracking-wider font-bold">
           {item.source_name}

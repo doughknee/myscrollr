@@ -75,7 +75,7 @@ export function SearchBox({
   return (
     <div
       className={clsx(
-        "relative flex items-center rounded-lg border transition-all duration-200",
+        "relative flex items-center rounded-lg border  ",
         expanded
           ? "w-40 border-accent/50 bg-surface ring-1 ring-accent/25 sm:w-64"
           : "w-24 border-edge/30 bg-base-150/60 sm:w-32",
@@ -113,7 +113,7 @@ export function SearchBox({
             onQueryChange("");
             inputRef.current?.focus();
           }}
-          className="absolute right-1.5 flex h-4 w-4 cursor-pointer items-center justify-center rounded text-fg-4 transition-colors hover:text-fg-2"
+          className="absolute right-1.5 flex h-4 w-4 cursor-pointer items-center justify-center rounded text-fg-4  hover:text-fg-2"
         >
           <X size={12} />
         </button>

@@ -4,7 +4,6 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
-import { AnimatePresence, motion } from "motion/react";
 import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 
 /** Close an open popover on outside-mousedown or Escape. */
@@ -30,7 +29,7 @@ export function useDismiss<T extends HTMLElement>(
   }, [ref, open, onClose]);
 }
 
-/** Shared dropdown panel: one look + one entrance for every bar menu. */
+/** Shared dropdown panel. */
 export function MenuPanel({
   className,
   children,
@@ -39,19 +38,15 @@ export function MenuPanel({
   children: React.ReactNode;
 }) {
   return (
-    <motion.div
+    <div
       role="menu"
-      initial={{ opacity: 0, y: -4, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -4, scale: 0.98 }}
-      transition={{ duration: 0.14, ease: "easeOut" }}
       className={clsx(
         "absolute top-full z-30 mt-1 max-h-80 origin-top overflow-y-auto rounded-xl border border-edge/50 bg-surface p-1 shadow-xl scrollbar-thin",
         className,
       )}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }
 
@@ -85,7 +80,7 @@ export function MenuRow({
       aria-checked={selected}
       onClick={onClick}
       className={clsx(
-        "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-ui-meta transition-colors hover:bg-surface-hover",
+        "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-ui-meta hover:bg-surface-hover",
         selected ? "text-accent" : "text-fg-2",
       )}
     >
@@ -138,13 +133,11 @@ export function MenuPopover({
       >
         {trigger}
       </MenuTrigger>
-      <AnimatePresence>
-        {open && (
-          <MenuPanel className={align === "left" ? "left-0 w-56" : "right-0 w-56"}>
-            {children(close)}
-          </MenuPanel>
-        )}
-      </AnimatePresence>
+      {open && (
+        <MenuPanel className={align === "left" ? "left-0 w-56" : "right-0 w-56"}>
+          {children(close)}
+        </MenuPanel>
+      )}
     </div>
   );
 }
@@ -174,7 +167,7 @@ export function FilterTrigger({
       aria-haspopup="menu"
       aria-label={ariaLabel}
       className={clsx(
-        "relative flex h-7 w-8 cursor-pointer items-center justify-center rounded-lg border transition-colors",
+        "relative flex h-7 w-8 cursor-pointer items-center justify-center rounded-lg border ",
         open || badgeCount > 0
           ? "border-accent/40 bg-accent/15 text-accent"
           : "border-edge/30 bg-base-150/60 text-fg-3 hover:text-fg-2",
@@ -213,9 +206,7 @@ export function FilterMenuShell({
         badgeCount={badgeCount}
         onClick={() => setOpen((o) => !o)}
       />
-      <AnimatePresence>
-        {open && <MenuPanel className="inset-x-2">{children}</MenuPanel>}
-      </AnimatePresence>
+      {open && <MenuPanel className="inset-x-2">{children}</MenuPanel>}
     </div>
   );
 }
@@ -245,7 +236,7 @@ function MenuTrigger({
       aria-haspopup="menu"
       aria-label={ariaLabel}
       className={clsx(
-        "flex max-w-40 cursor-pointer items-center gap-1 rounded-full border py-1 pl-2.5 pr-2 text-ui-meta font-medium transition-colors",
+        "flex max-w-40 cursor-pointer items-center gap-1 rounded-full border py-1 pl-2.5 pr-2 text-ui-meta font-medium ",
         lit
           ? "border-accent/40 bg-accent/15 text-accent"
           : "border-edge/30 bg-base-150/60 text-fg-3 hover:text-fg-2",
@@ -256,7 +247,7 @@ function MenuTrigger({
         size={12}
         aria-hidden
         className={clsx(
-          "shrink-0 transition-transform duration-150",
+          "shrink-0 ",
           open && "rotate-180",
           lit ? "text-accent/70" : "text-fg-4",
         )}

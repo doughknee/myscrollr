@@ -18,7 +18,6 @@
  */
 import { ArrowLeft, ArrowRight, Radio, RadioTower } from "lucide-react";
 import clsx from "clsx";
-import { motion, AnimatePresence } from "motion/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import Tooltip from "./Tooltip";
 import WindowControls, { IS_MACOS } from "./WindowControls";
@@ -97,13 +96,13 @@ export default function TopBar({
           aria-label="Scrollr — what's new"
           aria-current={isReleases ? "page" : undefined}
           className={clsx(
-            "flex items-center gap-2 px-1.5 h-7 rounded-md transition-colors shrink-0",
+            "flex items-center gap-2 px-1.5 h-7 rounded-md shrink-0",
             isReleases
               ? "bg-accent/10 text-accent"
               : "hover:bg-surface-hover",
           )}
         >
-          <ScrollLogo alive={tickerOn} size={20} />
+          <ScrollLogo alive={false} size={20} />
           <span className="text-ui-body font-semibold tracking-tight">
             Scrollr
           </span>
@@ -120,7 +119,7 @@ export default function TopBar({
             disabled={!canBack}
             aria-label="Go back"
             className={clsx(
-              "flex items-center justify-center w-7 h-7 rounded-md transition-all duration-150 active:scale-90",
+              "flex items-center justify-center w-7 h-7 rounded-md active:scale-90",
               canBack
                 ? "text-fg-2 hover:text-fg hover:bg-surface-hover"
                 : "text-fg-4/40 cursor-not-allowed",
@@ -135,7 +134,7 @@ export default function TopBar({
             disabled={!canForward}
             aria-label="Go forward"
             className={clsx(
-              "flex items-center justify-center w-7 h-7 rounded-md transition-all duration-150 active:scale-90",
+              "flex items-center justify-center w-7 h-7 rounded-md active:scale-90",
               canForward
                 ? "text-fg-2 hover:text-fg hover:bg-surface-hover"
                 : "text-fg-4/40 cursor-not-allowed",
@@ -167,7 +166,7 @@ export default function TopBar({
                 <>
                   <button
                     onClick={page.onParentClick}
-                    className="text-fg-3 hover:text-fg-2 transition-colors shrink-0"
+                    className="text-fg-3 hover:text-fg-2 shrink-0"
                   >
                     {page.parentLabel}
                   </button>
@@ -180,7 +179,7 @@ export default function TopBar({
               {page.onTitleClick ? (
                 <button
                   onClick={page.onTitleClick}
-                  className="font-semibold text-fg-2 hover:text-fg truncate transition-colors"
+                  className="font-semibold text-fg-2 hover:text-fg truncate "
                 >
                   {page.title}
                 </button>
@@ -190,26 +189,16 @@ export default function TopBar({
                 </span>
               )}
 
-              {/* Subtitle slot. */}
-              <AnimatePresence mode="popLayout" initial={false}>
-                {page.subtitle && (
-                  <motion.div
-                    key={page.subtitle}
-                    initial={{ opacity: 0, x: -6, filter: "blur(2px)" }}
-                    animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-                    exit={{ opacity: 0, x: -6, filter: "blur(2px)" }}
-                    transition={{ duration: 0.18, ease: [0.22, 0.61, 0.36, 1] }}
-                    className="flex items-center gap-1.5 min-w-0"
-                  >
+              {page.subtitle && (
+                <div className="flex items-center gap-1.5 min-w-0">
                     <span className="text-fg-4 shrink-0" aria-hidden>
                       /
                     </span>
                     <span className="text-fg-3 truncate">
                       {page.subtitle}
                     </span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                </div>
+              )}
             </div>
 
             {/* Spacer — sibling navigation lives in each page's WCB
@@ -249,7 +238,7 @@ export default function TopBar({
             aria-checked={tickerOn}
             onClick={onToggleTicker}
             className={clsx(
-              "flex items-center gap-1.5 h-7 px-2.5 rounded-md text-ui-chip font-medium transition-all duration-150 active:scale-95",
+              "flex items-center gap-1.5 h-7 px-2.5 rounded-md text-ui-chip font-medium active:scale-95",
               tickerOn
                 ? "bg-accent/15 text-accent hover:bg-accent/20"
                 : "text-fg-4 hover:text-fg-2 hover:bg-surface-hover",

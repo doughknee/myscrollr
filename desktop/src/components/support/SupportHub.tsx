@@ -11,7 +11,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import clsx from "clsx";
-import { motion } from "motion/react";
 import { searchSupportContent } from "./support-content";
 import { getAllDataWidgets } from "../../datawidgets/registry";
 import { getAllWidgets } from "../../widgets/registry";
@@ -159,7 +158,7 @@ export default function SupportHub({ onSelectSection }: SupportHubProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search support articles..."
-          className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-surface-2 border border-edge/30 text-sm text-fg placeholder:text-fg-3 focus:outline-none focus:border-accent/60 transition-colors"
+          className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-surface-2 border border-edge/30 text-sm text-fg placeholder:text-fg-3 focus:outline-none focus:border-accent/60 "
         />
       </div>
 
@@ -172,7 +171,7 @@ export default function SupportHub({ onSelectSection }: SupportHubProps) {
                 <button
                   key={`${result.section}-${result.index}-${i}`}
                   onClick={() => onSelectSection(result.section as SectionId)}
-                  className="flex flex-col gap-1.5 p-3 rounded-lg text-left hover:bg-base-150/50 transition-all duration-150 active:scale-[0.99] cursor-pointer"
+                  className="flex flex-col gap-1.5 p-3 rounded-lg text-left hover:bg-base-150/50 active:scale-[0.99] cursor-pointer"
                 >
                   <div className="flex items-center gap-2">
                     <span
@@ -200,49 +199,33 @@ export default function SupportHub({ onSelectSection }: SupportHubProps) {
           )
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            {CATEGORIES.map((cat, idx) => {
+            {CATEGORIES.map((cat) => {
               const Icon = cat.icon;
               return (
-                <motion.button
+                <button
                   key={cat.id}
                   onClick={() => onSelectSection(cat.id)}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{
-                    duration: 0.25,
-                    delay: 0.04 + idx * 0.04,
-                    ease: [0.22, 0.61, 0.36, 1],
-                  }}
-                  whileHover={{ y: -2 }}
                   // Matches the dense Section card chrome on Settings,
                   // Ticker, Account, and Catalog so the support hub
                   // reads as part of the same surface vocabulary.
-                  className="rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left hover:border-accent/40 hover:bg-base-150/55 hover:shadow-soft-sm transition-[border-color,background-color,box-shadow] duration-200 active:scale-[0.98] cursor-pointer"
+                  className="rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left hover:border-accent/40 hover:bg-base-150/55 hover:shadow-soft-sm active:scale-[0.98] cursor-pointer"
                 >
                   <Icon size={18} className="text-accent mb-2.5" />
                   <h3 className="text-ui-body font-semibold mb-1">{cat.label}</h3>
                   <p className="text-ui-meta">{cat.description}</p>
-                </motion.button>
+                </button>
               );
             })}
             {/* What's New — routes to /releases instead of a support
                 section, so it lives outside CATEGORIES/SectionId. */}
-            <motion.button
+            <button
               onClick={() => navigate({ to: "/releases" })}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                duration: 0.25,
-                delay: 0.04 + CATEGORIES.length * 0.04,
-                ease: [0.22, 0.61, 0.36, 1],
-              }}
-              whileHover={{ y: -2 }}
-              className="rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left hover:border-accent/40 hover:bg-base-150/55 hover:shadow-soft-sm transition-[border-color,background-color,box-shadow] duration-200 active:scale-[0.98] cursor-pointer"
+              className="rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left hover:border-accent/40 hover:bg-base-150/55 hover:shadow-soft-sm active:scale-[0.98] cursor-pointer"
             >
               <Sparkles size={18} className="text-accent mb-2.5" />
               <h3 className="text-ui-body font-semibold mb-1">What's New</h3>
               <p className="text-ui-meta">Release notes and version history</p>
-            </motion.button>
+            </button>
           </div>
         )}
       </div>

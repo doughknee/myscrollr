@@ -16,7 +16,7 @@ export const FEED_CARD =
 
 /** Hover/press affordances for clickable cards. */
 export const FEED_CARD_INTERACTIVE =
-  "cursor-pointer transition-all duration-150 hover:border-edge/70 hover:bg-base-150/60 hover:shadow-soft-sm active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50";
+  "cursor-pointer hover:border-edge/70 hover:bg-base-150/60 hover:shadow-soft-sm active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50";
 
 /** Static variant for non-clickable rows (status readouts, summaries). */
-export const FEED_CARD_STATIC = "transition-colors duration-150";
+export const FEED_CARD_STATIC = "";

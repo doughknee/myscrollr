@@ -3,7 +3,7 @@
  *
  * The shell (background, padding, bottom separator, elevation shadow)
  * mounts ONCE in the app frame, above the routed page, so it never
- * participates in page transitions: the bar/feed separator line is
+ * participates in page s: the bar/feed separator line is
  * physically incapable of animating on source swaps. Each FeedTab's
  * WidgetBar portals its control ROW into the chassis host; during a
  * swap the outgoing and incoming rows briefly coexist, grid-stacked in
@@ -97,7 +97,7 @@ export function BarChassisSlot() {
     // nothing ever renders behind a non-overlapping chassis row.
     <div
       className={clsx(
-        "@container relative z-20 shrink-0 rounded-t-xl border-b bg-surface px-3 py-1.5 transition-shadow duration-200",
+        "@container relative z-20 shrink-0 rounded-t-xl border-b bg-surface px-3 py-1.5 ",
         ctx.stuck
           ? "border-edge/50 shadow-[0_6px_16px_-8px_rgba(0,0,0,0.35)]"
           : "border-edge/30",

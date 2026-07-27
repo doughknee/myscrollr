@@ -64,7 +64,7 @@ export default function ConnectionIndicator({
         aria-current={active ? "page" : undefined}
         aria-label={`Connection status: ${health.label}. View status page.`}
         className={clsx(
-          "flex items-center justify-center gap-1.5 h-7 rounded-md select-none transition-colors",
+          "flex items-center justify-center gap-1.5 h-7 rounded-md select-none ",
           degraded ? "px-2" : "w-7",
           // Healthy states sit quietly in the chrome like every other
           // icon; state color is reserved for degraded states (and the

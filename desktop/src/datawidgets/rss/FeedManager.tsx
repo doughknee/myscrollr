@@ -19,7 +19,6 @@ import {
   Rss,
 } from "lucide-react";
 import clsx from "clsx";
-import { motion, AnimatePresence } from "motion/react";
 import Tooltip from "../../components/Tooltip";
 import EmptySection from "../../components/layout/EmptySection";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
@@ -254,7 +253,7 @@ export default function FeedManager({
           onClick={() => setShowCustomForm((v) => !v)}
           className={clsx(
             "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-ui-meta font-medium",
-            "transition-all duration-150 active:scale-95",
+            "  active:scale-95",
             showCustomForm
               ? "border-accent/50 bg-accent/10 text-accent"
               : "border-edge/40 text-fg-3 hover:text-accent hover:border-accent/40",
@@ -265,15 +264,8 @@ export default function FeedManager({
         </button>
       </div>
 
-      <AnimatePresence initial={false}>
-        {showCustomForm && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.18, ease: [0.22, 0.61, 0.36, 1] }}
-            className="shrink-0 overflow-hidden"
-          >
+      {showCustomForm && (
+        <div className="shrink-0 overflow-hidden">
             <div className="p-3 rounded-lg border border-edge/40 bg-surface-2 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-ui-section uppercase tracking-wider font-bold text-fg-3">
@@ -286,7 +278,7 @@ export default function FeedManager({
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="Feed name"
-                  className="flex-1 px-2.5 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta font-mono text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
+                  className="flex-1 px-2.5 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta font-mono text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 "
                 />
                 <input
                   type="url"
@@ -296,12 +288,12 @@ export default function FeedManager({
                     if (e.key === "Enter") handleAddCustom();
                   }}
                   placeholder="https://..."
-                  className="flex-[2] px-2.5 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta font-mono text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
+                  className="flex-[2] px-2.5 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta font-mono text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 "
                 />
                 <button
                   onClick={handleAddCustom}
                   disabled={saving || !newName.trim() || !newUrl.trim()}
-                  className="px-2.5 py-1.5 rounded-md bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20 transition-all duration-150 active:scale-95 flex items-center gap-1 disabled:opacity-30 cursor-pointer"
+                  className="px-2.5 py-1.5 rounded-md bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20   active:scale-95 flex items-center gap-1 disabled:opacity-30 cursor-pointer"
                 >
                   <Plus size={11} />
                   <span className="text-ui-meta font-medium">Add</span>
@@ -311,9 +303,8 @@ export default function FeedManager({
                 <p className="text-ui-meta text-error/80">{urlError}</p>
               )}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
 
       <div className="shrink-0 flex items-center gap-2">
         <div className="relative flex-1 min-w-0">
@@ -326,13 +317,13 @@ export default function FeedManager({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search feeds..."
-            className="w-full pl-7 pr-7 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 transition-colors"
+            className="w-full pl-7 pr-7 py-1.5 rounded-md bg-base-200 border border-edge/40 text-ui-meta text-fg-2 placeholder:text-fg-4 focus:outline-none focus:border-accent/60 "
           />
           {search && (
             <button
               onClick={() => setSearch("")}
               aria-label="Clear search"
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-fg-4 hover:text-fg-2 hover:bg-surface-hover transition-colors"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-fg-4 hover:text-fg-2 hover:bg-surface-hover "
             >
               <X size={11} />
             </button>
@@ -361,7 +352,7 @@ export default function FeedManager({
             aria-pressed={trackedOnly}
             className={clsx(
               "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-ui-meta cursor-pointer whitespace-nowrap",
-              "transition-all duration-200 active:scale-95",
+              "  active:scale-95",
               trackedOnly
                 ? "border-accent/50 bg-accent/10 text-accent"
                 : "border-edge/40 text-fg-3 hover:text-fg-2 hover:border-edge/60",
@@ -370,7 +361,7 @@ export default function FeedManager({
             <Star
               size={11}
               className={clsx(
-                "transition-transform duration-200",
+                " ",
                 trackedOnly && "fill-current rotate-[20deg]",
               )}
             />
@@ -398,7 +389,7 @@ export default function FeedManager({
             <button
               key={cat}
               onClick={() => toggleCategory(cat)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-ui-chip text-accent hover:bg-accent/25 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-ui-chip text-accent hover:bg-accent/25  cursor-pointer"
             >
               {cat}
               <X size={10} className="opacity-60" />
@@ -406,7 +397,7 @@ export default function FeedManager({
           ))}
           <button
             onClick={() => setSelectedCategories(new Set())}
-            className="px-2 py-0.5 text-ui-chip text-fg-3 hover:text-fg-2 transition-colors cursor-pointer"
+            className="px-2 py-0.5 text-ui-chip text-fg-3 hover:text-fg-2  cursor-pointer"
           >
             Clear all
           </button>
@@ -415,7 +406,7 @@ export default function FeedManager({
 
       {loading ? (
         <div className="shrink-0 text-center py-8">
-          <p className="text-ui-meta text-fg-3 animate-pulse">Loading catalog...</p>
+          <p className="text-ui-meta text-fg-3 ">Loading catalog...</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="shrink-0">
@@ -474,7 +465,7 @@ function FeedRow({ feed, saving, onToggle }: FeedRowProps) {
       disabled={saving}
       aria-label={tracked ? `Remove ${feed.name}` : `Add ${feed.name}`}
       className={clsx(
-        "w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all duration-150 group active:scale-[0.995]",
+        "w-full flex items-center gap-2.5 px-3 py-2 text-left   group active:scale-[0.995]",
         tracked
           ? "bg-accent/[0.04] hover:bg-accent/[0.08]"
           : "hover:bg-base-200/50 cursor-pointer",
@@ -483,21 +474,18 @@ function FeedRow({ feed, saving, onToggle }: FeedRowProps) {
     >
       <span
         className={clsx(
-          "shrink-0 w-5 h-5 flex items-center justify-center rounded-md transition-colors",
+          "shrink-0 w-5 h-5 flex items-center justify-center rounded-md ",
           tracked
             ? "bg-accent/20 text-accent"
             : "bg-surface-hover text-fg-4 group-hover:text-fg-2",
         )}
       >
-        <motion.span
+        <span
           key={tracked ? "check" : "plus"}
-          initial={{ scale: 0.4, opacity: 0, rotate: tracked ? -45 : 45 }}
-          animate={{ scale: 1, opacity: 1, rotate: 0 }}
-          transition={{ type: "spring", stiffness: 500, damping: 24 }}
           className="flex items-center justify-center"
         >
           {tracked ? <Check size={12} strokeWidth={3} /> : <Plus size={12} />}
-        </motion.span>
+        </span>
       </span>
 
       <div className="shrink-0 w-5 h-5 flex items-center justify-center text-fg-4">

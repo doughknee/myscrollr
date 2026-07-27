@@ -13,7 +13,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import { open } from "@tauri-apps/plugin-shell";
-import { motion } from "motion/react";
 import {
   ChevronDown,
   Eye,
@@ -151,16 +150,8 @@ export function ConnectedView({
 
           <div className="mt-2 space-y-1 px-3">
             {visibleLeagues.map((league, i) => (
-              <motion.div
+              <div
                 key={league.league_key}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 420,
-                  damping: 32,
-                  delay: i < LEAGUES_PER_PAGE ? i * 0.03 : 0,
-                }}
               >
                 <LeagueManagementRow
                   league={league}
@@ -170,7 +161,7 @@ export function ConnectedView({
                   onSetPrimary={() => setPrimary(league.league_key)}
                   hex={hex}
                 />
-              </motion.div>
+              </div>
             ))}
 
             {filtered.length === 0 && (
@@ -183,7 +174,7 @@ export function ConnectedView({
               <button
                 type="button"
                 onClick={() => setVisibleCount((prev) => prev + LEAGUES_PER_PAGE)}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-edge/30 bg-base-250/30 p-3 text-[11px] font-medium text-fg-3 transition-all hover:border-edge/40 hover:text-fg-2 cursor-pointer"
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-edge/30 bg-base-250/30 p-3 text-[11px] font-medium text-fg-3  hover:border-edge/40 hover:text-fg-2 cursor-pointer"
               >
                 <ChevronDown size={14} />
                 Show {Math.min(filtered.length - visibleCount, LEAGUES_PER_PAGE)} more
@@ -207,14 +198,14 @@ export function ConnectedView({
                 <button
                   type="button"
                   onClick={() => open("https://football.fantasysports.yahoo.com")}
-                  className="inline-flex items-center gap-2 rounded-lg border border-edge/30 px-4 py-2 text-[12px] font-medium text-fg-3 transition-colors hover:border-edge/50 hover:text-fg-2 cursor-pointer"
+                  className="inline-flex items-center gap-2 rounded-lg border border-edge/30 px-4 py-2 text-[12px] font-medium text-fg-3  hover:border-edge/50 hover:text-fg-2 cursor-pointer"
                 >
                   Go to Yahoo Fantasy
                 </button>
                 <button
                   type="button"
                   onClick={onStartDiscovery}
-                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium text-white transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium text-white  cursor-pointer"
                   style={{ background: hex }}
                 >
                   Search Again
@@ -229,7 +220,7 @@ export function ConnectedView({
               <button
                 type="button"
                 onClick={onStartDiscovery}
-                className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium text-white transition-colors cursor-pointer"
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium text-white  cursor-pointer"
                 style={{ background: hex }}
               >
                 <Plus size={14} />
@@ -289,7 +280,7 @@ function FilterBar({
             onClick={() => onChange(opt.value)}
             disabled={opt.count === 0 && opt.value !== "all"}
             className={clsx(
-              "rounded-md px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer",
+              "rounded-md px-2 py-1 text-[11px] font-medium  cursor-pointer",
               active
                 ? "bg-accent/15 text-accent"
                 : "text-fg-3 hover:bg-surface-hover hover:text-fg-2",
@@ -325,7 +316,7 @@ function LeagueManagementRow({
   return (
     <div
       className={clsx(
-        "flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors",
+        "flex items-center gap-3 rounded-lg border px-3 py-2 ",
         isPrimary
           ? "border-accent/40 bg-accent/[0.04]"
           : "border-edge/40 bg-surface hover:bg-surface-2",
@@ -396,7 +387,7 @@ function IconButton({
       title={label}
       aria-label={label}
       className={clsx(
-        "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors cursor-pointer",
+        "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border  cursor-pointer",
         active ? "border-transparent text-white" : "border-edge/40 text-fg-3 hover:text-fg",
       )}
       style={active ? { background: `${color}30`, color, borderColor: `${color}60` } : undefined}

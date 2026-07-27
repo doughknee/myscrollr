@@ -17,7 +17,6 @@
  */
 import { memo, useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { clsx } from "clsx";
-import { motion, AnimatePresence } from "motion/react";
 import {
   TrendingUp,
   LineChart,
@@ -699,7 +698,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                 changeQuery("");
                 searchInputRef.current?.focus();
               }}
-              className="mt-1 px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
+              className="mt-1 px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20  cursor-pointer"
             >
               Clear search
             </button>
@@ -713,7 +712,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
             </p>
             <button
               onClick={() => pickLens("trending")}
-              className="mt-1 px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
+              className="mt-1 px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20  cursor-pointer"
             >
               Browse markets
             </button>
@@ -727,7 +726,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
             </p>
             <button
               onClick={() => pickLens("trending")}
-              className="px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
+              className="px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20  cursor-pointer"
             >
               Back to Trending
             </button>
@@ -748,13 +747,13 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                 type="button"
                 onClick={() => focusCategory(section.category)}
                 aria-label={`View all ${section.category} markets`}
-                className="group mx-1.5 mb-1 mt-1.5 flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-surface-hover active:bg-surface-hover/70"
+                className="group mx-1.5 mb-1 mt-1.5 flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1.5 text-left  hover:bg-surface-hover active:bg-surface-hover/70"
               >
                 <span
                   data-section-title
                   role="heading"
                   aria-level={3}
-                  className="text-ui-section font-semibold uppercase tracking-wide text-fg-3 transition-colors group-hover:text-fg-2"
+                  className="text-ui-section font-semibold uppercase tracking-wide text-fg-3  group-hover:text-fg-2"
                 >
                   {section.category}
                 </span>
@@ -762,36 +761,33 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                   {section.events.length}
                 </span>
                 {!searching && (
-                  <span className="ml-auto inline-flex items-center gap-0.5 text-ui-meta font-medium text-accent opacity-80 transition-opacity group-hover:opacity-100">
+                  <span className="ml-auto inline-flex items-center gap-0.5 text-ui-meta font-medium text-accent opacity-80  group-hover:opacity-100">
                     View all
                     <ChevronRight size={13} />
                   </span>
                 )}
               </button>
               <div className="grid grid-cols-1 gap-2 px-3 pb-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {/* While searching every match shows (no preview cap) and
-                    leavers animate out. */}
-                <AnimatePresence initial={false} mode="popLayout">
-                  {section.events
-                    .slice(0, searching ? undefined : SECTION_PREVIEW_COUNT)
-                    .map((ev) => (
-                      <CardCell
-                        key={ev.eventTicker}
-                        navIdx={navIndex.get(ev.eventTicker)}
-                        selected={selIdx >= 0 && navIndex.get(ev.eventTicker) === selIdx}
-                      >
-                        <EventCard
-                          event={ev}
-                          category={categoryOf(ev.outcomes[0])}
-                          now={now}
-                          watchedSet={watchedSet}
-                          onToggleWatch={toggleWatch}
-                          onOpenDetail={openDetail}
-                          hit={hits?.get(ev.eventTicker)}
-                        />
-                      </CardCell>
-                    ))}
-                </AnimatePresence>
+                {/* While searching every match shows without a preview cap. */}
+                {section.events
+                  .slice(0, searching ? undefined : SECTION_PREVIEW_COUNT)
+                  .map((ev) => (
+                    <CardCell
+                      key={ev.eventTicker}
+                      navIdx={navIndex.get(ev.eventTicker)}
+                      selected={selIdx >= 0 && navIndex.get(ev.eventTicker) === selIdx}
+                    >
+                      <EventCard
+                        event={ev}
+                        category={categoryOf(ev.outcomes[0])}
+                        now={now}
+                        watchedSet={watchedSet}
+                        onToggleWatch={toggleWatch}
+                        onOpenDetail={openDetail}
+                        hit={hits?.get(ev.eventTicker)}
+                      />
+                    </CardCell>
+                  ))}
               </div>
             </div>
           ))}
@@ -816,8 +812,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                 />
               ))
             ) : (
-              <AnimatePresence initial={false} mode="popLayout">
-                {pageEvents.map((ev) => (
+              pageEvents.map((ev) => (
                   <CardCell
                     key={ev.eventTicker}
                     navIdx={navIndex.get(ev.eventTicker)}
@@ -845,8 +840,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                       />
                     )}
                   </CardCell>
-                ))}
-              </AnimatePresence>
+                ))
             )}
           </div>
           {footer}
@@ -877,7 +871,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                 type="button"
                 onClick={() => toggleWatch(ticker)}
                 aria-label={`Remove ${ticker} from watchlist`}
-                className="shrink-0 rounded-md px-2 py-0.5 text-ui-chip font-medium text-fg-4 transition-colors hover:bg-error/10 hover:text-error cursor-pointer"
+                className="shrink-0 rounded-md px-2 py-0.5 text-ui-chip font-medium text-fg-4  hover:bg-error/10 hover:text-error cursor-pointer"
               >
                 Remove
               </button>
@@ -971,8 +965,8 @@ function FilterMenu({
   );
 }
 
-/** Grid cell for a card: exit animation (search filter), keyboard-selection
- *  ring, and the data-nav-idx hook scrollIntoView targets. */
+/** Grid cell for a card: keyboard-selection ring and the data-nav-idx hook
+ *  scrollIntoView targets. */
 function CardCell({
   navIdx,
   selected,
@@ -983,9 +977,7 @@ function CardCell({
   children: React.ReactNode;
 }) {
   return (
-    <motion.div
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.12 }}
+    <div
       data-nav-idx={navIdx}
       className={clsx(
         "h-full min-w-0 rounded-lg",
@@ -993,7 +985,7 @@ function CardCell({
       )}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }
 
@@ -1078,7 +1070,7 @@ const ResolvedCard = memo(function ResolvedCard({
             onToggleWatch(lead.ticker);
           }}
           className={clsx(
-            "flex h-5 w-5 items-center justify-center rounded transition-colors cursor-pointer hover:bg-surface-hover",
+            "flex h-5 w-5 items-center justify-center rounded  cursor-pointer hover:bg-surface-hover",
             watched ? "text-amber-400" : "text-fg-4 hover:text-fg-2",
           )}
         >
@@ -1139,7 +1131,7 @@ const ResolvedCard = memo(function ResolvedCard({
                 e.stopPropagation();
                 onOpenDetail(m);
               }}
-              className="flex w-full cursor-pointer items-center gap-1.5 rounded-md border border-edge/30 bg-base-100/40 px-2 py-1.5 text-left transition-colors hover:border-edge/60 hover:bg-surface-hover"
+              className="flex w-full cursor-pointer items-center gap-1.5 rounded-md border border-edge/30 bg-base-100/40 px-2 py-1.5 text-left  hover:border-edge/60 hover:bg-surface-hover"
             >
               <span className="min-w-0 flex-1 truncate text-ui-meta text-fg-2">
                 <Highlight text={legLabel} ranges={hit?.outcomeRanges[m.id]} />
@@ -1200,7 +1192,7 @@ const MarketItem = memo(function MarketItem({
       target="_blank"
       rel="noopener noreferrer"
       className={clsx(
-        "flex items-center gap-2 px-3 py-1.5 bg-surface text-xs font-mono transition-colors duration-700 hover:bg-surface-hover",
+        "flex items-center gap-2 px-3 py-1.5 bg-surface text-xs font-mono   hover:bg-surface-hover",
         flash === "up" && "bg-up/8",
         flash === "down" && "bg-down/8",
       )}
@@ -1311,7 +1303,7 @@ const EventCard = memo(function EventCard({
             onToggleWatch(lead.ticker);
           }}
           className={clsx(
-            "flex h-5 w-5 items-center justify-center rounded transition-colors cursor-pointer hover:bg-surface-hover",
+            "flex h-5 w-5 items-center justify-center rounded  cursor-pointer hover:bg-surface-hover",
             watched ? "text-amber-400" : "text-fg-4 hover:text-fg-2",
           )}
         >
@@ -1387,7 +1379,7 @@ const EventCard = memo(function EventCard({
               e.stopPropagation();
               openCard();
             }}
-            className="self-start rounded-md px-2 py-0.5 text-ui-chip font-medium text-accent transition-colors hover:bg-accent/10 cursor-pointer"
+            className="self-start rounded-md px-2 py-0.5 text-ui-chip font-medium text-accent  hover:bg-accent/10 cursor-pointer"
           >
             +{extra} more
           </button>
@@ -1470,7 +1462,7 @@ function OutcomeRow({
         e.stopPropagation();
         onOpenDetail(market);
       }}
-      className="flex w-full cursor-pointer items-center gap-1.5 rounded-md border border-edge/30 bg-base-100/40 px-2 py-1.5 text-left transition-colors hover:border-edge/60 hover:bg-surface-hover"
+      className="flex w-full cursor-pointer items-center gap-1.5 rounded-md border border-edge/30 bg-base-100/40 px-2 py-1.5 text-left  hover:border-edge/60 hover:bg-surface-hover"
     >
       <span className="min-w-0 flex-1 truncate text-ui-meta text-fg-2">
         <Highlight text={legLabel} ranges={syntheticNo ? undefined : ranges} />

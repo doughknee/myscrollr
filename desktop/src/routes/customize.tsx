@@ -14,7 +14,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import RouteError from "../components/RouteError";
-import ContentTransition from "../components/layout/ContentTransition";
 import PageLayout from "../components/layout/PageLayout";
 import { WidgetBar } from "../components/widget-bar/Bar";
 import {
@@ -55,7 +54,7 @@ function CustomizeRoute() {
   }, [searchTab]);
 
   return (
-    <PageLayout title="Customize" width="wide" stableChrome>
+    <PageLayout title="Customize" width="wide">
       {/* Same WCB chrome as every other page — the Segmented is the
           section switch. */}
       <WidgetBar>
@@ -67,7 +66,7 @@ function CustomizeRoute() {
         />
       </WidgetBar>
 
-      <ContentTransition id={tab} className="pt-4">
+      <div className="pt-4">
         {tab === "ticker" ? (
           <TickerSettings prefs={prefs} onPrefsChange={onPrefsChange} />
         ) : (
@@ -92,7 +91,7 @@ function CustomizeRoute() {
             appVersion={shell.appVersion}
           />
         )}
-      </ContentTransition>
+      </div>
     </PageLayout>
   );
 }

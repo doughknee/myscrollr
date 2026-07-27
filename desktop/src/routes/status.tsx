@@ -190,11 +190,10 @@ function StatusPage() {
             <button
               onClick={() => health.refetch()}
               disabled={health.isFetching}
-              className="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-ui-chip font-medium text-fg-3 hover:text-fg hover:bg-surface-hover transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-ui-chip font-medium text-fg-3 hover:text-fg hover:bg-surface-hover disabled:opacity-50"
             >
               <RefreshCw
                 size={12}
-                className={health.isFetching ? "animate-spin" : undefined}
               />
               Refresh
             </button>
@@ -212,7 +211,6 @@ function StatusPage() {
             strokeWidth={2.2}
             className={clsx(
               "shrink-0",
-              !health.data && !health.isError && "animate-spin",
             )}
           />
           <div className="min-w-0">

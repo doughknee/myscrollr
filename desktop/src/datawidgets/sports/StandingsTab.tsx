@@ -123,7 +123,7 @@ function GroupHeader({
 }) {
   return (
     <tr
-      className="bg-surface-hover cursor-pointer select-none hover:bg-surface-hover/80 transition-colors"
+      className="bg-surface-hover cursor-pointer select-none hover:bg-surface-hover/80 "
       onClick={onToggle}
     >
       <td colSpan={9} className="px-3 py-1.5 text-xs font-semibold text-fg-2">
@@ -131,7 +131,7 @@ function GroupHeader({
           <ChevronDown
             size={14}
             className={clsx(
-              "text-fg-3 transition-transform duration-200",
+              "text-fg-3  ",
               isCollapsed && "-rotate-90",
             )}
           />
@@ -303,7 +303,7 @@ export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
                             key={`${s.team_name}-${i}`}
                             ref={assignRef ? favRowRef : undefined}
                             className={clsx(
-                              "border-b border-edge/30 hover:bg-surface-hover transition-colors",
+                              "border-b border-edge/30 hover:bg-surface-hover ",
                               isFav && "bg-[#f97316]/5",
                               zoneColor
                                 ? `border-l-2 ${zoneColor}`

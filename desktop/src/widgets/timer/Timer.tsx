@@ -145,7 +145,7 @@ function CircularProgress({
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={offset}
-          className="text-widget-timer transition-[stroke-dashoffset] duration-300"
+          className="text-widget-timer  "
           style={
             running
               ? {
@@ -184,7 +184,7 @@ function TimerModeTabs({
         <button
           key={m}
           onClick={() => onSwitch(m)}
-          className={`font-mono uppercase tracking-wider transition-colors ${cls} ${
+          className={`font-mono uppercase tracking-wider  ${cls} ${
             activeMode === m
               ? "text-widget-timer bg-widget-timer/10 border border-widget-timer/25"
               : "text-fg-2 hover:text-fg border border-transparent hover:border-edge"
@@ -230,7 +230,6 @@ function TimerConfirmDialog({
   return (
     <div
       className="absolute inset-0 z-10 flex items-center justify-center bg-surface/80 backdrop-blur-sm rounded-xl"
-      style={{ animation: "widget-card-enter 150ms ease-out" }}
     >
       <div className="text-center space-y-3 px-4">
         <p className="text-[13px] font-mono text-fg">
@@ -242,13 +241,13 @@ function TimerConfirmDialog({
         <div className="flex items-center justify-center gap-2">
           <button
             onClick={onCancel}
-            className="text-xs font-mono text-fg-2 px-3 py-1.5 rounded-lg border border-edge hover:text-fg hover:border-edge-2 transition-colors"
+            className="text-xs font-mono text-fg-2 px-3 py-1.5 rounded-lg border border-edge hover:text-fg hover:border-edge-2 "
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="text-xs font-mono font-semibold text-widget-timer px-3 py-1.5 rounded-lg bg-widget-timer/10 border border-widget-timer/25 hover:bg-widget-timer/15 transition-colors"
+            className="text-xs font-mono font-semibold text-widget-timer px-3 py-1.5 rounded-lg bg-widget-timer/10 border border-widget-timer/25 hover:bg-widget-timer/15 "
           >
             Switch
           </button>
@@ -462,12 +461,7 @@ export function Timer({
         <div className={clsx(FEED_CARD, FEED_CARD_STATIC, "flex items-center justify-between")}>
           <div className="flex items-center gap-2">
             {isRunning && (
-              <div
-                className="w-1.5 h-1.5 rounded-full bg-widget-timer"
-                style={{
-                  animation: "widget-pulse 1.5s ease-in-out infinite",
-                }}
-              />
+              <div className="w-1.5 h-1.5 rounded-full bg-widget-timer" />
             )}
             <div className="flex items-baseline gap-2 min-w-0">
               <span
@@ -484,14 +478,14 @@ export function Timer({
             {isComplete ? (
               <button
                 onClick={reset}
-                className="text-xs font-mono text-widget-timer hover:text-widget-timer/80 px-2 py-1 rounded bg-widget-timer/10 transition-colors"
+                className="text-xs font-mono text-widget-timer hover:text-widget-timer/80 px-2 py-1 rounded bg-widget-timer/10 "
               >
                 Reset
               </button>
             ) : isRunning ? (
               <button
                 onClick={pause}
-                className="text-xs font-mono text-widget-timer hover:text-widget-timer/80 px-2 py-1 rounded bg-widget-timer/10 transition-colors"
+                className="text-xs font-mono text-widget-timer hover:text-widget-timer/80 px-2 py-1 rounded bg-widget-timer/10 "
               >
                 Pause
               </button>
@@ -499,14 +493,14 @@ export function Timer({
               <>
                 <button
                   onClick={start}
-                  className="text-xs font-mono text-widget-timer hover:text-widget-timer/80 px-2 py-1 rounded bg-widget-timer/10 transition-colors"
+                  className="text-xs font-mono text-widget-timer hover:text-widget-timer/80 px-2 py-1 rounded bg-widget-timer/10 "
                 >
                   {state.bankedMs > 0 ? "Resume" : "Start"}
                 </button>
                 {state.bankedMs > 0 && (
                   <button
                     onClick={reset}
-                    className="text-xs font-mono text-fg-2 hover:text-fg px-2 py-1 rounded transition-colors"
+                    className="text-xs font-mono text-fg-2 hover:text-fg px-2 py-1 rounded "
                   >
                     Reset
                   </button>
@@ -558,12 +552,7 @@ export function Timer({
             <div className="text-center py-4">
               <div className="flex items-center justify-center gap-2">
                 {isRunning && (
-                  <div
-                    className="w-2 h-2 rounded-full bg-widget-timer"
-                    style={{
-                      animation: "widget-pulse 1.5s ease-in-out infinite",
-                    }}
-                  />
+                  <div className="w-2 h-2 rounded-full bg-widget-timer" />
                 )}
                 <span className="text-3xl font-mono font-bold text-fg tabular-nums">
                   {displayTime}
@@ -580,7 +569,7 @@ export function Timer({
           <>
             <button
               onClick={reset}
-              className="text-xs font-mono font-semibold text-widget-timer px-5 py-2 rounded-full bg-widget-timer/10 border border-widget-timer/25 hover:bg-widget-timer/15 transition-colors"
+              className="text-xs font-mono font-semibold text-widget-timer px-5 py-2 rounded-full bg-widget-timer/10 border border-widget-timer/25 hover:bg-widget-timer/15 "
             >
               Reset
             </button>
@@ -588,7 +577,7 @@ export function Timer({
               <>
                 <button
                   onClick={() => startBreak(false)}
-                  className="text-xs font-mono text-fg px-4 py-2 rounded-full bg-surface-2 border border-edge hover:border-edge-2 transition-colors"
+                  className="text-xs font-mono text-fg px-4 py-2 rounded-full bg-surface-2 border border-edge hover:border-edge-2 "
                 >
                   Short Break
                 </button>
@@ -596,7 +585,7 @@ export function Timer({
                   state.completedSessions % pomodoroTiming.longBreakEvery === 0 && (
                     <button
                       onClick={() => startBreak(true)}
-                      className="text-xs font-mono text-fg px-4 py-2 rounded-full bg-surface-2 border border-edge hover:border-edge-2 transition-colors"
+                      className="text-xs font-mono text-fg px-4 py-2 rounded-full bg-surface-2 border border-edge hover:border-edge-2 "
                     >
                       Long Break
                     </button>
@@ -607,7 +596,7 @@ export function Timer({
         ) : isRunning ? (
           <button
             onClick={pause}
-            className="text-xs font-mono font-semibold text-widget-timer px-5 py-2 rounded-full bg-widget-timer/10 border border-widget-timer/25 hover:bg-widget-timer/15 transition-colors"
+            className="text-xs font-mono font-semibold text-widget-timer px-5 py-2 rounded-full bg-widget-timer/10 border border-widget-timer/25 hover:bg-widget-timer/15 "
           >
             Pause
           </button>
@@ -615,14 +604,14 @@ export function Timer({
           <>
             <button
               onClick={start}
-              className="text-xs font-mono font-semibold text-widget-timer px-5 py-2 rounded-full bg-widget-timer/10 border border-widget-timer/25 hover:bg-widget-timer/15 transition-colors"
+              className="text-xs font-mono font-semibold text-widget-timer px-5 py-2 rounded-full bg-widget-timer/10 border border-widget-timer/25 hover:bg-widget-timer/15 "
             >
               {state.bankedMs > 0 ? "Resume" : "Start"}
             </button>
             {state.bankedMs > 0 && (
               <button
                 onClick={reset}
-                className="text-xs font-mono text-fg-2 px-4 py-2 rounded-full hover:text-fg hover:bg-surface-2 transition-colors"
+                className="text-xs font-mono text-fg-2 px-4 py-2 rounded-full hover:text-fg hover:bg-surface-2 "
               >
                 Reset
               </button>
@@ -639,7 +628,7 @@ export function Timer({
               <button
                 key={p.secs}
                 onClick={() => setTarget(p.secs)}
-                className={`text-xs font-mono px-2.5 py-1 rounded-full transition-colors ${
+                className={`text-xs font-mono px-2.5 py-1 rounded-full  ${
                   state.targetSecs === p.secs && !showCustom
                     ? "text-widget-timer bg-widget-timer/10 border border-widget-timer/25"
                     : "text-fg-2 border border-edge hover:text-fg hover:border-edge-2"
@@ -650,7 +639,7 @@ export function Timer({
             ))}
             <button
               onClick={() => setShowCustom((v) => !v)}
-              className={`text-xs font-mono px-2.5 py-1 rounded-full transition-colors ${
+              className={`text-xs font-mono px-2.5 py-1 rounded-full  ${
                 showCustom
                   ? "text-widget-timer bg-widget-timer/10 border border-widget-timer/25"
                   : "text-fg-2 border border-edge hover:text-fg hover:border-edge-2"
@@ -662,7 +651,6 @@ export function Timer({
           {showCustom && (
             <div
               className="flex items-center justify-center gap-2"
-              style={{ animation: "widget-card-enter 150ms ease-out" }}
             >
               <input
                 ref={customInputRef}
@@ -676,14 +664,14 @@ export function Timer({
                   if (e.key === "Enter") handleCustomSubmit();
                 }}
                 placeholder="Minutes"
-                className="w-20 text-center text-xs font-mono bg-surface-2 border border-edge rounded-lg px-2 py-1.5 text-fg placeholder:text-fg-3 outline-none focus:border-widget-timer/30 transition-colors"
+                className="w-20 text-center text-xs font-mono bg-surface-2 border border-edge rounded-lg px-2 py-1.5 text-fg placeholder:text-fg-3 outline-none focus:border-widget-timer/30 "
               />
               <button
                 onClick={handleCustomSubmit}
                 disabled={
                   !customMinutes || parseFloat(customMinutes) <= 0
                 }
-                className="text-xs font-mono font-semibold text-widget-timer px-3 py-1.5 rounded-lg bg-widget-timer/10 border border-widget-timer/25 hover:bg-widget-timer/15 transition-colors disabled:opacity-30 disabled:cursor-default"
+                className="text-xs font-mono font-semibold text-widget-timer px-3 py-1.5 rounded-lg bg-widget-timer/10 border border-widget-timer/25 hover:bg-widget-timer/15  disabled:opacity-30 disabled:cursor-default"
               >
                 Set
               </button>
@@ -704,14 +692,13 @@ export function Timer({
       {notifPermission === "default" && (
         <div
           className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-widget-timer/[0.04] border border-widget-timer/10"
-          style={{ animation: "widget-card-enter 200ms ease-out" }}
         >
           <span className="text-[11px] font-mono text-fg-2">
             Enable notifications for timer alerts?
           </span>
           <button
             onClick={requestNotificationPermission}
-            className="text-[11px] font-mono font-semibold text-widget-timer hover:text-widget-timer/80 transition-colors"
+            className="text-[11px] font-mono font-semibold text-widget-timer hover:text-widget-timer/80 "
           >
             Allow
           </button>

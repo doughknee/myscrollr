@@ -1,5 +1,4 @@
 import { Check } from "lucide-react";
-import { motion } from "motion/react";
 import { clsx } from "clsx";
 import {
   Section,
@@ -36,23 +35,21 @@ export function LeaguePicker({
   const pickableFinished = pickableLeagues.filter((l) => l.is_finished);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
+    <div
     >
       <Section title={`Select Leagues (${pickableLeagues.length} found)`}>
         <div className="px-3 space-y-3">
           <div className="flex items-center justify-end gap-3">
             <button
               onClick={onSelectAll}
-              className="text-[11px] text-fg-3 hover:text-fg-2 transition-colors cursor-pointer"
+              className="text-[11px] text-fg-3 hover:text-fg-2  cursor-pointer"
             >
               Select All
             </button>
             <span className="text-fg-3">|</span>
             <button
               onClick={onDeselectAll}
-              className="text-[11px] text-fg-3 hover:text-fg-2 transition-colors cursor-pointer"
+              className="text-[11px] text-fg-3 hover:text-fg-2  cursor-pointer"
             >
               Deselect All
             </button>
@@ -61,7 +58,7 @@ export function LeaguePicker({
           {pickableActive.length > 0 && (
             <div className="space-y-1">
               <p className="text-[11px] font-semibold text-success/80 flex items-center gap-1.5 mb-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+                <span className="h-1.5 w-1.5 rounded-full bg-success " />
                 Active Leagues
               </p>
               {pickableActive.map((league) => (
@@ -97,7 +94,7 @@ export function LeaguePicker({
             <button
               onClick={onImport}
               disabled={selectedKeys.size === 0}
-              className="flex-1 px-4 py-2 rounded-lg text-[12px] font-medium text-white transition-colors disabled:opacity-30 cursor-pointer"
+              className="flex-1 px-4 py-2 rounded-lg text-[12px] font-medium text-white  disabled:opacity-30 cursor-pointer"
               style={{
                 background:
                   selectedKeys.size > 0 ? hex : "var(--color-base-300)",
@@ -107,14 +104,14 @@ export function LeaguePicker({
             </button>
             <button
               onClick={onSkip}
-              className="px-4 py-2 rounded-lg text-[12px] font-medium text-fg-3 hover:text-fg-2 hover:bg-base-250/50 transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-lg text-[12px] font-medium text-fg-3 hover:text-fg-2 hover:bg-base-250/50  cursor-pointer"
             >
               Skip
             </button>
           </div>
         </div>
       </Section>
-    </motion.div>
+    </div>
   );
 }
 
@@ -137,7 +134,7 @@ function LeaguePickerRow({
     <button
       onClick={onToggle}
       className={clsx(
-        "w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left cursor-pointer",
+        "w-full flex items-center gap-3 p-2.5 rounded-lg border  text-left cursor-pointer",
         selected
           ? "bg-base-250/40 border-edge/30"
           : "bg-base-250/15 border-edge/30 opacity-60",
@@ -147,7 +144,7 @@ function LeaguePickerRow({
       }
     >
       <div
-        className="h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-all"
+        className="h-4 w-4 rounded border flex items-center justify-center shrink-0 "
         style={
           selected
             ? { background: hex, borderColor: hex }
@@ -169,7 +166,7 @@ function LeaguePickerRow({
 
       {!league.is_finished ? (
         <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-success/10 border border-success/20">
-          <span className="h-1 w-1 rounded-full bg-success animate-pulse" />
+          <span className="h-1 w-1 rounded-full bg-success " />
           <span className="text-[10px] font-bold text-success">Active</span>
         </span>
       ) : (

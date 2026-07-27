@@ -27,12 +27,12 @@ export default function RouteError({ error, reset }: ErrorComponentProps) {
       </p>
       <button
         onClick={reset}
-        className="mt-2 px-4 py-1.5 rounded-lg text-xs font-medium bg-surface-3/50 hover:bg-surface-3 text-fg-3 hover:text-fg transition-colors"
+        className="mt-2 px-4 py-1.5 rounded-lg text-xs font-medium bg-surface-3/50 hover:bg-surface-3 text-fg-3 hover:text-fg "
       >
         Try again
       </button>
       <details className="w-full mt-3 text-left">
-        <summary className="text-xs text-fg-3 cursor-pointer select-none hover:text-fg transition-colors">
+        <summary className="text-xs text-fg-3 cursor-pointer select-none hover:text-fg ">
           Technical details
         </summary>
         <pre className="mt-2 max-h-40 overflow-auto text-[11px] font-mono text-fg-3 bg-surface-2 rounded-lg p-2 whitespace-pre-wrap break-words">

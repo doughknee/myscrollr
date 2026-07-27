@@ -174,12 +174,12 @@ function GitHubFeedBody({ mode: feedMode }: FeedTabProps) {
             onChange={(e) => { setInputUrl(e.target.value); setInputError(null); }}
             onKeyDown={(e) => { if (e.key === "Enter") handleAddRepo(); }}
             placeholder="https://github.com/owner/repo"
-            className="w-full text-xs font-mono px-3 py-2 rounded-lg bg-surface-2 border border-edge text-fg placeholder:text-fg-4 focus:border-widget-github/50 focus:outline-none transition-colors"
+            className="w-full text-xs font-mono px-3 py-2 rounded-lg bg-surface-2 border border-edge text-fg placeholder:text-fg-4 focus:border-widget-github/50 focus:outline-none "
           />
           <button
             onClick={handleAddRepo}
             disabled={!inputUrl.trim()}
-            className="w-full text-xs font-mono font-semibold text-widget-github px-3 py-2 rounded-lg bg-widget-github/10 border border-widget-github/25 hover:bg-widget-github/15 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full text-xs font-mono font-semibold text-widget-github px-3 py-2 rounded-lg bg-widget-github/10 border border-widget-github/25 hover:bg-widget-github/15  disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Plus size={12} />
             Add Repo
@@ -234,14 +234,14 @@ function GitHubFeedBody({ mode: feedMode }: FeedTabProps) {
           onChange={(e) => { setInputUrl(e.target.value); setInputError(null); }}
           onKeyDown={(e) => { if (e.key === "Enter") handleAddRepo(); }}
           placeholder="Add another repo..."
-          className="flex-1 text-[11px] font-mono px-2.5 py-1.5 rounded-md bg-surface-2 border border-edge text-fg placeholder:text-fg-4 focus:border-widget-github/50 focus:outline-none transition-colors"
+          className="flex-1 text-[11px] font-mono px-2.5 py-1.5 rounded-md bg-surface-2 border border-edge text-fg placeholder:text-fg-4 focus:border-widget-github/50 focus:outline-none "
         />
         <Tooltip content="Add repo">
           <button
             onClick={handleAddRepo}
             disabled={!inputUrl.trim()}
             aria-label="Add repo"
-            className="text-[11px] font-mono font-semibold text-widget-github px-2.5 py-1.5 rounded-md bg-widget-github/10 border border-widget-github/25 hover:bg-widget-github/15 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-[11px] font-mono font-semibold text-widget-github px-2.5 py-1.5 rounded-md bg-widget-github/10 border border-widget-github/25 hover:bg-widget-github/15  disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Plus size={11} />
           </button>
@@ -302,9 +302,9 @@ function RepoRow({
     >
       {/* Status dot */}
       {isLoading ? (
-        <Loader2 size={10} className="animate-spin text-fg-4 shrink-0" />
+        <Loader2 size={10} className=" text-fg-4 shrink-0" />
       ) : (
-        <span className={`w-2 h-2 rounded-full shrink-0 ${CI_STATUS_COLORS[status]}${status === "failure" ? " animate-pulse" : ""}`} />
+        <span className={`w-2 h-2 rounded-full shrink-0 ${CI_STATUS_COLORS[status]}${status === "failure" ? " " : ""}`} />
       )}
 
       {/* Repo name + workflow */}
@@ -314,7 +314,7 @@ function RepoRow({
             href={data.runUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs font-mono text-fg hover:text-widget-github transition-colors truncate block"
+            className="text-xs font-mono text-fg hover:text-widget-github  truncate block"
           >
             {owner}/{repo}
             <ExternalLink size={9} className="inline ml-1 opacity-40" />
@@ -341,7 +341,7 @@ function RepoRow({
         <button
           onClick={onRemove}
           aria-label="Remove repo"
-          className="text-fg-4 hover:text-error transition-colors shrink-0"
+          className="text-fg-4 hover:text-error  shrink-0"
         >
           <Trash2 size={11} />
         </button>

@@ -6,7 +6,6 @@
  */
 import { useMemo } from "react";
 import { clsx } from "clsx";
-import { motion } from "motion/react";
 import { Crown, Medal, Shield, Trophy } from "lucide-react";
 import { fmtPoints, isPlayoffBound, playoffSpotCount, streakLabel } from "./types";
 import type { LeagueResponse, StandingsEntry } from "./types";
@@ -135,12 +134,9 @@ function StandingRow({
       : "text-fg-3";
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ type: "spring", stiffness: 420, damping: 34 }}
+    <div
       className={clsx(
-        "grid grid-cols-[28px_minmax(0,1fr)_repeat(3,_auto)] items-center gap-3 px-3 py-2 font-mono tabular-nums transition-colors",
+        "grid grid-cols-[28px_minmax(0,1fr)_repeat(3,_auto)] items-center gap-3 px-3 py-2 font-mono tabular-nums ",
         isUser && "ring-1 ring-inset ring-accent/50 bg-accent/[0.06]",
         !isUser && zone === "playoff" && "bg-up/[0.02] hover:bg-up/[0.06]",
         !isUser && zone === "outside" && "hover:bg-surface-2",
@@ -222,7 +218,7 @@ function StandingRow({
             )}
           </div>
         )}
-    </motion.div>
+    </div>
   );
 }
 

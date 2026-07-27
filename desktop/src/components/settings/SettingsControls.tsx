@@ -1,5 +1,4 @@
 import { clsx } from "clsx";
-import { motion } from "motion/react";
 import Tooltip from "../Tooltip";
 import { SelectMenu } from "../widget-bar/SelectMenu";
 
@@ -84,24 +83,21 @@ export function ToggleRow({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="flex items-center justify-between w-full px-3 py-2 rounded-lg hover:bg-base-250/45 transition-colors cursor-pointer group"
+      className="flex items-center justify-between w-full px-3 py-2 rounded-lg hover:bg-base-250/45 cursor-pointer group"
     >
       <div className="flex flex-col gap-0.5 text-left group-hover:text-fg">
         <SettingLabel label={label} description={description} />
       </div>
       <div
         className={clsx(
-          "relative w-8 h-[18px] rounded-full transition-colors shrink-0 ml-4",
+          "relative w-8 h-[18px] rounded-full shrink-0 ml-4",
           checked ? "bg-accent" : "bg-base-350",
         )}
       >
-        {/* Thumb springs across with a slight overshoot so the toggle
-            feels physical rather than mechanical. */}
-        <motion.div
-          animate={{ x: checked ? 14 : 0 }}
-          transition={{ type: "spring", stiffness: 500, damping: 28 }}
+        <div
           className={clsx(
             "absolute top-[3px] left-[3px] h-3 w-3 rounded-full",
+            checked && "translate-x-3.5",
             checked ? "bg-surface" : "bg-fg-3",
           )}
         />
@@ -144,7 +140,7 @@ export function SegmentedRow<T extends string>({
             aria-checked={value === opt.value}
             onClick={() => onChange(opt.value)}
             className={clsx(
-              "px-2.5 py-1 text-ui-chip font-medium rounded-md transition-all duration-150 active:scale-95 cursor-pointer leading-none",
+              "px-2.5 py-1 text-ui-chip font-medium rounded-md active:scale-95 cursor-pointer leading-none",
               value === opt.value
                 ? "bg-base-300 text-fg shadow-sm"
                 : "text-fg-3 hover:text-fg-2",
@@ -298,7 +294,7 @@ export function ResetButton({
   return (
     <button
       onClick={onClick}
-      className="text-ui-chip font-medium px-3 py-1.5 rounded-lg text-fg-3 hover:text-fg-2 hover:bg-base-250/50 transition-colors cursor-pointer"
+      className="text-ui-chip font-medium px-3 py-1.5 rounded-lg text-fg-3 hover:text-fg-2 hover:bg-base-250/50 cursor-pointer"
     >
       {label}
     </button>
@@ -330,7 +326,7 @@ export function ActionRow({
       <button
         onClick={onClick}
         className={clsx(
-          "text-ui-chip font-medium px-2.5 py-1 rounded-md transition-colors cursor-pointer",
+          "text-ui-chip font-medium px-2.5 py-1 rounded-md cursor-pointer",
           actionClass ??
             "bg-base-250 text-fg-3 hover:text-fg-2 hover:bg-base-300",
         )}

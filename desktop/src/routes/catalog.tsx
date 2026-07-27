@@ -15,7 +15,6 @@ import {
   Trophy,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { AnimatePresence } from "motion/react";
 import { open } from "@tauri-apps/plugin-shell";
 import clsx from "clsx";
 
@@ -33,7 +32,6 @@ import {
 import CatalogCard from "../components/marketplace/CatalogCard";
 import QueryErrorBanner from "../components/QueryErrorBanner";
 import RouteError from "../components/RouteError";
-import ContentTransition from "../components/layout/ContentTransition";
 import PageLayout from "../components/layout/PageLayout";
 import PageSection from "../components/layout/PageSection";
 import { WidgetBar } from "../components/widget-bar/Bar";
@@ -117,9 +115,8 @@ function CatalogFilterMenu({
         onClick={() => setOpen((o) => !o)}
         ariaLabel="Filter by category"
       />
-      <AnimatePresence>
-        {open && (
-          <MenuPanel className="inset-x-2">
+      {open && (
+        <MenuPanel className="inset-x-2">
             <MenuHeading>Category</MenuHeading>
             {FILTER_TABS.map((t) => (
               <MenuRow
@@ -135,9 +132,8 @@ function CatalogFilterMenu({
                 {t.label}
               </MenuRow>
             ))}
-          </MenuPanel>
-        )}
-      </AnimatePresence>
+        </MenuPanel>
+      )}
     </div>
   );
 }
@@ -240,7 +236,7 @@ function CatalogPage() {
   // two sections: what you have, and what you could add (v1.1.1 r3).
 
   return (
-    <PageLayout title="Catalog" width="wide" stableChrome>
+    <PageLayout title="Catalog" width="wide">
       {/* WCB — same persistent chrome as every source page. Category
           filter (ex-TopBar tab strip) left, sort (ex-slot-band group)
           right, per the bar grammar. */}
@@ -321,7 +317,7 @@ function CatalogPage() {
           {slots.atCapacity && slots.finite && (
             <button
               onClick={() => void open("https://myscrollr.com/uplink")}
-              className="shrink-0 rounded-lg bg-warn/15 px-3 py-1.5 text-ui-chip font-semibold text-warn transition-colors hover:bg-warn/25"
+              className="shrink-0 rounded-lg bg-warn/15 px-3 py-1.5 text-ui-chip font-semibold text-warn hover:bg-warn/25"
             >
               Upgrade
             </button>
@@ -331,7 +327,7 @@ function CatalogPage() {
         </div>
       </div>
 
-      <ContentTransition id={`${filter}-${sort}`}>
+      <div>
         {yourItems.length === 0 && discoverItems.length === 0 ? (
           <EmptySection
             icon={Search}
@@ -376,7 +372,7 @@ function CatalogPage() {
             </PageSection>
           </>
         )}
-      </ContentTransition>
+      </div>
     </PageLayout>
   );
 }

@@ -68,7 +68,6 @@ export function WeatherCard({
           FEED_CARD_STATIC,
           "group flex items-center justify-between",
         )}
-        style={{ animation: "widget-card-enter 0.25s ease-out both" }}
       >
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-xs font-mono text-widget-weather/80 uppercase tracking-wider shrink-0 w-24 truncate">
@@ -98,7 +97,7 @@ export function WeatherCard({
           <Tooltip content="Refresh">
             <button
               onClick={onRefresh}
-              className="text-fg-3 hover:text-widget-weather opacity-0 group-hover:opacity-100 transition-opacity"
+              className="text-fg-3 hover:text-widget-weather opacity-0 group-hover:opacity-100 "
             >
               <RefreshIcon />
             </button>
@@ -106,7 +105,7 @@ export function WeatherCard({
           <Tooltip content="Remove city">
             <button
               onClick={onRemove}
-              className="text-fg-3 hover:text-error opacity-0 group-hover:opacity-100 transition-opacity"
+              className="text-fg-3 hover:text-error opacity-0 group-hover:opacity-100 "
             >
               <X size={12} />
             </button>
@@ -119,9 +118,8 @@ export function WeatherCard({
   return (
     <div
       className={clsx(FEED_CARD, FEED_CARD_STATIC, "group relative")}
-      style={{ animation: "widget-card-enter 0.25s ease-out both" }}
     >
-      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 ">
         <Tooltip content="Refresh">
           <button
             onClick={onRefresh}
@@ -181,7 +179,7 @@ export function WeatherCard({
           <span className="text-xs font-mono text-error">{error}</span>
           <button
             onClick={onRefresh}
-            className="block text-[11px] font-mono text-widget-weather/70 hover:text-widget-weather mt-1 transition-colors"
+            className="block text-[11px] font-mono text-widget-weather/70 hover:text-widget-weather mt-1 "
           >
             Retry
           </button>

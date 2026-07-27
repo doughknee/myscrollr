@@ -25,7 +25,6 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { motion } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardQueryOptions } from "../../api/queries";
 import { useShell } from "../../shell-context";
@@ -211,7 +210,7 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
                 <Star size={10} className="shrink-0 fill-accent stroke-accent" />
               )}
               {live && (
-                <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-live" />
+                <span className="h-1.5 w-1.5 shrink-0  rounded-full bg-live" />
               )}
             </span>
           ),
@@ -262,7 +261,7 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
           <div className="ml-auto flex min-w-0 shrink items-center gap-3">
             {liveCount > 0 && (
               <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-live">
-                <span className="h-1.5 w-1.5 rounded-full bg-live animate-pulse" />
+                <span className="h-1.5 w-1.5 rounded-full bg-live " />
                 {liveCount} live
               </span>
             )}
@@ -310,11 +309,8 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
           </button>
         </div>
       ) : (
-        <motion.div
+        <div
           key={subTab + (activeLeague?.league_key ?? "none")}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.18 }}
         >
           {subTab === "overview" && (
             <OverviewView
@@ -327,7 +323,7 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
           {subTab === "matchup" && <MatchupView league={activeLeague} />}
           {subTab === "standings" && <StandingsView league={activeLeague} />}
           {subTab === "roster" && <RosterView league={activeLeague} />}
-        </motion.div>
+        </div>
       )}
     </div>
   );

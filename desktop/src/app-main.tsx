@@ -8,9 +8,7 @@ import * as Sentry from "@sentry/react";
 import ReactDOM from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { MotionConfig } from "motion/react";
 import "./api/fetchOverride";
-import { APP_TRANSITION } from "./lib/motion";
 import { initStore } from "./lib/store";
 import { createQueryClient } from "./query";
 import { createAppRouter } from "./router";
@@ -27,11 +25,9 @@ initStore().catch((err) => console.error("[Scrollr] Store init failed:", err)).t
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <Sentry.ErrorBoundary fallback={SentryFallback}>
-        <MotionConfig reducedMotion="user" transition={APP_TRANSITION}>
-          <QueryClientProvider client={queryClient}>
-            <RouterProvider router={router} />
-          </QueryClientProvider>
-        </MotionConfig>
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>
       </Sentry.ErrorBoundary>
     </StrictMode>,
   );

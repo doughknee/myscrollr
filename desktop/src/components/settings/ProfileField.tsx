@@ -98,13 +98,13 @@ export default function ProfileField({
             disabled={saving}
             aria-label="Save"
             className={clsx(
-              "p-1.5 rounded-md transition-colors",
+              "p-1.5 rounded-md ",
               "bg-accent/10 text-accent hover:bg-accent/20",
               "disabled:opacity-60 disabled:cursor-not-allowed",
             )}
           >
             {saving ? (
-              <Loader2 size={12} className="animate-spin" />
+              <Loader2 size={12} />
             ) : (
               <Check size={12} />
             )}
@@ -113,7 +113,7 @@ export default function ProfileField({
             onClick={handleCancel}
             disabled={saving}
             aria-label="Cancel"
-            className="p-1.5 rounded-md text-fg-4 hover:text-fg-2 hover:bg-base-300 disabled:opacity-60 transition-colors"
+            className="p-1.5 rounded-md text-fg-4 hover:text-fg-2 hover:bg-base-300 disabled:opacity-60 "
           >
             <X size={12} />
           </button>
@@ -129,7 +129,7 @@ export default function ProfileField({
           </span>
           <button
             onClick={() => setEditing(true)}
-            className="shrink-0 flex items-center gap-1 px-2 py-1 text-ui-chip font-medium text-fg-4 hover:text-fg-2 hover:bg-base-300 rounded-md transition-colors"
+            className="shrink-0 flex items-center gap-1 px-2 py-1 text-ui-chip font-medium text-fg-4 hover:text-fg-2 hover:bg-base-300 rounded-md "
           >
             <Pencil size={10} /> Edit
           </button>

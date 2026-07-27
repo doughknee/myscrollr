@@ -15,8 +15,6 @@
  */
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import clsx from "clsx";
-import { motion, AnimatePresence } from "motion/react";
-import { ROUTE_VARIANTS } from "../../lib/motion";
 import { useRegisterPageIdentity } from "./page-context";
 import type { OverflowMenuItem } from "../OverflowMenu";
 
@@ -78,16 +76,6 @@ interface PageLayoutProps {
    */
   noContentPadding?: boolean;
 
-  /**
-   * Source-page transition mode: an OVERLAPPING crossfade (popLayout,
-   * no wait gap) that broadcasts `hidden/show/out` variant LABELS
-   * instead of inline values. The widget-bar row (portaled into the
-   * persistent BarChassis, which lives OUTSIDE this subtree and never
-   * animates) consumes the labels to roll its contents out the top and
-   * in from the bottom, while the feed content itself rises in / sinks
-   * out here.
-   */
-  stableChrome?: boolean;
 }
 
 // ── Component ───────────────────────────────────────────────────
@@ -106,7 +94,6 @@ export default function PageLayout({
   width = "narrow",
   fillHeight = false,
   noContentPadding = false,
-  stableChrome = false,
 }: PageLayoutProps) {
   // Publish this page's identity to the TopBar.
   useRegisterPageIdentity({
@@ -122,11 +109,7 @@ export default function PageLayout({
 
   const widthClass = width === "wide" ? "max-w-6xl" : "max-w-3xl";
 
-  // Key the content cross-fade on title+subtitle+active-tab so:
-  //  - Source pages animate when switching feed/configure/display
-  //    (subtitle changes).
-  //  - Settings/Catalog/Support animate when switching tab pills
-  //    (activeKey changes) even though title stays the same.
+  // Reset the scroll container when the visible page identity changes.
   const contentKey = `${title}::${subtitle ?? ""}`;
 
   // Each content identity is a fresh page: reset the scroll container.
@@ -140,29 +123,20 @@ export default function PageLayout({
 
   return (
     <div className="flex flex-col h-full">
-      {/* ── Content stack ────────────────────────────────────
-          This is the shared entry transition for every page and for
-          identity changes while a route stays mounted. */}
+      {/* ── Content stack ──────────────────────────────────── */}
       {fillHeight ? (
         // Fill-height mode: content area is a flex column with no
         // outer scroll. Children manage their own scrollable panel.
         // Used by Configure routes that have a long inner list.
-        <div className="relative flex-1 min-h-0 flex flex-col">
-          <AnimatePresence mode="popLayout">
-            <motion.div
-              key={contentKey}
-              variants={ROUTE_VARIANTS}
-              initial="hidden"
-              animate="show"
-              exit="out"
-              className={clsx(
-                "mx-auto px-5 pt-5 pb-0 w-full flex-1 min-h-0 flex flex-col",
-                widthClass,
-              )}
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div
+            className={clsx(
+              "mx-auto px-5 pt-5 pb-0 w-full flex-1 min-h-0 flex flex-col",
+              widthClass,
+            )}
+          >
+            {children}
+          </div>
           {footer && (
             <div className="border-t border-edge/40 shrink-0">
               <div className={clsx("mx-auto px-5 py-4", widthClass)}>
@@ -173,23 +147,15 @@ export default function PageLayout({
         </div>
       ) : (
         // Default mode: content area scrolls; children stack vertically.
-        // (`relative` anchors popLayout's absolutely-positioned exits.)
         <div ref={scrollRef} className="relative flex-1 overflow-y-auto scrollbar-thin [scrollbar-gutter:stable]">
-          <AnimatePresence mode="popLayout">
-            <motion.div
-              key={contentKey}
-              initial={stableChrome ? "hidden" : ROUTE_VARIANTS.hidden}
-              animate={stableChrome ? "show" : ROUTE_VARIANTS.show}
-              exit={stableChrome ? "out" : ROUTE_VARIANTS.out}
-              variants={stableChrome ? ROUTE_VARIANTS : undefined}
-              className={clsx(
-                noContentPadding ? "w-full" : "mx-auto px-5 py-5",
-                !noContentPadding && widthClass,
-              )}
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+          <div
+            className={clsx(
+              noContentPadding ? "w-full" : "mx-auto px-5 py-5",
+              !noContentPadding && widthClass,
+            )}
+          >
+            {children}
+          </div>
           {footer && (
             <div className="border-t border-edge/40">
               <div className={clsx("mx-auto px-5 py-4", widthClass)}>

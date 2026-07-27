@@ -173,13 +173,13 @@ function BillingBanner({
       <div className="flex items-center gap-2 shrink-0 ml-4">
         <button
           onClick={onCta}
-          className={clsx("text-xs font-medium hover:text-fg transition-colors", t.cta)}
+          className={clsx("text-xs font-medium hover:text-fg ", t.cta)}
         >
           {cta}
         </button>
         <button
           onClick={onDismiss}
-          className="text-xs text-fg-4 hover:text-fg-3 transition-colors"
+          className="text-xs text-fg-4 hover:text-fg-3 "
           aria-label="Dismiss"
         >
           Dismiss
@@ -962,7 +962,7 @@ function RootLayout() {
           className="absolute inset-0 z-50 flex items-center justify-center bg-surface/80 backdrop-blur-sm"
         >
           <div className="text-center">
-            <div className="w-6 h-6 border-2 border-accent/30 border-t-accent rounded-full animate-spin mx-auto mb-3" />
+            <div className="w-6 h-6 border-2 border-accent/30 border-t-accent rounded-full mx-auto mb-3" />
             <p className="text-sm font-medium text-fg-2">
               Signing you in...
             </p>
@@ -971,7 +971,7 @@ function RootLayout() {
             </p>
             <button
               onClick={() => auth.setLoggingIn(false)}
-              className="mt-4 px-4 py-1.5 rounded-lg text-xs font-medium text-fg-3 hover:text-fg-2 hover:bg-surface-hover transition-colors"
+              className="mt-4 px-4 py-1.5 rounded-lg text-xs font-medium text-fg-3 hover:text-fg-2 hover:bg-surface-hover "
             >
               Cancel
             </button>

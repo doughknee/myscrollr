@@ -147,7 +147,6 @@ function WeatherFeedTab(props: FeedTabProps) {
                 <BarPill active={false} onClick={detectLocation}>
                   <LocateFixed
                     size={13}
-                    className={detecting ? "animate-pulse" : undefined}
                   />
                 </BarPill>
               </span>
@@ -234,14 +233,14 @@ function WeatherFeedBody({
         <div className="flex gap-2">
           <button
             onClick={() => (barDriven ? onFocusSearch() : setShowSearch(true))}
-            className="text-xs font-mono font-semibold text-widget-weather px-3 py-1.5 rounded-lg bg-widget-weather/10 border border-widget-weather/25 hover:bg-widget-weather/15 transition-colors"
+            className="text-xs font-mono font-semibold text-widget-weather px-3 py-1.5 rounded-lg bg-widget-weather/10 border border-widget-weather/25 hover:bg-widget-weather/15 "
           >
             Search City
           </button>
           <button
             onClick={onDetect}
             disabled={detecting}
-            className="text-xs font-mono text-fg px-3 py-1.5 rounded-lg bg-surface-2 border border-edge hover:border-edge-2 transition-colors disabled:opacity-40"
+            className="text-xs font-mono text-fg px-3 py-1.5 rounded-lg bg-surface-2 border border-edge hover:border-edge-2  disabled:opacity-40"
           >
             {detecting ? "Detecting..." : "Use My Location"}
           </button>
@@ -264,7 +263,7 @@ function WeatherFeedBody({
               <button
                 onClick={onDetect}
                 disabled={detecting}
-                className="text-xs font-mono text-widget-weather/70 hover:text-widget-weather transition-colors disabled:opacity-40"
+                className="text-xs font-mono text-widget-weather/70 hover:text-widget-weather  disabled:opacity-40"
               >
                 {detecting ? "..." : "\u{1F4CD}"}
               </button>
@@ -273,7 +272,7 @@ function WeatherFeedBody({
               onClick={() => {
                 setShowSearch(!showSearch);
               }}
-              className="text-xs font-mono text-widget-weather/70 hover:text-widget-weather transition-colors"
+              className="text-xs font-mono text-widget-weather/70 hover:text-widget-weather "
             >
               {showSearch ? "Done" : "+ Add"}
             </button>

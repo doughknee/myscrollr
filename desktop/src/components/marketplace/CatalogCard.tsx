@@ -39,7 +39,7 @@ export default function CatalogCard({ item, enabled, onInfo }: CatalogCardProps)
       }}
       className={clsx(
         "group/card relative flex flex-col overflow-hidden rounded-xl border border-edge/40 bg-base-150/30 p-4 cursor-pointer",
-        "transition-all duration-150 hover:-translate-y-0.5 hover:shadow-soft-sm hover:border-edge/60 hover:bg-base-150/50",
+        "hover:-translate-y-0.5 hover:shadow-soft-sm hover:border-edge/60 hover:bg-base-150/50",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
         // Added cards de-emphasized so new content stays prominent.
         enabled && "opacity-80 hover:opacity-100",
@@ -109,7 +109,7 @@ export default function CatalogCard({ item, enabled, onInfo }: CatalogCardProps)
 
       {/* "Learn more" affordance — a quiet hint, not a button; the card
           itself is the hit target. */}
-      <div className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-0.5 text-ui-chip font-medium text-fg-4 opacity-0 translate-x-[-2px] transition-all duration-150 group-hover/card:opacity-100 group-hover/card:translate-x-0">
+      <div className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-0.5 text-ui-chip font-medium text-fg-4 opacity-0 translate-x-[-2px] group-hover/card:opacity-100 group-hover/card:translate-x-0">
         View
         <ChevronRight size={11} />
       </div>
