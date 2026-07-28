@@ -5,10 +5,8 @@
  * The one route for every widget — /channel/$type was retired with the
  * rest of the "widget" vocabulary.
  *
- * One route for every source means every swap is a same-route swap —
- * PageLayout stays mounted
- * (bar roll + feed crossfade) plays on ALL s. The old
- * channel/widget route split made cross-kind swaps hard-cut.
+ * One route for every source means every swap keeps the same PageLayout
+ * chassis mounted while the routed feed content changes.
  *
  * NOTE: this is deliberately an INDEX route (widget.$id.index.tsx,
  * not widget.$id.tsx) so it doesn't become widget.$id.info.tsx's
@@ -71,9 +69,6 @@ function WidgetRoute() {
       // components own their padding.
       width="wide"
       noContentPadding
-      // Source→source swaps overlap-crossfade so the (identical) WidgetBar
-      // shell reads as stationary chrome; only the bar's contents and the
-      // feed animate.
     >
       <div className="h-full">
         <WidgetFeed id={id} manifest={manifest} />

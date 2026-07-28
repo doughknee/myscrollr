@@ -72,7 +72,10 @@ export function useTheme({
     const resolvedMode = resolveThemeMode(themeMode);
     const dataTheme = resolveThemeName(themeFamily, resolvedMode);
 
-    shell.classList.add("theme-transition");
+    const animateTheme = shellId === "desktop-shell";
+    if (animateTheme) {
+      shell.classList.add("theme-transition");
+    }
     shell.dataset.theme = dataTheme;
     // Mirror the user's pref so the pre-paint script can read it on
     // next launch and avoid a theme flash for non-default families.
@@ -80,10 +83,9 @@ export function useTheme({
     // Also ensure <html> stays in sync with the shell so the
     // pre-paint background colors don't fight us once React mounts.
     document.documentElement.setAttribute("data-theme", dataTheme);
-    const timer = setTimeout(
-      () => shell.classList.remove("theme-transition"),
-      350,
-    );
+    const timer = animateTheme
+      ? setTimeout(() => shell.classList.remove("theme-transition"), 350)
+      : null;
 
     if (themeMode === "system") {
       const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -95,12 +97,14 @@ export function useTheme({
       };
       mq.addEventListener("change", handler);
       return () => {
-        clearTimeout(timer);
+        if (timer !== null) clearTimeout(timer);
         mq.removeEventListener("change", handler);
       };
     }
 
-    return () => clearTimeout(timer);
+    return () => {
+      if (timer !== null) clearTimeout(timer);
+    };
   }, [shellId, themeFamily, themeMode]);
 
   // ── UI scale via native webview zoom ─────────────────────────

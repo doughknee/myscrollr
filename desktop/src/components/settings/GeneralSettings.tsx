@@ -357,7 +357,7 @@ function WhatsNewRow() {
       <span className="text-ui-meta">See what changed in recent versions</span>
       <button
         onClick={() => navigate({ to: "/releases" })}
-        className="flex items-center gap-1 text-ui-chip font-medium px-2.5 py-1 rounded-md text-fg-3 hover:text-fg-2 hover:bg-base-250/50 active:scale-95 cursor-pointer"
+        className="flex items-center gap-1 text-ui-chip font-medium px-2.5 py-1 rounded-md text-fg-3 hover:text-fg-2 hover:bg-base-250/50 cursor-pointer"
       >
         <Sparkles size={12} />
         What's new
@@ -383,7 +383,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
           <span className="text-ui-meta">Check for new versions</span>
           <button
             onClick={onCheck}
-            className="text-ui-chip font-medium px-2.5 py-1 rounded-md bg-base-250 text-fg-3 hover:text-fg-2 hover:bg-base-300 active:scale-95 cursor-pointer"
+            className="text-ui-chip font-medium px-2.5 py-1 rounded-md bg-base-250 text-fg-3 hover:text-fg-2 hover:bg-base-300 cursor-pointer"
           >
             Check for updates
           </button>
@@ -408,7 +408,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
           </div>
           <button
             onClick={onCheck}
-            className="text-ui-chip font-medium px-2.5 py-1 rounded-md text-fg-3 hover:text-fg-2 hover:bg-base-250/50 active:scale-95 cursor-pointer"
+            className="text-ui-chip font-medium px-2.5 py-1 rounded-md text-fg-3 hover:text-fg-2 hover:bg-base-250/50 cursor-pointer"
           >
             Check again
           </button>
@@ -426,7 +426,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
             </div>
             <button
               onClick={onDownload}
-              className="text-ui-chip font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 active:scale-95 cursor-pointer shrink-0 ml-4"
+              className="text-ui-chip font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 cursor-pointer shrink-0 ml-4"
             >
               Download & install
             </button>
@@ -488,7 +488,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
           </div>
           <button
             onClick={onRelaunch}
-            className="text-ui-chip font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 active:scale-95 cursor-pointer"
+            className="text-ui-chip font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 cursor-pointer"
           >
             Restart now
           </button>
@@ -508,7 +508,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
           </div>
           <button
             onClick={onCheck}
-            className="text-ui-chip font-medium px-2.5 py-1 rounded-md text-fg-3 hover:text-fg-2 hover:bg-base-250/50 active:scale-95 cursor-pointer"
+            className="text-ui-chip font-medium px-2.5 py-1 rounded-md text-fg-3 hover:text-fg-2 hover:bg-base-250/50 cursor-pointer"
           >
             Retry
           </button>

@@ -497,9 +497,7 @@ export default function AccountSettings({
         </div>
       </div>
 
-      {/* Sign-out confirmation. Mounted unconditionally so the close
-          animation runs even after `authenticated` flips false during
-          the logout flow. */}
+      {/* Sign-out confirmation stays mounted through the logout flow. */}
       <ConfirmDialog
         open={confirmSignOut}
         title="Sign out of Scrollr?"

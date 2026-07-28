@@ -72,7 +72,6 @@ import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
 import {
   useLoadMore,
-  usePriceFlash,
   useSetToggle,
   latestTimestamp,
 } from "../feedHooks";
@@ -1181,8 +1180,6 @@ const MarketItem = memo(function MarketItem({
   const isUp = delta > 0;
   const isDown = delta < 0;
 
-  const flash = usePriceFlash(market.yes_price);
-
   const dirColor = isUp ? "text-up" : isDown ? "text-down" : "text-fg-3";
   const countdown = formatCloseCountdown(market.close_time, now);
 
@@ -1191,11 +1188,7 @@ const MarketItem = memo(function MarketItem({
       href={market.link}
       target="_blank"
       rel="noopener noreferrer"
-      className={clsx(
-        "flex items-center gap-2 px-3 py-1.5 bg-surface text-xs font-mono   hover:bg-surface-hover",
-        flash === "up" && "bg-up/8",
-        flash === "down" && "bg-down/8",
-      )}
+      className="flex items-center gap-2 px-3 py-1.5 bg-surface text-xs font-mono hover:bg-surface-hover"
     >
       <ProbabilityPill pct={market.yes_price} delta={delta} size="sm" />
       {/* Fixed slot; empty (not "—") when unmoved, matching card rows. */}

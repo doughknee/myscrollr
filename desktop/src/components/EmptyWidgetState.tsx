@@ -76,7 +76,6 @@ export default function EmptyWidgetState({
                 "px-2.5 py-1 text-xs font-medium",
                 "text-accent bg-accent/10 hover:bg-accent/15",
                 "border border-accent/25 hover:border-accent/40",
-                " active:scale-[0.97]",
               )}
             >
               {actionLabel ?? actionHint ?? `Add ${noun}`}

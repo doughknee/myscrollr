@@ -7,7 +7,7 @@
  * renders its content.
  *
  * The content area renders:
- *   1. Content stack — children, cross-faded on tab/route changes
+ *   1. Content stack — children
  *   2. Footer — optional destructive/peripheral page-level actions
  *
  * Tab band hoisted into the TopBar on 2026-05-11 to reclaim vertical

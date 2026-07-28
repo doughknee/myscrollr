@@ -1,20 +1,13 @@
-# Consistency lens: animation
+# Animation consistency re-audit
 
-## P1 — Equivalent app state changes use unrelated animation contracts
+Final result: no unresolved main-app animation findings.
 
-Evidence:
+The four residual findings from the first scan were fixed:
 
-- Route content uses shared opacity variants in
-  `desktop/src/lib/motion.ts:8`.
-- Feed edit mode uses wait-mode presence in
-  `desktop/src/routes/feed.tsx:449`.
-- Support cards use delayed entrance and hover translation in
-  `desktop/src/components/support/SupportHub.tsx:206`.
-- Utility cards use CSS keyframes, for example
-  `desktop/src/widgets/weather/WeatherCard.tsx:71`.
+1. Main-app tooltips now render statically inside `#app-shell`.
+2. Finance, sports, and predictions no longer run timed visual flashes.
+3. Main-app theme changes no longer schedule an inert transition timer.
+4. The unused scroll-logo keyframe, class, prop, and animated SVG gradient
+   were removed.
 
-Verification: compare the duration, easing, transform, and presence modes at
-the references above.
-
-Suggested fix: for the main app, render state changes immediately and keep
-animation only in the independently mounted ticker.
+Ticker animation remains intentionally unchanged.

@@ -171,7 +171,7 @@ export default function SupportHub({ onSelectSection }: SupportHubProps) {
                 <button
                   key={`${result.section}-${result.index}-${i}`}
                   onClick={() => onSelectSection(result.section as SectionId)}
-                  className="flex flex-col gap-1.5 p-3 rounded-lg text-left hover:bg-base-150/50 active:scale-[0.99] cursor-pointer"
+                  className="flex flex-col gap-1.5 p-3 rounded-lg text-left hover:bg-base-150/50 cursor-pointer"
                 >
                   <div className="flex items-center gap-2">
                     <span
@@ -208,7 +208,7 @@ export default function SupportHub({ onSelectSection }: SupportHubProps) {
                   // Matches the dense Section card chrome on Settings,
                   // Ticker, Account, and Catalog so the support hub
                   // reads as part of the same surface vocabulary.
-                  className="rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left hover:border-accent/40 hover:bg-base-150/55 hover:shadow-soft-sm active:scale-[0.98] cursor-pointer"
+                  className="rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left hover:border-accent/40 hover:bg-base-150/55 hover:shadow-soft-sm cursor-pointer"
                 >
                   <Icon size={18} className="text-accent mb-2.5" />
                   <h3 className="text-ui-body font-semibold mb-1">{cat.label}</h3>
@@ -220,7 +220,7 @@ export default function SupportHub({ onSelectSection }: SupportHubProps) {
                 section, so it lives outside CATEGORIES/SectionId. */}
             <button
               onClick={() => navigate({ to: "/releases" })}
-              className="rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left hover:border-accent/40 hover:bg-base-150/55 hover:shadow-soft-sm active:scale-[0.98] cursor-pointer"
+              className="rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left hover:border-accent/40 hover:bg-base-150/55 hover:shadow-soft-sm cursor-pointer"
             >
               <Sparkles size={18} className="text-accent mb-2.5" />
               <h3 className="text-ui-body font-semibold mb-1">What's New</h3>

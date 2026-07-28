@@ -102,7 +102,7 @@ export default function TopBar({
               : "hover:bg-surface-hover",
           )}
         >
-          <ScrollLogo alive={false} size={20} />
+          <ScrollLogo size={20} />
           <span className="text-ui-body font-semibold tracking-tight">
             Scrollr
           </span>
@@ -119,7 +119,7 @@ export default function TopBar({
             disabled={!canBack}
             aria-label="Go back"
             className={clsx(
-              "flex items-center justify-center w-7 h-7 rounded-md active:scale-90",
+              "flex items-center justify-center w-7 h-7 rounded-md",
               canBack
                 ? "text-fg-2 hover:text-fg hover:bg-surface-hover"
                 : "text-fg-4/40 cursor-not-allowed",
@@ -134,7 +134,7 @@ export default function TopBar({
             disabled={!canForward}
             aria-label="Go forward"
             className={clsx(
-              "flex items-center justify-center w-7 h-7 rounded-md active:scale-90",
+              "flex items-center justify-center w-7 h-7 rounded-md",
               canForward
                 ? "text-fg-2 hover:text-fg hover:bg-surface-hover"
                 : "text-fg-4/40 cursor-not-allowed",
@@ -238,7 +238,7 @@ export default function TopBar({
             aria-checked={tickerOn}
             onClick={onToggleTicker}
             className={clsx(
-              "flex items-center gap-1.5 h-7 px-2.5 rounded-md text-ui-chip font-medium active:scale-95",
+              "flex items-center gap-1.5 h-7 px-2.5 rounded-md text-ui-chip font-medium",
               tickerOn
                 ? "bg-accent/15 text-accent hover:bg-accent/20"
                 : "text-fg-4 hover:text-fg-2 hover:bg-surface-hover",

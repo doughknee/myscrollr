@@ -3,7 +3,7 @@
  *
  * Renders a grid of trade cards with real-time price updates
  * via the desktop CDC/SSE pipeline. Supports compact and comfort
- * display modes with price flash animations on change.
+ * display modes.
  *
  * ONE Kalshi-style control bar (widget-bar primitives): direction pills
  * · sort + category menus · symbol search · freshness. The search is
@@ -36,7 +36,6 @@ import { useNow } from "../../hooks/useNow";
 import { useCatalog } from "../../hooks/useCatalog";
 import {
   useLoadMore,
-  usePriceFlash,
   useSetToggle,
   latestTimestamp,
 } from "../feedHooks";
@@ -608,10 +607,6 @@ const TradeItem = memo(function TradeItem({ trade, mode, category, now }: TradeI
   const isUp = trade.direction === "up";
   const isDown = trade.direction === "down";
 
-  const flash = usePriceFlash(
-    typeof trade.price === "string" ? parseFloat(trade.price) : trade.price,
-  );
-
   const dirColor = isUp ? "text-up" : isDown ? "text-down" : "text-fg-3";
 
   if (mode === "compact") {
@@ -620,11 +615,7 @@ const TradeItem = memo(function TradeItem({ trade, mode, category, now }: TradeI
         href={trade.link}
         target="_blank"
         rel="noopener noreferrer"
-        className={clsx(
-          "flex items-center gap-2 px-3 py-1.5 bg-surface text-xs font-mono   hover:bg-surface-hover",
-          flash === "up" && "bg-up/8",
-          flash === "down" && "bg-down/8",
-        )}
+        className="flex items-center gap-2 px-3 py-1.5 bg-surface text-xs font-mono hover:bg-surface-hover"
       >
         <span className="font-bold text-fg min-w-[52px] tracking-wide">
           {trade.symbol}
@@ -654,21 +645,6 @@ const TradeItem = memo(function TradeItem({ trade, mode, category, now }: TradeI
         !isUp && !isDown && "border-l-transparent",
       )}
     >
-      {/* Price-flash tint on its OWN overlay: the slow 700ms fade the
-          cards had pre-unification, decoupled from the shell's 150ms
-          hover  (a bg class on the card also fought
-          FEED_CARD's bg utility on stylesheet order). */}
-      <span
-        aria-hidden
-        className={clsx(
-          "pointer-events-none absolute inset-0  ",
-          flash === "up"
-            ? "bg-up/6"
-            : flash === "down"
-              ? "bg-down/6"
-              : "bg-transparent",
-        )}
-      />
       <div className="flex flex-col gap-0.5">
         <span className="font-mono font-bold text-sm text-fg tracking-wide">
           {trade.symbol}

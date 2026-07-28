@@ -60,14 +60,14 @@ export default function ConfirmDialog({
               <button
                 ref={cancelRef}
                 onClick={onCancel}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium text-fg-3 hover:text-fg-2 hover:bg-surface-hover active:scale-95 cursor-pointer"
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-fg-3 hover:text-fg-2 hover:bg-surface-hover cursor-pointer"
               >
                 {cancelLabel}
               </button>
               <button
                 onClick={onConfirm}
                 className={clsx(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold active:scale-95 cursor-pointer",
+                  "px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer",
                   destructive
                     ? "bg-error/10 text-error hover:bg-error/20"
                     : "bg-accent/10 text-accent hover:bg-accent/20",

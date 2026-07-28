@@ -256,14 +256,11 @@ function WidgetInfoPage() {
                 <>
                   <button
                     onClick={openWidget}
-                    className="group/btn flex items-center gap-1.5 rounded-lg bg-white px-5 py-2.5 text-ui-body font-semibold shadow-soft-sm active:scale-[0.98] hover:brightness-95"
+                    className="group/btn flex items-center gap-1.5 rounded-lg bg-white px-5 py-2.5 text-ui-body font-semibold shadow-soft-sm hover:brightness-95"
                     style={{ color: item.hex }}
                   >
                     Open
-                    <ChevronRight
-                      size={15}
-                      className="group-hover/btn:translate-x-0.5"
-                    />
+                    <ChevronRight size={15} />
                   </button>
                 </>
               ) : primaryAction ? (
@@ -271,7 +268,7 @@ function WidgetInfoPage() {
                   onClick={primaryAction.onClick}
                   disabled={primaryAction.disabled}
                   className={clsx(
-                    "flex items-center gap-1.5 rounded-lg bg-white px-5 py-2.5 text-ui-body font-semibold shadow-soft-sm active:scale-[0.98] hover:brightness-95",
+                    "flex items-center gap-1.5 rounded-lg bg-white px-5 py-2.5 text-ui-body font-semibold shadow-soft-sm hover:brightness-95",
                     primaryAction.disabled && "cursor-not-allowed opacity-60",
                   )}
                   style={{ color: item.hex }}
@@ -447,7 +444,7 @@ function WidgetInfoPage() {
                     onClick={() =>
                       navigate({ to: "/widget/$id/info", params: { id: rel.id } })
                     }
-                    className="group/rel flex items-center gap-2.5 rounded-xl border border-edge/35 bg-base-150/35 p-3 text-left hover:-translate-y-0.5 hover:border-edge/60 hover:shadow-soft-sm"
+                    className="group/rel flex items-center gap-2.5 rounded-xl border border-edge/35 bg-base-150/35 p-3 text-left hover:border-edge/60 hover:shadow-soft-sm"
                   >
                     <span
                       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"

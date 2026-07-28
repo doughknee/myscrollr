@@ -1,11 +1,10 @@
 /**
- * Shared FeedTab helpers — load-more paging, price-flash animation,
- * set-filter toggles, and freshness timestamps used across data widgets.
+ * Shared FeedTab helpers — load-more paging, set-filter toggles, and
+ * freshness timestamps used across data widgets.
  */
 import {
   useCallback,
   useEffect,
-  useRef,
   useState,
   type DependencyList,
 } from "react";
@@ -52,34 +51,6 @@ export function useLoadMore(
     ) : null;
 
   return { visible, footer };
-}
-
-/**
- * Flash "up"/"down" for 800ms when `value` changes between renders. A
- * single effect owns the previous-value ref so rapid back-to-back CDC
- * events can't swallow a flash.
- */
-export function usePriceFlash(
-  value: number | null | undefined,
-): "up" | "down" | null {
-  const prevRef = useRef<number | null>(null);
-  const [flash, setFlash] = useState<"up" | "down" | null>(null);
-
-  useEffect(() => {
-    const current = typeof value === "number" ? value : NaN;
-    const prev = prevRef.current;
-    prevRef.current = current;
-
-    if (prev === null || isNaN(current) || current === prev) {
-      return;
-    }
-
-    setFlash(current > prev ? "up" : "down");
-    const timer = setTimeout(() => setFlash(null), 800);
-    return () => clearTimeout(timer);
-  }, [value]);
-
-  return flash;
 }
 
 /** Set-membership filter state: [set, toggle(value), clear]. */

@@ -140,7 +140,7 @@ export function SegmentedRow<T extends string>({
             aria-checked={value === opt.value}
             onClick={() => onChange(opt.value)}
             className={clsx(
-              "px-2.5 py-1 text-ui-chip font-medium rounded-md active:scale-95 cursor-pointer leading-none",
+              "px-2.5 py-1 text-ui-chip font-medium rounded-md cursor-pointer leading-none",
               value === opt.value
                 ? "bg-base-300 text-fg shadow-sm"
                 : "text-fg-3 hover:text-fg-2",

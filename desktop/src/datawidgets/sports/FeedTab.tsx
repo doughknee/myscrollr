@@ -55,10 +55,10 @@ export const sportsDataWidget: DataWidgetManifest = {
   info: {
     about:
       "Follow live scores across NFL, NBA, MLB, NHL, MLS, and more. " +
-      "Scores update automatically with a visual flash when they change.",
+      "Scores update automatically when they change.",
     usage: [
       "Set your favorite team and time window from the top bar.",
-      "Live games show a pulsing indicator and scores update automatically.",
+      "Live games show a status indicator and scores update automatically.",
       "Final scores highlight the winning team in bold.",
     ],
   },

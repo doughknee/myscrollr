@@ -319,7 +319,7 @@ function ReleaseRow({
               <div className="mt-4 flex justify-end border-t border-edge/25 pt-3">
                 <button
                   onClick={() => open(entry.url).catch(() => {})}
-                  className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-ui-chip font-medium text-fg-3 hover:bg-base-250/50 hover:text-fg-2 active:scale-95 cursor-pointer"
+                  className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-ui-chip font-medium text-fg-3 hover:bg-base-250/50 hover:text-fg-2 cursor-pointer"
                 >
                   <ExternalLink size={12} />
                   View on GitHub
@@ -378,7 +378,7 @@ function EmptyState() {
       </p>
       <button
         onClick={() => open(RELEASES_PAGE_URL).catch(() => {})}
-        className="mt-4 flex items-center gap-1.5 rounded-lg bg-accent/10 px-3.5 py-1.5 text-ui-body font-semibold text-accent hover:bg-accent/20 active:scale-[0.98] cursor-pointer"
+        className="mt-4 flex items-center gap-1.5 rounded-lg bg-accent/10 px-3.5 py-1.5 text-ui-body font-semibold text-accent hover:bg-accent/20 cursor-pointer"
       >
         <ExternalLink size={14} />
         View releases on GitHub

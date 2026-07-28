@@ -394,7 +394,7 @@ export default function MarketDetail({
             <button
               type="button"
               onClick={() => open(market.link!).catch(() => {})}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-predictions px-3 py-1.5 text-[12px] font-semibold text-white  hover:-translate-y-px cursor-pointer"
+              className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-predictions px-3 py-1.5 text-[12px] font-semibold text-white cursor-pointer"
             >
               <ExternalLink size={13} />
               View on Kalshi

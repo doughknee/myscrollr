@@ -21,7 +21,6 @@ import {
   ExternalLink,
   FileCheck2,
   UploadCloud,
-  CheckCircle2,
   Loader2,
   AlertCircle,
   HelpCircle,
@@ -32,7 +31,6 @@ import {
   isKalshiAvailable,
   type CredentialStatus,
 } from "./kalshi";
-import { formatUsdCents } from "./positions";
 import { loadPref, savePref } from "../../preferences";
 
 const HELP_OPEN_KEY = "predictions.connectHelpOpen";
@@ -57,9 +55,8 @@ export default function ConnectWizard({ onConnected, hex }: ConnectWizardProps) 
   const [keyId, setKeyId] = useState("");
   const [filePath, setFilePath] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [status, setStatus] = useState<"idle" | "checking" | "ok" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "checking" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [balanceCents, setBalanceCents] = useState<number | null>(null);
 
   // "How do I get this?" help — expanded the first time, then remembered.
   const [helpOpen, setHelpOpen] = useState(() => loadPref<boolean>(HELP_OPEN_KEY, true));
@@ -116,12 +113,7 @@ export default function ConnectWizard({ onConnected, hex }: ConnectWizardProps) 
     setErrorMsg(null);
     try {
       const result = await kalshiConnect({ keyId: keyId.trim(), pemPath: filePath });
-      setBalanceCents(result.balance_cents);
-      setStatus("ok");
-      // Brief success beat, then hand control to the panel.
-      setTimeout(() => {
-        onConnected({ connected: true, key_id: result.key_id });
-      }, 1200);
+      onConnected({ connected: true, key_id: result.key_id });
     } catch (err) {
       // The backend returns already-friendly, plain-language messages.
       setStatus("error");
@@ -238,16 +230,6 @@ export default function ConnectWizard({ onConnected, hex }: ConnectWizardProps) 
           </div>
         )}
 
-        {/* Success */}
-        {status === "ok" && balanceCents != null && (
-          <div
-            className="flex items-center gap-2 rounded-lg border border-up/30 bg-up/10 px-3 py-2 text-[13px] font-medium text-up"
-          >
-            <CheckCircle2 size={16} className="shrink-0" />
-            <span>Connected — {formatUsdCents(balanceCents)} in your Kalshi account</span>
-          </div>
-        )}
-
         {/* Connect button */}
         <button
           type="button"
@@ -256,7 +238,7 @@ export default function ConnectWizard({ onConnected, hex }: ConnectWizardProps) 
           className={clsx(
             "flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[13px] font-semibold  cursor-pointer",
             canConnect
-              ? "text-white hover:-translate-y-px"
+              ? "text-white"
               : "cursor-not-allowed bg-surface-2 text-fg-4",
           )}
           style={canConnect ? { background: hex } : undefined}
@@ -265,11 +247,6 @@ export default function ConnectWizard({ onConnected, hex }: ConnectWizardProps) 
             <>
               <Loader2 size={15} />
               Checking with Kalshi…
-            </>
-          ) : status === "ok" ? (
-            <>
-              <CheckCircle2 size={15} />
-              Connected
             </>
           ) : (
             "Connect my account"
@@ -303,7 +280,7 @@ export default function ConnectWizard({ onConnected, hex }: ConnectWizardProps) 
                 <button
                   type="button"
                   onClick={() => open(KALSHI_PROFILE_URL).catch(() => {})}
-                  className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium text-white  hover:-translate-y-px cursor-pointer"
+                  className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium text-white cursor-pointer"
                   style={{ background: hex }}
                 >
                   <ExternalLink size={13} />

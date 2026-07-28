@@ -284,7 +284,6 @@ export default function Sidebar({
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={clsx(
               "flex items-center justify-center shrink-0 rounded-lg text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
-              "active:scale-[0.97]",
               collapsed ? "w-full py-1.5" : "w-7 h-7",
             )}
           >
@@ -405,17 +404,13 @@ function NavItem({
         aria-label={collapsed ? label : undefined}
         className={clsx(
           "relative flex items-center w-full rounded-lg font-medium",
-          "active:scale-[0.97]",
           collapsed
             ? "justify-center py-1.5 px-0"
             : "gap-2.5 px-2.5 py-1.5 text-ui-body",
           active ? "text-fg" : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
         )}
       >
-        {/* Active indicator — filled pill behind the row. layoutId
-            makes it slide between nav items when the active page
-            changes (same pattern as the TopBar tab pill; z-0 fill +
-            z-10 content so labels stay above it mid-flight). */}
+        {/* Active indicator — filled pill behind the current row. */}
         {active && (
           <span className="absolute inset-0 z-0 rounded-lg bg-accent/10" />
         )}
@@ -465,7 +460,6 @@ function SlotChip({
         aria-label={label}
         className={clsx(
           "relative flex items-center w-full rounded-lg font-medium",
-          "active:scale-[0.97]",
           collapsed
             ? "justify-center py-1.5 px-0"
             : "gap-2.5 px-2.5 py-1.5 text-ui-body",
@@ -556,7 +550,6 @@ const AccountChip = forwardRef(function AccountChip(
       {...props}
       className={clsx(
         "flex items-center rounded-lg min-w-0",
-        "active:scale-[0.97]",
         collapsed
           ? "w-full justify-center py-1.5"
           : "flex-1 gap-2 px-1.5 py-1",

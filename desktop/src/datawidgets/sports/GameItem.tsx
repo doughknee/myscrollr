@@ -2,7 +2,7 @@
  * GameItem — renders a single game scoreboard card.
  *
  * Supports compact (single-row) and comfort (two-row with team logos)
- * display modes. Flashes briefly when scores update via CDC.
+ * display modes. Scores update in place via CDC.
  * Clickable when game.link is available (opens in new tab).
  */
 import { memo } from "react";
@@ -11,7 +11,6 @@ import { Star } from "lucide-react";
 import { isLive, isFinal, getWinner, gameStatusLabel, displayTeamCode, sameGame } from "../../utils/gameHelpers";
 import { FEED_CARD, FEED_CARD_INTERACTIVE, FEED_CARD_STATIC } from "../../components/feedCard";
 import TeamLogo from "../../components/TeamLogo";
-import { useScoreFlash } from "../../hooks/useScoreFlash";
 import type { Game, FeedMode } from "../../types";
 
 interface GameItemProps {
@@ -60,7 +59,6 @@ export const GameItem = memo(function GameItem({
   const live = isLive(game);
   const final_ = isFinal(game);
   const winner = getWinner(game);
-  const flash = useScoreFlash(game.away_team_score, game.home_team_score);
   const hasLink = !!game.link;
 
   if (mode === "compact") {
@@ -68,8 +66,7 @@ export const GameItem = memo(function GameItem({
       <CardWrapper
         link={game.link}
         className={clsx(
-          "flex items-center gap-2 px-3 py-1.5 bg-surface text-xs  ",
-          flash && "bg-live/10",
+          "flex items-center gap-2 px-3 py-1.5 bg-surface text-xs",
           hasLink && "hover:bg-surface-hover cursor-pointer",
         )}
       >
@@ -149,17 +146,6 @@ export const GameItem = memo(function GameItem({
               : null,
       )}
     >
-      {/* Score-flash tint on its OWN overlay: the slow 700ms fade the
-          cards had pre-unification, decoupled from the shell's 150ms
-          hover  (a bg class on the card also fought
-          FEED_CARD's bg utility on stylesheet order). */}
-      <span
-        aria-hidden
-        className={clsx(
-          "pointer-events-none absolute inset-0  ",
-          flash ? "bg-live/8" : "bg-transparent",
-        )}
-      />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <TeamLogo src={game.away_team_logo} alt={game.away_team_name} size="lg" />

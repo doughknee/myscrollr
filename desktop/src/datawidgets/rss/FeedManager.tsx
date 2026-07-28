@@ -253,7 +253,6 @@ export default function FeedManager({
           onClick={() => setShowCustomForm((v) => !v)}
           className={clsx(
             "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-ui-meta font-medium",
-            "  active:scale-95",
             showCustomForm
               ? "border-accent/50 bg-accent/10 text-accent"
               : "border-edge/40 text-fg-3 hover:text-accent hover:border-accent/40",
@@ -293,7 +292,7 @@ export default function FeedManager({
                 <button
                   onClick={handleAddCustom}
                   disabled={saving || !newName.trim() || !newUrl.trim()}
-                  className="px-2.5 py-1.5 rounded-md bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20   active:scale-95 flex items-center gap-1 disabled:opacity-30 cursor-pointer"
+                  className="px-2.5 py-1.5 rounded-md bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20 flex items-center gap-1 disabled:opacity-30 cursor-pointer"
                 >
                   <Plus size={11} />
                   <span className="text-ui-meta font-medium">Add</span>
@@ -352,7 +351,6 @@ export default function FeedManager({
             aria-pressed={trackedOnly}
             className={clsx(
               "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-ui-meta cursor-pointer whitespace-nowrap",
-              "  active:scale-95",
               trackedOnly
                 ? "border-accent/50 bg-accent/10 text-accent"
                 : "border-edge/40 text-fg-3 hover:text-fg-2 hover:border-edge/60",
@@ -465,7 +463,7 @@ function FeedRow({ feed, saving, onToggle }: FeedRowProps) {
       disabled={saving}
       aria-label={tracked ? `Remove ${feed.name}` : `Add ${feed.name}`}
       className={clsx(
-        "w-full flex items-center gap-2.5 px-3 py-2 text-left   group active:scale-[0.995]",
+        "w-full flex items-center gap-2.5 px-3 py-2 text-left group",
         tracked
           ? "bg-accent/[0.04] hover:bg-accent/[0.08]"
           : "hover:bg-base-200/50 cursor-pointer",

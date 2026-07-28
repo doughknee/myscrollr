@@ -1,28 +1,27 @@
-# Animation inventory (pre-removal)
+# Desktop main-app animation re-audit
 
 Scope: the Tauri main app mounted by `desktop/src/app-main.tsx` into
 `#app-shell`. The ticker mounted by `desktop/src/main.tsx` into
-`#desktop-shell` is explicitly excluded.
+`#desktop-shell` remains intentionally animated and is excluded.
 
-The main app has nine routed surfaces (`feed`, `catalog`, `customize`,
-`account`, `status`, `releases`, `support`, widget feed, and widget info),
-plus finance, sports, RSS, fantasy, predictions, and utility-widget views.
+Final scan date: 2026-07-28.
 
-Animation mechanisms found:
+- Main-app routes, widgets, settings, catalog, tooltips, and controls contain
+  no Motion, Motion+, CSS keyframe, transition, movement, or timed-flash
+  animation paths.
+- Main-app tooltip content is mounted under `#app-shell` and rendered
+  statically; the ticker retains the animated tooltip branch.
+- Theme-transition timers, live-data flashes, success delays, and the
+  orphaned scroll-logo animation were removed from the main app.
+- Remaining Motion imports and transition utilities are confined to the
+  ticker entry and ticker-only components.
+- `#app-shell` retains a defensive `animation: none` / `transition: none`
+  rule for third-party and shared styles.
 
-- Motion for React in 28 non-test main-app files.
-- Tailwind transition/animation utilities across route, component,
-  data-widget, and utility-widget files.
-- CSS keyframes and inline `style.animation` for utility-widget cards,
-  timers, live indicators, and the animated logo.
-- Shared theme-transition behavior in `useTheme` / `style.css`.
+Verification:
 
-Ticker exclusion boundary:
-
-- Preserve `desktop/src/main.tsx`, `desktop/src/App.tsx`,
-  `desktop/src/components/ScrollrTicker.tsx`,
-  `desktop/src/components/TickerToolbar.tsx`, ticker renderer modules, and
-  ticker chip components.
-- Preserve shared animation definitions needed by those ticker files.
-- Main-app CSS is scoped by `#app-shell`; ticker CSS is scoped by
-  `#desktop-shell`.
+```text
+npm run build
+npm test
+rg "motion/react|motion-plus/react|AnimatePresence|motion\.|@keyframes|animation:|transition:|animate-|active:scale|hover:.*translate" desktop/src
+```
