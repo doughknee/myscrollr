@@ -135,25 +135,29 @@ function ClockCard({
   if (compact) {
     return (
       <div
-        className={clsx(FEED_CARD, FEED_CARD_STATIC, "group flex items-center justify-between py-2")}
+        className={clsx(FEED_CARD, FEED_CARD_STATIC, "flex items-center justify-between gap-2 py-2")}
       >
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex min-w-0 items-center gap-3 overflow-hidden">
           <span className="text-xs font-mono text-widget-clock/80 uppercase tracking-wider shrink-0 w-20 truncate">
             {label}
           </span>
-          <span className="text-sm font-mono font-semibold text-fg tabular-nums">
+          <span className="shrink-0 text-sm font-mono font-semibold text-fg tabular-nums">
             {time}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono text-fg-2">{offset}</span>
+        <div className="flex shrink-0 items-center gap-1">
+          <span className="max-w-16 truncate text-[11px] font-mono text-fg-2">
+            {offset}
+          </span>
           {!isLocal && onRemove && (
             <Tooltip content="Remove timezone">
               <button
+                type="button"
                 onClick={onRemove}
-                className="text-fg-3 hover:text-error opacity-0 group-hover:opacity-100 "
+                aria-label={`Remove ${label} timezone`}
+                className="flex size-7 shrink-0 items-center justify-center rounded text-fg-3 hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
               >
-                <X size={11} />
+                <X size={13} />
               </button>
             </Tooltip>
           )}
@@ -163,21 +167,9 @@ function ClockCard({
   }
 
   return (
-    <div
-      className={clsx(FEED_CARD, FEED_CARD_STATIC, "group relative overflow-hidden")}
-    >
-      {!isLocal && onRemove && (
-        <Tooltip content="Remove timezone">
-          <button
-            onClick={onRemove}
-            className="absolute top-2.5 right-2.5 w-5 h-5 flex items-center justify-center rounded text-fg-3 hover:text-error hover:bg-error/10 opacity-0 group-hover:opacity-100 "
-          >
-            <X size={11} />
-          </button>
-        </Tooltip>
-      )}
+    <div className={clsx(FEED_CARD, FEED_CARD_STATIC, "overflow-hidden")}>
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-xs font-mono text-widget-clock/80 uppercase tracking-wider">
+        <span className="min-w-0 truncate text-xs font-mono text-widget-clock/80 uppercase tracking-wider">
           {label}
         </span>
         {isLocal && (
@@ -185,9 +177,21 @@ function ClockCard({
             local
           </span>
         )}
-        <span className="text-[11px] font-mono text-fg-2 ml-auto">
+        <span className="ml-auto shrink-0 text-[11px] font-mono text-fg-2">
           {offset}
         </span>
+        {!isLocal && onRemove && (
+          <Tooltip content="Remove timezone">
+            <button
+              type="button"
+              onClick={onRemove}
+              aria-label={`Remove ${label} timezone`}
+              className="flex size-7 shrink-0 items-center justify-center rounded text-fg-3 hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+            >
+              <X size={13} />
+            </button>
+          </Tooltip>
+        )}
       </div>
       <div className={isLocal ? "text-2xl font-mono font-bold text-fg tabular-nums leading-none" : "text-xl font-mono font-bold text-fg tabular-nums leading-none"}>
         {time}
