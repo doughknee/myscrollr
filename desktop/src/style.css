@@ -1190,6 +1190,11 @@ textarea:focus-visible,
   outline-offset: 2px;
 }
 
+/* Contained controls draw focus on their shell, not twice around the input. */
+input[data-contained-focus]:focus-visible {
+  outline: none;
+}
+
 /* ── Reduced motion ─────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {

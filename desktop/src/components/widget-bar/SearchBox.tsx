@@ -7,6 +7,8 @@
 import { useEffect, useState } from "react";
 import { clsx } from "clsx";
 import { Search, X } from "lucide-react";
+import { motion } from "motion/react";
+import { controlTransition } from "../../lib/motion";
 
 /** "/" focuses the input from anywhere in the widget — unless the user is
  *  already typing somewhere, or a modal dialog is open. */
@@ -75,7 +77,10 @@ export function SearchBox({
   };
 
   return (
-    <div
+    <motion.div
+      layout
+      initial={false}
+      transition={controlTransition}
       className={clsx(
         "relative flex items-center rounded-lg border  ",
         expanded
@@ -103,6 +108,7 @@ export function SearchBox({
         spellCheck={false}
         autoCorrect="off"
         autoComplete="off"
+        data-contained-focus
         className="w-full bg-transparent py-1 pl-7 pr-6 text-ui-meta text-fg outline-none placeholder:text-fg-4"
       />
       {query ? (
@@ -136,6 +142,6 @@ export function SearchBox({
             : `${resultCount} ${noun} match`}
         </span>
       )}
-    </div>
+    </motion.div>
   );
 }

@@ -14,7 +14,7 @@
 import { memo, useMemo, useRef, useState, useCallback } from "react";
 import { clsx } from "clsx";
 import { Plus, Trash2, TrendingUp, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import {
   dashboardQueryOptions,
@@ -37,7 +37,7 @@ import { useDataWidgetConfig } from "../../hooks/useDataWidgetConfig";
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
 import { useCatalog } from "../../hooks/useCatalog";
-import { controlTransition, popoverMotion } from "../../lib/motion";
+import { controlTransition } from "../../lib/motion";
 import {
   useAutoPagination,
   useSetToggle,
@@ -367,85 +367,66 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
         </div>
       )}
 
-      <AnimatePresence initial={false}>
-        {isComfort && searchQ && (
-          <motion.div
-            key="watchlist-search"
-            variants={popoverMotion}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="mx-3 mt-2 overflow-hidden rounded-xl border border-edge/40 bg-surface-2 shadow-lg shadow-black/10"
-          >
-            <div className="flex items-center justify-between gap-3 border-b border-edge/30 px-3 py-2">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold text-fg">
-                  Manage watchlist
-                </p>
-                <p className="truncate text-[10px] text-fg-4">
-                  Add or remove several symbols, then press Esc to close
-                </p>
-              </div>
-              <span className="shrink-0 text-[10px] tabular-nums text-fg-4">
-                {catalogMatches.length} found
-              </span>
-            </div>
-            {catalogMatches.length === 0 ? (
-              <div className="px-3 py-5 text-center text-[11px] text-fg-3">
-                No {isStocks ? "stocks" : "crypto"} found for “{query.trim()}”
-              </div>
-            ) : (
-              catalogMatches.map((item) => {
-                const tracked = trackedSet.has(item.symbol);
-                return (
-                  <div
-                    key={item.symbol}
-                    className="flex items-center justify-between gap-3 border-b border-edge/30 px-3 py-2 last:border-b-0"
-                  >
-                    <div className="flex min-w-0 items-baseline gap-2">
-                      <span className="font-mono text-[12px] font-semibold text-fg">
-                        {item.symbol}
-                      </span>
-                      <span className="truncate text-[11px] text-fg-3">
-                        {item.name}
-                      </span>
-                      {isStocks && (
-                        <span className="shrink-0 text-[10px] uppercase tracking-wider text-fg-4">
-                          {item.category}
-                        </span>
-                      )}
-                    </div>
-                    <motion.button
-                      type="button"
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() =>
-                        tracked
-                          ? removeSymbol(item.symbol)
-                          : addSymbol(item.symbol)
-                      }
-                      whileTap={{ transform: "scale(0.97)" }}
-                      transition={controlTransition}
-                      disabled={symbolsSaving}
-                      aria-label={`${tracked ? "Remove" : "Add"} ${item.symbol} ${tracked ? "from" : "to"} watchlist`}
-                      className={clsx(
-                        "inline-flex min-w-20 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 py-1 text-ui-chip font-semibold disabled:cursor-wait disabled:opacity-40",
-                        tracked
-                          ? "border border-edge/40 text-fg-3 hover:border-down/30 hover:bg-down/10 hover:text-down"
-                          : "bg-accent/10 text-accent hover:bg-accent/20",
-                      )}
-                    >
-                      {tracked ? <Trash2 size={11} /> : <Plus size={12} />}
-                      {tracked ? "Remove" : "Add"}
-                    </motion.button>
+      {searchQ ? (
+        catalogMatches.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <p className="text-[12px] text-fg-3">
+              No {isStocks ? "stocks" : "crypto"} found for “{query.trim()}”
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {catalogMatches.map((item) => {
+              const tracked = trackedSet.has(item.symbol);
+              return (
+                <div
+                  key={item.symbol}
+                  className={clsx(
+                    FEED_CARD,
+                    "flex min-w-0 items-center justify-between gap-3",
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className="font-mono text-[12px] font-semibold text-fg">
+                      {item.symbol}
+                    </p>
+                    <p className="truncate text-[11px] text-fg-3">
+                      {item.name}
+                    </p>
+                    {isStocks && (
+                      <p className="truncate text-[10px] uppercase tracking-wider text-fg-4">
+                        {item.category}
+                      </p>
+                    )}
                   </div>
-                );
-              })
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {searchQ ? null : showEmpty ? (
+                  <motion.button
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() =>
+                      tracked
+                        ? removeSymbol(item.symbol)
+                        : addSymbol(item.symbol)
+                    }
+                    whileTap={{ transform: "scale(0.97)" }}
+                    transition={controlTransition}
+                    disabled={symbolsSaving}
+                    aria-label={`${tracked ? "Remove" : "Add"} ${item.symbol} ${tracked ? "from" : "to"} watchlist`}
+                    className={clsx(
+                      "inline-flex min-w-20 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 py-1 text-ui-chip font-semibold disabled:cursor-wait disabled:opacity-40",
+                      tracked
+                        ? "border border-edge/40 text-fg-3 hover:border-down/30 hover:bg-down/10 hover:text-down"
+                        : "bg-accent/10 text-accent hover:bg-accent/20",
+                    )}
+                  >
+                    {tracked ? <Trash2 size={11} /> : <Plus size={12} />}
+                    {tracked ? "Remove" : "Add"}
+                  </motion.button>
+                </div>
+              );
+            })}
+          </div>
+        )
+      ) : showEmpty ? (
         <div className="flex flex-1 flex-col justify-center">
           <EmptyWidgetState
             refreshing={Boolean(feedContext.__refreshing)}
