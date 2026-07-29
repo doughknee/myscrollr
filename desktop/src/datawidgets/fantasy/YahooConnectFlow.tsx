@@ -9,11 +9,12 @@
  * Configure page wraps it in its fillHeight scroller until teardown.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Ghost, Link2, Loader2 } from "lucide-react";
+import { Ghost, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { open } from "@tauri-apps/plugin-shell";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "../../api/client";
+import LoadingGlyph from "../../components/LoadingGlyph";
 import {
   fantasyStatusOptions,
   fantasyLeaguesOptions,
@@ -349,7 +350,7 @@ export default function YahooConnectFlow({ hex }: YahooConnectFlowProps) {
           >
             {awaitingYahoo ? (
               <>
-                <Loader2 size={14} />
+                <LoadingGlyph size={14} />
                 Waiting for Yahoo sign-in…
               </>
             ) : (
@@ -367,14 +368,8 @@ export default function YahooConnectFlow({ hex }: YahooConnectFlowProps) {
         <div
           className="text-center py-10 space-y-4 px-3"
         >
-          <div className="flex items-center justify-center gap-1.5 h-6">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="w-1.5 rounded-full origin-center"
-                style={{ height: 8, background: hex }}
-              />
-            ))}
+          <div className="flex h-6 items-center justify-center">
+            <LoadingGlyph size={20} style={{ color: hex }} />
           </div>
           <div className="space-y-2">
             <p

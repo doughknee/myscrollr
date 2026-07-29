@@ -29,6 +29,7 @@ import { useQuery } from "@tanstack/react-query";
 import { dashboardQueryOptions } from "../../api/queries";
 import { useShell } from "../../shell-context";
 import EmptyWidgetState from "../../components/EmptyWidgetState";
+import WidgetStateTransition from "../../components/WidgetStateTransition";
 import { WidgetBar, BarPill } from "../../components/widget-bar/Bar";
 import {
   Segmented,
@@ -275,56 +276,62 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
         </WidgetBar>
       )}
 
-      {showLoading ? (
-        <div className="flex flex-1 flex-col justify-center">
-          <EmptyWidgetState
-            refreshing={Boolean(feedContext.__refreshing)}
-            icon={Swords}
-            noun="fantasy leagues"
-            hasConfig={!!feedContext.__hasConfig}
-            dashboardLoaded={!!feedContext.__dashboardLoaded}
-            loadingNoun="leagues"
-          />
-        </div>
-      ) : showConnect || accountOpen ? (
-        <div className="pt-4">
-          <YahooConnectFlow hex={FANTASY_HEX} />
-        </div>
-      ) : visibleLeagues.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-          <Activity size={28} className="text-fg-3" />
-          <div className="text-[13px] font-semibold text-fg">
-            No leagues enabled for viewing
-          </div>
-          <p className="max-w-sm text-[11px] text-fg-3">
-            Every one of your imported leagues is currently hidden. Enable
-            them from the Account view, or show them all:
-          </p>
-          <button
-            type="button"
-            onClick={enableAllLeagues}
-            className="mt-1 rounded-md bg-accent/10 px-3 py-1.5 text-[11px] font-medium text-accent hover:bg-accent/20 cursor-pointer"
-          >
-            Show all leagues
-          </button>
-        </div>
-      ) : (
-        <div
-          key={subTab + (activeLeague?.league_key ?? "none")}
-        >
-          {subTab === "overview" && (
-            <OverviewView
-              leagues={visibleLeagues}
-              primaryLeagueKey={primaryLeague?.league_key ?? null}
-              onSelectLeague={handleSelectLeague}
-              onOpenMatchup={handleOpenMatchup}
+      <WidgetStateTransition
+        stateKey={
+          accountOpen
+            ? "account"
+            : `tab-${subTab}-${activeLeague?.league_key ?? "none"}`
+        }
+      >
+        {showLoading ? (
+          <div className="flex flex-1 flex-col justify-center">
+            <EmptyWidgetState
+              refreshing={Boolean(feedContext.__refreshing)}
+              icon={Swords}
+              noun="fantasy leagues"
+              hasConfig={!!feedContext.__hasConfig}
+              dashboardLoaded={!!feedContext.__dashboardLoaded}
+              loadingNoun="leagues"
             />
-          )}
-          {subTab === "matchup" && <MatchupView league={activeLeague} />}
-          {subTab === "standings" && <StandingsView league={activeLeague} />}
-          {subTab === "roster" && <RosterView league={activeLeague} />}
-        </div>
-      )}
+          </div>
+        ) : showConnect || accountOpen ? (
+          <div className="pt-4">
+            <YahooConnectFlow hex={FANTASY_HEX} />
+          </div>
+        ) : visibleLeagues.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+            <Activity size={28} className="text-fg-3" />
+            <div className="text-[13px] font-semibold text-fg">
+              No leagues enabled for viewing
+            </div>
+            <p className="max-w-sm text-[11px] text-fg-3">
+              Every one of your imported leagues is currently hidden. Enable
+              them from the Account view, or show them all:
+            </p>
+            <button
+              type="button"
+              onClick={enableAllLeagues}
+              className="mt-1 rounded-md bg-accent/10 px-3 py-1.5 text-[11px] font-medium text-accent hover:bg-accent/20 cursor-pointer"
+            >
+              Show all leagues
+            </button>
+          </div>
+        ) : (
+          <div key={subTab + (activeLeague?.league_key ?? "none")}>
+            {subTab === "overview" && (
+              <OverviewView
+                leagues={visibleLeagues}
+                primaryLeagueKey={primaryLeague?.league_key ?? null}
+                onSelectLeague={handleSelectLeague}
+                onOpenMatchup={handleOpenMatchup}
+              />
+            )}
+            {subTab === "matchup" && <MatchupView league={activeLeague} />}
+            {subTab === "standings" && <StandingsView league={activeLeague} />}
+            {subTab === "roster" && <RosterView league={activeLeague} />}
+          </div>
+        )}
+      </WidgetStateTransition>
     </div>
   );
 }

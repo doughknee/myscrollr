@@ -8,7 +8,7 @@
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Bug, Lightbulb, MessageSquare, CreditCard, UserCog, Radio, Paperclip, X, Loader2 } from "lucide-react";
+import { Bug, Lightbulb, MessageSquare, CreditCard, UserCog, Radio, Paperclip, X } from "lucide-react";
 import clsx from "clsx";
 import { toast } from "sonner";
 import { authFetch, ApiError } from "../../api/client";
@@ -16,6 +16,7 @@ import { SelectMenu } from "../widget-bar/SelectMenu";
 import { getUserIdentity, isAuthenticated } from "../../auth";
 import { getCatalogItems } from "../../marketplace";
 import { useCatalog } from "../../hooks/useCatalog";
+import LoadingGlyph from "../LoadingGlyph";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -549,7 +550,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
               <div className="mt-2">
                 {diagnosticsLoading ? (
                   <div className="flex items-center gap-2 text-xs text-fg-4 py-3">
-                    <Loader2 size={13} />
+                    <LoadingGlyph size={13} />
                     Collecting diagnostics...
                   </div>
                 ) : diagnostics ? (
@@ -678,7 +679,7 @@ export default function ContactForm({ onBack }: ContactFormProps) {
         >
           {submitting ? (
             <span className="flex items-center justify-center gap-2">
-              <Loader2 size={14} />
+              <LoadingGlyph size={14} />
               Submitting...
             </span>
           ) : cooldown > 0 ? (

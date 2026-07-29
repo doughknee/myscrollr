@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Check, Loader2, Pencil, X } from "lucide-react";
+import { Check, Pencil, X } from "lucide-react";
 import { clsx } from "clsx";
+import LoadingGlyph from "../LoadingGlyph";
 
 // ── ProfileField ────────────────────────────────────────────────
 //
@@ -104,7 +105,7 @@ export default function ProfileField({
             )}
           >
             {saving ? (
-              <Loader2 size={12} />
+              <LoadingGlyph size={12} />
             ) : (
               <Check size={12} />
             )}

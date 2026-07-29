@@ -7,11 +7,14 @@
  */
 import { useState, useCallback } from "react";
 import { clsx } from "clsx";
-import { Github, Plus, Trash2, ExternalLink, Loader2 } from "lucide-react";
+import { Github, Plus, Trash2, ExternalLink } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 import Tooltip from "../../components/Tooltip";
 import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import QueryErrorBanner from "../../components/QueryErrorBanner";
+import LoadingGlyph from "../../components/LoadingGlyph";
+import { controlTransition, tooltipMotion } from "../../lib/motion";
 import type { GitHubRepo } from "./types";
 import {
   parseRepoUrl,
@@ -255,19 +258,30 @@ function GitHubFeedBody({ mode: feedMode }: FeedTabProps) {
 
       {/* Repo list */}
       <div className={compact ? "space-y-1" : "space-y-1.5"}>
-        {configRepos.map((configRepo) => {
-          const rd = repoData.find((r) => repoKey(r) === repoKey(configRepo));
-          return (
-            <RepoRow
-              key={repoKey(configRepo)}
-              owner={configRepo.owner}
-              repo={configRepo.repo}
-              data={rd ?? null}
-              compact={compact}
-              onRemove={() => removeRepo(configRepo.owner, configRepo.repo)}
-            />
-          );
-        })}
+        <AnimatePresence initial={false}>
+          {configRepos.map((configRepo) => {
+            const rd = repoData.find((r) => repoKey(r) === repoKey(configRepo));
+            return (
+              <motion.div
+                key={repoKey(configRepo)}
+                layout="position"
+                variants={tooltipMotion}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                transition={{ layout: controlTransition }}
+              >
+                <RepoRow
+                  owner={configRepo.owner}
+                  repo={configRepo.repo}
+                  data={rd ?? null}
+                  compact={compact}
+                  onRemove={() => removeRepo(configRepo.owner, configRepo.repo)}
+                />
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -302,7 +316,7 @@ function RepoRow({
     >
       {/* Status dot */}
       {isLoading ? (
-        <Loader2 size={10} className=" text-fg-4 shrink-0" />
+        <LoadingGlyph size={10} className="text-fg-4" />
       ) : (
         <span className={`w-2 h-2 rounded-full shrink-0 ${CI_STATUS_COLORS[status]}${status === "failure" ? " " : ""}`} />
       )}
@@ -333,7 +347,7 @@ function RepoRow({
 
       {/* Status label */}
       <span className={`text-[10px] font-mono font-semibold uppercase tracking-wider shrink-0 ${CI_STATUS_TEXT[status]}`}>
-        {isLoading ? "" : CI_STATUS_LABELS[status]}
+        {isLoading ? "Checking" : CI_STATUS_LABELS[status]}
       </span>
 
       {/* Remove */}

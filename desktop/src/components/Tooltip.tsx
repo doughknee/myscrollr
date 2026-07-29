@@ -25,6 +25,8 @@ import {
   FloatingPortal,
 } from "@floating-ui/react";
 import type { FloatingContext, Placement, Side } from "@floating-ui/react";
+import { AnimatePresence, motion } from "motion/react";
+import { tooltipMotion } from "../lib/motion";
 
 interface TooltipProps {
   /** Tooltip text. When undefined, renders children without tooltip. */
@@ -118,13 +120,28 @@ export default function Tooltip({
         ref: refs.setReference,
         ...getReferenceProps(),
       })}
-      {/* Main-app tooltips stay inside #app-shell and render statically.
-          Ticker tooltips keep their existing body-level transition. */}
+      {/* Ticker tooltips keep their existing Floating UI transition. */}
       <FloatingPortal root={document.getElementById("app-shell")}>
         {ticker ? (
           <AnimatedTooltip context={context}>{renderContent}</AnimatedTooltip>
         ) : (
-          isOpen && renderContent()
+          <AnimatePresence>
+            {isOpen && (
+              <motion.div
+                key="tooltip"
+                ref={refs.setFloating}
+                style={floatingStyles}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                variants={tooltipMotion}
+                className="z-50 px-2.5 py-1 text-xs font-medium rounded-md pointer-events-none select-none whitespace-nowrap bg-[#282838] text-[#e2e2ec] border border-[#383848] shadow-[0_2px_8px_rgba(0,0,0,0.25)]"
+                {...getFloatingProps()}
+              >
+                {content}
+              </motion.div>
+            )}
+          </AnimatePresence>
         )}
       </FloatingPortal>
     </>

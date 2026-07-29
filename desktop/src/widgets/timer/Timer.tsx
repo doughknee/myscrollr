@@ -6,8 +6,13 @@
  */
 import { useState, useEffect, useCallback, useRef } from "react";
 import { clsx } from "clsx";
+import { AnimatePresence, motion } from "motion/react";
 import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import { LS_TIMER_STATE } from "../../constants";
+import {
+  backdropMotion,
+  overlaySurfaceMotion,
+} from "../../lib/motion";
 import { getStore, setStore } from "../../lib/store";
 import { loadPrefs } from "../../preferences";
 import { getPomodoroTiming, reconcileIdlePomodoroTarget } from "./pomodoro";
@@ -220,7 +225,6 @@ function TimerConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  if (!targetMode) return null;
   const name =
     targetMode === "pomodoro"
       ? "Pomodoro"
@@ -228,32 +232,49 @@ function TimerConfirmDialog({
         ? "Countdown"
         : "Stopwatch";
   return (
-    <div
-      className="absolute inset-0 z-10 flex items-center justify-center bg-surface/80 backdrop-blur-sm rounded-xl"
-    >
-      <div className="text-center space-y-3 px-4">
-        <p className="text-[13px] font-mono text-fg">
-          Timer is {isRunning ? "running" : "paused"}.
-        </p>
-        <p className="text-xs font-mono text-fg-2">
-          Switch to {name} and reset?
-        </p>
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={onCancel}
-            className="text-xs font-mono text-fg-2 px-3 py-1.5 rounded-lg border border-edge hover:text-fg hover:border-edge-2 "
+    <AnimatePresence>
+      {targetMode && (
+        <motion.div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Switch to ${name}`}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          className="absolute inset-0 z-10 flex items-center justify-center overflow-hidden rounded-xl"
+        >
+          <motion.div
+            variants={backdropMotion}
+            className="absolute inset-0 bg-surface/80 backdrop-blur-sm"
+          />
+          <motion.div
+            variants={overlaySurfaceMotion}
+            className="relative text-center space-y-3 px-4"
           >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="text-xs font-mono font-semibold text-widget-timer px-3 py-1.5 rounded-lg bg-widget-timer/10 border border-widget-timer/25 hover:bg-widget-timer/15 "
-          >
-            Switch
-          </button>
-        </div>
-      </div>
-    </div>
+            <p className="text-[13px] font-mono text-fg">
+              Timer is {isRunning ? "running" : "paused"}.
+            </p>
+            <p className="text-xs font-mono text-fg-2">
+              Switch to {name} and reset?
+            </p>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={onCancel}
+                className="text-xs font-mono text-fg-2 px-3 py-1.5 rounded-lg border border-edge hover:text-fg hover:border-edge-2 "
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onConfirm}
+                className="text-xs font-mono font-semibold text-widget-timer px-3 py-1.5 rounded-lg bg-widget-timer/10 border border-widget-timer/25 hover:bg-widget-timer/15 "
+              >
+                Switch
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

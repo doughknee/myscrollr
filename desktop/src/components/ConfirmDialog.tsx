@@ -1,5 +1,10 @@
 import { useEffect, useRef } from "react";
 import clsx from "clsx";
+import { AnimatePresence, motion } from "motion/react";
+import {
+  backdropMotion,
+  overlaySurfaceMotion,
+} from "../lib/motion";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -31,26 +36,34 @@ export default function ConfirmDialog({
     restoreRef.current = document.activeElement as HTMLElement | null;
     dialogRef.current?.showModal();
     cancelRef.current?.focus();
-    return () => restoreRef.current?.focus();
   }, [open]);
 
-  if (!open) return null;
-
   return (
-    <dialog
-      ref={dialogRef}
-      aria-label={title}
-      onCancel={(e) => {
-        e.preventDefault();
-        onCancel();
-      }}
-      className="fixed inset-0 z-[100] m-0 flex h-full max-h-none w-full max-w-none items-center justify-center border-0 bg-transparent p-0 backdrop:bg-transparent"
+    <AnimatePresence
+      onExitComplete={() => restoreRef.current?.focus()}
     >
-      <div
-        className="absolute inset-0 bg-surface/60 backdrop-blur-sm"
-        onClick={onCancel}
-      />
-      <div className="relative w-full max-w-sm mx-4 p-5 rounded-xl bg-surface-2 border border-edge shadow-soft-md">
+      {open && (
+        <motion.dialog
+          ref={dialogRef}
+          aria-label={title}
+          onCancel={(e) => {
+            e.preventDefault();
+            onCancel();
+          }}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          className="fixed inset-0 z-[100] m-0 flex h-full max-h-none w-full max-w-none items-center justify-center border-0 bg-transparent p-0 backdrop:bg-transparent"
+        >
+          <motion.div
+            variants={backdropMotion}
+            className="absolute inset-0 bg-surface/60 backdrop-blur-sm"
+            onClick={onCancel}
+          />
+          <motion.div
+            variants={overlaySurfaceMotion}
+            className="relative w-full max-w-sm mx-4 p-5 rounded-xl bg-surface-2 border border-edge shadow-soft-md"
+          >
             <h3 className="text-sm font-semibold text-fg">{title}</h3>
             <p className="text-xs text-fg-3 mt-1.5 leading-relaxed">
               {description}
@@ -76,7 +89,9 @@ export default function ConfirmDialog({
                 {confirmLabel}
               </button>
             </div>
-      </div>
-    </dialog>
+          </motion.div>
+        </motion.dialog>
+      )}
+    </AnimatePresence>
   );
 }

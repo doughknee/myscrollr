@@ -19,7 +19,14 @@
  * slot chip shows cap dots) — a slot-capped source list doesn't fill
  * a 200px panel. Expanding is one click and the pref persists.
  */
-import { useState, forwardRef } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { ButtonHTMLAttributes, Ref } from "react";
 import {
   ArrowUpRight,
@@ -36,8 +43,10 @@ import {
   UserCircle,
 } from "lucide-react";
 import clsx from "clsx";
+import { AnimatePresence, motion } from "motion/react";
 import Tooltip from "./Tooltip";
 import OverflowMenu from "./OverflowMenu";
+import { controlTransition } from "../lib/motion";
 import type { DataWidgetManifest, WidgetManifest } from "../types";
 import { loadPref, savePref } from "../preferences";
 import { TIER_LABELS, getUserIdentity } from "../auth";
@@ -170,6 +179,66 @@ export default function Sidebar({
     x: number;
     y: number;
   } | null>(null);
+  const asideRef = useRef<HTMLElement>(null);
+  const indicatorFrame = useRef<number | null>(null);
+  const [indicator, setIndicator] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    marketplace: boolean;
+  } | null>(null);
+
+  const measureIndicator = useCallback(() => {
+    const aside = asideRef.current;
+    const target = aside?.querySelector<HTMLElement>(
+      '[data-sidebar-active="true"]',
+    );
+
+    if (!aside || !target) {
+      setIndicator(null);
+      return;
+    }
+
+    const asideRect = aside.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    setIndicator({
+      x: targetRect.left - asideRect.left,
+      y: targetRect.top - asideRect.top,
+      width: targetRect.width,
+      height: targetRect.height,
+      marketplace: isMarketplace,
+    });
+  }, [isMarketplace]);
+
+  const scheduleIndicatorMeasure = useCallback(() => {
+    if (indicatorFrame.current !== null) return;
+    indicatorFrame.current = requestAnimationFrame(() => {
+      indicatorFrame.current = null;
+      measureIndicator();
+    });
+  }, [measureIndicator]);
+
+  useEffect(
+    () => () => {
+      if (indicatorFrame.current !== null) {
+        cancelAnimationFrame(indicatorFrame.current);
+      }
+    },
+    [],
+  );
+
+  useLayoutEffect(() => {
+    measureIndicator();
+  }, [
+    activeItem,
+    collapsed,
+    isCustomize,
+    isFeed,
+    isMarketplace,
+    measureIndicator,
+    sources,
+  ]);
 
   function toggleCollapsed() {
     const next = !collapsed;
@@ -181,11 +250,28 @@ export default function Sidebar({
 
   return (
     <aside
+      ref={asideRef}
+      onScrollCapture={scheduleIndicatorMeasure}
       className={clsx(
-        "flex flex-col shrink-0 h-full overflow-hidden select-none ",
+        "relative flex flex-col shrink-0 h-full overflow-hidden select-none ",
         collapsed ? "w-[48px]" : "w-[200px]",
       )}
     >
+      {indicator && (
+        <motion.span
+          aria-hidden
+          initial={false}
+          style={{ width: indicator.width, height: indicator.height }}
+          animate={{
+            transform: `translate(${indicator.x}px, ${indicator.y}px)`,
+          }}
+          transition={controlTransition}
+          className={clsx(
+            "pointer-events-none absolute left-0 top-0 z-0 rounded-lg",
+            indicator.marketplace ? "bg-accent/15" : "bg-accent/10",
+          )}
+        />
+      )}
       {/* ── App destinations — Home + Customize above the sources,
           Claude-desktop style: the rail leads with where you GO, then
           lists what you FOLLOW. */}
@@ -224,21 +310,30 @@ export default function Sidebar({
         collapsed={collapsed}
         className="flex-1 overflow-y-auto scrollbar-thin"
       >
-        {sources.map((source) => (
-          <NavItem
-            key={source.id}
-            icon={<SourceGlyph source={source} />}
-            label={source.name}
-            active={activeItem === source.id}
-            collapsed={collapsed}
-            onClick={() => onSelectItem(source.id)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              setMenu({ source, x: e.clientX, y: e.clientY });
-            }}
-          />
-        ))}
-
+        <AnimatePresence initial={false}>
+          {sources.map((source) => (
+            <motion.div
+              key={source.id}
+              layout="position"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={controlTransition}
+            >
+              <NavItem
+                icon={<SourceGlyph source={source} />}
+                label={source.name}
+                active={activeItem === source.id}
+                collapsed={collapsed}
+                onClick={() => onSelectItem(source.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setMenu({ source, x: e.clientX, y: e.clientY });
+                }}
+              />
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </NavGroup>
 
       {/* ── Workspace ─────────────────────────────────────────── */}
@@ -400,6 +495,7 @@ function NavItem({
       <button
         onClick={onClick}
         onContextMenu={onContextMenu}
+        data-sidebar-active={active}
         aria-current={active ? "page" : undefined}
         aria-label={collapsed ? label : undefined}
         className={clsx(
@@ -410,14 +506,12 @@ function NavItem({
           active ? "text-fg" : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
         )}
       >
-        {/* Active indicator — filled pill behind the current row. */}
-        {active && (
-          <span className="absolute inset-0 z-0 rounded-lg bg-accent/10" />
-        )}
         <span className="relative z-10 shrink-0 flex items-center justify-center w-5 h-5">
           {icon}
         </span>
-        {!collapsed && <span className="relative z-10 truncate">{label}</span>}
+        {!collapsed && (
+          <span className="relative z-10 truncate">{label}</span>
+        )}
       </button>
     </Tooltip>
   );
@@ -457,6 +551,8 @@ function SlotChip({
     <Tooltip content={collapsed ? label : undefined} side="right">
       <button
         onClick={onClick}
+        data-sidebar-active={active}
+        aria-current={active ? "page" : undefined}
         aria-label={label}
         className={clsx(
           "relative flex items-center w-full rounded-lg font-medium",
@@ -468,13 +564,6 @@ function SlotChip({
             : "text-accent/85 hover:bg-accent/10 hover:text-accent",
         )}
       >
-        {/* Same shared active pill as NavItem — without it, navigating
-            source → catalog unmounted the indicator with no destination
-            (the highlight vanished instead of sliding here). The static
-            bg is dropped while active so the pill is the one fill. */}
-        {active && (
-          <span className="absolute inset-0 z-0 rounded-lg bg-accent/15" />
-        )}
         <span className="relative z-10 shrink-0 flex items-center justify-center w-5 h-5">
           <Plus size={15} strokeWidth={2.5} />
         </span>

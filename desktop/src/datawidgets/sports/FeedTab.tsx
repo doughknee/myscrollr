@@ -25,6 +25,7 @@ import { ScoresTab } from "./ScoresTab";
 import { ScheduleTab } from "./ScheduleTab";
 import { StandingsTab } from "./StandingsTab";
 import EmptyWidgetState from "../../components/EmptyWidgetState";
+import WidgetStateTransition from "../../components/WidgetStateTransition";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarDivider, BarPill } from "../../components/widget-bar/Bar";
 import {
@@ -203,45 +204,47 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
         </WidgetBar>
       )}
 
-      {showEmpty ? (
-        <div className="flex flex-1 flex-col justify-center">
-          <EmptyWidgetState
-            refreshing={Boolean(feedContext.__refreshing)}
-            icon={Trophy}
-            noun="leagues"
-            hasConfig={!!feedContext.__hasConfig}
-            dashboardLoaded={!!feedContext.__dashboardLoaded}
-            loadingNoun="scores"
-            actionHint="pick your leagues"
-          />
-        </div>
-      ) : (
-        <>
-          {/* Tab content */}
-          {tab === "scores" && (
-            <ScoresTab
-              games={games}
-              mode={mode}
-              display={display}
-              favoriteTeams={favoriteTeamNames}
-              statusFilter={statusFilter}
+      <WidgetStateTransition stateKey={`tab-${tab}`}>
+        {showEmpty ? (
+          <div className="flex flex-1 flex-col justify-center">
+            <EmptyWidgetState
+              refreshing={Boolean(feedContext.__refreshing)}
+              icon={Trophy}
+              noun="leagues"
+              hasConfig={!!feedContext.__hasConfig}
+              dashboardLoaded={!!feedContext.__dashboardLoaded}
+              loadingNoun="scores"
+              actionHint="pick your leagues"
             />
-          )}
-          {tab === "schedule" && (
-            <ScheduleTab
-              games={games}
-              favoriteTeams={favoriteTeamNames}
-              statusFilter={statusFilter}
-            />
-          )}
-          {tab === "standings" && (
-            <StandingsTab
-              leagues={leagues}
-              favoriteTeams={favoriteTeamNames}
-            />
-          )}
-        </>
-      )}
+          </div>
+        ) : (
+          <>
+            {/* Tab content */}
+            {tab === "scores" && (
+              <ScoresTab
+                games={games}
+                mode={mode}
+                display={display}
+                favoriteTeams={favoriteTeamNames}
+                statusFilter={statusFilter}
+              />
+            )}
+            {tab === "schedule" && (
+              <ScheduleTab
+                games={games}
+                favoriteTeams={favoriteTeamNames}
+                statusFilter={statusFilter}
+              />
+            )}
+            {tab === "standings" && (
+              <StandingsTab
+                leagues={leagues}
+                favoriteTeams={favoriteTeamNames}
+              />
+            )}
+          </>
+        )}
+      </WidgetStateTransition>
     </div>
   );
 }

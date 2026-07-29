@@ -24,7 +24,7 @@ function renderSidebar(opts: {
     kind: "data" as const,
     onTicker: false,
   }));
-  render(
+  const { container } = render(
     <Sidebar
       isCustomize={false}
       isAccount={false}
@@ -45,7 +45,7 @@ function renderSidebar(opts: {
       onRemoveItem={() => {}}
     />,
   );
-  return { onNavigateToMarketplace, onNavigateHome };
+  return { container, onNavigateToMarketplace, onNavigateHome };
 }
 
 describe("Sidebar slot chip", () => {
@@ -114,6 +114,20 @@ describe("Sidebar home row", () => {
       "aria-current",
       "page",
     );
+  });
+
+  it("keeps the moving indicator outside the scrollable widget list", () => {
+    const { container } = renderSidebar({
+      tier: "free",
+      sourceCount: 1,
+      isFeed: true,
+    });
+    const aside = container.querySelector("aside");
+    const indicator = Array.from(aside?.children ?? []).find(
+      (child) => child.getAttribute("aria-hidden") === "true",
+    );
+
+    expect(indicator).toBeInTheDocument();
   });
 
   it("is not marked current off the feed route", () => {

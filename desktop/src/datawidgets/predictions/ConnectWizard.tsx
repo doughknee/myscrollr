@@ -21,11 +21,11 @@ import {
   ExternalLink,
   FileCheck2,
   UploadCloud,
-  Loader2,
   AlertCircle,
   HelpCircle,
   ChevronDown,
 } from "lucide-react";
+import LoadingGlyph from "../../components/LoadingGlyph";
 import {
   kalshiConnect,
   isKalshiAvailable,
@@ -245,7 +245,7 @@ export default function ConnectWizard({ onConnected, hex }: ConnectWizardProps) 
         >
           {status === "checking" ? (
             <>
-              <Loader2 size={15} />
+              <LoadingGlyph size={15} />
               Checking with Kalshi…
             </>
           ) : (

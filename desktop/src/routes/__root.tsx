@@ -26,6 +26,7 @@ import { UpdateRequiredOverlay } from "../components/UpdateRequiredOverlay";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import clsx from "clsx";
 import { Toaster, toast } from "sonner";
+import { AnimatePresence, motion } from "motion/react";
 // Note: sonner CSS is imported in src/app-main.tsx so it ships in the
 // entry bundle. Importing it here would put it in this route's
 // code-split chunk, causing toasts to appear unstyled until the chunk
@@ -40,6 +41,7 @@ import {
 } from "../components/widget-bar/BarChassis";
 import ConnectionBanner from "../components/ConnectionBanner";
 import TopBar from "../components/TopBar";
+import LoadingGlyph from "../components/LoadingGlyph";
 
 // Onboarding
 import AuthGate from "../components/onboarding/AuthGate";
@@ -96,6 +98,11 @@ import { POLL_INTERVALS } from "../cdc";
 // Shell context
 import { ShellContext, ShellDataContext } from "../shell-context";
 import { PageIdentityProvider } from "../components/layout/page-context";
+import RouteTransition from "../components/layout/RouteTransition";
+import {
+  backdropMotion,
+  overlaySurfaceMotion,
+} from "../lib/motion";
 
 // Store
 import { onStoreChange, setStore, removeStore } from "../lib/store";
@@ -811,12 +818,14 @@ function RootLayout() {
       )}
     >
       {/* ── Mandatory update: blocks everything, including sign-in ── */}
-      {updateGate.updateRequired && (
-        <UpdateRequiredOverlay
-          appVersion={appVersion}
-          minVersion={updateGate.minVersion}
-        />
-      )}
+      <AnimatePresence>
+        {updateGate.updateRequired && (
+          <UpdateRequiredOverlay
+            appVersion={appVersion}
+            minVersion={updateGate.minVersion}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── Auth gate: unauthenticated users ── */}
       {showAuthGate && <AuthGate onLogin={auth.handleLogin} />}
@@ -941,7 +950,9 @@ function RootLayout() {
               <div className="flex-1 min-h-0 overflow-hidden">
                 <ShellContext.Provider value={shellStableValue}>
                   <ShellDataContext.Provider value={shellDataValue}>
-                    <Outlet />
+                    <RouteTransition routeKey={location.pathname}>
+                      <Outlet />
+                    </RouteTransition>
                   </ShellDataContext.Provider>
                 </ShellContext.Provider>
               </div>
@@ -954,30 +965,45 @@ function RootLayout() {
       )}
 
       {/* Signing-in overlay — shows on ALL states (auth gate triggers login too) */}
-      {auth.loggingIn && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Signing in"
-          className="absolute inset-0 z-50 flex items-center justify-center bg-surface/80 backdrop-blur-sm"
-        >
-          <div className="text-center">
-            <div className="w-6 h-6 border-2 border-accent/30 border-t-accent rounded-full mx-auto mb-3" />
-            <p className="text-sm font-medium text-fg-2">
-              Signing you in...
-            </p>
-            <p className="text-xs text-fg-3 mt-1">
-              Finish signing in from your browser
-            </p>
-            <button
-              onClick={() => auth.setLoggingIn(false)}
-              className="mt-4 px-4 py-1.5 rounded-lg text-xs font-medium text-fg-3 hover:text-fg-2 hover:bg-surface-hover "
+      <AnimatePresence>
+        {auth.loggingIn && (
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Signing in"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="absolute inset-0 z-50 flex items-center justify-center"
+          >
+            <motion.div
+              variants={backdropMotion}
+              className="absolute inset-0 bg-surface/80 backdrop-blur-sm"
+            />
+            <motion.div
+              variants={overlaySurfaceMotion}
+              className="relative text-center"
             >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+              <LoadingGlyph
+                size={24}
+                className="mx-auto mb-3 text-accent"
+              />
+              <p className="text-sm font-medium text-fg-2">
+                Signing you in...
+              </p>
+              <p className="text-xs text-fg-3 mt-1">
+                Finish signing in from your browser
+              </p>
+              <button
+                onClick={() => auth.setLoggingIn(false)}
+                className="mt-4 px-4 py-1.5 rounded-lg text-xs font-medium text-fg-3 hover:text-fg-2 hover:bg-surface-hover "
+              >
+                Cancel
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Toaster must be available in all states */}
       {!showApp && <Toaster theme={resolvedToasterTheme} richColors position="bottom-right" />}

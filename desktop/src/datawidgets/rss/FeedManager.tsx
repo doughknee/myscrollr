@@ -19,8 +19,10 @@ import {
   Rss,
 } from "lucide-react";
 import clsx from "clsx";
+import { AnimatePresence, motion } from "motion/react";
 import Tooltip from "../../components/Tooltip";
 import EmptySection from "../../components/layout/EmptySection";
+import { tooltipMotion } from "../../lib/motion";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import type { TrackedFeed } from "../../api/client";
@@ -472,18 +474,24 @@ function FeedRow({ feed, saving, onToggle }: FeedRowProps) {
     >
       <span
         className={clsx(
-          "shrink-0 w-5 h-5 flex items-center justify-center rounded-md ",
+          "relative shrink-0 w-5 h-5 flex items-center justify-center rounded-md ",
           tracked
             ? "bg-accent/20 text-accent"
             : "bg-surface-hover text-fg-4 group-hover:text-fg-2",
         )}
       >
-        <span
-          key={tracked ? "check" : "plus"}
-          className="flex items-center justify-center"
-        >
-          {tracked ? <Check size={12} strokeWidth={3} /> : <Plus size={12} />}
-        </span>
+        <AnimatePresence initial={false} mode="popLayout">
+          <motion.span
+            key={tracked ? "check" : "plus"}
+            variants={tooltipMotion}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="flex items-center justify-center"
+          >
+            {tracked ? <Check size={12} strokeWidth={3} /> : <Plus size={12} />}
+          </motion.span>
+        </AnimatePresence>
       </span>
 
       <div className="shrink-0 w-5 h-5 flex items-center justify-center text-fg-4">

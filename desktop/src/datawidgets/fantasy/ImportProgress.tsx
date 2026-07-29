@@ -1,5 +1,6 @@
-import { Check, Loader2 } from "lucide-react";
+import { Check } from "lucide-react";
 import { Section } from "../../components/settings/SettingsControls";
+import LoadingGlyph from "../../components/LoadingGlyph";
 import { sportLabel } from "./types";
 import type { DiscoveredLeague } from "./types";
 
@@ -46,7 +47,7 @@ export function ImportProgress({
                     <Check size={14} className="text-success" />
                   )}
                   {status === "importing" && (
-                    <Loader2
+                    <LoadingGlyph
                       size={14}
                       style={{ color: hex }}
                     />

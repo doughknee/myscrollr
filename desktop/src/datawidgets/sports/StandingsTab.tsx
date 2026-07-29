@@ -1,4 +1,5 @@
 import { Fragment, useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useReducedMotion } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { ChevronDown } from "lucide-react";
@@ -152,6 +153,7 @@ function getZoneColor(description?: string): string | null {
 }
 
 export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
+  const reduceMotion = useReducedMotion();
   const [selected, setSelected] = useState(leagues[0] ?? "");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const favRowRef = useRef<HTMLTableRowElement | null>(null);
@@ -178,9 +180,12 @@ export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
 
   useEffect(() => {
     if (favRowRef.current) {
-      favRowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      favRowRef.current.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "center",
+      });
     }
-  }, [standings, favoriteTeams]);
+  }, [standings, favoriteTeams, reduceMotion]);
 
   const { columns, groupedRows, hasZones } = useMemo(() => {
     const cols = getColumnsForSport(standings[0]?.sport_api);

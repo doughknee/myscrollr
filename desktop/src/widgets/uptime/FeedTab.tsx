@@ -12,10 +12,11 @@
 import { useState, useCallback } from "react";
 import { clsx } from "clsx";
 import { useQueryClient } from "@tanstack/react-query";
-import { HeartPulse, RefreshCw, Unlink, Loader2 } from "lucide-react";
+import { HeartPulse, RefreshCw, Unlink } from "lucide-react";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 import Tooltip from "../../components/Tooltip";
 import QueryErrorBanner from "../../components/QueryErrorBanner";
+import LoadingGlyph from "../../components/LoadingGlyph";
 import type { KumaMonitor } from "./types";
 import { fetchKumaStatus, loadMonitors, saveMonitors, MONITOR_STATUS_LABELS, MONITOR_STATUS_COLORS, MONITOR_STATUS_TEXT } from "./types";
 import { toast } from "sonner";
@@ -191,7 +192,7 @@ function UptimeFeedBody({ mode: feedMode }: FeedTabProps) {
             disabled={isConnecting || !inputUrl.trim()}
             className="w-full text-xs font-mono font-semibold text-widget-uptime px-3 py-2 rounded-lg bg-widget-uptime/10 border border-widget-uptime/25 hover:bg-widget-uptime/15  disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {isConnecting && <Loader2 size={12} />}
+            {isConnecting && <LoadingGlyph size={12} />}
             {isConnecting ? "Connecting..." : "Connect"}
           </button>
         </div>
@@ -210,7 +211,7 @@ function UptimeFeedBody({ mode: feedMode }: FeedTabProps) {
   if (isLoading && monitors.length === 0) {
     return (
       <div className="p-4 flex flex-col items-center justify-center gap-2">
-        <Loader2 size={16} className=" text-widget-uptime/60" />
+        <LoadingGlyph size={16} className="text-widget-uptime/60" />
         <span className="text-xs font-mono text-fg-3">Loading monitors...</span>
       </div>
     );

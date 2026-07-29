@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { dashboardQueryOptions, rssCatalogOptions } from "../../api/queries";
 import { relativeTime, truncate } from "../../utils/format";
 import EmptyWidgetState from "../../components/EmptyWidgetState";
+import WidgetStateTransition from "../../components/WidgetStateTransition";
 import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarDivider } from "../../components/widget-bar/Bar";
@@ -431,29 +432,32 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
         </WidgetBar>
       )}
 
-      {showFeedsView ? (
-        <RssFeedsPanel
-          widgetType={widgetType}
-          widgetConfig={widget?.config as RssWidgetConfig | undefined}
-        />
-      ) : showEmpty ? (
-        <div className="flex flex-1 flex-col justify-center">
-          <EmptyWidgetState
-            refreshing={Boolean(feedContext.__refreshing)}
-            icon={Rss}
-            noun="feeds"
-            hasConfig={!!feedContext.__hasConfig}
-            dashboardLoaded={!!dashboardLoaded}
-            loadingNoun="articles"
-            actionHint="add websites"
-            actionLabel={isComfort && isCustom ? "Add feeds" : undefined}
-            onConfigure={
-              isComfort && isCustom ? () => setView("feeds") : undefined
-            }
+      <WidgetStateTransition
+        stateKey={showFeedsView ? "feeds" : "articles"}
+      >
+        {showFeedsView ? (
+          <RssFeedsPanel
+            widgetType={widgetType}
+            widgetConfig={widget?.config as RssWidgetConfig | undefined}
           />
-        </div>
-      ) : (
-        <>
+        ) : showEmpty ? (
+          <div className="flex flex-1 flex-col justify-center">
+            <EmptyWidgetState
+              refreshing={Boolean(feedContext.__refreshing)}
+              icon={Rss}
+              noun="feeds"
+              hasConfig={!!feedContext.__hasConfig}
+              dashboardLoaded={!!dashboardLoaded}
+              loadingNoun="articles"
+              actionHint="add websites"
+              actionLabel={isComfort && isCustom ? "Add feeds" : undefined}
+              onConfigure={
+                isComfort && isCustom ? () => setView("feeds") : undefined
+              }
+            />
+          </div>
+        ) : (
+          <>
           {/* No-results state */}
           {visibleItems.length === 0 && hasFilters && (
             <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
@@ -531,8 +535,9 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
               </button>
             </div>
           )}
-        </>
-      )}
+          </>
+        )}
+      </WidgetStateTransition>
     </div>
   );
 }

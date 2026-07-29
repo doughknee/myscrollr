@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import { useQuery, queryOptions } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-shell";
+import { motion } from "motion/react";
 import {
   X,
   Star,
@@ -28,6 +29,10 @@ import {
   relativeTime,
 } from "../../utils/format";
 import { authFetch } from "../../api/client";
+import {
+  backdropMotion,
+  overlaySurfaceMotion,
+} from "../../lib/motion";
 import type {
   PredictionCandle,
   PredictionCandlesticksResponse,
@@ -145,17 +150,24 @@ export default function MarketDetail({
   const countdown = formatCloseCountdown(market.close_time, now);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onClose}
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="presentation"
     >
-      <div
+      <motion.div
+        variants={backdropMotion}
+        className="absolute inset-0 bg-black/50"
+        onClick={onClose}
+      />
+      <motion.div
+        variants={overlaySurfaceMotion}
         role="dialog"
         aria-modal="true"
         aria-label={market.title}
-        onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-edge/60 bg-surface shadow-2xl"
+        className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-edge/60 bg-surface shadow-2xl"
       >
         {/* Header */}
         <div className="flex items-start gap-2 border-b border-edge/30 px-4 py-3">
@@ -408,8 +420,8 @@ export default function MarketDetail({
             Updated {relativeTime(market.updated_at, now, { suffix: true })}
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

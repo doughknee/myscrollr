@@ -5,6 +5,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { controlTransition, popoverMotion } from "../../lib/motion";
 
 /** Close an open popover on outside-mousedown or Escape. */
 export function useDismiss<T extends HTMLElement>(
@@ -38,15 +40,19 @@ export function MenuPanel({
   children: React.ReactNode;
 }) {
   return (
-    <div
+    <motion.div
       role="menu"
+      variants={popoverMotion}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
       className={clsx(
         "absolute top-full z-30 mt-1 max-h-80 origin-top overflow-y-auto rounded-xl border border-edge/50 bg-surface p-1 shadow-xl scrollbar-thin",
         className,
       )}
     >
       {children}
-    </div>
+    </motion.div>
   );
 }
 
@@ -133,11 +139,15 @@ export function MenuPopover({
       >
         {trigger}
       </MenuTrigger>
-      {open && (
-        <MenuPanel className={align === "left" ? "left-0 w-56" : "right-0 w-56"}>
-          {children(close)}
-        </MenuPanel>
-      )}
+      <AnimatePresence>
+        {open && (
+          <MenuPanel
+            className={align === "left" ? "left-0 w-56" : "right-0 w-56"}
+          >
+            {children(close)}
+          </MenuPanel>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -206,7 +216,9 @@ export function FilterMenuShell({
         badgeCount={badgeCount}
         onClick={() => setOpen((o) => !o)}
       />
-      {open && <MenuPanel className="inset-x-2">{children}</MenuPanel>}
+      <AnimatePresence>
+        {open && <MenuPanel className="inset-x-2">{children}</MenuPanel>}
+      </AnimatePresence>
     </div>
   );
 }
@@ -243,15 +255,19 @@ function MenuTrigger({
       )}
     >
       {children}
-      <ChevronDown
-        size={12}
+      <motion.span
         aria-hidden
+        animate={{
+          transform: open ? "rotate(180deg)" : "rotate(0deg)",
+        }}
+        transition={controlTransition}
         className={clsx(
-          "shrink-0 ",
-          open && "rotate-180",
+          "inline-flex shrink-0",
           lit ? "text-accent/70" : "text-fg-4",
         )}
-      />
+      >
+        <ChevronDown size={12} />
+      </motion.span>
     </button>
   );
 }

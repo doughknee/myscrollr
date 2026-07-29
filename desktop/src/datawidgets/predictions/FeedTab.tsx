@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { AnimatePresence } from "motion/react";
 import { dataWidgetsApi } from "../../api/client";
 import { dashboardQueryOptions, predictionsCatalogOptions } from "../../api/queries";
 import {
@@ -880,20 +881,23 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
       )}
 
       {/* Market-detail modal */}
-      {liveDetail && (
-        <MarketDetail
-          market={liveDetail}
-          siblings={detailSiblings}
-          onSelectMarket={openDetail}
-          now={now}
-          watched={watchedSet.has(liveDetail.ticker)}
-          onToggleWatch={() => toggleWatch(liveDetail.ticker)}
-          alerts={alerts}
-          onAddAlert={addAlertCb}
-          onRemoveAlert={removeAlertCb}
-          onClose={closeDetail}
-        />
-      )}
+      <AnimatePresence>
+        {liveDetail && (
+          <MarketDetail
+            key="market-detail"
+            market={liveDetail}
+            siblings={detailSiblings}
+            onSelectMarket={openDetail}
+            now={now}
+            watched={watchedSet.has(liveDetail.ticker)}
+            onToggleWatch={() => toggleWatch(liveDetail.ticker)}
+            alerts={alerts}
+            onAddAlert={addAlertCb}
+            onRemoveAlert={removeAlertCb}
+            onClose={closeDetail}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

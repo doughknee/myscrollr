@@ -1,6 +1,9 @@
+import { useId } from "react";
 import { clsx } from "clsx";
+import { LayoutGroup, motion } from "motion/react";
 import Tooltip from "../Tooltip";
 import { SelectMenu } from "../widget-bar/SelectMenu";
+import { controlTransition } from "../../lib/motion";
 
 // ── Section heading ─────────────────────────────────────────────
 // Open layout: just a label + thin divider. No bordered card.
@@ -94,10 +97,13 @@ export function ToggleRow({
           checked ? "bg-accent" : "bg-base-350",
         )}
       >
-        <div
+        <motion.div
+          animate={{
+            transform: checked ? "translateX(14px)" : "translateX(0px)",
+          }}
+          transition={controlTransition}
           className={clsx(
             "absolute top-[3px] left-[3px] h-3 w-3 rounded-full",
-            checked && "translate-x-3.5",
             checked ? "bg-surface" : "bg-fg-3",
           )}
         />
@@ -123,33 +129,44 @@ export function SegmentedRow<T extends string>({
   options,
   onChange,
 }: SegmentedRowProps<T>) {
+  const layoutGroupId = useId();
+
   return (
     <div className="flex items-center justify-between px-3 py-2 rounded-lg">
       <div className="flex flex-col gap-0.5">
         <SettingLabel label={label} description={description} />
       </div>
-      <div
-        role="radiogroup"
-        aria-label={label}
-        className="inline-flex items-center rounded-lg bg-base-200 p-0.5 shrink-0 ml-4"
-      >
-        {options.map((opt) => (
-          <button
-            key={opt.value}
-            role="radio"
-            aria-checked={value === opt.value}
-            onClick={() => onChange(opt.value)}
-            className={clsx(
-              "px-2.5 py-1 text-ui-chip font-medium rounded-md cursor-pointer leading-none",
-              value === opt.value
-                ? "bg-base-300 text-fg shadow-sm"
-                : "text-fg-3 hover:text-fg-2",
-            )}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
+      <LayoutGroup id={layoutGroupId}>
+        <div
+          role="radiogroup"
+          aria-label={label}
+          className="inline-flex items-center rounded-lg bg-base-200 p-0.5 shrink-0 ml-4"
+        >
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              role="radio"
+              aria-checked={value === opt.value}
+              onClick={() => onChange(opt.value)}
+              className={clsx(
+                "relative px-2.5 py-1 text-ui-chip font-medium rounded-md cursor-pointer leading-none",
+                value === opt.value
+                  ? "text-fg"
+                  : "text-fg-3 hover:text-fg-2",
+              )}
+            >
+              {value === opt.value && (
+                <motion.span
+                  layoutId="active-option"
+                  transition={controlTransition}
+                  className="absolute inset-0 rounded-md bg-base-300 shadow-sm"
+                />
+              )}
+              <span className="relative z-10">{opt.label}</span>
+            </button>
+          ))}
+        </div>
+      </LayoutGroup>
     </div>
   );
 }
