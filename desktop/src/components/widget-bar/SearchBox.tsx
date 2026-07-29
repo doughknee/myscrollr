@@ -46,6 +46,7 @@ export function SearchBox({
   resultCount,
   ariaLabel = "Search",
   noun = "results",
+  placeholder = "Search",
 }: {
   inputRef: React.RefObject<HTMLInputElement | null>;
   query: string;
@@ -57,6 +58,7 @@ export function SearchBox({
   ariaLabel?: string;
   /** Plural noun for the sr-only result announcement (e.g. "markets"). */
   noun?: string;
+  placeholder?: string;
 }) {
   const [focused, setFocused] = useState(false);
   const expanded = focused || query.length > 0;
@@ -96,7 +98,7 @@ export function SearchBox({
         onKeyDown={handleKeyDown}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        placeholder="Search"
+        placeholder={placeholder}
         aria-label={ariaLabel}
         spellCheck={false}
         autoCorrect="off"

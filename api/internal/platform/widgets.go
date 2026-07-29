@@ -93,11 +93,11 @@ var catalog = []WidgetDef{
 	{
 		ID: "finance_stocks", Name: "Stocks", Category: "finance", Source: "finance",
 		Color: "#16a34a",
-		Description:   "Live stock & ETF prices for the symbols you pick.",
+		Description:   "Live stock & ETF prices with a watchlist you control.",
 		DefaultConfig: map[string]any{"symbols": []string{}, "asset_class": "stock"},
 		About:         "Real-time stock and ETF prices for the tickers you follow. Your watchlist streams live as the market moves — no brokerage app open, no tab to babysit.",
 		Usage: []string{
-			"Type a ticker in the top bar's search to add or remove it.",
+			"Open Watchlist, then search the full stock catalog to add or remove symbols.",
 			"Quotes stream in real time during market hours.",
 			"Pin it to keep your watchlist always visible.",
 		},
@@ -105,11 +105,11 @@ var catalog = []WidgetDef{
 	{
 		ID: "finance_crypto", Name: "Crypto", Category: "finance", Source: "finance",
 		Color: "#f7931a",
-		Description:   "Live crypto prices for the coins you pick.",
+		Description:   "Live crypto prices with a watchlist you control.",
 		DefaultConfig: map[string]any{"symbols": []string{}, "asset_class": "crypto"},
 		About:         "Live crypto prices for the coins you track, streamed around the clock. From BTC and ETH to the long tail, your picks update the moment the market does.",
 		Usage: []string{
-			"Type a coin in the top bar's search to add or remove it.",
+			"Open Watchlist, then search the full crypto catalog to add or remove coins.",
 			"Prices stream 24/7 — crypto never closes.",
 			"Pin it so every big move catches your eye.",
 		},

@@ -228,6 +228,17 @@ describe("applyFinancePipeline", () => {
     expect(result).toHaveLength(4);
   });
 
+  it("direction=watchlist keeps tracked symbols", () => {
+    const result = applyFinancePipeline(makeTrades(), {
+      directionFilter: "watchlist",
+      selectedCategories: new Set(),
+      categoryMap,
+      sortKey: "alpha",
+      watchlist: new Set(["MSFT", "XOM"]),
+    });
+    expect(result.map((t) => t.symbol)).toEqual(["MSFT", "XOM"]);
+  });
+
   it("applies category filter", () => {
     const result = applyFinancePipeline(makeTrades(), {
       directionFilter: "all",

@@ -9,7 +9,7 @@ import type { Trade } from "../../types";
 import type { FinanceDisplayPrefs } from "../../preferences";
 
 export type FinanceSortKey = "alpha" | "price" | "change" | "updated";
-export type FinanceDirectionFilter = "all" | "gainers" | "losers";
+export type FinanceDirectionFilter = "all" | "gainers" | "losers" | "watchlist";
 export type StockView =
   | "overview"
   | "big-tech"
@@ -150,13 +150,14 @@ export interface FinancePipelineOptions {
   selectedCategories: Set<string>;
   categoryMap: Map<string, string>;
   sortKey: FinanceSortKey;
+  watchlist?: ReadonlySet<string>;
 }
 
 export function applyFinancePipeline(
   trades: Trade[],
   opts: FinancePipelineOptions,
 ): Trade[] {
-  const { directionFilter, selectedCategories, categoryMap, sortKey } = opts;
+  const { directionFilter, selectedCategories, categoryMap, sortKey, watchlist } = opts;
 
   let items = trades;
 
@@ -164,6 +165,8 @@ export function applyFinancePipeline(
     items = items.filter((t) => parsePct(t.percentage_change) > 0);
   } else if (directionFilter === "losers") {
     items = items.filter((t) => parsePct(t.percentage_change) < 0);
+  } else if (directionFilter === "watchlist") {
+    items = items.filter((t) => watchlist?.has(t.symbol));
   }
 
   if (selectedCategories.size > 0) {

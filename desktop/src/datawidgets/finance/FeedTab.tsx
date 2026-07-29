@@ -14,7 +14,7 @@
  */
 import { memo, useMemo, useRef, useState, useCallback } from "react";
 import { clsx } from "clsx";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
   dashboardQueryOptions,
@@ -65,7 +65,7 @@ export const financeDataWidget: DataWidgetManifest = {
       "Track stocks, ETFs, and cryptocurrencies with live price updates. " +
       "Prices update automatically so your feed always shows the latest.",
     usage: [
-      "Search in the top bar to add or remove symbols — catalog matches appear as you type.",
+      "Open Watchlist, then search the full catalog to add or remove symbols.",
       "Prices update automatically when connected.",
       "Click any symbol to view its chart on Google Finance.",
     ],
@@ -84,6 +84,7 @@ const DIRECTION_OPTIONS: { value: DirectionFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "gainers", label: "Gainers" },
   { value: "losers", label: "Losers" },
+  { value: "watchlist", label: "Watchlist" },
 ];
 
 const STOCK_VIEW_OPTIONS: { value: StockView; label: string }[] = [
@@ -253,6 +254,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
           selectedCategories,
           categoryMap,
           sortKey,
+          watchlist: trackedSet,
         }),
     [
       categoryMap,
@@ -324,20 +326,23 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
     (sym: string) => {
       if (trackedSet.has(sym)) return;
       updateSymbols([...trackedSymbols, sym]);
-      if (isStocks) {
-        setStockView("watchlist");
-        setQuery("");
-      }
+      if (isStocks) setStockView("watchlist");
+      else if (assetClass === "crypto") setDirectionFilter("watchlist");
+      setQuery("");
     },
-    [isStocks, trackedSymbols, trackedSet, updateSymbols],
+    [assetClass, isStocks, trackedSymbols, trackedSet, updateSymbols],
   );
 
   const removeSymbol = useCallback(
     (sym: string) => {
+      if (!trackedSet.has(sym)) return;
       updateSymbols(trackedSymbols.filter((s) => s !== sym));
     },
-    [trackedSymbols, updateSymbols],
+    [trackedSymbols, trackedSet, updateSymbols],
   );
+
+  const isWatchlist =
+    isStocks ? stockView === "watchlist" : directionFilter === "watchlist";
 
   return (
     // NO inner scroll container: the Source page (PageLayout) owns the
@@ -404,8 +409,9 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                   query={query}
                   onQueryChange={setQuery}
                   resultCount={searchQ ? filtered.length : null}
-                  ariaLabel="Search symbols"
+                  ariaLabel="Search to add to watchlist"
                   noun="symbols"
+                  placeholder="Add to watchlist"
                 />
                 {latestUpdated && (
                   <span className="hidden @xl:block">
@@ -422,8 +428,9 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                 query={query}
                 onQueryChange={setQuery}
                 resultCount={null}
-                ariaLabel="Search symbols"
+                ariaLabel="Search to add to watchlist"
                 noun="symbols"
+                placeholder="Add to watchlist"
               />
             </div>
           )}
@@ -467,6 +474,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                   </span>
                 </div>
                 <button
+                  type="button"
                   onClick={() =>
                     tracked ? removeSymbol(item.symbol) : addSymbol(item.symbol)
                   }
@@ -511,7 +519,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
           <p className="text-[12px] text-fg-3">
             {searchQ
               ? `No symbols match “${query.trim()}”`
-              : isStocks && stockView === "watchlist"
+              : isWatchlist
                 ? "Your watchlist is empty — search to add symbols"
               : "No symbols match your filters"}
           </p>
@@ -538,6 +546,8 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                 mode={mode}
                 category={categoryMap.get(trade.symbol)}
                 now={now}
+                onRemove={isComfort && isWatchlist ? removeSymbol : undefined}
+                saving={symbolsSaving}
               />
             ))}
           </div>
@@ -554,11 +564,20 @@ interface TradeItemProps {
   trade: Trade;
   mode: "comfort" | "compact";
   category?: string;
+  onRemove?: (symbol: string) => void;
+  saving?: boolean;
   /** Shared "now" from `useNow()` in the parent list — drives the `Xs ago` label. */
   now: number;
 }
 
-const TradeItem = memo(function TradeItem({ trade, mode, category, now }: TradeItemProps) {
+const TradeItem = memo(function TradeItem({
+  trade,
+  mode,
+  category,
+  now,
+  onRemove,
+  saving,
+}: TradeItemProps) {
   const isUp = trade.direction === "up";
   const isDown = trade.direction === "down";
 
@@ -587,20 +606,25 @@ const TradeItem = memo(function TradeItem({ trade, mode, category, now }: TradeI
 
   // Comfort mode
   return (
-    <a
-      href={trade.link}
-      target="_blank"
-      rel="noopener noreferrer"
+    <div
       className={clsx(
         FEED_CARD,
         FEED_CARD_INTERACTIVE,
         "relative flex items-center justify-between overflow-hidden border-l-2",
+        onRemove && "pr-10",
         isUp && "border-l-up/40",
         isDown && "border-l-down/40",
         !isUp && !isDown && "border-l-transparent",
       )}
     >
-      <div className="flex flex-col gap-0.5">
+      <a
+        href={trade.link}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Open ${trade.symbol} on Google Finance`}
+        className="absolute inset-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+      />
+      <div className="pointer-events-none flex flex-col gap-0.5">
         <span className="font-mono font-bold text-sm text-fg tracking-wide">
           {trade.symbol}
         </span>
@@ -616,7 +640,7 @@ const TradeItem = memo(function TradeItem({ trade, mode, category, now }: TradeI
         )}
       </div>
 
-      <div className="flex flex-col items-end gap-0.5">
+      <div className="pointer-events-none flex flex-col items-end gap-0.5">
         <span className="text-sm font-mono font-medium text-fg tabular-nums">
           {formatPrice(trade.price)}
         </span>
@@ -639,11 +663,25 @@ const TradeItem = memo(function TradeItem({ trade, mode, category, now }: TradeI
           )}
         </div>
       </div>
-    </a>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={() => onRemove(trade.symbol)}
+          disabled={saving}
+          aria-label={`Remove ${trade.symbol} from watchlist`}
+          title="Remove from watchlist"
+          className="absolute right-2 top-2 z-10 rounded-md p-1.5 text-fg-4 hover:bg-down/10 hover:text-down disabled:opacity-40"
+        >
+          <X size={14} />
+        </button>
+      )}
+    </div>
   );
 }, (prev, next) =>
   prev.mode === next.mode &&
   prev.category === next.category &&
+  prev.onRemove === next.onRemove &&
+  prev.saving === next.saving &&
   // `now` must trigger a re-render while the "Xs ago" label is visible
   // so it advances on every tick. Compact mode has no label — skip the
   // tick there to avoid churning the whole list.
