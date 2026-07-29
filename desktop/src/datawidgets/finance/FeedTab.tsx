@@ -13,7 +13,7 @@
  */
 import { memo, useMemo, useRef, useState, useCallback } from "react";
 import { clsx } from "clsx";
-import { Plus, TrendingUp, X } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { motion } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -530,38 +530,9 @@ const TradeItem = memo(function TradeItem({
         className="absolute inset-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
       />
       <div className="flex min-w-0 flex-col gap-0.5">
-        <div className="flex items-center gap-1.5">
-          <span className="pointer-events-none font-mono font-bold text-sm text-fg tracking-wide">
-            {trade.symbol}
-          </span>
-          {(onAdd || onRemove) && (
-            <motion.button
-              type="button"
-              initial={false}
-              animate={
-                actionVisible || actionHovered
-                  ? CARD_ACTION_MOTION.visible
-                  : CARD_ACTION_MOTION.hidden
-              }
-              onFocus={() => setActionHovered(true)}
-              onBlur={() => setActionHovered(false)}
-              whileTap={{ transform: "scale(0.92)" }}
-              transition={controlTransition}
-              onClick={() => (onRemove ?? onAdd)?.(trade.symbol)}
-              disabled={saving}
-              aria-label={`${onRemove ? "Remove" : "Add"} ${trade.symbol} ${onRemove ? "from" : "to"} watchlist`}
-              title={`${onRemove ? "Remove from" : "Add to"} watchlist`}
-              className={clsx(
-                "relative z-10 flex size-5 shrink-0 items-center justify-center rounded border border-edge/40 bg-surface-3 shadow-sm disabled:opacity-40",
-                onRemove
-                  ? "text-fg-4 hover:border-down/30 hover:text-down"
-                  : "text-accent hover:border-accent/30",
-              )}
-            >
-              {onRemove ? <X size={12} /> : <Plus size={12} />}
-            </motion.button>
-          )}
-        </div>
+        <span className="pointer-events-none font-mono font-bold text-sm text-fg tracking-wide">
+          {trade.symbol}
+        </span>
         {category && (
           <span className="pointer-events-none bg-[#22c55e]/10 text-fg-3 text-ui-chip font-medium rounded px-1.5 py-px w-fit">
             {category}
@@ -597,6 +568,33 @@ const TradeItem = memo(function TradeItem({
           )}
         </div>
       </div>
+      {(onAdd || onRemove) && (
+        <motion.button
+          type="button"
+          initial={false}
+          animate={
+            actionVisible || actionHovered
+              ? CARD_ACTION_MOTION.visible
+              : CARD_ACTION_MOTION.hidden
+          }
+          onFocus={() => setActionHovered(true)}
+          onBlur={() => setActionHovered(false)}
+          whileTap={{ transform: "scale(0.95)" }}
+          transition={controlTransition}
+          onClick={() => (onRemove ?? onAdd)?.(trade.symbol)}
+          disabled={saving}
+          aria-label={`${onRemove ? "Remove" : "Add"} ${trade.symbol} ${onRemove ? "from" : "to"} watchlist`}
+          title={`${onRemove ? "Remove from" : "Add to"} watchlist`}
+          className={clsx(
+            "absolute right-2 top-2 z-10 flex h-7 min-w-14 items-center justify-center rounded-md border bg-surface-3 px-2.5 text-ui-chip font-semibold shadow-md disabled:opacity-40",
+            onRemove
+              ? "border-down/30 text-down hover:bg-surface-hover"
+              : "border-accent/30 text-accent hover:bg-surface-hover",
+          )}
+        >
+          {onRemove ? "Remove ×" : "Add +"}
+        </motion.button>
+      )}
     </motion.div>
   );
 }, (prev, next) =>
