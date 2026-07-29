@@ -67,7 +67,7 @@ import {
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
 import {
-  useLoadMore,
+  useAutoPagination,
   useSetToggle,
   latestTimestamp,
 } from "../feedHooks";
@@ -417,7 +417,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const renderTotal = isComfort ? shownEvents.length : focusedItems.length;
-  const { visible, footer } = useLoadMore(
+  const { visible, footer } = useAutoPagination(
     renderTotal,
     [lens, selectedCats, watchlist, query],
     "px-3 pb-3",

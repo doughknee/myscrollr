@@ -13,13 +13,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import { open } from "@tauri-apps/plugin-shell";
-import {
-  ChevronDown,
-  Eye,
-  EyeOff,
-  Plus,
-  Star,
-} from "lucide-react";
+import { Eye, EyeOff, Plus, Star } from "lucide-react";
 import {
   Section,
   DisplayRow,
@@ -28,8 +22,6 @@ import {
 import { useShell } from "../../shell-context";
 import { SPORT_EMOJI, sportLabel } from "./types";
 import type { LeagueResponse } from "./types";
-
-const LEAGUES_PER_PAGE = 6;
 
 interface ConnectedViewProps {
   leagues: LeagueResponse[];
@@ -52,7 +44,6 @@ export function ConnectedView({
   const { prefs, onPrefsChange } = useShell();
   const fantasyPrefs = prefs.widgetDisplay.fantasy;
 
-  const [visibleCount, setVisibleCount] = useState(LEAGUES_PER_PAGE);
   const [filter, setFilter] = useState<"all" | "active" | "past">("all");
 
   const sorted = useMemo(() => {
@@ -74,9 +65,6 @@ export function ConnectedView({
     if (filter === "past") return sorted.filter((l) => l.data.is_finished);
     return sorted;
   }, [sorted, filter]);
-  const visibleLeagues = filtered.slice(0, visibleCount);
-  const hasMore = visibleCount < filtered.length;
-
   const enabledSet = useMemo(() => {
     // Empty enabled list means "all" — reflect that as a fully-enabled state.
     if (!fantasyPrefs.enabledLeagueKeys || fantasyPrefs.enabledLeagueKeys.length === 0) {
@@ -140,16 +128,13 @@ export function ConnectedView({
           <div className="px-3">
             <FilterBar
               filter={filter}
-              onChange={(next) => {
-                setFilter(next);
-                setVisibleCount(LEAGUES_PER_PAGE);
-              }}
+              onChange={setFilter}
               counts={{ all: sorted.length, active: activeCount, past: pastCount }}
             />
           </div>
 
           <div className="mt-2 space-y-1 px-3">
-            {visibleLeagues.map((league, i) => (
+            {filtered.map((league) => (
               <div
                 key={league.league_key}
               >
@@ -170,16 +155,6 @@ export function ConnectedView({
               </p>
             )}
 
-            {hasMore && (
-              <button
-                type="button"
-                onClick={() => setVisibleCount((prev) => prev + LEAGUES_PER_PAGE)}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-edge/30 bg-base-250/30 p-3 text-[11px] font-medium text-fg-3  hover:border-edge/40 hover:text-fg-2 cursor-pointer"
-              >
-                <ChevronDown size={14} />
-                Show {Math.min(filtered.length - visibleCount, LEAGUES_PER_PAGE)} more
-              </button>
-            )}
           </div>
         </Section>
       )}

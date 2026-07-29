@@ -29,7 +29,7 @@ import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
 import { useCatalog } from "../../hooks/useCatalog";
 import {
-  useLoadMore,
+  useAutoPagination,
   useSetToggle,
   latestTimestamp,
 } from "../feedHooks";
@@ -209,7 +209,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
     [piped, searchQ],
   );
 
-  const { visible, footer } = useLoadMore(
+  const { visible, footer } = useAutoPagination(
     filtered.length,
     [directionFilter, selectedCategories, sortKey, query],
     "px-3 py-3 bg-surface border-t border-edge/30",

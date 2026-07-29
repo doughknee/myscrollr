@@ -147,7 +147,11 @@ export default function PageLayout({
         </div>
       ) : (
         // Default mode: content area scrolls; children stack vertically.
-        <div ref={scrollRef} className="relative flex-1 overflow-y-auto scrollbar-thin [scrollbar-gutter:stable]">
+        <div
+          ref={scrollRef}
+          data-page-scroll
+          className="relative flex-1 overflow-y-auto scrollbar-thin [scrollbar-gutter:stable]"
+        >
           <div
             className={clsx(
               noContentPadding ? "w-full" : "mx-auto px-5 py-5",

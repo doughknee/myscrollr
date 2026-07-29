@@ -309,7 +309,7 @@ export default function MyPositionsPanel({ markets, hex }: MyPositionsPanelProps
         empty={portfolio.fills.length === 0}
       >
         <div className="flex flex-col">
-          {portfolio.fills.slice(0, 25).map((f, i) => {
+          {portfolio.fills.map((f, i) => {
             const m = lookupMeta(f.ticker);
             return (
               <div
