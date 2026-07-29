@@ -376,8 +376,10 @@ export interface RssDisplayPrefs {
   /** Sticky feed sort (2026-07-17 unification): the bar's sort choice
    *  persists per widget via the config.display override; this is the
    *  global fallback. */
-  feedSort: "newest" | "oldest" | "by-source";
+  feedSort: "newest" | "oldest";
   articlesPerSource: number; // 0 = all (the default since v1.1.1); 1/3/5/10 legacy per-source caps
+  /** Maximum eligible articles shown in the feed. 0 = all. */
+  maxArticles: number;
   /** v1.1.3 Time Controls: hide articles older than N days (published_at,
    *  falling back to created_at). 0 = no age filter — every article the
    *  server sends, which is the pre-v1.1.3 behavior. */
@@ -604,6 +606,7 @@ export const DEFAULT_WIDGET_DISPLAY: WidgetDisplayPrefs = {
   rss: {
     feedSort: "newest",
     articlesPerSource: 0,
+    maxArticles: 0,
     maxArticleAgeDays: 0,
   },
   predictions: {
@@ -1073,7 +1076,7 @@ export function migrateRssDisplay(
     // Sticky feed sort (2026-07-17 unification).
     feedSort: oneOf(
       raw.feedSort,
-      ["newest", "oldest", "by-source"],
+      ["newest", "oldest"],
       DEFAULT_WIDGET_DISPLAY.rss.feedSort,
     ),
     // One-shot migration (v1.1.1): 4 was the pre-widget-era DEFAULT and
@@ -1084,6 +1087,12 @@ export function migrateRssDisplay(
       typeof raw.articlesPerSource === "number" && raw.articlesPerSource !== 4
         ? raw.articlesPerSource
         : DEFAULT_WIDGET_DISPLAY.rss.articlesPerSource,
+    maxArticles:
+      typeof raw.maxArticles === "number" &&
+      Number.isFinite(raw.maxArticles) &&
+      raw.maxArticles > 0
+        ? Math.round(raw.maxArticles)
+        : DEFAULT_WIDGET_DISPLAY.rss.maxArticles,
     // v1.1.3: clamp to a sane range; missing/invalid → 0 (no filter),
     // which is exactly the pre-v1.1.3 behavior.
     maxArticleAgeDays:

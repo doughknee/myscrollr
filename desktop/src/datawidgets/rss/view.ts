@@ -11,9 +11,9 @@
  * sort order) to work on the feed but not the ticker prior to this module.
  */
 import type { RssItem } from "../../types";
-import type { RssDisplayPrefs } from "../../preferences";
+import { migrateRssDisplay, type RssDisplayPrefs } from "../../preferences";
 
-export type RssSortOrder = "newest" | "oldest" | "by-source";
+export type RssSortOrder = "newest" | "oldest";
 
 // ── Pure: sort ───────────────────────────────────────────────────
 
@@ -29,14 +29,7 @@ function sortRssItems(items: RssItem[], order: RssSortOrder): RssItem[] {
       return aTime.localeCompare(bTime);
     });
   }
-  // by-source
-  return [...items].sort((a, b) => {
-    const cmp = a.source_name.localeCompare(b.source_name, undefined, { sensitivity: "base" });
-    if (cmp !== 0) return cmp;
-    const aTime = a.published_at ?? a.created_at;
-    const bTime = b.published_at ?? b.created_at;
-    return bTime.localeCompare(aTime);
-  });
+  return items;
 }
 
 // ── Pure: article-age window (v1.1.3 Time Controls) ─────────────
@@ -157,7 +150,7 @@ export function getRssDisplayPrefs(
     widget?.config as { display?: Partial<RssDisplayPrefs> } | undefined
   )?.display;
   if (!override) return globalPrefs;
-  return { ...globalPrefs, ...override };
+  return migrateRssDisplay({ ...globalPrefs, ...override });
 }
 
 // ── Pipeline result (for FeedTab) ────────────────────────────────
@@ -173,14 +166,14 @@ export interface RssPipelineOptions {
   sortOrder: RssSortOrder;
   /** Per-source limit (from Display prefs). 0 = no limit. */
   articlesPerSource: number;
+  /** Total feed limit after filtering and sorting. 0 = no limit. */
+  maxArticles?: number;
   /** Article-age window in days (v1.1.3). 0 = no filter. */
   maxArticleAgeDays?: number;
   /** Injectable clock for tests; defaults to Date.now(). */
   now?: number;
   /** Feed-page interactive toggle that disables the per-source limit. */
   showAll?: boolean;
-  /** Feed-page: sources the user has expanded in by-source view. */
-  expandedSources?: Set<string>;
 }
 
 export interface RssPipelineResult {
@@ -205,10 +198,10 @@ export function applyRssPipeline(
     categoryMap,
     sortOrder,
     articlesPerSource,
+    maxArticles = 0,
     maxArticleAgeDays = 0,
     now = Date.now(),
     showAll,
-    expandedSources,
   } = opts;
 
   // Age window first (v1.1.3) — everything downstream (filters, limit,
@@ -229,8 +222,6 @@ export function applyRssPipeline(
   const sorted = sortRssItems(filtered, sortOrder);
 
   const overflow = new Map<string, number>();
-  const isBySource = sortOrder === "by-source";
-
   // Per-source limiting only means anything when several sources are
   // competing — single-outlet widgets show their whole feed (v1.1.1).
   const multiSource = distinctSourceCount(items) > 1;
@@ -241,9 +232,7 @@ export function applyRssPipeline(
 
     for (const item of sorted) {
       const count = sourceCounts.get(item.source_name) ?? 0;
-      const isExpanded = !!(isBySource && expandedSources?.has(item.source_name));
-
-      if (isExpanded || count < articlesPerSource) {
+      if (count < articlesPerSource) {
         limited.push(item);
       }
       sourceCounts.set(item.source_name, count + 1);
@@ -251,15 +240,22 @@ export function applyRssPipeline(
 
     let hidden = 0;
     for (const [source, total] of sourceCounts) {
-      const expanded = !!(isBySource && expandedSources?.has(source));
-      if (total > articlesPerSource && !expanded) {
+      if (total > articlesPerSource) {
         overflow.set(source, total - articlesPerSource);
         hidden += total - articlesPerSource;
       }
     }
 
-    return { visibleItems: limited, overflowCounts: overflow, totalHidden: hidden };
+    return {
+      visibleItems: maxArticles > 0 ? limited.slice(0, maxArticles) : limited,
+      overflowCounts: overflow,
+      totalHidden: hidden,
+    };
   }
 
-  return { visibleItems: sorted, overflowCounts: overflow, totalHidden: 0 };
+  return {
+    visibleItems: maxArticles > 0 ? sorted.slice(0, maxArticles) : sorted,
+    overflowCounts: overflow,
+    totalHidden: 0,
+  };
 }

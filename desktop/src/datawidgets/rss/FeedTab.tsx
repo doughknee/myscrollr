@@ -14,7 +14,7 @@
  * FOOTER as content, not chrome.
  */
 import { memo, useMemo, useState, useCallback } from "react";
-import { Rss, ChevronDown, ChevronUp, Newspaper, CalendarRange } from "lucide-react";
+import { Rss, Newspaper, CalendarRange } from "lucide-react";
 import { clsx } from "clsx";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -83,7 +83,6 @@ type SortOrder = RssSortOrder;
 const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
   { value: "newest", label: "Newest" },
   { value: "oldest", label: "Oldest" },
-  { value: "by-source", label: "By Source" },
 ];
 
 type RssView = "articles" | "feeds";
@@ -203,7 +202,6 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   const [sortOrder, setSortOrder] = useState<SortOrder>(
     () => dp.feedSort ?? "newest",
   );
-  const [expandedSources, toggleExpanded, clearExpanded] = useSetToggle();
   const [showAll, setShowAll] = useState(false);
 
   // Per-source article counts — menu rows carry the numbers now.
@@ -234,15 +232,21 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
     (next: SortOrder) => {
       setSortOrder(next);
       setShowAll(false);
-      clearExpanded();
       persistDisplay({ ...displayOverride, feedSort: next });
     },
-    [displayOverride, persistDisplay, clearExpanded],
+    [displayOverride, persistDisplay],
   );
 
   const pickWindow = useCallback(
     (days: number) => {
       persistDisplay({ ...displayOverride, maxArticleAgeDays: days });
+    },
+    [displayOverride, persistDisplay],
+  );
+
+  const pickMaxArticles = useCallback(
+    (maxArticles: number) => {
+      persistDisplay({ ...displayOverride, maxArticles });
     },
     [displayOverride, persistDisplay],
   );
@@ -262,7 +266,7 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   // ── Data pipeline ────────────────────────────────────────────
   // Delegates to the shared `applyRssPipeline` selector so the feed page
   // and the ticker apply the same filter/sort/limit logic.
-  const { visibleItems, overflowCounts, totalHidden } = useMemo(
+  const { visibleItems, totalHidden } = useMemo(
     () =>
       applyRssPipeline(rssItems, {
         selectedSources,
@@ -270,11 +274,11 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
         categoryMap,
         sortOrder,
         articlesPerSource: dp.articlesPerSource,
+        maxArticles: dp.maxArticles,
         maxArticleAgeDays: dp.maxArticleAgeDays,
         showAll,
-        expandedSources,
       }),
-    [rssItems, selectedSources, selectedCategories, sortOrder, dp.articlesPerSource, dp.maxArticleAgeDays, categoryMap, expandedSources, showAll],
+    [rssItems, selectedSources, selectedCategories, sortOrder, dp.articlesPerSource, dp.maxArticles, dp.maxArticleAgeDays, categoryMap, showAll],
   );
 
   // Single-outlet widgets have exactly one source; the per-source
@@ -284,53 +288,6 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
     () => distinctSourceCount(rssItems) > 1,
     [rssItems],
   );
-
-  // ── Build render list ──────────────────────────────────────────
-  type RenderEntry =
-    | { kind: "article"; item: RssItemType; category?: string }
-    | { kind: "source-header"; source: string; overflow: number; expanded: boolean };
-
-  const isBySource = sortOrder === "by-source";
-
-  const renderList = useMemo(() => {
-    const entries: RenderEntry[] = [];
-
-    if (isBySource) {
-      // Group by source — header contains the expand/collapse action
-      let currentSource: string | null = null;
-
-      for (const item of visibleItems) {
-        if (item.source_name !== currentSource) {
-          currentSource = item.source_name;
-          const overflow = overflowCounts.get(currentSource) ?? 0;
-          const expanded = expandedSources.has(currentSource);
-          entries.push({
-            kind: "source-header",
-            source: currentSource,
-            overflow,
-            expanded,
-          });
-        }
-
-        entries.push({
-          kind: "article",
-          item,
-          category: categoryMap.get(item.feed_url),
-        });
-      }
-    } else {
-      // Chronological sorts: plain article list
-      for (const item of visibleItems) {
-        entries.push({
-          kind: "article",
-          item,
-          category: categoryMap.get(item.feed_url),
-        });
-      }
-    }
-
-    return entries;
-  }, [visibleItems, overflowCounts, expandedSources, categoryMap, isBySource]);
 
   const showEmpty = rssItems.length === 0;
   const showFeedsView = isComfort && isCustom && view === "feeds";
@@ -400,11 +357,19 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
                     <FreshnessPill lastUpdated={latestUpdated} label="article" />
                   </span>
                 )}
+                <RssLimitInput
+                  maxArticles={dp.maxArticles}
+                  onPick={pickMaxArticles}
+                />
                 <RssWindowSelect days={dp.maxArticleAgeDays} onPick={pickWindow} />
               </div>
             </>
           ) : (
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              <RssLimitInput
+                maxArticles={dp.maxArticles}
+                onPick={pickMaxArticles}
+              />
               <RssWindowSelect days={dp.maxArticleAgeDays} onPick={pickWindow} />
             </div>
           )}
@@ -460,38 +425,22 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
                   : "grid grid-cols-1 gap-2 p-3 sm:grid-cols-2",
               )}
             >
-              {renderList.map((entry) => {
-                if (entry.kind === "source-header") {
-                  return (
-                    <SourceHeader
-                      key={`hdr:${entry.source}`}
-                      source={entry.source}
-                      category={categoryMap.get(
-                        rssItems.find((i) => i.source_name === entry.source)?.feed_url ?? "",
-                      )}
-                      overflow={entry.overflow}
-                      expanded={entry.expanded}
-                      onToggle={() => toggleExpanded(entry.source)}
-                    />
-                  );
-                }
-                return (
-                  <RssArticle
-                    key={`${entry.item.feed_url}:${entry.item.guid}`}
-                    item={entry.item}
-                    mode={mode}
-                    category={entry.category}
-                    now={now}
-                  />
-                );
-              })}
+              {visibleItems.map((item) => (
+                <RssArticle
+                  key={`${item.feed_url}:${item.guid}`}
+                  item={item}
+                  mode={mode}
+                  category={categoryMap.get(item.feed_url)}
+                  now={now}
+                />
+              ))}
             </div>
           )}
 
           {/* Per-source limit — list FOOTER content, not chrome (the old
               info bands above the list are gone). Multi-source only:
               single-outlet widgets have no per-source concept. */}
-          {multiSource && !isBySource && totalHidden > 0 && !showAll && (
+          {multiSource && totalHidden > 0 && !showAll && (
             <div className="flex items-center justify-center gap-3 px-3 py-3">
               <button
                 onClick={() => setShowAll(true)}
@@ -504,7 +453,7 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
               </span>
             </div>
           )}
-          {multiSource && !isBySource && showAll && totalHidden === 0 && dp.articlesPerSource > 0 && (
+          {multiSource && showAll && totalHidden === 0 && dp.articlesPerSource > 0 && (
             <div className="flex items-center justify-center px-3 py-3">
               <button
                 onClick={() => setShowAll(false)}
@@ -526,6 +475,40 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
 // Same write the old gear's ArticleAgeControl made: the widget's
 // `config.display` override, merged over the global rss display
 // everywhere it's read. 0 = no age filter.
+
+function RssLimitInput({
+  maxArticles,
+  onPick,
+}: {
+  maxArticles: number;
+  onPick: (maxArticles: number) => void;
+}) {
+  return (
+    <label className="flex h-7 items-center gap-1 rounded-lg border border-edge/30 bg-base-150/60 px-2 text-ui-meta text-fg-3">
+      <span>Show</span>
+      <input
+        key={maxArticles}
+        type="number"
+        min={1}
+        step={1}
+        defaultValue={maxArticles || ""}
+        placeholder="All"
+        aria-label="Maximum articles; leave blank for all"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        onBlur={(e) => {
+          const value = e.currentTarget.valueAsNumber;
+          const next =
+            Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
+          e.currentTarget.value = next ? String(next) : "";
+          onPick(next);
+        }}
+        className="w-10 bg-transparent text-center font-mono text-fg outline-none placeholder:text-fg-4"
+      />
+    </label>
+  );
+}
 
 const AGE_OPTIONS: { value: string; label: string }[] = [
   { value: "1", label: "Today" },
@@ -641,51 +624,6 @@ function RssFeedsPanel({
         error={catalogError}
         saving={saving}
       />
-    </div>
-  );
-}
-
-// ── SourceHeader (by-source sort) ────────────────────────────────
-
-interface SourceHeaderProps {
-  source: string;
-  category?: string;
-  overflow: number;
-  expanded: boolean;
-  onToggle: () => void;
-}
-
-function SourceHeader({ source, category, overflow, expanded, onToggle }: SourceHeaderProps) {
-  const hasAction = overflow > 0 || expanded;
-
-  return (
-    <div className="col-span-full flex items-center gap-2 px-3 py-2 bg-surface-2 border-b border-edge/30">
-      <span className="font-mono text-ui-section font-bold text-fg-2 uppercase tracking-wider">
-        {source}
-      </span>
-      {category && (
-        <span className="px-1.5 py-px rounded text-ui-chip text-fg-3 bg-accent/10">
-          {category}
-        </span>
-      )}
-      {hasAction && (
-        <button
-          onClick={onToggle}
-          className="ml-auto flex items-center gap-1 text-ui-chip text-accent hover:text-accent/80  cursor-pointer"
-        >
-          {overflow > 0 ? (
-            <>
-              <span>{overflow} more</span>
-              <ChevronDown size={11} />
-            </>
-          ) : (
-            <>
-              <span>Collapse</span>
-              <ChevronUp size={11} />
-            </>
-          )}
-        </button>
-      )}
     </div>
   );
 }
