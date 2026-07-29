@@ -7,14 +7,14 @@
  *
  * ONE Kalshi-style control bar (widget-bar primitives): All/Watchlist
  * · sort/category menus · symbol search · freshness.
- * The search is
- * ALSO the symbol manager: catalog matches surface inline with
+ * Search is the symbol manager: catalog matches surface inline with
  * Add/Remove actions (the separate Symbols view is gone). Controls remain
  * visible in the shared horizontally scrollable bar at narrow widths.
  */
 import { memo, useMemo, useRef, useState, useCallback } from "react";
 import { clsx } from "clsx";
-import { TrendingUp, X } from "lucide-react";
+import { Plus, Trash2, TrendingUp, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import {
   dashboardQueryOptions,
@@ -37,6 +37,7 @@ import { useDataWidgetConfig } from "../../hooks/useDataWidgetConfig";
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
 import { useCatalog } from "../../hooks/useCatalog";
+import { controlTransition, popoverMotion } from "../../lib/motion";
 import {
   useAutoPagination,
   useSetToggle,
@@ -44,6 +45,7 @@ import {
 } from "../feedHooks";
 import {
   applyFinancePipeline,
+  searchFinanceCatalog,
   selectStockView,
   STOCK_SECTORS,
   type FinanceSortKey,
@@ -259,69 +261,33 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   );
 
   const searchQ = query.trim().toLowerCase();
-  const filtered = useMemo(
-    () =>
-      searchQ
-        ? piped.filter((t) => t.symbol.toLowerCase().includes(searchQ))
-        : piped,
-    [piped, searchQ],
-  );
 
   const { visible, footer } = useAutoPagination(
-    filtered.length,
-    [view, selectedCategories, sortKey, query],
+    piped.length,
+    [view, selectedCategories, sortKey],
     "px-3 py-3 bg-surface border-t border-edge/30",
   );
-  const pageItems = filtered.slice(0, visible);
+  const pageItems = piped.slice(0, visible);
 
   const latestUpdated = useMemo(
-    () => latestTimestamp(filtered, (t) => t.last_updated),
-    [filtered],
+    () => latestTimestamp(piped, (t) => t.last_updated),
+    [piped],
   );
 
   const showEmpty = trades.length === 0;
 
-  // ── Search-to-add (the Symbols view, folded into the bar) ────
-  // Typing in the bar search filters the tracked grid AND surfaces
-  // catalog matches: untracked ones with an Add action, tracked ones
-  // with Remove — same config.symbols write the Symbols view made.
-  // Scope catalog matches to this widget's asset class (crypto widget
-  // sees only Crypto; stocks widget everything else).
-  const catalogMatches = useMemo(() => {
-    if (!searchQ) return [];
-    return (catalog ?? [])
-      .filter((item) =>
-        assetClass === "crypto"
-          ? item.category === "Crypto"
-          : assetClass
-            ? item.category !== "Crypto"
-            : true,
-      )
-      .filter(
-        (item) =>
-          item.symbol.toLowerCase().includes(searchQ) ||
-          item.name.toLowerCase().includes(searchQ),
-      )
-      .sort((a, b) => {
-        // Untracked (addable) first — adding is why you searched.
-        const at = trackedSet.has(a.symbol) ? 1 : 0;
-        const bt = trackedSet.has(b.symbol) ? 1 : 0;
-        if (at !== bt) return at - bt;
-        return a.symbol.localeCompare(b.symbol);
-      })
-      .slice(0, 8);
-  }, [searchQ, catalog, assetClass, trackedSet]);
+  // Catalog results replace the feed while searching so the field has one job.
+  const catalogMatches = useMemo(
+    () => searchFinanceCatalog(catalog ?? [], searchQ, assetClass, trackedSet),
+    [searchQ, catalog, assetClass, trackedSet],
+  );
 
   const addSymbol = useCallback(
     (sym: string) => {
       if (trackedSet.has(sym)) return;
       updateSymbols([...trackedSymbols, sym]);
-      if (assetClass === "stock" || assetClass === "crypto") {
-        setView("watchlist");
-      }
-      setQuery("");
     },
-    [assetClass, trackedSymbols, trackedSet, updateSymbols],
+    [trackedSymbols, trackedSet, updateSymbols],
   );
 
   const removeSymbol = useCallback(
@@ -373,10 +339,10 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
               inputRef={searchInputRef}
               query={query}
               onQueryChange={setQuery}
-              resultCount={searchQ ? filtered.length : null}
-              ariaLabel="Search to add to watchlist"
+              resultCount={searchQ ? catalogMatches.length : null}
+              ariaLabel={`Search ${isStocks ? "stocks" : "crypto"} to manage watchlist`}
               noun="symbols"
-              placeholder="Add to watchlist"
+              placeholder={`Search ${isStocks ? "stocks" : "crypto"}`}
             />
             {latestUpdated && (
               <span className="hidden @xl:block">
@@ -401,76 +367,105 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
         </div>
       )}
 
-      {/* Catalog matches — search-to-add/remove, replaces the Symbols
-          view. Untracked rows add; tracked rows remove. */}
-      {isComfort && searchQ && catalogMatches.length > 0 && (
-        <div className="mx-3 mt-2 overflow-hidden rounded-lg border border-edge/40 bg-surface-2">
-          {catalogMatches.map((item) => {
-            const tracked = trackedSet.has(item.symbol);
-            return (
-              <div
-                key={item.symbol}
-                className="flex items-center justify-between gap-3 border-b border-edge/30 px-3 py-1.5 last:border-b-0"
-              >
-                <div className="flex min-w-0 items-baseline gap-2">
-                  <span className="font-mono text-[12px] font-semibold text-fg">
-                    {item.symbol}
-                  </span>
-                  <span className="truncate text-[11px] text-fg-3">
-                    {item.name}
-                  </span>
-                  <span className="shrink-0 text-[10px] uppercase tracking-wider text-fg-4">
-                    {item.category}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    tracked ? removeSymbol(item.symbol) : addSymbol(item.symbol)
-                  }
-                  disabled={symbolsSaving}
-                  className={clsx(
-                    "shrink-0 rounded-md px-2.5 py-1 text-ui-chip font-semibold  disabled:opacity-40",
-                    tracked
-                      ? "text-fg-3 hover:bg-down/10 hover:text-down"
-                      : "bg-accent/10 text-accent hover:bg-accent/20",
-                  )}
-                >
-                  {tracked ? "Remove" : "+ Add"}
-                </button>
+      <AnimatePresence initial={false}>
+        {isComfort && searchQ && (
+          <motion.div
+            key="watchlist-search"
+            variants={popoverMotion}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="mx-3 mt-2 overflow-hidden rounded-xl border border-edge/40 bg-surface-2 shadow-lg shadow-black/10"
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-edge/30 px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold text-fg">
+                  Manage watchlist
+                </p>
+                <p className="truncate text-[10px] text-fg-4">
+                  Add or remove several symbols, then press Esc to close
+                </p>
               </div>
-            );
-          })}
-        </div>
-      )}
+              <span className="shrink-0 text-[10px] tabular-nums text-fg-4">
+                {catalogMatches.length} found
+              </span>
+            </div>
+            {catalogMatches.length === 0 ? (
+              <div className="px-3 py-5 text-center text-[11px] text-fg-3">
+                No {isStocks ? "stocks" : "crypto"} found for “{query.trim()}”
+              </div>
+            ) : (
+              catalogMatches.map((item) => {
+                const tracked = trackedSet.has(item.symbol);
+                return (
+                  <div
+                    key={item.symbol}
+                    className="flex items-center justify-between gap-3 border-b border-edge/30 px-3 py-2 last:border-b-0"
+                  >
+                    <div className="flex min-w-0 items-baseline gap-2">
+                      <span className="font-mono text-[12px] font-semibold text-fg">
+                        {item.symbol}
+                      </span>
+                      <span className="truncate text-[11px] text-fg-3">
+                        {item.name}
+                      </span>
+                      {isStocks && (
+                        <span className="shrink-0 text-[10px] uppercase tracking-wider text-fg-4">
+                          {item.category}
+                        </span>
+                      )}
+                    </div>
+                    <motion.button
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() =>
+                        tracked
+                          ? removeSymbol(item.symbol)
+                          : addSymbol(item.symbol)
+                      }
+                      whileTap={{ transform: "scale(0.97)" }}
+                      transition={controlTransition}
+                      disabled={symbolsSaving}
+                      aria-label={`${tracked ? "Remove" : "Add"} ${item.symbol} ${tracked ? "from" : "to"} watchlist`}
+                      className={clsx(
+                        "inline-flex min-w-20 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 py-1 text-ui-chip font-semibold disabled:cursor-wait disabled:opacity-40",
+                        tracked
+                          ? "border border-edge/40 text-fg-3 hover:border-down/30 hover:bg-down/10 hover:text-down"
+                          : "bg-accent/10 text-accent hover:bg-accent/20",
+                      )}
+                    >
+                      {tracked ? <Trash2 size={11} /> : <Plus size={12} />}
+                      {tracked ? "Remove" : "Add"}
+                    </motion.button>
+                  </div>
+                );
+              })
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {showEmpty ? (
+      {searchQ ? null : showEmpty ? (
         <div className="flex flex-1 flex-col justify-center">
-          {/* Searching from empty: the matches panel above is the
-              content — don't stack the hero under it. */}
-          {!searchQ && (
-            <EmptyWidgetState
-              refreshing={Boolean(feedContext.__refreshing)}
-              icon={TrendingUp}
-              noun="stocks or crypto"
-              hasConfig={!!feedContext.__hasConfig}
-              dashboardLoaded={!!feedContext.__dashboardLoaded}
-              loadingNoun="prices"
-              actionHint="search to add symbols"
-              actionLabel={isComfort ? "Search to add symbols" : undefined}
-              onConfigure={
-                isComfort ? () => searchInputRef.current?.focus() : undefined
-              }
-            />
-          )}
+          <EmptyWidgetState
+            refreshing={Boolean(feedContext.__refreshing)}
+            icon={TrendingUp}
+            noun="stocks or crypto"
+            hasConfig={!!feedContext.__hasConfig}
+            dashboardLoaded={!!feedContext.__dashboardLoaded}
+            loadingNoun="prices"
+            actionHint="search to add symbols"
+            actionLabel={isComfort ? "Search to add symbols" : undefined}
+            onConfigure={
+              isComfort ? () => searchInputRef.current?.focus() : undefined
+            }
+          />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : piped.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 gap-3">
           <p className="text-[12px] text-fg-3">
-            {searchQ
-              ? `No symbols match “${query.trim()}”`
-              : isWatchlist
-                ? "Your watchlist is empty — search to add symbols"
+            {isWatchlist
+              ? "Your watchlist is empty — search to add symbols"
               : "No symbols match your filters"}
           </p>
           <button

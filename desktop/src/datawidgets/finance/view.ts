@@ -24,6 +24,54 @@ export const STOCK_SECTORS = [
   "Utilities",
 ] as const;
 
+interface FinanceCatalogItem {
+  symbol: string;
+  name: string;
+  category: string;
+}
+
+/** Catalog search for watchlist management, ranked by relevance. */
+export function searchFinanceCatalog(
+  catalog: readonly FinanceCatalogItem[],
+  query: string,
+  assetClass: string | undefined,
+  watchlist: ReadonlySet<string>,
+): FinanceCatalogItem[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+
+  const relevance = (item: FinanceCatalogItem) => {
+    const symbol = item.symbol.toLowerCase();
+    const name = item.name.toLowerCase();
+    if (symbol === q) return 0;
+    if (symbol.startsWith(q)) return 1;
+    if (name.startsWith(q)) return 2;
+    if (symbol.includes(q)) return 3;
+    return 4;
+  };
+
+  return catalog
+    .filter((item) =>
+      assetClass === "crypto"
+        ? item.category === "Crypto"
+        : assetClass === "stock"
+          ? item.category !== "Crypto"
+          : true,
+    )
+    .filter(
+      (item) =>
+        item.symbol.toLowerCase().includes(q) ||
+        item.name.toLowerCase().includes(q),
+    )
+    .sort(
+      (a, b) =>
+        relevance(a) - relevance(b) ||
+        Number(watchlist.has(a.symbol)) - Number(watchlist.has(b.symbol)) ||
+        a.symbol.localeCompare(b.symbol),
+    )
+    .slice(0, 8);
+}
+
 // ── Pure: parse percentage change ───────────────────────────────
 
 function parsePct(v: string | number | null | undefined): number {

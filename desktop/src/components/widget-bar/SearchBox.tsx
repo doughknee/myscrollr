@@ -37,7 +37,7 @@ export function useSlashFocus(
 
 /** Compact-by-default search field; expands on focus (or while a query is
  *  set). Same contained shape as the Segmented control so the bar stays
- *  one family. Results filter the host's grid in place as the user types. */
+ *  one family. The host decides how to present matching results. */
 export function SearchBox({
   inputRef,
   query,

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   sortTrades,
   applyFinancePipeline,
+  searchFinanceCatalog,
   selectFinanceForTicker,
   selectStockView,
 } from "./view";
@@ -152,6 +153,33 @@ describe("selectStockView", () => {
         selectedSectors: new Set(["Technology"]),
       }).map((trade) => trade.symbol),
     ).toEqual(["MSFT"]);
+  });
+});
+
+describe("searchFinanceCatalog", () => {
+  const catalog = [
+    { symbol: "AAPL", name: "Apple Inc.", category: "Technology" },
+    { symbol: "AAP", name: "Advance Auto Parts", category: "Consumer Cyclical" },
+    { symbol: "BTC/USD", name: "Bitcoin", category: "Crypto" },
+    { symbol: "ETH/USD", name: "Ethereum", category: "Crypto" },
+  ];
+
+  it("scopes results and ranks relevant, addable symbols first", () => {
+    expect(
+      searchFinanceCatalog(catalog, "aap", "stock", new Set(["AAP"])).map(
+        (item) => item.symbol,
+      ),
+    ).toEqual(["AAP", "AAPL"]);
+    expect(
+      searchFinanceCatalog(catalog, "a", "stock", new Set(["AAP"])).map(
+        (item) => item.symbol,
+      ),
+    ).toEqual(["AAPL", "AAP"]);
+    expect(
+      searchFinanceCatalog(catalog, "bit", "crypto", new Set()).map(
+        (item) => item.symbol,
+      ),
+    ).toEqual(["BTC/USD"]);
   });
 });
 
