@@ -63,6 +63,7 @@ import {
   savePrefs,
   toggleWidgetOnTicker,
   consumeTickerLayoutChanged,
+  reconcileSidebarOrder,
   resolveThemeMode,
 } from "../preferences";
 import {
@@ -674,12 +675,48 @@ function RootLayout() {
         }
       }
     }
-    return sources;
+    const byId = new Map(sources.map((source) => [source.id, source]));
+    return reconcileSidebarOrder(
+      prefs.widgets.sidebarOrder,
+      sources.map((source) => source.id),
+    ).map((id) => byId.get(id)!);
     // `prefs` wholesale: the ticker-row layout lives under
     // prefs.appearance and enabled widgets under prefs.widgets — the
     // list build is cheap, so one broad dep beats two narrow ones
     // that could silently miss a third source of truth later.
   }, [dashboard?.widgets, prefs, allDataWidgetManifests, allWidgets, catalogVersion]);
+
+  // Once the complete server-backed list is known, persist the reconciled
+  // order so removed IDs disappear and newly enabled widgets get a stable slot.
+  useEffect(() => {
+    if (!dashboard) return;
+    const nextOrder = sidebarSources.map((source) => source.id);
+    if (
+      nextOrder.length === prefs.widgets.sidebarOrder.length &&
+      nextOrder.every((id, index) => id === prefs.widgets.sidebarOrder[index])
+    ) {
+      return;
+    }
+    persistPrefs({
+      ...prefs,
+      widgets: { ...prefs.widgets, sidebarOrder: nextOrder },
+    });
+  }, [dashboard, persistPrefs, prefs, sidebarSources]);
+
+  const handleMoveSidebarItem = useCallback(
+    (id: string, direction: "up" | "down") => {
+      const nextOrder = sidebarSources.map((source) => source.id);
+      const from = nextOrder.indexOf(id);
+      const to = from + (direction === "up" ? -1 : 1);
+      if (from < 0 || to < 0 || to >= nextOrder.length) return;
+      [nextOrder[from], nextOrder[to]] = [nextOrder[to], nextOrder[from]];
+      persistPrefs({
+        ...prefs,
+        widgets: { ...prefs.widgets, sidebarOrder: nextOrder },
+      });
+    },
+    [persistPrefs, prefs, sidebarSources],
+  );
 
   // ── Keyboard shortcuts ──────────────────────────────────────
   useEffect(() => {
@@ -873,6 +910,7 @@ function RootLayout() {
               onSelectItem={handleSelectPinned}
               onInfoItem={handleInfoItem}
               onToggleItemTicker={handleToggleItemTicker}
+              onMoveItem={handleMoveSidebarItem}
               onRemoveItem={handleRemoveItem}
             />
 

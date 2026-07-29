@@ -22,6 +22,7 @@ function renderSidebar(opts: {
   const onNavigateHome = vi.fn();
   const onNavigateToReleases = vi.fn();
   const onNavigateToStatus = vi.fn();
+  const onMoveItem = vi.fn();
   const sources = Array.from({ length: opts.sourceCount }, (_, i) => ({
     id: `src-${i}`,
     name: `Source ${i}`,
@@ -61,6 +62,7 @@ function renderSidebar(opts: {
         onSelectItem={() => {}}
         onInfoItem={() => {}}
         onToggleItemTicker={() => {}}
+        onMoveItem={onMoveItem}
         onRemoveItem={() => {}}
       />
     </div>,
@@ -71,6 +73,7 @@ function renderSidebar(opts: {
     onNavigateHome,
     onNavigateToReleases,
     onNavigateToStatus,
+    onMoveItem,
   };
 }
 
@@ -213,5 +216,18 @@ describe("Sidebar account menu", () => {
     fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
     expect(screen.getByText("Super User")).toBeInTheDocument();
     expect(screen.queryByText("Super User plan")).not.toBeInTheDocument();
+  });
+});
+
+describe("Sidebar widget ordering", () => {
+  it("moves widgets from their right-click menu and guards the list edges", async () => {
+    const { onMoveItem } = renderSidebar({ tier: "free", sourceCount: 3 });
+
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Source 1" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Move up" }));
+    expect(onMoveItem).toHaveBeenCalledWith("src-1", "up");
+
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Source 0" }));
+    expect(await screen.findByRole("menuitem", { name: "Move up" })).toBeDisabled();
   });
 });

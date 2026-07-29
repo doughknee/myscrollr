@@ -276,6 +276,8 @@ export interface WidgetPinConfig {
 export interface WidgetPrefs {
   /** Widget IDs that are enabled (shown in sidebar and feed tabs). */
   enabledWidgets: string[];
+  /** User-defined order for all enabled sidebar widgets. */
+  sidebarOrder: string[];
   /** Widget IDs whose data appears on the ticker. Subset of enabledWidgets. */
   widgetsOnTicker: string[];
   /** Per-widget pin state: removes the chip from the scrolling ticker and
@@ -645,6 +647,7 @@ const DEFAULT_WIDGETS: WidgetPrefs = {
   // 3 slots and needs no setup. Existing users keep their saved prefs — this
   // only seeds fresh installs.
   enabledWidgets: ["clock"],
+  sidebarOrder: [],
   widgetsOnTicker: ["clock"],
   pinnedWidgets: {},
   clock: {
@@ -796,6 +799,9 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
 
   return {
     enabledWidgets,
+    sidebarOrder: Array.isArray(saved.sidebarOrder)
+      ? saved.sidebarOrder.filter((id): id is string => typeof id === "string")
+      : [],
     // Migration: if widgetsOnTicker doesn't exist, default to enabledWidgets
     widgetsOnTicker,
     pinnedWidgets: (saved.pinnedWidgets != null && typeof saved.pinnedWidgets === "object" && !Array.isArray(saved.pinnedWidgets))
@@ -843,6 +849,24 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
       ticker: { ...DEFAULT_GITHUB_TICKER },
     },
   };
+}
+
+/** Keep saved positions, remove stale/duplicate IDs, then append new widgets. */
+export function reconcileSidebarOrder(
+  saved: readonly string[],
+  available: readonly string[],
+): string[] {
+  const remaining = new Set(available);
+  const ordered: string[] = [];
+
+  for (const id of saved) {
+    if (remaining.delete(id)) ordered.push(id);
+  }
+  for (const id of available) {
+    if (remaining.delete(id)) ordered.push(id);
+  }
+
+  return ordered;
 }
 
 // ── Ticker layout migration ─────────────────────────────────────

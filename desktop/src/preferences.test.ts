@@ -31,6 +31,7 @@ import {
   isThemeMode,
   THEME_FAMILIES,
   mergeWidgetPrefs,
+  reconcileSidebarOrder,
   loadPrefs,
 } from "./preferences";
 import type { AppPreferences, WidgetPrefs } from "./preferences";
@@ -48,6 +49,15 @@ vi.mock("./lib/store", () => ({
 
 afterEach(() => {
   storeValues.clear();
+});
+
+it("reconciles sidebar ordering across widget types", () => {
+  expect(
+    reconcileSidebarOrder(
+      ["clock", "finance", "removed", "clock"],
+      ["finance", "sports", "clock", "github"],
+    ),
+  ).toEqual(["clock", "finance", "sports", "github"]);
 });
 
 interface LegacyClockTimerWidgetPrefs extends Omit<Partial<WidgetPrefs>, "clock"> {

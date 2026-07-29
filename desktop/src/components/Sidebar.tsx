@@ -27,6 +27,8 @@ import {
 } from "react";
 import type { ButtonHTMLAttributes, Ref } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
   ArrowUpRight,
   ChevronDown,
   Home,
@@ -153,6 +155,8 @@ interface SidebarProps {
   onInfoItem: (id: string) => void;
   /** Toggle the source's presence on the ticker. */
   onToggleItemTicker: (source: SidebarSource) => void;
+  /** Move the widget within the shared sidebar order. */
+  onMoveItem: (id: string, direction: "up" | "down") => void;
   /** Remove the widget (frees its slot). */
   onRemoveItem: (source: SidebarSource) => void;
 }
@@ -181,6 +185,7 @@ export default function Sidebar({
   onSelectItem,
   onInfoItem,
   onToggleItemTicker,
+  onMoveItem,
   onRemoveItem,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(() =>
@@ -438,6 +443,20 @@ export default function Sidebar({
                   label: "Open",
                   icon: ArrowUpRight,
                   onSelect: () => onSelectItem(menu.source.id),
+                },
+                {
+                  key: "move-up",
+                  label: "Move up",
+                  icon: ArrowUp,
+                  disabled: sources[0]?.id === menu.source.id,
+                  onSelect: () => onMoveItem(menu.source.id, "up"),
+                },
+                {
+                  key: "move-down",
+                  label: "Move down",
+                  icon: ArrowDown,
+                  disabled: sources.at(-1)?.id === menu.source.id,
+                  onSelect: () => onMoveItem(menu.source.id, "down"),
                 },
                 {
                   key: "ticker",
