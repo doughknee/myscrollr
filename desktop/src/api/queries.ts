@@ -9,12 +9,13 @@ import { isAuthenticated, hasRefreshToken } from "../auth";
 import { authFetch, request, rssApi, fetchOverview } from "./client";
 import { DEMO } from "../config";
 import type { TrackedFeed, UserOverview } from "./client";
-import type { DashboardResponse, Game } from "../types";
+import type { DashboardResponse, Game, Trade } from "../types";
 
 // ── Query Keys ───────────────────────────────────────────────────
 
 export const queryKeys = {
   dashboard: ["dashboard"] as const,
+  financeMarket: ["finance", "market"] as const,
   weather: ["weather"] as const,
   catalogs: {
     finance: ["catalogs", "finance"] as const,
@@ -212,6 +213,15 @@ export function financeCatalogOptions() {
     queryKey: queryKeys.catalogs.finance,
     queryFn: () => request<TrackedSymbol[]>("/finance/symbols"),
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function financeMarketOptions() {
+  return queryOptions({
+    queryKey: queryKeys.financeMarket,
+    queryFn: () => request<Trade[]>("/finance/public"),
+    staleTime: 30_000,
+    refetchInterval: 30_000,
   });
 }
 

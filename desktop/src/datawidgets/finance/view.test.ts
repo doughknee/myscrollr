@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { sortTrades, applyFinancePipeline, selectFinanceForTicker } from "./view";
+import {
+  sortTrades,
+  applyFinancePipeline,
+  selectFinanceForTicker,
+  selectStockView,
+} from "./view";
 import type { Trade } from "../../types";
 import type { FinanceDisplayPrefs } from "../../preferences";
 
@@ -63,6 +68,19 @@ describe("sortTrades", () => {
     expect(result.map((t) => t.symbol)).toEqual(["B", "C", "A", "D"]);
   });
 
+  it("sorts by current session volume descending", () => {
+    const trades = [
+      mk({ symbol: "A", day_volume: 100 }),
+      mk({ symbol: "B", day_volume: 900 }),
+      mk({ symbol: "C", day_volume: 400 }),
+    ];
+    expect(sortTrades(trades, "volume").map((trade) => trade.symbol)).toEqual([
+      "B",
+      "C",
+      "A",
+    ]);
+  });
+
   it("sorts by updated (last_updated) descending", () => {
     const trades = [
       mk({ symbol: "A", last_updated: "2026-01-01T00:00:00Z" }),
@@ -99,6 +117,65 @@ describe("sortTrades", () => {
     ];
     const result = sortTrades(trades, "change");
     expect(result.map((t) => t.symbol)).toEqual(["B", "A", "C"]);
+  });
+});
+
+describe("selectStockView", () => {
+  const trades = [
+    mk({ symbol: "SPY", day_volume: 10 }),
+    mk({ symbol: "QQQ", day_volume: 20 }),
+    mk({ symbol: "AAPL", day_volume: 30 }),
+    mk({ symbol: "MSFT", day_volume: 40 }),
+    mk({ symbol: "JPM", day_volume: 50 }),
+    mk({ symbol: "XOM", day_volume: 60 }),
+  ];
+  const categoryMap = new Map([
+    ["AAPL", "Technology"],
+    ["MSFT", "Technology"],
+    ["JPM", "Financial Services"],
+    ["XOM", "Energy"],
+  ]);
+  const base = {
+    watchlist: new Set<string>(["MSFT", "JPM"]),
+    selectedSectors: new Set<string>(),
+    categoryMap,
+    sortKey: "alpha" as const,
+  };
+
+  it("uses explicit overview and big-tech memberships", () => {
+    expect(
+      selectStockView(trades, { ...base, view: "overview" }).map(
+        (trade) => trade.symbol,
+      ),
+    ).toEqual(["QQQ", "SPY"]);
+    expect(
+      selectStockView(trades, { ...base, view: "big-tech" }).map(
+        (trade) => trade.symbol,
+      ),
+    ).toEqual(["AAPL", "MSFT"]);
+  });
+
+  it("filters meaningful sectors and the saved watchlist", () => {
+    expect(
+      selectStockView(trades, {
+        ...base,
+        view: "sectors",
+        selectedSectors: new Set(["Energy"]),
+      }).map((trade) => trade.symbol),
+    ).toEqual(["XOM"]);
+    expect(
+      selectStockView(trades, { ...base, view: "watchlist" }).map(
+        (trade) => trade.symbol,
+      ),
+    ).toEqual(["JPM", "MSFT"]);
+  });
+
+  it("orders Most Active by real session volume", () => {
+    expect(
+      selectStockView(trades, { ...base, view: "active" }).map(
+        (trade) => trade.symbol,
+      ),
+    ).toEqual(["XOM", "JPM", "MSFT", "AAPL", "QQQ", "SPY"]);
   });
 });
 
