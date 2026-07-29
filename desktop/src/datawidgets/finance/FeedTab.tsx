@@ -114,13 +114,13 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   const isComfort = mode === "comfort";
   const assetClass = widgetId ? assetClassForWidget(widgetId) : undefined;
   const isStocks = assetClass === "stock";
-  const useStockViews = isStocks && isComfort;
+  const useMarketUniverse = assetClass != null && isComfort;
 
   const { data: dashboard } = useQuery(dashboardQueryOptions());
   const { data: catalog } = useQuery(financeCatalogOptions());
   const { data: marketTrades } = useQuery({
     ...financeMarketOptions(),
-    enabled: useStockViews,
+    enabled: useMarketUniverse,
   });
 
   // One subscription for the whole list — passed down to each row so
@@ -149,7 +149,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   // A per-asset-class widget (finance_stocks / finance_crypto) scopes the feed
   // to its class: crypto = the "Crypto" category, stocks = everything else.
   const trades = useMemo(() => {
-    const universe = useStockViews
+    const universe = useMarketUniverse
       ? (marketTrades ?? configuredTrades)
       : configuredTrades;
     if (!assetClass) return universe;
@@ -158,7 +158,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
         categoryMap.get(t.symbol) === "Crypto" || t.symbol.includes("/");
       return assetClass === "crypto" ? isCrypto : !isCrypto;
     });
-  }, [assetClass, categoryMap, configuredTrades, marketTrades, useStockViews]);
+  }, [assetClass, categoryMap, configuredTrades, marketTrades, useMarketUniverse]);
 
   // Derive meaningful stock-sector counts from the broad market universe.
   const categoryList = useMemo(() => {
@@ -231,7 +231,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   // Stocks scope All to known sectors; Crypto uses the full coin universe.
   // Both share the same All/Watchlist view and persisted sort preference.
   const piped = useMemo(
-    () => useStockViews
+    () => isStocks && isComfort
       ? selectStockView(trades, {
           view,
           watchlist: trackedSet,
@@ -252,8 +252,9 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
       sortKey,
       trackedSet,
       trades,
-      useStockViews,
       view,
+      isComfort,
+      isStocks,
     ],
   );
 
@@ -340,66 +341,49 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
     <div ref={containerRef} className="relative flex min-h-full flex-col">
       {isComfort && (
         <WidgetBar>
-          {!showEmpty ? (
-            <>
-              <Segmented
-                value={view}
-                options={VIEW_OPTIONS}
-                ariaLabel={isStocks ? "Stock view" : "Crypto view"}
-                onChange={setView}
-              />
+          <Segmented
+            value={view}
+            options={VIEW_OPTIONS}
+            ariaLabel={isStocks ? "Stock view" : "Crypto view"}
+            onChange={setView}
+          />
 
-              <div className="ml-auto flex min-w-0 shrink items-center gap-2">
-                <SelectMenu
-                  value={sortKey}
-                  options={SORT_OPTIONS}
-                  onChange={pickSort}
-                  ariaLabel="Sort symbols"
-                  prefix="Sort"
-                />
-                {isStocks && categoryList.length > 1 && (
-                  <MultiSelectMenu
-                    options={categoryList.map((c) => c.name)}
-                    counts={Object.fromEntries(
-                      categoryList.map((c) => [c.name, c.count]),
-                    )}
-                    selected={Array.from(selectedCategories)}
-                    onToggle={toggleCategory}
-                    onClear={clearCategories}
-                    noun="categories"
-                    ariaLabel="Filter by category"
-                  />
+          <div className="ml-auto flex min-w-0 shrink items-center gap-2">
+            <SelectMenu
+              value={sortKey}
+              options={SORT_OPTIONS}
+              onChange={pickSort}
+              ariaLabel="Sort symbols"
+              prefix="Sort"
+            />
+            {isStocks && categoryList.length > 1 && (
+              <MultiSelectMenu
+                options={categoryList.map((c) => c.name)}
+                counts={Object.fromEntries(
+                  categoryList.map((c) => [c.name, c.count]),
                 )}
-                <SearchBox
-                  inputRef={searchInputRef}
-                  query={query}
-                  onQueryChange={setQuery}
-                  resultCount={searchQ ? filtered.length : null}
-                  ariaLabel="Search to add to watchlist"
-                  noun="symbols"
-                  placeholder="Add to watchlist"
-                />
-                {latestUpdated && (
-                  <span className="hidden @xl:block">
-                    <FreshnessPill lastUpdated={latestUpdated} label="price" />
-                  </span>
-                )}
-              </div>
-            </>
-          ) : (
-            // Empty feed: the search IS the add mechanism, so it stays.
-            <div className="ml-auto">
-              <SearchBox
-                inputRef={searchInputRef}
-                query={query}
-                onQueryChange={setQuery}
-                resultCount={null}
-                ariaLabel="Search to add to watchlist"
-                noun="symbols"
-                placeholder="Add to watchlist"
+                selected={Array.from(selectedCategories)}
+                onToggle={toggleCategory}
+                onClear={clearCategories}
+                noun="categories"
+                ariaLabel="Filter by category"
               />
-            </div>
-          )}
+            )}
+            <SearchBox
+              inputRef={searchInputRef}
+              query={query}
+              onQueryChange={setQuery}
+              resultCount={searchQ ? filtered.length : null}
+              ariaLabel="Search to add to watchlist"
+              noun="symbols"
+              placeholder="Add to watchlist"
+            />
+            {latestUpdated && (
+              <span className="hidden @xl:block">
+                <FreshnessPill lastUpdated={latestUpdated} label="price" />
+              </span>
+            )}
+          </div>
         </WidgetBar>
       )}
 
