@@ -516,7 +516,7 @@ const TradeItem = memo(function TradeItem({
       className={clsx(
         FEED_CARD,
         FEED_CARD_INTERACTIVE,
-        "relative flex items-center justify-between overflow-hidden border-l-2 pr-10",
+        "relative flex items-center justify-between overflow-hidden border-l-2",
         isUp && "border-l-up/40",
         isDown && "border-l-down/40",
         !isUp && !isDown && "border-l-transparent",
@@ -529,23 +529,52 @@ const TradeItem = memo(function TradeItem({
         aria-label={`Open ${trade.symbol} on Google Finance`}
         className="absolute inset-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
       />
-      <div className="pointer-events-none flex flex-col gap-0.5">
-        <span className="font-mono font-bold text-sm text-fg tracking-wide">
-          {trade.symbol}
-        </span>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <div className="flex items-center gap-1.5">
+          <span className="pointer-events-none font-mono font-bold text-sm text-fg tracking-wide">
+            {trade.symbol}
+          </span>
+          {(onAdd || onRemove) && (
+            <motion.button
+              type="button"
+              initial={false}
+              animate={
+                actionVisible || actionHovered
+                  ? CARD_ACTION_MOTION.visible
+                  : CARD_ACTION_MOTION.hidden
+              }
+              onFocus={() => setActionHovered(true)}
+              onBlur={() => setActionHovered(false)}
+              whileTap={{ transform: "scale(0.92)" }}
+              transition={controlTransition}
+              onClick={() => (onRemove ?? onAdd)?.(trade.symbol)}
+              disabled={saving}
+              aria-label={`${onRemove ? "Remove" : "Add"} ${trade.symbol} ${onRemove ? "from" : "to"} watchlist`}
+              title={`${onRemove ? "Remove from" : "Add to"} watchlist`}
+              className={clsx(
+                "relative z-10 flex size-5 shrink-0 items-center justify-center rounded border border-edge/40 bg-surface-3 shadow-sm disabled:opacity-40",
+                onRemove
+                  ? "text-fg-4 hover:border-down/30 hover:text-down"
+                  : "text-accent hover:border-accent/30",
+              )}
+            >
+              {onRemove ? <X size={12} /> : <Plus size={12} />}
+            </motion.button>
+          )}
+        </div>
         {category && (
-          <span className="bg-[#22c55e]/10 text-fg-3 text-ui-chip font-medium rounded px-1.5 py-px w-fit">
+          <span className="pointer-events-none bg-[#22c55e]/10 text-fg-3 text-ui-chip font-medium rounded px-1.5 py-px w-fit">
             {category}
           </span>
         )}
         {trade.previous_close != null && Number(trade.previous_close) > 0 && (
-          <span className="text-ui-chip font-mono text-fg-3 tabular-nums">
+          <span className="pointer-events-none text-ui-chip font-mono text-fg-3 tabular-nums">
             Prev close {formatPrice(trade.previous_close)}
           </span>
         )}
       </div>
 
-      <div className="pointer-events-none flex flex-col items-end gap-0.5">
+      <div className="pointer-events-none flex shrink-0 flex-col items-end gap-0.5">
         <span className="text-sm font-mono font-medium text-fg tabular-nums">
           {formatPrice(trade.price)}
         </span>
@@ -568,33 +597,6 @@ const TradeItem = memo(function TradeItem({
           )}
         </div>
       </div>
-      {(onAdd || onRemove) && (
-        <motion.button
-          type="button"
-          initial={false}
-          animate={
-            actionVisible || actionHovered
-              ? CARD_ACTION_MOTION.visible
-              : CARD_ACTION_MOTION.hidden
-          }
-          onFocus={() => setActionHovered(true)}
-          onBlur={() => setActionHovered(false)}
-          whileTap={{ transform: "scale(0.92)" }}
-          transition={controlTransition}
-          onClick={() => (onRemove ?? onAdd)?.(trade.symbol)}
-          disabled={saving}
-          aria-label={`${onRemove ? "Remove" : "Add"} ${trade.symbol} ${onRemove ? "from" : "to"} watchlist`}
-          title={`${onRemove ? "Remove from" : "Add to"} watchlist`}
-          className={clsx(
-            "absolute right-2 top-2 z-10 rounded-md p-1.5 disabled:opacity-40",
-            onRemove
-              ? "text-fg-4 hover:bg-down/10 hover:text-down"
-              : "text-accent hover:bg-accent/10",
-          )}
-        >
-          {onRemove ? <X size={14} /> : <Plus size={14} />}
-        </motion.button>
-      )}
     </motion.div>
   );
 }, (prev, next) =>
