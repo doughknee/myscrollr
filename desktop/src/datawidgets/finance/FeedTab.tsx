@@ -552,13 +552,13 @@ const TradeItem = memo(function TradeItem({
               aria-label={`${onRemove ? "Remove" : "Add"} ${trade.symbol} ${onRemove ? "from" : "to"} watchlist`}
               title={`${onRemove ? "Remove from" : "Add to"} watchlist`}
               className={clsx(
-                "relative z-10 -m-1 flex size-7 shrink-0 items-center justify-center rounded-md border border-edge/40 bg-surface-3 shadow-sm disabled:opacity-40",
+                "relative z-10 flex size-5 shrink-0 items-center justify-center rounded border border-edge/40 bg-surface-3 shadow-sm disabled:opacity-40",
                 onRemove
                   ? "text-fg-4 hover:border-down/30 hover:text-down"
                   : "text-accent hover:border-accent/30",
               )}
             >
-              {onRemove ? <X size={14} /> : <Plus size={14} />}
+              {onRemove ? <X size={12} /> : <Plus size={12} />}
             </motion.button>
           )}
         </div>
