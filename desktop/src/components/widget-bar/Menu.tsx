@@ -4,7 +4,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
-import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { controlTransition, popoverMotion } from "../../lib/motion";
 
@@ -53,14 +53,6 @@ export function MenuPanel({
     >
       {children}
     </motion.div>
-  );
-}
-
-export function MenuHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="px-2 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-fg-4 first:pt-1">
-      {children}
-    </div>
   );
 }
 
@@ -147,77 +139,6 @@ export function MenuPopover({
             {children(close)}
           </MenuPanel>
         )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-/** Narrow-width collapse trigger: one Filter button with an active-count
- *  badge. The host owns the open state + panel; its root should NOT be
- *  position:relative — the panel then anchors to the sticky bar (the
- *  nearest positioned ancestor) and spans the widget width instead of
- *  clipping off-screen at narrow sizes. rounded-lg on the wrapper feeds
- *  the global focus rule's `border-radius: inherit`. */
-export function FilterTrigger({
-  open,
-  badgeCount,
-  onClick,
-  ariaLabel = "Filters",
-}: {
-  open: boolean;
-  badgeCount: number;
-  onClick: () => void;
-  ariaLabel?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-expanded={open}
-      aria-haspopup="menu"
-      aria-label={ariaLabel}
-      className={clsx(
-        "relative flex h-7 w-8 cursor-pointer items-center justify-center rounded-lg border ",
-        open || badgeCount > 0
-          ? "border-accent/40 bg-accent/15 text-accent"
-          : "border-edge/30 bg-base-150/60 text-fg-3 hover:text-fg-2",
-      )}
-    >
-      <SlidersHorizontal size={13} />
-      {badgeCount > 0 && (
-        <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-accent px-0.5 font-mono text-[9px] font-bold leading-none text-white">
-          {badgeCount}
-        </span>
-      )}
-    </button>
-  );
-}
-
-/** Narrow-width collapse shell: FilterTrigger + full-width MenuPanel with
- *  the open/dismiss wiring. Hosts render only the menu rows as children. */
-export function FilterMenuShell({
-  badgeCount,
-  children,
-}: {
-  badgeCount: number;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
-  useDismiss(rootRef, open, close);
-
-  return (
-    // NOT position:relative — the dropdown anchors to the sticky bar so
-    // it spans the widget width instead of clipping at narrow widths.
-    <div ref={rootRef} className="shrink-0 rounded-lg">
-      <FilterTrigger
-        open={open}
-        badgeCount={badgeCount}
-        onClick={() => setOpen((o) => !o)}
-      />
-      <AnimatePresence>
-        {open && <MenuPanel className="inset-x-2">{children}</MenuPanel>}
       </AnimatePresence>
     </div>
   );

@@ -8,9 +8,8 @@
  * ONE Kalshi-style control bar (widget-bar primitives): direction pills
  * · sort + category menus · symbol search · freshness. The search is
  * ALSO the symbol manager: catalog matches surface inline with
- * Add/Remove actions (the separate Symbols view is gone). Counts live
- * in menu rows (no summary band); filters collapse into one Filter
- * button at narrow widths.
+ * Add/Remove actions (the separate Symbols view is gone). Controls remain
+ * visible in the shared horizontally scrollable bar at narrow widths.
  */
 import { memo, useMemo, useRef, useState, useCallback } from "react";
 import { clsx } from "clsx";
@@ -22,11 +21,6 @@ import EmptyWidgetState from "../../components/EmptyWidgetState";
 import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarPill } from "../../components/widget-bar/Bar";
-import {
-  FilterMenuShell,
-  MenuHeading,
-  MenuRow,
-} from "../../components/widget-bar/Menu";
 import { SearchBox, useSlashFocus } from "../../components/widget-bar/SearchBox";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
@@ -228,18 +222,6 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   );
 
   // ── Direction counts (menu rows — the summary band is gone) ──
-  // Counted over the widget-scoped universe, not the filtered list, so
-  // the Gainers/Losers rows stay stable while a direction is selected.
-  const directionCounts = useMemo(() => {
-    let up = 0;
-    let down = 0;
-    for (const t of trades) {
-      if (t.direction === "up") up++;
-      else if (t.direction === "down") down++;
-    }
-    return { all: trades.length, gainers: up, losers: down };
-  }, [trades]);
-
   const widgetType = (widgetId ?? "finance");
   const showEmpty = trades.length === 0;
 
@@ -315,8 +297,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
         <WidgetBar>
           {!showEmpty ? (
             <>
-              {/* Wide: open direction pills. Collapse BEFORE clipping. */}
-              <div className="scrollbar-none hidden min-w-0 items-center gap-1 overflow-x-auto @5xl:flex">
+              <div className="flex shrink-0 items-center gap-1">
                 {DIRECTION_OPTIONS.map((opt) => (
                   <BarPill
                     key={opt.value}
@@ -328,45 +309,26 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                 ))}
               </div>
 
-              {/* Narrow: direction + sort + categories in one Filter menu. */}
-              <div className="@5xl:hidden">
-                <FinanceFilterMenu
-                  directionFilter={directionFilter}
-                  onPickDirection={setDirectionFilter}
-                  directionCounts={directionCounts}
-                  sortKey={sortKey}
-                  onPickSort={pickSort}
-                  categories={categoryList}
-                  selectedCategories={selectedCategories}
-                  onToggleCategory={toggleCategory}
-                  onClearCategories={clearCategories}
-                />
-              </div>
-
               <div className="ml-auto flex min-w-0 shrink items-center gap-2">
-                <span className="hidden @5xl:block">
-                  <SelectMenu
-                    value={sortKey}
-                    options={SORT_OPTIONS}
-                    onChange={pickSort}
-                    ariaLabel="Sort symbols"
-                    prefix="Sort"
-                  />
-                </span>
+                <SelectMenu
+                  value={sortKey}
+                  options={SORT_OPTIONS}
+                  onChange={pickSort}
+                  ariaLabel="Sort symbols"
+                  prefix="Sort"
+                />
                 {categoryList.length > 1 && (
-                  <span className="hidden @5xl:block">
-                    <MultiSelectMenu
-                      options={categoryList.map((c) => c.name)}
-                      counts={Object.fromEntries(
-                        categoryList.map((c) => [c.name, c.count]),
-                      )}
-                      selected={Array.from(selectedCategories)}
-                      onToggle={toggleCategory}
-                      onClear={clearCategories}
-                      noun="categories"
-                      ariaLabel="Filter by category"
-                    />
-                  </span>
+                  <MultiSelectMenu
+                    options={categoryList.map((c) => c.name)}
+                    counts={Object.fromEntries(
+                      categoryList.map((c) => [c.name, c.count]),
+                    )}
+                    selected={Array.from(selectedCategories)}
+                    onToggle={toggleCategory}
+                    onClear={clearCategories}
+                    noun="categories"
+                    ariaLabel="Filter by category"
+                  />
                 )}
                 <SearchBox
                   inputRef={searchInputRef}
@@ -512,84 +474,6 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
         </>
       )}
     </div>
-  );
-}
-
-// ── Filter menu (narrow-width collapse) ─────────────────────────
-
-function FinanceFilterMenu({
-  directionFilter,
-  onPickDirection,
-  directionCounts,
-  sortKey,
-  onPickSort,
-  categories,
-  selectedCategories,
-  onToggleCategory,
-  onClearCategories,
-}: {
-  directionFilter: DirectionFilter;
-  onPickDirection: (d: DirectionFilter) => void;
-  directionCounts: { all: number; gainers: number; losers: number };
-  sortKey: SortKey;
-  onPickSort: (s: SortKey) => void;
-  categories: { name: string; count: number }[];
-  selectedCategories: Set<string>;
-  onToggleCategory: (c: string) => void;
-  onClearCategories: () => void;
-}) {
-  const activeCount =
-    (directionFilter !== "all" ? 1 : 0) + selectedCategories.size;
-
-  return (
-    <FilterMenuShell badgeCount={activeCount}>
-      <MenuHeading>Direction</MenuHeading>
-      {DIRECTION_OPTIONS.map((opt) => (
-        <MenuRow
-          key={opt.value}
-          selected={directionFilter === opt.value}
-          onClick={() => onPickDirection(opt.value)}
-          role="menuitemradio"
-          count={directionCounts[opt.value]}
-        >
-          {opt.label}
-        </MenuRow>
-      ))}
-      <MenuHeading>Sort</MenuHeading>
-      {SORT_OPTIONS.map((opt) => (
-        <MenuRow
-          key={opt.value}
-          selected={sortKey === opt.value}
-          onClick={() => onPickSort(opt.value)}
-          role="menuitemradio"
-        >
-          {opt.label}
-        </MenuRow>
-      ))}
-      {categories.length > 0 && (
-        <>
-          <MenuHeading>Category</MenuHeading>
-          <MenuRow
-            selected={selectedCategories.size === 0}
-            onClick={onClearCategories}
-            role="menuitemradio"
-          >
-            All categories
-          </MenuRow>
-          {categories.map((c) => (
-            <MenuRow
-              key={c.name}
-              selected={selectedCategories.has(c.name)}
-              onClick={() => onToggleCategory(c.name)}
-              role="menuitemcheckbox"
-              count={c.count}
-            >
-              {c.name}
-            </MenuRow>
-          ))}
-        </>
-      )}
-    </FilterMenuShell>
   );
 }
 

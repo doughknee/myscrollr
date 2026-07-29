@@ -29,16 +29,10 @@ import WidgetStateTransition from "../../components/WidgetStateTransition";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarDivider, BarPill } from "../../components/widget-bar/Bar";
 import {
-  FilterMenuShell,
-  MenuHeading,
-  MenuRow,
-} from "../../components/widget-bar/Menu";
-import {
   Segmented,
   type SegmentedOption,
 } from "../../components/widget-bar/Segmented";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
-import { isLive, isPre, isFinal } from "../../utils/gameHelpers";
 import { latestTimestamp } from "../feedHooks";
 import type { FeedTabProps, DataWidgetManifest } from "../../types";
 import type { FavoriteTeam } from "../../hooks/useSportsConfig";
@@ -134,19 +128,6 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
     [games],
   );
 
-  // Status counts for the collapsed Filter menu rows.
-  const statusCounts = useMemo(() => {
-    let live = 0;
-    let upcoming = 0;
-    let final = 0;
-    for (const g of games) {
-      if (isLive(g)) live++;
-      else if (isPre(g)) upcoming++;
-      else if (isFinal(g)) final++;
-    }
-    return { all: games.length, live, upcoming, final };
-  }, [games]);
-
   const showEmpty = games.length === 0 && leagues.length === 0;
 
   return (
@@ -165,8 +146,7 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
           {tab !== "standings" && !showEmpty && (
             <>
               <BarDivider />
-              {/* Wide: open status pills. Collapse BEFORE clipping. */}
-              <div className="scrollbar-none hidden min-w-0 items-center gap-1 overflow-x-auto @2xl:flex">
+              <div className="flex shrink-0 items-center gap-1">
                 {STATUS_OPTIONS.map((opt) => (
                   <BarPill
                     key={opt.value}
@@ -176,14 +156,6 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
                     {opt.label}
                   </BarPill>
                 ))}
-              </div>
-              {/* Narrow: status radios in one Filter menu (with counts). */}
-              <div className="@2xl:hidden">
-                <SportsFilterMenu
-                  statusFilter={statusFilter}
-                  onPickStatus={setStatusFilter}
-                  counts={statusCounts}
-                />
               </div>
             </>
           )}
@@ -246,35 +218,6 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
         )}
       </WidgetStateTransition>
     </div>
-  );
-}
-
-// ── Filter menu (narrow-width collapse) ─────────────────────────
-
-function SportsFilterMenu({
-  statusFilter,
-  onPickStatus,
-  counts,
-}: {
-  statusFilter: StatusFilter;
-  onPickStatus: (s: StatusFilter) => void;
-  counts: { all: number; live: number; upcoming: number; final: number };
-}) {
-  return (
-    <FilterMenuShell badgeCount={statusFilter !== "all" ? 1 : 0}>
-      <MenuHeading>Status</MenuHeading>
-      {STATUS_OPTIONS.map((opt) => (
-        <MenuRow
-          key={opt.value}
-          selected={statusFilter === opt.value}
-          onClick={() => onPickStatus(opt.value)}
-          role="menuitemradio"
-          count={counts[opt.value]}
-        >
-          {opt.label}
-        </MenuRow>
-      ))}
-    </FilterMenuShell>
   );
 }
 

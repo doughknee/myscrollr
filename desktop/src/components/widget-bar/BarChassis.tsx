@@ -92,8 +92,7 @@ export function BarChassisSlot() {
   if (!ctx) return null;
   return (
     // Same anatomy as WidgetBar's standalone shell (rounded-t-xl seats
-    // the bar against the content panel's top radius; @container drives
-    // the rows' collapse-before-clip variants). backdrop-blur is gone:
+    // the bar against the content panel's top radius). backdrop-blur is gone:
     // nothing ever renders behind a non-overlapping chassis row.
     <div
       className={clsx(

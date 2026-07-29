@@ -9,8 +9,8 @@
  *   scrolls (the Source page's PageLayout scroller in-app), and an inner
  *   scrollport that never scrolls swallows it silently.
  * - ONE bar per widget. No stacked sticky bands; counts live in menu rows.
- * - The bar is a @container: children collapse via @Nxl: variants BEFORE
- *   they'd clip at narrow widths (collapse-before-clip).
+ * - Controls stay visible at narrow widths; the shared row wraps instead
+ *   of collapsing them into a catch-all menu.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -19,7 +19,7 @@ import { useBarChassis } from "./BarChassis";
 
 function BarRow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-w-0 items-center gap-2">
+    <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
       {children}
     </div>
   );

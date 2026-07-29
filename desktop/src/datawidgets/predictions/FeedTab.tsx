@@ -43,11 +43,6 @@ import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarDivider, BarPill } from "../../components/widget-bar/Bar";
 import {
-  FilterMenuShell,
-  MenuHeading,
-  MenuRow,
-} from "../../components/widget-bar/Menu";
-import {
   Segmented,
   type SegmentedOption,
 } from "../../components/widget-bar/Segmented";
@@ -581,9 +576,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
     <div ref={containerRef} className="relative flex min-h-full flex-col">
       {/* ONE control bar: view switcher (segmented, Tauri-only) · lens
           pills + category select · search · freshness. WidgetBar owns the
-          sticky @container shell and the pinned-elevation sentinel. At
-          narrow widget widths the lens pills + category select collapse
-          into a single Filter button so nothing clips (B4/B5). */}
+          sticky shell, horizontal overflow, and pinned elevation. */}
       {isComfort && (
         <WidgetBar>
           {showSwitcher && (
@@ -598,11 +591,8 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
             </>
           )}
 
-          {/* Wide: open lens pills. Counts live in the filter menu and
-              section headers — pills stay quiet (de-crowd pass). The
-              @5xl threshold collapses BEFORE the row runs out of room —
-              pills must never render cut off. */}
-          <div className="scrollbar-none hidden min-w-0 items-center gap-1 overflow-x-auto @5xl:flex">
+          {/* Open lens pills stay visible at every width. */}
+          <div className="flex shrink-0 items-center gap-1">
             {LENSES.map((l) => {
               const Icon = l.icon;
               const active = lens === l.value && selectedCats.size === 0;
@@ -620,33 +610,17 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
             })}
           </div>
 
-          {/* Narrow: everything above collapses into one Filter button. */}
-          <div className="@5xl:hidden">
-            <FilterMenu
-              lens={lens}
-              onPickLens={pickLens}
-              watchlistCount={watchlist.length}
-              resolvedCount={resolvedToday.length}
-              categories={categories}
-              selectedCats={selectedCats}
-              onToggleCategory={toggleCat}
-              onClearCategories={clearCats}
-            />
-          </div>
-
           <div className="ml-auto flex min-w-0 shrink items-center gap-2">
             {/* Category rides with the other narrowing controls (search)
                 so the lens row keeps its breathing room. */}
-            <span className="hidden @5xl:block">
-              <MultiSelectMenu
-                options={categories}
-                selected={Array.from(selectedCats)}
-                onToggle={toggleCat}
-                onClear={clearCats}
-                noun="categories"
-                ariaLabel="Filter by category"
-              />
-            </span>
+            <MultiSelectMenu
+              options={categories}
+              selected={Array.from(selectedCats)}
+              onToggle={toggleCat}
+              onClear={clearCats}
+              noun="categories"
+              ariaLabel="Filter by category"
+            />
             <SearchBox
               inputRef={searchInputRef}
               query={query}
@@ -899,72 +873,6 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-// ── Filter bar controls (B4/B5) ──────────────────────────────────
-
-/** Narrow-width collapse of the lens pills + category menu: one Filter
- *  button (with an active-filter count badge) opening a compact menu. The
- *  wide bar hides this via container queries and vice versa. */
-function FilterMenu({
-  lens,
-  onPickLens,
-  watchlistCount,
-  resolvedCount,
-  categories,
-  selectedCats,
-  onToggleCategory,
-  onClearCategories,
-}: {
-  lens: PredictionsLens;
-  onPickLens: (l: PredictionsLens) => void;
-  watchlistCount: number;
-  resolvedCount: number;
-  categories: string[];
-  selectedCats: Set<string>;
-  onToggleCategory: (c: string) => void;
-  onClearCategories: () => void;
-}) {
-  const activeCount = (lens !== "trending" ? 1 : 0) + selectedCats.size;
-
-  return (
-    <FilterMenuShell badgeCount={activeCount}>
-      <MenuHeading>View</MenuHeading>
-      {LENSES.map((l) => (
-        <MenuRow
-          key={l.value}
-          selected={lens === l.value}
-          onClick={() => onPickLens(l.value)}
-          role="menuitemradio"
-        >
-          {l.label}
-          {l.value === "watchlist" && watchlistCount > 0
-            ? ` ${watchlistCount}`
-            : l.value === "resolved" && resolvedCount > 0
-              ? ` ${resolvedCount}`
-              : ""}
-        </MenuRow>
-      ))}
-      <MenuHeading>Category</MenuHeading>
-      <MenuRow
-        selected={selectedCats.size === 0}
-        onClick={onClearCategories}
-        role="menuitemradio"
-      >
-        All categories
-      </MenuRow>
-      {categories.map((c) => (
-        <MenuRow
-          key={c}
-          selected={selectedCats.has(c)}
-          onClick={() => onToggleCategory(c)}
-          role="menuitemcheckbox"
-        >
-          {c}
-        </MenuRow>
-      ))}
-    </FilterMenuShell>
   );
 }
 

@@ -80,6 +80,14 @@ function Frame({
 }
 
 describe("BarChassis", () => {
+  it("keeps narrow controls visible by wrapping the shared row", () => {
+    render(<Frame />);
+    expect(screen.getByText("bar-0").parentElement).toHaveClass(
+      "w-full",
+      "flex-wrap",
+    );
+  });
+
   it("portals the bar row into the shell instead of rendering a standalone one", () => {
     render(<Frame />);
     const row = screen.getByText("bar-0");

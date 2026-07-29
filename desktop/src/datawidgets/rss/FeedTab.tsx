@@ -26,11 +26,6 @@ import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarDivider } from "../../components/widget-bar/Bar";
 import {
-  FilterMenuShell,
-  MenuHeading,
-  MenuRow,
-} from "../../components/widget-bar/Menu";
-import {
   Segmented,
   type SegmentedOption,
 } from "../../components/widget-bar/Segmented";
@@ -362,7 +357,7 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
               {/* Left cluster: the filters (Kalshi weighting — filters
                   anchor the left, utilities keep the right). Collapse
                   BEFORE clipping. */}
-              <div className="hidden min-w-0 items-center gap-2 @2xl:flex">
+              <div className="flex shrink-0 items-center gap-2">
                 <SelectMenu
                   value={sortOrder}
                   options={SORT_OPTIONS}
@@ -399,22 +394,6 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
                 )}
               </div>
               {/* Narrow: one Filter menu. */}
-              <div className="@2xl:hidden">
-                <RssFilterMenu
-                  sortOrder={sortOrder}
-                  onPickSort={pickSort}
-                  sources={allSources}
-                  sourceCounts={sourceCounts}
-                  selectedSources={selectedSources}
-                  onToggleSource={toggleSource}
-                  onClearSources={clearSources}
-                  categories={categoryList}
-                  selectedCategories={selectedCategories}
-                  onToggleCategory={toggleCategory}
-                  onClearCategories={clearCategories}
-                />
-              </div>
-
               <div className="ml-auto flex min-w-0 shrink items-center gap-2">
                 {latestUpdated && (
                   <span className="hidden @xl:block">
@@ -539,98 +518,6 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
         )}
       </WidgetStateTransition>
     </div>
-  );
-}
-
-// ── Filter menu (narrow-width collapse) ─────────────────────────
-
-function RssFilterMenu({
-  sortOrder,
-  onPickSort,
-  sources,
-  sourceCounts,
-  selectedSources,
-  onToggleSource,
-  onClearSources,
-  categories,
-  selectedCategories,
-  onToggleCategory,
-  onClearCategories,
-}: {
-  sortOrder: SortOrder;
-  onPickSort: (s: SortOrder) => void;
-  sources: string[];
-  sourceCounts: Record<string, number>;
-  selectedSources: Set<string>;
-  onToggleSource: (s: string) => void;
-  onClearSources: () => void;
-  categories: { name: string; count: number }[];
-  selectedCategories: Set<string>;
-  onToggleCategory: (c: string) => void;
-  onClearCategories: () => void;
-}) {
-  const activeCount = selectedSources.size + selectedCategories.size;
-
-  return (
-    <FilterMenuShell badgeCount={activeCount}>
-      <MenuHeading>Sort</MenuHeading>
-      {SORT_OPTIONS.map((opt) => (
-        <MenuRow
-          key={opt.value}
-          selected={sortOrder === opt.value}
-          onClick={() => onPickSort(opt.value)}
-          role="menuitemradio"
-        >
-          {opt.label}
-        </MenuRow>
-      ))}
-      {sources.length > 1 && (
-        <>
-          <MenuHeading>Sources</MenuHeading>
-          <MenuRow
-            selected={selectedSources.size === 0}
-            onClick={onClearSources}
-            role="menuitemradio"
-          >
-            All sources
-          </MenuRow>
-          {sources.map((s) => (
-            <MenuRow
-              key={s}
-              selected={selectedSources.has(s)}
-              onClick={() => onToggleSource(s)}
-              role="menuitemcheckbox"
-              count={sourceCounts[s]}
-            >
-              {s}
-            </MenuRow>
-          ))}
-        </>
-      )}
-      {categories.length > 1 && (
-        <>
-          <MenuHeading>Category</MenuHeading>
-          <MenuRow
-            selected={selectedCategories.size === 0}
-            onClick={onClearCategories}
-            role="menuitemradio"
-          >
-            All categories
-          </MenuRow>
-          {categories.map((c) => (
-            <MenuRow
-              key={c.name}
-              selected={selectedCategories.has(c.name)}
-              onClick={() => onToggleCategory(c.name)}
-              role="menuitemcheckbox"
-              count={c.count}
-            >
-              {c.name}
-            </MenuRow>
-          ))}
-        </>
-      )}
-    </FilterMenuShell>
   );
 }
 
