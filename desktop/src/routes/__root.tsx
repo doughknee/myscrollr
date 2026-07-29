@@ -328,7 +328,7 @@ function RootLayout() {
   const updateGate = useUpdateGate(appVersion);
 
   // Persist helper shared by the tip-firing effects, the shell
-  // context, and the TopBar toggles.
+  // context, and the TopBar ticker toggle.
   const persistPrefs = useCallback((next: AppPreferences) => {
     setPrefs(next);
     savePrefs(next);
@@ -759,11 +759,9 @@ function RootLayout() {
     }
   }, []);
 
-  // ── TopBar ambient-toggle handlers ──────────────────────────
-  // Two ambient toggles always visible in the TopBar so users never
-  // have to dig into Settings → Ticker to toggle the entire product
-  // on/off. Same prefs as Settings → Ticker "Enable ticker" toggle
-  // and the Pin button — single source of truth.
+  // ── TopBar ticker-toggle handler ─────────────────────────────
+  // Same pref as Customize → Ticker "Enable ticker" — one source of
+  // truth for the always-visible chrome control.
   const handleTickerToggle = useCallback(() => {
     persistPrefs({
       ...prefs,
@@ -836,19 +834,14 @@ function RootLayout() {
           {/* TopBar — primary chrome row spanning the full window.
               Houses the Scrollr brand mark, Spotify-style forward/back
               navigation, page-identity breadcrumb (read from
-              PageContext), entityAction, and the ambient ticker +
-              connection controls. Always visible regardless of route.
+              PageContext), entityAction, and the ambient ticker
+              control. Always visible regardless of route.
               (Always-on-top moved to Settings → Window — the chrome
               button wasn't earning its slot.) */}
           <TopBar
             tickerOn={prefs.ticker.showTicker}
-            health={deliveryHealth}
             canBack={navHistory.canBack}
             canForward={navHistory.canForward}
-            isReleases={route.isReleases}
-            isStatus={route.isStatus}
-            onNavigateToReleases={handleNavigateToReleases}
-            onNavigateToStatus={handleNavigateToStatus}
             onBack={navHistory.back}
             onForward={navHistory.forward}
             onToggleTicker={handleTickerToggle}
@@ -863,15 +856,20 @@ function RootLayout() {
               isAccount={route.isAccount}
               isMarketplace={route.isMarketplace}
               isSupport={route.isSupport}
+              isReleases={route.isReleases}
+              isStatus={route.isStatus}
               isFeed={route.isFeed}
               activeItem={route.activeItem}
               tier={auth.tier}
+              health={deliveryHealth}
               sources={sidebarSources}
               onNavigateHome={handleNavigateToFeed}
               onNavigateToMarketplace={handleNavigateToMarketplace}
               onNavigateToCustomize={handleNavigateToCustomize}
               onNavigateToAccount={handleNavigateToAccount}
               onNavigateToSupport={handleNavigateToSupport}
+              onNavigateToReleases={handleNavigateToReleases}
+              onNavigateToStatus={handleNavigateToStatus}
               onSelectItem={handleSelectPinned}
               onInfoItem={handleInfoItem}
               onToggleItemTicker={handleToggleItemTicker}

@@ -8,14 +8,20 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { TrendingUp } from "lucide-react";
 import Sidebar from "./Sidebar";
 import type { SubscriptionTier } from "../auth";
+import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
 
 function renderSidebar(opts: {
   tier: SubscriptionTier;
   sourceCount: number;
   isFeed?: boolean;
+  isReleases?: boolean;
+  isStatus?: boolean;
+  health?: DeliveryHealth;
 }) {
   const onNavigateToMarketplace = vi.fn();
   const onNavigateHome = vi.fn();
+  const onNavigateToReleases = vi.fn();
+  const onNavigateToStatus = vi.fn();
   const sources = Array.from({ length: opts.sourceCount }, (_, i) => ({
     id: `src-${i}`,
     name: `Source ${i}`,
@@ -25,27 +31,47 @@ function renderSidebar(opts: {
     onTicker: false,
   }));
   const { container } = render(
-    <Sidebar
-      isCustomize={false}
-      isAccount={false}
-      isMarketplace={false}
-      isSupport={false}
-      isFeed={opts.isFeed ?? false}
-      activeItem=""
-      tier={opts.tier}
-      sources={sources}
-      onNavigateHome={onNavigateHome}
-      onNavigateToMarketplace={onNavigateToMarketplace}
-      onNavigateToCustomize={() => {}}
-      onNavigateToAccount={() => {}}
-      onNavigateToSupport={() => {}}
-      onSelectItem={() => {}}
-      onInfoItem={() => {}}
-      onToggleItemTicker={() => {}}
-      onRemoveItem={() => {}}
-    />,
+    <div id="app-shell">
+      <Sidebar
+        isCustomize={false}
+        isAccount={false}
+        isMarketplace={false}
+        isSupport={false}
+        isReleases={opts.isReleases ?? false}
+        isStatus={opts.isStatus ?? false}
+        isFeed={opts.isFeed ?? false}
+        activeItem=""
+        tier={opts.tier}
+        health={
+          opts.health ?? {
+            state: "live",
+            ageMs: 0,
+            label: "Live",
+            description: "Connected",
+          }
+        }
+        sources={sources}
+        onNavigateHome={onNavigateHome}
+        onNavigateToMarketplace={onNavigateToMarketplace}
+        onNavigateToCustomize={() => {}}
+        onNavigateToAccount={() => {}}
+        onNavigateToSupport={() => {}}
+        onNavigateToReleases={onNavigateToReleases}
+        onNavigateToStatus={onNavigateToStatus}
+        onSelectItem={() => {}}
+        onInfoItem={() => {}}
+        onToggleItemTicker={() => {}}
+        onRemoveItem={() => {}}
+      />
+    </div>,
   );
-  return { container, onNavigateToMarketplace, onNavigateHome };
+  return {
+    container,
+    onNavigateToMarketplace,
+    onNavigateHome,
+    onNavigateToReleases,
+    onNavigateToStatus,
+  };
 }
 
 describe("Sidebar slot chip", () => {
@@ -135,5 +161,57 @@ describe("Sidebar home row", () => {
     expect(screen.getByRole("button", { name: "Home" })).not.toHaveAttribute(
       "aria-current",
     );
+  });
+});
+
+describe("Sidebar account menu", () => {
+  it("keeps connection status visible and accessible on the collapsed chip", () => {
+    renderSidebar({ tier: "free", sourceCount: 0 });
+    expect(
+      screen.getByRole("button", {
+        name: "Account and app. Connection status: Live.",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("opens Status and What's new destinations", async () => {
+    const { onNavigateToReleases, onNavigateToStatus } = renderSidebar({
+      tier: "free",
+      sourceCount: 0,
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Account and app. Connection status: Live.",
+      }),
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Status/ }));
+    expect(onNavigateToStatus).toHaveBeenCalledOnce();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Account and app. Connection status: Live.",
+      }),
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "What's new" }),
+    );
+    expect(onNavigateToReleases).toHaveBeenCalledOnce();
+  });
+
+  it("marks Status as an active account destination", () => {
+    renderSidebar({ tier: "free", sourceCount: 0, isStatus: true });
+    expect(
+      screen.getByRole("button", {
+        name: "Account and app. Connection status: Live.",
+      }),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
+  it("shows the tier without the redundant plan suffix", () => {
+    renderSidebar({ tier: "super_user", sourceCount: 0 });
+    fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
+    expect(screen.getByText("Super User")).toBeInTheDocument();
+    expect(screen.queryByText("Super User plan")).not.toBeInTheDocument();
   });
 });

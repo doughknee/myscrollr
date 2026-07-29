@@ -7,13 +7,11 @@
  *   │ Sports     │
  *   │ + 2/3      │  ← slot chip: add-source CTA + cap meter in one
  *   │    ⋮       │
- *   │ [Account ▾]│⇤│  ← footer chip: Account/Support menu
+ *   │ [Account ▾]│⇤│  ← footer chip: account + app menu
  *   └────────────┘      menu + collapse toggle
  *
- * Home navigation lives on the Scrollr brand mark in the TopBar;
- * connection/ticker status lives in the TopBar too. The sidebar
- * stays minimal: sources are the rail, everything app-level hides
- * behind the footer account chip.
+ * Home and Customize lead the rail. Connection status and the other
+ * account-level destinations live behind the footer account chip.
  *
  * Defaults to the 48px icon-only rail (tooltips carry labels; the
  * slot chip shows cap dots) — a slot-capped source list doesn't fill
@@ -39,6 +37,7 @@ import {
   Plus,
   RadioTower,
   SlidersHorizontal,
+  Sparkles,
   Trash2,
   UserCircle,
 } from "lucide-react";
@@ -46,11 +45,13 @@ import clsx from "clsx";
 import { AnimatePresence, motion } from "motion/react";
 import Tooltip from "./Tooltip";
 import OverflowMenu from "./OverflowMenu";
+import { DELIVERY_STATE_META } from "./ConnectionIndicator";
 import { controlTransition } from "../lib/motion";
 import type { DataWidgetManifest, WidgetManifest } from "../types";
 import { loadPref, savePref } from "../preferences";
 import { TIER_LABELS, getUserIdentity } from "../auth";
 import type { SubscriptionTier } from "../auth";
+import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
 import { getMaxWidgets } from "../tierLimits";
 
 // ── Props ───────────────────────────────────────────────────────
@@ -114,12 +115,18 @@ interface SidebarProps {
   isMarketplace: boolean;
   /** Whether the support page is active. */
   isSupport: boolean;
+  /** Whether the What's New page is active. */
+  isReleases: boolean;
+  /** Whether the Status page is active. */
+  isStatus: boolean;
   /** Whether the home feed is active. Drives the pinned Home row. */
   isFeed: boolean;
   /** Currently active widget or widget ID (for highlighting). */
   activeItem: string;
   /** Subscription tier — shown on the footer account chip. */
   tier: SubscriptionTier;
+  /** Current data-delivery health — shown on the account chip. */
+  health: DeliveryHealth;
 
   /** Resolved enabled-source manifest data, in canonical order. */
   sources: SidebarSource[];
@@ -134,6 +141,10 @@ interface SidebarProps {
   onNavigateToAccount: () => void;
   /** Navigate to the support page. */
   onNavigateToSupport: () => void;
+  /** Navigate to the What's New page. */
+  onNavigateToReleases: () => void;
+  /** Navigate to the Status page. */
+  onNavigateToStatus: () => void;
   /** Navigate to a specific source (widget or widget) feed. */
   onSelectItem: (id: string) => void;
 
@@ -153,15 +164,20 @@ export default function Sidebar({
   isAccount,
   isMarketplace,
   isSupport,
+  isReleases,
+  isStatus,
   isFeed,
   activeItem,
   tier,
+  health,
   sources,
   onNavigateHome,
   onNavigateToMarketplace,
   onNavigateToCustomize,
   onNavigateToAccount,
   onNavigateToSupport,
+  onNavigateToReleases,
+  onNavigateToStatus,
   onSelectItem,
   onInfoItem,
   onToggleItemTicker,
@@ -338,7 +354,7 @@ export default function Sidebar({
 
       {/* ── Workspace ─────────────────────────────────────────── */}
       {/* ── Footer: account chip + collapse ─────────────────────
-          Account + Support live behind one chip menu — Customize is
+          Account-level destinations live behind one chip menu — Customize is
           a top-level rail item, and the sources own the rows. */}
       <div
         className={clsx(
@@ -355,7 +371,8 @@ export default function Sidebar({
             <AccountChip
               collapsed={collapsed}
               tierLabel={TIER_LABELS[tier]}
-              active={isAccount || isSupport}
+              health={health}
+              active={isAccount || isSupport || isReleases || isStatus}
             />
           }
           items={[
@@ -364,6 +381,23 @@ export default function Sidebar({
               label: "Account",
               icon: UserCircle,
               onSelect: onNavigateToAccount,
+            },
+            {
+              key: "status",
+              label: "Status",
+              hint: health.label,
+              icon: DELIVERY_STATE_META[health.state].icon,
+              onSelect: onNavigateToStatus,
+            },
+            {
+              key: "releases",
+              label: "What's new",
+              icon: Sparkles,
+              onSelect: onNavigateToReleases,
+            },
+            {
+              key: "app-divider",
+              divider: true,
             },
             {
               key: "support",
@@ -603,21 +637,23 @@ function SlotChip({
 }
 
 // ── Account chip ────────────────────────────────────────────────
-// Footer trigger for the app-level menu (Account/
-// Support). floating-ui injects ref + aria handlers via cloneElement,
+// Footer trigger for the app-level menu. floating-ui injects ref +
+// aria handlers via cloneElement,
 // so this is a forwardRef-compatible button (same pattern as the
-// TopBar's MoreTabsTrigger). `active` marks that one of the menu's
-// pages is currently open.
+// other custom triggers). `active` marks that one of the menu's pages
+// is currently open.
 
 const AccountChip = forwardRef(function AccountChip(
   {
     collapsed,
     tierLabel,
+    health,
     active,
     ...props
   }: ButtonHTMLAttributes<HTMLButtonElement> & {
     collapsed: boolean;
     tierLabel: string;
+    health: DeliveryHealth;
     active: boolean;
   },
   ref: Ref<HTMLButtonElement>,
@@ -631,12 +667,16 @@ const AccountChip = forwardRef(function AccountChip(
   const { name, email } = getUserIdentity();
   const displayName = name || email?.split("@")[0] || "Account";
   const initial = displayName.charAt(0).toUpperCase();
+  const statusMeta = DELIVERY_STATE_META[health.state];
+  const StatusIcon = statusMeta.icon;
 
   return (
     <button
       ref={ref}
       type="button"
       {...props}
+      aria-label={`Account and app. Connection status: ${health.label}.`}
+      aria-current={active ? "page" : undefined}
       className={clsx(
         "flex items-center rounded-lg min-w-0",
         collapsed
@@ -650,12 +690,21 @@ const AccountChip = forwardRef(function AccountChip(
       {/* Initial avatar */}
       <span
         className={clsx(
-          "shrink-0 flex items-center justify-center rounded-full",
+          "relative shrink-0 flex items-center justify-center rounded-full",
           "bg-accent/15 text-accent text-ui-chip font-semibold",
           collapsed ? "w-6 h-6" : "w-7 h-7",
         )}
       >
         {initial}
+        <span
+          aria-hidden
+          className={clsx(
+            "absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-surface bg-surface",
+            statusMeta.text,
+          )}
+        >
+          <StatusIcon size={9} strokeWidth={2.5} />
+        </span>
       </span>
       {!collapsed && (
         <>
@@ -664,7 +713,7 @@ const AccountChip = forwardRef(function AccountChip(
               {displayName}
             </span>
             <span className="w-full truncate text-left text-ui-meta text-fg-4">
-              {tierLabel} plan
+              {tierLabel}
             </span>
           </span>
           <ChevronDown

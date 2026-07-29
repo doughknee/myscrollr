@@ -5,14 +5,13 @@
  *   1. Your connection — how this app is receiving updates. Derived
  *      from the same `sse-status` Tauri event + `deliveryMode` pref
  *      the shell reads, through the same `useDeliveryHealth` hook and
- *      the same DELIVERY_STATE_META icon language as the TopBar
- *      indicator, so the two can't disagree in state OR looks.
+ *      the same DELIVERY_STATE_META icon language as the sidebar
+ *      account chip, so the two can't disagree in state OR looks.
  *   2. Scrollr services — the backend's own view, straight from the
  *      public GET /health (database, cache, and each data service).
  *
- * Reached by clicking the connection indicator in the TopBar. That
- * indicator is deliberately terse; the detail it used to cram into a
- * tooltip lives here instead.
+ * Reached through Status in the sidebar account menu. The chip badge
+ * stays deliberately terse; the detail lives here instead.
  */
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";

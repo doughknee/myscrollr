@@ -2,15 +2,14 @@
  * TopBar — the app's primary chrome row.
  *
  * Layout:
- *   [logo + Scrollr] | [←][→] | breadcrumb · subtitle    [entityAction] | [Ticker] | [⚡]
+ *   [logo + Scrollr] | [←][→] | breadcrumb · subtitle    [entityAction] | [Ticker]
  *
  * The TopBar is the single canonical home for:
- *   - Brand mark (clickable → Home)
+ *   - Brand mark
  *   - Forward/back navigation (Spotify-style)
  *   - Page identity (where am I — published via PageContext)
  *   - Page-level entity action (Trash on source pages)
  *   - Ambient toggles (ticker on/off)
- *   - Connection status
  *
  * Page-level chrome (title + breadcrumb) used to live inside the
  * route's content area in a chunky 4-row header. It's now in the
@@ -21,26 +20,17 @@ import clsx from "clsx";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import Tooltip from "./Tooltip";
 import WindowControls, { IS_MACOS } from "./WindowControls";
-import ConnectionIndicator from "./ConnectionIndicator";
 import ScrollLogo from "./ScrollLogo";
 import OverflowMenu from "./OverflowMenu";
 import type { OverflowMenuItem } from "./OverflowMenu";
 import { usePageIdentity } from "./layout/page-context";
-import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
 
 // ── Props ───────────────────────────────────────────────────────
 
 interface TopBarProps {
   tickerOn: boolean;
-  health: DeliveryHealth;
   canBack: boolean;
   canForward: boolean;
-  /** Whether the What's New page is open — lights up the brand mark. */
-  isReleases: boolean;
-  /** Whether the Status page is open — lights up the indicator. */
-  isStatus: boolean;
-  onNavigateToReleases: () => void;
-  onNavigateToStatus: () => void;
   onBack: () => void;
   onForward: () => void;
   onToggleTicker: () => void;
@@ -67,13 +57,8 @@ function handleDragRegion(e: React.MouseEvent) {
 
 export default function TopBar({
   tickerOn,
-  health,
   canBack,
   canForward,
-  isReleases,
-  isStatus,
-  onNavigateToReleases,
-  onNavigateToStatus,
   onBack,
   onForward,
   onToggleTicker,
@@ -87,27 +72,13 @@ export default function TopBar({
       onMouseDown={handleDragRegion}
       className="flex items-center h-11 shrink-0 px-3 gap-2 select-none"
     >
-      {/* ── Brand mark (left) ────────────────────────────────
-          Home lives in the sidebar rail now, so the mark takes the
-          "what's new" slot — the app's version + release notes. */}
-      <Tooltip content="What's new" side="bottom">
-        <button
-          onClick={onNavigateToReleases}
-          aria-label="Scrollr — what's new"
-          aria-current={isReleases ? "page" : undefined}
-          className={clsx(
-            "flex items-center gap-2 px-1.5 h-7 rounded-md shrink-0",
-            isReleases
-              ? "bg-accent/10 text-accent"
-              : "hover:bg-surface-hover",
-          )}
-        >
-          <ScrollLogo size={20} />
-          <span className="text-ui-body font-semibold tracking-tight">
-            Scrollr
-          </span>
-        </button>
-      </Tooltip>
+      {/* ── Brand mark (left) ──────────────────────────────── */}
+      <div className="flex h-7 shrink-0 items-center gap-2 px-1.5">
+        <ScrollLogo size={20} />
+        <span className="text-ui-body font-semibold tracking-tight">
+          Scrollr
+        </span>
+      </div>
 
       <div className="w-px h-5 bg-edge/40 mx-1 shrink-0" />
 
@@ -249,13 +220,6 @@ export default function TopBar({
           </button>
         </Tooltip>
 
-        <div className="w-px h-5 bg-edge/40 mx-1" />
-
-        <ConnectionIndicator
-          health={health}
-          active={isStatus}
-          onClick={onNavigateToStatus}
-        />
       </div>
 
       {/* ── Window controls (Windows/Linux frameless only) ────
