@@ -440,7 +440,10 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                     ? removeSymbol
                     : undefined
                 }
-                actionVisible={isWatchlist || Boolean(searchQ)}
+                actionVisible={
+                  Boolean(searchQ) &&
+                  (!isWatchlist || !trackedSet.has(trade.symbol))
+                }
                 saving={symbolsSaving}
               />
             ))}
