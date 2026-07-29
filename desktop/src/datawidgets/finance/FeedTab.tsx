@@ -483,6 +483,7 @@ const TradeItem = memo(function TradeItem({
 }: TradeItemProps) {
   const isUp = trade.direction === "up";
   const isDown = trade.direction === "down";
+  const [actionHovered, setActionHovered] = useState(false);
 
   const dirColor = isUp ? "text-up" : isDown ? "text-down" : "text-fg-3";
 
@@ -510,14 +511,12 @@ const TradeItem = memo(function TradeItem({
   // Comfort mode
   return (
     <motion.div
-      initial={false}
-      animate={actionVisible ? "visible" : "hidden"}
-      whileHover="visible"
+      onHoverStart={() => setActionHovered(true)}
+      onHoverEnd={() => setActionHovered(false)}
       className={clsx(
         FEED_CARD,
         FEED_CARD_INTERACTIVE,
-        "relative flex items-center justify-between overflow-hidden border-l-2",
-        (onAdd || onRemove) && "pr-10",
+        "relative flex items-center justify-between overflow-hidden border-l-2 pr-10",
         isUp && "border-l-up/40",
         isDown && "border-l-down/40",
         !isUp && !isDown && "border-l-transparent",
@@ -572,8 +571,14 @@ const TradeItem = memo(function TradeItem({
       {(onAdd || onRemove) && (
         <motion.button
           type="button"
-          variants={CARD_ACTION_MOTION}
-          whileFocus="visible"
+          initial={false}
+          animate={
+            actionVisible || actionHovered
+              ? CARD_ACTION_MOTION.visible
+              : CARD_ACTION_MOTION.hidden
+          }
+          onFocus={() => setActionHovered(true)}
+          onBlur={() => setActionHovered(false)}
           whileTap={{ transform: "scale(0.92)" }}
           transition={controlTransition}
           onClick={() => (onRemove ?? onAdd)?.(trade.symbol)}
