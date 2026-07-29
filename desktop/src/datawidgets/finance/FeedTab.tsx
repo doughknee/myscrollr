@@ -5,8 +5,8 @@
  * via the desktop CDC/SSE pipeline. Supports compact and comfort
  * display modes.
  *
- * ONE Kalshi-style control bar (widget-bar primitives): stock list/watchlist
- * (or crypto direction pills) · sort/category menus · symbol search · freshness.
+ * ONE Kalshi-style control bar (widget-bar primitives): All/Watchlist
+ * · sort/category menus · symbol search · freshness.
  * The search is
  * ALSO the symbol manager: catalog matches surface inline with
  * Add/Remove actions (the separate Symbols view is gone). Controls remain
@@ -25,7 +25,7 @@ import { formatPrice, formatChange, relativeTime } from "../../utils/format";
 import EmptyWidgetState from "../../components/EmptyWidgetState";
 import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
-import { WidgetBar, BarPill } from "../../components/widget-bar/Bar";
+import { WidgetBar } from "../../components/widget-bar/Bar";
 import {
   Segmented,
   type SegmentedOption,
@@ -47,8 +47,7 @@ import {
   selectStockView,
   STOCK_SECTORS,
   type FinanceSortKey,
-  type FinanceDirectionFilter,
-  type StockView,
+  type FinanceView,
 } from "./view";
 import type { Trade, FeedTabProps, DataWidgetManifest } from "../../types";
 import type { WidgetId } from "../../api/client";
@@ -81,17 +80,9 @@ export const financeDataWidget: DataWidgetManifest = {
 
 // ── Types ────────────────────────────────────────────────────────
 
-type DirectionFilter = FinanceDirectionFilter;
 type SortKey = FinanceSortKey;
 
-const DIRECTION_OPTIONS: { value: DirectionFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "gainers", label: "Gainers" },
-  { value: "losers", label: "Losers" },
-  { value: "watchlist", label: "Watchlist" },
-];
-
-const STOCK_VIEW_OPTIONS: SegmentedOption<StockView>[] = [
+const VIEW_OPTIONS: SegmentedOption<FinanceView>[] = [
   { value: "all", label: "All" },
   { value: "watchlist", label: "Watchlist" },
 ];
@@ -185,8 +176,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   }, [trades, categoryMap]);
 
   // ── Filter / sort state ──────────────────────────────────────
-  const [directionFilter, setDirectionFilter] = useState<DirectionFilter>("all");
-  const [stockView, setStockView] = useState<StockView>("all");
+  const [view, setView] = useState<FinanceView>("all");
   const [sortKey, setSortKey] = useState<SortKey>(() => dp.defaultSort ?? "alpha");
 
   // Sticky sort (2026-07-17 unification): the bar's sort choice persists
@@ -230,8 +220,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   const trackedSet = useMemo(() => new Set(trackedSymbols), [trackedSymbols]);
 
   const clearAllFilters = useCallback(() => {
-    setStockView("all");
-    setDirectionFilter("all");
+    setView("all");
     clearCategories();
     setQuery("");
   }, [clearCategories]);
@@ -239,19 +228,19 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   const containerRef = useRef<HTMLDivElement>(null);
 
   // ── Data pipeline ────────────────────────────────────────────
-  // Stocks use broad-market lenses; Crypto retains its simpler direction
-  // pipeline. Both continue to share the persisted sort preference.
+  // Stocks scope All to known sectors; Crypto uses the full coin universe.
+  // Both share the same All/Watchlist view and persisted sort preference.
   const piped = useMemo(
     () => useStockViews
       ? selectStockView(trades, {
-          view: stockView,
+          view,
           watchlist: trackedSet,
           selectedSectors: selectedCategories,
           categoryMap,
           sortKey,
         })
       : applyFinancePipeline(trades, {
-          directionFilter,
+          view,
           selectedCategories,
           categoryMap,
           sortKey,
@@ -259,13 +248,12 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
         }),
     [
       categoryMap,
-      directionFilter,
       selectedCategories,
       sortKey,
-      stockView,
       trackedSet,
       trades,
       useStockViews,
+      view,
     ],
   );
 
@@ -280,7 +268,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
 
   const { visible, footer } = useAutoPagination(
     filtered.length,
-    [directionFilter, stockView, selectedCategories, sortKey, query],
+    [view, selectedCategories, sortKey, query],
     "px-3 py-3 bg-surface border-t border-edge/30",
   );
   const pageItems = filtered.slice(0, visible);
@@ -327,11 +315,12 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
     (sym: string) => {
       if (trackedSet.has(sym)) return;
       updateSymbols([...trackedSymbols, sym]);
-      if (isStocks) setStockView("watchlist");
-      else if (assetClass === "crypto") setDirectionFilter("watchlist");
+      if (assetClass === "stock" || assetClass === "crypto") {
+        setView("watchlist");
+      }
       setQuery("");
     },
-    [assetClass, isStocks, trackedSymbols, trackedSet, updateSymbols],
+    [assetClass, trackedSymbols, trackedSet, updateSymbols],
   );
 
   const removeSymbol = useCallback(
@@ -342,8 +331,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
     [trackedSymbols, trackedSet, updateSymbols],
   );
 
-  const isWatchlist =
-    isStocks ? stockView === "watchlist" : directionFilter === "watchlist";
+  const isWatchlist = view === "watchlist";
 
   return (
     // NO inner scroll container: the Source page (PageLayout) owns the
@@ -354,29 +342,12 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
         <WidgetBar>
           {!showEmpty ? (
             <>
-              {isStocks ? (
-                <Segmented
-                  value={stockView}
-                  options={STOCK_VIEW_OPTIONS}
-                  ariaLabel="Stock view"
-                  onChange={(next) => {
-                    setStockView(next);
-                    clearCategories();
-                  }}
-                />
-              ) : (
-                <div className="flex shrink-0 items-center gap-1">
-                  {DIRECTION_OPTIONS.map((opt) => (
-                    <BarPill
-                      key={opt.value}
-                      active={directionFilter === opt.value}
-                      onClick={() => setDirectionFilter(opt.value)}
-                    >
-                      {opt.label}
-                    </BarPill>
-                  ))}
-                </div>
-              )}
+              <Segmented
+                value={view}
+                options={VIEW_OPTIONS}
+                ariaLabel={isStocks ? "Stock view" : "Crypto view"}
+                onChange={setView}
+              />
 
               <div className="ml-auto flex min-w-0 shrink items-center gap-2">
                 <SelectMenu
@@ -386,7 +357,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                   ariaLabel="Sort symbols"
                   prefix="Sort"
                 />
-                {isStocks && stockView === "all" && categoryList.length > 1 && (
+                {isStocks && categoryList.length > 1 && (
                   <MultiSelectMenu
                     options={categoryList.map((c) => c.name)}
                     counts={Object.fromEntries(

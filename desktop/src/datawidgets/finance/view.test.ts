@@ -137,7 +137,7 @@ describe("selectStockView", () => {
     ).toEqual(["AAPL", "JPM", "MSFT", "XOM"]);
   });
 
-  it("filters All by category and keeps the saved watchlist separate", () => {
+  it("filters both All and Watchlist by category", () => {
     expect(
       selectStockView(trades, {
         ...base,
@@ -146,10 +146,12 @@ describe("selectStockView", () => {
       }).map((trade) => trade.symbol),
     ).toEqual(["XOM"]);
     expect(
-      selectStockView(trades, { ...base, view: "watchlist" }).map(
-        (trade) => trade.symbol,
-      ),
-    ).toEqual(["JPM", "MSFT"]);
+      selectStockView(trades, {
+        ...base,
+        view: "watchlist",
+        selectedSectors: new Set(["Technology"]),
+      }).map((trade) => trade.symbol),
+    ).toEqual(["MSFT"]);
   });
 });
 
@@ -172,29 +174,9 @@ describe("applyFinancePipeline", () => {
     ];
   }
 
-  it("applies direction=gainers", () => {
+  it("view=all keeps everything", () => {
     const result = applyFinancePipeline(makeTrades(), {
-      directionFilter: "gainers",
-      selectedCategories: new Set(),
-      categoryMap,
-      sortKey: "alpha",
-    });
-    expect(result.map((t) => t.symbol)).toEqual(["AAPL", "JPM"]);
-  });
-
-  it("applies direction=losers", () => {
-    const result = applyFinancePipeline(makeTrades(), {
-      directionFilter: "losers",
-      selectedCategories: new Set(),
-      categoryMap,
-      sortKey: "alpha",
-    });
-    expect(result.map((t) => t.symbol)).toEqual(["MSFT"]);
-  });
-
-  it("direction=all keeps everything including zero-change", () => {
-    const result = applyFinancePipeline(makeTrades(), {
-      directionFilter: "all",
+      view: "all",
       selectedCategories: new Set(),
       categoryMap,
       sortKey: "alpha",
@@ -202,9 +184,9 @@ describe("applyFinancePipeline", () => {
     expect(result).toHaveLength(4);
   });
 
-  it("direction=watchlist keeps tracked symbols", () => {
+  it("view=watchlist keeps tracked symbols", () => {
     const result = applyFinancePipeline(makeTrades(), {
-      directionFilter: "watchlist",
+      view: "watchlist",
       selectedCategories: new Set(),
       categoryMap,
       sortKey: "alpha",
@@ -215,7 +197,7 @@ describe("applyFinancePipeline", () => {
 
   it("applies category filter", () => {
     const result = applyFinancePipeline(makeTrades(), {
-      directionFilter: "all",
+      view: "all",
       selectedCategories: new Set(["tech"]),
       categoryMap,
       sortKey: "alpha",
@@ -229,7 +211,7 @@ describe("applyFinancePipeline", () => {
       mk({ symbol: "UNKNOWN" }),
     ];
     const result = applyFinancePipeline(trades, {
-      directionFilter: "all",
+      view: "all",
       selectedCategories: new Set(["tech"]),
       categoryMap,
       sortKey: "alpha",
@@ -237,15 +219,15 @@ describe("applyFinancePipeline", () => {
     expect(result.map((t) => t.symbol)).toEqual(["AAPL"]);
   });
 
-  it("combines direction + category filter + sort", () => {
+  it("combines watchlist + category filter + sort", () => {
     const result = applyFinancePipeline(makeTrades(), {
-      directionFilter: "gainers",
+      view: "watchlist",
       selectedCategories: new Set(["tech"]),
       categoryMap,
       sortKey: "price",
+      watchlist: new Set(["AAPL", "MSFT", "JPM"]),
     });
-    // gainers in tech: AAPL only
-    expect(result.map((t) => t.symbol)).toEqual(["AAPL"]);
+    expect(result.map((t) => t.symbol)).toEqual(["MSFT", "AAPL"]);
   });
 });
 

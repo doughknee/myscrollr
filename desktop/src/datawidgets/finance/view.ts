@@ -9,8 +9,7 @@ import type { Trade } from "../../types";
 import type { FinanceDisplayPrefs } from "../../preferences";
 
 export type FinanceSortKey = "alpha" | "price" | "change" | "updated";
-export type FinanceDirectionFilter = "all" | "gainers" | "losers" | "watchlist";
-export type StockView = "all" | "watchlist";
+export type FinanceView = "all" | "watchlist";
 export const STOCK_SECTORS = [
   "Basic Materials",
   "Communication Services",
@@ -63,7 +62,7 @@ export function sortTrades(
 }
 
 export interface StockViewOptions {
-  view: StockView;
+  view: FinanceView;
   watchlist: ReadonlySet<string>;
   selectedSectors: ReadonlySet<string>;
   categoryMap: ReadonlyMap<string, string>;
@@ -77,17 +76,19 @@ export function selectStockView(
 ): Trade[] {
   const { view, watchlist, selectedSectors, categoryMap, sortKey } = options;
   const sectors = new Set<string>(STOCK_SECTORS);
-  const items =
+  let items =
     view === "watchlist"
       ? trades.filter((trade) => watchlist.has(trade.symbol))
       : trades.filter((trade) => {
           const sector = categoryMap.get(trade.symbol);
-          return (
-            sector != null &&
-            sectors.has(sector) &&
-            (selectedSectors.size === 0 || selectedSectors.has(sector))
-          );
+          return sector != null && sectors.has(sector);
         });
+  if (selectedSectors.size > 0) {
+    items = items.filter((trade) => {
+      const sector = categoryMap.get(trade.symbol);
+      return sector != null && selectedSectors.has(sector);
+    });
+  }
 
   return sortTrades(items, sortKey);
 }
@@ -109,7 +110,7 @@ export function selectFinanceForTicker(
 // ── Pipeline for FeedTab ─────────────────────────────────────────
 
 export interface FinancePipelineOptions {
-  directionFilter: FinanceDirectionFilter;
+  view: FinanceView;
   selectedCategories: Set<string>;
   categoryMap: Map<string, string>;
   sortKey: FinanceSortKey;
@@ -120,15 +121,11 @@ export function applyFinancePipeline(
   trades: Trade[],
   opts: FinancePipelineOptions,
 ): Trade[] {
-  const { directionFilter, selectedCategories, categoryMap, sortKey, watchlist } = opts;
+  const { view, selectedCategories, categoryMap, sortKey, watchlist } = opts;
 
   let items = trades;
 
-  if (directionFilter === "gainers") {
-    items = items.filter((t) => parsePct(t.percentage_change) > 0);
-  } else if (directionFilter === "losers") {
-    items = items.filter((t) => parsePct(t.percentage_change) < 0);
-  } else if (directionFilter === "watchlist") {
+  if (view === "watchlist") {
     items = items.filter((t) => watchlist?.has(t.symbol));
   }
 
