@@ -106,7 +106,12 @@ function GitHubFeedBody({ mode: feedMode }: FeedTabProps) {
   const [inputError, setInputError] = useState<string | null>(null);
 
   // Auto-refresh + cross-window sync via useSyncedQuery
-  const { data: repoData, error } = useSyncedQuery<GitHubRepo>({
+  const {
+    data: repoData,
+    error,
+    isFetching,
+    refetch,
+  } = useSyncedQuery<GitHubRepo>({
     storeKey: LS_GITHUB_REPOS,
     loadFn: loadRepoData,
     saveFn: saveRepoData,
@@ -227,7 +232,12 @@ function GitHubFeedBody({ mode: feedMode }: FeedTabProps) {
       </div>
 
       {/* Error banner */}
-      <QueryErrorBanner error={error} />
+      <QueryErrorBanner
+        error={error}
+        message="Couldn't refresh repository status."
+        onRetry={() => void refetch()}
+        retrying={isFetching}
+      />
 
       {/* Add repo input */}
       <div className="flex gap-1.5 px-1">

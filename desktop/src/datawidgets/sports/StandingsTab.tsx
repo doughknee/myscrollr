@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { ChevronDown } from "lucide-react";
 import TeamLogo from "../../components/TeamLogo";
+import QueryErrorBanner from "../../components/QueryErrorBanner";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import { standingsOptions } from "../../api/queries";
 import type { Standing } from "../../api/queries";
@@ -171,7 +172,7 @@ export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
     setCollapsed(new Set());
   }, [selected]);
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, error, isLoading, isError, isFetching, refetch } = useQuery({
     ...standingsOptions(selected),
     enabled: !!selected,
   });
@@ -252,8 +253,13 @@ export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
       )}
 
       {isError && (
-        <div className="flex items-center justify-center py-12 text-error text-xs">
-          Failed to load standings
+        <div className="p-3">
+          <QueryErrorBanner
+            error={error}
+            message="Couldn't load standings."
+            onRetry={() => void refetch()}
+            retrying={isFetching}
+          />
         </div>
       )}
 

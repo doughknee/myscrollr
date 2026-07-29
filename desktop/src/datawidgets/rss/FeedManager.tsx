@@ -22,6 +22,7 @@ import clsx from "clsx";
 import { AnimatePresence, motion } from "motion/react";
 import Tooltip from "../../components/Tooltip";
 import EmptySection from "../../components/layout/EmptySection";
+import QueryErrorBanner from "../../components/QueryErrorBanner";
 import { tooltipMotion } from "../../lib/motion";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
@@ -43,7 +44,9 @@ interface FeedManagerProps {
   onAddCustom: (name: string, url: string) => void;
   onRemove: (url: string) => void;
   loading: boolean;
-  error: boolean;
+  error: Error | null;
+  onRetry: () => void;
+  retrying: boolean;
   saving: boolean;
 }
 
@@ -70,6 +73,8 @@ export default function FeedManager({
   onRemove,
   loading,
   error,
+  onRetry,
+  retrying,
   saving,
 }: FeedManagerProps) {
   const [search, setSearch] = useState("");
@@ -232,18 +237,14 @@ export default function FeedManager({
     setShowCustomForm(false);
   }, [newName, newUrl, onAddCustom]);
 
-  if (error) {
-    return (
-      <EmptySection
-        icon={X}
-        title="Couldn't load the feed catalog"
-        description="Check your connection and try again."
-      />
-    );
-  }
-
   return (
     <div className="h-full flex flex-col gap-3 pb-5 min-h-0">
+      <QueryErrorBanner
+        error={error}
+        message="Couldn't refresh the feed catalog."
+        onRetry={onRetry}
+        retrying={retrying}
+      />
       <div className="shrink-0 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <h3 className="text-sm font-semibold text-fg">Feeds</h3>

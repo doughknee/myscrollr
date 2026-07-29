@@ -565,11 +565,16 @@ function RssFeedsPanel({
   const {
     data: catalog = [],
     isLoading: catalogLoading,
-    isError: catalogError,
+    error: catalogError,
+    isFetching: catalogFetching,
+    refetch: refetchCatalog,
   } = useQuery(rssCatalogOptions());
-  const { data: catalogAll = [] } = useQuery(
-    rssCatalogOptions({ includeFailing: true }),
-  );
+  const {
+    data: catalogAll = [],
+    error: catalogAllError,
+    isFetching: catalogAllFetching,
+    refetch: refetchCatalogAll,
+  } = useQuery(rssCatalogOptions({ includeFailing: true }));
 
   const addCatalogFeed = useCallback(
     (url: string) => {
@@ -621,7 +626,11 @@ function RssFeedsPanel({
         onAddCustom={addCustomFeed}
         onRemove={removeFeed}
         loading={catalogLoading}
-        error={catalogError}
+        error={catalogError ?? catalogAllError}
+        onRetry={() => {
+          void Promise.all([refetchCatalog(), refetchCatalogAll()]);
+        }}
+        retrying={catalogFetching || catalogAllFetching}
         saving={saving}
       />
     </div>
