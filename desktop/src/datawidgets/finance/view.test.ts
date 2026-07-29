@@ -68,19 +68,6 @@ describe("sortTrades", () => {
     expect(result.map((t) => t.symbol)).toEqual(["B", "C", "A", "D"]);
   });
 
-  it("sorts by current session volume descending", () => {
-    const trades = [
-      mk({ symbol: "A", day_volume: 100 }),
-      mk({ symbol: "B", day_volume: 900 }),
-      mk({ symbol: "C", day_volume: 400 }),
-    ];
-    expect(sortTrades(trades, "volume").map((trade) => trade.symbol)).toEqual([
-      "B",
-      "C",
-      "A",
-    ]);
-  });
-
   it("sorts by updated (last_updated) descending", () => {
     const trades = [
       mk({ symbol: "A", last_updated: "2026-01-01T00:00:00Z" }),
@@ -142,24 +129,19 @@ describe("selectStockView", () => {
     sortKey: "alpha" as const,
   };
 
-  it("uses explicit overview and big-tech memberships", () => {
+  it("defaults All to the sector-based stock universe", () => {
     expect(
-      selectStockView(trades, { ...base, view: "overview" }).map(
+      selectStockView(trades, { ...base, view: "all" }).map(
         (trade) => trade.symbol,
       ),
-    ).toEqual(["QQQ", "SPY"]);
-    expect(
-      selectStockView(trades, { ...base, view: "big-tech" }).map(
-        (trade) => trade.symbol,
-      ),
-    ).toEqual(["AAPL", "MSFT"]);
+    ).toEqual(["AAPL", "JPM", "MSFT", "XOM"]);
   });
 
-  it("filters meaningful sectors and the saved watchlist", () => {
+  it("filters All by category and keeps the saved watchlist separate", () => {
     expect(
       selectStockView(trades, {
         ...base,
-        view: "sectors",
+        view: "all",
         selectedSectors: new Set(["Energy"]),
       }).map((trade) => trade.symbol),
     ).toEqual(["XOM"]);
@@ -168,14 +150,6 @@ describe("selectStockView", () => {
         (trade) => trade.symbol,
       ),
     ).toEqual(["JPM", "MSFT"]);
-  });
-
-  it("orders Most Active by real session volume", () => {
-    expect(
-      selectStockView(trades, { ...base, view: "active" }).map(
-        (trade) => trade.symbol,
-      ),
-    ).toEqual(["XOM", "JPM", "MSFT", "AAPL", "QQQ", "SPY"]);
   });
 });
 

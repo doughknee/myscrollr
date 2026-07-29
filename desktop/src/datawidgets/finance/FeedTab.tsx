@@ -5,8 +5,8 @@
  * via the desktop CDC/SSE pipeline. Supports compact and comfort
  * display modes.
  *
- * ONE Kalshi-style control bar (widget-bar primitives): stock market views
- * (or crypto direction pills) · sort/sector menus · symbol search · freshness.
+ * ONE Kalshi-style control bar (widget-bar primitives): stock list/watchlist
+ * (or crypto direction pills) · sort/category menus · symbol search · freshness.
  * The search is
  * ALSO the symbol manager: catalog matches surface inline with
  * Add/Remove actions (the separate Symbols view is gone). Controls remain
@@ -26,6 +26,10 @@ import EmptyWidgetState from "../../components/EmptyWidgetState";
 import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
 import { WidgetBar, BarPill } from "../../components/widget-bar/Bar";
+import {
+  Segmented,
+  type SegmentedOption,
+} from "../../components/widget-bar/Segmented";
 import { SearchBox, useSlashFocus } from "../../components/widget-bar/SearchBox";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
@@ -87,11 +91,8 @@ const DIRECTION_OPTIONS: { value: DirectionFilter; label: string }[] = [
   { value: "watchlist", label: "Watchlist" },
 ];
 
-const STOCK_VIEW_OPTIONS: { value: StockView; label: string }[] = [
-  { value: "overview", label: "Market Overview" },
-  { value: "big-tech", label: "Big Tech" },
-  { value: "sectors", label: "Sectors" },
-  { value: "active", label: "Most Active" },
+const STOCK_VIEW_OPTIONS: SegmentedOption<StockView>[] = [
+  { value: "all", label: "All" },
   { value: "watchlist", label: "Watchlist" },
 ];
 
@@ -185,7 +186,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
 
   // ── Filter / sort state ──────────────────────────────────────
   const [directionFilter, setDirectionFilter] = useState<DirectionFilter>("all");
-  const [stockView, setStockView] = useState<StockView>("overview");
+  const [stockView, setStockView] = useState<StockView>("all");
   const [sortKey, setSortKey] = useState<SortKey>(() => dp.defaultSort ?? "alpha");
 
   // Sticky sort (2026-07-17 unification): the bar's sort choice persists
@@ -229,7 +230,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
   const trackedSet = useMemo(() => new Set(trackedSymbols), [trackedSymbols]);
 
   const clearAllFilters = useCallback(() => {
-    setStockView("overview");
+    setStockView("all");
     setDirectionFilter("all");
     clearCategories();
     setQuery("");
@@ -353,45 +354,39 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
         <WidgetBar>
           {!showEmpty ? (
             <>
-              <div
-                className={clsx(
-                  "flex items-center gap-1",
-                  isStocks ? "min-w-0 flex-wrap" : "shrink-0",
-                )}
-              >
-                {(isStocks ? STOCK_VIEW_OPTIONS : DIRECTION_OPTIONS).map((opt) => (
-                  <BarPill
-                    key={opt.value}
-                    active={
-                      isStocks
-                        ? stockView === opt.value
-                        : directionFilter === opt.value
-                    }
-                    onClick={() => {
-                      if (isStocks) {
-                        setStockView(opt.value as StockView);
-                        clearCategories();
-                      } else {
-                        setDirectionFilter(opt.value as DirectionFilter);
-                      }
-                    }}
-                  >
-                    {opt.label}
-                  </BarPill>
-                ))}
-              </div>
+              {isStocks ? (
+                <Segmented
+                  value={stockView}
+                  options={STOCK_VIEW_OPTIONS}
+                  ariaLabel="Stock view"
+                  onChange={(next) => {
+                    setStockView(next);
+                    clearCategories();
+                  }}
+                />
+              ) : (
+                <div className="flex shrink-0 items-center gap-1">
+                  {DIRECTION_OPTIONS.map((opt) => (
+                    <BarPill
+                      key={opt.value}
+                      active={directionFilter === opt.value}
+                      onClick={() => setDirectionFilter(opt.value)}
+                    >
+                      {opt.label}
+                    </BarPill>
+                  ))}
+                </div>
+              )}
 
               <div className="ml-auto flex min-w-0 shrink items-center gap-2">
-                {(!isStocks || stockView !== "active") && (
-                  <SelectMenu
-                    value={sortKey}
-                    options={SORT_OPTIONS}
-                    onChange={pickSort}
-                    ariaLabel="Sort symbols"
-                    prefix="Sort"
-                  />
-                )}
-                {isStocks && stockView === "sectors" && categoryList.length > 1 && (
+                <SelectMenu
+                  value={sortKey}
+                  options={SORT_OPTIONS}
+                  onChange={pickSort}
+                  ariaLabel="Sort symbols"
+                  prefix="Sort"
+                />
+                {isStocks && stockView === "all" && categoryList.length > 1 && (
                   <MultiSelectMenu
                     options={categoryList.map((c) => c.name)}
                     counts={Object.fromEntries(
@@ -400,8 +395,8 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                     selected={Array.from(selectedCategories)}
                     onToggle={toggleCategory}
                     onClear={clearCategories}
-                    noun="sectors"
-                    ariaLabel="Filter by sector"
+                    noun="categories"
+                    ariaLabel="Filter by category"
                   />
                 )}
                 <SearchBox

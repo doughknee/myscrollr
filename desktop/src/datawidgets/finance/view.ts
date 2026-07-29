@@ -10,23 +10,7 @@ import type { FinanceDisplayPrefs } from "../../preferences";
 
 export type FinanceSortKey = "alpha" | "price" | "change" | "updated";
 export type FinanceDirectionFilter = "all" | "gainers" | "losers" | "watchlist";
-export type StockView =
-  | "overview"
-  | "big-tech"
-  | "sectors"
-  | "active"
-  | "watchlist";
-
-export const MARKET_OVERVIEW_SYMBOLS = ["SPY", "QQQ", "DIA", "IWM"] as const;
-export const BIG_TECH_SYMBOLS = [
-  "AAPL",
-  "MSFT",
-  "NVDA",
-  "AMZN",
-  "GOOGL",
-  "META",
-  "TSLA",
-] as const;
+export type StockView = "all" | "watchlist";
 export const STOCK_SECTORS = [
   "Basic Materials",
   "Communication Services",
@@ -57,7 +41,7 @@ function parsePrice(v: string | number | null | undefined): number {
 
 export function sortTrades(
   trades: Trade[],
-  key: FinanceSortKey | "volume",
+  key: FinanceSortKey,
 ): Trade[] {
   return [...trades].sort((a, b) => {
     switch (key) {
@@ -67,8 +51,6 @@ export function sortTrades(
         return parsePrice(b.price) - parsePrice(a.price);
       case "change":
         return parsePct(b.percentage_change) - parsePct(a.percentage_change);
-      case "volume":
-        return (b.day_volume ?? 0) - (a.day_volume ?? 0);
       case "updated": {
         const at = a.last_updated ?? "";
         const bt = b.last_updated ?? "";
@@ -94,37 +76,18 @@ export function selectStockView(
   options: StockViewOptions,
 ): Trade[] {
   const { view, watchlist, selectedSectors, categoryMap, sortKey } = options;
-  let items: Trade[];
-
-  switch (view) {
-    case "overview": {
-      const symbols = new Set<string>(MARKET_OVERVIEW_SYMBOLS);
-      items = trades.filter((trade) => symbols.has(trade.symbol));
-      break;
-    }
-    case "big-tech": {
-      const symbols = new Set<string>(BIG_TECH_SYMBOLS);
-      items = trades.filter((trade) => symbols.has(trade.symbol));
-      break;
-    }
-    case "sectors": {
-      const sectors = new Set<string>(STOCK_SECTORS);
-      items = trades.filter((trade) => {
-        const sector = categoryMap.get(trade.symbol);
-        return (
-          sector != null &&
-          sectors.has(sector) &&
-          (selectedSectors.size === 0 || selectedSectors.has(sector))
-        );
-      });
-      break;
-    }
-    case "active":
-      return sortTrades(trades, "volume");
-    case "watchlist":
-      items = trades.filter((trade) => watchlist.has(trade.symbol));
-      break;
-  }
+  const sectors = new Set<string>(STOCK_SECTORS);
+  const items =
+    view === "watchlist"
+      ? trades.filter((trade) => watchlist.has(trade.symbol))
+      : trades.filter((trade) => {
+          const sector = categoryMap.get(trade.symbol);
+          return (
+            sector != null &&
+            sectors.has(sector) &&
+            (selectedSectors.size === 0 || selectedSectors.has(sector))
+          );
+        });
 
   return sortTrades(items, sortKey);
 }
