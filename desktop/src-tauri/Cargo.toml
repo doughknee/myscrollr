@@ -27,7 +27,16 @@ default = []
 dev-mcp-bridge = ["dep:tauri-plugin-mcp-bridge"]
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
+# Omit common-controls-v6: Windows GNU test binaries have no app manifest and
+# otherwise bind comctl32 v5, which cannot resolve TaskDialogIndirect.
+tauri = { version = "2", default-features = false, features = [
+    "compression",
+    "dynamic-acl",
+    "image-png",
+    "tray-icon",
+    "wry",
+    "x11",
+] }
 tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
