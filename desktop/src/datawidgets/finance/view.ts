@@ -35,7 +35,6 @@ export function searchFinanceCatalog(
   catalog: readonly FinanceCatalogItem[],
   query: string,
   assetClass: string | undefined,
-  watchlist: ReadonlySet<string>,
 ): FinanceCatalogItem[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
@@ -66,7 +65,6 @@ export function searchFinanceCatalog(
     .sort(
       (a, b) =>
         relevance(a) - relevance(b) ||
-        Number(watchlist.has(a.symbol)) - Number(watchlist.has(b.symbol)) ||
         a.symbol.localeCompare(b.symbol),
     )
     .slice(0, 8);

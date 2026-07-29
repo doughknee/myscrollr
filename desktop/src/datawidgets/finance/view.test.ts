@@ -164,21 +164,15 @@ describe("searchFinanceCatalog", () => {
     { symbol: "ETH/USD", name: "Ethereum", category: "Crypto" },
   ];
 
-  it("scopes results and ranks relevant, addable symbols first", () => {
+  it("scopes results and ranks relevant symbols first", () => {
     expect(
-      searchFinanceCatalog(catalog, "aap", "stock", new Set(["AAP"])).map(
-        (item) => item.symbol,
-      ),
+      searchFinanceCatalog(catalog, "aap", "stock").map((item) => item.symbol),
     ).toEqual(["AAP", "AAPL"]);
     expect(
-      searchFinanceCatalog(catalog, "a", "stock", new Set(["AAP"])).map(
-        (item) => item.symbol,
-      ),
-    ).toEqual(["AAPL", "AAP"]);
+      searchFinanceCatalog(catalog, "a", "stock").map((item) => item.symbol),
+    ).toEqual(["AAP", "AAPL"]);
     expect(
-      searchFinanceCatalog(catalog, "bit", "crypto", new Set()).map(
-        (item) => item.symbol,
-      ),
+      searchFinanceCatalog(catalog, "bit", "crypto").map((item) => item.symbol),
     ).toEqual(["BTC/USD"]);
   });
 });

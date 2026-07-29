@@ -13,7 +13,7 @@
  */
 import { memo, useMemo, useRef, useState, useCallback } from "react";
 import { clsx } from "clsx";
-import { Plus, Trash2, TrendingUp, X } from "lucide-react";
+import { Plus, TrendingUp, X } from "lucide-react";
 import { motion } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -262,25 +262,36 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
 
   const searchQ = query.trim().toLowerCase();
 
+  const catalogMatches = useMemo(
+    () => searchFinanceCatalog(catalog ?? [], searchQ, assetClass),
+    [searchQ, catalog, assetClass],
+  );
+  const shownTrades = useMemo(
+    () =>
+      searchQ
+        ? catalogMatches.flatMap((item) => {
+            const trade = trades.find(
+              (candidate) => candidate.symbol === item.symbol,
+            );
+            return trade ? [trade] : [];
+          })
+        : piped,
+    [catalogMatches, piped, searchQ, trades],
+  );
+
   const { visible, footer } = useAutoPagination(
-    piped.length,
-    [view, selectedCategories, sortKey],
+    shownTrades.length,
+    [view, selectedCategories, sortKey, searchQ],
     "px-3 py-3 bg-surface border-t border-edge/30",
   );
-  const pageItems = piped.slice(0, visible);
+  const pageItems = shownTrades.slice(0, visible);
 
   const latestUpdated = useMemo(
-    () => latestTimestamp(piped, (t) => t.last_updated),
-    [piped],
+    () => latestTimestamp(shownTrades, (t) => t.last_updated),
+    [shownTrades],
   );
 
   const showEmpty = trades.length === 0;
-
-  // Catalog results replace the feed while searching so the field has one job.
-  const catalogMatches = useMemo(
-    () => searchFinanceCatalog(catalog ?? [], searchQ, assetClass, trackedSet),
-    [searchQ, catalog, assetClass, trackedSet],
-  );
 
   const addSymbol = useCallback(
     (sym: string) => {
@@ -339,7 +350,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
               inputRef={searchInputRef}
               query={query}
               onQueryChange={setQuery}
-              resultCount={searchQ ? catalogMatches.length : null}
+              resultCount={searchQ ? shownTrades.length : null}
               ariaLabel={`Search ${isStocks ? "stocks" : "crypto"} to manage watchlist`}
               noun="symbols"
               placeholder={`Search ${isStocks ? "stocks" : "crypto"}`}
@@ -367,66 +378,7 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
         </div>
       )}
 
-      {searchQ ? (
-        catalogMatches.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <p className="text-[12px] text-fg-3">
-              No {isStocks ? "stocks" : "crypto"} found for “{query.trim()}”
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {catalogMatches.map((item) => {
-              const tracked = trackedSet.has(item.symbol);
-              return (
-                <div
-                  key={item.symbol}
-                  className={clsx(
-                    FEED_CARD,
-                    "flex min-w-0 items-center justify-between gap-3",
-                  )}
-                >
-                  <div className="min-w-0">
-                    <p className="font-mono text-[12px] font-semibold text-fg">
-                      {item.symbol}
-                    </p>
-                    <p className="truncate text-[11px] text-fg-3">
-                      {item.name}
-                    </p>
-                    {isStocks && (
-                      <p className="truncate text-[10px] uppercase tracking-wider text-fg-4">
-                        {item.category}
-                      </p>
-                    )}
-                  </div>
-                  <motion.button
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() =>
-                      tracked
-                        ? removeSymbol(item.symbol)
-                        : addSymbol(item.symbol)
-                    }
-                    whileTap={{ transform: "scale(0.97)" }}
-                    transition={controlTransition}
-                    disabled={symbolsSaving}
-                    aria-label={`${tracked ? "Remove" : "Add"} ${item.symbol} ${tracked ? "from" : "to"} watchlist`}
-                    className={clsx(
-                      "inline-flex min-w-20 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 py-1 text-ui-chip font-semibold disabled:cursor-wait disabled:opacity-40",
-                      tracked
-                        ? "border border-edge/40 text-fg-3 hover:border-down/30 hover:bg-down/10 hover:text-down"
-                        : "bg-accent/10 text-accent hover:bg-accent/20",
-                    )}
-                  >
-                    {tracked ? <Trash2 size={11} /> : <Plus size={12} />}
-                    {tracked ? "Remove" : "Add"}
-                  </motion.button>
-                </div>
-              );
-            })}
-          </div>
-        )
-      ) : showEmpty ? (
+      {!searchQ && showEmpty ? (
         <div className="flex flex-1 flex-col justify-center">
           <EmptyWidgetState
             refreshing={Boolean(feedContext.__refreshing)}
@@ -442,19 +394,23 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
             }
           />
         </div>
-      ) : piped.length === 0 ? (
+      ) : shownTrades.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 gap-3">
           <p className="text-[12px] text-fg-3">
-            {isWatchlist
-              ? "Your watchlist is empty — search to add symbols"
-              : "No symbols match your filters"}
+            {searchQ
+              ? `No ${isStocks ? "stocks" : "crypto"} found for “${query.trim()}”`
+              : isWatchlist
+                ? "Your watchlist is empty — search to add symbols"
+                : "No symbols match your filters"}
           </p>
-          <button
-            onClick={clearAllFilters}
-            className="px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20  cursor-pointer"
-          >
-            Clear filters
-          </button>
+          {!searchQ && (
+            <button
+              onClick={clearAllFilters}
+              className="px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20  cursor-pointer"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       ) : (
         <>
@@ -472,7 +428,19 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                 mode={mode}
                 category={categoryMap.get(trade.symbol)}
                 now={now}
-                onRemove={isComfort && isWatchlist ? removeSymbol : undefined}
+                onAdd={
+                  isComfort && !trackedSet.has(trade.symbol)
+                    ? addSymbol
+                    : undefined
+                }
+                onRemove={
+                  isComfort &&
+                  trackedSet.has(trade.symbol) &&
+                  (isWatchlist || Boolean(searchQ))
+                    ? removeSymbol
+                    : undefined
+                }
+                actionVisible={isWatchlist || Boolean(searchQ)}
                 saving={symbolsSaving}
               />
             ))}
@@ -486,11 +454,18 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
 
 // ── TradeItem ────────────────────────────────────────────────────
 
+const CARD_ACTION_MOTION = {
+  hidden: { opacity: 0, transform: "scale(0.9)" },
+  visible: { opacity: 1, transform: "scale(1)" },
+};
+
 interface TradeItemProps {
   trade: Trade;
   mode: "comfort" | "compact";
   category?: string;
+  onAdd?: (symbol: string) => void;
   onRemove?: (symbol: string) => void;
+  actionVisible?: boolean;
   saving?: boolean;
   /** Shared "now" from `useNow()` in the parent list — drives the `Xs ago` label. */
   now: number;
@@ -501,7 +476,9 @@ const TradeItem = memo(function TradeItem({
   mode,
   category,
   now,
+  onAdd,
   onRemove,
+  actionVisible = false,
   saving,
 }: TradeItemProps) {
   const isUp = trade.direction === "up";
@@ -532,12 +509,15 @@ const TradeItem = memo(function TradeItem({
 
   // Comfort mode
   return (
-    <div
+    <motion.div
+      initial={false}
+      animate={actionVisible ? "visible" : "hidden"}
+      whileHover="visible"
       className={clsx(
         FEED_CARD,
         FEED_CARD_INTERACTIVE,
         "relative flex items-center justify-between overflow-hidden border-l-2",
-        onRemove && "pr-10",
+        (onAdd || onRemove) && "pr-10",
         isUp && "border-l-up/40",
         isDown && "border-l-down/40",
         !isUp && !isDown && "border-l-transparent",
@@ -589,24 +569,35 @@ const TradeItem = memo(function TradeItem({
           )}
         </div>
       </div>
-      {onRemove && (
-        <button
+      {(onAdd || onRemove) && (
+        <motion.button
           type="button"
-          onClick={() => onRemove(trade.symbol)}
+          variants={CARD_ACTION_MOTION}
+          whileFocus="visible"
+          whileTap={{ transform: "scale(0.92)" }}
+          transition={controlTransition}
+          onClick={() => (onRemove ?? onAdd)?.(trade.symbol)}
           disabled={saving}
-          aria-label={`Remove ${trade.symbol} from watchlist`}
-          title="Remove from watchlist"
-          className="absolute right-2 top-2 z-10 rounded-md p-1.5 text-fg-4 hover:bg-down/10 hover:text-down disabled:opacity-40"
+          aria-label={`${onRemove ? "Remove" : "Add"} ${trade.symbol} ${onRemove ? "from" : "to"} watchlist`}
+          title={`${onRemove ? "Remove from" : "Add to"} watchlist`}
+          className={clsx(
+            "absolute right-2 top-2 z-10 rounded-md p-1.5 disabled:opacity-40",
+            onRemove
+              ? "text-fg-4 hover:bg-down/10 hover:text-down"
+              : "text-accent hover:bg-accent/10",
+          )}
         >
-          <X size={14} />
-        </button>
+          {onRemove ? <X size={14} /> : <Plus size={14} />}
+        </motion.button>
       )}
-    </div>
+    </motion.div>
   );
 }, (prev, next) =>
   prev.mode === next.mode &&
   prev.category === next.category &&
+  prev.onAdd === next.onAdd &&
   prev.onRemove === next.onRemove &&
+  prev.actionVisible === next.actionVisible &&
   prev.saving === next.saving &&
   // `now` must trigger a re-render while the "Xs ago" label is visible
   // so it advances on every tick. Compact mode has no label — skip the
