@@ -5,12 +5,10 @@ import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import TeamLogo from "../../components/TeamLogo";
 import { isPre, formatCountdown, displayTeamCode } from "../../utils/gameHelpers";
 import type { Game } from "../../types";
-import type { StatusFilter } from "./FeedTab";
 
 interface ScheduleTabProps {
   games: Game[];
   favoriteTeams: Set<string>;
-  statusFilter: StatusFilter;
 }
 
 function dateLabel(dateStr: string): string {
@@ -39,16 +37,10 @@ function isFavoriteGame(game: Game, favorites: Set<string>): boolean {
 export function ScheduleTab({
   games,
   favoriteTeams,
-  statusFilter,
 }: ScheduleTabProps) {
   const upcoming = useMemo(() => {
     return games
-      .filter((g) => {
-        // When statusFilter is "upcoming", show only pre games (already handled by ScoresTab
-        // but ScheduleTab only cares about pre games anyway)
-        if (statusFilter !== "all" && statusFilter !== "upcoming") return false;
-        return isPre(g);
-      })
+      .filter(isPre)
       .sort((a, b) => {
         // Favorites first
         const aFav = isFavoriteGame(a, favoriteTeams) ? 1 : 0;
@@ -56,7 +48,7 @@ export function ScheduleTab({
         if (aFav !== bFav) return bFav - aFav;
         return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
       });
-  }, [games, favoriteTeams, statusFilter]);
+  }, [games, favoriteTeams]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, Game[]>();
@@ -72,11 +64,7 @@ export function ScheduleTab({
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         <CalendarOff size={28} className="text-fg-3" />
-        <p className="text-fg-3 text-xs">
-          {statusFilter !== "all" && statusFilter !== "upcoming"
-            ? "Schedule only shows upcoming games"
-            : "No upcoming games scheduled"}
-        </p>
+        <p className="text-fg-3 text-xs">No upcoming games scheduled</p>
       </div>
     );
   }

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   selectSportsForTicker,
+  selectSportsForFeed,
   gameEngagement,
   normalizeSportsDisplayConfig,
   SPORTS_WINDOW_DEFAULTS,
@@ -278,5 +279,23 @@ describe("selectSportsForTicker", () => {
     const orderAtT1 = selectSportsForTicker(games, null).map((g) => g.id);
 
     expect(orderAtT1).toEqual(orderAtT0);
+  });
+});
+
+describe("selectSportsForFeed", () => {
+  it("promotes favorites, then keeps live, upcoming, and recent finals ordered", () => {
+    const games = [
+      finalGame(1, 30 * 60_000),
+      preGame(2, 2 * 3_600_000),
+      liveGame(3),
+      { ...finalGame(4, 60 * 60_000), home_team_name: "Favorite" },
+    ];
+    const result = selectSportsForFeed(
+      games,
+      null,
+      new Set(["Favorite"]),
+      NOW.getTime(),
+    );
+    expect(result.map((g) => g.id)).toEqual([4, 3, 2, 1]);
   });
 });

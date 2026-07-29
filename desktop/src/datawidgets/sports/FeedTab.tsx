@@ -7,9 +7,8 @@
  * Standings fetches league standings from the API.
  *
  * ONE Kalshi-style control bar (widget-bar primitives): Segmented
- * [Scores | Schedule | Standings] · status BarPills (collapsing into a
- * Filter menu at narrow widths, counts in the rows) · freshness ·
- * favorite-team and time-window SelectMenus — all via useSportsConfig.
+ * [Scores | Schedule | Standings] · freshness · favorite-team and
+ * time-window SelectMenus — all via useSportsConfig.
  * No league management: per-league widgets have an intrinsic league,
  * and coarse `sports` rows can't exist post-migration-000014.
  */
@@ -27,7 +26,7 @@ import { StandingsTab } from "./StandingsTab";
 import EmptyWidgetState from "../../components/EmptyWidgetState";
 import WidgetStateTransition from "../../components/WidgetStateTransition";
 import FreshnessPill from "../../components/FreshnessPill";
-import { WidgetBar, BarDivider, BarPill } from "../../components/widget-bar/Bar";
+import { WidgetBar } from "../../components/widget-bar/Bar";
 import {
   Segmented,
   type SegmentedOption,
@@ -65,21 +64,11 @@ export const sportsDataWidget: DataWidgetManifest = {
 // ── Types ────────────────────────────────────────────────────────
 
 type SportsTab = "scores" | "schedule" | "standings";
-export type StatusFilter = "all" | "live" | "upcoming" | "final";
 
 const TAB_OPTIONS: SegmentedOption<SportsTab>[] = [
   { value: "scores", label: "Scores" },
   { value: "schedule", label: "Schedule" },
   { value: "standings", label: "Standings" },
-];
-
-// ── StatusFilter pills ───────────────────────────────────────────
-
-const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "live", label: "Live" },
-  { value: "upcoming", label: "Upcoming" },
-  { value: "final", label: "Final" },
 ];
 
 // ── Helper: build set of favorite team names ─────────────────────
@@ -96,7 +85,6 @@ function buildFavoriteSet(favorites: Record<string, FavoriteTeam>): Set<string> 
 
 function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   const [tab, setTab] = useState<SportsTab>("scores");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const { leagues, display, favoriteTeams } = useSportsConfig(widgetId ?? "sports");
   const isComfort = mode === "comfort";
 
@@ -110,7 +98,7 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
 
   // Full widget page reads from /sports directly (not /dashboard), which
   // returns every game for the user's selected leagues without per-league
-  // fair-share capping. The bar's status pills narrow down by hand.
+  // fair-share capping.
   const { data: sportsData } = useQuery(sportsFullQueryOptions());
   const games = useMemo(() => {
     const all = sportsData?.sports ?? [];
@@ -142,23 +130,6 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
             onChange={setTab}
             options={TAB_OPTIONS}
           />
-
-          {tab !== "standings" && !showEmpty && (
-            <>
-              <BarDivider />
-              <div className="flex shrink-0 items-center gap-1">
-                {STATUS_OPTIONS.map((opt) => (
-                  <BarPill
-                    key={opt.value}
-                    active={statusFilter === opt.value}
-                    onClick={() => setStatusFilter(opt.value)}
-                  >
-                    {opt.label}
-                  </BarPill>
-                ))}
-              </div>
-            </>
-          )}
 
           <div className="ml-auto flex min-w-0 shrink items-center gap-2">
             {tab !== "standings" && latestUpdated && (
@@ -198,14 +169,13 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
                 mode={mode}
                 display={display}
                 favoriteTeams={favoriteTeamNames}
-                statusFilter={statusFilter}
+                showLeagueHeaders={!scopedLeague}
               />
             )}
             {tab === "schedule" && (
               <ScheduleTab
                 games={games}
                 favoriteTeams={favoriteTeamNames}
-                statusFilter={statusFilter}
               />
             )}
             {tab === "standings" && (
