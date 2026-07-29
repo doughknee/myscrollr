@@ -132,6 +132,7 @@ pub async fn update_all_previous_closes(state: FinanceState) {
                                 change,
                                 pct,
                                 direction,
+                                None,
                             ).await;
                         } else {
                             warn!("[ TwelveData ] Skipping price update for {}: close is 0", symbol);

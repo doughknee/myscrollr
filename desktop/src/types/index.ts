@@ -18,6 +18,7 @@ export interface Trade {
   price_change?: number | string;
   percentage_change?: number | string;
   direction?: "up" | "down";
+  day_volume?: number;
   last_updated?: string;
   link?: string;
 }

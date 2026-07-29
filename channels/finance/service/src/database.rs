@@ -72,6 +72,7 @@ pub struct DatabaseTradeData {
     pub price_change: f64,
     pub percentage_change: f64,
     pub direction: String,
+    pub day_volume: i64,
     pub last_updated: chrono::DateTime<Utc>
 }
 
@@ -121,10 +122,11 @@ pub async fn update_previous_close(pool: Arc<PgPool>, symbol: String, prev_close
     Ok(())
 }
 
-pub async fn update_trade(pool: Arc<PgPool>, symbol: String, price: f64, price_change: f64, percentage_change: f64, direction: &str) -> Result<()> {
-    let statement = "UPDATE trades SET price = $1, price_change = $2, percentage_change = $3, direction = $4, last_updated = CURRENT_TIMESTAMP WHERE symbol = $5";
+pub async fn update_trade(pool: Arc<PgPool>, symbol: String, price: f64, price_change: f64, percentage_change: f64, direction: &str, day_volume: Option<u64>) -> Result<()> {
+    let statement = "UPDATE trades SET price = $1, price_change = $2, percentage_change = $3, direction = $4, day_volume = COALESCE($5, day_volume), last_updated = CURRENT_TIMESTAMP WHERE symbol = $6";
     let mut connection = pool.acquire().await?;
-    query(statement).bind(price).bind(price_change).bind(percentage_change).bind(direction).bind(symbol).execute(&mut *connection).await?;
+    let day_volume = day_volume.and_then(|value| i64::try_from(value).ok());
+    query(statement).bind(price).bind(price_change).bind(percentage_change).bind(direction).bind(day_volume).bind(symbol).execute(&mut *connection).await?;
     Ok(())
 }
 
@@ -137,6 +139,7 @@ pub async fn get_trades(pool: Arc<PgPool>) -> Vec<DatabaseTradeData> {
             price_change::FLOAT8 as price_change,
             percentage_change::FLOAT8 as percentage_change,
             direction,
+            day_volume,
             last_updated
         FROM trades
         ORDER BY symbol ASC
