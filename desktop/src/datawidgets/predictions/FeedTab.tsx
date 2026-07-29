@@ -1,12 +1,10 @@
 /**
  * Predictions FeedTab — v1.1.5 "Kalshi Cleans Up".
  *
- * ONE personalization primitive (the ★ watchlist) and ONE control row
- * (four lenses: Trending / Movers / Closing soon / Watchlist). Trending
- * browses Kalshi-style: category sections ordered by 24h volume, each a
- * grid of event cards (question headline, outcome rows with probability
- * pills, volume footer). Other lenses and category focus render a flat
- * sorted grid with incremental paging.
+ * One control row switches between Markets, Watchlist, and Positions.
+ * Market sorting lives in a dropdown so the bar stays compact. Trending
+ * browses category sections ordered by 24h volume; other sorts and
+ * category focus render a flat paginated grid.
  *
  * Server-side config (categories/favorites) is retired — the payload is
  * the full curated set (~240 markets) and ALL filtering is client-side.
@@ -22,15 +20,12 @@ import {
   LineChart,
   Wallet,
   Star,
-  CheckCircle2,
   ChevronRight,
-  Flame,
-  Clock,
   Search,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { dataWidgetsApi } from "../../api/client";
 import { dashboardQueryOptions, predictionsCatalogOptions } from "../../api/queries";
 import {
@@ -41,7 +36,7 @@ import {
 import EmptyWidgetState from "../../components/EmptyWidgetState";
 import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
-import { WidgetBar, BarDivider, BarPill } from "../../components/widget-bar/Bar";
+import { WidgetBar } from "../../components/widget-bar/Bar";
 import {
   Segmented,
   type SegmentedOption,
@@ -66,6 +61,7 @@ import {
 } from "./watchlist";
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
+import { controlTransition } from "../../lib/motion";
 import {
   useAutoPagination,
   useSetToggle,
@@ -73,7 +69,6 @@ import {
 } from "../feedHooks";
 import {
   selectLens,
-  selectResolvedToday,
   groupByEvent,
   groupEventsByCategory,
   priceDelta,
@@ -93,7 +88,6 @@ import {
   type MatchRange,
 } from "./search";
 import type { Prediction, FeedTabProps, DataWidgetManifest } from "../../types";
-import type { PredictionsDisplayPrefs } from "../../preferences";
 import { PredictionsHomeRows } from "./home";
 
 // ── DataWidgetRow manifest ─────────────────────────────────────────────
@@ -112,8 +106,8 @@ export const predictionsDataWidget: DataWidgetManifest = {
       "the market gives a 'Yes' outcome — and moves in real time as " +
       "traders shift the odds.",
     usage: [
-      "Browse Trending by category, or flip lenses: Movers, Closing soon, Resolved.",
-      "Star any market — stars build your watchlist and take over the ticker.",
+      "Browse by category, then sort by Trending, Movers, Closing soon, or Recently settled.",
+      "Use Add and Remove on any market to manage your watchlist.",
       "Click any outcome for its price history, alerts, and the Kalshi link.",
     ],
   },
@@ -130,23 +124,21 @@ const PREDICTIONS_HEX = "#1fc9a0";
 /** Events shown per category section before "View all" takes over. */
 const SECTION_PREVIEW_COUNT = 6;
 
-type FeedView = "markets" | "positions";
+type FeedView = "markets" | "watchlist" | "positions";
+type BrowseLens = Exclude<PredictionsLens, "watchlist">;
 
-/** Markets / My Positions — options for the Segmented view switch. */
+/** The three user tasks. Positions is omitted outside the Tauri app. */
 const VIEW_OPTIONS: SegmentedOption<FeedView>[] = [
   { value: "markets", label: "Markets", icon: LineChart },
+  { value: "watchlist", label: "Watchlist", icon: Star },
   { value: "positions", label: "Positions", icon: Wallet },
 ];
 
-/** Ticker fallback when nothing is starred — bar SelectMenu options
- *  (mirrors PredictionsDisplayPrefs.defaultSort minus "alpha"). */
-const TICKER_FALLBACKS: {
-  value: NonNullable<PredictionsDisplayPrefs["defaultSort"]>;
-  label: string;
-}[] = [
+const BROWSE_OPTIONS: { value: BrowseLens; label: string }[] = [
   { value: "trending", label: "Trending" },
   { value: "movers", label: "Movers" },
   { value: "closing", label: "Closing soon" },
+  { value: "resolved", label: "Recently settled" },
 ];
 
 /** Pre-v1.1.5 server-side config keys (see the migration effect). */
@@ -163,14 +155,6 @@ function formatDelta(delta: number): string {
   if (delta < 0) return `▼ ${Math.abs(delta)}`;
   return "—";
 }
-
-const LENSES: { value: PredictionsLens; label: string; icon?: typeof Flame }[] = [
-  { value: "trending", label: "Trending", icon: Flame },
-  { value: "movers", label: "Movers", icon: TrendingUp },
-  { value: "closing", label: "Closing soon", icon: Clock },
-  { value: "resolved", label: "Resolved", icon: CheckCircle2 },
-  { value: "watchlist", label: "Watchlist", icon: Star },
-];
 
 // ── FeedTab ──────────────────────────────────────────────────────
 
@@ -263,7 +247,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
         setWatchlist(merged);
         toast.success(
           `Moved ${imported} pinned market${imported === 1 ? "" : "s"} to your watchlist`,
-          { description: "Stars are the one list now — managed right here." },
+          { description: "Your watchlist is managed directly from market cards." },
         );
       }
     }
@@ -287,7 +271,11 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   }, [widgetRow, queryClient]);
 
   // ── Lens + category filter + market-detail modal ──────────────
-  const [lens, setLens] = useState<PredictionsLens>("trending");
+  const [view, setView] = useState<FeedView>("markets");
+  const [lens, setLens] = useState<BrowseLens>(() => {
+    const stored = dp.defaultSort;
+    return stored === "movers" || stored === "closing" ? stored : "trending";
+  });
   // Multi-select category filter (empty = all). "View all" on a section
   // focuses exactly that category; the menu toggles combine freely.
   const [selectedCats, toggleCat, clearCats] = useSetToggle();
@@ -304,17 +292,18 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   );
 
   const pickLens = useCallback(
-    (next: PredictionsLens) => {
+    (next: BrowseLens) => {
       setLens(next);
-      clearCats();
+      if (next === "resolved") return;
+      onPrefsChange({
+        ...prefs,
+        widgetDisplay: {
+          ...prefs.widgetDisplay,
+          predictions: { ...dp, defaultSort: next },
+        },
+      });
     },
-    [clearCats],
-  );
-
-  // Resolved-today recap (trailing 24h), refreshed as `now` ticks.
-  const resolvedToday = useMemo(
-    () => selectResolvedToday(markets, now),
-    [markets, now],
+    [dp, onPrefsChange, prefs],
   );
 
   // Starred tickers with no live row — they left the curated set, so the
@@ -356,10 +345,12 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   // ── Data pipeline (pure selectors from view.ts) ───────────────
   // `now` only anchors the resolved lens's 24h window — freeze it for the
   // other lenses so their memo doesn't churn on every 1s tick.
-  const lensNow = lens === "resolved" ? now : 0;
+  const effectiveLens: PredictionsLens =
+    view === "watchlist" ? "watchlist" : lens;
+  const lensNow = effectiveLens === "resolved" ? now : 0;
   const lensItems = useMemo(
-    () => selectLens(markets, lens, watchedSet, lensNow),
-    [markets, lens, watchedSet, lensNow],
+    () => selectLens(markets, effectiveLens, watchedSet, lensNow),
+    [markets, effectiveLens, watchedSet, lensNow],
   );
 
   const focusedItems = useMemo(
@@ -407,10 +398,13 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   // Browse mode: Trending with no category filter = Kalshi-style sections.
   const sections: CategorySection[] | null = useMemo(
     () =>
-      isComfort && lens === "trending" && selectedCats.size === 0
+      isComfort &&
+      view === "markets" &&
+      effectiveLens === "trending" &&
+      selectedCats.size === 0
         ? groupEventsByCategory(shownEvents)
         : null,
-    [isComfort, lens, selectedCats, shownEvents],
+    [effectiveLens, isComfort, selectedCats, shownEvents, view],
   );
 
   // ── Pagination (flat modes only — sections self-cap) ─────────
@@ -419,7 +413,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   const renderTotal = isComfort ? shownEvents.length : focusedItems.length;
   const { visible, footer } = useAutoPagination(
     renderTotal,
-    [lens, selectedCats, watchlist, query],
+    [effectiveLens, selectedCats, watchlist, query, view],
     "px-3 pb-3",
   );
   const pageItems = focusedItems.slice(0, visible);
@@ -469,8 +463,10 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   // ── View switcher (Markets / My Positions) ───────────────────
   // Only on the full-size Source page (comfort). The compact Home preview
   // stays a pure markets list. "My Positions" is desktop-only (keychain).
-  const [view, setView] = useState<FeedView>("markets");
-  const showSwitcher = mode === "comfort" && isKalshiAvailable();
+  const showPositions = mode === "comfort" && isKalshiAvailable();
+  const viewOptions = showPositions
+    ? VIEW_OPTIONS
+    : VIEW_OPTIONS.filter((option) => option.value !== "positions");
 
   // ── Search keyboard support ───────────────────────────────────
   // Render-order list of matched events for ↑/↓ + Enter. Sections show
@@ -487,7 +483,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
 
   // "/" focuses search from anywhere in the widget (unless typing, or
   // the market-detail modal is open).
-  useSlashFocus(searchInputRef, isComfort && view === "markets");
+  useSlashFocus(searchInputRef, isComfort && view !== "positions");
 
   // Keep the keyboard-selected card in view.
   useEffect(() => {
@@ -519,18 +515,17 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
     [searching, navEvents, selIdx, openDetail],
   );
 
-  if (showSwitcher && view === "positions") {
+  if (showPositions && view === "positions") {
     return (
       <div className="flex min-h-full flex-col">
-        {/* Sticky so the way back to Markets survives scrolling. */}
-        <div className="sticky top-0 z-20 flex shrink-0 items-center gap-2 border-b border-edge/30 bg-surface px-3 py-1.5">
+        <WidgetBar>
           <Segmented
             ariaLabel="Predictions view"
             value={view}
             onChange={setView}
-            options={VIEW_OPTIONS}
+            options={viewOptions}
           />
-        </div>
+        </WidgetBar>
         <div className="flex flex-1 flex-col">
           <MyPositionsPanel markets={markets} hex={PREDICTIONS_HEX} />
         </div>
@@ -542,15 +537,15 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
   if (markets.length === 0) {
     return (
       <div className="flex min-h-full flex-col">
-        {showSwitcher && (
-          <div className="flex shrink-0 items-center gap-2 border-b border-edge/30 bg-surface px-3 py-1.5">
+        {isComfort && (
+          <WidgetBar>
             <Segmented
               ariaLabel="Predictions view"
               value={view}
               onChange={setView}
-              options={VIEW_OPTIONS}
+              options={viewOptions}
             />
-          </div>
+          </WidgetBar>
         )}
         <div className="flex flex-1 flex-col justify-center">
           <EmptyWidgetState
@@ -574,45 +569,26 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
     // pins against the ancestor that actually scrolls. (RSS uses the same
     // page-scroll structure.)
     <div ref={containerRef} className="relative flex min-h-full flex-col">
-      {/* ONE control bar: view switcher (segmented, Tauri-only) · lens
-          pills + category select · search · freshness. WidgetBar owns the
-          sticky shell, horizontal overflow, and pinned elevation. */}
+      {/* One task switch, then contextual browse controls. */}
       {isComfort && (
         <WidgetBar>
-          {showSwitcher && (
-            <>
-              <Segmented
-                ariaLabel="Predictions view"
-                value={view}
-                onChange={setView}
-                options={VIEW_OPTIONS}
-              />
-              <BarDivider />
-            </>
-          )}
-
-          {/* Open lens pills stay visible at every width. */}
-          <div className="flex shrink-0 items-center gap-1">
-            {LENSES.map((l) => {
-              const Icon = l.icon;
-              const active = lens === l.value && selectedCats.size === 0;
-              return (
-                <BarPill key={l.value} active={active} onClick={() => pickLens(l.value)}>
-                  {Icon && (
-                    <Icon
-                      size={12}
-                      className={l.value === "watchlist" && active ? "fill-current" : ""}
-                    />
-                  )}
-                  {l.label}
-                </BarPill>
-              );
-            })}
-          </div>
+          <Segmented
+            ariaLabel="Predictions view"
+            value={view}
+            onChange={setView}
+            options={viewOptions}
+          />
 
           <div className="ml-auto flex min-w-0 shrink items-center gap-2">
-            {/* Category rides with the other narrowing controls (search)
-                so the lens row keeps its breathing room. */}
+            {view === "markets" && (
+              <SelectMenu
+                ariaLabel="Sort markets"
+                prefix="Sort"
+                value={lens}
+                options={BROWSE_OPTIONS}
+                onChange={pickLens}
+              />
+            )}
             <MultiSelectMenu
               options={categories}
               selected={Array.from(selectedCats)}
@@ -635,21 +611,6 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                 <FreshnessPill lastUpdated={latestUpdated} label="odds" />
               </span>
             )}
-            <SelectMenu
-              ariaLabel="Ticker fallback when nothing is starred"
-              prefix="Ticker"
-              value={dp.defaultSort ?? "trending"}
-              options={TICKER_FALLBACKS}
-              onChange={(v) =>
-                onPrefsChange({
-                  ...prefs,
-                  widgetDisplay: {
-                    ...prefs.widgetDisplay,
-                    predictions: { ...dp, defaultSort: v },
-                  },
-                })
-              }
-            />
           </div>
         </WidgetBar>
       )}
@@ -677,15 +638,18 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
               Clear search
             </button>
           </div>
-        ) : lens === "watchlist" ? (
+        ) : view === "watchlist" ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2 px-6 text-center">
             <Star size={22} className="text-fg-4" />
             <p className="text-[12px] text-fg-3">No watched markets yet</p>
             <p className="text-[11px] text-fg-4">
-              Tap the ☆ on any market to add it to your watchlist.
+              Hover any market and choose Add + to build your watchlist.
             </p>
             <button
-              onClick={() => pickLens("trending")}
+              onClick={() => {
+                setView("markets");
+                pickLens("trending");
+              }}
               className="mt-1 px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20  cursor-pointer"
             >
               Browse markets
@@ -694,12 +658,15 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
         ) : (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
             <p className="text-[12px] text-fg-3">
-              {lens === "resolved"
+              {effectiveLens === "resolved"
                 ? "Nothing settled in the last 24 hours"
                 : "Nothing here right now"}
             </p>
             <button
-              onClick={() => pickLens("trending")}
+              onClick={() => {
+                setView("markets");
+                pickLens("trending");
+              }}
               className="px-3 py-1.5 rounded-md text-ui-meta font-medium text-accent bg-accent/10 hover:bg-accent/20  cursor-pointer"
             >
               Back to Trending
@@ -758,6 +725,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                         watchedSet={watchedSet}
                         onToggleWatch={toggleWatch}
                         onOpenDetail={openDetail}
+                        actionVisible={searching}
                         hit={hits?.get(ev.eventTicker)}
                       />
                     </CardCell>
@@ -792,7 +760,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                     navIdx={navIndex.get(ev.eventTicker)}
                     selected={selIdx >= 0 && navIndex.get(ev.eventTicker) === selIdx}
                   >
-                    {lens === "resolved" ? (
+                    {effectiveLens === "resolved" ? (
                       <ResolvedCard
                         event={ev}
                         category={categoryOf(ev.outcomes[0])}
@@ -800,6 +768,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                         watchedSet={watchedSet}
                         onToggleWatch={toggleWatch}
                         onOpenDetail={openDetail}
+                        actionVisible={searching && view === "markets"}
                         hit={hits?.get(ev.eventTicker)}
                       />
                     ) : (
@@ -810,6 +779,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
                         watchedSet={watchedSet}
                         onToggleWatch={toggleWatch}
                         onOpenDetail={openDetail}
+                        actionVisible={searching && view === "markets"}
                         hit={hits?.get(ev.eventTicker)}
                       />
                     )}
@@ -824,7 +794,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
       {/* Stale stars — starred markets that left the curated set. The
           lens grid can't render them (no live row), so a quiet list keeps
           them visible and removable. */}
-      {isComfort && lens === "watchlist" && staleStars.length > 0 && (
+      {isComfort && view === "watchlist" && staleStars.length > 0 && (
         <div className="flex flex-col gap-1 px-3 pb-3 pt-1">
           <span className="text-ui-chip font-medium uppercase tracking-wide text-fg-4">
             No longer tracked
@@ -928,9 +898,62 @@ function Highlight({
   return <>{parts}</>;
 }
 
+const WATCH_ACTION_MOTION = {
+  hidden: {
+    opacity: 0,
+    transform: "scale(0.9)",
+    pointerEvents: "none" as const,
+  },
+  visible: {
+    opacity: 1,
+    transform: "scale(1)",
+    pointerEvents: "auto" as const,
+  },
+};
+
+function WatchAction({
+  watched,
+  visible,
+  onToggle,
+  onFocusChange,
+}: {
+  watched: boolean;
+  visible: boolean;
+  onToggle: () => void;
+  onFocusChange: (focused: boolean) => void;
+}) {
+  return (
+    <motion.button
+      type="button"
+      initial={false}
+      animate={
+        visible ? WATCH_ACTION_MOTION.visible : WATCH_ACTION_MOTION.hidden
+      }
+      onFocus={() => onFocusChange(true)}
+      onBlur={() => onFocusChange(false)}
+      whileTap={{ transform: "scale(0.95)" }}
+      transition={controlTransition}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle();
+      }}
+      aria-label={`${watched ? "Remove from" : "Add to"} watchlist`}
+      aria-pressed={watched}
+      className={clsx(
+        "absolute right-2 top-2 z-10 flex h-7 min-w-14 items-center justify-center rounded-md border bg-surface-3 px-2.5 text-ui-chip font-semibold shadow-md",
+        watched
+          ? "border-down/30 text-down hover:bg-surface-hover"
+          : "border-accent/30 text-accent hover:bg-surface-hover",
+      )}
+    >
+      {watched ? "Remove ×" : "Add +"}
+    </motion.button>
+  );
+}
+
 // ── ResolvedCard (the Resolved lens) ─────────────────────────────
 //
-// Same card anatomy as EventCard — header (category · settled-time + ★),
+// Same card anatomy as EventCard — header, title, outcomes, and footer,
 // dominant clamped title, outcome rows, quiet footer — but purpose-fit
 // content for settled markets: each leg carries its RESULT badge instead
 // of a live probability pill, and the footer shows total volume (24h
@@ -943,6 +966,7 @@ interface ResolvedCardProps {
   watchedSet: Set<string>;
   onToggleWatch: (ticker: string) => void;
   onOpenDetail: (market: Prediction) => void;
+  actionVisible?: boolean;
   /** Search-match highlight ranges, present only while searching. */
   hit?: EventSearchHit;
 }
@@ -958,48 +982,27 @@ const ResolvedCard = memo(function ResolvedCard({
   watchedSet,
   onToggleWatch,
   onOpenDetail,
+  actionVisible = false,
   hit,
 }: ResolvedCardProps) {
   const lead = event.outcomes[0];
   const watched = lead ? watchedSet.has(lead.ticker) : false;
+  const [actionHovered, setActionHovered] = useState(false);
   const stamp = resolvedStamp(lead);
   const settledLabel = stamp ? `Settled ${relativeTime(stamp, now)}` : "Settled";
   const showHeaderCategory = Boolean(category);
-
-  const metaGroup = (
-    <span className="flex shrink-0 items-center gap-1">
-      <span className="font-mono text-ui-chip tabular-nums text-fg-3">
-        {settledLabel}
-      </span>
-      {lead && (
-        <button
-          type="button"
-          aria-label={watched ? "Remove from watchlist" : "Add to watchlist"}
-          aria-pressed={watched}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleWatch(lead.ticker);
-          }}
-          className={clsx(
-            "flex h-5 w-5 items-center justify-center rounded  cursor-pointer hover:bg-surface-hover",
-            watched ? "text-amber-400" : "text-fg-4 hover:text-fg-2",
-          )}
-        >
-          <Star size={13} className={watched ? "fill-current" : ""} />
-        </button>
-      )}
-    </span>
-  );
 
   const openCard = () => {
     if (lead) onOpenDetail(lead);
   };
 
   return (
-    <div
+    <motion.div
       role="button"
       tabIndex={0}
       aria-label={`Open ${event.title}`}
+      onHoverStart={() => setActionHovered(true)}
+      onHoverEnd={() => setActionHovered(false)}
       onClick={openCard}
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return;
@@ -1008,22 +1011,32 @@ const ResolvedCard = memo(function ResolvedCard({
           openCard();
         }
       }}
-      className={clsx(FEED_CARD, FEED_CARD_INTERACTIVE, "flex h-full flex-col gap-1.5")}
+      className={clsx(
+        FEED_CARD,
+        FEED_CARD_INTERACTIVE,
+        "relative flex h-full flex-col gap-1.5 overflow-hidden",
+      )}
     >
+      {lead && (
+        <WatchAction
+          watched={watched}
+          visible={actionVisible || actionHovered}
+          onToggle={() => onToggleWatch(lead.ticker)}
+          onFocusChange={setActionHovered}
+        />
+      )}
       {showHeaderCategory && (
-        <div className="flex h-5 items-center justify-between gap-2">
+        <div className="flex h-7 items-center gap-2">
           <span className="truncate text-ui-chip font-medium uppercase tracking-wide text-fg-4">
             <Highlight text={category!} ranges={hit?.categoryRanges} />
           </span>
-          {metaGroup}
         </div>
       )}
 
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start gap-2">
         <span className="text-ui-title line-clamp-2 sm:min-h-10">
           <Highlight text={event.title} ranges={hit?.titleRanges} />
         </span>
-        {!showHeaderCategory && metaGroup}
       </div>
 
       {/* Legs with their results — no synthetic No here; settlement is
@@ -1062,13 +1075,18 @@ const ResolvedCard = memo(function ResolvedCard({
         })}
       </div>
 
-      {event.volume > 0 && (
-        <div className="mt-auto pt-0.5 font-mono text-ui-chip tabular-nums text-fg-3">
-          Vol {formatCompactNumber(event.volume)}
-          <span className="text-fg-4"> · total</span>
-        </div>
-      )}
-    </div>
+      <div className="mt-auto flex items-center justify-between gap-2 pt-0.5 font-mono text-ui-chip tabular-nums text-fg-3">
+        <span>
+          {event.volume > 0 && (
+            <>
+              Vol {formatCompactNumber(event.volume)}
+              <span className="text-fg-4"> · total</span>
+            </>
+          )}
+        </span>
+        <span className="shrink-0 text-fg-3">{settledLabel}</span>
+      </div>
+    </motion.div>
   );
 });
 
@@ -1143,16 +1161,13 @@ const MarketItem = memo(function MarketItem({
 //
 // Card anatomy (top to bottom) — every row has a left anchor, metadata
 // never floats alone (Kalshi hierarchy, Scrollr skin):
-//   1. Header: muted uppercase category LEFT · countdown + ★ RIGHT.
-//      With the category hidden by prefs, the countdown/★ group moves
-//      into the title row so no row is right-aligned metadata only.
+//   1. Header: muted uppercase category with a contextual watchlist action.
 //   2. Title: the ONE focal point (text-ui-title), clamped to two
 //      lines with the two-line height reserved so card heights stay
 //      uniform across a row regardless of title length.
 //   3. Exactly two outcome rows (synthetic No fills single-leg events).
 //   4. Footer: 24h volume, left-aligned, quiet mono.
-// The star always stars the LEAD leg; leg-level starring lives in
-// MarketDetail.
+// Watchlist actions target the lead leg; leg-level actions live in MarketDetail.
 
 interface EventCardProps {
   event: PredictionEvent;
@@ -1161,6 +1176,7 @@ interface EventCardProps {
   watchedSet: Set<string>;
   onToggleWatch: (ticker: string) => void;
   onOpenDetail: (market: Prediction) => void;
+  actionVisible?: boolean;
   /** Search-match highlight ranges, present only while searching. */
   hit?: EventSearchHit;
 }
@@ -1172,10 +1188,12 @@ const EventCard = memo(function EventCard({
   watchedSet,
   onToggleWatch,
   onOpenDetail,
+  actionVisible = false,
   hit,
 }: EventCardProps) {
   const lead = event.outcomes[0];
   const watched = lead ? watchedSet.has(lead.ticker) : false;
+  const [actionHovered, setActionHovered] = useState(false);
   // Time indicator (B3) — evaluated against the event's close time.
   const ind: TimeIndicator = lead
     ? timeIndicator(
@@ -1189,43 +1207,22 @@ const EventCard = memo(function EventCard({
   // Top outcomes by price + the hidden count (B2). Detail shows them all.
   const { visible, extra } = cardOutcomes(event.outcomes);
   // Card click lands on the top-priced leg — the first row the user reads
-  // (the ★ still anchors to the rank-1 lead; rank ≠ price on some events).
+  // (watchlist actions still anchor to the rank-1 lead).
   const openCard = () => {
     const target = visible[0] ?? lead;
     if (target) onOpenDetail(target);
   };
 
-  const metaGroup = (
-    <span className="flex shrink-0 items-center gap-1">
-      {showTime && <TimeBadge ind={ind} />}
-      {lead && (
-        <button
-          type="button"
-          aria-label={watched ? "Remove from watchlist" : "Add to watchlist"}
-          aria-pressed={watched}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleWatch(lead.ticker);
-          }}
-          className={clsx(
-            "flex h-5 w-5 items-center justify-center rounded  cursor-pointer hover:bg-surface-hover",
-            watched ? "text-amber-400" : "text-fg-4 hover:text-fg-2",
-          )}
-        >
-          <Star size={13} className={watched ? "fill-current" : ""} />
-        </button>
-      )}
-    </span>
-  );
-
   return (
-    // Whole card opens the market detail (B1); the outcome rows, star and
+    // Whole card opens the market detail (B1); outcome rows, the action and
     // "+N more" are their own targets via stopPropagation. role=button (not
     // <button>) because interactive children live inside.
-    <div
+    <motion.div
       role="button"
       tabIndex={0}
       aria-label={`Open ${event.title}`}
+      onHoverStart={() => setActionHovered(true)}
+      onHoverEnd={() => setActionHovered(false)}
       onClick={openCard}
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return; // inner controls handle their own keys
@@ -1234,27 +1231,35 @@ const EventCard = memo(function EventCard({
           openCard();
         }
       }}
-      className={clsx(FEED_CARD, FEED_CARD_INTERACTIVE, "flex h-full flex-col gap-1.5")}
+      className={clsx(
+        FEED_CARD,
+        FEED_CARD_INTERACTIVE,
+        "relative flex h-full flex-col gap-1.5 overflow-hidden",
+      )}
     >
-      {/* Header row — category anchors the left so the countdown/star
-          never sit alone. */}
+      {lead && (
+        <WatchAction
+          watched={watched}
+          visible={actionVisible || actionHovered}
+          onToggle={() => onToggleWatch(lead.ticker)}
+          onFocusChange={setActionHovered}
+        />
+      )}
       {showHeaderCategory && (
-        <div className="flex h-5 items-center justify-between gap-2">
+        <div className="flex h-7 items-center gap-2">
           <span className="truncate text-ui-chip font-medium uppercase tracking-wide text-fg-4">
             <Highlight text={category!} ranges={hit?.categoryRanges} />
           </span>
-          {metaGroup}
         </div>
       )}
 
       {/* Title row — the focal point. The two-line slot (20px line height
           × 2) is reserved only at multi-column widths, where it keeps
           neighbors row-aligned; single-column cards hug their title. */}
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start gap-2">
         <span className="text-ui-title line-clamp-2 sm:min-h-10">
           <Highlight text={event.title} ranges={hit?.titleRanges} />
         </span>
-        {!showHeaderCategory && metaGroup}
       </div>
 
       {/* Outcome legs, highest price first, capped at two (B2). ANY
@@ -1293,13 +1298,20 @@ const EventCard = memo(function EventCard({
 
       {/* Footer: 24h volume, quiet and left-anchored. mt-auto pins it to
           the card bottom so footers align across a row. */}
-      {(event.volume24h > 0 || event.volume > 0) && (
-        <div className="mt-auto pt-0.5 font-mono text-ui-chip tabular-nums text-fg-3">
-          Vol {formatCompactNumber(event.volume24h || event.volume)}
-          <span className="text-fg-4"> · 24h</span>
+      {(event.volume24h > 0 || event.volume > 0 || showTime) && (
+        <div className="mt-auto flex items-center justify-between gap-2 pt-0.5 font-mono text-ui-chip tabular-nums text-fg-3">
+          <span>
+            {(event.volume24h > 0 || event.volume > 0) && (
+              <>
+                Vol {formatCompactNumber(event.volume24h || event.volume)}
+                <span className="text-fg-4"> · 24h</span>
+              </>
+            )}
+          </span>
+          {showTime && <TimeBadge ind={ind} />}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 });
 
@@ -1329,8 +1341,8 @@ function TimeBadge({ ind }: { ind: TimeIndicator }) {
  *  border shifted the label 2px and made siblings misalign).
  *
  *  `syntheticNo` renders the implicit No side of a binary market
- *  (100 - yes, inverted delta) — it's the same market, so the star and
- *  detail click belong to the Yes row / card. */
+ *  (100 - yes, inverted delta) — it's the same market, so the watchlist
+ *  action and detail click belong to the Yes row / card. */
 function OutcomeRow({
   market,
   onOpenDetail,
