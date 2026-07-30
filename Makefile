@@ -28,7 +28,13 @@ else
   SHELL := /bin/bash
 endif
 
-COMPOSE      := docker compose -f docker/compose.yml
+# docker/compose.override.yml is layered in automatically when it exists.
+# Compose only auto-discovers an override next to the default compose.yml,
+# and passing -f opts out of that discovery entirely — so name it
+# explicitly. Gitignored and per-machine: host port remaps when something
+# else already owns 5432/6379, extra mounts, whatever your box needs.
+COMPOSE_OVERRIDE := $(wildcard docker/compose.override.yml)
+COMPOSE      := docker compose -f docker/compose.yml $(if $(COMPOSE_OVERRIDE),-f $(COMPOSE_OVERRIDE))
 COMPOSE_PRED := $(COMPOSE) --profile predictions
 # Predictions is opt-in: it needs a Kalshi key. The profile turns on only
 # once `make setup` (or `make kalshi-key`) has produced its env file.
@@ -72,8 +78,14 @@ up: ##run: Start the backend, wait until healthy (svc= for a subset)
 	fi
 	@$(SHELL) scripts/dev/wait-healthy.sh
 
+# COMPOSE_AUTO, not COMPOSE_PRED: naming the predictions profile makes
+# compose resolve that service, and it fails outright on the missing
+# secrets/predictions.docker.env when you have no Kalshi key. That left a
+# fresh checkout able to start the stack but not stop it. --remove-orphans
+# still clears a predictions container left over from a run that did have
+# a key.
 down: ##run: Stop the backend (keeps your database)
-	@$(COMPOSE_PRED) down
+	@$(COMPOSE_AUTO) down --remove-orphans
 
 restart: down up ##run: Stop and start again
 
@@ -105,7 +117,7 @@ shell: ##iterate: Open a shell in a service, svc=core-api
 
 # ── Reset ────────────────────────────────────────────────────────────
 reset: ##reset: Stop and wipe the database, Redis and build caches
-	@$(COMPOSE_PRED) down -v
+	@$(COMPOSE_AUTO) down -v --remove-orphans
 
 check: ##reset: Run the test suites that can run locally
 	@echo "-- desktop --"       && cd desktop        && npm test --silent

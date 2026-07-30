@@ -198,27 +198,12 @@ export interface DataWidgetManifest {
    * wraps its rows in `{ leagues: [...] }`.
    */
   normalizeHome?: (raw: unknown) => unknown[];
-
-  /**
-   * Distinct group keys for the Home filter chips — symbols, leagues,
-   * feed names. Omit for sources with no meaningful grouping and the
-   * chips are hidden.
-   */
-  homeGroups?: (rows: unknown[]) => string[];
-
-  /**
-   * Display label for a group key. Omit when the key is already
-   * human-readable; fantasy keys on `league_key` and labels by name.
-   */
-  homeGroupLabel?: (key: string, rows: unknown[]) => string;
 }
 
 /** Props every source's `HomeRows` receives. */
 export interface HomeRowsProps {
   /** This widget's rows: normalized, then scoped to its own config. */
   data: unknown[];
-  /** Group keys the user pinned. Empty means "no filter". */
-  filter: string[];
   /**
    * The whole `dashboard.data`, for the rare source that needs a sibling
    * key — sports reads `sports_meta` to explain an empty league.

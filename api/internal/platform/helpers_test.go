@@ -19,6 +19,8 @@ func TestValidateURL(t *testing.T) {
 		{"whitespace trimmed", "  https://example.com  ", "https://fallback.com", "https://example.com"},
 		{"empty fallback preserved", "", "", ""},
 		{"no scheme no trailing slash", "example.com", "fallback.com", "https://example.com"},
+		{"tauri scheme preserved", "tauri://localhost", "https://fallback.com", "tauri://localhost"},
+		{"custom scheme preserved", "myscrollr://auth", "https://fallback.com", "myscrollr://auth"},
 	}
 
 	for _, tc := range tests {

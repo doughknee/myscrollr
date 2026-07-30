@@ -45,6 +45,10 @@ x-rust-ingester: &rust-ingester
   restart: unless-stopped
   environment: &rust-env
     DATABASE_URL: *db-url
+    # This compose file is local dev only (production is k8s). The ingesters
+    # read ENVIRONMENT to decide whether a missing third-party API key is a
+    # fatal misconfiguration or the documented "boot anyway, don't poll".
+    ENVIRONMENT: development
     # Compiled artifacts stay per-service (they're different crates), but the
     # downloaded crate SOURCES are identical across all four and go in one
     # shared volume — tokio, serde, sqlx et al are fetched once, not 4x.

@@ -76,6 +76,15 @@ interface PageLayoutProps {
    */
   noContentPadding?: boolean;
 
+  /**
+   * Drop the content wrapper's top padding, keeping the sides and
+   * bottom. For pages whose first child is a WidgetBar: the bar brings
+   * its own spacing, so the default `py-5` stacks on top of it and
+   * pushes the whole page down. Horizontal padding still applies, which
+   * is why this isn't just `noContentPadding`.
+   */
+  noTopPadding?: boolean;
+
 }
 
 // ── Component ───────────────────────────────────────────────────
@@ -94,6 +103,7 @@ export default function PageLayout({
   width = "narrow",
   fillHeight = false,
   noContentPadding = false,
+  noTopPadding = false,
 }: PageLayoutProps) {
   // Publish this page's identity to the TopBar.
   useRegisterPageIdentity({
@@ -154,7 +164,9 @@ export default function PageLayout({
         >
           <div
             className={clsx(
-              noContentPadding ? "w-full" : "mx-auto px-5 py-5",
+              noContentPadding
+                ? "w-full"
+                : clsx("mx-auto px-5 pb-5", noTopPadding ? "pt-0" : "pt-5"),
               !noContentPadding && widthClass,
             )}
           >

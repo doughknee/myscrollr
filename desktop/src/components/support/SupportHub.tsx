@@ -216,10 +216,10 @@ export default function SupportHub({ onSelectSection }: SupportHubProps) {
                 </button>
               );
             })}
-            {/* What's New — routes to /releases instead of a support
+            {/* What's New — routes to /updates instead of a support
                 section, so it lives outside CATEGORIES/SectionId. */}
             <button
-              onClick={() => navigate({ to: "/releases" })}
+              onClick={() => navigate({ to: "/updates" })}
               className="rounded-xl border border-edge/35 bg-base-150/35 p-4 text-left hover:border-accent/40 hover:bg-base-150/55 hover:shadow-soft-sm cursor-pointer"
             >
               <Sparkles size={18} className="text-accent mb-2.5" />

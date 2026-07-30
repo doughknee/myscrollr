@@ -1,3 +1,12 @@
+/**
+ * Whether a source is on the ticker, and how it got there.
+ *
+ * The ticker is single-row. It previously supported two or three rows
+ * with per-row source assignment, and these helpers reported which row a
+ * source landed on; that whole layer was removed because configuring it
+ * confused more people than it helped. What remains is the question that
+ * actually matters to a user: is this thing scrolling, pinned, or off.
+ */
 import { isWidgetTickerEnabled } from "../api/client";
 import type { AppPreferences } from "../preferences";
 
@@ -9,31 +18,25 @@ interface DataWidgetTickerInfo {
 
 export interface EffectiveWidgetTickerStatus {
   kind: "off" | "scrolling" | "pinned";
-  row: number | null;
 }
 
-export function formatTickerStatus(row: number | null, rowCount: number): string {
-  if (row === null) return "Not on ticker";
-  if (rowCount <= 1) return "On ticker";
-  return `Row ${row + 1}`;
+export function formatTickerStatus(onTicker: boolean): string {
+  return onTicker ? "On ticker" : "Not on ticker";
 }
 
 export function formatEffectiveWidgetTickerStatus(
   status: EffectiveWidgetTickerStatus,
-  rowCount: number,
 ): string {
-  if (status.kind === "pinned") {
-    return rowCount <= 1 ? "Pinned" : `Pinned row ${(status.row ?? 0) + 1}`;
-  }
-  return formatTickerStatus(status.row, rowCount);
+  if (status.kind === "pinned") return "Pinned";
+  return formatTickerStatus(status.kind === "scrolling");
 }
 
-export function getEffectiveDataWidgetTickerRow(
-  prefs: AppPreferences,
+export function isDataWidgetOnTicker(
+  _prefs: AppPreferences,
   widget: DataWidgetTickerInfo,
-): number | null {
-  if (widget.enabled === false || !isWidgetTickerEnabled(widget)) return null;
-  return getEffectiveSourceRow(prefs, widget.widget_type);
+): boolean {
+  if (widget.enabled === false) return false;
+  return isWidgetTickerEnabled(widget);
 }
 
 export function getEffectiveWidgetTickerStatus(
@@ -41,41 +44,10 @@ export function getEffectiveWidgetTickerStatus(
   widgetId: string,
 ): EffectiveWidgetTickerStatus {
   const onTicker = prefs.widgets.widgetsOnTicker.includes(widgetId);
-  const pin = prefs.widgets.pinnedWidgets[widgetId];
-
-  if (pin && onTicker) {
-    const pinRow = pin.row ?? 0;
-    return rowAllowsSource(prefs, pinRow, widgetId)
-      ? { kind: "pinned", row: pinRow }
-      : { kind: "off", row: null };
-  }
-
-  if (!onTicker) return { kind: "off", row: null };
-
-  const row = getEffectiveSourceRow(prefs, widgetId);
-  return row === null
-    ? { kind: "off", row: null }
-    : { kind: "scrolling", row };
-}
-
-function getEffectiveSourceRow(
-  prefs: AppPreferences,
-  sourceId: string,
-): number | null {
-  const rows = prefs.appearance.tickerLayout.rows;
-  const explicitRow = rows.findIndex((row) => row.sources.includes(sourceId));
-  if (explicitRow >= 0) return explicitRow;
-
-  const allSourcesRow = rows.findIndex((row) => row.sources.length === 0);
-  return allSourcesRow >= 0 ? allSourcesRow : null;
-}
-
-function rowAllowsSource(
-  prefs: AppPreferences,
-  rowIndex: number,
-  sourceId: string,
-): boolean {
-  const row = prefs.appearance.tickerLayout.rows[rowIndex];
-  if (!row) return false;
-  return row.sources.length === 0 || row.sources.includes(sourceId);
+  if (!onTicker) return { kind: "off" };
+  // A pin still outranks scrolling — it parks the source at the head of
+  // the row rather than letting it cycle.
+  return prefs.widgets.pinnedWidgets[widgetId]
+    ? { kind: "pinned" }
+    : { kind: "scrolling" };
 }

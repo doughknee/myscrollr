@@ -7,7 +7,7 @@
  *
  *   undoable(
  *     { label: "Removed Row 2" },
- *     (prefs) => removeTickerRow(prefs, 1),
+ *     (prefs) => a destructive prefs mutation(prefs, 1),
  *   );
  *
  * The hook reads `prefs` and `onPrefsChange` from `useShell()`, deep-

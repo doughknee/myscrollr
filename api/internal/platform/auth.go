@@ -20,13 +20,24 @@ var (
 
 // InitAuth initialises the JWKS keyfunc for JWT validation.
 //
-// LOGTO_JWKS_URL is required in all environments. The old behavior
-// (log a warning and continue) meant authenticated routes silently
-// 401'd at request time with "JWKS not initialized", which looked to
-// operators like a broken user rather than a broken deploy. Fail fast.
+// LOGTO_JWKS_URL is required outside development. Failing fast matters in a
+// deploy: warn-and-continue meant authenticated routes silently 401'd with
+// "JWKS not initialized", which reads to an operator like a broken user
+// rather than a broken deploy.
+//
+// Development is the documented exception. There is no local Logto, so
+// `make setup` lets you leave the tenant blank and docs/LOCAL_SETUP.md
+// promises the stack still boots and serves public data — you just can't
+// sign in. Fataling here broke that promise and blocked local dev outright.
 func InitAuth() {
 	jwksURL := os.Getenv("LOGTO_JWKS_URL")
 	if jwksURL == "" {
+		// Deliberately not envOr's "default to development": an unset
+		// ENVIRONMENT in a deploy must fail closed, not silently drop auth.
+		if os.Getenv("ENVIRONMENT") == "development" {
+			log.Print("[Auth] LOGTO_JWKS_URL unset; sign-in disabled, public data still served")
+			return
+		}
 		log.Fatal("[Auth] LOGTO_JWKS_URL is required")
 	}
 

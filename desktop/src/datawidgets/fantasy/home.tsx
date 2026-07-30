@@ -12,11 +12,6 @@ import type { HomeRowsProps } from "../../types";
  *  reads the handful of fields below and the shape varies by sport. */
 type LeagueRow = Record<string, unknown>;
 
-/** Group key for one league: id first, falling back to whatever names it. */
-function leagueKey(l: LeagueRow): string {
-  return String(l.league_key ?? l.league_name ?? l.name ?? "");
-}
-
 /**
  * Fantasy wraps its rows: `{ leagues: [...] }`, not a bare array. Every other
  * Fantasy consumer (ticker, FeedTab, player picker) already unwraps it; Home
@@ -28,19 +23,7 @@ export function normalizeFantasyHome(raw: unknown): unknown[] {
   return Array.isArray(obj?.leagues) ? (obj.leagues as unknown[]) : [];
 }
 
-export function fantasyHomeGroups(rows: unknown[]): string[] {
-  return [...new Set((rows as LeagueRow[]).map(leagueKey).filter(Boolean))];
-}
-
-/** Chips key on the league id but must read as its name. */
-export function fantasyHomeGroupLabel(key: string, rows: unknown[]): string {
-  const league = (rows as LeagueRow[]).find(
-    (l) => String(l.league_key ?? "") === key || String(l.league_name ?? "") === key,
-  );
-  return league ? String(league.league_name ?? league.name ?? key) : key;
-}
-
-export function FantasyHomeRows({ data, filter, onConfigure }: HomeRowsProps) {
+export function FantasyHomeRows({ data, onConfigure }: HomeRowsProps) {
   const leagues = data as LeagueRow[];
   const empty = (
     <HomeEmptyRow
@@ -51,12 +34,27 @@ export function FantasyHomeRows({ data, filter, onConfigure }: HomeRowsProps) {
   );
   if (leagues.length === 0) return empty;
 
-  const filtered =
-    filter.length > 0
-      ? leagues.filter((l) => filter.includes(leagueKey(l)))
-      : leagues;
+  // Rank like every other source: leagues worth a glance first. One with
+  // a live matchup beats one without, and among those a tight margin
+  // beats a blowout.
+  const margin = (l: LeagueRow): number | null => {
+    const mine = l.my_score ?? l.team_points;
+    const theirs = l.opp_score ?? l.opponent_points;
+    if (mine == null || theirs == null) return null;
+    const diff = Math.abs(Number(mine) - Number(theirs));
+    return Number.isFinite(diff) ? diff : null;
+  };
 
-  const preview = filtered.slice(0, HOME_PREVIEW_MAX);
+  const preview = [...leagues]
+    .sort((a, b) => {
+      const am = margin(a);
+      const bm = margin(b);
+      if (am == null && bm == null) return 0;
+      if (am == null) return 1;
+      if (bm == null) return -1;
+      return am - bm;
+    })
+    .slice(0, HOME_PREVIEW_MAX);
   if (preview.length === 0) return empty;
 
   return (

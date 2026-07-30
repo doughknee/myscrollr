@@ -16,7 +16,7 @@ import { getDataWidget } from "./registry";
 const rows = (source: string, data: unknown[], dashboard?: Record<string, unknown>) => {
   const HomeRows = getDataWidget(source)!.HomeRows;
   return render(
-    <HomeRows data={data} filter={[]} dashboard={dashboard} onConfigure={() => {}} />,
+    <HomeRows data={data} dashboard={dashboard} onConfigure={() => {}} />,
   );
 };
 
@@ -92,36 +92,12 @@ describe("Home previews", () => {
   });
 });
 
-describe("Home group hooks", () => {
-  it("derives filter chips from the rows", () => {
-    expect(
-      getDataWidget("finance")!.homeGroups!([
-        { symbol: "AAPL" },
-        { symbol: "TSLA" },
-        { symbol: "AAPL" },
-      ]),
-    ).toEqual(["AAPL", "TSLA"]);
-
-    expect(
-      getDataWidget("sports")!.homeGroups!([{ league: "NFL" }, { league: "NBA" }]),
-    ).toEqual(["NFL", "NBA"]);
-  });
-
-  it("predictions has no groups — one market set, nothing to slice by", () => {
-    expect(getDataWidget("predictions")!.homeGroups).toBeUndefined();
-  });
-
-  it("fantasy unwraps its payload and labels keys by league name", () => {
+describe("normalizeHome", () => {
+  it("fantasy unwraps its payload", () => {
     const m = getDataWidget("fantasy")!;
     // The wrapper is the bug this hook exists for: treating the payload as a
     // flat array showed "No leagues imported yet" to users who had leagues.
     expect(m.normalizeHome!({ leagues: [{ league_key: "a" }] })).toHaveLength(1);
     expect(m.normalizeHome!(undefined)).toEqual([]);
-
-    const rows = [{ league_key: "nfl.1", league_name: "Dynasty" }];
-    expect(m.homeGroups!(rows)).toEqual(["nfl.1"]);
-    expect(m.homeGroupLabel!("nfl.1", rows)).toBe("Dynasty");
-    // Unknown key falls back to the key itself rather than rendering blank.
-    expect(m.homeGroupLabel!("missing", rows)).toBe("missing");
   });
 });

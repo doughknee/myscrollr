@@ -21,10 +21,6 @@ import {
   migrateRssDisplay,
   migratePredictionsDisplay,
   migrateFantasyDisplay,
-  getSourceTickerRow,
-  setSourceTickerRow,
-  setWidgetTickerRow,
-  setTickerRowSourceMembership,
   migrateAppearanceTheme,
   resolveThemeName,
   isThemeFamily,
@@ -339,217 +335,6 @@ describe("migrateFantasyDisplay", () => {
   });
 });
 
-// ── Unified ticker row selector helpers (Stream 3 of Batch D) ────
-//
-// These tests lock in the contract for the new row-selector mental model:
-//   "Where should this source appear? Off / Row 1 / Row 2 / Row 3"
-//
-// The helpers must:
-//  - return the correct row for a source explicitly listed in tickerLayout
-//  - fall back to legacy `DataWidgetRow.ticker_enabled` (or `visible`) when the
-//    source isn't in any row, so users upgrading from pre-multi-deck
-//    builds don't see all their widgets suddenly go dark
-//  - move a source between rows atomically (remove from old row, add to new)
-//  - silently ignore out-of-bounds row indices (caller's job to clamp to tier)
-
-/**
- * Build a minimal AppPreferences fixture with the given ticker rows. Other
- * fields are set to whatever shape the helpers don't touch — the tests
- * cast to AppPreferences because they only exercise the appearance.tickerLayout
- * branch.
- */
-function makePrefs(rows: { sources: string[] }[]): AppPreferences {
-  return {
-    appearance: {
-      tickerLayout: { rows },
-    },
-    widgets: {
-      widgetsOnTicker: [],
-    },
-  } as unknown as AppPreferences;
-}
-
-describe("getSourceTickerRow", () => {
-  it("returns the row index when the source is in tickerLayout sources", () => {
-    const prefs = makePrefs([
-      { sources: ["finance"] },
-      { sources: ["sports", "rss"] },
-    ]);
-    expect(getSourceTickerRow(prefs, null, "rss")).toBe(1);
-    expect(getSourceTickerRow(prefs, null, "finance")).toBe(0);
-    expect(getSourceTickerRow(prefs, null, "sports")).toBe(1);
-  });
-
-  it("falls back to ticker_enabled=true for widgets missing from rows", () => {
-    const prefs = makePrefs([{ sources: [] }]);
-    const ch = { widget_type: "finance", ticker_enabled: true };
-    expect(getSourceTickerRow(prefs, ch, "finance")).toBe(0);
-  });
-
-  it("returns null when ticker_enabled is false and the widget isn't in any row", () => {
-    const prefs = makePrefs([{ sources: [] }]);
-    const ch = { widget_type: "finance", ticker_enabled: false };
-    expect(getSourceTickerRow(prefs, ch, "finance")).toBeNull();
-  });
-
-  it("ignores the retired `visible` alias", () => {
-    // The server stopped emitting `visible` in the unification, so a row
-    // carrying it is not a row we can receive. If one somehow arrives, the
-    // absence of ticker_enabled is what decides — defaulting to on — rather
-    // than a field the wire no longer has.
-    const prefs = makePrefs([{ sources: [] }]);
-    const ch = { widget_type: "finance", visible: false } as {
-      widget_type: string;
-      ticker_enabled?: boolean;
-    };
-    expect(getSourceTickerRow(prefs, ch, "finance")).toBe(0);
-  });
-
-  it("returns null for widgets that aren't in any row", () => {
-    const prefs = makePrefs([{ sources: ["finance"] }]);
-    expect(getSourceTickerRow(prefs, null, "clock")).toBeNull();
-  });
-
-  it("returns the row index for widgets that are in a row", () => {
-    const prefs = makePrefs([{ sources: ["finance"] }, { sources: ["clock"] }]);
-    expect(getSourceTickerRow(prefs, null, "clock")).toBe(1);
-  });
-
-  it("explicit row assignment beats the legacy ticker_enabled fallback", () => {
-    // DataWidgetRow has ticker_enabled=true, but it's pinned to row 1 explicitly.
-    const prefs = makePrefs([{ sources: [] }, { sources: ["finance"] }]);
-    const ch = { widget_type: "finance", ticker_enabled: true };
-    expect(getSourceTickerRow(prefs, ch, "finance")).toBe(1);
-  });
-});
-
-describe("setSourceTickerRow / setWidgetTickerRow", () => {
-  it("removes the source from any other row when moving it", () => {
-    const prefs = makePrefs([
-      { sources: ["finance", "sports"] },
-      { sources: ["rss"] },
-    ]);
-    const next = setSourceTickerRow(prefs, "finance", 1);
-    expect(next.appearance.tickerLayout.rows[0].sources).toEqual(["sports"]);
-    expect(next.appearance.tickerLayout.rows[1].sources).toEqual([
-      "rss",
-      "finance",
-    ]);
-  });
-
-  it("removes the source from every row when row is null", () => {
-    const prefs = makePrefs([{ sources: ["finance"] }, { sources: ["rss"] }]);
-    const next = setSourceTickerRow(prefs, "finance", null);
-    expect(next.appearance.tickerLayout.rows[0].sources).toEqual([]);
-    expect(next.appearance.tickerLayout.rows[1].sources).toEqual(["rss"]);
-  });
-
-  it("returns prefs unchanged when row is out of bounds", () => {
-    const prefs = makePrefs([{ sources: [] }]);
-    const next = setSourceTickerRow(prefs, "finance", 5);
-    expect(next).toBe(prefs);
-  });
-
-  it("returns prefs unchanged for negative rows", () => {
-    const prefs = makePrefs([{ sources: [] }]);
-    const next = setSourceTickerRow(prefs, "finance", -1);
-    expect(next).toBe(prefs);
-  });
-
-  it("setWidgetTickerRow places a widget id alongside widgets in the same sources array", () => {
-    const prefs = makePrefs([{ sources: ["finance"] }]);
-    const next = setWidgetTickerRow(prefs, "clock", 0);
-    expect(next.appearance.tickerLayout.rows[0].sources).toEqual([
-      "finance",
-      "clock",
-    ]);
-  });
-
-  it("setWidgetTickerRow adds assigned widgets to widgetsOnTicker", () => {
-    const prefs = makePrefs([{ sources: [] }]);
-    const next = setWidgetTickerRow(prefs, "timer", 0);
-    expect(next.widgets.widgetsOnTicker).toEqual(["timer"]);
-  });
-
-  it("setWidgetTickerRow removes unassigned widgets from widgetsOnTicker", () => {
-    const prefs = makePrefs([{ sources: ["timer"] }]);
-    prefs.widgets.widgetsOnTicker = ["clock", "timer"];
-    const next = setWidgetTickerRow(prefs, "timer", null);
-    expect(next.widgets.widgetsOnTicker).toEqual(["clock"]);
-  });
-
-  it("does not mutate the original prefs object", () => {
-    const prefs = makePrefs([{ sources: ["finance"] }]);
-    const before = JSON.stringify(prefs);
-    setSourceTickerRow(prefs, "finance", null);
-    expect(JSON.stringify(prefs)).toBe(before);
-  });
-
-  it("never produces a zero-row layout (preserves the trailing fallback)", () => {
-    // The layout is the single source of truth for row count. Edge cases
-    // that would otherwise empty `rows` (no-op edits, defensive callers)
-    // must always leave at least one row so the ticker has somewhere to
-    // render and the height math doesn't blow up.
-    const prefs = makePrefs([{ sources: ["finance"] }]);
-    const next = setSourceTickerRow(prefs, "finance", null);
-    expect(next.appearance.tickerLayout.rows.length).toBe(1);
-  });
-});
-
-describe("setTickerRowSourceMembership", () => {
-  it("keeps widgets globally ticker-enabled when removing row membership", () => {
-    const prefs = {
-      appearance: {
-        tickerLayout: { rows: [{ sources: ["timer"] }] },
-      },
-      widgets: {
-        enabledWidgets: ["timer"],
-        widgetsOnTicker: ["timer"],
-      },
-    } as unknown as AppPreferences;
-
-    const next = setTickerRowSourceMembership(prefs, "timer", 0, false);
-
-    expect(next.appearance.tickerLayout.rows[0].sources).toEqual([]);
-    expect(next.widgets.widgetsOnTicker).toEqual(["timer"]);
-  });
-
-  it("adds widgets to widgetsOnTicker when assigning them to a row", () => {
-    const prefs = {
-      appearance: {
-        tickerLayout: { rows: [{ sources: ["finance"] }] },
-      },
-      widgets: {
-        enabledWidgets: ["timer"],
-        widgetsOnTicker: [],
-      },
-    } as unknown as AppPreferences;
-
-    const next = setTickerRowSourceMembership(prefs, "timer", 0, true);
-
-    expect(next.appearance.tickerLayout.rows[0].sources).toEqual([
-      "finance",
-      "timer",
-    ]);
-    expect(next.widgets.widgetsOnTicker).toEqual(["timer"]);
-  });
-});
-
-// ── Theme family + mode ─────────────────────────────────────────
-//
-// The multi-theme rollout split the single `appearance.theme` field
-// into `themeFamily` (palette identity) + `themeMode` (light/dark/system).
-// These tests pin down:
-//
-//   - The 10 supported families exist and the type guard accepts them.
-//   - The legacy `theme` field migrates into `themeMode` without losing
-//     the user's prior color-mode choice (`scrollr` family is assumed).
-//   - The new explicit fields take precedence over the legacy one when
-//     both are present (an unusual but plausible state during rollout).
-//   - Unknown families fall back to "scrollr" and unknown modes to
-//     "system" so a corrupted prefs file never breaks the UI.
-//   - resolveThemeName composes data-theme strings in the expected form.
-
 describe("isThemeFamily / isThemeMode", () => {
   it("accepts every family in THEME_FAMILIES", () => {
     for (const family of THEME_FAMILIES) {
@@ -861,140 +646,44 @@ describe("widget timer preference migration", () => {
     expect(prefs.widgetsOnTicker).toEqual([]);
   });
 
-  it("adds timer to explicit ticker layout rows when legacy clock timer was enabled by default", () => {
+  // The clock/timer split: users whose combined widget had the timer
+  // showing should end up with the timer on the ticker too. This used to
+  // be expressed per ticker row; with a single-row ticker it is one
+  // membership list, so these assert against widgetsOnTicker.
+
+  it("adds timer to the ticker when the legacy clock timer was on", () => {
     storeValues.set("scrollr:settings", {
-      appearance: {
-        tickerLayout: {
-          rows: [{ sources: ["clock"] }],
-        },
-      },
       widgets: legacyWidgetPrefs({
         enabledWidgets: ["clock"],
         widgetsOnTicker: ["clock"],
-        clock: {
-          ticker: {},
-        },
+        clock: { ticker: {} },
       }),
     });
 
-    const prefs = loadPrefs();
-
-    expect(prefs.appearance.tickerLayout.rows[0].sources).toEqual(["clock", "timer"]);
+    expect(loadPrefs().widgets.widgetsOnTicker).toEqual(["clock", "timer"]);
   });
 
-  it("adds timer to explicit ticker layout rows when legacy widgetsOnTicker is absent", () => {
+  it("leaves the ticker alone when clock is not on it", () => {
     storeValues.set("scrollr:settings", {
-      appearance: {
-        tickerLayout: {
-          rows: [{ sources: ["clock"] }],
-        },
-      },
       widgets: legacyWidgetPrefs({
         enabledWidgets: ["clock"],
-        clock: {
-          ticker: {},
-        },
+        widgetsOnTicker: [],
+        clock: { ticker: {} },
       }),
     });
 
-    const prefs = loadPrefs();
-
-    expect(prefs.appearance.tickerLayout.rows[0].sources).toEqual(["clock", "timer"]);
+    expect(loadPrefs().widgets.widgetsOnTicker).toEqual([]);
   });
 
-  it("preserves current explicit clock and timer rows when timer was already on ticker", () => {
-    storeValues.set("scrollr:auth", {
-      accessToken: "x.eyJyb2xlcyI6WyJ1cGxpbmsiXX0.x",
-      refreshToken: null,
-      expiresAt: Date.now() + 60_000,
-      userSub: "test-user",
-    });
+  it("does not duplicate timer when it is already on the ticker", () => {
     storeValues.set("scrollr:settings", {
-      appearance: {
-        tickerLayout: {
-          rows: [{ sources: ["clock"] }, { sources: ["timer"] }],
-        },
-      },
       widgets: legacyWidgetPrefs({
         enabledWidgets: ["clock", "timer"],
         widgetsOnTicker: ["clock", "timer"],
-        clock: {
-          ticker: {},
-        },
-        timer: {
-          ticker: { activeTimer: true },
-          pomodoro: {
-            workMins: 25,
-            shortBreakMins: 5,
-            longBreakMins: 15,
-            longBreakEvery: 4,
-          },
-        },
+        clock: { ticker: {} },
       }),
     });
 
-    const prefs = loadPrefs();
-
-    expect(prefs.appearance.tickerLayout.rows).toEqual([
-      { sources: ["clock"] },
-      { sources: ["timer"] },
-    ]);
-  });
-
-  it("preserves current explicit clock-only rows when timer prefs exist", () => {
-    storeValues.set("scrollr:settings", {
-      appearance: {
-        tickerLayout: {
-          rows: [{ sources: ["clock"] }],
-        },
-      },
-      widgets: legacyWidgetPrefs({
-        enabledWidgets: ["clock"],
-        widgetsOnTicker: ["clock"],
-        clock: {
-          ticker: {},
-        },
-        timer: {
-          ticker: { activeTimer: true },
-          pomodoro: {
-            workMins: 25,
-            shortBreakMins: 5,
-            longBreakMins: 15,
-            longBreakEvery: 4,
-          },
-        },
-      }),
-    });
-
-    const prefs = loadPrefs();
-
-    expect(prefs.appearance.tickerLayout.rows[0].sources).toEqual(["clock"]);
-  });
-
-  // Pins a deliberate unification: a legacy blob with a `widgets` object but
-  // neither enabledWidgets nor widgetsOnTicker arrays now falls back to the
-  // default widget list (["clock"]) for BOTH the widget-list and ticker-row
-  // halves of the migration. Previously the rows half fell back to [] and
-  // left clock rows without a timer while the list half added one.
-  it("adds timer to clock rows for legacy blobs missing both widget arrays", () => {
-    storeValues.set("scrollr:settings", {
-      appearance: {
-        tickerLayout: {
-          rows: [{ sources: ["clock"] }],
-        },
-      },
-      widgets: legacyWidgetPrefs({
-        clock: {
-          ticker: {},
-        },
-      }),
-    });
-
-    const prefs = loadPrefs();
-
-    expect(prefs.appearance.tickerLayout.rows[0].sources).toEqual([
-      "clock",
-      "timer",
-    ]);
+    expect(loadPrefs().widgets.widgetsOnTicker).toEqual(["clock", "timer"]);
   });
 });

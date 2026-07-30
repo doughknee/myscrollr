@@ -29,12 +29,8 @@ import {
   TICKER_GAPS,
   TICKER_HEIGHTS,
   toggleWidgetPin,
-  setSourceTickerRow,
-  setWidgetTickerRow,
-  setTickerLayout,
-  getSourceTickerRow,
+  toggleWidgetOnTicker,
 } from "./preferences";
-import { getMaxTickerRows } from "./tierLimits";
 import type { SubscriptionTier } from "./auth";
 import type { WidgetId } from "./api/client";
 import type { DeliveryMode } from "./types";
@@ -50,12 +46,10 @@ import { useCatalog } from "./hooks/useCatalog";
 
 import { API_BASE as API_URL, DEMO } from "./config";
 
-/** Ticker window height in px: per-mode row height × rows × scale. */
+/** Ticker window height in px: per-mode row height × scale. */
 function tickerHeight(p: AppPreferences): number {
   return Math.round(
-    TICKER_HEIGHTS[p.ticker.tickerMode] *
-      p.appearance.tickerLayout.rows.length *
-      (p.appearance.tickerScale / 100),
+    TICKER_HEIGHTS[p.ticker.tickerMode] * (p.appearance.tickerScale / 100),
   );
 }
 
@@ -404,7 +398,6 @@ export default function App() {
     }
   }, [
     prefs.ticker.tickerMode,
-    prefs.appearance.tickerLayout.rows.length,
     prefs.appearance.tickerScale,
     prefs.ticker.showTicker,
     tickerPosition,
@@ -508,18 +501,12 @@ export default function App() {
   // handlers mirror the row-change logic in routes/feed.tsx exactly.
   // See preferences.ts §"Unified ticker row selector helpers".
 
-  const handleDataWidgetRowChange = useCallback(
-    async (widgetType: WidgetId, row: number | null) => {
-      // 1) Client-side: assign / unassign in tickerLayout. Optimistic update
-      //    so the next tray menu rebuild reflects the change immediately.
-      setPrefs((prev) => {
-        const updated = setSourceTickerRow(prev, widgetType, row);
-        savePrefs(updated);
-        return updated;
-      });
-      // 2) Server-side: flip DataWidgetRow.ticker_enabled (true if row is set).
+  const handleDataWidgetTickerChange = useCallback(
+    async (widgetType: WidgetId, onTicker: boolean) => {
+      // Server-side only: a data widget's ticker membership lives on
+      // DataWidgetRow.ticker_enabled, not in prefs.
       try {
-        await toggleDataWidgetVisibility(widgetType, row !== null);
+        await toggleDataWidgetVisibility(widgetType, onTicker);
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
       } catch {
         // Silently fail — will sync on next dashboard poll/CDC event.
@@ -528,9 +515,9 @@ export default function App() {
     [queryClient],
   );
 
-  const handleWidgetRowChange = useCallback((widgetId: string, row: number | null) => {
+  const handleWidgetTickerChange = useCallback((widgetId: string) => {
     setPrefs((prev) => {
-      const updated = setWidgetTickerRow(prev, widgetId, row);
+      const updated = toggleWidgetOnTicker(prev, widgetId);
       savePrefs(updated);
       return updated;
     });
@@ -620,114 +607,15 @@ export default function App() {
 
       items.push(await PredefinedMenuItem.new({ item: "Separator" }));
 
-      // Per-source row picker — same mental model as the feed page
-      // the ticker row editor. Each widget gets its own submenu with
-      // [Off, Row 1, Row 2, …] CheckMenuItems where exactly one is
-      // checked at any time. The row count is dynamic: we show only
-      // the rows the user has actually enabled in their ticker layout
-      // (clamped to tier max, with a minimum of 1). A user running a
-      // single row sees [Off, On]; a user with 3 rows sees all four
-      // entries. This keeps the menu in lockstep with what's actually
-      // visible on the ticker.
-      const tierMax = getMaxTickerRows(tierRef.current);
-      const layoutRows = prefsRef.current?.appearance?.tickerLayout?.rows
-        ?.length ?? 1;
-      const pickerRows = Math.max(1, Math.min(tierMax, layoutRows));
-      // Whether the layout has headroom for another row. When true, the
-      // submenu surfaces a "+ Add row & assign" item so the user can
-      // grow the layout without leaving the tray menu — same one-click
-      // affordance as Customize → Ticker's [+ Add] button.
-      const canAddRowFromTray = layoutRows < tierMax;
-
-      // Build one submenu of row CheckMenuItems for a source. The "Off"
-      // entry is always present; row entries 1..pickerRows follow.
-      // When `onAddNewRow` is provided AND the layout has headroom,
-      // a trailing "+ Add row & assign" MenuItem is appended.
-      async function buildRowSubmenuItems(
-        currentRow: number | null,
-        onPick: (row: number | null) => void,
-        disabled: boolean,
-        onAddNewRow?: () => void,
-      ): Promise<(CheckMenuItem | MenuItem | PredefinedMenuItem)[]> {
-        // Single-row layouts read as a plain [Off, On] toggle; multi-row
-        // layouts list every row the user actually has.
-        const rows =
-          pickerRows === 1
-            ? [{ text: "On", row: 0 }]
-            : Array.from({ length: pickerRows }, (_, i) => ({
-                text: `Row ${i + 1}`,
-                row: i,
-              }));
-
-        const rowItems = await Promise.all([
-          CheckMenuItem.new({
-            text: "Off",
-            checked: currentRow === null,
-            enabled: !disabled,
-            action: () => onPick(null),
-          }),
-          ...rows.map((r) =>
-            CheckMenuItem.new({
-              text: r.text,
-              checked: currentRow === r.row,
-              enabled: !disabled,
-              action: () => onPick(r.row),
-            }),
-          ),
-        ]);
-
-        if (canAddRowFromTray && onAddNewRow && !disabled) {
-          return [
-            ...rowItems,
-            ...(await Promise.all([
-              PredefinedMenuItem.new({ item: "Separator" }),
-              MenuItem.new({ text: "Add row & assign", action: onAddNewRow }),
-            ])),
-          ];
-        }
-        return rowItems;
-      }
-
-      // Append an empty row to the layout, then optimistically assign
-      // `sourceId` to it. We do the assignment via a follow-up call to
-      // setSourceTickerRow / setWidgetTickerRow rather than seeding
-      // the layout in one step, because the data branch also needs
-      // to flip the server-side `ticker_enabled` flag — reusing the
-      // existing handlers keeps that logic in one place.
-      //
-      // `kind` mirrors the catalog's own kind field: a data widget is
-      // CDC-backed and has a server row, a utility widget is local-only.
-      function addRowAndAssign(
-        sourceId: string,
-        kind: "data" | "utility",
-      ): void {
-        const current = prefsRef.current.appearance.tickerLayout;
-        const tier = tierRef.current;
-        const cap = getMaxTickerRows(tier);
-        if (current.rows.length >= cap) return;
-        const newIndex = current.rows.length;
-        const withRow = setTickerLayout(prefsRef.current, {
-          rows: [...current.rows, { sources: [] }],
-        });
-        // Persist the new row first so the assign helper sees a layout
-        // long enough to accept the new index.
-        prefsRef.current = withRow;
-        setPrefs(withRow);
-        savePrefs(withRow);
-        // Now thread through the existing per-kind handler (data also
-        // flips the server-side flag; utility is purely client-side).
-        if (kind === "data") {
-          handleDataWidgetRowChange(sourceId, newIndex);
-        } else {
-          handleWidgetRowChange(sourceId, newIndex);
-        }
-      }
+      // Per-source ticker toggles. One checkable item per widget: on the
+      // ticker or not. This was a submenu of [Off, Row 1, Row 2, …] when
+      // the ticker had multiple rows.
 
       // Widgets submenu — one unified row-picker list. The widget/slot model
       // has no coarse "widgets": server-backed data widgets (sports_nfl,
       // finance_stocks, …) and local widgets (clock, weather, …) sit together,
       // each labeled by its catalog name.
-      const widgetSubmenus: Submenu[] = [];
+      const widgetSubmenus: CheckMenuItem[] = [];
 
       // Data widgets — the user's enabled widgets, labeled by their catalog
       // name ("NFL", "Stocks", "BBC News"), not the raw widget_type.
@@ -736,23 +624,22 @@ export default function App() {
         const label =
           metaById.get(ch.widget_type)?.name ??
           `${ch.widget_type.charAt(0).toUpperCase()}${ch.widget_type.slice(1)}`;
-        const currentRow = getSourceTickerRow(prefsRef.current, ch, ch.widget_type);
-        const rowItems = await buildRowSubmenuItems(
-          currentRow,
-          (row) => {
-            // Optimistic update — flip the ref immediately so the next
-            // menu build reflects the change without waiting for the API.
-            const target = widgetsRef.current.find(
-              (c) => c.widget_type === ch.widget_type,
-            );
-            if (target) target.ticker_enabled = row !== null;
-            handleDataWidgetRowChange(ch.widget_type, row);
-          },
-          !ch.enabled,
-          () => addRowAndAssign(ch.widget_type, "data"),
-        );
+        const onTicker = isWidgetTickerEnabled(ch);
         widgetSubmenus.push(
-          await Submenu.new({ text: label, items: rowItems }),
+          await CheckMenuItem.new({
+            text: label,
+            checked: onTicker,
+            enabled: ch.enabled !== false,
+            action: () => {
+              // Optimistic — flip the ref so the next menu build reflects
+              // the change without waiting for the API round trip.
+              const target = widgetsRef.current.find(
+                (c) => c.widget_type === ch.widget_type,
+              );
+              if (target) target.ticker_enabled = !onTicker;
+              handleDataWidgetTickerChange(ch.widget_type, !onTicker);
+            },
+          }),
         );
       }
 
@@ -763,8 +650,7 @@ export default function App() {
       // this build ship the widget" when the question is "did the user add
       // it". A fresh install enables only `clock`, so the tray offered rows
       // for the other five — and picking one routes through
-      // setWidgetTickerRow, which writes tickerLayout and widgetsOnTicker but
-      // never enabledWidgets. activeTabs is widgetTabs + widgetsOnTicker, so
+      // a handler that writes widgetsOnTicker but never enabledWidgets. activeTabs is widgetTabs + widgetsOnTicker, so
       // the chip really renders (sysmon needs no config to produce data)
       // while every slot count reads enabledWidgets.length — including the
       // one useAddWidget reports to the server. A widget on the ticker that
@@ -778,15 +664,12 @@ export default function App() {
           wp.enabledWidgets.includes(mf.id) ||
           wp.widgetsOnTicker.includes(mf.id),
       )) {
-        const currentRow = getSourceTickerRow(prefsRef.current, null, widget.id);
-        const rowItems = await buildRowSubmenuItems(
-          currentRow,
-          (row) => handleWidgetRowChange(widget.id, row),
-          false,
-          () => addRowAndAssign(widget.id, "utility"),
-        );
         widgetSubmenus.push(
-          await Submenu.new({ text: widget.name, items: rowItems }),
+          await CheckMenuItem.new({
+            text: widget.name,
+            checked: wp.widgetsOnTicker.includes(widget.id),
+            action: () => handleWidgetTickerChange(widget.id),
+          }),
         );
       }
 
@@ -869,7 +752,7 @@ export default function App() {
     }
     document.addEventListener("contextmenu", onContextMenu);
     return () => document.removeEventListener("contextmenu", onContextMenu);
-  }, [handleDataWidgetRowChange, handleWidgetRowChange, handleTogglePosition]);
+  }, [handleDataWidgetTickerChange, handleWidgetTickerChange, handleTogglePosition]);
 
   // ── Merge widget + widget tabs ──────────────────────────────
   const activeTabs = useMemo(
@@ -894,57 +777,31 @@ export default function App() {
             onTogglePosition={handleTogglePosition}
             onHideTicker={() => handleToggleTicker(true)}
           />
-          {prefs.appearance.tickerLayout.rows.map((row, i) => {
-            // Empty sources = "show everything on this row" (1-row behaviour).
-            // Otherwise filter activeTabs down to only the row's configured
-            // sources. We pass activeTabs (not row.sources directly) so the
-            // downstream pipeline still respects onboarding-level visibility.
-            //
-            // Persisted rows from pre-split builds hold COARSE ids ("sports",
-            // "rss"); post-migration tabs are widget ids ("sports_nfl",
-            // "news_bbc"). Match either the exact widget id or its coarse
-            // source, so a row pinned to "Sports" keeps showing all sports
-            // widgets instead of going permanently blank.
-            const rowTabs = row.sources.length > 0
-              ? activeTabs.filter(
-                  (tab) =>
-                    row.sources.includes(tab) ||
-                    row.sources.includes(sourceForWidget(tab) ?? ""),
-                )
-              : activeTabs;
-            // Empty-state CTAs are anchored to the first row only, so
-            // multi-row layouts don't stack duplicate banners. Two
-            // mutually exclusive states:
-            //   - Sourceless:    signed in, ZERO installed widgets.
-            //                    CTA → Browse catalog.
-            //   - InstalledOff:  signed in, has installed widgets, but
-            //                    the ticker would otherwise render nothing
-            //                    for ANY reason — widgets turned off,
-            //                    nothing picked yet (e.g. Finance on but
-            //                    no symbols), offseason, etc. The actual
-            //                    "has no chips" gate lives in the ticker
-            //                    component itself; we just pass the flag
-            //                    saying "if you have nothing, here's the
-            //                    recovery UI to use".  CTA → per-widget
-            //                    chips that open each widget feed.
-            const hasAnyPinnedWidget = Object.values(prefs.widgets.pinnedWidgets ?? {})
-              .some((pin) => (pin.row ?? 0) === i);
-            const isFirstRow = i === 0;
+          {(() => {
+            // Empty-state CTAs, both gated on "the ticker would otherwise
+            // render nothing":
+            //   - Sourceless:   signed in, ZERO installed widgets.
+            //                   CTA -> Browse catalog.
+            //   - InstalledOff: signed in, has installed widgets, but
+            //                   nothing would render for ANY reason —
+            //                   widgets off, nothing picked yet (Finance
+            //                   on but no symbols), offseason, etc. The
+            //                   "has no chips" gate lives in the ticker
+            //                   itself; this just says "if you have
+            //                   nothing, here's the recovery UI".
+            //                   CTA -> per-widget chips.
+            const hasAnyPinnedWidget =
+              Object.keys(prefs.widgets.pinnedWidgets ?? {}).length > 0;
             const showSourcelessCTA =
-              isFirstRow &&
-              authenticated &&
-              widgets.length === 0 &&
-              !hasAnyPinnedWidget;
+              authenticated && widgets.length === 0 && !hasAnyPinnedWidget;
             const showInstalledOffCTA =
-              isFirstRow &&
               authenticated &&
               installedWidgetsMeta.length > 0 &&
               !hasAnyPinnedWidget;
             return (
               <ScrollrTicker
-                key={`row${i}`}
                 dashboard={dashboard ?? null}
-                activeTabs={rowTabs}
+                activeTabs={activeTabs}
                 widgetData={widgetData}
                 onChipClick={handleChipClick}
                 onTogglePin={handleTogglePin}
@@ -957,12 +814,9 @@ export default function App() {
                 chipColorMode={prefs.ticker.chipColors}
                 widgetDisplay={prefs.widgetDisplay}
                 comfort={prefs.ticker.tickerMode === "comfort"}
-                rowIndex={i}
                 direction={prefs.ticker.tickerDirection}
                 scrollMode={prefs.ticker.scrollMode}
                 stepPause={prefs.ticker.stepPause}
-                rowConfig={row}
-                rowHasExplicitSources={row.sources.length > 0}
                 showSourcelessCTA={showSourcelessCTA}
                 onAddSources={handleAddSources}
                 showInstalledOffCTA={showInstalledOffCTA}
@@ -970,7 +824,7 @@ export default function App() {
                 onOpenWidget={handleOpenWidget}
               />
             );
-          })}
+          })()}
         </>
       )}
     </div>

@@ -6,12 +6,7 @@ import clsx from "clsx";
 import { HOME_PREVIEW_MAX, HomeEmptyRow } from "../home";
 import type { HomeRowsProps, Trade } from "../../types";
 
-/** Filter chips are per symbol. */
-export function financeHomeGroups(rows: unknown[]): string[] {
-  return [...new Set((rows as Trade[]).map((t) => t.symbol))];
-}
-
-export function FinanceHomeRows({ data, filter, onConfigure }: HomeRowsProps) {
+export function FinanceHomeRows({ data, onConfigure }: HomeRowsProps) {
   const trades = data as Trade[];
   const empty = (
     <HomeEmptyRow
@@ -22,10 +17,7 @@ export function FinanceHomeRows({ data, filter, onConfigure }: HomeRowsProps) {
   );
   if (trades.length === 0) return empty;
 
-  const filtered =
-    filter.length > 0 ? trades.filter((t) => filter.includes(t.symbol)) : trades;
-
-  const sorted = [...filtered]
+  const sorted = [...trades]
     .sort(
       (a, b) =>
         Math.abs(Number(b.percentage_change ?? 0)) -

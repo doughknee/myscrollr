@@ -52,8 +52,6 @@ import type { FantasySubTab } from "../../preferences";
 import type { LeagueResponse, MyLeaguesResponse } from "./types";
 import {
   FantasyHomeRows,
-  fantasyHomeGroups,
-  fantasyHomeGroupLabel,
   normalizeFantasyHome,
 } from "./home";
 
@@ -83,8 +81,6 @@ export const fantasyDataWidget: DataWidgetManifest = {
   FeedTab: FantasyFeedTab,
   HomeRows: FantasyHomeRows,
   normalizeHome: normalizeFantasyHome,
-  homeGroups: fantasyHomeGroups,
-  homeGroupLabel: fantasyHomeGroupLabel,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────

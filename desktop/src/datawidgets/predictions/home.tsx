@@ -1,8 +1,5 @@
 /**
  * Predictions — Home preview. Top movers, matching the finance treatment.
- *
- * No group chips: a prediction widget is a single market set, so there is
- * nothing to slice it by. Omitting `homeGroups` hides the chip row.
  */
 import clsx from "clsx";
 import { HOME_PREVIEW_MAX, HomeEmptyRow } from "../home";

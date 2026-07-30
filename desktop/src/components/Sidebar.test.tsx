@@ -14,8 +14,9 @@ function renderSidebar(opts: {
   tier: SubscriptionTier;
   sourceCount: number;
   isFeed?: boolean;
-  isReleases?: boolean;
+  isUpdates?: boolean;
   isStatus?: boolean;
+  collapsed?: boolean;
   health?: DeliveryHealth;
 }) {
   const onNavigateToMarketplace = vi.fn();
@@ -38,7 +39,8 @@ function renderSidebar(opts: {
         isAccount={false}
         isMarketplace={false}
         isSupport={false}
-        isReleases={opts.isReleases ?? false}
+        isUpdates={opts.isUpdates ?? false}
+        collapsed={opts.collapsed ?? false}
         isStatus={opts.isStatus ?? false}
         isFeed={opts.isFeed ?? false}
         activeItem=""
@@ -212,8 +214,10 @@ describe("Sidebar account menu", () => {
   });
 
   it("shows the tier without the redundant plan suffix", () => {
-    renderSidebar({ tier: "super_user", sourceCount: 0 });
-    fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
+    // Rendered expanded rather than clicking a toggle: the collapse
+    // button moved to the TopBar, so the rail no longer owns that
+    // state. Only the chip's caption is under test here.
+    renderSidebar({ tier: "super_user", sourceCount: 0, collapsed: false });
     expect(screen.getByText("Super User")).toBeInTheDocument();
     expect(screen.queryByText("Super User plan")).not.toBeInTheDocument();
   });

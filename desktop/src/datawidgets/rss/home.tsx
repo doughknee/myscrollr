@@ -5,12 +5,7 @@ import { HOME_PREVIEW_MAX, HomeEmptyRow } from "../home";
 import { timeAgo } from "../../utils/format";
 import type { HomeRowsProps, RssItem } from "../../types";
 
-/** Filter chips are per feed. */
-export function rssHomeGroups(rows: unknown[]): string[] {
-  return [...new Set((rows as RssItem[]).map((i) => i.source_name))];
-}
-
-export function RssHomeRows({ data, filter, onConfigure }: HomeRowsProps) {
+export function RssHomeRows({ data, onConfigure }: HomeRowsProps) {
   const items = data as RssItem[];
   const empty = (
     <HomeEmptyRow
@@ -21,12 +16,7 @@ export function RssHomeRows({ data, filter, onConfigure }: HomeRowsProps) {
   );
   if (items.length === 0) return empty;
 
-  const filtered =
-    filter.length > 0
-      ? items.filter((i) => filter.includes(i.source_name))
-      : items;
-
-  const sorted = [...filtered]
+  const sorted = [...items]
     .sort((a, b) => {
       const aTime = a.published_at ? new Date(a.published_at).getTime() : 0;
       const bTime = b.published_at ? new Date(b.published_at).getTime() : 0;

@@ -413,7 +413,6 @@ function buildTierShowcases(limits: TierLimitsResponse): Array<TierShowcase> {
         `${uplink.max_widgets} widgets at once`,
         'Priority support',
         'Unlimited items per widget',
-        'Two ticker rows',
         'Blacklist site filtering',
         'Early access to features',
       ],
@@ -432,7 +431,6 @@ function buildTierShowcases(limits: TierLimitsResponse): Array<TierShowcase> {
         `${pro.max_widgets} widgets at once`,
         'Custom alerts & notifications',
         'Feed profiles & advanced controls',
-        'Three ticker rows',
         'Blacklist + Whitelist filtering',
         'Everything in Uplink',
       ],
@@ -449,7 +447,6 @@ function buildTierShowcases(limits: TierLimitsResponse): Array<TierShowcase> {
         'Every widget you follow, all running at once. Webhooks push alerts to your Discord. You export weekly market data to a spreadsheet. Your personal dashboard pulls from the API. Scrollr becomes infrastructure, not just a feed.',
       features: [
         'Unlimited widgets at once',
-        'Per-row ticker controls',
         'Webhooks & integrations',
         'Data export (CSV / JSON)',
         'API access',
@@ -1518,8 +1515,8 @@ function UplinkPage() {
                 </span>
                 <p className="text-base text-base-content/40 leading-relaxed">
                   Scrollr is free and open source. Three paid tiers for power
-                  users who want more — more widgets at once, more ticker rows,
-                  custom alerts, and power-user integrations.
+                  users who want more — more widgets at once, custom alerts,
+                  and power-user integrations.
                 </p>
               </motion.div>
 

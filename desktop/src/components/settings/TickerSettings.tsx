@@ -5,10 +5,8 @@
  * it isn't duplicated here. Settings sections mirror the Settings page
  * (dense card grid, tooltip-labeled rows).
  */
-import { useCallback, useMemo } from "react";
-import { clsx } from "clsx";
-import { Plus, Trash2, Lock } from "lucide-react";
-import { resetCategory, removeTickerRow, setTickerRowSourceMembership } from "../../preferences";
+import { useCallback } from "react";
+import { resetCategory } from "../../preferences";
 import {
   Section,
   SegmentedRow,
@@ -17,9 +15,6 @@ import {
   ResetButton,
 } from "./SettingsControls";
 import { getTier } from "../../auth";
-import { getAllDataWidgets } from "../../datawidgets/registry";
-import { getAllWidgets } from "../../widgets/registry";
-import { useTickerLayout } from "../../hooks/useTickerLayout";
 import { useUndoableAction } from "../../hooks/useUndoableAction";
 import type {
   AppPreferences,
@@ -29,7 +24,6 @@ import type {
   ChipColorMode,
   TickerDirection,
   ScrollMode,
-  TickerRowConfig,
 } from "../../preferences";
 
 // ── Props ───────────────────────────────────────────────────────
@@ -80,19 +74,6 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
   const { ticker } = prefs;
   const tier = getTier();
 
-  // Single source of truth for layout state, shared with the Home page
-  // the tray submenus. `rowCount`, `tierMaxRows`,
-  // `canAddRow`, etc. all flow from this hook so this surface and Home
-  // can never drift on what's possible vs what currently exists.
-  const tickerLayout = useTickerLayout(prefs, onPrefsChange, tier);
-  const {
-    rows,
-    rowCount,
-    tierMaxRows: maxRows,
-    canAddRow,
-    canCustomize,
-    addRow: addRowFromHook,
-  } = tickerLayout;
 
   // Undoable destructive-action wrapper. Every "the user might regret
   // this" mutation in this file routes through `undoable` instead of
@@ -114,66 +95,6 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
     );
   }, [undoable]);
 
-  // ── Row mutations ─────────────────────────────────────────────
-  // Thin wrappers around the hook so the JSX below stays readable.
-  // Ticker settings edits row membership only. Removing a widget from a
-  // row must not remove it from `widgetsOnTicker`; otherwise returning a
-  // row to the empty "all sources" state would still hide that widget.
-  const addRow = useCallback(() => {
-    addRowFromHook();
-  }, [addRowFromHook]);
-
-  const toggleRowSource = useCallback(
-    (rowIndex: number, sourceId: string) => {
-      const row = rows[rowIndex];
-      const isInTarget = row.sources.includes(sourceId);
-      onPrefsChange(setTickerRowSourceMembership(
-        prefs,
-        sourceId,
-        rowIndex,
-        !isInTarget,
-      ));
-    },
-    [prefs, rows, onPrefsChange],
-  );
-
-  const deleteRow = useCallback(
-    (index: number) => {
-      // Build the toast description from the row's actual contents so
-      // the user knows what they just lost. Empty rows ("shows all
-      // sources") get a generic label instead of the noisy "Removed:
-      // (nothing)" string.
-      const row = rows[index];
-      const sources = row?.sources ?? [];
-      const sourceLabel = sources.length === 0
-        ? undefined
-        : sources.length <= 3
-          ? `Removed: ${sources.join(", ")}.`
-          : `Removed: ${sources.slice(0, 3).join(", ")} +${sources.length - 3} more.`;
-      undoable(
-        { label: `Removed Row ${index + 1}`, description: sourceLabel },
-        (current) => removeTickerRow(current, index),
-      );
-    },
-    [rows, undoable],
-  );
-
-  // ── Available sources (data widgets + enabled utility widgets) ──
-  const availableSources = useMemo(() => {
-    const dataWidgets = getAllDataWidgets().map((ch) => ({
-      id: ch.id,
-      label: ch.tabLabel,
-      hex: ch.hex,
-    }));
-    const widgets = getAllWidgets()
-      .filter((w) => prefs.widgets.enabledWidgets.includes(w.id))
-      .map((w) => ({
-        id: w.id,
-        label: w.tabLabel,
-        hex: w.hex,
-      }));
-    return [...dataWidgets, ...widgets];
-  }, [prefs.widgets.enabledWidgets]);
 
   return (
     <div>
@@ -269,44 +190,6 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
           />
         </Section>
 
-        {/* ── Rows ───────────────────────────────────────────── */}
-        <Section title={`Rows (${rowCount}/${maxRows})`} variant="card">
-          <div className="px-3 pt-1 pb-2 space-y-2">
-            {rows.map((row, rowIdx) => (
-              <RowCard
-                key={rowIdx}
-                rowIndex={rowIdx}
-                row={row}
-                sources={availableSources}
-                canRemove={rowCount > 1}
-                canCustomize={canCustomize}
-                onToggleSource={(id) => toggleRowSource(rowIdx, id)}
-                onRemove={() => deleteRow(rowIdx)}
-              />
-            ))}
-            <button
-              type="button"
-              onClick={addRow}
-              disabled={!canAddRow}
-              className={clsx(
-                "w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed text-ui-meta font-medium ",
-                !canAddRow
-                  ? "border-edge/30 text-fg-4 cursor-not-allowed"
-                  : "border-edge/50 text-fg-3 hover:text-accent hover:border-accent/60 cursor-pointer",
-              )}
-            >
-              <Plus size={12} />
-              {!canAddRow ? "Tier cap reached" : "Add row"}
-            </button>
-            {!canAddRow && maxRows < 3 && (
-              <p className="text-ui-chip text-fg-3 text-center pt-1">
-                {maxRows === 1
-                  ? "Upgrade to Uplink for a second ticker row."
-                  : "Upgrade to Uplink Pro for up to 3 ticker rows."}
-              </p>
-            )}
-          </div>
-        </Section>
         </div>
       </div>
 
@@ -314,114 +197,6 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
       <div className="flex items-center justify-end pt-3">
         <ResetButton label="Reset ticker settings" onClick={handleReset} />
       </div>
-    </div>
-  );
-}
-
-// ── Row card (multi-deck builder) ───────────────────────────────
-
-interface RowSource {
-  id: string;
-  label: string;
-  hex: string;
-}
-
-interface RowCardProps {
-  rowIndex: number;
-  row: TickerRowConfig;
-  sources: RowSource[];
-  canRemove: boolean;
-  canCustomize: boolean;
-  onToggleSource: (id: string) => void;
-  onRemove: () => void;
-}
-
-function RowCard({
-  rowIndex,
-  row,
-  sources,
-  canRemove,
-  canCustomize,
-  onToggleSource,
-  onRemove,
-}: RowCardProps) {
-  const showingAll = row.sources.length === 0;
-
-  return (
-    <div className="rounded-xl border border-edge/40 bg-surface-2/30 p-3">
-      {/* Row header */}
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-ui-section font-mono">
-          Row {rowIndex + 1}
-        </span>
-        {canRemove && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="text-fg-4 hover:text-accent-red cursor-pointer p-1 rounded"
-            aria-label={`Remove row ${rowIndex + 1}`}
-          >
-            <Trash2 size={12} />
-          </button>
-        )}
-      </div>
-
-      {/* Sources grid */}
-      <div>
-        <div className="text-ui-section font-mono mb-1.5">
-          Sources {showingAll && <span className="text-fg-3">(all visible)</span>}
-        </div>
-        {sources.length === 0 ? (
-          <div className="text-ui-meta font-mono text-fg-3 py-2">
-            No widgets added yet. Add some from the Catalog first.
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-1.5">
-            {sources.map((src) => {
-              const selected = row.sources.includes(src.id);
-              return (
-                <button
-                  key={src.id}
-                  type="button"
-                  onClick={() => onToggleSource(src.id)}
-                  className={clsx(
-                    "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-ui-meta font-mono cursor-pointer",
-                    selected
-                      ? "border-accent/60 bg-accent/10 text-fg"
-                      : "border-edge/40 bg-transparent text-fg-3 hover:border-edge/60 hover:text-fg-2",
-                  )}
-                >
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ backgroundColor: src.hex }}
-                  />
-                  <span className="truncate">{src.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Customize (Ultimate) upsell teaser — only shown to tiers that
-          DON'T already have customization unlocked. Showing "Coming
-          soon" to Ultimate / super_user users implies a feature gap
-          where there isn't one (the Phase 2 UI hasn't shipped yet,
-          but tease pre-launch confused testers). Free / Uplink / Pro
-          continue to see the locked Ultimate upsell here. */}
-      {!canCustomize && (
-        <div className="mt-3 pt-3 border-t border-edge/30">
-          <div className="flex items-center justify-between text-ui-meta font-mono text-fg-3">
-            <span className="flex items-center gap-1.5">
-              <Lock size={11} />
-              Customize scroll
-            </span>
-            <span className="text-ui-chip uppercase tracking-wider">
-              Ultimate
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

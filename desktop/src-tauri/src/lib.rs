@@ -2,6 +2,8 @@ mod commands;
 mod compositor;
 mod kalshi;
 mod state;
+#[cfg(target_os = "macos")]
+mod titlebar;
 mod tray;
 
 use std::sync::{atomic::AtomicBool, Arc, Mutex};
@@ -209,11 +211,30 @@ pub fn run() {
             }
 
             // ── App window: strip native chrome on Linux/Windows ─
-            // macOS keeps native decorations (traffic lights). On
-            // other platforms we use our custom TitleBar component.
+            // macOS keeps decorations on purpose: tauri.conf.json sets
+            // titleBarStyle "Overlay" + hiddenTitle, so the title bar is
+            // transparent and our TopBar renders under it while the
+            // traffic lights stay native. Elsewhere there is no such
+            // style, so we drop decorations and use WindowControls.
             #[cfg(not(target_os = "macos"))]
             if let Some(app_win) = app.get_webview_window("main") {
                 let _ = app_win.set_decorations(false);
+            }
+
+            // Grow the title bar with an empty toolbar so macOS re-centres
+            // the traffic lights lower, giving the TopBar room to be both
+            // roomy and exactly aligned with them. AppKit moves the
+            // buttons itself, so nothing here fights its relayout.
+            #[cfg(target_os = "macos")]
+            if let Some(app_win) = app.get_webview_window("main") {
+                if !titlebar::install(&app_win) {
+                    let win = app_win.clone();
+                    app_win.on_window_event(move |event| {
+                        if matches!(event, tauri::WindowEvent::Focused(_)) {
+                            titlebar::install(&win);
+                        }
+                    });
+                }
             }
 
             // ── System tray ──────────────────────────────────────

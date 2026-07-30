@@ -35,6 +35,20 @@ pub async fn start_finance_services(pool: Arc<PgPool>, health_state: Arc<Mutex<F
         let _ = seed_tracked_symbols(pool.clone(), entries).await;
     }
 
+    // Local dev has no TwelveData key by default. Mirror the sports ingester:
+    // stay up, skip polling, and let core keep serving the symbols already in
+    // Postgres. Seeding above still runs, so a fresh database gets its symbol
+    // rows. Outside development `FinanceState::new` still exits via
+    // `fatal_env`, so a real deploy cannot silently stop ingesting.
+    if std::env::var("ENVIRONMENT").as_deref() == Ok("development")
+        && std::env::var("TWELVEDATA_API_KEY")
+            .map(|v| v.trim().is_empty())
+            .unwrap_or(true)
+    {
+        info!("TWELVEDATA_API_KEY not set; not polling. Existing database rows are still served.");
+        return;
+    }
+
     // Initialization with database-driven state
     let state = FinanceState::new(Arc::clone(&pool)).await;
     initialize_symbols(state.clone()).await;

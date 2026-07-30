@@ -5,11 +5,9 @@
  * plus a compact widget status strip. Discovery and add/remove happen
  * in the Catalog (/catalog), not here.
  */
-import { useState, useMemo, useCallback } from "react";
+import { useMemo, useCallback } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
-  Pencil,
-  Check,
   ChevronRight,
   Plus,
   Settings,
@@ -17,10 +15,9 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import RouteError from "../components/RouteError";
-import Tooltip from "../components/Tooltip";
 import { WidgetBar, BarPill } from "../components/widget-bar/Bar";
+import SectionNav from "../components/layout/SectionNav";
 import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../components/feedCard";
-import TickerLayoutSummary from "../components/TickerLayoutSummary";
 import PageLayout from "../components/layout/PageLayout";
 import EmptySection from "../components/layout/EmptySection";
 import { useShell, useShellData } from "../shell-context";
@@ -39,21 +36,16 @@ import {
   LS_WEATHER_UNIT,
   LS_SYSMON_DATA,
 } from "../constants";
-import { useTickerLayout } from "../hooks/useTickerLayout";
 import {
   formatEffectiveWidgetTickerStatus,
-  formatTickerStatus,
-  getEffectiveDataWidgetTickerRow,
   getEffectiveWidgetTickerStatus,
 } from "../utils/tickerStatus";
 import type { DataWidgetRow } from "../api/client";
 import type { DataWidgetManifest, WidgetManifest } from "../types";
-import type { TempUnit, HomePreview } from "../preferences";
+import type { TempUnit } from "../preferences";
 import type { SystemInfo } from "../hooks/useSysmonData";
 import type { TimerState } from "../widgets/timer/types";
 import type { SavedCity } from "../widgets/weather/types";
-
-const MAX_PREVIEW = 5;
 
 function formatTimerDuration(ms: number): string {
   const totalSecs = Math.floor(Math.max(0, ms) / 1000);
@@ -107,28 +99,7 @@ function HomePage() {
   } = shell;
 
   const enabledWidgets = shell.prefs.widgets.enabledWidgets;
-  const homePreview = shell.prefs.homePreview;
 
-  // Single source of truth for layout state, shared with Settings →
-  // Ticker, the Settings → Ticker source picker, and the tray submenus.
-  // Pre-refactor each surface computed its own `maxRows` from this same
-  // prefs blob and they kept drifting (Home derived from row count,
-  // Settings derived from tier cap). The hook collapses both into one
-  // shape so every screen renders in lockstep.
-  const tickerLayout = useTickerLayout(
-    shell.prefs,
-    shell.onPrefsChange,
-    shell.tier,
-  );
-  const { rows: layoutRows, tierMaxRows, canAddRow } = tickerLayout;
-
-  const setHomePreview = useCallback(
-    (widgetType: string, keys: string[]) => {
-      const next: HomePreview = { ...homePreview, [widgetType]: keys };
-      shell.onPrefsChange({ ...shell.prefs, homePreview: next });
-    },
-    [homePreview, shell],
-  );
 
   const openTickerSettings = useCallback(() => {
     navigate({ to: "/customize" });
@@ -172,26 +143,29 @@ function HomePage() {
       title="Home"
       subtitle="Your live feed at a glance"
       width="wide"
+      noTopPadding
     >
-      {/* WCB — same persistent chrome as every other page. Home has no
-          view switch; its right cluster carries the ticker-manage
-          action. */}
-      {hasAnySources && (
-        <WidgetBar>
+      {/* WCB — same persistent chrome as every other page. The section
+          nav is always present (it's how you leave Home for settings);
+          the ticker-manage action only appears once there's a ticker
+          worth managing. */}
+      <WidgetBar>
+        <SectionNav active="home" />
+        {hasAnySources && (
           <div className="ml-auto">
             <BarPill active={false} onClick={openTickerSettings}>
               Manage ticker
             </BarPill>
           </div>
-        </WidgetBar>
-      )}
+        )}
+      </WidgetBar>
       {/* Home uses the standard PageLayout chassis (px-5 py-5,
           max-w-6xl) so it lines up with Catalog and every other
           wide route. The inner wrapper just owns vertical rhythm
           between sections (space-y-5, no dangling margin on the
           last child). Content under the WCB starts at pt-4, same as
-          Customize/Support; the bar-less empty state doesn't. */}
-      <div className={clsx("space-y-5", hasAnySources && "pt-4")}>
+          Customize/Support. */}
+      <div className="space-y-5 pt-4">
       {/* Empty state — hero. Shown when the user has no widgets and
           no enabled widgets. Disappears the moment they add their
           first source. This IS the post-wizard first-run experience —
@@ -222,22 +196,6 @@ function HomePage() {
         />
       )}
 
-      {/* Ticker preview — read-only summary of "what's on your radar".
-          TickerLayoutSummary draws its own card chrome, so we render
-          it directly instead of wrapping it in another PageSection
-          card (which would have nested two cards and doubled padding).
-          The "Manage" CTA already exists inside the summary's header. */}
-      {hasAnySources && (
-        <TickerLayoutSummary
-          rows={layoutRows}
-          tierMaxRows={tierMaxRows}
-          canAddRow={canAddRow}
-          onOpenSettings={openTickerSettings}
-          dataWidgetManifests={allDataWidgetManifests}
-          widgetManifests={allWidgets}
-        />
-      )}
-
       {/* DataWidgetRow sections — stagger in on first paint so the Home
           page reveals its data instead of slamming everything in
           at once. */}
@@ -250,14 +208,6 @@ function HomePage() {
               widget={ch}
               manifest={manifest}
               data={dashboard?.data}
-              tickerStatus={formatTickerStatus(
-                getEffectiveDataWidgetTickerRow(shell.prefs, ch),
-                layoutRows.length,
-              )}
-              selectedKeys={homePreview[ch.widget_type] ?? []}
-              onSelectionChange={(keys) =>
-                setHomePreview(ch.widget_type, keys)
-              }
               onViewAll={() =>
                 navigate({
                   to: "/widget/$id",
@@ -292,7 +242,6 @@ function HomePage() {
             getTickerStatus={(id) =>
               formatEffectiveWidgetTickerStatus(
                 getEffectiveWidgetTickerStatus(shell.prefs, id),
-                layoutRows.length,
               )
             }
             onNavigate={(id) =>
@@ -315,9 +264,6 @@ interface WidgetSectionProps {
   widget: DataWidgetRow;
   manifest: DataWidgetManifest;
   data: Record<string, unknown> | undefined;
-  tickerStatus: string;
-  selectedKeys: string[];
-  onSelectionChange: (keys: string[]) => void;
   onViewAll: () => void;
   onRowClick: () => void;
   onConfigure: () => void;
@@ -327,14 +273,10 @@ function WidgetSection({
   widget,
   manifest,
   data,
-  tickerStatus,
-  selectedKeys,
-  onSelectionChange,
   onViewAll,
   onRowClick,
   onConfigure,
 }: WidgetSectionProps) {
-  const [editing, setEditing] = useState(false);
   const Icon = manifest.icon;
   const type = widget.widget_type;
   // Resolve the widget id to its coarse source (dashboard.data is source-keyed)
@@ -356,20 +298,6 @@ function WidgetSection({
       widget.config as Record<string, unknown> | undefined,
     );
   }, [source, data, widget.config, manifest]);
-  const groups = useMemo(
-    () => manifest.homeGroups?.(widgetData) ?? [],
-    [manifest, widgetData],
-  );
-  const hasSelections = selectedKeys.length > 0;
-
-  function toggleGroup(key: string) {
-    if (selectedKeys.includes(key)) {
-      onSelectionChange(selectedKeys.filter((k) => k !== key));
-    } else if (selectedKeys.length < MAX_PREVIEW) {
-      onSelectionChange([...selectedKeys, key]);
-    }
-  }
-
   return (
     <section>
       {/* Section header */}
@@ -383,121 +311,33 @@ function WidgetSection({
         <span className="text-sm font-semibold text-fg flex-1">
           {manifest.name}
         </span>
-        <TickerStatusBadge label={tickerStatus} />
-
-        {/* Edit toggle */}
-        {groups.length > 0 && (
-          <Tooltip content={editing ? "Done editing" : "Edit preview"}>
-            <button
-              onClick={() => setEditing(!editing)}
-              aria-label={editing ? "Done editing" : `Edit ${manifest.name} preview`}
-              className={clsx(
-                "w-7 h-7 flex items-center justify-center rounded-lg",
-                editing
-                  ? "text-accent bg-accent/10"
-                  : hasSelections
-                    ? "text-accent hover:bg-surface-hover"
-                    : "text-fg-4/60 hover:text-fg-2 hover:bg-surface-hover",
-              )}
-            >
-              <span
-                key={editing ? "check" : "pencil"}
-              >
-                {editing ? <Check size={14} /> : <Pencil size={14} />}
-              </span>
-            </button>
-          </Tooltip>
-        )}
-
-        {/* View all */}
-        {!editing && (
-          <button
-            onClick={onViewAll}
-            className="group flex items-center gap-1 text-ui-chip font-medium text-fg-4 hover:text-fg-2"
-          >
-            View all
-            <ChevronRight
-              size={12}
-            />
-          </button>
-        )}
+        <button
+          onClick={onViewAll}
+          className="group flex items-center gap-1 text-ui-chip font-medium text-fg-4 hover:text-fg-2"
+        >
+          View all
+          <ChevronRight size={12} />
+        </button>
       </div>
 
-      {/* Edit mode picker / data rows. */}
-        {editing ? (
-          <div
-            key="edit"
-            className="rounded-lg border border-accent/20 bg-accent/[0.03] overflow-hidden divide-y divide-edge/10 mb-3"
-          >
-            <div className="px-4 py-2 flex items-center justify-between">
-              <span className="text-ui-chip font-medium text-fg-3">
-                Choose up to {MAX_PREVIEW} to show on Home
-              </span>
-              {hasSelections && (
-                <button
-                  onClick={() => onSelectionChange([])}
-                  className="text-ui-chip font-medium text-fg-4 hover:text-fg-2"
-                >
-                  Clear all
-                </button>
-              )}
-            </div>
-            {groups.map((key) => {
-              const isSelected = selectedKeys.includes(key);
-              const atLimit = selectedKeys.length >= MAX_PREVIEW && !isSelected;
-              return (
-                <button
-                  key={key}
-                  onClick={() => toggleGroup(key)}
-                  disabled={atLimit}
-                  className={clsx(
-                    "flex items-center gap-3 px-4 py-2.5 w-full text-left",
-                    atLimit
-                      ? "opacity-40 cursor-not-allowed"
-                      : "hover:bg-accent/[0.04] cursor-pointer",
-                  )}
-                >
-                  <span
-                    className={clsx(
-                      "w-4 h-4 rounded border flex items-center justify-center shrink-0 ",
-                      isSelected
-                        ? "bg-accent border-accent"
-                        : "border-edge/40",
-                    )}
-                  >
-                    {isSelected && (
-                      <span
-                      >
-                        <Check size={10} className="text-surface" strokeWidth={3} />
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-ui-meta text-fg truncate flex-1">
-                    {manifest.homeGroupLabel?.(key, widgetData) ?? key}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <div
-            key="data"
-            className="rounded-lg border border-edge/20 overflow-hidden divide-y divide-edge/10 cursor-pointer hover:bg-base-200/30 "
-            onClick={onRowClick}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onRowClick();
-            }}
-          >
-            <manifest.HomeRows
-              data={widgetData}
-              filter={selectedKeys}
-              dashboard={data}
-              onConfigure={onConfigure}
-            />
-          </div>
-        )}
+      {/* Ranked rows — each source picks its own most
+          interesting items; see its home.tsx. */}
+        <div
+          key="data"
+          className="rounded-lg border border-edge/20 overflow-hidden divide-y divide-edge/10 cursor-pointer hover:bg-base-200/30 "
+          onClick={onRowClick}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onRowClick();
+          }}
+        >
+          <manifest.HomeRows
+            data={widgetData}
+            dashboard={data}
+            onConfigure={onConfigure}
+          />
+        </div>
     </section>
   );
 }
