@@ -61,6 +61,9 @@ LOGTO_SUPER_USER_ROLE_ID=
   "channels/finance/.env": `DATABASE_URL=${DB}
 PORT=3001
 ENCRYPTION_KEY=${enc}
+# Optional: without a key the finance ingester serves whatever is already
+# in the database and logs that it is not polling.
+TWELVEDATA_API_KEY=
 `,
   "channels/sports/.env": `DATABASE_URL=${DB}
 PORT=3002

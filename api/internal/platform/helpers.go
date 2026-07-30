@@ -2,10 +2,17 @@ package platform
 
 import (
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 )
+
+// schemePrefix matches any RFC 3986 scheme, not just http(s). ALLOWED_ORIGINS
+// carries the desktop app's `tauri://localhost`, and blindly prepending
+// https:// to it produced `https://tauri://localhost`, which panics Fiber's
+// CORS middleware at boot.
+var schemePrefix = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*://`)
 
 // ValidateURL cleans a URL string, ensuring it has a scheme prefix.
 // Returns the fallback if the input is empty.
@@ -14,7 +21,7 @@ func ValidateURL(urlStr, fallback string) string {
 		return fallback
 	}
 	urlStr = strings.TrimSpace(urlStr)
-	if !strings.HasPrefix(urlStr, "http://") && !strings.HasPrefix(urlStr, "https://") {
+	if !schemePrefix.MatchString(urlStr) {
 		urlStr = "https://" + urlStr
 	}
 	return strings.TrimSuffix(urlStr, "/")

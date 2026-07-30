@@ -11,7 +11,7 @@ use sports_service::{
     init_sports_service,
     log::init_async_logger,
     poll_live, poll_schedule, poll_standings, poll_teams,
-    RateLimiter, SportsHealth,
+    InitError, RateLimiter, SportsHealth,
 };
 
 #[derive(Clone)]
@@ -201,6 +201,22 @@ async fn run_service() -> Result<()> {
         // ── Initialize service (tables, migrations, seeding) ─────────────
         let (client, leagues) = match init_sports_service(&pool).await {
             Ok(result) => result,
+            // Local dev has no api-sports.io key by default, and `make setup`
+            // documents exactly that: "without a key the sports ingester
+            // serves whatever is already in the database and logs that it is
+            // not polling". Exiting here broke that promise and took the
+            // service down on every fresh checkout. Stay up and skip polling
+            // — core keeps reading the rows already in Postgres.
+            Err(InitError::MissingApiKey)
+                if std::env::var("ENVIRONMENT").as_deref() == Ok("development") =>
+            {
+                println!(
+                    "[Sports] API_SPORTS_KEY not set; not polling. \
+                     Existing database rows are still served."
+                );
+                readiness_bg.mark_ready().await;
+                return;
+            }
             Err(e) => {
                 sentry::capture_message(
                     &format!("Sports init failed: {e}"),

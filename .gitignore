@@ -80,3 +80,7 @@ myscrollr.com/src/lib/latestVersion.generated.ts
 # import.meta.glob, so a missing file never breaks dev).
 myscrollr.com/src/lib/releases.generated.ts
 ui-review-out/
+
+# Per-machine compose tweaks (host port remaps when something else already
+# owns 5432/6379, extra mounts, etc). Local to whoever wrote it.
+docker/compose.override.yml
