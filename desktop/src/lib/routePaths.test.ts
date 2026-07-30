@@ -17,7 +17,7 @@ const ROUTE_IDS = [
   "/catalog",
   "/customize",
   "/feed",
-  "/releases",
+  "/updates",
   "/status",
   "/support",
   "/widget/$id",

@@ -19,7 +19,17 @@ import { useBarChassis } from "./BarChassis";
 
 function BarRow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
+    // min-h pins the row so the bar's height can't depend on which
+    // controls a page puts in it. BarPill and Segmented are built to the
+    // same outer height, but they compose that height differently
+    // (border + py-1 vs border + p-0.5 + py-0.5) and round to a 1px
+    // difference. That was enough to make Home — the only page carrying
+    // both — sit 1px lower than every other page, so arriving there
+    // nudged the whole content area down.
+    //
+    // min-h, not h: the row is flex-wrap, and content that genuinely
+    // needs a second line must still be able to grow.
+    <div className="flex w-full min-w-0 flex-wrap items-center gap-2 min-h-[30px]">
       {children}
     </div>
   );

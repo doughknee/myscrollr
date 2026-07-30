@@ -15,7 +15,14 @@
  * route's content area in a chunky 4-row header. It's now in the
  * TopBar, freeing the entire content area for actual content.
  */
-import { ArrowLeft, ArrowRight, Radio, RadioTower } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Radio,
+  RadioTower,
+} from "lucide-react";
 import clsx from "clsx";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import Tooltip from "./Tooltip";
@@ -29,6 +36,10 @@ import { usePageIdentity } from "./layout/page-context";
 
 interface TopBarProps {
   tickerOn: boolean;
+  /** Collapsed state of the nav rail. Owned by the shell, since the
+   *  toggle lives here but the rail is a sibling component. */
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
   canBack: boolean;
   canForward: boolean;
   onBack: () => void;
@@ -62,6 +73,8 @@ function handleDragRegion(e: React.MouseEvent) {
 
 export default function TopBar({
   tickerOn,
+  sidebarCollapsed,
+  onToggleSidebar,
   canBack,
   canForward,
   onBack,
@@ -94,6 +107,30 @@ export default function TopBar({
         IS_MACOS && "pl-[78px]",
       )}
     >
+      {/* ── Sidebar toggle ──────────────────────────────────
+          Leads the row, ahead of Back: it acts on the rail to its
+          left, so it reads as belonging to that edge rather than to
+          the navigation cluster. */}
+      <Tooltip
+        content={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        side="bottom"
+      >
+        <button
+          onClick={onToggleSidebar}
+          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!sidebarCollapsed}
+          className="flex items-center justify-center w-7 h-7 shrink-0 rounded-md text-fg-3 hover:text-fg-2 hover:bg-surface-hover"
+        >
+          {sidebarCollapsed ? (
+            <PanelLeftOpen size={14} />
+          ) : (
+            <PanelLeftClose size={14} />
+          )}
+        </button>
+      </Tooltip>
+
+      <div className="w-px h-5 bg-edge/40 mx-1 shrink-0" />
+
       {/* ── Back / Forward — Spotify-style ─────────────────── */}
       <div className="flex items-center gap-0.5 shrink-0">
         <Tooltip content="Back" side="bottom">

@@ -21,13 +21,25 @@ export function Segmented<T extends string>({
   onChange,
   options,
   ariaLabel,
+  layoutGroupId: stableGroupId,
 }: {
   value: T;
   onChange: (next: T) => void;
   options: SegmentedOption<T>[];
   ariaLabel: string;
+  /**
+   * Fixed id for the shared-layout group. Defaults to a per-instance
+   * `useId`, which is what you want when the control's lifetime matches
+   * its page — two Segmenteds on screen must not animate into each
+   * other. Pass a constant when the *same* control is re-rendered by
+   * different routes: motion can only slide the indicator between an
+   * unmounting and a mounting element if both carry the same group id,
+   * and a fresh `useId` per mount makes them strangers that jump.
+   */
+  layoutGroupId?: string;
 }) {
-  const layoutGroupId = useId();
+  const generatedId = useId();
+  const layoutGroupId = stableGroupId ?? generatedId;
 
   return (
     <LayoutGroup id={layoutGroupId}>

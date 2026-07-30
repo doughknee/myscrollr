@@ -9,9 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UpdatesRouteImport } from './routes/updates'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as StatusRouteImport } from './routes/status'
-import { Route as ReleasesRouteImport } from './routes/releases'
 import { Route as FeedRouteImport } from './routes/feed'
 import { Route as CustomizeRouteImport } from './routes/customize'
 import { Route as CatalogRouteImport } from './routes/catalog'
@@ -20,6 +20,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as WidgetIdIndexRouteImport } from './routes/widget.$id.index'
 import { Route as WidgetIdInfoRouteImport } from './routes/widget.$id.info'
 
+const UpdatesRoute = UpdatesRouteImport.update({
+  id: '/updates',
+  path: '/updates',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
   path: '/support',
@@ -28,11 +33,6 @@ const SupportRoute = SupportRouteImport.update({
 const StatusRoute = StatusRouteImport.update({
   id: '/status',
   path: '/status',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReleasesRoute = ReleasesRouteImport.update({
-  id: '/releases',
-  path: '/releases',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FeedRoute = FeedRouteImport.update({
@@ -77,9 +77,9 @@ export interface FileRoutesByFullPath {
   '/catalog': typeof CatalogRoute
   '/customize': typeof CustomizeRoute
   '/feed': typeof FeedRoute
-  '/releases': typeof ReleasesRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
+  '/updates': typeof UpdatesRoute
   '/widget/$id/info': typeof WidgetIdInfoRoute
   '/widget/$id/': typeof WidgetIdIndexRoute
 }
@@ -89,9 +89,9 @@ export interface FileRoutesByTo {
   '/catalog': typeof CatalogRoute
   '/customize': typeof CustomizeRoute
   '/feed': typeof FeedRoute
-  '/releases': typeof ReleasesRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
+  '/updates': typeof UpdatesRoute
   '/widget/$id/info': typeof WidgetIdInfoRoute
   '/widget/$id': typeof WidgetIdIndexRoute
 }
@@ -102,9 +102,9 @@ export interface FileRoutesById {
   '/catalog': typeof CatalogRoute
   '/customize': typeof CustomizeRoute
   '/feed': typeof FeedRoute
-  '/releases': typeof ReleasesRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
+  '/updates': typeof UpdatesRoute
   '/widget/$id/info': typeof WidgetIdInfoRoute
   '/widget/$id/': typeof WidgetIdIndexRoute
 }
@@ -116,9 +116,9 @@ export interface FileRouteTypes {
     | '/catalog'
     | '/customize'
     | '/feed'
-    | '/releases'
     | '/status'
     | '/support'
+    | '/updates'
     | '/widget/$id/info'
     | '/widget/$id/'
   fileRoutesByTo: FileRoutesByTo
@@ -128,9 +128,9 @@ export interface FileRouteTypes {
     | '/catalog'
     | '/customize'
     | '/feed'
-    | '/releases'
     | '/status'
     | '/support'
+    | '/updates'
     | '/widget/$id/info'
     | '/widget/$id'
   id:
@@ -140,9 +140,9 @@ export interface FileRouteTypes {
     | '/catalog'
     | '/customize'
     | '/feed'
-    | '/releases'
     | '/status'
     | '/support'
+    | '/updates'
     | '/widget/$id/info'
     | '/widget/$id/'
   fileRoutesById: FileRoutesById
@@ -153,15 +153,22 @@ export interface RootRouteChildren {
   CatalogRoute: typeof CatalogRoute
   CustomizeRoute: typeof CustomizeRoute
   FeedRoute: typeof FeedRoute
-  ReleasesRoute: typeof ReleasesRoute
   StatusRoute: typeof StatusRoute
   SupportRoute: typeof SupportRoute
+  UpdatesRoute: typeof UpdatesRoute
   WidgetIdInfoRoute: typeof WidgetIdInfoRoute
   WidgetIdIndexRoute: typeof WidgetIdIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/updates': {
+      id: '/updates'
+      path: '/updates'
+      fullPath: '/updates'
+      preLoaderRoute: typeof UpdatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/support': {
       id: '/support'
       path: '/support'
@@ -174,13 +181,6 @@ declare module '@tanstack/react-router' {
       path: '/status'
       fullPath: '/status'
       preLoaderRoute: typeof StatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/releases': {
-      id: '/releases'
-      path: '/releases'
-      fullPath: '/releases'
-      preLoaderRoute: typeof ReleasesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/feed': {
@@ -241,9 +241,9 @@ const rootRouteChildren: RootRouteChildren = {
   CatalogRoute: CatalogRoute,
   CustomizeRoute: CustomizeRoute,
   FeedRoute: FeedRoute,
-  ReleasesRoute: ReleasesRoute,
   StatusRoute: StatusRoute,
   SupportRoute: SupportRoute,
+  UpdatesRoute: UpdatesRoute,
   WidgetIdInfoRoute: WidgetIdInfoRoute,
   WidgetIdIndexRoute: WidgetIdIndexRoute,
 }

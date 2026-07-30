@@ -169,7 +169,7 @@ function CatalogPage() {
   // two sections: what you have, and what you could add (v1.1.1 r3).
 
   return (
-    <PageLayout title="Catalog" width="wide">
+    <PageLayout title="Catalog" width="wide" noTopPadding>
       {/* WCB — same persistent chrome as every source page. Category
           filter (ex-TopBar tab strip) left, sort (ex-slot-band group)
           right, per the bar grammar. */}

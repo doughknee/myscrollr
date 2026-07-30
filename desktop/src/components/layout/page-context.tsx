@@ -10,7 +10,12 @@
  * a separate full-width tab band wastes vertical space. Walkthrough
  * fix 2026-05-11 round 3.
  */
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useLayoutEffect,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 import type { OverflowMenuItem } from "../OverflowMenu";
 
@@ -101,7 +106,13 @@ export function useRegisterPageIdentity(identity: PageIdentity) {
     menuLabel: identity.menuLabel,
     menuKey,
   });
-  useEffect(() => {
+  // Layout effect, not effect: this runs before the browser paints, so
+  // the TopBar's breadcrumb changes in the same frame as the page body.
+  // Post-paint, the first frame of a new route still showed the previous
+  // page's identity and corrected on the next one — invisible between
+  // two short titles, obvious arriving at Home, whose subtitle makes the
+  // breadcrumb visibly longer than everything else.
+  useLayoutEffect(() => {
     ctx?.setIdentity(identity);
     return () => ctx?.setIdentity(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
