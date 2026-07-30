@@ -44,13 +44,22 @@ const files = (enc, logto) => ({
 DATABASE_URL=${DB}
 REDIS_URL=${REDIS}
 PORT=8080
-API_URL=http://localhost:18080
+# NOT an address — core only ever uses API_URL as the OIDC \`resource\` it
+# requests and the \`aud\` it validates on incoming tokens. Logto issues
+# tokens for the resource it has registered, which is the production
+# identifier even when you are calling localhost, so pointing this at
+# localhost rejects every token with "invalid token audience". Same
+# reasoning as VITE_LOGTO_RESOURCE below.
+API_URL=https://api.myscrollr.com
 FRONTEND_URL=http://localhost:3000
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5174,tauri://localhost
 ENVIRONMENT=development
 STRIPE_DISABLED=true
 ENCRYPTION_KEY=${enc}
-LOGTO_URL=${logto.url}
+# The /oidc form: core builds its token endpoint as LOGTO_URL + "/token"
+# and compares it against the token's \`iss\`. The bare tenant domain 404s
+# on token exchange and rejects every token as "invalid token issuer".
+LOGTO_URL=${logto.issuer}
 LOGTO_JWKS_URL=${logto.jwks}
 LOGTO_EXTENSION_APP_ID=${logto.appId}
 LOGTO_UPLINK_ROLE_ID=
@@ -191,13 +200,23 @@ const enc =
 
 const logto = {
   url: await ask("Logto URL (blank = no auth)", ""),
+  issuer: "",
   jwks: "",
   appId: await ask("Logto extension app id", ""),
   desktopAppId: await ask("Logto DESKTOP app id", ""),
   webAppId: await ask("Logto WEBSITE app id", ""),
 };
-// JWKS is always <logto>/oidc/jwks — derive it rather than asking twice.
-logto.jwks = logto.url ? `${logto.url.replace(/\/$/, "")}/oidc/jwks` : "";
+// Everything below hangs off the tenant URL — derive rather than ask
+// four times. The bare URL is what the Logto SDKs want (they append
+// /oidc themselves, so VITE_LOGTO_ENDPOINT and VITE_AUTH_ENDPOINT must
+// NOT carry it); core talks to the OIDC endpoints directly and needs the
+// /oidc form for both the token endpoint and the `iss` it validates.
+{
+  const base = logto.url.replace(/\/$/, "");
+  logto.url = base;
+  logto.issuer = base ? `${base}/oidc` : "";
+  logto.jwks = base ? `${base}/oidc/jwks` : "";
+}
 
 rl?.close();
 

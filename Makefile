@@ -72,8 +72,14 @@ up: ##run: Start the backend, wait until healthy (svc= for a subset)
 	fi
 	@$(SHELL) scripts/dev/wait-healthy.sh
 
+# COMPOSE_AUTO, not COMPOSE_PRED: naming the predictions profile makes
+# compose resolve that service, and it fails outright on the missing
+# secrets/predictions.docker.env when you have no Kalshi key. That left a
+# fresh checkout able to start the stack but not stop it. --remove-orphans
+# still clears a predictions container left over from a run that did have
+# a key.
 down: ##run: Stop the backend (keeps your database)
-	@$(COMPOSE_PRED) down
+	@$(COMPOSE_AUTO) down --remove-orphans
 
 restart: down up ##run: Stop and start again
 
@@ -105,7 +111,7 @@ shell: ##iterate: Open a shell in a service, svc=core-api
 
 # ── Reset ────────────────────────────────────────────────────────────
 reset: ##reset: Stop and wipe the database, Redis and build caches
-	@$(COMPOSE_PRED) down -v
+	@$(COMPOSE_AUTO) down -v --remove-orphans
 
 check: ##reset: Run the test suites that can run locally
 	@echo "-- desktop --"       && cd desktop        && npm test --silent
