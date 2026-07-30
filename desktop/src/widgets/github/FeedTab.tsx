@@ -7,7 +7,7 @@
  */
 import { useState, useCallback } from "react";
 import { clsx } from "clsx";
-import { Github, Plus, Trash2, ExternalLink } from "lucide-react";
+import { Github, Plus, X, ExternalLink } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 import Tooltip from "../../components/Tooltip";
@@ -67,6 +67,19 @@ const POLL_OPTIONS: SelectOption<string>[] = Array.from({ length: 9 }, (_, i) =>
   const v = 60 + i * 30;
   return { value: String(v), label: formatPollInterval(v) };
 });
+
+const REMOVE_MOTION = {
+  hidden: {
+    opacity: 0,
+    transform: "scale(0.9)",
+    pointerEvents: "none" as const,
+  },
+  visible: {
+    opacity: 1,
+    transform: "scale(1)",
+    pointerEvents: "auto" as const,
+  },
+};
 
 function GitHubFeedTab(props: FeedTabProps) {
   return (
@@ -314,13 +327,16 @@ function RepoRow({
 }) {
   const status = data?.status ?? "unavailable";
   const isLoading = !data;
+  const [removeVisible, setRemoveVisible] = useState(false);
 
   return (
-    <div
+    <motion.div
+      onHoverStart={() => setRemoveVisible(true)}
+      onHoverEnd={() => setRemoveVisible(false)}
       className={clsx(
         FEED_CARD,
         FEED_CARD_STATIC,
-        "flex items-center gap-2",
+        "relative flex items-center gap-2 overflow-hidden",
         compact && "px-2 py-1.5",
       )}
     >
@@ -360,16 +376,22 @@ function RepoRow({
         {isLoading ? "Checking" : CI_STATUS_LABELS[status]}
       </span>
 
-      {/* Remove */}
       <Tooltip content="Remove repo">
-        <button
+        <motion.button
+          type="button"
+          initial={false}
+          animate={removeVisible ? REMOVE_MOTION.visible : REMOVE_MOTION.hidden}
+          transition={controlTransition}
+          whileTap={{ transform: "scale(0.95)" }}
+          onFocus={() => setRemoveVisible(true)}
+          onBlur={() => setRemoveVisible(false)}
           onClick={onRemove}
           aria-label="Remove repo"
-          className="text-fg-4 hover:text-error  shrink-0"
+          className="absolute right-2 top-2 z-10 flex h-7 min-w-16 items-center justify-center gap-1 rounded-md border border-down/30 bg-surface-3 px-2.5 text-ui-chip font-semibold text-down shadow-md hover:bg-surface-hover"
         >
-          <Trash2 size={11} />
-        </button>
+          Remove <X size={11} />
+        </motion.button>
       </Tooltip>
-    </div>
+    </motion.div>
   );
 }

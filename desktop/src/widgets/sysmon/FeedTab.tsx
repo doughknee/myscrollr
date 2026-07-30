@@ -1,5 +1,4 @@
-import { useCallback, useRef, useState } from "react";
-import { Activity, ChevronDown } from "lucide-react";
+import { Activity } from "lucide-react";
 import { clsx } from "clsx";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 import { WidgetBar } from "../../components/widget-bar/Bar";
@@ -11,7 +10,7 @@ import {
   Segmented,
   type SegmentedOption,
 } from "../../components/widget-bar/Segmented";
-import { MenuPanel, MenuRow, useDismiss } from "../../components/widget-bar/Menu";
+import { MenuPopover, MenuRow } from "../../components/widget-bar/Menu";
 import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import { useShell } from "../../shell-context";
 import { useWidgetConfig } from "../../hooks/useWidgetConfig";
@@ -110,56 +109,34 @@ function StatsMenu({
   ticker: SysmonTickerConfig;
   setTicker: (patch: Partial<SysmonTickerConfig>) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
-  useDismiss(rootRef, open, close);
-
   const onCount = STAT_ROWS.filter(({ key }) => ticker[key]).length;
 
   return (
-    <div ref={rootRef} className="relative shrink-0 rounded-full">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label="Choose stats"
-        className={clsx(
-          "flex cursor-pointer items-center gap-1 rounded-full border py-1 pl-2.5 pr-2 text-ui-meta font-medium ",
-          open
-            ? "border-accent/40 bg-accent/15 text-accent"
-            : "border-edge/30 bg-base-150/60 text-fg-3 hover:text-fg-2",
-        )}
-      >
-        <span>Stats</span>
-        <span className="font-mono text-ui-chip tabular-nums text-fg-4">
-          {onCount}/{STAT_ROWS.length}
-        </span>
-        <ChevronDown
-          size={12}
-          aria-hidden
-          className={clsx(
-            "shrink-0  ",
-            open ? "rotate-180 text-accent/70" : "text-fg-4",
-          )}
-        />
-      </button>
-      {open && (
-        <MenuPanel className="left-0 w-56">
-          {STAT_ROWS.map(({ key, label }) => (
-            <MenuRow
-              key={key}
-              role="menuitemcheckbox"
-              selected={ticker[key]}
-              onClick={() => setTicker({ [key]: !ticker[key] })}
-            >
-              {label}
-            </MenuRow>
-          ))}
-        </MenuPanel>
-      )}
-    </div>
+    <MenuPopover
+      ariaLabel="Choose stats"
+      align="left"
+      trigger={
+        <>
+          <span>Stats</span>
+          <span className="font-mono text-ui-chip tabular-nums text-fg-4">
+            {onCount}/{STAT_ROWS.length}
+          </span>
+        </>
+      }
+    >
+      {() =>
+        STAT_ROWS.map(({ key, label }) => (
+          <MenuRow
+            key={key}
+            role="menuitemcheckbox"
+            selected={ticker[key]}
+            onClick={() => setTicker({ [key]: !ticker[key] })}
+          >
+            {label}
+          </MenuRow>
+        ))
+      }
+    </MenuPopover>
   );
 }
 

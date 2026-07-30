@@ -6,8 +6,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { X } from "lucide-react";
 import { clsx } from "clsx";
+import { motion } from "motion/react";
 import Tooltip from "../../components/Tooltip";
 import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
+import { controlTransition } from "../../lib/motion";
 import { loadTimezones, saveTimezones, tzLabel } from "./storage";
 import type { TimeFormat, TimezoneEntry } from "./types";
 
@@ -102,6 +104,19 @@ function getUtcOffset(tz: string): string {
 
 // ── Clock Card ──────────────────────────────────────────────────
 
+const REMOVE_MOTION = {
+  hidden: {
+    opacity: 0,
+    transform: "scale(0.9)",
+    pointerEvents: "none" as const,
+  },
+  visible: {
+    opacity: 1,
+    transform: "scale(1)",
+    pointerEvents: "auto" as const,
+  },
+};
+
 function ClockCard({
   tz,
   label,
@@ -119,6 +134,7 @@ function ClockCard({
 }) {
   const [time, setTime] = useState(fmtTime(tz, fmt));
   const [date, setDate] = useState(fmtDate(tz));
+  const [actionHovered, setActionHovered] = useState(false);
 
   useEffect(() => {
     const tick = () => {
@@ -134,8 +150,14 @@ function ClockCard({
 
   if (compact) {
     return (
-      <div
-        className={clsx(FEED_CARD, FEED_CARD_STATIC, "flex items-center justify-between gap-2 py-2")}
+      <motion.div
+        onHoverStart={() => setActionHovered(true)}
+        onHoverEnd={() => setActionHovered(false)}
+        className={clsx(
+          FEED_CARD,
+          FEED_CARD_STATIC,
+          "relative flex items-center justify-between gap-2 overflow-hidden py-2",
+        )}
       >
         <div className="flex min-w-0 items-center gap-3 overflow-hidden">
           <span className="text-xs font-mono text-widget-clock/80 uppercase tracking-wider shrink-0 w-20 truncate">
@@ -145,29 +167,27 @@ function ClockCard({
             {time}
           </span>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <span className="max-w-16 truncate text-[11px] font-mono text-fg-2">
-            {offset}
-          </span>
-          {!isLocal && onRemove && (
-            <Tooltip content="Remove timezone">
-              <button
-                type="button"
-                onClick={onRemove}
-                aria-label={`Remove ${label} timezone`}
-                className="flex size-7 shrink-0 items-center justify-center rounded text-fg-3 hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-              >
-                <X size={13} />
-              </button>
-            </Tooltip>
-          )}
-        </div>
-      </div>
+        <span className="max-w-16 shrink-0 truncate text-[11px] font-mono text-fg-2">
+          {offset}
+        </span>
+        {!isLocal && onRemove && (
+          <ClockRemoveAction
+            label={label}
+            visible={actionHovered}
+            onFocusChange={setActionHovered}
+            onRemove={onRemove}
+          />
+        )}
+      </motion.div>
     );
   }
 
   return (
-    <div className={clsx(FEED_CARD, FEED_CARD_STATIC, "overflow-hidden")}>
+    <motion.div
+      onHoverStart={() => setActionHovered(true)}
+      onHoverEnd={() => setActionHovered(false)}
+      className={clsx(FEED_CARD, FEED_CARD_STATIC, "relative overflow-hidden")}
+    >
       <div className="flex items-center gap-2 mb-1">
         <span className="min-w-0 truncate text-xs font-mono text-widget-clock/80 uppercase tracking-wider">
           {label}
@@ -180,24 +200,51 @@ function ClockCard({
         <span className="ml-auto shrink-0 text-[11px] font-mono text-fg-2">
           {offset}
         </span>
-        {!isLocal && onRemove && (
-          <Tooltip content="Remove timezone">
-            <button
-              type="button"
-              onClick={onRemove}
-              aria-label={`Remove ${label} timezone`}
-              className="flex size-7 shrink-0 items-center justify-center rounded text-fg-3 hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-            >
-              <X size={13} />
-            </button>
-          </Tooltip>
-        )}
       </div>
       <div className={isLocal ? "text-2xl font-mono font-bold text-fg tabular-nums leading-none" : "text-xl font-mono font-bold text-fg tabular-nums leading-none"}>
         {time}
       </div>
       <div className="text-xs font-mono text-fg-2 mt-1">{date}</div>
-    </div>
+      {!isLocal && onRemove && (
+        <ClockRemoveAction
+          label={label}
+          visible={actionHovered}
+          onFocusChange={setActionHovered}
+          onRemove={onRemove}
+        />
+      )}
+    </motion.div>
+  );
+}
+
+function ClockRemoveAction({
+  label,
+  visible,
+  onFocusChange,
+  onRemove,
+}: {
+  label: string;
+  visible: boolean;
+  onFocusChange: (focused: boolean) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <Tooltip content="Remove timezone">
+      <motion.button
+        type="button"
+        initial={false}
+        animate={visible ? REMOVE_MOTION.visible : REMOVE_MOTION.hidden}
+        onFocus={() => onFocusChange(true)}
+        onBlur={() => onFocusChange(false)}
+        whileTap={{ transform: "scale(0.95)" }}
+        transition={controlTransition}
+        onClick={onRemove}
+        aria-label={`Remove ${label} timezone`}
+        className="absolute right-2 top-2 z-10 flex h-7 min-w-16 items-center justify-center rounded-md border border-down/30 bg-surface-3 px-2.5 text-ui-chip font-semibold text-down shadow-md hover:bg-surface-hover"
+      >
+        Remove <X size={11} />
+      </motion.button>
+    </Tooltip>
   );
 }
 

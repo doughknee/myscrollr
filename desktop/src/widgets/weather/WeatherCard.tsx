@@ -4,8 +4,10 @@
  * Supports compact (single-row) and comfort (expanded with
  * humidity, wind, feels-like) display modes.
  */
+import { useState } from "react";
 import { clsx } from "clsx";
 import { X } from "lucide-react";
+import { motion } from "motion/react";
 import type { SavedCity, TempUnit } from "./types";
 import {
   weatherCodeToIcon,
@@ -16,6 +18,7 @@ import {
 } from "./types";
 import Tooltip from "../../components/Tooltip";
 import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
+import { controlTransition } from "../../lib/motion";
 
 // ── Inline SVG Icons ────────────────────────────────────────────
 
@@ -48,6 +51,19 @@ interface WeatherCardProps {
   onRefresh: () => void;
 }
 
+const ACTIONS_MOTION = {
+  hidden: {
+    opacity: 0,
+    transform: "scale(0.9)",
+    pointerEvents: "none" as const,
+  },
+  visible: {
+    opacity: 1,
+    transform: "scale(1)",
+    pointerEvents: "auto" as const,
+  },
+};
+
 export function WeatherCard({
   city,
   unit,
@@ -55,6 +71,7 @@ export function WeatherCard({
   onRemove,
   onRefresh,
 }: WeatherCardProps) {
+  const [actionsVisible, setActionsVisible] = useState(false);
   const { location, weather, error } = city;
   const label = location.admin1
     ? `${location.name}, ${location.admin1}`
@@ -62,11 +79,13 @@ export function WeatherCard({
 
   if (compact) {
     return (
-      <div
+      <motion.div
+        onHoverStart={() => setActionsVisible(true)}
+        onHoverEnd={() => setActionsVisible(false)}
         className={clsx(
           FEED_CARD,
           FEED_CARD_STATIC,
-          "group flex items-center justify-between",
+          "relative flex items-center justify-between overflow-hidden",
         )}
       >
         <div className="flex items-center gap-3 min-w-0">
@@ -93,50 +112,28 @@ export function WeatherCard({
             <span className="text-[11px] font-mono text-fg-3">Loading...</span>
           )}
         </div>
-        <div className="flex items-center gap-1">
-          <Tooltip content="Refresh">
-            <button
-              onClick={onRefresh}
-              className="text-fg-3 hover:text-widget-weather opacity-0 group-hover:opacity-100 "
-            >
-              <RefreshIcon />
-            </button>
-          </Tooltip>
-          <Tooltip content="Remove city">
-            <button
-              onClick={onRemove}
-              className="text-fg-3 hover:text-error opacity-0 group-hover:opacity-100 "
-            >
-              <X size={12} />
-            </button>
-          </Tooltip>
-        </div>
-      </div>
+        <WeatherActions
+          visible={actionsVisible}
+          onFocusChange={setActionsVisible}
+          onRefresh={onRefresh}
+          onRemove={onRemove}
+        />
+      </motion.div>
     );
   }
 
   return (
-    <div
-      className={clsx(FEED_CARD, FEED_CARD_STATIC, "group relative")}
+    <motion.div
+      onHoverStart={() => setActionsVisible(true)}
+      onHoverEnd={() => setActionsVisible(false)}
+      className={clsx(FEED_CARD, FEED_CARD_STATIC, "relative overflow-hidden")}
     >
-      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 ">
-        <Tooltip content="Refresh">
-          <button
-            onClick={onRefresh}
-            className="text-fg-3 hover:text-widget-weather p-0.5"
-          >
-            <RefreshIcon />
-          </button>
-        </Tooltip>
-        <Tooltip content="Remove city">
-          <button
-            onClick={onRemove}
-            className="text-fg-3 hover:text-error p-0.5"
-          >
-            <X size={12} />
-          </button>
-        </Tooltip>
-      </div>
+      <WeatherActions
+        visible={actionsVisible}
+        onFocusChange={setActionsVisible}
+        onRefresh={onRefresh}
+        onRemove={onRemove}
+      />
 
       <div className="flex items-center gap-2 mb-2">
         <span className="text-xs font-mono text-widget-weather/80 uppercase tracking-wider truncate">
@@ -191,6 +188,54 @@ export function WeatherCard({
           </span>
         </div>
       )}
-    </div>
+    </motion.div>
+  );
+}
+
+function WeatherActions({
+  visible,
+  onFocusChange,
+  onRefresh,
+  onRemove,
+}: {
+  visible: boolean;
+  onFocusChange: (focused: boolean) => void;
+  onRefresh: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <motion.div
+      initial={false}
+      animate={visible ? ACTIONS_MOTION.visible : ACTIONS_MOTION.hidden}
+      transition={controlTransition}
+      className="absolute right-2 top-2 z-10 flex gap-1 rounded-md border border-edge bg-surface-3 p-0.5 shadow-md"
+    >
+      <Tooltip content="Refresh">
+        <motion.button
+          type="button"
+          onFocus={() => onFocusChange(true)}
+          onBlur={() => onFocusChange(false)}
+          whileTap={{ transform: "scale(0.92)" }}
+          onClick={onRefresh}
+          aria-label="Refresh weather"
+          className="flex h-7 w-7 items-center justify-center rounded text-fg-3 hover:bg-surface-hover hover:text-widget-weather"
+        >
+          <RefreshIcon />
+        </motion.button>
+      </Tooltip>
+      <Tooltip content="Remove city">
+        <motion.button
+          type="button"
+          onFocus={() => onFocusChange(true)}
+          onBlur={() => onFocusChange(false)}
+          whileTap={{ transform: "scale(0.92)" }}
+          onClick={onRemove}
+          aria-label="Remove city"
+          className="flex h-7 w-7 items-center justify-center rounded text-fg-3 hover:bg-surface-hover hover:text-error"
+        >
+          <X size={12} />
+        </motion.button>
+      </Tooltip>
+    </motion.div>
   );
 }

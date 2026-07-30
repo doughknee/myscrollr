@@ -24,7 +24,7 @@ import EmptyWidgetState from "../../components/EmptyWidgetState";
 import WidgetStateTransition from "../../components/WidgetStateTransition";
 import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
-import { WidgetBar, BarDivider } from "../../components/widget-bar/Bar";
+import { WidgetBar } from "../../components/widget-bar/Bar";
 import {
   Segmented,
   type SegmentedOption,
@@ -307,70 +307,52 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
             />
           )}
 
-          {view === "articles" && !showEmpty ? (
-            <>
-              {isCustom && <BarDivider />}
-
-              {/* Left cluster: the filters (Kalshi weighting — filters
-                  anchor the left, utilities keep the right). Collapse
-                  BEFORE clipping. */}
-              <div className="flex shrink-0 items-center gap-2">
-                <SelectMenu
-                  value={sortOrder}
-                  options={SORT_OPTIONS}
-                  onChange={pickSort}
-                  ariaLabel="Sort articles"
-                  prefix="Sort"
-                  align="left"
+          {view === "articles" && !showEmpty && (
+            <div className="ml-auto flex min-w-0 shrink items-center gap-2">
+              <SelectMenu
+                value={sortOrder}
+                options={SORT_OPTIONS}
+                onChange={pickSort}
+                ariaLabel="Sort articles"
+                prefix="Sort"
+              />
+              {allSources.length > 1 && (
+                <MultiSelectMenu
+                  options={allSources}
+                  counts={sourceCounts}
+                  selected={Array.from(selectedSources)}
+                  onToggle={toggleSource}
+                  onClear={clearSources}
+                  noun="sources"
+                  ariaLabel="Filter by source"
                 />
-                {allSources.length > 1 && (
-                  <MultiSelectMenu
-                    options={allSources}
-                    counts={sourceCounts}
-                    selected={Array.from(selectedSources)}
-                    onToggle={toggleSource}
-                    onClear={clearSources}
-                    noun="sources"
-                    ariaLabel="Filter by source"
-                    align="left"
-                  />
-                )}
-                {categoryList.length > 1 && (
-                  <MultiSelectMenu
-                    options={categoryList.map((c) => c.name)}
-                    counts={Object.fromEntries(
-                      categoryList.map((c) => [c.name, c.count]),
-                    )}
-                    selected={Array.from(selectedCategories)}
-                    onToggle={toggleCategory}
-                    onClear={clearCategories}
-                    noun="categories"
-                    ariaLabel="Filter by category"
-                    align="left"
-                  />
-                )}
-              </div>
-              {/* Narrow: one Filter menu. */}
-              <div className="ml-auto flex min-w-0 shrink items-center gap-2">
-                {latestUpdated && (
-                  <span className="hidden @xl:block">
-                    <FreshnessPill lastUpdated={latestUpdated} label="article" />
-                  </span>
-                )}
-                <RssLimitInput
-                  maxArticles={dp.maxArticles}
-                  onPick={pickMaxArticles}
+              )}
+              {categoryList.length > 1 && (
+                <MultiSelectMenu
+                  options={categoryList.map((c) => c.name)}
+                  counts={Object.fromEntries(
+                    categoryList.map((c) => [c.name, c.count]),
+                  )}
+                  selected={Array.from(selectedCategories)}
+                  onToggle={toggleCategory}
+                  onClear={clearCategories}
+                  noun="categories"
+                  ariaLabel="Filter by category"
                 />
-                <RssWindowSelect days={dp.maxArticleAgeDays} onPick={pickWindow} />
-              </div>
-            </>
-          ) : (
-            <div className="ml-auto flex items-center gap-2">
+              )}
+              {latestUpdated && (
+                <span className="hidden @xl:block">
+                  <FreshnessPill lastUpdated={latestUpdated} label="article" />
+                </span>
+              )}
               <RssLimitInput
                 maxArticles={dp.maxArticles}
                 onPick={pickMaxArticles}
               />
-              <RssWindowSelect days={dp.maxArticleAgeDays} onPick={pickWindow} />
+              <RssWindowSelect
+                days={dp.maxArticleAgeDays}
+                onPick={pickWindow}
+              />
             </div>
           )}
         </WidgetBar>
