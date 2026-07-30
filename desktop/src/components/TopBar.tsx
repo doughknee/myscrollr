@@ -38,14 +38,19 @@ interface TopBarProps {
 
 // ── Frameless-window drag region ────────────────────────────────
 //
-// On Windows/Linux the window is frameless and the TopBar doubles as
-// the title bar: empty areas move the window, double-click toggles
-// maximize — the same contract as native chrome. Drag is via JS
-// (startDragging), NOT CSS app-region: app-region makes macOS
-// WKWebView swallow mouse events before they reach JavaScript,
-// breaking all buttons.
+// The TopBar doubles as the title bar on every platform: empty areas
+// move the window, double-click toggles maximize — the same contract
+// as native chrome. Drag is via JS (startDragging), NOT CSS
+// app-region: app-region makes macOS WKWebView swallow mouse events
+// before they reach JavaScript, breaking all buttons.
+//
+// macOS runs titleBarStyle: "Overlay" — the traffic lights stay
+// native but the title bar is transparent and our content renders
+// under it, so the bar below the lights is ours to make draggable.
+// Known Tauri limitation: an unfocused window can't be dragged
+// (tauri-apps/tauri#4316); the first click focuses it.
 function handleDragRegion(e: React.MouseEvent) {
-  if (IS_MACOS || e.buttons !== 1) return;
+  if (e.buttons !== 1) return;
   // Interactive children keep their normal behavior.
   if ((e.target as HTMLElement).closest("button, a, input")) return;
   const win = getCurrentWindow();
@@ -70,18 +75,25 @@ export default function TopBar({
       role="toolbar"
       aria-label="App controls"
       onMouseDown={handleDragRegion}
-      className="flex items-center h-11 shrink-0 px-3 gap-2 select-none"
+      className={clsx(
+        // 38px is not a style choice — it is the height macOS gives the
+        // title bar once src-tauri/src/titlebar.rs attaches a
+        // UnifiedCompact toolbar, measured on a running window. macOS
+        // centres the traffic lights in that bar, at 19px, so a 38px row
+        // centres its own content on exactly the same line. Any other
+        // height puts them off by half the difference — which is why the
+        // stock 28pt bar could never be both roomy and aligned.
+        //
+        // Keep this in step with the toolbar style: Unified gives 52px,
+        // UnifiedCompact 38px. Changing one without the other misaligns
+        // the lights.
+        "flex items-center h-[38px] shrink-0 px-3 gap-2 select-none",
+        // The lights occupy x=7..61 (three 14pt buttons, 20pt apart, as
+        // measured). Inset past them so the row's first control clears
+        // the cluster with a little breathing room.
+        IS_MACOS && "pl-[78px]",
+      )}
     >
-      {/* ── Brand mark (left) ──────────────────────────────── */}
-      <div className="flex h-7 shrink-0 items-center gap-2 px-1.5">
-        <ScrollLogo size={20} />
-        <span className="text-ui-body font-semibold tracking-tight">
-          Scrollr
-        </span>
-      </div>
-
-      <div className="w-px h-5 bg-edge/40 mx-1 shrink-0" />
-
       {/* ── Back / Forward — Spotify-style ─────────────────── */}
       <div className="flex items-center gap-0.5 shrink-0">
         <Tooltip content="Back" side="bottom">
@@ -220,6 +232,17 @@ export default function TopBar({
           </button>
         </Tooltip>
 
+        {/* ── Brand mark (far right) ────────────────────────────
+            Sits right of the Ticker toggle. It used to lead the row,
+            but macOS draws the traffic lights over that corner under
+            titleBarStyle "Overlay", so the left edge belongs to them. */}
+        <div className="w-px h-5 bg-edge/40 mx-1 shrink-0" />
+        <div className="flex h-7 shrink-0 items-center gap-2 px-1.5">
+          <ScrollLogo size={20} />
+          <span className="text-ui-body font-semibold tracking-tight">
+            Scrollr
+          </span>
+        </div>
       </div>
 
       {/* ── Window controls (Windows/Linux frameless only) ────
