@@ -9,7 +9,7 @@
  * zero overhead — useful for conditional tooltips (e.g. sidebar collapsed state).
  */
 import { useState, cloneElement } from "react";
-import type { ReactElement, Ref } from "react";
+import type { CSSProperties, ReactElement, Ref } from "react";
 import {
   useFloating,
   autoUpdate,
@@ -24,7 +24,9 @@ import {
   useTransitionStyles,
   FloatingPortal,
 } from "@floating-ui/react";
-import type { Placement, Side } from "@floating-ui/react";
+import type { FloatingContext, Placement, Side } from "@floating-ui/react";
+import { AnimatePresence, motion } from "motion/react";
+import { tooltipMotion } from "../lib/motion";
 
 interface TooltipProps {
   /** Tooltip text. When undefined, renders children without tooltip. */
@@ -42,6 +44,24 @@ const SLIDE: Record<Side, string> = {
   left: "translateX(4px)",
   right: "translateX(-4px)",
 };
+
+function AnimatedTooltip({
+  context,
+  children,
+}: {
+  context: FloatingContext;
+  children: (styles: CSSProperties) => ReactElement;
+}) {
+  const { isMounted, styles } = useTransitionStyles(context, {
+    duration: 100,
+    initial: ({ side: s }) => ({
+      opacity: 0,
+      transform: SLIDE[s],
+    }),
+  });
+
+  return isMounted ? children(styles) : null;
+}
 
 export default function Tooltip({
   content,
@@ -78,19 +98,21 @@ export default function Tooltip({
     role,
   ]);
 
-  const { isMounted, styles: transitionStyles } = useTransitionStyles(
-    context,
-    {
-      duration: 100,
-      initial: ({ side: s }) => ({
-        opacity: 0,
-        transform: SLIDE[s],
-      }),
-    },
-  );
-
   // Passthrough when no content — hooks above are called unconditionally
   if (!content) return children;
+
+  const renderContent = (transitionStyles?: CSSProperties) => (
+    <div
+      ref={refs.setFloating}
+      style={{ ...floatingStyles, ...transitionStyles }}
+      className="z-50 px-2.5 py-1 text-xs font-medium rounded-md pointer-events-none select-none whitespace-nowrap bg-[#282838] text-[#e2e2ec] border border-[#383848] shadow-[0_2px_8px_rgba(0,0,0,0.25)]"
+      {...getFloatingProps()}
+    >
+      {content}
+    </div>
+  );
+
+  const ticker = document.getElementById("desktop-shell") !== null;
 
   return (
     <>
@@ -98,19 +120,28 @@ export default function Tooltip({
         ref: refs.setReference,
         ...getReferenceProps(),
       })}
-      {/* Portal renders at body level — outside the themed shell container.
-          Use hardcoded dark tooltip colors (convention: tooltips are always
-          dark, matching macOS/Figma/VS Code behavior). */}
-      <FloatingPortal>
-        {isMounted && (
-          <div
-            ref={refs.setFloating}
-            style={{ ...floatingStyles, ...transitionStyles }}
-            className="z-50 px-2.5 py-1 text-xs font-medium rounded-md pointer-events-none select-none whitespace-nowrap bg-[#282838] text-[#e2e2ec] border border-[#383848] shadow-[0_2px_8px_rgba(0,0,0,0.25)]"
-            {...getFloatingProps()}
-          >
-            {content}
-          </div>
+      {/* Ticker tooltips keep their existing Floating UI transition. */}
+      <FloatingPortal root={document.getElementById("app-shell")}>
+        {ticker ? (
+          <AnimatedTooltip context={context}>{renderContent}</AnimatedTooltip>
+        ) : (
+          <AnimatePresence>
+            {isOpen && (
+              <motion.div
+                key="tooltip"
+                ref={refs.setFloating}
+                style={floatingStyles}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                variants={tooltipMotion}
+                className="z-50 px-2.5 py-1 text-xs font-medium rounded-md pointer-events-none select-none whitespace-nowrap bg-[#282838] text-[#e2e2ec] border border-[#383848] shadow-[0_2px_8px_rgba(0,0,0,0.25)]"
+                {...getFloatingProps()}
+              >
+                {content}
+              </motion.div>
+            )}
+          </AnimatePresence>
         )}
       </FloatingPortal>
     </>

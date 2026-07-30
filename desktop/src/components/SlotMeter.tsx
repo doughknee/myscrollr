@@ -80,7 +80,7 @@ export function SlotPills({
         <span
           key={i}
           className={clsx(
-            "h-1.5 w-4 rounded-full transition-colors",
+            "h-1.5 w-4 rounded-full ",
             i < usage.used
               ? usage.atCapacity
                 ? "bg-warn"

@@ -5,14 +5,13 @@
  *   1. Your connection — how this app is receiving updates. Derived
  *      from the same `sse-status` Tauri event + `deliveryMode` pref
  *      the shell reads, through the same `useDeliveryHealth` hook and
- *      the same DELIVERY_STATE_META icon language as the TopBar
- *      indicator, so the two can't disagree in state OR looks.
+ *      the same DELIVERY_STATE_META icon language as the sidebar
+ *      account chip, so the two can't disagree in state OR looks.
  *   2. Scrollr services — the backend's own view, straight from the
  *      public GET /health (database, cache, and each data service).
  *
- * Reached by clicking the connection indicator in the TopBar. That
- * indicator is deliberately terse; the detail it used to cram into a
- * tooltip lives here instead.
+ * Reached through Status in the sidebar account menu. The chip badge
+ * stays deliberately terse; the detail lives here instead.
  */
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -190,11 +189,10 @@ function StatusPage() {
             <button
               onClick={() => health.refetch()}
               disabled={health.isFetching}
-              className="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-ui-chip font-medium text-fg-3 hover:text-fg hover:bg-surface-hover transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-ui-chip font-medium text-fg-3 hover:text-fg hover:bg-surface-hover disabled:opacity-50"
             >
               <RefreshCw
                 size={12}
-                className={health.isFetching ? "animate-spin" : undefined}
               />
               Refresh
             </button>
@@ -212,7 +210,6 @@ function StatusPage() {
             strokeWidth={2.2}
             className={clsx(
               "shrink-0",
-              !health.data && !health.isError && "animate-spin",
             )}
           />
           <div className="min-w-0">

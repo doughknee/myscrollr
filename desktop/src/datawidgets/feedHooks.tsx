@@ -1,6 +1,6 @@
 /**
- * Shared FeedTab helpers — load-more paging, price-flash animation,
- * set-filter toggles, and freshness timestamps used across data widgets.
+ * Shared FeedTab helpers — automatic paging, set-filter toggles, and
+ * freshness timestamps used across data widgets.
  */
 import {
   useCallback,
@@ -11,20 +11,18 @@ import {
 } from "react";
 
 const PAGE_SIZE = 20;
-const LOAD_MORE_INCREMENT = 20;
 
 /**
- * Incremental "load more" paging: render a progressively larger slice and
- * append more on click, keeping scroll position stable as users continue
- * down the list. Resets to the first page whenever `resetDeps` change
- * (filters, sort, query).
+ * Reveal locally available rows as the page scroller approaches the end.
+ * Resets to the first page whenever filters, sort, search, or scope change.
  */
-export function useLoadMore(
+export function useAutoPagination(
   total: number,
   resetDeps: DependencyList,
   footerClassName: string,
 ): { visible: number; footer: React.ReactNode } {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -34,52 +32,37 @@ export function useLoadMore(
   const visible = Math.min(visibleCount, total);
   const remaining = Math.max(0, total - visible);
 
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || remaining === 0) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setVisibleCount((count) => Math.min(total, count + PAGE_SIZE));
+        }
+      },
+      {
+        root: sentinel.closest<HTMLElement>("[data-page-scroll]"),
+        rootMargin: "0px 0px 160px",
+      },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [remaining, total]);
+
   const footer =
-    remaining > 0 ? (
-      <div className={`flex items-center justify-center gap-3 ${footerClassName}`}>
-        <button
-          onClick={() =>
-            setVisibleCount((c) => Math.min(total, c + LOAD_MORE_INCREMENT))
-          }
-          className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
-        >
-          Load more
-        </button>
-        <span className="text-xs text-fg-3 tabular-nums font-mono">
-          {visible} of {total}
-        </span>
+    total > PAGE_SIZE ? (
+      <div
+        ref={sentinelRef}
+        role="status"
+        className={`flex items-center justify-center text-xs text-fg-3 tabular-nums font-mono ${footerClassName}`}
+      >
+        {remaining > 0 ? `Loading more… ${visible} of ${total}` : `All ${total} shown`}
       </div>
     ) : null;
 
   return { visible, footer };
-}
-
-/**
- * Flash "up"/"down" for 800ms when `value` changes between renders. A
- * single effect owns the previous-value ref so rapid back-to-back CDC
- * events can't swallow a flash.
- */
-export function usePriceFlash(
-  value: number | null | undefined,
-): "up" | "down" | null {
-  const prevRef = useRef<number | null>(null);
-  const [flash, setFlash] = useState<"up" | "down" | null>(null);
-
-  useEffect(() => {
-    const current = typeof value === "number" ? value : NaN;
-    const prev = prevRef.current;
-    prevRef.current = current;
-
-    if (prev === null || isNaN(current) || current === prev) {
-      return;
-    }
-
-    setFlash(current > prev ? "up" : "down");
-    const timer = setTimeout(() => setFlash(null), 800);
-    return () => clearTimeout(timer);
-  }, [value]);
-
-  return flash;
 }
 
 /** Set-membership filter state: [set, toggle(value), clear]. */

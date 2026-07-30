@@ -17,6 +17,7 @@ vi.mock("../lib/store", () => ({
 function makeWidgetPrefs(widgetsOnTicker: string[]): WidgetPrefs {
   return {
     enabledWidgets: widgetsOnTicker,
+    sidebarOrder: [],
     widgetsOnTicker,
     pinnedWidgets: {},
     clock: {

@@ -31,6 +31,7 @@ import {
   isThemeMode,
   THEME_FAMILIES,
   mergeWidgetPrefs,
+  reconcileSidebarOrder,
   loadPrefs,
 } from "./preferences";
 import type { AppPreferences, WidgetPrefs } from "./preferences";
@@ -48,6 +49,15 @@ vi.mock("./lib/store", () => ({
 
 afterEach(() => {
   storeValues.clear();
+});
+
+it("reconciles sidebar ordering across widget types", () => {
+  expect(
+    reconcileSidebarOrder(
+      ["clock", "finance", "removed", "clock"],
+      ["finance", "sports", "clock", "github"],
+    ),
+  ).toEqual(["clock", "finance", "sports", "github"]);
 });
 
 interface LegacyClockTimerWidgetPrefs extends Omit<Partial<WidgetPrefs>, "clock"> {
@@ -174,6 +184,13 @@ describe("migrateRssDisplay", () => {
     for (const chosen of [1, 3, 5, 10]) {
       expect(migrateRssDisplay({ articlesPerSource: chosen }).articlesPerSource).toBe(chosen);
     }
+  });
+
+  it("keeps positive total article caps and maps invalid values to All", () => {
+    expect(migrateRssDisplay({ maxArticles: 5 }).maxArticles).toBe(5);
+    expect(migrateRssDisplay({ maxArticles: 2.6 }).maxArticles).toBe(3);
+    expect(migrateRssDisplay({ maxArticles: 0 }).maxArticles).toBe(0);
+    expect(migrateRssDisplay({ maxArticles: -1 }).maxArticles).toBe(0);
   });
 });
 

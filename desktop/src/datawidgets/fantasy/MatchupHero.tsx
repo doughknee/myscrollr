@@ -1,14 +1,11 @@
 /**
  * MatchupHero — the tentpole element of the Fantasy widget.
  *
- * Renders the user's current head-to-head matchup as a large, animated
- * card. Live scores pulse on update, the win-probability bar slides with
- * each refresh, and projected finals are shown as faint numbers next to
- * the live score. This is the single visual that sells the widget.
+ * Renders the user's current head-to-head matchup as a large card.
+ * Projected finals are shown as faint numbers next to the live score.
  */
 import { useEffect, useRef } from "react";
 import { clsx } from "clsx";
-import { motion, AnimatePresence } from "motion/react";
 import { Trophy, Zap } from "lucide-react";
 import {
   SPORT_EMOJI,
@@ -79,7 +76,7 @@ export function MatchupHero({ league, onClick }: MatchupHeroProps) {
     <button
       onClick={onClick}
       className={clsx(
-        "group relative w-full overflow-hidden rounded-xl border text-left transition-all",
+        "group relative w-full overflow-hidden rounded-xl border text-left ",
         "bg-gradient-to-br from-surface-2 via-surface to-surface-2",
         "border-edge/50 hover:border-accent/40",
         onClick && "cursor-pointer",
@@ -90,15 +87,12 @@ export function MatchupHero({ league, onClick }: MatchupHeroProps) {
     >
       {/* Ambient glow when live */}
       {live && (
-        <motion.div
+        <div
           className="pointer-events-none absolute inset-0 rounded-xl"
           style={{
             background:
               "radial-gradient(circle at 50% 0%, rgba(244, 63, 94, 0.12), transparent 60%)",
           }}
-          initial={{ opacity: 0.6 }}
-          animate={{ opacity: [0.55, 0.9, 0.55] }}
-          transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
         />
       )}
 
@@ -133,9 +127,9 @@ export function MatchupHero({ league, onClick }: MatchupHeroProps) {
         {/* Center score */}
         <div className="flex flex-col items-center gap-1 tabular-nums font-mono">
           <div className="font-bold text-3xl">
-            <AnimatedScore value={myPts} colorClass={myColor} />
+            <ScoreValue value={myPts} colorClass={myColor} />
             <span className="mx-1 text-fg-3">–</span>
-            <AnimatedScore value={oppPts} colorClass={oppColor} />
+            <ScoreValue value={oppPts} colorClass={oppColor} />
           </div>
           {(user.projected_points !== null || opponent.projected_points !== null) && (
             <div className="flex items-center gap-1 text-[10px] text-fg-3">
@@ -243,10 +237,8 @@ function StatusPill({ status, live }: { status: string; live: boolean }) {
       )}
     >
       {live && (
-        <motion.span
+        <span
           className="h-1.5 w-1.5 rounded-full bg-live"
-          animate={{ opacity: [0.35, 1, 0.35] }}
-          transition={{ duration: 1.3, repeat: Infinity, ease: "easeInOut" }}
         />
       )}
       {status}
@@ -254,7 +246,7 @@ function StatusPill({ status, live }: { status: string; live: boolean }) {
   );
 }
 
-function AnimatedScore({ value, colorClass }: { value: number; colorClass: string }) {
+function ScoreValue({ value, colorClass }: { value: number; colorClass: string }) {
   const prev = useRef(value);
   const delta = value - prev.current;
   useEffect(() => {
@@ -262,18 +254,9 @@ function AnimatedScore({ value, colorClass }: { value: number; colorClass: strin
   }, [value]);
   return (
     <span className={clsx("relative inline-block tabular-nums", colorClass)}>
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.span
-          key={value.toFixed(1)}
-          initial={{ y: delta > 0 ? -12 : delta < 0 ? 12 : 0, opacity: delta !== 0 ? 0 : 1 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: delta > 0 ? 12 : -12, opacity: 0, position: "absolute" }}
-          transition={{ type: "spring", stiffness: 380, damping: 34 }}
-          className="inline-block"
-        >
-          {value.toFixed(1)}
-        </motion.span>
-      </AnimatePresence>
+      <span key={value.toFixed(1)} className="inline-block">
+        {value.toFixed(1)}
+      </span>
     </span>
   );
 }
@@ -287,12 +270,9 @@ function WinProbabilityBar({ probability }: { probability: number }) {
   const pct = Math.max(4, Math.min(96, probability * 100));
   return (
     <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
-      <motion.div
+      <div
         className="h-full rounded-full bg-up"
         style={{ width: `${pct}%` }}
-        initial={false}
-        animate={{ width: `${pct}%` }}
-        transition={{ type: "spring", stiffness: 130, damping: 24 }}
       />
     </div>
   );

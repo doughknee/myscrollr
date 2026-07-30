@@ -7,9 +7,8 @@
  * Standings fetches league standings from the API.
  *
  * ONE Kalshi-style control bar (widget-bar primitives): Segmented
- * [Scores | Schedule | Standings] · status BarPills (collapsing into a
- * Filter menu at narrow widths, counts in the rows) · freshness ·
- * favorite-team and time-window SelectMenus — all via useSportsConfig.
+ * [Scores | Schedule | Standings] · freshness · favorite-team and
+ * time-window SelectMenus — all via useSportsConfig.
  * No league management: per-league widgets have an intrinsic league,
  * and coarse `sports` rows can't exist post-migration-000014.
  */
@@ -25,19 +24,14 @@ import { ScoresTab } from "./ScoresTab";
 import { ScheduleTab } from "./ScheduleTab";
 import { StandingsTab } from "./StandingsTab";
 import EmptyWidgetState from "../../components/EmptyWidgetState";
+import WidgetStateTransition from "../../components/WidgetStateTransition";
 import FreshnessPill from "../../components/FreshnessPill";
-import { WidgetBar, BarDivider, BarPill } from "../../components/widget-bar/Bar";
-import {
-  FilterMenuShell,
-  MenuHeading,
-  MenuRow,
-} from "../../components/widget-bar/Menu";
+import { WidgetBar } from "../../components/widget-bar/Bar";
 import {
   Segmented,
   type SegmentedOption,
 } from "../../components/widget-bar/Segmented";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
-import { isLive, isPre, isFinal } from "../../utils/gameHelpers";
 import { latestTimestamp } from "../feedHooks";
 import type { FeedTabProps, DataWidgetManifest } from "../../types";
 import type { FavoriteTeam } from "../../hooks/useSportsConfig";
@@ -55,10 +49,10 @@ export const sportsDataWidget: DataWidgetManifest = {
   info: {
     about:
       "Follow live scores across NFL, NBA, MLB, NHL, MLS, and more. " +
-      "Scores update automatically with a visual flash when they change.",
+      "Scores update automatically when they change.",
     usage: [
       "Set your favorite team and time window from the top bar.",
-      "Live games show a pulsing indicator and scores update automatically.",
+      "Live games show a status indicator and scores update automatically.",
       "Final scores highlight the winning team in bold.",
     ],
   },
@@ -70,21 +64,11 @@ export const sportsDataWidget: DataWidgetManifest = {
 // ── Types ────────────────────────────────────────────────────────
 
 type SportsTab = "scores" | "schedule" | "standings";
-export type StatusFilter = "all" | "live" | "upcoming" | "final";
 
 const TAB_OPTIONS: SegmentedOption<SportsTab>[] = [
   { value: "scores", label: "Scores" },
   { value: "schedule", label: "Schedule" },
   { value: "standings", label: "Standings" },
-];
-
-// ── StatusFilter pills ───────────────────────────────────────────
-
-const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "live", label: "Live" },
-  { value: "upcoming", label: "Upcoming" },
-  { value: "final", label: "Final" },
 ];
 
 // ── Helper: build set of favorite team names ─────────────────────
@@ -101,7 +85,6 @@ function buildFavoriteSet(favorites: Record<string, FavoriteTeam>): Set<string> 
 
 function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   const [tab, setTab] = useState<SportsTab>("scores");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const { leagues, display, favoriteTeams } = useSportsConfig(widgetId ?? "sports");
   const isComfort = mode === "comfort";
 
@@ -115,7 +98,7 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
 
   // Full widget page reads from /sports directly (not /dashboard), which
   // returns every game for the user's selected leagues without per-league
-  // fair-share capping. The bar's status pills narrow down by hand.
+  // fair-share capping.
   const { data: sportsData } = useQuery(sportsFullQueryOptions());
   const games = useMemo(() => {
     const all = sportsData?.sports ?? [];
@@ -133,19 +116,6 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
     [games],
   );
 
-  // Status counts for the collapsed Filter menu rows.
-  const statusCounts = useMemo(() => {
-    let live = 0;
-    let upcoming = 0;
-    let final = 0;
-    for (const g of games) {
-      if (isLive(g)) live++;
-      else if (isPre(g)) upcoming++;
-      else if (isFinal(g)) final++;
-    }
-    return { all: games.length, live, upcoming, final };
-  }, [games]);
-
   const showEmpty = games.length === 0 && leagues.length === 0;
 
   return (
@@ -160,32 +130,6 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
             onChange={setTab}
             options={TAB_OPTIONS}
           />
-
-          {tab !== "standings" && !showEmpty && (
-            <>
-              <BarDivider />
-              {/* Wide: open status pills. Collapse BEFORE clipping. */}
-              <div className="scrollbar-none hidden min-w-0 items-center gap-1 overflow-x-auto @2xl:flex">
-                {STATUS_OPTIONS.map((opt) => (
-                  <BarPill
-                    key={opt.value}
-                    active={statusFilter === opt.value}
-                    onClick={() => setStatusFilter(opt.value)}
-                  >
-                    {opt.label}
-                  </BarPill>
-                ))}
-              </div>
-              {/* Narrow: status radios in one Filter menu (with counts). */}
-              <div className="@2xl:hidden">
-                <SportsFilterMenu
-                  statusFilter={statusFilter}
-                  onPickStatus={setStatusFilter}
-                  counts={statusCounts}
-                />
-              </div>
-            </>
-          )}
 
           <div className="ml-auto flex min-w-0 shrink items-center gap-2">
             {tab !== "standings" && latestUpdated && (
@@ -203,75 +147,47 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
         </WidgetBar>
       )}
 
-      {showEmpty ? (
-        <div className="flex flex-1 flex-col justify-center">
-          <EmptyWidgetState
-            refreshing={Boolean(feedContext.__refreshing)}
-            icon={Trophy}
-            noun="leagues"
-            hasConfig={!!feedContext.__hasConfig}
-            dashboardLoaded={!!feedContext.__dashboardLoaded}
-            loadingNoun="scores"
-            actionHint="pick your leagues"
-          />
-        </div>
-      ) : (
-        <>
-          {/* Tab content */}
-          {tab === "scores" && (
-            <ScoresTab
-              games={games}
-              mode={mode}
-              display={display}
-              favoriteTeams={favoriteTeamNames}
-              statusFilter={statusFilter}
+      <WidgetStateTransition stateKey={`tab-${tab}`}>
+        {showEmpty ? (
+          <div className="flex flex-1 flex-col justify-center">
+            <EmptyWidgetState
+              refreshing={Boolean(feedContext.__refreshing)}
+              icon={Trophy}
+              noun="leagues"
+              hasConfig={!!feedContext.__hasConfig}
+              dashboardLoaded={!!feedContext.__dashboardLoaded}
+              loadingNoun="scores"
+              actionHint="pick your leagues"
             />
-          )}
-          {tab === "schedule" && (
-            <ScheduleTab
-              games={games}
-              favoriteTeams={favoriteTeamNames}
-              statusFilter={statusFilter}
-            />
-          )}
-          {tab === "standings" && (
-            <StandingsTab
-              leagues={leagues}
-              favoriteTeams={favoriteTeamNames}
-            />
-          )}
-        </>
-      )}
+          </div>
+        ) : (
+          <>
+            {/* Tab content */}
+            {tab === "scores" && (
+              <ScoresTab
+                games={games}
+                mode={mode}
+                display={display}
+                favoriteTeams={favoriteTeamNames}
+                showLeagueHeaders={!scopedLeague}
+              />
+            )}
+            {tab === "schedule" && (
+              <ScheduleTab
+                games={games}
+                favoriteTeams={favoriteTeamNames}
+              />
+            )}
+            {tab === "standings" && (
+              <StandingsTab
+                leagues={leagues}
+                favoriteTeams={favoriteTeamNames}
+              />
+            )}
+          </>
+        )}
+      </WidgetStateTransition>
     </div>
-  );
-}
-
-// ── Filter menu (narrow-width collapse) ─────────────────────────
-
-function SportsFilterMenu({
-  statusFilter,
-  onPickStatus,
-  counts,
-}: {
-  statusFilter: StatusFilter;
-  onPickStatus: (s: StatusFilter) => void;
-  counts: { all: number; live: number; upcoming: number; final: number };
-}) {
-  return (
-    <FilterMenuShell badgeCount={statusFilter !== "all" ? 1 : 0}>
-      <MenuHeading>Status</MenuHeading>
-      {STATUS_OPTIONS.map((opt) => (
-        <MenuRow
-          key={opt.value}
-          selected={statusFilter === opt.value}
-          onClick={() => onPickStatus(opt.value)}
-          role="menuitemradio"
-          count={counts[opt.value]}
-        >
-          {opt.label}
-        </MenuRow>
-      ))}
-    </FilterMenuShell>
   );
 }
 

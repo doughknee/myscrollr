@@ -12,10 +12,11 @@
 import { useState, useCallback } from "react";
 import { clsx } from "clsx";
 import { useQueryClient } from "@tanstack/react-query";
-import { HeartPulse, RefreshCw, Unlink, Loader2 } from "lucide-react";
+import { HeartPulse, RefreshCw, Unlink } from "lucide-react";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 import Tooltip from "../../components/Tooltip";
 import QueryErrorBanner from "../../components/QueryErrorBanner";
+import LoadingGlyph from "../../components/LoadingGlyph";
 import type { KumaMonitor } from "./types";
 import { fetchKumaStatus, loadMonitors, saveMonitors, MONITOR_STATUS_LABELS, MONITOR_STATUS_COLORS, MONITOR_STATUS_TEXT } from "./types";
 import { toast } from "sonner";
@@ -184,14 +185,14 @@ function UptimeFeedBody({ mode: feedMode }: FeedTabProps) {
             onChange={(e) => setInputUrl(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleConnect(); }}
             placeholder="https://status.example.com/status/my-page"
-            className="w-full text-xs font-mono px-3 py-2 rounded-lg bg-surface-2 border border-edge text-fg placeholder:text-fg-4 focus:border-widget-uptime/50 focus:outline-none transition-colors"
+            className="w-full text-xs font-mono px-3 py-2 rounded-lg bg-surface-2 border border-edge text-fg placeholder:text-fg-4 focus:border-widget-uptime/50 focus:outline-none "
           />
           <button
             onClick={handleConnect}
             disabled={isConnecting || !inputUrl.trim()}
-            className="w-full text-xs font-mono font-semibold text-widget-uptime px-3 py-2 rounded-lg bg-widget-uptime/10 border border-widget-uptime/25 hover:bg-widget-uptime/15 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full text-xs font-mono font-semibold text-widget-uptime px-3 py-2 rounded-lg bg-widget-uptime/10 border border-widget-uptime/25 hover:bg-widget-uptime/15  disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {isConnecting && <Loader2 size={12} className="animate-spin" />}
+            {isConnecting && <LoadingGlyph size={12} />}
             {isConnecting ? "Connecting..." : "Connect"}
           </button>
         </div>
@@ -210,7 +211,7 @@ function UptimeFeedBody({ mode: feedMode }: FeedTabProps) {
   if (isLoading && monitors.length === 0) {
     return (
       <div className="p-4 flex flex-col items-center justify-center gap-2">
-        <Loader2 size={16} className="animate-spin text-widget-uptime/60" />
+        <LoadingGlyph size={16} className="text-widget-uptime/60" />
         <span className="text-xs font-mono text-fg-3">Loading monitors...</span>
       </div>
     );
@@ -238,7 +239,7 @@ function UptimeFeedBody({ mode: feedMode }: FeedTabProps) {
             <button
               onClick={handleRefresh}
               aria-label="Refresh monitors"
-              className="text-xs font-mono text-widget-uptime/70 hover:text-widget-uptime transition-colors"
+              className="text-xs font-mono text-widget-uptime/70 hover:text-widget-uptime "
             >
               <RefreshCw size={12} />
             </button>
@@ -247,7 +248,7 @@ function UptimeFeedBody({ mode: feedMode }: FeedTabProps) {
             <button
               onClick={handleDisconnect}
               aria-label="Disconnect from Uptime Kuma"
-              className="text-xs font-mono text-fg-3 hover:text-error transition-colors"
+              className="text-xs font-mono text-fg-3 hover:text-error "
             >
               <Unlink size={12} />
             </button>
@@ -289,7 +290,7 @@ function MonitorRow({
       className={clsx(FEED_CARD, FEED_CARD_STATIC, "flex items-center gap-2 px-2", compact ? "py-1.5" : "py-2")}
     >
       {/* Status dot */}
-      <span className={`w-2 h-2 rounded-full shrink-0 ${MONITOR_STATUS_COLORS[monitor.status]}${monitor.status === "down" ? " animate-pulse" : ""}`} />
+      <span className={`w-2 h-2 rounded-full shrink-0 ${MONITOR_STATUS_COLORS[monitor.status]}${monitor.status === "down" ? " " : ""}`} />
 
       {/* Name */}
       <span className="text-xs font-mono text-fg truncate flex-1">

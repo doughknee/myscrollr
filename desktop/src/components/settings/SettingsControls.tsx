@@ -1,7 +1,9 @@
+import { useId } from "react";
 import { clsx } from "clsx";
-import { motion } from "motion/react";
+import { LayoutGroup, motion } from "motion/react";
 import Tooltip from "../Tooltip";
 import { SelectMenu } from "../widget-bar/SelectMenu";
+import { controlTransition } from "../../lib/motion";
 
 // ── Section heading ─────────────────────────────────────────────
 // Open layout: just a label + thin divider. No bordered card.
@@ -16,35 +18,12 @@ interface SectionProps {
   action?: React.ReactNode;
   /** Card sections are used by the compact flat Settings page. */
   variant?: "open" | "card";
-  /**
-   * Entrance-stagger position. When set, the section fades up on mount
-   * with the same timing as the Support hub / widget pages
-   * (0.25s, 0.04 + index * 0.04 delay), so Settings / Ticker / Account
-   * match the rest of the app when switching destinations (v1.1.1).
-   */
-  index?: number;
 }
 
-export function Section({ title, children, action, variant = "open", index }: SectionProps) {
-  const entrance =
-    index === undefined
-      ? {}
-      : {
-          initial: { opacity: 0, y: 8 },
-          animate: { opacity: 1, y: 0 },
-          transition: {
-            duration: 0.25,
-            delay: 0.04 + index * 0.04,
-            ease: [0.22, 0.61, 0.36, 1] as const,
-          },
-        };
-
+export function Section({ title, children, action, variant = "open" }: SectionProps) {
   if (variant === "card") {
     return (
-      <motion.section
-        {...entrance}
-        className="rounded-xl border border-edge/35 bg-base-150/35 overflow-hidden"
-      >
+      <section className="rounded-xl border border-edge/35 bg-base-150/35 overflow-hidden">
         <div className="flex items-center justify-between px-4 pt-3.5 pb-2">
           <h3 className="text-ui-section font-mono">
             {title}
@@ -52,15 +31,12 @@ export function Section({ title, children, action, variant = "open", index }: Se
           {action && <div className="shrink-0">{action}</div>}
         </div>
         <div className="px-1 pb-2">{children}</div>
-      </motion.section>
+      </section>
     );
   }
 
   return (
-    <motion.div
-      {...entrance}
-      className="mb-6 pb-5 border-b border-edge/30 last:border-b-0 last:mb-0 last:pb-0"
-    >
+    <div className="mb-6 pb-5 border-b border-edge/30 last:border-b-0 last:mb-0 last:pb-0">
       <div className="flex items-center justify-between mb-3 px-3">
         <h3 className="text-ui-section font-mono">
           {title}
@@ -68,7 +44,7 @@ export function Section({ title, children, action, variant = "open", index }: Se
         {action && <div className="shrink-0">{action}</div>}
       </div>
       <div className="space-y-0.5">{children}</div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -110,22 +86,22 @@ export function ToggleRow({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="flex items-center justify-between w-full px-3 py-2 rounded-lg hover:bg-base-250/45 transition-colors cursor-pointer group"
+      className="flex items-center justify-between w-full px-3 py-2 rounded-lg hover:bg-base-250/45 cursor-pointer group"
     >
       <div className="flex flex-col gap-0.5 text-left group-hover:text-fg">
         <SettingLabel label={label} description={description} />
       </div>
       <div
         className={clsx(
-          "relative w-8 h-[18px] rounded-full transition-colors shrink-0 ml-4",
+          "relative w-8 h-[18px] rounded-full shrink-0 ml-4",
           checked ? "bg-accent" : "bg-base-350",
         )}
       >
-        {/* Thumb springs across with a slight overshoot so the toggle
-            feels physical rather than mechanical. */}
         <motion.div
-          animate={{ x: checked ? 14 : 0 }}
-          transition={{ type: "spring", stiffness: 500, damping: 28 }}
+          animate={{
+            transform: checked ? "translateX(14px)" : "translateX(0px)",
+          }}
+          transition={controlTransition}
           className={clsx(
             "absolute top-[3px] left-[3px] h-3 w-3 rounded-full",
             checked ? "bg-surface" : "bg-fg-3",
@@ -153,33 +129,44 @@ export function SegmentedRow<T extends string>({
   options,
   onChange,
 }: SegmentedRowProps<T>) {
+  const layoutGroupId = useId();
+
   return (
     <div className="flex items-center justify-between px-3 py-2 rounded-lg">
       <div className="flex flex-col gap-0.5">
         <SettingLabel label={label} description={description} />
       </div>
-      <div
-        role="radiogroup"
-        aria-label={label}
-        className="inline-flex items-center rounded-lg bg-base-200 p-0.5 shrink-0 ml-4"
-      >
-        {options.map((opt) => (
-          <button
-            key={opt.value}
-            role="radio"
-            aria-checked={value === opt.value}
-            onClick={() => onChange(opt.value)}
-            className={clsx(
-              "px-2.5 py-1 text-ui-chip font-medium rounded-md transition-all duration-150 active:scale-95 cursor-pointer leading-none",
-              value === opt.value
-                ? "bg-base-300 text-fg shadow-sm"
-                : "text-fg-3 hover:text-fg-2",
-            )}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
+      <LayoutGroup id={layoutGroupId}>
+        <div
+          role="radiogroup"
+          aria-label={label}
+          className="inline-flex items-center rounded-lg bg-base-200 p-0.5 shrink-0 ml-4"
+        >
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              role="radio"
+              aria-checked={value === opt.value}
+              onClick={() => onChange(opt.value)}
+              className={clsx(
+                "relative px-2.5 py-1 text-ui-chip font-medium rounded-md cursor-pointer leading-none",
+                value === opt.value
+                  ? "text-fg"
+                  : "text-fg-3 hover:text-fg-2",
+              )}
+            >
+              {value === opt.value && (
+                <motion.span
+                  layoutId="active-option"
+                  transition={controlTransition}
+                  className="absolute inset-0 rounded-md bg-base-300 shadow-sm"
+                />
+              )}
+              <span className="relative z-10">{opt.label}</span>
+            </button>
+          ))}
+        </div>
+      </LayoutGroup>
     </div>
   );
 }
@@ -324,7 +311,7 @@ export function ResetButton({
   return (
     <button
       onClick={onClick}
-      className="text-ui-chip font-medium px-3 py-1.5 rounded-lg text-fg-3 hover:text-fg-2 hover:bg-base-250/50 transition-colors cursor-pointer"
+      className="text-ui-chip font-medium px-3 py-1.5 rounded-lg text-fg-3 hover:text-fg-2 hover:bg-base-250/50 cursor-pointer"
     >
       {label}
     </button>
@@ -356,7 +343,7 @@ export function ActionRow({
       <button
         onClick={onClick}
         className={clsx(
-          "text-ui-chip font-medium px-2.5 py-1 rounded-md transition-colors cursor-pointer",
+          "text-ui-chip font-medium px-2.5 py-1 rounded-md cursor-pointer",
           actionClass ??
             "bg-base-250 text-fg-3 hover:text-fg-2 hover:bg-base-300",
         )}

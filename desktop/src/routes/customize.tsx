@@ -54,7 +54,7 @@ function CustomizeRoute() {
   }, [searchTab]);
 
   return (
-    <PageLayout title="Customize" width="wide" stableChrome>
+    <PageLayout title="Customize" width="wide">
       {/* Same WCB chrome as every other page — the Segmented is the
           section switch. */}
       <WidgetBar>

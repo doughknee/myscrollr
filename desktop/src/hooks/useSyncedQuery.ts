@@ -25,10 +25,12 @@ export function useSyncedQuery<T>(opts: UseSyncedQueryOptions<T>): {
   data: T[];
   error: Error | null;
   isLoading: boolean;
+  isFetching: boolean;
+  refetch: () => Promise<unknown>;
 } {
   const [data, setData] = useStoreData(opts.storeKey, opts.loadFn);
 
-  const { data: queryData, error, isLoading } = useQuery({
+  const { data: queryData, error, isLoading, isFetching, refetch } = useQuery({
     queryKey: opts.queryKey,
     queryFn: opts.queryFn,
     enabled: opts.enabled,
@@ -44,5 +46,11 @@ export function useSyncedQuery<T>(opts: UseSyncedQueryOptions<T>): {
     }
   }, [queryData]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { data, error: error as Error | null, isLoading };
+  return {
+    data,
+    error: error as Error | null,
+    isLoading,
+    isFetching,
+    refetch,
+  };
 }

@@ -48,6 +48,7 @@ const (
 			COALESCE(t.price_change, 0),
 			COALESCE(t.percentage_change, 0),
 			COALESCE(t.direction, 'flat'),
+			COALESCE(t.day_volume, 0),
 			COALESCE(t.last_updated, t.created_at),
 			COALESCE(ts.link, 'https://www.google.com/search?q=' || t.symbol || '+stock')`
 )
@@ -60,6 +61,7 @@ type Trade struct {
 	PriceChange      float64   `json:"price_change"`
 	PercentageChange float64   `json:"percentage_change"`
 	Direction        string    `json:"direction"`
+	DayVolume        int64     `json:"day_volume"`
 	LastUpdated      time.Time `json:"last_updated"`
 	Link             string    `json:"link"`
 }
@@ -215,7 +217,7 @@ func queryTrades(ctx context.Context) ([]Trade, error) {
 	trades := make([]Trade, 0)
 	for rows.Next() {
 		var t Trade
-		if err := rows.Scan(&t.Symbol, &t.Price, &t.PreviousClose, &t.PriceChange, &t.PercentageChange, &t.Direction, &t.LastUpdated, &t.Link); err != nil {
+		if err := rows.Scan(&t.Symbol, &t.Price, &t.PreviousClose, &t.PriceChange, &t.PercentageChange, &t.Direction, &t.DayVolume, &t.LastUpdated, &t.Link); err != nil {
 			log.Printf("[Finance] Row scan failed: %v", err)
 			continue
 		}
@@ -247,7 +249,7 @@ func queryTradesBySymbols(ctx context.Context, symbols []string) []Trade {
 	trades := make([]Trade, 0)
 	for rows.Next() {
 		var t Trade
-		if err := rows.Scan(&t.Symbol, &t.Price, &t.PreviousClose, &t.PriceChange, &t.PercentageChange, &t.Direction, &t.LastUpdated, &t.Link); err != nil {
+		if err := rows.Scan(&t.Symbol, &t.Price, &t.PreviousClose, &t.PriceChange, &t.PercentageChange, &t.Direction, &t.DayVolume, &t.LastUpdated, &t.Link); err != nil {
 			log.Printf("[Finance] Row scan failed: %v", err)
 			continue
 		}

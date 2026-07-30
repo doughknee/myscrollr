@@ -13,7 +13,12 @@ import { useState } from "react";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { RefreshCw, Download } from "lucide-react";
+import { motion } from "motion/react";
 import { tryAcquireUpdateLock, releaseUpdateLock } from "../lib/updateState";
+import {
+  backdropMotion,
+  overlaySurfaceMotion,
+} from "../lib/motion";
 
 interface Props {
   appVersion: string;
@@ -78,8 +83,20 @@ export function UpdateRequiredOverlay({ appVersion, minVersion }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-base-100/95 backdrop-blur-sm">
-      <div className="max-w-md w-full mx-6 rounded-2xl border border-base-300/40 bg-base-200/80 p-8 text-center shadow-xl">
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className="fixed inset-0 z-[1000] flex items-center justify-center"
+    >
+      <motion.div
+        variants={backdropMotion}
+        className="absolute inset-0 bg-base-100/95 backdrop-blur-sm"
+      />
+      <motion.div
+        variants={overlaySurfaceMotion}
+        className="relative max-w-md w-full mx-6 rounded-2xl border border-base-300/40 bg-base-200/80 p-8 text-center shadow-xl"
+      >
         <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Download size={22} />
         </div>
@@ -119,7 +136,7 @@ export function UpdateRequiredOverlay({ appVersion, minVersion }: Props) {
         {phase.kind === "error" && (
           <p className="mt-3 text-xs text-error/70">{phase.message}</p>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

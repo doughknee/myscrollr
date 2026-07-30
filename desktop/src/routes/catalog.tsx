@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -15,7 +15,6 @@ import {
   Trophy,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
 import { open } from "@tauri-apps/plugin-shell";
 import clsx from "clsx";
 
@@ -38,13 +37,6 @@ import PageSection from "../components/layout/PageSection";
 import { WidgetBar } from "../components/widget-bar/Bar";
 import { Segmented } from "../components/widget-bar/Segmented";
 import { SelectMenu } from "../components/widget-bar/SelectMenu";
-import {
-  useDismiss,
-  MenuPanel,
-  MenuHeading,
-  MenuRow,
-  FilterTrigger,
-} from "../components/widget-bar/Menu";
 import EmptySection from "../components/layout/EmptySection";
 
 
@@ -89,58 +81,6 @@ const SORT_OPTIONS: { key: SortMode; label: string; icon: LucideIcon }[] = [
   { key: "az", label: "A–Z", icon: ArrowDownAZ },
 ];
 
-/** Narrow-width collapse of the category Segmented: one Filter button
- *  (active-filter badge) opening radio rows with counts — same idiom
- *  as the source bars' filter menus. */
-function CatalogFilterMenu({
-  filter,
-  onPickFilter,
-  counts,
-}: {
-  filter: FilterTab;
-  onPickFilter: (f: FilterTab) => void;
-  counts: Record<string, number>;
-}) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
-  useDismiss(rootRef, open, close);
-
-  return (
-    // NOT position:relative — the dropdown anchors to the bar so it
-    // spans the page width instead of clipping at narrow widths.
-    <div ref={rootRef} className="shrink-0 rounded-lg">
-      <FilterTrigger
-        open={open}
-        badgeCount={filter !== "all" ? 1 : 0}
-        onClick={() => setOpen((o) => !o)}
-        ariaLabel="Filter by category"
-      />
-      <AnimatePresence>
-        {open && (
-          <MenuPanel className="inset-x-2">
-            <MenuHeading>Category</MenuHeading>
-            {FILTER_TABS.map((t) => (
-              <MenuRow
-                key={t.key}
-                selected={filter === t.key}
-                onClick={() => {
-                  onPickFilter(t.key);
-                  close();
-                }}
-                role="menuitemradio"
-                count={counts[t.key] ?? 0}
-              >
-                {t.label}
-              </MenuRow>
-            ))}
-          </MenuPanel>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 function orderItems(items: CatalogItem[], sort: SortMode): CatalogItem[] {
   if (sort === "az") return [...items].sort((a, b) => a.name.localeCompare(b.name));
   // Resolved once per call rather than once per comparison.
@@ -166,16 +106,6 @@ function CatalogPage() {
   // string changes exactly when the catalog does.
   const catalogVersion = useCatalog();
   const allItems = useMemo(() => getCatalogItems(), [catalogVersion]);
-
-  // Per-category counts for the collapsed Filter menu rows (counts
-  // live in menu rows, not chrome — bar grammar).
-  const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: allItems.length };
-    for (const item of allItems) {
-      counts[item.category] = (counts[item.category] ?? 0) + 1;
-    }
-    return counts;
-  }, [allItems]);
 
   const enabledDataWidgetIds = useMemo(
     () => new Set(widgets.map((ch) => ch.widget_type)),
@@ -214,17 +144,8 @@ function CatalogPage() {
     };
   }, [allItems, filter, sort, allEnabledIds]);
 
-  const cardFor = (item: CatalogItem, i: number) => (
-    <motion.div
-      key={item.id}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{
-        duration: 0.22,
-        delay: Math.min(0.06 + i * 0.018, 0.3),
-        ease: [0.22, 0.61, 0.36, 1],
-      }}
-    >
+  const cardFor = (item: CatalogItem) => (
+    <div key={item.id}>
       <CatalogCard
         item={item}
         enabled={allEnabledIds.has(item.id)}
@@ -232,7 +153,7 @@ function CatalogPage() {
           navigate({ to: "/widget/$id/info", params: { id: it.id } })
         }
       />
-    </motion.div>
+    </div>
   );
 
   const countChip = (n: number) => (
@@ -248,29 +169,17 @@ function CatalogPage() {
   // two sections: what you have, and what you could add (v1.1.1 r3).
 
   return (
-    <PageLayout title="Catalog" width="wide" stableChrome>
+    <PageLayout title="Catalog" width="wide">
       {/* WCB — same persistent chrome as every source page. Category
           filter (ex-TopBar tab strip) left, sort (ex-slot-band group)
           right, per the bar grammar. */}
       <WidgetBar>
-        {/* Wide: the full category Segmented. Narrow: collapse into one
-            Filter menu BEFORE the seven tabs would clip (same
-            collapse-before-clip idiom as the source bars). */}
-        <span className="hidden @3xl:block">
-          <Segmented
-            ariaLabel="Filter by category"
-            value={filter}
-            onChange={(k) => setFilter(k)}
-            options={FILTER_TABS.map((t) => ({ value: t.key, label: t.label }))}
-          />
-        </span>
-        <span className="@3xl:hidden">
-          <CatalogFilterMenu
-            filter={filter}
-            onPickFilter={setFilter}
-            counts={categoryCounts}
-          />
-        </span>
+        <Segmented
+          ariaLabel="Filter by category"
+          value={filter}
+          onChange={(k) => setFilter(k)}
+          options={FILTER_TABS.map((t) => ({ value: t.key, label: t.label }))}
+        />
         <div className="ml-auto">
           <SelectMenu
             ariaLabel="Sort widgets"
@@ -294,10 +203,7 @@ function CatalogPage() {
           The counter lives HERE now — cards never nag, and the old
           at-capacity banner folded into this band (warn tint +
           Upgrade button when full). ── */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25, delay: 0.02, ease: [0.22, 0.61, 0.36, 1] }}
+      <div
         className={clsx(
           "mt-4 mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-xl border px-4 py-3",
           slots.atCapacity && slots.finite
@@ -332,7 +238,7 @@ function CatalogPage() {
           {slots.atCapacity && slots.finite && (
             <button
               onClick={() => void open("https://myscrollr.com/uplink")}
-              className="shrink-0 rounded-lg bg-warn/15 px-3 py-1.5 text-ui-chip font-semibold text-warn transition-colors hover:bg-warn/25"
+              className="shrink-0 rounded-lg bg-warn/15 px-3 py-1.5 text-ui-chip font-semibold text-warn hover:bg-warn/25"
             >
               Upgrade
             </button>
@@ -340,26 +246,17 @@ function CatalogPage() {
           {/* Sort control moved to the WCB (bar grammar: config
               selects live in the bar's right cluster). */}
         </div>
-      </motion.div>
+      </div>
 
-      {yourItems.length === 0 && discoverItems.length === 0 ? (
-        <EmptySection
-          icon={Search}
-          title="Nothing here"
-          description="No items match this filter. Try a different category."
-        />
-      ) : (
-        // No initial={false} here — it would propagate presence-context
-        // suppression and block the card entrances on page arrival
-        // (same bug PageLayout had until v1.1.1).
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={`${filter}-${sort}`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18, ease: [0.22, 0.61, 0.36, 1] }}
-          >
+      <div>
+        {yourItems.length === 0 && discoverItems.length === 0 ? (
+          <EmptySection
+            icon={Search}
+            title="Nothing here"
+            description="No items match this filter. Try a different category."
+          />
+        ) : (
+          <>
             {/* ── Your widgets ── */}
             {yourItems.length > 0 && (
               <PageSection
@@ -383,9 +280,7 @@ function CatalogPage() {
             >
               {discoverItems.length > 0 ? (
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                  {discoverItems.map((item, i) =>
-                    cardFor(item, yourItems.length + i),
-                  )}
+                  {discoverItems.map(cardFor)}
                 </div>
               ) : (
                 <EmptySection
@@ -396,9 +291,9 @@ function CatalogPage() {
                 />
               )}
             </PageSection>
-          </motion.div>
-        </AnimatePresence>
-      )}
+          </>
+        )}
+      </div>
     </PageLayout>
   );
 }

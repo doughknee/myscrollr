@@ -7,6 +7,8 @@
 import { useEffect, useState } from "react";
 import { clsx } from "clsx";
 import { Search, X } from "lucide-react";
+import { motion } from "motion/react";
+import { controlTransition } from "../../lib/motion";
 
 /** "/" focuses the input from anywhere in the widget — unless the user is
  *  already typing somewhere, or a modal dialog is open. */
@@ -37,7 +39,7 @@ export function useSlashFocus(
 
 /** Compact-by-default search field; expands on focus (or while a query is
  *  set). Same contained shape as the Segmented control so the bar stays
- *  one family. Results filter the host's grid in place as the user types. */
+ *  one family. The host decides how to present matching results. */
 export function SearchBox({
   inputRef,
   query,
@@ -46,6 +48,7 @@ export function SearchBox({
   resultCount,
   ariaLabel = "Search",
   noun = "results",
+  placeholder = "Search",
 }: {
   inputRef: React.RefObject<HTMLInputElement | null>;
   query: string;
@@ -57,6 +60,7 @@ export function SearchBox({
   ariaLabel?: string;
   /** Plural noun for the sr-only result announcement (e.g. "markets"). */
   noun?: string;
+  placeholder?: string;
 }) {
   const [focused, setFocused] = useState(false);
   const expanded = focused || query.length > 0;
@@ -73,9 +77,12 @@ export function SearchBox({
   };
 
   return (
-    <div
+    <motion.div
+      layout
+      initial={false}
+      transition={controlTransition}
       className={clsx(
-        "relative flex items-center rounded-lg border transition-all duration-200",
+        "relative flex items-center rounded-lg border  ",
         expanded
           ? "w-40 border-accent/50 bg-surface ring-1 ring-accent/25 sm:w-64"
           : "w-24 border-edge/30 bg-base-150/60 sm:w-32",
@@ -96,11 +103,12 @@ export function SearchBox({
         onKeyDown={handleKeyDown}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        placeholder="Search"
+        placeholder={placeholder}
         aria-label={ariaLabel}
         spellCheck={false}
         autoCorrect="off"
         autoComplete="off"
+        data-contained-focus
         className="w-full bg-transparent py-1 pl-7 pr-6 text-ui-meta text-fg outline-none placeholder:text-fg-4"
       />
       {query ? (
@@ -113,7 +121,7 @@ export function SearchBox({
             onQueryChange("");
             inputRef.current?.focus();
           }}
-          className="absolute right-1.5 flex h-4 w-4 cursor-pointer items-center justify-center rounded text-fg-4 transition-colors hover:text-fg-2"
+          className="absolute right-1.5 flex h-4 w-4 cursor-pointer items-center justify-center rounded text-fg-4  hover:text-fg-2"
         >
           <X size={12} />
         </button>
@@ -134,6 +142,6 @@ export function SearchBox({
             : `${resultCount} ${noun} match`}
         </span>
       )}
-    </div>
+    </motion.div>
   );
 }

@@ -26,6 +26,7 @@ import { UpdateRequiredOverlay } from "../components/UpdateRequiredOverlay";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import clsx from "clsx";
 import { Toaster, toast } from "sonner";
+import { AnimatePresence, motion } from "motion/react";
 // Note: sonner CSS is imported in src/app-main.tsx so it ships in the
 // entry bundle. Importing it here would put it in this route's
 // code-split chunk, causing toasts to appear unstyled until the chunk
@@ -40,6 +41,7 @@ import {
 } from "../components/widget-bar/BarChassis";
 import ConnectionBanner from "../components/ConnectionBanner";
 import TopBar from "../components/TopBar";
+import LoadingGlyph from "../components/LoadingGlyph";
 
 // Onboarding
 import AuthGate from "../components/onboarding/AuthGate";
@@ -61,6 +63,7 @@ import {
   savePrefs,
   toggleWidgetOnTicker,
   consumeTickerLayoutChanged,
+  reconcileSidebarOrder,
   resolveThemeMode,
 } from "../preferences";
 import {
@@ -96,6 +99,11 @@ import { POLL_INTERVALS } from "../cdc";
 // Shell context
 import { ShellContext, ShellDataContext } from "../shell-context";
 import { PageIdentityProvider } from "../components/layout/page-context";
+import RouteTransition from "../components/layout/RouteTransition";
+import {
+  backdropMotion,
+  overlaySurfaceMotion,
+} from "../lib/motion";
 
 // Store
 import { onStoreChange, setStore, removeStore } from "../lib/store";
@@ -173,13 +181,13 @@ function BillingBanner({
       <div className="flex items-center gap-2 shrink-0 ml-4">
         <button
           onClick={onCta}
-          className={clsx("text-xs font-medium hover:text-fg transition-colors", t.cta)}
+          className={clsx("text-xs font-medium hover:text-fg ", t.cta)}
         >
           {cta}
         </button>
         <button
           onClick={onDismiss}
-          className="text-xs text-fg-4 hover:text-fg-3 transition-colors"
+          className="text-xs text-fg-4 hover:text-fg-3 "
           aria-label="Dismiss"
         >
           Dismiss
@@ -321,7 +329,7 @@ function RootLayout() {
   const updateGate = useUpdateGate(appVersion);
 
   // Persist helper shared by the tip-firing effects, the shell
-  // context, and the TopBar toggles.
+  // context, and the TopBar ticker toggle.
   const persistPrefs = useCallback((next: AppPreferences) => {
     setPrefs(next);
     savePrefs(next);
@@ -667,12 +675,48 @@ function RootLayout() {
         }
       }
     }
-    return sources;
+    const byId = new Map(sources.map((source) => [source.id, source]));
+    return reconcileSidebarOrder(
+      prefs.widgets.sidebarOrder,
+      sources.map((source) => source.id),
+    ).map((id) => byId.get(id)!);
     // `prefs` wholesale: the ticker-row layout lives under
     // prefs.appearance and enabled widgets under prefs.widgets — the
     // list build is cheap, so one broad dep beats two narrow ones
     // that could silently miss a third source of truth later.
   }, [dashboard?.widgets, prefs, allDataWidgetManifests, allWidgets, catalogVersion]);
+
+  // Once the complete server-backed list is known, persist the reconciled
+  // order so removed IDs disappear and newly enabled widgets get a stable slot.
+  useEffect(() => {
+    if (!dashboard) return;
+    const nextOrder = sidebarSources.map((source) => source.id);
+    if (
+      nextOrder.length === prefs.widgets.sidebarOrder.length &&
+      nextOrder.every((id, index) => id === prefs.widgets.sidebarOrder[index])
+    ) {
+      return;
+    }
+    persistPrefs({
+      ...prefs,
+      widgets: { ...prefs.widgets, sidebarOrder: nextOrder },
+    });
+  }, [dashboard, persistPrefs, prefs, sidebarSources]);
+
+  const handleMoveSidebarItem = useCallback(
+    (id: string, direction: "up" | "down") => {
+      const nextOrder = sidebarSources.map((source) => source.id);
+      const from = nextOrder.indexOf(id);
+      const to = from + (direction === "up" ? -1 : 1);
+      if (from < 0 || to < 0 || to >= nextOrder.length) return;
+      [nextOrder[from], nextOrder[to]] = [nextOrder[to], nextOrder[from]];
+      persistPrefs({
+        ...prefs,
+        widgets: { ...prefs.widgets, sidebarOrder: nextOrder },
+      });
+    },
+    [persistPrefs, prefs, sidebarSources],
+  );
 
   // ── Keyboard shortcuts ──────────────────────────────────────
   useEffect(() => {
@@ -752,11 +796,9 @@ function RootLayout() {
     }
   }, []);
 
-  // ── TopBar ambient-toggle handlers ──────────────────────────
-  // Two ambient toggles always visible in the TopBar so users never
-  // have to dig into Settings → Ticker to toggle the entire product
-  // on/off. Same prefs as Settings → Ticker "Enable ticker" toggle
-  // and the Pin button — single source of truth.
+  // ── TopBar ticker-toggle handler ─────────────────────────────
+  // Same pref as Customize → Ticker "Enable ticker" — one source of
+  // truth for the always-visible chrome control.
   const handleTickerToggle = useCallback(() => {
     persistPrefs({
       ...prefs,
@@ -811,12 +853,14 @@ function RootLayout() {
       )}
     >
       {/* ── Mandatory update: blocks everything, including sign-in ── */}
-      {updateGate.updateRequired && (
-        <UpdateRequiredOverlay
-          appVersion={appVersion}
-          minVersion={updateGate.minVersion}
-        />
-      )}
+      <AnimatePresence>
+        {updateGate.updateRequired && (
+          <UpdateRequiredOverlay
+            appVersion={appVersion}
+            minVersion={updateGate.minVersion}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── Auth gate: unauthenticated users ── */}
       {showAuthGate && <AuthGate onLogin={auth.handleLogin} />}
@@ -827,19 +871,14 @@ function RootLayout() {
           {/* TopBar — primary chrome row spanning the full window.
               Houses the Scrollr brand mark, Spotify-style forward/back
               navigation, page-identity breadcrumb (read from
-              PageContext), entityAction, and the ambient ticker +
-              connection controls. Always visible regardless of route.
+              PageContext), entityAction, and the ambient ticker
+              control. Always visible regardless of route.
               (Always-on-top moved to Settings → Window — the chrome
               button wasn't earning its slot.) */}
           <TopBar
             tickerOn={prefs.ticker.showTicker}
-            health={deliveryHealth}
             canBack={navHistory.canBack}
             canForward={navHistory.canForward}
-            isReleases={route.isReleases}
-            isStatus={route.isStatus}
-            onNavigateToReleases={handleNavigateToReleases}
-            onNavigateToStatus={handleNavigateToStatus}
             onBack={navHistory.back}
             onForward={navHistory.forward}
             onToggleTicker={handleTickerToggle}
@@ -854,18 +893,24 @@ function RootLayout() {
               isAccount={route.isAccount}
               isMarketplace={route.isMarketplace}
               isSupport={route.isSupport}
+              isReleases={route.isReleases}
+              isStatus={route.isStatus}
               isFeed={route.isFeed}
               activeItem={route.activeItem}
               tier={auth.tier}
+              health={deliveryHealth}
               sources={sidebarSources}
               onNavigateHome={handleNavigateToFeed}
               onNavigateToMarketplace={handleNavigateToMarketplace}
               onNavigateToCustomize={handleNavigateToCustomize}
               onNavigateToAccount={handleNavigateToAccount}
               onNavigateToSupport={handleNavigateToSupport}
+              onNavigateToReleases={handleNavigateToReleases}
+              onNavigateToStatus={handleNavigateToStatus}
               onSelectItem={handleSelectPinned}
               onInfoItem={handleInfoItem}
               onToggleItemTicker={handleToggleItemTicker}
+              onMoveItem={handleMoveSidebarItem}
               onRemoveItem={handleRemoveItem}
             />
 
@@ -938,13 +983,12 @@ function RootLayout() {
                   their control rows into it (widget-bar/BarChassis.tsx). */}
               <BarChassisSlot />
 
-              {/* PageLayout (used by every route) owns its own scroll
-                  for its content area. The outer wrapper just provides
-                  the flex slot for it to fill. */}
               <div className="flex-1 min-h-0 overflow-hidden">
                 <ShellContext.Provider value={shellStableValue}>
                   <ShellDataContext.Provider value={shellDataValue}>
-                    <Outlet />
+                    <RouteTransition routeKey={location.pathname}>
+                      <Outlet />
+                    </RouteTransition>
                   </ShellDataContext.Provider>
                 </ShellContext.Provider>
               </div>
@@ -957,30 +1001,45 @@ function RootLayout() {
       )}
 
       {/* Signing-in overlay — shows on ALL states (auth gate triggers login too) */}
-      {auth.loggingIn && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Signing in"
-          className="absolute inset-0 z-50 flex items-center justify-center bg-surface/80 backdrop-blur-sm"
-        >
-          <div className="text-center">
-            <div className="w-6 h-6 border-2 border-accent/30 border-t-accent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-sm font-medium text-fg-2">
-              Signing you in...
-            </p>
-            <p className="text-xs text-fg-3 mt-1">
-              Finish signing in from your browser
-            </p>
-            <button
-              onClick={() => auth.setLoggingIn(false)}
-              className="mt-4 px-4 py-1.5 rounded-lg text-xs font-medium text-fg-3 hover:text-fg-2 hover:bg-surface-hover transition-colors"
+      <AnimatePresence>
+        {auth.loggingIn && (
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Signing in"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="absolute inset-0 z-50 flex items-center justify-center"
+          >
+            <motion.div
+              variants={backdropMotion}
+              className="absolute inset-0 bg-surface/80 backdrop-blur-sm"
+            />
+            <motion.div
+              variants={overlaySurfaceMotion}
+              className="relative text-center"
             >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+              <LoadingGlyph
+                size={24}
+                className="mx-auto mb-3 text-accent"
+              />
+              <p className="text-sm font-medium text-fg-2">
+                Signing you in...
+              </p>
+              <p className="text-xs text-fg-3 mt-1">
+                Finish signing in from your browser
+              </p>
+              <button
+                onClick={() => auth.setLoggingIn(false)}
+                className="mt-4 px-4 py-1.5 rounded-lg text-xs font-medium text-fg-3 hover:text-fg-2 hover:bg-surface-hover "
+              >
+                Cancel
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Toaster must be available in all states */}
       {!showApp && <Toaster theme={resolvedToasterTheme} richColors position="bottom-right" />}

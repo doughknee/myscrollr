@@ -46,7 +46,7 @@ export function CitySearch({ onSelect, query: externalQuery }: CitySearchProps) 
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search city..."
-          className="w-full px-3 py-1.5 text-xs font-mono bg-surface-2 border border-widget-weather/15 rounded-lg text-fg placeholder:text-fg-3 outline-none focus:border-widget-weather/30 transition-colors"
+          className="w-full px-3 py-1.5 text-xs font-mono bg-surface-2 border border-widget-weather/15 rounded-lg text-fg placeholder:text-fg-3 outline-none focus:border-widget-weather/30 "
         />
       )}
       {isSearching && (
@@ -64,7 +64,7 @@ export function CitySearch({ onSelect, query: externalQuery }: CitySearchProps) 
               <button
                 key={`${r.lat}-${r.lon}`}
                 onClick={() => onSelect(r)}
-                className="flex items-center justify-between w-full px-3 py-1.5 text-left hover:bg-widget-weather/[0.06] transition-colors"
+                className="flex items-center justify-between w-full px-3 py-1.5 text-left hover:bg-widget-weather/[0.06] "
               >
                 <span className="text-xs font-mono text-fg">{r.name}</span>
                 <span className="text-[11px] font-mono text-fg-2 truncate ml-2">

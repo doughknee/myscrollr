@@ -91,7 +91,7 @@ export default function TickerLayoutSummary({
           <button
             type="button"
             onClick={onOpenSettings}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-ui-meta font-medium text-fg-3 hover:text-accent transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-ui-meta font-medium text-fg-3 hover:text-accent "
             aria-label="Open the full ticker layout editor in Customize"
           >
             <SettingsIcon size={11} />

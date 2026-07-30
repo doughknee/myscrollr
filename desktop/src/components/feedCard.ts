@@ -6,8 +6,7 @@
  * the old bg-surface-on-bg-surface cards blended together).
  *
  * Compose with clsx: `clsx(FEED_CARD, FEED_CARD_INTERACTIVE, …extras)`.
- * Widget-specific accents (live pulses, price-flash tints, brand
- * washes) layer ON TOP — they don't replace the shell.
+ * Widget-specific accents layer on top — they don't replace the shell.
  */
 
 /** Resting shell: tinted surface + hairline border, dense padding. */
@@ -16,7 +15,7 @@ export const FEED_CARD =
 
 /** Hover/press affordances for clickable cards. */
 export const FEED_CARD_INTERACTIVE =
-  "cursor-pointer transition-all duration-150 hover:border-edge/70 hover:bg-base-150/60 hover:shadow-soft-sm active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50";
+  "cursor-pointer hover:border-edge/70 hover:bg-base-150/60 hover:shadow-soft-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50";
 
 /** Static variant for non-clickable rows (status readouts, summaries). */
-export const FEED_CARD_STATIC = "transition-colors duration-150";
+export const FEED_CARD_STATIC = "";

@@ -53,6 +53,7 @@ export default defineConfig({
     strictPort: true,
     host: host || false,
     hmr: host ? { protocol: "ws", host, port: 5174 } : undefined,
+    watch: { ignored: ["**/src-tauri/target/**"] },
   },
 
   // Multi-page build: ticker (index.html) + app window (app.html)

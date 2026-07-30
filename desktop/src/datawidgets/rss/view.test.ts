@@ -34,6 +34,7 @@ function mk(
 const DEFAULT_PREFS: RssDisplayPrefs = {
   feedSort: "newest",
   articlesPerSource: 4,
+  maxArticles: 0,
   maxArticleAgeDays: 0,
 };
 
@@ -242,23 +243,6 @@ describe("applyRssPipeline", () => {
     expect(result.visibleItems.map((i) => i.id)).toEqual([4, 2, 1, 5, 3]);
   });
 
-  it("groups by source then newest-first within source when sortOrder=by-source", () => {
-    const result = applyRssPipeline(makeItems(), {
-      categoryMap,
-      sortOrder: "by-source",
-      articlesPerSource: 0,
-    });
-    const sources = result.visibleItems.map((i) => i.source_name);
-    // stable: a, a, b, b, c
-    expect(sources).toEqual(["a", "a", "b", "b", "c"]);
-    // within source a: newest first = id 1 (Feb) before id 2 (Jan)
-    const aIds = result.visibleItems.filter((i) => i.source_name === "a").map((i) => i.id);
-    expect(aIds).toEqual([1, 2]);
-    // within source b: id 3 (Mar) before id 4 (Jan)
-    const bIds = result.visibleItems.filter((i) => i.source_name === "b").map((i) => i.id);
-    expect(bIds).toEqual([3, 4]);
-  });
-
   it("applies per-source limit and reports overflow counts", () => {
     const result = applyRssPipeline(makeItems(), {
       categoryMap,
@@ -283,29 +267,6 @@ describe("applyRssPipeline", () => {
     expect(result.totalHidden).toBe(0);
   });
 
-  it("expands a specific source under by-source sort via expandedSources", () => {
-    // Three from "a" (ids 1,2 + extra 6), two from "b". Limit = 1.
-    // Expand only "a" → all 3 items of "a", 1 of "b".
-    const items = [
-      ...makeItems(),
-      mk(6, "a", "2026-02-10T10:00:00Z"),
-    ];
-    const result = applyRssPipeline(items, {
-      categoryMap,
-      sortOrder: "by-source",
-      articlesPerSource: 1,
-      expandedSources: new Set(["a"]),
-    });
-    const aItems = result.visibleItems.filter((i) => i.source_name === "a");
-    const bItems = result.visibleItems.filter((i) => i.source_name === "b");
-    expect(aItems).toHaveLength(3);
-    expect(bItems).toHaveLength(1);
-    // Expanded source should not be counted as overflow
-    expect(result.overflowCounts.has("a")).toBe(false);
-    expect(result.overflowCounts.get("b")).toBe(1);
-    expect(result.totalHidden).toBe(1);
-  });
-
   it("falls back to created_at when published_at is null (oldest sort)", () => {
     const items = [
       mk(1, "a", null),
@@ -319,6 +280,27 @@ describe("applyRssPipeline", () => {
       articlesPerSource: 0,
     });
     expect(result.visibleItems.map((i) => i.id)).toEqual([1, 2]);
+  });
+
+  it("applies a finite total cap after filters and ordering", () => {
+    const result = applyRssPipeline(makeItems(), {
+      selectedCategories: new Set(["tech"]),
+      categoryMap,
+      sortOrder: "oldest",
+      articlesPerSource: 0,
+      maxArticles: 2,
+    });
+    expect(result.visibleItems.map((i) => i.id)).toEqual([2, 1]);
+  });
+
+  it("shows all eligible articles when the total cap is unlimited", () => {
+    const result = applyRssPipeline(makeItems(), {
+      categoryMap,
+      sortOrder: "newest",
+      articlesPerSource: 0,
+      maxArticles: 0,
+    });
+    expect(result.visibleItems).toHaveLength(5);
   });
 });
 

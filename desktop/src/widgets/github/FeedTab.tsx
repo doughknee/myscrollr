@@ -7,11 +7,14 @@
  */
 import { useState, useCallback } from "react";
 import { clsx } from "clsx";
-import { Github, Plus, Trash2, ExternalLink, Loader2 } from "lucide-react";
+import { Github, Plus, X, ExternalLink } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 import Tooltip from "../../components/Tooltip";
 import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import QueryErrorBanner from "../../components/QueryErrorBanner";
+import LoadingGlyph from "../../components/LoadingGlyph";
+import { controlTransition, tooltipMotion } from "../../lib/motion";
 import type { GitHubRepo } from "./types";
 import {
   parseRepoUrl,
@@ -65,6 +68,19 @@ const POLL_OPTIONS: SelectOption<string>[] = Array.from({ length: 9 }, (_, i) =>
   return { value: String(v), label: formatPollInterval(v) };
 });
 
+const REMOVE_MOTION = {
+  hidden: {
+    opacity: 0,
+    transform: "scale(0.9)",
+    pointerEvents: "none" as const,
+  },
+  visible: {
+    opacity: 1,
+    transform: "scale(1)",
+    pointerEvents: "auto" as const,
+  },
+};
+
 function GitHubFeedTab(props: FeedTabProps) {
   return (
     <div className="flex min-h-full flex-col">
@@ -103,7 +119,12 @@ function GitHubFeedBody({ mode: feedMode }: FeedTabProps) {
   const [inputError, setInputError] = useState<string | null>(null);
 
   // Auto-refresh + cross-window sync via useSyncedQuery
-  const { data: repoData, error } = useSyncedQuery<GitHubRepo>({
+  const {
+    data: repoData,
+    error,
+    isFetching,
+    refetch,
+  } = useSyncedQuery<GitHubRepo>({
     storeKey: LS_GITHUB_REPOS,
     loadFn: loadRepoData,
     saveFn: saveRepoData,
@@ -174,12 +195,12 @@ function GitHubFeedBody({ mode: feedMode }: FeedTabProps) {
             onChange={(e) => { setInputUrl(e.target.value); setInputError(null); }}
             onKeyDown={(e) => { if (e.key === "Enter") handleAddRepo(); }}
             placeholder="https://github.com/owner/repo"
-            className="w-full text-xs font-mono px-3 py-2 rounded-lg bg-surface-2 border border-edge text-fg placeholder:text-fg-4 focus:border-widget-github/50 focus:outline-none transition-colors"
+            className="w-full text-xs font-mono px-3 py-2 rounded-lg bg-surface-2 border border-edge text-fg placeholder:text-fg-4 focus:border-widget-github/50 focus:outline-none "
           />
           <button
             onClick={handleAddRepo}
             disabled={!inputUrl.trim()}
-            className="w-full text-xs font-mono font-semibold text-widget-github px-3 py-2 rounded-lg bg-widget-github/10 border border-widget-github/25 hover:bg-widget-github/15 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full text-xs font-mono font-semibold text-widget-github px-3 py-2 rounded-lg bg-widget-github/10 border border-widget-github/25 hover:bg-widget-github/15  disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Plus size={12} />
             Add Repo
@@ -224,7 +245,12 @@ function GitHubFeedBody({ mode: feedMode }: FeedTabProps) {
       </div>
 
       {/* Error banner */}
-      <QueryErrorBanner error={error} />
+      <QueryErrorBanner
+        error={error}
+        message="Couldn't refresh repository status."
+        onRetry={() => void refetch()}
+        retrying={isFetching}
+      />
 
       {/* Add repo input */}
       <div className="flex gap-1.5 px-1">
@@ -234,14 +260,14 @@ function GitHubFeedBody({ mode: feedMode }: FeedTabProps) {
           onChange={(e) => { setInputUrl(e.target.value); setInputError(null); }}
           onKeyDown={(e) => { if (e.key === "Enter") handleAddRepo(); }}
           placeholder="Add another repo..."
-          className="flex-1 text-[11px] font-mono px-2.5 py-1.5 rounded-md bg-surface-2 border border-edge text-fg placeholder:text-fg-4 focus:border-widget-github/50 focus:outline-none transition-colors"
+          className="flex-1 text-[11px] font-mono px-2.5 py-1.5 rounded-md bg-surface-2 border border-edge text-fg placeholder:text-fg-4 focus:border-widget-github/50 focus:outline-none "
         />
         <Tooltip content="Add repo">
           <button
             onClick={handleAddRepo}
             disabled={!inputUrl.trim()}
             aria-label="Add repo"
-            className="text-[11px] font-mono font-semibold text-widget-github px-2.5 py-1.5 rounded-md bg-widget-github/10 border border-widget-github/25 hover:bg-widget-github/15 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-[11px] font-mono font-semibold text-widget-github px-2.5 py-1.5 rounded-md bg-widget-github/10 border border-widget-github/25 hover:bg-widget-github/15  disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Plus size={11} />
           </button>
@@ -255,19 +281,30 @@ function GitHubFeedBody({ mode: feedMode }: FeedTabProps) {
 
       {/* Repo list */}
       <div className={compact ? "space-y-1" : "space-y-1.5"}>
-        {configRepos.map((configRepo) => {
-          const rd = repoData.find((r) => repoKey(r) === repoKey(configRepo));
-          return (
-            <RepoRow
-              key={repoKey(configRepo)}
-              owner={configRepo.owner}
-              repo={configRepo.repo}
-              data={rd ?? null}
-              compact={compact}
-              onRemove={() => removeRepo(configRepo.owner, configRepo.repo)}
-            />
-          );
-        })}
+        <AnimatePresence initial={false}>
+          {configRepos.map((configRepo) => {
+            const rd = repoData.find((r) => repoKey(r) === repoKey(configRepo));
+            return (
+              <motion.div
+                key={repoKey(configRepo)}
+                layout="position"
+                variants={tooltipMotion}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                transition={{ layout: controlTransition }}
+              >
+                <RepoRow
+                  owner={configRepo.owner}
+                  repo={configRepo.repo}
+                  data={rd ?? null}
+                  compact={compact}
+                  onRemove={() => removeRepo(configRepo.owner, configRepo.repo)}
+                />
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -290,21 +327,24 @@ function RepoRow({
 }) {
   const status = data?.status ?? "unavailable";
   const isLoading = !data;
+  const [removeVisible, setRemoveVisible] = useState(false);
 
   return (
-    <div
+    <motion.div
+      onHoverStart={() => setRemoveVisible(true)}
+      onHoverEnd={() => setRemoveVisible(false)}
       className={clsx(
         FEED_CARD,
         FEED_CARD_STATIC,
-        "flex items-center gap-2",
+        "relative flex items-center gap-2 overflow-hidden",
         compact && "px-2 py-1.5",
       )}
     >
       {/* Status dot */}
       {isLoading ? (
-        <Loader2 size={10} className="animate-spin text-fg-4 shrink-0" />
+        <LoadingGlyph size={10} className="text-fg-4" />
       ) : (
-        <span className={`w-2 h-2 rounded-full shrink-0 ${CI_STATUS_COLORS[status]}${status === "failure" ? " animate-pulse" : ""}`} />
+        <span className={`w-2 h-2 rounded-full shrink-0 ${CI_STATUS_COLORS[status]}${status === "failure" ? " " : ""}`} />
       )}
 
       {/* Repo name + workflow */}
@@ -314,7 +354,7 @@ function RepoRow({
             href={data.runUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs font-mono text-fg hover:text-widget-github transition-colors truncate block"
+            className="text-xs font-mono text-fg hover:text-widget-github  truncate block"
           >
             {owner}/{repo}
             <ExternalLink size={9} className="inline ml-1 opacity-40" />
@@ -333,19 +373,25 @@ function RepoRow({
 
       {/* Status label */}
       <span className={`text-[10px] font-mono font-semibold uppercase tracking-wider shrink-0 ${CI_STATUS_TEXT[status]}`}>
-        {isLoading ? "" : CI_STATUS_LABELS[status]}
+        {isLoading ? "Checking" : CI_STATUS_LABELS[status]}
       </span>
 
-      {/* Remove */}
       <Tooltip content="Remove repo">
-        <button
+        <motion.button
+          type="button"
+          initial={false}
+          animate={removeVisible ? REMOVE_MOTION.visible : REMOVE_MOTION.hidden}
+          transition={controlTransition}
+          whileTap={{ transform: "scale(0.95)" }}
+          onFocus={() => setRemoveVisible(true)}
+          onBlur={() => setRemoveVisible(false)}
           onClick={onRemove}
           aria-label="Remove repo"
-          className="text-fg-4 hover:text-error transition-colors shrink-0"
+          className="absolute right-2 top-2 z-10 flex h-7 min-w-16 items-center justify-center gap-1 rounded-md border border-down/30 bg-surface-3 px-2.5 text-ui-chip font-semibold text-down shadow-md hover:bg-surface-hover"
         >
-          <Trash2 size={11} />
-        </button>
+          Remove <X size={11} />
+        </motion.button>
       </Tooltip>
-    </div>
+    </motion.div>
   );
 }

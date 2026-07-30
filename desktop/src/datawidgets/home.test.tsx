@@ -9,21 +9,9 @@
  * Each case goes through the real manifest, not a direct import, so the
  * wiring in each FeedTab.tsx is under test too.
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { getDataWidget } from "./registry";
-
-vi.mock("motion/react", () => ({
-  AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  motion: new Proxy(
-    {},
-    {
-      get:
-        () =>
-        ({ children, ...p }: React.HTMLAttributes<HTMLElement>) => <div {...p}>{children}</div>,
-    },
-  ),
-}));
 
 const rows = (source: string, data: unknown[], dashboard?: Record<string, unknown>) => {
   const HomeRows = getDataWidget(source)!.HomeRows;

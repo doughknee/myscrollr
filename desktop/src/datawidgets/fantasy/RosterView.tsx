@@ -196,7 +196,7 @@ function TeamSelector({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 rounded-md border border-edge/50 bg-surface px-2.5 py-1.5 text-[12px] font-medium text-fg transition-colors hover:border-accent/40 cursor-pointer"
+        className="flex items-center gap-2 rounded-md border border-edge/50 bg-surface px-2.5 py-1.5 text-[12px] font-medium text-fg  hover:border-accent/40 cursor-pointer"
       >
         <span>{current?.data.team_name ?? "Team"}</span>
         {isMe && (
@@ -204,7 +204,7 @@ function TeamSelector({
             You
           </span>
         )}
-        <ChevronDown size={12} className={clsx("transition-transform", open && "rotate-180")} />
+        <ChevronDown size={12} className={clsx(open && "rotate-180")} />
       </button>
       {open && (
         <div className="absolute left-0 top-full z-20 mt-1 max-h-60 w-64 overflow-y-auto rounded-lg border border-edge/50 bg-surface-2 py-1 shadow-lg">
@@ -217,7 +217,7 @@ function TeamSelector({
                 setOpen(false);
               }}
               className={clsx(
-                "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors cursor-pointer hover:bg-surface-3",
+                "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px]  cursor-pointer hover:bg-surface-3",
                 r.team_key === value && "bg-accent/10",
               )}
             >
@@ -288,7 +288,7 @@ function Pill({
       disabled={disabled}
       title={title}
       className={clsx(
-        "px-2.5 py-1 font-medium transition-colors",
+        "px-2.5 py-1 font-medium ",
         active
           ? "bg-accent/15 text-accent"
           : disabled

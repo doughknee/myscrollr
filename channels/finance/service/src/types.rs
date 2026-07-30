@@ -56,6 +56,7 @@ pub(crate) struct TradeData {
     pub symbol: String,
     pub price: f64,
     pub timestamp: u64,
+    pub day_volume: Option<u64>,
 }
 
 #[derive(Debug, Default)]

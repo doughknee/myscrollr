@@ -250,7 +250,7 @@ export default function AccountSettings({
       <div className="grid gap-4 grid-cols-2 items-start">
         <div className="space-y-4 min-w-0">
       {/* ── Account ──────────────────────────────────────────── */}
-      <Section index={0} title="Account" variant="card">
+      <Section title="Account" variant="card">
         {authenticated ? (
           <>
             {userLabel && (
@@ -286,7 +286,7 @@ export default function AccountSettings({
 
       {/* ── Profile (inline edit) ────────────────────────────── */}
       {authenticated && (
-        <Section index={1} title="Profile" variant="card">
+        <Section title="Profile" variant="card">
           <ProfileField
             label="Display name"
             value={overview?.identity.name ?? ""}
@@ -312,7 +312,7 @@ export default function AccountSettings({
 
       {/* ── Security ─────────────────────────────────────────── */}
       {authenticated && (
-        <Section index={2} title="Security" variant="card">
+        <Section title="Security" variant="card">
           <ActionRow
             label="Password"
             description="We'll email you a reset link."
@@ -334,7 +334,7 @@ export default function AccountSettings({
       {/* Keeps the two-column grid balanced when logged out so the */}
       {/* Account card never sits alone next to an empty column.    */}
       {!authenticated && (
-        <Section index={3} title="Welcome" variant="card">
+        <Section title="Welcome" variant="card">
           <ActionRow
             label="Sign in to Scrollr"
             description="Signing in syncs your subscription, profile, and source preferences across devices and unlocks billing management."
@@ -347,7 +347,7 @@ export default function AccountSettings({
 
       {/* ── Subscription ─────────────────────────────────────── */}
       {authenticated && hasSub && (
-        <Section index={4} title="Subscription" variant="card">
+        <Section title="Subscription" variant="card">
           <DisplayRow
             label="Status"
             value={
@@ -435,7 +435,7 @@ export default function AccountSettings({
 
       {/* ── Your Plan ────────────────────────────────────────── */}
       {authenticated && (
-        <Section index={5} title="Widget slots" variant="card">
+        <Section title="Widget slots" variant="card">
           {/* The plan story is ONE number now (v1.1.2): how many widgets
               you run at once. The old per-feature limits table — five
               rows of "Unlimited" since the caps were retired — is gone.
@@ -470,7 +470,7 @@ export default function AccountSettings({
 
       {/* ── Your Data ────────────────────────────────────────── */}
       {authenticated && (
-        <Section index={6} title="Data" variant="card">
+        <Section title="Data" variant="card">
           <ActionRow
             label="Export your data"
             description="Download your sources, preferences, and account metadata as JSON."
@@ -485,7 +485,7 @@ export default function AccountSettings({
       )}
 
       {/* ── Danger zone ─────────────────────────────────────── */}
-      <Section index={7} title="Danger zone" variant="card">
+      <Section title="Danger zone" variant="card">
         <ActionRow
           label="Reset all settings"
           description="Clear every local preference. Your account, billing, and server data are untouched."
@@ -497,9 +497,7 @@ export default function AccountSettings({
         </div>
       </div>
 
-      {/* Sign-out confirmation. Mounted unconditionally so the close
-          animation runs even after `authenticated` flips false during
-          the logout flow. */}
+      {/* Sign-out confirmation stays mounted through the logout flow. */}
       <ConfirmDialog
         open={confirmSignOut}
         title="Sign out of Scrollr?"

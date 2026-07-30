@@ -2,15 +2,9 @@
  * ProbabilityPill — the predictions widget's signature element (v1.1.5).
  *
  * A rounded mono pill showing implied probability ("62%"), tinted by the
- * market's direction and flashing briefly when the value changes — the
- * kalshi.com percentage-pill look, built on Scrollr tokens so it holds up
- * across light/dark and every theme palette.
- *
- * Owns the flash lifecycle: one effect tracks the previous value in a ref
- * so rapid back-to-back CDC events can't swallow a flash. Card rows that
- * previously flashed their whole background now delegate to this pill.
+ * market's direction. Uses Scrollr tokens so it holds up across light/dark
+ * and every theme palette.
  */
-import { useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { formatProbability } from "./view";
 
@@ -37,32 +31,17 @@ export default function ProbabilityPill({
   size = "md",
   className,
 }: ProbabilityPillProps) {
-  const prevRef = useRef<number | null>(null);
-  const [flash, setFlash] = useState<"up" | "down" | null>(null);
-
-  useEffect(() => {
-    const current = typeof pct === "number" ? pct : NaN;
-    const prev = prevRef.current;
-    prevRef.current = Number.isNaN(current) ? prev : current;
-    if (prev === null || Number.isNaN(current) || current === prev) return;
-    setFlash(current > prev ? "up" : "down");
-    const timer = setTimeout(() => setFlash(null), 800);
-    return () => clearTimeout(timer);
-  }, [pct]);
-
   const isUp = delta > 0;
   const isDown = delta < 0;
 
   return (
     <span
       className={clsx(
-        "inline-flex shrink-0 items-center justify-center rounded-full font-mono font-bold tabular-nums transition-colors duration-700",
+        "inline-flex shrink-0 items-center justify-center rounded-full font-mono font-bold tabular-nums  ",
         SIZE_CLASSES[size],
         isUp && "bg-up/10 text-up",
         isDown && "bg-down/10 text-down",
         !isUp && !isDown && "bg-surface-2 text-fg",
-        flash === "up" && "bg-up/25",
-        flash === "down" && "bg-down/25",
         className,
       )}
     >

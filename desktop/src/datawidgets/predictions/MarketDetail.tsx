@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import { useQuery, queryOptions } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-shell";
+import { motion } from "motion/react";
 import {
   X,
   Star,
@@ -28,6 +29,10 @@ import {
   relativeTime,
 } from "../../utils/format";
 import { authFetch } from "../../api/client";
+import {
+  backdropMotion,
+  overlaySurfaceMotion,
+} from "../../lib/motion";
 import type {
   PredictionCandle,
   PredictionCandlesticksResponse,
@@ -145,17 +150,24 @@ export default function MarketDetail({
   const countdown = formatCloseCountdown(market.close_time, now);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onClose}
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="presentation"
     >
-      <div
+      <motion.div
+        variants={backdropMotion}
+        className="absolute inset-0 bg-black/50"
+        onClick={onClose}
+      />
+      <motion.div
+        variants={overlaySurfaceMotion}
         role="dialog"
         aria-modal="true"
         aria-label={market.title}
-        onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-edge/60 bg-surface shadow-2xl"
+        className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-edge/60 bg-surface shadow-2xl"
       >
         {/* Header */}
         <div className="flex items-start gap-2 border-b border-edge/30 px-4 py-3">
@@ -184,7 +196,7 @@ export default function MarketDetail({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-surface-hover hover:text-fg cursor-pointer"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-fg-3  hover:bg-surface-hover hover:text-fg cursor-pointer"
           >
             <X size={16} />
           </button>
@@ -218,7 +230,7 @@ export default function MarketDetail({
             {candlePts.length >= 2 ? (
               <HistoryChart points={candlePts} />
             ) : candlesLoading ? (
-              <div className="h-[88px] animate-pulse rounded-lg bg-base-100/40" />
+              <div className="h-[88px]  rounded-lg bg-base-100/40" />
             ) : history.length >= 2 ? (
               <svg
                 viewBox={`0 0 ${SPARK_W} ${SPARK_H}`}
@@ -312,7 +324,7 @@ export default function MarketDetail({
                           if (!current) onSelectMarket(s);
                         }}
                         className={clsx(
-                          "flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[12px] transition-colors",
+                          "flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-[12px] ",
                           current
                             ? "cursor-default border-accent/40 bg-accent/8"
                             : "cursor-pointer border-edge/30 bg-base-100/40 hover:border-edge/60 hover:bg-surface-hover",
@@ -353,7 +365,7 @@ export default function MarketDetail({
                       type="button"
                       onClick={() => onRemoveAlert(a.id)}
                       aria-label="Remove alert"
-                      className="text-fg-4 transition-colors hover:text-error cursor-pointer"
+                      className="text-fg-4  hover:text-error cursor-pointer"
                     >
                       <Trash2 size={13} />
                     </button>
@@ -381,7 +393,7 @@ export default function MarketDetail({
             onClick={onToggleWatch}
             aria-pressed={watched}
             className={clsx(
-              "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors cursor-pointer",
+              "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-medium  cursor-pointer",
               watched
                 ? "border-amber-400/40 bg-amber-400/10 text-amber-400"
                 : "border-edge/50 text-fg-3 hover:text-fg-2",
@@ -394,7 +406,7 @@ export default function MarketDetail({
             <button
               type="button"
               onClick={() => open(market.link!).catch(() => {})}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-predictions px-3 py-1.5 text-[12px] font-semibold text-white transition-transform hover:-translate-y-px cursor-pointer"
+              className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-predictions px-3 py-1.5 text-[12px] font-semibold text-white cursor-pointer"
             >
               <ExternalLink size={13} />
               View on Kalshi
@@ -408,8 +420,8 @@ export default function MarketDetail({
             Updated {relativeTime(market.updated_at, now, { suffix: true })}
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -556,7 +568,7 @@ function AlertForm({ onAdd }: { onAdd: (comparator: AlertComparator, threshold: 
       <button
         type="button"
         onClick={submit}
-        className="ml-auto inline-flex items-center gap-1 rounded-md bg-accent/15 px-2 py-1 text-[12px] font-medium text-accent transition-colors hover:bg-accent/25 cursor-pointer"
+        className="ml-auto inline-flex items-center gap-1 rounded-md bg-accent/15 px-2 py-1 text-[12px] font-medium text-accent  hover:bg-accent/25 cursor-pointer"
       >
         <BellPlus size={13} />
         Add

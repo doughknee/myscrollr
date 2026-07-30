@@ -1,8 +1,10 @@
 import { Fragment, useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useReducedMotion } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { ChevronDown } from "lucide-react";
 import TeamLogo from "../../components/TeamLogo";
+import QueryErrorBanner from "../../components/QueryErrorBanner";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import { standingsOptions } from "../../api/queries";
 import type { Standing } from "../../api/queries";
@@ -123,7 +125,7 @@ function GroupHeader({
 }) {
   return (
     <tr
-      className="bg-surface-hover cursor-pointer select-none hover:bg-surface-hover/80 transition-colors"
+      className="bg-surface-hover cursor-pointer select-none hover:bg-surface-hover/80 "
       onClick={onToggle}
     >
       <td colSpan={9} className="px-3 py-1.5 text-xs font-semibold text-fg-2">
@@ -131,7 +133,7 @@ function GroupHeader({
           <ChevronDown
             size={14}
             className={clsx(
-              "text-fg-3 transition-transform duration-200",
+              "text-fg-3  ",
               isCollapsed && "-rotate-90",
             )}
           />
@@ -152,6 +154,7 @@ function getZoneColor(description?: string): string | null {
 }
 
 export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
+  const reduceMotion = useReducedMotion();
   const [selected, setSelected] = useState(leagues[0] ?? "");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const favRowRef = useRef<HTMLTableRowElement | null>(null);
@@ -169,7 +172,7 @@ export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
     setCollapsed(new Set());
   }, [selected]);
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, error, isLoading, isError, isFetching, refetch } = useQuery({
     ...standingsOptions(selected),
     enabled: !!selected,
   });
@@ -178,9 +181,12 @@ export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
 
   useEffect(() => {
     if (favRowRef.current) {
-      favRowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      favRowRef.current.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "center",
+      });
     }
-  }, [standings, favoriteTeams]);
+  }, [standings, favoriteTeams, reduceMotion]);
 
   const { columns, groupedRows, hasZones } = useMemo(() => {
     const cols = getColumnsForSport(standings[0]?.sport_api);
@@ -247,8 +253,13 @@ export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
       )}
 
       {isError && (
-        <div className="flex items-center justify-center py-12 text-error text-xs">
-          Failed to load standings
+        <div className="p-3">
+          <QueryErrorBanner
+            error={error}
+            message="Couldn't load standings."
+            onRetry={() => void refetch()}
+            retrying={isFetching}
+          />
         </div>
       )}
 
@@ -303,7 +314,7 @@ export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
                             key={`${s.team_name}-${i}`}
                             ref={assignRef ? favRowRef : undefined}
                             className={clsx(
-                              "border-b border-edge/30 hover:bg-surface-hover transition-colors",
+                              "border-b border-edge/30 hover:bg-surface-hover ",
                               isFav && "bg-[#f97316]/5",
                               zoneColor
                                 ? `border-l-2 ${zoneColor}`

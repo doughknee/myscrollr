@@ -51,6 +51,7 @@ export function useDataWidgetConfig<T>(
     // Optimistic write so the control responds on the next paint instead of
     // waiting on the POST + dashboard refetch.
     onMutate: async (next: T) => {
+      setError(null);
       await queryClient.cancelQueries({ queryKey: queryKeys.dashboard });
       const previous = queryClient.getQueryData<DashboardResponse>(
         queryKeys.dashboard,
@@ -80,11 +81,12 @@ export function useDataWidgetConfig<T>(
       // the server's message verbatim instead of our generic toast so
       // users understand why the save was refused and what to change.
       const msg = err instanceof Error && err.message ? err.message : "";
-      if (msg && msg.toLowerCase().includes("plan allows")) {
-        toast.error(msg);
-      } else {
-        toast.error("Failed to save \u2014 try again");
-      }
+      const display =
+        msg && msg.toLowerCase().includes("plan allows")
+          ? msg
+          : "Failed to save \u2014 try again";
+      setError(display);
+      toast.error(display);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });

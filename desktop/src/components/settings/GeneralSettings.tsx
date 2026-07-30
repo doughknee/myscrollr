@@ -205,7 +205,7 @@ export default function GeneralSettings({
     <div className="space-y-4">
       <div className="grid gap-4 grid-cols-2 items-start">
         <div className="space-y-4">
-          <Section index={0} title="Appearance" variant="card">
+          <Section title="Appearance" variant="card">
             <SelectRow
               label="Theme"
               description="Pick a color palette"
@@ -242,7 +242,7 @@ export default function GeneralSettings({
             />
           </Section>
 
-          <Section index={1} title="Window" variant="card">
+          <Section title="Window" variant="card">
             <ToggleRow
               label="Always on top"
               description="Keep the ticker above all other windows"
@@ -257,7 +257,7 @@ export default function GeneralSettings({
             />
           </Section>
 
-          <Section index={2} title="Startup" variant="card">
+          <Section title="Startup" variant="card">
             <ToggleRow
               label="Launch on system startup"
               description="Automatically open Scrollr when you start your computer"
@@ -269,11 +269,11 @@ export default function GeneralSettings({
 
         <div className="space-y-4">
 
-          <Section index={3} title="In-app shortcuts" variant="card">
+          <Section title="In-app shortcuts" variant="card">
             <ShortcutsList />
           </Section>
 
-          <Section index={4} title="Updates" variant="card">
+          <Section title="Updates" variant="card">
             <ToggleRow
               label="Check for updates on startup"
               description="Notify me when a new version is available shortly after launch"
@@ -289,7 +289,7 @@ export default function GeneralSettings({
             <WhatsNewRow />
           </Section>
 
-          <Section index={5} title="About" variant="card">
+          <Section title="About" variant="card">
             <DisplayRow label="Version" value={appVersion ? `v${appVersion}` : "\u2014"} />
           </Section>
         </div>
@@ -357,7 +357,7 @@ function WhatsNewRow() {
       <span className="text-ui-meta">See what changed in recent versions</span>
       <button
         onClick={() => navigate({ to: "/releases" })}
-        className="flex items-center gap-1 text-ui-chip font-medium px-2.5 py-1 rounded-md text-fg-3 hover:text-fg-2 hover:bg-base-250/50 transition-all duration-150 active:scale-95 cursor-pointer"
+        className="flex items-center gap-1 text-ui-chip font-medium px-2.5 py-1 rounded-md text-fg-3 hover:text-fg-2 hover:bg-base-250/50 cursor-pointer"
       >
         <Sparkles size={12} />
         What's new
@@ -383,7 +383,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
           <span className="text-ui-meta">Check for new versions</span>
           <button
             onClick={onCheck}
-            className="text-ui-chip font-medium px-2.5 py-1 rounded-md bg-base-250 text-fg-3 hover:text-fg-2 hover:bg-base-300 transition-all duration-150 active:scale-95 cursor-pointer"
+            className="text-ui-chip font-medium px-2.5 py-1 rounded-md bg-base-250 text-fg-3 hover:text-fg-2 hover:bg-base-300 cursor-pointer"
           >
             Check for updates
           </button>
@@ -394,7 +394,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
       return (
         <div className="flex items-center justify-between px-3 py-2.5 rounded-lg">
           <span className="text-ui-meta">Checking for updates...</span>
-          <div className="w-4 h-4 border-2 border-fg-4 border-t-accent rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-fg-4 border-t-accent rounded-full " />
         </div>
       );
 
@@ -408,7 +408,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
           </div>
           <button
             onClick={onCheck}
-            className="text-ui-chip font-medium px-2.5 py-1 rounded-md text-fg-3 hover:text-fg-2 hover:bg-base-250/50 transition-all duration-150 active:scale-95 cursor-pointer"
+            className="text-ui-chip font-medium px-2.5 py-1 rounded-md text-fg-3 hover:text-fg-2 hover:bg-base-250/50 cursor-pointer"
           >
             Check again
           </button>
@@ -426,7 +426,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
             </div>
             <button
               onClick={onDownload}
-              className="text-ui-chip font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 transition-all duration-150 active:scale-95 cursor-pointer shrink-0 ml-4"
+              className="text-ui-chip font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 cursor-pointer shrink-0 ml-4"
             >
               Download & install
             </button>
@@ -465,8 +465,8 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
           >
             <div
               className={clsx(
-                "h-full rounded-full transition-all duration-300",
-                status.total > 0 ? "bg-accent" : "bg-accent/50 motion-safe:animate-pulse",
+                "h-full rounded-full ",
+                status.total > 0 ? "bg-accent" : "bg-accent/50 ",
               )}
               style={{ width: status.total > 0 ? `${pct}%` : "30%" }}
             />
@@ -488,7 +488,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
           </div>
           <button
             onClick={onRelaunch}
-            className="text-ui-chip font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 transition-all duration-150 active:scale-95 cursor-pointer"
+            className="text-ui-chip font-semibold px-2.5 py-1 rounded-md bg-accent text-surface hover:bg-accent/90 cursor-pointer"
           >
             Restart now
           </button>
@@ -508,7 +508,7 @@ function UpdateRow({ status, onCheck, onDownload, onRelaunch }: UpdateRowProps) 
           </div>
           <button
             onClick={onCheck}
-            className="text-ui-chip font-medium px-2.5 py-1 rounded-md text-fg-3 hover:text-fg-2 hover:bg-base-250/50 transition-all duration-150 active:scale-95 cursor-pointer"
+            className="text-ui-chip font-medium px-2.5 py-1 rounded-md text-fg-3 hover:text-fg-2 hover:bg-base-250/50 cursor-pointer"
           >
             Retry
           </button>

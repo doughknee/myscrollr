@@ -5,10 +5,8 @@
  * The one route for every widget — /channel/$type was retired with the
  * rest of the "widget" vocabulary.
  *
- * One route for every source means every swap is a same-route swap —
- * PageLayout stays mounted and the full stableChrome choreography
- * (bar roll + feed crossfade) plays on ALL transitions. The old
- * channel/widget route split made cross-kind swaps hard-cut.
+ * One route for every source means every swap keeps the same PageLayout
+ * chassis mounted while the routed feed content changes.
  *
  * NOTE: this is deliberately an INDEX route (widget.$id.index.tsx,
  * not widget.$id.tsx) so it doesn't become widget.$id.info.tsx's
@@ -71,10 +69,6 @@ function WidgetRoute() {
       // components own their padding.
       width="wide"
       noContentPadding
-      // Source→source swaps overlap-crossfade so the (identical) WidgetBar
-      // shell reads as stationary chrome; only the bar's contents and the
-      // feed animate.
-      stableChrome
     >
       <div className="h-full">
         <WidgetFeed id={id} manifest={manifest} />
@@ -132,7 +126,7 @@ function WidgetPending() {
       {Array.from({ length: 6 }, (_, i) => (
         <div
           key={i}
-          className="flex items-center gap-3 motion-safe:animate-pulse"
+          className="flex items-center gap-3 "
         >
           <div className="w-8 h-8 rounded-lg bg-surface-2" />
           <div className="flex-1 space-y-2">

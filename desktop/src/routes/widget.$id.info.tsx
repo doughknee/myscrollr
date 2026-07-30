@@ -11,7 +11,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
 import clsx from "clsx";
 import {
   Check,
@@ -65,15 +64,6 @@ function tierMeets(current: SubscriptionTier, required: SubscriptionTier): boole
 }
 
 // ── Shared entrance (Support-hub timing) ────────────────────────
-
-const EASE: [number, number, number, number] = [0.22, 0.61, 0.36, 1];
-function enter(index: number) {
-  return {
-    initial: { opacity: 0, y: 10 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.28, delay: 0.05 + index * 0.06, ease: EASE },
-  };
-}
 
 // ── Page ────────────────────────────────────────────────────────
 
@@ -199,8 +189,7 @@ function WidgetInfoPage() {
     <PageLayout title={item.name} parentLabel="Catalog" onParentClick={backToCatalog}>
       <div className="flex flex-col gap-7">
         {/* ── Hero — the product moment ─────────────────────── */}
-        <motion.div
-          {...enter(0)}
+        <div
           className="relative overflow-hidden rounded-2xl p-7 shadow-soft-sm"
           style={{ backgroundColor: item.hex }}
         >
@@ -267,14 +256,11 @@ function WidgetInfoPage() {
                 <>
                   <button
                     onClick={openWidget}
-                    className="group/btn flex items-center gap-1.5 rounded-lg bg-white px-5 py-2.5 text-ui-body font-semibold shadow-soft-sm transition-all duration-150 active:scale-[0.98] hover:brightness-95"
+                    className="group/btn flex items-center gap-1.5 rounded-lg bg-white px-5 py-2.5 text-ui-body font-semibold shadow-soft-sm hover:brightness-95"
                     style={{ color: item.hex }}
                   >
                     Open
-                    <ChevronRight
-                      size={15}
-                      className="transition-transform duration-150 group-hover/btn:translate-x-0.5"
-                    />
+                    <ChevronRight size={15} />
                   </button>
                 </>
               ) : primaryAction ? (
@@ -282,7 +268,7 @@ function WidgetInfoPage() {
                   onClick={primaryAction.onClick}
                   disabled={primaryAction.disabled}
                   className={clsx(
-                    "flex items-center gap-1.5 rounded-lg bg-white px-5 py-2.5 text-ui-body font-semibold shadow-soft-sm transition-all duration-150 active:scale-[0.98] hover:brightness-95",
+                    "flex items-center gap-1.5 rounded-lg bg-white px-5 py-2.5 text-ui-body font-semibold shadow-soft-sm hover:brightness-95",
                     primaryAction.disabled && "cursor-not-allowed opacity-60",
                   )}
                   style={{ color: item.hex }}
@@ -300,21 +286,18 @@ function WidgetInfoPage() {
               </span>
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* ── Ticker preview — what it feels like ───────────── */}
-        <motion.div {...enter(1)} className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
           <span className="text-ui-meta font-semibold uppercase tracking-wide text-fg-4">
             In your ticker
           </span>
           <div className="relative overflow-hidden rounded-xl border border-edge/40 bg-base-150/40 px-3 py-2.5">
             <div className="flex items-center gap-2">
               {previewChips.map((chip, i) => (
-                <motion.div
+                <div
                   key={i}
-                  initial={{ opacity: 0, x: 14 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.25 + i * 0.09, ease: EASE }}
                   className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5"
                   style={{
                     borderColor: `${item.hex}44`,
@@ -323,22 +306,22 @@ function WidgetInfoPage() {
                   }}
                 >
                   <span
-                    className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full"
+                    className="h-1.5 w-1.5 shrink-0 rounded-full"
                     style={{ backgroundColor: item.hex }}
                   />
                   <span
                     className="h-1.5 flex-1 rounded-full opacity-40"
                     style={{ backgroundColor: item.hex }}
                   />
-                </motion.div>
+                </div>
               ))}
               <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-base-100 to-transparent" />
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* ── Quick facts ────────────────────────────────────── */}
-        <motion.div {...enter(2)} className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {[
             {
               icon: Tag,
@@ -370,33 +353,30 @@ function WidgetInfoPage() {
               <span className="text-ui-meta font-medium text-fg-2">{fact.value}</span>
             </div>
           ))}
-        </motion.div>
+        </div>
 
         {/* ── About ──────────────────────────────────────────── */}
         {item.info.about && (
-          <motion.section {...enter(3)}>
+          <section>
             <h2 className="text-ui-meta font-semibold uppercase tracking-wide text-fg-4">
               About
             </h2>
             <p className="mt-2 text-ui-body leading-relaxed text-fg-2">
               {item.info.about}
             </p>
-          </motion.section>
+          </section>
         )}
 
         {/* ── How to use — numbered step cards ───────────────── */}
         {(item.info.usage?.length ?? 0) > 0 && (
-          <motion.section {...enter(4)}>
+          <section>
             <h2 className="text-ui-meta font-semibold uppercase tracking-wide text-fg-4">
               How to use it
             </h2>
             <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
               {(item.info.usage ?? []).map((point, i) => (
-                <motion.div
+                <div
                   key={i}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, delay: 0.3 + i * 0.06, ease: EASE }}
                   className="flex items-start gap-3 rounded-xl border border-edge/35 bg-base-150/35 p-3.5"
                 >
                   <span
@@ -406,15 +386,14 @@ function WidgetInfoPage() {
                     {i + 1}
                   </span>
                   <span className="text-ui-meta leading-relaxed text-fg-2">{point}</span>
-                </motion.div>
+                </div>
               ))}
             </div>
-          </motion.section>
+          </section>
         )}
 
         {/* ── Plan / swap / remove band ──────────────────────── */}
-        <motion.div
-          {...enter(5)}
+        <div
           className="flex flex-col gap-3 rounded-xl border border-edge/35 bg-base-150/25 p-4"
         >
           <div className="flex items-center justify-between gap-3">
@@ -423,7 +402,7 @@ function WidgetInfoPage() {
               <button
                 onClick={() => void removeWidget()}
                 disabled={removing}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-ui-meta font-medium text-fg-4 transition-colors hover:bg-error/10 hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-ui-meta font-medium text-fg-4 hover:bg-error/10 hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Trash2 size={13} />
                 Remove
@@ -448,11 +427,11 @@ function WidgetInfoPage() {
               Removing frees the slot instantly — you can swap widgets any time.
             </p>
           )}
-        </motion.div>
+        </div>
 
         {/* ── More like this ─────────────────────────────────── */}
         {related.length > 0 && (
-          <motion.section {...enter(6)}>
+          <section>
             <h2 className="text-ui-meta font-semibold uppercase tracking-wide text-fg-4">
               More like this
             </h2>
@@ -465,7 +444,7 @@ function WidgetInfoPage() {
                     onClick={() =>
                       navigate({ to: "/widget/$id/info", params: { id: rel.id } })
                     }
-                    className="group/rel flex items-center gap-2.5 rounded-xl border border-edge/35 bg-base-150/35 p-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-edge/60 hover:shadow-soft-sm"
+                    className="group/rel flex items-center gap-2.5 rounded-xl border border-edge/35 bg-base-150/35 p-3 text-left hover:border-edge/60 hover:shadow-soft-sm"
                   >
                     <span
                       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
@@ -485,7 +464,7 @@ function WidgetInfoPage() {
                 );
               })}
             </div>
-          </motion.section>
+          </section>
         )}
       </div>
     </PageLayout>

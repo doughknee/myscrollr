@@ -6,7 +6,6 @@
  * (dense card grid, tooltip-labeled rows).
  */
 import { useCallback, useMemo } from "react";
-import { motion } from "motion/react";
 import { clsx } from "clsx";
 import { Plus, Trash2, Lock } from "lucide-react";
 import { resetCategory, removeTickerRow, setTickerRowSourceMembership } from "../../preferences";
@@ -179,14 +178,10 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
   return (
     <div>
       {/* ── Settings cards ────────────────────────────────────── */}
-      <motion.div
-        layout="position"
-        transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-        className="grid gap-4 grid-cols-2 items-start"
-      >
+      <div className="grid gap-4 grid-cols-2 items-start">
         <div className="space-y-4 min-w-0">
         {/* ── Behavior ───────────────────────────────────────── */}
-        <Section index={0} title="Behavior" variant="card">
+        <Section title="Behavior" variant="card">
           <ToggleRow
             label="Pause on hover"
             description="Slow the ticker while you hover so chips are easier to read."
@@ -219,7 +214,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
         </Section>
 
         {/* ── Display ────────────────────────────────────────── */}
-        <Section index={1} title="Display" variant="card">
+        <Section title="Display" variant="card">
           <SegmentedRow
             label="Detail level"
             description="Single line vs. detail row under each chip."
@@ -261,7 +256,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
 
         <div className="space-y-4 min-w-0">
         {/* ── Motion ─────────────────────────────────────────── */}
-        <Section index={2} title="Motion" variant="card">
+        <Section title="Motion" variant="card">
           <SliderRow
             label="Speed"
             description="How fast the ticker scrolls."
@@ -275,7 +270,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
         </Section>
 
         {/* ── Rows ───────────────────────────────────────────── */}
-        <Section index={3} title={`Rows (${rowCount}/${maxRows})`} variant="card">
+        <Section title={`Rows (${rowCount}/${maxRows})`} variant="card">
           <div className="px-3 pt-1 pb-2 space-y-2">
             {rows.map((row, rowIdx) => (
               <RowCard
@@ -294,7 +289,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
               onClick={addRow}
               disabled={!canAddRow}
               className={clsx(
-                "w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed text-ui-meta font-medium transition-colors",
+                "w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed text-ui-meta font-medium ",
                 !canAddRow
                   ? "border-edge/30 text-fg-4 cursor-not-allowed"
                   : "border-edge/50 text-fg-3 hover:text-accent hover:border-accent/60 cursor-pointer",
@@ -313,7 +308,7 @@ export default function TickerSettings({ prefs, onPrefsChange }: TickerSettingsP
           </div>
         </Section>
         </div>
-      </motion.div>
+      </div>
 
       {/* ── Reset ──────────────────────────────────────────── */}
       <div className="flex items-center justify-end pt-3">
@@ -363,7 +358,7 @@ function RowCard({
           <button
             type="button"
             onClick={onRemove}
-            className="text-fg-4 hover:text-accent-red transition-colors cursor-pointer p-1 rounded"
+            className="text-fg-4 hover:text-accent-red cursor-pointer p-1 rounded"
             aria-label={`Remove row ${rowIndex + 1}`}
           >
             <Trash2 size={12} />
@@ -390,7 +385,7 @@ function RowCard({
                   type="button"
                   onClick={() => onToggleSource(src.id)}
                   className={clsx(
-                    "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-ui-meta font-mono transition-all cursor-pointer",
+                    "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-ui-meta font-mono cursor-pointer",
                     selected
                       ? "border-accent/60 bg-accent/10 text-fg"
                       : "border-edge/40 bg-transparent text-fg-3 hover:border-edge/60 hover:text-fg-2",

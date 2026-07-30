@@ -77,7 +77,6 @@ function SupportPage() {
         title="Support"
         subtitle="Find help, file bugs, or contact us"
         width="wide"
-        stableChrome
       >
         <SupportHub onSelectSection={setActiveSection} />
       </PageLayout>
@@ -98,7 +97,6 @@ function SupportPage() {
       parentLabel="Support"
       onParentClick={() => setActiveSection(null)}
       width="wide"
-      stableChrome
     >
       <WidgetBar>
         <Segmented

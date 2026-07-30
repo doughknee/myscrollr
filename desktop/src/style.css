@@ -75,18 +75,6 @@
   --shadow-soft-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
   --shadow-soft-md: 0 4px 16px rgba(0, 0, 0, 0.3);
 
-  /* ── Motion easings ───────────────────────────────────────────
-     Generated via motion-studio. Use these instead of cubic-bezier
-     so the whole app shares one feel.
-       --ease-snap: short, bouncy. Chevrons, icon rotations, hover
-         color flips that should feel responsive but not robotic.
-       --ease-pop: slightly longer, more bounce. Menu open/close,
-         element entry animations.
-       --ease-out-soft: standard ease-out for non-spring transitions
-         (color fades, opacity). */
-  --ease-snap: linear(0, 0.1494, 0.4161, 0.6554, 0.8246, 0.9269, 0.9804, 1.0037, 1.0107, 1.0104, 1.0076, 1.0048, 1.0026, 1.0012, 1.0004, 1, 1);
-  --ease-pop: linear(0, 0.347, 0.7676, 0.9735, 1.0268, 1.0223, 1.0093, 1.0018, 0.9994, 1, 0.9996, 1);
-  --ease-out-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 /* ── Theme palettes ─────────────────────────────────────────────
@@ -976,12 +964,20 @@
   line-height: 16px;
 }
 
-/* Smooth theme transition */
+/* The ticker keeps its existing theme transition. */
 #desktop-shell.theme-transition,
-#desktop-shell.theme-transition *,
-#app-shell.theme-transition,
-#app-shell.theme-transition * {
+#desktop-shell.theme-transition * {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease !important;
+}
+
+/* The main app is intentionally motion-free. */
+#app-shell,
+#app-shell *,
+#app-shell *::before,
+#app-shell *::after {
+  animation: none !important;
+  scroll-behavior: auto !important;
+  transition: none !important;
 }
 
 /* Light-mode scrollbar — applies to every theme family's light variant.
@@ -1172,34 +1168,6 @@ body {
   cursor: pointer;
 }
 
-/* ── Scroll logo channel-color glow ─────────────────────────────── */
-/* Cycles a soft drop-shadow through the four channel colors
-   while the gradient fill inside the SVG shifts in sync. */
-
-@keyframes scroll-glow {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(52, 211, 153, 0.5)); }
-  25%      { filter: drop-shadow(0 0 4px rgba(255, 71, 87, 0.5)); }
-  50%      { filter: drop-shadow(0 0 4px rgba(0, 212, 255, 0.5)); }
-  75%      { filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.5)); }
-}
-
-.scroll-logo-alive {
-  animation: scroll-glow 8s ease-in-out infinite;
-}
-
-/* ── Live indicator dot ─────────────────────────────────────────── */
-
-/* ── Widget card animations ──────────────────────────────────── */
-@keyframes widget-card-enter {
-  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes widget-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%      { opacity: 0.4; transform: scale(0.75); }
-}
-
 /* ── Global focus-visible ring ──────────────────────────────────── */
 /* Provides a consistent, visible focus indicator for keyboard users.
    Uses focus-visible so mouse clicks don't show the ring. */
@@ -1220,6 +1188,11 @@ textarea:focus-visible,
      box-shadow ring double-drew on every keyboard focus.) */
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+/* Contained controls draw focus on their shell, not twice around the input. */
+input[data-contained-focus]:focus-visible {
+  outline: none;
 }
 
 /* ── Reduced motion ─────────────────────────────────────────────── */

@@ -36,14 +36,14 @@ export default function Disclosure({
         <ChevronDown
           size={16}
           className={clsx(
-            "shrink-0 text-fg-3 transition-transform duration-200",
+            "shrink-0 text-fg-3 ",
             open && "rotate-180",
           )}
         />
       </button>
       <div
         className={clsx(
-          "overflow-hidden transition-all duration-200",
+          "overflow-hidden ",
           open ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0",
         )}
       >

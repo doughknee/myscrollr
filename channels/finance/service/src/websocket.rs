@@ -176,7 +176,12 @@ async fn ws_read(
                                 Ok(ev) if ev.event == "price" => {
                                     // Real-time price update
                                     if let (Some(symbol), Some(price), Some(ts)) = (ev.symbol, ev.price, ev.timestamp) {
-                                        let trade = TradeData { symbol, price, timestamp: ts };
+                                        let trade = TradeData {
+                                            symbol,
+                                            price,
+                                            timestamp: ts,
+                                            day_volume: ev.day_volume,
+                                        };
                                         handle_trade_update(trade, &state).await;
                                     }
                                 }
@@ -400,7 +405,7 @@ async fn process_batch(state_arc: Arc<RwLock<WebSocketState>>, client: Arc<Clien
 }
 
 async fn process_single_trade(trade: TradeData, trades_map: Arc<HashMap<String, DatabaseTradeData>>, client: Arc<Client>, api_key: &str, pool: Arc<PgPool>) -> anyhow::Result<()> {
-    let (symbol, price) = (trade.symbol, trade.price);
+    let (symbol, price, day_volume) = (trade.symbol, trade.price, trade.day_volume);
 
     let existing_record = trades_map.get(&symbol).cloned();
     let mut current_record = existing_record.unwrap_or_else(|| {
@@ -419,6 +424,7 @@ async fn process_single_trade(trade: TradeData, trades_map: Arc<HashMap<String, 
             price_change: 0.0,
             percentage_change: 0.0,
             direction: String::from("up"),
+            day_volume: 0,
             last_updated: Utc::now(),
         }
     });
@@ -485,7 +491,8 @@ async fn process_single_trade(trade: TradeData, trades_map: Arc<HashMap<String, 
         current_price,
         price_change,
         percentage_change,
-        direction
+        direction,
+        day_volume,
     ).await;
 
     Ok(())

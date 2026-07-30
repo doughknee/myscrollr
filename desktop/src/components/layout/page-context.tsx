@@ -79,7 +79,7 @@ export function usePageIdentity(): PageIdentity | null {
  * Routes call this from inside PageLayout to publish their identity.
  * Effect-based so the identity stays in sync with prop changes; the
  * cleanup clears the identity on unmount so brief flashes of "stale"
- * identity don't appear during route transitions.
+ * identity don't appear during route changes.
  */
 export function useRegisterPageIdentity(identity: PageIdentity) {
   const ctx = useContext(PageIdentityContext);

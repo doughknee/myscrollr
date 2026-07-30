@@ -144,18 +144,22 @@ export function selectSportsForTicker(
 }
 
 /**
- * Feed-side filter mirroring `selectSportsForTicker` — same day window,
- * same live-game bypass, no re-sort (the feed has its own grouping).
+ * Feed-side selector: the same useful default order as the ticker, with
+ * favorite teams promoted ahead of live, upcoming, and recent finals.
  */
 export function selectSportsForFeed(
   games: Game[],
   config: SportsDisplayConfig | null | undefined,
+  favoriteTeams: ReadonlySet<string>,
   now: number = Date.now(),
 ): Game[] {
-  const cfg = config ?? {};
-  const daysBack = cfg.daysBack ?? SPORTS_WINDOW_DEFAULTS.daysBack;
-  const daysAhead = cfg.daysAhead ?? SPORTS_WINDOW_DEFAULTS.daysAhead;
-  return games.filter((g) => inDayWindow(g, daysBack, daysAhead, now));
+  return selectSportsForTicker(games, config, now).sort((a, b) => {
+    const aFavorite =
+      favoriteTeams.has(a.home_team_name) || favoriteTeams.has(a.away_team_name);
+    const bFavorite =
+      favoriteTeams.has(b.home_team_name) || favoriteTeams.has(b.away_team_name);
+    return Number(bFavorite) - Number(aFavorite);
+  });
 }
 
 // ── Helper: extract sports display config from dashboard ────────

@@ -22,7 +22,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { getVersion } from "@tauri-apps/api/app";
 import { open } from "@tauri-apps/plugin-shell";
 import clsx from "clsx";
-import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowDown,
   ArrowUp,
@@ -207,7 +206,7 @@ function SortHeader({
       <button
         onClick={onClick}
         className={clsx(
-          "flex items-center gap-1 rounded-md px-1 py-0.5 -mx-1 text-ui-section transition-colors duration-150 cursor-pointer",
+          "flex items-center gap-1 rounded-md px-1 py-0.5 -mx-1 text-ui-section cursor-pointer",
           active ? "text-accent" : "hover:text-fg-2",
         )}
       >
@@ -263,7 +262,7 @@ function ReleaseRow({
         aria-expanded={expanded}
         className={clsx(
           ROW_GRID,
-          "w-full px-4 py-3 text-left transition-colors duration-150 cursor-pointer",
+          "w-full px-4 py-3 text-left cursor-pointer",
           expanded ? "bg-base-150/60" : "hover:bg-base-150/50",
         )}
       >
@@ -298,22 +297,15 @@ function ReleaseRow({
         <ChevronDown
           size={15}
           className={clsx(
-            "justify-self-end text-fg-3 transition-transform duration-200",
+            "justify-self-end text-fg-3 ",
             expanded && "rotate-180",
           )}
         />
       </button>
 
       {/* Expanded notes */}
-      <AnimatePresence initial={false}>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: [0.22, 0.61, 0.36, 1] }}
-            className="overflow-hidden"
-          >
+      {expanded && (
+        <div className="overflow-hidden">
             <div className="border-t border-edge/25 bg-base-100/40 px-4 py-4">
               {entry.body.trim() ? (
                 <div
@@ -327,16 +319,15 @@ function ReleaseRow({
               <div className="mt-4 flex justify-end border-t border-edge/25 pt-3">
                 <button
                   onClick={() => open(entry.url).catch(() => {})}
-                  className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-ui-chip font-medium text-fg-3 transition-all duration-150 hover:bg-base-250/50 hover:text-fg-2 active:scale-95 cursor-pointer"
+                  className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-ui-chip font-medium text-fg-3 hover:bg-base-250/50 hover:text-fg-2 cursor-pointer"
                 >
                   <ExternalLink size={12} />
                   View on GitHub
                 </button>
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }
@@ -361,10 +352,10 @@ function SkeletonTable() {
           key={i}
           className={clsx(ROW_GRID, "border-b border-edge/25 px-4 py-3.5 last:border-b-0")}
         >
-          <span className="h-3.5 w-16 animate-pulse rounded bg-base-250" />
-          <span className="h-3.5 w-24 animate-pulse rounded bg-base-250" />
+          <span className="h-3.5 w-16 rounded bg-base-250" />
+          <span className="h-3.5 w-24 rounded bg-base-250" />
           <span
-            className="h-3.5 animate-pulse rounded bg-base-250"
+            className="h-3.5 rounded bg-base-250"
             style={{ width: `${45 + ((i * 17) % 40)}%` }}
           />
           <span aria-hidden />
@@ -387,7 +378,7 @@ function EmptyState() {
       </p>
       <button
         onClick={() => open(RELEASES_PAGE_URL).catch(() => {})}
-        className="mt-4 flex items-center gap-1.5 rounded-lg bg-accent/10 px-3.5 py-1.5 text-ui-body font-semibold text-accent transition-all duration-150 hover:bg-accent/20 active:scale-[0.98] cursor-pointer"
+        className="mt-4 flex items-center gap-1.5 rounded-lg bg-accent/10 px-3.5 py-1.5 text-ui-body font-semibold text-accent hover:bg-accent/20 cursor-pointer"
       >
         <ExternalLink size={14} />
         View releases on GitHub

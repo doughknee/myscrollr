@@ -32,6 +32,7 @@ const CONTRACT: &[(&str, &[(&str, &str)])] = &[
         ("price_change", "numeric"),
         ("percentage_change", "numeric"),
         ("direction", "character varying"),
+        ("day_volume", "bigint"),
     ]),
     ("tracked_symbols", &[
         ("symbol", "character varying"),

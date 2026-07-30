@@ -34,7 +34,7 @@ export default function AuthGate({ onLogin }: AuthGateProps) {
         {/* Sign in button */}
         <button
           onClick={onLogin}
-          className="w-full px-6 py-2.5 rounded-lg bg-accent text-surface text-sm font-medium hover:bg-accent/90 transition-colors"
+          className="w-full px-6 py-2.5 rounded-lg bg-accent text-surface text-sm font-medium hover:bg-accent/90 "
         >
           Sign In
         </button>
@@ -44,7 +44,7 @@ export default function AuthGate({ onLogin }: AuthGateProps) {
           Don&apos;t have an account?{" "}
           <button
             onClick={onLogin}
-            className="text-accent hover:text-accent/80 transition-colors font-medium"
+            className="text-accent hover:text-accent/80 font-medium"
           >
             Create one
           </button>

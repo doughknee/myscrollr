@@ -7,21 +7,28 @@
  *   │ Sports     │
  *   │ + 2/3      │  ← slot chip: add-source CTA + cap meter in one
  *   │    ⋮       │
- *   │ [Account ▾]│⇤│  ← footer chip: Account/Support menu
+ *   │ [Account ▾]│⇤│  ← footer chip: account + app menu
  *   └────────────┘      menu + collapse toggle
  *
- * Home navigation lives on the Scrollr brand mark in the TopBar;
- * connection/ticker status lives in the TopBar too. The sidebar
- * stays minimal: sources are the rail, everything app-level hides
- * behind the footer account chip.
+ * Home and Customize lead the rail. Connection status and the other
+ * account-level destinations live behind the footer account chip.
  *
  * Defaults to the 48px icon-only rail (tooltips carry labels; the
  * slot chip shows cap dots) — a slot-capped source list doesn't fill
  * a 200px panel. Expanding is one click and the pref persists.
  */
-import { useState, forwardRef } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { ButtonHTMLAttributes, Ref } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
   ArrowUpRight,
   ChevronDown,
   Home,
@@ -32,17 +39,21 @@ import {
   Plus,
   RadioTower,
   SlidersHorizontal,
+  Sparkles,
   Trash2,
   UserCircle,
 } from "lucide-react";
 import clsx from "clsx";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import Tooltip from "./Tooltip";
 import OverflowMenu from "./OverflowMenu";
+import { DELIVERY_STATE_META } from "./ConnectionIndicator";
+import { controlTransition } from "../lib/motion";
 import type { DataWidgetManifest, WidgetManifest } from "../types";
 import { loadPref, savePref } from "../preferences";
 import { TIER_LABELS, getUserIdentity } from "../auth";
 import type { SubscriptionTier } from "../auth";
+import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
 import { getMaxWidgets } from "../tierLimits";
 
 // ── Props ───────────────────────────────────────────────────────
@@ -106,12 +117,18 @@ interface SidebarProps {
   isMarketplace: boolean;
   /** Whether the support page is active. */
   isSupport: boolean;
+  /** Whether the What's New page is active. */
+  isReleases: boolean;
+  /** Whether the Status page is active. */
+  isStatus: boolean;
   /** Whether the home feed is active. Drives the pinned Home row. */
   isFeed: boolean;
   /** Currently active widget or widget ID (for highlighting). */
   activeItem: string;
   /** Subscription tier — shown on the footer account chip. */
   tier: SubscriptionTier;
+  /** Current data-delivery health — shown on the account chip. */
+  health: DeliveryHealth;
 
   /** Resolved enabled-source manifest data, in canonical order. */
   sources: SidebarSource[];
@@ -126,6 +143,10 @@ interface SidebarProps {
   onNavigateToAccount: () => void;
   /** Navigate to the support page. */
   onNavigateToSupport: () => void;
+  /** Navigate to the What's New page. */
+  onNavigateToReleases: () => void;
+  /** Navigate to the Status page. */
+  onNavigateToStatus: () => void;
   /** Navigate to a specific source (widget or widget) feed. */
   onSelectItem: (id: string) => void;
 
@@ -134,6 +155,8 @@ interface SidebarProps {
   onInfoItem: (id: string) => void;
   /** Toggle the source's presence on the ticker. */
   onToggleItemTicker: (source: SidebarSource) => void;
+  /** Move the widget within the shared sidebar order. */
+  onMoveItem: (id: string, direction: "up" | "down") => void;
   /** Remove the widget (frees its slot). */
   onRemoveItem: (source: SidebarSource) => void;
 }
@@ -145,18 +168,24 @@ export default function Sidebar({
   isAccount,
   isMarketplace,
   isSupport,
+  isReleases,
+  isStatus,
   isFeed,
   activeItem,
   tier,
+  health,
   sources,
   onNavigateHome,
   onNavigateToMarketplace,
   onNavigateToCustomize,
   onNavigateToAccount,
   onNavigateToSupport,
+  onNavigateToReleases,
+  onNavigateToStatus,
   onSelectItem,
   onInfoItem,
   onToggleItemTicker,
+  onMoveItem,
   onRemoveItem,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(() =>
@@ -171,6 +200,66 @@ export default function Sidebar({
     x: number;
     y: number;
   } | null>(null);
+  const asideRef = useRef<HTMLElement>(null);
+  const indicatorFrame = useRef<number | null>(null);
+  const [indicator, setIndicator] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    marketplace: boolean;
+  } | null>(null);
+
+  const measureIndicator = useCallback(() => {
+    const aside = asideRef.current;
+    const target = aside?.querySelector<HTMLElement>(
+      '[data-sidebar-active="true"]',
+    );
+
+    if (!aside || !target) {
+      setIndicator(null);
+      return;
+    }
+
+    const asideRect = aside.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    setIndicator({
+      x: targetRect.left - asideRect.left,
+      y: targetRect.top - asideRect.top,
+      width: targetRect.width,
+      height: targetRect.height,
+      marketplace: isMarketplace,
+    });
+  }, [isMarketplace]);
+
+  const scheduleIndicatorMeasure = useCallback(() => {
+    if (indicatorFrame.current !== null) return;
+    indicatorFrame.current = requestAnimationFrame(() => {
+      indicatorFrame.current = null;
+      measureIndicator();
+    });
+  }, [measureIndicator]);
+
+  useEffect(
+    () => () => {
+      if (indicatorFrame.current !== null) {
+        cancelAnimationFrame(indicatorFrame.current);
+      }
+    },
+    [],
+  );
+
+  useLayoutEffect(() => {
+    measureIndicator();
+  }, [
+    activeItem,
+    collapsed,
+    isCustomize,
+    isFeed,
+    isMarketplace,
+    measureIndicator,
+    sources,
+  ]);
 
   function toggleCollapsed() {
     const next = !collapsed;
@@ -182,11 +271,28 @@ export default function Sidebar({
 
   return (
     <aside
+      ref={asideRef}
+      onScrollCapture={scheduleIndicatorMeasure}
       className={clsx(
-        "flex flex-col shrink-0 h-full overflow-hidden select-none transition-[width] duration-200 ease-out",
+        "relative flex flex-col shrink-0 h-full overflow-hidden select-none ",
         collapsed ? "w-[48px]" : "w-[200px]",
       )}
     >
+      {indicator && (
+        <motion.span
+          aria-hidden
+          initial={false}
+          style={{ width: indicator.width, height: indicator.height }}
+          animate={{
+            transform: `translate(${indicator.x}px, ${indicator.y}px)`,
+          }}
+          transition={controlTransition}
+          className={clsx(
+            "pointer-events-none absolute left-0 top-0 z-0 rounded-lg",
+            indicator.marketplace ? "bg-accent/15" : "bg-accent/10",
+          )}
+        />
+      )}
       {/* ── App destinations — Home + Customize above the sources,
           Claude-desktop style: the rail leads with where you GO, then
           lists what you FOLLOW. */}
@@ -225,26 +331,35 @@ export default function Sidebar({
         collapsed={collapsed}
         className="flex-1 overflow-y-auto scrollbar-thin"
       >
-        {sources.map((source) => (
-          <NavItem
-            key={source.id}
-            icon={<SourceGlyph source={source} />}
-            label={source.name}
-            active={activeItem === source.id}
-            collapsed={collapsed}
-            onClick={() => onSelectItem(source.id)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              setMenu({ source, x: e.clientX, y: e.clientY });
-            }}
-          />
-        ))}
-
+        <AnimatePresence initial={false}>
+          {sources.map((source) => (
+            <motion.div
+              key={source.id}
+              layout="position"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={controlTransition}
+            >
+              <NavItem
+                icon={<SourceGlyph source={source} />}
+                label={source.name}
+                active={activeItem === source.id}
+                collapsed={collapsed}
+                onClick={() => onSelectItem(source.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setMenu({ source, x: e.clientX, y: e.clientY });
+                }}
+              />
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </NavGroup>
 
       {/* ── Workspace ─────────────────────────────────────────── */}
       {/* ── Footer: account chip + collapse ─────────────────────
-          Account + Support live behind one chip menu — Customize is
+          Account-level destinations live behind one chip menu — Customize is
           a top-level rail item, and the sources own the rows. */}
       <div
         className={clsx(
@@ -261,7 +376,8 @@ export default function Sidebar({
             <AccountChip
               collapsed={collapsed}
               tierLabel={TIER_LABELS[tier]}
-              active={isAccount || isSupport}
+              health={health}
+              active={isAccount || isSupport || isReleases || isStatus}
             />
           }
           items={[
@@ -270,6 +386,23 @@ export default function Sidebar({
               label: "Account",
               icon: UserCircle,
               onSelect: onNavigateToAccount,
+            },
+            {
+              key: "status",
+              label: "Status",
+              hint: health.label,
+              icon: DELIVERY_STATE_META[health.state].icon,
+              onSelect: onNavigateToStatus,
+            },
+            {
+              key: "releases",
+              label: "What's new",
+              icon: Sparkles,
+              onSelect: onNavigateToReleases,
+            },
+            {
+              key: "app-divider",
+              divider: true,
             },
             {
               key: "support",
@@ -285,7 +418,6 @@ export default function Sidebar({
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={clsx(
               "flex items-center justify-center shrink-0 rounded-lg text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
-              "transition-all duration-150 active:scale-[0.97]",
               collapsed ? "w-full py-1.5" : "w-7 h-7",
             )}
           >
@@ -311,6 +443,20 @@ export default function Sidebar({
                   label: "Open",
                   icon: ArrowUpRight,
                   onSelect: () => onSelectItem(menu.source.id),
+                },
+                {
+                  key: "move-up",
+                  label: "Move up",
+                  icon: ArrowUp,
+                  disabled: sources[0]?.id === menu.source.id,
+                  onSelect: () => onMoveItem(menu.source.id, "up"),
+                },
+                {
+                  key: "move-down",
+                  label: "Move down",
+                  icon: ArrowDown,
+                  disabled: sources.at(-1)?.id === menu.source.id,
+                  onSelect: () => onMoveItem(menu.source.id, "down"),
                 },
                 {
                   key: "ticker",
@@ -402,32 +548,23 @@ function NavItem({
       <button
         onClick={onClick}
         onContextMenu={onContextMenu}
+        data-sidebar-active={active}
         aria-current={active ? "page" : undefined}
         aria-label={collapsed ? label : undefined}
         className={clsx(
           "relative flex items-center w-full rounded-lg font-medium",
-          "transition-all duration-150 active:scale-[0.97]",
           collapsed
             ? "justify-center py-1.5 px-0"
             : "gap-2.5 px-2.5 py-1.5 text-ui-body",
           active ? "text-fg" : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
         )}
       >
-        {/* Active indicator — filled pill behind the row. layoutId
-            makes it slide between nav items when the active page
-            changes (same pattern as the TopBar tab pill; z-0 fill +
-            z-10 content so labels stay above it mid-flight). */}
-        {active && (
-          <motion.span
-            layoutId="sidebar-active-indicator"
-            transition={{ type: "spring", stiffness: 380, damping: 30 }}
-            className="absolute inset-0 z-0 rounded-lg bg-accent/10"
-          />
-        )}
         <span className="relative z-10 shrink-0 flex items-center justify-center w-5 h-5">
           {icon}
         </span>
-        {!collapsed && <span className="relative z-10 truncate">{label}</span>}
+        {!collapsed && (
+          <span className="relative z-10 truncate">{label}</span>
+        )}
       </button>
     </Tooltip>
   );
@@ -467,10 +604,11 @@ function SlotChip({
     <Tooltip content={collapsed ? label : undefined} side="right">
       <button
         onClick={onClick}
+        data-sidebar-active={active}
+        aria-current={active ? "page" : undefined}
         aria-label={label}
         className={clsx(
           "relative flex items-center w-full rounded-lg font-medium",
-          "transition-all duration-150 active:scale-[0.97]",
           collapsed
             ? "justify-center py-1.5 px-0"
             : "gap-2.5 px-2.5 py-1.5 text-ui-body",
@@ -479,17 +617,6 @@ function SlotChip({
             : "text-accent/85 hover:bg-accent/10 hover:text-accent",
         )}
       >
-        {/* Same shared active pill as NavItem — without it, navigating
-            source → catalog unmounted the indicator with no destination
-            (the highlight vanished instead of sliding here). The static
-            bg is dropped while active so the pill is the one fill. */}
-        {active && (
-          <motion.span
-            layoutId="sidebar-active-indicator"
-            transition={{ type: "spring", stiffness: 380, damping: 30 }}
-            className="absolute inset-0 z-0 rounded-lg bg-accent/15"
-          />
-        )}
         <span className="relative z-10 shrink-0 flex items-center justify-center w-5 h-5">
           <Plus size={15} strokeWidth={2.5} />
         </span>
@@ -529,21 +656,23 @@ function SlotChip({
 }
 
 // ── Account chip ────────────────────────────────────────────────
-// Footer trigger for the app-level menu (Account/
-// Support). floating-ui injects ref + aria handlers via cloneElement,
+// Footer trigger for the app-level menu. floating-ui injects ref +
+// aria handlers via cloneElement,
 // so this is a forwardRef-compatible button (same pattern as the
-// TopBar's MoreTabsTrigger). `active` marks that one of the menu's
-// pages is currently open.
+// other custom triggers). `active` marks that one of the menu's pages
+// is currently open.
 
 const AccountChip = forwardRef(function AccountChip(
   {
     collapsed,
     tierLabel,
+    health,
     active,
     ...props
   }: ButtonHTMLAttributes<HTMLButtonElement> & {
     collapsed: boolean;
     tierLabel: string;
+    health: DeliveryHealth;
     active: boolean;
   },
   ref: Ref<HTMLButtonElement>,
@@ -557,15 +686,18 @@ const AccountChip = forwardRef(function AccountChip(
   const { name, email } = getUserIdentity();
   const displayName = name || email?.split("@")[0] || "Account";
   const initial = displayName.charAt(0).toUpperCase();
+  const statusMeta = DELIVERY_STATE_META[health.state];
+  const StatusIcon = statusMeta.icon;
 
   return (
     <button
       ref={ref}
       type="button"
       {...props}
+      aria-label={`Account and app. Connection status: ${health.label}.`}
+      aria-current={active ? "page" : undefined}
       className={clsx(
         "flex items-center rounded-lg min-w-0",
-        "transition-all duration-150 active:scale-[0.97]",
         collapsed
           ? "w-full justify-center py-1.5"
           : "flex-1 gap-2 px-1.5 py-1",
@@ -577,12 +709,21 @@ const AccountChip = forwardRef(function AccountChip(
       {/* Initial avatar */}
       <span
         className={clsx(
-          "shrink-0 flex items-center justify-center rounded-full",
+          "relative shrink-0 flex items-center justify-center rounded-full",
           "bg-accent/15 text-accent text-ui-chip font-semibold",
           collapsed ? "w-6 h-6" : "w-7 h-7",
         )}
       >
         {initial}
+        <span
+          aria-hidden
+          className={clsx(
+            "absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-surface bg-surface",
+            statusMeta.text,
+          )}
+        >
+          <StatusIcon size={9} strokeWidth={2.5} />
+        </span>
       </span>
       {!collapsed && (
         <>
@@ -591,14 +732,13 @@ const AccountChip = forwardRef(function AccountChip(
               {displayName}
             </span>
             <span className="w-full truncate text-left text-ui-meta text-fg-4">
-              {tierLabel} plan
+              {tierLabel}
             </span>
           </span>
           <ChevronDown
             size={11}
             className="ml-auto shrink-0 text-fg-4"
             style={{
-              transition: "transform 300ms var(--ease-snap)",
               transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
             }}
           />

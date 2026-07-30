@@ -9,12 +9,12 @@
  * Configure page wraps it in its fillHeight scroller until teardown.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Ghost, Link2, Loader2 } from "lucide-react";
-import { motion } from "motion/react";
+import { Ghost, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { open } from "@tauri-apps/plugin-shell";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "../../api/client";
+import LoadingGlyph from "../../components/LoadingGlyph";
 import {
   fantasyStatusOptions,
   fantasyLeaguesOptions,
@@ -326,9 +326,7 @@ export default function YahooConnectFlow({ hex }: YahooConnectFlowProps) {
 
       {/* ── DISCONNECTED ──────────────────────────────────────── */}
       {phase === "disconnected" && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
+        <div
           className="text-center py-10 space-y-4 px-3"
         >
           <Ghost size={40} className="mx-auto text-fg-3/30" />
@@ -347,12 +345,12 @@ export default function YahooConnectFlow({ hex }: YahooConnectFlowProps) {
           <button
             onClick={handleYahooConnect}
             disabled={awaitingYahoo}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-medium text-white transition-colors cursor-pointer disabled:opacity-60"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-medium text-white  cursor-pointer disabled:opacity-60"
             style={{ background: hex }}
           >
             {awaitingYahoo ? (
               <>
-                <Loader2 size={14} className="animate-spin" />
+                <LoadingGlyph size={14} />
                 Waiting for Yahoo sign-in…
               </>
             ) : (
@@ -362,34 +360,16 @@ export default function YahooConnectFlow({ hex }: YahooConnectFlowProps) {
               </>
             )}
           </button>
-        </motion.div>
+        </div>
       )}
 
       {/* ── DISCOVERING ───────────────────────────────────────── */}
       {phase === "discovering" && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
+        <div
           className="text-center py-10 space-y-4 px-3"
         >
-          <div className="flex items-center justify-center gap-1.5 h-6">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <motion.div
-                key={i}
-                className="w-1.5 rounded-full origin-center"
-                style={{ height: 8, background: hex }}
-                animate={{
-                  scaleY: [1, 3, 1],
-                  opacity: [0.3, 1, 0.3],
-                }}
-                transition={{
-                  duration: 1,
-                  repeat: Infinity,
-                  delay: i * 0.12,
-                  ease: "easeInOut",
-                }}
-              />
-            ))}
+          <div className="flex h-6 items-center justify-center">
+            <LoadingGlyph size={20} style={{ color: hex }} />
           </div>
           <div className="space-y-2">
             <p
@@ -403,7 +383,7 @@ export default function YahooConnectFlow({ hex }: YahooConnectFlowProps) {
               sports.
             </p>
           </div>
-        </motion.div>
+        </div>
       )}
 
       {/* ── PICKING ───────────────────────────────────────────── */}

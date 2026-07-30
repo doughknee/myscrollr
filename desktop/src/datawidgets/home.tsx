@@ -44,7 +44,7 @@ export function HomeEmptyRow({
             e.stopPropagation();
             onConfigure();
           }}
-          className="inline-flex items-center gap-1.5 text-ui-chip text-accent hover:text-accent/80 transition-colors"
+          className="inline-flex items-center gap-1.5 text-ui-chip text-accent hover:text-accent/80 "
         >
           <Settings size={11} />
           Open {openLabel}

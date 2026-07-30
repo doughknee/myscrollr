@@ -14,21 +14,17 @@
  * FOOTER as content, not chrome.
  */
 import { memo, useMemo, useState, useCallback } from "react";
-import { Rss, ChevronDown, ChevronUp, Newspaper, CalendarRange } from "lucide-react";
+import { Rss, Newspaper, CalendarRange } from "lucide-react";
 import { clsx } from "clsx";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { dashboardQueryOptions, rssCatalogOptions } from "../../api/queries";
 import { relativeTime, truncate } from "../../utils/format";
 import EmptyWidgetState from "../../components/EmptyWidgetState";
+import WidgetStateTransition from "../../components/WidgetStateTransition";
 import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../../components/feedCard";
 import FreshnessPill from "../../components/FreshnessPill";
-import { WidgetBar, BarDivider } from "../../components/widget-bar/Bar";
-import {
-  FilterMenuShell,
-  MenuHeading,
-  MenuRow,
-} from "../../components/widget-bar/Menu";
+import { WidgetBar } from "../../components/widget-bar/Bar";
 import {
   Segmented,
   type SegmentedOption,
@@ -87,7 +83,6 @@ type SortOrder = RssSortOrder;
 const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
   { value: "newest", label: "Newest" },
   { value: "oldest", label: "Oldest" },
-  { value: "by-source", label: "By Source" },
 ];
 
 type RssView = "articles" | "feeds";
@@ -207,7 +202,6 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   const [sortOrder, setSortOrder] = useState<SortOrder>(
     () => dp.feedSort ?? "newest",
   );
-  const [expandedSources, toggleExpanded, clearExpanded] = useSetToggle();
   const [showAll, setShowAll] = useState(false);
 
   // Per-source article counts — menu rows carry the numbers now.
@@ -238,15 +232,21 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
     (next: SortOrder) => {
       setSortOrder(next);
       setShowAll(false);
-      clearExpanded();
       persistDisplay({ ...displayOverride, feedSort: next });
     },
-    [displayOverride, persistDisplay, clearExpanded],
+    [displayOverride, persistDisplay],
   );
 
   const pickWindow = useCallback(
     (days: number) => {
       persistDisplay({ ...displayOverride, maxArticleAgeDays: days });
+    },
+    [displayOverride, persistDisplay],
+  );
+
+  const pickMaxArticles = useCallback(
+    (maxArticles: number) => {
+      persistDisplay({ ...displayOverride, maxArticles });
     },
     [displayOverride, persistDisplay],
   );
@@ -266,7 +266,7 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   // ── Data pipeline ────────────────────────────────────────────
   // Delegates to the shared `applyRssPipeline` selector so the feed page
   // and the ticker apply the same filter/sort/limit logic.
-  const { visibleItems, overflowCounts, totalHidden } = useMemo(
+  const { visibleItems, totalHidden } = useMemo(
     () =>
       applyRssPipeline(rssItems, {
         selectedSources,
@@ -274,11 +274,11 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
         categoryMap,
         sortOrder,
         articlesPerSource: dp.articlesPerSource,
+        maxArticles: dp.maxArticles,
         maxArticleAgeDays: dp.maxArticleAgeDays,
         showAll,
-        expandedSources,
       }),
-    [rssItems, selectedSources, selectedCategories, sortOrder, dp.articlesPerSource, dp.maxArticleAgeDays, categoryMap, expandedSources, showAll],
+    [rssItems, selectedSources, selectedCategories, sortOrder, dp.articlesPerSource, dp.maxArticles, dp.maxArticleAgeDays, categoryMap, showAll],
   );
 
   // Single-outlet widgets have exactly one source; the per-source
@@ -288,53 +288,6 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
     () => distinctSourceCount(rssItems) > 1,
     [rssItems],
   );
-
-  // ── Build render list ──────────────────────────────────────────
-  type RenderEntry =
-    | { kind: "article"; item: RssItemType; category?: string }
-    | { kind: "source-header"; source: string; overflow: number; expanded: boolean };
-
-  const isBySource = sortOrder === "by-source";
-
-  const renderList = useMemo(() => {
-    const entries: RenderEntry[] = [];
-
-    if (isBySource) {
-      // Group by source — header contains the expand/collapse action
-      let currentSource: string | null = null;
-
-      for (const item of visibleItems) {
-        if (item.source_name !== currentSource) {
-          currentSource = item.source_name;
-          const overflow = overflowCounts.get(currentSource) ?? 0;
-          const expanded = expandedSources.has(currentSource);
-          entries.push({
-            kind: "source-header",
-            source: currentSource,
-            overflow,
-            expanded,
-          });
-        }
-
-        entries.push({
-          kind: "article",
-          item,
-          category: categoryMap.get(item.feed_url),
-        });
-      }
-    } else {
-      // Chronological sorts: plain article list
-      for (const item of visibleItems) {
-        entries.push({
-          kind: "article",
-          item,
-          category: categoryMap.get(item.feed_url),
-        });
-      }
-    }
-
-    return entries;
-  }, [visibleItems, overflowCounts, expandedSources, categoryMap, isBySource]);
 
   const showEmpty = rssItems.length === 0;
   const showFeedsView = isComfort && isCustom && view === "feeds";
@@ -354,106 +307,83 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
             />
           )}
 
-          {view === "articles" && !showEmpty ? (
-            <>
-              {isCustom && <BarDivider />}
-
-              {/* Left cluster: the filters (Kalshi weighting — filters
-                  anchor the left, utilities keep the right). Collapse
-                  BEFORE clipping. */}
-              <div className="hidden min-w-0 items-center gap-2 @2xl:flex">
-                <SelectMenu
-                  value={sortOrder}
-                  options={SORT_OPTIONS}
-                  onChange={pickSort}
-                  ariaLabel="Sort articles"
-                  prefix="Sort"
-                  align="left"
+          {view === "articles" && !showEmpty && (
+            <div className="ml-auto flex min-w-0 shrink items-center gap-2">
+              <SelectMenu
+                value={sortOrder}
+                options={SORT_OPTIONS}
+                onChange={pickSort}
+                ariaLabel="Sort articles"
+                prefix="Sort"
+              />
+              {allSources.length > 1 && (
+                <MultiSelectMenu
+                  options={allSources}
+                  counts={sourceCounts}
+                  selected={Array.from(selectedSources)}
+                  onToggle={toggleSource}
+                  onClear={clearSources}
+                  noun="sources"
+                  ariaLabel="Filter by source"
                 />
-                {allSources.length > 1 && (
-                  <MultiSelectMenu
-                    options={allSources}
-                    counts={sourceCounts}
-                    selected={Array.from(selectedSources)}
-                    onToggle={toggleSource}
-                    onClear={clearSources}
-                    noun="sources"
-                    ariaLabel="Filter by source"
-                    align="left"
-                  />
-                )}
-                {categoryList.length > 1 && (
-                  <MultiSelectMenu
-                    options={categoryList.map((c) => c.name)}
-                    counts={Object.fromEntries(
-                      categoryList.map((c) => [c.name, c.count]),
-                    )}
-                    selected={Array.from(selectedCategories)}
-                    onToggle={toggleCategory}
-                    onClear={clearCategories}
-                    noun="categories"
-                    ariaLabel="Filter by category"
-                    align="left"
-                  />
-                )}
-              </div>
-              {/* Narrow: one Filter menu. */}
-              <div className="@2xl:hidden">
-                <RssFilterMenu
-                  sortOrder={sortOrder}
-                  onPickSort={pickSort}
-                  sources={allSources}
-                  sourceCounts={sourceCounts}
-                  selectedSources={selectedSources}
-                  onToggleSource={toggleSource}
-                  onClearSources={clearSources}
-                  categories={categoryList}
-                  selectedCategories={selectedCategories}
-                  onToggleCategory={toggleCategory}
-                  onClearCategories={clearCategories}
+              )}
+              {categoryList.length > 1 && (
+                <MultiSelectMenu
+                  options={categoryList.map((c) => c.name)}
+                  counts={Object.fromEntries(
+                    categoryList.map((c) => [c.name, c.count]),
+                  )}
+                  selected={Array.from(selectedCategories)}
+                  onToggle={toggleCategory}
+                  onClear={clearCategories}
+                  noun="categories"
+                  ariaLabel="Filter by category"
                 />
-              </div>
-
-              <div className="ml-auto flex min-w-0 shrink items-center gap-2">
-                {latestUpdated && (
-                  <span className="hidden @xl:block">
-                    <FreshnessPill lastUpdated={latestUpdated} label="article" />
-                  </span>
-                )}
-                <RssWindowSelect days={dp.maxArticleAgeDays} onPick={pickWindow} />
-              </div>
-            </>
-          ) : (
-            <div className="ml-auto">
-              <RssWindowSelect days={dp.maxArticleAgeDays} onPick={pickWindow} />
+              )}
+              {latestUpdated && (
+                <span className="hidden @xl:block">
+                  <FreshnessPill lastUpdated={latestUpdated} label="article" />
+                </span>
+              )}
+              <RssLimitInput
+                maxArticles={dp.maxArticles}
+                onPick={pickMaxArticles}
+              />
+              <RssWindowSelect
+                days={dp.maxArticleAgeDays}
+                onPick={pickWindow}
+              />
             </div>
           )}
         </WidgetBar>
       )}
 
-      {showFeedsView ? (
-        <RssFeedsPanel
-          widgetType={widgetType}
-          widgetConfig={widget?.config as RssWidgetConfig | undefined}
-        />
-      ) : showEmpty ? (
-        <div className="flex flex-1 flex-col justify-center">
-          <EmptyWidgetState
-            refreshing={Boolean(feedContext.__refreshing)}
-            icon={Rss}
-            noun="feeds"
-            hasConfig={!!feedContext.__hasConfig}
-            dashboardLoaded={!!dashboardLoaded}
-            loadingNoun="articles"
-            actionHint="add websites"
-            actionLabel={isComfort && isCustom ? "Add feeds" : undefined}
-            onConfigure={
-              isComfort && isCustom ? () => setView("feeds") : undefined
-            }
+      <WidgetStateTransition
+        stateKey={showFeedsView ? "feeds" : "articles"}
+      >
+        {showFeedsView ? (
+          <RssFeedsPanel
+            widgetType={widgetType}
+            widgetConfig={widget?.config as RssWidgetConfig | undefined}
           />
-        </div>
-      ) : (
-        <>
+        ) : showEmpty ? (
+          <div className="flex flex-1 flex-col justify-center">
+            <EmptyWidgetState
+              refreshing={Boolean(feedContext.__refreshing)}
+              icon={Rss}
+              noun="feeds"
+              hasConfig={!!feedContext.__hasConfig}
+              dashboardLoaded={!!dashboardLoaded}
+              loadingNoun="articles"
+              actionHint="add websites"
+              actionLabel={isComfort && isCustom ? "Add feeds" : undefined}
+              onConfigure={
+                isComfort && isCustom ? () => setView("feeds") : undefined
+              }
+            />
+          </div>
+        ) : (
+          <>
           {/* No-results state */}
           {visibleItems.length === 0 && hasFilters && (
             <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
@@ -461,7 +391,7 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
               <p className="text-sm text-fg-4">No articles match your filters</p>
               <button
                 onClick={clearAllFilters}
-                className="text-xs text-accent hover:text-accent/80 transition-colors cursor-pointer"
+                className="text-xs text-accent hover:text-accent/80  cursor-pointer"
               >
                 Clear filters
               </button>
@@ -477,42 +407,26 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
                   : "grid grid-cols-1 gap-2 p-3 sm:grid-cols-2",
               )}
             >
-              {renderList.map((entry) => {
-                if (entry.kind === "source-header") {
-                  return (
-                    <SourceHeader
-                      key={`hdr:${entry.source}`}
-                      source={entry.source}
-                      category={categoryMap.get(
-                        rssItems.find((i) => i.source_name === entry.source)?.feed_url ?? "",
-                      )}
-                      overflow={entry.overflow}
-                      expanded={entry.expanded}
-                      onToggle={() => toggleExpanded(entry.source)}
-                    />
-                  );
-                }
-                return (
-                  <RssArticle
-                    key={`${entry.item.feed_url}:${entry.item.guid}`}
-                    item={entry.item}
-                    mode={mode}
-                    category={entry.category}
-                    now={now}
-                  />
-                );
-              })}
+              {visibleItems.map((item) => (
+                <RssArticle
+                  key={`${item.feed_url}:${item.guid}`}
+                  item={item}
+                  mode={mode}
+                  category={categoryMap.get(item.feed_url)}
+                  now={now}
+                />
+              ))}
             </div>
           )}
 
           {/* Per-source limit — list FOOTER content, not chrome (the old
               info bands above the list are gone). Multi-source only:
               single-outlet widgets have no per-source concept. */}
-          {multiSource && !isBySource && totalHidden > 0 && !showAll && (
+          {multiSource && totalHidden > 0 && !showAll && (
             <div className="flex items-center justify-center gap-3 px-3 py-3">
               <button
                 onClick={() => setShowAll(true)}
-                className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
+                className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20  cursor-pointer"
               >
                 Show all
               </button>
@@ -521,111 +435,20 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
               </span>
             </div>
           )}
-          {multiSource && !isBySource && showAll && totalHidden === 0 && dp.articlesPerSource > 0 && (
+          {multiSource && showAll && totalHidden === 0 && dp.articlesPerSource > 0 && (
             <div className="flex items-center justify-center px-3 py-3">
               <button
                 onClick={() => setShowAll(false)}
-                className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
+                className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20  cursor-pointer"
               >
                 Limit to {dp.articlesPerSource} per source
               </button>
             </div>
           )}
-        </>
-      )}
+          </>
+        )}
+      </WidgetStateTransition>
     </div>
-  );
-}
-
-// ── Filter menu (narrow-width collapse) ─────────────────────────
-
-function RssFilterMenu({
-  sortOrder,
-  onPickSort,
-  sources,
-  sourceCounts,
-  selectedSources,
-  onToggleSource,
-  onClearSources,
-  categories,
-  selectedCategories,
-  onToggleCategory,
-  onClearCategories,
-}: {
-  sortOrder: SortOrder;
-  onPickSort: (s: SortOrder) => void;
-  sources: string[];
-  sourceCounts: Record<string, number>;
-  selectedSources: Set<string>;
-  onToggleSource: (s: string) => void;
-  onClearSources: () => void;
-  categories: { name: string; count: number }[];
-  selectedCategories: Set<string>;
-  onToggleCategory: (c: string) => void;
-  onClearCategories: () => void;
-}) {
-  const activeCount = selectedSources.size + selectedCategories.size;
-
-  return (
-    <FilterMenuShell badgeCount={activeCount}>
-      <MenuHeading>Sort</MenuHeading>
-      {SORT_OPTIONS.map((opt) => (
-        <MenuRow
-          key={opt.value}
-          selected={sortOrder === opt.value}
-          onClick={() => onPickSort(opt.value)}
-          role="menuitemradio"
-        >
-          {opt.label}
-        </MenuRow>
-      ))}
-      {sources.length > 1 && (
-        <>
-          <MenuHeading>Sources</MenuHeading>
-          <MenuRow
-            selected={selectedSources.size === 0}
-            onClick={onClearSources}
-            role="menuitemradio"
-          >
-            All sources
-          </MenuRow>
-          {sources.map((s) => (
-            <MenuRow
-              key={s}
-              selected={selectedSources.has(s)}
-              onClick={() => onToggleSource(s)}
-              role="menuitemcheckbox"
-              count={sourceCounts[s]}
-            >
-              {s}
-            </MenuRow>
-          ))}
-        </>
-      )}
-      {categories.length > 1 && (
-        <>
-          <MenuHeading>Category</MenuHeading>
-          <MenuRow
-            selected={selectedCategories.size === 0}
-            onClick={onClearCategories}
-            role="menuitemradio"
-          >
-            All categories
-          </MenuRow>
-          {categories.map((c) => (
-            <MenuRow
-              key={c.name}
-              selected={selectedCategories.has(c.name)}
-              onClick={() => onToggleCategory(c.name)}
-              role="menuitemcheckbox"
-              count={c.count}
-            >
-              {c.name}
-            </MenuRow>
-          ))}
-        </>
-      )}
-    </FilterMenuShell>
   );
 }
 
@@ -634,6 +457,40 @@ function RssFilterMenu({
 // Same write the old gear's ArticleAgeControl made: the widget's
 // `config.display` override, merged over the global rss display
 // everywhere it's read. 0 = no age filter.
+
+function RssLimitInput({
+  maxArticles,
+  onPick,
+}: {
+  maxArticles: number;
+  onPick: (maxArticles: number) => void;
+}) {
+  return (
+    <label className="flex h-7 items-center gap-1 rounded-lg border border-edge/30 bg-base-150/60 px-2 text-ui-meta text-fg-3">
+      <span>Show</span>
+      <input
+        key={maxArticles}
+        type="number"
+        min={1}
+        step={1}
+        defaultValue={maxArticles || ""}
+        placeholder="All"
+        aria-label="Maximum articles; leave blank for all"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        onBlur={(e) => {
+          const value = e.currentTarget.valueAsNumber;
+          const next =
+            Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
+          e.currentTarget.value = next ? String(next) : "";
+          onPick(next);
+        }}
+        className="w-10 bg-transparent text-center font-mono text-fg outline-none placeholder:text-fg-4"
+      />
+    </label>
+  );
+}
 
 const AGE_OPTIONS: { value: string; label: string }[] = [
   { value: "1", label: "Today" },
@@ -690,11 +547,16 @@ function RssFeedsPanel({
   const {
     data: catalog = [],
     isLoading: catalogLoading,
-    isError: catalogError,
+    error: catalogError,
+    isFetching: catalogFetching,
+    refetch: refetchCatalog,
   } = useQuery(rssCatalogOptions());
-  const { data: catalogAll = [] } = useQuery(
-    rssCatalogOptions({ includeFailing: true }),
-  );
+  const {
+    data: catalogAll = [],
+    error: catalogAllError,
+    isFetching: catalogAllFetching,
+    refetch: refetchCatalogAll,
+  } = useQuery(rssCatalogOptions({ includeFailing: true }));
 
   const addCatalogFeed = useCallback(
     (url: string) => {
@@ -746,54 +608,13 @@ function RssFeedsPanel({
         onAddCustom={addCustomFeed}
         onRemove={removeFeed}
         loading={catalogLoading}
-        error={catalogError}
+        error={catalogError ?? catalogAllError}
+        onRetry={() => {
+          void Promise.all([refetchCatalog(), refetchCatalogAll()]);
+        }}
+        retrying={catalogFetching || catalogAllFetching}
         saving={saving}
       />
-    </div>
-  );
-}
-
-// ── SourceHeader (by-source sort) ────────────────────────────────
-
-interface SourceHeaderProps {
-  source: string;
-  category?: string;
-  overflow: number;
-  expanded: boolean;
-  onToggle: () => void;
-}
-
-function SourceHeader({ source, category, overflow, expanded, onToggle }: SourceHeaderProps) {
-  const hasAction = overflow > 0 || expanded;
-
-  return (
-    <div className="col-span-full flex items-center gap-2 px-3 py-2 bg-surface-2 border-b border-edge/30">
-      <span className="font-mono text-ui-section font-bold text-fg-2 uppercase tracking-wider">
-        {source}
-      </span>
-      {category && (
-        <span className="px-1.5 py-px rounded text-ui-chip text-fg-3 bg-accent/10">
-          {category}
-        </span>
-      )}
-      {hasAction && (
-        <button
-          onClick={onToggle}
-          className="ml-auto flex items-center gap-1 text-ui-chip text-accent hover:text-accent/80 transition-colors cursor-pointer"
-        >
-          {overflow > 0 ? (
-            <>
-              <span>{overflow} more</span>
-              <ChevronDown size={11} />
-            </>
-          ) : (
-            <>
-              <span>Collapse</span>
-              <ChevronUp size={11} />
-            </>
-          )}
-        </button>
-      )}
     </div>
   );
 }
@@ -823,7 +644,7 @@ const RssArticle = memo(function RssArticle({ item, mode, category, now }: RssAr
         href={item.link}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-2 px-3 py-1.5 bg-surface text-xs hover:bg-surface-hover transition-colors cursor-pointer"
+        className="flex items-center gap-2 px-3 py-1.5 bg-surface text-xs hover:bg-surface-hover  cursor-pointer"
       >
         <span className="font-mono text-ui-section text-accent shrink-0 min-w-[56px] max-w-[80px] truncate uppercase tracking-wider font-bold">
           {item.source_name}

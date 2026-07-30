@@ -29,7 +29,7 @@ interface FreshnessPillProps {
 const THRESHOLDS = { fresh: 30_000, stale: 90_000, verystale: 300_000 };
 
 /**
- * Shows "updated Xs ago" with a color transition that escalates as the
+ * Shows "updated Xs ago" with a color  that escalates as the
  * value ages past the configured thresholds.
  *
  * Memoized so parents can re-render freely without churning the pill.
@@ -83,7 +83,7 @@ export default memo(function FreshnessPill({
           tone === "fresh" && "bg-up",
           tone === "neutral" && "bg-fg-4",
           tone === "stale" && "bg-warning",
-          tone === "very-stale" && "bg-down animate-pulse",
+          tone === "very-stale" && "bg-down ",
         )}
       />
       {rel}

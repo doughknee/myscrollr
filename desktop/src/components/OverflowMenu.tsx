@@ -26,13 +26,17 @@ import {
   useInteractions,
   useListNavigation,
   useTypeahead,
-  useTransitionStyles,
   FloatingFocusManager,
   FloatingPortal,
 } from "@floating-ui/react";
 import type { Placement } from "@floating-ui/react";
 import clsx from "clsx";
 import { Settings2, ChevronDown } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import {
+  controlTransition,
+  popoverMotion,
+} from "../lib/motion";
 import type { LucideIcon } from "lucide-react";
 
 // ── Item types ──────────────────────────────────────────────────
@@ -174,27 +178,6 @@ export default function OverflowMenu({
     typeahead,
   ]);
 
-  const { isMounted, styles: transitionStyles } = useTransitionStyles(context, {
-    // Open uses the pop spring (slight overshoot). Close is a faster
-    // out-soft so dismissals don't feel sluggish.
-    duration: { open: 350, close: 140 },
-    common: ({ side }) => ({
-      transformOrigin: side === "top" ? "bottom" : "top",
-    }),
-    initial: {
-      opacity: 0,
-      transform: "translateY(-6px) scale(0.96)",
-      transition:
-        "opacity 140ms var(--ease-out-soft), transform 140ms var(--ease-out-soft)",
-    },
-    open: {
-      opacity: 1,
-      transform: "translateY(0) scale(1)",
-      transition:
-        "opacity 140ms var(--ease-out-soft), transform 350ms var(--ease-pop)",
-    },
-  });
-
   // Default trigger: a small pill button with a Settings2 (sliders +
   // gear) icon, a label, and a chevron-down to signal "this opens a
   // menu". Reads as "Options" rather than "more stuff" — clearer
@@ -207,7 +190,7 @@ export default function OverflowMenu({
       aria-haspopup="menu"
       aria-expanded={isOpen}
       className={clsx(
-        "flex items-center gap-1.5 h-7 px-2 rounded-md text-ui-chip font-medium transition-colors",
+        "flex items-center gap-1.5 h-7 px-2 rounded-md text-ui-chip font-medium ",
         isOpen
           ? "bg-accent/15 text-accent"
           : "text-fg-3 hover:text-fg hover:bg-surface-hover",
@@ -215,13 +198,15 @@ export default function OverflowMenu({
     >
       <Settings2 size={13} />
       <span>Options</span>
-      <ChevronDown
-        size={11}
-        style={{
-          transition: "transform 300ms var(--ease-snap)",
+      <motion.span
+        className="flex"
+        animate={{
           transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
         }}
-      />
+        transition={controlTransition}
+      >
+        <ChevronDown size={11} />
+      </motion.span>
     </button>
   );
 
@@ -241,83 +226,89 @@ export default function OverflowMenu({
           that element via [data-theme="light"]). Falls back to body
           when the shell isn't mounted yet (e.g. during initial render). */}
       <FloatingPortal root={portalRoot}>
-        {isMounted && (
-          <FloatingFocusManager context={context} modal={false}>
-            <div
-              ref={refs.setFloating}
-              style={{ ...floatingStyles, ...transitionStyles }}
-              {...getFloatingProps()}
-              className="z-50 min-w-[220px] py-1 rounded-lg border border-edge bg-surface-2 shadow-lg shadow-black/20 outline-none"
-            >
-              {items.map((item, i) => {
-                if ("divider" in item) {
-                  return (
-                    <div
-                      key={item.key}
-                      role="separator"
-                      className="my-1 h-px bg-edge/60"
-                    />
-                  );
-                }
-
-                const Icon = item.icon;
-                const isActive = activeIndex === i;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    role="menuitem"
-                    disabled={item.disabled}
-                    ref={(node) => {
-                      listRef.current[i] = node;
-                    }}
-                    // Pass our onClick INTO getItemProps so floating-ui
-                    // merges it with its own list-navigation handlers.
-                    // Spreading {...getItemProps()} *after* a sibling
-                    // onClick would silently overwrite ours, which was
-                    // why menu items weren't doing anything.
-                    {...getItemProps({
-                      onClick() {
-                        if (item.disabled) return;
-                        item.onSelect();
-                        setIsOpen(false);
-                      },
-                    })}
-                    className={clsx(
-                      "flex items-center gap-2.5 w-full px-3 py-2 text-left text-ui-meta transition-colors outline-none",
-                      item.disabled && "opacity-40 cursor-not-allowed",
-                      !item.disabled && item.destructive
-                        ? isActive
-                          ? "bg-error/10 text-error"
-                          : "text-error hover:bg-error/10"
-                        : isActive
-                          ? "bg-accent/10 text-fg"
-                          : "text-fg-2 hover:bg-surface-hover hover:text-fg",
-                    )}
-                  >
-                    {Icon && (
-                      <Icon
-                        size={14}
-                        className="shrink-0"
-                        aria-hidden
+        <AnimatePresence>
+          {isOpen && (
+            <FloatingFocusManager context={context} modal={false}>
+              <motion.div
+                ref={refs.setFloating}
+                style={floatingStyles}
+                {...getFloatingProps()}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                variants={popoverMotion}
+                className="z-50 min-w-[220px] py-1 rounded-lg border border-edge bg-surface-2 shadow-lg shadow-black/20 outline-none"
+              >
+                {items.map((item, i) => {
+                  if ("divider" in item) {
+                    return (
+                      <div
+                        key={item.key}
+                        role="separator"
+                        className="my-1 h-px bg-edge/60"
                       />
-                    )}
-                    <span className="flex-1 min-w-0">
-                      <span className="block truncate font-medium">
-                        {item.label}
-                      </span>
-                      {item.hint && (
-                        <span className="block truncate text-[10px] text-fg-4 mt-0.5">
-                          {item.hint}
-                        </span>
+                    );
+                  }
+
+                  const Icon = item.icon;
+                  const isActive = activeIndex === i;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      role="menuitem"
+                      disabled={item.disabled}
+                      ref={(node) => {
+                        listRef.current[i] = node;
+                      }}
+                      // Pass our onClick INTO getItemProps so floating-ui
+                      // merges it with its own list-navigation handlers.
+                      // Spreading {...getItemProps()} *after* a sibling
+                      // onClick would silently overwrite ours, which was
+                      // why menu items weren't doing anything.
+                      {...getItemProps({
+                        onClick() {
+                          if (item.disabled) return;
+                          item.onSelect();
+                          setIsOpen(false);
+                        },
+                      })}
+                      className={clsx(
+                        "flex items-center gap-2.5 w-full px-3 py-2 text-left text-ui-meta outline-none",
+                        item.disabled && "opacity-40 cursor-not-allowed",
+                        !item.disabled && item.destructive
+                          ? isActive
+                            ? "bg-error/10 text-error"
+                            : "text-error hover:bg-error/10"
+                          : isActive
+                            ? "bg-accent/10 text-fg"
+                            : "text-fg-2 hover:bg-surface-hover hover:text-fg",
                       )}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </FloatingFocusManager>
-        )}
+                    >
+                      {Icon && (
+                        <Icon
+                          size={14}
+                          className="shrink-0"
+                          aria-hidden
+                        />
+                      )}
+                      <span className="flex-1 min-w-0">
+                        <span className="block truncate font-medium">
+                          {item.label}
+                        </span>
+                        {item.hint && (
+                          <span className="block truncate text-[10px] text-fg-4 mt-0.5">
+                            {item.hint}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </motion.div>
+            </FloatingFocusManager>
+          )}
+        </AnimatePresence>
       </FloatingPortal>
     </>
   );

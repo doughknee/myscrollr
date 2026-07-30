@@ -9,7 +9,66 @@ import type { Trade } from "../../types";
 import type { FinanceDisplayPrefs } from "../../preferences";
 
 export type FinanceSortKey = "alpha" | "price" | "change" | "updated";
-export type FinanceDirectionFilter = "all" | "gainers" | "losers";
+export type FinanceView = "all" | "watchlist";
+export const STOCK_SECTORS = [
+  "Basic Materials",
+  "Communication Services",
+  "Consumer Cyclical",
+  "Consumer Defensive",
+  "Energy",
+  "Financial Services",
+  "Healthcare",
+  "Industrials",
+  "Real Estate",
+  "Technology",
+  "Utilities",
+] as const;
+
+interface FinanceCatalogItem {
+  symbol: string;
+  name: string;
+  category: string;
+}
+
+/** Catalog search for watchlist management, ranked by relevance. */
+export function searchFinanceCatalog(
+  catalog: readonly FinanceCatalogItem[],
+  query: string,
+  assetClass: string | undefined,
+): FinanceCatalogItem[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+
+  const relevance = (item: FinanceCatalogItem) => {
+    const symbol = item.symbol.toLowerCase();
+    const name = item.name.toLowerCase();
+    if (symbol === q) return 0;
+    if (symbol.startsWith(q)) return 1;
+    if (name.startsWith(q)) return 2;
+    if (symbol.includes(q)) return 3;
+    return 4;
+  };
+
+  return catalog
+    .filter((item) =>
+      assetClass === "crypto"
+        ? item.category === "Crypto"
+        : assetClass === "stock"
+          ? item.category !== "Crypto"
+          : true,
+    )
+    .filter(
+      (item) =>
+        item.symbol.toLowerCase().includes(q) ||
+        item.name.toLowerCase().includes(q),
+    )
+    .sort(
+      (a, b) =>
+        relevance(a) - relevance(b) ||
+        a.symbol.localeCompare(b.symbol),
+    )
+    .slice(0, 8);
+}
 
 // ── Pure: parse percentage change ───────────────────────────────
 
@@ -25,7 +84,10 @@ function parsePrice(v: string | number | null | undefined): number {
 
 // ── Pure: sort ───────────────────────────────────────────────────
 
-export function sortTrades(trades: Trade[], key: FinanceSortKey): Trade[] {
+export function sortTrades(
+  trades: Trade[],
+  key: FinanceSortKey,
+): Trade[] {
   return [...trades].sort((a, b) => {
     switch (key) {
       case "alpha":
@@ -45,6 +107,38 @@ export function sortTrades(trades: Trade[], key: FinanceSortKey): Trade[] {
   });
 }
 
+export interface StockViewOptions {
+  view: FinanceView;
+  watchlist: ReadonlySet<string>;
+  selectedSectors: ReadonlySet<string>;
+  categoryMap: ReadonlyMap<string, string>;
+  sortKey: FinanceSortKey;
+}
+
+/** Stock-only market lenses. Crypto continues through its own pipeline. */
+export function selectStockView(
+  trades: Trade[],
+  options: StockViewOptions,
+): Trade[] {
+  const { view, watchlist, selectedSectors, categoryMap, sortKey } = options;
+  const sectors = new Set<string>(STOCK_SECTORS);
+  let items =
+    view === "watchlist"
+      ? trades.filter((trade) => watchlist.has(trade.symbol))
+      : trades.filter((trade) => {
+          const sector = categoryMap.get(trade.symbol);
+          return sector != null && sectors.has(sector);
+        });
+  if (selectedSectors.size > 0) {
+    items = items.filter((trade) => {
+      const sector = categoryMap.get(trade.symbol);
+      return sector != null && selectedSectors.has(sector);
+    });
+  }
+
+  return sortTrades(items, sortKey);
+}
+
 // ── Pure: selector for the ticker ────────────────────────────────
 
 /**
@@ -62,24 +156,23 @@ export function selectFinanceForTicker(
 // ── Pipeline for FeedTab ─────────────────────────────────────────
 
 export interface FinancePipelineOptions {
-  directionFilter: FinanceDirectionFilter;
+  view: FinanceView;
   selectedCategories: Set<string>;
   categoryMap: Map<string, string>;
   sortKey: FinanceSortKey;
+  watchlist?: ReadonlySet<string>;
 }
 
 export function applyFinancePipeline(
   trades: Trade[],
   opts: FinancePipelineOptions,
 ): Trade[] {
-  const { directionFilter, selectedCategories, categoryMap, sortKey } = opts;
+  const { view, selectedCategories, categoryMap, sortKey, watchlist } = opts;
 
   let items = trades;
 
-  if (directionFilter === "gainers") {
-    items = items.filter((t) => parsePct(t.percentage_change) > 0);
-  } else if (directionFilter === "losers") {
-    items = items.filter((t) => parsePct(t.percentage_change) < 0);
+  if (view === "watchlist") {
+    items = items.filter((t) => watchlist?.has(t.symbol));
   }
 
   if (selectedCategories.size > 0) {
