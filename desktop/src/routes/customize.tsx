@@ -65,14 +65,12 @@ function CustomizeRoute() {
           <GeneralSettings
             appearance={prefs.appearance}
             window_={prefs.window}
-            startup={prefs.startup}
             onAppearanceChange={(appearance) =>
               onPrefsChange({ ...prefs, appearance })
             }
             onWindowChange={(window_) =>
               onPrefsChange({ ...prefs, window: window_ })
             }
-            onStartupChange={(startup) => onPrefsChange({ ...prefs, startup })}
             onReset={() => {
               let next: AppPreferences = resetCategory(prefs, "appearance");
               next = resetCategory(next, "window");

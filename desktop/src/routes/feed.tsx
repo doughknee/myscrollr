@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import RouteError from "../components/RouteError";
-import Tooltip from "../components/Tooltip";
 import { WidgetBar, BarPill } from "../components/widget-bar/Bar";
 import SectionNav from "../components/layout/SectionNav";
 import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../components/feedCard";
@@ -39,8 +38,6 @@ import {
 } from "../constants";
 import {
   formatEffectiveWidgetTickerStatus,
-  formatTickerStatus,
-  isDataWidgetOnTicker,
   getEffectiveWidgetTickerStatus,
 } from "../utils/tickerStatus";
 import type { DataWidgetRow } from "../api/client";
@@ -211,9 +208,6 @@ function HomePage() {
               widget={ch}
               manifest={manifest}
               data={dashboard?.data}
-              tickerStatus={formatTickerStatus(
-                isDataWidgetOnTicker(shell.prefs, ch),
-              )}
               onViewAll={() =>
                 navigate({
                   to: "/widget/$id",
@@ -270,7 +264,6 @@ interface WidgetSectionProps {
   widget: DataWidgetRow;
   manifest: DataWidgetManifest;
   data: Record<string, unknown> | undefined;
-  tickerStatus: string;
   onViewAll: () => void;
   onRowClick: () => void;
   onConfigure: () => void;
@@ -280,7 +273,6 @@ function WidgetSection({
   widget,
   manifest,
   data,
-  tickerStatus,
   onViewAll,
   onRowClick,
   onConfigure,

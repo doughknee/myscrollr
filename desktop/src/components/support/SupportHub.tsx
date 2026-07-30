@@ -216,7 +216,7 @@ export default function SupportHub({ onSelectSection }: SupportHubProps) {
                 </button>
               );
             })}
-            {/* What's New — routes to /releases instead of a support
+            {/* What's New — routes to /updates instead of a support
                 section, so it lives outside CATEGORIES/SectionId. */}
             <button
               onClick={() => navigate({ to: "/updates" })}

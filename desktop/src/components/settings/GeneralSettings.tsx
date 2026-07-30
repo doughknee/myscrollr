@@ -3,7 +3,6 @@ import clsx from "clsx";
 import type {
   AppearancePrefs,
   WindowPrefs,
-  StartupPrefs,
   ThemeMode,
   ThemeFamily,
 } from "../../preferences";
@@ -21,10 +20,8 @@ import {
 interface GeneralSettingsProps {
   appearance: AppearancePrefs;
   window_: WindowPrefs;
-  startup: StartupPrefs;
   onAppearanceChange: (prefs: AppearancePrefs) => void;
   onWindowChange: (prefs: WindowPrefs) => void;
-  onStartupChange: (prefs: StartupPrefs) => void;
   onReset: () => void;
   autostartEnabled: boolean;
   onAutostartChange: (enabled: boolean) => void;
@@ -62,10 +59,8 @@ const APP_SCALE_PRESETS: { value: string; label: string }[] = [
 export default function GeneralSettings({
   appearance,
   window_,
-  startup,
   onAppearanceChange,
   onWindowChange,
-  onStartupChange,
   onReset,
   autostartEnabled,
   onAutostartChange,

@@ -12,11 +12,6 @@ import type { HomeRowsProps } from "../../types";
  *  reads the handful of fields below and the shape varies by sport. */
 type LeagueRow = Record<string, unknown>;
 
-/** Group key for one league: id first, falling back to whatever names it. */
-function leagueKey(l: LeagueRow): string {
-  return String(l.league_key ?? l.league_name ?? l.name ?? "");
-}
-
 /**
  * Fantasy wraps its rows: `{ leagues: [...] }`, not a bare array. Every other
  * Fantasy consumer (ticker, FeedTab, player picker) already unwraps it; Home
