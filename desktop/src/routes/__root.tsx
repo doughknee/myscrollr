@@ -63,12 +63,11 @@ import {
   loadPrefs,
   savePrefs,
   toggleWidgetOnTicker,
-  consumeTickerLayoutChanged,
   reconcileSidebarOrder,
   resolveThemeMode,
 } from "../preferences";
 import {
-  getEffectiveDataWidgetTickerRow,
+  isDataWidgetOnTicker,
   getEffectiveWidgetTickerStatus,
 } from "../utils/tickerStatus";
 import type { AppPreferences } from "../preferences";
@@ -273,71 +272,6 @@ function RootLayout() {
   const [prefs, setPrefs] = useState<AppPreferences>(loadPrefs);
   const [autostartOn, setAutostartOn] = useState(false);
   const enabledWidgets = prefs.widgets.enabledWidgets;
-
-  // Surface the tier-clamp toast once when loadPrefs() dropped pinned
-  // ticker rows (e.g. user downgraded Pro→Uplink and lost rows 2/3 of
-  // their layout). Empty rows getting sliced doesn't trigger this.
-  // See `migrateTickerLayout` and `consumeTickerLayoutChanged` in
-  // preferences.ts for why we use a transient module-level signal
-  // instead of plumbing a flag through the loadPrefs return value.
-  //
-  // Phase 1 (Apr 26) upgrade: the toast now lists the affected
-  // sources by name and offers Undo. Clicking Undo restores the
-  // pre-clamp layout from a snapshot the migration captured before
-  // it dropped rows. The undo here is best-effort — if the user is
-  // genuinely on a lower tier the next loadPrefs will re-clamp; the
-  // user is expected to take a real action (upgrade or rearrange)
-  // within the same session for the restore to "stick".
-  useEffect(() => {
-    const change = consumeTickerLayoutChanged();
-    if (!change) return;
-
-    const sourceList = change.droppedSources.slice(0, 3).join(", ");
-    const more =
-      change.droppedSources.length > 3
-        ? ` and ${change.droppedSources.length - 3} more`
-        : "";
-    const description =
-      change.droppedSources.length > 0
-        ? `Removed: ${sourceList}${more}.`
-        : undefined;
-
-    // Snapshot the *current* (post-clamp) prefs into the Undo
-    // closure before the toast fires. If the user clicks Undo we
-    // splice the saved pre-clamp rows back into that snapshot so the
-    // rest of the prefs (theme, widgets, widgets) stay current.
-    const snapshot = structuredClone(prefs);
-
-    toast.message("Your ticker layout was simplified to fit your plan.", {
-      id: "scrollr-tier-clamp",
-      description,
-      duration: 8_000,
-      action: {
-        label: "Undo",
-        onClick: () => {
-          const base = snapshot;
-          const restored: AppPreferences = {
-            ...base,
-            appearance: {
-              ...base.appearance,
-              tickerLayout: { rows: change.preClampRows },
-            },
-          };
-          setPrefs(restored);
-          savePrefs(restored);
-          toast.success("Layout restored", {
-            id: "scrollr-tier-clamp",
-            duration: 1_500,
-          });
-        },
-      },
-    });
-    // We intentionally exclude `prefs` from the deps array. The toast
-    // and snapshot are a one-shot reaction to the migration that
-    // already happened during loadPrefs; capturing the post-clamp
-    // prefs at mount-time is correct.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const [appVersion, setAppVersion] = useState("");
   useEffect(() => {
@@ -683,7 +617,7 @@ function RootLayout() {
             // row-assigned widgets read permanently "on" and the menu
             // toggle one-way. The effective helper is what the feed page
             // uses for exactly this question.
-            onTicker: getEffectiveDataWidgetTickerRow(prefs, widget) !== null,
+            onTicker: isDataWidgetOnTicker(prefs, widget),
           });
         }
       } else if (enabledWidgetIds.has(id)) {

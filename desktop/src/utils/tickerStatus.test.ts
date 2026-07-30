@@ -1,110 +1,105 @@
+/**
+ * These cases used to be about which ROW a source landed on — the
+ * ticker supported two or three, with per-row source assignment and a
+ * fallback row that showed everything. That layer is gone, so what's
+ * left to pin down is narrower but still worth guarding: a disabled
+ * widget is never on the ticker regardless of its ticker flag, and a
+ * pin only counts when the widget is on the ticker in the first place.
+ */
 import { describe, expect, it } from "vitest";
 import {
+  formatEffectiveWidgetTickerStatus,
   formatTickerStatus,
-  getEffectiveDataWidgetTickerRow,
+  isDataWidgetOnTicker,
   getEffectiveWidgetTickerStatus,
 } from "./tickerStatus";
 import type { AppPreferences } from "../preferences";
 
 function makePrefs(
-  rows: { sources: string[] }[],
   widgetsOnTicker: string[] = [],
   pinnedWidgets: AppPreferences["widgets"]["pinnedWidgets"] = {},
 ): AppPreferences {
   return {
-    appearance: { tickerLayout: { rows } },
-    widgets: {
-      widgetsOnTicker,
-      pinnedWidgets,
-    },
+    widgets: { widgetsOnTicker, pinnedWidgets },
   } as unknown as AppPreferences;
 }
 
 describe("formatTickerStatus", () => {
-  it("labels an assigned single-row source as on ticker", () => {
-    expect(formatTickerStatus(0, 1)).toBe("On ticker");
-  });
-
-  it("labels an assigned multi-row source by row number", () => {
-    expect(formatTickerStatus(1, 3)).toBe("Row 2");
-  });
-
-  it("labels unassigned sources as not on ticker", () => {
-    expect(formatTickerStatus(null, 2)).toBe("Not on ticker");
+  it("distinguishes on from off", () => {
+    expect(formatTickerStatus(true)).toBe("On ticker");
+    expect(formatTickerStatus(false)).toBe("Not on ticker");
   });
 });
 
-describe("getEffectiveDataWidgetTickerRow", () => {
-  it("returns null for disabled widgets even when the legacy fallback would be row 0", () => {
-    const prefs = makePrefs([{ sources: ["finance"] }]);
-
+describe("isDataWidgetOnTicker", () => {
+  it("is false for a disabled widget even when its ticker flag is set", () => {
     expect(
-      getEffectiveDataWidgetTickerRow(prefs, {
+      isDataWidgetOnTicker(makePrefs(), {
         widget_type: "sports",
         enabled: false,
         ticker_enabled: true,
       }),
-    ).toBeNull();
+    ).toBe(false);
   });
 
-  it("returns null for enabled widgets excluded from explicit rows", () => {
-    const prefs = makePrefs([{ sources: ["finance"] }]);
-
+  it("is false for an enabled widget with the ticker flag off", () => {
     expect(
-      getEffectiveDataWidgetTickerRow(prefs, {
+      isDataWidgetOnTicker(makePrefs(), {
+        widget_type: "sports",
+        enabled: true,
+        ticker_enabled: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("is true for an enabled, ticker-enabled widget", () => {
+    expect(
+      isDataWidgetOnTicker(makePrefs(), {
         widget_type: "sports",
         enabled: true,
         ticker_enabled: true,
       }),
-    ).toBeNull();
-  });
-
-  it("uses the first empty row for ticker-enabled widgets when a row shows all sources", () => {
-    const prefs = makePrefs([{ sources: ["finance"] }, { sources: [] }]);
-
-    expect(
-      getEffectiveDataWidgetTickerRow(prefs, {
-        widget_type: "sports",
-        enabled: true,
-        ticker_enabled: true,
-      }),
-    ).toBe(1);
+    ).toBe(true);
   });
 });
 
 describe("getEffectiveWidgetTickerStatus", () => {
-  it("labels pinned widgets by their pin row", () => {
-    const prefs = makePrefs(
-      [{ sources: ["finance"] }, { sources: [] }],
-      ["timer"],
-      { timer: { side: "right", row: 1 } },
+  it("reports a widget that is on the ticker as scrolling", () => {
+    expect(getEffectiveWidgetTickerStatus(makePrefs(["timer"]), "timer")).toEqual(
+      { kind: "scrolling" },
     );
+  });
 
+  it("reports a pinned widget as pinned", () => {
+    const prefs = makePrefs(["timer"], { timer: { side: "right" } });
     expect(getEffectiveWidgetTickerStatus(prefs, "timer")).toEqual({
       kind: "pinned",
-      row: 1,
     });
   });
 
-  it("returns off for pinned widgets filtered out of their pinned row", () => {
-    const prefs = makePrefs(
-      [{ sources: ["finance"] }],
-      ["timer"],
-      { timer: { side: "right", row: 0 } },
+  /** A stale pin must not resurrect a widget the user took off. */
+  it("reports off for a pinned widget that is not on the ticker", () => {
+    const prefs = makePrefs([], { timer: { side: "right" } });
+    expect(getEffectiveWidgetTickerStatus(prefs, "timer")).toEqual({
+      kind: "off",
+    });
+  });
+
+  it("reports off for a widget that is not on the ticker", () => {
+    expect(getEffectiveWidgetTickerStatus(makePrefs(), "timer")).toEqual({
+      kind: "off",
+    });
+  });
+});
+
+describe("formatEffectiveWidgetTickerStatus", () => {
+  it("labels each kind", () => {
+    expect(formatEffectiveWidgetTickerStatus({ kind: "pinned" })).toBe("Pinned");
+    expect(formatEffectiveWidgetTickerStatus({ kind: "scrolling" })).toBe(
+      "On ticker",
     );
-
-    expect(getEffectiveWidgetTickerStatus(prefs, "timer")).toEqual({
-      kind: "off",
-      row: null,
-    });
-  });
-
-  it("returns null for widgets excluded from explicit rows", () => {
-    const prefs = makePrefs([{ sources: ["finance"] }], ["timer"]);
-
-    expect(getEffectiveWidgetTickerStatus(prefs, "timer")).toEqual({
-      kind: "off",
-      row: null,
-    });
+    expect(formatEffectiveWidgetTickerStatus({ kind: "off" })).toBe(
+      "Not on ticker",
+    );
   });
 });

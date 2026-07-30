@@ -11,14 +11,8 @@ import { HOME_PREVIEW_MAX } from "../home";
 import type { LeagueMeta } from "../../api/queries";
 import type { HomeRowsProps, Game } from "../../types";
 
-/** Filter chips are per league. */
-export function sportsHomeGroups(rows: unknown[]): string[] {
-  return [...new Set((rows as Game[]).map((g) => g.league))];
-}
-
 export function SportsHomeRows({
   data,
-  filter,
   dashboard,
   onConfigure,
 }: HomeRowsProps) {
@@ -26,24 +20,17 @@ export function SportsHomeRows({
   const meta = (dashboard?.sports_meta as { leagues?: LeagueMeta[] } | undefined)
     ?.leagues;
 
-  // Restrict meta to the user's filter selection so the empty state speaks
-  // only about leagues they actually configured.
-  const visibleMeta: LeagueMeta[] = (meta ?? []).filter(
-    (m) => filter.length === 0 || filter.includes(m.name),
-  );
+  const visibleMeta: LeagueMeta[] = meta ?? [];
   const empty = (
     <SportsEmptyState leagues={visibleMeta} onConfigure={onConfigure} />
   );
   if (games.length === 0) return empty;
 
-  const filtered =
-    filter.length > 0 ? games.filter((g) => filter.includes(g.league)) : games;
-
   // State priority matches the API contract: in > pre > final > postponed.
   // Earlier versions used the legacy "post" state from the ESPN era, which
   // never matched anything api-sports.io produces.
   const priority: Record<string, number> = { in: 0, pre: 1, final: 2, postponed: 3 };
-  const sorted = [...filtered]
+  const sorted = [...games]
     .sort((a, b) => (priority[a.state ?? ""] ?? 4) - (priority[b.state ?? ""] ?? 4))
     .slice(0, HOME_PREVIEW_MAX);
 

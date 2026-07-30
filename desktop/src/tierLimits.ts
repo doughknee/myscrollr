@@ -28,45 +28,29 @@ import type { SubscriptionTier } from "./auth";
 // one Stocks widget"), and the desktop mirror stopped carrying them entirely
 // (REL-60) — the backend still sends the keys as `null`, which the drift test
 // asserts. Provider-quota protection moves to rate limiting, not per-user
-// caps. `maxTickerRows`/`maxTickerCustomization` are free in the product
-// model; kept only so existing consumers compile until the ticker UI is
-// reworked.
+// caps.
 // =====================================================================
 
 interface DataWidgetLimits {
   /** Max widgets a tier can run at once — the slot model. Infinity = unlimited. */
   maxWidgets: number;
-  /** Max simultaneous ticker rows this tier can configure (1..3). */
-  maxTickerRows: number;
-  /** Can configure per-row scroll mode/direction/speed/mix overrides. */
-  maxTickerCustomization: boolean;
 }
 
 export const TIER_LIMITS: Record<SubscriptionTier, DataWidgetLimits> = {
   free: {
     maxWidgets: 3,
-    maxTickerRows: 1,
-    maxTickerCustomization: false,
   },
   uplink: {
     maxWidgets: 6,
-    maxTickerRows: 2,
-    maxTickerCustomization: false,
   },
   uplink_pro: {
     maxWidgets: 12,
-    maxTickerRows: 3,
-    maxTickerCustomization: false,
   },
   uplink_ultimate: {
     maxWidgets: Infinity,
-    maxTickerRows: 3,
-    maxTickerCustomization: true,
   },
   super_user: {
     maxWidgets: Infinity,
-    maxTickerRows: 3,
-    maxTickerCustomization: true,
   },
 };
 
@@ -77,15 +61,5 @@ export const TIER_LIMITS: Record<SubscriptionTier, DataWidgetLimits> = {
  */
 export function getMaxWidgets(tier: SubscriptionTier): number {
   return TIER_LIMITS[tier].maxWidgets;
-}
-
-/** Max ticker rows for the tier (1..3). */
-export function getMaxTickerRows(tier: SubscriptionTier): number {
-  return TIER_LIMITS[tier].maxTickerRows;
-}
-
-/** Whether the tier may configure per-row scroll prefs. */
-export function canCustomizeTickerRows(tier: SubscriptionTier): boolean {
-  return TIER_LIMITS[tier].maxTickerCustomization;
 }
 

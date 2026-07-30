@@ -37,7 +37,7 @@ describe("datawidget registry", () => {
   it("optional Home hooks are functions when defined", () => {
     for (const id of DATA_SOURCES) {
       const m = getDataWidget(id)!;
-      for (const hook of ["normalizeHome", "homeGroups", "homeGroupLabel"] as const) {
+      for (const hook of ["normalizeHome"] as const) {
         const fn = m[hook];
         if (fn !== undefined) {
           expect(typeof fn, `${id}.${hook} is not a function`).toBe("function");

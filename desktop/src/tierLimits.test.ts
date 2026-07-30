@@ -3,8 +3,6 @@ import snapshot from "../../api/internal/widgets/tier_limits.json";
 import {
   TIER_LIMITS,
   getMaxWidgets,
-  getMaxTickerRows,
-  canCustomizeTickerRows,
 } from "./tierLimits";
 import type { SubscriptionTier } from "./auth";
 
@@ -19,35 +17,6 @@ describe("getMaxWidgets", () => {
     ["super_user", Infinity],
   ])("returns %s = %d", (tier, expected) => {
     expect(getMaxWidgets(tier)).toBe(expected);
-  });
-});
-
-// ── getMaxTickerRows ────────────────────────────────────────────
-
-describe("getMaxTickerRows", () => {
-  it.each<[SubscriptionTier, number]>([
-    ["free", 1],
-    ["uplink", 2],
-    ["uplink_pro", 3],
-    ["uplink_ultimate", 3],
-    ["super_user", 3],
-  ])("returns %s = %d", (tier, expected) => {
-    expect(getMaxTickerRows(tier)).toBe(expected);
-  });
-});
-
-// ── canCustomizeTickerRows ──────────────────────────────────────
-
-describe("canCustomizeTickerRows", () => {
-  it("returns false for free, uplink, and uplink_pro", () => {
-    expect(canCustomizeTickerRows("free")).toBe(false);
-    expect(canCustomizeTickerRows("uplink")).toBe(false);
-    expect(canCustomizeTickerRows("uplink_pro")).toBe(false);
-  });
-
-  it("returns true only for uplink_ultimate and super_user", () => {
-    expect(canCustomizeTickerRows("uplink_ultimate")).toBe(true);
-    expect(canCustomizeTickerRows("super_user")).toBe(true);
   });
 });
 
@@ -80,8 +49,6 @@ describe("TIER_LIMITS table", () => {
         tier,
         {
           max_widgets: toWire(l.maxWidgets),
-          max_ticker_rows: l.maxTickerRows,
-          max_ticker_customization: l.maxTickerCustomization,
         },
       ])
     );
@@ -90,13 +57,16 @@ describe("TIER_LIMITS table", () => {
         tier,
         {
           max_widgets: t.max_widgets,
-          max_ticker_rows: t.max_ticker_rows,
-          max_ticker_customization: t.max_ticker_customization,
         },
       ])
     );
     expect(wire).toEqual(live);
   });
+
+  // The ticker-row caps left the mirror when the multi-row ticker was
+  // removed. The backend still sends max_ticker_rows /
+  // max_ticker_customization and nothing here reads them, so they are no
+  // longer compared — same treatment the retired depth caps got.
 
   // The desktop mirror dropped the retired depth caps (REL-60). It may only
   // do that while the backend keeps sending them as "unlimited" — if a cap
@@ -110,7 +80,7 @@ describe("TIER_LIMITS table", () => {
   });
 
   it("super_user matches or exceeds every other tier on every numeric key", () => {
-    const keys = ["maxWidgets", "maxTickerRows"] as const;
+    const keys = ["maxWidgets"] as const;
     const tiers: SubscriptionTier[] = ["free", "uplink", "uplink_pro", "uplink_ultimate"];
     for (const key of keys) {
       const superVal = TIER_LIMITS.super_user[key];

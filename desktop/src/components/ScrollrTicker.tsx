@@ -11,7 +11,6 @@ import type {
   ScrollMode,
   WidgetPinConfig,
   WidgetDisplayPrefs,
-  TickerRowConfig,
 } from "../preferences";
 import { shouldShowOnTicker } from "../preferences";
 import type { LeagueResponse as FantasyLeague } from "../datawidgets/fantasy/types";
@@ -54,8 +53,6 @@ interface ScrollrTickerProps {
   chipColorMode?: ChipColorMode;
   /** Per-widget display preferences (controls what data chips show) */
   widgetDisplay?: WidgetDisplayPrefs;
-  /** Which row this ticker represents (0-indexed, for multi-row splitting) */
-  rowIndex?: number;
   /** Scroll direction: left (default) or right */
   direction?: TickerDirection;
   /** Scroll mode: continuous, step, or flip */
@@ -63,26 +60,11 @@ interface ScrollrTickerProps {
   /** Seconds to pause between transitions in step/flip modes (default 2) */
   stepPause?: number;
   /**
-   * Per-row config for the multi-deck ticker. When present, `sources`
-   * lives on `row.sources` (but App.tsx already pre-filtered activeTabs
-   * to match) and row-level scroll overrides (Ultimate-only) are read
-   * from here. When `undefined`, this behaves like the legacy single-row.
-   */
-  rowConfig?: TickerRowConfig;
-  /**
-   * True when `rowConfig.sources` was non-empty AND at least one
-   * source was configured. Used to decide whether to show the
-   * "empty row" CTA when all of a row's sources get filtered away.
-   */
-  rowHasExplicitSources?: boolean;
-  /**
    * When true, this row should render the "no sources installed yet"
    * empty-shell CTA instead of returning null. Only the parent
    * (App.tsx) knows whether the user is signed-in with zero widgets
-   * vs. a row that legitimately has nothing to show right now, so the
-   * decision is hoisted up there. The parent should set this only on
-   * the first row to avoid stacking duplicate CTAs in multi-row
-   * layouts.
+   * vs. a ticker that legitimately has nothing to show right now, so
+   * the decision is hoisted up there.
    */
   showSourcelessCTA?: boolean;
   /** Click handler for the sourceless CTA (opens the catalog). */
@@ -174,27 +156,19 @@ export default function ScrollrTicker({
   chipColorMode = "widget",
   widgetDisplay,
   comfort = false,
-  rowIndex = 0,
   direction = "left",
   scrollMode = "continuous",
   stepPause = 5,
-  rowConfig,
-  rowHasExplicitSources = false,
   showSourcelessCTA = false,
   onAddSources,
   showInstalledOffCTA = false,
   installedWidgets = [],
   onOpenWidget,
 }: ScrollrTickerProps) {
-  // Per-row overrides shadow the globals. The Ultimate-gate is enforced
-  // upstream — Settings only lets Ultimate/super_user WRITE these fields,
-  // so reading them unconditionally here is safe. (If a downgraded user
-  // still has row overrides in their prefs, we honour them until they
-  // edit the row — no surprise resets.)
-  const effectiveScrollMode: ScrollMode = rowConfig?.scrollMode ?? scrollMode;
-  const effectiveDirection: TickerDirection = rowConfig?.direction ?? direction;
-  const effectiveSpeed: number = rowConfig?.speed ?? speed;
-  const effectiveMixMode: MixMode = rowConfig?.mixMode ?? mixMode;
+  const effectiveScrollMode: ScrollMode = scrollMode;
+  const effectiveDirection: TickerDirection = direction;
+  const effectiveSpeed: number = speed;
+  const effectiveMixMode: MixMode = mixMode;
 
   // Predictions watchlist (starred tickers). The pref store's cache is
   // per-webview: stars are toggled in the MAIN window, and this ticker
@@ -210,8 +184,6 @@ export default function ScrollrTicker({
   );
 
   // Build chip arrays per widget, then combine based on mixMode.
-  // Row filtering (multi-deck) happens UPSTREAM in App.tsx — activeTabs
-  // here is already the per-row source list. No round-robin split.
   // The chip builder resolves each tab through sourceForWidget(); without
   // subscribing, a server-added widget renders with no source and is skipped.
   const catalogVersion = useCatalog();
@@ -298,7 +270,7 @@ export default function ScrollrTicker({
       : buckets.flat();
 
     return allItems;
-  }, [dashboard, activeTabs, widgetData, onChipClick, onTogglePin, pinnedWidgets, comfort, effectiveMixMode, chipColorMode, widgetDisplay, rowIndex, predictionsWatchlist, catalogVersion]);
+  }, [dashboard, activeTabs, widgetData, onChipClick, onTogglePin, pinnedWidgets, comfort, effectiveMixMode, chipColorMode, widgetDisplay, predictionsWatchlist, catalogVersion]);
 
   // ── Shared refs ─────────────────────────────────────────────────
   const containerRef = useRef<HTMLDivElement>(null);
@@ -407,15 +379,11 @@ export default function ScrollrTicker({
   // ── Build pinned chip arrays (rendered inside this row) ─────────
   //
   // Pinned widgets are visually static, single-instance elements. With
-  // multi-deck layout, each pin targets exactly one row (pin.row). This
-  // replaces the old "only render on row 0" bandaid — now we scope by
-  // pin.row so users can pin widgets to any row independently.
 
   const pinnedLeft: React.ReactNode[] = [];
   const pinnedRight: React.ReactNode[] = [];
 
   for (const [widgetId, pin] of Object.entries(pinnedWidgets)) {
-    if ((pin.row ?? 0) !== rowIndex) continue;
     if (!activeTabs.includes(widgetId)) continue;
     const target = pin.side === "left" ? pinnedLeft : pinnedRight;
 
@@ -446,13 +414,6 @@ export default function ScrollrTicker({
   const hasPinnedLeft = pinnedLeft.length > 0;
   const hasPinnedRight = pinnedRight.length > 0;
   const hasScrollingChips = chips.length > 0;
-
-  // Empty-row CTA: the user explicitly configured sources for this row
-  // but none of them produced any chips (e.g. they deleted the widget
-  // from their subscription). Show a dismissible CTA rather than silently
-  // pretending the row doesn't exist — per spec §Edge Cases #1.
-  const isEmptyRowWithExplicitSources =
-    !hasScrollingChips && !hasPinnedLeft && !hasPinnedRight && rowHasExplicitSources;
 
   // Sourceless CTA: signed-in user has zero widgets installed and zero
   // pinned widgets, so there's literally nothing to put on the ticker.
@@ -573,16 +534,6 @@ export default function ScrollrTicker({
             );
           })}
         </div>
-      </EmptyTickerRow>
-    );
-  }
-
-  if (isEmptyRowWithExplicitSources) {
-    return (
-      <EmptyTickerRow containerClass={containerClass}>
-        <span className="text-ui-meta font-mono text-fg-3">
-          This row has no widgets to show. Edit it in Customize &rarr; Ticker.
-        </span>
       </EmptyTickerRow>
     );
   }
