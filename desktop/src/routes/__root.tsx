@@ -59,6 +59,7 @@ import { dashboardQueryOptions } from "../api/queries";
 // Preferences
 import {
   loadPref,
+  savePref,
   loadPrefs,
   savePrefs,
   toggleWidgetOnTicker,
@@ -132,11 +133,13 @@ function parseRoute(pathname: string) {
   const widgetId = (kind === "widget" && itemId) || "";
   const isUtility = widgetId !== "" && isUtilityWidget(widgetId);
 
-  // Releases and status must not fall through to the isFeed default,
-  // which would light up the sidebar's Home row there.
+  // Every named route must be listed here: anything unlisted falls
+  // through to the isFeed default and lights up the sidebar's Home row.
   const isFeed =
     widgetId === "" &&
-    !["catalog", "customize", "account", "support", "releases", "status"].includes(kind ?? "");
+    !["catalog", "customize", "account", "support", "status", "updates"].includes(
+      kind ?? "",
+    );
 
   return {
     activeItem:
@@ -146,12 +149,22 @@ function parseRoute(pathname: string) {
     isFeed,
     isCustomize: kind === "customize",
     isAccount: kind === "account",
+    isUpdates: kind === "updates",
     isMarketplace: kind === "catalog",
     isSupport: kind === "support",
-    isReleases: kind === "releases",
     isStatus: kind === "status",
   };
 }
+
+/**
+ * The surfaces SectionNav switches between. They share one transition
+ * key so moving among them doesn't remount RouteTransition's motion
+ * wrapper — no enter animation, so it feels like the App/Ticker swap
+ * (which is instant only because both are /customize and the pathname
+ * never changes) rather than a page load. Any route outside this set
+ * still gets the normal transition.
+ */
+const SECTION_PATHS = ["/feed", "/customize", "/account", "/updates"];
 
 // ── Status banners ──────────────────────────────────────────────
 
@@ -204,6 +217,23 @@ function RootLayout() {
   const navigate = useNavigate();
   const navHistory = useNavHistory();
   const route = parseRoute(location.pathname);
+
+  // Sidebar collapse lives here, not in Sidebar: the toggle button sits
+  // in the TopBar (left of Back), so the two components that need this
+  // state are siblings and it has to be owned by their parent.
+  //
+  // Collapsed is the default — with a slot-capped source list the
+  // expanded rail is mostly void — and the choice persists.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    loadPref("sidebarCollapsed", true),
+  );
+  const toggleSidebarCollapsed = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      savePref("sidebarCollapsed", next);
+      return next;
+    });
+  }, []);
 
   // Sync with the server-authoritative widget catalog. Renders from the
   // bundled snapshot first, then re-renders if the server's differs — so a
@@ -540,7 +570,9 @@ function RootLayout() {
   // ── Navigation handlers ─────────────────────────────────────
 
   const handleNavigateToFeed = useCallback(() => navigate({ to: "/feed" }), [navigate]);
-  const handleNavigateToReleases = useCallback(() => navigate({ to: "/releases" }), [navigate]);
+  // "What's new" kept its inviting label in the account menu, but the
+  // release notes now live under Updates rather than on their own page.
+  const handleNavigateToReleases = useCallback(() => navigate({ to: "/updates" }), [navigate]);
   const handleNavigateToStatus = useCallback(() => navigate({ to: "/status" }), [navigate]);
   const handleNavigateToCustomize = useCallback(() => navigate({ to: "/customize" }), [navigate]);
   const handleNavigateToAccount = useCallback(() => navigate({ to: "/account" }), [navigate]);
@@ -882,6 +914,8 @@ function RootLayout() {
             onBack={navHistory.back}
             onForward={navHistory.forward}
             onToggleTicker={handleTickerToggle}
+            sidebarCollapsed={sidebarCollapsed}
+            onToggleSidebar={toggleSidebarCollapsed}
           />
 
           {/* Inset gaps on the RIGHT and BOTTOM only — the content
@@ -889,11 +923,12 @@ function RootLayout() {
               symmetric gap-1.5 read as lopsided padding around both). */}
           <div className="flex flex-1 min-h-0 overflow-hidden pr-1.5 pb-1.5">
             <Sidebar
+              collapsed={sidebarCollapsed}
               isCustomize={route.isCustomize}
               isAccount={route.isAccount}
               isMarketplace={route.isMarketplace}
               isSupport={route.isSupport}
-              isReleases={route.isReleases}
+              isUpdates={route.isUpdates}
               isStatus={route.isStatus}
               isFeed={route.isFeed}
               activeItem={route.activeItem}
@@ -925,7 +960,14 @@ function RootLayout() {
                  route.isFeed ||
                  route.isMarketplace ||
                  route.isCustomize ||
-                 route.isSupport
+                 route.isSupport ||
+                 // Account and Updates joined the section nav, so they
+                 // carry a WidgetBar now. Without them here the bar falls
+                 // back to its standalone shell, which nests its own px-3
+                 // inside the page's px-5 and sits 12px right of the
+                 // content it's supposed to align with.
+                 route.isAccount ||
+                 route.isUpdates
                }
              >
               <ConnectionBanner deliveryMode={deliveryMode} />
@@ -986,7 +1028,13 @@ function RootLayout() {
               <div className="flex-1 min-h-0 overflow-hidden">
                 <ShellContext.Provider value={shellStableValue}>
                   <ShellDataContext.Provider value={shellDataValue}>
-                    <RouteTransition routeKey={location.pathname}>
+                    <RouteTransition
+                      routeKey={
+                        SECTION_PATHS.includes(location.pathname)
+                          ? "sections"
+                          : location.pathname
+                      }
+                    >
                       <Outlet />
                     </RouteTransition>
                   </ShellDataContext.Provider>

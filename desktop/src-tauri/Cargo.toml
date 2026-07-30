@@ -97,6 +97,18 @@ tokio-tungstenite = { version = "0.28", default-features = false, features = [
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
+# Taller unified title bar (see src/titlebar.rs). Pinned to the objc2
+# generation Tauri already links (tauri 2.10 -> muda 0.17 ->
+# objc2-app-kit 0.3.2) so we don't compile a second set of AppKit bindings.
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = [
+    "NSWindow",
+    "NSView",
+    "NSButton",
+    "NSControl",
+    "NSResponder",
+    "NSToolbar",
+] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3", features = ["sync-secret-service"] }

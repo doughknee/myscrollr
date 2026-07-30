@@ -19,6 +19,7 @@ import clsx from "clsx";
 import RouteError from "../components/RouteError";
 import Tooltip from "../components/Tooltip";
 import { WidgetBar, BarPill } from "../components/widget-bar/Bar";
+import SectionNav from "../components/layout/SectionNav";
 import { FEED_CARD, FEED_CARD_INTERACTIVE } from "../components/feedCard";
 import TickerLayoutSummary from "../components/TickerLayoutSummary";
 import PageLayout from "../components/layout/PageLayout";
@@ -172,26 +173,29 @@ function HomePage() {
       title="Home"
       subtitle="Your live feed at a glance"
       width="wide"
+      noTopPadding
     >
-      {/* WCB — same persistent chrome as every other page. Home has no
-          view switch; its right cluster carries the ticker-manage
-          action. */}
-      {hasAnySources && (
-        <WidgetBar>
+      {/* WCB — same persistent chrome as every other page. The section
+          nav is always present (it's how you leave Home for settings);
+          the ticker-manage action only appears once there's a ticker
+          worth managing. */}
+      <WidgetBar>
+        <SectionNav active="home" />
+        {hasAnySources && (
           <div className="ml-auto">
             <BarPill active={false} onClick={openTickerSettings}>
               Manage ticker
             </BarPill>
           </div>
-        </WidgetBar>
-      )}
+        )}
+      </WidgetBar>
       {/* Home uses the standard PageLayout chassis (px-5 py-5,
           max-w-6xl) so it lines up with Catalog and every other
           wide route. The inner wrapper just owns vertical rhythm
           between sections (space-y-5, no dangling margin on the
           last child). Content under the WCB starts at pt-4, same as
-          Customize/Support; the bar-less empty state doesn't. */}
-      <div className={clsx("space-y-5", hasAnySources && "pt-4")}>
+          Customize/Support. */}
+      <div className="space-y-5 pt-4">
       {/* Empty state — hero. Shown when the user has no widgets and
           no enabled widgets. Disappears the moment they add their
           first source. This IS the post-wizard first-run experience —

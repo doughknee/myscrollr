@@ -7,15 +7,17 @@
  *   │ Sports     │
  *   │ + 2/3      │  ← slot chip: add-source CTA + cap meter in one
  *   │    ⋮       │
- *   │ [Account ▾]│⇤│  ← footer chip: account + app menu
- *   └────────────┘      menu + collapse toggle
+ *   │ [Account ▾]│  ← footer chip: account + app menu
+ *   └────────────┘
  *
  * Home and Customize lead the rail. Connection status and the other
  * account-level destinations live behind the footer account chip.
  *
  * Defaults to the 48px icon-only rail (tooltips carry labels; the
  * slot chip shows cap dots) — a slot-capped source list doesn't fill
- * a 200px panel. Expanding is one click and the pref persists.
+ * a 200px panel. `collapsed` is a prop, not local state: the toggle
+ * lives in the TopBar (left of Back), so the shell owns it and the
+ * persistence that goes with it.
  */
 import {
   forwardRef,
@@ -34,8 +36,6 @@ import {
   Home,
   Info,
   LifeBuoy,
-  PanelLeftClose,
-  PanelLeftOpen,
   Plus,
   RadioTower,
   SlidersHorizontal,
@@ -50,7 +50,6 @@ import OverflowMenu from "./OverflowMenu";
 import { DELIVERY_STATE_META } from "./ConnectionIndicator";
 import { controlTransition } from "../lib/motion";
 import type { DataWidgetManifest, WidgetManifest } from "../types";
-import { loadPref, savePref } from "../preferences";
 import { TIER_LABELS, getUserIdentity } from "../auth";
 import type { SubscriptionTier } from "../auth";
 import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
@@ -117,8 +116,11 @@ interface SidebarProps {
   isMarketplace: boolean;
   /** Whether the support page is active. */
   isSupport: boolean;
-  /** Whether the What's New page is active. */
-  isReleases: boolean;
+  /** Whether the Updates page is active. */
+  isUpdates: boolean;
+  /** Collapsed rail. Owned by the shell — the toggle lives in the
+   *  TopBar, so this state is shared between two siblings. */
+  collapsed: boolean;
   /** Whether the Status page is active. */
   isStatus: boolean;
   /** Whether the home feed is active. Drives the pinned Home row. */
@@ -168,7 +170,8 @@ export default function Sidebar({
   isAccount,
   isMarketplace,
   isSupport,
-  isReleases,
+  isUpdates,
+  collapsed,
   isStatus,
   isFeed,
   activeItem,
@@ -188,11 +191,6 @@ export default function Sidebar({
   onMoveItem,
   onRemoveItem,
 }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(() =>
-    // Collapsed is the default: with a slot-capped source list the
-    // expanded rail is mostly void. Users who expand keep their pref.
-    loadPref("sidebarCollapsed", true),
-  );
   // Right-click menu on a source row (v1.1.2). One menu at a time,
   // anchored at the pointer.
   const [menu, setMenu] = useState<{
@@ -260,12 +258,6 @@ export default function Sidebar({
     measureIndicator,
     sources,
   ]);
-
-  function toggleCollapsed() {
-    const next = !collapsed;
-    setCollapsed(next);
-    savePref("sidebarCollapsed", next);
-  }
 
   const slotCap = getMaxWidgets(tier);
 
@@ -377,7 +369,7 @@ export default function Sidebar({
               collapsed={collapsed}
               tierLabel={TIER_LABELS[tier]}
               health={health}
-              active={isAccount || isSupport || isReleases || isStatus}
+              active={isAccount || isSupport || isUpdates || isStatus}
             />
           }
           items={[
@@ -388,9 +380,23 @@ export default function Sidebar({
               onSelect: onNavigateToAccount,
             },
             {
+              key: "settings",
+              label: "Settings",
+              icon: SlidersHorizontal,
+              onSelect: onNavigateToCustomize,
+            },
+            {
+              key: "add-widget",
+              label: "Add widget",
+              icon: Plus,
+              onSelect: onNavigateToMarketplace,
+            },
+            {
+              // No hint: the live/degraded wording is already carried by
+              // the status dot on the chip itself, and repeating it here
+              // read as clutter.
               key: "status",
               label: "Status",
-              hint: health.label,
               icon: DELIVERY_STATE_META[health.state].icon,
               onSelect: onNavigateToStatus,
             },
@@ -406,24 +412,12 @@ export default function Sidebar({
             },
             {
               key: "support",
-              label: "Support",
+              label: "Get help",
               icon: LifeBuoy,
               onSelect: onNavigateToSupport,
             },
           ]}
         />
-        <Tooltip content={collapsed ? "Expand sidebar" : "Collapse sidebar"} side="right">
-          <button
-            onClick={toggleCollapsed}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className={clsx(
-              "flex items-center justify-center shrink-0 rounded-lg text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
-              collapsed ? "w-full py-1.5" : "w-7 h-7",
-            )}
-          >
-            {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
-          </button>
-        </Tooltip>
       </div>
 
       {/* ── Source context menu (v1.1.2) ───────────────────────
@@ -682,9 +676,16 @@ const AccountChip = forwardRef(function AccountChip(
 
   // Identity from the token claims — stable for the sidebar's
   // lifetime (it only renders authenticated). Claude-style two-line
-  // chip: name on top, plan caption beneath.
-  const { name, email } = getUserIdentity();
-  const displayName = name || email?.split("@")[0] || "Account";
+  // chip: handle on top, plan caption beneath.
+  //
+  // Username first, then the email's local part, and only then the
+  // display name: the handle is what the user identifies as here, and
+  // a full name reads as too formal for a chip this size. Accounts
+  // created via social sign-in may have no handle at all, hence the
+  // chain rather than a single claim.
+  const { name, email, username } = getUserIdentity();
+  const displayName =
+    username || email?.split("@")[0] || name || "Account";
   const initial = displayName.charAt(0).toUpperCase();
   const statusMeta = DELIVERY_STATE_META[health.state];
   const StatusIcon = statusMeta.icon;

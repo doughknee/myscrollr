@@ -1,25 +1,24 @@
 /**
- * What's New route — `/releases`.
+ * ReleaseNotes — the sortable release-history table.
  *
- * Human-readable, sortable table of the desktop release train pulled
- * from GitHub Releases at runtime (see lib/releases.ts for the shared
- * data contract with myscrollr.com). Columns: Version, Date, Headline.
- * Version and Date headers toggle asc/desc (version compares numeric
- * segments, not lexically); default is newest first. Clicking a row
- * expands it in place to the fully rendered markdown notes plus a
- * "View on GitHub" link. The newest stable release wears a "Latest"
- * badge; prereleases wear "Pre-release".
+ * Lives under Updates rather than on its own page: the version you're on
+ * and the list of what shipped are the same question asked twice, and
+ * splitting them meant the updater and its changelog were two clicks
+ * apart. The account menu still offers "What's new" as a way in — it's a
+ * more inviting label than "Updates" — it just lands here now.
  *
- * States: skeleton rows while fetching; a friendly card linking to the
- * GitHub releases page when nothing loads (offline, rate-limited, or
- * genuinely zero releases) — never a blank page.
+ * Data comes from GitHub Releases at runtime (see lib/releases.ts for the
+ * contract shared with myscrollr.com). Version and Date headers toggle
+ * asc/desc — version compares numeric segments, not lexically — and
+ * default to newest first. A row expands in place to rendered markdown
+ * plus a "View on GitHub" link. Newest stable wears "Latest";
+ * prereleases wear "Pre-release".
  *
- * Entry points: Settings → Updates ("What's new" link) and the Support
- * hub card. Built 2026-07-02.
+ * States: skeleton rows while fetching, and a card linking to the GitHub
+ * releases page when nothing loads (offline, rate-limited, or genuinely
+ * empty) — never a blank space.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
-import { getVersion } from "@tauri-apps/api/app";
 import { open } from "@tauri-apps/plugin-shell";
 import clsx from "clsx";
 import {
@@ -31,8 +30,6 @@ import {
   PackageOpen,
 } from "lucide-react";
 
-import PageLayout from "../components/layout/PageLayout";
-import RouteError from "../components/RouteError";
 import {
   fetchReleases,
   compareVersions,
@@ -41,12 +38,7 @@ import {
   renderReleaseMarkdown,
   RELEASES_PAGE_URL,
   type ReleaseEntry,
-} from "../lib/releases";
-
-export const Route = createFileRoute("/releases")({
-  component: ReleasesPage,
-  errorComponent: RouteError,
-});
+} from "../../lib/releases";
 
 // ── Sort state ──────────────────────────────────────────────────
 
@@ -63,15 +55,9 @@ function dateMs(iso: string): number {
 const ROW_GRID =
   "grid grid-cols-[minmax(130px,160px)_130px_1fr_24px] items-center gap-3";
 
-// ── Page ────────────────────────────────────────────────────────
+// ── Component ───────────────────────────────────────────────────
 
-function ReleasesPage() {
-  // Current app version — same pattern as __root.tsx.
-  const [appVersion, setAppVersion] = useState("");
-  useEffect(() => {
-    getVersion().then(setAppVersion).catch(() => {});
-  }, []);
-
+export default function ReleaseNotes() {
   // null = loading, [] = nothing available (error/offline/empty).
   const [releases, setReleases] = useState<ReleaseEntry[] | null>(null);
   useEffect(() => {
@@ -127,15 +113,7 @@ function ReleasesPage() {
   }, [releases]);
 
   return (
-    <PageLayout
-      title="What's New"
-      subtitle={
-        appVersion
-          ? `Release notes and version history · you're on v${appVersion}`
-          : "Release notes and version history"
-      }
-      width="wide"
-    >
+    <>
       {releases === null ? (
         <SkeletonTable />
       ) : releases.length === 0 ? (
@@ -181,7 +159,7 @@ function ReleasesPage() {
           </div>
         </div>
       )}
-    </PageLayout>
+    </>
   );
 }
 
