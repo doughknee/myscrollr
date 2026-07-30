@@ -28,7 +28,13 @@ else
   SHELL := /bin/bash
 endif
 
-COMPOSE      := docker compose -f docker/compose.yml
+# docker/compose.override.yml is layered in automatically when it exists.
+# Compose only auto-discovers an override next to the default compose.yml,
+# and passing -f opts out of that discovery entirely — so name it
+# explicitly. Gitignored and per-machine: host port remaps when something
+# else already owns 5432/6379, extra mounts, whatever your box needs.
+COMPOSE_OVERRIDE := $(wildcard docker/compose.override.yml)
+COMPOSE      := docker compose -f docker/compose.yml $(if $(COMPOSE_OVERRIDE),-f $(COMPOSE_OVERRIDE))
 COMPOSE_PRED := $(COMPOSE) --profile predictions
 # Predictions is opt-in: it needs a Kalshi key. The profile turns on only
 # once `make setup` (or `make kalshi-key`) has produced its env file.

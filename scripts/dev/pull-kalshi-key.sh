@@ -5,9 +5,23 @@
 # files and never printed. Needs kubectl + cluster access.
 set -euo pipefail
 
-KUBECTL="${KUBECTL:-$LOCALAPPDATA/kubectl/kubectl.exe}"
-if [ ! -x "$KUBECTL" ] && ! command -v "$KUBECTL" >/dev/null 2>&1; then
-  echo "kubectl not found at '$KUBECTL' — set KUBECTL=/path/to/kubectl and retry." >&2
+# Resolution order: an explicit KUBECTL wins; then kubectl on PATH, which
+# covers macOS, Linux, and any Windows install that puts it there; then the
+# default Windows location, since `winget install kubectl` lands it under
+# LOCALAPPDATA without touching PATH. Defaulting to that Windows path
+# unconditionally — as this did — made the script unusable everywhere else,
+# because LOCALAPPDATA is unset and the path collapsed to
+# "/kubectl/kubectl.exe".
+if [ -z "${KUBECTL:-}" ]; then
+  if command -v kubectl >/dev/null 2>&1; then
+    KUBECTL=kubectl
+  elif [ -n "${LOCALAPPDATA:-}" ] && [ -x "$LOCALAPPDATA/kubectl/kubectl.exe" ]; then
+    KUBECTL="$LOCALAPPDATA/kubectl/kubectl.exe"
+  fi
+fi
+if [ -z "${KUBECTL:-}" ] ||
+   { [ ! -x "$KUBECTL" ] && ! command -v "$KUBECTL" >/dev/null 2>&1; }; then
+  echo "kubectl not found on PATH — install it, or set KUBECTL=/path/to/kubectl and retry." >&2
   exit 1
 fi
 
