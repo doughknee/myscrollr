@@ -1015,6 +1015,34 @@
   transition: none !important;
 }
 
+/* …with two narrow, opt-in exceptions.
+   The rule above is a blanket `animation: none !important`, which means
+   a Tailwind `animate-*` class inside the app silently does nothing —
+   it compiles, it lands on the element, and it never runs. The Home
+   marquee and the live badges are motion BY DESIGN (a ticker that
+   doesn't move isn't a ticker), so they opt in explicitly by attribute
+   rather than the calm default being weakened for everything.
+
+   Keep this list short. Anything added here is asserting that stillness
+   would make it wrong, not merely less lively. */
+#app-shell [data-motion="marquee"] {
+  animation: chipdrift var(--marquee-duration, 22s) linear infinite !important;
+}
+#app-shell [data-motion="marquee"][data-paused="true"] {
+  animation-play-state: paused !important;
+}
+#app-shell [data-motion="pulse"] {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
+}
+
+/* Reduced motion still wins over both. */
+@media (prefers-reduced-motion: reduce) {
+  #app-shell [data-motion="marquee"],
+  #app-shell [data-motion="pulse"] {
+    animation: none !important;
+  }
+}
+
 /* Light-mode scrollbar — applies to every theme family's light variant.
    Dark scrollbars are already covered by the base ::-webkit-scrollbar
    rule further down (which reads --color-base-300). */

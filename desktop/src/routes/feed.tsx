@@ -313,7 +313,7 @@ function HomePage() {
         {highlights.length > 0 && (
           <section className="mb-4">
             <div className="mb-2 flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-error motion-safe:animate-pulse" />
+              <span data-motion="pulse" className="size-1.5 rounded-full bg-error" />
               <h2 className="font-mono text-ui-section text-fg-3">
                 Happening now
               </h2>

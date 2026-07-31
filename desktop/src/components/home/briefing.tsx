@@ -98,7 +98,7 @@ export function LiveDot({ label = "LIVE" }: { label?: string }) {
     // The text is the badge. Colour alone would leave the state invisible
     // to anyone who can't separate red from grey.
     <span className="inline-flex items-center gap-1 rounded bg-error/12 px-1.5 py-0.5 font-mono text-ui-chip font-bold text-error">
-      <span className="size-1.5 rounded-full bg-error motion-safe:animate-pulse" />
+      <span data-motion="pulse" className="size-1.5 rounded-full bg-error" />
       {label}
     </span>
   );

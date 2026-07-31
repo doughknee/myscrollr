@@ -147,13 +147,28 @@ export default function CatalogCard({
     return (
       <div
         {...shared}
-        className="group/card flex cursor-pointer items-center gap-2.5 rounded-[10px] border border-edge/55 bg-surface-raised px-2.5 py-2 hover:border-edge focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+        className="group/card relative flex cursor-pointer items-center gap-2.5 overflow-hidden rounded-[10px] border border-edge/55 bg-surface-raised px-2.5 py-2 hover:border-edge focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
       >
-        <LogoTile item={item} size={30} radius="rounded-[7px]" />
-        <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-fg">
-          {item.name}
-        </span>
-        <AddControl item={item} added={added} onAdd={onAdd} />
+        {/* Horizontal brand wash. Without it these tiles are bare
+            surface-raised, which in a dark palette is a few percent off
+            the panel behind them — the row reads as floating labels with
+            no card under them. The rich variant gets its separation from
+            a vertical wash; compact needs the same help, just along its
+            own axis. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: `linear-gradient(to right, ${item.hex}26, transparent 70%)`,
+          }}
+        />
+        <div className="relative flex w-full items-center gap-2.5">
+          <LogoTile item={item} size={30} radius="rounded-[7px]" />
+          <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-fg">
+            {item.name}
+          </span>
+          <AddControl item={item} added={added} onAdd={onAdd} />
+        </div>
       </div>
     );
   }

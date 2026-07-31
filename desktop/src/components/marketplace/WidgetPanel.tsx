@@ -60,7 +60,11 @@ function TickerPreview({ hex }: { hex: string }) {
   const chips = [...widths, ...widths];
   return (
     <div className="relative overflow-hidden rounded-[10px] border border-edge/60 bg-surface-raised py-2">
-      <div className="flex w-max gap-2 motion-safe:animate-[chipdrift_14s_linear_infinite]">
+      <div
+        data-motion="marquee"
+        style={{ "--marquee-duration": "14s" } as React.CSSProperties}
+        className="flex w-max gap-2"
+      >
         {chips.map((w, i) => (
           <div
             key={i}

@@ -14,7 +14,6 @@
  * thirty.
  */
 import { useState } from "react";
-import clsx from "clsx";
 import { Pause, Play, SlidersHorizontal } from "lucide-react";
 
 export interface TickerChip {
@@ -38,7 +37,7 @@ export default function HomeTicker({
   return (
     <div className="flex items-center gap-2.5 overflow-hidden">
       <span className="inline-flex shrink-0 items-center gap-1.5 rounded bg-accent/12 px-1.5 py-0.5 font-mono text-ui-chip font-bold text-accent">
-        <span className="size-1.5 rounded-full bg-accent motion-safe:animate-pulse" />
+        <span data-motion="pulse" className="size-1.5 rounded-full bg-accent" />
         LIVE
       </span>
 
@@ -56,13 +55,15 @@ export default function HomeTicker({
           </span>
         ) : (
           <div
-            className={clsx(
-              "flex w-max gap-2",
-              // motion-safe only: with reduced motion the track simply
-              // sits still and stays readable.
-              "motion-safe:animate-[chipdrift_22s_linear_infinite]",
-              paused && "[animation-play-state:paused]",
-            )}
+            // Attribute, not an animate-* class: the app-wide
+            // `#app-shell * { animation: none !important }` rule silences
+            // every Tailwind animation inside the app. style.css grants
+            // marquees an explicit exception keyed off this attribute,
+            // and still honours prefers-reduced-motion.
+            data-motion="marquee"
+            data-paused={paused ? "true" : "false"}
+            style={{ "--marquee-duration": "22s" } as React.CSSProperties}
+            className="flex w-max gap-2"
           >
             {[...chips, ...chips].map((c, i) => (
               <button
