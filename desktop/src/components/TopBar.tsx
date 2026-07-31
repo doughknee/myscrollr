@@ -107,6 +107,18 @@ export default function TopBar({
         IS_MACOS && "pl-[78px]",
       )}
     >
+      {/* ── Brand mark (Windows/Linux) ───────────────────────
+          Leads the row on the frameless platforms, where the left
+          corner is ours to use. macOS can't have it here — the traffic
+          lights are drawn over that corner — so it trails the row
+          there instead. */}
+      {!IS_MACOS && (
+        <>
+          <BrandMark />
+          <div className="w-px h-5 bg-edge/40 mx-1 shrink-0" />
+        </>
+      )}
+
       {/* ── Sidebar toggle ──────────────────────────────────
           Leads the row, ahead of Back: it acts on the rail to its
           left, so it reads as belonging to that edge rather than to
@@ -269,17 +281,15 @@ export default function TopBar({
           </button>
         </Tooltip>
 
-        {/* ── Brand mark (far right) ────────────────────────────
-            Sits right of the Ticker toggle. It used to lead the row,
-            but macOS draws the traffic lights over that corner under
-            titleBarStyle "Overlay", so the left edge belongs to them. */}
-        <div className="w-px h-5 bg-edge/40 mx-1 shrink-0" />
-        <div className="flex h-7 shrink-0 items-center gap-2 px-1.5">
-          <ScrollLogo size={20} />
-          <span className="text-ui-body font-semibold tracking-tight">
-            Scrollr
-          </span>
-        </div>
+        {/* macOS only: the brand mark trails the row because the
+            traffic lights own the left corner under titleBarStyle
+            "Overlay". Everywhere else it leads — see the top of the row. */}
+        {IS_MACOS && (
+          <>
+            <div className="w-px h-5 bg-edge/40 mx-1 shrink-0" />
+            <BrandMark />
+          </>
+        )}
       </div>
 
       {/* ── Window controls (Windows/Linux frameless only) ────
@@ -294,3 +304,18 @@ export default function TopBar({
   );
 }
 
+
+// ── Brand mark ──────────────────────────────────────────────────
+//
+// Rendered at one end of the row or the other depending on platform:
+// leading on Windows/Linux, trailing on macOS. It is the same mark
+// either way, so it lives here rather than being written twice.
+
+function BrandMark() {
+  return (
+    <div className="flex h-7 shrink-0 items-center gap-2 px-1.5">
+      <ScrollLogo size={20} />
+      <span className="text-ui-body font-semibold tracking-tight">Scrollr</span>
+    </div>
+  );
+}

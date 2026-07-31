@@ -323,10 +323,20 @@ export function SegmentedRow<T extends string>({
               )}
             >
               {value === opt.value && (
+                // The fill alone does not carry the selected state. In a
+                // light palette the drop shadow draws the pill's edge, but
+                // shadow-soft-sm is black at 25% — on a dark background it
+                // is invisible, leaving the pill and its container within
+                // ~1.05 contrast (measured worst case: solarized-dark at
+                // 1.005, i.e. literally the same color). The hairline is
+                // keyed to `fg`, which is the one token guaranteed to
+                // contrast with the surface in every palette, so it reads
+                // as an edge in both polarities rather than needing a
+                // per-theme value.
                 <motion.span
                   layoutId="active-option"
                   transition={controlTransition}
-                  className="absolute inset-0 rounded-md bg-surface-raised shadow-soft-sm"
+                  className="absolute inset-0 rounded-md bg-surface-raised shadow-soft-sm ring-1 ring-inset ring-fg/20"
                 />
               )}
               <span className="relative z-10">{opt.label}</span>
