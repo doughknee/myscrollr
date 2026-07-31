@@ -198,6 +198,39 @@ export interface DataWidgetManifest {
    * wraps its rows in `{ leagues: [...] }`.
    */
   normalizeHome?: (raw: unknown) => unknown[];
+
+  /**
+   * The one thing worth interrupting someone for, or null.
+   *
+   * Home's "Happening now" row asks each source this and keeps the top
+   * three. OPTIONAL on purpose, unlike HomeRows: the registries are
+   * runtime globs that tsc cannot see through, so a required member
+   * would not actually be enforced at build time for a source that
+   * forgot it — it would just be `undefined` at runtime, in a hero row,
+   * on the first screen anyone sees. Optional and explicitly checked is
+   * honest about what the type system can promise here.
+   *
+   * `data` is the SAME array HomeRows receives — normalized and scoped
+   * to this widget. Anything else and the headline will contradict the
+   * rows directly beneath it.
+   *
+   * Copy must be template-derived, never editorial: this renders as the
+   * app's own voice, and a source cannot know what is actually
+   * important to a given person.
+   */
+  highlight?: (data: unknown[]) => HomeHighlight | null;
+}
+
+/** A candidate for Home's "Happening now" row. */
+export interface HomeHighlight {
+  /** Tabular, scannable: "Inter Miami 2 – 1 LA Galaxy", "NVDA +3.4% today". */
+  headline: string;
+  /** The supporting formula line: "71' · 2nd half", "$188.52 · top mover". */
+  sub: string;
+  /** Drives the LIVE badge — and the badge always carries text, not just color. */
+  live?: boolean;
+  /** Brand hex for the card gradient. Falls back to the widget's own. */
+  hex?: string;
 }
 
 /** Props every source's `HomeRows` receives. */

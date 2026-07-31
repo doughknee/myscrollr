@@ -46,6 +46,32 @@ export const overlaySurfaceMotion: Variants = {
   },
 };
 
+/**
+ * Right-edge slide-over (the catalog's widget panel).
+ *
+ * Distinct from overlaySurfaceMotion, which rises and scales because it
+ * describes a centered modal appearing in place. A panel anchored to an
+ * edge should read as coming *from* that edge, so this translates on X
+ * only — scaling a full-height panel warps its border against the one
+ * it is sliding over.
+ */
+export const slideOverMotion: Variants = {
+  hidden: { opacity: 0, transform: "translateX(24px)" },
+  visible: {
+    opacity: 1,
+    transform: "translateX(0px)",
+    transition: {
+      opacity: { duration: 0.2, ease: appEase },
+      transform: { type: "spring", bounce: 0, visualDuration: 0.34 },
+    },
+  },
+  exit: {
+    opacity: 0,
+    transform: "translateX(16px)",
+    transition: { duration: 0.16, ease: appEase },
+  },
+};
+
 export const popoverMotion: Variants = {
   hidden: {
     opacity: 0,

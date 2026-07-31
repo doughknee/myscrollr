@@ -63,3 +63,26 @@ export function getMaxWidgets(tier: SubscriptionTier): number {
   return TIER_LIMITS[tier].maxWidgets;
 }
 
+
+/**
+ * Tier ranking, for "is this widget's required tier within reach?".
+ *
+ * Lived privately inside routes/widget.$id.info.tsx, which meant the
+ * catalog and the info page could answer the same gating question
+ * differently — exactly the drift that a shared slot helper already
+ * exists to prevent. It belongs next to getMaxWidgets.
+ */
+export const TIER_ORDER: SubscriptionTier[] = [
+  "free",
+  "uplink",
+  "uplink_pro",
+  "uplink_ultimate",
+  "super_user",
+];
+
+export function tierMeets(
+  current: SubscriptionTier,
+  required: SubscriptionTier,
+): boolean {
+  return TIER_ORDER.indexOf(current) >= TIER_ORDER.indexOf(required);
+}

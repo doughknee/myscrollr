@@ -54,7 +54,7 @@ import {
 import type { Trade, FeedTabProps, DataWidgetManifest } from "../../types";
 import type { WidgetId } from "../../api/client";
 import { assetClassForWidget } from "../../marketplace";
-import { FinanceHomeRows } from "./home";
+import { FinanceHomeRows, financeHighlight } from "./home";
 
 // ── DataWidgetRow manifest ─────────────────────────────────────────────
 
@@ -77,6 +77,7 @@ export const financeDataWidget: DataWidgetManifest = {
   },
   FeedTab: FinanceFeedTab,
   HomeRows: FinanceHomeRows,
+  highlight: financeHighlight,
 };
 
 // ── Types ────────────────────────────────────────────────────────

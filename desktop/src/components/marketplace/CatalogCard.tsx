@@ -1,117 +1,212 @@
 import { useState } from "react";
 import clsx from "clsx";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, Plus } from "lucide-react";
 import type { CatalogItem } from "../../marketplace";
 import { CATEGORY_LABELS } from "../../marketplace";
 
-// ── Props ───────────────────────────────────────────────────────
+// ── Browse-AND-act card ─────────────────────────────────────────
 //
-// Browse-only card (v1.1.1 catalog redesign): the catalog shows what
-// exists; every transaction (add / remove / configure / gating) lives
-// on the widget's own info page. Clicking anywhere on the card goes
-// there. No per-card buttons, no per-card lock badges — uniform,
-// sleek, calm.
+// The catalog used to be browse-only — every transaction lived on the
+// widget's info page, one navigation away. It's a store now: the card
+// adds, and the card body opens details in a slide-over rather than
+// navigating. Two variants:
+//
+//   rich    — the default. Logo tile on a brand gradient, name, category
+//             kicker, two-line description on a vertical brand wash.
+//   compact — sports. League descriptions are boilerplate ("Live NFL
+//             scores…"), so a shelf of 14 rich cards is 14 restatements
+//             of the same sentence. Logo + name + add button, 4-across.
 
 interface CatalogCardProps {
   item: CatalogItem;
-  enabled: boolean;
-  /** Open the widget's info page — the card's single affordance. */
-  onInfo: (item: CatalogItem) => void;
+  added: boolean;
+  variant?: "rich" | "compact";
+  /** Open the detail panel. The card body is the hit target. */
+  onOpen: (item: CatalogItem) => void;
+  /**
+   * Add without leaving the page. Omitted when the item is already
+   * added; at slot capacity the caller passes a handler that opens the
+   * panel instead, where the upgrade path is explained.
+   */
+  onAdd?: (item: CatalogItem) => void;
+}
+
+// ── Logo tile ───────────────────────────────────────────────────
+
+function LogoTile({
+  item,
+  size,
+  radius,
+}: {
+  item: CatalogItem;
+  size: number;
+  radius: string;
+}) {
+  const [logoFailed, setLogoFailed] = useState(false);
+  const Icon = item.icon;
+
+  if (item.logoUrl && !logoFailed) {
+    return (
+      <img
+        src={item.logoUrl}
+        alt=""
+        loading="lazy"
+        className={clsx(
+          "shrink-0 object-contain",
+          radius,
+          // Transparent/dark marks (UFC) need a light tile or they
+          // disappear flush against a dark card.
+          item.logoLight && "bg-white p-1",
+        )}
+        style={{ width: size, height: size }}
+        onError={() => setLogoFailed(true)}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={clsx(
+        "flex shrink-0 items-center justify-center text-white",
+        radius,
+      )}
+      style={{
+        width: size,
+        height: size,
+        background: `linear-gradient(135deg, ${item.hex} 0%, ${item.hex}b8 100%)`,
+      }}
+    >
+      <Icon size={Math.round(size * 0.55)} />
+    </div>
+  );
+}
+
+// ── Add / added control ─────────────────────────────────────────
+
+function AddControl({
+  item,
+  added,
+  onAdd,
+}: {
+  item: CatalogItem;
+  added: boolean;
+  onAdd?: (item: CatalogItem) => void;
+}) {
+  if (added) {
+    return (
+      <span
+        aria-label={`${item.name} added`}
+        className="flex size-[26px] shrink-0 items-center justify-center rounded-[7px] bg-accent/14 text-accent"
+      >
+        <Check size={13} strokeWidth={3} />
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      // Named, not "Add to ticker": a screen reader running the shelf
+      // otherwise hears the same three words fourteen times.
+      aria-label={`Add ${item.name}`}
+      onClick={(e) => {
+        // The card body opens the panel; without this, adding would
+        // also open it.
+        e.stopPropagation();
+        onAdd?.(item);
+      }}
+      className="flex size-[26px] shrink-0 cursor-pointer items-center justify-center rounded-[7px] border border-edge/70 bg-transparent text-accent hover:border-accent/50 hover:bg-accent/10"
+    >
+      <Plus size={13} strokeWidth={2.5} />
+    </button>
+  );
 }
 
 // ── Component ───────────────────────────────────────────────────
 
-export default function CatalogCard({ item, enabled, onInfo }: CatalogCardProps) {
-  const [logoFailed, setLogoFailed] = useState(false);
-  const Icon = item.icon;
+export default function CatalogCard({
+  item,
+  added,
+  variant = "rich",
+  onOpen,
+  onAdd,
+}: CatalogCardProps) {
+  const shared = {
+    role: "button" as const,
+    tabIndex: 0,
+    "aria-label": `More about ${item.name}`,
+    onClick: () => onOpen(item),
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onOpen(item);
+      }
+    },
+  };
+
+  if (variant === "compact") {
+    return (
+      <div
+        {...shared}
+        className="group/card relative flex cursor-pointer items-center gap-2.5 overflow-hidden rounded-[10px] border border-edge/55 bg-surface-raised px-2.5 py-2 hover:border-edge focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+      >
+        {/* Horizontal brand wash. Without it these tiles are bare
+            surface-raised, which in a dark palette is a few percent off
+            the panel behind them — the row reads as floating labels with
+            no card under them. The rich variant gets its separation from
+            a vertical wash; compact needs the same help, just along its
+            own axis. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: `linear-gradient(to right, ${item.hex}26, transparent 70%)`,
+          }}
+        />
+        <div className="relative flex w-full items-center gap-2.5">
+          <LogoTile item={item} size={30} radius="rounded-[7px]" />
+          <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-fg">
+            {item.name}
+          </span>
+          <AddControl item={item} added={added} onAdd={onAdd} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      aria-label={`More about ${item.name}`}
-      onClick={() => onInfo(item)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onInfo(item);
-        }
-      }}
-      className={clsx(
-        "group/card relative flex flex-col overflow-hidden rounded-xl border border-edge/40 bg-base-150/30 p-4 cursor-pointer",
-        "hover:shadow-soft-sm hover:border-edge/60 hover:bg-base-150/50",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
-        // Added cards de-emphasized so new content stays prominent.
-        enabled && "opacity-80 hover:opacity-100",
-      )}
+      {...shared}
+      className="group/card relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-edge/55 bg-surface-raised p-3.5 hover:border-edge hover:shadow-soft-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
     >
-      {/* Brand wash — a single vertical fade of the widget's color across the
-          whole card, so there's no seam where a header band would end. */}
+      {/* Vertical brand wash — a single fade so there's no seam where a
+          header band would end. */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-24"
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
         style={{
-          background: `linear-gradient(to bottom, ${item.hex}30 0%, ${item.hex}0a 45%, transparent 100%)`,
+          background: `linear-gradient(to bottom, ${item.hex}26, transparent 55%)`,
         }}
       />
 
-      {/* Content */}
       <div className="relative flex flex-1 flex-col">
-        <div className="flex items-center gap-3">
-          {item.logoUrl && !logoFailed ? (
-            <img
-              src={item.logoUrl}
-              alt=""
-              loading="lazy"
-              className={clsx(
-                "w-10 h-10 rounded-lg object-contain shrink-0",
-                // Transparent/dark marks (UFC) need a light tile or they
-                // disappear flush on a dark card.
-                item.logoLight && "bg-white p-1",
-              )}
-              onError={() => setLogoFailed(true)}
-            />
-          ) : (
-            // App-icon tile — same treatment as the sidebar's SourceGlyph
-            // fallback, so brandless widgets read as distinct logos here
-            // too (white glyph on a gradient of the brand hex).
-            <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-white"
-              style={{
-                background: `linear-gradient(135deg, ${item.hex} 0%, ${item.hex}b8 100%)`,
-              }}
-            >
-              <Icon size={22} />
-            </div>
-          )}
+        <div className="flex items-start gap-3">
+          <LogoTile item={item} size={34} radius="rounded-lg" />
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className="text-ui-body font-semibold truncate">{item.name}</span>
-              {enabled && (
-                <span className="flex items-center gap-0.5 text-ui-chip font-medium text-success shrink-0">
-                  <Check size={10} />
-                  Added
-                </span>
-              )}
+            <div className="truncate text-ui-body font-semibold text-fg">
+              {item.name}
             </div>
-            <span className="text-ui-chip font-semibold uppercase tracking-wide text-fg-4">
+            <div className="text-ui-chip font-semibold tracking-wide text-fg-4 uppercase">
               {CATEGORY_LABELS[item.category]}
-            </span>
+            </div>
           </div>
+          <AddControl item={item} added={added} onAdd={onAdd} />
         </div>
 
-        {/* Reserve exactly two lines (leading-relaxed = 1.625 → 3.25em) so
-            1- and 2-line descriptions occupy the same height and cards stay
-            uniform. */}
-        <p className="mt-2.5 text-ui-meta leading-relaxed line-clamp-2 h-[3.25em]">
+        {/* Two reserved lines so 1- and 2-line descriptions leave cards
+            the same height across a shelf. */}
+        <p className="mt-2.5 line-clamp-2 min-h-9 text-ui-meta leading-relaxed text-fg-3">
           {item.description}
         </p>
-      </div>
-
-      {/* "Learn more" affordance — a quiet hint, not a button; the card
-          itself is the hit target. */}
-      <div className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-0.5 text-ui-chip font-medium text-fg-4 opacity-0 group-hover/card:opacity-100">
-        View
-        <ChevronRight size={11} />
       </div>
     </div>
   );
