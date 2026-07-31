@@ -279,7 +279,7 @@ function RootLayout() {
   }, []);
 
   // Silent update check on startup — toasts only if a real update is
-  // available. The user opts out via Settings → General → Updates.
+  // available. The user opts out via Customize → Updates.
   useStartupUpdateCheck({
     enabled: prefs.startup.autoCheckUpdates,
     appVersion,
@@ -839,8 +839,8 @@ function RootLayout() {
               navigation, page-identity breadcrumb (read from
               PageContext), entityAction, and the ambient ticker
               control. Always visible regardless of route.
-              (Always-on-top moved to Settings → Window — the chrome
-              button wasn't earning its slot.) */}
+              (Always-on-top moved to Customize → App → Window — the
+              chrome button wasn't earning its slot.) */}
           <TopBar
             tickerOn={prefs.ticker.showTicker}
             canBack={navHistory.canBack}

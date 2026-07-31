@@ -234,7 +234,7 @@ export const GETTING_STARTED_STEPS: GettingStartedStep[] = [
     title: "Customize the Ticker",
     iconName: "Monitor",
     description:
-      "The ticker bar runs across your screen showing live data. Open Customize > Ticker (or press Ctrl+,) to lay out which widgets appear on which ticker rows. To move the ticker to the top or bottom of the screen, right-click it or use the up/down chevron in the hover toolbar.",
+      "The ticker bar runs across your screen showing live data. Open Customize > Ticker (or press Ctrl+,) to set how it scrolls, how much detail each chip shows, and which edge of the screen it sits on. You can also move it by right-clicking the ticker or using the up/down chevron in its hover toolbar.",
   },
   {
     title: "Explore Widgets",

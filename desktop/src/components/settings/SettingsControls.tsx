@@ -1,7 +1,6 @@
 import { useId } from "react";
 import { clsx } from "clsx";
 import { LayoutGroup, motion } from "motion/react";
-import Tooltip from "../Tooltip";
 import { SelectMenu } from "../widget-bar/SelectMenu";
 import { controlTransition } from "../../lib/motion";
 
@@ -48,20 +47,25 @@ export function Section({ title, children, action, variant = "open" }: SectionPr
   );
 }
 
+// Descriptions render as a visible subline, not a tooltip. They used to
+// be hover-only, which made the page unscannable (you had to hover every
+// row to learn what it did) and put load-bearing copy — "Windows only",
+// "Local preferences stay intact" — permanently out of reach of keyboard
+// users: the tooltip's trigger was a non-focusable <span> nested inside
+// the row's button, so Tab focus landed on the button and the tooltip
+// never opened.
 function SettingLabel({ label, description }: { label: string; description?: string }) {
-  const className = clsx(
-    "text-ui-muted leading-tight group-hover:text-fg",
-    description && "cursor-help",
-  );
-
-  if (!description) {
-    return <span className={className}>{label}</span>;
-  }
-
   return (
-    <Tooltip content={description} side="top">
-      <span className={className}>{label}</span>
-    </Tooltip>
+    <>
+      <span className="text-ui-muted leading-tight group-hover:text-fg">
+        {label}
+      </span>
+      {description && (
+        <span className="text-ui-meta text-fg-4 leading-snug text-balance">
+          {description}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -88,7 +92,7 @@ export function ToggleRow({
       onClick={() => onChange(!checked)}
       className="flex items-center justify-between w-full px-3 py-2 rounded-lg hover:bg-base-250/45 cursor-pointer group"
     >
-      <div className="flex flex-col gap-0.5 text-left group-hover:text-fg">
+      <div className="flex flex-col gap-0.5 min-w-0 pr-2 text-left group-hover:text-fg">
         <SettingLabel label={label} description={description} />
       </div>
       <div
@@ -133,7 +137,7 @@ export function SegmentedRow<T extends string>({
 
   return (
     <div className="flex items-center justify-between px-3 py-2 rounded-lg">
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-0.5 min-w-0 pr-2">
         <SettingLabel label={label} description={description} />
       </div>
       <LayoutGroup id={layoutGroupId}>
@@ -193,7 +197,7 @@ export function SelectRow<T extends string>({
 }: SelectRowProps<T>) {
   return (
     <div className="flex items-center justify-between px-3 py-2 rounded-lg">
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-0.5 min-w-0 pr-2">
         <SettingLabel label={label} description={description} />
       </div>
       <div className="shrink-0 ml-4">
@@ -235,7 +239,7 @@ export function SliderRow({
 
   return (
     <div className="flex items-center justify-between px-3 py-2 rounded-lg">
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-0.5 min-w-0 pr-2">
         <SettingLabel label={label} description={description} />
       </div>
       <div className="flex items-center gap-2.5 shrink-0 ml-4">
@@ -337,7 +341,7 @@ export function ActionRow({
 }: ActionRowProps) {
   return (
     <div className="flex items-center justify-between px-3 py-2 rounded-lg">
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-0.5 min-w-0 pr-2">
         <SettingLabel label={label} description={description} />
       </div>
       <button

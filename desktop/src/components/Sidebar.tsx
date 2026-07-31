@@ -380,8 +380,12 @@ export default function Sidebar({
               onSelect: onNavigateToAccount,
             },
             {
+              // "Customize" everywhere: the route is /customize and the
+              // page titles itself Customize, so labelling the way in
+              // "Settings" meant the destination renamed itself on
+              // arrival.
               key: "settings",
-              label: "Settings",
+              label: "Customize",
               icon: SlidersHorizontal,
               onSelect: onNavigateToCustomize,
             },

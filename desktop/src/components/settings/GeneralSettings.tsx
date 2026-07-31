@@ -1,5 +1,3 @@
-import clsx from "clsx";
-
 import type {
   AppearancePrefs,
   WindowPrefs,
