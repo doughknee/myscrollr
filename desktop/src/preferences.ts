@@ -66,7 +66,6 @@ export function isThemeMode(value: unknown): value is ThemeMode {
 type TaskbarHeight = "compact" | "default" | "comfortable";
 export type TickerGap = "tight" | "normal" | "spacious";
 export type TickerMode = "compact" | "comfort";
-type DefaultView = "feed" | "dashboard" | "last";
 export type MixMode = "grouped" | "weave";
 export type ChipColorMode = "widget" | "accent" | "muted";
 export type TickerDirection = "left" | "right";
@@ -115,14 +114,17 @@ export interface TickerPrefs {
 }
 
 export interface StartupPrefs {
-  defaultView: DefaultView;
-  refreshInterval: number;
-  autostart: boolean;
   /**
    * When true, the main window runs a single update check shortly after
    * launch and surfaces a toast if a new version is available. The user
    * confirms before any download happens — we never auto-install.
-   * Defaults to true; opt out via Settings → General → Updates.
+   * Defaults to true; opt out via Customize → Updates.
+   *
+   * The only field here. `defaultView`, `refreshInterval` and
+   * `autostart` used to sit alongside it and were all dead: nothing
+   * read them, and the real autostart state is owned by the Tauri
+   * autostart plugin (see `autostartOn` in routes/__root.tsx), not by
+   * this object.
    */
   autoCheckUpdates: boolean;
 }
@@ -131,9 +133,6 @@ export type TickerPosition = "top" | "bottom";
 
 export interface WindowPrefs {
   pinned: boolean;
-  defaultWidth: "full" | "narrow";
-  narrowWidth: number;
-  skipTaskbar: boolean;
   tickerPosition: TickerPosition;
   /**
    * Windows-only. When true (default), hides the ticker when any
@@ -485,17 +484,11 @@ const DEFAULT_TICKER: TickerPrefs = {
 };
 
 const DEFAULT_STARTUP: StartupPrefs = {
-  defaultView: "last",
-  refreshInterval: 60_000,
-  autostart: false,
   autoCheckUpdates: true,
 };
 
 const DEFAULT_WINDOW: WindowPrefs = {
   pinned: true,
-  defaultWidth: "full",
-  narrowWidth: 800,
-  skipTaskbar: true,
   tickerPosition: "top",
   hideOnFullscreen: true,
 };
@@ -655,16 +648,13 @@ const PREFIX = "scrollr:settings";
 function migrateV1(saved: Record<string, unknown>): Partial<AppPreferences> {
   const result: Record<string, unknown> = {};
 
-  // Old "general" → split into startup + appearance
-  const general = saved.general as Record<string, unknown> | undefined;
-  if (general) {
-    result.startup = {
-      defaultView: general.defaultView ?? DEFAULT_STARTUP.defaultView,
-      refreshInterval: general.refreshInterval ?? DEFAULT_STARTUP.refreshInterval,
-      autostart: general.autostart ?? DEFAULT_STARTUP.autostart,
-      autoCheckUpdates: DEFAULT_STARTUP.autoCheckUpdates,
-    };
-    // smoothScroll and scrollSmoothness are dropped (removed)
+  // Old "general" → split into startup + appearance. Only
+  // autoCheckUpdates survives the split: v1's defaultView,
+  // refreshInterval and autostart were migrated forward for years
+  // without anything ever reading them, so they're dropped rather than
+  // carried again. smoothScroll and scrollSmoothness went earlier.
+  if (saved.general) {
+    result.startup = { ...DEFAULT_STARTUP };
   }
 
   // Old "taskbar" → taskbar (add pinnedActions)
@@ -1047,11 +1037,37 @@ export function loadPrefs(): AppPreferences {
       themeFamily,
       themeMode,
     };
+    // Strip the retired startup/window fields the same way the legacy
+    // appearance keys above are stripped. Spreading saved-over-defaults
+    // would otherwise carry `defaultView`, `refreshInterval`,
+    // `autostart`, `defaultWidth`, `narrowWidth` and `skipTaskbar`
+    // straight back out to disk on the next save, so removing them from
+    // the types alone would never actually shed them.
+    const {
+      defaultView: _defaultView,
+      refreshInterval: _refreshInterval,
+      autostart: _autostart,
+      ...savedStartup
+    } = (source.startup ?? {}) as Partial<StartupPrefs> & {
+      defaultView?: unknown;
+      refreshInterval?: unknown;
+      autostart?: unknown;
+    };
+    const {
+      defaultWidth: _defaultWidth,
+      narrowWidth: _narrowWidth,
+      skipTaskbar: _skipTaskbar,
+      ...savedWindow
+    } = (source.window ?? {}) as Partial<WindowPrefs> & {
+      defaultWidth?: unknown;
+      narrowWidth?: unknown;
+      skipTaskbar?: unknown;
+    };
     const merged: AppPreferences = {
       appearance: mergedAppearance,
       ticker: { ...DEFAULT_TICKER, ...source.ticker },
-      startup: { ...DEFAULT_STARTUP, ...source.startup },
-      window: { ...DEFAULT_WINDOW, ...source.window },
+      startup: { ...DEFAULT_STARTUP, ...savedStartup },
+      window: { ...DEFAULT_WINDOW, ...savedWindow },
       taskbar: { ...DEFAULT_TASKBAR, ...source.taskbar },
       widgets: mergeWidgetPrefs(source.widgets as Partial<WidgetPrefs> | undefined),
       widgetDisplay: {

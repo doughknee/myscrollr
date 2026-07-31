@@ -3,6 +3,21 @@
 @source "./widgets/**/*.tsx";
 @source "./components/**/*.tsx";
 
+/* `dark:` keyed to the app's own theme attribute, not the OS.
+   Tailwind v4's stock `dark:` resolves to prefers-color-scheme, which is
+   wrong here: color mode is a preference (themeMode light|dark|system),
+   so a user can run a light palette on a dark OS and vice versa. The
+   shells already carry `data-theme="<family>-<mode>"` (useTheme.ts), and
+   style.css already keys mode-conditional rules off the `-dark` suffix
+   (see .high-contrast below), so this variant just makes that same test
+   available to utilities.
+
+   Reach for it sparingly. Anything expressible as a token belongs in the
+   20 palette blocks instead — this is for the few places where a value
+   is genuinely polarity-dependent rather than palette-dependent, like
+   the strength of a drop shadow. */
+@custom-variant dark (&:where([data-theme$="-dark"], [data-theme$="-dark"] *));
+
 @theme {
   /* ── Surface palette ──────────────────────────────────────────
      Warm desaturated purple-black matching the website dark mode.
@@ -11,6 +26,7 @@
   --color-surface-2: #1c1c2a;
   --color-surface-hover: #21212e;
   --color-surface-3: #1e1e2c;
+  --color-surface-raised: #20202b;
 
   /* Website base palette (for parity) */
   --color-base-100: #141420;
@@ -113,6 +129,7 @@
   --color-surface-2: #f6f7fb;
   --color-surface-hover: #eef0f6;
   --color-surface-3: #f0f2f8;
+  --color-surface-raised: #fcfcfc;
 
   --color-base-100: #ffffff;
   --color-base-150: #f6f7fb;
@@ -148,6 +165,7 @@
   --color-surface-2: #181825;        /* mantle */
   --color-surface-hover: #313244;    /* surface0 */
   --color-surface-3: #11111b;        /* crust */
+  --color-surface-raised: #292938;
 
   --color-base-100: #1e1e2e;
   --color-base-150: #181825;
@@ -188,6 +206,7 @@
   --color-surface-2: #e6e9ef;        /* mantle */
   --color-surface-hover: #ccd0da;    /* surface0 */
   --color-surface-3: #dce0e8;        /* crust */
+  --color-surface-raised: #f9f9fb;
 
   --color-base-100: #eff1f5;
   --color-base-150: #e6e9ef;
@@ -228,6 +247,7 @@
   --color-surface-2: #21222c;
   --color-surface-hover: #44475a;    /* current line */
   --color-surface-3: #1e1f29;
+  --color-surface-raised: #333540;
 
   --color-base-100: #282a36;
   --color-base-150: #21222c;
@@ -268,6 +288,7 @@
   --color-surface-2: #efefe6;
   --color-surface-hover: #e4e4d8;
   --color-surface-3: #ececdf;
+  --color-surface-raised: #fcfcfa;
 
   --color-base-100: #f8f8f2;
   --color-base-150: #efefe6;
@@ -308,6 +329,7 @@
   --color-surface-2: #16161e;
   --color-surface-hover: #24283b;
   --color-surface-3: #13131a;
+  --color-surface-raised: #252631;
 
   --color-base-100: #1a1b26;
   --color-base-150: #16161e;
@@ -348,6 +370,7 @@
   --color-surface-2: #d5d6dc;
   --color-surface-hover: #c4c8da;
   --color-surface-3: #cbcdd4;
+  --color-surface-raised: #f3f3f5;
 
   --color-base-100: #e1e2e7;
   --color-base-150: #d5d6dc;
@@ -388,6 +411,7 @@
   --color-surface-2: #292e39;
   --color-surface-hover: #3b4252;    /* nord1 */
   --color-surface-3: #242933;
+  --color-surface-raised: #383e4a;
 
   --color-base-100: #2e3440;
   --color-base-150: #292e39;
@@ -428,6 +452,7 @@
   --color-surface-2: #e5e9f0;        /* nord5 */
   --color-surface-hover: #d8dee9;    /* nord4 */
   --color-surface-3: #dfe3ec;
+  --color-surface-raised: #f7f9fb;
 
   --color-base-100: #eceff4;
   --color-base-150: #e5e9f0;
@@ -468,6 +493,7 @@
   --color-surface-2: #1d2021;        /* bg0_h */
   --color-surface-hover: #3c3836;    /* bg1 */
   --color-surface-3: #1d2021;
+  --color-surface-raised: #333333;
 
   --color-base-100: #282828;
   --color-base-150: #32302f;
@@ -508,6 +534,7 @@
   --color-surface-2: #f9f5d7;        /* bg0_h */
   --color-surface-hover: #ebdbb2;    /* bg1 */
   --color-surface-3: #f2e5bc;
+  --color-surface-raised: #fdf9e9;
 
   --color-base-100: #fbf1c7;
   --color-base-150: #f2e5bc;
@@ -548,6 +575,7 @@
   --color-surface-2: #073642;        /* base02 */
   --color-surface-hover: #094352;
   --color-surface-3: #00212b;
+  --color-surface-raised: #0d3640;
 
   --color-base-100: #002b36;
   --color-base-150: #03303b;
@@ -588,6 +616,7 @@
   --color-surface-2: #eee8d5;        /* base2 */
   --color-surface-hover: #e6e0cc;
   --color-surface-3: #f5efdc;
+  --color-surface-raised: #fefbf4;
 
   --color-base-100: #fdf6e3;
   --color-base-150: #f5efdc;
@@ -629,6 +658,7 @@
   --color-surface-2: #1f1d2e;        /* surface */
   --color-surface-hover: #26233a;    /* overlay */
   --color-surface-3: #16141f;        /* _nc */
+  --color-surface-raised: #24232f;
 
   --color-base-100: #191724;         /* base */
   --color-base-150: #1f1d2e;         /* surface */
@@ -673,6 +703,7 @@
   --color-surface-2: #fffaf3;        /* surface */
   --color-surface-hover: #f2e9e1;    /* overlay */
   --color-surface-3: #f8f0e7;        /* _nc */
+  --color-surface-raised: #fdfbf8;
 
   --color-base-100: #faf4ed;         /* base */
   --color-base-150: #fffaf3;         /* surface */
@@ -713,6 +744,7 @@
   --color-surface-2: #21252b;
   --color-surface-hover: #2c313a;
   --color-surface-3: #1d2025;
+  --color-surface-raised: #33373e;
 
   --color-base-100: #282c34;
   --color-base-150: #23272e;
@@ -753,6 +785,7 @@
   --color-surface-2: #f0f0f1;
   --color-surface-hover: #e5e5e6;
   --color-surface-3: #f4f4f5;
+  --color-surface-raised: #fdfdfd;
 
   --color-base-100: #fafafa;
   --color-base-150: #f4f4f5;
@@ -795,6 +828,7 @@
   --color-surface-2: #232a2e;        /* bg_dim */
   --color-surface-hover: #343f44;    /* bg1 */
   --color-surface-3: #232a2e;        /* bg_dim */
+  --color-surface-raised: #383f45;
 
   --color-base-100: #2d353b;         /* bg0 */
   --color-base-150: #232a2e;         /* bg_dim */
@@ -837,6 +871,7 @@
   --color-surface-2: #efebd4;        /* bg_dim */
   --color-surface-hover: #f4f0d9;    /* bg1 */
   --color-surface-3: #efebd4;        /* bg_dim */
+  --color-surface-raised: #fefbf4;
 
   --color-base-100: #fdf6e3;         /* bg0 */
   --color-base-150: #efebd4;         /* bg_dim */

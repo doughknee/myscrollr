@@ -298,7 +298,7 @@ export default function Sidebar({
         />
         <NavItem
           icon={<SlidersHorizontal size={15} />}
-          label="Customize"
+          label="Settings"
           active={isCustomize}
           collapsed={collapsed}
           onClick={onNavigateToCustomize}
@@ -380,6 +380,12 @@ export default function Sidebar({
               onSelect: onNavigateToAccount,
             },
             {
+              // "Settings" everywhere. The 2026-07 redesign folded the
+              // Account and Updates routes into one settings surface and
+              // renamed it, so the rail, this menu, and the page all
+              // agree. (The URL is still /customize — renaming that
+              // would break saved links and the cross-window navigate
+              // channel for no user-visible gain.)
               key: "settings",
               label: "Settings",
               icon: SlidersHorizontal,

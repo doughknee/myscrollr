@@ -102,7 +102,9 @@ function HomePage() {
 
 
   const openTickerSettings = useCallback(() => {
-    navigate({ to: "/customize" });
+    // Lands on the Ticker page, not the settings default — this pill is
+    // specifically "configure the ticker".
+    navigate({ to: "/customize", search: { page: "ticker" } });
   }, [navigate]);
 
   // Resolve each enabled widget row to a render manifest — the coarse source's

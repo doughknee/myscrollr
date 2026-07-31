@@ -202,7 +202,12 @@ describe("Sidebar account menu", () => {
       await screen.findByRole("menuitem", { name: "What's new" }),
     );
     expect(onNavigateToReleases).toHaveBeenCalledOnce();
-  });
+    // Two full open/animate/query cycles on an animated menu. Comfortably
+    // under a second on an idle machine, but it was already the slowest
+    // test in the suite and would intermittently blow the 5s default once
+    // enough files ran in parallel — a timeout, never an assertion
+    // failure. The budget is the fix; the test itself is sound.
+  }, 20_000);
 
   it("marks Status as an active account destination", () => {
     renderSidebar({ tier: "free", sourceCount: 0, isStatus: true });

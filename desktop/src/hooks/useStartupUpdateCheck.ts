@@ -3,7 +3,7 @@
 // Runs a single update check shortly after the main window mounts.
 // On a real update it surfaces a sonner toast with a "Download &
 // install" action. On up-to-date or error it stays silent — the
-// manual button in Settings → General is the recovery path.
+// manual button in Customize → Updates is the recovery path.
 //
 // We delay 4s so:
 //   1) Tauri webview, splash, and React hydration finish first.
@@ -55,7 +55,7 @@ export function useStartupUpdateCheck({ enabled, appVersion }: Options) {
         showUpdateToast(update, appVersion);
       } catch (err) {
         // Startup check failures are silent. The user can always retry
-        // via Settings → General → Updates. We still log so devs can
+        // via Customize → Updates. We still log so devs can
         // see what's going wrong during local development.
         console.warn("[Scrollr] Startup update check failed:", err);
       }

@@ -75,10 +75,13 @@ export default function ProfileField({
   }
 
   return (
-    <div className="px-3 py-2.5">
-      <div className="text-[10px] uppercase tracking-wider text-fg-4 mb-1.5">
-        {label}
-      </div>
+    // Matches the settings row anatomy — 16px/12px box, label as 13px
+    // medium fg — so an editable row reads as the same kind of thing as
+    // the toggle and action rows either side of it. It stacks rather
+    // than sitting label-left/control-right because the edit affordance
+    // has to replace the value in place.
+    <div className="px-4 py-3">
+      <div className="mb-1 text-ui-body font-medium text-fg">{label}</div>
       {editing ? (
         <div className="flex items-center gap-2">
           <input
@@ -121,7 +124,7 @@ export default function ProfileField({
         </div>
       ) : (
         <div className="flex items-center justify-between gap-2">
-          <span className="text-ui-meta text-fg-2 truncate min-w-0 flex-1">
+          <span className="text-ui-meta text-fg-4 truncate min-w-0 flex-1">
             {value || (
               <span className="italic text-fg-4">
                 {placeholder ?? "Not set"}
@@ -130,7 +133,7 @@ export default function ProfileField({
           </span>
           <button
             onClick={() => setEditing(true)}
-            className="shrink-0 flex items-center gap-1 px-2 py-1 text-ui-chip font-medium text-fg-4 hover:text-fg-2 hover:bg-base-300 rounded-md "
+            className="shrink-0 flex items-center gap-1 rounded-[7px] border border-edge/80 px-3 py-[5px] text-ui-chip font-medium text-fg-3 hover:text-fg hover:border-edge cursor-pointer"
           >
             <Pencil size={10} /> Edit
           </button>

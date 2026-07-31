@@ -219,7 +219,7 @@ export function ConnectedView({
             label="Disconnect Yahoo"
             description="Remove your Yahoo account link and clear imported leagues"
             action="Disconnect"
-            actionClass="bg-error/10 text-error hover:bg-error/20"
+            tone="error"
             onClick={onDisconnect}
           />
         </Section>

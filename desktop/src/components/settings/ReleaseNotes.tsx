@@ -8,11 +8,13 @@
  * more inviting label than "Updates" — it just lands here now.
  *
  * Data comes from GitHub Releases at runtime (see lib/releases.ts for the
- * contract shared with myscrollr.com). Version and Date headers toggle
- * asc/desc — version compares numeric segments, not lexically — and
- * default to newest first. A row expands in place to rendered markdown
- * plus a "View on GitHub" link. Newest stable wears "Latest";
- * prereleases wear "Pre-release".
+ * contract shared with myscrollr.com). Sorting is a menu beside the
+ * heading rather than clickable column headers — the 680px settings
+ * column has no room for four columns of content — and still offers both
+ * date and version order, the latter comparing numeric segments rather
+ * than lexically. Defaults to newest first. A row expands in place to
+ * rendered markdown plus a "View on GitHub" link. Newest stable wears
+ * "Latest"; prereleases wear "Pre-release".
  *
  * States: skeleton rows while fetching, and a card linking to the GitHub
  * releases page when nothing loads (offline, rate-limited, or genuinely
@@ -21,14 +23,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-shell";
 import clsx from "clsx";
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  ChevronDown,
-  ExternalLink,
-  PackageOpen,
-} from "lucide-react";
+import { ChevronDown, ExternalLink, PackageOpen } from "lucide-react";
 
 import {
   fetchReleases,
@@ -39,6 +34,8 @@ import {
   RELEASES_PAGE_URL,
   type ReleaseEntry,
 } from "../../lib/releases";
+import { SelectMenu } from "../widget-bar/SelectMenu";
+import { CARD_SURFACE } from "./SettingsControls";
 
 // ── Sort state ──────────────────────────────────────────────────
 
@@ -50,10 +47,26 @@ function dateMs(iso: string): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
-// Shared row grid — header and body rows must agree on columns:
-// Version (+badges) | Date | Headline | expand chevron.
+// Shared row grid — body and skeleton rows must agree on columns:
+// Version (+badges) | Headline | relative date | expand chevron.
+//
+// The calendar-date column and the clickable sort headers were dropped
+// when the surface narrowed to a 680px reading column: four columns of
+// content did not fit without truncating the headline to uselessness.
+// Sorting survives as a menu next to the heading — the version
+// comparator is version-aware (numeric segments, not lexical), which is
+// worth more than the header affordance was.
 const ROW_GRID =
-  "grid grid-cols-[minmax(130px,160px)_130px_1fr_24px] items-center gap-3";
+  "grid grid-cols-[minmax(112px,auto)_1fr_auto_20px] items-center gap-3";
+
+type SortChoice = "date-desc" | "date-asc" | "version-desc" | "version-asc";
+
+const SORT_OPTIONS: { value: SortChoice; label: string }[] = [
+  { value: "date-desc", label: "Newest first" },
+  { value: "date-asc", label: "Oldest first" },
+  { value: "version-desc", label: "Version ↓" },
+  { value: "version-asc", label: "Version ↑" },
+];
 
 // ── Component ───────────────────────────────────────────────────
 
@@ -70,24 +83,10 @@ export default function ReleaseNotes() {
     };
   }, []);
 
-  const [sortKey, setSortKey] = useState<SortKey>("date");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sort, setSort] = useState<SortChoice>("date-desc");
   const [expandedTag, setExpandedTag] = useState<string | null>(null);
 
-  // NOTE: no setter-inside-updater here — updater functions must be
-  // pure (StrictMode double-invokes them in dev, which would toggle
-  // the direction twice and turn the click into a no-op).
-  const toggleSort = useCallback(
-    (key: SortKey) => {
-      if (key === sortKey) {
-        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-      } else {
-        setSortKey(key);
-        setSortDir("desc"); // fresh column starts newest/highest first
-      }
-    },
-    [sortKey],
-  );
+  const [sortKey, sortDir] = sort.split("-") as [SortKey, SortDir];
 
   const sorted = useMemo(() => {
     if (!releases) return [];
@@ -114,92 +113,38 @@ export default function ReleaseNotes() {
 
   return (
     <>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h3 className="font-mono text-ui-section text-fg-4">Release history</h3>
+        {releases !== null && releases.length > 0 && (
+          <SelectMenu
+            value={sort}
+            options={SORT_OPTIONS}
+            onChange={setSort}
+            ariaLabel="Sort releases"
+          />
+        )}
+      </div>
+
       {releases === null ? (
         <SkeletonTable />
       ) : releases.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-edge/35 bg-base-150/35">
-          {/* ── Header row ── */}
-          <div
-            role="row"
-            className={clsx(ROW_GRID, "border-b border-edge/40 bg-base-200/50 px-4 py-2")}
-          >
-            <SortHeader
-              label="Version"
-              active={sortKey === "version"}
-              dir={sortDir}
-              onClick={() => toggleSort("version")}
+        <div className={clsx(CARD_SURFACE, "overflow-hidden")}>
+          {sorted.map((entry) => (
+            <ReleaseRow
+              key={entry.tag}
+              entry={entry}
+              isLatest={entry.tag === latestTag}
+              expanded={expandedTag === entry.tag}
+              onToggle={() =>
+                setExpandedTag((prev) => (prev === entry.tag ? null : entry.tag))
+              }
             />
-            <SortHeader
-              label="Date"
-              active={sortKey === "date"}
-              dir={sortDir}
-              onClick={() => toggleSort("date")}
-            />
-            <span role="columnheader" className="text-ui-section">
-              Headline
-            </span>
-            <span aria-hidden />
-          </div>
-
-          {/* ── Rows ── */}
-          <div>
-            {sorted.map((entry) => (
-              <ReleaseRow
-                key={entry.tag}
-                entry={entry}
-                isLatest={entry.tag === latestTag}
-                expanded={expandedTag === entry.tag}
-                onToggle={() =>
-                  setExpandedTag((prev) => (prev === entry.tag ? null : entry.tag))
-                }
-              />
-            ))}
-          </div>
+          ))}
         </div>
       )}
     </>
-  );
-}
-
-// ── Sortable column header ──────────────────────────────────────
-
-function SortHeader({
-  label,
-  active,
-  dir,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  dir: SortDir;
-  onClick: () => void;
-}) {
-  return (
-    <span
-      role="columnheader"
-      aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
-    >
-      <button
-        onClick={onClick}
-        className={clsx(
-          "flex items-center gap-1 rounded-md px-1 py-0.5 -mx-1 text-ui-section cursor-pointer",
-          active ? "text-accent" : "hover:text-fg-2",
-        )}
-      >
-        {label}
-        {active ? (
-          dir === "asc" ? (
-            <ArrowUp size={11} strokeWidth={2.5} />
-          ) : (
-            <ArrowDown size={11} strokeWidth={2.5} />
-          )
-        ) : (
-          <ArrowUpDown size={11} className="opacity-50" />
-        )}
-      </button>
-    </span>
   );
 }
 
@@ -234,14 +179,14 @@ function ReleaseRow({
   }, []);
 
   return (
-    <div className="border-b border-edge/25 last:border-b-0">
+    <div className="border-t border-fg/7 first:border-t-0">
       <button
         onClick={onToggle}
         aria-expanded={expanded}
         className={clsx(
           ROW_GRID,
           "w-full px-4 py-3 text-left cursor-pointer",
-          expanded ? "bg-base-150/60" : "hover:bg-base-150/50",
+          expanded ? "bg-surface-hover/50" : "hover:bg-surface-hover/30",
         )}
       >
         {/* Version + badges */}
@@ -255,27 +200,34 @@ function ReleaseRow({
             </span>
           )}
           {entry.prerelease && (
-            <span className="shrink-0 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-ui-chip font-semibold leading-none text-amber-400">
+            // `warn`, not Tailwind's amber: a fixed palette color is the
+            // one thing that cannot follow 20 themes, and this badge sits
+            // next to an accent-tinted one that does.
+            <span className="shrink-0 rounded-full bg-warn/15 px-1.5 py-0.5 text-ui-chip font-semibold leading-none text-warn">
               Pre-release
             </span>
           )}
         </span>
 
-        {/* Date — calendar + relative age */}
-        <span className="flex flex-col">
-          <span className="text-ui-body">{formatReleaseDate(entry.date) || "—"}</span>
-          <span className="text-ui-chip">{relativeTime(entry.date)}</span>
+        {/* Headline */}
+        <span className="truncate text-ui-body text-fg">
+          {entry.headline || entry.name}
         </span>
 
-        {/* Headline */}
-        <span className="truncate text-ui-muted">
-          {entry.headline || entry.name}
+        {/* Relative age. The calendar date moved into the title
+            attribute rather than being dropped outright — it is still
+            the thing you want when comparing two releases. */}
+        <span
+          className="shrink-0 text-ui-chip text-fg-4"
+          title={formatReleaseDate(entry.date) || undefined}
+        >
+          {relativeTime(entry.date)}
         </span>
 
         <ChevronDown
           size={15}
           className={clsx(
-            "justify-self-end text-fg-3 ",
+            "justify-self-end text-fg-3",
             expanded && "rotate-180",
           )}
         />
@@ -315,27 +267,21 @@ function ReleaseRow({
 function SkeletonTable() {
   return (
     <div
-      className="overflow-hidden rounded-xl border border-edge/35 bg-base-150/35"
+      className={clsx(CARD_SURFACE, "overflow-hidden")}
       aria-busy="true"
       aria-label="Loading releases"
     >
-      <div className={clsx(ROW_GRID, "border-b border-edge/40 bg-base-200/50 px-4 py-2")}>
-        <span className="text-ui-section">Version</span>
-        <span className="text-ui-section">Date</span>
-        <span className="text-ui-section">Headline</span>
-        <span aria-hidden />
-      </div>
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
-          className={clsx(ROW_GRID, "border-b border-edge/25 px-4 py-3.5 last:border-b-0")}
+          className={clsx(ROW_GRID, "border-t border-fg/7 px-4 py-3.5 first:border-t-0")}
         >
           <span className="h-3.5 w-16 rounded bg-base-250" />
-          <span className="h-3.5 w-24 rounded bg-base-250" />
           <span
             className="h-3.5 rounded bg-base-250"
             style={{ width: `${45 + ((i * 17) % 40)}%` }}
           />
+          <span className="h-3.5 w-14 rounded bg-base-250" />
           <span aria-hidden />
         </div>
       ))}
@@ -347,7 +293,7 @@ function SkeletonTable() {
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-edge/35 bg-base-150/35 px-6 py-16 text-center">
+    <div className={clsx(CARD_SURFACE, "flex flex-col items-center justify-center px-6 py-16 text-center")}>
       <PackageOpen size={28} className="mb-3 text-fg-3 opacity-60" />
       <h3 className="text-ui-body font-semibold">Couldn't load release notes</h3>
       <p className="mt-1 max-w-sm text-ui-meta">
