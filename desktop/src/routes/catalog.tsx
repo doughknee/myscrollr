@@ -1,299 +1,504 @@
-import { useState, useMemo } from "react";
+/**
+ * Catalog — browse and act.
+ *
+ * Was a browse-only grid split into "Your widgets" / "Discover", with
+ * every transaction one navigation away on the widget's info page. It's
+ * a store now: cards add in place, and details open in a slide-over so
+ * you keep your place in the shelf you were reading.
+ *
+ * Browsing All shows one shelf per category in canonical order, which
+ * beats Your/Discover for the thing people actually do here — look for a
+ * kind of thing. Filtering or searching collapses to a single section,
+ * and the "In your ticker" strip (which subsumed both the old Your
+ * section and the slot banner) hides, because at that point you are
+ * shopping, not auditing.
+ */
+import { useCallback, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowDownAZ,
-  Boxes,
-  Gamepad2,
-  Layers,
-  LayoutGrid,
-  LineChart,
-  Rss,
-  Search,
-  Sparkles,
-  TrendingUp,
-  Trophy,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Check, Plus, Search } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import clsx from "clsx";
 
-import { getCatalogItems, CATEGORY_LABELS, canonicalOrder } from "../marketplace";
-import type { WidgetCategory, CatalogItem } from "../marketplace";
+import {
+  CATEGORY_LABELS,
+  canonicalOrder,
+  getCatalogItems,
+  readableTextOn,
+} from "../marketplace";
+import type { CatalogItem, WidgetCategory } from "../marketplace";
 import { dashboardQueryOptions } from "../api/queries";
 import { useShell, useShellData } from "../shell-context";
 import { useCatalog } from "../hooks/useCatalog";
-import {
-  SlotPills,
-  slotHeadline,
-  slotSubline,
-  useSlotUsage,
-} from "../components/SlotMeter";
+import { useAddWidget } from "../hooks/useAddWidget";
+import { useRemoveWidget } from "../hooks/useRemoveWidget";
+import { getMaxWidgets, tierMeets } from "../tierLimits";
+import { SlotPills, useSlotUsage } from "../components/SlotMeter";
 import CatalogCard from "../components/marketplace/CatalogCard";
+import WidgetPanel from "../components/marketplace/WidgetPanel";
 import QueryErrorBanner from "../components/QueryErrorBanner";
 import RouteError from "../components/RouteError";
 import PageLayout from "../components/layout/PageLayout";
-import PageSection from "../components/layout/PageSection";
+import EmptySection from "../components/layout/EmptySection";
 import { WidgetBar } from "../components/widget-bar/Bar";
 import { Segmented } from "../components/widget-bar/Segmented";
-import { SelectMenu } from "../components/widget-bar/SelectMenu";
-import EmptySection from "../components/layout/EmptySection";
 
+// ── Route ───────────────────────────────────────────────────────
+
+type FilterTab = "all" | WidgetCategory;
+
+const CATEGORY_ORDER: WidgetCategory[] = [
+  "sports",
+  "finance",
+  "news",
+  "fantasy",
+  "predictions",
+  "utility",
+];
 
 export const Route = createFileRoute("/catalog")({
   component: CatalogPage,
   errorComponent: RouteError,
+  // The open panel is a search param so it deep-links, survives reload,
+  // and gives Back somewhere sensible to go.
+  validateSearch: (search: Record<string, unknown>): { widget?: string } =>
+    typeof search.widget === "string" && search.widget
+      ? { widget: search.widget }
+      : {},
 });
 
-// ── Category filter options ─────────────────────────────────────
+// ── Spotlight ───────────────────────────────────────────────────
+//
+// Editorial, so it is hardcoded rather than derived: the point is a
+// human saying "start here", and all three are zero-config — nothing to
+// set up before they show you something.
 
-type FilterTab = "all" | WidgetCategory;
-
-const CATEGORY_ICONS: Record<WidgetCategory, LucideIcon> = {
-  sports: Trophy,
-  finance: TrendingUp,
-  news: Rss,
-  fantasy: Gamepad2,
-  predictions: LineChart,
-  utility: Boxes,
-};
-
-const FILTER_TABS: { key: FilterTab; label: string; icon: LucideIcon; hint: string }[] = [
-  { key: "all", label: "All", icon: LayoutGrid, hint: "Show every widget" },
-  ...(
-    ["sports", "finance", "news", "fantasy", "predictions", "utility"] as WidgetCategory[]
-  ).map((c) => ({
-    key: c,
-    label: CATEGORY_LABELS[c],
-    icon: CATEGORY_ICONS[c],
-    hint: `Show ${CATEGORY_LABELS[c]} widgets`,
-  })),
+const SPOTLIGHT: { id: string; tagline: string }[] = [
+  { id: "finance_stocks", tagline: "Zero setup — instant quotes" },
+  { id: "predictions", tagline: "Read the room" },
+  { id: "clock", tagline: "Always on time" },
 ];
 
-// ── Sort modes (v1.1.1 round 3): the "Your widgets"/"Discover" split
-//    replaced the old enabled-first sort, so sorting is now an explicit
-//    header control applied within each section. ──────────────────
-
-type SortMode = "featured" | "az";
-
-const SORT_OPTIONS: { key: SortMode; label: string; icon: LucideIcon }[] = [
-  { key: "featured", label: "Featured", icon: Sparkles },
-  { key: "az", label: "A–Z", icon: ArrowDownAZ },
-];
-
-function orderItems(items: CatalogItem[], sort: SortMode): CatalogItem[] {
-  if (sort === "az") return [...items].sort((a, b) => a.name.localeCompare(b.name));
-  // Resolved once per call rather than once per comparison.
-  const order = canonicalOrder();
-  return [...items].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
-}
-
-// ── Page component ──────────────────────────────────────────────
+// ── Page ────────────────────────────────────────────────────────
 
 function CatalogPage() {
   const navigate = useNavigate();
-  const { prefs } = useShell();
+  const { widget: openId } = Route.useSearch();
+  const { prefs, authenticated, tier, onLogin } = useShell();
   const { widgets } = useShellData();
   const { error: dashboardError } = useQuery(dashboardQueryOptions());
 
   const [filter, setFilter] = useState<FilterTab>("all");
-  const [sort, setSort] = useState<SortMode>("featured");
+  const [query, setQuery] = useState("");
 
-  // The Library is the one surface whose entire content IS the catalog, and
-  // it was the one surface not subscribed to it: an empty dep array pinned
-  // `allItems` to whatever the bundled snapshot held at mount, so a refresh
-  // swapped the catalog underneath and this never re-read it. The version
-  // string changes exactly when the catalog does.
+  const addWidget = useAddWidget();
+  const removeWidget = useRemoveWidget();
+
+  // The catalog is the one surface whose entire content IS the catalog,
+  // so it subscribes: a refresh must swap the shelves underneath it.
   const catalogVersion = useCatalog();
   const allItems = useMemo(() => getCatalogItems(), [catalogVersion]);
 
-  const enabledDataWidgetIds = useMemo(
-    () => new Set(widgets.map((ch) => ch.widget_type)),
-    [widgets],
-  );
-  const enabledWidgetIds = useMemo(
-    () => new Set(prefs.widgets.enabledWidgets),
-    [prefs.widgets.enabledWidgets],
-  );
-  const allEnabledIds = useMemo(
-    () => new Set([...enabledDataWidgetIds, ...enabledWidgetIds]),
-    [enabledDataWidgetIds, enabledWidgetIds],
+  // Deliberately two different sets. "Added" counts every row so a
+  // disabled widget still reads as added and can't be added twice; the
+  // slot meter counts enabled rows only, matching the server's gate.
+  const addedIds = useMemo(
+    () =>
+      new Set([
+        ...widgets.map((w) => w.widget_type),
+        ...prefs.widgets.enabledWidgets,
+      ]),
+    [widgets, prefs.widgets.enabledWidgets],
   );
 
-  // Widget/slot model: slot math + meter live in SlotMeter.tsx, shared
-  // with the Account page so the two surfaces can't drift (v1.1.2). At
-  // capacity, the catalog locks *new* adds (already-added items stay
-  // interactive).
   const slots = useSlotUsage();
+  const browsing = filter === "all" && query.trim() === "";
 
-  // Filter → split into "yours" vs "discover" → sort within each.
-  const { yourItems, discoverItems } = useMemo(() => {
-    const filtered =
-      filter === "all"
-        ? allItems
-        : allItems.filter((item) => item.category === filter);
-    return {
-      yourItems: orderItems(
-        filtered.filter((item) => allEnabledIds.has(item.id)),
-        sort,
-      ),
-      discoverItems: orderItems(
-        filtered.filter((item) => !allEnabledIds.has(item.id)),
-        sort,
-      ),
+  // ── Selection ─────────────────────────────────────────────────
+
+  const openItem = useMemo(
+    () => allItems.find((i) => i.id === openId) ?? null,
+    [allItems, openId],
+  );
+
+  const setOpen = useCallback(
+    (item: CatalogItem | null) => {
+      void navigate({
+        to: "/catalog",
+        search: item ? { widget: item.id } : {},
+        replace: true,
+      });
+    },
+    [navigate],
+  );
+
+  const maxSlots = getMaxWidgets(tier);
+  const capped = slots.finite && slots.used >= maxSlots;
+
+  const lockedFor = useCallback(
+    (item: CatalogItem) => {
+      const added = addedIds.has(item.id);
+      const tierLocked =
+        authenticated &&
+        item.requiredTier !== "free" &&
+        !tierMeets(tier, item.requiredTier);
+      return {
+        added,
+        tierLocked,
+        slotLocked: capped && !added && !tierLocked,
+      };
+    },
+    [addedIds, authenticated, tier, capped],
+  );
+
+  // At capacity (or gated) the + opens the panel instead of adding —
+  // the panel is where the upgrade path is explained.
+  const handleAdd = useCallback(
+    (item: CatalogItem) => {
+      const { tierLocked, slotLocked } = lockedFor(item);
+      if (!authenticated || tierLocked || slotLocked) {
+        setOpen(item);
+        return;
+      }
+      void addWidget(item);
+    },
+    [addWidget, authenticated, lockedFor, setOpen],
+  );
+
+  // ── Shelves ───────────────────────────────────────────────────
+
+  const matches = useCallback(
+    (item: CatalogItem) => {
+      const q = query.trim().toLowerCase();
+      if (!q) return true;
+      return `${item.name} ${item.description} ${CATEGORY_LABELS[item.category]}`
+        .toLowerCase()
+        .includes(q);
+    },
+    [query],
+  );
+
+  const shelves = useMemo(() => {
+    const order = canonicalOrder();
+    const rank = (i: CatalogItem) => {
+      const at = order.indexOf(i.id);
+      return at === -1 ? Number.MAX_SAFE_INTEGER : at;
     };
-  }, [allItems, filter, sort, allEnabledIds]);
+    const pool = allItems
+      .filter((i) => (filter === "all" ? true : i.category === filter))
+      .filter(matches)
+      .sort((a, b) => rank(a) - rank(b));
 
-  const cardFor = (item: CatalogItem) => (
-    <div key={item.id}>
+    if (browsing) {
+      return CATEGORY_ORDER.map((cat) => ({
+        key: cat as string,
+        title: CATEGORY_LABELS[cat],
+        items: pool.filter((i) => i.category === cat),
+      })).filter((s) => s.items.length > 0);
+    }
+    return [
+      {
+        key: "results",
+        title: filter === "all" ? "Results" : CATEGORY_LABELS[filter],
+        items: pool,
+      },
+    ].filter((s) => s.items.length > 0);
+  }, [allItems, filter, matches, browsing]);
+
+  const spotlight = useMemo(
+    () =>
+      browsing
+        ? SPOTLIGHT.map((s) => ({
+            ...s,
+            item: allItems.find((i) => i.id === s.id),
+          })).filter((s): s is typeof s & { item: CatalogItem } =>
+            Boolean(s.item),
+          )
+        : [],
+    [allItems, browsing],
+  );
+
+  const yourItems = useMemo(
+    () => allItems.filter((i) => addedIds.has(i.id)),
+    [allItems, addedIds],
+  );
+
+  const related = useMemo(() => {
+    if (!openItem) return [];
+    return allItems
+      .filter((i) => i.category === openItem.category && i.id !== openItem.id)
+      .slice(0, 3);
+  }, [allItems, openItem]);
+
+  const cardFor = (item: CatalogItem, variant: "rich" | "compact") => {
+    const { added } = lockedFor(item);
+    return (
       <CatalogCard
+        key={item.id}
         item={item}
-        enabled={allEnabledIds.has(item.id)}
-        onInfo={(it) =>
-          navigate({ to: "/widget/$id/info", params: { id: it.id } })
-        }
+        added={added}
+        variant={variant}
+        onOpen={setOpen}
+        onAdd={added ? undefined : handleAdd}
       />
-    </div>
-  );
+    );
+  };
 
-  const countChip = (n: number) => (
-    <span className="rounded-full bg-base-150 px-2 py-0.5 text-ui-chip font-semibold text-fg-3">
-      {n}
-    </span>
-  );
-
-  // ── Render ──────────────────────────────────────────────────
-  //
-  // Catalog uses an in-page tab band (category filters) in the TopBar,
-  // then a content header owning the slot budget + sort control, then
-  // two sections: what you have, and what you could add (v1.1.1 r3).
+  const gating = openItem
+    ? lockedFor(openItem)
+    : { added: false, tierLocked: false, slotLocked: false };
 
   return (
-    <PageLayout title="Catalog" width="wide" noTopPadding>
-      {/* WCB — same persistent chrome as every source page. Category
-          filter (ex-TopBar tab strip) left, sort (ex-slot-band group)
-          right, per the bar grammar. */}
+    <PageLayout
+      // While the panel is open the page IS that widget, so the title
+      // takes its name and "Catalog" steps back to being the parent —
+      // otherwise the breadcrumb reads "Catalog / Catalog".
+      title={openItem ? openItem.name : "Catalog"}
+      width="wide"
+      noTopPadding
+      parentLabel={openItem ? "Catalog" : undefined}
+      onParentClick={openItem ? () => setOpen(null) : undefined}
+    >
       <WidgetBar>
         <Segmented
           ariaLabel="Filter by category"
           value={filter}
-          onChange={(k) => setFilter(k)}
-          options={FILTER_TABS.map((t) => ({ value: t.key, label: t.label }))}
+          // Picking a category clears the query: the pill and a stale
+          // search term otherwise compose into a result set that looks
+          // like the pill is broken.
+          onChange={(k) => {
+            setFilter(k);
+            setQuery("");
+          }}
+          options={[
+            { value: "all" as FilterTab, label: "All" },
+            ...CATEGORY_ORDER.map((c) => ({
+              value: c as FilterTab,
+              label: CATEGORY_LABELS[c],
+            })),
+          ]}
         />
-        <div className="ml-auto">
-          <SelectMenu
-            ariaLabel="Sort widgets"
-            prefix="Sort"
-            value={sort}
-            onChange={setSort}
-            options={SORT_OPTIONS.map((s) => ({ value: s.key, label: s.label }))}
+        <div className="relative ml-auto w-[220px]">
+          <Search
+            size={13}
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-fg-4"
+          />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search widgets"
+            placeholder="Search widgets"
+            autoComplete="off"
+            className="w-full rounded-[7px] border border-edge/80 bg-surface-raised py-1.5 pr-2.5 pl-7 text-ui-meta text-fg placeholder:text-fg-4 focus:border-accent/50 focus:outline-none"
           />
         </div>
       </WidgetBar>
-      {/* mt-4 on the first band(s) = the pt-4 gap every WCB page keeps
-          under the bar (adjacent margins collapse, so both carrying it
-          is safe whichever renders first). */}
+
       {dashboardError && (
-        <div className="mt-4 mb-5">
+        <div className="mt-4">
           <QueryErrorBanner error={dashboardError} />
         </div>
       )}
 
-      {/* ── Catalog header: slot budget + sort (v1.1.1 round 3).
-          The counter lives HERE now — cards never nag, and the old
-          at-capacity banner folded into this band (warn tint +
-          Upgrade button when full). ── */}
-      <div
-        className={clsx(
-          "mt-4 mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-xl border px-4 py-3",
-          slots.atCapacity && slots.finite
-            ? "border-warn/25 bg-warn/[0.06]"
-            : "border-edge/40 bg-base-150/30",
-        )}
-      >
-        <div className="flex items-center gap-3">
-          <span
-            className={clsx(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-              slots.atCapacity && slots.finite
-                ? "bg-warn/15 text-warn"
-                : "bg-accent/10 text-accent",
-            )}
-          >
-            <Layers size={16} />
-          </span>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <span className="text-ui-body font-semibold text-fg-1">
-                {slotHeadline(slots)}
-              </span>
-              {/* Slot meter — one pill per slot, filled as used. */}
-              <SlotPills usage={slots} />
+      <div className="mx-auto w-full max-w-[1000px] pt-4 pb-8">
+        {/* ── In your ticker ─────────────────────────────────── */}
+        {browsing && yourItems.length > 0 && (
+          <section className="mb-5 flex flex-col gap-2.5 rounded-xl border border-edge/50 bg-base-150/45 px-3.5 py-3">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="font-mono text-ui-section text-fg-3">
+                In your ticker
+              </h2>
+              <div className="ml-auto flex items-center gap-2.5">
+                <SlotPills usage={slots} />
+                <span className="text-ui-chip text-fg-4">
+                  {slots.finite
+                    ? `${slots.used} of ${slots.max} slots free`
+                    : `${slots.used} added · unlimited slots`}
+                </span>
+                {capped && (
+                  <button
+                    type="button"
+                    onClick={() => void open("https://myscrollr.com/uplink")}
+                    className="shrink-0 cursor-pointer rounded-lg bg-warn/15 px-2.5 py-1 text-ui-chip font-semibold text-warn hover:bg-warn/25"
+                  >
+                    Upgrade
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="text-ui-chip text-fg-4">{slotSubline(slots)}</div>
-          </div>
-        </div>
+            <div className="flex flex-wrap gap-2">
+              {yourItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setOpen(item)}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-edge/55 bg-surface-raised px-2.5 py-1.5 hover:border-edge"
+                >
+                  <span
+                    className="flex size-[18px] shrink-0 items-center justify-center rounded text-white"
+                    style={{
+                      background: `linear-gradient(135deg, ${item.hex} 0%, ${item.hex}b8 100%)`,
+                    }}
+                  >
+                    <item.icon size={10} />
+                  </span>
+                  <span className="text-ui-meta font-medium text-fg">
+                    {item.name}
+                  </span>
+                  <Check size={11} strokeWidth={3} className="text-accent" />
+                </button>
+              ))}
+              {/* Ghost chips make an abstract number concrete: three
+                  empty outlines read as "room for three more" faster
+                  than "3 of 6 slots free" does. */}
+              {slots.finite &&
+                Array.from({ length: Math.max(0, slots.max - slots.used) }).map(
+                  (_, i) => (
+                    <span
+                      key={`empty-${i}`}
+                      className="flex items-center gap-2 rounded-lg border border-dashed border-edge/70 px-2.5 py-1.5 text-ui-meta text-fg-4"
+                    >
+                      empty slot
+                    </span>
+                  ),
+                )}
+            </div>
+          </section>
+        )}
 
-        <div className="flex items-center gap-2">
-          {slots.atCapacity && slots.finite && (
-            <button
-              onClick={() => void open("https://myscrollr.com/uplink")}
-              className="shrink-0 rounded-lg bg-warn/15 px-3 py-1.5 text-ui-chip font-semibold text-warn hover:bg-warn/25"
-            >
-              Upgrade
-            </button>
-          )}
-          {/* Sort control moved to the WCB (bar grammar: config
-              selects live in the bar's right cluster). */}
-        </div>
-      </div>
+        {/* ── Spotlight ──────────────────────────────────────── */}
+        {spotlight.length > 0 && (
+          <section className="mb-6">
+            <h2 className="mb-2 font-mono text-ui-section text-fg-3">
+              Spotlight
+            </h2>
+            <div className="grid grid-cols-3 gap-3">
+              {spotlight.map(({ item, tagline }) => {
+                const textOn = readableTextOn(item.hex);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setOpen(item)}
+                    className="flex cursor-pointer flex-col items-start gap-2.5 rounded-xl p-3.5 text-left"
+                    style={{
+                      background: `linear-gradient(135deg, ${item.hex} 0%, ${item.hex}d8 100%)`,
+                    }}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white"
+                        style={{ color: item.hex }}
+                      >
+                        <item.icon size={18} />
+                      </span>
+                      <span className="flex min-w-0 flex-col">
+                        <span
+                          className="text-ui-body font-bold"
+                          style={{ color: textOn }}
+                        >
+                          {item.name}
+                        </span>
+                        <span
+                          className="font-mono text-ui-section opacity-80"
+                          style={{ color: textOn }}
+                        >
+                          {tagline}
+                        </span>
+                      </span>
+                    </div>
+                    <p
+                      className="text-ui-meta leading-relaxed opacity-90"
+                      style={{ color: textOn }}
+                    >
+                      {item.description}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
-      <div>
-        {yourItems.length === 0 && discoverItems.length === 0 ? (
+        {/* ── Shelves ────────────────────────────────────────── */}
+        {shelves.length === 0 ? (
           <EmptySection
             icon={Search}
-            title="Nothing here"
-            description="No items match this filter. Try a different category."
+            title="Nothing matches"
+            description="Try a different word, or pick another category."
           />
         ) : (
-          <>
-            {/* ── Your widgets ── */}
-            {yourItems.length > 0 && (
-              <PageSection
-                variant="grid"
-                title="Your widgets"
-                badge={countChip(yourItems.length)}
+          shelves.map((shelf) => (
+            <section key={shelf.key} className="mb-6 last:mb-0">
+              <div className="mb-2 flex items-center gap-2">
+                <h2 className="font-mono text-ui-section text-fg-3">
+                  {shelf.title}
+                </h2>
+                <span className="rounded-full bg-base-150 px-2 py-0.5 text-ui-chip font-semibold text-fg-3">
+                  {shelf.items.length}
+                </span>
+              </div>
+              {/* Sports go compact: league descriptions are boilerplate,
+                  so 14 rich cards would be 14 restatements of one
+                  sentence. */}
+              <div
+                className={clsx(
+                  "grid gap-2.5",
+                  shelf.key === "sports" ? "grid-cols-4" : "grid-cols-3 gap-3",
+                )}
               >
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                  {yourItems.map(cardFor)}
-                </div>
-              </PageSection>
-            )}
+                {shelf.items.map((item) =>
+                  cardFor(item, shelf.key === "sports" ? "compact" : "rich"),
+                )}
+              </div>
+            </section>
+          ))
+        )}
 
-            {/* ── Discover new widgets ── */}
-            <PageSection
-              variant="grid"
-              title="Discover new widgets"
-              badge={
-                discoverItems.length > 0 ? countChip(discoverItems.length) : undefined
-              }
+        {/* ── Request a widget ───────────────────────────────── */}
+        {browsing && (
+          <section className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-edge/70 px-4 py-3.5">
+            <div>
+              <div className="text-ui-body font-semibold text-fg">
+                Don't see what you want?
+              </div>
+              <div className="text-ui-meta text-fg-4">
+                Tell us what you'd put in your ticker.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void navigate({ to: "/support" })}
+              className="shrink-0 cursor-pointer rounded-[7px] border border-edge/80 px-3 py-1.5 text-ui-chip font-medium text-fg-3 hover:border-edge hover:text-fg"
             >
-              {discoverItems.length > 0 ? (
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                  {discoverItems.map(cardFor)}
-                </div>
-              ) : (
-                <EmptySection
-                  compact
-                  icon={Sparkles}
-                  title="You've added everything here"
-                  description="Check another category for more widgets."
-                />
-              )}
-            </PageSection>
-          </>
+              Request a widget
+            </button>
+          </section>
         )}
       </div>
+
+      <WidgetPanel
+        item={openItem}
+        added={gating.added}
+        tierLocked={gating.tierLocked}
+        slotLocked={gating.slotLocked}
+        authenticated={authenticated}
+        related={related}
+        onClose={() => setOpen(null)}
+        onAdd={(item) => void addWidget(item)}
+        onRemove={(item) => {
+          void removeWidget(item);
+          setOpen(null);
+        }}
+        onOpenWidget={(item) => {
+          void navigate({ to: "/widget/$id", params: { id: item.id } });
+        }}
+        onSignIn={onLogin}
+        onUpgrade={() => void open("https://myscrollr.com/uplink")}
+        onPick={setOpen}
+      />
     </PageLayout>
   );
 }

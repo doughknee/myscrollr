@@ -1368,3 +1368,11 @@ input[data-contained-focus]:focus-visible {
   color: var(--color-fg);
   background: var(--color-base-200);
 }
+
+/* Catalog panel's ticker preview: the chip row is rendered twice inside
+   a width:max-content track, so translating exactly -50% lands on the
+   seam and the loop is invisible. Same trick the Home marquee uses. */
+@keyframes chipdrift {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}

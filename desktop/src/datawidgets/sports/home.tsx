@@ -9,7 +9,7 @@
 import SportsEmptyState from "./EmptyState";
 import { HOME_PREVIEW_MAX } from "../home";
 import type { LeagueMeta } from "../../api/queries";
-import type { HomeRowsProps, Game } from "../../types";
+import type { HomeRowsProps, Game, HomeHighlight } from "../../types";
 
 export function SportsHomeRows({
   data,
@@ -81,4 +81,37 @@ export function SportsHomeRows({
       })}
     </>
   );
+}
+
+/**
+ * Happening now — the first genuinely live game.
+ *
+ * "in" is the only state worth interrupting for: a final already
+ * happened and an upcoming game has nothing to report yet. Returning
+ * null on a quiet slate is the point — Home shows the hero row only
+ * when there is something in it, rather than padding it with a
+ * scheduled fixture and calling that news.
+ */
+export function sportsHighlight(data: unknown[]): HomeHighlight | null {
+  const games = data as Game[];
+  const live = games.find((g) => g.state === "in");
+  if (!live) return null;
+
+  const away = live.away_team_name || live.away_team_code || "";
+  const home = live.home_team_name || live.home_team_code || "";
+  if (!away || !home) return null;
+
+  const headline =
+    live.away_team_score != null && live.home_team_score != null
+      ? `${away} ${live.away_team_score} – ${live.home_team_score} ${home}`
+      : `${away} v ${home}`;
+
+  return {
+    headline,
+    // Straight from the feed — `short_detail` is the game clock ("71'",
+    // "2nd 04:12"), with the status strings as fallbacks. Never phrased
+    // by us.
+    sub: live.short_detail || live.status_long || live.status_short || "Live",
+    live: true,
+  };
 }
