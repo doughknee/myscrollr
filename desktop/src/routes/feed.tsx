@@ -799,7 +799,7 @@ function UtilityTiles({
 // ── First run ───────────────────────────────────────────────────
 
 const STARTERS: { id: string; blurb: string }[] = [
-  { id: "finance_stocks", blurb: "Live quotes, zero setup." },
+  { id: "finance_stocks", blurb: "Live quotes the moment you add it." },
   { id: "predictions", blurb: "The news, in numbers." },
   { id: "clock", blurb: "Local time and world clocks." },
 ];

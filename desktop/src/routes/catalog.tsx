@@ -74,7 +74,7 @@ export const Route = createFileRoute("/catalog")({
 // set up before they show you something.
 
 const SPOTLIGHT: { id: string; tagline: string }[] = [
-  { id: "finance_stocks", tagline: "Zero setup — instant quotes" },
+  { id: "finance_stocks", tagline: "Instant quotes" },
   { id: "predictions", tagline: "Read the room" },
   { id: "clock", tagline: "Always on time" },
 ];
