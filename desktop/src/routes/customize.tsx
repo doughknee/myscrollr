@@ -1,86 +1,43 @@
 /**
- * Customize route — every surface-level presentation control in one
- * place (REL-44). Completes the REL-41 principle: content is
- * widget-level (each widget's bar), presentation is surface-level
- * (here). Two of the five sections behind the shared SectionNav:
+ * The settings surface.
  *
- *   App    — appearance, window, startup, shortcuts (the old /settings
- *            page). The default when no tab is given.
- *   Ticker — the row-layout manager (the old /ticker page)
+ * One route for all of settings, with `?page=` selecting which of the
+ * seven pages the rail is showing. This replaced the old split across
+ * /customize (App | Ticker tabs), /account and /updates — those two are
+ * now redirects into this route, so the IA is one surface with one way
+ * in.
  *
- * Updates moved out to its own route when the nav gained a fifth entry.
- * Account and Home are their own routes too, reachable from the same
- * nav. /settings and /ticker redirect here (tab preselected).
+ * The search query lives here rather than inside the surface so it
+ * survives a page switch within the same route mount and so the route
+ * remains the single owner of "what is on screen".
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import RouteError from "../components/RouteError";
-import PageLayout from "../components/layout/PageLayout";
-import { WidgetBar } from "../components/widget-bar/Bar";
-import SectionNav from "../components/layout/SectionNav";
-import TickerSettings from "../components/settings/TickerSettings";
-import GeneralSettings from "../components/settings/GeneralSettings";
-import { useShell } from "../shell-context";
-import { resetCategory, type AppPreferences } from "../preferences";
-
-type CustomizeTab = "ticker" | "app";
+import SettingsSurface from "../components/settings/SettingsSurface";
+import {
+  DEFAULT_SETTINGS_PAGE,
+  isSettingsPage,
+  type SettingsPage,
+} from "../components/settings/pages";
 
 export const Route = createFileRoute("/customize")({
   component: CustomizeRoute,
   errorComponent: RouteError,
-  validateSearch: (search: Record<string, unknown>): { tab?: CustomizeTab } =>
-    search.tab === "app" || search.tab === "ticker"
-      ? { tab: search.tab }
-      : {},
+  // Materialise the default so the URL always names the page it is
+  // showing — otherwise `/customize` and `/customize?page=appearance`
+  // are the same screen under two addresses, and the rail's
+  // aria-current has to guess.
+  validateSearch: (search: Record<string, unknown>): { page: SettingsPage } => ({
+    page: isSettingsPage(search.page) ? search.page : DEFAULT_SETTINGS_PAGE,
+  }),
 });
 
 function CustomizeRoute() {
-  const shell = useShell();
-  const { prefs, onPrefsChange } = shell;
-  const { tab: searchTab } = Route.useSearch();
-  // App, not Ticker, when nothing is specified: arriving here without a
-  // tab means the sidebar's Customize row or the account menu's Settings
-  // item, and both read as "the app's settings". Ticker is the narrower
-  // of the two and is one click away.
-  const [tab, setTab] = useState<CustomizeTab>(searchTab ?? "app");
-  // Search-only navigations don't remount the component — without this,
-  // Ctrl+, / the tray Settings item / the /settings shim are no-ops when
-  // the user is already sitting on /customize.
-  useEffect(() => {
-    if (searchTab) setTab(searchTab);
-  }, [searchTab]);
+  const { page } = Route.useSearch();
+  const [query, setQuery] = useState("");
 
   return (
-    <PageLayout title="Customize" width="wide" noTopPadding>
-      {/* Same WCB chrome as every other page — the Segmented is the
-          section switch. */}
-      <WidgetBar>
-        <SectionNav active={tab === "app" ? "app" : "ticker"} />
-      </WidgetBar>
-
-      <div className="pt-4">
-        {tab === "ticker" ? (
-          <TickerSettings prefs={prefs} onPrefsChange={onPrefsChange} />
-        ) : (
-          <GeneralSettings
-            appearance={prefs.appearance}
-            window_={prefs.window}
-            onAppearanceChange={(appearance) =>
-              onPrefsChange({ ...prefs, appearance })
-            }
-            onWindowChange={(window_) =>
-              onPrefsChange({ ...prefs, window: window_ })
-            }
-            onReset={() => {
-              let next: AppPreferences = resetCategory(prefs, "appearance");
-              next = resetCategory(next, "window");
-              onPrefsChange(next);
-            }}
-            autostartEnabled={shell.autostartEnabled}
-            onAutostartChange={shell.onAutostartChange}
-          />
-        )}
-      </div>
-    </PageLayout>
+    <SettingsSurface page={page} query={query} onQueryChange={setQuery} />
   );
 }

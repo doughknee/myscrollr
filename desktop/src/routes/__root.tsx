@@ -506,10 +506,19 @@ function RootLayout() {
   const handleNavigateToFeed = useCallback(() => navigate({ to: "/feed" }), [navigate]);
   // "What's new" kept its inviting label in the account menu, but the
   // release notes now live under Updates rather than on their own page.
-  const handleNavigateToReleases = useCallback(() => navigate({ to: "/updates" }), [navigate]);
+  const handleNavigateToReleases = useCallback(
+    () => navigate({ to: "/customize", search: { page: "updates" } }),
+    [navigate],
+  );
   const handleNavigateToStatus = useCallback(() => navigate({ to: "/status" }), [navigate]);
-  const handleNavigateToCustomize = useCallback(() => navigate({ to: "/customize" }), [navigate]);
-  const handleNavigateToAccount = useCallback(() => navigate({ to: "/account" }), [navigate]);
+  const handleNavigateToCustomize = useCallback(
+    () => navigate({ to: "/customize", search: { page: "appearance" } }),
+    [navigate],
+  );
+  const handleNavigateToAccount = useCallback(
+    () => navigate({ to: "/customize", search: { page: "profile" } }),
+    [navigate],
+  );
   const handleNavigateToMarketplace = useCallback(() => navigate({ to: "/catalog" }), [navigate]);
   const handleNavigateToSupport = useCallback(() => navigate({ to: "/support" }), [navigate]);
 
@@ -690,7 +699,7 @@ function RootLayout() {
       // Ctrl+, → open settings
       if ((e.ctrlKey || e.metaKey) && e.key === ",") {
         e.preventDefault();
-        navigate({ to: "/customize", search: { tab: "app" } });
+        navigate({ to: "/customize", search: { page: "appearance" } });
         return;
       }
 
@@ -921,7 +930,8 @@ function RootLayout() {
               {auth.authenticated && !billingBannerDismissed && (() => {
                 const s = subscriptionInfo;
                 if (!s) return null;
-                const toAccount = () => navigate({ to: "/account" });
+                const toAccount = () =>
+                  navigate({ to: "/customize", search: { page: "profile" } });
                 const dismiss = () => setBillingBannerDismissed(true);
                 // Trial ending in ≤3 days
                 if (s.status === "trialing" && s.trial_end) {
