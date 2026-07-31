@@ -306,7 +306,13 @@ export function SegmentedRow<T extends string>({
         <div
           role="radiogroup"
           aria-label={label}
-          className="inline-flex shrink-0 items-center gap-px rounded-lg bg-base-250/50 p-0.5"
+          // The track is a well the selected pill rises out of — that
+          // is what makes the light-mode control read as raised. In dark
+          // palettes base-250/50 lands within ~1.01 of the card it sits
+          // on, so there was no well at all and the pill had nothing to
+          // rise from. `surface` is the panel colour, always a step below
+          // the raised card, so every dark theme gets a real recess.
+          className="inline-flex shrink-0 items-center gap-px rounded-lg bg-base-250/50 dark:bg-surface p-0.5"
         >
           {options.map((opt) => (
             <button
@@ -323,10 +329,25 @@ export function SegmentedRow<T extends string>({
               )}
             >
               {value === opt.value && (
+                // Three things carry the selected state, because no one
+                // of them survives every palette: the fill returns to the
+                // card's level (rising out of the recessed track), the
+                // shadow lifts it in light palettes, and the hairline
+                // draws its edge in dark ones where a 25%-black shadow is
+                // invisible. The ring is keyed to `fg` — the one token
+                // guaranteed to contrast with the surface everywhere — and
+                // is stronger in dark, where it is doing the shadow's job
+                // as well as its own.
+                //
+                // The fill deliberately does NOT lighten in dark themes.
+                // A lighter pill (base-300) reads well but puts the
+                // semibold label below 4.5:1 in two palettes and below
+                // WCAG AA outright in solarized-dark (2.01) — trading a
+                // visibility problem for a legibility one.
                 <motion.span
                   layoutId="active-option"
                   transition={controlTransition}
-                  className="absolute inset-0 rounded-md bg-surface-raised shadow-soft-sm"
+                  className="absolute inset-0 rounded-md bg-surface-raised shadow-soft-sm ring-1 ring-inset ring-fg/20 dark:ring-fg/30"
                 />
               )}
               <span className="relative z-10">{opt.label}</span>
