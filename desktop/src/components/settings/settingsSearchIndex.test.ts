@@ -5,8 +5,6 @@
  * checked mechanically — including reading the page sources to confirm
  * every indexed rowId still corresponds to a real `data-row` target.
  */
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   SETTINGS_SEARCH_INDEX,
@@ -14,13 +12,21 @@ import {
 } from "./searchIndex";
 import { SETTINGS_PAGES, isSettingsPage } from "./pages";
 
+// Page sources as raw strings, via Vite rather than node:fs. This file
+// lives under src/, where tsconfig exposes only vite/client + vitest
+// globals — reaching for node builtins here type-checks fine under
+// vitest (Vite resolves them at runtime) but fails `tsc --noEmit`, which
+// is the second half of `npm run build` and therefore the release build.
+const PAGE_SOURCES = import.meta.glob("./pages/*.tsx", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
 /** Every `<Row id="…">` and `data-row="…"` across the settings surface. */
 function renderedRowIds(): Set<string> {
-  const dir = join(__dirname, "pages");
-  const files = readdirSync(dir).filter((f) => f.endsWith(".tsx"));
   const ids = new Set<string>();
-  for (const f of files) {
-    const src = readFileSync(join(dir, f), "utf8");
+  for (const src of Object.values(PAGE_SOURCES)) {
     for (const m of src.matchAll(/<Row\s+id="([^"]+)"/g)) ids.add(m[1]);
     for (const m of src.matchAll(/data-row="([^"]+)"/g)) ids.add(m[1]);
   }

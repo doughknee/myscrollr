@@ -200,7 +200,10 @@ function ReleaseRow({
             </span>
           )}
           {entry.prerelease && (
-            <span className="shrink-0 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-ui-chip font-semibold leading-none text-amber-400">
+            // `warn`, not Tailwind's amber: a fixed palette color is the
+            // one thing that cannot follow 20 themes, and this badge sits
+            // next to an accent-tinted one that does.
+            <span className="shrink-0 rounded-full bg-warn/15 px-1.5 py-0.5 text-ui-chip font-semibold leading-none text-warn">
               Pre-release
             </span>
           )}

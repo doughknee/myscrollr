@@ -68,10 +68,17 @@ const SettingsRail = forwardRef<HTMLInputElement, SettingsRailProps>(
         >
           {SETTINGS_RAIL_GROUPS.map((group) => (
             <div key={group.label} className="mb-4 last:mb-0">
-              <h2 className="mb-1 px-2.5 font-mono text-ui-section text-fg-4">
+              {/* Not a heading element: the rail precedes the pane in
+                  the DOM, so an <h2> here would sit above the page's own
+                  <h1> and invert the document outline. It labels its
+                  list instead. */}
+              <div
+                id={`rail-group-${group.label}`}
+                className="mb-1 px-2.5 font-mono text-ui-section text-fg-4"
+              >
                 {group.label}
-              </h2>
-              <ul>
+              </div>
+              <ul aria-labelledby={`rail-group-${group.label}`}>
                 {group.pages.map((page) => {
                   const meta = SETTINGS_PAGE_META[page];
                   const Icon = meta.icon;
@@ -83,7 +90,7 @@ const SettingsRail = forwardRef<HTMLInputElement, SettingsRailProps>(
                         onClick={() => onSelect(page)}
                         aria-current={isActive ? "page" : undefined}
                         className={clsx(
-                          "flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-ui-meta",
+                          "flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-ui-body",
                           isActive
                             ? "bg-accent/12 font-semibold text-fg"
                             : "font-medium text-fg-3 hover:bg-surface-hover",

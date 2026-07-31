@@ -224,7 +224,15 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     keywords: "slots catalog plan",
   },
   {
-    // Reachable in the prototype's DOM but missing from its index.
+    // Both of these have data-row targets in the prototype's DOM but no
+    // index entries, so they could never actually be jumped to.
+    page: "profile",
+    rowId: "signedIn",
+    label: "Signed in as",
+    description: "The account this device is signed in to",
+    keywords: "account identity user who signin sign in",
+  },
+  {
     page: "profile",
     rowId: "plan",
     label: "Plan",
@@ -299,6 +307,19 @@ export function flashRow(rowId: string): void {
     block: "center",
     behavior: reduced ? "auto" : "smooth",
   });
+
+  // Move focus to the row as well as the eye. Following a result used to
+  // leave focus on the results list that had just been replaced, which
+  // drops a keyboard user back at the top of the document — the flash
+  // told sighted users where they landed and nobody else. Prefer the
+  // row's own control so the next Tab continues from the right place.
+  const target =
+    el.querySelector<HTMLElement>(
+      'button, input, [role="switch"], [role="radiogroup"]',
+    ) ?? el;
+  if (target === el && !el.hasAttribute("tabindex")) el.tabIndex = -1;
+  target.focus({ preventScroll: true });
+
   if (reduced) return;
 
   el.animate(

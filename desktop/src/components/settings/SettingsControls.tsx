@@ -62,14 +62,16 @@ export function SettingsGroup({
       {(label || action) && (
         <div className="mb-2 flex items-center justify-between gap-3">
           {label ? (
-            <h3
+            // h2, not h3: these sit directly under the page's h1, and
+            // skipping a level breaks heading navigation.
+            <h2
               className={clsx(
                 "text-ui-section font-mono",
                 tone === "danger" ? "text-error" : "text-fg-4",
               )}
             >
               {label}
-            </h3>
+            </h2>
           ) : (
             <span />
           )}
@@ -409,8 +411,12 @@ export function SliderRow({
     <div className={ROW_BASE}>
       <RowText label={label} description={description} />
       <div className="flex shrink-0 items-center gap-2.5">
+        {/* The real <input type=range> is transparent and stretched over
+            the track, so it takes focus but shows none of the browser's
+            default ring. Without this the slider is the one control here
+            a keyboard user cannot see they have landed on. */}
         <div
-          className="relative flex h-5 items-center"
+          className="relative flex h-5 items-center rounded-full has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/60 has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-surface-raised"
           style={{ width: TRACK_PX }}
         >
           <div className="absolute inset-x-0 h-1 rounded-full bg-base-300" />
@@ -522,12 +528,20 @@ export function ResetButton({
 
 export function RowList({ children }: { children: React.ReactNode }) {
   const rows = Array.isArray(children) ? children.flat() : [children];
-  const visible = rows.filter(Boolean);
+  const visible = rows.filter(Boolean) as React.ReactElement<{ id?: string }>[];
   return (
     <>
       {visible.map((row, i) => (
-        // eslint-disable-next-line react/no-array-index-key
-        <div key={i} className={i > 0 ? ROW_DIVIDER : undefined}>
+        // Keyed by the row's own id where it has one, not by position.
+        // Conditional rows (Direction, Time per page, Hover speed) shift
+        // every index below them as they appear and disappear, so an
+        // index key hands one setting's mounted instance to a different
+        // setting — the sliding pill and any transient state ride along
+        // to a row that never asked for them.
+        <div
+          key={row?.props?.id ?? `row-${i}`}
+          className={i > 0 ? ROW_DIVIDER : undefined}
+        >
           {row}
         </div>
       ))}

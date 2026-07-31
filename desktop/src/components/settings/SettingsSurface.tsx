@@ -124,6 +124,17 @@ export default function SettingsSurface({
     paneRef.current?.scrollTo(0, 0);
   }, [page, searching]);
 
+  // Arriving at a page clears any live query. The query lives in the
+  // route so it survives a rail click, but that also meant a query left
+  // in the box swallowed every arrival from OUTSIDE the surface —
+  // Ctrl+, the sidebar, the account menu, the feed's ticker pill would
+  // all navigate correctly and then land you on stale search results,
+  // because `searching` outranks the page. Rail clicks already clear it
+  // via goTo; this covers everyone else.
+  useEffect(() => {
+    onQueryChange("");
+  }, [page, onQueryChange]);
+
   const handleResetAll = useCallback(() => {
     onPrefsChange(resetAll());
   }, [onPrefsChange]);
@@ -240,8 +251,8 @@ function SearchResults({
         title="Search"
         subtitle={
           results.length === 0
-            ? "Nothing matched."
-            : `${results.length} setting${results.length === 1 ? "" : "s"} match "${query.trim()}"`
+            ? `No settings match "${query.trim()}"`
+            : `${results.length} setting${results.length === 1 ? " matches" : "s match"} "${query.trim()}"`
         }
       />
 
@@ -249,7 +260,7 @@ function SearchResults({
         <div className="rounded-xl border border-dashed border-edge/60 px-4 py-10 text-center">
           <p className="text-ui-body font-medium text-fg">No settings found</p>
           <p className="mt-1 text-ui-meta text-fg-4">
-            Try a different word — or browse the sections on the left.
+            Try a different word — or pick a section on the left.
           </p>
         </div>
       ) : (

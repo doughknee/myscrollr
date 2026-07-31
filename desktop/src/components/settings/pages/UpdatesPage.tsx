@@ -187,13 +187,19 @@ function UpdateSubtitle({
       return <>Downloading the update…</>;
     case "ready":
       return <>Update installed — restart to apply it.</>;
+    case "up-to-date":
+      return <>You're on {mono} — the latest version.</>;
     case "checking":
       return <>Checking for updates…</>;
-    case "up-to-date":
+    // Idle has checked nothing, and error has just failed to check —
+    // neither is in a position to certify currency. Claiming it in both
+    // gave the page a header that argued with the row underneath it
+    // (most visibly: find an update, have the download fail, and the
+    // header would go back to insisting you were up to date).
     case "idle":
     case "error":
     default:
-      return <>You're on {mono} — the latest version.</>;
+      return <>You're on {mono}.</>;
   }
 }
 
