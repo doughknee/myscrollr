@@ -808,7 +808,7 @@ function ArchitecturePage() {
               index="01"
               label="Browse widgets"
               meta="Every source the pipeline serves, in one catalog."
-              action="/CHANNELS →"
+              action="/WIDGETS →"
               to="/widgets"
             />
             <DeparturesRow
