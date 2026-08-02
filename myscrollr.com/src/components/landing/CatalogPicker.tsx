@@ -138,24 +138,30 @@ export function CatalogPicker() {
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.4, ease: EASE }}
-              className="flex flex-wrap gap-2 overflow-hidden pb-5"
+              className="overflow-hidden"
             >
-              {featured.map((w) => (
-                <WidgetPill
-                  key={w.id}
-                  widget={w}
-                  on={active.includes(w.id)}
-                  onToggle={toggle}
-                />
-              ))}
-              <button
-                type="button"
-                aria-expanded={false}
-                onClick={() => setExpanded(true)}
-                className="inline-flex cursor-pointer items-center gap-[9px] whitespace-nowrap rounded-[4px] border border-dashed border-base-content/25 bg-transparent px-[15px] py-2.5 font-mono text-xs tracking-[0.08em] text-base-content/55 transition-colors duration-150 hover:border-primary hover:text-primary"
-              >
-                ＋ {moreCount} MORE ▾
-              </button>
+              {/* Padding lives on this inner div, NOT the animated one:
+                  border-box height can't go below its own padding, so a
+                  padded container "finishes" 20px tall and snaps away
+                  on unmount — the end-of-animation bump. */}
+              <div className="flex flex-wrap gap-2 pb-5">
+                {featured.map((w) => (
+                  <WidgetPill
+                    key={w.id}
+                    widget={w}
+                    on={active.includes(w.id)}
+                    onToggle={toggle}
+                  />
+                ))}
+                <button
+                  type="button"
+                  aria-expanded={false}
+                  onClick={() => setExpanded(true)}
+                  className="inline-flex cursor-pointer items-center gap-[9px] whitespace-nowrap rounded-[4px] border border-dashed border-base-content/25 bg-transparent px-[15px] py-2.5 font-mono text-xs tracking-[0.08em] text-base-content/55 transition-colors duration-150 hover:border-primary hover:text-primary"
+                >
+                  ＋ {moreCount} MORE ▾
+                </button>
+              </div>
             </motion.div>
           ) : (
             <motion.div
@@ -180,56 +186,59 @@ export function CatalogPicker() {
                   transition: { duration: 0.3, ease: EASE },
                 },
               }}
-              className="overflow-hidden pb-2"
+              className="overflow-hidden"
             >
-              {CATEGORY_ORDER.filter((c) => (counts[c.id] ?? 0) > 0).map(
-                (c) => (
-                  <motion.div
-                    key={c.id}
-                    variants={{
-                      hidden: { opacity: 0, y: 14 },
-                      show: {
-                        opacity: 1,
-                        y: 0,
-                        transition: { duration: 0.35, ease: EASE },
-                      },
-                    }}
-                    className="pb-[22px]"
-                  >
-                    <div className="pb-2.5 font-mono text-[10px] tracking-[0.14em] text-base-content/45">
-                      {`${c.label} — ${counts[c.id]}`}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {widgets
-                        .filter((w) => w.category === c.id)
-                        .map((w) => (
-                          <WidgetPill
-                            key={w.id}
-                            widget={w}
-                            on={active.includes(w.id)}
-                            onToggle={toggle}
-                          />
-                        ))}
-                    </div>
-                  </motion.div>
-                ),
-              )}
-              <motion.button
-                type="button"
-                aria-expanded
-                onClick={() => setExpanded(false)}
-                variants={{
-                  hidden: { opacity: 0, y: 14 },
-                  show: {
-                    opacity: 1,
-                    y: 0,
-                    transition: { duration: 0.35, ease: EASE },
-                  },
-                }}
-                className="mb-5 cursor-pointer rounded-[4px] border border-dashed border-base-content/25 bg-transparent px-[18px] py-2.5 font-mono text-xs tracking-[0.08em] text-base-content/55 transition-colors duration-150 hover:border-primary hover:text-primary"
-              >
-                SHOW LESS ▴
-              </motion.button>
+              {/* Same padding-inside pattern as the featured block */}
+              <div className="pb-2">
+                {CATEGORY_ORDER.filter((c) => (counts[c.id] ?? 0) > 0).map(
+                  (c) => (
+                    <motion.div
+                      key={c.id}
+                      variants={{
+                        hidden: { opacity: 0, y: 14 },
+                        show: {
+                          opacity: 1,
+                          y: 0,
+                          transition: { duration: 0.35, ease: EASE },
+                        },
+                      }}
+                      className="pb-[22px]"
+                    >
+                      <div className="pb-2.5 font-mono text-[10px] tracking-[0.14em] text-base-content/45">
+                        {`${c.label} — ${counts[c.id]}`}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {widgets
+                          .filter((w) => w.category === c.id)
+                          .map((w) => (
+                            <WidgetPill
+                              key={w.id}
+                              widget={w}
+                              on={active.includes(w.id)}
+                              onToggle={toggle}
+                            />
+                          ))}
+                      </div>
+                    </motion.div>
+                  ),
+                )}
+                <motion.button
+                  type="button"
+                  aria-expanded
+                  onClick={() => setExpanded(false)}
+                  variants={{
+                    hidden: { opacity: 0, y: 14 },
+                    show: {
+                      opacity: 1,
+                      y: 0,
+                      transition: { duration: 0.35, ease: EASE },
+                    },
+                  }}
+                  className="mb-5 cursor-pointer rounded-[4px] border border-dashed border-base-content/25 bg-transparent px-[18px] py-2.5 font-mono text-xs tracking-[0.08em] text-base-content/55 transition-colors duration-150 hover:border-primary hover:text-primary"
+                >
+                  SHOW LESS ▴
+                </motion.button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
