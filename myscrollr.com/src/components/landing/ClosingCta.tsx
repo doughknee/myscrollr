@@ -13,10 +13,14 @@ const PLATFORMS: ReadonlyArray<{
   label: string
   os: 'mac' | 'windows' | 'linux'
   platform: DesktopPlatform
+  meta: string
 }> = [
-  { index: '01', label: 'macOS', os: 'mac', platform: 'macos' },
-  { index: '02', label: 'Windows', os: 'windows', platform: 'windows' },
-  { index: '03', label: 'Linux', os: 'linux', platform: 'linux' },
+  // prettier-ignore
+  { index: '01', label: 'macOS', os: 'mac', platform: 'macos', meta: '.DMG · APPLE SILICON' },
+  // prettier-ignore
+  { index: '02', label: 'Windows', os: 'windows', platform: 'windows', meta: 'SETUP .EXE · X64' },
+  // prettier-ignore
+  { index: '03', label: 'Linux', os: 'linux', platform: 'linux', meta: '.APPIMAGE / .DEB / .RPM · X86_64' },
 ]
 
 export function ClosingCta() {
@@ -48,6 +52,11 @@ export function ClosingCta() {
               index={p.index}
               label={p.label}
               tag={detected === p.platform ? 'YOURS' : undefined}
+              meta={
+                <span className="font-mono text-xs tracking-[0.06em] text-base-content/40">
+                  {p.meta}
+                </span>
+              }
               action="DOWNLOAD ↓"
               to={`/download/${p.os}`}
             />
