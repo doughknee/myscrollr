@@ -132,12 +132,12 @@ const STATIC_FAQ = [
   {
     question: 'What does early access include?',
     answer:
-      'Every paid tier unlocks early access to new features, channels, and UI updates before they roll out to free users. This includes beta channels, experimental feed modes, and new dashboard widgets. You get to try everything first and provide feedback that shapes the final release.',
+      'When a new widget or feature needs a test run before wide release, paid tiers see it first. It is situational rather than constant — some releases ship to everyone at once — but when an early build exists, you get it, and your feedback shapes what ships.',
   },
   {
-    question: 'Does every tier get the full dashboard?',
+    question: 'Is the app different on paid plans?',
     answer:
-      'Every user gets complete access to the web dashboard at myscrollr.com. You can view all your channels, manage your watchlists, configure feeds, and adjust preferences regardless of your subscription tier. Paid tiers enhance the data flowing into the dashboard, not the dashboard itself.',
+      'No. Every tier is the same app with the same widgets and the same features. Paying changes how many widgets run at once — not what the app can do.',
   },
 ]
 
