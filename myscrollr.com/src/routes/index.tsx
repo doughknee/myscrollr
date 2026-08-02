@@ -70,8 +70,12 @@ const ClosingCta = lazy(() =>
 //
 // Keep both constants in sync with components/landing/DesktopProof.tsx
 // so the preloaded rendition is the one the <img> actually requests.
-const PAGE_IMAGE_SRCSET =
-  '/marketing/desktop-home@1x.webp 1600w, /marketing/desktop-home@2x.webp 2940w'
+// Light/dark variants of the SEC 02 desktop screenshot. Preloads are
+// scoped per OS color scheme; users whose stored theme contradicts
+// their OS eat one wasted preload (same trade-off as the original
+// hero preloads — see useTheme for the rationale).
+const pageImageSrcset = (theme: 'dark' | 'light') =>
+  `/marketing/desktop-home-${theme}@1x.webp 1600w, /marketing/desktop-home-${theme}@2x.webp 2940w`
 const PAGE_IMAGE_SIZES = '(max-width: 1023px) 100vw, 990px'
 
 export const Route = createFileRoute('/')({
@@ -94,9 +98,18 @@ export const Route = createFileRoute('/')({
         {
           rel: 'preload',
           as: 'image',
-          imagesrcset: PAGE_IMAGE_SRCSET,
+          imagesrcset: pageImageSrcset('dark'),
           imagesizes: PAGE_IMAGE_SIZES,
           fetchpriority: 'high',
+          media: '(prefers-color-scheme: dark)',
+        },
+        {
+          rel: 'preload',
+          as: 'image',
+          imagesrcset: pageImageSrcset('light'),
+          imagesizes: PAGE_IMAGE_SIZES,
+          fetchpriority: 'high',
+          media: '(prefers-color-scheme: light)',
         },
       ],
     }),

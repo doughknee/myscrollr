@@ -7,11 +7,18 @@
 import { motion } from 'motion/react'
 import { EASE } from '@/lib/animations'
 import { SectionRow, TerminalContainer } from '@/components/terminal'
+import { useTheme } from '@/hooks/useTheme'
 
-// Keep in sync with the preload <link> in routes/index.tsx.
-const SRCSET =
-  '/marketing/desktop-home@1x.webp 1600w, /marketing/desktop-home@2x.webp 2940w'
+// Keep in sync with the preload <link>s in routes/index.tsx. The shot
+// follows the site color mode: light visitors see the light desktop,
+// dark visitors the dark one (captured two minutes apart).
+const srcset = (theme: 'dark' | 'light') =>
+  `/marketing/desktop-home-${theme}@1x.webp 1600w, /marketing/desktop-home-${theme}@2x.webp 2940w`
 const SIZES = '(max-width: 1023px) 100vw, 990px'
+const SHOT_TIME: Record<'dark' | 'light', string> = {
+  dark: '11:27 AM',
+  light: '11:29 AM',
+}
 
 const ANNOTATIONS: ReadonlyArray<[string, string]> = [
   ['① THE BAR', 'pinned to the top edge, floating over every window'],
@@ -23,12 +30,13 @@ const ANNOTATIONS: ReadonlyArray<[string, string]> = [
 ]
 
 export function DesktopProof() {
+  const { theme } = useTheme()
   return (
     <section className="border-b border-hairline">
       <TerminalContainer>
         <SectionRow
           tag="SEC 02 ／ ON YOUR DESKTOP"
-          stat="SAT AUG 1 · 4:53 PM · UNRETOUCHED"
+          stat={`SUN AUG 2 · ${SHOT_TIME[theme]} · UNRETOUCHED`}
         />
         <motion.div
           initial={{ opacity: 0, y: 24 }}
@@ -43,7 +51,7 @@ export function DesktopProof() {
             <span className="text-primary">Not a mockup.</span>
           </h2>
           <p className="m-0 mb-1.5 max-w-[400px] text-[15px] text-base-content/60 [text-wrap:pretty]">
-            The bar pinned to the top of a real desktop (weather, MLB finals,
+            The bar pinned to the top of a real desktop (weather, MLB scores,
             and a focus timer streaming live) with the Home window open behind
             it.
           </p>
@@ -60,18 +68,18 @@ export function DesktopProof() {
           </div>
           <div className="rounded-[8px] border border-hairline bg-panel p-4">
             <img
-              src="/marketing/desktop-home@1x.webp"
-              srcSet={SRCSET}
+              src={`/marketing/desktop-home-${theme}@1x.webp`}
+              srcSet={srcset(theme)}
               sizes={SIZES}
               width={1600}
               height={1041}
               loading="lazy"
               decoding="async"
-              alt="Scrollr on a real macOS desktop: the live ticker pinned along the top of the screen showing MLB finals, weather, and a timer, with the Home window showing live scores, markets, and Kalshi"
+              alt="Scrollr on a real macOS desktop: the live ticker pinned along the top of the screen showing weather, MLB and MLS games, markets, and a timer, with the Home window open showing scores, markets, and Kalshi"
               className="block h-auto w-full rounded-[4px]"
             />
             <div className="flex flex-wrap justify-between gap-2 px-1 pt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-base-content/45">
-              <span>FIG. 01 — MACOS · SAT AUG 1, 4:53 PM</span>
+              <span>{`FIG. 01 — MACOS · SUN AUG 2, ${SHOT_TIME[theme]}`}</span>
               <span>UNRETOUCHED</span>
             </div>
           </div>
