@@ -14,9 +14,9 @@
   "bugs": "https://myscrollr.com/support",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/fetch-latest-version.mjs",
+    "predev": "node scripts/fetch-latest-version.mjs && node scripts/ensure-motion-plus.mjs",
     "dev": "vite --port 3000",
-    "prebuild": "node scripts/fetch-latest-version.mjs && node scripts/fetch-releases.mjs && node scripts/generate-sitemap.mjs && node scripts/optimize-screenshots.mjs",
+    "prebuild": "node scripts/ensure-motion-plus.mjs && node scripts/fetch-latest-version.mjs && node scripts/fetch-releases.mjs && node scripts/generate-sitemap.mjs && node scripts/optimize-screenshots.mjs",
     "optimize:screenshots": "node scripts/optimize-screenshots.mjs",
     "build": "vite build && tsc",
     "postbuild": "node scripts/check-sentry-tunnel.mjs && node scripts/check-prerender.mjs && node scripts/check-mobile-viewport.mjs",
@@ -42,7 +42,6 @@
     "lucide-react": "^0.545.0",
     "marked": "^18.0.5",
     "motion": "^12.23.24",
-    "motion-plus": "https://api.motion.dev/registry?package=motion-plus&version=latest&token=032997dbced0702754906e3f43111740b10beaa970fd6d26423e34e43a46acfe",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwindcss": "^4.0.6"
