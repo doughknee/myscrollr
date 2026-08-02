@@ -1126,7 +1126,7 @@ function UplinkPage() {
                                   }}
                                   transition={{ duration: 0.2, ease: EASE }}
                                   aria-hidden={!activeView}
-                                  className={`col-start-1 row-start-1 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 self-center font-mono text-[11px] tracking-[0.06em] text-base-content/45 ${
+                                  className={`col-start-1 row-start-1 flex flex-wrap items-center gap-x-2 gap-y-1.5 self-center font-mono text-[11px] tracking-[0.06em] text-base-content/45 ${
                                     activeView ? '' : 'pointer-events-none'
                                   }`}
                                 >
@@ -1135,7 +1135,10 @@ function UplinkPage() {
                                       <span className="whitespace-nowrap">
                                         {`BILLED $${PRICING[p.tier].annual.price.toFixed(2)}/YR`}
                                       </span>
-                                      <span className="whitespace-nowrap rounded-[3px] border border-primary/35 px-[7px] py-[2px] text-primary">
+                                      {/* Compact enough that even BILLED
+                                          $399.99/YR + badge fit one line
+                                          in a 4-col card */}
+                                      <span className="whitespace-nowrap rounded-[3px] border border-primary/35 px-[5px] py-[2px] text-[10px] tracking-[0.02em] text-primary">
                                         4 MONTHS FREE
                                       </span>
                                     </>
