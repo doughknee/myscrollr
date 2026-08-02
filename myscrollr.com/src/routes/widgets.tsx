@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import type { CatalogWidget } from '@/lib/catalog'
 import { seo } from '@/lib/seo'
 import { breadcrumbs, organization } from '@/lib/structured-data'
@@ -144,49 +144,84 @@ function ChannelsPage() {
       <section className="border-b border-hairline">
         <TerminalContainer>
           <motion.div {...reveal}>
-            {/* Filter tabs */}
+            {/* Filter tabs — the active chip slides between tabs, same
+                segmented-control treatment as MAKE IT YOURS */}
             <div className="flex flex-wrap gap-1.5 pb-2 pt-6">
-              {filters.map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setFilter(f.id)}
-                  aria-pressed={filter === f.id}
-                  className={`cursor-pointer whitespace-nowrap rounded-[4px] border px-3.5 py-2 font-mono text-[11px] tracking-[0.1em] transition-colors hover:border-primary ${
-                    filter === f.id
-                      ? 'border-primary/45 bg-primary/10 text-primary'
-                      : 'border-hairline text-base-content/55'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
+              {filters.map((f) => {
+                const isActive = filter === f.id
+                return (
+                  <motion.button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setFilter(f.id)}
+                    aria-pressed={isActive}
+                    whileTap={{ scale: 0.96 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    className={`relative cursor-pointer whitespace-nowrap rounded-[4px] border px-3.5 py-2 font-mono text-[11px] tracking-[0.1em] transition-colors hover:border-primary ${
+                      isActive
+                        ? 'border-transparent text-primary'
+                        : 'border-hairline text-base-content/55'
+                    }`}
+                  >
+                    {isActive && (
+                      <motion.span
+                        aria-hidden="true"
+                        layoutId="widgets-filter"
+                        className="absolute inset-0 rounded-[4px] border border-primary/45 bg-primary/10"
+                        transition={{
+                          type: 'spring',
+                          stiffness: 500,
+                          damping: 35,
+                        }}
+                      />
+                    )}
+                    <span className="relative">{f.label}</span>
+                  </motion.button>
+                )
+              })}
             </div>
 
-            {/* Grouped ledger rows */}
-            {groups.map((g) => (
-              <div key={g.id} className="pb-1.5 pt-6">
-                <div className="border-b border-hairline pb-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/45">
-                  {g.label} — {g.count}
-                </div>
-                {g.items.map((w) => (
-                  <CatalogRow
-                    key={w.id}
-                    widget={w}
-                    inBar={active.includes(w.id)}
-                    tick={tick}
-                    now={now}
-                    onToggle={() => toggle(w.id)}
-                  />
-                ))}
-              </div>
-            ))}
+            {/* Grouped ledger rows — keyed by the active tab so picking
+                a filter replays the group entrances as the transition.
+                Deliberately NOT keyed on the search query: retriggering
+                entrances per keystroke would flicker. */}
+            <div key={filter}>
+              {groups.map((g, gi) => (
+                <motion.div
+                  key={g.id}
+                  initial={{ opacity: 0, y: 14 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-40px' }}
+                  transition={{ duration: 0.4, ease: EASE, delay: gi * 0.05 }}
+                  className="pb-1.5 pt-6"
+                >
+                  <div className="border-b border-hairline pb-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/45">
+                    {g.label} — {g.count}
+                  </div>
+                  {g.items.map((w) => (
+                    <CatalogRow
+                      key={w.id}
+                      widget={w}
+                      inBar={active.includes(w.id)}
+                      tick={tick}
+                      now={now}
+                      onToggle={() => toggle(w.id)}
+                    />
+                  ))}
+                </motion.div>
+              ))}
 
-            {groups.length === 0 && (
-              <div className="px-2 py-12 font-mono text-[13px] text-base-content/45">
-                {`NO WIDGETS MATCH "${query.toUpperCase()}". THE CATALOG GROWS EVERY MONTH.`}
-              </div>
-            )}
+              {groups.length === 0 && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.25 }}
+                  className="px-2 py-12 font-mono text-[13px] text-base-content/45"
+                >
+                  {`NO WIDGETS MATCH "${query.toUpperCase()}". THE CATALOG GROWS EVERY MONTH.`}
+                </motion.div>
+              )}
+            </div>
 
             <div className="mt-5">
               <DeparturesRow
@@ -277,21 +312,37 @@ function CatalogRow({
         {sample}
       </span>
 
-      <button
+      {/* min-w reserves the wider label's width on mobile so toggling
+          doesn't resize the button and shift the row (desktop sits in
+          a fixed 130px grid track already). */}
+      <motion.button
         type="button"
         onClick={(e) => {
           e.stopPropagation()
           onToggle()
         }}
         aria-pressed={inBar}
-        className={`col-start-3 row-start-1 cursor-pointer whitespace-nowrap rounded-[4px] border px-3 py-2 font-mono text-[11px] tracking-[0.1em] transition-colors hover:border-primary lg:col-start-auto lg:row-start-auto lg:px-0 ${
+        whileTap={{ scale: 0.95 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        className={`col-start-3 row-start-1 min-w-[124px] cursor-pointer whitespace-nowrap rounded-[4px] border px-3 py-2 font-mono text-[11px] tracking-[0.1em] transition-colors hover:border-primary lg:col-start-auto lg:row-start-auto lg:min-w-0 lg:px-0 ${
           inBar
             ? 'border-primary/45 text-primary'
             : 'border-hairline text-base-content/55'
         }`}
       >
-        {inBar ? '● IN BAR' : '＋ ADD TO BAR'}
-      </button>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={inBar ? 'in' : 'add'}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.12 }}
+            className="inline-block"
+          >
+            {inBar ? '● IN BAR' : '＋ ADD TO BAR'}
+          </motion.span>
+        </AnimatePresence>
+      </motion.button>
     </div>
   )
 }
