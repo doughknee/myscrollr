@@ -34,7 +34,7 @@ export const Route = createFileRoute('/releases')({
     seo({
       title: "Scrollr Releases: What's New",
       description:
-        'Human-readable release notes for the Scrollr desktop app — every version, what shipped, and why it matters. No commit-log archaeology required.',
+        'Human-readable release notes for the Scrollr desktop app: every version, what shipped, and why it matters. No commit-log archaeology required.',
       path: '/releases',
       jsonLd: [
         organization,
@@ -225,7 +225,7 @@ function ReleasesPage() {
         eyebrowRight="SERVED FROM GITHUB RELEASES"
         line1="Every build,"
         line2="dated and signed."
-        sub="What shipped, what changed, and why it matters — every version, in plain English. No commit-log archaeology."
+        sub="What shipped, what changed, and why it matters. Every version, in plain English. No commit-log archaeology."
       />
 
       {/* ── The ledger ───────────────────────────────────────── */}
@@ -309,7 +309,7 @@ function ReleasesPage() {
               index="00"
               label="Prefer the raw feed?"
               labelClassName="text-xl"
-              meta="Tags, assets, and checksums — every release, straight from the source."
+              meta="Tags, assets, and checksums: every release, straight from the source."
               action="GITHUB RELEASES ↗"
               href={RELEASES_PAGE_URL}
             />

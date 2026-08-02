@@ -155,9 +155,9 @@ const AUDIENCES = [
   { tag: 'VENUE', color: '#fbbf24', name: 'Sports bars & restaurants', copy: 'Every TV in the room runs live scores, news, and your branding. Better than ESPN scrollers, fully under your control.' },
   { tag: 'FIN', color: '#00d4ff', name: 'Brokerages & advisors', copy: 'A branded desktop ticker for clients. Real-time quotes, custom watchlists, your logo, your colors, your domain.' },
   { tag: 'FAN', color: '#ff4757', name: 'Fantasy sports platforms', copy: "White-label the desktop app as your platform's companion. Native ticker, your branding, your standings." },
-  { tag: 'ODDS', color: '#a855f7', name: 'Sportsbooks & betting affiliates', copy: "Stay on a user's desktop without a tab open. Odds, scores, and your offers — visible the moment they matter." },
+  { tag: 'ODDS', color: '#a855f7', name: 'Sportsbooks & betting affiliates', copy: "Stay on a user's desktop without a tab open. Odds, scores, and your offers, visible the moment they matter." },
   { tag: 'CRYPTO', color: '#34d399', name: 'Crypto exchanges', copy: "A native desktop price ticker for power users. Custom symbol list, your exchange's pairs, your branding." },
-  { tag: 'NEWS', color: '#0ea5e9', name: 'News publishers', copy: "Your headlines on readers' desktops all day — a quiet, branded channel that doesn't depend on the algorithm." },
+  { tag: 'NEWS', color: '#0ea5e9', name: 'News publishers', copy: "Your headlines on readers' desktops all day: a quiet, branded channel that doesn't depend on the algorithm." },
 ]
 
 // prettier-ignore
@@ -165,26 +165,26 @@ const CAPABILITIES = [
   { num: 'CAP—01', title: 'Full white-label', body: 'Logo, colors, fonts, app name, app icon, install bundle identity, custom domain on the API. Your customers see your brand, not ours.' },
   { num: 'CAP—02', title: 'Multi-display deployment', body: 'Venue mode: one config, every screen in the building. Per-display content and scheduling included.' },
   { num: 'CAP—03', title: 'API access', body: 'Programmatic read/write to your deployment. Push your own data into the bar, pull state into your stack.' },
-  { num: 'CAP—04', title: 'Custom data sources', body: 'Your odds feed, your CMS, your internal metrics — we build the ingester and it streams like everything else.' },
+  { num: 'CAP—04', title: 'Custom data sources', body: 'Your odds feed, your CMS, your internal metrics: we build the ingester and it streams like everything else.' },
   { num: 'CAP—05', title: 'A real SLA', body: 'Defined response times in writing (typically P1 < 1hr), uptime targets, maintenance windows, and a direct Slack channel with the engineers.' },
-  { num: 'CAP—06', title: 'Self-host option', body: 'The full stack runs in your environment. We hand you the keys — deploy scripts, Compose files, runbooks — and stay reachable after.' },
+  { num: 'CAP—06', title: 'Self-host option', body: 'The full stack runs in your environment. We hand you the keys (deploy scripts, Compose files, runbooks) and stay reachable after.' },
 ]
 
 // prettier-ignore
 const STEPS = [
   { num: '01', title: 'Scope', body: 'Mutual NDA first, then a scoping call. You get a written scope with a committed timeline and price before you pay anything.' },
-  { num: '02', title: 'Build & brand', body: 'We build on the production Scrollr platform — the same pipeline running the public app — with your brand and data wired in.' },
-  { num: '03', title: 'Deploy', body: 'Most deployments go live in 2–4 weeks. We stay engaged for support, changes, and whatever breaks at 5pm on a Friday.' },
+  { num: '02', title: 'Build & brand', body: 'We build on the production Scrollr platform, the same pipeline running the public app, with your brand and data wired in.' },
+  { num: '03', title: 'Deploy', body: 'Most deployments go live in 2-4 weeks. We stay engaged for support, changes, and whatever breaks at 5pm on a Friday.' },
 ]
 
 // prettier-ignore
 const FAQS = [
-  { num: 'B.01', q: 'Can we self-host?', a: 'Yes. Desktop app, Go API, Rust ingesters, Postgres, Redis — all of it runs in your environment, with deployment scripts, runbooks, and a hand-off call.' },
+  { num: 'B.01', q: 'Can we self-host?', a: 'Yes. Desktop app, Go API, Rust ingesters, Postgres, Redis: all of it runs in your environment, with deployment scripts, runbooks, and a hand-off call.' },
   { num: 'B.02', q: 'Can we fully white-label?', a: 'Completely. The codebase is AGPL-3.0; white-label builds ship under a commercial license that removes the copyleft requirement for distribution.' },
-  { num: 'B.03', q: 'Do you sign NDAs?', a: 'Before the scoping call, so you can speak freely. Our standard one-pager or yours — no legal back-and-forth before the first conversation.' },
+  { num: 'B.03', q: 'Do you sign NDAs?', a: 'Before the scoping call, so you can speak freely. Our standard one-pager or yours, with no legal back-and-forth before the first conversation.' },
   { num: 'B.04', q: "What's the SLA?", a: 'Written, not implied: incident response times (often P1 < 1hr), monthly uptime targets, maintenance windows, and a direct Slack channel.' },
-  { num: 'B.05', q: 'How long does deployment take?', a: 'Custom branding, two data sources, basic integrations: 2–4 weeks. Heavy customization (new sources, custom UI, SSO): 6–12 weeks. Committed in the scope doc.' },
-  { num: 'B.06', q: 'Perpetual or one-time licensing?', a: 'For self-hosted, yes — perpetual licenses with optional annual maintenance. Managed deployments default to monthly. Bring us your procurement constraints.' },
+  { num: 'B.05', q: 'How long does deployment take?', a: 'Custom branding, two data sources, basic integrations: 2-4 weeks. Heavy customization (new sources, custom UI, SSO): 6-12 weeks. Committed in the scope doc.' },
+  { num: 'B.06', q: 'Perpetual or one-time licensing?', a: 'For self-hosted, yes: perpetual licenses with optional annual maintenance. Managed deployments default to monthly. Bring us your procurement constraints.' },
 ]
 
 const USE_CASE_OPTIONS = [
@@ -900,7 +900,7 @@ function BusinessPage() {
         eyebrowRight="FROM $500/MO · MUTUAL NDA BEFORE THE FIRST CALL"
         line1="YOUR BRAND,"
         line2="OUR RAILS."
-        sub="The Scrollr platform — ticker, data pipeline, and all — wearing your logo, your colors, your domain. Built, deployed, and supported by the people who wrote it."
+        sub="The Scrollr platform (ticker, data pipeline, and all) wearing your logo, your colors, your domain. Built, deployed, and supported by the people who wrote it."
         actions={
           <div className="flex flex-col items-start gap-3.5 sm:items-end">
             <button
@@ -944,7 +944,7 @@ function BusinessPage() {
         <TerminalContainer>
           <SectionRow
             tag="SEC 00 ／ ONE PLATFORM, MANY DEPLOYMENTS"
-            stat="CLICK A SCREEN — THE BAR BELOW REBRANDS"
+            stat="CLICK A SCREEN · THE BAR BELOW REBRANDS"
           />
           <div className="flex justify-center py-12">
             <DeploymentFanout brand={brand} onSelect={setBrand} />

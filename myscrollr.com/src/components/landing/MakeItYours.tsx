@@ -75,7 +75,7 @@ export function MakeItYours() {
             </h2>
             <p className="m-0 mb-7 max-w-[440px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
               Twenty palettes. Top or bottom of any monitor. Speed, density, all
-              of it tunable. Try it right here — the bar takes orders.
+              of it tunable. Try it right here. The bar takes orders.
             </p>
             <div className="flex flex-col gap-3">
               <ControlRow

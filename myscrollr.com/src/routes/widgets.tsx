@@ -33,7 +33,7 @@ export const Route = createFileRoute('/widgets')({
     seo({
       title: 'Scrollr Widget Catalog: Live Sports, Finance, News, Fantasy',
       description:
-        'Browse the full Scrollr widget catalog — live sports leagues, stocks and crypto, curated news and custom RSS, Yahoo Fantasy, prediction markets, and utilities. Every widget streams live.',
+        'Browse the full Scrollr widget catalog: live sports leagues, stocks and crypto, curated news and custom RSS, Yahoo Fantasy, prediction markets, and utilities. Every widget streams live.',
       path: '/widgets',
       jsonLd: [
         organization,
@@ -112,10 +112,10 @@ function ChannelsPage() {
     <div className="min-h-dvh">
       <PageHeader
         eyebrowLeft="WIDGETS ／ THE CATALOG"
-        eyebrowRight="NEW WIDGETS SHIP SERVER-SIDE — NO APP UPDATE NEEDED"
+        eyebrowRight="NEW WIDGETS SHIP SERVER-SIDE · NO APP UPDATE NEEDED"
         line1="The catalog."
         line2={`${n} and counting.`}
-        sub="Every widget streams live and takes ten seconds to add. Tap ADD TO BAR to preview any of them in the bar below — it follows you to every page."
+        sub="Every widget streams live and takes ten seconds to add. Tap ADD TO BAR to preview any of them in the bar below. It follows you to every page."
         actions={
           <input
             type="text"
@@ -172,7 +172,7 @@ function ChannelsPage() {
 
             {groups.length === 0 && (
               <div className="px-2 py-12 font-mono text-[13px] text-base-content/45">
-                {`NO WIDGETS MATCH "${query.toUpperCase()}" — BUT THE CATALOG GROWS EVERY MONTH.`}
+                {`NO WIDGETS MATCH "${query.toUpperCase()}". THE CATALOG GROWS EVERY MONTH.`}
               </div>
             )}
 
@@ -181,7 +181,7 @@ function ChannelsPage() {
                 index={String(n + 1)}
                 label="Missing something?"
                 labelClassName="text-xl"
-                meta="Widgets ship server-side — a good request can be live for everyone in days."
+                meta="Widgets ship server-side. A good request can be live for everyone in days."
                 action="REQUEST A WIDGET ↗"
                 href="https://github.com/brandon-relentnet/myscrollr/issues/new"
               />

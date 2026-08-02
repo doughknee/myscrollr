@@ -117,7 +117,7 @@ const STATIC_FAQ = [
   {
     question: 'What are widgets, and how many do I get?',
     answer:
-      'Widgets are the building blocks of your ticker — MLB scores, a stocks watchlist, crypto prices, your news feed, Yahoo Fantasy, and more. Your plan sets how many run at the same time: Free runs 3, Uplink 6, Pro 12, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.',
+      'Widgets are the building blocks of your ticker: MLB scores, a stocks watchlist, crypto prices, your news feed, Yahoo Fantasy, and more. Your plan sets how many run at the same time: Free runs 3, Uplink 6, Pro 12, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.',
   },
   {
     question: 'How fast are live updates?',
@@ -127,17 +127,17 @@ const STATIC_FAQ = [
   {
     question: 'Are there limits inside a widget?',
     answer:
-      'No. Every plan holds unlimited items inside each widget — track 5 or 500 symbols in your Stocks widget, follow every source in your news feeds, sync every fantasy league you play. Your plan only sets how many widgets run at once.',
+      'No. Every plan holds unlimited items inside each widget: track 5 or 500 symbols in your Stocks widget, follow every source in your news feeds, sync every fantasy league you play. Your plan only sets how many widgets run at once.',
   },
   {
     question: 'What does early access include?',
     answer:
-      'When a new widget or feature needs a test run before wide release, paid tiers see it first. It is situational rather than constant — some releases ship to everyone at once — but when an early build exists, you get it, and your feedback shapes what ships.',
+      'When a new widget or feature needs a test run before wide release, paid tiers see it first. It is situational rather than constant (some releases ship to everyone at once), but when an early build exists, you get it, and your feedback shapes what ships.',
   },
   {
     question: 'Is the app different on paid plans?',
     answer:
-      'No. Every tier is the same app with the same widgets and the same features. Paying changes how many widgets run at once — not what the app can do.',
+      'No. Every tier is the same app with the same widgets and the same features. Paying changes how many widgets run at once, not what the app can do.',
   },
 ]
 
@@ -147,7 +147,7 @@ export const Route = createFileRoute('/uplink')({
     seo({
       title: 'Scrollr Uplink: Pricing & Plans',
       description:
-        'Scrollr Uplink unlocks more widgets at once, priority support, and power-user tools — on top of real-time streaming for everyone. Plans from $9.99/month with annual savings.',
+        'Scrollr Uplink adds more widgets at once, priority support, and early access, on top of live streaming for everyone. Plans from $9.99/month with annual savings.',
       path: '/uplink',
       image: 'https://myscrollr.com/og/uplink.png',
       type: 'product',
@@ -350,7 +350,7 @@ function buildUplinkFAQ(
   return [
     {
       question: 'What are widgets, and how many do I get?',
-      answer: `Widgets are the building blocks of your ticker — MLB scores, a stocks watchlist, crypto prices, your news feed, Yahoo Fantasy, and more. Your plan sets how many run at the same time: Free runs ${free.max_widgets}, Uplink ${uplink.max_widgets}, Pro ${pro.max_widgets}, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.`,
+      answer: `Widgets are the building blocks of your ticker: MLB scores, a stocks watchlist, crypto prices, your news feed, Yahoo Fantasy, and more. Your plan sets how many run at the same time: Free runs ${free.max_widgets}, Uplink ${uplink.max_widgets}, Pro ${pro.max_widgets}, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.`,
     },
     ...STATIC_FAQ.slice(1),
   ]
@@ -594,7 +594,7 @@ function UplinkPage() {
         key: 'free',
         tier: null,
         name: 'Free',
-        tagline: "Start here — it's free forever",
+        tagline: "Start here. It's free forever.",
         slots: t.free.max_widgets,
         popular: false,
       },
@@ -995,8 +995,8 @@ function UplinkPage() {
                         </span>
                       </h2>
                       <p className="m-0 max-w-[440px] text-[15.5px] leading-[1.65] text-base-content/60 [text-wrap:pretty]">
-                        Permanent Uplink Ultimate — unlimited slots, priority
-                        support, early access — plus a founding-member badge.
+                        Permanent Uplink Ultimate: unlimited slots, priority
+                        support, and early access, plus a founding-member badge.
                         Pays for itself against Ultimate Annual in 2.5 years.
                       </p>
                     </div>

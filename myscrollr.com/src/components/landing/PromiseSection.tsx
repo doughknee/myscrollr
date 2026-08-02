@@ -41,7 +41,7 @@ export function PromiseSection() {
             </h2>
             <p className="m-0 mb-7 max-w-[460px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
               {
-                'Scrollr ships zero telemetry — no analytics, no tracking pixels, no "anonymous usage data." Tests block any deploy that breaks this. You don\'t have to take our word for it.'
+                'Scrollr ships zero telemetry: no analytics, no tracking pixels, no "anonymous usage data." Tests block any deploy that breaks this. You don\'t have to take our word for it.'
               }
             </p>
             <a

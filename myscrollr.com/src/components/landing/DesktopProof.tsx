@@ -17,9 +17,9 @@ const ANNOTATIONS: ReadonlyArray<[string, string]> = [
   ['① THE BAR', 'pinned to the top edge, floating over every window'],
   [
     '② LIVE WIDGETS',
-    'eight running at once — MLB, MLS, markets, Kalshi, a Pomodoro timer',
+    'eight running at once: MLB, MLS, markets, Kalshi, a Pomodoro timer',
   ],
-  ['③ HOME WINDOW', 'the glanceable briefing — open only when you want it'],
+  ['③ HOME WINDOW', 'the glanceable briefing, open only when you want it'],
 ]
 
 export function DesktopProof() {
@@ -43,8 +43,8 @@ export function DesktopProof() {
             <span className="text-primary">Not a mockup.</span>
           </h2>
           <p className="m-0 mb-1.5 max-w-[400px] text-[15px] text-base-content/60 [text-wrap:pretty]">
-            The bar pinned to the top of a real desktop — weather, MLB finals,
-            and a focus timer streaming live — with the Home window open behind
+            The bar pinned to the top of a real desktop (weather, MLB finals,
+            and a focus timer streaming live) with the Home window open behind
             it.
           </p>
         </motion.div>

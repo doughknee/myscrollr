@@ -16,7 +16,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Is Scrollr free?',
     answer:
-      'Yes — three widgets at once, forever, no account. Uplink plans add more concurrent widgets from $6.67/mo.',
+      'Yes. Three widgets at once, forever, no account. Uplink plans add more concurrent widgets from $6.67/mo.',
   },
   {
     question: "Does it affect my computer's performance?",
@@ -26,7 +26,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Is my data private?',
     answer:
-      'Scrollr ships zero telemetry — no analytics, no tracking. Enforced by tests that block deploys; the source is public.',
+      'Scrollr ships zero telemetry: no analytics, no tracking. Enforced by tests that block deploys; the source is public.',
   },
   {
     question: 'Do I need an account?',
@@ -46,7 +46,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'How do I update the app?',
     answer:
-      'Scrollr checks GitHub Releases and updates in place. New widgets need no update at all — they ship server-side.',
+      'Scrollr checks GitHub Releases and updates in place. New widgets need no update at all. They ship server-side.',
   },
   {
     question: 'How does live data work?',
@@ -69,7 +69,7 @@ export const TROUBLESHOOTING_ARTICLES: Array<TroubleshootingArticle> = [
   },
   {
     title: 'Data not loading / bar shows empty',
-    body: 'Check Settings → Connection. A red dot means the stream is down — Scrollr reconnects automatically with backoff. If only one widget is empty, its league or market may simply have nothing live right now.',
+    body: 'Check Settings → Connection. A red dot means the stream is down. Scrollr reconnects automatically with backoff. If only one widget is empty, its league or market may simply have nothing live right now.',
   },
   {
     title: 'Ticker not visible',
@@ -77,11 +77,11 @@ export const TROUBLESHOOTING_ARTICLES: Array<TroubleshootingArticle> = [
   },
   {
     title: 'Finance prices not updating',
-    body: "Quotes pause outside market hours — that's the market, not the app. Crypto streams around the clock; if BTC is frozen too, check Settings → Connection.",
+    body: "Quotes pause outside market hours. That's the market, not the app. Crypto streams around the clock; if BTC is frozen too, check Settings → Connection.",
   },
   {
     title: 'Yahoo Fantasy connect fails',
-    body: "Reconnect from the widget's settings — Yahoo tokens expire roughly monthly. Make sure you complete the Yahoo consent screen in the browser it opens.",
+    body: "Reconnect from the widget's settings. Yahoo tokens expire roughly monthly. Make sure you complete the Yahoo consent screen in the browser it opens.",
   },
   {
     title: 'Subscription not reflecting after purchase',
@@ -115,7 +115,7 @@ export const GETTING_STARTED_STEPS: Array<GettingStartedStep> = [
   {
     title: 'Configure Your Feeds',
     description:
-      'Each channel has a Configure view where you pick what to track. Open a channel, click Options in the title bar, then Configure source — add stock symbols, select sports leagues, subscribe to news feeds, or connect your Yahoo account.',
+      'Each channel has a Configure view where you pick what to track. Open a channel, click Options in the title bar, then Configure source: add stock symbols, select sports leagues, subscribe to news feeds, or connect your Yahoo account.',
   },
   {
     title: 'Customize the Ticker',

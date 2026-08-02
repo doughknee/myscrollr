@@ -21,7 +21,7 @@ export function TerminalHero() {
       line1="The moment it happens,"
       line2="you already know."
       sub={
-        "The go-ahead run, the market swing, the breaking story, your fantasy comeback — live in a quiet bar above whatever you're working on. No checking, no feeds, no finding out late."
+        "The go-ahead run, the market swing, the breaking story, your fantasy comeback. It all lives in a quiet bar above whatever you're working on. No checking, no feeds, no finding out late."
       }
       actions={<HeroActions />}
     />
@@ -85,7 +85,7 @@ function HeroActions() {
       <div className="text-left font-mono text-xs leading-[1.7] text-base-content/45 sm:text-right">
         {'the ticker is already running at the bottom of this page ↓'}
         <br />
-        {"that's the app — it stays on top of everything, including this site"}
+        {"that's the app. it stays on top of everything, including this site"}
       </div>
     </div>
   )

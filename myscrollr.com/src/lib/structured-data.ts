@@ -170,7 +170,7 @@ export const HOMEPAGE_FAQ_ITEMS: ReadonlyArray<{
   {
     question: 'Is it really free?',
     answer:
-      'Yes. Three widget slots, forever, no account. Uplink exists if you outgrow them — most people don’t.',
+      "Yes. Three widget slots, forever, no account. Uplink exists if you outgrow them. Most people don't.",
   },
   {
     question: 'Will it slow my computer down?',
@@ -180,7 +180,7 @@ export const HOMEPAGE_FAQ_ITEMS: ReadonlyArray<{
   {
     question: 'What does Scrollr collect about me?',
     answer:
-      'Nothing. Zero telemetry is a shipped promise, enforced by tests that block deploys — and the source is public.',
+      'Nothing. Zero telemetry is a shipped promise, enforced by tests that block deploys, and the source is public.',
   },
   {
     question: 'Which platforms?',

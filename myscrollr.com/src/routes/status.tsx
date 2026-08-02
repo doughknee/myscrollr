@@ -77,22 +77,22 @@ interface ChannelMeta {
 const CHANNEL_META: Partial<Record<string, ChannelMeta>> = {
   finance: {
     code: 'CHN—FIN',
-    description: 'TwelveData WebSocket — real-time market data',
+    description: 'TwelveData WebSocket · real-time market data',
     port: 3001,
   },
   sports: {
     code: 'CHN—SPT',
-    description: 'ESPN API — scores polling every 60s',
+    description: 'ESPN API · scores polling every 60s',
     port: 3002,
   },
   fantasy: {
     code: 'CHN—FAN',
-    description: 'Yahoo Fantasy — Go-native sync, no Rust ingestion',
+    description: 'Yahoo Fantasy · Go-native sync, no Rust ingestion',
     port: 8084,
   },
   rss: {
     code: 'CHN—RSS',
-    description: 'RSS/Atom/JSON — feed aggregation every 5 min',
+    description: 'RSS/Atom/JSON · feed aggregation every 5 min',
     port: 3004,
   },
 }
@@ -238,7 +238,7 @@ function StatusPage() {
         eyebrowRight={`AUTO-REFRESH EVERY ${POLL_INTERVAL / 1000}S`}
         line1="All systems,"
         line2="plainly stated."
-        sub={`The database, the cache, every channel worker — rechecked every ${
+        sub={`The database, the cache, every channel worker. Rechecked every ${
           POLL_INTERVAL / 1000
         } seconds, straight from the same API the app reads.`}
         actions={
@@ -330,7 +330,7 @@ function StatusPage() {
                   CHN—??
                 </span>
                 <span className="text-sm text-base-content/55">
-                  Unable to discover channels — the API is not reachable from
+                  Unable to discover channels. The API is not reachable from
                   this browser.
                 </span>
                 <span className="font-mono text-xs text-error/80">
@@ -411,7 +411,7 @@ function StatusPage() {
               index="01"
               label="API documentation"
               labelClassName="text-xl"
-              meta="Swagger — every route, documented."
+              meta="Swagger: every route, documented."
               action="OPEN ↗"
               href={`${API_BASE}/swagger/index.html`}
             />

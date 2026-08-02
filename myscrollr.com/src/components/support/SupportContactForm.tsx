@@ -333,7 +333,7 @@ function SuccessPanel({ onReset }: { onReset: () => void }) {
       </div>
       <div>
         <h3 className="m-0 text-lg font-bold text-base-content">
-          Message sent — thanks.
+          Message sent. Thanks.
         </h3>
         <p className="mt-2 max-w-md text-sm leading-relaxed text-base-content/55">
           We've received your note and will get back to you within 1-2 business

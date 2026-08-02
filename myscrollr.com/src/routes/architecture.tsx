@@ -147,7 +147,7 @@ const PRINCIPLES: Array<Principle> = [
   {
     title: 'Zero-trust Gateway',
     description:
-      'Core API validates JWTs at the edge. The one proxied service (Fantasy) never sees tokens — it trusts identity headers injected by the gateway.',
+      'Core API validates JWTs at the edge. The one proxied service (Fantasy) never sees tokens. It trusts identity headers injected by the gateway.',
     hex: HEX.secondary,
   },
   {

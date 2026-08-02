@@ -98,7 +98,7 @@ function LegalPage() {
         eyebrowRight={`${LEGAL_DOCUMENTS.length} DOCUMENTS ON FILE`}
         line1="Everything in writing."
         line2="Nothing in fine print."
-        sub="Every document that governs Scrollr and myscrollr.com — terms, privacy, licensing, cookies. Pick a row; the full text renders below."
+        sub="Every document that governs Scrollr and myscrollr.com: terms, privacy, licensing, cookies. Pick a row; the full text renders below."
       />
 
       {/* ── SEC 01 ／ THE LEDGER ─────────────────────────────── */}

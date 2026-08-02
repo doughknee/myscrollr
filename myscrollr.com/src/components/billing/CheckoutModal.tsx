@@ -320,7 +320,7 @@ function OrderSummary({
         </p>
         <p className="text-xs text-base-content/40 mt-0.5">
           {isLifetime
-            ? 'One-time payment — permanent access'
+            ? 'One-time payment · permanent access'
             : `${plan.interval === 'annual' ? 'Annual' : 'Monthly'} billing`}
         </p>
       </div>
@@ -328,7 +328,7 @@ function OrderSummary({
       <div className="border-t border-base-content/10 pt-4">
         <div className="flex items-baseline justify-between">
           <span className="text-xs text-base-content/50">
-            {isLifetime ? 'Lifetime Access' : `${plan.name} — ${plan.interval}`}
+            {isLifetime ? 'Lifetime Access' : `${plan.name} · ${plan.interval}`}
           </span>
           <span className="text-sm font-semibold text-base-content">
             {amountLabel}

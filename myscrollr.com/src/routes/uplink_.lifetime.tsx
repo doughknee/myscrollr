@@ -19,7 +19,7 @@ export const Route = createFileRoute('/uplink_/lifetime')({
     seo({
       title: 'Scrollr Lifetime Ultimate: Founding Members',
       description:
-        'One payment, permanent Uplink Ultimate access — unlimited widgets, webhooks, data export, and API access forever. Only 128 founding member slots available.',
+        'One payment, permanent Uplink Ultimate access: unlimited widgets, priority support, and early access, forever. Only 128 founding member slots available.',
       path: '/uplink/lifetime',
       image: 'https://myscrollr.com/og/uplink.png',
       type: 'product',
@@ -189,18 +189,18 @@ function LifetimePage() {
                 className="m-0 mb-10 max-w-[480px] text-[15.5px] leading-relaxed text-base-content/60 [text-wrap:pretty]"
               >
                 Lifetime members get permanent Uplink Ultimate access with a
-                single payment — unlimited widgets at once, webhooks, data
-                export, and API access, forever. No renewals, no tiers to think
-                about. Only 128 founding member slots will ever exist.
+                single payment: unlimited widgets at once, priority support, and
+                early access, forever. No renewals, no tiers to think about.
+                Only 128 founding member slots will ever exist.
               </motion.p>
 
               {/* Feature list */}
               <motion.div {...riseIn(4)} className="space-y-3">
                 <Feature>
-                  Permanent Uplink Ultimate access — one payment, no renewals
+                  Permanent Uplink Ultimate access. One payment, no renewals.
                 </Feature>
                 <Feature>Unlimited widgets at once</Feature>
-                <Feature>Webhooks, data export & API access</Feature>
+                <Feature>Early access to new widgets and features</Feature>
                 <Feature>Unlimited items inside every widget</Feature>
                 <Feature>Founding member badge & priority support</Feature>
                 <Feature>Early access to new features & widgets</Feature>
@@ -265,10 +265,10 @@ function LifetimePage() {
                       Everything Ultimate has. Forever.
                     </p>
                     <p className="m-0 text-[11px] leading-relaxed text-base-content/50">
-                      Every Ultimate feature — unlimited widgets at once,
-                      webhooks, data export, API access, priority support —
-                      permanently included. Future Ultimate features land in
-                      your account automatically.
+                      Every Ultimate feature, permanently included: unlimited
+                      widgets at once, priority support, and early access.
+                      Future Ultimate features land in your account
+                      automatically.
                     </p>
                   </div>
 

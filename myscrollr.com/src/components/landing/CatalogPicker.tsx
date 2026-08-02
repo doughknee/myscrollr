@@ -90,7 +90,7 @@ export function CatalogPicker() {
             <span className="text-primary">Watch the bar change.</span>
           </h2>
           <p className="m-0 mb-1.5 max-w-[400px] text-[15px] text-base-content/60 [text-wrap:pretty]">
-            Start with the hits — the full catalog is one click away. Everything
+            Start with the hits. The full catalog is one click away. Everything
             you add shows up in the bar below, immediately.
           </p>
         </motion.div>
@@ -153,7 +153,7 @@ export function CatalogPicker() {
               {used} RUNNING ▓ UPLINK TERRITORY
             </span>
             <span className="min-w-0 flex-[1_1_260px] text-sm text-base-content/75">
-              This is what Uplink feels like — 6, 12, or unlimited slots. From
+              This is what Uplink feels like: 6, 12, or unlimited slots. From
               $6.67/mo, 7-day free trial.
             </span>
             <Link
