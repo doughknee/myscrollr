@@ -39,7 +39,7 @@ export function ClosingCta() {
           <h2 className="type-display m-0 text-[clamp(44px,6vw,84px)]">
             Put it on
             <br />
-            your desktop.
+            <span className="type-outline">your desktop.</span>
           </h2>
           <p className="m-0 mt-[18px] font-mono text-base-content/60">
             three slots free, forever · nothing between you and the download
