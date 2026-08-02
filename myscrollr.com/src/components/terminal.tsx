@@ -154,9 +154,16 @@ export function DeparturesRow({
           {label}
         </span>
         {tag != null && (
-          <span className="rounded-[3px] border border-primary/40 px-2 py-[3px] font-mono text-[10px] tracking-[0.12em] text-primary">
+          // Tags (YOURS) mount client-side after platform detection —
+          // pop in with a spring instead of blinking into place.
+          <motion.span
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 20 }}
+            className="rounded-[3px] border border-primary/40 px-2 py-[3px] font-mono text-[10px] tracking-[0.12em] text-primary"
+          >
             {tag}
-          </span>
+          </motion.span>
         )}
         {meta != null && (
           <span className="text-sm text-base-content/55">{meta}</span>

@@ -125,10 +125,23 @@ function LegalPage() {
                       type="button"
                       onClick={() => handleDocChange(doc.slug)}
                       aria-current={isActive || undefined}
-                      className={`grid w-full cursor-pointer grid-cols-[64px_1fr] items-baseline gap-x-4 gap-y-1 border-t border-hairline-minor px-3 py-5 text-left transition-colors duration-150 sm:grid-cols-[84px_1fr_auto] ${
+                      className={`relative grid w-full cursor-pointer grid-cols-[64px_1fr] items-baseline gap-x-4 gap-y-1 border-t border-hairline-minor px-3 py-5 text-left transition-colors duration-150 sm:grid-cols-[84px_1fr_auto] ${
                         isActive ? 'bg-primary/5' : 'hover:bg-primary/5'
                       }`}
                     >
+                      {/* Emerald edge slides to the doc being read */}
+                      {isActive && (
+                        <motion.span
+                          aria-hidden="true"
+                          layoutId="legal-active-doc"
+                          className="absolute bottom-0 left-0 top-0 w-[2px] bg-primary"
+                          transition={{
+                            type: 'spring',
+                            stiffness: 450,
+                            damping: 38,
+                          }}
+                        />
+                      )}
                       <span
                         className={`font-mono text-xs ${
                           isActive ? 'text-primary' : 'text-base-content/40'

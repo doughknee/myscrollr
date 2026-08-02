@@ -380,7 +380,13 @@ function ReleaseRow({
   )
 
   return (
-    <li className="border-b border-hairline-minor">
+    <motion.li
+      initial={{ opacity: 0, y: 10 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ duration: 0.35, ease: EASE }}
+      className="border-b border-hairline-minor"
+    >
       {/* Whole-row click expands; the version button carries the a11y
           contract (aria-expanded + keyboard), the RELEASE link opts out. */}
       <div
@@ -496,7 +502,7 @@ function ReleaseRow({
           </motion.div>
         ) : null}
       </AnimatePresence>
-    </li>
+    </motion.li>
   )
 }
 

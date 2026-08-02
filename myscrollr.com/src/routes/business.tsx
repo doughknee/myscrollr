@@ -392,10 +392,14 @@ function AudiencesSection() {
     <section className="border-b border-hairline">
       <TerminalContainer>
         <SectionRow tag="SEC 01 ／ WHO DEPLOYS THIS" />
-        <motion.div {...reveal()} className="pb-8 pt-2">
-          {AUDIENCES.map((a) => (
-            <div
+        <div className="pb-8 pt-2">
+          {AUDIENCES.map((a, i) => (
+            <motion.div
               key={a.tag}
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ duration: 0.45, ease: EASE, delay: i * 0.06 }}
               className="grid grid-cols-1 gap-2 border-b border-hairline-minor px-2 py-[19px] sm:grid-cols-[70px_260px_1fr] sm:items-baseline sm:gap-5"
             >
               <span
@@ -412,9 +416,9 @@ function AudiencesSection() {
               <span className="text-sm text-base-content/60 [text-wrap:pretty]">
                 {a.copy}
               </span>
-            </div>
+            </motion.div>
           ))}
-        </motion.div>
+        </div>
       </TerminalContainer>
     </section>
   )
@@ -469,13 +473,14 @@ function FaqSection() {
     <section>
       <TerminalContainer>
         <SectionRow tag="SEC 04 ／ STRAIGHT ANSWERS" />
-        <motion.div
-          {...reveal()}
-          className="grid grid-cols-1 gap-x-12 pb-10 pt-3 md:grid-cols-2"
-        >
-          {FAQS.map((f) => (
-            <div
+        <div className="grid grid-cols-1 gap-x-12 pb-10 pt-3 md:grid-cols-2">
+          {FAQS.map((f, i) => (
+            <motion.div
               key={f.num}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ duration: 0.45, ease: EASE, delay: (i % 2) * 0.08 }}
               className="border-b border-hairline-minor px-1 py-[26px]"
             >
               <div className="mb-[9px] flex items-baseline gap-3.5">
@@ -485,9 +490,9 @@ function FaqSection() {
               <p className="m-0 pl-[34px] text-[14.5px] leading-[1.65] text-base-content/60 [text-wrap:pretty]">
                 {f.a}
               </p>
-            </div>
+            </motion.div>
           ))}
-        </motion.div>
+        </div>
       </TerminalContainer>
     </section>
   )

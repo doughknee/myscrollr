@@ -167,36 +167,57 @@ export function DownloadPage({
           {/* -mt-px collapses the first row's border-t into the
               SectionRow's border-b so hairlines never double. */}
           <div className="-mt-px pb-4">
-            <DeparturesRow
-              index="01"
-              label="macOS"
-              tag={detected === 'macos' ? 'YOURS' : undefined}
-              meta={
-                <span className="font-mono text-xs text-base-content/45">
-                  {['.DMG', getDownloadInfo('macos').size, 'APPLE SILICON']
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              }
-              action="DOWNLOAD ↓"
-              onClick={() => triggerDownload('macos')}
-            />
-            <DeparturesRow
-              index="02"
-              label="Windows"
-              tag={detected === 'windows' ? 'YOURS' : undefined}
-              meta={
-                <span className="font-mono text-xs text-base-content/45">
-                  {['SETUP .EXE', getDownloadInfo('windows').size, 'X64']
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              }
-              action="DOWNLOAD ↓"
-              onClick={() => triggerDownload('windows')}
-            />
+            {/* Platform rows cascade in */}
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ duration: 0.45, ease: EASE }}
+            >
+              <DeparturesRow
+                index="01"
+                label="macOS"
+                tag={detected === 'macos' ? 'YOURS' : undefined}
+                meta={
+                  <span className="font-mono text-xs text-base-content/45">
+                    {['.DMG', getDownloadInfo('macos').size, 'APPLE SILICON']
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                }
+                action="DOWNLOAD ↓"
+                onClick={() => triggerDownload('macos')}
+              />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ duration: 0.45, ease: EASE, delay: 0.08 }}
+            >
+              <DeparturesRow
+                index="02"
+                label="Windows"
+                tag={detected === 'windows' ? 'YOURS' : undefined}
+                meta={
+                  <span className="font-mono text-xs text-base-content/45">
+                    {['SETUP .EXE', getDownloadInfo('windows').size, 'X64']
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                }
+                action="DOWNLOAD ↓"
+                onClick={() => triggerDownload('windows')}
+              />
+            </motion.div>
             {/* Linux: three format actions, so not a single DeparturesRow. */}
-            <div className="flex flex-wrap items-center justify-between gap-5 border-t border-hairline px-3 py-6">
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ duration: 0.45, ease: EASE, delay: 0.16 }}
+              className="flex flex-wrap items-center justify-between gap-5 border-t border-hairline px-3 py-6"
+            >
               <span className="flex flex-wrap items-baseline gap-5">
                 <span className="font-mono text-xs text-base-content/40">
                   ↳ 03
@@ -205,9 +226,14 @@ export function DownloadPage({
                   Linux
                 </span>
                 {detected === 'linux' && (
-                  <span className="rounded-[3px] border border-primary/40 px-2 py-[3px] font-mono text-[10px] tracking-[0.12em] text-primary">
+                  <motion.span
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 420, damping: 20 }}
+                    className="rounded-[3px] border border-primary/40 px-2 py-[3px] font-mono text-[10px] tracking-[0.12em] text-primary"
+                  >
                     YOURS
-                  </span>
+                  </motion.span>
                 )}
                 <span className="font-mono text-xs text-base-content/45">
                   X86_64
@@ -215,17 +241,19 @@ export function DownloadPage({
               </span>
               <span className="flex flex-wrap gap-2">
                 {LINUX_FORMATS.map(({ format, label }) => (
-                  <button
+                  <motion.button
                     key={format}
                     type="button"
                     onClick={() => triggerDownload('linux', format)}
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                     className="cursor-pointer whitespace-nowrap rounded-[4px] border border-hairline px-4 py-[9px] font-mono text-xs tracking-[0.08em] text-primary transition-colors hover:border-primary max-sm:py-3"
                   >
                     {label} ↓
-                  </button>
+                  </motion.button>
                 ))}
               </span>
-            </div>
+            </motion.div>
           </div>
         </TerminalContainer>
       </section>

@@ -45,10 +45,20 @@ export const Route = createFileRoute('/uplink_/lifetime')({
 // ── Feature line ────────────────────────────────────────────────
 function Feature({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3">
+    <motion.div
+      variants={{
+        hidden: { opacity: 0, x: -10 },
+        show: {
+          opacity: 1,
+          x: 0,
+          transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] },
+        },
+      }}
+      className="flex items-center gap-3"
+    >
       <Check size={14} className="shrink-0 text-warning" />
       <span className="text-[13px] text-base-content/60">{children}</span>
-    </div>
+    </motion.div>
   )
 }
 
@@ -195,7 +205,17 @@ function LifetimePage() {
               </motion.p>
 
               {/* Feature list */}
-              <motion.div {...riseIn(4)} className="space-y-3">
+              <motion.div
+                initial="hidden"
+                animate="show"
+                variants={{
+                  hidden: {},
+                  show: {
+                    transition: { delayChildren: 0.35, staggerChildren: 0.07 },
+                  },
+                }}
+                className="space-y-3"
+              >
                 <Feature>
                   Permanent Uplink Ultimate access. One payment, no renewals.
                 </Feature>

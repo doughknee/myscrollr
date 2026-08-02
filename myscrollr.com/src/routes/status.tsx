@@ -9,6 +9,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
+import { AnimateNumber } from 'motion-plus/react'
 import type { ReactNode } from 'react'
 import { seo } from '@/lib/seo'
 import { breadcrumbs, organization } from '@/lib/structured-data'
@@ -355,7 +356,14 @@ function StatusPage() {
               detail="Active connections"
               right={
                 <span className="font-mono text-sm text-base-content">
-                  {viewers !== null ? viewers : '—'}
+                  {/* Live value rolls odometer-style on refresh */}
+                  {viewers !== null ? (
+                    <AnimateNumber style={{ verticalAlign: '0.055em' }}>
+                      {viewers}
+                    </AnimateNumber>
+                  ) : (
+                    '—'
+                  )}
                 </span>
               }
             />
@@ -457,7 +465,13 @@ function LedgerRow({
   right: ReactNode
 }) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-hairline-minor px-2 py-[15px] sm:grid-cols-[110px_220px_minmax(0,1fr)_auto] sm:gap-x-5">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ duration: 0.35, ease: EASE }}
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-hairline-minor px-2 py-[15px] sm:grid-cols-[110px_220px_minmax(0,1fr)_auto] sm:gap-x-5"
+    >
       <span className="hidden font-mono text-[11px] tracking-[0.1em] text-base-content/40 sm:block">
         {code}
       </span>
@@ -473,7 +487,7 @@ function LedgerRow({
         {detail}
       </span>
       <span className="justify-self-end">{right}</span>
-    </div>
+    </motion.div>
   )
 }
 
