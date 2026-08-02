@@ -8,7 +8,10 @@ export function SupportFAQ() {
   return (
     <section id="faq" className="border-b border-hairline">
       <TerminalContainer>
-        <SectionRow tag="SEC 01 ／ COMMON QUESTIONS" />
+        <SectionRow
+          tag="SEC 01 ／ COMMON QUESTIONS"
+          stat={`${FAQ_ITEMS.length} ANSWERS`}
+        />
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -19,15 +22,23 @@ export function SupportFAQ() {
           {FAQ_ITEMS.map((f, i) => (
             <div
               key={f.question}
-              className="border-b border-hairline-minor px-1 py-[26px]"
+              className="group relative overflow-hidden border-b border-hairline-minor px-4 pb-8 pt-12 transition-colors duration-150 hover:bg-primary/5"
             >
-              <div className="mb-2 flex items-baseline gap-3.5">
-                <span className="font-mono text-xs text-primary">
+              {/* Oversized ghost numeral — same vocabulary as the
+                  landing QUICK ANSWERS cells */}
+              <div
+                aria-hidden="true"
+                className="type-display type-ghost pointer-events-none absolute -top-2 right-1 select-none text-[64px] leading-none"
+              >
+                {String(i + 1).padStart(2, '0')}
+              </div>
+              <h3 className="type-display relative m-0 mb-3 max-w-[86%] text-[clamp(17px,1.4vw,21px)]">
+                <span className="mr-3 font-mono text-xs font-normal tracking-[0.1em] text-primary">
                   Q.{String(i + 1).padStart(2, '0')}
                 </span>
-                <span className="text-[16.5px] font-bold">{f.question}</span>
-              </div>
-              <p className="m-0 pl-[34px] text-[14.5px] leading-[1.65] text-base-content/60 [text-wrap:pretty]">
+                {f.question}
+              </h3>
+              <p className="relative m-0 text-[14.5px] leading-[1.65] text-base-content/60 [text-wrap:pretty]">
                 {f.answer}
               </p>
             </div>

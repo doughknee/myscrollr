@@ -106,7 +106,7 @@ export function SupportContactForm() {
     <section id="contact" className="scroll-mt-24 border-b border-hairline">
       <TerminalContainer>
         <SectionRow tag="SEC 04 ／ OPEN A TICKET" />
-        <div className="pb-14 pt-8">
+        <div className="mx-auto max-w-[760px] pb-14 pt-8">
           <p className="mb-8 max-w-[480px] text-[14.5px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
             We read every message. Replies usually arrive within 1-2 business
             days.
@@ -123,7 +123,7 @@ export function SupportContactForm() {
           ) : (
             <form
               onSubmit={handleSubmit}
-              className="flex max-w-[760px] flex-col gap-5 rounded-[8px] border border-hairline bg-panel p-6 sm:p-8"
+              className="flex flex-col gap-5 rounded-[8px] border border-hairline bg-panel p-6 sm:p-8"
               noValidate
             >
               {/* Name + email row. Email is required for both flows; name is optional. */}
