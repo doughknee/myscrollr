@@ -237,16 +237,29 @@ function scrollToForm() {
    wears one of the white-label demo brands.
    ══════════════════════════════════════════════════════════════════ */
 
-const FANOUT_MONITORS = [
-  { label: 'SCROLLR', accent: '#34d399', delay: 0.4 },
-  { label: 'ACME CAPITAL', accent: '#00d4ff', delay: 0.55 },
-  { label: 'THE DUGOUT', accent: '#fbbf24', delay: 0.7 },
-  { label: 'NOVAX', accent: '#a855f7', delay: 0.85 },
-] as const
+// prettier-ignore
+const FANOUT_MONITORS: ReadonlyArray<{
+  id: BrandId
+  label: string
+  accent: string
+  delay: number
+  sample: string
+}> = [
+  { id: 'scrollr', label: 'SCROLLR', accent: '#34d399', delay: 0.4, sample: 'AAPL $232.14 ▲+1.2%' },
+  { id: 'acme', label: 'ACME CAPITAL', accent: '#00d4ff', delay: 0.55, sample: 'SPY $612.40 ▲+0.4%' },
+  { id: 'dugout', label: 'THE DUGOUT', accent: '#fbbf24', delay: 0.7, sample: 'NYY 5 - 3 BOS · ▲7' },
+  { id: 'novax', label: 'NOVAX', accent: '#a855f7', delay: 0.85, sample: 'BTC/USDT $118,240 ▲' },
+]
 
-function DeploymentFanout() {
+function DeploymentFanout({
+  brand,
+  onSelect,
+}: {
+  brand: BrandId
+  onSelect: (id: BrandId) => void
+}) {
   return (
-    <div className="relative h-[340px] w-[340px] sm:h-[400px] sm:w-[400px]">
+    <div className="relative h-[360px] w-[340px] sm:h-[420px] sm:w-[560px] lg:w-[680px]">
       {/* Center pulse rings */}
       {[0, 1].map((i) => (
         <motion.div
@@ -268,10 +281,13 @@ function DeploymentFanout() {
       <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-5 p-3">
         {FANOUT_MONITORS.map((m) => (
           <MonitorTile
-            key={m.label}
+            key={m.id}
             label={m.label}
             accent={m.accent}
             delay={m.delay}
+            sample={m.sample}
+            active={brand === m.id}
+            onClick={() => onSelect(m.id)}
           />
         ))}
       </div>
@@ -288,16 +304,6 @@ function DeploymentFanout() {
           <span className="animate-pulse-dot absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary" />
         </div>
       </motion.div>
-
-      {/* Caption — anchors the visual to the 'fleet' idea */}
-      <motion.span
-        className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-[3px] border border-hairline bg-panel px-3 py-1 font-mono text-[9px] uppercase tracking-[0.14em] text-base-content/45"
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1.3, duration: 0.5, ease: EASE }}
-      >
-        ONE PLATFORM · MANY DEPLOYMENTS
-      </motion.span>
     </div>
   )
 }
@@ -306,18 +312,32 @@ function MonitorTile({
   label,
   accent,
   delay,
+  sample,
+  active,
+  onClick,
 }: {
   label: string
   accent: string
   delay: number
+  sample: string
+  active: boolean
+  onClick: () => void
 }) {
   return (
-    <motion.div
+    <motion.button
+      type="button"
+      aria-pressed={active}
+      aria-label={`Switch the white-label demo to ${label}`}
+      onClick={onClick}
       initial={{ opacity: 0, scale: 0.85 }}
-      animate={{ opacity: 1, scale: 1 }}
+      animate={{ opacity: active ? 1 : 0.75, scale: active ? 1.02 : 1 }}
       transition={{ delay, duration: 0.5, ease: EASE }}
-      className="relative overflow-hidden rounded-[8px] border bg-panel"
-      style={{ borderColor: `${accent}30` }}
+      className="relative flex cursor-pointer flex-col items-stretch justify-start overflow-hidden rounded-[8px] border bg-panel text-left transition-shadow"
+      style={{
+        borderColor: active ? accent : `${accent}30`,
+        boxShadow: active ? `0 0 30px ${accent}30` : 'none',
+        background: active ? `${accent}0a` : undefined,
+      }}
     >
       {/* Title row — mono brand tag */}
       <div className="flex items-center justify-between border-b border-hairline-minor px-2.5 py-1.5">
@@ -352,15 +372,14 @@ function MonitorTile({
           className="animate-pulse-dot h-1 w-1 rounded-full"
           style={{ background: accent }}
         />
-        {[1, 2, 3].map((i) => (
-          <span
-            key={i}
-            className="h-1.5 rounded-[1px]"
-            style={{ background: `${accent}25`, width: 12 + i * 4 }}
-          />
-        ))}
+        <span
+          className="truncate font-mono text-[9px] font-medium"
+          style={{ color: active ? accent : `${accent}99` }}
+        >
+          {sample}
+        </span>
       </div>
-    </motion.div>
+    </motion.button>
   )
 }
 
@@ -408,7 +427,7 @@ function CapabilitiesSection() {
         <SectionRow tag="SEC 02 ／ WHAT A DEPLOYMENT INCLUDES" />
         <motion.div
           {...reveal()}
-          className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))]"
+          className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
         >
           {CAPABILITIES.map((c) => (
             <div
@@ -919,10 +938,17 @@ function BusinessPage() {
         }
       />
 
-      {/* Kept hero visual — the 2x2 branded-monitors fan-out */}
+      {/* Kept hero visual — the 2x2 branded-monitors fan-out, wired to
+          the same brand state as the switcher and the pinned bar. */}
       <section className="border-b border-hairline">
-        <TerminalContainer className="flex justify-center py-16">
-          <DeploymentFanout />
+        <TerminalContainer>
+          <SectionRow
+            tag="SEC 00 ／ ONE PLATFORM, MANY DEPLOYMENTS"
+            stat="CLICK A SCREEN — THE BAR BELOW REBRANDS"
+          />
+          <div className="flex justify-center py-12">
+            <DeploymentFanout brand={brand} onSelect={setBrand} />
+          </div>
         </TerminalContainer>
       </section>
 
