@@ -39,12 +39,8 @@ function HeroActions() {
     setInfo(detectPlatform())
   }, [])
 
-  // Mono-voice separator: facts get middots on this site, em dashes are
-  // for prose payoffs.
   const label =
-    info && !info.isMobile
-      ? `Download for ${info.label} · free`
-      : 'Download Scrollr · free'
+    info && !info.isMobile ? `Download for ${info.label}` : 'Download Scrollr'
 
   const handleDownload = () => {
     const p = info ?? detectPlatform()
@@ -63,9 +59,13 @@ function HeroActions() {
         <button
           type="button"
           onClick={handleDownload}
-          className="cursor-pointer rounded-[4px] bg-primary px-8 py-4 font-bold text-primary-content shadow-[0_0_60px_rgba(52,211,153,.18)] transition-all duration-150 hover:brightness-110 active:scale-[0.98]"
+          className="relative cursor-pointer rounded-[4px] bg-primary px-8 py-4 font-bold text-primary-content shadow-[0_0_60px_rgba(52,211,153,.18)] transition-all duration-150 hover:brightness-110 active:scale-[0.98]"
         >
           {label}
+          {/* Corner sticker — amber like the site's other attention tags */}
+          <span className="absolute -right-2.5 -top-2.5 rotate-[7deg] rounded-[3px] bg-warning px-2 py-0.5 font-mono text-[10px] font-semibold tracking-[0.14em] text-[#101018] shadow-[0_2px_8px_rgba(0,0,0,.35)]">
+            FREE
+          </span>
         </button>
         <button
           type="button"
