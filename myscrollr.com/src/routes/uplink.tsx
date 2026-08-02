@@ -130,26 +130,6 @@ const STATIC_FAQ = [
       'No. Every plan holds unlimited items inside each widget — track 5 or 500 symbols in your Stocks widget, follow every source in your news feeds, sync every fantasy league you play. Your plan only sets how many widgets run at once.',
   },
   {
-    question: 'What are custom RSS feeds?',
-    answer:
-      'Beyond the curated news catalog, the Custom RSS widget lets you paste any RSS or Atom URL — niche industry sources, personal blogs, or company news. It is included on every plan, holds unlimited sources, and counts as one widget.',
-  },
-  {
-    question: 'What sports leagues are included?',
-    answer:
-      'All 14 leagues are available on every plan — NFL, NBA, MLB, NHL, MLS, Premier League, La Liga, Champions League, World Cup, F1, UFC, AFL, plus college football and basketball. Each league is its own widget, so you add exactly the ones you follow and scores stream in live.',
-  },
-  {
-    question: 'How many fantasy leagues can I connect?',
-    answer:
-      'As many as you play. Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. The Yahoo Fantasy widget is included on every plan — even Free — and syncs unlimited leagues across every sport.',
-  },
-  {
-    question: 'What is site filtering?',
-    answer:
-      'Site filtering controls where the feed bar appears. Every tier includes blacklist filtering — hide the bar on specific displays. Pro and Ultimate add whitelist mode on top, so you can restrict the bar to only the displays you choose.',
-  },
-  {
     question: 'What does early access include?',
     answer:
       'Every paid tier unlocks early access to new features, channels, and UI updates before they roll out to free users. This includes beta channels, experimental feed modes, and new dashboard widgets. You get to try everything first and provide feedback that shapes the final release.',
@@ -879,7 +859,6 @@ function UplinkPage() {
             </motion.div>
           )
         })()}
-
       {/* ── Plan Change Error Banner ──────────────────────────── */}
       {planChangeError && (
         <motion.div
@@ -902,7 +881,6 @@ function UplinkPage() {
           </button>
         </motion.div>
       )}
-
       {/* ================================================================
           HEADER
           ================================================================ */}
@@ -939,7 +917,6 @@ function UplinkPage() {
           </div>
         }
       />
-
       {/* ================================================================
           PLANS — 4 cards / lifetime card (AnimatePresence swap)
           ================================================================ */}
@@ -1083,7 +1060,6 @@ function UplinkPage() {
                           MOST POPULAR
                         </div>
                       )}
-
                       {/* Name + tagline */}
                       <div className="font-display text-xl font-extrabold uppercase tracking-[0.02em]">
                         {p.name}
