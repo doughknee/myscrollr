@@ -30,15 +30,9 @@ export function PromiseSection() {
 
   return (
     <section className="relative overflow-hidden border-b border-hairline">
-      <div
-        aria-hidden="true"
-        className="type-display type-ghost pointer-events-none absolute -bottom-7 left-0 right-0 whitespace-nowrap text-center text-[clamp(80px,13vw,190px)] leading-none"
-      >
-        Zero telemetry
-      </div>
       <TerminalContainer className="relative">
         <SectionRow tag="SEC 05 ／ THE PROMISE" />
-        <div className="grid items-start gap-10 pb-[88px] pt-[52px] lg:grid-cols-[1.1fr_1fr] lg:gap-16">
+        <div className="grid items-start gap-10 pb-10 pt-[52px] lg:grid-cols-[1.1fr_1fr] lg:gap-16">
           <div>
             <h2 className="type-display m-0 mb-[18px] text-[clamp(30px,3.6vw,46px)] [text-wrap:balance]">
               Every line of code is public.
@@ -86,6 +80,16 @@ export function PromiseSection() {
           </div>
         </div>
       </TerminalContainer>
+      {/* Ghost signature — in normal flow BELOW the content (so it can
+          never cover the button or the GitHub line), sized in vw so the
+          full phrase always fits the viewport, and bled past the
+          section's bottom edge for the half-sunk look. */}
+      <div
+        aria-hidden="true"
+        className="type-display type-ghost pointer-events-none -mb-[0.2em] mt-2 select-none whitespace-nowrap text-center text-[10.5vw] leading-none"
+      >
+        Zero tracking
+      </div>
     </section>
   )
 }
