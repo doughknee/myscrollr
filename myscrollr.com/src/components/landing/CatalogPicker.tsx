@@ -63,7 +63,7 @@ export function CatalogPicker() {
     .join(' · ')
 
   return (
-    <section id="catalog" className="scroll-mt-14 border-b border-hairline">
+    <section id="catalog" className="scroll-mt-32 border-b border-hairline">
       <TerminalContainer>
         <SectionRow
           tag={`SEC 01 ／ THE CATALOG — ${widgets.length} WIDGETS & COUNTING`}

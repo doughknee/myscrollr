@@ -103,7 +103,7 @@ export function SupportContactForm() {
   }
 
   return (
-    <section id="contact" className="scroll-mt-24 border-b border-hairline">
+    <section id="contact" className="scroll-mt-32 border-b border-hairline">
       <TerminalContainer>
         <SectionRow tag="SEC 04 ／ OPEN A TICKET" />
         <div className="mx-auto max-w-[760px] pb-14 pt-8">

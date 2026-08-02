@@ -5,13 +5,16 @@ import { AnimatePresence, motion } from 'motion/react'
 import type { IdTokenClaims } from '@logto/react'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { useDemoTicker } from '@/hooks/useDemoTicker'
 import ScrollrSVG from '@/components/ScrollrSVG'
 
 /**
  * Terminal-editorial nav (design_handoff_marketing_site/README.md):
  * wordmark + mono uppercase links, current page in emerald, emerald
- * DOWNLOAD ↓ button. Static (not fixed) — the persistent demo ticker
- * bar owns the "pinned above everything" story.
+ * DOWNLOAD ↓ button. Sticky — scrolls with the page. When the demo
+ * ticker bar is pinned top the header offsets to sit beneath it; the
+ * bar keeps the "pinned above everything" story (bar z-50 > header
+ * z-40).
  *
  * Header is SSR-safe. Auth-dependent slices live inside the
  * <ClientOnly> children below (account link + auth menu, desktop and
@@ -28,6 +31,12 @@ const NAV_LINKS: Array<{ to: string; label: string }> = [
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
+  // Sticky offset: when the demo bar is pinned top, the header slots
+  // in directly beneath it — the bar stays "on top of everything".
+  // Bar height tracks density (h-12 compact / h-16 detailed).
+  const { pos, density } = useDemoTicker()
+  const stickyTop =
+    pos === 'top' ? (density === 'detailed' ? 'top-16' : 'top-12') : 'top-0'
   const drawerRef = useRef<HTMLElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
 
@@ -57,7 +66,9 @@ export default function Header() {
 
   return (
     <>
-      <header className="relative z-30 flex h-[60px] items-center justify-between border-b border-hairline bg-base-75 px-5 sm:px-8">
+      <header
+        className={`sticky z-40 flex h-[60px] items-center justify-between border-b border-hairline bg-base-75/85 backdrop-blur-xl px-5 sm:px-8 ${stickyTop}`}
+      >
         <Wordmark />
 
         {/* Desktop navigation */}

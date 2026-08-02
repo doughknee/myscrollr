@@ -169,7 +169,7 @@ function LegalPage() {
       </section>
 
       {/* ── SEC 02 ／ ON FILE ────────────────────────────────── */}
-      <section ref={panelRef} className="scroll-mt-6 border-b border-hairline">
+      <section ref={panelRef} className="scroll-mt-24 border-b border-hairline">
         <TerminalContainer>
           <SectionRow
             tag="SEC 02 ／ ON FILE"

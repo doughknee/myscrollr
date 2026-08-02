@@ -176,7 +176,7 @@ function RootLayout() {
   }, [pathname])
 
   const hasDemoBar = showsDemoBar(pathname)
-  const { theme: demoFamily, density } = useDemoTicker()
+  const { theme: demoFamily, density, pos } = useDemoTicker()
 
   // Site-wide theme family: picking a family in MAKE IT YOURS re-skins
   // the whole site (the [data-theme-family] token blocks in styles.css).
@@ -200,6 +200,14 @@ function RootLayout() {
               ? density === 'detailed'
                 ? 'pb-[88px]'
                 : 'pb-[72px]'
+              : ''
+          } ${
+            // Top-pinned bar is fixed; pad the page so it doesn't sit
+            // on top of the (sticky) header at scroll 0.
+            hasDemoBar && pos === 'top'
+              ? density === 'detailed'
+                ? 'pt-16'
+                : 'pt-12'
               : ''
           }`}
         >

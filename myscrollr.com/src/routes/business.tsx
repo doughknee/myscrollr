@@ -522,7 +522,7 @@ function ContactSection() {
     <section
       ref={sectionRef}
       id="contact-form"
-      className="relative scroll-mt-24 overflow-clip border-b border-hairline"
+      className="relative scroll-mt-32 overflow-clip border-b border-hairline"
     >
       <ConvergenceBackdrop
         isInView={isInView}
