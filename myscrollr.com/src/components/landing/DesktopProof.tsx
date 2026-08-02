@@ -16,8 +16,8 @@ const srcset = (theme: 'dark' | 'light') =>
   `/marketing/desktop-home-${theme}@1x.webp 1600w, /marketing/desktop-home-${theme}@2x.webp 2940w`
 const SIZES = '(max-width: 1023px) 100vw, 990px'
 const SHOT_TIME: Record<'dark' | 'light', string> = {
-  dark: '11:27 AM',
-  light: '11:29 AM',
+  dark: '2:37 PM',
+  light: '2:37 PM',
 }
 
 const ANNOTATIONS: ReadonlyArray<[string, string]> = [
@@ -76,12 +76,13 @@ export function DesktopProof() {
               </motion.div>
             ))}
           </div>
+          {/* The shot IS a full desktop — no card chrome around it,
+              just the image with a hairline edge and the FIG caption. */}
           <motion.div
             initial={{ opacity: 0, y: 32, scale: 0.985 }}
             whileInView={{ opacity: 1, y: 0, scale: 1 }}
             viewport={{ once: true, margin: '-80px' }}
             transition={{ duration: 0.7, ease: EASE }}
-            className="rounded-[8px] border border-hairline bg-panel p-4"
           >
             <img
               src={`/marketing/desktop-home-${theme}@1x.webp`}
@@ -92,7 +93,7 @@ export function DesktopProof() {
               loading="lazy"
               decoding="async"
               alt="Scrollr on a real macOS desktop: the live ticker pinned along the top of the screen showing weather, MLB and MLS games, markets, and a timer, with the Home window open showing scores, markets, and Kalshi"
-              className="block h-auto w-full rounded-[4px]"
+              className="block h-auto w-full rounded-[8px] border border-hairline"
             />
             <div className="flex flex-wrap justify-between gap-2 px-1 pt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-base-content/45">
               <span>{`FIG. 01 — MACOS · SUN AUG 2, ${SHOT_TIME[theme]}`}</span>

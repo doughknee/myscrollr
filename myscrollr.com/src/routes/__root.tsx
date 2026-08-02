@@ -202,7 +202,7 @@ function RootLayout() {
     <RootDocument>
       <MotionConfig reducedMotion="user">
         <div
-          className={`min-h-dvh relative overflow-x-clip bg-base-75 scanlines ${
+          className={`min-h-dvh relative overflow-x-clip bg-base-75 scanlines motion-safe:transition-[padding] motion-safe:duration-300 motion-safe:ease-out ${
             hasDemoBar
               ? density === 'detailed'
                 ? 'pb-[88px]'

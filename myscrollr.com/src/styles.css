@@ -471,6 +471,24 @@
   }
 }
 
+/* StepsGrid: the ghost numeral flips to emerald when its cell is
+   hovered. Lives here (unlayered, next to .type-ghost) because the
+   ghost rules above beat layered Tailwind hover utilities. */
+.steps-cell .type-ghost {
+  transition:
+    color 0.15s ease,
+    -webkit-text-stroke-color 0.15s ease;
+}
+.steps-cell:hover .type-ghost {
+  color: var(--color-primary);
+}
+@supports (-webkit-text-stroke: 1px black) {
+  .steps-cell:hover .type-ghost {
+    color: transparent;
+    -webkit-text-stroke-color: var(--color-primary);
+  }
+}
+
 /* Demo ticker bar marquee. Chips are duplicated 2x by the component, so
    -50% loops seamlessly. Paused on hover; the global reduced-motion
    override freezes it at 0 (static chips remain visible). */

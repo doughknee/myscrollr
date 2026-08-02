@@ -105,7 +105,7 @@ export default function DemoTickerBar({
       role="presentation"
       aria-hidden="true"
       data-demo-ticker-bar={pos}
-      className={`fixed left-0 right-0 z-50 flex items-center backdrop-blur-[14px] ${
+      className={`fixed left-0 right-0 z-50 flex items-center backdrop-blur-[14px] motion-safe:transition-[height] motion-safe:duration-300 motion-safe:ease-out ${
         detailed ? 'h-16' : 'h-12'
       } ${pos === 'bottom' ? 'bottom-0' : 'top-0'}`}
       style={barStyle}

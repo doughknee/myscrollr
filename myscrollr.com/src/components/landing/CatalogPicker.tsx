@@ -75,18 +75,36 @@ export function CatalogPicker() {
             </>
           }
           stat={
-            used <= 3 ? (
-              <span className="text-primary">
-                {`SLOTS ${'▓'.repeat(used)}${'░'.repeat(3 - used)} `}
-                <CountUp value={used} />
-                {'/3 FREE'}
-              </span>
-            ) : (
-              <span className="text-warning">
-                <CountUp value={used} />
-                {' RUNNING · UPLINK TERRITORY'}
-              </span>
-            )
+            // Crossfade between the free-slots meter and the amber
+            // over-limit stat instead of hard-swapping mid-glance.
+            <AnimatePresence mode="wait" initial={false}>
+              {used <= 3 ? (
+                <motion.span
+                  key="free"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18, ease: EASE }}
+                  className="inline-block text-primary"
+                >
+                  {`SLOTS ${'▓'.repeat(used)}${'░'.repeat(3 - used)} `}
+                  <CountUp value={used} />
+                  {'/3 FREE'}
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="over"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18, ease: EASE }}
+                  className="inline-block text-warning"
+                >
+                  <CountUp value={used} />
+                  {' RUNNING · UPLINK TERRITORY'}
+                </motion.span>
+              )}
+            </AnimatePresence>
           }
         />
         <motion.div
@@ -109,15 +127,18 @@ export function CatalogPicker() {
         <div className="pb-[18px] pt-6 font-mono text-[11px] uppercase tracking-[0.12em] text-base-content/45">
           {countLine}
         </div>
-        <AnimatePresence mode="wait" initial={false}>
+        {/* sync mode (no "wait"): the leaving block collapses while the
+            entering one expands, so the section's total height morphs
+            smoothly instead of snapping — the sections below glide. */}
+        <AnimatePresence initial={false}>
           {!expanded ? (
             <motion.div
               key="featured"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transition: { duration: 0.15 } }}
-              transition={{ duration: 0.25 }}
-              className="flex flex-wrap gap-2 pb-5"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.4, ease: EASE }}
+              className="flex flex-wrap gap-2 overflow-hidden pb-5"
             >
               {featured.map((w) => (
                 <WidgetPill
@@ -141,12 +162,25 @@ export function CatalogPicker() {
               key="full"
               initial="hidden"
               animate="show"
-              exit={{ opacity: 0, transition: { duration: 0.15 } }}
+              exit="exit"
               variants={{
-                hidden: {},
-                show: { transition: { staggerChildren: 0.05 } },
+                hidden: { opacity: 0, height: 0 },
+                show: {
+                  opacity: 1,
+                  height: 'auto',
+                  transition: {
+                    duration: 0.4,
+                    ease: EASE,
+                    staggerChildren: 0.05,
+                  },
+                },
+                exit: {
+                  opacity: 0,
+                  height: 0,
+                  transition: { duration: 0.3, ease: EASE },
+                },
               }}
-              className="pb-2"
+              className="overflow-hidden pb-2"
             >
               {CATEGORY_ORDER.filter((c) => (counts[c.id] ?? 0) > 0).map(
                 (c) => (
@@ -199,23 +233,35 @@ export function CatalogPicker() {
             </motion.div>
           )}
         </AnimatePresence>
-        {used > 3 && (
-          <div className="mb-7 flex flex-wrap items-center gap-3.5 rounded-[4px] border border-dashed border-warning/40 px-[18px] py-3.5">
-            <span className="font-mono text-xs tracking-[0.1em] text-warning">
-              {used} RUNNING ▓ UPLINK TERRITORY
-            </span>
-            <span className="min-w-0 flex-[1_1_260px] text-sm text-base-content/75">
-              This is what Uplink feels like: 6, 12, or unlimited slots. From
-              $6.67/mo, 7-day free trial.
-            </span>
-            <Link
-              to="/uplink"
-              className="ml-auto font-mono text-xs font-semibold tracking-[0.1em] text-warning hover:text-warning/80"
+        {/* The upsell strip unfolds instead of popping into existence */}
+        <AnimatePresence initial={false}>
+          {used > 3 && (
+            <motion.div
+              key="upsell"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.35, ease: EASE }}
+              className="overflow-hidden"
             >
-              SEE UPLINK →
-            </Link>
-          </div>
-        )}
+              <div className="mb-7 flex flex-wrap items-center gap-3.5 rounded-[4px] border border-dashed border-warning/40 px-[18px] py-3.5">
+                <span className="font-mono text-xs tracking-[0.1em] text-warning">
+                  {used} RUNNING ▓ UPLINK TERRITORY
+                </span>
+                <span className="min-w-0 flex-[1_1_260px] text-sm text-base-content/75">
+                  This is what Uplink feels like: 6, 12, or unlimited slots.
+                  From $6.67/mo, 7-day free trial.
+                </span>
+                <Link
+                  to="/uplink"
+                  className="ml-auto font-mono text-xs font-semibold tracking-[0.1em] text-warning hover:text-warning/80"
+                >
+                  SEE UPLINK →
+                </Link>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </TerminalContainer>
     </section>
   )
@@ -250,7 +296,9 @@ function WidgetPill({
       <span className="whitespace-nowrap text-sm font-semibold text-base-content">
         {widget.name}
       </span>
-      {/* The ●/＋ pops on toggle — the pill echoes the bar updating */}
+      {/* The ●/＋ pops on toggle — the pill echoes the bar updating.
+          Fixed-width box: ● and fullwidth ＋ have different advances,
+          and letting the pill resize reflows the whole wrap row. */}
       <AnimatePresence mode="wait" initial={false}>
         <motion.span
           key={on ? 'on' : 'off'}
@@ -259,7 +307,7 @@ function WidgetPill({
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.4, opacity: 0 }}
           transition={{ duration: 0.12 }}
-          className={`font-mono text-[11px] ${on ? 'text-primary' : 'text-base-content/45'}`}
+          className={`inline-block w-3.5 text-center font-mono text-[11px] ${on ? 'text-primary' : 'text-base-content/45'}`}
         >
           {on ? '●' : '＋'}
         </motion.span>

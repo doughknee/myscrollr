@@ -217,7 +217,7 @@ export function StepsGrid({ steps }: { steps: Array<TerminalStep> }) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-60px' }}
           transition={{ duration: 0.55, ease: EASE, delay: i * 0.12 }}
-          className="border-hairline-minor px-8 pb-12 pt-10 lg:border-r lg:last:border-r-0"
+          className="steps-cell border-hairline-minor px-8 pb-12 pt-10 lg:border-r lg:last:border-r-0"
         >
           <div className="type-display type-ghost mb-[18px] text-7xl">
             {s.num}

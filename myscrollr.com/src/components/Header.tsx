@@ -89,7 +89,7 @@ export default function Header({
   return (
     <>
       <header
-        className={`sticky z-40 flex h-[60px] items-center justify-between border-b border-hairline bg-base-75/85 backdrop-blur-xl px-5 sm:px-8 ${stickyTop}`}
+        className={`sticky z-40 flex h-[60px] items-center justify-between border-b border-hairline bg-base-75/85 backdrop-blur-xl px-5 sm:px-8 motion-safe:transition-[top] motion-safe:duration-300 motion-safe:ease-out ${stickyTop}`}
       >
         <Wordmark />
 
