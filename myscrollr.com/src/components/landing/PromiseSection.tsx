@@ -88,7 +88,7 @@ export function PromiseSection() {
           half-sunk bleed off the section's bottom edge. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none -mb-[1.7vw] mt-2 select-none px-[2vw]"
+        className="pointer-events-none -mb-[0.8vw] mt-2 select-none px-[2vw]"
       >
         <svg
           className="block w-full"
