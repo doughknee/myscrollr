@@ -220,8 +220,6 @@ interface ComparisonRow {
   uplinkUp?: boolean
   proUp?: boolean
   ultimateUp?: boolean
-  /** Feature planned but not yet shipped */
-  comingSoon?: boolean
 }
 
 /**
@@ -250,58 +248,11 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
       ultimateUp: true,
     },
     {
-      label: 'Data Delivery',
-      free: 'Real-time SSE',
-      uplink: 'Real-time SSE',
-      pro: 'Real-time SSE',
-      ultimate: 'Real-time SSE',
-    },
-    {
-      label: 'Custom Alerts',
-      free: 'No',
-      uplink: 'No',
-      pro: 'Yes',
-      ultimate: 'Yes',
-      proUp: true,
-      ultimateUp: true,
-      comingSoon: true,
-    },
-    {
-      label: 'Feed Profiles',
-      free: 'No',
-      uplink: 'No',
-      pro: 'Yes',
-      ultimate: 'Yes',
-      proUp: true,
-      ultimateUp: true,
-      comingSoon: true,
-    },
-    {
-      label: 'Advanced Feed Controls',
-      free: 'No',
-      uplink: 'No',
-      pro: 'Yes',
-      ultimate: 'Yes',
-      proUp: true,
-      ultimateUp: true,
-    },
-    {
-      label: 'Data Export',
-      free: 'No',
-      uplink: 'No',
-      pro: 'No',
-      ultimate: 'CSV / JSON',
-      ultimateUp: true,
-      comingSoon: true,
-    },
-    {
-      label: 'API Access',
-      free: 'No',
-      uplink: 'No',
-      pro: 'No',
-      ultimate: 'Yes',
-      ultimateUp: true,
-      comingSoon: true,
+      label: 'Live updates',
+      free: 'Instant',
+      uplink: 'Instant',
+      pro: 'Instant',
+      ultimate: 'Instant',
     },
     {
       label: 'Early Access',
@@ -1323,11 +1274,6 @@ function UplinkPage() {
                     <span className="text-sm font-semibold text-base-content/80">
                       {row.label}
                     </span>
-                    {row.comingSoon && (
-                      <span className="rounded-[3px] border border-[#fbbf24]/35 px-1.5 py-0.5 font-mono text-[9px] tracking-[0.12em] text-[#fbbf24]">
-                        SOON
-                      </span>
-                    )}
                   </span>
                   <span className="text-center">
                     <CompareCell value={row.free} />
