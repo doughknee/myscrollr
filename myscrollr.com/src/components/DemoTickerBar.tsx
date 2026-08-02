@@ -26,6 +26,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { Ticker } from 'motion-plus/react'
 import type { CSSProperties } from 'react'
 import type { DemoChip, DemoPalette } from '@/hooks/useDemoTicker'
 import {
@@ -70,6 +71,16 @@ export default function DemoTickerBar({
   const up = override ? '#22c55e' : themePalette.up
   const down = override ? '#ef4444' : themePalette.down
   const detailed = density === 'detailed'
+
+  // Ticker measures widths client-side; the pre-mount render is a
+  // static chip run so prerendered HTML carries real content.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  // Hover pause driven explicitly (hoverFactor proved unreliable in
+  // this embed) — velocity drops to 0 while the pointer is over the
+  // chip run, matching the old CSS marquee's pause-on-hover.
+  const [hovered, setHovered] = useState(false)
 
   const [now, setNow] = useState<Date | null>(null)
   useEffect(() => {
@@ -120,15 +131,34 @@ export default function DemoTickerBar({
         </span>
       </div>
 
-      <div className="demo-marquee-viewport flex h-full flex-1 items-center overflow-hidden">
-        <div
-          className="demo-marquee"
-          style={
-            direction === 'right'
-              ? { animationDirection: 'reverse' }
-              : undefined
-          }
-        >
+      <div
+        className="flex h-full min-w-0 flex-1 items-center overflow-hidden"
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
+      >
+        {mounted ? (
+          // Motion+ Ticker: velocity matched to the old CSS marquee
+          // (measured 32px/s), sign flips for direction, 0 while
+          // hovered, respects OS reduced motion, and its reprojection
+          // renderer keeps the loop seamless.
+          <Ticker
+            items={chips.map((c, i) => (
+              <ChipCard
+                key={i}
+                chip={c}
+                remap={remap}
+                up={up}
+                down={down}
+                detailed={detailed}
+              />
+            ))}
+            velocity={hovered ? 0 : direction === 'right' ? -32 : 32}
+            gap={8}
+            className="w-full"
+          />
+        ) : (
+          // SSR + first client render: static chip run so prerendered
+          // pages carry real chip content and hydration matches.
           <ChipRun
             chips={chips}
             remap={remap}
@@ -136,15 +166,7 @@ export default function DemoTickerBar({
             down={down}
             detailed={detailed}
           />
-          {/* Duplicate copy makes the -50% loop seamless. */}
-          <ChipRun
-            chips={chips}
-            remap={remap}
-            up={up}
-            down={down}
-            detailed={detailed}
-          />
-        </div>
+        )}
       </div>
 
       <div

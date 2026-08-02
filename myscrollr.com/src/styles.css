@@ -489,21 +489,9 @@
   }
 }
 
-/* Demo ticker bar marquee. Chips are duplicated 2x by the component, so
-   -50% loops seamlessly. Paused on hover; the global reduced-motion
-   override freezes it at 0 (static chips remain visible). */
-.demo-marquee {
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-  width: max-content;
-  animation: ticker-scroll var(--marquee-duration, 45s) linear infinite;
-  will-change: transform;
-}
-
-.demo-marquee-viewport:hover .demo-marquee {
-  animation-play-state: paused;
-}
+/* Demo ticker bar scrolling is the Motion+ Ticker component now
+   (DemoTickerBar.tsx) — velocity-driven, stops on hover, respects
+   reduced motion on its own. */
 
 @keyframes pulse-dot {
   0%,
@@ -1067,21 +1055,6 @@ pre,
 /* ==========================================================================
    ANIMATIONS
    ========================================================================== */
-
-/* Ticker Scroll Animation */
-@keyframes ticker-scroll {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
-}
-
-.animate-ticker-scroll {
-  animation: ticker-scroll 40s linear infinite;
-  width: max-content;
-}
 
 /* ==========================================================================
    SCROLLBAR — Clean

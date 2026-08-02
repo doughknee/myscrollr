@@ -302,10 +302,13 @@ try {
             failures += 1
           }
 
-          if (layout.chipCount === 0 || layout.chipCount % 2 !== 0) {
+          // Motion+ Ticker clones however many chips it needs to fill
+          // the viewport (no fixed 2x duplication anymore) — assert
+          // the bar holds a non-empty chip run.
+          if (layout.chipCount === 0) {
             console.error(
               `✗ ${route.path} @ ${viewport.name} (${viewport.width}px): ` +
-                `demo bar marquee should hold a non-empty, 2x-duplicated chip run — ` +
+                `demo bar should hold a non-empty chip run — ` +
                 `chips=${layout.chipCount}`,
             )
             failures += 1
