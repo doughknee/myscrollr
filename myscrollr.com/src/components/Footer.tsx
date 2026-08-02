@@ -88,13 +88,17 @@ export default function Footer() {
           ))}
         </nav>
 
-        <div className="font-mono text-[11px] tracking-[0.1em] text-base-content/30">
+        {/* /65, not /30 — the /30 tier measures 1.92:1 in light mode,
+            failing WCAG AA for these functional links; /65 clears 4.5:1
+            in both themes (/60 measured 4.41:1 in light) while staying
+            visibly de-emphasized. */}
+        <div className="font-mono text-[11px] tracking-[0.1em] text-base-content/65">
           ZERO ADS · ZERO TELEMETRY
         </div>
       </div>
 
       <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 border-t border-hairline-minor px-5 py-4 sm:px-8">
-        <div className="font-mono text-[10px] tracking-[0.1em] text-base-content/30">
+        <div className="font-mono text-[10px] tracking-[0.1em] text-base-content/65">
           © {year} SCROLLR · OPEN SOURCE · V{LATEST_DESKTOP_VERSION}
         </div>
         <nav
@@ -105,7 +109,7 @@ export default function Footer() {
             <FooterLink
               key={l.label}
               {...l}
-              className="text-base-content/30 transition-colors hover:text-primary hover:opacity-100"
+              className="text-base-content/65 transition-colors hover:text-primary hover:opacity-100"
             />
           ))}
         </nav>

@@ -249,11 +249,14 @@ function CatalogRow({
         {widgetAbbr(widget)}
       </span>
 
-      <span className="text-base font-bold lg:whitespace-nowrap">
+      {/* On mobile the name gets its own full-width row — sharing row 1
+          with the ADD TO BAR button crushes it to ~43px at 320px and the
+          text paints through the button. */}
+      <span className="col-span-2 col-start-2 row-start-2 text-base font-bold lg:col-span-1 lg:col-start-auto lg:row-start-auto lg:whitespace-nowrap">
         {widget.name}
       </span>
 
-      <span className="col-span-2 col-start-2 row-start-2 text-[13.5px] text-base-content/50 lg:col-span-1 lg:col-start-auto lg:row-start-auto">
+      <span className="col-span-2 col-start-2 row-start-3 text-[13.5px] text-base-content/50 lg:col-span-1 lg:col-start-auto lg:row-start-auto">
         {widget.description}
       </span>
 

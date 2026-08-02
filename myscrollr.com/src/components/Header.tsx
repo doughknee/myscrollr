@@ -29,14 +29,36 @@ const NAV_LINKS: Array<{ to: string; label: string }> = [
   { to: '/business', label: 'BUSINESS' },
 ]
 
-export default function Header() {
+export default function Header({
+  barMode = 'none',
+}: {
+  /**
+   * Which fixed bar the sticky header and drawer must dodge:
+   * 'store' = the shared demo ticker bar (position/density from the
+   * store), 'fixed-bottom' = /business's always-bottom compact
+   * white-label bar, 'none' = bar-less routes.
+   */
+  barMode?: 'store' | 'fixed-bottom' | 'none'
+}) {
   const [isOpen, setIsOpen] = useState(false)
   // Sticky offset: when the demo bar is pinned top, the header slots
   // in directly beneath it — the bar stays "on top of everything".
   // Bar height tracks density (h-12 compact / h-16 detailed).
   const { pos, density } = useDemoTicker()
-  const stickyTop =
-    pos === 'top' ? (density === 'detailed' ? 'top-16' : 'top-12') : 'top-0'
+  const barTopInset = density === 'detailed' ? 'top-16' : 'top-12'
+  const barBottomInset = density === 'detailed' ? 'bottom-16' : 'bottom-12'
+  const stickyTop = barMode === 'store' && pos === 'top' ? barTopInset : 'top-0'
+  // The mobile drawer and the bar are both z-50 with the bar later in
+  // the DOM, so the bar paints on top — inset the drawer on the bar's
+  // edge so its header row / DOWNLOAD footer never sit underneath it.
+  const drawerInsets =
+    barMode === 'none'
+      ? 'top-0 bottom-0'
+      : barMode === 'fixed-bottom'
+        ? 'top-0 bottom-12'
+        : pos === 'top'
+          ? `${barTopInset} bottom-0`
+          : `top-0 ${barBottomInset}`
   const drawerRef = useRef<HTMLElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
 
@@ -93,7 +115,8 @@ export default function Header() {
 
         {/* Mobile: theme + menu button */}
         <div className="flex items-center gap-2 lg:hidden">
-          <ThemeToggle />
+          {/* 40px tap target on phones, matching the hamburger */}
+          <ThemeToggle className="max-lg:h-10 max-lg:w-10" />
           <button
             ref={menuButtonRef}
             onClick={() => setIsOpen(true)}
@@ -131,13 +154,13 @@ export default function Header() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed right-0 top-0 z-50 flex h-full w-72 flex-col border-l border-hairline bg-base-75 lg:hidden"
+              className={`fixed right-0 z-50 flex w-72 flex-col border-l border-hairline bg-base-75 lg:hidden ${drawerInsets}`}
             >
               <div className="flex items-center justify-between border-b border-hairline px-5 py-4">
                 <Wordmark />
                 <button
                   onClick={closeDrawer}
-                  className="cursor-pointer rounded-[4px] p-2 transition-colors hover:bg-base-200"
+                  className="flex cursor-pointer items-center justify-center rounded-[4px] border border-hairline p-2.5 transition-colors hover:border-primary/40"
                   aria-label="Close menu"
                 >
                   <X size={18} />

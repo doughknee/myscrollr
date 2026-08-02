@@ -321,7 +321,9 @@ function StatusPage() {
                 )
               })
             ) : (
-              <div className="grid grid-cols-[90px_1fr_auto] items-center gap-[18px] border-b border-hairline-minor px-2 py-5">
+              // Mirrors LedgerRow's mobile stacking: badge + state share
+              // the top row, the message spans full width beneath.
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-[18px] gap-y-1 border-b border-hairline-minor px-2 py-5 sm:grid-cols-[90px_1fr_auto]">
                 <span className="inline-flex items-center gap-2 font-mono text-[11px] font-semibold text-error/80">
                   <span
                     aria-hidden="true"
@@ -329,7 +331,7 @@ function StatusPage() {
                   />
                   CHN—??
                 </span>
-                <span className="text-sm text-base-content/55">
+                <span className="order-last col-span-full text-sm text-base-content/55 sm:order-none sm:col-span-1">
                   Unable to discover channels. The API is not reachable from
                   this browser.
                 </span>

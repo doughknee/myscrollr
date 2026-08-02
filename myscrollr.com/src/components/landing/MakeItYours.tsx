@@ -146,7 +146,7 @@ export function MakeItYours() {
                         style={{ background: pal.accent }}
                       />
                       <span
-                        className="overflow-hidden whitespace-nowrap font-mono text-[11px]"
+                        className="min-w-0 truncate font-mono text-[11px]"
                         style={{ color: pal.text }}
                       >
                         <span style={{ color: pal.chips.fin }}>

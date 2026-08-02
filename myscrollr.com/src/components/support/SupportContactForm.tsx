@@ -254,6 +254,9 @@ export function SupportContactForm() {
             border: 1px solid var(--color-hairline);
             border-radius: 4px;
             padding: 0.55rem 0.75rem;
+            /* Native selects ignore part of the vertical padding; pin
+               the height so the select matches the 42px inputs. */
+            min-height: 42px;
             font-size: 0.875rem;
             color: var(--color-base-content);
             transition: border-color 0.15s ease, box-shadow 0.15s ease;

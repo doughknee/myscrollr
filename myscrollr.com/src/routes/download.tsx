@@ -219,7 +219,7 @@ export function DownloadPage({
                     key={format}
                     type="button"
                     onClick={() => triggerDownload('linux', format)}
-                    className="cursor-pointer whitespace-nowrap rounded-[4px] border border-hairline px-4 py-[9px] font-mono text-xs tracking-[0.08em] text-primary transition-colors hover:border-primary"
+                    className="cursor-pointer whitespace-nowrap rounded-[4px] border border-hairline px-4 py-[9px] font-mono text-xs tracking-[0.08em] text-primary transition-colors hover:border-primary max-sm:py-3"
                   >
                     {label} ↓
                   </button>

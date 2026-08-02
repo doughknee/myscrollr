@@ -176,6 +176,13 @@ function RootLayout() {
   }, [pathname])
 
   const hasDemoBar = showsDemoBar(pathname)
+  // What fixed bar the Header must dodge: the store-driven demo bar,
+  // /business's always-bottom white-label bar, or none.
+  const barMode = hasDemoBar
+    ? 'store'
+    : pathname.startsWith('/business')
+      ? 'fixed-bottom'
+      : 'none'
   const { theme: demoFamily, density, pos } = useDemoTicker()
 
   // Site-wide theme family: picking a family in MAKE IT YOURS re-skins
@@ -220,7 +227,7 @@ function RootLayout() {
           </a>
 
           {/* Navigation */}
-          <Header />
+          <Header barMode={barMode} />
 
           {/* Main Content */}
           <main

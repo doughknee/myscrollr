@@ -152,8 +152,11 @@ function relativeTime(iso: string, now: number): string {
 // Shared grid template: index | version | date | headline | action.
 // The column-header row and every release row use the same columns so
 // cells align like a real departures board.
+// md:, not sm: — at 640-700px the fixed tracks + gaps exceed the
+// container and the minmax(0,1fr) HIGHLIGHTS track collapses to 0px;
+// the stacked mobile layout already works, so keep it through 767px.
 const ROW_GRID =
-  'sm:grid sm:grid-cols-[2.75rem_11.5rem_13.5rem_minmax(0,1fr)_auto] sm:items-center sm:gap-x-5'
+  'md:grid md:grid-cols-[2.75rem_11.5rem_10.5rem_minmax(0,1fr)_auto] md:items-center md:gap-x-5'
 
 function ReleasesPage() {
   // Build-time snapshot renders instantly (no layout shift, works
@@ -386,7 +389,7 @@ function ReleaseRow({
           expanded ? 'bg-primary/5' : ''
         }`}
       >
-        <span className="hidden font-mono text-xs text-base-content/40 sm:block">
+        <span className="hidden font-mono text-xs text-base-content/40 md:block">
           ↳ {index}
         </span>
 
@@ -436,7 +439,7 @@ function ReleaseRow({
 
         {/* Headline */}
         <span
-          className={`min-w-0 text-sm sm:truncate ${
+          className={`min-w-0 text-sm md:truncate ${
             release.headline
               ? 'text-base-content/55'
               : 'italic text-base-content/30'
@@ -450,7 +453,7 @@ function ReleaseRow({
           href={release.url}
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="whitespace-nowrap font-mono text-sm text-primary sm:justify-self-end"
+          className="whitespace-nowrap font-mono text-sm text-primary md:justify-self-end"
         >
           RELEASE ↗
         </a>

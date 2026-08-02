@@ -203,7 +203,6 @@ function LifetimePage() {
                 <Feature>Early access to new widgets and features</Feature>
                 <Feature>Unlimited items inside every widget</Feature>
                 <Feature>Founding member badge & priority support</Feature>
-                <Feature>Early access to new features & widgets</Feature>
               </motion.div>
             </div>
 

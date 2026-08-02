@@ -961,7 +961,7 @@ function BusinessPage() {
 
       {/* Page exception: /business renders its own bar as the
           white-label demo (see DEMO_BAR_EXCLUDED in __root.tsx). */}
-      <DemoTickerBar override={override} />
+      <DemoTickerBar override={override} pinBottom />
     </div>
   )
 }

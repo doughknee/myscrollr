@@ -41,7 +41,7 @@ export function SectionRow({
   stat?: ReactNode
 }) {
   return (
-    <div className="flex items-center justify-between gap-6 border-b border-hairline py-5 font-mono text-[11px] uppercase tracking-[0.14em] text-base-content/45">
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 border-b border-hairline py-5 font-mono text-[11px] uppercase tracking-[0.14em] text-base-content/45">
       <span>{tag}</span>
       {stat != null && <span className="text-right">{stat}</span>}
     </div>
@@ -71,10 +71,13 @@ export function PageHeader({
   /** 'lg' = landing-hero scale, 'md' = interior pages. */
   size?: 'md' | 'lg'
 }) {
+  // The max-sm overrides keep the clamp floors from exceeding what a
+  // ~280px content column can fit — otherwise the h1's last-resort
+  // overflow-wrap:break-word splits words mid-glyph on small phones.
   const headline =
     size === 'lg'
-      ? 'text-[clamp(56px,8.5vw,118px)]'
-      : 'text-[clamp(44px,6.5vw,96px)]'
+      ? 'text-[clamp(56px,8.5vw,118px)] max-sm:text-[clamp(40px,13.5vw,56px)]'
+      : 'text-[clamp(44px,6.5vw,96px)] max-sm:text-[clamp(34px,10.5vw,44px)]'
   return (
     <section className="relative overflow-hidden border-b border-hairline px-5 pb-14 pt-16 sm:px-8">
       {/* Soft accent radial glow behind the header — follows the active
@@ -107,7 +110,7 @@ export function PageHeader({
           <p className="m-0 max-w-[480px] text-lg leading-relaxed text-base-content/60 [text-wrap:pretty]">
             {sub}
           </p>
-          {actions != null && <div>{actions}</div>}
+          {actions != null && <div className="min-w-0">{actions}</div>}
         </motion.div>
       </div>
     </section>
@@ -164,8 +167,12 @@ export function DeparturesRow({
       </span>
     </>
   )
+  // max-sm:flex-wrap lets the nowrap action drop below the label on
+  // phones instead of crushing it into a one-word-per-line column or
+  // clipping off-screen; text-left neutralizes the UA's centered
+  // <button> text for the onClick variant.
   const className =
-    'flex items-center justify-between gap-5 border-t border-hairline px-3 py-6 text-base-content transition-colors duration-150 hover:bg-primary/5 hover:opacity-100'
+    'flex max-sm:flex-wrap items-center justify-between gap-5 border-t border-hairline px-3 py-6 text-left text-base-content transition-colors duration-150 hover:bg-primary/5 hover:opacity-100'
   if (to) {
     return (
       <Link to={to} className={className}>
@@ -202,11 +209,11 @@ export interface TerminalStep {
 /** Ghost-numeral step sequence (01 / 02 / 03). */
 export function StepsGrid({ steps }: { steps: Array<TerminalStep> }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fit,minmax(280px,1fr))]">
+    <div className="grid grid-cols-1 lg:grid-cols-3">
       {steps.map((s) => (
         <div
           key={s.num}
-          className="border-hairline-minor px-8 pb-12 pt-10 sm:border-r sm:last:border-r-0"
+          className="border-hairline-minor px-8 pb-12 pt-10 lg:border-r lg:last:border-r-0"
         >
           <div className="type-display type-ghost mb-[18px] text-7xl">
             {s.num}
