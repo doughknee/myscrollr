@@ -14,17 +14,17 @@ import { HOMEPAGE_FAQ_ITEMS } from '@/lib/structured-data'
 export function QuickAnswers() {
   const last = HOMEPAGE_FAQ_ITEMS.length - 1
   return (
-    <section className="border-b border-hairline">
+    <section className="border-b border-hairline pt-12">
       <TerminalContainer>
         <SectionRow
           tag="SEC 06 ／ QUICK ANSWERS"
           stat={`${HOMEPAGE_FAQ_ITEMS.length} QUESTIONS · TEN-SECOND READS`}
         />
-        <div className="grid gap-x-12 pb-16 pt-2 md:grid-cols-2 lg:gap-x-20">
+        <div className="grid gap-x-12 pb-12 pt-1 md:grid-cols-2">
           {HOMEPAGE_FAQ_ITEMS.map((f, i) => (
             <div
               key={f.question}
-              className="group relative overflow-hidden border-b border-hairline-minor px-4 pb-12 pt-16 transition-colors duration-150 hover:bg-primary/5"
+              className="group relative overflow-hidden border-b border-hairline-minor px-4 pb-8 pt-12 transition-colors duration-150 hover:bg-primary/5"
             >
               {/* Oversized ghost numeral behind the question */}
               <div
@@ -33,13 +33,13 @@ export function QuickAnswers() {
               >
                 {String(i + 1).padStart(2, '0')}
               </div>
-              <h3 className="type-display relative m-0 mb-4 max-w-[86%] text-[clamp(19px,1.7vw,24px)]">
+              <h3 className="type-display relative m-0 mb-3 max-w-[86%] text-[clamp(19px,1.7vw,24px)]">
                 <span className="mr-3 font-mono text-xs font-normal tracking-[0.1em] text-primary">
                   Q.{String(i + 1).padStart(2, '0')}
                 </span>
                 {f.question}
               </h3>
-              <div className="relative max-w-[540px] text-[14.5px] leading-[1.75] text-base-content/60 [text-wrap:pretty]">
+              <div className="relative text-[14.5px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
                 {f.answer}
                 {i === last && (
                   <span
