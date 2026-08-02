@@ -12,8 +12,6 @@ import { PageHeader } from '@/components/terminal'
 import { detectPlatform } from '@/lib/detectPlatform'
 import { triggerDownload } from '@/lib/getDownloadInfo'
 
-const GITHUB_URL = 'https://github.com/brandon-relentnet/myscrollr'
-
 export function TerminalHero() {
   return (
     <PageHeader
@@ -41,10 +39,12 @@ function HeroActions() {
     setInfo(detectPlatform())
   }, [])
 
+  // Mono-voice separator: facts get middots on this site, em dashes are
+  // for prose payoffs.
   const label =
     info && !info.isMobile
-      ? `Download for ${info.label} — free`
-      : 'Download Scrollr — free'
+      ? `Download for ${info.label} · free`
+      : 'Download Scrollr · free'
 
   const handleDownload = () => {
     const p = info ?? detectPlatform()
@@ -67,13 +67,19 @@ function HeroActions() {
         >
           {label}
         </button>
-        <a
-          href={GITHUB_URL}
-          rel="noopener noreferrer"
-          className="rounded-[4px] border border-base-content/25 px-[26px] py-4 font-semibold text-base-content transition-colors duration-150 hover:border-primary hover:text-base-content"
+        <button
+          type="button"
+          onClick={() =>
+            // Smooth unless the user prefers reduced motion — the global
+            // reduced-motion CSS forces scroll-behavior: auto.
+            document
+              .getElementById('catalog')
+              ?.scrollIntoView({ behavior: 'smooth' })
+          }
+          className="cursor-pointer rounded-[4px] border border-base-content/25 px-[26px] py-4 font-semibold text-base-content transition-colors duration-150 hover:border-primary hover:text-base-content"
         >
-          Source ↗
-        </a>
+          See the widgets ↓
+        </button>
       </div>
       <div className="text-left font-mono text-xs leading-[1.7] text-base-content/45 sm:text-right">
         {'the ticker is already running at the bottom of this page ↓'}
