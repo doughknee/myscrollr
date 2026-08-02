@@ -906,7 +906,7 @@ function BusinessPage() {
             <button
               type="button"
               onClick={scrollToForm}
-              className="cursor-pointer rounded-[4px] bg-primary px-[30px] py-[15px] font-mono text-[13px] font-bold tracking-[0.08em] text-[#101018] shadow-[0_0_60px_rgba(52,211,153,.18)] transition-colors hover:bg-[#6ee7b7]"
+              className="cursor-pointer rounded-[4px] bg-primary px-[30px] py-[15px] font-mono text-[13px] font-bold tracking-[0.08em] text-[#101018] shadow-[0_0_60px_color-mix(in_srgb,var(--color-primary)_18%,transparent)] transition-colors hover:bg-[#6ee7b7]"
             >
               START THE CONVERSATION →
             </button>

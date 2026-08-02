@@ -59,7 +59,7 @@ function HeroActions() {
         <button
           type="button"
           onClick={handleDownload}
-          className="relative cursor-pointer rounded-[4px] bg-primary px-8 py-4 font-bold text-primary-content shadow-[0_0_60px_rgba(52,211,153,.18)] transition-all duration-150 hover:brightness-110 active:scale-[0.98]"
+          className="relative cursor-pointer rounded-[4px] bg-primary px-8 py-4 font-bold text-primary-content shadow-[0_0_60px_color-mix(in_srgb,var(--color-primary)_18%,transparent)] transition-all duration-150 hover:brightness-110 active:scale-[0.98]"
         >
           {label}
           {/* Corner sticker — dark ink chip with the accent text, the

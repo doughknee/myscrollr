@@ -28,7 +28,10 @@
  * because we don't unlist old releases.
  */
 
-import { LATEST_DESKTOP_VERSION } from './latestVersion.generated'
+import {
+  DESKTOP_ASSET_SIZES,
+  LATEST_DESKTOP_VERSION,
+} from './latestVersion.generated'
 
 const REPO_URL = 'https://github.com/brandon-relentnet/myscrollr'
 export const FALLBACK_RELEASES_URL = `${REPO_URL}/releases/latest`
@@ -53,6 +56,17 @@ export interface DownloadInfo {
   filename: string
   /** Direct download URL. */
   url: string
+  /** Human asset size, e.g. `"6.7 MB"`. Undefined when the build
+   *  resolved the version without the GitHub API (env/fallback). */
+  size?: string
+}
+
+/** Format a release asset's size from the build-time snapshot. */
+export function assetSize(filename: string): string | undefined {
+  const bytes = DESKTOP_ASSET_SIZES[filename]
+  if (!bytes) return undefined
+  const mb = bytes / 1_048_576
+  return `${mb >= 100 ? Math.round(mb) : mb.toFixed(1)} MB`
 }
 
 /**
@@ -80,6 +94,7 @@ export function getDownloadInfo(
     version,
     filename,
     url: `${REPO_URL}/releases/download/desktop-v${version}/${filename}`,
+    size: assetSize(filename),
   }
 }
 

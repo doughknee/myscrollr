@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react'
 import type { DesktopPlatform } from '@/lib/getDownloadInfo'
+import { getDownloadInfo } from '@/lib/getDownloadInfo'
 import { DeparturesRow, TerminalContainer } from '@/components/terminal'
 import { detectPlatform } from '@/lib/detectPlatform'
 
@@ -16,9 +17,9 @@ const PLATFORMS: ReadonlyArray<{
   meta: string
 }> = [
   // prettier-ignore
-  { index: '01', label: 'macOS', os: 'mac', platform: 'macos', meta: '.DMG · APPLE SILICON' },
+  { index: '01', label: 'macOS', os: 'mac', platform: 'macos', meta: ['.DMG', getDownloadInfo('macos').size, 'APPLE SILICON'].filter(Boolean).join(' · ') },
   // prettier-ignore
-  { index: '02', label: 'Windows', os: 'windows', platform: 'windows', meta: 'SETUP .EXE · X64' },
+  { index: '02', label: 'Windows', os: 'windows', platform: 'windows', meta: ['SETUP .EXE', getDownloadInfo('windows').size, 'X64'].filter(Boolean).join(' · ') },
   // prettier-ignore
   { index: '03', label: 'Linux', os: 'linux', platform: 'linux', meta: '.APPIMAGE / .DEB / .RPM · X86_64' },
 ]

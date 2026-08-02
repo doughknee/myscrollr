@@ -85,7 +85,7 @@ const STEPS = [
 ]
 
 const CTA_BUTTON_CLASS =
-  'inline-flex cursor-pointer items-center gap-3 rounded-[4px] bg-primary px-[34px] py-[17px] text-[17px] font-bold text-[#101018] shadow-[0_0_60px_rgba(52,211,153,.18)] transition-colors hover:bg-[#6ee7b7]'
+  'inline-flex cursor-pointer items-center gap-3 rounded-[4px] bg-primary px-[34px] py-[17px] text-[17px] font-bold text-[#101018] shadow-[0_0_60px_color-mix(in_srgb,var(--color-primary)_18%,transparent)] transition-colors hover:bg-[#6ee7b7]'
 
 // ── OS detection ───────────────────────────────────────────────
 
@@ -147,7 +147,13 @@ export function DownloadPage({
             )}
             <div className="text-right font-mono text-[11px] tracking-[0.06em] text-base-content/45">
               {detected
-                ? `${getDownloadInfo(detected).filename} · ${ARCH_NOTE[detected]}`
+                ? [
+                    getDownloadInfo(detected).filename,
+                    getDownloadInfo(detected).size,
+                    ARCH_NOTE[detected],
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
                 : `PICK YOUR PLATFORM BELOW · V${version}`}
             </div>
           </div>
@@ -167,7 +173,9 @@ export function DownloadPage({
               tag={detected === 'macos' ? 'YOURS' : undefined}
               meta={
                 <span className="font-mono text-xs text-base-content/45">
-                  .DMG · APPLE SILICON
+                  {['.DMG', getDownloadInfo('macos').size, 'APPLE SILICON']
+                    .filter(Boolean)
+                    .join(' · ')}
                 </span>
               }
               action="DOWNLOAD ↓"
@@ -179,7 +187,9 @@ export function DownloadPage({
               tag={detected === 'windows' ? 'YOURS' : undefined}
               meta={
                 <span className="font-mono text-xs text-base-content/45">
-                  SETUP .EXE · X64
+                  {['SETUP .EXE', getDownloadInfo('windows').size, 'X64']
+                    .filter(Boolean)
+                    .join(' · ')}
                 </span>
               }
               action="DOWNLOAD ↓"
