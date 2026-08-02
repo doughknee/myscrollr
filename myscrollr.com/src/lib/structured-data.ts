@@ -35,7 +35,7 @@ export const website = {
 // SoftwareApplication: describes the Scrollr desktop app for rich-result
 // surfaces (Google "App" cards, AI crawlers). `screenshot` references the
 // channel hero screenshots that ship in /public/screenshots/ and are
-// already visible on /channels. The `offers` array reflects the live
+// already visible on /widgets. The `offers` array reflects the live
 // pricing tiers from /uplink (Free + the three paid Uplink tiers); keep
 // in sync with PRICING in routes/uplink.tsx.
 export const softwareApplication = {

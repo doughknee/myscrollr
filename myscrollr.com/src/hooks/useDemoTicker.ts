@@ -6,7 +6,7 @@
  *   { active: string[] (widget ids), theme: string (theme FAMILY id —
  *     light/dark comes from the site color mode), pos: 'top'|'bottom',
  *     density: 'compact'|'detailed', direction: 'left'|'right' }
- * The landing picker and /channels "ADD TO BAR" buttons write it; every
+ * The landing picker and /widgets "ADD TO BAR" buttons write it; every
  * marketing page reads it. The /business white-label bar does NOT write
  * to this key (it passes an override to <DemoTickerBar> instead).
  *

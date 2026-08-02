@@ -46,7 +46,7 @@ const VIEWPORTS = [
 // hide real bugs.
 const ROUTES = [
   { path: '/', file: 'index.html' },
-  { path: '/channels', file: 'channels/index.html' },
+  { path: '/widgets', file: 'widgets/index.html' },
   { path: '/download', file: 'download/index.html' },
   { path: '/business', file: 'business/index.html' },
   { path: '/architecture', file: 'architecture/index.html' },

@@ -39,8 +39,8 @@ const ROUTES = [
     expectedBody: 'The go-ahead run',
   },
   {
-    path: '/channels',
-    file: 'channels/index.html',
+    path: '/widgets',
+    file: 'widgets/index.html',
     minJsonLd: 2, // organization + breadcrumbs
     expectedBody: 'Every widget streams live',
   },

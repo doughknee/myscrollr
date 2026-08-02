@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WidgetsRouteImport } from './routes/widgets'
 import { Route as UplinkRouteImport } from './routes/uplink'
 import { Route as TssSpaShellRouteImport } from './routes/tss-spa-shell'
 import { Route as SupportRouteImport } from './routes/support'
@@ -27,6 +28,11 @@ import { Route as UplinkLifetimeRouteImport } from './routes/uplink_.lifetime'
 import { Route as UUsernameRouteImport } from './routes/u.$username'
 import { Route as DownloadOsRouteImport } from './routes/download_.$os'
 
+const WidgetsRoute = WidgetsRouteImport.update({
+  id: '/widgets',
+  path: '/widgets',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UplinkRoute = UplinkRouteImport.update({
   id: '/uplink',
   path: '/uplink',
@@ -128,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/support': typeof SupportRoute
   '/tss-spa-shell': typeof TssSpaShellRoute
   '/uplink': typeof UplinkRoute
+  '/widgets': typeof WidgetsRoute
   '/download/$os': typeof DownloadOsRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink/lifetime': typeof UplinkLifetimeRoute
@@ -147,6 +154,7 @@ export interface FileRoutesByTo {
   '/support': typeof SupportRoute
   '/tss-spa-shell': typeof TssSpaShellRoute
   '/uplink': typeof UplinkRoute
+  '/widgets': typeof WidgetsRoute
   '/download/$os': typeof DownloadOsRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink/lifetime': typeof UplinkLifetimeRoute
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   '/support': typeof SupportRoute
   '/tss-spa-shell': typeof TssSpaShellRoute
   '/uplink': typeof UplinkRoute
+  '/widgets': typeof WidgetsRoute
   '/download_/$os': typeof DownloadOsRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink_/lifetime': typeof UplinkLifetimeRoute
@@ -188,6 +197,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/tss-spa-shell'
     | '/uplink'
+    | '/widgets'
     | '/download/$os'
     | '/u/$username'
     | '/uplink/lifetime'
@@ -207,6 +217,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/tss-spa-shell'
     | '/uplink'
+    | '/widgets'
     | '/download/$os'
     | '/u/$username'
     | '/uplink/lifetime'
@@ -226,6 +237,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/tss-spa-shell'
     | '/uplink'
+    | '/widgets'
     | '/download_/$os'
     | '/u/$username'
     | '/uplink_/lifetime'
@@ -246,6 +258,7 @@ export interface RootRouteChildren {
   SupportRoute: typeof SupportRoute
   TssSpaShellRoute: typeof TssSpaShellRoute
   UplinkRoute: typeof UplinkRoute
+  WidgetsRoute: typeof WidgetsRoute
   DownloadOsRoute: typeof DownloadOsRoute
   UUsernameRoute: typeof UUsernameRoute
   UplinkLifetimeRoute: typeof UplinkLifetimeRoute
@@ -253,6 +266,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/widgets': {
+      id: '/widgets'
+      path: '/widgets'
+      fullPath: '/widgets'
+      preLoaderRoute: typeof WidgetsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/uplink': {
       id: '/uplink'
       path: '/uplink'
@@ -390,6 +410,7 @@ const rootRouteChildren: RootRouteChildren = {
   SupportRoute: SupportRoute,
   TssSpaShellRoute: TssSpaShellRoute,
   UplinkRoute: UplinkRoute,
+  WidgetsRoute: WidgetsRoute,
   DownloadOsRoute: DownloadOsRoute,
   UUsernameRoute: UUsernameRoute,
   UplinkLifetimeRoute: UplinkLifetimeRoute,

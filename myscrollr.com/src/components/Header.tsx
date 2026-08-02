@@ -19,7 +19,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
  */
 
 const NAV_LINKS: Array<{ to: string; label: string }> = [
-  { to: '/channels', label: 'WIDGETS' },
+  { to: '/widgets', label: 'WIDGETS' },
   { to: '/uplink', label: 'UPLINK' },
   { to: '/business', label: 'BUSINESS' },
 ]

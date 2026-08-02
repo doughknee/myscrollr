@@ -11,7 +11,7 @@ import { LATEST_DESKTOP_VERSION } from '@/lib/latestVersion.generated'
 
 const PRIMARY_LINKS: Array<{ label: string; to?: string; href?: string }> = [
   { label: 'DOWNLOAD', to: '/download' },
-  { label: 'WIDGETS', to: '/channels' },
+  { label: 'WIDGETS', to: '/widgets' },
   { label: 'UPLINK', to: '/uplink' },
   { label: 'BUSINESS', to: '/business' },
   { label: 'SUPPORT', to: '/support' },
