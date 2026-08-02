@@ -1136,10 +1136,10 @@ function UplinkPage() {
                         duration: 0.5,
                         ease: EASE,
                       }}
-                      className={`relative flex flex-col rounded-[8px] border p-7 px-[26px] ${
+                      className={`relative flex flex-col rounded-[8px] border p-7 px-[26px] transition-colors duration-150 ${
                         p.popular
-                          ? 'border-primary/45 bg-primary/5'
-                          : 'border-hairline bg-panel'
+                          ? 'border-primary/45 bg-primary/5 hover:border-primary/70'
+                          : 'border-hairline bg-panel hover:border-primary/35'
                       }`}
                     >
                       {p.popular && (
@@ -1192,7 +1192,7 @@ function UplinkPage() {
                       {/* Capacity viz — slot squares from live tier-limits */}
                       <div className="mb-1.5 flex min-h-[34px] items-center">
                         {p.slots === null ? (
-                          <span className="font-mono text-[30px] leading-none text-primary">
+                          <span className="unlimited-text-glow font-mono text-[38px] font-semibold leading-none text-primary">
                             ∞
                           </span>
                         ) : (
@@ -1317,7 +1317,7 @@ function UplinkPage() {
               {comparisonRows.map((row) => (
                 <div
                   key={row.label}
-                  className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] items-center border-b border-hairline-minor py-4"
+                  className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] items-center border-b border-hairline-minor px-1 py-4 transition-colors duration-150 hover:bg-primary/5"
                 >
                   <span className="flex items-center gap-2.5">
                     <span className="text-sm font-semibold text-base-content/80">
