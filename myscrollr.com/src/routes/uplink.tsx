@@ -1,10 +1,6 @@
 import { ClientOnly, Link, createFileRoute } from '@tanstack/react-router'
-import {
-  AnimatePresence,
-  motion,
-  useMotionValue,
-  useSpring,
-} from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
+import { AnimateNumber } from 'motion-plus/react'
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Loader2, ShieldAlert } from 'lucide-react'
 
@@ -50,34 +46,27 @@ const ULTIMATE_PRICE_IDS = {
 type PlanKey = 'monthly' | 'annual'
 type TierKey = 'uplink' | 'pro' | 'ultimate'
 
-// Animates the displayed price toward `value` using a spring. This
-// replaces `motion-plus`'s `<AnimateNumber>` (524 KB on disk) for the
-// only place we used it: the per-tier monthly-price flip when the
-// billing toggle changes.
-//
-// Renders to 2 decimal places so cent values (e.g. 9.99, 6.67) stay
-// intact through the toggle animation.
+// Motion+ AnimateNumber rolls the per-tier monthly price when the
+// billing toggle flips (odometer-style digits instead of the old
+// useSpring text interpolation — motion-plus is in the bundle now for
+// the count-ups on / and /widgets). Fixed 2dp format keeps cent values
+// (9.99, 6.67) exact through the roll. This page is ClientOnly, so no
+// SSR wrapper is needed. The vertical-align nudge matches CountUp's:
+// the digit strips' internal line-height sags the inline-flex baseline.
 function AnimatedPrice({ value }: { value: number }) {
-  const [display, setDisplay] = useState(value)
-  const motionVal = useMotionValue(value)
-  const spring = useSpring(motionVal, {
-    stiffness: 90,
-    damping: 22,
-    restSpeed: 0.01,
-  })
-
-  useEffect(() => {
-    motionVal.set(value)
-  }, [value, motionVal])
-
-  useEffect(() => {
-    const unsub = spring.on('change', (v) => {
-      setDisplay(Math.round(v * 100) / 100)
-    })
-    return unsub
-  }, [spring])
-
-  return <>{display.toFixed(2)}</>
+  return (
+    <AnimateNumber
+      format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
+      locales="en-US"
+      style={{ verticalAlign: '0.055em' }}
+      transition={{
+        y: { type: 'spring', visualDuration: 0.4, bounce: 0.15 },
+        layout: { duration: 0.25 },
+      }}
+    >
+      {value}
+    </AnimateNumber>
+  )
 }
 
 // Static JSON-LD source data for the /uplink route. Kept module-scope
@@ -894,24 +883,43 @@ function UplinkPage() {
           <div className="flex flex-wrap gap-1.5 font-mono text-xs tracking-[0.1em]">
             {billingTabs.map((tab) => {
               const active = billingView === tab.id
-              const activeClass =
-                tab.id === 'lifetime'
-                  ? 'border-[#fbbf24]/45 bg-[#fbbf24]/10 text-[#fbbf24]'
-                  : 'border-primary/45 bg-primary/10 text-primary'
+              const amber = tab.id === 'lifetime'
               return (
-                <button
+                <motion.button
                   key={tab.id}
                   type="button"
                   aria-pressed={active}
                   onClick={() => setBillingView(tab.id)}
-                  className={`cursor-pointer whitespace-nowrap rounded-[4px] border px-[18px] py-2.5 transition-colors ${
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  className={`relative cursor-pointer whitespace-nowrap rounded-[4px] border px-[18px] py-2.5 transition-colors ${
                     active
-                      ? activeClass
+                      ? amber
+                        ? 'border-transparent text-[#fbbf24]'
+                        : 'border-transparent text-primary'
                       : 'border-hairline text-base-content/50 hover:text-base-content/80'
                   }`}
                 >
-                  {tab.label}
-                </button>
+                  {/* Active chip slides between billing views, turning
+                      amber when it lands on LIFETIME */}
+                  {active && (
+                    <motion.span
+                      aria-hidden="true"
+                      layoutId="billing-tab"
+                      className={`absolute inset-0 rounded-[4px] border ${
+                        amber
+                          ? 'border-[#fbbf24]/45 bg-[#fbbf24]/10'
+                          : 'border-primary/45 bg-primary/10'
+                      }`}
+                      transition={{
+                        type: 'spring',
+                        stiffness: 500,
+                        damping: 35,
+                      }}
+                    />
+                  )}
+                  <span className="relative">{tab.label}</span>
+                </motion.button>
               )
             })}
           </div>
@@ -1041,6 +1049,14 @@ function UplinkPage() {
                       key={p.key}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
+                      whileHover={{
+                        y: -3,
+                        transition: {
+                          type: 'spring',
+                          stiffness: 400,
+                          damping: 28,
+                        },
+                      }}
                       transition={{
                         delay: 0.03 + i * 0.03,
                         duration: 0.5,
@@ -1101,14 +1117,34 @@ function UplinkPage() {
                       {/* Capacity viz — slot squares from live tier-limits */}
                       <div className="mb-1.5 flex min-h-[34px] items-center">
                         {p.slots === null ? (
-                          <span className="unlimited-text-glow font-mono text-[38px] font-semibold leading-none text-primary">
+                          <motion.span
+                            initial={{ opacity: 0, scale: 0.4 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{
+                              delay: 0.25 + i * 0.03,
+                              type: 'spring',
+                              stiffness: 380,
+                              damping: 18,
+                            }}
+                            className="unlimited-text-glow font-mono text-[38px] font-semibold leading-none text-primary"
+                          >
                             ∞
-                          </span>
+                          </motion.span>
                         ) : (
                           <span className="flex flex-wrap gap-1">
+                            {/* Slot squares fill in one by one — the
+                                card's capacity literally builds up */}
                             {Array.from({ length: p.slots }, (_, s) => (
-                              <span
+                              <motion.span
                                 key={s}
+                                initial={{ opacity: 0, scale: 0 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{
+                                  delay: 0.2 + i * 0.03 + s * 0.03,
+                                  type: 'spring',
+                                  stiffness: 500,
+                                  damping: 28,
+                                }}
                                 className="h-[13px] w-[13px] rounded-[2px] bg-primary/75"
                               />
                             ))}
@@ -1178,8 +1214,16 @@ function UplinkPage() {
 
           {/* Assurance strip */}
           <div className="flex flex-wrap justify-center gap-x-7 gap-y-2 border-t border-hairline-minor pb-[26px] pt-5 font-mono text-[11px] tracking-[0.1em] text-base-content/45">
-            {ASSURANCES.map((a) => (
-              <span key={a}>{a}</span>
+            {ASSURANCES.map((a, i) => (
+              <motion.span
+                key={a}
+                initial={{ opacity: 0, y: 8 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.35, ease: EASE, delay: i * 0.05 }}
+              >
+                {a}
+              </motion.span>
             ))}
           </div>
         </TerminalContainer>
@@ -1191,14 +1235,9 @@ function UplinkPage() {
       <section className="border-b border-hairline">
         <TerminalContainer>
           <SectionRow tag="SEC 02 ／ WHAT PAYING ACTUALLY GETS YOU" />
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, ease: EASE }}
-          >
-            <StepsGrid steps={PERKS} />
-          </motion.div>
+          {/* StepsGrid cascades its own cells now — no outer wrapper,
+              which was double-fading the whole grid */}
+          <StepsGrid steps={PERKS} />
         </TerminalContainer>
       </section>
 
@@ -1208,24 +1247,28 @@ function UplinkPage() {
       <section className="border-b border-hairline">
         <TerminalContainer>
           <SectionRow tag="SEC 03 ／ COMPARE TIERS" stat="FREE IS FOREVER" />
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, ease: EASE }}
-            className="overflow-x-auto"
-          >
+          <div className="overflow-x-auto">
             <div className="min-w-[760px]">
-              <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] border-b border-hairline-minor py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/45">
+              <motion.div
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, ease: EASE }}
+                className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] border-b border-hairline-minor py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/45"
+              >
                 <span>FEATURE</span>
                 <span className="text-center">FREE</span>
                 <span className="text-center">UPLINK</span>
                 <span className="text-center">PRO</span>
                 <span className="text-center text-primary">ULTIMATE</span>
-              </div>
-              {comparisonRows.map((row) => (
-                <div
+              </motion.div>
+              {comparisonRows.map((row, ri) => (
+                <motion.div
                   key={row.label}
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-40px' }}
+                  transition={{ duration: 0.4, ease: EASE, delay: ri * 0.07 }}
                   className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] items-center border-b border-hairline-minor px-1 py-4 transition-colors duration-150 hover:bg-primary/5"
                 >
                   <span className="flex items-center gap-2.5">
@@ -1245,13 +1288,13 @@ function UplinkPage() {
                   <span className="text-center">
                     <CompareCell value={row.ultimate} up={row.ultimateUp} />
                   </span>
-                </div>
+                </motion.div>
               ))}
               <div className="py-4 font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/40">
                 PER-ACCOUNT · FREE TIER ALWAYS INCLUDED · UPGRADE ANYTIME
               </div>
             </div>
-          </motion.div>
+          </div>
         </TerminalContainer>
       </section>
 
@@ -1270,8 +1313,12 @@ function UplinkPage() {
             {uplinkFAQ.map((f, i) => {
               const open = openFaq === i
               return (
-                <div
+                <motion.div
                   key={f.question}
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-40px' }}
+                  transition={{ duration: 0.4, ease: EASE, delay: i * 0.04 }}
                   className="border-b border-hairline-minor last:border-b-0"
                 >
                   <button
@@ -1288,19 +1335,40 @@ function UplinkPage() {
                         {f.question}
                       </span>
                     </span>
-                    <span
-                      className="font-mono text-sm text-primary"
-                      aria-hidden="true"
-                    >
-                      {open ? '−' : '+'}
-                    </span>
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.span
+                        key={open ? 'minus' : 'plus'}
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
+                        transition={{ duration: 0.1 }}
+                        className="inline-block w-[1ch] text-center font-mono text-sm text-primary"
+                        aria-hidden="true"
+                      >
+                        {open ? '−' : '+'}
+                      </motion.span>
+                    </AnimatePresence>
                   </button>
-                  {open && (
-                    <p className="m-0 max-w-[760px] pb-6 text-sm leading-relaxed text-base-content/60 sm:pl-12">
-                      {f.answer}
-                    </p>
-                  )}
-                </div>
+                  {/* Answer unfolds; padding lives on the inner <p>, not
+                      the height-animated container (the border-box
+                      end-bump lesson from SEC 01 on the homepage). */}
+                  <AnimatePresence initial={false}>
+                    {open && (
+                      <motion.div
+                        key="answer"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: EASE }}
+                        className="overflow-hidden"
+                      >
+                        <p className="m-0 max-w-[760px] pb-6 text-sm leading-relaxed text-base-content/60 sm:pl-12">
+                          {f.answer}
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
               )
             })}
           </div>
