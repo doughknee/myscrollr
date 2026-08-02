@@ -49,7 +49,15 @@ export function CountUp({
   return (
     <span ref={ref} className={className}>
       {mounted ? (
-        <AnimateNumber transition={transition}>
+        <AnimateNumber
+          // AnimateNumber's digit strips carry their own internal
+          // line-height, so its inline-flex box's synthesized baseline
+          // sags ~0.06em below the surrounding text (visible in the
+          // tight-leading display headings). Nudge it back up; measured
+          // residual is <1px from 375px to 1440px.
+          style={{ verticalAlign: '0.055em' }}
+          transition={transition}
+        >
           {reduce ? value : display}
         </AnimateNumber>
       ) : (
