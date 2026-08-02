@@ -81,14 +81,39 @@ export function PromiseSection() {
         </div>
       </TerminalContainer>
       {/* Ghost signature — in normal flow BELOW the content (so it can
-          never cover the button or the GitHub line), sized in vw so the
-          full phrase always fits the viewport, and bled past the
-          section's bottom edge for the half-sunk look. */}
+          never cover the button or the GitHub line). Rendered as SVG
+          with textLength so the phrase spans EXACTLY the available
+          width in every browser regardless of font metrics — no more
+          clipped last glyph — while the negative margin keeps the
+          half-sunk bleed off the section's bottom edge. */}
       <div
         aria-hidden="true"
-        className="type-display type-ghost pointer-events-none -mb-[0.2em] mt-2 select-none whitespace-nowrap text-center text-[10.5vw] leading-none"
+        className="pointer-events-none -mb-[1.7vw] mt-2 select-none px-[2vw]"
       >
-        Zero tracking
+        <svg
+          className="block w-full"
+          viewBox="0 18 1000 82"
+          role="presentation"
+          focusable="false"
+        >
+          <text
+            x="500"
+            y="95"
+            textAnchor="middle"
+            textLength="1000"
+            lengthAdjust="spacingAndGlyphs"
+            className="type-display"
+            style={{
+              fontSize: 100,
+              fill: 'none',
+              stroke: 'var(--ghost-stroke)',
+              strokeWidth: 1,
+              vectorEffect: 'non-scaling-stroke',
+            }}
+          >
+            ZERO TRACKING
+          </text>
+        </svg>
       </div>
     </section>
   )
