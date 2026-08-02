@@ -70,13 +70,14 @@ export default function Header() {
           <ClientOnly>
             <DesktopAccountLink />
           </ClientOnly>
+          <ThemeToggle />
+          {/* Download owns the corner */}
           <Link
             to="/download"
             className="rounded-[4px] bg-primary px-[18px] py-2 font-semibold text-primary-content transition-colors hover:bg-[#6ee7b7] hover:text-primary-content hover:opacity-100"
           >
             DOWNLOAD ↓
           </Link>
-          <ThemeToggle />
         </nav>
 
         {/* Mobile: theme + menu button */}
