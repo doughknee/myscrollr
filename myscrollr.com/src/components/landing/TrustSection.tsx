@@ -414,8 +414,9 @@ export function TrustSection() {
 
               <p className="text-sm text-base-content/40 leading-relaxed mb-6">
                 Every data source is a self-contained package — your own API,
-                your own service, your own UI components. Follow the architecture,
-                ship your plugin. The ecosystem grows with every contributor.
+                your own service, your own UI components. Follow the
+                architecture, ship your plugin. The ecosystem grows with every
+                contributor.
               </p>
 
               <div className="relative rounded-xl border border-base-300/40 bg-base-100/50 overflow-hidden mb-6 p-5">

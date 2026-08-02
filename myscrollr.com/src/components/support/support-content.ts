@@ -16,57 +16,42 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Is Scrollr free?',
     answer:
-      'Yes. The free tier streams real-time data to 3 widgets at once with no ads. Upgrade to Uplink or higher for more widget slots, priority support, and power-user tools like alerts and integrations.',
+      'Yes — three widgets at once, forever, no account. Uplink plans add more concurrent widgets from $6.67/mo.',
   },
   {
     question: "Does it affect my computer's performance?",
     answer:
-      'Not noticeably. All data flows through a single lightweight connection. The ticker uses minimal CPU and memory. You can check resource usage anytime with the built-in System Monitor widget.',
+      "No. It's a small native app (Tauri, not Electron) that idles quietly and sips memory.",
   },
   {
     question: 'Is my data private?',
     answer:
-      'Scrollr contains zero analytics, zero tracking pixels, and zero telemetry. Your widget configurations and preferences are stored on your device. The only server-side data is your account profile and subscription status.',
-  },
-  {
-    question: 'What platforms are supported?',
-    answer:
-      'Scrollr runs natively on macOS (Apple Silicon), Windows (x64), and Linux (x64). Each platform gets a dedicated build optimized for that OS.',
+      'Scrollr ships zero telemetry — no analytics, no tracking. Enforced by tests that block deploys; the source is public.',
   },
   {
     question: 'Do I need an account?',
     answer:
-      'You can browse widgets and explore the desktop app without signing in. An account is needed to add live data widgets (sports, stocks, crypto, news, fantasy) and to sync your setup across devices.',
+      'Not to use the free tier. An account only exists to sync an Uplink subscription across machines.',
   },
   {
-    question: 'What data does Scrollr show?',
+    question: 'What platforms are supported?',
     answer:
-      'A catalog of 30+ widgets: live stock and crypto prices, scores from 14 sports leagues, curated news outlets plus custom RSS, and Yahoo Fantasy Sports leagues. Plus utility widgets for weather, clocks, system monitoring, uptime, and GitHub Actions.',
+      'macOS (Apple Silicon), Windows (x64), and Linux (AppImage, .deb, .rpm). Multi-monitor aware on all three.',
   },
   {
-    question: 'Can I customize the feed?',
+    question: 'Can I customize the bar?',
     answer:
-      'Extensively. Move the ticker to the top or bottom of the screen by right-clicking it (or using the up/down chevron in the hover toolbar). In Settings > Ticker you can change the detail level (Compact / Detailed), add ticker rows, and adjust speed. Within each widget you can filter, sort, and toggle individual data points on or off from its Configure page.',
-  },
-  {
-    question: 'Is Scrollr open source?',
-    answer:
-      'Yes. Every line of code is publicly available on GitHub under the GNU AGPL v3.0 license. You can inspect, fork, or contribute.',
+      'Twenty palettes, top or bottom of any monitor, speed and density controls, and per-widget settings.',
   },
   {
     question: 'How do I update the app?',
     answer:
-      "Scrollr checks for updates automatically on launch. When an update is available, you'll see a notification prompting you to install. Updates are downloaded in the background and applied on next restart.",
+      'Scrollr checks GitHub Releases and updates in place. New widgets need no update at all — they ship server-side.',
   },
   {
-    question: 'How does live data work vs. polling?',
+    question: 'How does live data work?',
     answer:
-      'Every plan streams live data over a persistent SSE connection — updates appear the instant data changes on the server. Polling is only used briefly as a fallback while a connection re-establishes.',
-  },
-  {
-    question: "What's the difference between Uplink tiers?",
-    answer:
-      'Your plan sets how many widgets run at once: Free 3, Uplink 6, Uplink Pro 12, Uplink Ultimate unlimited — with unlimited items inside every widget on every plan. Every widget is available on every plan, Yahoo Fantasy included. Uplink adds a second ticker row, Pro a third plus custom alerts, feed profiles and whitelist filtering; Ultimate adds per-row ticker customisation, webhooks, data export, and API access.',
+      'Game scores, prices, and odds stream over a realtime connection; feeds refresh on a fast poll. No refresh button anywhere.',
   },
 ]
 
@@ -74,84 +59,33 @@ export const FAQ_ITEMS: Array<FAQItem> = [
 
 export interface TroubleshootingArticle {
   title: string
-  symptoms: Array<string>
-  steps: Array<string>
+  body: string
 }
 
 export const TROUBLESHOOTING_ARTICLES: Array<TroubleshootingArticle> = [
   {
     title: 'Sign-in fails or shows "Sign-in failed"',
-    symptoms: [
-      'Browser opens but returns to the desktop app with an error toast',
-      'Browser shows "authorization successful" but the app still shows failure',
-    ],
-    steps: [
-      'Check your internet connection.',
-      'In the desktop app, sign out (Settings > Account) then sign in again.',
-      'If the browser shows an error page, close it and retry from the app.',
-      'If the problem persists, send us a note from the contact form below.',
-    ],
+    body: 'Sign in happens in your browser and hands back to the app. If it stalls: make sure a default browser is set, then retry from Settings → Account. Corporate VPNs that block auth.myscrollr.com are the usual culprit.',
   },
   {
-    title: 'Data not loading / feed shows empty',
-    symptoms: [
-      'Widget added but shows "No data right now"',
-      'Ticker shows empty slots where data should be',
-    ],
-    steps: [
-      "Open the widget's Configure page to verify items are added (symbols or feeds).",
-      "Check that you're signed in (Settings > Account).",
-      'Try switching away from and back to the feed tab.',
-      'Check your internet connection.',
-    ],
+    title: 'Data not loading / bar shows empty',
+    body: 'Check Settings → Connection. A red dot means the stream is down — Scrollr reconnects automatically with backoff. If only one widget is empty, its league or market may simply have nothing live right now.',
   },
   {
     title: 'Ticker not visible',
-    symptoms: [
-      'Ticker bar disappeared from the screen edge',
-      'Only the main window shows',
-    ],
-    steps: [
-      'Press Ctrl+T (Cmd+T on macOS) to toggle ticker visibility.',
-      'Or go to Settings > Ticker and turn on "Enable ticker".',
-      'Or click the Ticker toggle in the title bar (next to the Pin button).',
-      'Or right-click the system tray icon and choose "Toggle Ticker".',
-    ],
+    body: 'It may be on another monitor or behind a fullscreen app. Use Settings → Position to re-pin it, or toggle "always on top" off and on. On macOS, grant Screen Recording permission if the bar vanishes over fullscreen video.',
   },
   {
     title: 'Finance prices not updating',
-    symptoms: [
-      'Stock prices appear frozen or stale',
-      '"Last updated" time doesn\'t change',
-    ],
-    steps: [
-      'The finance data service reconnects automatically after brief disconnections. Wait 2-5 minutes.',
-      'Check your internet connection.',
-      'If persistent, try restarting the app.',
-    ],
+    body: "Quotes pause outside market hours — that's the market, not the app. Crypto streams around the clock; if BTC is frozen too, check Settings → Connection.",
   },
   {
     title: 'Yahoo Fantasy connect fails',
-    symptoms: [
-      'Clicking "Connect Yahoo" opens browser but nothing happens',
-      'Returns an error after authorizing',
-    ],
-    steps: [
-      "Yahoo's OAuth can be intermittent. Wait 30 seconds and try again.",
-      "Make sure you're authorizing the correct Yahoo account.",
-      'If you see "invalid redirect URI", this is a known Yahoo issue — retry usually works.',
-    ],
+    body: "Reconnect from the widget's settings — Yahoo tokens expire roughly monthly. Make sure you complete the Yahoo consent screen in the browser it opens.",
   },
   {
     title: 'Subscription not reflecting after purchase',
-    symptoms: [
-      'Completed checkout but app still shows Free tier limits',
-      'Tier says "free" after upgrading',
-    ],
-    steps: [
-      'The app checks subscription status every 5 minutes and on window focus. Click away from and back to the app window.',
-      'If it persists, sign out and sign back in — the fresh token will include your updated role.',
-    ],
+    body: "Sign out and back in to refresh entitlements. Stripe webhooks land within a minute; if it's been longer, open a ticket with your receipt and we'll sort it same-day.",
   },
 ]
 

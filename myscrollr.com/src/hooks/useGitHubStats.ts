@@ -4,6 +4,8 @@ export interface GitHubStats {
   stars: number
   forks: number
   issues: number
+  /** Whole days since the last push to the repo (0 = pushed today). */
+  daysSincePush: number
 }
 
 const CACHE_KEY_PREFIX = 'gh-stats-cache:'
@@ -13,6 +15,7 @@ interface CachedEntry {
   stars: number
   forks: number
   issues: number
+  daysSincePush: number
   ts: number
 }
 
@@ -22,10 +25,13 @@ function readCache(repo: string): GitHubStats | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as CachedEntry
     if (Date.now() - parsed.ts > CACHE_TTL_MS) return null
+    // Entries written before `daysSincePush` existed are stale — refetch.
+    if (typeof parsed.daysSincePush !== 'number') return null
     return {
       stars: parsed.stars,
       forks: parsed.forks,
       issues: parsed.issues,
+      daysSincePush: parsed.daysSincePush,
     }
   } catch {
     return null // private mode / disabled storage / malformed JSON
@@ -58,10 +64,16 @@ export function useGitHubStats(repo: string) {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!cancelled && data?.stargazers_count != null) {
+          const pushedAt = Date.parse(
+            (data.pushed_at as string | undefined) ?? '',
+          )
           const next: GitHubStats = {
             stars: data.stargazers_count as number,
             forks: data.forks_count as number,
             issues: data.open_issues_count as number,
+            daysSincePush: Number.isNaN(pushedAt)
+              ? 0
+              : Math.max(0, Math.round((Date.now() - pushedAt) / 86_400_000)),
           }
           setStats(next)
           writeCache(repo, next)

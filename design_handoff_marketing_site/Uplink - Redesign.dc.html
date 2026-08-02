@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #101018; color: #e2e2ec; font-family: 'Archivo', system-ui, sans-serif; }
+  a { color: #34d399; text-decoration: none; }
+  a:hover { color: #6ee7b7; }
+  ::selection { background: rgba(52,211,153,.3); }
+  @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  @keyframes pulseDot { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  @keyframes riseIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #101018; background-image: repeating-linear-gradient(to bottom, transparent 0px, transparent 3px, rgba(226,226,236,.012) 3px, rgba(226,226,236,.012) 4px); padding-bottom: 120px">
+
+  <nav data-screen-label="Nav" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #232332; padding: 0 32px; height: 60px">
+    <a href="Marketing - Redesign v2.dc.html" style="display: flex; align-items: baseline; font-weight: 800; font-size: 20px; letter-spacing: -0.02em; color: #e2e2ec" style-hover="color: #e2e2ec">scrollr<span style="color: #34d399">.</span></a>
+    <div style="display: flex; align-items: center; gap: 32px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: .08em">
+      <a href="Widgets - Redesign.dc.html" style="color: #8a8aa0">WIDGETS</a>
+      <a href="Uplink - Redesign.dc.html" style="color: #34d399">UPLINK</a>
+      <a href="https://github.com/brandon-relentnet/myscrollr" style="color: #8a8aa0">GITHUB</a>
+      <a href="Download - Redesign.dc.html" style="background: #34d399; color: #101018; padding: 8px 18px; border-radius: 4px; font-weight: 600" style-hover="background: #6ee7b7; color: #101018">DOWNLOAD ↓</a>
+    </div>
+  </nav>
+
+  <section data-screen-label="Pricing header" style="border-bottom: 1px solid #232332; padding: 64px 32px 48px; position: relative; overflow: hidden">
+    <div style="position: absolute; top: -220px; left: 45%; width: 720px; height: 480px; background: radial-gradient(ellipse at center, rgba(52,211,153,.09), transparent 65%); pointer-events: none"></div>
+    <div style="max-width: 1280px; margin: 0 auto; position: relative">
+      <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #5a5a72; margin-bottom: 40px; animation: riseIn .5s ease-out both">
+        <span>UPLINK ／ PRICING</span>
+        <span>EVERY PAID PLAN: 7-DAY FREE TRIAL · NOT CHARGED UNTIL DAY 8</span>
+      </div>
+      <h1 style="font-size: clamp(48px, 6.5vw, 96px); font-weight: 800; font-stretch: 115%; text-transform: uppercase; line-height: .94; letter-spacing: -0.015em; margin: 0 0 8px; animation: riseIn .6s ease-out .08s both">One price lever:</h1>
+      <h1 style="font-size: clamp(48px, 6.5vw, 96px); font-weight: 800; font-stretch: 115%; text-transform: uppercase; line-height: .94; letter-spacing: -0.015em; margin: 0 0 32px; color: transparent; -webkit-text-stroke: 1.5px #34d399; animation: riseIn .6s ease-out .16s both">how many at once.</h1>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; flex-wrap: wrap; animation: riseIn .6s ease-out .24s both">
+        <p style="font-size: 18px; line-height: 1.6; color: #9a9ab0; max-width: 460px; margin: 0; text-wrap: pretty">Every plan is the same app, and every widget costs the same. You're only choosing how many run on your bar at once. No feature matrix to squint at.</p>
+        <div style="display: flex; gap: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: .1em">
+          <sc-for list="{{ billingTabs }}" as="b" hint-placeholder-count="3">
+            <button onClick="{{ b.action }}" style="background: {{ b.bg }}; color: {{ b.color }}; border: 1px solid {{ b.border }}; border-radius: 4px; padding: 10px 18px; cursor: pointer; font-family: inherit; white-space: nowrap">{{ b.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="Plans" style="border-bottom: 1px solid #232332">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 0 32px">
+      <sc-if value="{{ showPlans }}" hint-placeholder-val="{{ true }}">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; padding: 44px 0">
+          <sc-for list="{{ plans }}" as="p" hint-placeholder-count="4">
+            <div style="position: relative; background: {{ p.bg }}; border: 1px solid {{ p.border }}; border-radius: 8px; padding: 28px 26px; display: flex; flex-direction: column; gap: 0">
+              <sc-if value="{{ p.popular }}" hint-placeholder-val="{{ false }}">
+                <div style="position: absolute; top: -1px; right: -1px; background: #34d399; color: #101018; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: .12em; padding: 5px 12px; border-radius: 0 8px 0 6px">MOST POPULAR</div>
+              </sc-if>
+              <div style="font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: .02em">{{ p.name }}</div>
+              <div style="font-size: 13.5px; color: #9a9ab0; margin: 6px 0 24px; min-height: 20px">{{ p.tagline }}</div>
+              <div style="display: flex; align-items: baseline; gap: 8px">
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 40px; font-weight: 600; letter-spacing: -0.02em">{{ p.price }}</span>
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5a5a72">{{ p.period }}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .06em; color: #5a5a72; margin: 8px 0 26px; min-height: 22px">
+                <span>{{ p.billed }}</span>
+                <sc-if value="{{ p.deal }}" hint-placeholder-val="{{ false }}"><span style="color: #34d399; border: 1px solid rgba(52,211,153,.35); border-radius: 3px; padding: 2px 7px; white-space: nowrap">{{ p.deal }}</span></sc-if>
+              </div>
+              <div style="margin-bottom: 6px; min-height: 34px; display: flex; align-items: center">
+                <sc-if value="{{ p.infinite }}" hint-placeholder-val="{{ false }}"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; color: #34d399; line-height: 1">∞</span></sc-if>
+                <sc-if value="{{ p.slotRow }}" hint-placeholder-val="{{ false }}">
+                  <span style="display: flex; gap: 4px; flex-wrap: wrap">
+                    <sc-for list="{{ p.slotDots }}" as="d" hint-placeholder-count="6"><span style="width: 13px; height: 13px; border-radius: 2px; background: rgba(52,211,153,.75)"></span></sc-for>
+                  </span>
+                </sc-if>
+              </div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: .14em; color: #5a5a72; margin-bottom: 26px">{{ p.slotLabel }}</div>
+              <a href="https://myscrollr.com/uplink" style="display: block; text-align: center; background: {{ p.ctaBg }}; color: {{ p.ctaColor }}; border: 1px solid {{ p.ctaBorder }}; padding: 13px 0; border-radius: 4px; font-weight: 700; font-size: 15px; margin-top: auto" style-hover="border-color: #34d399">{{ p.cta }}</a>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: #5a5a72; text-align: center; padding-top: 10px">{{ p.foot }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ showLifetime }}" hint-placeholder-val="{{ false }}">
+        <div style="padding: 44px 0">
+          <div style="position: relative; border: 1px solid rgba(251,191,36,.4); border-radius: 8px; background: rgba(251,191,36,.03); padding: 44px 40px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 48px; align-items: center">
+            <div style="position: absolute; top: -1px; right: -1px; background: #fbbf24; color: #101018; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: .12em; padding: 5px 12px; border-radius: 0 8px 0 6px">LIMITED · FOUNDING MEMBERS</div>
+            <div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #fbbf24; margin-bottom: 14px">LIFETIME ULTIMATE</div>
+              <h2 style="font-size: clamp(28px, 3.4vw, 44px); font-weight: 800; font-stretch: 115%; text-transform: uppercase; line-height: 1.05; margin: 0 0 14px">One payment.<br><span style="color: #fbbf24">Every widget, forever.</span></h2>
+              <p style="color: #9a9ab0; font-size: 15.5px; line-height: 1.65; margin: 0; max-width: 440px; text-wrap: pretty">Permanent Uplink Ultimate — unlimited slots, priority support, early access — plus a founding-member badge. Pays for itself against Ultimate Annual in 2.5 years.</p>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 18px">
+              <div style="display: flex; align-items: baseline; gap: 10px">
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 56px; font-weight: 600; letter-spacing: -0.02em">$999</span>
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5a5a72">ONCE</span>
+              </div>
+              <a href="https://myscrollr.com/uplink/lifetime" style="display: inline-block; background: #fbbf24; color: #101018; padding: 14px 30px; border-radius: 4px; font-weight: 700; font-size: 15px" style-hover="background: #fde68a; color: #101018">Purchase lifetime access</a>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: #5a5a72">NO SUBSCRIPTION · NO RENEWAL · STRIPE</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+      <div style="display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; border-top: 1px solid #1c1c2a; padding: 20px 0 26px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .1em; color: #5a5a72">
+        <span>✓ 7-DAY FREE TRIAL</span>
+        <span>✓ CANCEL WITH ONE CLICK</span>
+        <span>✓ NO HIDDEN FEES</span>
+        <span>✓ INSTANT ACTIVATION</span>
+        <span>✓ FREE TIER ALWAYS INCLUDED</span>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="What Uplink adds" style="border-bottom: 1px solid #232332">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 0 32px">
+      <div style="padding: 20px 0; border-bottom: 1px solid #232332; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #5a5a72">SEC 02 ／ WHAT PAYING ACTUALLY GETS YOU</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0">
+        <sc-for list="{{ perks }}" as="s" hint-placeholder-count="3">
+          <div style="padding: 40px 32px 48px; border-right: 1px solid #1c1c2a">
+            <div style="font-size: 72px; font-weight: 800; font-stretch: 115%; line-height: 1; color: transparent; -webkit-text-stroke: 1px #2e2e42; margin-bottom: 18px">{{ s.num }}</div><!-- perk -->
+            <div style="font-size: 19px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; margin-bottom: 10px">{{ s.title }}</div>
+            <div style="font-size: 14.5px; line-height: 1.65; color: #9a9ab0; text-wrap: pretty; max-width: 340px">{{ s.body }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="Free reminder" style="border-bottom: 1px solid #232332">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 0 32px">
+      <a href="Download - Redesign.dc.html" style="display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 30px 12px; color: #e2e2ec; transition: background 150ms" style-hover="background: rgba(52,211,153,.05); color: #e2e2ec">
+        <span style="display: flex; align-items: baseline; gap: 20px; flex-wrap: wrap">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #5a5a72">↳ 00</span>
+          <span style="font-size: 24px; font-weight: 700; text-transform: uppercase">Not ready? The free tier isn't a trial.</span>
+          <span style="font-size: 14px; color: #9a9ab0">Three slots, forever. No card, no clock.</span>
+        </span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: #34d399; white-space: nowrap">DOWNLOAD FREE ↓</span>
+      </a>
+    </div>
+  </section>
+
+  <footer data-screen-label="Footer" style="max-width: 1280px; margin: 0 auto; padding: 28px 32px 40px; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap">
+    <a href="Marketing - Redesign v2.dc.html" style="display: flex; align-items: baseline; font-weight: 800; font-size: 16px; color: #e2e2ec" style-hover="color: #e2e2ec">scrollr<span style="color: #34d399">.</span></a>
+    <div style="display: flex; gap: 26px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .1em">
+      <a href="Download - Redesign.dc.html" style="color: #5a5a72">DOWNLOAD</a>
+      <a href="Uplink - Redesign.dc.html" style="color: #5a5a72">UPLINK</a>
+      <a href="Support - Redesign.dc.html" style="color: #5a5a72">SUPPORT</a>
+      <a href="https://myscrollr.com/legal" style="color: #5a5a72">LEGAL</a>
+      <a href="https://discord.gg/85b49TcGJa" style="color: #5a5a72">DISCORD</a>
+    </div>
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .1em; color: #3e3e52">ZERO ADS · ZERO TELEMETRY</div>
+  </footer>
+
+  <div data-screen-label="Live ticker (pinned)" style="{{ barStyle }}">
+    <div style="display: flex; align-items: center; gap: 8px; padding: 0 16px; border-right: 1px solid var(--bar-border); height: 100%; flex-shrink: 0">
+      <span style="width: 7px; height: 7px; border-radius: 50%; background: #34d399; animation: pulseDot 2s ease-in-out infinite"></span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: .12em; color: var(--bar-muted)">SCROLLR</span>
+    </div>
+    <div style="flex: 1; overflow: hidden; height: 100%; display: flex; align-items: center">
+      <div style="display: inline-flex; align-items: center; white-space: nowrap; animation: {{ marqueeAnim }}; will-change: transform" style-hover="animation-play-state: paused">
+        <sc-for list="{{ marqueeChips }}" as="c" hint-placeholder-count="8">
+          <span style="display: inline-flex; align-items: center; gap: 9px; padding: 0 26px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--bar-text); border-right: 1px solid var(--bar-border)">
+            <sc-if value="{{ c.live }}" hint-placeholder-val="{{ false }}"><span style="display: inline-flex; align-items: center; gap: 5px; color: #ff4757; font-size: 10px; font-weight: 600; letter-spacing: .12em"><span style="width: 5px; height: 5px; border-radius: 50%; background: #ff4757; animation: pulseDot 1.4s ease-in-out infinite"></span>LIVE</span></sc-if>
+            <span>{{ c.text }}</span>
+            <sc-if value="{{ c.delta }}" hint-placeholder-val="{{ false }}"><span style="color: {{ c.deltaColor }}; font-weight: 500">{{ c.delta }}</span></sc-if>
+          </span>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; padding: 0 16px; border-left: 1px solid var(--bar-border); height: 100%; flex-shrink: 0; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--bar-muted)">{{ clock }}</div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;tickerSpeed&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 45, &quot;min&quot;: 15, &quot;max&quot;: 90, &quot;step&quot;: 5, &quot;unit&quot;: &quot;s&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Ticker&quot;}}">
+class Component extends DCLogic {
+  state = { billing: 'annual', active: ['finance_stocks', 'sports_nfl', 'news_bbc'], theme: 'terminal', pos: 'bottom', tick: 0, now: new Date() };
+
+  componentDidMount() {
+    this.iv = setInterval(() => this.setState((s) => ({ tick: s.tick + 1, now: new Date() })), 3000);
+    try {
+      const saved = JSON.parse(localStorage.getItem('scrollr-marketing-demo') || 'null');
+      if (saved) {
+        const patch = {};
+        if (Array.isArray(saved.active) && saved.active.length) patch.active = saved.active;
+        if (this.palettes().some((p) => p.id === saved.theme)) patch.theme = saved.theme;
+        if (saved.pos === 'top' || saved.pos === 'bottom') patch.pos = saved.pos;
+        this.setState(patch);
+      }
+    } catch (e) {}
+  }
+  componentWillUnmount() { clearInterval(this.iv); }
+
+  palettes() {
+    return [
+      { id: 'terminal', bg: 'rgba(16,16,24,.9)', border: '#2e2e42', text: '#c8c8d8', muted: '#5a5a72' },
+      { id: 'paper', bg: 'rgba(248,248,252,.94)', border: '#d5d7e2', text: '#1a1b2e', muted: '#8a8aa0' },
+      { id: 'midnight', bg: 'rgba(10,14,26,.92)', border: '#1e2a45', text: '#c9d6f0', muted: '#4a5a7a' },
+      { id: 'matrix', bg: 'rgba(6,16,10,.92)', border: '#14402a', text: '#6ee7b7', muted: '#2f6b4f' },
+      { id: 'crimson', bg: 'rgba(24,12,16,.92)', border: '#452030', text: '#f0c9d2', muted: '#7a4a5a' },
+      { id: 'violet', bg: 'rgba(18,12,28,.92)', border: '#322048', text: '#d8c9f0', muted: '#5f4a7a' },
+    ];
+  }
+
+  jitter(base, seed, spread) { return base + Math.sin(this.state.tick * 0.9 + seed) * spread; }
+
+  chipsFor(id) {
+    const t = this.state.tick, up = '#34d399', down = '#ff4757';
+    switch (id) {
+      case 'finance_stocks':
+        return [
+          { text: 'AAPL ' + this.jitter(232.14, 1, 0.4).toFixed(2), delta: '▲ 1.2%', deltaColor: up, color: '#34d399' },
+          { text: 'NVDA ' + this.jitter(1204.1, 2, 3.2).toFixed(2), delta: '▲ 3.1%', deltaColor: up, color: '#34d399' },
+        ];
+      case 'finance_crypto':
+        return [{ text: 'BTC ' + Math.round(this.jitter(118240, 4, 180)).toLocaleString(), delta: '▲ 2.4%', deltaColor: up, color: '#34d399' }];
+      case 'sports_nfl':
+        return [{ text: 'NFL · KC 24 — BUF 21 · Q4 ' + (2 - (t % 3)) + ':' + String(59 - ((t * 7) % 60)).padStart(2, '0'), color: '#ff4757', live: true }];
+      case 'sports_mls': return [{ text: 'MLS · MIA 2 — LA 1 · 63′', color: '#ff4757', live: true }];
+      case 'sports_mlb': return [{ text: 'MLB · NYY 5 — BOS 3 · ▲7', color: '#ff4757', live: true }];
+      case 'news_bbc': return [{ text: 'BBC · SpaceX sets reuse record with 30th booster flight', color: '#00d4ff' }];
+      case 'news_hackernews': return [{ text: 'HN · Show HN: A 2KB reactive framework · 342▲', color: '#00d4ff' }];
+      case 'predictions': return [{ text: 'KALSHI · Sept rate cut — ' + Math.round(this.jitter(71, 6, 2)) + '¢', color: '#a855f7' }];
+      case 'fantasy_yahoo': return [{ text: 'FANTASY · You ' + this.jitter(112.4, 7, 0.8).toFixed(1) + ' — Mike 98.7 · SUN', color: '#fbbf24' }];
+      case 'weather': return [{ text: '72° · SUNNY · AUSTIN', color: '#0ea5e9' }];
+      case 'clock': return [{ text: this.state.now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + ' LOCAL', color: '#6366f1' }];
+      case 'timer': return [{ text: 'TIMER · 25:00 FOCUS', color: '#f59e0b' }];
+      case 'sysmon': return [{ text: 'CPU ' + Math.round(this.jitter(12, 8, 4)) + '% · MEM 48%', color: '#06b6d4' }];
+      default: return [{ text: id.replace(/^[a-z]+_/, '').toUpperCase() + ' · LIVE', color: '#8a8aa0' }];
+    }
+  }
+
+  renderVals() {
+    const { billing, active, theme, pos } = this.state;
+    const annual = billing === 'annual';
+    const tabs = [
+      { id: 'monthly', label: 'MONTHLY' },
+      { id: 'annual', label: 'ANNUAL · 4 MO FREE' },
+      { id: 'lifetime', label: 'LIFETIME · LIMITED' },
+    ];
+    const billingTabs = tabs.map((b) => ({
+      ...b,
+      bg: billing === b.id ? (b.id === 'lifetime' ? 'rgba(251,191,36,.12)' : 'rgba(52,211,153,.1)') : 'transparent',
+      color: billing === b.id ? (b.id === 'lifetime' ? '#fbbf24' : '#34d399') : '#8a8aa0',
+      border: billing === b.id ? (b.id === 'lifetime' ? 'rgba(251,191,36,.45)' : 'rgba(52,211,153,.45)') : '#2a2a3c',
+      action: () => this.setState({ billing: b.id }),
+    }));
+    const defs = [
+      { name: 'Free', tagline: "Start here — it's free forever", slots: 3, monthly: 0, annualPm: 0, billedYr: 0 },
+      { name: 'Uplink', tagline: 'Check in every morning. Miss nothing.', slots: 6, monthly: 9.99, annualPm: 6.67, billedYr: 79.99 },
+      { name: 'Pro', tagline: 'Know the moment it happens.', slots: 12, monthly: 24.99, annualPm: 16.67, billedYr: 199.99 },
+      { name: 'Ultimate', tagline: 'Everything. Zero limits.', slots: Infinity, monthly: 49.99, annualPm: 33.33, billedYr: 399.99, popular: true },
+    ];
+    const plans = defs.map((d) => {
+      const free = d.monthly === 0;
+      const pm = annual ? d.annualPm : d.monthly;
+      return {
+        name: d.name,
+        tagline: d.tagline,
+        popular: !!d.popular,
+        price: free ? '$0' : '$' + pm.toFixed(2),
+        period: '/MO',
+        billed: free ? 'FREE FOREVER' : annual ? 'BILLED $' + d.billedYr.toFixed(2) + '/YR' : 'BILLED MONTHLY',
+        deal: !free && annual ? '4 MONTHS FREE' : false,
+        infinite: d.slots === Infinity,
+        slotRow: d.slots !== Infinity,
+        slotDots: d.slots === Infinity ? [] : Array.from({ length: d.slots }, (_, i) => ({ i })),
+        slotLabel: (d.slots === Infinity ? 'UNLIMITED' : d.slots) + ' WIDGETS AT ONCE',
+        cta: free ? 'Get started free' : 'Start free trial',
+        foot: free ? 'NO CARD REQUIRED' : '7 DAYS FREE, THEN $' + pm.toFixed(2) + '/MO',
+        bg: d.popular ? 'rgba(52,211,153,.04)' : '#15151f',
+        border: d.popular ? 'rgba(52,211,153,.45)' : '#26263a',
+        ctaBg: d.popular ? '#34d399' : 'transparent',
+        ctaColor: d.popular ? '#101018' : '#e2e2ec',
+        ctaBorder: d.popular ? '#34d399' : '#34344a',
+      };
+    });
+    const chips = active.flatMap((id) => this.chipsFor(id));
+    const doubled = chips.concat(chips).map((c, i) => ({ ...c, key: i }));
+    const pal = this.palettes().find((p) => p.id === theme);
+    const barStyle = {
+      position: 'fixed', left: 0, right: 0, height: 48, zIndex: 50,
+      display: 'flex', alignItems: 'center', backdropFilter: 'blur(14px)',
+      background: pal.bg,
+      [pos === 'bottom' ? 'bottom' : 'top']: 0,
+      [pos === 'bottom' ? 'borderTop' : 'borderBottom']: '1px solid ' + pal.border,
+      '--bar-border': pal.border, '--bar-text': pal.text, '--bar-muted': pal.muted,
+    };
+    return {
+      billingTabs, plans,
+      showPlans: billing !== 'lifetime',
+      showLifetime: billing === 'lifetime',
+      marqueeChips: doubled,
+      marqueeAnim: 'marquee ' + (this.props.tickerSpeed ?? 45) + 's linear infinite',
+      barStyle,
+      clock: this.state.now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+      perks: [
+        { num: '01', title: 'More at once', body: 'The only number that changes. Free runs three widgets; Uplink runs six, Pro twelve, Ultimate as many as you can read.' },
+        { num: '02', title: 'Priority support', body: 'Paid plans jump the queue. Real humans, usually the ones who wrote the code you\'re asking about.' },
+        { num: '03', title: 'Early access', body: 'New widgets land on paid tiers first, then roll out to everyone. You fund the roadmap; you see it first.' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

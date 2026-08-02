@@ -52,6 +52,19 @@
     U+2215, U+FEFF, U+FFFD;
 }
 
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-display: swap;
+  src: url('/fonts/archivo-variable-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
 @import 'tailwindcss';
 
 /* Class-based dark mode for toggle support */
@@ -82,6 +95,7 @@
   --color-info-content: #ffffff;
 
   --color-base-50: #f8f8fc;
+  --color-base-75: #f8f8fc;
   --color-base-100: #ffffff;
   --color-base-150: #f6f7fb;
   --color-base-200: #eef0f6;
@@ -91,8 +105,13 @@
   --color-base-400: #b0b3c4;
   --color-base-content: #1a1b2e;
 
+  /* Terminal-editorial surfaces (marketing redesign) */
+  --color-panel: #ffffff;
+  --color-hairline: #d5d7e2;
+  --color-hairline-minor: #e4e6ee;
+
   /* Typography */
-  --font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-display: 'Archivo', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
 
   /* Border Radius — Softened */
@@ -134,6 +153,7 @@
   --color-warning: #fbbf24;
 
   --color-base-50: #f8f8fc;
+  --color-base-75: #101018;
   --color-base-100: #141420;
   --color-base-150: #171726;
   --color-base-200: #1c1c2a;
@@ -142,6 +162,10 @@
   --color-base-350: #303040;
   --color-base-400: #383848;
   --color-base-content: #e2e2ec;
+
+  --color-panel: #15151f;
+  --color-hairline: #232332;
+  --color-hairline-minor: #1c1c2a;
 
   --shadow-glow-sm: 0 0 20px rgba(52, 211, 153, 0.06);
   --shadow-glow-md: 0 0 30px rgba(52, 211, 153, 0.1);
@@ -166,6 +190,10 @@
   --grid-dot-warning: rgba(245, 158, 11, 0.25);
   --glow-primary-subtle: rgba(52, 211, 153, 0.03);
   --glow-info-subtle: rgba(0, 184, 219, 0.02);
+  /* Terminal-editorial decorations */
+  --scanline-color: rgba(26, 27, 46, 0.02);
+  --outline-stroke: #059669;
+  --ghost-stroke: #c4c6d4;
 }
 
 .dark {
@@ -174,6 +202,303 @@
   --grid-dot-warning: rgba(250, 204, 21, 0.4);
   --glow-primary-subtle: rgba(52, 211, 153, 0.05);
   --glow-info-subtle: rgba(0, 212, 255, 0.04);
+  --scanline-color: rgba(226, 226, 236, 0.012);
+  --outline-stroke: #34d399;
+  --ghost-stroke: #2e2e42;
+}
+
+/* ==========================================================================
+   THEME FAMILIES — site-wide overrides (marketing redesign)
+   The desktop app ships 10 theme families x 2 modes; picking one in
+   the landing page's MAKE IT YOURS section sets data-theme-family on
+   <html> and re-skins the whole site with that family's real tokens
+   (extracted from desktop/src/style.css — the 'website base palette
+   (for parity)' blocks). Scrollr is the default and needs no block.
+   ========================================================================== */
+
+/* ── catppuccin ── */
+[data-theme-family='catppuccin'] {
+  --color-base-75: #e6e9ef;
+  --color-base-100: #eff1f5;
+  --color-base-150: #e6e9ef;
+  --color-base-200: #ccd0da;
+  --color-base-250: #bcc0cc;
+  --color-base-300: #acb0be;
+  --color-base-350: #9ca0b0;
+  --color-base-400: #8c8fa1;
+  --color-base-content: #4c4f69;
+  --color-panel: #eff1f5;
+  --color-hairline: #ccd0da;
+  --color-hairline-minor: color-mix(in srgb, #ccd0da 55%, #e6e9ef);
+  --color-primary: #40a02b;
+  --color-secondary: #d20f39;
+  --color-info: #04a5e5;
+  --color-accent: #8839ef;
+  --outline-stroke: #40a02b;
+  --ghost-stroke: #9ca0b0;
+}
+.dark[data-theme-family='catppuccin'] {
+  --color-base-75: #181825;
+  --color-base-100: #1e1e2e;
+  --color-base-150: #181825;
+  --color-base-200: #313244;
+  --color-base-250: #45475a;
+  --color-base-300: #585b70;
+  --color-base-350: #6c7086;
+  --color-base-400: #7f849c;
+  --color-base-content: #cdd6f4;
+  --color-panel: #1e1e2e;
+  --color-hairline: #313244;
+  --color-hairline-minor: color-mix(in srgb, #313244 55%, #181825);
+  --color-primary: #a6e3a1;
+  --color-secondary: #f38ba8;
+  --color-info: #89dceb;
+  --color-accent: #cba6f7;
+  --outline-stroke: #a6e3a1;
+  --ghost-stroke: #45475a;
+}
+
+/* ── dracula ── */
+[data-theme-family='dracula'] {
+  --color-base-75: #efefe6;
+  --color-base-100: #f8f8f2;
+  --color-base-150: #efefe6;
+  --color-base-200: #e4e4d8;
+  --color-base-250: #d4d4c5;
+  --color-base-300: #c2c2b2;
+  --color-base-350: #a8a89a;
+  --color-base-400: #8e8e82;
+  --color-base-content: #282a36;
+  --color-panel: #f8f8f2;
+  --color-hairline: #c2c2b2;
+  --color-hairline-minor: color-mix(in srgb, #c2c2b2 55%, #efefe6);
+  --color-primary: #2a9d6f;
+  --color-secondary: #c43a3a;
+  --color-info: #2a8aa5;
+  --color-accent: #7a52d8;
+  --outline-stroke: #2a9d6f;
+  --ghost-stroke: #a8a89a;
+}
+.dark[data-theme-family='dracula'] {
+  --color-base-75: #21222c;
+  --color-base-100: #282a36;
+  --color-base-150: #21222c;
+  --color-base-200: #44475a;
+  --color-base-250: #565973;
+  --color-base-300: #6272a4;
+  --color-base-350: #7783b4;
+  --color-base-400: #8c95c2;
+  --color-base-content: #f8f8f2;
+  --color-panel: #282a36;
+  --color-hairline: #44475a;
+  --color-hairline-minor: color-mix(in srgb, #44475a 55%, #21222c);
+  --color-primary: #50fa7b;
+  --color-secondary: #ff5555;
+  --color-info: #8be9fd;
+  --color-accent: #bd93f9;
+  --outline-stroke: #50fa7b;
+  --ghost-stroke: #6272a4;
+}
+
+/* ── tokyo-night ── */
+[data-theme-family='tokyo-night'] {
+  --color-base-75: #d5d6dc;
+  --color-base-100: #e1e2e7;
+  --color-base-150: #d5d6dc;
+  --color-base-200: #c4c8da;
+  --color-base-250: #b4b8cf;
+  --color-base-300: #a1a6c5;
+  --color-base-350: #8990af;
+  --color-base-400: #6c728c;
+  --color-base-content: #3760bf;
+  --color-panel: #e1e2e7;
+  --color-hairline: #c4c8da;
+  --color-hairline-minor: color-mix(in srgb, #c4c8da 55%, #d5d6dc);
+  --color-primary: #2e7de9;
+  --color-secondary: #f52a65;
+  --color-info: #007197;
+  --color-accent: #9854f1;
+  --outline-stroke: #2e7de9;
+  --ghost-stroke: #8990af;
+}
+.dark[data-theme-family='tokyo-night'] {
+  --color-base-75: #16161e;
+  --color-base-100: #1a1b26;
+  --color-base-150: #16161e;
+  --color-base-200: #24283b;
+  --color-base-250: #2f334d;
+  --color-base-300: #414868;
+  --color-base-350: #545c7e;
+  --color-base-400: #737aa2;
+  --color-base-content: #c0caf5;
+  --color-panel: #1a1b26;
+  --color-hairline: #2f334d;
+  --color-hairline-minor: color-mix(in srgb, #2f334d 55%, #16161e);
+  --color-primary: #7aa2f7;
+  --color-secondary: #f7768e;
+  --color-info: #7dcfff;
+  --color-accent: #bb9af7;
+  --outline-stroke: #7aa2f7;
+  --ghost-stroke: #414868;
+}
+
+/* ── nord ── */
+[data-theme-family='nord'] {
+  --color-base-75: #e5e9f0;
+  --color-base-100: #eceff4;
+  --color-base-150: #e5e9f0;
+  --color-base-200: #d8dee9;
+  --color-base-250: #c8d0dd;
+  --color-base-300: #b6bfce;
+  --color-base-350: #9aa3b4;
+  --color-base-400: #7d8595;
+  --color-base-content: #2e3440;
+  --color-panel: #eceff4;
+  --color-hairline: #d8dee9;
+  --color-hairline-minor: color-mix(in srgb, #d8dee9 55%, #e5e9f0);
+  --color-primary: #5e81ac;
+  --color-secondary: #bf616a;
+  --color-info: #5d8eaf;
+  --color-accent: #9c6c8d;
+  --outline-stroke: #5e81ac;
+  --ghost-stroke: #9aa3b4;
+}
+.dark[data-theme-family='nord'] {
+  --color-base-75: #292e39;
+  --color-base-100: #2e3440;
+  --color-base-150: #292e39;
+  --color-base-200: #3b4252;
+  --color-base-250: #434c5e;
+  --color-base-300: #4c566a;
+  --color-base-350: #5e6779;
+  --color-base-400: #6f7889;
+  --color-base-content: #eceff4;
+  --color-panel: #2e3440;
+  --color-hairline: #3b4252;
+  --color-hairline-minor: color-mix(in srgb, #3b4252 55%, #292e39);
+  --color-primary: #88c0d0;
+  --color-secondary: #bf616a;
+  --color-info: #81a1c1;
+  --color-accent: #b48ead;
+  --outline-stroke: #88c0d0;
+  --ghost-stroke: #4c566a;
+}
+
+/* ── gruvbox ── */
+[data-theme-family='gruvbox'] {
+  --color-base-75: #f2e5bc;
+  --color-base-100: #fbf1c7;
+  --color-base-150: #f2e5bc;
+  --color-base-200: #ebdbb2;
+  --color-base-250: #d5c4a1;
+  --color-base-300: #bdae93;
+  --color-base-350: #a89984;
+  --color-base-400: #928374;
+  --color-base-content: #3c3836;
+  --color-panel: #fbf1c7;
+  --color-hairline: #ebdbb2;
+  --color-hairline-minor: color-mix(in srgb, #ebdbb2 55%, #f2e5bc);
+  --color-primary: #79740e;
+  --color-secondary: #9d0006;
+  --color-info: #076678;
+  --color-accent: #8f3f71;
+  --outline-stroke: #79740e;
+  --ghost-stroke: #a89984;
+}
+.dark[data-theme-family='gruvbox'] {
+  --color-base-75: #282828;
+  --color-base-100: #282828;
+  --color-base-150: #32302f;
+  --color-base-200: #3c3836;
+  --color-base-250: #504945;
+  --color-base-300: #665c54;
+  --color-base-350: #7c6f64;
+  --color-base-400: #928374;
+  --color-base-content: #ebdbb2;
+  --color-panel: #32302f;
+  --color-hairline: #3c3836;
+  --color-hairline-minor: color-mix(in srgb, #3c3836 55%, #282828);
+  --color-primary: #b8bb26;
+  --color-secondary: #fb4934;
+  --color-info: #83a598;
+  --color-accent: #d3869b;
+  --outline-stroke: #b8bb26;
+  --ghost-stroke: #504945;
+}
+
+/* ==========================================================================
+   TERMINAL EDITORIAL — marketing redesign utilities
+   4px scanlines, condensed display type, outlined headlines with a solid
+   color fallback where -webkit-text-stroke is unsupported, ghost numerals,
+   and the persistent demo ticker bar's marquee.
+   ========================================================================== */
+
+.scanlines {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    var(--scanline-color) 3px,
+    var(--scanline-color) 4px
+  );
+}
+
+.type-display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-stretch: 115%;
+  text-transform: uppercase;
+  line-height: 0.94;
+  letter-spacing: -0.015em;
+}
+
+.type-outline {
+  color: var(--outline-stroke);
+}
+
+.type-ghost {
+  color: var(--ghost-stroke);
+}
+
+@supports (-webkit-text-stroke: 1px black) {
+  .type-outline {
+    color: transparent;
+    -webkit-text-stroke: 1.5px var(--outline-stroke);
+  }
+  .type-ghost {
+    color: transparent;
+    -webkit-text-stroke: 1px var(--ghost-stroke);
+  }
+}
+
+/* Demo ticker bar marquee. Chips are duplicated 2x by the component, so
+   -50% loops seamlessly. Paused on hover; the global reduced-motion
+   override freezes it at 0 (static chips remain visible). */
+.demo-marquee {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  width: max-content;
+  animation: ticker-scroll var(--marquee-duration, 45s) linear infinite;
+  will-change: transform;
+}
+
+.demo-marquee-viewport:hover .demo-marquee {
+  animation-play-state: paused;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
 }
 
 /* ==========================================================================
@@ -787,14 +1112,20 @@ pre,
 
 /* ==========================================================================
    LINK STYLES
+   Layered as `base` so Tailwind utility classes (which live in the
+   `utilities` layer and would otherwise LOSE to these unlayered rules
+   under native cascade-layer precedence) can override link color and
+   hover opacity per-element.
    ========================================================================== */
 
-a {
-  @apply text-primary transition-colors duration-200;
-}
+@layer base {
+  a {
+    @apply text-primary transition-colors duration-200;
+  }
 
-a:hover {
-  @apply opacity-80;
+  a:hover {
+    @apply opacity-80;
+  }
 }
 
 /* ==========================================================================

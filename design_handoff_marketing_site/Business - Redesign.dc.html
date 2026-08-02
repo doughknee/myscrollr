@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #101018; color: #e2e2ec; font-family: 'Archivo', system-ui, sans-serif; }
+  a { color: #34d399; text-decoration: none; }
+  a:hover { color: #6ee7b7; }
+  ::selection { background: rgba(52,211,153,.3); }
+  @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  @keyframes pulseDot { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  @keyframes riseIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #101018; background-image: repeating-linear-gradient(to bottom, transparent 0px, transparent 3px, rgba(226,226,236,.012) 3px, rgba(226,226,236,.012) 4px); padding-bottom: 120px">
+
+  <nav data-screen-label="Nav" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #232332; padding: 0 32px; height: 60px">
+    <a href="Marketing - Redesign v2.dc.html" style="display: flex; align-items: baseline; font-weight: 800; font-size: 20px; letter-spacing: -0.02em; color: #e2e2ec" style-hover="color: #e2e2ec">scrollr<span style="color: #34d399">.</span></a>
+    <div style="display: flex; align-items: center; gap: 32px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: .08em">
+      <a href="Widgets - Redesign.dc.html" style="color: #8a8aa0">WIDGETS</a>
+      <a href="Uplink - Redesign.dc.html" style="color: #8a8aa0">UPLINK</a>
+      <a href="Business - Redesign.dc.html" style="color: #34d399">BUSINESS</a>
+      <a href="https://github.com/brandon-relentnet/myscrollr" style="color: #8a8aa0">GITHUB</a>
+      <a href="Download - Redesign.dc.html" style="background: #34d399; color: #101018; padding: 8px 18px; border-radius: 4px; font-weight: 600" style-hover="background: #6ee7b7; color: #101018">DOWNLOAD ↓</a>
+    </div>
+  </nav>
+
+  <section data-screen-label="Business hero" style="border-bottom: 1px solid #232332; padding: 64px 32px 56px; position: relative; overflow: hidden">
+    <div style="position: absolute; top: -220px; left: 45%; width: 720px; height: 480px; background: radial-gradient(ellipse at center, rgba(52,211,153,.09), transparent 65%); pointer-events: none"></div>
+    <div style="max-width: 1280px; margin: 0 auto; position: relative">
+      <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #5a5a72; margin-bottom: 40px; animation: riseIn .5s ease-out both">
+        <span>BUSINESS ／ BRANDED DEPLOYMENTS</span>
+        <span>FROM $500/MO · MUTUAL NDA BEFORE THE FIRST CALL</span>
+      </div>
+      <h1 style="font-size: clamp(48px, 6.5vw, 96px); font-weight: 800; font-stretch: 115%; text-transform: uppercase; line-height: .94; letter-spacing: -0.015em; margin: 0 0 8px; animation: riseIn .6s ease-out .08s both">Your brand,</h1>
+      <h1 style="font-size: clamp(48px, 6.5vw, 96px); font-weight: 800; font-stretch: 115%; text-transform: uppercase; line-height: .94; letter-spacing: -0.015em; margin: 0 0 32px; color: transparent; -webkit-text-stroke: 1.5px #34d399; animation: riseIn .6s ease-out .16s both">our rails.</h1>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; flex-wrap: wrap; animation: riseIn .6s ease-out .24s both">
+        <p style="font-size: 18px; line-height: 1.6; color: #9a9ab0; max-width: 480px; margin: 0; text-wrap: pretty">The Scrollr platform — ticker, data pipeline, and all — wearing your logo, your colors, your domain. Built, deployed, and supported by the people who wrote it.</p>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 14px">
+          <a href="mailto:enterprise@myscrollr.com" style="background: #34d399; color: #101018; padding: 15px 30px; border-radius: 4px; font-weight: 700; font-size: 16px; box-shadow: 0 0 60px rgba(52,211,153,.18)" style-hover="background: #6ee7b7; color: #101018">enterprise@myscrollr.com</a>
+          <div style="display: flex; align-items: center; gap: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .1em; color: #5a5a72">
+            <span>TRY THE WHITE-LABEL ↘</span>
+            <sc-for list="{{ brands }}" as="b" hint-placeholder-count="4">
+              <button onClick="{{ b.action }}" style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .08em; background: {{ b.bg }}; color: {{ b.color }}; border: 1px solid {{ b.border }}; border-radius: 4px; padding: 7px 12px; cursor: pointer; white-space: nowrap" style-hover="border-color: #34d399">{{ b.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="Who deploys" style="border-bottom: 1px solid #232332">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 0 32px">
+      <div style="padding: 20px 0; border-bottom: 1px solid #232332; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #5a5a72">SEC 01 ／ WHO DEPLOYS THIS</div>
+      <div style="padding: 8px 0 32px">
+        <sc-for list="{{ audiences }}" as="a" hint-placeholder-count="6">
+          <div style="display: grid; grid-template-columns: 70px 260px 1fr; align-items: baseline; gap: 20px; border-bottom: 1px solid #1c1c2a; padding: 19px 8px">
+            <span style="display: inline-flex; align-items: center; gap: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; color: {{ a.color }}"><span style="width: 7px; height: 7px; border-radius: 2px; background: {{ a.color }}"></span>{{ a.tag }}</span>
+            <span style="font-weight: 700; font-size: 17px">{{ a.name }}</span>
+            <span style="font-size: 14px; color: #9a9ab0; text-wrap: pretty">{{ a.copy }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="What you get" style="border-bottom: 1px solid #232332">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 0 32px">
+      <div style="padding: 20px 0; border-bottom: 1px solid #232332; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #5a5a72">SEC 02 ／ WHAT A DEPLOYMENT INCLUDES</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0">
+        <sc-for list="{{ capabilities }}" as="c" hint-placeholder-count="6">
+          <div style="padding: 36px 32px 42px; border-right: 1px solid #1c1c2a; border-bottom: 1px solid #1c1c2a">
+            <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #34d399; margin-bottom: 14px">{{ c.num }}</div>
+            <div style="font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; margin-bottom: 9px">{{ c.title }}</div>
+            <div style="font-size: 14px; line-height: 1.65; color: #9a9ab0; text-wrap: pretty; max-width: 360px">{{ c.body }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="Process" style="border-bottom: 1px solid #232332">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 0 32px">
+      <div style="padding: 20px 0; border-bottom: 1px solid #232332; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #5a5a72">SEC 03 ／ FIRST EMAIL TO LIVE</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0">
+        <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+          <div style="padding: 40px 32px 48px; border-right: 1px solid #1c1c2a">
+            <div style="font-size: 72px; font-weight: 800; font-stretch: 115%; line-height: 1; color: transparent; -webkit-text-stroke: 1px #2e2e42; margin-bottom: 18px">{{ s.num }}</div>
+            <div style="font-size: 19px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; margin-bottom: 10px">{{ s.title }}</div>
+            <div style="font-size: 14.5px; line-height: 1.65; color: #9a9ab0; text-wrap: pretty; max-width: 340px">{{ s.body }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="Business FAQ" style="border-bottom: 1px solid #232332">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 0 32px">
+      <div style="padding: 20px 0; border-bottom: 1px solid #232332; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #5a5a72">SEC 04 ／ STRAIGHT ANSWERS</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 48px; padding: 12px 0 40px">
+        <sc-for list="{{ faqs }}" as="f" hint-placeholder-count="6">
+          <div style="padding: 26px 4px; border-bottom: 1px solid #1c1c2a">
+            <div style="display: flex; gap: 14px; align-items: baseline; margin-bottom: 9px">
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #34d399">{{ f.num }}</span>
+              <span style="font-weight: 700; font-size: 16.5px">{{ f.q }}</span>
+            </div>
+            <div style="font-size: 14.5px; line-height: 1.65; color: #9a9ab0; text-wrap: pretty; padding-left: 34px">{{ f.a }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="Business CTA" style="border-bottom: 1px solid #232332">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 0 32px">
+      <a href="mailto:enterprise@myscrollr.com" style="display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 34px 12px; color: #e2e2ec; transition: background 150ms" style-hover="background: rgba(52,211,153,.05); color: #e2e2ec">
+        <span style="display: flex; align-items: baseline; gap: 20px; flex-wrap: wrap">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #5a5a72">↳ 01</span>
+          <span style="font-size: 26px; font-weight: 700; text-transform: uppercase">Starts at $500/mo.</span>
+          <span style="font-size: 14px; color: #9a9ab0">Timeline and scope committed in writing before you pay anything.</span>
+        </span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: #34d399; white-space: nowrap">START THE CONVERSATION →</span>
+      </a>
+    </div>
+  </section>
+
+  <footer data-screen-label="Footer" style="max-width: 1280px; margin: 0 auto; padding: 28px 32px 40px; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap">
+    <a href="Marketing - Redesign v2.dc.html" style="display: flex; align-items: baseline; font-weight: 800; font-size: 16px; color: #e2e2ec" style-hover="color: #e2e2ec">scrollr<span style="color: #34d399">.</span></a>
+    <div style="display: flex; gap: 26px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .1em">
+      <a href="Download - Redesign.dc.html" style="color: #5a5a72">DOWNLOAD</a>
+      <a href="Uplink - Redesign.dc.html" style="color: #5a5a72">UPLINK</a>
+      <a href="Support - Redesign.dc.html" style="color: #5a5a72">SUPPORT</a>
+      <a href="https://myscrollr.com/legal" style="color: #5a5a72">LEGAL</a>
+      <a href="https://discord.gg/85b49TcGJa" style="color: #5a5a72">DISCORD</a>
+    </div>
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .1em; color: #3e3e52">ZERO ADS · ZERO TELEMETRY</div>
+  </footer>
+
+  <div data-screen-label="Live ticker (pinned)" style="{{ barStyle }}">
+    <div style="display: flex; align-items: center; gap: 8px; padding: 0 16px; border-right: 1px solid var(--bar-border); height: 100%; flex-shrink: 0">
+      <span style="width: 7px; height: 7px; border-radius: 50%; background: {{ brandAccent }}; animation: pulseDot 2s ease-in-out infinite"></span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: .12em; color: var(--bar-muted)">{{ barLabel }}</span>
+    </div>
+    <div style="flex: 1; overflow: hidden; height: 100%; display: flex; align-items: center">
+      <div style="display: inline-flex; align-items: center; white-space: nowrap; animation: {{ marqueeAnim }}; will-change: transform" style-hover="animation-play-state: paused">
+        <sc-for list="{{ marqueeChips }}" as="c" hint-placeholder-count="8">
+          <span style="display: inline-flex; align-items: center; gap: 9px; padding: 0 26px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--bar-text); border-right: 1px solid var(--bar-border)">
+            <sc-if value="{{ c.live }}" hint-placeholder-val="{{ false }}"><span style="display: inline-flex; align-items: center; gap: 5px; color: #ff4757; font-size: 10px; font-weight: 600; letter-spacing: .12em"><span style="width: 5px; height: 5px; border-radius: 50%; background: #ff4757; animation: pulseDot 1.4s ease-in-out infinite"></span>LIVE</span></sc-if>
+            <span>{{ c.text }}</span>
+            <sc-if value="{{ c.delta }}" hint-placeholder-val="{{ false }}"><span style="color: {{ c.deltaColor }}; font-weight: 500">{{ c.delta }}</span></sc-if>
+          </span>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; padding: 0 16px; border-left: 1px solid var(--bar-border); height: 100%; flex-shrink: 0; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--bar-muted)">{{ clock }}</div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;tickerSpeed&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 45, &quot;min&quot;: 15, &quot;max&quot;: 90, &quot;step&quot;: 5, &quot;unit&quot;: &quot;s&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Ticker&quot;}}">
+class Component extends DCLogic {
+  state = { brand: 'scrollr', active: ['finance_stocks', 'sports_nfl', 'news_bbc'], theme: 'terminal', pos: 'bottom', tick: 0, now: new Date() };
+
+  componentDidMount() {
+    this.iv = setInterval(() => this.setState((s) => ({ tick: s.tick + 1, now: new Date() })), 3000);
+    try {
+      const saved = JSON.parse(localStorage.getItem('scrollr-marketing-demo') || 'null');
+      if (saved) {
+        const patch = {};
+        if (Array.isArray(saved.active) && saved.active.length) patch.active = saved.active;
+        if (saved.pos === 'top' || saved.pos === 'bottom') patch.pos = saved.pos;
+        this.setState(patch);
+      }
+    } catch (e) {}
+  }
+  componentWillUnmount() { clearInterval(this.iv); }
+
+  brandDefs() {
+    return {
+      scrollr: { label: 'SCROLLR', accent: '#34d399', bar: { bg: 'rgba(16,16,24,.9)', border: '#2e2e42', text: '#c8c8d8', muted: '#5a5a72' } },
+      acme: { label: 'ACME CAPITAL', accent: '#00d4ff', bar: { bg: 'rgba(8,16,28,.93)', border: '#1c3450', text: '#c9dcf0', muted: '#4a6a8a' } },
+      dugout: { label: 'THE DUGOUT', accent: '#fbbf24', bar: { bg: 'rgba(22,14,8,.93)', border: '#4a3418', text: '#f0e2c9', muted: '#8a7a5a' } },
+      novax: { label: 'NOVAX', accent: '#a855f7', bar: { bg: 'rgba(16,10,26,.93)', border: '#362050', text: '#ddc9f0', muted: '#6f5a8a' } },
+    };
+  }
+
+  jitter(base, seed, spread) { return base + Math.sin(this.state.tick * 0.9 + seed) * spread; }
+
+  chipsFor(id) {
+    const t = this.state.tick, up = '#34d399', down = '#ff4757';
+    switch (id) {
+      case 'finance_stocks':
+        return [
+          { text: 'AAPL ' + this.jitter(232.14, 1, 0.4).toFixed(2), delta: '▲ 1.2%', deltaColor: up, color: '#34d399' },
+          { text: 'NVDA ' + this.jitter(1204.1, 2, 3.2).toFixed(2), delta: '▲ 3.1%', deltaColor: up, color: '#34d399' },
+        ];
+      case 'finance_crypto':
+        return [{ text: 'BTC ' + Math.round(this.jitter(118240, 4, 180)).toLocaleString(), delta: '▲ 2.4%', deltaColor: up, color: '#34d399' }];
+      case 'sports_nfl':
+        return [{ text: 'NFL · KC 24 — BUF 21 · Q4 ' + (2 - (t % 3)) + ':' + String(59 - ((t * 7) % 60)).padStart(2, '0'), color: '#ff4757', live: true }];
+      case 'sports_mlb': return [{ text: 'MLB · NYY 5 — BOS 3 · ▲7', color: '#ff4757', live: true }];
+      case 'news_bbc': return [{ text: 'BBC · SpaceX sets reuse record with 30th booster flight', color: '#00d4ff' }];
+      case 'predictions': return [{ text: 'KALSHI · Sept rate cut — ' + Math.round(this.jitter(71, 6, 2)) + '¢', color: '#a855f7' }];
+      case 'fantasy_yahoo': return [{ text: 'FANTASY · You ' + this.jitter(112.4, 7, 0.8).toFixed(1) + ' — Mike 98.7 · SUN', color: '#fbbf24' }];
+      case 'weather': return [{ text: '72° · SUNNY · AUSTIN', color: '#0ea5e9' }];
+      default: return [{ text: id.replace(/^[a-z]+_/, '').toUpperCase() + ' · LIVE', color: '#8a8aa0' }];
+    }
+  }
+
+  brandChips(brand) {
+    const up = '#34d399', down = '#ff4757', t = this.state.tick;
+    if (brand === 'acme') {
+      const a = this.jitter(482.1, 3, 1.2);
+      return [
+        { text: 'ACME MODEL PORTFOLIO ▲ 0.8% TODAY', color: '#00d4ff' },
+        { text: 'SPY ' + this.jitter(612.4, 1, 0.8).toFixed(2), delta: '▲ 0.4%', deltaColor: up, color: '#00d4ff' },
+        { text: 'QQQ ' + a.toFixed(2), delta: '▲ 0.9%', deltaColor: up, color: '#00d4ff' },
+        { text: '10Y YIELD 3.84%', delta: '▼ 2BP', deltaColor: down, color: '#00d4ff' },
+        { text: 'YOUR ADVISOR: QUARTERLY REVIEW THU 2PM', color: '#00d4ff' },
+      ];
+    }
+    if (brand === 'dugout') {
+      return [
+        { text: 'MLB · NYY 5 — BOS 3 · ▲7', color: '#fbbf24', live: true },
+        { text: 'MLS · MIA 2 — LA 1 · 63′', color: '#fbbf24', live: true },
+        { text: 'TONIGHT: TRIVIA 8PM · WINGS ½ OFF DURING ANY OT', color: '#fbbf24' },
+        { text: 'NFL · KC 24 — BUF 21 · Q4 ' + (2 - (t % 3)) + ':' + String(59 - ((t * 7) % 60)).padStart(2, '0'), color: '#fbbf24', live: true },
+      ];
+    }
+    if (brand === 'novax') {
+      return [
+        { text: 'BTC/USDT ' + Math.round(this.jitter(118240, 4, 180)).toLocaleString(), delta: '▲ 2.4%', deltaColor: up, color: '#a855f7' },
+        { text: 'ETH/USDT ' + Math.round(this.jitter(4120, 5, 14)).toLocaleString(), delta: '▼ 0.8%', deltaColor: down, color: '#a855f7' },
+        { text: 'SOL/USDT ' + this.jitter(212.5, 6, 2.4).toFixed(2), delta: '▲ 5.1%', deltaColor: up, color: '#a855f7' },
+        { text: 'NOVAX · MAKER FEES 0% THROUGH SEPTEMBER', color: '#a855f7' },
+      ];
+    }
+    return this.state.active.flatMap((id) => this.chipsFor(id));
+  }
+
+  renderVals() {
+    const { brand, pos } = this.state;
+    const defs = this.brandDefs();
+    const cur = defs[brand];
+    const brands = Object.keys(defs).map((id) => ({
+      id,
+      label: defs[id].label,
+      bg: brand === id ? 'rgba(52,211,153,.1)' : 'transparent',
+      color: brand === id ? '#34d399' : '#8a8aa0',
+      border: brand === id ? 'rgba(52,211,153,.45)' : '#2a2a3c',
+      action: () => this.setState({ brand: id }),
+    }));
+    const chips = this.brandChips(brand);
+    const doubled = chips.concat(chips).map((c, i) => ({ ...c, key: i }));
+    const barStyle = {
+      position: 'fixed', left: 0, right: 0, height: 48, zIndex: 50,
+      display: 'flex', alignItems: 'center', backdropFilter: 'blur(14px)',
+      background: cur.bar.bg,
+      [pos === 'bottom' ? 'bottom' : 'top']: 0,
+      [pos === 'bottom' ? 'borderTop' : 'borderBottom']: '1px solid ' + cur.bar.border,
+      '--bar-border': cur.bar.border, '--bar-text': cur.bar.text, '--bar-muted': cur.bar.muted,
+    };
+    return {
+      brands,
+      barLabel: cur.label,
+      brandAccent: cur.accent,
+      marqueeChips: doubled,
+      marqueeAnim: 'marquee ' + (this.props.tickerSpeed ?? 45) + 's linear infinite',
+      barStyle,
+      clock: this.state.now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+      audiences: [
+        { tag: 'VENUE', color: '#fbbf24', name: 'Sports bars & restaurants', copy: 'Every TV in the room runs live scores, news, and your branding. Better than ESPN scrollers, fully under your control.' },
+        { tag: 'FIN', color: '#00d4ff', name: 'Brokerages & advisors', copy: 'A branded desktop ticker for clients. Real-time quotes, custom watchlists, your logo, your colors, your domain.' },
+        { tag: 'FAN', color: '#ff4757', name: 'Fantasy sports platforms', copy: 'White-label the desktop app as your platform\'s companion. Native ticker, your branding, your standings.' },
+        { tag: 'ODDS', color: '#a855f7', name: 'Sportsbooks & betting affiliates', copy: 'Stay on a user\'s desktop without a tab open. Odds, scores, and your offers — visible the moment they matter.' },
+        { tag: 'CRYPTO', color: '#34d399', name: 'Crypto exchanges', copy: 'A native desktop price ticker for power users. Custom symbol list, your exchange\'s pairs, your branding.' },
+        { tag: 'NEWS', color: '#0ea5e9', name: 'News publishers', copy: 'Your headlines on readers\' desktops all day — a quiet, branded channel that doesn\'t depend on the algorithm.' },
+      ],
+      capabilities: [
+        { num: 'CAP—01', title: 'Full white-label', body: 'Logo, colors, fonts, app name, app icon, install bundle identity, custom domain on the API. Your customers see your brand, not ours.' },
+        { num: 'CAP—02', title: 'Multi-display deployment', body: 'Venue mode: one config, every screen in the building. Per-display content and scheduling included.' },
+        { num: 'CAP—03', title: 'API access', body: 'Programmatic read/write to your deployment. Push your own data into the bar, pull state into your stack.' },
+        { num: 'CAP—04', title: 'Custom data sources', body: 'Your odds feed, your CMS, your internal metrics — we build the ingester and it streams like everything else.' },
+        { num: 'CAP—05', title: 'A real SLA', body: 'Defined response times in writing (typically P1 < 1hr), uptime targets, maintenance windows, and a direct Slack channel with the engineers.' },
+        { num: 'CAP—06', title: 'Self-host option', body: 'The full stack runs in your environment. We hand you the keys — deploy scripts, Compose files, runbooks — and stay reachable after.' },
+      ],
+      steps: [
+        { num: '01', title: 'Scope', body: 'Mutual NDA first, then a scoping call. You get a written scope with a committed timeline and price before you pay anything.' },
+        { num: '02', title: 'Build & brand', body: 'We build on the production Scrollr platform — the same pipeline running the public app — with your brand and data wired in.' },
+        { num: '03', title: 'Deploy', body: 'Most deployments go live in 2–4 weeks. We stay engaged for support, changes, and whatever breaks at 5pm on a Friday.' },
+      ],
+      faqs: [
+        { num: 'B.01', q: 'Can we self-host?', a: 'Yes. Desktop app, Go API, Rust ingesters, Postgres, Redis — all of it runs in your environment, with deployment scripts, runbooks, and a hand-off call.' },
+        { num: 'B.02', q: 'Can we fully white-label?', a: 'Completely. The codebase is AGPL-3.0; white-label builds ship under a commercial license that removes the copyleft requirement for distribution.' },
+        { num: 'B.03', q: 'Do you sign NDAs?', a: 'Before the scoping call, so you can speak freely. Our standard one-pager or yours — no legal back-and-forth before the first conversation.' },
+        { num: 'B.04', q: "What's the SLA?", a: 'Written, not implied: incident response times (often P1 < 1hr), monthly uptime targets, maintenance windows, and a direct Slack channel.' },
+        { num: 'B.05', q: 'How long does deployment take?', a: 'Custom branding, two data sources, basic integrations: 2–4 weeks. Heavy customization (new sources, custom UI, SSO): 6–12 weeks. Committed in the scope doc.' },
+        { num: 'B.06', q: 'Perpetual or one-time licensing?', a: 'For self-hosted, yes — perpetual licenses with optional annual maintenance. Managed deployments default to monthly. Bring us your procurement constraints.' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

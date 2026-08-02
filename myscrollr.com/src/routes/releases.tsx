@@ -1,15 +1,15 @@
+/**
+ * /releases — the changelog as a departures board (terminal editorial).
+ *
+ * Data flow is unchanged: build-time snapshot from releases.generated.ts
+ * renders instantly, then a live GitHub fetch on mount replaces it.
+ * Sorting, expandable markdown notes, and the LATEST/PRE-RELEASE badges
+ * all carry over from the previous page — only the skin changed.
+ */
+
 import { useEffect, useMemo, useState } from 'react'
 import DOMPurify from 'dompurify'
 import { createFileRoute } from '@tanstack/react-router'
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  ArrowUpRight,
-  ChevronDown,
-  PackageOpen,
-  Sparkles,
-} from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { marked } from 'marked'
 import type { ReleaseEntry, SortDir, SortKey } from '@/lib/releases'
@@ -21,6 +21,13 @@ import {
   fetchLiveReleases,
   sortReleases,
 } from '@/lib/releases'
+import { EASE } from '@/lib/animations'
+import {
+  DeparturesRow,
+  PageHeader,
+  SectionRow,
+  TerminalContainer,
+} from '@/components/terminal'
 
 export const Route = createFileRoute('/releases')({
   head: () =>
@@ -40,8 +47,12 @@ export const Route = createFileRoute('/releases')({
   component: ReleasesPage,
 })
 
-// ── Signature easing (matches homepage) ────────────────────────
-const EASE = [0.22, 1, 0.36, 1] as const
+const reveal = {
+  initial: { opacity: 0, y: 24 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true },
+  transition: { duration: 0.6, ease: EASE },
+}
 
 // ── Markdown rendering ──────────────────────────────────────────
 // Release bodies are first-party GitHub-flavored markdown (we author
@@ -70,6 +81,7 @@ function renderNotes(markdown: string): string {
 // Hand-rolled minimal "prose" styles for the rendered notes — the
 // Tailwind Typography plugin is not installed. Scoped under
 // `.release-notes` so nothing leaks into the rest of the page.
+// Radii follow the terminal system: 4px controls, 8px cards.
 const RELEASE_NOTES_CSS = `
 .release-notes { font-size: 0.875rem; line-height: 1.7; color: color-mix(in srgb, var(--color-base-content) 70%, transparent); }
 .release-notes > :first-child { margin-top: 0; }
@@ -84,17 +96,17 @@ const RELEASE_NOTES_CSS = `
 .release-notes ul { list-style: disc; }
 .release-notes ol { list-style: decimal; }
 .release-notes li::marker { color: color-mix(in srgb, var(--color-primary) 60%, transparent); }
-.release-notes code { font-family: var(--font-mono); font-size: 0.8em; padding: 0.15em 0.4em; border-radius: 0.375rem; background: color-mix(in srgb, var(--color-base-300) 35%, transparent); color: color-mix(in srgb, var(--color-base-content) 85%, transparent); }
-.release-notes pre { margin: 0.9em 0; padding: 0.9em 1em; border-radius: 0.75rem; border: 1px solid color-mix(in srgb, var(--color-base-300) 25%, transparent); background: color-mix(in srgb, var(--color-base-200) 60%, transparent); overflow-x: auto; }
+.release-notes code { font-family: var(--font-mono); font-size: 0.8em; padding: 0.15em 0.4em; border-radius: 3px; background: color-mix(in srgb, var(--color-base-300) 35%, transparent); color: color-mix(in srgb, var(--color-base-content) 85%, transparent); }
+.release-notes pre { margin: 0.9em 0; padding: 0.9em 1em; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--color-base-300) 25%, transparent); background: color-mix(in srgb, var(--color-base-200) 60%, transparent); overflow-x: auto; }
 .release-notes pre code { padding: 0; background: none; }
 .release-notes blockquote { margin: 0.9em 0; padding: 0.1em 1em; border-left: 2px solid color-mix(in srgb, var(--color-primary) 40%, transparent); color: color-mix(in srgb, var(--color-base-content) 55%, transparent); }
 .release-notes hr { margin: 1.5em 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--color-base-300) 25%, transparent); }
-.release-notes .table-wrap { margin: 0.9em 0; overflow-x: auto; border: 1px solid color-mix(in srgb, var(--color-base-300) 25%, transparent); border-radius: 0.75rem; }
+.release-notes .table-wrap { margin: 0.9em 0; overflow-x: auto; border: 1px solid color-mix(in srgb, var(--color-base-300) 25%, transparent); border-radius: 8px; }
 .release-notes table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .release-notes th { text-align: left; font-weight: 600; color: var(--color-base-content); padding: 0.6em 0.9em; background: color-mix(in srgb, var(--color-base-200) 70%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--color-base-300) 30%, transparent); white-space: nowrap; }
 .release-notes td { padding: 0.55em 0.9em; border-bottom: 1px solid color-mix(in srgb, var(--color-base-300) 18%, transparent); }
 .release-notes tr:last-child td { border-bottom: 0; }
-.release-notes img { max-width: 100%; border-radius: 0.5rem; }
+.release-notes img { max-width: 100%; border-radius: 4px; }
 `
 
 // ── Date formatting ─────────────────────────────────────────────
@@ -134,11 +146,11 @@ function relativeTime(iso: string, now: number): string {
 
 // ── Page ────────────────────────────────────────────────────────
 
-// Shared grid template: version | date | headline | chevron. The
-// header row and every release row use the same columns so cells
-// align like a real table.
+// Shared grid template: index | version | date | headline | action.
+// The column-header row and every release row use the same columns so
+// cells align like a real departures board.
 const ROW_GRID =
-  'sm:grid sm:grid-cols-[7.5rem_13rem_minmax(0,1fr)_2rem] sm:items-center sm:gap-4'
+  'sm:grid sm:grid-cols-[2.75rem_11.5rem_13.5rem_minmax(0,1fr)_auto] sm:items-center sm:gap-x-5'
 
 function ReleasesPage() {
   // Build-time snapshot renders instantly (no layout shift, works
@@ -197,117 +209,60 @@ function ReleasesPage() {
   }
 
   return (
-    <div className="min-h-dvh pt-20">
+    <div className="min-h-dvh">
       <style>{RELEASE_NOTES_CSS}</style>
 
-      {/* ── HERO ─────────────────────────────────────────────── */}
-      <section className="relative pt-28 pb-20 overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div
-            className="absolute inset-0 opacity-[0.02]"
-            style={{
-              backgroundImage: `
-                linear-gradient(rgba(52, 211, 153, 0.15) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(52, 211, 153, 0.15) 1px, transparent 1px)
-              `,
-              backgroundSize: '60px 60px',
-            }}
-          />
-        </div>
+      <PageHeader
+        eyebrowLeft="RELEASES ／ CHANGELOG"
+        eyebrowRight="SERVED FROM GITHUB RELEASES"
+        line1="Every build,"
+        line2="dated and signed."
+        sub="What shipped, what changed, and why it matters — every version, in plain English. No commit-log archaeology."
+      />
 
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+      {/* ── The ledger ───────────────────────────────────────── */}
+      <section className="border-b border-hairline">
+        <TerminalContainer className="pb-14">
+          <motion.div {...reveal}>
+            <SectionRow
+              tag="SEC 01 ／ THE LEDGER"
+              stat={
+                releases.length > 0 ? `${releases.length} RELEASES` : undefined
+              }
+            />
 
-        <div className="container relative z-10 !py-0 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: EASE }}
-            className="flex items-center justify-center gap-3 mb-8"
-          >
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/8 text-primary text-[10px] font-bold rounded-lg border border-primary/15 uppercase tracking-wide">
-              <Sparkles size={12} />
-              {releases.length > 0
-                ? `${releases.length} releases and counting`
-                : 'Release notes'}
-            </span>
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.15, ease: EASE }}
-            className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black tracking-tight leading-[0.95] mb-6"
-          >
-            Fresh out of the <span className="text-gradient-primary">Oven</span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3, ease: EASE }}
-            className="text-base text-base-content/45 max-w-lg mx-auto leading-relaxed"
-          >
-            Every release, in plain English — what shipped, what changed, and
-            why it matters. No commit-log archaeology.
-          </motion.p>
-        </div>
-
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-base-300/50 to-transparent" />
-      </section>
-
-      {/* ── RELEASE TABLE ─────────────────────────────────────── */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-base-200/20 to-transparent pointer-events-none" />
-
-        <div className="container relative z-10">
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.7, ease: EASE }}
-            className="max-w-5xl mx-auto"
-          >
             {sorted.length === 0 ? (
               <EmptyState />
             ) : (
-              <div className="relative bg-base-200/40 border border-base-300/25 rounded-xl overflow-hidden">
-                {/* Accent top line */}
-                <div
-                  className="absolute top-0 left-0 right-0 h-px z-10"
-                  style={{
-                    background:
-                      'linear-gradient(90deg, transparent, #34d399 50%, transparent)',
-                  }}
-                />
-
+              <>
                 {/* Column headers — clickable sort toggles */}
                 <div
-                  className={`flex items-center gap-3 px-5 sm:px-6 py-3 border-b border-base-300/25 bg-base-200/60 ${ROW_GRID}`}
+                  className={`hidden border-b border-hairline-minor px-3 py-3 ${ROW_GRID}`}
                 >
+                  <span aria-hidden="true" />
                   <SortHeader
-                    label="Version"
+                    label="VERSION"
                     active={sortKey === 'version'}
                     dir={sortDir}
                     onClick={() => handleSort('version')}
                   />
                   <SortHeader
-                    label="Date"
+                    label="DATE"
                     active={sortKey === 'date'}
                     dir={sortDir}
                     onClick={() => handleSort('date')}
                   />
-                  <span className="hidden sm:block text-[10px] font-bold uppercase tracking-wide text-base-content/35">
-                    Highlights
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/40">
+                    HIGHLIGHTS
                   </span>
-                  <span className="hidden sm:block" aria-hidden="true" />
+                  <span aria-hidden="true" />
                 </div>
 
-                {/* Rows */}
-                <ul>
-                  {sorted.map((release) => (
+                <ul className="m-0 list-none p-0">
+                  {sorted.map((release, i) => (
                     <ReleaseRow
                       key={release.tag}
+                      index={String(i + 1).padStart(2, '0')}
                       release={release}
                       isLatest={release.tag === latestTag}
                       expanded={expandedTag === release.tag}
@@ -320,24 +275,26 @@ function ReleasesPage() {
                     />
                   ))}
                 </ul>
-              </div>
+              </>
             )}
-
-            {/* GitHub footnote */}
-            <p className="mt-6 text-center text-xs text-base-content/35">
-              Prefer the raw feed?{' '}
-              <a
-                href={RELEASES_PAGE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary/70 hover:text-primary transition-colors inline-flex items-center gap-0.5"
-              >
-                Browse releases on GitHub
-                <ArrowUpRight size={11} />
-              </a>
-            </p>
           </motion.div>
-        </div>
+        </TerminalContainer>
+      </section>
+
+      {/* ── Raw feed ─────────────────────────────────────────── */}
+      <section className="border-b border-hairline">
+        <TerminalContainer>
+          <motion.div {...reveal}>
+            <DeparturesRow
+              index="00"
+              label="Prefer the raw feed?"
+              labelClassName="text-xl"
+              meta="Tags, assets, and checksums — every release, straight from the source."
+              action="GITHUB RELEASES ↗"
+              href={RELEASES_PAGE_URL}
+            />
+          </motion.div>
+        </TerminalContainer>
       </section>
     </div>
   )
@@ -365,22 +322,13 @@ function SortHeader({
           ? `, currently ${dir === 'desc' ? 'descending' : 'ascending'}`
           : ''
       }`}
-      className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors cursor-pointer rounded ${
+      className={`cursor-pointer text-left font-mono text-[10px] uppercase tracking-[0.14em] transition-colors ${
         active
           ? 'text-primary'
-          : 'text-base-content/35 hover:text-base-content/60'
+          : 'text-base-content/40 hover:text-base-content/70'
       }`}
     >
-      {label}
-      {active ? (
-        dir === 'desc' ? (
-          <ArrowDown size={11} />
-        ) : (
-          <ArrowUp size={11} />
-        )
-      ) : (
-        <ArrowUpDown size={11} className="opacity-50" />
-      )}
+      {label} {active ? (dir === 'desc' ? '↓' : '↑') : '↕'}
     </button>
   )
 }
@@ -388,12 +336,14 @@ function SortHeader({
 // ── Release row ─────────────────────────────────────────────────
 
 function ReleaseRow({
+  index,
   release,
   isLatest,
   expanded,
   now,
   onToggle,
 }: {
+  index: string
   release: ReleaseEntry
   isLatest: boolean
   expanded: boolean
@@ -407,34 +357,54 @@ function ReleaseRow({
   )
 
   return (
-    <li className="border-b border-base-300/20 last:border-b-0">
-      <button
-        type="button"
+    <li className="border-b border-hairline-minor">
+      {/* Whole-row click expands; the version button carries the a11y
+          contract (aria-expanded + keyboard), the RELEASE link opts out. */}
+      <div
         onClick={onToggle}
-        aria-expanded={expanded}
-        className={`relative w-full text-left px-5 sm:px-6 py-4 flex flex-col gap-1 cursor-pointer transition-colors hover:bg-base-200/60 ${ROW_GRID} ${
-          expanded ? 'bg-base-200/50' : ''
+        className={`flex cursor-pointer flex-col items-start gap-1.5 px-3 py-5 transition-colors duration-150 hover:bg-primary/5 ${ROW_GRID} ${
+          expanded ? 'bg-primary/5' : ''
         }`}
       >
-        {/* Version + badges */}
-        <span className="flex items-center gap-2 pr-8 sm:pr-0">
-          <span className="font-mono text-sm font-bold text-base-content">
+        <span className="hidden font-mono text-xs text-base-content/40 sm:block">
+          ↳ {index}
+        </span>
+
+        {/* Version + badges + chevron */}
+        <span className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            aria-expanded={expanded}
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggle()
+            }}
+            className="flex cursor-pointer items-center gap-2 font-display text-lg font-bold uppercase tracking-[0.01em] text-base-content"
+          >
             v{release.version}
-          </span>
+            <span
+              aria-hidden="true"
+              className={`text-xs transition-transform duration-300 ${
+                expanded ? 'rotate-180 text-primary' : 'text-base-content/40'
+              }`}
+            >
+              ▾
+            </span>
+          </button>
           {isLatest ? (
-            <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide rounded-full text-primary bg-primary/10 border border-primary/25">
-              Latest
+            <span className="rounded-[3px] border border-primary/40 px-2 py-[3px] font-mono text-[10px] tracking-[0.12em] text-primary">
+              LATEST
             </span>
           ) : null}
           {release.prerelease ? (
-            <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide rounded-full text-warning bg-warning/10 border border-warning/25">
-              Pre-release
+            <span className="rounded-[3px] border border-warning/40 px-2 py-[3px] font-mono text-[10px] tracking-[0.12em] text-warning">
+              PRE-RELEASE
             </span>
           ) : null}
         </span>
 
         {/* Date: absolute + relative (relative is client-only) */}
-        <span className="text-xs sm:text-[13px] text-base-content/50">
+        <span className="font-mono text-xs text-base-content/50">
           {formatDate(release.date)}
           {now !== null && release.date ? (
             <span className="text-base-content/30">
@@ -446,26 +416,25 @@ function ReleaseRow({
 
         {/* Headline */}
         <span
-          className={`block text-sm truncate ${
+          className={`min-w-0 text-sm sm:truncate ${
             release.headline
-              ? 'text-base-content/65'
-              : 'text-base-content/30 italic'
+              ? 'text-base-content/55'
+              : 'italic text-base-content/30'
           }`}
         >
           {release.headline || 'Maintenance release'}
         </span>
 
-        {/* Expand chevron */}
-        <span className="absolute right-5 top-4 sm:static text-base-content/30">
-          <ChevronDown
-            size={16}
-            className={`transition-transform duration-300 ${
-              expanded ? 'rotate-180 text-primary/70' : ''
-            }`}
-            aria-hidden="true"
-          />
-        </span>
-      </button>
+        {/* GitHub tag link */}
+        <a
+          href={release.url}
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="whitespace-nowrap font-mono text-sm text-primary sm:justify-self-end"
+        >
+          RELEASE ↗
+        </a>
+      </div>
 
       {/* Expanded notes */}
       <AnimatePresence initial={false}>
@@ -477,29 +446,29 @@ function ReleaseRow({
             transition={{ duration: 0.35, ease: EASE }}
             className="overflow-hidden"
           >
-            <div className="border-t border-base-300/20 bg-base-100/40 px-5 sm:px-6 py-6">
-              {notesHtml ? (
-                <div
-                  className="release-notes"
-                  // First-party content (we author our own release notes);
-                  // <script> tags are stripped in renderNotes anyway.
-                  dangerouslySetInnerHTML={{ __html: notesHtml }}
-                />
-              ) : (
-                <p className="text-sm text-base-content/40 italic">
-                  No release notes for this version.
-                </p>
-              )}
+            <div className="px-3 pb-6">
+              <div className="rounded-[8px] border border-hairline-minor bg-panel px-5 py-6 sm:px-6">
+                {notesHtml ? (
+                  <div
+                    className="release-notes"
+                    // First-party content (we author our own release notes);
+                    // <script> tags are stripped in renderNotes anyway.
+                    dangerouslySetInnerHTML={{ __html: notesHtml }}
+                  />
+                ) : (
+                  <p className="text-sm italic text-base-content/40">
+                    No release notes for this version.
+                  </p>
+                )}
 
-              <a
-                href={release.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-primary/80 hover:text-primary transition-colors"
-              >
-                View on GitHub
-                <ArrowUpRight size={12} />
-              </a>
+                <a
+                  href={release.url}
+                  rel="noopener noreferrer"
+                  className="mt-6 inline-block font-mono text-xs tracking-[0.1em] text-primary"
+                >
+                  VIEW ON GITHUB ↗
+                </a>
+              </div>
             </div>
           </motion.div>
         ) : null}
@@ -512,32 +481,20 @@ function ReleaseRow({
 
 function EmptyState() {
   return (
-    <div className="relative bg-base-200/40 border border-base-300/25 rounded-xl p-10 sm:p-14 text-center overflow-hidden">
-      <div
-        className="absolute top-0 left-0 right-0 h-px"
-        style={{
-          background:
-            'linear-gradient(90deg, transparent, #34d399 50%, transparent)',
-        }}
-      />
-      <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center mx-auto mb-5 text-primary/70">
-        <PackageOpen size={22} />
-      </div>
-      <h2 className="text-lg font-bold text-base-content mb-2">
-        The oven is preheating
-      </h2>
-      <p className="text-sm text-base-content/45 leading-relaxed max-w-sm mx-auto mb-6">
+    <div className="my-8 rounded-[8px] border border-hairline bg-panel px-8 py-12 text-center">
+      <p className="m-0 font-mono text-[11px] uppercase tracking-[0.14em] text-base-content/45">
+        NO RELEASE DATA
+      </p>
+      <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-base-content/60">
         We couldn't load the release history right now. The full changelog
         always lives on GitHub.
       </p>
       <a
         href={RELEASES_PAGE_URL}
-        target="_blank"
         rel="noopener noreferrer"
-        className="btn btn-outline btn-sm"
+        className="mt-6 inline-block rounded-[4px] border border-primary/40 px-4 py-2.5 font-mono text-xs tracking-[0.1em] text-primary transition-colors hover:bg-primary/10"
       >
-        View releases on GitHub
-        <ArrowUpRight size={12} />
+        GITHUB RELEASES ↗
       </a>
     </div>
   )

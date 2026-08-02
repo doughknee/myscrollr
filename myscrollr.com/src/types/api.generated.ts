@@ -15,189 +15,188 @@
 // A test fails the build if this file is stale.
 
 export interface CatalogResponse {
-  version: string;
-  widgets: WidgetDef[];
+  version: string
+  widgets: Array<WidgetDef>
 }
 
 export interface CheckoutResponse {
-  client_secret: string;
-  session_id: string;
-  publishable_key: string;
+  client_secret: string
+  session_id: string
+  publishable_key: string
 }
 
 export interface CheckoutReturnResponse {
-  status: string;
-  session_id?: string;
+  status: string
+  session_id?: string
 }
 
 export interface DashboardResponse {
-  data: Record<string, unknown>;
-  preferences?: UserPreferences;
-  widgets?: Widget[];
+  data: Record<string, unknown>
+  preferences?: UserPreferences
+  widgets?: Array<Widget>
 }
 
 export interface ErrorResponse {
-  status: string;
-  error: string;
+  status: string
+  error: string
 }
 
 export interface HealthResponse {
-  status: string;
-  database: string;
-  redis: string;
-  services: Record<string, string>;
+  status: string
+  database: string
+  redis: string
+  services: Record<string, string>
 }
 
 export interface OverviewFantasy {
-  yahoo_connected: boolean;
-  yahoo_synced: boolean;
-  league_count: number;
+  yahoo_connected: boolean
+  yahoo_synced: boolean
+  league_count: number
 }
 
 export interface OverviewGDPR {
-  deletion_status: string;
-  requested_at: string | null;
-  purge_at: string | null;
+  deletion_status: string
+  requested_at: string | null
+  purge_at: string | null
 }
 
 export interface OverviewIdentity {
-  sub: string;
-  email: string;
-  name: string;
-  username: string;
+  sub: string
+  email: string
+  name: string
+  username: string
 }
 
 export interface OverviewLinks {
-  logto_account: string;
+  logto_account: string
 }
 
 export interface OverviewResponse {
-  identity: OverviewIdentity;
-  tier: OverviewTier;
-  subscription: SubscriptionResponse | null;
-  widgets: OverviewWidgets;
-  fantasy: OverviewFantasy | null;
-  gdpr: OverviewGDPR;
-  links: OverviewLinks;
+  identity: OverviewIdentity
+  tier: OverviewTier
+  subscription: SubscriptionResponse | null
+  widgets: OverviewWidgets
+  fantasy: OverviewFantasy | null
+  gdpr: OverviewGDPR
+  links: OverviewLinks
 }
 
 export interface OverviewTier {
-  current: string;
-  is_super_user: boolean;
-  label: string;
-  limits: WidgetLimits;
+  current: string
+  is_super_user: boolean
+  label: string
+  limits: WidgetLimits
 }
 
 export interface OverviewWidgetRow {
-  type: string;
-  enabled: boolean;
-  ticker_enabled: boolean;
+  type: string
+  enabled: boolean
+  ticker_enabled: boolean
 }
 
 export interface OverviewWidgets {
-  total: number;
-  enabled: number;
-  by_type: OverviewWidgetRow[];
+  total: number
+  enabled: number
+  by_type: Array<OverviewWidgetRow>
 }
 
 export interface PaymentIntentResponse {
-  client_secret: string;
-  amount: number;
-  currency: string;
-  publishable_key: string;
+  client_secret: string
+  amount: number
+  currency: string
+  publishable_key: string
 }
 
 export interface PlanPreviewResponse {
-  amount_due: number;
-  currency: string;
-  proration_date: number;
-  is_downgrade: boolean;
-  scheduled_date?: number;
-  is_trial_change?: boolean;
-  trial_end?: number;
+  amount_due: number
+  currency: string
+  proration_date: number
+  is_downgrade: boolean
+  scheduled_date?: number
+  is_trial_change?: boolean
+  trial_end?: number
 }
 
 export interface SetupIntentResponse {
-  client_secret: string;
-  plan: string;
-  has_trial: boolean;
-  trial_days?: number;
-  amount: number;
-  currency: string;
-  interval: string;
-  publishable_key: string;
+  client_secret: string
+  plan: string
+  has_trial: boolean
+  trial_days?: number
+  amount: number
+  currency: string
+  interval: string
+  publishable_key: string
 }
 
 export interface SubscribeResponse {
-  subscription_id: string;
-  status: string;
-  trial_end?: number;
-  plan: string;
+  subscription_id: string
+  status: string
+  trial_end?: number
+  plan: string
 }
 
 export interface SubscriptionResponse {
-  plan: string;
-  status: string;
-  current_period_end?: string;
-  lifetime: boolean;
-  pending_downgrade_plan?: string;
-  scheduled_change_at?: string;
-  amount?: number;
-  currency?: string;
-  interval?: string;
-  trial_end?: number;
-  had_prior_sub: boolean;
+  plan: string
+  status: string
+  current_period_end?: string
+  lifetime: boolean
+  pending_downgrade_plan?: string
+  scheduled_change_at?: string
+  amount?: number
+  currency?: string
+  interval?: string
+  trial_end?: number
+  had_prior_sub: boolean
 }
 
 export interface TierLimitsResponse {
-  tiers: Record<string, WidgetLimits>;
+  tiers: Record<string, WidgetLimits>
 }
 
 export interface UserPreferences {
-  feed_mode: string;
-  feed_position: string;
-  feed_behavior: string;
-  feed_enabled: boolean;
-  enabled_sites: string[];
-  disabled_sites: string[];
-  subscription_tier: string;
-  updated_at: string;
+  feed_mode: string
+  feed_position: string
+  feed_behavior: string
+  feed_enabled: boolean
+  enabled_sites: Array<string>
+  disabled_sites: Array<string>
+  subscription_tier: string
+  updated_at: string
 }
 
 export interface Widget {
-  id: number;
-  widget_type: string;
-  enabled: boolean;
-  ticker_enabled: boolean;
-  config: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
+  id: number
+  widget_type: string
+  enabled: boolean
+  ticker_enabled: boolean
+  config: Record<string, unknown>
+  created_at: string
+  updated_at: string
 }
 
 export interface WidgetDef {
-  id: string;
-  name: string;
-  description: string;
-  source?: string;
-  category: string;
-  color: string;
-  logo_url?: string;
-  logo_light?: boolean;
-  default_config?: Record<string, unknown>;
-  required_tier: string;
-  about?: string;
-  usage?: string[];
-  order: number;
+  id: string
+  name: string
+  description: string
+  source?: string
+  category: string
+  color: string
+  logo_url?: string
+  logo_light?: boolean
+  default_config?: Record<string, unknown>
+  required_tier: string
+  about?: string
+  usage?: Array<string>
+  order: number
 }
 
 export interface WidgetLimits {
-  max_widgets: number | null;
-  symbols: number | null;
-  feeds: number | null;
-  custom_feeds: number | null;
-  leagues: number | null;
-  fantasy: number | null;
-  max_ticker_rows: number;
-  max_ticker_customization: boolean;
+  max_widgets: number | null
+  symbols: number | null
+  feeds: number | null
+  custom_feeds: number | null
+  leagues: number | null
+  fantasy: number | null
+  max_ticker_rows: number
+  max_ticker_customization: boolean
 }
-

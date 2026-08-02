@@ -32,15 +32,15 @@ Canonical design reference extracted from the homepage. Every new page, componen
 
 ## Stack & Tooling
 
-| Layer     | Tool                                            |
-| --------- | ----------------------------------------------- |
-| Framework | React 19                                        |
-| Bundler   | Vite 7                                          |
-| Router    | TanStack Start (file-based routes, static prerender) |
-| Styling   | Tailwind CSS v4                                 |
-| Animation | Motion (framer-motion successor)                |
-| Icons     | Lucide React                                    |
-| Auth      | Logto (via `useScrollrAuth` hook)               |
+| Layer     | Tool                                                      |
+| --------- | --------------------------------------------------------- |
+| Framework | React 19                                                  |
+| Bundler   | Vite 7                                                    |
+| Router    | TanStack Start (file-based routes, static prerender)      |
+| Styling   | Tailwind CSS v4                                           |
+| Animation | Motion (framer-motion successor)                          |
+| Icons     | Lucide React                                              |
+| Auth      | Logto (via `useScrollrAuth` hook)                         |
 | Fonts     | Self-hosted via `@font-face` in `src/styles.css` (no CDN) |
 
 Dark mode is **class-based** (`html.dark`), toggled via `ThemeToggle` component, with smooth 300ms transitions applied through a temporary `theme-transition` class on `<html>`.

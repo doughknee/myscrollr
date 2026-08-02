@@ -84,6 +84,7 @@ Runs:
    Both `*.generated.ts` files are gitignored — they do not exist in a clean
    checkout and are rebuilt every time. `predev` runs `fetch-latest-version`
    alone, so `npm run dev` works without the rest.
+
 2. `vite build` — builds the client + SSR bundles, runs the Start prerender phase, then runs the `copyShellToIndex()` plugin.
 3. `tsc` — final type check.
 4. `postbuild` — three gates that fail the build: `check-sentry-tunnel.mjs`,

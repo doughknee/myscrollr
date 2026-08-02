@@ -1,312 +1,111 @@
 import { Link } from '@tanstack/react-router'
-import { motion } from 'motion/react'
-import { ArrowUpRight, Github, Mail } from 'lucide-react'
-import ScrollrSVG from '@/components/ScrollrSVG'
 import { LATEST_DESKTOP_VERSION } from '@/lib/latestVersion.generated'
 
-const isExternalHref = (href: string) =>
-  href.startsWith('http') ||
-  href.startsWith('mailto:') ||
-  href.startsWith('tel:')
+/**
+ * Terminal-editorial footer (design_handoff_marketing_site/README.md):
+ * wordmark left, mono uppercase link rows, `ZERO ADS · ZERO TELEMETRY`
+ * right. Keeps the full sitemap (status/architecture/releases/legal
+ * docs) that the mockup's minimal footer omitted — existing site wins
+ * on navigation/SEO.
+ */
 
-export default function Footer() {
-  const year = new Date().getFullYear()
+const PRIMARY_LINKS: Array<{ label: string; to?: string; href?: string }> = [
+  { label: 'DOWNLOAD', to: '/download' },
+  { label: 'WIDGETS', to: '/channels' },
+  { label: 'UPLINK', to: '/uplink' },
+  { label: 'BUSINESS', to: '/business' },
+  { label: 'SUPPORT', to: '/support' },
+  { label: 'LEGAL', to: '/legal' },
+  { label: 'DISCORD', href: 'https://discord.gg/85b49TcGJa' },
+]
 
-  const links = {
-    product: [
-      { label: 'Widgets', href: '/channels' },
-      { label: 'Download', href: '/download' },
-      { label: 'Uplink', href: '/uplink' },
-    ],
-    resources: [
-      { label: 'Status', href: '/status' },
-      { label: 'Architecture', href: '/architecture' },
-      { label: 'Widgets', href: '/channels' },
-      { label: 'Releases', href: '/releases' },
-    ],
-    company: [
-      { label: 'Terms', href: '/legal?doc=terms' },
-      { label: 'Privacy', href: '/legal?doc=privacy' },
-      { label: 'Legal', href: '/legal' },
-      { label: 'License', href: '/legal?doc=license' },
-      { label: 'Support', href: '/support' },
-    ],
-    social: [
-      {
-        icon: Github,
-        href: 'https://github.com/brandon-relentnet/myscrollr',
-        label: 'GitHub',
-      },
-      {
-        icon: Mail,
-        href: '/support',
-        label: 'Contact support',
-      },
-    ],
+const SECONDARY_LINKS: Array<{ label: string; to?: string; href?: string }> = [
+  { label: 'STATUS', to: '/status' },
+  { label: 'ARCHITECTURE', to: '/architecture' },
+  { label: 'RELEASES', to: '/releases' },
+  { label: 'TERMS', to: '/legal?doc=terms' },
+  { label: 'PRIVACY', to: '/legal?doc=privacy' },
+  { label: 'LICENSE', to: '/legal?doc=license' },
+  { label: 'GITHUB', href: 'https://github.com/brandon-relentnet/myscrollr' },
+]
+
+function FooterLink({
+  label,
+  to,
+  href,
+  className,
+}: {
+  label: string
+  to?: string
+  href?: string
+  className: string
+}) {
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+      >
+        {label}
+      </a>
+    )
   }
-
   return (
-    <footer className="relative bg-base-200/30 border-t border-base-300/50 overflow-hidden">
-      {/* Background Grid */}
-      <div
-        className="absolute inset-0 opacity-[0.02] pointer-events-none"
-        style={{
-          backgroundImage: `
-            linear-gradient(var(--grid-dot-primary) 1px, transparent 1px),
-            linear-gradient(90deg, var(--grid-dot-primary) 1px, transparent 1px)
-          `,
-          backgroundSize: '60px 60px',
-        }}
-      />
-
-      {/* Accent Glow */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
-
-      <div className="container relative z-10 px-5 py-16 lg:py-20">
-        {/* Main Footer Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 mb-16">
-          {/* Brand Column */}
-          <div className="lg:col-span-4 space-y-6">
-            <div className="flex items-center gap-4">
-              <motion.div
-                whileHover={{ scale: 1.02 }}
-                className="relative flex items-center justify-center rounded-lg border border-base-300/50 bg-base-200/50 p-2.5"
-              >
-                <ScrollrSVG className="size-10" />
-                <span className="absolute -bottom-0.5 -right-0.5 flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-                </span>
-              </motion.div>
-              <div className="flex flex-col">
-                <span className="font-bold text-2xl tracking-tight font-display">
-                  Scrollr
-                </span>
-                <span className="text-[10px] text-primary/40">
-                  v{LATEST_DESKTOP_VERSION}
-                </span>
-              </div>
-            </div>
-
-            <p className="text-sm text-base-content/60 leading-relaxed max-w-sm pb-2">
-              Live scores, prices, and headlines on your desktop. The ticker
-              that's always there when you need it.
-            </p>
-
-            {/* Status Indicators */}
-            <div className="flex flex-wrap gap-2">
-              <StatusBadge status="online" />
-              <StatusBadge status="live" />
-            </div>
-          </div>
-
-          {/* Links Columns */}
-          <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-8 lg:gap-12">
-            {/* Product */}
-            <div className="space-y-5">
-              {/* h3 (not h4) so the document outline stays valid —
-                  marketing pages reach h3 in main content, so jumping
-                  to h4 here trips Lighthouse's heading-order audit. */}
-              <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-primary/80">
-                Product
-              </h3>
-              <ul className="space-y-3">
-                {links.product.map((link) => (
-                  <li key={link.label}>
-                    {isExternalHref(link.href) ? (
-                      <motion.a
-                        href={link.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        whileHover={{ x: 2 }}
-                        className="flex items-center gap-2 text-sm text-base-content/50 hover:text-primary transition-colors group cursor-pointer"
-                      >
-                        {link.label}
-                        <ArrowUpRight
-                          size={12}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        />
-                      </motion.a>
-                    ) : (
-                      <Link
-                        to={link.href}
-                        className="flex items-center gap-2 text-sm text-base-content/50 hover:text-primary transition-colors group"
-                      >
-                        {link.label}
-                        <ArrowUpRight
-                          size={12}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        />
-                      </Link>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Resources */}
-            <div className="space-y-5">
-              <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-primary/80">
-                Resources
-              </h3>
-              <ul className="space-y-3">
-                {links.resources.map((link) => (
-                  <li key={link.label}>
-                    {isExternalHref(link.href) ? (
-                      <motion.a
-                        href={link.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        whileHover={{ x: 2 }}
-                        className="flex items-center gap-2 text-sm text-base-content/50 hover:text-primary transition-colors group cursor-pointer"
-                      >
-                        {link.label}
-                        <ArrowUpRight
-                          size={12}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        />
-                      </motion.a>
-                    ) : (
-                      <Link
-                        to={link.href}
-                        className="flex items-center gap-2 text-sm text-base-content/50 hover:text-primary transition-colors group"
-                      >
-                        {link.label}
-                        <ArrowUpRight
-                          size={12}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        />
-                      </Link>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Company */}
-            <div className="space-y-5">
-              <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-primary/80">
-                Company
-              </h3>
-              <ul className="space-y-3">
-                {links.company.map((link) => (
-                  <li key={link.label}>
-                    {isExternalHref(link.href) ? (
-                      <motion.a
-                        href={link.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        whileHover={{ x: 2 }}
-                        className="flex items-center gap-2 text-sm text-base-content/50 hover:text-primary transition-colors group cursor-pointer"
-                      >
-                        {link.label}
-                        <ArrowUpRight
-                          size={12}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        />
-                      </motion.a>
-                    ) : (
-                      <Link
-                        to={link.href}
-                        className="flex items-center gap-2 text-sm text-base-content/50 hover:text-primary transition-colors group"
-                      >
-                        {link.label}
-                        <ArrowUpRight
-                          size={12}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        />
-                      </Link>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Bar */}
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-6 pt-8 border-t border-base-300/30">
-          {/* Copyright */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-base-content/40">
-              © {year} Scrollr
-            </span>
-            <span className="hidden sm:inline text-xs text-base-content/20">
-              ·
-            </span>
-            <span className="flex items-center gap-2 text-xs text-base-content/40">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-50" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
-              </span>
-              Open Source
-            </span>
-          </div>
-
-          {/* Social Links */}
-          <div className="flex items-center gap-4">
-            {links.social.map((social) => {
-              const external = isExternalHref(social.href)
-              const className =
-                'flex items-center justify-center w-10 h-10 rounded-lg bg-base-200/50 border border-base-300/30 text-base-content/40 hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-colors cursor-pointer'
-              const hover = {
-                scale: 1.1,
-                y: -2,
-                transition: { type: 'tween' as const, duration: 0.2 },
-              }
-              const Icon = social.icon
-
-              if (external) {
-                return (
-                  <motion.a
-                    key={social.label}
-                    href={social.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    whileHover={hover}
-                    whileTap={{ scale: 0.95 }}
-                    className={className}
-                    aria-label={social.label}
-                  >
-                    <Icon size={16} />
-                  </motion.a>
-                )
-              }
-
-              return (
-                <Link
-                  key={social.label}
-                  to={social.href}
-                  className={className}
-                  aria-label={social.label}
-                >
-                  <Icon size={16} />
-                </Link>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-    </footer>
+    <Link to={to} className={className}>
+      {label}
+    </Link>
   )
 }
 
-function StatusBadge({ status }: { status: 'online' | 'live' }) {
+export default function Footer() {
+  const year = new Date().getFullYear()
+  const linkClass =
+    'text-base-content/40 transition-colors hover:text-primary hover:opacity-100'
+
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/5 border border-primary/10">
-      <span className="relative flex h-1.5 w-1.5">
-        {status === 'live' && (
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-        )}
-        <span
-          className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
-            status === 'online' ? 'bg-success' : 'bg-primary'
-          }`}
-        />
-      </span>
-      <span className="text-[10px] text-base-content/50">
-        {status === 'online' ? 'Online' : 'Live Data'}
-      </span>
-    </div>
+    <footer className="border-t border-hairline bg-base-75">
+      <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-5 px-5 pb-4 pt-7 sm:px-8">
+        <Link
+          to="/"
+          className="flex items-baseline text-base font-extrabold tracking-[-0.02em] text-base-content hover:text-base-content hover:opacity-100"
+        >
+          scrollr
+          <span className="text-primary">.</span>
+        </Link>
+
+        <nav
+          aria-label="Footer"
+          className="flex flex-wrap gap-x-6 gap-y-2 font-mono text-[11px] tracking-[0.1em]"
+        >
+          {PRIMARY_LINKS.map((l) => (
+            <FooterLink key={l.label} {...l} className={linkClass} />
+          ))}
+        </nav>
+
+        <div className="font-mono text-[11px] tracking-[0.1em] text-base-content/30">
+          ZERO ADS · ZERO TELEMETRY
+        </div>
+      </div>
+
+      <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 border-t border-hairline-minor px-5 py-4 sm:px-8">
+        <div className="font-mono text-[10px] tracking-[0.1em] text-base-content/30">
+          © {year} SCROLLR · OPEN SOURCE · V{LATEST_DESKTOP_VERSION}
+        </div>
+        <nav
+          aria-label="Secondary"
+          className="flex flex-wrap gap-x-5 gap-y-2 font-mono text-[10px] tracking-[0.1em]"
+        >
+          {SECONDARY_LINKS.map((l) => (
+            <FooterLink
+              key={l.label}
+              {...l}
+              className="text-base-content/30 transition-colors hover:text-primary hover:opacity-100"
+            />
+          ))}
+        </nav>
+      </div>
+    </footer>
   )
 }

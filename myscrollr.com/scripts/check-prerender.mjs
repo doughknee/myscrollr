@@ -36,37 +36,37 @@ const ROUTES = [
     path: '/',
     file: 'index.html',
     minJsonLd: 4, // Org, WebSite, SoftwareApp, FAQPage
-    expectedBody: 'What actually sits',
+    expectedBody: 'The go-ahead run',
   },
   {
     path: '/channels',
     file: 'channels/index.html',
     minJsonLd: 2, // organization + breadcrumbs
-    expectedBody: 'Real-time market data',
+    expectedBody: 'Every widget streams live',
   },
   {
     path: '/download',
     file: 'download/index.html',
     minJsonLd: 3, // organization + softwareApp + breadcrumbs
-    expectedBody: 'Download for',
+    expectedBody: 'One small native app',
   },
   {
     path: '/download/mac',
     file: 'download/mac/index.html',
     minJsonLd: 3, // organization + softwareApp + breadcrumbs
-    expectedBody: 'Download Scrollr',
+    expectedBody: 'Download for macOS',
   },
   {
     path: '/download/windows',
     file: 'download/windows/index.html',
     minJsonLd: 3,
-    expectedBody: 'Download Scrollr',
+    expectedBody: 'Download for Windows',
   },
   {
     path: '/download/linux',
     file: 'download/linux/index.html',
     minJsonLd: 3,
-    expectedBody: 'Download Scrollr',
+    expectedBody: 'Download for Linux',
   },
   {
     path: '/business',
@@ -84,7 +84,7 @@ const ROUTES = [
     path: '/support',
     file: 'support/index.html',
     minJsonLd: 3, // organization + FAQ + breadcrumbs
-    expectedBody: 'How can we',
+    expectedBody: 'Most answers are a scroll away',
   },
   {
     path: '/legal',
@@ -201,7 +201,7 @@ if (!existsSync(shell)) {
   // this assertion fails.
   const shellHtml = readFileSync(shell, 'utf8')
   const shellBody = shellHtml.replace(/<head[\s\S]*?<\/head>/i, '')
-  const expectedShellChrome = 'Always Visible'
+  const expectedShellChrome = 'ZERO ADS'
   if (!shellBody.includes(expectedShellChrome)) {
     console.error(
       `✗ _shell.html missing expected chrome "${expectedShellChrome}" ` +

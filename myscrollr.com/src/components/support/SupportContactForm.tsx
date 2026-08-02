@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
-import { AlertTriangle, CheckCircle2, Loader2, Send } from 'lucide-react'
-import { SupportSection } from './SupportSection'
 import type { FormEvent } from 'react'
 import type { SupportCategory, SupportTicketPayload } from '@/api/client'
+import { SectionRow, TerminalContainer } from '@/components/terminal'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { supportApi } from '@/api/client'
 
@@ -104,188 +103,176 @@ export function SupportContactForm() {
   }
 
   return (
-    <SupportSection
-      id="contact"
-      eyebrow="Contact"
-      title="Still need help? Send us a note"
-      description="We read every message. Replies usually arrive within 1-2 business days."
-      screenshot={{
-        basename: 'support/contact-form',
-        alt: 'The in-app Contact form in Scrollr, which submits to the same support inbox as this form.',
-      }}
-    >
-      {success ? (
-        <SuccessPanel
-          onReset={() => {
-            setSuccess(false)
-            setSubject('')
-            setMessage('')
-          }}
-        />
-      ) : (
-        <form
-          onSubmit={handleSubmit}
-          className="flex flex-col gap-5 rounded-2xl border border-base-300/40 bg-base-200/30 p-6 sm:p-8"
-          noValidate
-        >
-          {/* Name + email row. Email is required for both flows; name is optional. */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Your name" htmlFor="support-name" optional>
-              <input
-                id="support-name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={submitting}
-                autoComplete="name"
-                maxLength={120}
-                className="input-base"
-                placeholder="Optional"
-              />
-            </FormField>
+    <section id="contact" className="scroll-mt-24 border-b border-hairline">
+      <TerminalContainer>
+        <SectionRow tag="SEC 04 ／ OPEN A TICKET" />
+        <div className="pb-14 pt-8">
+          <p className="mb-8 max-w-[480px] text-[14.5px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
+            We read every message. Replies usually arrive within 1-2 business
+            days.
+          </p>
 
-            <FormField label="Email" htmlFor="support-email" required>
-              <input
-                id="support-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={submitting || isAuthenticated}
+          {success ? (
+            <SuccessPanel
+              onReset={() => {
+                setSuccess(false)
+                setSubject('')
+                setMessage('')
+              }}
+            />
+          ) : (
+            <form
+              onSubmit={handleSubmit}
+              className="flex max-w-[760px] flex-col gap-5 rounded-[8px] border border-hairline bg-panel p-6 sm:p-8"
+              noValidate
+            >
+              {/* Name + email row. Email is required for both flows; name is optional. */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FormField label="Your name" htmlFor="support-name" optional>
+                  <input
+                    id="support-name"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={submitting}
+                    autoComplete="name"
+                    maxLength={120}
+                    className="input-base"
+                    placeholder="Optional"
+                  />
+                </FormField>
+
+                <FormField label="Email" htmlFor="support-email" required>
+                  <input
+                    id="support-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={submitting || isAuthenticated}
+                    required
+                    autoComplete="email"
+                    maxLength={254}
+                    className="input-base"
+                    placeholder="you@example.com"
+                  />
+                  {isAuthenticated ? (
+                    <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-base-content/40">
+                      Linked to your account
+                    </p>
+                  ) : null}
+                </FormField>
+              </div>
+
+              <FormField label="Category" htmlFor="support-category" required>
+                <select
+                  id="support-category"
+                  value={category}
+                  onChange={(e) =>
+                    setCategory(e.target.value as SupportCategory)
+                  }
+                  disabled={submitting}
+                  className="input-base"
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+
+              <FormField label="Subject" htmlFor="support-subject" required>
+                <input
+                  id="support-subject"
+                  type="text"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  disabled={submitting}
+                  required
+                  minLength={SUBJECT_MIN}
+                  maxLength={SUBJECT_MAX}
+                  className="input-base"
+                  placeholder="One-line summary"
+                />
+              </FormField>
+
+              <FormField
+                label="Message"
+                htmlFor="support-message"
                 required
-                autoComplete="email"
-                maxLength={254}
-                className="input-base"
-                placeholder="you@example.com"
-              />
-              {isAuthenticated ? (
-                <p className="mt-1 text-xs text-base-content/40">
-                  Linked to your account.
-                </p>
+                counter={`${message.length}/${MESSAGE_MAX}`}
+              >
+                <textarea
+                  id="support-message"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  disabled={submitting}
+                  required
+                  minLength={MESSAGE_MIN}
+                  maxLength={MESSAGE_MAX}
+                  rows={7}
+                  className="input-base resize-y"
+                  placeholder="Tell us what's going on. The more detail, the better."
+                />
+              </FormField>
+
+              {error ? (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-[4px] border border-error/30 bg-error/10 p-3"
+                  role="alert"
+                >
+                  <p className="m-0 text-xs text-error">{error}</p>
+                </motion.div>
               ) : null}
-            </FormField>
-          </div>
 
-          <FormField label="Category" htmlFor="support-category" required>
-            <select
-              id="support-category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value as SupportCategory)}
-              disabled={submitting}
-              className="input-base"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </FormField>
+              <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="m-0 text-xs text-base-content/40">
+                  {isAuthenticated
+                    ? 'Submitted with your account, so we can look up your subscription if needed.'
+                    : 'Submitted anonymously. Limited to 5 tickets per hour per IP.'}
+                </p>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="inline-flex cursor-pointer items-center justify-center rounded-[4px] bg-primary px-6 py-3 font-mono text-xs font-semibold uppercase tracking-[0.1em] text-[#101018] transition-colors hover:bg-[#6ee7b7] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {submitting ? 'Sending…' : 'Send message'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
 
-          <FormField label="Subject" htmlFor="support-subject" required>
-            <input
-              id="support-subject"
-              type="text"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              disabled={submitting}
-              required
-              minLength={SUBJECT_MIN}
-              maxLength={SUBJECT_MAX}
-              className="input-base"
-              placeholder="One-line summary"
-            />
-          </FormField>
-
-          <FormField
-            label="Message"
-            htmlFor="support-message"
-            required
-            counter={`${message.length}/${MESSAGE_MAX}`}
-          >
-            <textarea
-              id="support-message"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              disabled={submitting}
-              required
-              minLength={MESSAGE_MIN}
-              maxLength={MESSAGE_MAX}
-              rows={7}
-              className="input-base resize-y"
-              placeholder="Tell us what's going on. The more detail, the better."
-            />
-          </FormField>
-
-          {error ? (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-start gap-2 rounded-lg border border-error/20 bg-error/10 p-3"
-              role="alert"
-            >
-              <AlertTriangle
-                size={14}
-                className="mt-0.5 shrink-0 text-error"
-                aria-hidden="true"
-              />
-              <p className="text-xs text-error">{error}</p>
-            </motion.div>
-          ) : null}
-
-          <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-base-content/40">
-              {isAuthenticated
-                ? 'Submitted with your account, so we can look up your subscription if needed.'
-                : 'Submitted anonymously. Limited to 5 tickets per hour per IP.'}
-            </p>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-content transition-all hover:bg-primary/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 size={15} className="animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Send size={15} />
-                  Send message
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Local utility classes — kept here so the input styling stays
-          colocated with the form rather than leaking into globals. */}
-      <style>{`
-        .input-base {
-          width: 100%;
-          background-color: color-mix(in oklab, var(--color-base-100) 85%, transparent);
-          border: 1px solid color-mix(in oklab, var(--color-base-300) 60%, transparent);
-          border-radius: 0.5rem;
-          padding: 0.55rem 0.75rem;
-          font-size: 0.875rem;
-          color: var(--color-base-content);
-          transition: border-color 0.15s ease, box-shadow 0.15s ease;
-        }
-        .input-base:focus {
-          outline: none;
-          border-color: color-mix(in oklab, var(--color-primary) 60%, transparent);
-          box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 15%, transparent);
-        }
-        .input-base:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-        .input-base::placeholder {
-          color: color-mix(in oklab, var(--color-base-content) 35%, transparent);
-        }
-      `}</style>
-    </SupportSection>
+        {/* Local utility classes — kept here so the input styling stays
+            colocated with the form rather than leaking into globals. */}
+        <style>{`
+          .input-base {
+            width: 100%;
+            background-color: var(--color-base-75);
+            border: 1px solid var(--color-hairline);
+            border-radius: 4px;
+            padding: 0.55rem 0.75rem;
+            font-size: 0.875rem;
+            color: var(--color-base-content);
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+          }
+          .input-base:focus {
+            outline: none;
+            border-color: #34d399;
+            box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.15);
+          }
+          .input-base:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+          }
+          .input-base::placeholder {
+            color: color-mix(in oklab, var(--color-base-content) 35%, transparent);
+          }
+        `}</style>
+      </TerminalContainer>
+    </section>
   )
 }
 
@@ -313,18 +300,16 @@ function FormField({
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <label
           htmlFor={htmlFor}
-          className="text-xs font-semibold tracking-wider text-base-content/70 uppercase"
+          className="font-mono text-[11px] uppercase tracking-[0.12em] text-base-content/60"
         >
           {label}
           {required ? <span className="ml-1 text-primary">*</span> : null}
           {optional ? (
-            <span className="ml-1 text-base-content/30 normal-case">
-              (optional)
-            </span>
+            <span className="ml-1 text-base-content/30">(optional)</span>
           ) : null}
         </label>
         {counter ? (
-          <span className="text-[11px] tabular-nums text-base-content/35">
+          <span className="font-mono text-[10px] tabular-nums text-base-content/35">
             {counter}
           </span>
         ) : null}
@@ -340,17 +325,17 @@ function SuccessPanel({ onReset }: { onReset: () => void }) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className="flex flex-col items-center gap-4 rounded-2xl border border-success/20 bg-success/5 p-10 text-center"
+      className="flex max-w-[760px] flex-col items-start gap-4 rounded-[8px] border border-primary/30 bg-panel p-8"
       role="status"
     >
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success/15 text-success">
-        <CheckCircle2 size={24} />
+      <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-primary">
+        Ticket received
       </div>
       <div>
-        <h3 className="text-lg font-bold text-base-content">
-          Message sent — thanks!
+        <h3 className="m-0 text-lg font-bold text-base-content">
+          Message sent — thanks.
         </h3>
-        <p className="mt-2 max-w-md text-sm text-base-content/55">
+        <p className="mt-2 max-w-md text-sm leading-relaxed text-base-content/55">
           We've received your note and will get back to you within 1-2 business
           days at the email you provided.
         </p>
@@ -358,7 +343,7 @@ function SuccessPanel({ onReset }: { onReset: () => void }) {
       <button
         type="button"
         onClick={onReset}
-        className="cursor-pointer rounded-lg border border-base-300/50 bg-base-200/40 px-4 py-2 text-sm font-medium text-base-content/70 transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+        className="cursor-pointer rounded-[4px] border border-hairline px-4 py-2 font-mono text-xs uppercase tracking-[0.1em] text-base-content/70 transition-colors hover:border-primary hover:text-primary"
       >
         Send another
       </button>

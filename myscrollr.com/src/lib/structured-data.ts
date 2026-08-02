@@ -157,59 +157,34 @@ export function faqPage(items: ReadonlyArray<FaqEntry>) {
 }
 
 /**
- * Homepage FAQ items — kept in lockstep with the 8 questions in
- * `components/landing/FAQSection.tsx`. Answers MUST match the rendered
- * `answer` text exactly, per Google's FAQPage rich-result policy:
+ * Homepage FAQ items — the 4 "Quick answers" on the landing page.
+ * `components/landing/QuickAnswers.tsx` renders these objects directly,
+ * so the visible FAQ and the `faqPage` JSON-LD can never drift. Answers
+ * are plain text per Google's FAQPage rich-result policy:
  * https://developers.google.com/search/docs/appearance/structured-data/faqpage
- *
- * When you change a FAQSection answer, change the matching entry here
- * (and vice versa). The shape diverges from FAQSection.FAQItem because
- * the section adds visual fields (icon, highlight, accent) that don't
- * belong in JSON-LD.
  */
 export const HOMEPAGE_FAQ_ITEMS: ReadonlyArray<{
   question: string
   answer: string
 }> = [
   {
-    question: 'Is Scrollr free?',
+    question: 'Is it really free?',
     answer:
-      'The free tier streams real-time data with no ads or tracking. Uplink plans unlock more widgets at once, priority support, and power-user tools like custom alerts and integrations. The entire codebase is open source under the AGPL-3.0 license.',
+      'Yes. Three widget slots, forever, no account. Uplink exists if you outgrow them — most people don’t.',
   },
   {
-    question: 'Does it affect performance?',
+    question: 'Will it slow my computer down?',
     answer:
-      'Not noticeably. All data flows through a single connection in the background. The ticker overlay is hardware-accelerated with minimal CPU and memory usage, and it never interferes with your other applications.',
+      'No. Scrollr is a small native app (Tauri), not a browser in disguise. It sips memory and idles quietly.',
   },
   {
-    question: 'Is my data private?',
+    question: 'What does Scrollr collect about me?',
     answer:
-      'Scrollr contains zero analytics, zero tracking pixels, and zero telemetry. Your preferences are stored locally on your device and never transmitted anywhere. The only network requests go to the Scrollr API to fetch your feed data.',
+      'Nothing. Zero telemetry is a shipped promise, enforced by tests that block deploys — and the source is public.',
   },
   {
-    question: 'What platforms are supported?',
-    answer:
-      'Scrollr runs natively on macOS (Apple Silicon), Windows (x64), and Linux (x64). Download the app for your platform from our download page.',
-  },
-  {
-    question: 'Do I need an account?',
-    answer:
-      'A free Scrollr account is required to stream live widget data. Signing up takes under a minute, secures your config via our hosted auth, and unlocks the widget catalog (sports, stocks, crypto, news, and fantasy), the web dashboard, and preference sync across devices.',
-  },
-  {
-    question: 'What data does Scrollr show?',
-    answer:
-      'A catalog of 30+ widgets: real-time stock and crypto prices, live scores from 14 sports leagues, curated news outlets plus custom RSS, and Yahoo Fantasy league updates including standings and matchups.',
-  },
-  {
-    question: 'Can I customize the feed?',
-    answer:
-      'Position the ticker at the top or bottom of your screen, drag to resize, switch between comfort and compact modes, choose overlay or push behavior, and pick which widgets appear in the ticker.',
-  },
-  {
-    question: 'Is Scrollr open source?',
-    answer:
-      'Every component, from the desktop application and web dashboard to the API and integration services, is publicly available on GitHub under the GNU Affero General Public License v3.0. You can inspect, fork, or contribute to any part of it.',
+    question: 'Which platforms?',
+    answer: 'macOS, Windows, and Linux. Multi-monitor aware on all three.',
   },
 ] as const
 

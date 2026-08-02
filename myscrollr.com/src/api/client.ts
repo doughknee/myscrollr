@@ -79,6 +79,37 @@ export async function authenticatedFetch<T>(
   return response.json()
 }
 
+// ── Widget Catalog ───────────────────────────────────────────────
+//
+// GET /catalog is the single authority for what widgets exist
+// (api/internal/widgets/catalog.go). Unauthenticated; CDN-cached 5 min.
+// The marketing site renders the catalog from this response and only
+// falls back to the bundled snapshot in src/lib/catalog.ts when the
+// network is unavailable.
+
+export interface CatalogWidget {
+  id: string
+  name: string
+  description: string
+  source?: string
+  category: string
+  color: string
+  logo_url?: string
+  logo_light?: boolean
+  required_tier: string
+  order?: number
+}
+
+export interface CatalogResponse {
+  version: string
+  widgets: Array<CatalogWidget>
+}
+
+export const catalogApi = {
+  /** Fetch the widget catalog. Cached by the CDN for 5 min. */
+  get: () => request<CatalogResponse>('/catalog'),
+}
+
 // ── Tier Limits ──────────────────────────────────────────────────
 //
 // Source of truth lives in api/core/tier_limits.go (DefaultTierLimits).
