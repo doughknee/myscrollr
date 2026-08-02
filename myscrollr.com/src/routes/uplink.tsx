@@ -976,7 +976,7 @@ function UplinkPage() {
       <PageHeader
         eyebrowLeft="UPLINK ／ PRICING"
         eyebrowRight="EVERY PAID PLAN: 7-DAY FREE TRIAL · NOT CHARGED UNTIL DAY 8"
-        line1="More widgets:"
+        line1="More widgets"
         line2="at once."
         sub="Every plan is the same app, and every widget costs the same. You're only choosing how many run on your bar at once. No feature matrix to squint at."
         actions={
