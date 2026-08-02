@@ -1099,20 +1099,55 @@ function UplinkPage() {
                           /MO
                         </span>
                       </div>
-                      <div className="mb-[26px] mt-2 flex min-h-[22px] items-center gap-2.5 font-mono text-[11px] tracking-[0.06em] text-base-content/45">
-                        <span>
-                          {isFree
-                            ? 'FREE FOREVER'
-                            : billingPeriod === 'annual'
-                              ? `BILLED $${PRICING[p.tier].annual.price.toFixed(2)}/YR`
-                              : 'BILLED MONTHLY'}
-                        </span>
-                        {!isFree && billingPeriod === 'annual' && (
-                          <span className="whitespace-nowrap rounded-[3px] border border-primary/35 px-[7px] py-[2px] text-primary">
-                            4 MONTHS FREE
-                          </span>
-                        )}
-                      </div>
+                      {isFree ? (
+                        <div className="mb-[26px] mt-2 flex min-h-[22px] items-center font-mono text-[11px] tracking-[0.06em] text-base-content/45">
+                          FREE FOREVER
+                        </div>
+                      ) : (
+                        // Both billing variants stay mounted, stacked in
+                        // one grid cell: the container always sizes to
+                        // the taller variant, so toggling never shifts
+                        // the card height (at 4-col widths the annual
+                        // line wraps its badge to a second row); the
+                        // active variant crossfades in. whitespace-nowrap
+                        // keeps "/YR" glued to its price — the badge
+                        // wraps as a unit, never mid-text.
+                        <div className="mb-[26px] mt-2 grid min-h-[22px]">
+                          {(['monthly', 'annual'] as Array<PlanKey>).map(
+                            (view) => {
+                              const activeView = billingPeriod === view
+                              return (
+                                <motion.div
+                                  key={view}
+                                  initial={false}
+                                  animate={{
+                                    opacity: activeView ? 1 : 0,
+                                    y: activeView ? 0 : 4,
+                                  }}
+                                  transition={{ duration: 0.2, ease: EASE }}
+                                  aria-hidden={!activeView}
+                                  className={`col-start-1 row-start-1 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 self-center font-mono text-[11px] tracking-[0.06em] text-base-content/45 ${
+                                    activeView ? '' : 'pointer-events-none'
+                                  }`}
+                                >
+                                  {view === 'annual' ? (
+                                    <>
+                                      <span className="whitespace-nowrap">
+                                        {`BILLED $${PRICING[p.tier].annual.price.toFixed(2)}/YR`}
+                                      </span>
+                                      <span className="whitespace-nowrap rounded-[3px] border border-primary/35 px-[7px] py-[2px] text-primary">
+                                        4 MONTHS FREE
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span>BILLED MONTHLY</span>
+                                  )}
+                                </motion.div>
+                              )
+                            },
+                          )}
+                        </div>
+                      )}
 
                       {/* Capacity viz — slot squares from live tier-limits */}
                       <div className="mb-1.5 flex min-h-[34px] items-center">
