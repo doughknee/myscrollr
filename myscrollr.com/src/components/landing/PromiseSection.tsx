@@ -3,7 +3,9 @@
  * live GitHub stat line (stars · forks · last commit).
  */
 
+import { motion } from 'motion/react'
 import type { GitHubStats } from '@/hooks/useGitHubStats'
+import { EASE } from '@/lib/animations'
 import { SectionRow, TerminalContainer } from '@/components/terminal'
 import { useGitHubStats } from '@/hooks/useGitHubStats'
 
@@ -61,9 +63,13 @@ export function PromiseSection() {
             <div className="border-b border-hairline pb-3 font-mono text-[11px] tracking-[0.14em] text-base-content/45">
               WHAT SCROLLR WILL NEVER DO
             </div>
-            {REFUSALS.map((r) => (
-              <div
+            {REFUSALS.map((r, i) => (
+              <motion.div
                 key={r}
+                initial={{ opacity: 0, y: 14 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-60px' }}
+                transition={{ duration: 0.45, ease: EASE, delay: i * 0.09 }}
                 className="flex items-center gap-4 border-b border-hairline-minor px-1 py-4"
               >
                 <span
@@ -72,10 +78,24 @@ export function PromiseSection() {
                 >
                   ✕
                 </span>
-                <span className="font-semibold text-base-content/75 line-through decoration-[rgba(255,71,87,.5)] decoration-1">
+                {/* The strike draws itself across each refusal once the
+                    row lands — replaces the static line-through. */}
+                <span className="relative font-semibold text-base-content/75">
                   {r}
+                  <motion.span
+                    aria-hidden="true"
+                    initial={{ scaleX: 0 }}
+                    whileInView={{ scaleX: 1 }}
+                    viewport={{ once: true, margin: '-60px' }}
+                    transition={{
+                      duration: 0.4,
+                      ease: EASE,
+                      delay: i * 0.09 + 0.35,
+                    }}
+                    className="absolute left-0 top-1/2 h-px w-full origin-left bg-[rgba(255,71,87,.5)]"
+                  />
                 </span>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>

@@ -58,15 +58,31 @@ export function DesktopProof() {
         </motion.div>
         <div className="grid items-start gap-10 pb-14 pt-7 md:grid-cols-[220px_1fr]">
           <div className="flex flex-col gap-[22px] font-mono text-xs leading-[1.6] text-base-content/55 md:pt-[18px]">
-            {ANNOTATIONS.map(([head, body]) => (
-              <div key={head}>
+            {ANNOTATIONS.map(([head, body], i) => (
+              <motion.div
+                key={head}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-60px' }}
+                transition={{
+                  duration: 0.5,
+                  ease: EASE,
+                  delay: 0.2 + i * 0.12,
+                }}
+              >
                 <span className="text-primary">{head}</span>
                 <br />
                 {body}
-              </div>
+              </motion.div>
             ))}
           </div>
-          <div className="rounded-[8px] border border-hairline bg-panel p-4">
+          <motion.div
+            initial={{ opacity: 0, y: 32, scale: 0.985 }}
+            whileInView={{ opacity: 1, y: 0, scale: 1 }}
+            viewport={{ once: true, margin: '-80px' }}
+            transition={{ duration: 0.7, ease: EASE }}
+            className="rounded-[8px] border border-hairline bg-panel p-4"
+          >
             <img
               src={`/marketing/desktop-home-${theme}@1x.webp`}
               srcSet={srcset(theme)}
@@ -82,7 +98,7 @@ export function DesktopProof() {
               <span>{`FIG. 01 — MACOS · SUN AUG 2, ${SHOT_TIME[theme]}`}</span>
               <span>NO EDITS</span>
             </div>
-          </div>
+          </motion.div>
         </div>
       </TerminalContainer>
     </section>

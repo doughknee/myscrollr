@@ -8,7 +8,7 @@
 
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import type { CatalogWidget } from '@/lib/catalog'
 import { EASE } from '@/lib/animations'
 import { SectionRow, TerminalContainer } from '@/components/terminal'
@@ -97,56 +97,96 @@ export function CatalogPicker() {
         <div className="pb-[18px] pt-6 font-mono text-[11px] uppercase tracking-[0.12em] text-base-content/45">
           {countLine}
         </div>
-        {!expanded ? (
-          <div className="flex flex-wrap gap-2 pb-5">
-            {featured.map((w) => (
-              <WidgetPill
-                key={w.id}
-                widget={w}
-                on={active.includes(w.id)}
-                onToggle={toggle}
-              />
-            ))}
-            <button
-              type="button"
-              aria-expanded={false}
-              onClick={() => setExpanded(true)}
-              className="inline-flex cursor-pointer items-center gap-[9px] whitespace-nowrap rounded-[4px] border border-dashed border-base-content/25 bg-transparent px-[15px] py-2.5 font-mono text-xs tracking-[0.08em] text-base-content/55 transition-colors duration-150 hover:border-primary hover:text-primary"
+        <AnimatePresence mode="wait" initial={false}>
+          {!expanded ? (
+            <motion.div
+              key="featured"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, transition: { duration: 0.15 } }}
+              transition={{ duration: 0.25 }}
+              className="flex flex-wrap gap-2 pb-5"
             >
-              ＋ {moreCount} MORE ▾
-            </button>
-          </div>
-        ) : (
-          <div className="pb-2">
-            {CATEGORY_ORDER.filter((c) => (counts[c.id] ?? 0) > 0).map((c) => (
-              <div key={c.id} className="pb-[22px]">
-                <div className="pb-2.5 font-mono text-[10px] tracking-[0.14em] text-base-content/45">
-                  {`${c.label} — ${counts[c.id]}`}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {widgets
-                    .filter((w) => w.category === c.id)
-                    .map((w) => (
-                      <WidgetPill
-                        key={w.id}
-                        widget={w}
-                        on={active.includes(w.id)}
-                        onToggle={toggle}
-                      />
-                    ))}
-                </div>
-              </div>
-            ))}
-            <button
-              type="button"
-              aria-expanded
-              onClick={() => setExpanded(false)}
-              className="mb-5 cursor-pointer rounded-[4px] border border-dashed border-base-content/25 bg-transparent px-[18px] py-2.5 font-mono text-xs tracking-[0.08em] text-base-content/55 transition-colors duration-150 hover:border-primary hover:text-primary"
+              {featured.map((w) => (
+                <WidgetPill
+                  key={w.id}
+                  widget={w}
+                  on={active.includes(w.id)}
+                  onToggle={toggle}
+                />
+              ))}
+              <button
+                type="button"
+                aria-expanded={false}
+                onClick={() => setExpanded(true)}
+                className="inline-flex cursor-pointer items-center gap-[9px] whitespace-nowrap rounded-[4px] border border-dashed border-base-content/25 bg-transparent px-[15px] py-2.5 font-mono text-xs tracking-[0.08em] text-base-content/55 transition-colors duration-150 hover:border-primary hover:text-primary"
+              >
+                ＋ {moreCount} MORE ▾
+              </button>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="full"
+              initial="hidden"
+              animate="show"
+              exit={{ opacity: 0, transition: { duration: 0.15 } }}
+              variants={{
+                hidden: {},
+                show: { transition: { staggerChildren: 0.05 } },
+              }}
+              className="pb-2"
             >
-              SHOW LESS ▴
-            </button>
-          </div>
-        )}
+              {CATEGORY_ORDER.filter((c) => (counts[c.id] ?? 0) > 0).map(
+                (c) => (
+                  <motion.div
+                    key={c.id}
+                    variants={{
+                      hidden: { opacity: 0, y: 14 },
+                      show: {
+                        opacity: 1,
+                        y: 0,
+                        transition: { duration: 0.35, ease: EASE },
+                      },
+                    }}
+                    className="pb-[22px]"
+                  >
+                    <div className="pb-2.5 font-mono text-[10px] tracking-[0.14em] text-base-content/45">
+                      {`${c.label} — ${counts[c.id]}`}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {widgets
+                        .filter((w) => w.category === c.id)
+                        .map((w) => (
+                          <WidgetPill
+                            key={w.id}
+                            widget={w}
+                            on={active.includes(w.id)}
+                            onToggle={toggle}
+                          />
+                        ))}
+                    </div>
+                  </motion.div>
+                ),
+              )}
+              <motion.button
+                type="button"
+                aria-expanded
+                onClick={() => setExpanded(false)}
+                variants={{
+                  hidden: { opacity: 0, y: 14 },
+                  show: {
+                    opacity: 1,
+                    y: 0,
+                    transition: { duration: 0.35, ease: EASE },
+                  },
+                }}
+                className="mb-5 cursor-pointer rounded-[4px] border border-dashed border-base-content/25 bg-transparent px-[18px] py-2.5 font-mono text-xs tracking-[0.08em] text-base-content/55 transition-colors duration-150 hover:border-primary hover:text-primary"
+              >
+                SHOW LESS ▴
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
         {used > 3 && (
           <div className="mb-7 flex flex-wrap items-center gap-3.5 rounded-[4px] border border-dashed border-warning/40 px-[18px] py-3.5">
             <span className="font-mono text-xs tracking-[0.1em] text-warning">
@@ -179,11 +219,13 @@ function WidgetPill({
   onToggle: (id: string) => void
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       title={widget.description}
       aria-pressed={on}
       onClick={() => onToggle(widget.id)}
+      whileTap={{ scale: 0.96 }}
+      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
       className={`inline-flex cursor-pointer items-center gap-[9px] rounded-[4px] border px-[15px] py-2.5 transition-colors duration-150 hover:border-primary ${
         on ? 'border-primary/45 bg-primary/10' : 'border-hairline bg-panel'
       }`}
@@ -196,12 +238,20 @@ function WidgetPill({
       <span className="whitespace-nowrap text-sm font-semibold text-base-content">
         {widget.name}
       </span>
-      <span
-        aria-hidden="true"
-        className={`font-mono text-[11px] ${on ? 'text-primary' : 'text-base-content/45'}`}
-      >
-        {on ? '●' : '＋'}
-      </span>
-    </button>
+      {/* The ●/＋ pops on toggle — the pill echoes the bar updating */}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.span
+          key={on ? 'on' : 'off'}
+          aria-hidden="true"
+          initial={{ scale: 0.4, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.4, opacity: 0 }}
+          transition={{ duration: 0.12 }}
+          className={`font-mono text-[11px] ${on ? 'text-primary' : 'text-base-content/45'}`}
+        >
+          {on ? '●' : '＋'}
+        </motion.span>
+      </AnimatePresence>
+    </motion.button>
   )
 }

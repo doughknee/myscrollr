@@ -8,6 +8,8 @@
  * the final answer ends on a blinking terminal cursor.
  */
 
+import { motion } from 'motion/react'
+import { EASE } from '@/lib/animations'
 import { SectionRow, TerminalContainer } from '@/components/terminal'
 import { HOMEPAGE_FAQ_ITEMS } from '@/lib/structured-data'
 
@@ -22,8 +24,12 @@ export function QuickAnswers() {
         />
         <div className="grid gap-x-12 pb-12 pt-1 md:grid-cols-2">
           {HOMEPAGE_FAQ_ITEMS.map((f, i) => (
-            <div
+            <motion.div
               key={f.question}
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ duration: 0.5, ease: EASE, delay: (i % 2) * 0.08 }}
               className="group relative overflow-hidden border-b border-hairline-minor px-4 pb-8 pt-12 transition-colors duration-150 hover:bg-primary/5"
             >
               {/* Oversized ghost numeral behind the question */}
@@ -48,7 +54,7 @@ export function QuickAnswers() {
                   />
                 )}
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </TerminalContainer>

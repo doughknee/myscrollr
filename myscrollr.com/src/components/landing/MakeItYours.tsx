@@ -6,6 +6,7 @@
  * are separate controls, exactly like the desktop app.
  */
 
+import { AnimatePresence, motion } from 'motion/react'
 import { SectionRow, TerminalContainer } from '@/components/terminal'
 import {
   APP_FAMILY_COUNT,
@@ -30,21 +31,34 @@ function ControlRow<T extends string>({
       <span className="w-[76px] font-mono text-[11px] tracking-[0.14em] text-base-content/45">
         {label}
       </span>
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          aria-pressed={value === o.id}
-          onClick={() => onChange(o.id)}
-          className={`cursor-pointer rounded-[4px] border px-[18px] py-[9px] font-mono text-[11px] tracking-[0.1em] transition-colors duration-150 hover:border-primary ${
-            value === o.id
-              ? 'border-primary/45 bg-primary/10 text-primary'
-              : 'border-hairline bg-transparent text-base-content/55'
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
+      {options.map((o) => {
+        const active = value === o.id
+        return (
+          <button
+            key={o.id}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(o.id)}
+            className={`relative cursor-pointer rounded-[4px] border px-[18px] py-[9px] font-mono text-[11px] tracking-[0.1em] transition-colors duration-150 hover:border-primary ${
+              active
+                ? 'border-transparent text-primary'
+                : 'border-hairline bg-transparent text-base-content/55'
+            }`}
+          >
+            {/* Active chip slides between options — same segmented-
+                control feel as the app's Appearance settings. */}
+            {active && (
+              <motion.span
+                aria-hidden="true"
+                layoutId={`control-${label}`}
+                className="absolute inset-0 rounded-[4px] border border-primary/45 bg-primary/10"
+                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+              />
+            )}
+            <span className="relative">{o.label}</span>
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -124,11 +138,14 @@ export function MakeItYours() {
               {DEMO_THEMES.map((fam) => {
                 const pal = fam[mode]
                 return (
-                  <button
+                  <motion.button
                     key={fam.id}
                     type="button"
                     aria-pressed={theme === fam.id}
                     onClick={() => setTheme(fam.id)}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                     className={`cursor-pointer rounded-[4px] border bg-transparent p-2 text-left transition-colors duration-150 hover:border-primary ${
                       theme === fam.id ? 'border-primary/45' : 'border-hairline'
                     }`}
@@ -161,11 +178,21 @@ export function MakeItYours() {
                     </span>
                     <span className="flex justify-between px-0.5 font-mono text-[10px] tracking-[0.1em] text-base-content/45">
                       <span>{fam.name}</span>
-                      {theme === fam.id && (
-                        <span className="text-primary">● ACTIVE</span>
-                      )}
+                      <AnimatePresence initial={false}>
+                        {theme === fam.id && (
+                          <motion.span
+                            initial={{ opacity: 0, x: 6 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 6 }}
+                            transition={{ duration: 0.15 }}
+                            className="text-primary"
+                          >
+                            ● ACTIVE
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
                     </span>
-                  </button>
+                  </motion.button>
                 )
               })}
             </div>

@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { motion } from 'motion/react'
 import type { PlatformInfo } from '@/lib/detectPlatform'
 import { PageHeader } from '@/components/terminal'
 import { detectPlatform } from '@/lib/detectPlatform'
@@ -56,18 +57,32 @@ function HeroActions() {
   return (
     <div className="flex flex-col items-start gap-4 sm:items-end">
       <div className="flex flex-wrap gap-3">
-        <button
+        <motion.button
           type="button"
           onClick={handleDownload}
-          className="relative cursor-pointer rounded-[4px] bg-primary px-8 py-4 font-bold text-primary-content shadow-[0_0_60px_color-mix(in_srgb,var(--color-primary)_18%,transparent)] transition-all duration-150 hover:brightness-110 active:scale-[0.98]"
+          whileHover={{ y: -2 }}
+          whileTap={{ scale: 0.97 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="relative cursor-pointer rounded-[4px] bg-primary px-8 py-4 font-bold text-primary-content shadow-[0_0_60px_color-mix(in_srgb,var(--color-primary)_18%,transparent)] transition-[filter] duration-150 hover:brightness-110"
         >
           {label}
           {/* Corner sticker — dark ink chip with the accent text, the
-              inverse of the button (same pairing as the bar chips). */}
-          <span className="absolute -right-2.5 -top-2.5 rotate-[7deg] rounded-[3px] bg-[#101018] px-2 py-0.5 font-mono text-[10px] font-semibold tracking-[0.14em] text-primary shadow-[0_2px_8px_rgba(0,0,0,.35)]">
+              inverse of the button (same pairing as the bar chips).
+              Springs in slightly overshot once the header settles. */}
+          <motion.span
+            initial={{ scale: 0, rotate: -18 }}
+            animate={{ scale: 1, rotate: 7 }}
+            transition={{
+              type: 'spring',
+              stiffness: 380,
+              damping: 16,
+              delay: 0.55,
+            }}
+            className="absolute -right-2.5 -top-2.5 rounded-[3px] bg-[#101018] px-2 py-0.5 font-mono text-[10px] font-semibold tracking-[0.14em] text-primary shadow-[0_2px_8px_rgba(0,0,0,.35)]"
+          >
             FREE
-          </span>
-        </button>
+          </motion.span>
+        </motion.button>
         <button
           type="button"
           onClick={() =>

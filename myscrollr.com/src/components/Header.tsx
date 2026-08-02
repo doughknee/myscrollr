@@ -269,13 +269,22 @@ function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
   return (
     <Link
       to={to}
-      className={`transition-colors hover:opacity-100 ${
+      className={`relative transition-colors hover:opacity-100 ${
         isActive
           ? 'text-primary'
           : 'text-base-content/55 hover:text-base-content'
       }`}
     >
       {children}
+      {/* Emerald underline slides between links on navigation */}
+      {isActive && (
+        <motion.span
+          aria-hidden="true"
+          layoutId="nav-underline"
+          className="absolute -bottom-1.5 left-0 right-0 h-px bg-primary"
+          transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+        />
+      )}
     </Link>
   )
 }

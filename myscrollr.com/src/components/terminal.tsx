@@ -15,7 +15,7 @@
 import { Link } from '@tanstack/react-router'
 import { motion } from 'motion/react'
 import type { ReactNode } from 'react'
-import { riseIn } from '@/lib/animations'
+import { EASE, riseIn } from '@/lib/animations'
 
 /** Max-width wrapper matching the mockups' 1280px content column. */
 export function TerminalContainer({
@@ -162,7 +162,7 @@ export function DeparturesRow({
           <span className="text-sm text-base-content/55">{meta}</span>
         )}
       </span>
-      <span className="whitespace-nowrap font-mono text-sm text-primary">
+      <span className="whitespace-nowrap font-mono text-sm text-primary transition-transform duration-150 group-hover:translate-x-1">
         {action}
       </span>
     </>
@@ -172,7 +172,7 @@ export function DeparturesRow({
   // clipping off-screen; text-left neutralizes the UA's centered
   // <button> text for the onClick variant.
   const className =
-    'flex max-sm:flex-wrap items-center justify-between gap-5 border-t border-hairline px-3 py-6 text-left text-base-content transition-colors duration-150 hover:bg-primary/5 hover:opacity-100'
+    'group flex max-sm:flex-wrap items-center justify-between gap-5 border-t border-hairline px-3 py-6 text-left text-base-content transition-colors duration-150 hover:bg-primary/5 hover:opacity-100'
   if (to) {
     return (
       <Link to={to} className={className}>
@@ -206,13 +206,17 @@ export interface TerminalStep {
   body: ReactNode
 }
 
-/** Ghost-numeral step sequence (01 / 02 / 03). */
+/** Ghost-numeral step sequence (01 / 02 / 03), cascading in on view. */
 export function StepsGrid({ steps }: { steps: Array<TerminalStep> }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3">
-      {steps.map((s) => (
-        <div
+      {steps.map((s, i) => (
+        <motion.div
           key={s.num}
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-60px' }}
+          transition={{ duration: 0.55, ease: EASE, delay: i * 0.12 }}
           className="border-hairline-minor px-8 pb-12 pt-10 lg:border-r lg:last:border-r-0"
         >
           <div className="type-display type-ghost mb-[18px] text-7xl">
@@ -224,7 +228,7 @@ export function StepsGrid({ steps }: { steps: Array<TerminalStep> }) {
           <div className="max-w-[340px] text-[14.5px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
             {s.body}
           </div>
-        </div>
+        </motion.div>
       ))}
     </div>
   )
