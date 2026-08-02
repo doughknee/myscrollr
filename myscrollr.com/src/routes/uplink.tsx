@@ -976,8 +976,8 @@ function UplinkPage() {
       <PageHeader
         eyebrowLeft="UPLINK ／ PRICING"
         eyebrowRight="EVERY PAID PLAN: 7-DAY FREE TRIAL · NOT CHARGED UNTIL DAY 8"
-        line1="ONE PRICE LEVER:"
-        line2="HOW MANY AT ONCE."
+        line1="More widgets at once."
+        line2="That's the whole upgrade."
         sub="Every plan is the same app, and every widget costs the same. You're only choosing how many run on your bar at once. No feature matrix to squint at."
         actions={
           <div className="flex flex-wrap gap-1.5 font-mono text-xs tracking-[0.1em]">
