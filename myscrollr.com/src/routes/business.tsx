@@ -897,9 +897,10 @@ function BusinessPage() {
         }
 
   return (
-    // __root skips its demo-bar padding on /business; add it here so
-    // the fixed white-label bar never overlaps the footer.
-    <div className="pb-[72px]">
+    // Bar clearance (top and bottom, density-aware) is handled by
+    // __root — it treats /business like every bar-having route; only
+    // the bar INSTANCE is page-local (for the white-label override).
+    <div>
       <PageHeader
         eyebrowLeft="BUSINESS ／ BRANDED DEPLOYMENTS"
         eyebrowRight="FROM $500/MO · MUTUAL NDA BEFORE THE FIRST CALL"
@@ -966,7 +967,7 @@ function BusinessPage() {
 
       {/* Page exception: /business renders its own bar as the
           white-label demo (see DEMO_BAR_EXCLUDED in __root.tsx). */}
-      <DemoTickerBar override={override} pinBottom />
+      <DemoTickerBar override={override} />
     </div>
   )
 }

@@ -30,15 +30,14 @@ const NAV_LINKS: Array<{ to: string; label: string }> = [
 ]
 
 export default function Header({
-  barMode = 'none',
+  hasBar = false,
 }: {
   /**
-   * Which fixed bar the sticky header and drawer must dodge:
-   * 'store' = the shared demo ticker bar (position/density from the
-   * store), 'fixed-bottom' = /business's always-bottom compact
-   * white-label bar, 'none' = bar-less routes.
+   * Whether the current route shows a demo ticker bar (the shared one,
+   * or /business's white-label instance — both follow the shared
+   * store's pin/density).
    */
-  barMode?: 'store' | 'fixed-bottom' | 'none'
+  hasBar?: boolean
 }) {
   const [isOpen, setIsOpen] = useState(false)
   // Sticky offset: when the demo bar is pinned top, the header slots
@@ -47,18 +46,15 @@ export default function Header({
   const { pos, density } = useDemoTicker()
   const barTopInset = density === 'detailed' ? 'top-16' : 'top-12'
   const barBottomInset = density === 'detailed' ? 'bottom-16' : 'bottom-12'
-  const stickyTop = barMode === 'store' && pos === 'top' ? barTopInset : 'top-0'
+  const stickyTop = hasBar && pos === 'top' ? barTopInset : 'top-0'
   // The mobile drawer and the bar are both z-50 with the bar later in
   // the DOM, so the bar paints on top — inset the drawer on the bar's
   // edge so its header row / DOWNLOAD footer never sit underneath it.
-  const drawerInsets =
-    barMode === 'none'
-      ? 'top-0 bottom-0'
-      : barMode === 'fixed-bottom'
-        ? 'top-0 bottom-12'
-        : pos === 'top'
-          ? `${barTopInset} bottom-0`
-          : `top-0 ${barBottomInset}`
+  const drawerInsets = !hasBar
+    ? 'top-0 bottom-0'
+    : pos === 'top'
+      ? `${barTopInset} bottom-0`
+      : `top-0 ${barBottomInset}`
   const drawerRef = useRef<HTMLElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
 

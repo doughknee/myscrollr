@@ -176,13 +176,11 @@ function RootLayout() {
   }, [pathname])
 
   const hasDemoBar = showsDemoBar(pathname)
-  // What fixed bar the Header must dodge: the store-driven demo bar,
-  // /business's always-bottom white-label bar, or none.
-  const barMode = hasDemoBar
-    ? 'store'
-    : pathname.startsWith('/business')
-      ? 'fixed-bottom'
-      : 'none'
+  // /business renders its OWN DemoTickerBar instance (white-label
+  // override) but it follows the shared store's pin/density, so for
+  // layout purposes (padding, header offset, drawer insets) it counts
+  // as a bar-having route like any other.
+  const hasAnyBar = hasDemoBar || pathname.startsWith('/business')
   const { theme: demoFamily, density, pos } = useDemoTicker()
 
   // Site-wide theme family: picking a family in MAKE IT YOURS re-skins
@@ -203,7 +201,7 @@ function RootLayout() {
       <MotionConfig reducedMotion="user">
         <div
           className={`min-h-dvh relative overflow-x-clip bg-base-75 scanlines motion-safe:transition-[padding] motion-safe:duration-300 motion-safe:ease-out ${
-            hasDemoBar
+            hasAnyBar
               ? density === 'detailed'
                 ? 'pb-[88px]'
                 : 'pb-[72px]'
@@ -211,7 +209,7 @@ function RootLayout() {
           } ${
             // Top-pinned bar is fixed; pad the page so it doesn't sit
             // on top of the (sticky) header at scroll 0.
-            hasDemoBar && pos === 'top'
+            hasAnyBar && pos === 'top'
               ? density === 'detailed'
                 ? 'pt-16'
                 : 'pt-12'
@@ -227,7 +225,7 @@ function RootLayout() {
           </a>
 
           {/* Navigation */}
-          <Header barMode={barMode} />
+          <Header hasBar={hasAnyBar} />
 
           {/* Main Content */}
           <main

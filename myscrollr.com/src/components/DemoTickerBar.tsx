@@ -49,26 +49,13 @@ export interface DemoTickerBarOverride {
 
 export default function DemoTickerBar({
   override,
-  pinBottom = false,
 }: {
   override?: DemoTickerBarOverride
-  /**
-   * Ignore the shared pin/density state and render bottom-pinned
-   * compact. /business sets this: its bar is the page's own demo
-   * ("THE BAR BELOW REBRANDS"), the page pads for a 48px bottom bar,
-   * and the header there doesn't offset for a top-pinned bar.
-   */
-  pinBottom?: boolean
 }) {
-  const {
-    active,
-    theme: family,
-    pos: storePos,
-    density: storeDensity,
-    direction,
-  } = useDemoTicker()
-  const pos = pinBottom ? 'bottom' : storePos
-  const density = pinBottom ? 'compact' : storeDensity
+  // Position and density always follow the shared store — /business's
+  // white-label instance included, so the bar behaves identically on
+  // every page (it overrides chips/palette there, never placement).
+  const { active, theme: family, pos, density, direction } = useDemoTicker()
   const { theme: mode } = useTheme()
   const sharedChips = useDemoChips(override ? [] : active)
 
