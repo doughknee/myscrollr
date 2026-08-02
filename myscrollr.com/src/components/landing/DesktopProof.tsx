@@ -1,5 +1,5 @@
 /**
- * SEC 02 ／ ON YOUR DESKTOP — the real, unretouched product screenshot
+ * SEC 02 ／ ON YOUR DESKTOP — the real, unedited product screenshot
  * with a mono annotation rail. The image is preloaded from the route
  * head in routes/index.tsx; keep SRCSET/SIZES in sync with that link.
  */
@@ -36,7 +36,7 @@ export function DesktopProof() {
       <TerminalContainer>
         <SectionRow
           tag="SEC 02 ／ ON YOUR DESKTOP"
-          stat={`SUN AUG 2 · ${SHOT_TIME[theme]} · UNRETOUCHED`}
+          stat={`SUN AUG 2 · ${SHOT_TIME[theme]} · NO EDITS`}
         />
         <motion.div
           initial={{ opacity: 0, y: 24 }}
@@ -80,7 +80,7 @@ export function DesktopProof() {
             />
             <div className="flex flex-wrap justify-between gap-2 px-1 pt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-base-content/45">
               <span>{`FIG. 01 — MACOS · SUN AUG 2, ${SHOT_TIME[theme]}`}</span>
-              <span>UNRETOUCHED</span>
+              <span>NO EDITS</span>
             </div>
           </div>
         </div>
