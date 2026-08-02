@@ -100,14 +100,14 @@ const STATIC_TIERS = [
   {
     name: 'Pro',
     description:
-      'Twelve widgets at once, custom alerts, feed profiles, advanced feed controls, and priority RSS refresh.',
+      'Twelve widgets at once, priority support, and early access to new widgets.',
     priceMonthly: 24.99,
     priceAnnual: 199.99,
   },
   {
     name: 'Ultimate',
     description:
-      'Unlimited widgets at once, plus webhooks, data export, and API access as they land.',
+      'Unlimited widgets at once, priority support, and early access to new widgets.',
     priceMonthly: 49.99,
     priceAnnual: 399.99,
   },
@@ -120,9 +120,9 @@ const STATIC_FAQ = [
       'Widgets are the building blocks of your ticker — MLB scores, a stocks watchlist, crypto prices, your news feed, Yahoo Fantasy, and more. Your plan sets how many run at the same time: Free runs 3, Uplink 6, Pro 12, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.',
   },
   {
-    question: 'What does "data delivery" mean?',
+    question: 'How fast are live updates?',
     answer:
-      'Every plan streams data in real time over Server-Sent Events (SSE) — the same technology used by stock trading platforms. The moment a price ticks or a score changes, it appears in your ticker. Polling only exists as a brief fallback while a connection re-establishes.',
+      'Instant, on every plan. The moment a price ticks or a score changes, it appears in your ticker over a live streaming connection. There is no faster tier to buy — everyone gets the same speed.',
   },
   {
     question: 'Are there limits inside a widget?',
@@ -145,24 +145,9 @@ const STATIC_FAQ = [
       'As many as you play. Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. The Yahoo Fantasy widget is included on every plan — even Free — and syncs unlimited leagues across every sport.',
   },
   {
-    question: 'What are custom alerts?',
-    answer:
-      'Custom alerts let you define conditions that trigger notifications: a stock hitting a target price, a game entering the 4th quarter, or an RSS item matching a keyword. Alerts are evaluated in the app background — no server round-trip needed. Available on Pro and Ultimate tiers.',
-  },
-  {
-    question: 'What are feed profiles and advanced controls?',
-    answer:
-      'Feed profiles let you save different configurations — like "Work" showing only finance and RSS, or "Weekend" with sports and fantasy. Advanced controls add pinning, custom sort rules, and per-channel filtering within the feed. Both features are exclusive to Pro and Ultimate tiers.',
-  },
-  {
     question: 'What is site filtering?',
     answer:
       'Site filtering controls where the feed bar appears. Every tier includes blacklist filtering — hide the bar on specific displays. Pro and Ultimate add whitelist mode on top, so you can restrict the bar to only the displays you choose.',
-  },
-  {
-    question: 'What about webhooks, data export, and API access?',
-    answer:
-      'Webhooks push your alerts to Discord, Slack, or any URL. Data export lets you download tracked symbols, historical prices, and game results as CSV or JSON. API access gives you programmatic read access to your MyScrollr data for personal dashboards or automation. All three are exclusive to Ultimate.',
   },
   {
     question: 'What does early access include?',
@@ -689,7 +674,6 @@ function UplinkPage() {
           />
         </Suspense>
       )}
-
       {/* ── Plan Change Confirmation Modal ─────────────────── */}
       {pendingChange && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
@@ -800,7 +784,6 @@ function UplinkPage() {
           </motion.div>
         </div>
       )}
-
       {/* ── Trial Cancel Retention Modal ──────────────────────── */}
       {showTrialCancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
@@ -865,7 +848,6 @@ function UplinkPage() {
           </motion.div>
         </div>
       )}
-
       {/* ── Checkout Success Banner ─────────────────────────── */}
       {checkoutSuccess &&
         (() => {
