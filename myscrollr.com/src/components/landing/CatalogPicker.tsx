@@ -19,6 +19,7 @@ import {
   widgetAccent,
 } from '@/lib/catalog'
 import { useDemoTicker } from '@/hooks/useDemoTicker'
+import { CountUp } from '@/components/CountUp'
 
 const FEATURED_IDS = [
   'finance_stocks',
@@ -66,14 +67,25 @@ export function CatalogPicker() {
     <section id="catalog" className="scroll-mt-32 border-b border-hairline">
       <TerminalContainer>
         <SectionRow
-          tag={`SEC 01 ／ THE CATALOG — ${widgets.length} WIDGETS & COUNTING`}
+          tag={
+            <>
+              {'SEC 01 ／ THE CATALOG — '}
+              <CountUp value={widgets.length} />
+              {' WIDGETS & COUNTING'}
+            </>
+          }
           stat={
             used <= 3 ? (
               <span className="text-primary">
-                {`SLOTS ${'▓'.repeat(used)}${'░'.repeat(3 - used)} ${used}/3 FREE`}
+                {`SLOTS ${'▓'.repeat(used)}${'░'.repeat(3 - used)} `}
+                <CountUp value={used} />
+                {'/3 FREE'}
               </span>
             ) : (
-              <span className="text-warning">{`${used} RUNNING · UPLINK TERRITORY`}</span>
+              <span className="text-warning">
+                <CountUp value={used} />
+                {' RUNNING · UPLINK TERRITORY'}
+              </span>
             )
           }
         />

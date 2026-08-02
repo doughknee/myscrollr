@@ -27,6 +27,7 @@ import {
   PageHeader,
   TerminalContainer,
 } from '@/components/terminal'
+import { CountUp } from '@/components/CountUp'
 
 export const Route = createFileRoute('/widgets')({
   head: () =>
@@ -114,7 +115,18 @@ function ChannelsPage() {
         eyebrowLeft="WIDGETS ／ THE CATALOG"
         eyebrowRight="NEW WIDGETS SHIP SERVER-SIDE · NO APP UPDATE NEEDED"
         line1="The catalog."
-        line2={`${n} and counting.`}
+        line2={
+          <>
+            <CountUp
+              value={n}
+              transition={{
+                y: { type: 'spring', visualDuration: 0.5, bounce: 0.2 },
+                layout: { duration: 0.3 },
+              }}
+            />
+            {' and counting.'}
+          </>
+        }
         sub="Every widget streams live and takes ten seconds to add. Tap ADD TO BAR to preview any of them in the bar below. It follows you to every page."
         actions={
           <input
