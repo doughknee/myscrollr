@@ -372,7 +372,7 @@ const PERKS = [
   {
     num: '03',
     title: 'Early access',
-    body: 'New widgets land on paid tiers first, then roll out to everyone. You fund the roadmap; you see it first.',
+    body: 'When a release needs a test run, paid tiers see it first before it rolls out to everyone. You fund the roadmap; you see it first.',
   },
 ]
 
