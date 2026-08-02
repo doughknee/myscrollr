@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import ScrollrSVG from '@/components/ScrollrSVG'
 import { LATEST_DESKTOP_VERSION } from '@/lib/latestVersion.generated'
 
 /**
@@ -69,10 +70,13 @@ export default function Footer() {
       <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-5 px-5 pb-4 pt-7 sm:px-8">
         <Link
           to="/"
-          className="flex items-baseline text-base font-extrabold tracking-[-0.02em] text-base-content hover:text-base-content hover:opacity-100"
+          className="flex items-center gap-2 text-base font-extrabold tracking-[-0.02em] text-base-content hover:text-base-content hover:opacity-100"
         >
-          scrollr
-          <span className="text-primary">.</span>
+          <ScrollrSVG width={20} height={20} />
+          <span className="flex items-baseline">
+            scrollr
+            <span className="text-primary">.</span>
+          </span>
         </Link>
 
         <nav

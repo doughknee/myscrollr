@@ -1,10 +1,11 @@
 import { ClientOnly, Link, useLocation } from '@tanstack/react-router'
-import { LogOut, Menu, X } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { IdTokenClaims } from '@logto/react'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import ScrollrSVG from '@/components/ScrollrSVG'
 
 /**
  * Terminal-editorial nav (design_handoff_marketing_site/README.md):
@@ -19,6 +20,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
  */
 
 const NAV_LINKS: Array<{ to: string; label: string }> = [
+  { to: '/', label: 'HOME' },
   { to: '/widgets', label: 'WIDGETS' },
   { to: '/uplink', label: 'UPLINK' },
   { to: '/business', label: 'BUSINESS' },
@@ -65,14 +67,6 @@ export default function Header() {
               {l.label}
             </NavLink>
           ))}
-          <a
-            href="https://github.com/brandon-relentnet/myscrollr"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-base-content/55 transition-colors hover:text-base-content hover:opacity-100"
-          >
-            GITHUB
-          </a>
           <ClientOnly>
             <DesktopAccountLink />
           </ClientOnly>
@@ -83,9 +77,6 @@ export default function Header() {
             DOWNLOAD ↓
           </Link>
           <ThemeToggle />
-          <ClientOnly>
-            <DesktopAuthMenu />
-          </ClientOnly>
         </nav>
 
         {/* Mobile: theme + menu button */}
@@ -142,34 +133,25 @@ export default function Header() {
               </div>
 
               <nav className="flex-1 space-y-1 px-4 py-6 font-mono text-sm tracking-[0.08em]">
-                <MobileNavLink to="/" onClick={closeDrawer}>
-                  HOME
-                </MobileNavLink>
                 {NAV_LINKS.map((l) => (
                   <MobileNavLink key={l.to} to={l.to} onClick={closeDrawer}>
                     {l.label}
                   </MobileNavLink>
                 ))}
-                <a
-                  href="https://github.com/brandon-relentnet/myscrollr"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block rounded-[4px] px-4 py-3 text-base-content/55 transition-colors hover:bg-base-200 hover:text-base-content hover:opacity-100"
-                >
-                  GITHUB ↗
-                </a>
-                <MobileNavLink to="/download" onClick={closeDrawer}>
-                  <span className="text-primary">DOWNLOAD ↓</span>
-                </MobileNavLink>
                 <ClientOnly>
                   <MobileAccountLink onNavigate={closeDrawer} />
                 </ClientOnly>
               </nav>
 
+              {/* Download is the one action that matters here */}
               <div className="border-t border-hairline px-5 py-5">
-                <ClientOnly>
-                  <MobileAuthMenu onAfterAction={closeDrawer} />
-                </ClientOnly>
+                <Link
+                  to="/download"
+                  onClick={closeDrawer}
+                  className="block rounded-[4px] bg-primary py-3 text-center font-mono text-sm font-bold tracking-[0.08em] text-primary-content hover:text-primary-content hover:opacity-100"
+                >
+                  DOWNLOAD ↓
+                </Link>
               </div>
             </motion.aside>
           </>
@@ -183,11 +165,18 @@ function Wordmark() {
   return (
     <Link
       to="/"
-      className="flex items-baseline text-xl font-extrabold tracking-[-0.02em] text-base-content hover:text-base-content hover:opacity-100"
+      className="group flex items-center gap-2.5 text-xl font-extrabold tracking-[-0.02em] text-base-content hover:text-base-content hover:opacity-100"
       aria-label="Scrollr home"
     >
-      scrollr
-      <span className="text-primary">.</span>
+      <ScrollrSVG
+        width={26}
+        height={26}
+        className="transition-transform duration-150 group-hover:scale-105"
+      />
+      <span className="flex items-baseline">
+        scrollr
+        <span className="text-primary">.</span>
+      </span>
     </Link>
   )
 }
@@ -224,35 +213,6 @@ function DesktopAccountLink() {
   )
 }
 
-function DesktopAuthMenu() {
-  const { signIn, signOut, isAuthenticated, isLoading } = useScrollrAuth()
-
-  if (isLoading) {
-    return <span className="h-2 w-2 animate-pulse rounded-full bg-primary/40" />
-  }
-
-  if (isAuthenticated) {
-    return (
-      <button
-        onClick={() => signOut(`${window.location.origin}`)}
-        className="flex cursor-pointer items-center gap-2 rounded-[4px] border border-hairline px-3 py-2 text-base-content/55 transition-colors hover:border-error/50 hover:text-error"
-        aria-label="Sign out"
-      >
-        <LogOut size={13} />
-      </button>
-    )
-  }
-
-  return (
-    <button
-      onClick={() => signIn()}
-      className="cursor-pointer rounded-[4px] border border-hairline px-[14px] py-2 text-base-content/70 transition-colors hover:border-primary hover:text-primary"
-    >
-      SIGN IN
-    </button>
-  )
-}
-
 function MobileAccountLink({ onNavigate }: { onNavigate: () => void }) {
   const { isAuthenticated } = useScrollrAuth()
   const userClaims = useUserClaims()
@@ -263,46 +223,6 @@ function MobileAccountLink({ onNavigate }: { onNavigate: () => void }) {
     <MobileNavLink to="/account" onClick={onNavigate}>
       {(userClaims?.username || userClaims?.name || 'ACCOUNT').toUpperCase()}
     </MobileNavLink>
-  )
-}
-
-function MobileAuthMenu({ onAfterAction }: { onAfterAction: () => void }) {
-  const { signIn, signOut, isAuthenticated, isLoading } = useScrollrAuth()
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center gap-2 py-3">
-        <div className="h-2 w-2 animate-pulse rounded-full bg-primary" />
-        <span className="font-mono text-xs text-base-content/40">LOADING…</span>
-      </div>
-    )
-  }
-
-  if (isAuthenticated) {
-    return (
-      <button
-        onClick={() => {
-          signOut(`${window.location.origin}`)
-          onAfterAction()
-        }}
-        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-[4px] border border-error/30 px-5 py-3 font-mono text-sm tracking-[0.08em] text-error/80 transition-colors hover:bg-error/10"
-      >
-        <LogOut size={14} />
-        SIGN OUT
-      </button>
-    )
-  }
-
-  return (
-    <button
-      onClick={() => {
-        signIn()
-        onAfterAction()
-      }}
-      className="w-full cursor-pointer rounded-[4px] border border-hairline px-5 py-3 font-mono text-sm tracking-[0.08em] text-base-content/70 transition-colors hover:border-primary hover:text-primary"
-    >
-      SIGN IN
-    </button>
   )
 }
 
