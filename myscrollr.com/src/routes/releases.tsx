@@ -47,6 +47,9 @@ export const Route = createFileRoute('/releases')({
   component: ReleasesPage,
 })
 
+// Rows shown before the SHOW ALL expander.
+const LEDGER_COLLAPSED_COUNT = 12
+
 const reveal = {
   initial: { opacity: 0, y: 24 },
   whileInView: { opacity: 1, y: 0 },
@@ -187,6 +190,11 @@ function ReleasesPage() {
     [releases, sortKey, sortDir],
   )
 
+  // 50+ releases as a flat wall helps nobody — show the most recent
+  // dozen (in the current sort order) behind an expander.
+  const [showAll, setShowAll] = useState(false)
+  const visible = showAll ? sorted : sorted.slice(0, LEDGER_COLLAPSED_COUNT)
+
   // "Latest" = newest non-prerelease by publish date (matches the badge
   // GitHub shows), independent of the current sort order.
   const latestTag = useMemo(() => {
@@ -259,7 +267,7 @@ function ReleasesPage() {
                 </div>
 
                 <ul className="m-0 list-none p-0">
-                  {sorted.map((release, i) => (
+                  {visible.map((release, i) => (
                     <ReleaseRow
                       key={release.tag}
                       index={String(i + 1).padStart(2, '0')}
@@ -275,6 +283,18 @@ function ReleasesPage() {
                     />
                   ))}
                 </ul>
+                {sorted.length > LEDGER_COLLAPSED_COUNT && (
+                  <button
+                    type="button"
+                    aria-expanded={showAll}
+                    onClick={() => setShowAll((v) => !v)}
+                    className="mt-5 cursor-pointer rounded-[4px] border border-dashed border-base-content/25 px-[18px] py-2.5 font-mono text-xs tracking-[0.08em] text-base-content/55 transition-colors hover:border-primary hover:text-primary"
+                  >
+                    {showAll
+                      ? 'SHOW RECENT ONLY ▴'
+                      : `＋ SHOW ALL ${sorted.length} ▾`}
+                  </button>
+                )}
               </>
             )}
           </motion.div>

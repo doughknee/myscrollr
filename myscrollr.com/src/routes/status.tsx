@@ -321,8 +321,21 @@ function StatusPage() {
                 )
               })
             ) : (
-              <div className="border-b border-hairline-minor px-2 py-8 font-mono text-[12px] tracking-[0.1em] text-base-content/40">
-                UNABLE TO DISCOVER CHANNELS
+              <div className="grid grid-cols-[90px_1fr_auto] items-center gap-[18px] border-b border-hairline-minor px-2 py-5">
+                <span className="inline-flex items-center gap-2 font-mono text-[11px] font-semibold text-error/80">
+                  <span
+                    aria-hidden="true"
+                    className="animate-pulse-dot h-[7px] w-[7px] rounded-[2px] bg-error/80"
+                  />
+                  CHN—??
+                </span>
+                <span className="text-sm text-base-content/55">
+                  Unable to discover channels — the API is not reachable from
+                  this browser.
+                </span>
+                <span className="font-mono text-xs text-error/80">
+                  UNREACHABLE
+                </span>
               </div>
             )}
           </motion.div>
