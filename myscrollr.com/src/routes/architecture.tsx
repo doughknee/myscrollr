@@ -1,29 +1,15 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { motion } from 'motion/react'
-import {
-  Activity,
-  ArrowDown,
-  ArrowRight,
-  Box,
-  Cable,
-  CircuitBoard,
-  Cloud,
-  Cpu,
-  Database,
-  Download as DownloadIcon,
-  Globe,
-  MonitorSmartphone,
-  Puzzle,
-  Radio,
-  RefreshCw,
-  Server,
-  Shield,
-  Workflow,
-} from 'lucide-react'
-import type { ComponentType } from 'react'
 
 import { BASE_URL, seo } from '@/lib/seo'
 import { breadcrumbs, organization } from '@/lib/structured-data'
+import { EASE } from '@/lib/animations'
+import {
+  DeparturesRow,
+  PageHeader,
+  SectionRow,
+  TerminalContainer,
+} from '@/components/terminal'
 
 // TechArticle JSON-LD for the architecture deep-dive page.
 // Per Google: TechArticle requires `headline`, `image`, `datePublished`.
@@ -69,9 +55,6 @@ export const Route = createFileRoute('/architecture')({
   component: ArchitecturePage,
 })
 
-// ── Signature easing (matches homepage) ────────────────────────
-const EASE = [0.22, 1, 0.36, 1] as const
-
 // ── Channel hex map ────────────────────────────────────────────
 const HEX = {
   primary: '#34d399',
@@ -83,59 +66,45 @@ const HEX = {
 // ── Pipeline Steps ─────────────────────────────────────────────
 
 interface PipelineStep {
-  Icon: ComponentType<{ size?: number; className?: string }>
   title: string
   description: string
   hex: string
   label: string
   items: Array<string>
-  Watermark: ComponentType<{
-    size?: number
-    strokeWidth?: number
-    className?: string
-  }>
 }
 
 const PIPELINE_STEPS: Array<PipelineStep> = [
   {
-    Icon: Globe,
     title: 'Data Sources',
     description:
       'TwelveData WebSocket for market data, ESPN API for scores, RSS/Atom feeds for news, Yahoo Fantasy API for leagues.',
     hex: HEX.primary,
     label: 'INGEST',
     items: ['TwelveData WS', 'ESPN HTTP', 'Yahoo API', 'RSS Feeds'],
-    Watermark: Globe,
   },
   {
-    Icon: Cpu,
     title: 'Ingestion Services',
     description:
       'Four independent Rust services collect, normalize, and write data to PostgreSQL. Each runs its own schedule and connection strategy.',
     hex: HEX.info,
     label: 'PROCESS',
     items: ['Finance :3001', 'Sports :3002', 'RSS :3004', 'Kalshi :3005'],
-    Watermark: Cpu,
   },
   {
-    Icon: Database,
     title: 'PostgreSQL + CDC',
     description:
       'All data lands in PostgreSQL. Sequin monitors table changes via CDC (Change Data Capture) and fires webhooks to the core API.',
     hex: HEX.secondary,
     label: 'DETECT',
     items: ['trades', 'games', 'rss_items', 'yahoo_*'],
-    Watermark: Database,
   },
   {
-    Icon: Radio,
     title: 'Real-time Delivery',
     description:
       'Core API maps each CDC record to a topic in-process and publishes via Redis pub/sub. Every replica fans out to its own SSE clients.',
     hex: HEX.accent,
     label: 'DELIVER',
     items: ['Topic Routing', 'Redis Pub/Sub', 'SSE Stream', 'Per-user'],
-    Watermark: Radio,
   },
 ]
 
@@ -144,95 +113,54 @@ const PIPELINE_STEPS: Array<PipelineStep> = [
 interface CdcStep {
   label: string
   detail: string
-  Icon: ComponentType<{ size?: number; className?: string }>
   hex: string
 }
 
 const CDC_FLOW: Array<CdcStep> = [
-  {
-    label: 'Rust Service',
-    detail: 'Writes to PostgreSQL',
-    Icon: Cpu,
-    hex: HEX.info,
-  },
-  {
-    label: 'Sequin CDC',
-    detail: 'Detects row changes',
-    Icon: Activity,
-    hex: HEX.secondary,
-  },
-  {
-    label: 'Core API',
-    detail: 'POST /webhooks/sequin',
-    Icon: Server,
-    hex: HEX.primary,
-  },
+  { label: 'Rust Service', detail: 'Writes to PostgreSQL', hex: HEX.info },
+  { label: 'Sequin CDC', detail: 'Detects row changes', hex: HEX.secondary },
+  { label: 'Core API', detail: 'POST /webhooks/sequin', hex: HEX.primary },
   {
     label: 'Topic Router',
     detail: 'record → cdc:{source}:{key}',
-    Icon: Cable,
     hex: HEX.info,
   },
-  {
-    label: 'Redis Pub/Sub',
-    detail: 'events:user:{sub}',
-    Icon: Radio,
-    hex: HEX.accent,
-  },
-  {
-    label: 'SSE → Client',
-    detail: 'Desktop App',
-    Icon: MonitorSmartphone,
-    hex: HEX.primary,
-  },
+  { label: 'Redis Pub/Sub', detail: 'events:user:{sub}', hex: HEX.accent },
+  { label: 'SSE → Client', detail: 'Desktop App', hex: HEX.primary },
 ]
 
 // ── Architecture Principles ────────────────────────────────────
 
 interface Principle {
-  Icon: ComponentType<{ size?: number; className?: string }>
   title: string
   description: string
   hex: string
-  Watermark: ComponentType<{
-    size?: number
-    strokeWidth?: number
-    className?: string
-  }>
 }
 
 const PRINCIPLES: Array<Principle> = [
   {
-    Icon: Box,
     title: 'Isolated Ingestion',
     description:
       'Each data source has its own Rust ingestion service with an independent schedule, quota budget, and crash blast radius. Widget read APIs live inside the core gateway.',
     hex: HEX.primary,
-    Watermark: Box,
   },
   {
-    Icon: Shield,
     title: 'Zero-trust Gateway',
     description:
-      'Core API validates JWTs at the edge. The one proxied service (Fantasy) never sees tokens — it trusts identity headers injected by the gateway.',
+      'Core API validates JWTs at the edge. The one proxied service (Fantasy) never sees tokens. It trusts identity headers injected by the gateway.',
     hex: HEX.secondary,
-    Watermark: Shield,
   },
   {
-    Icon: RefreshCw,
     title: 'Self-registration',
     description:
       'The Fantasy service registers in Redis on startup with a 30s TTL heartbeat and is discovered dynamically. First-party widget sources are served natively by core.',
     hex: HEX.info,
-    Watermark: RefreshCw,
   },
   {
-    Icon: Workflow,
     title: 'Server-authoritative catalog',
     description:
       'One catalog defines every widget, served from the API. The desktop fetches it and renders generically, so a new widget ships without a new release.',
     hex: HEX.accent,
-    Watermark: Workflow,
   },
 ]
 
@@ -240,869 +168,658 @@ const PRINCIPLES: Array<Principle> = [
 
 interface TechGroup {
   category: string
-  Icon: ComponentType<{ size?: number; className?: string }>
   hex: string
   items: Array<{ name: string; detail: string }>
-  Watermark: ComponentType<{
-    size?: number
-    strokeWidth?: number
-    className?: string
-  }>
 }
 
 const TECH_STACK: Array<TechGroup> = [
   {
     category: 'Core API',
-    Icon: Server,
     hex: HEX.primary,
     items: [
       { name: 'Go 1.25', detail: 'Fiber v2, pgx, Redis' },
       { name: 'SSE Hub', detail: 'Per-user Redis Pub/Sub channels' },
       { name: 'Logto', detail: 'Self-hosted OIDC, JWT validation' },
     ],
-    Watermark: Server,
   },
   {
     category: 'Ingestion',
-    Icon: Cpu,
     hex: HEX.info,
     items: [
       { name: 'Rust', detail: 'tokio async runtime' },
       { name: 'WebSocket', detail: 'TwelveData persistent connection' },
       { name: 'HTTP Polling', detail: 'ESPN 60s, RSS 5min, Yahoo 120s' },
     ],
-    Watermark: Cpu,
   },
   {
     category: 'Frontend',
-    Icon: MonitorSmartphone,
     hex: HEX.accent,
     items: [
       { name: 'React 19', detail: 'Vite 7, TanStack Router' },
       { name: 'Tailwind v4', detail: 'daisyUI theme system' },
       { name: 'Motion', detail: 'Production-grade animations' },
     ],
-    Watermark: MonitorSmartphone,
   },
   {
     category: 'Desktop',
-    Icon: Globe,
     hex: HEX.secondary,
     items: [
       { name: 'Tauri v2', detail: 'Cross-platform native shell' },
       { name: 'React 19', detail: 'Multi-window UI' },
       { name: 'SSE + Polling', detail: 'Real-time data delivery' },
     ],
-    Watermark: Globe,
   },
   {
     category: 'Infrastructure',
-    Icon: Database,
     hex: HEX.primary,
     items: [
       { name: 'PostgreSQL', detail: 'Shared DB, natural table isolation' },
       { name: 'Redis', detail: 'Cache, Pub/Sub, registration' },
       { name: 'Sequin', detail: 'CDC webhooks from PostgreSQL' },
     ],
-    Watermark: Database,
   },
   {
     category: 'Deployment',
-    Icon: Cloud,
     hex: HEX.info,
     items: [
       { name: 'Kubernetes', detail: 'DigitalOcean DOKS + DOCR' },
       { name: 'GitHub Actions', detail: 'Build, deploy, smoke test' },
       { name: 'nginx + cert-manager', detail: 'Ingress, TLS' },
     ],
-    Watermark: Cloud,
   },
 ]
+
+// ── Motion helpers ─────────────────────────────────────────────
+
+const reveal = (index = 0) => ({
+  initial: { opacity: 0, y: 24 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true },
+  transition: { duration: 0.6, ease: EASE, delay: index * 0.08 },
+})
+
+const revealX = (index = 0) => ({
+  initial: { opacity: 0, x: -20 },
+  whileInView: { opacity: 1, x: 0 },
+  viewport: { once: true },
+  transition: { duration: 0.5, ease: EASE, delay: index * 0.08 },
+})
+
+// ── Section intro (display heading + muted sub) ────────────────
+
+function SectionIntro({
+  line1,
+  outline,
+  sub,
+}: {
+  line1: string
+  outline: string
+  sub: string
+}) {
+  return (
+    <motion.div {...reveal(0)}>
+      <h2 className="type-display m-0 text-[clamp(30px,4vw,52px)]">
+        {line1} <span className="type-outline">{outline}</span>
+      </h2>
+      <p className="mb-0 mt-3 max-w-lg text-base leading-relaxed text-base-content/55">
+        {sub}
+      </p>
+    </motion.div>
+  )
+}
 
 // ── Page Component ─────────────────────────────────────────────
 
 function ArchitecturePage() {
   return (
-    <div className="min-h-dvh pt-20">
-      {/* ── HERO ─────────────────────────────────────────────── */}
-      <section className="relative pt-28 pb-20 overflow-hidden">
-        {/* Background grid */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div
-            className="absolute inset-0 opacity-[0.02]"
-            style={{
-              backgroundImage: `
-                linear-gradient(rgba(52, 211, 153, 0.15) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(52, 211, 153, 0.15) 1px, transparent 1px)
-              `,
-              backgroundSize: '60px 60px',
-            }}
+    <div>
+      <PageHeader
+        eyebrowLeft="ARCHITECTURE ／ SYSTEM DESIGN"
+        eyebrowRight="GO · RUST · REACT · REDIS"
+        line1="How Scrollr"
+        line2="works."
+        sub="From source API to your desktop in milliseconds. A decoupled, CDC-driven pipeline built on Go, Rust, React, and Redis."
+      />
+
+      {/* ── SEC 01 ／ THE PIPELINE ───────────────────────────── */}
+      <section className="border-b border-hairline">
+        <TerminalContainer>
+          <SectionRow
+            tag="SEC 01 ／ THE PIPELINE"
+            stat={`${PIPELINE_STEPS.length} STAGES · SOURCE → SCREEN`}
           />
-          <motion.div
-            className="absolute top-[-10%] left-[40%] w-[600px] h-[600px] rounded-full"
-            style={{
-              background:
-                'radial-gradient(circle, var(--glow-primary-subtle) 0%, transparent 70%)',
-            }}
-            whileInView={{ scale: [1, 1.06, 1], opacity: [0.3, 0.6, 0.3] }}
-            viewport={{ once: false, margin: '200px' }}
-            transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
-          />
-        </div>
+          <div className="py-10 sm:py-14">
+            <SectionIntro
+              line1="The"
+              outline="pipeline"
+              sub="Four stages from data source to your screen"
+            />
 
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+            <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {PIPELINE_STEPS.map((step, i) => (
+                <motion.div
+                  key={step.title}
+                  {...reveal(i)}
+                  className="relative overflow-hidden rounded-[8px] border border-hairline bg-panel p-6"
+                >
+                  {/* Accent top line */}
+                  <div
+                    className="absolute inset-x-0 top-0 h-px"
+                    style={{
+                      background: `linear-gradient(90deg, transparent, ${step.hex} 50%, transparent)`,
+                    }}
+                  />
 
-        <div className="container relative z-10 !py-0 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: EASE }}
-            className="flex items-center justify-center gap-3 mb-8"
-          >
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/8 text-primary text-[10px] font-bold rounded-lg border border-primary/15 uppercase tracking-wide">
-              <CircuitBoard size={12} />
-              System Design
-            </span>
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.15, ease: EASE }}
-            className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black tracking-tight leading-[0.95] mb-6"
-          >
-            How Scrollr <span className="text-gradient-primary">Works</span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3, ease: EASE }}
-            className="text-base text-base-content/45 max-w-xl mx-auto leading-relaxed"
-          >
-            From source API to your desktop in milliseconds. A decoupled,
-            CDC-driven pipeline built on Go, Rust, React, and Redis.
-          </motion.p>
-        </div>
-
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-base-300/50 to-transparent" />
-      </section>
-
-      {/* ── DATA PIPELINE ────────────────────────────────────── */}
-      <section className="relative overflow-hidden">
-        {/* Tinted section background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-base-200/20 to-transparent pointer-events-none" />
-
-        <div className="container relative z-10">
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.7, ease: EASE }}
-            className="text-center mb-12 sm:mb-16"
-          >
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
-              The <span className="text-gradient-primary">Pipeline</span>
-            </h2>
-            <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
-              Four stages from data source to your screen
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {PIPELINE_STEPS.map((step, i) => (
-              <motion.div
-                key={step.title}
-                style={{ opacity: 0 }}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{
-                  delay: i * 0.1,
-                  duration: 0.6,
-                  ease: EASE,
-                }}
-                className="group relative bg-base-200/40 border border-base-300/25 rounded-xl p-6 overflow-hidden hover:border-base-300/50 transition-colors"
-              >
-                {/* Accent top line */}
-                <div
-                  className="absolute top-0 left-0 right-0 h-px"
-                  style={{
-                    background: `linear-gradient(90deg, transparent, ${step.hex} 50%, transparent)`,
-                  }}
-                />
-
-                {/* Corner dot grid */}
-                <div
-                  className="absolute top-0 right-0 w-20 h-20 opacity-[0.04] text-base-content"
-                  style={{
-                    backgroundImage:
-                      'radial-gradient(circle, currentColor 1px, transparent 1px)',
-                    backgroundSize: '8px 8px',
-                  }}
-                />
-
-                {/* Ambient glow orb on hover */}
-                <div
-                  className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                  style={{ background: `${step.hex}10` }}
-                />
-
-                <div className="relative z-10">
-                  {/* Header */}
-                  <div className="flex items-center justify-between mb-5">
-                    <div
-                      className="w-11 h-11 rounded-xl flex items-center justify-center"
-                      style={{
-                        background: `${step.hex}15`,
-                        boxShadow: `0 0 20px ${step.hex}15, 0 0 0 1px ${step.hex}20`,
-                      }}
-                    >
-                      <step.Icon size={20} className="text-base-content/80" />
-                    </div>
+                  <div className="mb-4 flex items-center justify-between">
+                    <span className="font-mono text-[10px] tracking-[0.14em] text-base-content/40">
+                      {String(i + 1).padStart(2, '0')}
+                    </span>
                     <span
-                      className="text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border font-mono"
-                      style={{
-                        background: `${step.hex}10`,
-                        color: step.hex,
-                        borderColor: `${step.hex}30`,
-                      }}
+                      className="rounded-[3px] border px-2 py-[3px] font-mono text-[10px] font-bold tracking-[0.12em]"
+                      style={{ color: step.hex, borderColor: `${step.hex}55` }}
                     >
                       {step.label}
                     </span>
                   </div>
 
-                  <h3 className="text-sm font-semibold text-base-content mb-2">
+                  <h3 className="m-0 text-[15px] font-bold uppercase tracking-[0.02em] text-base-content">
                     {step.title}
                   </h3>
-                  <p className="text-xs text-base-content/40 leading-relaxed mb-4">
+                  <p className="mb-0 mt-2 text-[13px] leading-relaxed text-base-content/55">
                     {step.description}
                   </p>
 
-                  {/* Items */}
-                  <div className="space-y-1.5 pt-4 border-t border-base-300/25">
+                  <div className="mt-4 space-y-1.5 border-t border-hairline-minor pt-4">
                     {step.items.map((item) => (
                       <div key={item} className="flex items-center gap-2">
                         <span
-                          className="w-1 h-1 rounded-full"
-                          style={{ background: `${step.hex}60` }}
+                          className="h-1.5 w-1.5 rounded-[1px]"
+                          style={{ background: step.hex }}
                         />
-                        <span className="text-[10px] font-mono text-base-content/30">
+                        <span className="font-mono text-[11px] text-base-content/45">
                           {item}
                         </span>
                       </div>
                     ))}
                   </div>
-                </div>
-
-                {/* Watermark icon */}
-                <step.Watermark
-                  size={100}
-                  strokeWidth={0.4}
-                  className="absolute -bottom-3 -right-3 text-base-content/[0.025] pointer-events-none"
-                />
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Flow arrows between cards (desktop) */}
-          <div className="hidden lg:flex items-center justify-center gap-2 mt-8">
-            {PIPELINE_STEPS.map((step, i) => (
-              <div key={step.label} className="flex items-center gap-2">
-                <span className="text-[9px] font-semibold uppercase tracking-wide text-base-content/20 font-mono">
-                  {step.label}
-                </span>
-                {i < PIPELINE_STEPS.length - 1 && (
-                  <ArrowRight size={12} className="text-primary/30" />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── CDC FLOW ─────────────────────────────────────────── */}
-      <section className="relative overflow-hidden">
-        <div className="container">
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.7, ease: EASE }}
-            className="text-center mb-12 sm:mb-16"
-          >
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
-              CDC Record <span className="text-gradient-primary">Flow</span>
-            </h2>
-            <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
-              How a single data change reaches the right user
-            </p>
-          </motion.div>
-
-          {/* Two-column: flow diagram left, decorative SVG right */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
-            {/* Flow diagram */}
-            <div className="space-y-0">
-              {CDC_FLOW.map((step, i) => (
-                <motion.div
-                  key={step.label}
-                  style={{ opacity: 0 }}
-                  initial={{ opacity: 0, x: -20 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{
-                    delay: i * 0.08,
-                    duration: 0.5,
-                    ease: EASE,
-                  }}
-                >
-                  <div className="group flex items-center gap-4 p-4 bg-base-200/40 border border-base-300/25 rounded-xl hover:border-base-300/50 transition-colors">
-                    <div
-                      className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                      style={{
-                        background: `${step.hex}15`,
-                        boxShadow: `0 0 20px ${step.hex}15, 0 0 0 1px ${step.hex}20`,
-                      }}
-                    >
-                      <step.Icon size={16} className="text-base-content/80" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-base-content">
-                        {step.label}
-                      </p>
-                      <p className="text-[10px] font-mono text-base-content/30 truncate">
-                        {step.detail}
-                      </p>
-                    </div>
-                    <span className="text-[9px] font-mono text-base-content/20 font-black shrink-0">
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                  </div>
-                  {i < CDC_FLOW.length - 1 && (
-                    <div className="flex justify-start pl-7 py-1.5">
-                      <ArrowDown size={14} className="text-primary/25" />
-                    </div>
-                  )}
                 </motion.div>
               ))}
             </div>
 
-            {/* Decorative node graph — right side (desktop only) */}
-            <motion.div
-              style={{ opacity: 0 }}
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 1, delay: 0.3, ease: EASE }}
-              className="hidden lg:flex items-center justify-center"
-            >
-              <svg
-                viewBox="0 0 320 400"
-                fill="none"
-                className="w-full max-w-xs text-primary"
-                aria-hidden
-              >
-                {/* Grid dots */}
-                {Array.from({ length: 8 }).map((_row, row) =>
-                  Array.from({ length: 6 }).map((_col, col) => (
-                    <circle
-                      key={`dot-${row}-${col}`}
-                      cx={30 + col * 52}
-                      cy={25 + row * 50}
-                      r={1}
-                      fill="currentColor"
-                      opacity={0.08}
-                    />
-                  )),
-                )}
-
-                {/* Connection lines */}
-                <line
-                  x1="82"
-                  y1="75"
-                  x2="238"
-                  y2="75"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  opacity="0.08"
-                />
-                <line
-                  x1="160"
-                  y1="75"
-                  x2="160"
-                  y2="175"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  opacity="0.1"
-                />
-                <line
-                  x1="82"
-                  y1="175"
-                  x2="238"
-                  y2="175"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  opacity="0.08"
-                />
-                <line
-                  x1="82"
-                  y1="175"
-                  x2="82"
-                  y2="275"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  opacity="0.1"
-                />
-                <line
-                  x1="238"
-                  y1="175"
-                  x2="238"
-                  y2="275"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  opacity="0.1"
-                />
-                <line
-                  x1="82"
-                  y1="275"
-                  x2="238"
-                  y2="275"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  opacity="0.08"
-                />
-                <line
-                  x1="160"
-                  y1="275"
-                  x2="160"
-                  y2="350"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  opacity="0.1"
-                />
-
-                {/* Animated pulse lines */}
-                <motion.line
-                  x1="160"
-                  y1="75"
-                  x2="160"
-                  y2="175"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  opacity="0.25"
-                  strokeDasharray="6 6"
-                  animate={{ strokeDashoffset: [0, -24] }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: 'linear',
-                  }}
-                />
-                <motion.line
-                  x1="160"
-                  y1="275"
-                  x2="160"
-                  y2="350"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  opacity="0.25"
-                  strokeDasharray="6 6"
-                  animate={{ strokeDashoffset: [0, -24] }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: 'linear',
-                    delay: 0.5,
-                  }}
-                />
-
-                {/* Nodes */}
-                <rect
-                  x="134"
-                  y="50"
-                  width="52"
-                  height="52"
-                  rx="4"
-                  fill="currentColor"
-                  opacity="0.05"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  strokeOpacity="0.15"
-                />
-                <text
-                  x="160"
-                  y="80"
-                  textAnchor="middle"
-                  fill="currentColor"
-                  opacity="0.3"
-                  fontSize="9"
-                  fontFamily="monospace"
-                  fontWeight="bold"
-                >
-                  SRC
-                </text>
-
-                <rect
-                  x="134"
-                  y="150"
-                  width="52"
-                  height="52"
-                  rx="4"
-                  fill="currentColor"
-                  opacity="0.08"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  strokeOpacity="0.2"
-                />
-                <text
-                  x="160"
-                  y="180"
-                  textAnchor="middle"
-                  fill="currentColor"
-                  opacity="0.4"
-                  fontSize="9"
-                  fontFamily="monospace"
-                  fontWeight="bold"
-                >
-                  CDC
-                </text>
-
-                <rect
-                  x="56"
-                  y="250"
-                  width="52"
-                  height="52"
-                  rx="4"
-                  fill="currentColor"
-                  opacity="0.05"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  strokeOpacity="0.15"
-                />
-                <text
-                  x="82"
-                  y="280"
-                  textAnchor="middle"
-                  fill="currentColor"
-                  opacity="0.3"
-                  fontSize="8"
-                  fontFamily="monospace"
-                  fontWeight="bold"
-                >
-                  USR:A
-                </text>
-
-                <rect
-                  x="212"
-                  y="250"
-                  width="52"
-                  height="52"
-                  rx="4"
-                  fill="currentColor"
-                  opacity="0.05"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  strokeOpacity="0.15"
-                />
-                <text
-                  x="238"
-                  y="280"
-                  textAnchor="middle"
-                  fill="currentColor"
-                  opacity="0.3"
-                  fontSize="8"
-                  fontFamily="monospace"
-                  fontWeight="bold"
-                >
-                  USR:B
-                </text>
-
-                <rect
-                  x="134"
-                  y="330"
-                  width="52"
-                  height="52"
-                  rx="4"
-                  fill="currentColor"
-                  opacity="0.06"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  strokeOpacity="0.2"
-                />
-                <text
-                  x="160"
-                  y="360"
-                  textAnchor="middle"
-                  fill="currentColor"
-                  opacity="0.35"
-                  fontSize="9"
-                  fontFamily="monospace"
-                  fontWeight="bold"
-                >
-                  SSE
-                </text>
-
-                {/* Pulsing center dot */}
-                <motion.circle
-                  cx="160"
-                  cy="176"
-                  r="3"
-                  fill="currentColor"
-                  animate={{
-                    opacity: [0.2, 0.6, 0.2],
-                    scale: [1, 1.67, 1],
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: 'easeInOut',
-                  }}
-                />
-              </svg>
-            </motion.div>
+            {/* Flow strip (desktop) */}
+            <div className="mt-8 hidden items-center justify-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/35 lg:flex">
+              {PIPELINE_STEPS.map((step, i) => (
+                <span key={step.label} className="flex items-center gap-3">
+                  <span>{step.label}</span>
+                  {i < PIPELINE_STEPS.length - 1 && (
+                    <span aria-hidden="true" className="text-primary/50">
+                      →
+                    </span>
+                  )}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
+        </TerminalContainer>
       </section>
 
-      {/* ── ARCHITECTURE PRINCIPLES ──────────────────────────── */}
-      <section className="relative overflow-hidden">
-        {/* Tinted section background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-base-200/20 to-transparent pointer-events-none" />
+      {/* ── SEC 02 ／ CDC RECORD FLOW ────────────────────────── */}
+      <section className="border-b border-hairline">
+        <TerminalContainer>
+          <SectionRow
+            tag="SEC 02 ／ CDC RECORD FLOW"
+            stat={`${CDC_FLOW.length} HOPS`}
+          />
+          <div className="py-10 sm:py-14">
+            <SectionIntro
+              line1="CDC record"
+              outline="flow"
+              sub="How a single data change reaches the right user"
+            />
 
-        <div className="container relative z-10">
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.7, ease: EASE }}
-            className="text-center mb-12 sm:mb-16"
-          >
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
-              Design <span className="text-gradient-primary">Principles</span>
-            </h2>
-            <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
-              The rules that shape every architectural decision
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-4xl mx-auto">
-            {PRINCIPLES.map((principle, i) => (
-              <motion.div
-                key={principle.title}
-                style={{ opacity: 0 }}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{
-                  delay: i * 0.1,
-                  duration: 0.6,
-                  ease: EASE,
-                }}
-                className="group relative bg-base-200/40 border border-base-300/25 rounded-xl p-6 overflow-hidden hover:border-base-300/50 transition-colors"
-              >
-                {/* Accent top line */}
-                <div
-                  className="absolute top-0 left-0 right-0 h-px"
-                  style={{
-                    background: `linear-gradient(90deg, transparent, ${principle.hex} 50%, transparent)`,
-                  }}
-                />
-
-                {/* Corner dot grid */}
-                <div
-                  className="absolute top-0 right-0 w-20 h-20 opacity-[0.04] text-base-content"
-                  style={{
-                    backgroundImage:
-                      'radial-gradient(circle, currentColor 1px, transparent 1px)',
-                    backgroundSize: '8px 8px',
-                  }}
-                />
-
-                {/* Ambient glow orb on hover */}
-                <div
-                  className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                  style={{ background: `${principle.hex}10` }}
-                />
-
-                <div className="relative z-10 flex items-start gap-4">
-                  <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-                    style={{
-                      background: `${principle.hex}15`,
-                      boxShadow: `0 0 20px ${principle.hex}15, 0 0 0 1px ${principle.hex}20`,
-                    }}
-                  >
-                    <principle.Icon
-                      size={20}
-                      className="text-base-content/80"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-base-content mb-1">
-                      {principle.title}
-                    </p>
-                    <p className="text-xs text-base-content/40 leading-relaxed">
-                      {principle.description}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Watermark icon */}
-                <principle.Watermark
-                  size={100}
-                  strokeWidth={0.4}
-                  className="absolute -bottom-3 -right-3 text-base-content/[0.025] pointer-events-none"
-                />
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── TECH STACK ───────────────────────────────────────── */}
-      <section className="relative overflow-hidden">
-        <div className="container pb-8">
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.7, ease: EASE }}
-            className="text-center mb-12 sm:mb-16"
-          >
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
-              Tech <span className="text-gradient-primary">Stack</span>
-            </h2>
-            <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
-              What powers each layer
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {TECH_STACK.map((group, i) => (
-              <motion.div
-                key={group.category}
-                style={{ opacity: 0 }}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{
-                  delay: i * 0.08,
-                  duration: 0.6,
-                  ease: EASE,
-                }}
-                className="group relative bg-base-200/40 border border-base-300/25 rounded-xl p-6 overflow-hidden hover:border-base-300/50 transition-colors"
-              >
-                {/* Accent top line */}
-                <div
-                  className="absolute top-0 left-0 right-0 h-px"
-                  style={{
-                    background: `linear-gradient(90deg, transparent, ${group.hex} 50%, transparent)`,
-                  }}
-                />
-
-                {/* Corner dot grid */}
-                <div
-                  className="absolute top-0 right-0 w-20 h-20 opacity-[0.04] text-base-content"
-                  style={{
-                    backgroundImage:
-                      'radial-gradient(circle, currentColor 1px, transparent 1px)',
-                    backgroundSize: '8px 8px',
-                  }}
-                />
-
-                {/* Ambient glow orb on hover */}
-                <div
-                  className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                  style={{ background: `${group.hex}10` }}
-                />
-
-                <div className="relative z-10">
-                  <div className="flex items-center gap-3 mb-5">
-                    <div
-                      className="w-9 h-9 rounded-lg flex items-center justify-center"
-                      style={{
-                        background: `${group.hex}15`,
-                        boxShadow: `0 0 20px ${group.hex}15, 0 0 0 1px ${group.hex}20`,
-                      }}
-                    >
-                      <group.Icon size={16} className="text-base-content/80" />
+            <div className="mt-10 grid grid-cols-1 items-start gap-12 lg:grid-cols-2">
+              {/* Flow diagram */}
+              <div>
+                {CDC_FLOW.map((step, i) => (
+                  <motion.div key={step.label} {...revealX(i)}>
+                    <div className="flex items-center gap-4 rounded-[4px] border border-hairline bg-panel px-4 py-3.5">
+                      <span className="font-mono text-[10px] text-base-content/35">
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-[1px]"
+                        style={{ background: step.hex }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="m-0 text-[13px] font-bold uppercase tracking-[0.02em] text-base-content">
+                          {step.label}
+                        </p>
+                        <p className="m-0 truncate font-mono text-[11px] text-base-content/45">
+                          {step.detail}
+                        </p>
+                      </div>
                     </div>
-                    <h3 className="text-xs font-bold uppercase tracking-wide text-base-content/60">
-                      {group.category}
-                    </h3>
-                  </div>
+                    {i < CDC_FLOW.length - 1 && (
+                      <div
+                        aria-hidden="true"
+                        className="py-1 pl-4 font-mono text-xs text-primary/40"
+                      >
+                        ↓
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Decorative node graph — right side (desktop only) */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 1, delay: 0.3, ease: EASE }}
+                className="hidden items-center justify-center lg:flex"
+              >
+                <svg
+                  viewBox="0 0 320 400"
+                  fill="none"
+                  className="w-full max-w-xs text-primary"
+                  aria-hidden
+                >
+                  {/* Grid dots */}
+                  {Array.from({ length: 8 }).map((_row, row) =>
+                    Array.from({ length: 6 }).map((_col, col) => (
+                      <circle
+                        key={`dot-${row}-${col}`}
+                        cx={30 + col * 52}
+                        cy={25 + row * 50}
+                        r={1}
+                        fill="currentColor"
+                        opacity={0.08}
+                      />
+                    )),
+                  )}
+
+                  {/* Connection lines */}
+                  <line
+                    x1="82"
+                    y1="75"
+                    x2="238"
+                    y2="75"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                    opacity="0.08"
+                  />
+                  <line
+                    x1="160"
+                    y1="75"
+                    x2="160"
+                    y2="175"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                    opacity="0.1"
+                  />
+                  <line
+                    x1="82"
+                    y1="175"
+                    x2="238"
+                    y2="175"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                    opacity="0.08"
+                  />
+                  <line
+                    x1="82"
+                    y1="175"
+                    x2="82"
+                    y2="275"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                    opacity="0.1"
+                  />
+                  <line
+                    x1="238"
+                    y1="175"
+                    x2="238"
+                    y2="275"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                    opacity="0.1"
+                  />
+                  <line
+                    x1="82"
+                    y1="275"
+                    x2="238"
+                    y2="275"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                    opacity="0.08"
+                  />
+                  <line
+                    x1="160"
+                    y1="275"
+                    x2="160"
+                    y2="350"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                    opacity="0.1"
+                  />
+
+                  {/* Animated pulse lines */}
+                  <motion.line
+                    x1="160"
+                    y1="75"
+                    x2="160"
+                    y2="175"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    opacity="0.25"
+                    strokeDasharray="6 6"
+                    animate={{ strokeDashoffset: [0, -24] }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: 'linear',
+                    }}
+                  />
+                  <motion.line
+                    x1="160"
+                    y1="275"
+                    x2="160"
+                    y2="350"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    opacity="0.25"
+                    strokeDasharray="6 6"
+                    animate={{ strokeDashoffset: [0, -24] }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: 'linear',
+                      delay: 0.5,
+                    }}
+                  />
+
+                  {/* Nodes */}
+                  <rect
+                    x="134"
+                    y="50"
+                    width="52"
+                    height="52"
+                    rx="4"
+                    fill="currentColor"
+                    opacity="0.05"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                    strokeOpacity="0.15"
+                  />
+                  <text
+                    x="160"
+                    y="80"
+                    textAnchor="middle"
+                    fill="currentColor"
+                    opacity="0.3"
+                    fontSize="9"
+                    fontFamily="monospace"
+                    fontWeight="bold"
+                  >
+                    SRC
+                  </text>
+
+                  <rect
+                    x="134"
+                    y="150"
+                    width="52"
+                    height="52"
+                    rx="4"
+                    fill="currentColor"
+                    opacity="0.08"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                    strokeOpacity="0.2"
+                  />
+                  <text
+                    x="160"
+                    y="180"
+                    textAnchor="middle"
+                    fill="currentColor"
+                    opacity="0.4"
+                    fontSize="9"
+                    fontFamily="monospace"
+                    fontWeight="bold"
+                  >
+                    CDC
+                  </text>
+
+                  <rect
+                    x="56"
+                    y="250"
+                    width="52"
+                    height="52"
+                    rx="4"
+                    fill="currentColor"
+                    opacity="0.05"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                    strokeOpacity="0.15"
+                  />
+                  <text
+                    x="82"
+                    y="280"
+                    textAnchor="middle"
+                    fill="currentColor"
+                    opacity="0.3"
+                    fontSize="8"
+                    fontFamily="monospace"
+                    fontWeight="bold"
+                  >
+                    USR:A
+                  </text>
+
+                  <rect
+                    x="212"
+                    y="250"
+                    width="52"
+                    height="52"
+                    rx="4"
+                    fill="currentColor"
+                    opacity="0.05"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                    strokeOpacity="0.15"
+                  />
+                  <text
+                    x="238"
+                    y="280"
+                    textAnchor="middle"
+                    fill="currentColor"
+                    opacity="0.3"
+                    fontSize="8"
+                    fontFamily="monospace"
+                    fontWeight="bold"
+                  >
+                    USR:B
+                  </text>
+
+                  <rect
+                    x="134"
+                    y="330"
+                    width="52"
+                    height="52"
+                    rx="4"
+                    fill="currentColor"
+                    opacity="0.06"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                    strokeOpacity="0.2"
+                  />
+                  <text
+                    x="160"
+                    y="360"
+                    textAnchor="middle"
+                    fill="currentColor"
+                    opacity="0.35"
+                    fontSize="9"
+                    fontFamily="monospace"
+                    fontWeight="bold"
+                  >
+                    SSE
+                  </text>
+
+                  {/* Pulsing center dot */}
+                  <motion.circle
+                    cx="160"
+                    cy="176"
+                    r="3"
+                    fill="currentColor"
+                    animate={{
+                      opacity: [0.2, 0.6, 0.2],
+                      scale: [1, 1.67, 1],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: 'easeInOut',
+                    }}
+                  />
+                </svg>
+              </motion.div>
+            </div>
+          </div>
+        </TerminalContainer>
+      </section>
+
+      {/* ── SEC 03 ／ DESIGN PRINCIPLES ──────────────────────── */}
+      <section className="border-b border-hairline">
+        <TerminalContainer>
+          <SectionRow
+            tag="SEC 03 ／ DESIGN PRINCIPLES"
+            stat={`${PRINCIPLES.length} RULES`}
+          />
+          <div className="py-10 sm:py-14">
+            <SectionIntro
+              line1="Design"
+              outline="principles"
+              sub="The rules that shape every architectural decision"
+            />
+
+            <div className="mt-10">
+              {PRINCIPLES.map((principle, i) => (
+                <motion.div
+                  key={principle.title}
+                  {...reveal(i)}
+                  className="grid grid-cols-[64px_1fr] items-baseline gap-x-6 gap-y-1 border-t border-hairline-minor px-3 py-6 sm:grid-cols-[84px_260px_1fr]"
+                >
+                  <span
+                    className="font-mono text-xs"
+                    style={{ color: principle.hex }}
+                  >
+                    PR—{String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="font-display text-lg font-bold uppercase leading-tight tracking-[0.01em] text-base-content">
+                    {principle.title}
+                  </span>
+                  <span className="col-start-2 max-w-[640px] text-sm leading-relaxed text-base-content/55 sm:col-start-3">
+                    {principle.description}
+                  </span>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </TerminalContainer>
+      </section>
+
+      {/* ── SEC 04 ／ TECH STACK ─────────────────────────────── */}
+      <section className="border-b border-hairline">
+        <TerminalContainer>
+          <SectionRow
+            tag="SEC 04 ／ TECH STACK"
+            stat={`${TECH_STACK.length} LAYERS`}
+          />
+          <div className="py-10 sm:py-14">
+            <SectionIntro
+              line1="Tech"
+              outline="stack"
+              sub="What powers each layer"
+            />
+
+            <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {TECH_STACK.map((group, i) => (
+                <motion.div
+                  key={group.category}
+                  {...reveal(i)}
+                  className="relative overflow-hidden rounded-[8px] border border-hairline bg-panel p-6"
+                >
+                  {/* Accent top line */}
+                  <div
+                    className="absolute inset-x-0 top-0 h-px"
+                    style={{
+                      background: `linear-gradient(90deg, transparent, ${group.hex} 50%, transparent)`,
+                    }}
+                  />
+
+                  <h3
+                    className="m-0 mb-5 font-mono text-[11px] font-bold uppercase tracking-[0.14em]"
+                    style={{ color: group.hex }}
+                  >
+                    {group.category}
+                  </h3>
                   <div className="space-y-3">
                     {group.items.map((item) => (
                       <div key={item.name}>
-                        <p className="text-xs font-bold text-base-content mb-0.5">
+                        <p className="m-0 mb-0.5 text-[13px] font-bold text-base-content">
                           {item.name}
                         </p>
-                        <p className="text-[10px] font-mono text-base-content/30">
+                        <p className="m-0 font-mono text-[11px] text-base-content/45">
                           {item.detail}
                         </p>
                       </div>
                     ))}
                   </div>
-                </div>
+                </motion.div>
+              ))}
+            </div>
 
-                {/* Watermark icon */}
-                <group.Watermark
-                  size={100}
-                  strokeWidth={0.4}
-                  className="absolute -bottom-3 -right-3 text-base-content/[0.025] pointer-events-none"
-                />
-              </motion.div>
-            ))}
+            {/* Infra note */}
+            <motion.div
+              {...reveal(2)}
+              className="mt-12 flex items-center justify-center gap-4"
+            >
+              <span aria-hidden="true" className="h-px w-8 bg-hairline" />
+              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-base-content/40">
+                Built and deployed on self-hosted infrastructure
+              </span>
+              <span aria-hidden="true" className="h-px w-8 bg-hairline" />
+            </motion.div>
           </div>
+        </TerminalContainer>
+      </section>
 
-          {/* Source link */}
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.3, duration: 0.6, ease: EASE }}
-            className="flex items-center justify-center gap-4 mt-12"
-          >
-            <span className="h-px w-8 bg-base-300/30" />
-            <span className="text-xs text-base-content/25">
-              Built and deployed on self-hosted infrastructure
-            </span>
-            <span className="h-px w-8 bg-base-300/30" />
-          </motion.div>
-
-          {/* ── Next steps ───────────────────────────────────────
-              Internal-link CTA pair. Keeps technical readers on the
-              site after they've finished the deep-dive: explore the
-              channel catalog or just install the app. */}
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.4, duration: 0.5, ease: EASE }}
-            className="mt-10 flex flex-wrap items-center justify-center gap-3"
-          >
-            <Link
-              to="/channels"
-              className="inline-flex items-center gap-2 rounded-lg border border-base-300/40 bg-base-200/40 px-4 py-2 text-sm font-semibold text-base-content/70 hover:border-primary/30 hover:text-primary transition-colors"
-            >
-              <Puzzle size={14} aria-hidden="true" />
-              Browse widgets
-            </Link>
-            <Link
+      {/* ── SEC 05 ／ WHERE NEXT ─────────────────────────────────
+          Internal-link CTA pair. Keeps technical readers on the
+          site after they've finished the deep-dive: explore the
+          widget catalog or just install the app. */}
+      <section className="border-b border-hairline">
+        <TerminalContainer>
+          <SectionRow tag="SEC 05 ／ WHERE NEXT" />
+          {/* -mt-px collapses the first row's border-t into the
+              SectionRow's border-b so hairlines never double. */}
+          <div className="-mt-px pb-4">
+            <DeparturesRow
+              index="01"
+              label="Browse widgets"
+              meta="Every source the pipeline serves, in one catalog."
+              action="/WIDGETS →"
+              to="/widgets"
+            />
+            <DeparturesRow
+              index="02"
+              label="Download Scrollr"
+              meta="The end of the pipeline, on your desktop."
+              action="DOWNLOAD ↓"
               to="/download"
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-content shadow-sm hover:brightness-110 transition-[filter]"
-            >
-              <DownloadIcon size={14} aria-hidden="true" />
-              Download Scrollr
-            </Link>
-          </motion.div>
-        </div>
+            />
+          </div>
+        </TerminalContainer>
       </section>
     </div>
   )

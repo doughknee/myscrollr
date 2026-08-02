@@ -7,6 +7,11 @@ import { FALLBACK_RELEASES_URL, getDownloadInfo } from './getDownloadInfo'
 // vi.mock is hoisted above the imports by Vitest, so order is safe.
 vi.mock('./latestVersion.generated', () => ({
   LATEST_DESKTOP_VERSION: '1.2.3',
+  DESKTOP_ASSET_SIZES: {
+    'Scrollr_1.2.3_aarch64.dmg': 6_738_052, // 6.4 MB
+    'Scrollr_1.2.3_amd64.AppImage': 125_829_120, // exactly 120 MB
+    // Windows asset intentionally absent — size must come back undefined.
+  },
 }))
 
 const RELEASE_BASE =
@@ -18,6 +23,7 @@ describe('getDownloadInfo', () => {
       version: '1.2.3',
       filename: 'Scrollr_1.2.3_aarch64.dmg',
       url: `${RELEASE_BASE}/Scrollr_1.2.3_aarch64.dmg`,
+      size: '6.4 MB',
     })
   })
 
@@ -44,6 +50,14 @@ describe('getDownloadInfo', () => {
     const info = getDownloadInfo('linux', format)
     expect(info.filename).toBe(filename)
     expect(info.url).toBe(`${RELEASE_BASE}/${filename}`)
+  })
+
+  it('formats asset sizes from the build-time snapshot', () => {
+    expect(getDownloadInfo('macos').size).toBe('6.4 MB')
+    // >= 100 MB drops the decimal
+    expect(getDownloadInfo('linux').size).toBe('120 MB')
+    // asset missing from the snapshot (env/fallback builds) -> undefined
+    expect(getDownloadInfo('windows').size).toBeUndefined()
   })
 
   it('pins the release tag format to desktop-v<version>', () => {

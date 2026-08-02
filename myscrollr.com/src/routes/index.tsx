@@ -8,19 +8,17 @@ import {
   softwareApplication,
   website,
 } from '@/lib/structured-data'
-import { HeroSection } from '@/components/landing/HeroSection'
-import { TickerShowcase } from '@/components/landing/TickerShowcase'
+import { TerminalHero } from '@/components/landing/TerminalHero'
+import { CatalogPicker } from '@/components/landing/CatalogPicker'
 
 // Code-splitting the home page.
 //
-// HeroSection and TickerShowcase stay eagerly imported because they are
-// the LCP target (hero) and the first scroll-into-view section that
-// holds the prerender-check assertion ("What actually sits..."). Every
-// section below is split into its own lazy chunk so the initial JS
-// bundle ships only what's needed for first paint and the immediate
-// scroll. Lighthouse measured ~450ms of "unused JavaScript" savings on
-// mobile from this; the rest of the win is shorter Element render
-// delay because React has less to parse + hydrate before painting LCP.
+// TerminalHero and CatalogPicker stay eagerly imported because they are
+// the LCP target (hero) and the first section, which holds the
+// prerender-check assertion (scripts/check-prerender.mjs asserts on the
+// hero sub copy). Every section below is split into its own lazy chunk
+// so the initial JS bundle ships only what's needed for first paint and
+// the immediate scroll.
 //
 // SSR safety: TanStack Start's build-time prerender resolves lazy
 // imports synchronously, so the prerendered HTML body still contains
@@ -29,80 +27,56 @@ import { TickerShowcase } from '@/components/landing/TickerShowcase'
 // which on a warm cache or fast connection is rarely visible. Sized
 // placeholders keep CLS at 0 either way.
 //
-// Placeholder heights were measured against the actual rendered
-// content (mobile 390px and desktop 1280px) and averaged so neither
-// viewport sees a meaningful layout jump. Slight under-estimates are
-// preferred to over-estimates because they collapse cleanly when the
-// real chunk renders.
-const HowItWorks = lazy(() =>
-  import('@/components/landing/HowItWorks').then((m) => ({
-    default: m.HowItWorks,
+// Placeholder heights are rough desktop estimates of each terminal
+// section; slight under-estimates are preferred because they collapse
+// cleanly when the real chunk renders.
+const DesktopProof = lazy(() =>
+  import('@/components/landing/DesktopProof').then((m) => ({
+    default: m.DesktopProof,
   })),
 )
-const ChannelsShowcase = lazy(() =>
-  import('@/components/landing/ChannelsShowcase').then((m) => ({
-    default: m.ChannelsShowcase,
+const StepsSection = lazy(() =>
+  import('@/components/landing/StepsSection').then((m) => ({
+    default: m.StepsSection,
   })),
 )
-const CustomizationShowcase = lazy(() =>
-  import('@/components/landing/CustomizationShowcase').then((m) => ({
-    default: m.CustomizationShowcase,
+const MakeItYours = lazy(() =>
+  import('@/components/landing/MakeItYours').then((m) => ({
+    default: m.MakeItYours,
   })),
 )
-const MakeItYoursSection = lazy(() =>
-  import('@/components/landing/MakeItYoursSection').then((m) => ({
-    default: m.MakeItYoursSection,
+const PromiseSection = lazy(() =>
+  import('@/components/landing/PromiseSection').then((m) => ({
+    default: m.PromiseSection,
   })),
 )
-const BenefitsSection = lazy(() =>
-  import('@/components/landing/BenefitsSection').then((m) => ({
-    default: m.BenefitsSection,
+const QuickAnswers = lazy(() =>
+  import('@/components/landing/QuickAnswers').then((m) => ({
+    default: m.QuickAnswers,
   })),
 )
-const TrustSection = lazy(() =>
-  import('@/components/landing/TrustSection').then((m) => ({
-    default: m.TrustSection,
-  })),
-)
-const FAQSection = lazy(() =>
-  import('@/components/landing/FAQSection').then((m) => ({
-    default: m.FAQSection,
-  })),
-)
-const CallToAction = lazy(() =>
-  import('@/components/landing/CallToAction').then((m) => ({
-    default: m.CallToAction,
+const ClosingCta = lazy(() =>
+  import('@/components/landing/ClosingCta').then((m) => ({
+    default: m.ClosingCta,
   })),
 )
 
-// Hero LCP preload. The browser otherwise can't discover the image URL
-// from the initial HTML — `HeroProductShowcase` only renders its
-// `<picture>` after React mounts, which Lighthouse measured as ~700ms
-// of "Element render delay" on mobile. Preloading from the head lets
-// the image fetch run in parallel with the JS bundle.
+// Page-image preload. The SEC 02 screenshot is the page's main image
+// and its <img> only renders after React mounts the lazy chunk, so the
+// browser can't discover the URL from the initial HTML. Preloading from
+// the head lets the fetch run in parallel with the JS bundle. The image
+// is theme-independent (one rendition pair for dark and light), so no
+// per-scheme media queries are needed.
 //
-// Theme handling: the SSR pass renders the dark variant (because
-// `useTheme()` defaults to 'dark' on the server), but the theme inline
-// script in __root.tsx can flip the document to light before React
-// hydrates. We avoid wasting a preload on the wrong variant by
-// scoping each preload with a `media` query keyed on the OS color
-// scheme. Users with a stored theme that contradicts their OS will
-// get a wasted ~30KB preload — an acceptable trade since they're a
-// small minority and the "correct" image still loads through React.
-//
-// The srcset and sizes attributes mirror `ProductScreenshot` exactly
-// so the browser picks the same rendition the React component would
-// have requested. Keeping these in sync is important: a mismatch
-// means the preloaded file is unused and a second fetch happens.
-const HERO_PRELOAD_SIZES =
-  '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 800px'
-const heroPreloadSrcSet = (theme: 'dark' | 'light') =>
-  [
-    `/screenshots/channels/sports-${theme}@sm.webp 800w`,
-    `/screenshots/channels/sports-${theme}@md.webp 1200w`,
-    `/screenshots/channels/sports-${theme}@1x.webp 1600w`,
-    `/screenshots/channels/sports-${theme}@2x.webp 3200w`,
-  ].join(', ')
+// Keep both constants in sync with components/landing/DesktopProof.tsx
+// so the preloaded rendition is the one the <img> actually requests.
+// Light/dark variants of the SEC 02 desktop screenshot. Preloads are
+// scoped per OS color scheme; users whose stored theme contradicts
+// their OS eat one wasted preload (same trade-off as the original
+// hero preloads — see useTheme for the rationale).
+const pageImageSrcset = (theme: 'dark' | 'light') =>
+  `/marketing/desktop-home-${theme}@1x.webp 1600w, /marketing/desktop-home-${theme}@2x.webp 2940w`
+const PAGE_IMAGE_SIZES = '(max-width: 1023px) 100vw, 990px'
 
 export const Route = createFileRoute('/')({
   component: HomePage,
@@ -124,16 +98,16 @@ export const Route = createFileRoute('/')({
         {
           rel: 'preload',
           as: 'image',
-          imagesrcset: heroPreloadSrcSet('dark'),
-          imagesizes: HERO_PRELOAD_SIZES,
+          imagesrcset: pageImageSrcset('dark'),
+          imagesizes: PAGE_IMAGE_SIZES,
           fetchpriority: 'high',
           media: '(prefers-color-scheme: dark)',
         },
         {
           rel: 'preload',
           as: 'image',
-          imagesrcset: heroPreloadSrcSet('light'),
-          imagesizes: HERO_PRELOAD_SIZES,
+          imagesrcset: pageImageSrcset('light'),
+          imagesizes: PAGE_IMAGE_SIZES,
           fetchpriority: 'high',
           media: '(prefers-color-scheme: light)',
         },
@@ -144,40 +118,32 @@ export const Route = createFileRoute('/')({
 function HomePage() {
   return (
     <>
-      <HeroSection />
+      <TerminalHero />
 
-      <TickerShowcase />
+      <CatalogPicker />
 
-      <Suspense fallback={<SectionPlaceholder height="700px" />}>
-        <HowItWorks />
+      <Suspense fallback={<SectionPlaceholder height="1050px" />}>
+        <DesktopProof />
       </Suspense>
 
-      <Suspense fallback={<SectionPlaceholder height="1200px" />}>
-        <ChannelsShowcase />
+      <Suspense fallback={<SectionPlaceholder height="480px" />}>
+        <StepsSection />
       </Suspense>
 
-      <Suspense fallback={<SectionPlaceholder height="1600px" />}>
-        <CustomizationShowcase />
-      </Suspense>
-
-      <Suspense fallback={<SectionPlaceholder height="1200px" />}>
-        <MakeItYoursSection />
-      </Suspense>
-
-      <Suspense fallback={<SectionPlaceholder height="1300px" />}>
-        <BenefitsSection />
-      </Suspense>
-
-      <Suspense fallback={<SectionPlaceholder height="2200px" />}>
-        <TrustSection />
-      </Suspense>
-
-      <Suspense fallback={<SectionPlaceholder height="900px" />}>
-        <FAQSection />
+      <Suspense fallback={<SectionPlaceholder height="640px" />}>
+        <MakeItYours />
       </Suspense>
 
       <Suspense fallback={<SectionPlaceholder height="700px" />}>
-        <CallToAction />
+        <PromiseSection />
+      </Suspense>
+
+      <Suspense fallback={<SectionPlaceholder height="600px" />}>
+        <QuickAnswers />
+      </Suspense>
+
+      <Suspense fallback={<SectionPlaceholder height="640px" />}>
+        <ClosingCta />
       </Suspense>
     </>
   )
@@ -185,17 +151,10 @@ function HomePage() {
 
 /**
  * Sized placeholder for `<Suspense>` fallback. Reserves vertical space
- * so the page does not jump when the lazy chunk finishes loading. Heights
- * approximate the average rendered size of each section on desktop;
- * mobile breakpoints land slightly off but the visual jump is small
- * since the deferred sections sit below the viewport on mobile too.
+ * so the page does not jump when the lazy chunk finishes loading.
+ * Transparent — the page background (base-75 + scanlines) comes from
+ * __root.tsx.
  */
 function SectionPlaceholder({ height }: { height: string }) {
-  return (
-    <div
-      aria-hidden="true"
-      style={{ minHeight: height }}
-      className="bg-base-100"
-    />
-  )
+  return <div aria-hidden="true" style={{ minHeight: height }} />
 }

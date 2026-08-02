@@ -1,52 +1,10 @@
 import { ClientOnly, Link, createFileRoute } from '@tanstack/react-router'
-import {
-  AnimatePresence,
-  motion,
-  useInView,
-  useMotionValue,
-  useSpring,
-} from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
+import { AnimateNumber } from 'motion-plus/react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, CheckCircle2, Loader2, ShieldAlert } from 'lucide-react'
 
-import {
-  Suspense,
-  lazy,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
-import {
-  AlertTriangle,
-  BarChart3,
-  Bell,
-  Check,
-  CheckCircle2,
-  Clock,
-  Code2,
-  CreditCard,
-  Crown,
-  Eye,
-  Filter,
-  Gauge,
-  Layers,
-  LayoutDashboard,
-  Loader2,
-  Lock,
-  Minus,
-  Rocket,
-  Satellite,
-  ShieldAlert,
-  Sparkles,
-  TrendingUp,
-  Trophy,
-  Zap,
-} from 'lucide-react'
-
-import type { FAQItem } from '@/components/landing/FAQSection'
 import type { SubscriptionStatus, TierLimitsResponse } from '@/api/client'
-import type { BackdropBeam } from '@/components/landing/_ConvergenceBackdrop'
-import { ConvergenceBackdrop } from '@/components/landing/_ConvergenceBackdrop'
 import { seo } from '@/lib/seo'
 import {
   breadcrumbs,
@@ -54,18 +12,20 @@ import {
   organization,
   productOffers,
 } from '@/lib/structured-data'
-import { seededRandom } from '@/lib/seededRandom'
+import { EASE } from '@/lib/animations'
 import { FALLBACK_LIMITS } from '@/lib/fallbackTierLimits'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { useGetToken } from '@/hooks/useGetToken'
-import { useTilt } from '@/components/TiltCard'
 import { billingApi, tierLimitsApi } from '@/api/client'
-import { FAQSection } from '@/components/landing/FAQSection'
+import {
+  DeparturesRow,
+  PageHeader,
+  SectionRow,
+  StepsGrid,
+  TerminalContainer,
+} from '@/components/terminal'
 
 const CheckoutModal = lazy(() => import('@/components/billing/CheckoutModal'))
-
-// ── Signature easing (matches homepage) ────────────────────────
-const EASE = [0.22, 1, 0.36, 1] as const
 
 // ── Price IDs (from Stripe via env vars) ───────────────────────
 const UPLINK_PRICE_IDS = {
@@ -86,45 +46,33 @@ const ULTIMATE_PRICE_IDS = {
 type PlanKey = 'monthly' | 'annual'
 type TierKey = 'uplink' | 'pro' | 'ultimate'
 
-// Animates the displayed price toward `value` using a spring. This
-// replaces `motion-plus`'s `<AnimateNumber>` (524 KB on disk) for the
-// only place we used it: the per-tier monthly-price flip when the
-// billing toggle changes. We lose `motion-plus`'s per-digit slot
-// animation, but the prices are 2-3 digits so the simpler counter
-// reads cleanly. Pattern mirrors `useAnimatedCounter` in CallToAction.
-//
-// Renders to 2 decimal places so cent values (e.g. 9.99, 6.67) stay
-// intact through the toggle animation.
+// Motion+ AnimateNumber rolls the per-tier monthly price when the
+// billing toggle flips (odometer-style digits instead of the old
+// useSpring text interpolation — motion-plus is in the bundle now for
+// the count-ups on / and /widgets). Fixed 2dp format keeps cent values
+// (9.99, 6.67) exact through the roll. This page is ClientOnly, so no
+// SSR wrapper is needed. The vertical-align nudge matches CountUp's:
+// the digit strips' internal line-height sags the inline-flex baseline.
 function AnimatedPrice({ value }: { value: number }) {
-  const [display, setDisplay] = useState(value)
-  const motionVal = useMotionValue(value)
-  const spring = useSpring(motionVal, {
-    stiffness: 90,
-    damping: 22,
-    restSpeed: 0.01,
-  })
-
-  useEffect(() => {
-    motionVal.set(value)
-  }, [value, motionVal])
-
-  useEffect(() => {
-    const unsub = spring.on('change', (v) => {
-      setDisplay(Math.round(v * 100) / 100)
-    })
-    return unsub
-  }, [spring])
-
-  return <>{display.toFixed(2)}</>
+  return (
+    <AnimateNumber
+      format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
+      locales="en-US"
+      style={{ verticalAlign: '0.055em' }}
+      transition={{
+        y: { type: 'spring', visualDuration: 0.4, bounce: 0.15 },
+        layout: { duration: 0.25 },
+      }}
+    >
+      {value}
+    </AnimateNumber>
+  )
 }
 
 // Static JSON-LD source data for the /uplink route. Kept module-scope
 // so it serializes cleanly inside head() during prerender. Pricing
 // mirrors the in-file PRICING constant; widget counts mirror
 // FALLBACK_LIMITS.max_widgets — keep all three in sync.
-//
-// The per-feature depth caps this used to also mirror (symbols, feeds,
-// leagues, fantasy) were retired 2026-07-02 and are null on every tier.
 //
 // FAQ answers match what the visible FAQ shows on first paint
 // (buildUplinkFAQ reads FALLBACK_LIMITS before the API responds), so
@@ -141,14 +89,14 @@ const STATIC_TIERS = [
   {
     name: 'Pro',
     description:
-      'Twelve widgets at once, custom alerts, feed profiles, advanced feed controls, and priority RSS refresh.',
+      'Twelve widgets at once, priority support, and early access to new widgets.',
     priceMonthly: 24.99,
     priceAnnual: 199.99,
   },
   {
     name: 'Ultimate',
     description:
-      'Unlimited widgets at once, plus webhooks, data export, and API access as they land.',
+      'Unlimited widgets at once, priority support, and early access to new widgets.',
     priceMonthly: 49.99,
     priceAnnual: 399.99,
   },
@@ -158,62 +106,27 @@ const STATIC_FAQ = [
   {
     question: 'What are widgets, and how many do I get?',
     answer:
-      'Widgets are the building blocks of your ticker — MLB scores, a stocks watchlist, crypto prices, your news feed, Yahoo Fantasy, and more. Your plan sets how many run at the same time: Free runs 3, Uplink 6, Pro 12, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.',
+      'Widgets are the building blocks of your ticker: MLB scores, a stocks watchlist, crypto prices, your news feed, Yahoo Fantasy, and more. Your plan sets how many run at the same time: Free runs 3, Uplink 6, Pro 12, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.',
   },
   {
-    question: 'What does "data delivery" mean?',
+    question: 'How fast are live updates?',
     answer:
-      'Every plan streams data in real time over Server-Sent Events (SSE) — the same technology used by stock trading platforms. The moment a price ticks or a score changes, it appears in your ticker. Polling only exists as a brief fallback while a connection re-establishes.',
+      'Instant, on every plan. The moment a price ticks or a score changes, it appears in your ticker over a live streaming connection. There is no faster tier to buy — everyone gets the same speed.',
   },
   {
     question: 'Are there limits inside a widget?',
     answer:
-      'No. Every plan holds unlimited items inside each widget — track 5 or 500 symbols in your Stocks widget, follow every source in your news feeds, sync every fantasy league you play. Your plan only sets how many widgets run at once.',
-  },
-  {
-    question: 'What are custom RSS feeds?',
-    answer:
-      'Beyond the curated news catalog, the Custom RSS widget lets you paste any RSS or Atom URL — niche industry sources, personal blogs, or company news. It is included on every plan, holds unlimited sources, and counts as one widget.',
-  },
-  {
-    question: 'What sports leagues are included?',
-    answer:
-      'All 14 leagues are available on every plan — NFL, NBA, MLB, NHL, MLS, Premier League, La Liga, Champions League, World Cup, F1, UFC, AFL, plus college football and basketball. Each league is its own widget, so you add exactly the ones you follow and scores stream in live.',
-  },
-  {
-    question: 'How many fantasy leagues can I connect?',
-    answer:
-      'As many as you play. Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. The Yahoo Fantasy widget is included on every plan — even Free — and syncs unlimited leagues across every sport.',
-  },
-  {
-    question: 'What are custom alerts?',
-    answer:
-      'Custom alerts let you define conditions that trigger notifications: a stock hitting a target price, a game entering the 4th quarter, or an RSS item matching a keyword. Alerts are evaluated in the app background — no server round-trip needed. Available on Pro and Ultimate tiers.',
-  },
-  {
-    question: 'What are feed profiles and advanced controls?',
-    answer:
-      'Feed profiles let you save different configurations — like "Work" showing only finance and RSS, or "Weekend" with sports and fantasy. Advanced controls add pinning, custom sort rules, and per-channel filtering within the feed. Both features are exclusive to Pro and Ultimate tiers.',
-  },
-  {
-    question: 'What is site filtering?',
-    answer:
-      'Site filtering controls where the feed bar appears. Every tier includes blacklist filtering — hide the bar on specific displays. Pro and Ultimate add whitelist mode on top, so you can restrict the bar to only the displays you choose.',
-  },
-  {
-    question: 'What about webhooks, data export, and API access?',
-    answer:
-      'Webhooks push your alerts to Discord, Slack, or any URL. Data export lets you download tracked symbols, historical prices, and game results as CSV or JSON. API access gives you programmatic read access to your MyScrollr data for personal dashboards or automation. All three are exclusive to Ultimate.',
+      'No. Every plan holds unlimited items inside each widget: track 5 or 500 symbols in your Stocks widget, follow every source in your news feeds, sync every fantasy league you play. Your plan only sets how many widgets run at once.',
   },
   {
     question: 'What does early access include?',
     answer:
-      'Every paid tier unlocks early access to new features, channels, and UI updates before they roll out to free users. This includes beta channels, experimental feed modes, and new dashboard widgets. You get to try everything first and provide feedback that shapes the final release.',
+      'When a new widget or feature needs a test run before wide release, paid tiers see it first. It is situational rather than constant (some releases ship to everyone at once), but when an early build exists, you get it, and your feedback shapes what ships.',
   },
   {
-    question: 'Does every tier get the full dashboard?',
+    question: 'Is the app different on paid plans?',
     answer:
-      'Every user gets complete access to the web dashboard at myscrollr.com. You can view all your channels, manage your watchlists, configure feeds, and adjust preferences regardless of your subscription tier. Paid tiers enhance the data flowing into the dashboard, not the dashboard itself.',
+      'No. Every tier is the same app with the same widgets and the same features. Paying changes how many widgets run at once, not what the app can do.',
   },
 ]
 
@@ -223,7 +136,7 @@ export const Route = createFileRoute('/uplink')({
     seo({
       title: 'Scrollr Uplink: Pricing & Plans',
       description:
-        'Scrollr Uplink unlocks more widgets at once, priority support, and power-user tools — on top of real-time streaming for everyone. Plans from $9.99/month with annual savings.',
+        'Scrollr Uplink adds more widgets at once, priority support, and early access, on top of live streaming for everyone. Plans from $9.99/month with annual savings.',
       path: '/uplink',
       image: 'https://myscrollr.com/og/uplink.png',
       type: 'product',
@@ -261,15 +174,12 @@ interface ComparisonRow {
   uplinkUp?: boolean
   proUp?: boolean
   ultimateUp?: boolean
-  /** Feature planned but not yet shipped */
-  comingSoon?: boolean
 }
 
 /**
  * Build the comparison table rows using the live tier-limits from the API.
- * Rows that describe limit-based features (symbols, feeds, leagues, etc.)
- * get their numbers from `limits`; rows for non-limit features (alerts,
- * priority support, etc.) are static.
+ * Rows that describe limit-based features get their numbers from `limits`;
+ * rows for non-limit features (alerts, priority support, etc.) are static.
  */
 function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
   const free = limits.tiers.free
@@ -292,63 +202,11 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
       ultimateUp: true,
     },
     {
-      label: 'Data Delivery',
-      free: 'Real-time SSE',
-      uplink: 'Real-time SSE',
-      pro: 'Real-time SSE',
-      ultimate: 'Real-time SSE',
-    },
-    // v1.1.3 trim: Items-per-Widget, Yahoo Fantasy, and Site Filtering
-    // rows removed — rows where every column reads the same (or that
-    // describe table-stakes) dilute the one comparison that sells:
-    // widgets at once.
-    {
-      label: 'Custom Alerts',
-      free: 'No',
-      uplink: 'No',
-      pro: 'Yes',
-      ultimate: 'Yes',
-      proUp: true,
-      ultimateUp: true,
-      comingSoon: true,
-    },
-    {
-      label: 'Feed Profiles',
-      free: 'No',
-      uplink: 'No',
-      pro: 'Yes',
-      ultimate: 'Yes',
-      proUp: true,
-      ultimateUp: true,
-      comingSoon: true,
-    },
-    {
-      label: 'Advanced Feed Controls',
-      free: 'No',
-      uplink: 'No',
-      pro: 'Yes',
-      ultimate: 'Yes',
-      proUp: true,
-      ultimateUp: true,
-    },
-    // v1.1.3 trim: Priority-RSS and Webhooks rows removed (see above).
-    {
-      label: 'Data Export',
-      free: 'No',
-      uplink: 'No',
-      pro: 'No',
-      ultimate: 'CSV / JSON',
-      ultimateUp: true,
-      comingSoon: true,
-    },
-    {
-      label: 'API Access',
-      free: 'No',
-      uplink: 'No',
-      pro: 'No',
-      ultimate: 'Yes',
-      ultimateUp: true,
-      comingSoon: true,
+      label: 'Live updates',
+      free: 'Instant',
+      uplink: 'Instant',
+      pro: 'Instant',
+      ultimate: 'Instant',
     },
     {
       label: 'Early Access',
@@ -361,7 +219,6 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
       ultimateUp: true,
     },
     {
-      // v1.1.2: moved from Ultimate-only to every paid tier.
       label: 'Priority Support',
       free: 'No',
       uplink: 'Yes',
@@ -370,88 +227,6 @@ function buildComparison(limits: TierLimitsResponse): Array<ComparisonRow> {
       uplinkUp: true,
       proUp: true,
       ultimateUp: true,
-    },
-    // v1.1.3 trim: Dashboard-Access row removed (all-"Full" row said nothing).
-  ]
-}
-
-// ── Tier Feature Showcases ──────────────────────────────────────
-
-interface TierShowcase {
-  tier: TierKey
-  Icon: typeof Gauge
-  name: string
-  tagline: string
-  hex: string
-  delivery: string
-  deliverySub: string
-  features: Array<string>
-  useCase: string
-}
-
-/**
- * Build the three tier showcase cards (Uplink / Pro / Ultimate). Feature
- * bullets pull numeric caps from the live tier-limits; non-numeric
- * features ('Early access', 'Priority support', etc.) stay static.
- */
-function buildTierShowcases(limits: TierLimitsResponse): Array<TierShowcase> {
-  const uplink = limits.tiers.uplink
-  const pro = limits.tiers.uplink_pro
-
-  return [
-    {
-      tier: 'uplink',
-      Icon: Rocket,
-      name: 'Uplink',
-      tagline: 'Check in every morning. Miss nothing.',
-      hex: '#00b8db',
-      delivery: `${uplink.max_widgets} widgets`,
-      deliverySub: 'Double the free plan',
-      useCase:
-        "You open Scrollr with your coffee, scan your watchlist, skim the morning headlines, and check last night's scores — with your fantasy leagues running alongside. Everything streams in live, so you catch the pre-market move before you leave for work.",
-      features: [
-        `${uplink.max_widgets} widgets at once`,
-        'Priority support',
-        'Unlimited items per widget',
-        'Blacklist site filtering',
-        'Early access to features',
-      ],
-    },
-    {
-      tier: 'pro',
-      Icon: Gauge,
-      name: 'Pro',
-      tagline: 'Know the moment it happens',
-      hex: '#a78bfa',
-      delivery: `${pro.max_widgets} widgets`,
-      deliverySub: '4x the free plan',
-      useCase:
-        'You set an alert when TSLA crosses $280. You save a "Work" feed profile that hides sports. When the 4th quarter starts on a close game, you get notified without checking. Scrollr watches so you don\'t have to.',
-      features: [
-        `${pro.max_widgets} widgets at once`,
-        'Custom alerts & notifications',
-        'Feed profiles & advanced controls',
-        'Blacklist + Whitelist filtering',
-        'Everything in Uplink',
-      ],
-    },
-    {
-      tier: 'ultimate',
-      Icon: Crown,
-      name: 'Uplink Ultimate',
-      tagline: 'Everything. Zero limits.',
-      hex: '#34d399',
-      delivery: 'Unlimited widgets',
-      deliverySub: 'No slot cap at all',
-      useCase:
-        'Every widget you follow, all running at once. Webhooks push alerts to your Discord. You export weekly market data to a spreadsheet. Your personal dashboard pulls from the API. Scrollr becomes infrastructure, not just a feed.',
-      features: [
-        'Unlimited widgets at once',
-        'Webhooks & integrations',
-        'Data export (CSV / JSON)',
-        'API access',
-        'Everything in Pro, plus more',
-      ],
     },
   ]
 }
@@ -497,13 +272,11 @@ const PRICING: Record<TierKey, Record<PlanKey, PricingPlan>> = {
   },
 }
 
-type BillingView = PlanKey | 'lifetime'
+/** Display price of the lifetime plan. The /uplink/lifetime route owns
+ *  the actual checkout (CheckoutModal is passed the amount there). */
+const LIFETIME_PRICE = 999
 
-const BILLING_LABELS: Record<BillingView, string> = {
-  monthly: 'Monthly',
-  annual: 'Annual',
-  lifetime: 'Lifetime',
-}
+type BillingView = PlanKey | 'lifetime'
 
 // ── Tier Helpers ───────────────────────────────────────────────
 
@@ -549,434 +322,87 @@ function getPriceId(tier: TierKey, plan: PlanKey): string {
   return UPLINK_PRICE_IDS[plan]
 }
 
-// ── CTA Particles ──────────────────────────────────────────────
-
-const CTA_PARTICLES = Array.from({ length: 20 }, (_, i) => {
-  const random = seededRandom(i * 6151 + 12289)
-  return {
-    id: i,
-    x: random() * 100,
-    y: random() * 100,
-    size: random() * 3 + 1.5,
-    delay: random() * 5,
-    duration: random() * 6 + 8,
-    color: i % 3 === 0 ? '#00b8db' : i % 3 === 1 ? '#a78bfa' : '#34d399',
-  }
-})
-
-const FOOTER_PARTICLES = Array.from({ length: 14 }, (_, i) => {
-  const random = seededRandom(i * 4093 + 8191)
-  return {
-    id: i,
-    x: 20 + random() * 60,
-    y: 10 + random() * 80,
-    size: random() * 2.5 + 1.5,
-    delay: 0.5 + random() * 3,
-    duration: random() * 5 + 6,
-  }
-})
-
 // ── Uplink FAQ ─────────────────────────────────────────────────
 
 /**
- * Build the FAQ items. Answers and highlights that reference numeric
- * caps interpolate them from the live tier-limits; purely descriptive
- * items stay static.
+ * Build the FAQ items. Answers that reference numeric caps interpolate
+ * them from the live tier-limits; purely descriptive items stay static.
+ * Question/answer text must stay in sync with STATIC_FAQ (JSON-LD).
  */
-function buildUplinkFAQ(limits: TierLimitsResponse): Array<FAQItem> {
+function buildUplinkFAQ(
+  limits: TierLimitsResponse,
+): Array<{ question: string; answer: string }> {
   const free = limits.tiers.free
   const uplink = limits.tiers.uplink
   const pro = limits.tiers.uplink_pro
-  const ult = limits.tiers.uplink_ultimate
-
-  // Render an Ultimate-tier cap value: numbers stay numbers, null = "unlimited".
-  const ultimateCopy = (n: number | null): string =>
-    n === null ? 'unlimited' : `${n}`
 
   return [
     {
-      icon: Sparkles,
       question: 'What are widgets, and how many do I get?',
-      highlight: `Run ${ultimateCopy(free.max_widgets)} widgets at once on Free, up to ${ultimateCopy(ult.max_widgets)} on Ultimate.`,
-      answer: `Widgets are the building blocks of your ticker — MLB scores, a stocks watchlist, crypto prices, your news feed, Yahoo Fantasy, and more. Your plan sets how many run at the same time: Free runs ${free.max_widgets}, Uplink ${uplink.max_widgets}, Pro ${pro.max_widgets}, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.`,
-      accent: 'emerald',
+      answer: `Widgets are the building blocks of your ticker: MLB scores, a stocks watchlist, crypto prices, your news feed, Yahoo Fantasy, and more. Your plan sets how many run at the same time: Free runs ${free.max_widgets}, Uplink ${uplink.max_widgets}, Pro ${pro.max_widgets}, and Ultimate is unlimited. Each widget holds as much as you want inside it — track a hundred stocks in one Stocks widget and it still counts as one.`,
     },
-    {
-      icon: Zap,
-      question: 'What does "data delivery" mean?',
-      highlight:
-        'Real time on every plan — data lands the instant it changes.',
-      answer:
-        'Every plan streams data in real time over Server-Sent Events (SSE) — the same technology used by stock trading platforms. The moment a price ticks or a score changes, it appears in your ticker. Polling only exists as a brief fallback while a connection re-establishes.',
-      accent: 'emerald',
-    },
-    {
-      icon: BarChart3,
-      question: 'Are there limits inside a widget?',
-      highlight:
-        'None — every widget holds unlimited items on every plan.',
-      answer:
-        'No. Every plan holds unlimited items inside each widget — track 5 or 500 symbols in your Stocks widget, follow every source in your news feeds, sync every fantasy league you play. Your plan only sets how many widgets run at once.',
-      accent: 'cyan',
-    },
-    {
-      icon: Sparkles,
-      question: 'What are custom RSS feeds?',
-      highlight:
-        'Add any RSS URL you want — your own blogs, niche sources, anything with a feed.',
-      answer:
-        'Beyond the curated news catalog, the Custom RSS widget lets you paste any RSS or Atom URL — niche industry sources, personal blogs, or company news. It is included on every plan, holds unlimited sources, and counts as one widget.',
-      accent: 'orange',
-    },
-    {
-      icon: Trophy,
-      question: 'What sports leagues are included?',
-      highlight:
-        'All 14 leagues on every plan — each league is its own widget.',
-      answer:
-        'All 14 leagues are available on every plan — NFL, NBA, MLB, NHL, MLS, Premier League, La Liga, Champions League, World Cup, F1, UFC, AFL, plus college football and basketball. Each league is its own widget, so you add exactly the ones you follow and scores stream in live.',
-      accent: 'violet',
-    },
-    {
-      icon: Crown,
-      question: 'How many fantasy leagues can I connect?',
-      highlight: 'Unlimited Yahoo leagues on every plan — even Free.',
-      answer:
-        'As many as you play. Scrollr syncs with Yahoo Fantasy Sports to show your standings, matchups, and roster updates. The Yahoo Fantasy widget is included on every plan — even Free — and syncs unlimited leagues across every sport.',
-      accent: 'rose',
-    },
-    {
-      icon: Bell,
-      question: 'What are custom alerts?',
-      highlight:
-        'Set price targets, score thresholds, and keyword triggers — Pro and Ultimate only.',
-      answer:
-        'Custom alerts let you define conditions that trigger notifications: a stock hitting a target price, a game entering the 4th quarter, or an RSS item matching a keyword. Alerts are evaluated in the app background — no server round-trip needed. Available on Pro and Ultimate tiers.',
-      accent: 'sky',
-    },
-    {
-      icon: Layers,
-      question: 'What are feed profiles and advanced controls?',
-      highlight:
-        'Save named configurations and fine-tune exactly what you see — Pro and Ultimate.',
-      answer:
-        'Feed profiles let you save different configurations — like "Work" showing only finance and RSS, or "Weekend" with sports and fantasy. Advanced controls add pinning, custom sort rules, and per-channel filtering within the feed. Both features are exclusive to Pro and Ultimate tiers.',
-      accent: 'fuchsia',
-    },
-    {
-      icon: Filter,
-      question: 'What is site filtering?',
-      highlight:
-        'Control which websites show the Scrollr feed bar, from blocklists to allowlists.',
-      answer:
-        'Site filtering controls where the feed bar appears. Every tier includes blacklist filtering — hide the bar on specific displays. Pro and Ultimate add whitelist mode on top, so you can restrict the bar to only the displays you choose.',
-      accent: 'cyan',
-    },
-    {
-      icon: Code2,
-      question: 'What about webhooks, data export, and API access?',
-      highlight:
-        'Ultimate-exclusive power features for integrations and automation.',
-      answer:
-        'Webhooks push your alerts to Discord, Slack, or any URL. Data export lets you download tracked symbols, historical prices, and game results as CSV or JSON. API access gives you programmatic read access to your MyScrollr data for personal dashboards or automation. All three are exclusive to Ultimate.',
-      accent: 'teal',
-    },
-    {
-      icon: Clock,
-      question: 'What does early access include?',
-      highlight:
-        'All paid subscribers get new features and channels before anyone else.',
-      answer:
-        'Every paid tier unlocks early access to new features, channels, and UI updates before they roll out to free users. This includes beta channels, experimental feed modes, and new dashboard widgets. You get to try everything first and provide feedback that shapes the final release.',
-      accent: 'orange',
-    },
-    {
-      icon: LayoutDashboard,
-      question: 'Does every tier get the full dashboard?',
-      highlight:
-        'Yes — the web dashboard is fully accessible on every tier, including free.',
-      answer:
-        'Every user gets complete access to the web dashboard at myscrollr.com. You can view all your channels, manage your watchlists, configure feeds, and adjust preferences regardless of your subscription tier. Paid tiers enhance the data flowing into the dashboard, not the dashboard itself.',
-      accent: 'lime',
-    },
+    ...STATIC_FAQ.slice(1),
   ]
 }
 
-// ── Signal Bars ─────────────────────────────────────────────────
+// ── Perks (SEC 02 — approved copy, verbatim) ───────────────────
 
-function SignalBars() {
-  return (
-    <div className="flex items-end gap-[3px]" aria-hidden>
-      {[1, 2, 3, 4, 5].map((i) => (
-        <motion.div
-          key={i}
-          className="w-[3px] rounded-full bg-primary origin-bottom"
-          style={{ height: 4 + i * 4 }}
-          initial={{ scaleY: 0, opacity: 0 }}
-          animate={{ scaleY: 1, opacity: 1 }}
-          transition={{
-            delay: 0.8 + i * 0.12,
-            duration: 0.4,
-            ease: EASE,
-          }}
-        />
-      ))}
-    </div>
-  )
-}
+const PERKS = [
+  {
+    num: '01',
+    title: 'More at once',
+    body: 'The only number that changes. Free runs three widgets; Uplink runs six, Pro twelve, Ultimate as many as you can read.',
+  },
+  {
+    num: '02',
+    title: 'Priority support',
+    body: "Paid plans jump the queue. Real humans, usually the ones who wrote the code you're asking about.",
+  },
+  {
+    num: '03',
+    title: 'Early access',
+    body: 'When a release needs a test run, paid tiers see it first before it rolls out to everyone. You fund the roadmap; you see it first.',
+  },
+]
 
-// ── Bottom CTA (full-section, matches homepage quality) ──────────
+const ASSURANCES = [
+  '✓ 7-DAY FREE TRIAL',
+  '✓ CANCEL WITH ONE CLICK',
+  '✓ NO HIDDEN FEES',
+  '✓ INSTANT ACTIVATION',
+  '✓ FREE TIER ALWAYS INCLUDED',
+]
 
-function BottomCTA({
-  handleSelectPlan,
-  hadPriorSub,
-}: {
-  handleSelectPlan: (period: PlanKey, tier: TierKey) => void
-  hadPriorSub: boolean
-}) {
-  const sectionRef = useRef<HTMLElement>(null)
-  const isInView = useInView(sectionRef, { amount: 0.15 })
+// ── Comparison cell ────────────────────────────────────────────
 
-  // Mouse parallax — actual orb + spring chain rendered inside the
-  // shared `<ConvergenceBackdrop>`. We just own the raw 0-1 cursor
-  // position MotionValues here.
-  const mouseX = useMotionValue(0.5)
-  const mouseY = useMotionValue(0.5)
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      const rect = e.currentTarget.getBoundingClientRect()
-      mouseX.set((e.clientX - rect.left) / rect.width)
-      mouseY.set((e.clientY - rect.top) / rect.height)
-    },
-    [mouseX, mouseY],
-  )
-
-  // 4 beams alternating green/cyan around the section center.
-  const beams = useMemo<Array<BackdropBeam>>(
-    () => [
-      { angle: 35, color: '#34d399', delay: 0.3 },
-      { angle: 145, color: '#00b8db', delay: 0.45 },
-      { angle: 215, color: '#34d399', delay: 0.6 },
-      { angle: 325, color: '#00b8db', delay: 0.75 },
-    ],
-    [],
-  )
-
-  return (
-    <section
-      ref={sectionRef}
-      className="relative overflow-clip py-32 lg:py-44"
-      onMouseMove={handleMouseMove}
-    >
-      {/* ── Background layers (shared with the homepage CallToAction) */}
-      <ConvergenceBackdrop
-        mouseX={mouseX}
-        mouseY={mouseY}
-        isInView={isInView}
-        particles={CTA_PARTICLES}
-        beams={beams}
-        pulseRingCount={3}
-        orbBackground="radial-gradient(circle, rgba(52,211,153,0.08) 0%, rgba(0,184,219,0.04) 40%, transparent 70%)"
-      />
-
-      {/* ── Content ───────────────────────────────────────────────── */}
-      <div
-        className="relative mx-auto px-5 sm:px-6 lg:px-8"
-        style={{ maxWidth: 1400 }}
+function CompareCell({ value, up }: { value: string; up?: boolean }) {
+  if (value === 'No') {
+    return (
+      <span
+        className="font-mono text-xs text-base-content/30"
+        aria-label="Not included"
       >
-        <div className="flex flex-col items-center text-center">
-          {/* Pill badge */}
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 15 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.5, ease: EASE }}
-          >
-            <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary backdrop-blur-sm">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
-              </span>
-              Available Now
-            </span>
-          </motion.div>
-
-          {/* Main headline */}
-          <motion.h2
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ delay: 0.1, duration: 0.6, ease: EASE }}
-            className="mt-8 text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-black tracking-tight leading-none"
-          >
-            <span className="block">Upgrade Your</span>
-            <span className="block mt-2 text-gradient-primary">Signal.</span>
-          </motion.h2>
-
-          {/* Sub-copy */}
-          <motion.span
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 15 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.25, duration: 0.5, ease: EASE }}
-            className="block mt-6 text-lg sm:text-xl text-base-content/50 max-w-lg leading-relaxed"
-          >
-            The core is free forever. Uplink, Pro, and Ultimate are for those
-            who want more widgets, more tools, and zero limits.
-          </motion.span>
-
-          {/* CTA buttons with central glow */}
-          <motion.div
-            className="relative mt-10"
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.4, duration: 0.6, ease: EASE }}
-          >
-            {/* Central glow behind buttons */}
-            <div
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none"
-              style={{
-                width: 240,
-                height: 240,
-                background:
-                  'radial-gradient(circle, rgba(52,211,153,0.15) 0%, transparent 70%)',
-                filter: 'blur(30px)',
-              }}
-            />
-
-            <div className="relative z-10 flex flex-wrap items-center justify-center gap-4">
-              <button
-                type="button"
-                onClick={() => handleSelectPlan('annual', 'ultimate')}
-                className="btn btn-pulse gap-2 text-base px-8 py-5 shadow-2xl"
-              >
-                <Crown size={14} />{' '}
-                {hadPriorSub
-                  ? 'Subscribe — Ultimate'
-                  : 'Start Free Trial — Ultimate'}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectPlan('annual', 'pro')}
-                className="btn btn-outline gap-2 px-6 py-4"
-              >
-                <Gauge size={14} />{' '}
-                {hadPriorSub ? 'Subscribe — Pro' : 'Try Pro Free for 7 Days'}
-              </button>
-            </div>
-          </motion.div>
-
-          {/* Trust signals */}
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.6, duration: 0.5, ease: EASE }}
-            className="mt-6 flex items-center gap-4 text-xs text-base-content/30"
-          >
-            {[
-              '7-day free trial',
-              'Cancel anytime',
-              'Instant activation',
-              'Stripe-secured',
-            ].map((item) => (
-              <span key={item} className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary/40" />
-                {item}
-              </span>
-            ))}
-          </motion.div>
-
-          {/* Bottom links */}
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.75, duration: 0.5, ease: EASE }}
-            className="mt-14 flex items-center gap-6"
-          >
-            <Link
-              to="/uplink/lifetime"
-              className="inline-flex items-center gap-2 text-sm text-base-content/40 hover:text-warning transition-colors duration-200"
-            >
-              <Sparkles className="size-4" aria-hidden />
-              Lifetime Access
-            </Link>
-            <span className="w-px h-4 bg-base-content/10" />
-            <Link
-              to="/"
-              className="inline-flex items-center gap-2 text-sm text-base-content/40 hover:text-primary transition-colors duration-200"
-            >
-              <Satellite className="size-4" aria-hidden />
-              Try Free First
-            </Link>
-          </motion.div>
-        </div>
-      </div>
-
-      {/* ── Bottom horizon glow ───────────────────────────────────── */}
-      <div className="absolute bottom-0 left-0 right-0 h-px pointer-events-none">
-        <motion.div
-          className="absolute inset-0"
-          style={{
-            background:
-              'linear-gradient(90deg, transparent, var(--color-primary), var(--color-info), var(--color-primary), transparent)',
-            opacity: 0,
-          }}
-          animate={isInView ? { opacity: [0, 0.4, 0.2] } : {}}
-          transition={{ delay: 1.5, duration: 2 }}
-        />
-        <motion.div
-          className="absolute bottom-0 left-1/2 -translate-x-1/2"
-          style={{
-            width: '60%',
-            height: 120,
-            background:
-              'radial-gradient(ellipse at bottom, rgba(52,211,153,0.08) 0%, transparent 70%)',
-            opacity: 0,
-          }}
-          animate={isInView ? { opacity: 1 } : {}}
-          transition={{ delay: 1.8, duration: 1.5 }}
-        />
-      </div>
-    </section>
-  )
+        —
+      </span>
+    )
+  }
+  if (up) {
+    return <span className="font-mono text-xs text-primary">✓ {value}</span>
+  }
+  return <span className="font-mono text-xs text-base-content/55">{value}</span>
 }
 
 // ── Page Component ──────────────────────────────────────────────
-// (PricingFeature bullet-line component retired v1.1.3 — the plan
-// cards show only the widget cap; differentiators live in the
-// compare table.)
 
 function UplinkPage() {
   const { isAuthenticated, signIn } = useScrollrAuth()
   const getToken = useGetToken()
 
   // Live tier limits from the backend (fallback-embedded for first paint).
-  // Rebuilds the comparison table, tier showcases, and FAQ whenever the
-  // fetch resolves or the cached response changes.
   const tierLimits = useTierLimits()
 
-  // Pointer-tracking 3D tilt for the four plan cards (v1.1.3 polish).
-  // One spring set per card; replaces the old whileHover y-lift.
-  const freeTilt = useTilt()
-  const uplinkTilt = useTilt()
-  const proTilt = useTilt()
-  const ultimateTilt = useTilt()
   const comparisonRows = useMemo(
     () => buildComparison(tierLimits),
-    [tierLimits],
-  )
-  const tierShowcases = useMemo(
-    () => buildTierShowcases(tierLimits),
     [tierLimits],
   )
   const uplinkFAQ = useMemo(() => buildUplinkFAQ(tierLimits), [tierLimits])
@@ -997,6 +423,7 @@ function UplinkPage() {
   const [showTrialCancelModal, setShowTrialCancelModal] = useState(false)
   const [trialCanceling, setTrialCanceling] = useState(false)
   const [loadingPreview, setLoadingPreview] = useState(false)
+  const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [pendingChange, setPendingChange] = useState<{
     tier: TierKey
     plan: PlanKey
@@ -1123,16 +550,14 @@ function UplinkPage() {
     if (loadingPreview) return 'Fetching quote...'
     if (!activeTier) {
       // No active subscription — check if they've used their trial
-      return hadPriorSub ? 'Subscribe' : 'Start Free Trial'
+      return hadPriorSub ? 'Subscribe' : 'Start free trial'
     }
-    if (isTrialing && activeTier === tier) return 'Your Choice'
+    if (isTrialing && activeTier === tier) return 'Your choice'
     if (currentSub?.status === 'canceling' && activeTier === tier)
-      return 'Current Plan'
-    if (activeTier === tier) return 'Current Plan'
-    if (pendingDowngradeTier === tier) return 'Downgrade Scheduled'
+      return 'Current plan'
+    if (activeTier === tier) return 'Current plan'
+    if (pendingDowngradeTier === tier) return 'Downgrade scheduled'
     if (isTrialing) return 'Switch to ' + TIER_NAMES[tier]
-    if (currentSub?.status === 'canceling')
-      return TIER_RANK[tier] > TIER_RANK[activeTier] ? 'Upgrade' : 'Downgrade'
     return TIER_RANK[tier] > TIER_RANK[activeTier] ? 'Upgrade' : 'Downgrade'
   }
 
@@ -1150,8 +575,53 @@ function UplinkPage() {
     ultimate: 'Uplink Ultimate',
   }
 
+  // ── Plan card data (slot caps from live tier-limits — never hardcoded)
+  const planDefs = useMemo(() => {
+    const t = tierLimits.tiers
+    return [
+      {
+        key: 'free',
+        tier: null,
+        name: 'Free',
+        tagline: "Start here. It's free forever.",
+        slots: t.free.max_widgets,
+        popular: false,
+      },
+      {
+        key: 'uplink',
+        tier: 'uplink' as TierKey,
+        name: 'Uplink',
+        tagline: 'Check in every morning. Miss nothing.',
+        slots: t.uplink.max_widgets,
+        popular: false,
+      },
+      {
+        key: 'pro',
+        tier: 'pro' as TierKey,
+        name: 'Pro',
+        tagline: 'Know the moment it happens.',
+        slots: t.uplink_pro.max_widgets,
+        popular: false,
+      },
+      {
+        key: 'ultimate',
+        tier: 'ultimate' as TierKey,
+        name: 'Ultimate',
+        tagline: 'Everything. Zero limits.',
+        slots: t.uplink_ultimate.max_widgets,
+        popular: true,
+      },
+    ]
+  }, [tierLimits])
+
+  const billingTabs: Array<{ id: BillingView; label: string }> = [
+    { id: 'monthly', label: 'MONTHLY' },
+    { id: 'annual', label: 'ANNUAL · 4 MO FREE' },
+    { id: 'lifetime', label: 'LIFETIME · LIMITED' },
+  ]
+
   return (
-    <div className="min-h-dvh pt-20">
+    <div className="min-h-dvh">
       {/* ── Checkout Modal ──────────────────────────────────── */}
       {checkoutPlan && (
         <Suspense
@@ -1173,16 +643,15 @@ function UplinkPage() {
           />
         </Suspense>
       )}
-
       {/* ── Plan Change Confirmation Modal ─────────────────── */}
       {pendingChange && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="relative w-full max-w-sm mx-4 bg-base-200 border border-base-content/10 rounded-xl p-6"
+            className="relative mx-4 w-full max-w-sm rounded-[8px] border border-hairline bg-panel p-6"
           >
-            <h3 className="text-sm font-semibold text-base-content/80 mb-4">
+            <h3 className="mb-4 text-sm font-semibold text-base-content/80">
               {pendingChange.isTrialChange
                 ? 'Switch to'
                 : pendingChange.isDowngrade
@@ -1191,7 +660,7 @@ function UplinkPage() {
               {TIER_NAMES[pendingChange.tier]}
             </h3>
 
-            <div className="space-y-3 mb-6">
+            <div className="mb-6 space-y-3">
               {pendingChange.isTrialChange ? (
                 <>
                   <p className="text-xs text-base-content/50">
@@ -1263,14 +732,14 @@ function UplinkPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setPendingChange(null)}
-                className="flex-1 py-2.5 text-[10px] font-semibold border border-base-content/10 rounded-lg text-base-content/40 hover:text-base-content/60 hover:border-base-content/20 transition-colors"
+                className="flex-1 rounded-[4px] border border-hairline py-2.5 text-[10px] font-semibold text-base-content/40 transition-colors hover:border-base-content/20 hover:text-base-content/60"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmChange}
                 disabled={planChanging}
-                className="flex-1 py-2.5 text-[10px] font-semibold bg-primary/10 border border-primary/30 text-primary rounded-lg hover:bg-primary/20 hover:border-primary/50 transition-colors disabled:opacity-50"
+                className="flex-1 rounded-[4px] border border-primary/30 bg-primary/10 py-2.5 text-[10px] font-semibold text-primary transition-colors hover:border-primary/50 hover:bg-primary/20 disabled:opacity-50"
               >
                 {planChanging
                   ? 'Processing...'
@@ -1284,17 +753,16 @@ function UplinkPage() {
           </motion.div>
         </div>
       )}
-
       {/* ── Trial Cancel Retention Modal ──────────────────────── */}
       {showTrialCancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="relative w-full max-w-sm mx-4 bg-base-200 border border-base-content/10 rounded-xl p-6 space-y-4"
+            className="relative mx-4 w-full max-w-sm space-y-4 rounded-[8px] border border-hairline bg-panel p-6"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-error/10">
                 <ShieldAlert size={20} className="text-error" />
               </div>
               <h3 className="text-sm font-semibold text-base-content/80">
@@ -1302,11 +770,11 @@ function UplinkPage() {
               </h3>
             </div>
 
-            <div className="space-y-3 text-xs text-base-content/50 leading-relaxed">
+            <div className="space-y-3 text-xs leading-relaxed text-base-content/50">
               <p>
                 If you cancel now, you&apos;ll lose access to all premium
-                features immediately &mdash; including your extra widget
-                slots and Uplink Ultimate access.
+                features immediately &mdash; including your extra widget slots
+                and Uplink Ultimate access.
               </p>
               <p className="font-semibold text-base-content/70">
                 This is the only free trial offered per account. Once canceled,
@@ -1321,8 +789,8 @@ function UplinkPage() {
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => setShowTrialCancelModal(false)}
-                className="flex-1 py-2.5 text-xs font-semibold border border-primary/30 rounded-lg
-                           text-primary hover:bg-primary/10 transition-colors"
+                className="flex-1 rounded-[4px] border border-primary/30 py-2.5 text-xs font-semibold
+                           text-primary transition-colors hover:bg-primary/10"
               >
                 Keep My Trial
               </button>
@@ -1340,8 +808,8 @@ function UplinkPage() {
                     setTrialCanceling(false)
                   }
                 }}
-                className="flex-1 py-2.5 text-xs font-semibold border border-error/30 rounded-lg
-                           text-error/60 hover:text-error hover:bg-error/10 transition-colors"
+                className="flex-1 rounded-[4px] border border-error/30 py-2.5 text-xs font-semibold
+                           text-error/60 transition-colors hover:bg-error/10 hover:text-error"
               >
                 Cancel Trial
               </button>
@@ -1349,7 +817,6 @@ function UplinkPage() {
           </motion.div>
         </div>
       )}
-
       {/* ── Checkout Success Banner ─────────────────────────── */}
       {checkoutSuccess &&
         (() => {
@@ -1359,7 +826,7 @@ function UplinkPage() {
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="fixed top-24 left-1/2 -translate-x-1/2 z-40 px-6 py-4 bg-success/10 border border-success/30 rounded-lg backdrop-blur-sm flex items-center gap-3"
+              className="fixed left-1/2 top-24 z-40 flex -translate-x-1/2 items-center gap-3 rounded-[4px] border border-success/30 bg-success/10 px-6 py-4 backdrop-blur-sm"
             >
               <CheckCircle2 size={18} className="text-success" />
               <div>
@@ -1374,20 +841,19 @@ function UplinkPage() {
               </div>
               <button
                 onClick={() => setCheckoutSuccess(false)}
-                className="ml-4 text-base-content/30 hover:text-base-content/60 transition-colors text-xs"
+                className="ml-4 text-xs text-base-content/30 transition-colors hover:text-base-content/60"
               >
                 &times;
               </button>
             </motion.div>
           )
         })()}
-
       {/* ── Plan Change Error Banner ──────────────────────────── */}
       {planChangeError && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="fixed top-24 left-1/2 -translate-x-1/2 z-40 px-6 py-4 bg-error/10 border border-error/30 rounded-lg backdrop-blur-sm flex items-center gap-3"
+          className="fixed left-1/2 top-24 z-40 flex -translate-x-1/2 items-center gap-3 rounded-[4px] border border-error/30 bg-error/10 px-6 py-4 backdrop-blur-sm"
         >
           <AlertTriangle size={18} className="text-error" />
           <div>
@@ -1398,2646 +864,569 @@ function UplinkPage() {
           </div>
           <button
             onClick={() => setPlanChangeError(null)}
-            className="ml-4 text-base-content/30 hover:text-base-content/60 transition-colors text-xs"
+            className="ml-4 text-xs text-base-content/30 transition-colors hover:text-base-content/60"
           >
             ✕
           </button>
         </motion.div>
       )}
-
       {/* ================================================================
-          HERO
+          HEADER
           ================================================================ */}
-      <section className="relative pt-32 pb-28 overflow-hidden">
-        {/* Layered background system */}
-        <div className="absolute inset-0 pointer-events-none">
-          {/* Fine dot matrix */}
-          <div
-            className="absolute inset-0 opacity-[0.03]"
-            style={{
-              backgroundImage: `radial-gradient(circle at 1px 1px, var(--grid-dot-primary) 1px, transparent 0)`,
-              backgroundSize: '24px 24px',
-            }}
-          />
-
-          {/* Primary orbital glow */}
-          <motion.div
-            className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] rounded-full"
-            style={{
-              background:
-                'radial-gradient(circle, var(--glow-primary-subtle) 0%, transparent 70%)',
-            }}
-            animate={{
-              scale: [1, 1.08, 1],
-              opacity: [0.6, 1, 0.6],
-            }}
-            transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-          />
-
-          {/* Secondary glow */}
-          <motion.div
-            className="absolute bottom-[-30%] left-[-10%] w-[600px] h-[600px] rounded-full"
-            style={{
-              background:
-                'radial-gradient(circle, var(--glow-info-subtle) 0%, transparent 70%)',
-            }}
-            animate={{
-              scale: [1.08, 1, 1.08],
-              opacity: [0.4, 0.7, 0.4],
-            }}
-            transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
-          />
-
-          {/* Scan line removed during the perf pass — was animating
-              `y` from -10% to 110% over 6s on `repeat: Infinity` across
-              the full hero. Compositor-tier so cheap individually, but
-              the hero already has 4 nested ring loops + 6 floating dots
-              + 2 perpetual orb pulses; the scan line wasn't pulling
-              its weight visually and the surface area for layout
-              reads grew on resize. */}
-        </div>
-
-        {/* Top border accent */}
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
-
-        <div className="container relative z-10 !py-0">
-          {/* Badge row */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: EASE }}
-            className="flex items-center gap-4 mb-10"
-          >
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/8 text-primary text-[10px] font-bold rounded-lg border border-primary/15 uppercase tracking-wide">
-              <Satellite size={12} />
-              uplink
-            </span>
-            <span className="h-px w-16 bg-gradient-to-r from-base-300 to-transparent" />
-            <span className="text-[10px] text-base-content/25 flex items-center gap-3">
-              power tier
-              <SignalBars />
-            </span>
-          </motion.div>
-
-          {/* Two-column: text left, tier cards right */}
-          <div className="flex items-center gap-6">
-            {/* Left — headline + CTA */}
-            <div className="flex-1 min-w-0">
-              <motion.h1
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, delay: 0.15, ease: EASE }}
-                className="text-6xl md:text-8xl lg:text-9xl font-black tracking-tight leading-[0.85] mb-8"
-              >
-                Total
-                <br />
-                <span className="relative inline-block">
-                  <span className="text-gradient-primary">Coverage</span>
-                  {/* Underline accent */}
-                  <motion.span
-                    className="absolute -bottom-2 left-0 right-0 h-[3px] bg-gradient-to-r from-primary via-primary/60 to-transparent origin-left"
-                    initial={{ scaleX: 0 }}
-                    animate={{ scaleX: 1 }}
-                    transition={{ duration: 0.8, delay: 0.8, ease: EASE }}
-                  />
-                </span>
-              </motion.h1>
-
-              {/* Subtitle */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.35, ease: EASE }}
-                className="flex items-start gap-3 mb-12 max-w-xl"
-              >
-                <span className="text-primary/30 font-mono text-sm mt-0.5 select-none shrink-0">
-                  $
-                </span>
-                <p className="text-base text-base-content/40 leading-relaxed">
-                  Scrollr is free and open source. Three paid tiers for power
-                  users who want more — more widgets at once, custom alerts,
-                  and power-user integrations.
-                </p>
-              </motion.div>
-
-              {/* CTA row */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.5, ease: EASE }}
-                className="flex flex-wrap items-center gap-5"
-              >
-                <button
+      <PageHeader
+        eyebrowLeft="UPLINK ／ PRICING"
+        eyebrowRight="EVERY PAID PLAN: 7-DAY FREE TRIAL · NOT CHARGED UNTIL DAY 8"
+        line1="More widgets"
+        line2="at once."
+        sub="Every plan is the same app, and every widget costs the same. You're only choosing how many run on your bar at once. No feature matrix to squint at."
+        actions={
+          <div className="flex flex-wrap gap-1.5 font-mono text-xs tracking-[0.1em]">
+            {billingTabs.map((tab) => {
+              const active = billingView === tab.id
+              const amber = tab.id === 'lifetime'
+              return (
+                <motion.button
+                  key={tab.id}
                   type="button"
-                  onClick={() => {
-                    document
-                      .getElementById('pricing')
-                      ?.scrollIntoView({ behavior: 'smooth' })
-                  }}
-                  className="btn btn-pulse btn-lg gap-2.5"
-                >
-                  <Zap size={14} />
-                  {hadPriorSub ? 'View Plans' : 'Start Free Trial'}
-                </button>
-
-                <div className="flex items-center gap-3">
-                  <span className="h-px w-6 bg-base-300/50" />
-                  <span className="text-[10px] font-mono text-base-content/20">
-                    {hadPriorSub
-                      ? `From $${PRICING.uplink.annual.perMonth}/mo \u00b7 Cancel anytime`
-                      : `7 days free \u00b7 From $${PRICING.uplink.annual.perMonth}/mo \u00b7 Cancel anytime`}
-                  </span>
-                </div>
-              </motion.div>
-            </div>
-
-            {/* Right — concentric signal rings (hidden on mobile) */}
-            <div className="hidden lg:flex items-center justify-center w-[380px] shrink-0">
-              <div className="relative w-[340px] h-[340px]">
-                {/* ── Outer ring: Unlimited (green glow) ── */}
-                <motion.div
-                  className="absolute inset-0 rounded-full"
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.9, duration: 1, ease: EASE }}
-                >
-                  {/* Glow layer */}
-                  <motion.div
-                    className="absolute inset-0 rounded-full"
-                    style={{
-                      boxShadow:
-                        '0 0 40px #34d39920, 0 0 80px #34d39910, inset 0 0 40px #34d39908',
-                    }}
-                    animate={{ opacity: [0.5, 1, 0.5] }}
-                    transition={{
-                      duration: 4,
-                      repeat: Infinity,
-                      ease: 'easeInOut',
-                    }}
-                  />
-                  <div
-                    className="absolute inset-0 rounded-full"
-                    style={{
-                      border: '1.5px solid #34d39930',
-                      background:
-                        'radial-gradient(circle, transparent 60%, #34d39908 100%)',
-                    }}
-                  />
-                  {/* Label */}
-                  <motion.div
-                    className="absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-1/2"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 1.6, duration: 0.5, ease: EASE }}
-                  >
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-primary/70 bg-base-100/80 backdrop-blur-sm px-3 py-1 rounded-full border border-primary/15">
-                      Ultimate
-                    </span>
-                  </motion.div>
-                </motion.div>
-
-                {/* ── Pro ring (violet) ── */}
-                <motion.div
-                  className="absolute inset-[45px] rounded-full"
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.7, duration: 0.95, ease: EASE }}
-                >
-                  <div
-                    className="absolute inset-0 rounded-full"
-                    style={{
-                      border: '1.5px solid #a78bfa25',
-                      background:
-                        'radial-gradient(circle, transparent 55%, #a78bfa06 100%)',
-                    }}
-                  />
-                  {/* Label */}
-                  <motion.div
-                    className="absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-1/2"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 1.4, duration: 0.5, ease: EASE }}
-                  >
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-[#a78bfa]/60 bg-base-100/80 backdrop-blur-sm px-3 py-1 rounded-full border border-[#a78bfa]/15">
-                      Pro
-                    </span>
-                  </motion.div>
-                </motion.div>
-
-                {/* ── Uplink ring (cyan) ── */}
-                <motion.div
-                  className="absolute inset-[85px] rounded-full"
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.5, duration: 0.9, ease: EASE }}
-                >
-                  <div
-                    className="absolute inset-0 rounded-full"
-                    style={{
-                      border: '1.5px solid #00b8db25',
-                      background:
-                        'radial-gradient(circle, transparent 55%, #00b8db06 100%)',
-                    }}
-                  />
-                  {/* Label */}
-                  <motion.div
-                    className="absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-1/2"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 1.2, duration: 0.5, ease: EASE }}
-                  >
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-info/50 bg-base-100/80 backdrop-blur-sm px-3 py-1 rounded-full border border-info/10">
-                      Uplink
-                    </span>
-                  </motion.div>
-                </motion.div>
-
-                {/* ── Inner ring: Free (muted) ── */}
-                <motion.div
-                  className="absolute inset-[120px] rounded-full"
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.3, duration: 0.8, ease: EASE }}
-                >
-                  <div
-                    className="absolute inset-0 rounded-full"
-                    style={{
-                      border: '1px solid rgba(255,255,255,0.06)',
-                    }}
-                  />
-                  {/* Label */}
-                  <motion.div
-                    className="absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-1/2"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 1.0, duration: 0.5, ease: EASE }}
-                  >
-                    <span className="text-[8px] font-bold uppercase tracking-widest text-base-content/25 bg-base-100/80 backdrop-blur-sm px-2.5 py-1 rounded-full border border-base-300/15">
-                      Free
-                    </span>
-                  </motion.div>
-                </motion.div>
-
-                {/* ── Center: Satellite icon ── */}
-                <motion.div
-                  className="absolute inset-0 flex items-center justify-center"
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.3, duration: 0.7, ease: EASE }}
-                >
-                  <div className="relative">
-                    {/* Icon glow */}
-                    <div
-                      className="absolute inset-0 rounded-full blur-xl"
-                      style={{
-                        background:
-                          'radial-gradient(circle, #34d39925 0%, transparent 70%)',
-                        width: 80,
-                        height: 80,
-                        left: -16,
-                        top: -16,
-                      }}
-                    />
-                    <div
-                      className="relative w-12 h-12 rounded-2xl flex items-center justify-center"
-                      style={{
-                        background: '#34d39910',
-                        boxShadow: '0 0 24px #34d39915, 0 0 0 1px #34d39920',
-                      }}
-                    >
-                      <Satellite size={22} className="text-primary/70" />
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* ── Radiating pulse (perpetual) ── */}
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    className="absolute inset-0 rounded-full border border-primary/10 pointer-events-none"
-                    animate={{ scale: [0.35, 1.15], opacity: [0.6, 0] }}
-                    transition={{
-                      delay: 1.5 + i * 1.2,
-                      duration: 3,
-                      ease: 'easeOut',
-                      repeat: Infinity,
-                      repeatDelay: 1.6,
-                    }}
-                  />
-                ))}
-
-                {/* ── Floating data dots ── */}
-                {[
-                  {
-                    angle: 30,
-                    radius: 45,
-                    color: '#34d399',
-                    size: 3,
-                    delay: 2,
-                  },
-                  {
-                    angle: 150,
-                    radius: 70,
-                    color: '#00b8db',
-                    size: 2.5,
-                    delay: 2.8,
-                  },
-                  {
-                    angle: 250,
-                    radius: 55,
-                    color: '#34d399',
-                    size: 2,
-                    delay: 3.5,
-                  },
-                  {
-                    angle: 80,
-                    radius: 85,
-                    color: '#00b8db',
-                    size: 3,
-                    delay: 2.4,
-                  },
-                  {
-                    angle: 200,
-                    radius: 40,
-                    color: '#34d399',
-                    size: 2.5,
-                    delay: 3.2,
-                  },
-                  {
-                    angle: 320,
-                    radius: 75,
-                    color: '#00b8db',
-                    size: 2,
-                    delay: 2.6,
-                  },
-                ].map((dot) => (
-                  <motion.div
-                    key={`${dot.angle}-${dot.radius}`}
-                    className="absolute rounded-full pointer-events-none"
-                    style={{
-                      width: dot.size,
-                      height: dot.size,
-                      backgroundColor: dot.color,
-                      left: '50%',
-                      top: '50%',
-                      marginLeft: -dot.size / 2,
-                      marginTop: -dot.size / 2,
-                    }}
-                    animate={{
-                      x: [
-                        Math.cos((dot.angle * Math.PI) / 180) *
-                          (dot.radius * 0.6),
-                        Math.cos((dot.angle * Math.PI) / 180) *
-                          (dot.radius * 1.8),
-                      ],
-                      y: [
-                        Math.sin((dot.angle * Math.PI) / 180) *
-                          (dot.radius * 0.6),
-                        Math.sin((dot.angle * Math.PI) / 180) *
-                          (dot.radius * 1.8),
-                      ],
-                      opacity: [0, 0.8, 0],
-                    }}
-                    transition={{
-                      delay: dot.delay,
-                      duration: 4,
-                      ease: 'easeInOut',
-                      repeat: Infinity,
-                      repeatDelay: 2,
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom border */}
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-base-300/50 to-transparent" />
-      </section>
-
-      {/* ================================================================
-          PRICING — TOGGLE + 4 COLUMNS
-          ================================================================ */}
-      <section id="pricing" className="relative overflow-hidden scroll-mt-24">
-        <div className="container">
-          {/* Section header */}
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.7, ease: EASE }}
-            className="text-center mb-10 sm:mb-14"
-          >
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
-              Pick Your <span className="text-gradient-primary">Plan</span>
-            </h2>
-            <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
-              Flexible billing — pick what works for you
-            </p>
-          </motion.div>
-
-          {/* Billing period toggle */}
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 15 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.1, ease: EASE }}
-            className="flex items-center justify-center mb-10"
-          >
-            <div className="relative inline-flex items-center gap-1 p-1 rounded-xl bg-base-200/60 border border-base-300/30 backdrop-blur-sm">
-              {(['monthly', 'annual', 'lifetime'] as const).map((period) => (
-                <button
-                  key={period}
-                  type="button"
-                  onClick={() => setBillingView(period)}
-                  className={`relative z-10 px-5 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-colors duration-200 ${
-                    billingView === period
-                      ? period === 'lifetime'
-                        ? 'text-base-100'
-                        : 'text-primary-content'
-                      : period === 'lifetime'
-                        ? 'text-warning/40 hover:text-warning/60'
-                        : 'text-base-content/35 hover:text-base-content/55'
+                  aria-pressed={active}
+                  onClick={() => setBillingView(tab.id)}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  className={`relative cursor-pointer whitespace-nowrap rounded-[4px] border px-[18px] py-2.5 transition-colors ${
+                    active
+                      ? amber
+                        ? 'border-transparent text-[#fbbf24]'
+                        : 'border-transparent text-primary'
+                      : 'border-hairline text-base-content/50 hover:text-base-content/80'
                   }`}
                 >
-                  {billingView === period && (
-                    <motion.div
-                      layoutId="billing-toggle"
-                      className={`absolute inset-0 rounded-lg ${period === 'lifetime' ? 'bg-warning' : 'bg-primary'}`}
+                  {/* Active chip slides between billing views, turning
+                      amber when it lands on LIFETIME */}
+                  {active && (
+                    <motion.span
+                      aria-hidden="true"
+                      layoutId="billing-tab"
+                      className={`absolute inset-0 rounded-[4px] border ${
+                        amber
+                          ? 'border-[#fbbf24]/45 bg-[#fbbf24]/10'
+                          : 'border-primary/45 bg-primary/10'
+                      }`}
                       transition={{
                         type: 'spring',
-                        bounce: 0.15,
-                        duration: 0.5,
+                        stiffness: 500,
+                        damping: 35,
                       }}
                     />
                   )}
-                  <span className="relative z-10">
-                    {BILLING_LABELS[period]}
-                  </span>
-                  {period === 'annual' && (
-                    <span
-                      className={`relative z-10 ml-1.5 text-[8px] ${billingView === period ? 'text-primary-content/70' : 'text-primary/50'}`}
-                    >
-                      Best
-                    </span>
-                  )}
-                  {period === 'lifetime' && (
-                    <span
-                      className={`relative z-10 ml-1.5 text-[8px] ${billingView === period ? 'text-base-100/70' : 'text-warning/40'}`}
-                    >
-                      Limited
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-
-          {/* Risk-free trial banner */}
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4, delay: 0.15, ease: EASE }}
-            className="flex items-center justify-center gap-2 mb-8"
-          >
-            <CheckCircle2
-              size={13}
-              className={
-                isTrialing
-                  ? 'text-info/60 shrink-0'
-                  : 'text-primary/50 shrink-0'
-              }
-            />
-            <span className="text-[11px] text-base-content/35">
-              {isTrialing ? (
-                'Your trial includes full Uplink Ultimate access. Pick the plan you want when it ends.'
-              ) : (
-                <>
-                  Every plan includes a 7-day free trial. Cancel anytime &mdash;
-                  you won&apos;t be charged until day 8.
-                </>
-              )}
-            </span>
-          </motion.div>
-
-          {/* Pricing cards — AnimatePresence swaps between tiers and Lifetime */}
-          <AnimatePresence mode="wait">
+                  <span className="relative">{tab.label}</span>
+                </motion.button>
+              )
+            })}
+          </div>
+        }
+      />
+      {/* ================================================================
+          PLANS — 4 cards / lifetime card (AnimatePresence swap)
+          ================================================================ */}
+      <section className="border-b border-hairline">
+        <TerminalContainer>
+          <AnimatePresence mode="wait" initial={false}>
             {isLifetime ? (
-              /* ═══════════════════════════════════════════════════════════════
-               LIFETIME REVEAL — Epic single card with aura
-               ═══════════════════════════════════════════════════════════════ */
               <motion.div
                 key="lifetime-reveal"
-                initial={{ opacity: 0, scale: 0.88 }}
+                initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.94, y: 10 }}
-                transition={{ duration: 0.55, ease: EASE }}
-                className="flex justify-center py-4"
+                exit={{ opacity: 0, scale: 0.97, y: 6 }}
+                transition={{ duration: 0.45, ease: EASE }}
+                className="py-11"
               >
-                <div className="relative w-full" style={{ maxWidth: 560 }}>
-                  {/* ── Expanding aura rings ── */}
-                  {[0, 1, 2, 3].map((i) => (
-                    <motion.div
-                      key={i}
-                      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border pointer-events-none"
-                      style={{
-                        width: 300 + i * 100,
-                        height: 300 + i * 100,
-                        borderColor: `rgba(245, 158, 11, ${0.12 - i * 0.025})`,
-                      }}
-                      initial={{ scale: 0, opacity: 0 }}
-                      animate={{
-                        scale: [0.6, 1.1, 1],
-                        opacity: [0, 0.8, 0.3],
-                      }}
-                      transition={{
-                        delay: 0.2 + i * 0.12,
-                        duration: 1.2,
-                        ease: EASE,
-                      }}
-                    />
-                  ))}
-
-                  {/* ── Perpetual pulse rings ── */}
-                  {[0, 1, 2].map((i) => (
-                    <motion.div
-                      key={`pulse-${i}`}
-                      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-warning/15 pointer-events-none"
-                      style={{ width: 400, height: 400 }}
-                      animate={{ scale: [0.7, 1.8], opacity: [0.5, 0] }}
-                      transition={{
-                        delay: 1 + i * 1.3,
-                        duration: 3,
-                        ease: 'easeOut',
-                        repeat: Infinity,
-                        repeatDelay: 1.5,
-                      }}
-                    />
-                  ))}
-
-                  {/* ── Ambient orb ── */}
-                  <motion.div
-                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                    style={{
-                      width: 500,
-                      height: 500,
-                      background:
-                        'radial-gradient(circle, rgba(245,158,11,0.1) 0%, rgba(245,158,11,0.03) 40%, transparent 70%)',
-                      filter: 'blur(40px)',
-                    }}
-                    animate={{
-                      scale: [1, 1.15, 1],
-                      opacity: [0.5, 1, 0.5],
-                    }}
-                    transition={{
-                      duration: 5,
-                      repeat: Infinity,
-                      ease: 'easeInOut',
-                    }}
-                  />
-
-                  {/* ── Floating particles ── */}
-                  {FOOTER_PARTICLES.map((p) => (
-                    <motion.div
-                      key={p.id}
-                      className="absolute rounded-full pointer-events-none"
-                      style={{
-                        left: `${p.x}%`,
-                        top: `${p.y}%`,
-                        width: p.size,
-                        height: p.size,
-                        backgroundColor: '#f59e0b',
-                      }}
-                      animate={{ y: [0, -60, -120], opacity: [0, 0.6, 0] }}
-                      transition={{
-                        delay: p.delay,
-                        duration: p.duration,
-                        ease: 'easeInOut',
-                        repeat: Infinity,
-                      }}
-                    />
-                  ))}
-
-                  {/* ── The Card ── */}
-                  <motion.div
-                    initial={{ y: 20 }}
-                    animate={{ y: 0 }}
-                    transition={{ delay: 0.15, duration: 0.6, ease: EASE }}
-                    className="relative rounded-2xl overflow-hidden"
+                <div className="relative">
+                  {/* Retained aura work, re-tinted amber: ambient orb +
+                      perpetual pulse rings behind the card. */}
+                  <div
+                    className="pointer-events-none absolute inset-0"
+                    aria-hidden="true"
                   >
-                    {/* Pulsing border glow */}
                     <motion.div
-                      className="absolute -inset-px rounded-2xl bg-gradient-to-b from-warning/30 via-warning/10 to-warning/5"
-                      animate={{ opacity: [0.5, 1, 0.5] }}
+                      className="absolute left-1/2 top-1/2 h-[420px] w-[560px] -translate-x-1/2 -translate-y-1/2"
+                      style={{
+                        background:
+                          'radial-gradient(ellipse at center, rgba(251,191,36,0.10) 0%, rgba(251,191,36,0.03) 45%, transparent 70%)',
+                        filter: 'blur(40px)',
+                      }}
+                      animate={{ scale: [1, 1.12, 1], opacity: [0.5, 1, 0.5] }}
                       transition={{
-                        duration: 3,
+                        duration: 5,
                         repeat: Infinity,
                         ease: 'easeInOut',
                       }}
                     />
-
-                    <div className="relative border border-warning/25 rounded-2xl p-8 sm:p-10">
-                      {/* Background */}
-                      <div className="absolute inset-0 bg-base-200/70 rounded-2xl pointer-events-none" />
-
-                      {/* Top accent */}
-                      <div
-                        className="absolute top-0 left-0 right-0 h-px"
-                        style={{
-                          background:
-                            'linear-gradient(90deg, transparent, #f59e0b 50%, transparent)',
+                    {[0, 1, 2].map((i) => (
+                      <motion.div
+                        key={i}
+                        className="absolute left-1/2 top-1/2 h-[400px] w-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#fbbf24]/15"
+                        animate={{ scale: [0.7, 1.8], opacity: [0.5, 0] }}
+                        transition={{
+                          delay: 1 + i * 1.3,
+                          duration: 3,
+                          ease: 'easeOut',
+                          repeat: Infinity,
+                          repeatDelay: 1.5,
                         }}
                       />
+                    ))}
+                  </div>
 
-                      {/* ── Amber smoke ── */}
-                      <div
-                        className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl"
-                        style={{ zIndex: 1 }}
-                      >
-                        <motion.div
-                          className="absolute inset-0"
-                          style={{
-                            background:
-                              'linear-gradient(135deg, #f59e0b12 0%, #f59e0b20 40%, #f59e0b12 60%, #f59e0b1a 100%)',
-                          }}
-                          animate={{ opacity: [0.4, 0.8, 0.4] }}
-                          transition={{
-                            duration: 4,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                          }}
-                        />
-                        <motion.div
-                          className="absolute bottom-[-10%] left-[10%] w-[80%] h-[55%] rounded-full blur-3xl"
-                          style={{
-                            background:
-                              'radial-gradient(ellipse 70% 60% at center bottom, #f59e0b30 0%, transparent 70%)',
-                          }}
-                          animate={{
-                            y: [0, -30, 0],
-                            scaleX: [1, 1.25, 1],
-                            opacity: [0.3, 0.7, 0.3],
-                          }}
-                          transition={{
-                            duration: 7,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                          }}
-                        />
-                        <motion.div
-                          className="absolute top-[-8%] right-[5%] w-[70%] h-[50%] rounded-full blur-3xl"
-                          style={{
-                            background:
-                              'radial-gradient(ellipse 65% 55% at center top, #f59e0b25 0%, transparent 65%)',
-                          }}
-                          animate={{
-                            y: [0, 20, 0],
-                            scaleX: [1, 1.15, 1],
-                            opacity: [0.25, 0.6, 0.25],
-                          }}
-                          transition={{
-                            duration: 8,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                            delay: 1.5,
-                          }}
-                        />
-                        <motion.div
-                          className="absolute top-[30%] left-[15%] w-[45px] h-[45px] rounded-full blur-xl"
-                          style={{
-                            background:
-                              'radial-gradient(circle, #f59e0b45 0%, transparent 70%)',
-                          }}
-                          animate={{
-                            y: [0, -15, 10, 0],
-                            opacity: [0, 0.7, 0.3, 0],
-                          }}
-                          transition={{
-                            duration: 5,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                          }}
-                        />
-                        <motion.div
-                          className="absolute top-[60%] right-[12%] w-[40px] h-[40px] rounded-full blur-lg"
-                          style={{
-                            background:
-                              'radial-gradient(circle, #f59e0b40 0%, transparent 70%)',
-                          }}
-                          animate={{
-                            y: [0, -10, 0],
-                            opacity: [0, 0.5, 0],
-                          }}
-                          transition={{
-                            duration: 4,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                            delay: 2.5,
-                          }}
-                        />
+                  <div className="relative grid items-center gap-10 rounded-[8px] border border-[#fbbf24]/40 bg-[#fbbf24]/[0.03] px-7 py-10 sm:px-10 md:grid-cols-[1.2fr_1fr] md:gap-12">
+                    <div
+                      className="absolute -right-px -top-px bg-[#fbbf24] px-3 py-[5px] font-mono text-[10px] font-semibold tracking-[0.12em] text-[#101018]"
+                      style={{ borderRadius: '0 8px 0 6px' }}
+                    >
+                      LIMITED · FOUNDING MEMBERS
+                    </div>
+                    <div>
+                      <div className="mb-3.5 font-mono text-[11px] tracking-[0.14em] text-[#fbbf24]">
+                        LIFETIME ULTIMATE
                       </div>
-
-                      {/* Watermark */}
-                      <Sparkles
-                        size={140}
-                        strokeWidth={0.3}
-                        className="absolute -bottom-8 -right-8 text-base-content/[0.02] pointer-events-none"
-                      />
-
-                      {/* ── Content ── */}
-                      <div className="relative z-10">
-                        {/* Header */}
-                        <div className="text-center mb-8">
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{
-                              delay: 0.3,
-                              type: 'spring',
-                              bounce: 0.35,
-                              duration: 0.6,
-                            }}
-                            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5"
-                            style={{
-                              background: '#f59e0b15',
-                              boxShadow:
-                                '0 0 40px #f59e0b20, 0 0 0 1px #f59e0b25',
-                            }}
-                          >
-                            <Sparkles size={28} className="text-warning" />
-                          </motion.div>
-
-                          <h3 className="text-2xl font-black text-base-content mb-1">
-                            The First Byte
-                          </h3>
-                          <p className="text-xs text-warning/50 font-medium">
-                            Lifetime Uplink &middot; Founding Member
-                          </p>
-                        </div>
-
-                        {/* Price */}
-                        <div className="text-center mb-6">
-                          <div className="flex items-baseline justify-center gap-2 mb-1">
-                            <span className="text-5xl font-black text-base-content tracking-tight">
-                              $999
-                            </span>
-                            <span className="text-sm text-base-content/25">
-                              one-time
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-warning/40">
-                            Permanent Ultimate access &middot; No renewals
-                          </p>
-                        </div>
-
-                        {/* Slot progress */}
-                        <div className="mb-8 p-4 rounded-xl bg-base-100/60 border border-base-300/30">
-                          <div className="flex items-center justify-between mb-2.5">
-                            <span className="text-[9px] text-base-content/25 uppercase tracking-wide">
-                              Founding Member Slots
-                            </span>
-                            <span className="text-[10px] font-mono text-warning/60 font-bold">
-                              128 total &middot; 0x00 — 0x7F
-                            </span>
-                          </div>
-                          <div className="h-1.5 rounded-full bg-base-300/50 overflow-hidden">
-                            <motion.div
-                              className="h-full rounded-full bg-gradient-to-r from-warning/70 via-warning to-primary/60 origin-left"
-                              initial={{ scaleX: 0 }}
-                              animate={{ scaleX: 1 }}
-                              transition={{
-                                duration: 2,
-                                delay: 0.5,
-                                ease: EASE,
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Features — 2 columns */}
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-3 mb-8">
-                          {[
-                            'Permanent Ultimate access',
-                            'One payment — no renewals',
-                            'Unlimited widgets at once',
-                            'Founding member badge',
-                            'Webhooks, export & API access',
-                            'Priority support',
-                            'Unlimited items per widget',
-                            'Early access to features',
-                          ].map((feature) => (
-                            <div
-                              key={feature}
-                              className="flex items-center gap-2"
-                            >
-                              <Check
-                                size={12}
-                                className="text-warning shrink-0"
-                              />
-                              <span className="text-[11px] text-base-content/55">
-                                {feature}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Unlimited callout */}
-                        <div
-                          className="relative mb-8 p-3.5 rounded-xl border border-primary/15 overflow-hidden"
-                          style={{ background: 'rgba(52, 211, 153, 0.04)' }}
-                        >
-                          <div className="relative z-10">
-                            <p className="text-[10px] text-primary/70 font-semibold mb-1">
-                              Everything Ultimate has. Forever.
-                            </p>
-                            <p className="text-[10px] text-base-content/35 leading-relaxed">
-                              Every Ultimate feature — unlimited widgets at
-                              once, webhooks, API access, and data export —
-                              permanently included with one payment.
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* CTA */}
-                        <Link
-                          to="/uplink/lifetime"
-                          className="block w-full py-3.5 text-center text-xs font-bold bg-warning/10 border border-warning/30 text-warning rounded-xl hover:bg-warning/20 hover:border-warning/50 transition-colors"
-                        >
-                          Claim Your Slot
-                        </Link>
+                      <h2
+                        className="m-0 mb-3.5 font-display font-extrabold uppercase"
+                        style={{
+                          fontSize: 'clamp(28px, 3.4vw, 44px)',
+                          fontStretch: '115%',
+                          lineHeight: 1.05,
+                        }}
+                      >
+                        One payment.
+                        <br />
+                        <span className="text-[#fbbf24]">
+                          Every widget, forever.
+                        </span>
+                      </h2>
+                      <p className="m-0 max-w-[440px] text-[15.5px] leading-[1.65] text-base-content/60 [text-wrap:pretty]">
+                        Permanent Uplink Ultimate: unlimited slots, priority
+                        support, and early access, plus a founding-member badge.
+                        Pays for itself against Ultimate Annual in 2.5 years.
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-start gap-[18px]">
+                      <div className="flex items-baseline gap-2.5">
+                        <span className="font-mono text-[56px] font-semibold tracking-[-0.02em]">
+                          ${LIFETIME_PRICE}
+                        </span>
+                        <span className="font-mono text-[13px] text-base-content/45">
+                          ONCE
+                        </span>
+                      </div>
+                      <Link
+                        to="/uplink/lifetime"
+                        className="inline-block rounded-[4px] bg-[#fbbf24] px-[30px] py-3.5 text-[15px] font-bold text-[#101018] transition-colors hover:bg-[#fde68a]"
+                      >
+                        Purchase lifetime access
+                      </Link>
+                      <div className="font-mono text-[10.5px] text-base-content/45">
+                        NO SUBSCRIPTION · NO RENEWAL · STRIPE
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 </div>
               </motion.div>
             ) : (
-              /* ═══════════════════════════════════════════════════════════════
-               TIER CARDS — Uplink / Pro / Unlimited
-               ═══════════════════════════════════════════════════════════════ */
               <motion.div
                 key="tier-cards"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.97, y: 6 }}
                 transition={{ duration: 0.35, ease: EASE }}
+                className="grid grid-cols-1 items-stretch gap-3.5 py-11 sm:grid-cols-2 xl:grid-cols-4"
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
-                  {/* ─── FREE ─── */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.03, duration: 0.5, ease: EASE }}
-                    ref={freeTilt.ref}
-                    style={freeTilt.style}
-                    {...freeTilt.handlers}
-                    className="group relative bg-base-200/20 border border-base-300/20 rounded-xl p-6 overflow-hidden flex flex-col"
-                  >
-                    <div className="relative z-10 flex flex-col flex-1">
-                      <div className="flex items-start gap-2.5 mb-5">
+                {planDefs.map((p, i) => {
+                  const isFree = p.tier === null
+                  const pricing = p.tier ? PRICING[p.tier][billingPeriod] : null
+                  const disabled = p.tier ? isTierDisabled(p.tier) : false
+                  const showFoot = isFree || (!activeTier && !hadPriorSub)
+                  return (
+                    <motion.div
+                      key={p.key}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      whileHover={{
+                        y: -3,
+                        transition: {
+                          type: 'spring',
+                          stiffness: 400,
+                          damping: 28,
+                        },
+                      }}
+                      transition={{
+                        delay: 0.03 + i * 0.03,
+                        duration: 0.5,
+                        ease: EASE,
+                      }}
+                      className={`relative flex flex-col rounded-[8px] border p-7 px-[26px] transition-colors duration-150 ${
+                        p.popular
+                          ? 'border-primary/45 bg-primary/5 hover:border-primary/70'
+                          : 'border-hairline bg-panel hover:border-primary/35'
+                      }`}
+                    >
+                      {p.popular && (
                         <div
-                          className="h-9 w-9 rounded-lg flex items-center justify-center bg-base-300/30 shrink-0"
-                          style={{
-                            boxShadow: '0 0 0 1px rgba(255,255,255,0.04)',
-                          }}
+                          className="absolute -right-px -top-px bg-primary px-3 py-[5px] font-mono text-[10px] font-semibold tracking-[0.12em] text-[#101018]"
+                          style={{ borderRadius: '0 8px 0 6px' }}
                         >
-                          <Satellite
-                            size={16}
-                            className="text-base-content/40"
-                          />
+                          MOST POPULAR
                         </div>
-                        <div>
-                          <h3 className="text-sm font-bold text-base-content/50">
-                            Free
-                          </h3>
-                          <p className="text-[11px] text-base-content/30 leading-snug mt-0.5">
-                            Start here &mdash; it&apos;s free forever
-                          </p>
-                        </div>
+                      )}
+                      {/* Name + tagline */}
+                      <div className="font-display text-xl font-extrabold uppercase tracking-[0.02em]">
+                        {p.name}
+                      </div>
+                      <div className="mb-6 mt-1.5 min-h-[20px] text-[13.5px] text-base-content/60">
+                        {p.tagline}
                       </div>
 
                       {/* Price */}
-                      <div className="mb-4">
-                        <div className="flex items-baseline gap-1 mb-1">
-                          <span className="text-3xl font-black text-base-content/40 tracking-tight font-mono tabular-nums">
-                            $0
-                          </span>
-                          <span className="text-xs font-mono text-base-content/20">
-                            /mo
-                          </span>
-                        </div>
-                        <div className="h-5 flex items-center">
-                          <span className="text-[10px] font-mono text-base-content/20">
-                            Free forever
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* v1.1.3: the card IS the widget cap — everything
-                          else lives in the compare table below. */}
-                      <div className="mb-6 flex flex-col items-start gap-1.5 py-5">
-                        <span className="font-mono text-6xl font-black leading-none text-base-content/80">
-                          {tierLimits.tiers.free.max_widgets}
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-mono text-[40px] font-semibold tracking-[-0.02em]">
+                          {isFree ? (
+                            '$0'
+                          ) : (
+                            <>
+                              $<AnimatedPrice value={pricing!.perMonth} />
+                            </>
+                          )}
                         </span>
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
-                          widgets at once
+                        <span className="font-mono text-[13px] text-base-content/45">
+                          /MO
                         </span>
                       </div>
-
-                      <div className="mt-auto pt-2 flex flex-col items-center gap-1.5">
-                        {isTrialing ? (
-                          <>
-                            <button
-                              onClick={() => setShowTrialCancelModal(true)}
-                              disabled={trialCanceling}
-                              className="block w-full py-2.5 text-center text-[10px] font-semibold border border-error/30 text-error/60 rounded-lg hover:border-error/50 hover:text-error/80 transition-colors cursor-pointer disabled:opacity-50"
-                            >
-                              {trialCanceling ? 'Canceling...' : 'Cancel Trial'}
-                            </button>
-                            <span className="text-[9px] text-base-content/20">
-                              You won&apos;t be charged
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <Link
-                              to="/"
-                              className="block w-full py-2.5 text-center text-[10px] font-semibold border border-base-300/30 text-base-content/35 rounded-lg hover:border-base-300/50 hover:text-base-content/50 transition-colors"
-                            >
-                              Get Started Free
-                            </Link>
-                            <span className="text-[9px] text-base-content/20">
-                              No card required
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  {/* ─── UPLINK ─── */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.06, duration: 0.5, ease: EASE }}
-                    ref={uplinkTilt.ref}
-                    style={uplinkTilt.style}
-                    {...uplinkTilt.handlers}
-                    role="button"
-                    tabIndex={isTierDisabled('uplink') ? -1 : 0}
-                    // No aria-label: the card's visible content (tier
-                    // name, description, price, features, CTA) is the
-                    // accessible name. Lighthouse's label-content-name-
-                    // mismatch audit requires the accessible name to
-                    // include all contained visible text — a short
-                    // label can't satisfy that for a complex card.
-                    onClick={() =>
-                      !isTierDisabled('uplink') &&
-                      handleSelectPlan(billingPeriod, 'uplink')
-                    }
-                    onKeyDown={(e) => {
-                      if (
-                        !isTierDisabled('uplink') &&
-                        (e.key === 'Enter' || e.key === ' ')
-                      ) {
-                        e.preventDefault()
-                        handleSelectPlan(billingPeriod, 'uplink')
-                      }
-                    }}
-                    className={`group relative bg-base-200/40 border border-info/15 rounded-xl p-6 transition-colors overflow-hidden flex flex-col ${isTierDisabled('uplink') ? 'opacity-60 cursor-default' : 'hover:border-info/30 cursor-pointer'}`}
-                  >
-                    <div
-                      className="absolute top-0 left-0 right-0 h-px"
-                      style={{
-                        background:
-                          'linear-gradient(90deg, transparent, #00b8db 50%, transparent)',
-                      }}
-                    />
-                    <div className="absolute -top-12 -right-12 w-36 h-36 rounded-full pointer-events-none blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-info/[0.06]" />
-                    <Rocket
-                      size={90}
-                      strokeWidth={0.4}
-                      className="absolute -bottom-4 -right-4 text-base-content/[0.02] pointer-events-none"
-                    />
-                    <div className="relative z-10 flex flex-col flex-1">
-                      <div className="flex items-start gap-2.5 mb-5">
-                        <div
-                          className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0"
-                          style={{
-                            background: '#00b8db15',
-                            boxShadow:
-                              '0 0 20px #00b8db15, 0 0 0 1px #00b8db20',
-                          }}
-                        >
-                          <Rocket size={16} className="text-base-content/80" />
+                      {isFree ? (
+                        <div className="mb-[26px] mt-2 flex min-h-[22px] items-center font-mono text-[11px] tracking-[0.06em] text-base-content/45">
+                          FREE FOREVER
                         </div>
-                        <div>
-                          <h3 className="text-sm font-bold text-base-content">
-                            Uplink
-                          </h3>
-                          <p className="text-[11px] text-base-content/40 leading-snug mt-0.5">
-                            Check in every morning. Miss nothing.
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Price — monthly-first for annual, per-digit slot animation */}
-                      <div className="mb-4">
-                        <div className="flex items-center mb-1">
-                          <span className="text-2xl font-black text-base-content tracking-tight font-mono tabular-nums">
-                            $
-                          </span>
-                          <span className="text-3xl font-black text-base-content tracking-tight font-mono tabular-nums leading-none">
-                            <AnimatedPrice
-                              value={PRICING.uplink[billingPeriod].perMonth}
-                            />
-                          </span>
-                          <span className="text-xs font-mono text-base-content/25 ml-1 self-end mb-0.5">
-                            /mo
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 h-5">
-                          <span className="inline-grid text-[10px] font-mono text-base-content/25 tabular-nums">
-                            <span
-                              className="col-start-1 row-start-1 transition-opacity duration-200"
-                              style={{
-                                opacity: billingPeriod === 'annual' ? 1 : 0,
-                              }}
-                            >
-                              Billed ${PRICING.uplink.annual.price}/yr
-                            </span>
-                            <span
-                              className="col-start-1 row-start-1 transition-opacity duration-200"
-                              style={{
-                                opacity: billingPeriod === 'monthly' ? 1 : 0,
-                              }}
-                            >
-                              Billed monthly
-                            </span>
-                          </span>
-                          <span
-                            className="text-[8px] font-bold text-info/60 bg-info/8 px-1.5 py-0.5 rounded transition-opacity duration-200"
-                            style={{
-                              opacity: PRICING.uplink[billingPeriod].savings
-                                ? 1
-                                : 0,
-                            }}
-                          >
-                            {PRICING.uplink[billingPeriod].savings ??
-                              PRICING.uplink.annual.savings}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mb-6 flex flex-col items-start gap-1.5 py-5">
-                        <span
-                          className="font-mono text-6xl font-black leading-none"
-                          style={{
-                            color: '#00b8db',
-                            textShadow: '0 0 28px #00b8db40',
-                          }}
-                        >
-                          {tierLimits.tiers.uplink.max_widgets}
-                        </span>
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
-                          widgets at once
-                        </span>
-                      </div>
-
-                      <div className="mt-auto pt-2 flex flex-col items-center gap-1.5">
-                        <div
-                          className={`w-full py-2.5 text-center text-[10px] font-semibold border rounded-lg transition-colors ${
-                            isTierDisabled('uplink')
-                              ? 'border-base-content/10 text-base-content/30 cursor-default'
-                              : 'border-info/20 text-info/60 group-hover:border-info/40 group-hover:text-info/80'
-                          }`}
-                        >
-                          {planChanging && !isTierDisabled('uplink')
-                            ? 'Changing...'
-                            : getCtaLabel('uplink')}
-                        </div>
-                        {!activeTier && !hadPriorSub && (
-                          <span className="text-[9px] text-base-content/20">
-                            7 days free, then $
-                            {PRICING.uplink[billingPeriod].perMonth}/mo
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  {/* ─── PRO ─── */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.09, duration: 0.5, ease: EASE }}
-                    ref={proTilt.ref}
-                    style={proTilt.style}
-                    {...proTilt.handlers}
-                    role="button"
-                    tabIndex={isTierDisabled('pro') ? -1 : 0}
-                    // See Uplink card above for why aria-label is omitted.
-                    onClick={() =>
-                      !isTierDisabled('pro') &&
-                      handleSelectPlan(billingPeriod, 'pro')
-                    }
-                    onKeyDown={(e) => {
-                      if (
-                        !isTierDisabled('pro') &&
-                        (e.key === 'Enter' || e.key === ' ')
-                      ) {
-                        e.preventDefault()
-                        handleSelectPlan(billingPeriod, 'pro')
-                      }
-                    }}
-                    className={`group relative bg-base-200/40 border border-[#a78bfa]/15 rounded-xl p-6 transition-colors overflow-hidden flex flex-col ${isTierDisabled('pro') ? 'opacity-60 cursor-default' : 'hover:border-[#a78bfa]/30 cursor-pointer'}`}
-                  >
-                    <div
-                      className="absolute top-0 left-0 right-0 h-px"
-                      style={{
-                        background:
-                          'linear-gradient(90deg, transparent, #a78bfa 50%, transparent)',
-                      }}
-                    />
-                    <div className="absolute -top-12 -right-12 w-36 h-36 rounded-full pointer-events-none blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-[#a78bfa]/[0.06]" />
-                    <Gauge
-                      size={90}
-                      strokeWidth={0.4}
-                      className="absolute -bottom-4 -right-4 text-base-content/[0.02] pointer-events-none"
-                    />
-                    <div className="relative z-10 flex flex-col flex-1">
-                      <div className="flex items-start gap-2.5 mb-5">
-                        <div
-                          className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0"
-                          style={{
-                            background: '#a78bfa15',
-                            boxShadow:
-                              '0 0 20px #a78bfa15, 0 0 0 1px #a78bfa20',
-                          }}
-                        >
-                          <Gauge size={16} className="text-base-content/80" />
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-bold text-base-content">
-                            Pro
-                          </h3>
-                          <p className="text-[11px] text-base-content/40 leading-snug mt-0.5">
-                            Know the moment it happens
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Price — monthly-first for annual, per-digit slot animation */}
-                      <div className="mb-4">
-                        <div className="flex items-center mb-1">
-                          <span className="text-2xl font-black text-base-content tracking-tight font-mono tabular-nums">
-                            $
-                          </span>
-                          <span className="text-3xl font-black text-base-content tracking-tight font-mono tabular-nums leading-none">
-                            <AnimatedPrice
-                              value={PRICING.pro[billingPeriod].perMonth}
-                            />
-                          </span>
-                          <span className="text-xs font-mono text-base-content/25 ml-1 self-end mb-0.5">
-                            /mo
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 h-5">
-                          <span className="inline-grid text-[10px] font-mono text-base-content/25 tabular-nums">
-                            <span
-                              className="col-start-1 row-start-1 transition-opacity duration-200"
-                              style={{
-                                opacity: billingPeriod === 'annual' ? 1 : 0,
-                              }}
-                            >
-                              Billed ${PRICING.pro.annual.price}/yr
-                            </span>
-                            <span
-                              className="col-start-1 row-start-1 transition-opacity duration-200"
-                              style={{
-                                opacity: billingPeriod === 'monthly' ? 1 : 0,
-                              }}
-                            >
-                              Billed monthly
-                            </span>
-                          </span>
-                          <span
-                            className="text-[8px] font-bold text-[#a78bfa]/60 bg-[#a78bfa]/8 px-1.5 py-0.5 rounded transition-opacity duration-200"
-                            style={{
-                              opacity: PRICING.pro[billingPeriod].savings
-                                ? 1
-                                : 0,
-                            }}
-                          >
-                            {PRICING.pro[billingPeriod].savings ??
-                              PRICING.pro.annual.savings}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mb-6 flex flex-col items-start gap-1.5 py-5">
-                        <span
-                          className="font-mono text-6xl font-black leading-none"
-                          style={{
-                            color: '#a78bfa',
-                            textShadow: '0 0 28px #a78bfa40',
-                          }}
-                        >
-                          {tierLimits.tiers.uplink_pro.max_widgets}
-                        </span>
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
-                          widgets at once
-                        </span>
-                      </div>
-
-                      <div className="mt-auto pt-2 flex flex-col items-center gap-1.5">
-                        <div
-                          className={`w-full py-2.5 text-center text-[10px] font-semibold border rounded-lg transition-colors ${
-                            isTierDisabled('pro')
-                              ? 'border-base-content/10 text-base-content/30 cursor-default'
-                              : 'border-[#a78bfa]/20 text-[#a78bfa]/60 group-hover:border-[#a78bfa]/40 group-hover:text-[#a78bfa]/80'
-                          }`}
-                        >
-                          {planChanging && !isTierDisabled('pro')
-                            ? 'Changing...'
-                            : getCtaLabel('pro')}
-                        </div>
-                        {!activeTier && !hadPriorSub && (
-                          <span className="text-[9px] text-base-content/20">
-                            7 days free, then $
-                            {PRICING.pro[billingPeriod].perMonth}/mo
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  {/* ─── UNLIMITED ─── */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.12, duration: 0.5, ease: EASE }}
-                    ref={ultimateTilt.ref}
-                    style={ultimateTilt.style}
-                    {...ultimateTilt.handlers}
-                    role="button"
-                    tabIndex={isTierDisabled('ultimate') ? -1 : 0}
-                    // See Uplink card above for why aria-label is omitted.
-                    onClick={() =>
-                      !isTierDisabled('ultimate') &&
-                      handleSelectPlan(billingPeriod, 'ultimate')
-                    }
-                    onKeyDown={(e) => {
-                      if (
-                        !isTierDisabled('ultimate') &&
-                        (e.key === 'Enter' || e.key === ' ')
-                      ) {
-                        e.preventDefault()
-                        handleSelectPlan(billingPeriod, 'ultimate')
-                      }
-                    }}
-                    className={`group relative rounded-xl overflow-hidden flex flex-col ${isTierDisabled('ultimate') ? 'opacity-60 cursor-default' : 'cursor-pointer'}`}
-                  >
-                    {/* Pulsing border glow */}
-                    <motion.div
-                      className="absolute -inset-px rounded-xl bg-gradient-to-b from-primary/30 via-primary/10 to-primary/5"
-                      animate={{ opacity: [0.6, 1, 0.6] }}
-                      transition={{
-                        duration: 4,
-                        repeat: Infinity,
-                        ease: 'easeInOut',
-                      }}
-                    />
-                    <div className="relative p-6 border border-primary/20 rounded-xl flex flex-col flex-1">
-                      {/* Background layer — below smoke. No backdrop-blur: it causes a
-                     compositing snap when the parent's whileInView opacity animation
-                     completes and the WAAPI layer is torn down. */}
-                      <div className="absolute inset-0 bg-base-200/60 rounded-xl pointer-events-none" />
-                      <div
-                        className="absolute top-0 left-0 right-0 h-px"
-                        style={{
-                          background:
-                            'linear-gradient(90deg, transparent, #34d399 50%, transparent)',
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.04] to-transparent pointer-events-none rounded-xl" />
-                      <Crown
-                        size={90}
-                        strokeWidth={0.4}
-                        className="absolute -bottom-4 -right-4 text-base-content/[0.02] pointer-events-none"
-                      />
-
-                      {/* "Popular" badge */}
-                      <div
-                        className="absolute top-0 right-0"
-                        style={{ zIndex: 20 }}
-                      >
-                        <div className="bg-primary text-primary-content text-[7px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-bl-lg">
-                          Most Popular
-                        </div>
-                      </div>
-
-                      {/* ── Ethereal smoke — above background, below content ── */}
-                      <div
-                        className="absolute inset-0 pointer-events-none rounded-xl overflow-hidden"
-                        style={{ zIndex: 1 }}
-                      >
-                        {/* Base haze — fills card */}
-                        <motion.div
-                          className="absolute inset-0"
-                          style={{
-                            background:
-                              'radial-gradient(ellipse 90% 60% at 50% 40%, #34d39928 0%, transparent 70%)',
-                          }}
-                          animate={{ opacity: [0.5, 1, 0.5] }}
-                          transition={{
-                            duration: 5,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                          }}
-                        />
-
-                        {/* Rising plume */}
-                        <motion.div
-                          className="absolute bottom-[-10%] left-[15%] w-[75%] h-[55%] rounded-full blur-2xl"
-                          style={{
-                            background:
-                              'radial-gradient(ellipse 70% 60% at center bottom, #34d39938 0%, transparent 70%)',
-                          }}
-                          animate={{
-                            y: [0, -30, 0],
-                            scaleX: [1, 1.25, 1],
-                            opacity: [0.4, 0.8, 0.4],
-                          }}
-                          transition={{
-                            duration: 7,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                          }}
-                        />
-
-                        {/* Descending plume */}
-                        <motion.div
-                          className="absolute top-[-8%] right-[10%] w-[65%] h-[50%] rounded-full blur-2xl"
-                          style={{
-                            background:
-                              'radial-gradient(ellipse 65% 55% at center top, #34d39930 0%, transparent 65%)',
-                          }}
-                          animate={{
-                            y: [0, 25, 0],
-                            scaleX: [1, 1.15, 1],
-                            opacity: [0.35, 0.7, 0.35],
-                          }}
-                          transition={{
-                            duration: 8,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                            delay: 1.5,
-                          }}
-                        />
-
-                        {/* Mid-card turbulence */}
-                        <motion.div
-                          className="absolute top-[25%] left-[5%] w-[90%] h-[50%] rounded-full blur-3xl"
-                          style={{
-                            background:
-                              'radial-gradient(ellipse 75% 50%, #34d39922 0%, transparent 60%)',
-                          }}
-                          animate={{
-                            scaleX: [1, 1.2, 0.9, 1],
-                            scaleY: [1, 0.9, 1.1, 1],
-                            opacity: [0.4, 0.7, 0.5, 0.4],
-                          }}
-                          transition={{
-                            duration: 10,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                          }}
-                        />
-
-                        {/* Accent particle */}
-                        <motion.div
-                          className="absolute top-[30%] right-[15%] w-[50px] h-[50px] rounded-full blur-lg"
-                          style={{
-                            background:
-                              'radial-gradient(circle, #34d39950 0%, transparent 70%)',
-                          }}
-                          animate={{
-                            y: [0, -15, 10, 0],
-                            x: [0, -8, 5, 0],
-                            opacity: [0, 0.7, 0.35, 0],
-                          }}
-                          transition={{
-                            duration: 5,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                          }}
-                        />
-
-                        {/* Second accent particle */}
-                        <motion.div
-                          className="absolute top-[65%] left-[20%] w-[40px] h-[40px] rounded-full blur-lg"
-                          style={{
-                            background:
-                              'radial-gradient(circle, #34d39945 0%, transparent 70%)',
-                          }}
-                          animate={{
-                            y: [0, -10, 0],
-                            opacity: [0, 0.6, 0],
-                          }}
-                          transition={{
-                            duration: 4,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                            delay: 2.5,
-                          }}
-                        />
-                      </div>
-
-                      <div className="relative z-10 flex flex-col flex-1">
-                        <div className="flex items-start gap-2.5 mb-5">
-                          <div
-                            className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0"
-                            style={{
-                              background: '#34d39915',
-                              boxShadow:
-                                '0 0 20px #34d39915, 0 0 0 1px #34d39920',
-                            }}
-                          >
-                            <Crown size={16} className="text-base-content/80" />
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-bold text-base-content">
-                              Ultimate
-                            </h3>
-                            <p className="text-[11px] text-base-content/40 leading-snug mt-0.5">
-                              Everything. Zero limits.
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Price — monthly-first for annual, per-digit slot animation */}
-                        <div className="mb-4">
-                          <div className="flex items-center mb-1">
-                            <span className="text-2xl font-black text-base-content tracking-tight font-mono tabular-nums">
-                              $
-                            </span>
-                            <span className="text-3xl font-black text-base-content tracking-tight font-mono tabular-nums leading-none">
-                              <AnimatedPrice
-                                value={PRICING.ultimate[billingPeriod].perMonth}
-                              />
-                            </span>
-                            <span className="text-xs font-mono text-base-content/25 ml-1 self-end mb-0.5">
-                              /mo
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 h-5">
-                            <span className="inline-grid text-[10px] font-mono text-primary/40 tabular-nums">
-                              <span
-                                className="col-start-1 row-start-1 transition-opacity duration-200"
-                                style={{
-                                  opacity: billingPeriod === 'annual' ? 1 : 0,
-                                }}
-                              >
-                                Billed ${PRICING.ultimate.annual.price}/yr
-                              </span>
-                              <span
-                                className="col-start-1 row-start-1 transition-opacity duration-200"
-                                style={{
-                                  opacity: billingPeriod === 'monthly' ? 1 : 0,
-                                }}
-                              >
-                                Billed monthly
-                              </span>
-                            </span>
-                            <span
-                              className="text-[8px] font-bold text-primary/70 bg-primary/10 px-1.5 py-0.5 rounded transition-opacity duration-200"
-                              style={{
-                                opacity: PRICING.ultimate[billingPeriod].savings
-                                  ? 1
-                                  : 0,
-                              }}
-                            >
-                              {PRICING.ultimate[billingPeriod].savings ??
-                                PRICING.ultimate.annual.savings}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="mb-6 flex flex-col items-start gap-1.5 py-5">
-                          <span
-                            className="font-mono text-6xl font-black leading-none"
-                            style={{
-                              color: '#34d399',
-                              textShadow: '0 0 28px #34d39940',
-                            }}
-                          >
-                            ∞
-                          </span>
-                          <span className="text-[10px] font-mono uppercase tracking-widest text-base-content/40">
-                            widgets at once
-                          </span>
-                        </div>
-
-                        <div className="mt-auto pt-2 flex flex-col items-center gap-1.5">
-                          <div
-                            className={`w-full py-2.5 text-center text-[10px] font-semibold border rounded-lg transition-colors ${
-                              isTierDisabled('ultimate')
-                                ? 'border-base-content/10 text-base-content/30 cursor-default'
-                                : 'bg-primary/10 border-primary/30 text-primary group-hover:bg-primary/20 group-hover:border-primary/50'
-                            }`}
-                          >
-                            {planChanging && !isTierDisabled('ultimate')
-                              ? 'Changing...'
-                              : getCtaLabel('ultimate')}
-                          </div>
-                          {!activeTier && !hadPriorSub && (
-                            <span className="text-[9px] text-base-content/20">
-                              7 days free, then $
-                              {PRICING.ultimate[billingPeriod].perMonth}/mo
-                            </span>
+                      ) : (
+                        // Both billing variants stay mounted, stacked in
+                        // one grid cell: the container always sizes to
+                        // the taller variant, so toggling never shifts
+                        // the card height (at 4-col widths the annual
+                        // line wraps its badge to a second row); the
+                        // active variant crossfades in. whitespace-nowrap
+                        // keeps "/YR" glued to its price — the badge
+                        // wraps as a unit, never mid-text.
+                        <div className="mb-[26px] mt-2 grid min-h-[22px]">
+                          {(['monthly', 'annual'] as Array<PlanKey>).map(
+                            (view) => {
+                              const activeView = billingPeriod === view
+                              return (
+                                <motion.div
+                                  key={view}
+                                  initial={false}
+                                  animate={{
+                                    opacity: activeView ? 1 : 0,
+                                    y: activeView ? 0 : 4,
+                                  }}
+                                  transition={{ duration: 0.2, ease: EASE }}
+                                  aria-hidden={!activeView}
+                                  className={`col-start-1 row-start-1 flex flex-wrap items-center gap-x-2 gap-y-1.5 self-center font-mono text-[11px] tracking-[0.06em] text-base-content/45 ${
+                                    activeView ? '' : 'pointer-events-none'
+                                  }`}
+                                >
+                                  {view === 'annual' ? (
+                                    <>
+                                      <span className="whitespace-nowrap">
+                                        {`BILLED $${PRICING[p.tier].annual.price.toFixed(2)}/YR`}
+                                      </span>
+                                      {/* Compact enough that even BILLED
+                                          $399.99/YR + badge fit one line
+                                          in a 4-col card */}
+                                      <span className="whitespace-nowrap rounded-[3px] border border-primary/35 px-[5px] py-[2px] text-[10px] tracking-[0.02em] text-primary">
+                                        4 MONTHS FREE
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span>BILLED MONTHLY</span>
+                                  )}
+                                </motion.div>
+                              )
+                            },
                           )}
                         </div>
+                      )}
+
+                      {/* Capacity viz — slot squares from live tier-limits */}
+                      <div className="mb-1.5 flex min-h-[34px] items-center">
+                        {p.slots === null ? (
+                          <motion.span
+                            initial={{ opacity: 0, scale: 0.4 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{
+                              delay: 0.25 + i * 0.03,
+                              type: 'spring',
+                              stiffness: 380,
+                              damping: 18,
+                            }}
+                            className="unlimited-text-glow font-mono text-[38px] font-semibold leading-none text-primary"
+                          >
+                            ∞
+                          </motion.span>
+                        ) : (
+                          <span className="flex flex-wrap gap-1">
+                            {/* Slot squares fill in one by one — the
+                                card's capacity literally builds up */}
+                            {Array.from({ length: p.slots }, (_, s) => (
+                              <motion.span
+                                key={s}
+                                initial={{ opacity: 0, scale: 0 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{
+                                  delay: 0.2 + i * 0.03 + s * 0.03,
+                                  type: 'spring',
+                                  stiffness: 500,
+                                  damping: 28,
+                                }}
+                                className="h-[13px] w-[13px] rounded-[2px] bg-primary/75"
+                              />
+                            ))}
+                          </span>
+                        )}
                       </div>
-                    </div>
-                  </motion.div>
-                </div>
+                      <div className="mb-[26px] font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/45">
+                        {p.slots === null
+                          ? 'UNLIMITED WIDGETS AT ONCE'
+                          : `${p.slots} WIDGETS AT ONCE`}
+                      </div>
+
+                      {/* CTA */}
+                      {isFree ? (
+                        isTrialing ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowTrialCancelModal(true)}
+                            disabled={trialCanceling}
+                            className="mt-auto block cursor-pointer rounded-[4px] border border-error/30 py-[13px] text-center text-[15px] font-bold text-error/60 transition-colors hover:border-error/50 hover:text-error/80 disabled:opacity-50"
+                          >
+                            {trialCanceling ? 'Canceling...' : 'Cancel trial'}
+                          </button>
+                        ) : (
+                          <Link
+                            to="/download"
+                            className="mt-auto block rounded-[4px] border border-base-content/25 py-[13px] text-center text-[15px] font-bold transition-colors hover:border-primary"
+                          >
+                            Get started free
+                          </Link>
+                        )
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={disabled}
+                          onClick={() =>
+                            handleSelectPlan(billingPeriod, p.tier)
+                          }
+                          className={`mt-auto block rounded-[4px] py-[13px] text-center text-[15px] font-bold transition-colors ${
+                            p.popular
+                              ? 'bg-primary text-[#101018] hover:bg-[#6ee7b7]'
+                              : 'border border-base-content/25 hover:border-primary'
+                          } ${disabled ? 'cursor-default opacity-50' : 'cursor-pointer'}`}
+                        >
+                          {planChanging && !disabled
+                            ? 'Changing...'
+                            : getCtaLabel(p.tier)}
+                        </button>
+                      )}
+
+                      {/* Foot line */}
+                      {showFoot && (
+                        <div className="pt-2.5 text-center font-mono text-[10.5px] text-base-content/45">
+                          {isFree
+                            ? isTrialing
+                              ? "YOU WON'T BE CHARGED"
+                              : 'NO CARD REQUIRED'
+                            : `7 DAYS FREE, THEN $${pricing!.perMonth.toFixed(2)}/MO`}
+                        </div>
+                      )}
+                    </motion.div>
+                  )
+                })}
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Trust signals strip */}
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="mt-8 flex flex-col items-center gap-3"
-          >
-            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-              {[
-                { icon: Clock, text: '7-day free trial' },
-                { icon: CreditCard, text: 'Cancel with one click' },
-                { icon: Lock, text: 'No hidden fees' },
-                { icon: Zap, text: 'Instant activation' },
-              ].map(({ icon: Icon, text }) => (
-                <span
-                  key={text}
-                  className="flex items-center gap-1.5 text-[10px] text-base-content/30"
-                >
-                  <Icon size={11} className="text-primary/40 shrink-0" />
-                  {text}
-                </span>
-              ))}
-            </div>
-            <p className="text-[9px] text-base-content/15">
-              Free tier always included &middot; Payments via Stripe
-            </p>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ================================================================
-          COMPARISON TABLE
-          ================================================================ */}
-      <section className="relative overflow-hidden">
-        <div className="container">
-          {/* Section header */}
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.7, ease: EASE }}
-            className="text-center mb-12 sm:mb-16"
-          >
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
-              Compare <span className="text-gradient-primary">Tiers</span>
-            </h2>
-            <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
-              Free is forever. Three tiers unlock more.
-            </p>
-          </motion.div>
-
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.6, delay: 0.1, ease: EASE }}
-            className="relative rounded-2xl border border-base-300/40 bg-base-100/60 backdrop-blur-md"
-          >
-            {/* ── Unlimited column full-column smoke ──
-                 Grid is 1.4fr+1fr+1fr+1fr+1fr = 5.4fr.
-                 Unlimited column = rightmost 1/5.4 ≈ 18.5% of table.
-                 Smoke fills the full column and bleeds at edges. */}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{ zIndex: 1 }}
-            >
-              {/* Base wash — fills exact column bounds, breathing opacity */}
-              <motion.div
-                className="absolute inset-y-0 right-0 w-[18.5%]"
-                style={{
-                  background:
-                    'linear-gradient(180deg, #34d39906 0%, #34d39914 25%, #34d39918 50%, #34d39914 75%, #34d39906 100%)',
-                }}
-                animate={{ opacity: [0.5, 0.85, 0.5] }}
-                transition={{
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              />
-
-              {/* Volumetric haze — wider than column, heavy blur, creates depth */}
-              <motion.div
-                className="absolute inset-y-[-8%] right-[-2%] w-[26%] blur-3xl"
-                style={{
-                  background:
-                    'radial-gradient(ellipse 80% 45% at 60% 50%, #34d39920 0%, #34d39908 50%, transparent 80%)',
-                }}
-                animate={{
-                  scaleX: [1, 1.08, 1],
-                  scaleY: [1, 1.04, 1],
-                  opacity: [0.5, 0.9, 0.5],
-                }}
-                transition={{
-                  duration: 6,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              />
-
-              {/* Left edge glow — vertical strip along column's left border */}
-              <motion.div
-                className="absolute inset-y-[5%] right-[16%] w-[5%] blur-2xl"
-                style={{
-                  background:
-                    'linear-gradient(180deg, transparent 5%, #34d39918 25%, #34d39922 50%, #34d39918 75%, transparent 95%)',
-                }}
-                animate={{
-                  opacity: [0.3, 0.7, 0.3],
-                  x: [0, -8, 0],
-                }}
-                transition={{
-                  duration: 5,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              />
-
-              {/* Rising plume — bottom to mid, drifts upward within column */}
-              <motion.div
-                className="absolute bottom-[-5%] right-[1%] w-[17%] h-[60%] rounded-full blur-2xl"
-                style={{
-                  background:
-                    'radial-gradient(ellipse 70% 60% at center bottom, #34d39925 0%, #34d39910 40%, transparent 75%)',
-                }}
-                animate={{
-                  y: [0, -60, 0],
-                  scaleX: [1, 1.3, 1],
-                  opacity: [0.35, 0.8, 0.35],
-                }}
-                transition={{
-                  duration: 7,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              />
-
-              {/* Descending plume — top to mid, fills upper column */}
-              <motion.div
-                className="absolute top-[-5%] right-[2%] w-[16%] h-[55%] rounded-full blur-2xl"
-                style={{
-                  background:
-                    'radial-gradient(ellipse 65% 55% at center top, #34d39920 0%, #34d39908 45%, transparent 70%)',
-                }}
-                animate={{
-                  y: [0, 40, 0],
-                  scaleX: [1, 1.2, 1],
-                  opacity: [0.25, 0.6, 0.25],
-                }}
-                transition={{
-                  duration: 8,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                  delay: 1.5,
-                }}
-              />
-
-              {/* Mid-column turbulence — slow shape-shifting blob */}
-              <motion.div
-                className="absolute top-[20%] right-[0%] w-[19%] h-[60%] rounded-full blur-3xl"
-                style={{
-                  background:
-                    'radial-gradient(ellipse 75% 50%, #34d39918 0%, transparent 65%)',
-                }}
-                animate={{
-                  scaleX: [1, 1.25, 0.9, 1],
-                  scaleY: [1, 0.9, 1.15, 1],
-                  x: [0, -10, 6, 0],
-                  opacity: [0.35, 0.65, 0.45, 0.35],
-                }}
-                transition={{
-                  duration: 10,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              />
-
-              {/* Left drift tendril — leaks from column into Pro territory */}
-              <motion.div
-                className="absolute top-[15%] right-[12%] w-[20%] h-[40%] rounded-full blur-3xl"
-                style={{
-                  background:
-                    'radial-gradient(ellipse 70% 45%, #34d39910 0%, transparent 65%)',
-                }}
-                animate={{
-                  x: [0, -60, 0],
-                  y: [0, 20, 0],
-                  opacity: [0.06, 0.3, 0.06],
-                }}
-                transition={{
-                  duration: 11,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              />
-
-              {/* Bright accent particle — upper column */}
-              <motion.div
-                className="absolute top-[25%] right-[5%] w-[50px] h-[50px] rounded-full blur-xl"
-                style={{
-                  background:
-                    'radial-gradient(circle, #34d39938 0%, transparent 70%)',
-                }}
-                animate={{
-                  y: [0, -20, 15, 0],
-                  x: [0, -10, 5, 0],
-                  opacity: [0, 0.7, 0.3, 0],
-                }}
-                transition={{
-                  duration: 5,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              />
-
-              {/* Bright accent particle — lower column */}
-              <motion.div
-                className="absolute top-[65%] right-[10%] w-[40px] h-[40px] rounded-full blur-lg"
-                style={{
-                  background:
-                    'radial-gradient(circle, #34d39930 0%, transparent 70%)',
-                }}
-                animate={{
-                  y: [0, -15, 10, 0],
-                  x: [0, 8, -12, 0],
-                  opacity: [0, 0.5, 0.6, 0],
-                }}
-                transition={{
-                  duration: 7,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                  delay: 2,
-                }}
-              />
-
-              {/* Top spill — smoke bleeds above the table */}
-              <motion.div
-                className="absolute -top-24 right-0 w-[24%] h-[200px] rounded-full blur-3xl"
-                style={{
-                  background:
-                    'radial-gradient(ellipse 70% 60% at 55% 80%, #34d39918 0%, transparent 70%)',
-                }}
-                animate={{
-                  scaleX: [1, 1.2, 1],
-                  opacity: [0.2, 0.5, 0.2],
-                }}
-                transition={{
-                  duration: 8,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              />
-
-              {/* Bottom spill — smoke bleeds below the table */}
-              <motion.div
-                className="absolute -bottom-20 right-0 w-[24%] h-[180px] rounded-full blur-3xl"
-                style={{
-                  background:
-                    'radial-gradient(ellipse 70% 60% at 55% 20%, #34d39915 0%, transparent 70%)',
-                }}
-                animate={{
-                  scaleX: [1.1, 1, 1.1],
-                  opacity: [0.15, 0.45, 0.15],
-                }}
-                transition={{
-                  duration: 9,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              />
-            </div>
-
-            {/* Dot grid overlay */}
-            <div
-              className="absolute inset-0 opacity-[0.02] pointer-events-none rounded-2xl overflow-hidden"
-              style={{
-                backgroundImage: `radial-gradient(circle at 1px 1px, var(--grid-dot-primary) 1px, transparent 0)`,
-                backgroundSize: '20px 20px',
-              }}
-            />
-
-            {/* Watermark */}
-            <TrendingUp
-              size={160}
-              strokeWidth={0.3}
-              className="absolute -bottom-8 -right-8 text-base-content/[0.02] pointer-events-none"
-            />
-
-            {/* Table Header */}
-            <div className="relative grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr] border-b border-base-300/40">
-              <div className="p-5 pl-6">
-                <span className="text-[9px] text-base-content/25 uppercase tracking-wider font-medium">
-                  Feature
-                </span>
-              </div>
-              <div className="p-5 text-center border-l border-base-300/20">
-                <span className="text-xs font-bold uppercase tracking-wider text-base-content/35">
-                  Free
-                </span>
-              </div>
-              <div className="p-5 text-center border-l border-info/15 bg-info/[0.03]">
-                <span className="text-xs font-bold uppercase tracking-wider text-info inline-flex items-center gap-1.5">
-                  <Rocket size={12} /> Uplink
-                </span>
-              </div>
-              <div className="p-5 text-center border-l border-[#a78bfa]/15 bg-[#a78bfa]/[0.03]">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#a78bfa] inline-flex items-center gap-1.5">
-                  <Gauge size={12} /> Pro
-                </span>
-              </div>
-              <div className="relative p-5 text-center border-l border-primary/15 bg-primary/[0.04] rounded-tr-2xl">
-                {/* Popular badge — absolute within header cell */}
-                <motion.div
-                  className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full"
-                  initial={{ opacity: 0, y: 4 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.5, duration: 0.4, ease: EASE }}
-                >
-                  <span className="bg-primary text-primary-content text-[7px] font-bold uppercase tracking-wider px-3 py-1 rounded-t-md block">
-                    Popular
-                  </span>
-                </motion.div>
-                <span className="text-xs font-bold uppercase tracking-wider text-primary inline-flex items-center gap-1.5">
-                  <Crown size={12} /> Ultimate
-                </span>
-              </div>
-            </div>
-
-            {/* Table Rows */}
-            {comparisonRows.map((row, i) => (
-              <motion.div
-                key={row.label}
-                style={{ opacity: 0 }}
-                initial={{ opacity: 0, x: -12 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{
-                  delay: i * 0.05,
-                  duration: 0.4,
-                  ease: EASE,
-                }}
-                className={`grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr] ${i < comparisonRows.length - 1 ? 'border-b border-base-300/20' : ''} group hover:bg-base-200/40 transition-colors duration-200`}
-              >
-                <div className="p-4 pl-6 flex items-center gap-2">
-                  <span className="text-xs text-base-content/55 font-medium">
-                    {row.label}
-                  </span>
-                  {row.comingSoon && (
-                    <span className="text-[9px] font-semibold text-warning/60 bg-warning/10 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                      Coming Soon
-                    </span>
-                  )}
-                </div>
-                <div className="p-4 flex items-center justify-center border-l border-base-300/20">
-                  <span className="text-[11px] font-mono text-base-content/25">
-                    {row.free}
-                  </span>
-                </div>
-                <div className="p-4 flex items-center justify-center border-l border-info/10 bg-info/[0.015]">
-                  {row.uplinkUp ? (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold font-mono text-info/80">
-                      <Check size={11} className="text-info shrink-0" />
-                      {row.uplink}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-mono text-base-content/25">
-                      <Minus
-                        size={9}
-                        className="text-base-content/15 shrink-0"
-                      />
-                      {row.uplink}
-                    </span>
-                  )}
-                </div>
-                <div className="p-4 flex items-center justify-center border-l border-[#a78bfa]/10 bg-[#a78bfa]/[0.015]">
-                  {row.proUp ? (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold font-mono text-[#a78bfa]/80">
-                      <Check size={11} className="text-[#a78bfa] shrink-0" />
-                      {row.pro}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-mono text-base-content/25">
-                      <Minus
-                        size={9}
-                        className="text-base-content/15 shrink-0"
-                      />
-                      {row.pro}
-                    </span>
-                  )}
-                </div>
-                <div className="p-4 flex items-center justify-center border-l border-primary/10 bg-primary/[0.025] relative">
-                  {/* Ethereal row glow for unlimited upgrades */}
-                  {row.ultimateUp && (
-                    <motion.div
-                      className="absolute inset-0 pointer-events-none"
-                      style={{
-                        background:
-                          'linear-gradient(90deg, transparent 0%, #34d39906 30%, #34d39910 70%, #34d39908 100%)',
-                      }}
-                      animate={{
-                        opacity: [0.5, 1, 0.5],
-                      }}
-                      transition={{
-                        duration: 3 + i * 0.3,
-                        repeat: Infinity,
-                        ease: 'easeInOut',
-                      }}
-                    />
-                  )}
-                  {row.ultimateUp ? (
-                    <span className="relative inline-flex items-center gap-1.5 text-[11px] font-bold font-mono text-primary">
-                      <motion.span
-                        className="shrink-0"
-                        whileInView={{ scale: [0, 1.2, 1] }}
-                        viewport={{ once: true }}
-                        transition={{
-                          delay: 0.3 + i * 0.05,
-                          duration: 0.4,
-                          ease: EASE,
-                        }}
-                      >
-                        <Check size={11} className="text-primary" />
-                      </motion.span>
-                      {row.ultimate}
-                    </span>
-                  ) : (
-                    <span className="relative inline-flex items-center gap-1.5 text-[11px] font-mono text-base-content/25">
-                      <Minus
-                        size={9}
-                        className="text-base-content/15 shrink-0"
-                      />
-                      {row.ultimate}
-                    </span>
-                  )}
-                </div>
-              </motion.div>
-            ))}
-
-            {/* Table Footer */}
-            <div className="border-t border-base-300/30 bg-base-200/30 px-6 py-4 flex items-center justify-between">
-              <span className="text-[9px] text-base-content/20">
-                Per-account &middot; Free tier always included &middot; Upgrade
-                anytime
-              </span>
+          {/* Assurance strip */}
+          <div className="flex flex-wrap justify-center gap-x-7 gap-y-2 border-t border-hairline-minor pb-[26px] pt-5 font-mono text-[11px] tracking-[0.1em] text-base-content/45">
+            {ASSURANCES.map((a, i) => (
               <motion.span
-                className="text-[9px] text-primary/40 font-mono"
-                animate={{ opacity: [0.3, 0.6, 0.3] }}
-                transition={{
-                  duration: 3,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              >
-                signal:locked
-              </motion.span>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ================================================================
-          WHAT YOU GET — TIER SHOWCASES
-          ================================================================ */}
-      <section className="relative overflow-hidden">
-        {/* Tinted background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-base-200/20 to-transparent pointer-events-none" />
-
-        <div className="container relative z-10">
-          {/* Section header */}
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.7, ease: EASE }}
-            className="text-center mb-12 sm:mb-16"
-          >
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
-              What You <span className="text-gradient-primary">Get</span>
-            </h2>
-            <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
-              Three tiers, one mission: total coverage
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {tierShowcases.map((tier, tierIdx) => (
-              <motion.div
-                key={tier.tier}
-                style={{ opacity: 0 }}
-                initial={{ opacity: 0, y: 24 }}
+                key={a}
+                initial={{ opacity: 0, y: 8 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{
-                  delay: tierIdx * 0.15,
-                  duration: 0.6,
-                  ease: EASE,
-                }}
-                className={`group relative rounded-2xl overflow-hidden ${
-                  tier.tier === 'ultimate'
-                    ? 'border border-primary/20'
-                    : tier.tier === 'pro'
-                      ? 'border border-[#a78bfa]/20'
-                      : 'border border-base-300/30'
-                }`}
+                transition={{ duration: 0.35, ease: EASE, delay: i * 0.05 }}
               >
-                {/* Animated border glow for Unlimited */}
-                {tier.tier === 'ultimate' && (
-                  <motion.div
-                    className="absolute -inset-px rounded-2xl bg-gradient-to-b from-primary/25 via-primary/8 to-primary/3 -z-10"
-                    animate={{ opacity: [0.6, 1, 0.6] }}
-                    transition={{
-                      duration: 4,
-                      repeat: Infinity,
-                      ease: 'easeInOut',
-                    }}
-                  />
-                )}
-
-                <div
-                  className={`relative p-7 md:p-8 h-full flex flex-col ${
-                    tier.tier === 'ultimate' ? '' : 'bg-base-200/40'
-                  }`}
-                >
-                  {/* Background layer — separate for Unlimited so smoke sits above it */}
-                  {tier.tier === 'ultimate' && (
-                    <div className="absolute inset-0 bg-base-200/60 rounded-2xl pointer-events-none" />
-                  )}
-
-                  {/* Top accent line */}
-                  <div
-                    className="absolute top-0 left-0 right-0 h-px"
-                    style={{
-                      background: `linear-gradient(90deg, transparent, ${tier.hex} 50%, transparent)`,
-                    }}
-                  />
-
-                  {/* Corner dot grid */}
-                  <div
-                    className="absolute top-0 right-0 w-32 h-32 opacity-[0.03] text-base-content"
-                    style={{
-                      backgroundImage:
-                        'radial-gradient(circle, currentColor 1px, transparent 1px)',
-                      backgroundSize: '8px 8px',
-                    }}
-                  />
-
-                  {/* Ambient glow */}
-                  <motion.div
-                    className="absolute -top-16 -right-16 w-48 h-48 rounded-full pointer-events-none blur-3xl"
-                    style={{ background: `${tier.hex}08` }}
-                    animate={{
-                      scale: [1, 1.2, 1],
-                      opacity: [0.5, 1, 0.5],
-                    }}
-                    transition={{
-                      duration: 6,
-                      repeat: Infinity,
-                      ease: 'easeInOut',
-                      delay: tierIdx * 2,
-                    }}
-                  />
-
-                  {/* Watermark */}
-                  <tier.Icon
-                    size={120}
-                    strokeWidth={0.3}
-                    className="absolute -bottom-6 -right-6 text-base-content/[0.02] pointer-events-none"
-                  />
-
-                  {/* "Recommended" badge for Unlimited */}
-                  {tier.tier === 'ultimate' && (
-                    <div
-                      className="absolute top-0 right-0"
-                      style={{ zIndex: 20 }}
-                    >
-                      <div className="bg-primary text-primary-content text-[7px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-bl-lg">
-                        Recommended
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ── Ethereal smoke (Unlimited only) — above background, below content ── */}
-                  {tier.tier === 'ultimate' && (
-                    <div
-                      className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl"
-                      style={{ zIndex: 1 }}
-                    >
-                      {/* Base wash */}
-                      <motion.div
-                        className="absolute inset-0"
-                        style={{
-                          background:
-                            'linear-gradient(135deg, #34d39915 0%, #34d39928 40%, #34d39915 60%, #34d39925 100%)',
-                        }}
-                        animate={{ opacity: [0.5, 0.9, 0.5] }}
-                        transition={{
-                          duration: 4.5,
-                          repeat: Infinity,
-                          ease: 'easeInOut',
-                        }}
-                      />
-
-                      {/* Left bloom */}
-                      <motion.div
-                        className="absolute top-[10%] left-[-5%] w-[55%] h-[60%] rounded-full blur-3xl"
-                        style={{
-                          background:
-                            'radial-gradient(ellipse 75% 60%, #34d39930 0%, transparent 70%)',
-                        }}
-                        animate={{
-                          x: [0, 15, 0],
-                          scaleY: [1, 1.15, 1],
-                          opacity: [0.4, 0.75, 0.4],
-                        }}
-                        transition={{
-                          duration: 7,
-                          repeat: Infinity,
-                          ease: 'easeInOut',
-                        }}
-                      />
-
-                      {/* Right bloom */}
-                      <motion.div
-                        className="absolute bottom-[5%] right-[-3%] w-[50%] h-[55%] rounded-full blur-3xl"
-                        style={{
-                          background:
-                            'radial-gradient(ellipse 70% 55%, #34d39928 0%, transparent 65%)',
-                        }}
-                        animate={{
-                          x: [0, -12, 0],
-                          y: [0, -20, 0],
-                          opacity: [0.35, 0.7, 0.35],
-                        }}
-                        transition={{
-                          duration: 8,
-                          repeat: Infinity,
-                          ease: 'easeInOut',
-                          delay: 1,
-                        }}
-                      />
-
-                      {/* Center turbulence */}
-                      <motion.div
-                        className="absolute top-[30%] left-[20%] w-[60%] h-[45%] rounded-full blur-3xl"
-                        style={{
-                          background:
-                            'radial-gradient(ellipse 70% 50%, #34d39922 0%, transparent 60%)',
-                        }}
-                        animate={{
-                          scaleX: [1, 1.2, 0.9, 1],
-                          scaleY: [1, 0.9, 1.15, 1],
-                          opacity: [0.3, 0.65, 0.45, 0.3],
-                        }}
-                        transition={{
-                          duration: 10,
-                          repeat: Infinity,
-                          ease: 'easeInOut',
-                        }}
-                      />
-
-                      {/* Rising tendril */}
-                      <motion.div
-                        className="absolute bottom-[-8%] left-[30%] w-[45%] h-[50%] rounded-full blur-2xl"
-                        style={{
-                          background:
-                            'radial-gradient(ellipse 65% 60% at center bottom, #34d39935 0%, transparent 70%)',
-                        }}
-                        animate={{
-                          y: [0, -40, 0],
-                          scaleX: [1, 1.3, 1],
-                          opacity: [0.35, 0.75, 0.35],
-                        }}
-                        transition={{
-                          duration: 7,
-                          repeat: Infinity,
-                          ease: 'easeInOut',
-                          delay: 2,
-                        }}
-                      />
-
-                      {/* Accent particles */}
-                      <motion.div
-                        className="absolute top-[22%] right-[18%] w-[55px] h-[55px] rounded-full blur-xl"
-                        style={{
-                          background:
-                            'radial-gradient(circle, #34d39950 0%, transparent 70%)',
-                        }}
-                        animate={{
-                          y: [0, -15, 10, 0],
-                          opacity: [0, 0.7, 0.35, 0],
-                        }}
-                        transition={{
-                          duration: 5,
-                          repeat: Infinity,
-                          ease: 'easeInOut',
-                        }}
-                      />
-                      <motion.div
-                        className="absolute top-[60%] left-[12%] w-[45px] h-[45px] rounded-full blur-lg"
-                        style={{
-                          background:
-                            'radial-gradient(circle, #34d39945 0%, transparent 70%)',
-                        }}
-                        animate={{
-                          y: [0, -12, 0],
-                          opacity: [0, 0.6, 0],
-                        }}
-                        transition={{
-                          duration: 4.5,
-                          repeat: Infinity,
-                          ease: 'easeInOut',
-                          delay: 3,
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  <div className="relative z-10 flex flex-col flex-1">
-                    {/* Header */}
-                    <div className="flex items-center gap-3 mb-6">
-                      <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center"
-                        style={{
-                          background: `${tier.hex}15`,
-                          boxShadow: `0 0 24px ${tier.hex}15, 0 0 0 1px ${tier.hex}20`,
-                        }}
-                      >
-                        <tier.Icon size={18} className="text-base-content/80" />
-                      </div>
-                      <div>
-                        <h3 className="text-base font-bold text-base-content">
-                          {tier.name}
-                        </h3>
-                        <p className="text-[10px] text-base-content/35">
-                          {tier.tagline}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Delivery highlight */}
-                    <div
-                      className="mb-5 p-3.5 rounded-xl border"
-                      style={{
-                        background: `${tier.hex}06`,
-                        borderColor: `${tier.hex}15`,
-                      }}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Zap
-                          size={14}
-                          style={{ color: tier.hex }}
-                          className="shrink-0"
-                        />
-                        <div>
-                          <span
-                            className="text-xs font-bold"
-                            style={{ color: tier.hex }}
-                          >
-                            {tier.delivery}
-                          </span>
-                          <span className="text-[10px] text-base-content/30 ml-2">
-                            {tier.deliverySub}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Use case — differentiates from feature list */}
-                    <p className="text-xs text-base-content/40 leading-relaxed mb-6 italic">
-                      &ldquo;{tier.useCase}&rdquo;
-                    </p>
-
-                    {/* Feature list */}
-                    <div className="space-y-3">
-                      {tier.features.map((feature, i) => (
-                        <motion.div
-                          key={feature}
-                          style={{ opacity: 0 }}
-                          initial={{ opacity: 0, x: -8 }}
-                          whileInView={{ opacity: 1, x: 0 }}
-                          viewport={{ once: true }}
-                          transition={{
-                            delay: 0.2 + tierIdx * 0.1 + i * 0.05,
-                            duration: 0.35,
-                            ease: EASE,
-                          }}
-                          className="flex items-center gap-2.5"
-                        >
-                          <Check
-                            size={12}
-                            className="shrink-0"
-                            style={{ color: tier.hex }}
-                          />
-                          <span className="text-xs text-base-content/55">
-                            {feature}
-                          </span>
-                        </motion.div>
-                      ))}
-                    </div>
-
-                    {/* CTA — mt-auto pushes to bottom, pt-7 guarantees min gap */}
-                    <div className="mt-auto pt-7">
-                      <button
-                        type="button"
-                        onClick={() => handleSelectPlan('annual', tier.tier)}
-                        className={`w-full py-2.5 text-center text-[10px] font-semibold rounded-lg transition-colors ${
-                          tier.tier === 'ultimate'
-                            ? 'bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 hover:border-primary/50'
-                            : tier.tier === 'pro'
-                              ? 'border border-[#a78bfa]/20 text-[#a78bfa]/60 hover:border-[#a78bfa]/40 hover:text-[#a78bfa]/80'
-                              : 'border border-info/20 text-info/60 hover:border-info/40 hover:text-info/80'
-                        }`}
-                      >
-                        {hadPriorSub ? 'Subscribe' : 'Start Free Trial'}
-                      </button>
-                      {!hadPriorSub && (
-                        <p className="text-center mt-1.5 text-[9px] text-base-content/20">
-                          {tier.tier === 'ultimate'
-                            ? '7 days free, then $33.33/mo'
-                            : tier.tier === 'pro'
-                              ? '7 days free, then $16.67/mo'
-                              : '7 days free, then $6.67/mo'}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
+                {a}
+              </motion.span>
             ))}
           </div>
-        </div>
+        </TerminalContainer>
       </section>
 
       {/* ================================================================
-          START RISK-FREE — CONVERSION
+          SEC 02 ／ WHAT PAYING ACTUALLY GETS YOU
           ================================================================ */}
-      <section className="relative overflow-hidden">
-        {/* Top border accent */}
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/15 to-transparent" />
+      <section className="border-b border-hairline">
+        <TerminalContainer>
+          <SectionRow tag="SEC 02 ／ WHAT PAYING ACTUALLY GETS YOU" />
+          {/* StepsGrid cascades its own cells now — no outer wrapper,
+              which was double-fading the whole grid */}
+          <StepsGrid steps={PERKS} />
+        </TerminalContainer>
+      </section>
 
-        <div className="container">
-          {/* Section header */}
-          <motion.div
-            style={{ opacity: 0 }}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, ease: EASE }}
-            className="text-center mb-14"
-          >
-            <h2 className="text-4xl sm:text-5xl font-black tracking-tight leading-[0.95] mb-4">
-              Start <span className="text-gradient-primary">Risk-Free</span>
-            </h2>
-            <p className="text-sm text-base-content/40 max-w-lg mx-auto leading-relaxed">
-              Try any plan free for 7 days. If it doesn&apos;t fit, cancel
-              before the trial ends and pay nothing.
-            </p>
-          </motion.div>
-
-          {/* 4-card grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-4xl mx-auto">
-            {/* Free Trial — spans full width for emphasis */}
-            <motion.div
-              style={{ opacity: 0 }}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.05, ease: EASE }}
-              className="relative md:col-span-2 bg-base-200/40 border border-primary/15 rounded-xl p-6 overflow-hidden"
-            >
-              {/* Top accent line */}
-              <div
-                className="absolute top-0 left-0 right-0 h-px"
-                style={{
-                  background:
-                    'linear-gradient(90deg, transparent, #34d399 50%, transparent)',
-                }}
-              />
-              {/* Corner dot grid */}
-              <div
-                className="absolute top-0 right-0 w-20 h-20 opacity-[0.03] text-base-content"
-                style={{
-                  backgroundImage:
-                    'radial-gradient(circle, currentColor 1px, transparent 1px)',
-                  backgroundSize: '8px 8px',
-                }}
-              />
-              {/* Watermark icon */}
-              <CreditCard
-                size={100}
-                strokeWidth={0.3}
-                className="absolute -bottom-3 -right-3 text-base-content/[0.02] pointer-events-none"
-              />
-              <div className="relative z-10 flex flex-col md:flex-row md:items-center gap-4">
-                <div className="flex items-center gap-3 shrink-0">
-                  <div
-                    className="h-9 w-9 rounded-lg flex items-center justify-center"
-                    style={{
-                      background: '#34d39915',
-                      boxShadow: '0 0 20px #34d39915, 0 0 0 1px #34d39920',
-                    }}
-                  >
-                    <CreditCard size={16} className="text-base-content/80" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-base-content">
-                      7-Day Free Trial
-                    </h3>
-                    <p className="text-[10px] text-base-content/35">
-                      Card required, cancel anytime
-                    </p>
-                  </div>
-                </div>
-                <div className="hidden md:block w-px h-8 bg-base-300/30 shrink-0" />
-                <p className="text-xs text-base-content/45 leading-relaxed">
-                  Every paid tier starts with a 7-day free trial. Add a card
-                  during onboarding, try the full feature set, and only pay if
-                  you stay. Cancel before the trial ends and you won&apos;t be
-                  charged &mdash; no questions asked.
-                </p>
+      {/* ================================================================
+          SEC 03 ／ COMPARE TIERS — ledger rows
+          ================================================================ */}
+      <section className="border-b border-hairline">
+        <TerminalContainer>
+          <SectionRow tag="SEC 03 ／ COMPARE TIERS" stat="FREE IS FOREVER" />
+          <div className="overflow-x-auto">
+            <div className="min-w-[760px]">
+              <motion.div
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, ease: EASE }}
+                className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] border-b border-hairline-minor py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/45"
+              >
+                <span>FEATURE</span>
+                <span className="text-center">FREE</span>
+                <span className="text-center">UPLINK</span>
+                <span className="text-center">PRO</span>
+                <span className="text-center text-primary">ULTIMATE</span>
+              </motion.div>
+              {comparisonRows.map((row, ri) => (
+                <motion.div
+                  key={row.label}
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-40px' }}
+                  transition={{ duration: 0.4, ease: EASE, delay: ri * 0.07 }}
+                  className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] items-center border-b border-hairline-minor px-1 py-4 transition-colors duration-150 hover:bg-primary/5"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <span className="text-sm font-semibold text-base-content/80">
+                      {row.label}
+                    </span>
+                  </span>
+                  <span className="text-center">
+                    <CompareCell value={row.free} />
+                  </span>
+                  <span className="text-center">
+                    <CompareCell value={row.uplink} up={row.uplinkUp} />
+                  </span>
+                  <span className="text-center">
+                    <CompareCell value={row.pro} up={row.proUp} />
+                  </span>
+                  <span className="text-center">
+                    <CompareCell value={row.ultimate} up={row.ultimateUp} />
+                  </span>
+                </motion.div>
+              ))}
+              <div className="py-4 font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/40">
+                PER-ACCOUNT · FREE TIER ALWAYS INCLUDED · UPGRADE ANYTIME
               </div>
-            </motion.div>
-
-            {/* Soft Limits */}
-            <motion.div
-              style={{ opacity: 0 }}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.15, ease: EASE }}
-              className="relative bg-base-200/40 border border-base-300/30 rounded-xl p-6 overflow-hidden"
-            >
-              <div
-                className="absolute top-0 left-0 right-0 h-px"
-                style={{
-                  background:
-                    'linear-gradient(90deg, transparent, #00b8db 50%, transparent)',
-                }}
-              />
-              <div
-                className="absolute top-0 right-0 w-20 h-20 opacity-[0.03] text-base-content"
-                style={{
-                  backgroundImage:
-                    'radial-gradient(circle, currentColor 1px, transparent 1px)',
-                  backgroundSize: '8px 8px',
-                }}
-              />
-              <Bell
-                size={100}
-                strokeWidth={0.3}
-                className="absolute -bottom-3 -right-3 text-base-content/[0.02] pointer-events-none"
-              />
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-4">
-                  <div
-                    className="h-9 w-9 rounded-lg flex items-center justify-center"
-                    style={{
-                      background: '#00b8db15',
-                      boxShadow: '0 0 20px #00b8db15, 0 0 0 1px #00b8db20',
-                    }}
-                  >
-                    <Bell size={16} className="text-base-content/80" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-base-content">
-                      Gentle Nudges
-                    </h3>
-                    <p className="text-[10px] text-base-content/35">
-                      In-app prompts at your limits
-                    </p>
-                  </div>
-                </div>
-                <p className="text-xs text-base-content/45 leading-relaxed">
-                  When you hit the free plan's limit — trying to run a 4th
-                  widget at once — the app shows a quiet prompt with what the
-                  next tier unlocks. No pop-ups, no dark patterns. Just context
-                  when it matters.
-                </p>
-              </div>
-            </motion.div>
-
-            {/* Locked Features Visible */}
-            <motion.div
-              style={{ opacity: 0 }}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.2, ease: EASE }}
-              className="relative bg-base-200/40 border border-base-300/30 rounded-xl p-6 overflow-hidden"
-            >
-              <div
-                className="absolute top-0 left-0 right-0 h-px"
-                style={{
-                  background:
-                    'linear-gradient(90deg, transparent, #f59e0b 50%, transparent)',
-                }}
-              />
-              <div
-                className="absolute top-0 right-0 w-20 h-20 opacity-[0.03] text-base-content"
-                style={{
-                  backgroundImage:
-                    'radial-gradient(circle, currentColor 1px, transparent 1px)',
-                  backgroundSize: '8px 8px',
-                }}
-              />
-              <Eye
-                size={100}
-                strokeWidth={0.3}
-                className="absolute -bottom-3 -right-3 text-base-content/[0.02] pointer-events-none"
-              />
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-4">
-                  <div
-                    className="h-9 w-9 rounded-lg flex items-center justify-center"
-                    style={{
-                      background: '#f59e0b15',
-                      boxShadow: '0 0 20px #f59e0b15, 0 0 0 1px #f59e0b20',
-                    }}
-                  >
-                    <Lock size={16} className="text-base-content/80" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-base-content">
-                      See What You're Missing
-                    </h3>
-                    <p className="text-[10px] text-base-content/35">
-                      Premium features ghosted on Free
-                    </p>
-                  </div>
-                </div>
-                <p className="text-xs text-base-content/45 leading-relaxed">
-                  Locked features aren't hidden — they're visible but ghosted in
-                  the UI. Custom alerts, feed profiles, webhooks, and export all
-                  appear in their natural positions so you can see exactly what
-                  upgrading unlocks before you decide.
-                </p>
-              </div>
-            </motion.div>
+            </div>
           </div>
-        </div>
-
-        {/* Bottom border */}
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-base-300/50 to-transparent" />
+        </TerminalContainer>
       </section>
 
       {/* ================================================================
-          FAQ — TIER BREAKDOWN
+          SEC 04 ／ QUESTIONS — accordion ledger (feeds faqPage JSON-LD)
           ================================================================ */}
-      <FAQSection
-        items={uplinkFAQ}
-        title="Tiers"
-        titleHighlight="Explained"
-        subtitle="Everything in the comparison table, broken down."
-      />
+      {/* No border-b here — the departures row below brings its own
+          border-t hairline. */}
+      <section>
+        <TerminalContainer>
+          <SectionRow
+            tag="SEC 04 ／ QUESTIONS"
+            stat={`${uplinkFAQ.length} ANSWERS`}
+          />
+          <div className="pb-6">
+            {uplinkFAQ.map((f, i) => {
+              const open = openFaq === i
+              return (
+                <motion.div
+                  key={f.question}
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-40px' }}
+                  transition={{ duration: 0.4, ease: EASE, delay: i * 0.04 }}
+                  className="border-b border-hairline-minor last:border-b-0"
+                >
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => setOpenFaq(open ? null : i)}
+                    className="flex w-full cursor-pointer items-baseline justify-between gap-5 py-5 text-left"
+                  >
+                    <span className="flex items-baseline gap-4">
+                      <span className="font-mono text-xs text-base-content/40">
+                        Q{String(i + 1).padStart(2, '0')}
+                      </span>
+                      <span className="text-[15px] font-semibold">
+                        {f.question}
+                      </span>
+                    </span>
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.span
+                        key={open ? 'minus' : 'plus'}
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
+                        transition={{ duration: 0.1 }}
+                        className="inline-block w-[1ch] text-center font-mono text-sm text-primary"
+                        aria-hidden="true"
+                      >
+                        {open ? '−' : '+'}
+                      </motion.span>
+                    </AnimatePresence>
+                  </button>
+                  {/* Answer unfolds; padding lives on the inner <p>, not
+                      the height-animated container (the border-box
+                      end-bump lesson from SEC 01 on the homepage). */}
+                  <AnimatePresence initial={false}>
+                    {open && (
+                      <motion.div
+                        key="answer"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: EASE }}
+                        className="overflow-hidden"
+                      >
+                        <p className="m-0 max-w-[760px] pb-6 text-sm leading-relaxed text-base-content/60 sm:pl-12">
+                          {f.answer}
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              )
+            })}
+          </div>
+        </TerminalContainer>
+      </section>
 
       {/* ================================================================
-          BOTTOM CTA
+          FREE-TIER ESCAPE ROW
           ================================================================ */}
-      <BottomCTA
-        handleSelectPlan={handleSelectPlan}
-        hadPriorSub={hadPriorSub}
-      />
+      <section className="border-b border-hairline">
+        <TerminalContainer>
+          <DeparturesRow
+            index="00"
+            label="Not ready? The free tier isn't a trial."
+            meta="Three slots, forever. No card, no clock."
+            action="DOWNLOAD FREE ↓"
+            to="/download"
+          />
+        </TerminalContainer>
+      </section>
     </div>
   )
 }

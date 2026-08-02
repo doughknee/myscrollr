@@ -470,8 +470,8 @@ export function ChannelsShowcase() {
             <span className="text-gradient-primary">One Ticker.</span>
           </h2>
           <p className="text-base text-base-content/45 max-w-lg leading-relaxed text-center">
-            Sports, stocks, crypto, news, and fantasy widgets today &mdash;
-            with more on the way. Add what you want, ignore the rest.
+            Sports, stocks, crypto, news, and fantasy widgets today &mdash; with
+            more on the way. Add what you want, ignore the rest.
           </p>
         </motion.div>
 

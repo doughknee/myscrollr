@@ -14,9 +14,9 @@
   "bugs": "https://myscrollr.com/support",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/fetch-latest-version.mjs",
+    "predev": "node scripts/fetch-latest-version.mjs && node scripts/ensure-motion-plus.mjs",
     "dev": "vite --port 3000",
-    "prebuild": "node scripts/fetch-latest-version.mjs && node scripts/fetch-releases.mjs && node scripts/generate-sitemap.mjs && node scripts/optimize-screenshots.mjs",
+    "prebuild": "node scripts/ensure-motion-plus.mjs && node scripts/fetch-latest-version.mjs && node scripts/fetch-releases.mjs && node scripts/generate-sitemap.mjs && node scripts/optimize-screenshots.mjs",
     "optimize:screenshots": "node scripts/optimize-screenshots.mjs",
     "build": "vite build && tsc",
     "postbuild": "node scripts/check-sentry-tunnel.mjs && node scripts/check-prerender.mjs && node scripts/check-mobile-viewport.mjs",

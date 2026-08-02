@@ -41,8 +41,12 @@ export function SupportAccordion({
         const id = `${idPrefix}-${i}`
 
         return (
-          <div
+          <motion.div
             key={id}
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-40px' }}
+            transition={{ duration: 0.35, ease: EASE, delay: (i % 4) * 0.04 }}
             className={`group relative rounded-xl border bg-base-200/40 transition-[border-color,background-color] duration-200 ${
               isOpen
                 ? 'border-primary/25'
@@ -102,7 +106,7 @@ export function SupportAccordion({
                 </motion.div>
               ) : null}
             </AnimatePresence>
-          </div>
+          </motion.div>
         )
       })}
     </div>

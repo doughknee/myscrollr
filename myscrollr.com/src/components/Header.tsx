@@ -1,42 +1,66 @@
 import { ClientOnly, Link, useLocation } from '@tanstack/react-router'
-import {
-  Building2,
-  ChevronRight,
-  Download,
-  House,
-  LogOut,
-  Menu,
-  Puzzle,
-  Satellite,
-  UserCircle,
-  X,
-} from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import type { IdTokenClaims } from '@logto/react'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
-import ScrollrSVG from '@/components/ScrollrSVG'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { useDemoTicker } from '@/hooks/useDemoTicker'
+import ScrollrSVG from '@/components/ScrollrSVG'
 
 /**
- * Header is SSR-safe. Auth-dependent slices live inside the three
- * <ClientOnly> children below (account nav link + auth menu, in both
- * desktop and mobile layouts). The Header itself never calls
- * `useScrollrAuth()`, so the entire layout chrome prerenders correctly.
+ * Terminal-editorial nav (design_handoff_marketing_site/README.md):
+ * wordmark + mono uppercase links, current page in emerald, emerald
+ * DOWNLOAD ↓ button. Sticky — scrolls with the page. When the demo
+ * ticker bar is pinned top the header offsets to sit beneath it; the
+ * bar keeps the "pinned above everything" story (bar z-50 > header
+ * z-40).
  *
- * Each <ClientOnly>'s subtree consumes Logto via `useScrollrAuth()`.
- * During SSR these render to null (the auth state is unknown server-
- * side anyway), and hydrate on the client once Logto initialises.
+ * Header is SSR-safe. Auth-dependent slices live inside the
+ * <ClientOnly> children below (account link + auth menu, desktop and
+ * mobile). The Header itself never calls `useScrollrAuth()`, so the
+ * layout chrome prerenders correctly.
  */
-export default function Header() {
+
+const NAV_LINKS: Array<{ to: string; label: string }> = [
+  { to: '/', label: 'HOME' },
+  { to: '/widgets', label: 'WIDGETS' },
+  { to: '/uplink', label: 'UPLINK' },
+  { to: '/business', label: 'BUSINESS' },
+]
+
+export default function Header({
+  hasBar = false,
+}: {
+  /**
+   * Whether the current route shows a demo ticker bar (the shared one,
+   * or /business's white-label instance — both follow the shared
+   * store's pin/density).
+   */
+  hasBar?: boolean
+}) {
   const [isOpen, setIsOpen] = useState(false)
+  // Sticky offset: when the demo bar is pinned top, the header slots
+  // in directly beneath it — the bar stays "on top of everything".
+  // Bar height tracks density (h-12 compact / h-16 detailed).
+  const { pos, density } = useDemoTicker()
+  const barTopInset = density === 'detailed' ? 'top-16' : 'top-12'
+  const barBottomInset = density === 'detailed' ? 'bottom-16' : 'bottom-12'
+  const stickyTop = hasBar && pos === 'top' ? barTopInset : 'top-0'
+  // The mobile drawer and the bar are both z-50 with the bar later in
+  // the DOM, so the bar paints on top — inset the drawer on the bar's
+  // edge so its header row / DOWNLOAD footer never sit underneath it.
+  const drawerInsets = !hasBar
+    ? 'top-0 bottom-0'
+    : pos === 'top'
+      ? `${barTopInset} bottom-0`
+      : `top-0 ${barBottomInset}`
   const drawerRef = useRef<HTMLElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
 
-  // Close drawer on Escape and trap focus
+  // Close drawer on Escape and return focus to the menu button
   const closeDrawer = useCallback(() => {
     setIsOpen(false)
-    // Return focus to the menu button
     requestAnimationFrame(() => menuButtonRef.current?.focus())
   }, [])
 
@@ -52,7 +76,6 @@ export default function Header() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, closeDrawer])
 
-  // Focus the drawer when it opens
   useEffect(() => {
     if (isOpen) {
       requestAnimationFrame(() => drawerRef.current?.focus())
@@ -61,104 +84,61 @@ export default function Header() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 px-6 flex items-center bg-base-100/80 backdrop-blur-2xl will-change-transform border-b border-base-300/50 h-20">
-        {/* Brand */}
-        <div className="flex-1 flex items-center gap-4">
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="relative flex items-center justify-center rounded-xl border border-base-300/50 bg-base-200/50 p-2.5 hover:scale-105 transition-spring group-hover:border-primary/30 group-hover:shadow-glow-sm transition-[transform,border-color,box-shadow]">
-              <ScrollrSVG className="size-8" />
-              {/* Online indicator */}
-              <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-              </span>
-            </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-xl tracking-tight font-display">
-                Scrollr
-              </span>
-              {/* Decorative brand tagline. Hidden from assistive tech so
-                  the screen-reader name for this link stays just "Scrollr",
-                  and Lighthouse's color-contrast audit skips it. */}
-              <span className="text-[9px] text-primary/50" aria-hidden="true">
-                Always Visible
-              </span>
-            </div>
-          </Link>
-        </div>
+      <header
+        className={`sticky z-40 flex h-[60px] items-center justify-between border-b border-hairline bg-base-75/85 backdrop-blur-xl px-5 sm:px-8 motion-safe:transition-[top] motion-safe:duration-300 motion-safe:ease-out ${stickyTop}`}
+      >
+        <Wordmark />
 
-        {/* Desktop Navigation */}
-        <LayoutGroup id="header-nav">
-          <nav className="hidden lg:flex items-center gap-1">
-            <NavLink to="/" activeOn="/">
-              <House size={14} />
-              Home
+        {/* Desktop navigation */}
+        <nav className="hidden items-center gap-8 font-mono text-xs tracking-[0.08em] lg:flex">
+          {NAV_LINKS.map((l) => (
+            <NavLink key={l.to} to={l.to}>
+              {l.label}
             </NavLink>
-
-            <NavLink to="/channels" activeOn="/channels">
-              <Puzzle size={14} />
-              Widgets
-            </NavLink>
-
-            <NavLink to="/uplink" activeOn="/uplink">
-              <Satellite size={14} />
-              Pricing
-            </NavLink>
-
-            <NavLink to="/business" activeOn="/business">
-              <Building2 size={14} />
-              Business
-            </NavLink>
-
-            <NavLink to="/download" activeOn="/download">
-              <Download size={14} />
-              Download
-            </NavLink>
-
-            <ClientOnly>
-              <DesktopAccountLink />
-            </ClientOnly>
-          </nav>
-        </LayoutGroup>
-
-        {/* Auth Section */}
-        <div className="flex-1 hidden lg:flex items-center gap-3 justify-end">
-          <ThemeToggle />
+          ))}
           <ClientOnly>
-            <DesktopAuthMenu />
+            <DesktopAccountLink />
           </ClientOnly>
-        </div>
+          <ThemeToggle />
+          {/* Download owns the corner */}
+          <Link
+            to="/download"
+            className="rounded-[4px] bg-primary px-[18px] py-2 font-semibold text-primary-content transition-colors hover:bg-[#6ee7b7] hover:text-primary-content hover:opacity-100"
+          >
+            DOWNLOAD ↓
+          </Link>
+        </nav>
 
-        {/* Mobile Menu Button */}
-        <motion.button
-          ref={menuButtonRef}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setIsOpen(true)}
-          className="lg:hidden flex items-center justify-center p-3 rounded-lg border border-base-300/50 bg-base-200/50 hover:bg-base-200 hover:border-primary/30 transition-colors cursor-pointer"
-          aria-label="Open menu"
-          aria-expanded={isOpen}
-          aria-controls="mobile-nav-drawer"
-        >
-          <Menu size={20} />
-        </motion.button>
+        {/* Mobile: theme + menu button */}
+        <div className="flex items-center gap-2 lg:hidden">
+          {/* 40px tap target on phones, matching the hamburger */}
+          <ThemeToggle className="max-lg:h-10 max-lg:w-10" />
+          <button
+            ref={menuButtonRef}
+            onClick={() => setIsOpen(true)}
+            className="flex cursor-pointer items-center justify-center rounded-[4px] border border-hairline p-2.5 transition-colors hover:border-primary/40"
+            aria-label="Open menu"
+            aria-expanded={isOpen}
+            aria-controls="mobile-nav-drawer"
+          >
+            <Menu size={18} />
+          </button>
+        </div>
       </header>
 
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Mobile Overlay */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               onClick={closeDrawer}
-              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden pointer-events-auto"
+              className="pointer-events-auto fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
               aria-hidden="true"
             />
 
-            {/* Mobile Drawer */}
             <motion.aside
               ref={drawerRef}
               id="mobile-nav-drawer"
@@ -170,97 +150,65 @@ export default function Header() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 h-full w-80 bg-base-200/95 backdrop-blur-2xl z-50 lg:hidden flex flex-col"
+              className={`fixed right-0 z-50 flex w-72 flex-col border-l border-hairline bg-base-75 lg:hidden ${drawerInsets}`}
             >
-              {/* Drawer Header */}
-              <div className="flex items-center justify-between px-5 py-5 border-b border-base-300/50">
-                <div className="flex items-center gap-3">
-                  <ScrollrSVG className="size-8" />
-                  <div className="flex flex-col">
-                    <span className="font-bold text-lg tracking-tight">
-                      Scrollr
-                    </span>
-                    {/* Decorative brand tagline — see desktop variant. */}
-                    <span
-                      className="text-[8px] text-primary/50"
-                      aria-hidden="true"
-                    >
-                      Always Visible
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <ThemeToggle />
-                  <motion.button
-                    whileHover={{ scale: 1.1, rotate: 90 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={closeDrawer}
-                    className="p-2 rounded-lg hover:bg-base-300 transition-colors cursor-pointer"
-                    aria-label="Close menu"
-                  >
-                    <X size={20} />
-                  </motion.button>
-                </div>
+              <div className="flex items-center justify-between border-b border-hairline px-5 py-4">
+                <Wordmark />
+                <button
+                  onClick={closeDrawer}
+                  className="flex cursor-pointer items-center justify-center rounded-[4px] border border-hairline p-2.5 transition-colors hover:border-primary/40"
+                  aria-label="Close menu"
+                >
+                  <X size={18} />
+                </button>
               </div>
 
-              {/* Navigation Links */}
-              <nav className="flex-1 px-4 py-6 space-y-1">
-                <MobileNavLink
-                  to="/"
-                  icon={<ChevronRight size={18} />}
-                  onClick={() => setIsOpen(false)}
-                >
-                  Home
-                </MobileNavLink>
-
-                <MobileNavLink
-                  to="/channels"
-                  icon={<ChevronRight size={18} />}
-                  onClick={() => setIsOpen(false)}
-                >
-                  Widgets
-                </MobileNavLink>
-
-                <MobileNavLink
-                  to="/uplink"
-                  icon={<ChevronRight size={18} />}
-                  onClick={() => setIsOpen(false)}
-                >
-                  Pricing
-                </MobileNavLink>
-
-                <MobileNavLink
-                  to="/business"
-                  icon={<ChevronRight size={18} />}
-                  onClick={() => setIsOpen(false)}
-                >
-                  Business
-                </MobileNavLink>
-
-                <MobileNavLink
-                  to="/download"
-                  icon={<ChevronRight size={18} />}
-                  onClick={() => setIsOpen(false)}
-                >
-                  Download
-                </MobileNavLink>
-
+              <nav className="flex-1 space-y-1 px-4 py-6 font-mono text-sm tracking-[0.08em]">
+                {NAV_LINKS.map((l) => (
+                  <MobileNavLink key={l.to} to={l.to} onClick={closeDrawer}>
+                    {l.label}
+                  </MobileNavLink>
+                ))}
                 <ClientOnly>
-                  <MobileAccountLink onNavigate={() => setIsOpen(false)} />
+                  <MobileAccountLink onNavigate={closeDrawer} />
                 </ClientOnly>
               </nav>
 
-              {/* Drawer Footer */}
-              <div className="px-5 py-5 border-t border-base-300/50 space-y-3">
-                <ClientOnly>
-                  <MobileAuthMenu onAfterAction={() => setIsOpen(false)} />
-                </ClientOnly>
+              {/* Download is the one action that matters here */}
+              <div className="border-t border-hairline px-5 py-5">
+                <Link
+                  to="/download"
+                  onClick={closeDrawer}
+                  className="block rounded-[4px] bg-primary py-3 text-center font-mono text-sm font-bold tracking-[0.08em] text-primary-content hover:text-primary-content hover:opacity-100"
+                >
+                  DOWNLOAD ↓
+                </Link>
               </div>
             </motion.aside>
           </>
         )}
       </AnimatePresence>
     </>
+  )
+}
+
+function Wordmark() {
+  return (
+    <Link
+      to="/"
+      className="group flex items-center gap-2.5 text-xl font-extrabold tracking-[-0.02em] text-base-content hover:text-base-content hover:opacity-100"
+      aria-label="Scrollr home"
+    >
+      <ScrollrSVG
+        width={26}
+        height={26}
+        className="transition-transform duration-150 group-hover:scale-105"
+      />
+      <span className="flex items-baseline">
+        scrollr
+        <span className="text-primary">.</span>
+      </span>
+    </Link>
   )
 }
 
@@ -290,59 +238,9 @@ function DesktopAccountLink() {
   if (!isAuthenticated) return null
 
   return (
-    <NavLink to="/account" activeOn="/account">
-      <UserCircle size={14} />
-      {userClaims?.username || userClaims?.name || 'Account'}
+    <NavLink to="/account">
+      {(userClaims?.username || userClaims?.name || 'ACCOUNT').toUpperCase()}
     </NavLink>
-  )
-}
-
-function DesktopAuthMenu() {
-  const { signIn, signOut, isAuthenticated, isLoading } = useScrollrAuth()
-
-  const handleSignIn = () => {
-    signIn()
-  }
-  const handleSignOut = () => {
-    signOut(`${window.location.origin}`)
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2">
-        <div className="h-2 w-2 rounded-full bg-primary/40 animate-pulse" />
-        <span className="text-xs text-base-content/30">Initializing</span>
-      </div>
-    )
-  }
-
-  if (isAuthenticated) {
-    return (
-      <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        onClick={handleSignOut}
-        className="flex items-center gap-2 px-4 py-2 text-xs font-semibold border border-error/30 text-error/80 hover:bg-error/10 hover:border-error/50 transition-colors rounded-lg cursor-pointer"
-      >
-        <LogOut size={14} />
-        Sign Out
-      </motion.button>
-    )
-  }
-
-  return (
-    <motion.button
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={handleSignIn}
-      className="btn btn-primary btn-sm flex items-center gap-2"
-    >
-      <span className="relative flex h-1.5 w-1.5">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-content opacity-75" />
-        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary-content" />
-      </span>
-      Sign In
-    </motion.button>
   )
 }
 
@@ -353,101 +251,34 @@ function MobileAccountLink({ onNavigate }: { onNavigate: () => void }) {
   if (!isAuthenticated) return null
 
   return (
-    <MobileNavLink
-      to="/account"
-      icon={<ChevronRight size={18} />}
-      onClick={onNavigate}
-    >
-      {userClaims?.username || userClaims?.name || 'Account'}
+    <MobileNavLink to="/account" onClick={onNavigate}>
+      {(userClaims?.username || userClaims?.name || 'ACCOUNT').toUpperCase()}
     </MobileNavLink>
   )
 }
 
-function MobileAuthMenu({ onAfterAction }: { onAfterAction: () => void }) {
-  const { signIn, signOut, isAuthenticated, isLoading } = useScrollrAuth()
-
-  const handleSignIn = () => {
-    signIn()
-  }
-  const handleSignOut = () => {
-    signOut(`${window.location.origin}`)
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center gap-2 py-3">
-        <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-        <span className="text-xs text-base-content/40">Loading...</span>
-      </div>
-    )
-  }
-
-  if (isAuthenticated) {
-    return (
-      <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        onClick={() => {
-          handleSignOut()
-          onAfterAction()
-        }}
-        className="w-full flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold border border-error/30 text-error/80 hover:bg-error/10 hover:border-error/50 transition-colors rounded-lg cursor-pointer"
-      >
-        <LogOut size={16} />
-        Sign Out
-      </motion.button>
-    )
-  }
-
-  return (
-    <motion.button
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={() => {
-        handleSignIn()
-        onAfterAction()
-      }}
-      className="w-full btn btn-primary flex items-center justify-center gap-2"
-    >
-      <span className="relative flex h-2 w-2">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-content opacity-75" />
-        <span className="relative inline-flex rounded-full h-2 w-2 bg-primary-content" />
-      </span>
-      Sign In
-    </motion.button>
-  )
-}
-
-function NavLink({
-  to,
-  children,
-  activeOn,
-}: {
-  to: string
-  children: React.ReactNode
-  activeOn?: string
-}) {
+function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
   const location = useLocation()
-
-  // For demo purposes, check if current path matches
-  const isActive = location.pathname === activeOn
+  const isActive =
+    to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
 
   return (
     <Link
       to={to}
-      className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold transition-colors rounded-lg relative ${
+      className={`relative transition-colors hover:opacity-100 ${
         isActive
-          ? 'text-primary bg-primary/10'
-          : 'text-base-content/50 hover:text-base-content hover:bg-base-200/50'
+          ? 'text-primary'
+          : 'text-base-content/55 hover:text-base-content'
       }`}
     >
       {children}
+      {/* Emerald underline slides between links on navigation */}
       {isActive && (
-        <motion.div
-          layoutId="nav-indicator"
-          className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary"
-          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-          style={{ originY: '100%' }}
+        <motion.span
+          aria-hidden="true"
+          layoutId="nav-underline"
+          className="absolute -bottom-1.5 left-0 right-0 h-px bg-primary"
+          transition={{ type: 'spring', stiffness: 500, damping: 40 }}
         />
       )}
     </Link>
@@ -457,30 +288,25 @@ function NavLink({
 function MobileNavLink({
   to,
   children,
-  icon,
   onClick,
 }: {
   to: string
   children: React.ReactNode
-  icon?: React.ReactNode
   onClick?: () => void
 }) {
+  const location = useLocation()
+  const isActive =
+    to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
+
   return (
     <Link
       to={to}
       onClick={onClick}
-      className="flex items-center justify-between px-4 py-4 text-sm font-semibold text-base-content/60 hover:text-primary hover:bg-base-300/50 transition-colors rounded-lg group cursor-pointer"
+      className={`block rounded-[4px] px-4 py-3 transition-colors hover:bg-base-200 hover:opacity-100 ${
+        isActive ? 'text-primary' : 'text-base-content/70'
+      }`}
     >
-      <span className="flex items-center gap-3">
-        <span className="text-primary/0 group-hover:text-primary/60 transition-colors">
-          {icon}
-        </span>
-        {children}
-      </span>
-      <ChevronRight
-        size={14}
-        className="opacity-0 group-hover:opacity-100 transition-[opacity,transform] group-hover:translate-x-1"
-      />
+      {children}
     </Link>
   )
 }

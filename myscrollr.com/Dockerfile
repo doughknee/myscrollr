@@ -22,6 +22,12 @@ COPY myscrollr.com/ ./myscrollr.com/
 # during prebuild (shared CI runner IPs exhaust the anonymous 60/hr).
 # Builder-stage only; the final image is a separate stage.
 ARG GITHUB_TOKEN
+# Required: Motion+ registry token for scripts/ensure-motion-plus.mjs
+# (motion-plus is deliberately absent from package.json — this repo is
+# public and the install URL embeds the private token). Builder-stage
+# only; the final nginx image never sees it. Set MOTION_PLUS_TOKEN as a
+# build-time variable in Coolify.
+ARG MOTION_PLUS_TOKEN
 ARG VITE_API_URL
 ARG VITE_LOGTO_ENDPOINT
 ARG VITE_LOGTO_APP_ID

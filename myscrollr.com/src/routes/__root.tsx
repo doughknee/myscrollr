@@ -11,6 +11,8 @@ import { MotionConfig } from 'motion/react'
 import type { ReactNode } from 'react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import DemoTickerBar from '@/components/DemoTickerBar'
+import { useDemoTicker } from '@/hooks/useDemoTicker'
 import appCss from '@/styles.css?url'
 
 const themeScript = `;(function () {
@@ -21,7 +23,13 @@ const themeScript = `;(function () {
   var dark = stored === 'dark' || (!stored && prefersDark)
   if (dark) document.documentElement.classList.add('dark')
   var meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', dark ? '#141420' : '#ffffff')
+  if (meta) meta.setAttribute('content', dark ? '#101018' : '#f8f8fc')
+  try {
+    var demo = JSON.parse(localStorage.getItem('scrollr-marketing-demo') || 'null')
+    if (demo && typeof demo.theme === 'string' && demo.theme !== 'scrollr') {
+      document.documentElement.setAttribute('data-theme-family', demo.theme)
+    }
+  } catch (e) {}
 })()`
 
 function RootErrorComponent({ error }: { error: Error }) {
@@ -89,7 +97,9 @@ function NotFound() {
 
 function RootDocument({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: the inline theme script legitimately adds
+    // `class="dark"` to <html> before React hydrates.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -99,7 +109,7 @@ function RootDocument({ children }: { children: ReactNode }) {
         <link rel="manifest" href="/manifest.json" />
         <link
           rel="preload"
-          href="/fonts/plus-jakarta-sans-latin.woff2"
+          href="/fonts/archivo-variable-latin.woff2"
           as="font"
           type="font/woff2"
           crossOrigin="anonymous"
@@ -131,6 +141,23 @@ function RootErrorDocument(props: { error: Error }) {
   )
 }
 
+// Routes that don't get the shared demo ticker bar: app-like surfaces
+// (account, invite, auth callback, public profiles) and /business,
+// which renders its own white-label variant of the bar.
+const DEMO_BAR_EXCLUDED = [
+  '/account',
+  '/invite',
+  '/callback',
+  '/u/',
+  '/business',
+]
+
+function showsDemoBar(pathname: string): boolean {
+  return !DEMO_BAR_EXCLUDED.some(
+    (p) => pathname === p || pathname.startsWith(p),
+  )
+}
+
 function RootLayout() {
   const { pathname } = useLocation()
   const mainRef = useRef<HTMLElement>(null)
@@ -148,10 +175,47 @@ function RootLayout() {
     })
   }, [pathname])
 
+  const hasDemoBar = showsDemoBar(pathname)
+  // /business renders its OWN DemoTickerBar instance (white-label
+  // override) but it follows the shared store's pin/density, so for
+  // layout purposes (padding, header offset, drawer insets) it counts
+  // as a bar-having route like any other.
+  const hasAnyBar = hasDemoBar || pathname.startsWith('/business')
+  const { theme: demoFamily, density, pos } = useDemoTicker()
+
+  // Site-wide theme family: picking a family in MAKE IT YOURS re-skins
+  // the whole site (the [data-theme-family] token blocks in styles.css).
+  // The inline themeScript sets this pre-hydration; this effect keeps it
+  // in sync with later changes.
+  useEffect(() => {
+    const root = document.documentElement
+    if (demoFamily === 'scrollr') {
+      root.removeAttribute('data-theme-family')
+    } else {
+      root.setAttribute('data-theme-family', demoFamily)
+    }
+  }, [demoFamily])
+
   return (
     <RootDocument>
       <MotionConfig reducedMotion="user">
-        <div className="min-h-dvh relative overflow-x-clip">
+        <div
+          className={`min-h-dvh relative overflow-x-clip bg-base-75 scanlines motion-safe:transition-[padding] motion-safe:duration-300 motion-safe:ease-out ${
+            hasAnyBar
+              ? density === 'detailed'
+                ? 'pb-[88px]'
+                : 'pb-[72px]'
+              : ''
+          } ${
+            // Top-pinned bar is fixed; pad the page so it doesn't sit
+            // on top of the (sticky) header at scroll 0.
+            hasAnyBar && pos === 'top'
+              ? density === 'detailed'
+                ? 'pt-16'
+                : 'pt-12'
+              : ''
+          }`}
+        >
           {/* Skip to main content — first focusable element */}
           <a
             href="#main-content"
@@ -161,7 +225,7 @@ function RootLayout() {
           </a>
 
           {/* Navigation */}
-          <Header />
+          <Header hasBar={hasAnyBar} />
 
           {/* Main Content */}
           <main
@@ -175,6 +239,10 @@ function RootLayout() {
 
           {/* Footer */}
           <Footer />
+
+          {/* Persistent demo ticker bar — the brand's connective tissue.
+              /business mounts its own white-label variant instead. */}
+          {hasDemoBar && <DemoTickerBar />}
         </div>
       </MotionConfig>
     </RootDocument>
