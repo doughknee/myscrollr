@@ -256,6 +256,12 @@ jobs:
           VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN_WEB }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          # Motion+ registry token for scripts/ensure-motion-plus.mjs —
+          # motion-plus is deliberately absent from package.json (public
+          # repo; the install URL embeds the token), so the website build
+          # installs it during prebuild. Builder-stage only; REQUIRED for
+          # the website build (ensure-motion-plus fails loudly without it).
+          MOTION_PLUS_TOKEN: ${{ secrets.MOTION_PLUS_TOKEN }}
           # Authenticated GitHub API for the website prebuild fetch scripts
           # (fetch-releases.mjs / fetch-latest-version.mjs) — shared runner
           # IPs exhaust the anonymous 60/hr limit. The ambient job token is
@@ -283,6 +289,7 @@ jobs:
               "VITE_SENTRY_DSN=$VITE_SENTRY_DSN" \
               "SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN" \
               "SENTRY_ORG=$SENTRY_ORG" \
+              "MOTION_PLUS_TOKEN=$MOTION_PLUS_TOKEN" \
               "GITHUB_TOKEN=$GH_API_TOKEN"; do
               BUILD_ARGS="$BUILD_ARGS --build-arg $arg"
             done
