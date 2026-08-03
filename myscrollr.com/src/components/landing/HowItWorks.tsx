@@ -86,19 +86,19 @@ const chipStyle: Record<
     border: 'border-primary/25',
     text: 'text-primary',
     bg: 'bg-primary/[0.06]',
-    sub: 'text-primary/60',
+    sub: 'text-primary',
   },
   secondary: {
     border: 'border-secondary/25',
     text: 'text-secondary',
     bg: 'bg-secondary/[0.06]',
-    sub: 'text-secondary/60',
+    sub: 'text-secondary',
   },
   info: {
     border: 'border-info/25',
     text: 'text-info',
     bg: 'bg-info/[0.06]',
-    sub: 'text-info/60',
+    sub: 'text-info',
   },
 }
 
@@ -148,7 +148,7 @@ function DownloadVisual() {
             <h4 className="text-lg sm:text-xl font-bold text-base-content mb-1">
               Scrollr
             </h4>
-            <p className="text-xs sm:text-sm text-base-content/40 leading-relaxed mb-2.5">
+            <p className="text-xs sm:text-sm text-base-subtle leading-relaxed mb-2.5">
               Live finance, sports &amp; news in a quiet desktop ticker.
             </p>
 
@@ -168,23 +168,23 @@ function DownloadVisual() {
                       damping: 15,
                     }}
                   >
-                    <Star size={12} className="text-warning fill-warning" />
+                    <Star size={12} className="text-warning-ink fill-warning" />
                   </motion.div>
                 ))}
-                <span className="text-[11px] text-base-content/30 ml-1 font-medium">
+                <span className="text-[11px] text-base-subtle ml-1 font-medium">
                   5.0
                 </span>
               </div>
 
-              <span className="text-base-content/10">|</span>
+              <span className="text-base-subtle">|</span>
 
               {/* Tags */}
               <div className="flex items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary/70 bg-primary/[0.07] border border-primary/10 rounded-md px-1.5 py-0.5">
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/[0.07] border border-primary/10 rounded-md px-1.5 py-0.5">
                   <Zap size={9} />
                   Free tier
                 </span>
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-base-content/30 bg-base-300/10 border border-base-300/15 rounded-md px-1.5 py-0.5">
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-base-subtle bg-base-300/10 border border-base-300/15 rounded-md px-1.5 py-0.5">
                   <Shield size={9} />
                   Privacy-first
                 </span>
@@ -216,11 +216,11 @@ function DownloadVisual() {
               }}
               className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-base-100/40 border border-base-300/15"
             >
-              <feat.icon size={14} className="text-base-content/30" />
-              <span className="text-[11px] font-semibold text-base-content/60">
+              <feat.icon size={14} className="text-base-subtle" />
+              <span className="text-[11px] font-semibold text-base-muted">
                 {feat.label}
               </span>
-              <span className="text-[10px] text-base-content/25">
+              <span className="text-[10px] text-base-subtle">
                 {feat.sub}
               </span>
             </motion.div>
@@ -296,7 +296,7 @@ function ChooseVisual() {
               >
                 <channel.icon size={15} />
               </div>
-              <span className="text-sm font-medium text-base-content/80">
+              <span className="text-sm font-medium text-base-muted">
                 {channel.name}
               </span>
             </div>
@@ -323,7 +323,7 @@ function ChooseVisual() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2, duration: 0.5, ease: VISUAL_EASE }}
-          className="text-[11px] text-base-content/25 text-center pt-2"
+          className="text-[11px] text-base-subtle text-center pt-2"
         >
           Change anytime from the app settings
         </motion.p>
@@ -353,7 +353,7 @@ function WorkVisual() {
             <div className="w-2 h-2 rounded-full bg-success/25" />
           </div>
           <div className="flex-1 mx-2">
-            <span className="text-[10px] text-base-content/20">
+            <span className="text-[10px] text-base-subtle">
               Your workspace
             </span>
           </div>
@@ -520,7 +520,7 @@ export function HowItWorks() {
             Ready in{' '}
             <span className="text-gradient-primary">Under a Minute</span>
           </h2>
-          <p className="text-base text-base-content/50 leading-relaxed text-center max-w-lg">
+          <p className="text-base text-base-muted leading-relaxed text-center max-w-lg">
             Three steps between you and live data on your desktop.
           </p>
         </div>
@@ -538,7 +538,7 @@ export function HowItWorks() {
             Ready in{' '}
             <span className="text-gradient-primary">Under a Minute</span>
           </h2>
-          <p className="text-base text-base-content/50 leading-relaxed text-center max-w-lg">
+          <p className="text-base text-base-muted leading-relaxed text-center max-w-lg">
             Three steps between you and live data on your desktop.
           </p>
         </motion.div>
@@ -559,7 +559,7 @@ export function HowItWorks() {
                   <h3 className="text-base font-bold text-base-content">
                     {step.title}
                   </h3>
-                  <p className="mt-1 text-sm leading-relaxed text-base-content/50">
+                  <p className="mt-1 text-sm leading-relaxed text-base-muted">
                     {step.description}
                   </p>
                 </div>
@@ -616,7 +616,7 @@ export function HowItWorks() {
                       className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold transition-colors duration-300 ${
                         isActive
                           ? 'bg-primary text-primary-content'
-                          : 'bg-base-300/20 text-base-content/25'
+                          : 'bg-base-300/20 text-base-subtle'
                       }`}
                     >
                       {i + 1}
@@ -627,7 +627,7 @@ export function HowItWorks() {
                         className={`text-sm font-bold transition-colors duration-300 ${
                           isActive
                             ? 'text-base-content'
-                            : 'text-base-content/45'
+                            : 'text-base-subtle'
                         }`}
                       >
                         {step.title}
@@ -649,7 +649,7 @@ export function HowItWorks() {
                             }}
                             className="overflow-hidden"
                           >
-                            <p className="text-sm text-base-content/45 leading-relaxed mt-2">
+                            <p className="text-sm text-base-subtle leading-relaxed mt-2">
                               {step.description}
                             </p>
                           </motion.div>

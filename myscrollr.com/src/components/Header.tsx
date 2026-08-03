@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { IdTokenClaims } from '@logto/react'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { useDemoTicker } from '@/hooks/useDemoTicker'
 import ScrollrSVG from '@/components/ScrollrSVG'
@@ -58,28 +59,25 @@ export default function Header({
   const drawerRef = useRef<HTMLElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
 
-  // Close drawer on Escape and return focus to the menu button
-  const closeDrawer = useCallback(() => {
-    setIsOpen(false)
-    requestAnimationFrame(() => menuButtonRef.current?.focus())
-  }, [])
+  const closeDrawer = useCallback(() => setIsOpen(false), [])
 
-  useEffect(() => {
-    if (!isOpen) return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        closeDrawer()
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, closeDrawer])
+  // Escape, Tab containment and focus restore. Previously this had Escape
+  // and a restore but no actual trap, so Tab left the open drawer and
+  // walked the page behind it.
+  useFocusTrap(drawerRef, isOpen, closeDrawer)
 
+  // AnimatePresence does not unmount the drawer after its exit animation:
+  // verified still in the DOM 15s after close, translated off-screen but
+  // `visibility: visible`, leaving 7 links in the tab order and in the
+  // accessibility tree on every page. Marking it inert is what actually
+  // holds, and it has to be imperative — AnimatePresence re-renders the
+  // exiting child with the props it had while open, so an `inert={!isOpen}`
+  // prop is captured as `false` and never applies.
   useEffect(() => {
-    if (isOpen) {
-      requestAnimationFrame(() => drawerRef.current?.focus())
-    }
+    const el = drawerRef.current
+    if (!el) return
+    if (isOpen) el.removeAttribute('inert')
+    else el.setAttribute('inert', '')
   }, [isOpen])
 
   return (
@@ -126,67 +124,72 @@ export default function Header({
         </div>
       </header>
 
+      {/* Each child is keyed and directly under AnimatePresence. Wrapping
+          them in a fragment stops AnimatePresence tracking the exit, so the
+          subtree never unmounts: the drawer slid off-screen but stayed in
+          the DOM, visible and focusable, leaving seven links in the tab
+          order and reachable by screen readers on every page. */}
       <AnimatePresence>
-        {isOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={closeDrawer}
-              className="pointer-events-auto fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
-              aria-hidden="true"
-            />
+        {isOpen && [
+          <motion.div
+            key="drawer-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={closeDrawer}
+            className="pointer-events-auto fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
+            aria-hidden="true"
+          />,
 
-            <motion.aside
-              ref={drawerRef}
-              id="mobile-nav-drawer"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Mobile navigation"
-              tabIndex={-1}
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={`fixed right-0 z-50 flex w-72 flex-col border-l border-hairline bg-base-75 lg:hidden ${drawerInsets}`}
-            >
-              <div className="flex items-center justify-between border-b border-hairline px-5 py-4">
-                <Wordmark />
-                <button
-                  onClick={closeDrawer}
-                  className="flex cursor-pointer items-center justify-center rounded-[4px] border border-hairline p-2.5 transition-colors hover:border-primary/40"
-                  aria-label="Close menu"
-                >
-                  <X size={18} />
-                </button>
-              </div>
+          <motion.aside
+            key="drawer-panel"
+            ref={drawerRef}
+            id="mobile-nav-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Mobile navigation"
+            tabIndex={-1}
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className={`fixed right-0 z-50 flex w-72 flex-col border-l border-hairline bg-base-75 lg:hidden ${drawerInsets}`}
+          >
+            <div className="flex items-center justify-between border-b border-hairline px-5 py-4">
+              <Wordmark />
+              <button
+                onClick={closeDrawer}
+                className="flex cursor-pointer items-center justify-center rounded-[4px] border border-hairline p-2.5 transition-colors hover:border-primary/40"
+                aria-label="Close menu"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-              <nav className="flex-1 space-y-1 px-4 py-6 font-mono text-sm tracking-[0.08em]">
-                {NAV_LINKS.map((l) => (
-                  <MobileNavLink key={l.to} to={l.to} onClick={closeDrawer}>
-                    {l.label}
-                  </MobileNavLink>
-                ))}
-                <ClientOnly>
-                  <MobileAccountLink onNavigate={closeDrawer} />
-                </ClientOnly>
-              </nav>
+            <nav className="flex-1 space-y-1 px-4 py-6 font-mono text-sm tracking-[0.08em]">
+              {NAV_LINKS.map((l) => (
+                <MobileNavLink key={l.to} to={l.to} onClick={closeDrawer}>
+                  {l.label}
+                </MobileNavLink>
+              ))}
+              <ClientOnly>
+                <MobileAccountLink onNavigate={closeDrawer} />
+              </ClientOnly>
+            </nav>
 
-              {/* Download is the one action that matters here */}
-              <div className="border-t border-hairline px-5 py-5">
-                <Link
-                  to="/download"
-                  onClick={closeDrawer}
-                  className="block rounded-[4px] bg-primary py-3 text-center font-mono text-sm font-bold tracking-[0.08em] text-primary-content hover:text-primary-content hover:opacity-100"
-                >
-                  DOWNLOAD ↓
-                </Link>
-              </div>
-            </motion.aside>
-          </>
-        )}
+            {/* Download is the one action that matters here */}
+            <div className="border-t border-hairline px-5 py-5">
+              <Link
+                to="/download"
+                onClick={closeDrawer}
+                className="block rounded-[4px] bg-primary py-3 text-center font-mono text-sm font-bold tracking-[0.08em] text-primary-content hover:text-primary-content hover:opacity-100"
+              >
+                DOWNLOAD ↓
+              </Link>
+            </div>
+          </motion.aside>,
+        ]}
       </AnimatePresence>
     </>
   )
@@ -266,9 +269,7 @@ function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
     <Link
       to={to}
       className={`relative transition-colors hover:opacity-100 ${
-        isActive
-          ? 'text-primary'
-          : 'text-base-content/55 hover:text-base-content'
+        isActive ? 'text-primary' : 'text-base-muted hover:text-base-content'
       }`}
     >
       {children}
@@ -303,7 +304,7 @@ function MobileNavLink({
       to={to}
       onClick={onClick}
       className={`block rounded-[4px] px-4 py-3 transition-colors hover:bg-base-200 hover:opacity-100 ${
-        isActive ? 'text-primary' : 'text-base-content/70'
+        isActive ? 'text-primary' : 'text-base-muted'
       }`}
     >
       {children}

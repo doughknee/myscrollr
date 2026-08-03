@@ -28,7 +28,7 @@ export function SupportBilling() {
       <div className="mt-6 flex justify-start">
         <Link
           to="/uplink"
-          className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary transition-colors"
         >
           View plans and pricing
           <ArrowRight size={14} aria-hidden="true" />

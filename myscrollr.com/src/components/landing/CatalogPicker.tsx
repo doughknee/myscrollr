@@ -98,7 +98,7 @@ export function CatalogPicker() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
                   transition={{ duration: 0.18, ease: EASE }}
-                  className="inline-block text-warning"
+                  className="inline-block text-warning-ink"
                 >
                   <CountUp value={used} />
                   {' RUNNING · UPLINK TERRITORY'}
@@ -119,12 +119,12 @@ export function CatalogPicker() {
             <br />
             <span className="text-primary">Watch the bar change.</span>
           </h2>
-          <p className="m-0 mb-1.5 max-w-[400px] text-[15px] text-base-content/60 [text-wrap:pretty]">
+          <p className="m-0 mb-1.5 max-w-[400px] text-[15px] text-base-muted [text-wrap:pretty]">
             Start with the hits. The full catalog is one click away. Everything
             you add shows up in the bar below, immediately.
           </p>
         </motion.div>
-        <div className="pb-[18px] pt-6 font-mono text-[11px] uppercase tracking-[0.12em] text-base-content/45">
+        <div className="pb-[18px] pt-6 font-mono text-[11px] uppercase tracking-[0.12em] text-base-subtle">
           {countLine}
         </div>
         {/* sync mode (no "wait"): the leaving block collapses while the
@@ -157,7 +157,7 @@ export function CatalogPicker() {
                   type="button"
                   aria-expanded={false}
                   onClick={() => setExpanded(true)}
-                  className="inline-flex cursor-pointer items-center gap-[9px] whitespace-nowrap rounded-[4px] border border-dashed border-base-content/25 bg-transparent px-[15px] py-2.5 font-mono text-xs tracking-[0.08em] text-base-content/55 transition-colors duration-150 hover:border-primary hover:text-primary"
+                  className="inline-flex cursor-pointer items-center gap-[9px] whitespace-nowrap rounded-[4px] border border-dashed border-base-content/25 bg-transparent px-[15px] py-2.5 font-mono text-xs tracking-[0.08em] text-base-muted transition-colors duration-150 hover:border-primary hover:text-primary"
                 >
                   ＋ {moreCount} MORE ▾
                 </button>
@@ -204,7 +204,7 @@ export function CatalogPicker() {
                       }}
                       className="pb-[22px]"
                     >
-                      <div className="pb-2.5 font-mono text-[10px] tracking-[0.14em] text-base-content/45">
+                      <div className="pb-2.5 font-mono text-[10px] tracking-[0.14em] text-base-subtle">
                         {`${c.label} — ${counts[c.id]}`}
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -234,7 +234,7 @@ export function CatalogPicker() {
                       transition: { duration: 0.35, ease: EASE },
                     },
                   }}
-                  className="mb-5 cursor-pointer rounded-[4px] border border-dashed border-base-content/25 bg-transparent px-[18px] py-2.5 font-mono text-xs tracking-[0.08em] text-base-content/55 transition-colors duration-150 hover:border-primary hover:text-primary"
+                  className="mb-5 cursor-pointer rounded-[4px] border border-dashed border-base-content/25 bg-transparent px-[18px] py-2.5 font-mono text-xs tracking-[0.08em] text-base-muted transition-colors duration-150 hover:border-primary hover:text-primary"
                 >
                   SHOW LESS ▴
                 </motion.button>
@@ -254,16 +254,16 @@ export function CatalogPicker() {
               className="overflow-hidden"
             >
               <div className="mb-7 flex flex-wrap items-center gap-3.5 rounded-[4px] border border-dashed border-warning/40 px-[18px] py-3.5">
-                <span className="font-mono text-xs tracking-[0.1em] text-warning">
+                <span className="font-mono text-xs tracking-[0.1em] text-warning-ink">
                   {used} RUNNING ▓ UPLINK TERRITORY
                 </span>
-                <span className="min-w-0 flex-[1_1_260px] text-sm text-base-content/75">
+                <span className="min-w-0 flex-[1_1_260px] text-sm text-base-muted">
                   This is what Uplink feels like: 6, 12, or unlimited slots.
                   From $6.67/mo, 7-day free trial.
                 </span>
                 <Link
                   to="/uplink"
-                  className="ml-auto font-mono text-xs font-semibold tracking-[0.1em] text-warning hover:text-warning/80"
+                  className="ml-auto font-mono text-xs font-semibold tracking-[0.1em] text-warning-ink hover:text-warning-ink"
                 >
                   SEE UPLINK →
                 </Link>
@@ -316,7 +316,7 @@ function WidgetPill({
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.4, opacity: 0 }}
           transition={{ duration: 0.12 }}
-          className={`inline-block w-3.5 text-center font-mono text-[11px] ${on ? 'text-primary' : 'text-base-content/45'}`}
+          className={`inline-block w-3.5 text-center font-mono text-[11px] ${on ? 'text-primary' : 'text-base-subtle'}`}
         >
           {on ? '●' : '＋'}
         </motion.span>

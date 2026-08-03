@@ -139,8 +139,8 @@ function ProfilePage() {
     return (
       <div className="min-h-dvh flex items-center justify-center">
         <div className="text-center space-y-4">
-          <Loader2 className="animate-spin h-12 w-12 text-base-content/30 mx-auto" />
-          <p className="text-xs text-base-content/30">Loading profile...</p>
+          <Loader2 className="animate-spin h-12 w-12 text-base-subtle mx-auto" />
+          <p className="text-xs text-base-subtle">Loading profile...</p>
         </div>
       </div>
     )
@@ -163,11 +163,11 @@ function ProfilePage() {
               background: `linear-gradient(90deg, transparent, ${HEX.primary} 50%, transparent)`,
             }}
           />
-          <AlertCircle className="h-16 w-16 text-warning mx-auto mb-6" />
+          <AlertCircle className="h-16 w-16 text-warning-ink mx-auto mb-6" />
           <h1 className="text-2xl font-black tracking-tight mb-3">
             Auth Required
           </h1>
-          <p className="text-base-content/45 text-sm leading-relaxed mb-8">
+          <p className="text-base-subtle text-sm leading-relaxed mb-8">
             Sign in to access your profile and connected widgets.
           </p>
           <button
@@ -199,11 +199,11 @@ function ProfilePage() {
               background: `linear-gradient(90deg, transparent, ${HEX.secondary} 50%, transparent)`,
             }}
           />
-          <AlertCircle className="h-16 w-16 text-error mx-auto mb-6" />
+          <AlertCircle className="h-16 w-16 text-error-ink mx-auto mb-6" />
           <h1 className="text-2xl font-black tracking-tight mb-3">
             Profile Not Found
           </h1>
-          <p className="text-base-content/45 text-sm leading-relaxed">
+          <p className="text-base-subtle text-sm leading-relaxed">
             {error || `Unable to load profile for @${username}.`}
           </p>
         </motion.div>
@@ -229,7 +229,7 @@ function ProfilePage() {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2, duration: 0.5, ease: EASE }}
-              className="mx-auto mb-6 w-28 h-28 rounded-xl flex items-center justify-center text-4xl font-black text-base-content/80 uppercase"
+              className="mx-auto mb-6 w-28 h-28 rounded-xl flex items-center justify-center text-4xl font-black text-base-muted uppercase"
               style={{
                 background: `${HEX.primary}15`,
                 boxShadow: `0 0 40px ${HEX.primary}15, 0 0 0 1px ${HEX.primary}20`,
@@ -244,13 +244,13 @@ function ProfilePage() {
 
             {profile.display_name &&
               profile.display_name !== profile.username && (
-                <p className="text-base text-base-content/45 mb-4">
+                <p className="text-base text-base-subtle mb-4">
                   {profile.display_name}
                 </p>
               )}
 
             <div className="flex items-center justify-center gap-2 mt-4">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-success/10 text-success text-xs font-semibold rounded-full border border-success/20">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-success/10 text-success-ink text-xs font-semibold rounded-full border border-success/20">
                 <Shield size={12} /> Active
               </span>
             </div>
@@ -272,7 +272,7 @@ function ProfilePage() {
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
               Connected <span className="text-gradient-primary">Widgets</span>
             </h2>
-            <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
+            <p className="text-base text-base-subtle leading-relaxed max-w-lg mx-auto">
               Linked services and data sources for this profile
             </p>
           </motion.div>
@@ -318,7 +318,7 @@ function ProfilePage() {
                     boxShadow: `0 0 20px ${HEX.accent}15, 0 0 0 1px ${HEX.accent}20`,
                   }}
                 >
-                  <span className="text-base font-black text-base-content/80">
+                  <span className="text-base font-black text-base-muted">
                     Y!
                   </span>
                 </div>
@@ -327,11 +327,11 @@ function ProfilePage() {
                     Yahoo Fantasy
                   </p>
                   {profile.connected_yahoo ? (
-                    <p className="text-xs text-success flex items-center gap-1.5 font-semibold mt-1">
+                    <p className="text-xs text-success-ink flex items-center gap-1.5 font-semibold mt-1">
                       <Check size={14} strokeWidth={3} /> Connected
                     </p>
                   ) : (
-                    <p className="text-xs text-base-content/30 font-semibold mt-1">
+                    <p className="text-xs text-base-subtle font-semibold mt-1">
                       Disconnected
                     </p>
                   )}
@@ -360,7 +360,7 @@ function ProfilePage() {
 
           {/* Footer */}
           <motion.div
-            className="flex items-center justify-center gap-4 text-base-content/20 text-[10px] uppercase tracking-wide pt-12"
+            className="flex items-center justify-center gap-4 text-base-subtle text-[10px] uppercase tracking-wide pt-12"
             style={{ opacity: 0 }}
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}

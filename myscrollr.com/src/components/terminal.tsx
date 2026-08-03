@@ -41,7 +41,7 @@ export function SectionRow({
   stat?: ReactNode
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 border-b border-hairline py-5 font-mono text-[11px] uppercase tracking-[0.14em] text-base-content/45">
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 border-b border-hairline py-5 font-mono text-[11px] uppercase tracking-[0.14em] text-base-subtle">
       <span>{tag}</span>
       {stat != null && <span className="text-right">{stat}</span>}
     </div>
@@ -93,7 +93,7 @@ export function PageHeader({
       <div className="relative mx-auto max-w-[1280px]">
         <motion.div
           {...riseIn(0)}
-          className="mb-10 flex flex-wrap justify-between gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-base-content/45"
+          className="mb-10 flex flex-wrap justify-between gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-base-subtle"
         >
           <span>{eyebrowLeft}</span>
           {eyebrowRight != null && <span>{eyebrowRight}</span>}
@@ -107,7 +107,7 @@ export function PageHeader({
           {...riseIn(3)}
           className="mt-10 flex flex-wrap items-end justify-between gap-10"
         >
-          <p className="m-0 max-w-[480px] text-lg leading-relaxed text-base-content/60 [text-wrap:pretty]">
+          <p className="m-0 max-w-[480px] text-lg leading-relaxed text-base-muted [text-wrap:pretty]">
             {sub}
           </p>
           {actions != null && <div className="min-w-0">{actions}</div>}
@@ -145,7 +145,7 @@ export function DeparturesRow({
   const inner = (
     <>
       <span className="flex flex-wrap items-baseline gap-5">
-        <span className="font-mono text-xs text-base-content/40">
+        <span className="font-mono text-xs text-base-subtle">
           ↳ {index}
         </span>
         <span
@@ -166,7 +166,7 @@ export function DeparturesRow({
           </motion.span>
         )}
         {meta != null && (
-          <span className="text-sm text-base-content/55">{meta}</span>
+          <span className="text-sm text-base-muted">{meta}</span>
         )}
       </span>
       <span className="whitespace-nowrap font-mono text-sm text-primary transition-transform duration-150 group-hover:translate-x-1">
@@ -232,7 +232,7 @@ export function StepsGrid({ steps }: { steps: Array<TerminalStep> }) {
           <div className="mb-2.5 text-[19px] font-bold uppercase tracking-[0.02em]">
             {s.title}
           </div>
-          <div className="max-w-[340px] text-[14.5px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
+          <div className="max-w-[340px] text-[14.5px] leading-relaxed text-base-muted [text-wrap:pretty]">
             {s.body}
           </div>
         </motion.div>

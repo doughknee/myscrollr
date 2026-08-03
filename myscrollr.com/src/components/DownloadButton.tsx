@@ -256,7 +256,7 @@ function LinuxDownloadButton() {
                 <span className="text-sm font-semibold text-base-content">
                   {label}
                 </span>
-                <span className="text-xs text-base-content/50">{hint}</span>
+                <span className="text-xs text-base-muted">{hint}</span>
               </button>
             ))}
           </motion.div>
@@ -270,7 +270,7 @@ function LinuxDownloadButton() {
 
 function IntelMacWarning() {
   return (
-    <div className="flex max-w-md items-start gap-2 rounded-xl border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning">
+    <div className="flex max-w-md items-start gap-2 rounded-xl border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning-ink">
       <span aria-hidden="true">⚠</span>
       <span>
         Apple Silicon only. Scrollr does not run on Intel Macs yet. The download
@@ -308,7 +308,7 @@ const MOBILE_PLATFORMS: ReadonlyArray<{
 function MobilePlatformPicker() {
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs text-base-content/60">
+      <p className="text-xs text-base-muted">
         Scrollr is a desktop app. Visit this page on macOS, Windows, or Linux to
         download.
       </p>
@@ -322,13 +322,13 @@ function MobilePlatformPicker() {
             className="group flex items-center justify-between gap-3 rounded-2xl border border-base-300 bg-base-200/40 px-4 py-3 text-sm font-semibold text-base-content transition-all hover:border-primary/30 hover:bg-base-200/80"
           >
             <span className="flex items-center gap-3">
-              <span className="text-base-content/60 group-hover:text-primary">
+              <span className="text-base-muted group-hover:text-primary">
                 {p.icon}
               </span>
               {p.label}
             </span>
             <Download
-              className="h-4 w-4 text-base-content/40 group-hover:text-primary"
+              className="h-4 w-4 text-base-subtle group-hover:text-primary"
               aria-hidden="true"
             />
           </a>

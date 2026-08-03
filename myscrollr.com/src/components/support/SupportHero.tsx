@@ -56,7 +56,7 @@ export function SupportHero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
-          className="mx-auto mt-6 max-w-2xl text-lg text-base-content/60"
+          className="mx-auto mt-6 max-w-2xl text-lg text-base-muted"
         >
           Find answers, troubleshoot issues, or send us a note. Most questions
           are answered below — we usually reply to direct messages within 1-2
@@ -75,7 +75,7 @@ export function SupportHero() {
             <a
               key={link.href}
               href={link.href}
-              className="rounded-full border border-base-300/50 bg-base-200/40 px-4 py-1.5 text-sm font-medium text-base-content/70 transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+              className="rounded-full border border-base-300/50 bg-base-200/40 px-4 py-1.5 text-sm font-medium text-base-muted transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
             >
               {link.label}
             </a>

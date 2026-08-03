@@ -379,7 +379,7 @@ function CompareCell({ value, up }: { value: string; up?: boolean }) {
   if (value === 'No') {
     return (
       <span
-        className="font-mono text-xs text-base-content/30"
+        className="font-mono text-xs text-base-subtle"
         aria-label="Not included"
       >
         —
@@ -389,7 +389,7 @@ function CompareCell({ value, up }: { value: string; up?: boolean }) {
   if (up) {
     return <span className="font-mono text-xs text-primary">✓ {value}</span>
   }
-  return <span className="font-mono text-xs text-base-content/55">{value}</span>
+  return <span className="font-mono text-xs text-base-muted">{value}</span>
 }
 
 // ── Page Component ──────────────────────────────────────────────
@@ -651,7 +651,7 @@ function UplinkPage() {
             animate={{ opacity: 1, scale: 1 }}
             className="relative mx-4 w-full max-w-sm rounded-[8px] border border-hairline bg-panel p-6"
           >
-            <h3 className="mb-4 text-sm font-semibold text-base-content/80">
+            <h3 className="mb-4 text-sm font-semibold text-base-muted">
               {pendingChange.isTrialChange
                 ? 'Switch to'
                 : pendingChange.isDowngrade
@@ -663,13 +663,13 @@ function UplinkPage() {
             <div className="mb-6 space-y-3">
               {pendingChange.isTrialChange ? (
                 <>
-                  <p className="text-xs text-base-content/50">
+                  <p className="text-xs text-base-muted">
                     No charge during your trial. Your plan will switch to{' '}
-                    <span className="font-semibold text-base-content/80">
+                    <span className="font-semibold text-base-muted">
                       {TIER_NAMES[pendingChange.tier]}
                     </span>{' '}
                     and billing starts{' '}
-                    <span className="font-semibold text-base-content/80">
+                    <span className="font-semibold text-base-muted">
                       {new Date(
                         pendingChange.trialEnd * 1000,
                       ).toLocaleDateString('en-US', {
@@ -680,7 +680,7 @@ function UplinkPage() {
                     </span>
                     .
                   </p>
-                  <p className="text-[10px] text-base-content/30">
+                  <p className="text-[10px] text-base-subtle">
                     You&rsquo;ll keep full{' '}
                     {TIER_NAMES[activeTier ?? 'ultimate']} access until your
                     trial ends.
@@ -688,10 +688,10 @@ function UplinkPage() {
                 </>
               ) : pendingChange.isDowngrade ? (
                 <>
-                  <p className="text-xs text-base-content/50">
+                  <p className="text-xs text-base-muted">
                     Your {activeTier ? TIER_NAMES[activeTier] : ''} access
                     continues until{' '}
-                    <span className="font-semibold text-base-content/80">
+                    <span className="font-semibold text-base-muted">
                       {new Date(
                         pendingChange.scheduledDate * 1000,
                       ).toLocaleDateString('en-US', {
@@ -702,7 +702,7 @@ function UplinkPage() {
                     </span>
                     .
                   </p>
-                  <p className="text-[10px] text-base-content/30">
+                  <p className="text-[10px] text-base-subtle">
                     After that, your plan switches to{' '}
                     {TIER_NAMES[pendingChange.tier]} at your next renewal. No
                     charge or refund — your current billing cycle is unaffected.
@@ -710,20 +710,20 @@ function UplinkPage() {
                 </>
               ) : pendingChange.amountDue > 0 ? (
                 <>
-                  <p className="text-xs text-base-content/50">
+                  <p className="text-xs text-base-muted">
                     You will be charged{' '}
-                    <span className="font-semibold text-base-content/80">
+                    <span className="font-semibold text-base-muted">
                       ${(pendingChange.amountDue / 100).toFixed(2)}
                     </span>{' '}
                     today.
                   </p>
-                  <p className="text-[10px] text-base-content/30">
+                  <p className="text-[10px] text-base-subtle">
                     This is the prorated difference for the remaining days in
                     your current billing cycle.
                   </p>
                 </>
               ) : (
-                <p className="text-xs text-base-content/50">
+                <p className="text-xs text-base-muted">
                   No charge — your new plan starts immediately.
                 </p>
               )}
@@ -732,7 +732,7 @@ function UplinkPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setPendingChange(null)}
-                className="flex-1 rounded-[4px] border border-hairline py-2.5 text-[10px] font-semibold text-base-content/40 transition-colors hover:border-base-content/20 hover:text-base-content/60"
+                className="flex-1 rounded-[4px] border border-hairline py-2.5 text-[10px] font-semibold text-base-subtle transition-colors hover:border-base-content/20 hover:text-base-muted"
               >
                 Cancel
               </button>
@@ -763,20 +763,20 @@ function UplinkPage() {
           >
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-error/10">
-                <ShieldAlert size={20} className="text-error" />
+                <ShieldAlert size={20} className="text-error-ink" />
               </div>
-              <h3 className="text-sm font-semibold text-base-content/80">
+              <h3 className="text-sm font-semibold text-base-muted">
                 Cancel your free trial?
               </h3>
             </div>
 
-            <div className="space-y-3 text-xs leading-relaxed text-base-content/50">
+            <div className="space-y-3 text-xs leading-relaxed text-base-muted">
               <p>
                 If you cancel now, you&apos;ll lose access to all premium
                 features immediately &mdash; including your extra widget slots
                 and Uplink Ultimate access.
               </p>
-              <p className="font-semibold text-base-content/70">
+              <p className="font-semibold text-base-muted">
                 This is the only free trial offered per account. Once canceled,
                 you&apos;ll need to purchase a paid plan to access premium
                 features again.
@@ -809,7 +809,7 @@ function UplinkPage() {
                   }
                 }}
                 className="flex-1 rounded-[4px] border border-error/30 py-2.5 text-xs font-semibold
-                           text-error/60 transition-colors hover:bg-error/10 hover:text-error"
+                           text-error-ink transition-colors hover:bg-error/10 hover:text-error-ink"
               >
                 Cancel Trial
               </button>
@@ -828,12 +828,12 @@ function UplinkPage() {
               animate={{ opacity: 1, y: 0 }}
               className="fixed left-1/2 top-24 z-40 flex -translate-x-1/2 items-center gap-3 rounded-[4px] border border-success/30 bg-success/10 px-6 py-4 backdrop-blur-sm"
             >
-              <CheckCircle2 size={18} className="text-success" />
+              <CheckCircle2 size={18} className="text-success-ink" />
               <div>
-                <p className="text-xs font-bold text-success">
+                <p className="text-xs font-bold text-success-ink">
                   {tierName} Activated
                 </p>
-                <p className="text-[10px] text-base-content/40">
+                <p className="text-[10px] text-base-subtle">
                   {currentSub?.status === 'trialing'
                     ? `Your 7-day free trial is active. Enjoy full Uplink Ultimate access.`
                     : `Your subscription is active. Welcome to ${tierName}.`}
@@ -841,7 +841,7 @@ function UplinkPage() {
               </div>
               <button
                 onClick={() => setCheckoutSuccess(false)}
-                className="ml-4 text-xs text-base-content/30 transition-colors hover:text-base-content/60"
+                className="ml-4 text-xs text-base-subtle transition-colors hover:text-base-muted"
               >
                 &times;
               </button>
@@ -855,16 +855,16 @@ function UplinkPage() {
           animate={{ opacity: 1, y: 0 }}
           className="fixed left-1/2 top-24 z-40 flex -translate-x-1/2 items-center gap-3 rounded-[4px] border border-error/30 bg-error/10 px-6 py-4 backdrop-blur-sm"
         >
-          <AlertTriangle size={18} className="text-error" />
+          <AlertTriangle size={18} className="text-error-ink" />
           <div>
-            <p className="text-xs font-bold text-error">Plan Change Failed</p>
-            <p className="text-[10px] text-base-content/40">
+            <p className="text-xs font-bold text-error-ink">Plan Change Failed</p>
+            <p className="text-[10px] text-base-subtle">
               {planChangeError}
             </p>
           </div>
           <button
             onClick={() => setPlanChangeError(null)}
-            className="ml-4 text-xs text-base-content/30 transition-colors hover:text-base-content/60"
+            className="ml-4 text-xs text-base-subtle transition-colors hover:text-base-muted"
           >
             ✕
           </button>
@@ -897,7 +897,7 @@ function UplinkPage() {
                       ? amber
                         ? 'border-transparent text-[#fbbf24]'
                         : 'border-transparent text-primary'
-                      : 'border-hairline text-base-content/50 hover:text-base-content/80'
+                      : 'border-hairline text-base-muted hover:text-base-muted'
                   }`}
                 >
                   {/* Active chip slides between billing views, turning
@@ -1002,7 +1002,7 @@ function UplinkPage() {
                           Every widget, forever.
                         </span>
                       </h2>
-                      <p className="m-0 max-w-[440px] text-[15.5px] leading-[1.65] text-base-content/60 [text-wrap:pretty]">
+                      <p className="m-0 max-w-[440px] text-[15.5px] leading-[1.65] text-base-muted [text-wrap:pretty]">
                         Permanent Uplink Ultimate: unlimited slots, priority
                         support, and early access, plus a founding-member badge.
                         Pays for itself against Ultimate Annual in 2.5 years.
@@ -1013,7 +1013,7 @@ function UplinkPage() {
                         <span className="font-mono text-[56px] font-semibold tracking-[-0.02em]">
                           ${LIFETIME_PRICE}
                         </span>
-                        <span className="font-mono text-[13px] text-base-content/45">
+                        <span className="font-mono text-[13px] text-base-subtle">
                           ONCE
                         </span>
                       </div>
@@ -1023,7 +1023,7 @@ function UplinkPage() {
                       >
                         Purchase lifetime access
                       </Link>
-                      <div className="font-mono text-[10.5px] text-base-content/45">
+                      <div className="font-mono text-[10.5px] text-base-subtle">
                         NO SUBSCRIPTION · NO RENEWAL · STRIPE
                       </div>
                     </div>
@@ -1080,7 +1080,7 @@ function UplinkPage() {
                       <div className="font-display text-xl font-extrabold uppercase tracking-[0.02em]">
                         {p.name}
                       </div>
-                      <div className="mb-6 mt-1.5 min-h-[20px] text-[13.5px] text-base-content/60">
+                      <div className="mb-6 mt-1.5 min-h-[20px] text-[13.5px] text-base-muted">
                         {p.tagline}
                       </div>
 
@@ -1095,12 +1095,12 @@ function UplinkPage() {
                             </>
                           )}
                         </span>
-                        <span className="font-mono text-[13px] text-base-content/45">
+                        <span className="font-mono text-[13px] text-base-subtle">
                           /MO
                         </span>
                       </div>
                       {isFree ? (
-                        <div className="mb-[26px] mt-2 flex min-h-[22px] items-center font-mono text-[11px] tracking-[0.06em] text-base-content/45">
+                        <div className="mb-[26px] mt-2 flex min-h-[22px] items-center font-mono text-[11px] tracking-[0.06em] text-base-subtle">
                           FREE FOREVER
                         </div>
                       ) : (
@@ -1126,7 +1126,7 @@ function UplinkPage() {
                                   }}
                                   transition={{ duration: 0.2, ease: EASE }}
                                   aria-hidden={!activeView}
-                                  className={`col-start-1 row-start-1 flex flex-wrap items-center gap-x-2 gap-y-1.5 self-center font-mono text-[11px] tracking-[0.06em] text-base-content/45 ${
+                                  className={`col-start-1 row-start-1 flex flex-wrap items-center gap-x-2 gap-y-1.5 self-center font-mono text-[11px] tracking-[0.06em] text-base-subtle ${
                                     activeView ? '' : 'pointer-events-none'
                                   }`}
                                 >
@@ -1189,7 +1189,7 @@ function UplinkPage() {
                           </span>
                         )}
                       </div>
-                      <div className="mb-[26px] font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/45">
+                      <div className="mb-[26px] font-mono text-[10px] uppercase tracking-[0.14em] text-base-subtle">
                         {p.slots === null
                           ? 'UNLIMITED WIDGETS AT ONCE'
                           : `${p.slots} WIDGETS AT ONCE`}
@@ -1202,7 +1202,7 @@ function UplinkPage() {
                             type="button"
                             onClick={() => setShowTrialCancelModal(true)}
                             disabled={trialCanceling}
-                            className="mt-auto block cursor-pointer rounded-[4px] border border-error/30 py-[13px] text-center text-[15px] font-bold text-error/60 transition-colors hover:border-error/50 hover:text-error/80 disabled:opacity-50"
+                            className="mt-auto block cursor-pointer rounded-[4px] border border-error/30 py-[13px] text-center text-[15px] font-bold text-error-ink transition-colors hover:border-error/50 hover:text-error-ink disabled:opacity-50"
                           >
                             {trialCanceling ? 'Canceling...' : 'Cancel trial'}
                           </button>
@@ -1235,7 +1235,7 @@ function UplinkPage() {
 
                       {/* Foot line */}
                       {showFoot && (
-                        <div className="pt-2.5 text-center font-mono text-[10.5px] text-base-content/45">
+                        <div className="pt-2.5 text-center font-mono text-[10.5px] text-base-subtle">
                           {isFree
                             ? isTrialing
                               ? "YOU WON'T BE CHARGED"
@@ -1251,7 +1251,7 @@ function UplinkPage() {
           </AnimatePresence>
 
           {/* Assurance strip */}
-          <div className="flex flex-wrap justify-center gap-x-7 gap-y-2 border-t border-hairline-minor pb-[26px] pt-5 font-mono text-[11px] tracking-[0.1em] text-base-content/45">
+          <div className="flex flex-wrap justify-center gap-x-7 gap-y-2 border-t border-hairline-minor pb-[26px] pt-5 font-mono text-[11px] tracking-[0.1em] text-base-subtle">
             {ASSURANCES.map((a, i) => (
               <motion.span
                 key={a}
@@ -1292,7 +1292,7 @@ function UplinkPage() {
                 whileInView={{ opacity: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.4, ease: EASE }}
-                className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] border-b border-hairline-minor py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/45"
+                className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] border-b border-hairline-minor py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-base-subtle"
               >
                 <span>FEATURE</span>
                 <span className="text-center">FREE</span>
@@ -1310,7 +1310,7 @@ function UplinkPage() {
                   className="grid grid-cols-[1.6fr_1fr_1fr_1fr_1fr] items-center border-b border-hairline-minor px-1 py-4 transition-colors duration-150 hover:bg-primary/5"
                 >
                   <span className="flex items-center gap-2.5">
-                    <span className="text-sm font-semibold text-base-content/80">
+                    <span className="text-sm font-semibold text-base-muted">
                       {row.label}
                     </span>
                   </span>
@@ -1328,7 +1328,7 @@ function UplinkPage() {
                   </span>
                 </motion.div>
               ))}
-              <div className="py-4 font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/40">
+              <div className="py-4 font-mono text-[10px] uppercase tracking-[0.14em] text-base-subtle">
                 PER-ACCOUNT · FREE TIER ALWAYS INCLUDED · UPGRADE ANYTIME
               </div>
             </div>
@@ -1366,7 +1366,7 @@ function UplinkPage() {
                     className="flex w-full cursor-pointer items-baseline justify-between gap-5 py-5 text-left"
                   >
                     <span className="flex items-baseline gap-4">
-                      <span className="font-mono text-xs text-base-content/40">
+                      <span className="font-mono text-xs text-base-subtle">
                         Q{String(i + 1).padStart(2, '0')}
                       </span>
                       <span className="text-[15px] font-semibold">
@@ -1400,7 +1400,7 @@ function UplinkPage() {
                         transition={{ duration: 0.3, ease: EASE }}
                         className="overflow-hidden"
                       >
-                        <p className="m-0 max-w-[760px] pb-6 text-sm leading-relaxed text-base-content/60 sm:pl-12">
+                        <p className="m-0 max-w-[760px] pb-6 text-sm leading-relaxed text-base-muted sm:pl-12">
                           {f.answer}
                         </p>
                       </motion.div>

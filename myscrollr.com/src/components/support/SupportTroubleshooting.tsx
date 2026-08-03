@@ -36,7 +36,7 @@ export function SupportTroubleshooting() {
                   className="flex w-full cursor-pointer items-center justify-between gap-5 px-2 py-[19px] text-left text-base-content"
                 >
                   <span className="flex items-baseline gap-[18px]">
-                    <span className="font-mono text-[11px] text-base-content/40">
+                    <span className="font-mono text-[11px] text-base-subtle">
                       T.{String(i + 1).padStart(2, '0')}
                     </span>
                     <span className="text-[16.5px] font-bold">
@@ -46,7 +46,7 @@ export function SupportTroubleshooting() {
                   <span
                     aria-hidden="true"
                     className={`font-mono text-sm ${
-                      isOpen ? 'text-primary' : 'text-base-content/40'
+                      isOpen ? 'text-primary' : 'text-base-subtle'
                     }`}
                   >
                     {isOpen ? '▴' : '▾'}
@@ -57,7 +57,7 @@ export function SupportTroubleshooting() {
                     id={`${id}-panel`}
                     role="region"
                     aria-labelledby={`${id}-trigger`}
-                    className="m-0 max-w-[720px] pb-[22px] pl-[47px] pr-2 text-[14.5px] leading-[1.7] text-base-content/60 [text-wrap:pretty]"
+                    className="m-0 max-w-[720px] pb-[22px] pl-[47px] pr-2 text-[14.5px] leading-[1.7] text-base-muted [text-wrap:pretty]"
                   >
                     {article.body}
                   </p>

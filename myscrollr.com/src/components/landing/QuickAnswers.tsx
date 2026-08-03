@@ -45,7 +45,7 @@ export function QuickAnswers() {
                 </span>
                 {f.question}
               </h3>
-              <div className="relative text-[14.5px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
+              <div className="relative text-[14.5px] leading-relaxed text-base-muted [text-wrap:pretty]">
                 {f.answer}
                 {i === last && (
                   <span

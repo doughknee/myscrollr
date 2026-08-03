@@ -97,7 +97,7 @@ function HeroActions() {
           See the widgets ↓
         </button>
       </div>
-      <div className="text-left font-mono text-xs leading-[1.7] text-base-content/45 sm:text-right">
+      <div className="text-left font-mono text-xs leading-[1.7] text-base-subtle sm:text-right">
         {'the ticker is already running at the bottom of this page ↓'}
         <br />
         {"that's the app. it stays on top of everything, including this site"}

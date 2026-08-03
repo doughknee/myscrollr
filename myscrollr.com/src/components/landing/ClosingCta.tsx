@@ -42,7 +42,7 @@ export function ClosingCta() {
             <br />
             <span className="type-outline">your desktop.</span>
           </h2>
-          <p className="m-0 mt-[18px] font-mono text-base-content/60">
+          <p className="m-0 mt-[18px] font-mono text-base-muted">
             three slots free, forever · nothing between you and the download
           </p>
         </div>
@@ -54,7 +54,7 @@ export function ClosingCta() {
               label={p.label}
               tag={detected === p.platform ? 'YOURS' : undefined}
               meta={
-                <span className="font-mono text-xs tracking-[0.06em] text-base-content/40">
+                <span className="font-mono text-xs tracking-[0.06em] text-base-subtle">
                   {p.meta}
                 </span>
               }

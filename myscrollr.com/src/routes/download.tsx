@@ -145,7 +145,7 @@ export function DownloadPage({
                 Download Scrollr ↓
               </a>
             )}
-            <div className="text-right font-mono text-[11px] tracking-[0.06em] text-base-content/45">
+            <div className="text-right font-mono text-[11px] tracking-[0.06em] text-base-subtle">
               {detected
                 ? [
                     getDownloadInfo(detected).filename,
@@ -179,7 +179,7 @@ export function DownloadPage({
                 label="macOS"
                 tag={detected === 'macos' ? 'YOURS' : undefined}
                 meta={
-                  <span className="font-mono text-xs text-base-content/45">
+                  <span className="font-mono text-xs text-base-subtle">
                     {['.DMG', getDownloadInfo('macos').size, 'APPLE SILICON']
                       .filter(Boolean)
                       .join(' · ')}
@@ -200,7 +200,7 @@ export function DownloadPage({
                 label="Windows"
                 tag={detected === 'windows' ? 'YOURS' : undefined}
                 meta={
-                  <span className="font-mono text-xs text-base-content/45">
+                  <span className="font-mono text-xs text-base-subtle">
                     {['SETUP .EXE', getDownloadInfo('windows').size, 'X64']
                       .filter(Boolean)
                       .join(' · ')}
@@ -219,7 +219,7 @@ export function DownloadPage({
               className="flex flex-wrap items-center justify-between gap-5 border-t border-hairline px-3 py-6"
             >
               <span className="flex flex-wrap items-baseline gap-5">
-                <span className="font-mono text-xs text-base-content/40">
+                <span className="font-mono text-xs text-base-subtle">
                   ↳ 03
                 </span>
                 <span className="font-display text-2xl font-bold uppercase tracking-[0.01em]">
@@ -235,7 +235,7 @@ export function DownloadPage({
                     YOURS
                   </motion.span>
                 )}
-                <span className="font-mono text-xs text-base-content/45">
+                <span className="font-mono text-xs text-base-subtle">
                   X86_64
                 </span>
               </span>

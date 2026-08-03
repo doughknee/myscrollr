@@ -12,25 +12,25 @@ const WORD_ACCENTS = [
     fill: 'bg-secondary',
     track: 'bg-secondary/15',
     text: 'text-secondary',
-    textMuted: 'text-secondary/40',
+    textMuted: 'text-secondary',
   },
   {
     fill: 'bg-primary',
     track: 'bg-primary/15',
     text: 'text-primary',
-    textMuted: 'text-primary/40',
+    textMuted: 'text-primary',
   },
   {
     fill: 'bg-info',
     track: 'bg-info/15',
     text: 'text-info',
-    textMuted: 'text-info/40',
+    textMuted: 'text-info',
   },
   {
     fill: 'bg-accent',
     track: 'bg-accent/15',
     text: 'text-accent',
-    textMuted: 'text-accent/40',
+    textMuted: 'text-accent',
   },
 ] as const
 
@@ -150,7 +150,7 @@ export function HeroSection() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 1 }}
-              className="text-base text-center lg:text-left text-base-content/50 max-w-md mx-auto lg:mx-0 leading-relaxed"
+              className="text-base text-center lg:text-left text-base-muted max-w-md mx-auto lg:mx-0 leading-relaxed"
             >
               A quiet ticker at the edge of your screen. Scores update, prices
               move, headlines arrive &mdash; all while you stay focused on
@@ -192,9 +192,9 @@ export function HeroSection() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 1.5 }}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden sm:flex flex-col items-center gap-3 text-base-content/40"
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden sm:flex flex-col items-center gap-3 text-base-subtle"
       >
-        <span className="text-xs text-base-content/40">Scroll</span>
+        <span className="text-xs text-base-subtle">Scroll</span>
         <motion.div
           animate={{ y: [0, 6, 0] }}
           transition={{ duration: 1.5, repeat: Infinity }}

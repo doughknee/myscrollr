@@ -108,7 +108,7 @@ function SupportPage() {
                 <div className="mb-2.5 text-[19px] font-bold uppercase tracking-[0.02em]">
                   {c.title}
                 </div>
-                <div className="max-w-[320px] text-[14.5px] leading-[1.65] text-base-content/60 [text-wrap:pretty]">
+                <div className="max-w-[320px] text-[14.5px] leading-[1.65] text-base-muted [text-wrap:pretty]">
                   {c.body}
                 </div>
               </a>

@@ -217,7 +217,7 @@ export function CallToAction() {
               duration: 0.5,
               ease: EASE,
             }}
-            className="block mt-6 text-lg sm:text-xl text-base-content/50 max-w-lg leading-relaxed"
+            className="block mt-6 text-lg sm:text-xl text-base-muted max-w-lg leading-relaxed"
           >
             Download once. It runs quietly at the edge of your screen.
           </motion.span>
@@ -257,7 +257,7 @@ export function CallToAction() {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ delay: 0.6, duration: 0.5, ease: EASE }}
-            className="mt-6 flex items-center gap-4 text-xs text-base-content/30"
+            className="mt-6 flex items-center gap-4 text-xs text-base-subtle"
           >
             {['macOS', 'Windows', 'Linux'].map((platform) => (
               <span key={platform} className="flex items-center gap-1.5">
@@ -283,13 +283,13 @@ export function CallToAction() {
               target="_blank"
               rel="noreferrer"
               title="Star on GitHub"
-              className="group flex items-center gap-2 px-4 py-2.5 rounded-xl border border-base-300/20 bg-base-200/30 text-warning/50 hover:text-warning hover:border-warning/20 hover:bg-warning/[0.04] transition-[color,border-color,background-color] duration-200"
+              className="group flex items-center gap-2 px-4 py-2.5 rounded-xl border border-base-300/20 bg-base-200/30 text-warning-ink hover:text-warning-ink hover:border-warning/20 hover:bg-warning/[0.04] transition-[color,border-color,background-color] duration-200"
             >
               <Star className="size-4" />
               <span className="text-sm font-bold tabular-nums">
                 {githubStats != null ? starsCount : '...'}
               </span>
-              <span className="text-xs text-base-content/30 group-hover:text-warning/40 transition-[color] duration-200">
+              <span className="text-xs text-base-subtle group-hover:text-warning-ink transition-[color] duration-200">
                 Stars
               </span>
             </a>
@@ -299,13 +299,13 @@ export function CallToAction() {
               href="https://github.com/brandon-relentnet/myscrollr/forks"
               target="_blank"
               rel="noreferrer"
-              className="group flex items-center gap-2 px-4 py-2.5 rounded-xl border border-base-300/20 bg-base-200/30 text-info/50 hover:text-info hover:border-info/20 hover:bg-info/[0.04] transition-[color,border-color,background-color] duration-200"
+              className="group flex items-center gap-2 px-4 py-2.5 rounded-xl border border-base-300/20 bg-base-200/30 text-info hover:text-info hover:border-info/20 hover:bg-info/[0.04] transition-[color,border-color,background-color] duration-200"
             >
               <GitFork className="size-4" />
               <span className="text-sm font-bold tabular-nums">
                 {githubStats != null ? forksCount : '...'}
               </span>
-              <span className="text-xs text-base-content/30 group-hover:text-info/40 transition-[color] duration-200">
+              <span className="text-xs text-base-subtle group-hover:text-info transition-[color] duration-200">
                 Forks
               </span>
             </a>
@@ -313,7 +313,7 @@ export function CallToAction() {
             {/* Discussions */}
             <Link
               to="/support"
-              className="group flex items-center gap-2 px-4 py-2.5 rounded-xl border border-base-300/20 bg-base-200/30 text-accent/50 hover:text-accent hover:border-accent/20 hover:bg-accent/[0.04] transition-[color,border-color,background-color] duration-200"
+              className="group flex items-center gap-2 px-4 py-2.5 rounded-xl border border-base-300/20 bg-base-200/30 text-accent hover:text-accent hover:border-accent/20 hover:bg-accent/[0.04] transition-[color,border-color,background-color] duration-200"
             >
               <MessageSquare className="size-4" />
               <span className="text-sm font-bold">Discuss</span>
@@ -333,7 +333,7 @@ export function CallToAction() {
               href="https://github.com/brandon-relentnet/myscrollr"
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 text-sm text-base-content/40 hover:text-primary transition-[color] duration-200"
+              className="inline-flex items-center gap-2 text-sm text-base-subtle hover:text-primary transition-[color] duration-200"
             >
               <Github className="size-4" aria-hidden />
               View Source
@@ -341,7 +341,7 @@ export function CallToAction() {
             <span className="w-px h-4 bg-base-content/10" />
             <a
               href="#channels"
-              className="inline-flex items-center gap-2 text-sm text-base-content/40 hover:text-primary transition-[color] duration-200"
+              className="inline-flex items-center gap-2 text-sm text-base-subtle hover:text-primary transition-[color] duration-200"
             >
               <Globe className="size-4" aria-hidden />
               Explore Channels
@@ -349,7 +349,7 @@ export function CallToAction() {
             <span className="w-px h-4 bg-base-content/10" />
             <Link
               to="/business"
-              className="inline-flex items-center gap-2 text-sm text-base-content/40 hover:text-primary transition-[color] duration-200"
+              className="inline-flex items-center gap-2 text-sm text-base-subtle hover:text-primary transition-[color] duration-200"
             >
               <Building2 className="size-4" aria-hidden />
               Running a business?

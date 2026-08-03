@@ -135,7 +135,7 @@ function ChannelsPage() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder={`SEARCH ${n} WIDGETS…`}
             aria-label="Search widgets"
-            className="w-[300px] max-w-full rounded-[4px] border border-hairline bg-panel px-[18px] py-[13px] font-mono text-[13px] tracking-[0.06em] text-base-content outline-none placeholder:text-base-content/35 focus:border-primary"
+            className="w-[300px] max-w-full rounded-[4px] border border-hairline bg-panel px-[18px] py-[13px] font-mono text-[13px] tracking-[0.06em] text-base-content outline-none placeholder:text-base-subtle focus:border-primary"
           />
         }
       />
@@ -160,7 +160,7 @@ function ChannelsPage() {
                     className={`relative cursor-pointer whitespace-nowrap rounded-[4px] border px-3.5 py-2 font-mono text-[11px] tracking-[0.1em] transition-colors hover:border-primary ${
                       isActive
                         ? 'border-transparent text-primary'
-                        : 'border-hairline text-base-content/55'
+                        : 'border-hairline text-base-muted'
                     }`}
                   >
                     {isActive && (
@@ -195,7 +195,7 @@ function ChannelsPage() {
                   transition={{ duration: 0.4, ease: EASE, delay: gi * 0.05 }}
                   className="pb-1.5 pt-6"
                 >
-                  <div className="border-b border-hairline pb-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/45">
+                  <div className="border-b border-hairline pb-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-base-subtle">
                     {g.label} — {g.count}
                   </div>
                   {g.items.map((w) => (
@@ -216,7 +216,7 @@ function ChannelsPage() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.25 }}
-                  className="px-2 py-12 font-mono text-[13px] text-base-content/45"
+                  className="px-2 py-12 font-mono text-[13px] text-base-subtle"
                 >
                   {`NO WIDGETS MATCH "${query.toUpperCase()}". THE CATALOG GROWS EVERY MONTH.`}
                 </motion.div>
@@ -303,12 +303,12 @@ function CatalogRow({
         {widget.name}
       </span>
 
-      <span className="col-span-2 col-start-2 row-start-3 text-[13.5px] text-base-content/50 lg:col-span-1 lg:col-start-auto lg:row-start-auto">
+      <span className="col-span-2 col-start-2 row-start-3 text-[13.5px] text-base-muted lg:col-span-1 lg:col-start-auto lg:row-start-auto">
         {widget.description}
       </span>
 
       {/* Jittering sample chip — desktop only */}
-      <span className="hidden overflow-hidden overflow-ellipsis whitespace-nowrap font-mono text-xs text-base-content/40 lg:block">
+      <span className="hidden overflow-hidden overflow-ellipsis whitespace-nowrap font-mono text-xs text-base-subtle lg:block">
         {sample}
       </span>
 
@@ -327,7 +327,7 @@ function CatalogRow({
         className={`col-start-3 row-start-1 min-w-[124px] cursor-pointer whitespace-nowrap rounded-[4px] border px-3 py-2 font-mono text-[11px] tracking-[0.1em] transition-colors hover:border-primary lg:col-start-auto lg:row-start-auto lg:min-w-0 lg:px-0 ${
           inBar
             ? 'border-primary/45 text-primary'
-            : 'border-hairline text-base-content/55'
+            : 'border-hairline text-base-muted'
         }`}
       >
         <AnimatePresence mode="wait" initial={false}>

@@ -179,7 +179,7 @@ function AccountHub() {
                   'User'}
               </span>
             </h1>
-            <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
+            <p className="text-base text-base-subtle leading-relaxed max-w-lg mx-auto">
               Your personal data widgets are ready for orchestration. Sync your
               leagues, track your assets, and stay in the flow.
             </p>
@@ -202,7 +202,7 @@ function AccountHub() {
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
               Your <span className="text-gradient-primary">Dashboard</span>
             </h2>
-            <p className="text-base text-base-content/45 leading-relaxed max-w-lg mx-auto">
+            <p className="text-base text-base-subtle leading-relaxed max-w-lg mx-auto">
               Subscription, widgets, and system health at a glance
             </p>
           </motion.div>
@@ -240,7 +240,7 @@ function AccountHub() {
                     boxShadow: `0 0 20px ${HEX.info}15, 0 0 0 1px ${HEX.info}20`,
                   }}
                 >
-                  <User size={20} className="text-base-content/80" />
+                  <User size={20} className="text-base-muted" />
                 </div>
                 <h3 className="text-lg font-black tracking-tight text-base-content">
                   Identity &amp; Security
@@ -302,17 +302,17 @@ function AccountHub() {
                       boxShadow: `0 0 20px ${HEX.primary}15, 0 0 0 1px ${HEX.primary}20`,
                     }}
                   >
-                    <Settings size={20} className="text-base-content/80" />
+                    <Settings size={20} className="text-base-muted" />
                   </div>
                   <h3 className="text-lg font-black tracking-tight text-base-content">
                     System Status
                   </h3>
                 </div>
-                <p className="text-sm text-base-content/45 mb-6 leading-relaxed">
+                <p className="text-sm text-base-subtle mb-6 leading-relaxed">
                   Monitor infrastructure health, ingestion workers, and live
                   connection status.
                 </p>
-                <div className="flex items-center gap-2 text-xs font-semibold text-base-content/40 group-hover:text-base-content/70 transition-colors">
+                <div className="flex items-center gap-2 text-xs font-semibold text-base-subtle group-hover:text-base-muted transition-colors">
                   View Status Dashboard
                   <ArrowRight size={14} />
                 </div>
@@ -365,7 +365,7 @@ function AccountHub() {
                     boxShadow: `0 0 20px ${HEX.accent}15, 0 0 0 1px ${HEX.accent}20`,
                   }}
                 >
-                  <Crown size={20} className="text-base-content/80" />
+                  <Crown size={20} className="text-base-muted" />
                 </div>
                 <h3 className="text-lg font-black tracking-tight text-base-content">
                   Subscription
@@ -380,7 +380,7 @@ function AccountHub() {
               <Link
                 to="/uplink"
                 search={{ session_id: undefined }}
-                className="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-base-content/40 hover:text-base-content/70 transition-colors"
+                className="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-base-subtle hover:text-base-muted transition-colors"
               >
                 View Plans <ArrowRight size={14} />
               </Link>
@@ -407,7 +407,7 @@ function AccountHub() {
             viewport={{ once: true, margin: '-40px' }}
             transition={{ duration: 0.5, ease: EASE }}
           >
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-base-content/70 mb-2">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-base-muted mb-2">
               Quick Links
             </h2>
           </motion.div>
@@ -538,14 +538,14 @@ function IdentityEditor({
       />
       <div className="flex items-center justify-between gap-3 py-2">
         <div className="min-w-0">
-          <div className="text-xs uppercase tracking-wide text-base-content/40 mb-1">
+          <div className="text-xs uppercase tracking-wide text-base-subtle mb-1">
             Username
           </div>
-          <div className="text-sm text-base-content/70 font-mono truncate">
+          <div className="text-sm text-base-muted font-mono truncate">
             {overview?.identity.username || '—'}
           </div>
         </div>
-        <span className="text-[10px] uppercase tracking-wider text-base-content/30 px-2 py-1 rounded-md bg-base-content/5 shrink-0">
+        <span className="text-[10px] uppercase tracking-wider text-base-subtle px-2 py-1 rounded-md bg-base-content/5 shrink-0">
           Immutable
         </span>
       </div>
@@ -553,17 +553,17 @@ function IdentityEditor({
       <div className="pt-3 border-t border-base-300/30">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-xs uppercase tracking-wide text-base-content/40 mb-1">
+            <div className="text-xs uppercase tracking-wide text-base-subtle mb-1">
               Password
             </div>
-            <div className="text-sm text-base-content/60 leading-relaxed">
+            <div className="text-sm text-base-muted leading-relaxed">
               We&apos;ll email you a link to reset it from the sign-in page.
             </div>
           </div>
           <button
             onClick={handleSendReset}
             disabled={resetState === 'sending' || resetState === 'sent'}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-base-content/10 rounded-lg text-base-content/60 hover:text-primary hover:border-primary/30 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-base-content/10 rounded-lg text-base-muted hover:text-primary hover:border-primary/30 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
             {resetState === 'sending' ? (
               <>
@@ -581,7 +581,7 @@ function IdentityEditor({
           </button>
         </div>
         {resetState === 'error' && resetError && (
-          <p className="mt-2 text-xs text-error/80">{resetError}</p>
+          <p className="mt-2 text-xs text-error-ink">{resetError}</p>
         )}
       </div>
     </div>
@@ -639,7 +639,7 @@ function EditableField({
 
   return (
     <div className="py-2">
-      <div className="text-xs uppercase tracking-wide text-base-content/40 mb-1.5">
+      <div className="text-xs uppercase tracking-wide text-base-subtle mb-1.5">
         {label}
       </div>
       {editing ? (
@@ -673,29 +673,29 @@ function EditableField({
             }}
             disabled={saving}
             aria-label="Cancel"
-            className="p-2 rounded-lg border border-base-content/10 text-base-content/40 hover:text-base-content/70 disabled:opacity-60 transition-colors"
+            className="p-2 rounded-lg border border-base-content/10 text-base-subtle hover:text-base-muted disabled:opacity-60 transition-colors"
           >
             <X size={14} />
           </button>
         </div>
       ) : (
         <div className="flex items-center justify-between gap-3">
-          <div className="text-sm text-base-content/80 truncate min-w-0">
+          <div className="text-sm text-base-muted truncate min-w-0">
             {value || (
-              <span className="text-base-content/30 italic">
+              <span className="text-base-subtle italic">
                 {placeholder ?? 'Not set'}
               </span>
             )}
           </div>
           <button
             onClick={() => setEditing(true)}
-            className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-base-content/40 hover:text-base-content/70 rounded-md transition-colors"
+            className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-base-subtle hover:text-base-muted rounded-md transition-colors"
           >
             <Pencil size={12} /> Edit
           </button>
         </div>
       )}
-      {error && <p className="mt-1.5 text-xs text-error/80">{error}</p>}
+      {error && <p className="mt-1.5 text-xs text-error-ink">{error}</p>}
     </div>
   )
 }
@@ -750,7 +750,7 @@ function HubCard({ card, index }: { card: HubCardDef; index: number }) {
       {/* Arrow indicator */}
       {isInteractive ? (
         <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-          <ArrowRight size={16} className="text-base-content/40" />
+          <ArrowRight size={16} className="text-base-subtle" />
         </div>
       ) : null}
 
@@ -763,13 +763,13 @@ function HubCard({ card, index }: { card: HubCardDef; index: number }) {
             boxShadow: `0 0 20px ${hex}15, 0 0 0 1px ${hex}20`,
           }}
         >
-          <Icon size={20} className="text-base-content/80" />
+          <Icon size={20} className="text-base-muted" />
         </div>
         <div>
-          <h3 className="text-lg font-black tracking-tight text-base-content group-hover:text-base-content/80 transition-colors">
+          <h3 className="text-lg font-black tracking-tight text-base-content group-hover:text-base-muted transition-colors">
             {title}
           </h3>
-          <p className="text-xs text-base-content/40 mt-2 leading-relaxed">
+          <p className="text-xs text-base-subtle mt-2 leading-relaxed">
             {desc}
           </p>
         </div>

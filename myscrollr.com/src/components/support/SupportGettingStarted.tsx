@@ -38,7 +38,7 @@ export function SupportGettingStarted() {
               <h3 className="text-base font-semibold text-base-content">
                 {step.title}
               </h3>
-              <p className="mt-1 text-sm leading-relaxed text-base-content/55">
+              <p className="mt-1 text-sm leading-relaxed text-base-muted">
                 {step.description}
               </p>
             </div>

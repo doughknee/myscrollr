@@ -54,11 +54,11 @@ const DOWNGRADE_PLAN_NAMES: Record<string, string> = {
 
 const STATUS_LABELS: Partial<Record<string, { label: string; color: string }>> =
   {
-    none: { label: 'No Subscription', color: 'text-base-content/40' },
-    active: { label: 'Active', color: 'text-success' },
-    canceling: { label: 'Canceling', color: 'text-warning' },
-    canceled: { label: 'Canceled', color: 'text-error' },
-    past_due: { label: 'Past Due', color: 'text-error' },
+    none: { label: 'No Subscription', color: 'text-base-subtle' },
+    active: { label: 'Active', color: 'text-success-ink' },
+    canceling: { label: 'Canceling', color: 'text-warning-ink' },
+    canceled: { label: 'Canceled', color: 'text-error-ink' },
+    past_due: { label: 'Past Due', color: 'text-error-ink' },
     trialing: { label: 'Free Trial', color: 'text-info' },
   }
 
@@ -142,8 +142,8 @@ export default function SubscriptionStatus({
   if (loading) {
     return (
       <div className="flex items-center gap-2 py-6">
-        <Loader2 size={16} className="animate-spin text-base-content/30" />
-        <span className="text-sm text-base-content/30">
+        <Loader2 size={16} className="animate-spin text-base-subtle" />
+        <span className="text-sm text-base-subtle">
           Loading subscription...
         </span>
       </div>
@@ -153,8 +153,8 @@ export default function SubscriptionStatus({
   if (error) {
     return (
       <div className="flex items-center gap-2 py-6">
-        <AlertTriangle size={16} className="text-error" />
-        <span className="text-sm text-error">{error}</span>
+        <AlertTriangle size={16} className="text-error-ink" />
+        <span className="text-sm text-error-ink">{error}</span>
       </div>
     )
   }
@@ -166,10 +166,10 @@ export default function SubscriptionStatus({
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <Sparkles size={16} className="text-success" />
-          <span className="text-sm font-semibold text-success">Super User</span>
+          <Sparkles size={16} className="text-success-ink" />
+          <span className="text-sm font-semibold text-success-ink">Super User</span>
         </div>
-        <p className="text-sm text-base-content/40 leading-relaxed">
+        <p className="text-sm text-base-subtle leading-relaxed">
           You have full access to every feature as a thank-you for early-access
           testing. No subscription required.
         </p>
@@ -181,12 +181,12 @@ export default function SubscriptionStatus({
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <Crown size={16} className="text-base-content/30" />
-          <span className="text-sm font-semibold text-base-content/40">
+          <Crown size={16} className="text-base-subtle" />
+          <span className="text-sm font-semibold text-base-subtle">
             Free Tier
           </span>
         </div>
-        <p className="text-sm text-base-content/30">
+        <p className="text-sm text-base-subtle">
           Upgrade to Uplink for more widget slots, or Uplink Ultimate for
           unlimited widgets.
         </p>
@@ -195,7 +195,7 @@ export default function SubscriptionStatus({
   }
 
   const statusInfo = STATUS_LABELS[subscription.status] ??
-    STATUS_LABELS.none ?? { label: 'Unknown', color: 'text-base-content/40' }
+    STATUS_LABELS.none ?? { label: 'Unknown', color: 'text-base-subtle' }
   const periodEnd = subscription.current_period_end
     ? new Date(subscription.current_period_end)
     : null
@@ -249,8 +249,8 @@ export default function SubscriptionStatus({
       {/* Billing Price */}
       {PLAN_PRICES[subscription.plan] && (
         <div className="flex items-center gap-2">
-          <CreditCard size={14} className="text-base-content/30" />
-          <span className="text-sm text-base-content/50">
+          <CreditCard size={14} className="text-base-subtle" />
+          <span className="text-sm text-base-muted">
             {PLAN_PRICES[subscription.plan]}
             {subscription.plan.includes('monthly')
               ? ' · Monthly billing'
@@ -268,9 +268,9 @@ export default function SubscriptionStatus({
       {subscription.status === 'trialing' && (
         <div className="flex items-center gap-2 py-2.5 px-3 bg-info/5 border border-info/15 rounded-lg">
           <Zap size={14} className="text-info shrink-0" />
-          <span className="text-xs text-base-content/50">
+          <span className="text-xs text-base-muted">
             Your trial includes full{' '}
-            <span className="font-semibold text-base-content/70">
+            <span className="font-semibold text-base-muted">
               Uplink Ultimate
             </span>{' '}
             access
@@ -290,22 +290,22 @@ export default function SubscriptionStatus({
       {/* Period End / Lifetime */}
       {subscription.lifetime ? (
         <div className="flex items-center gap-2">
-          <InfinityIcon size={14} className="text-base-content/30" />
-          <span className="text-sm text-base-content/40">
+          <InfinityIcon size={14} className="text-base-subtle" />
+          <span className="text-sm text-base-subtle">
             Lifetime access — no expiration
           </span>
         </div>
       ) : subscription.status === 'canceled' ? (
         <div className="flex items-center gap-2">
-          <Calendar size={14} className="text-base-content/30" />
-          <span className="text-sm text-base-content/40">
+          <Calendar size={14} className="text-base-subtle" />
+          <span className="text-sm text-base-subtle">
             Your subscription has ended. Resubscribe to restore your plan.
           </span>
         </div>
       ) : periodEnd ? (
         <div className="flex items-center gap-2">
-          <Calendar size={14} className="text-base-content/30" />
-          <span className="text-sm text-base-content/40">
+          <Calendar size={14} className="text-base-subtle" />
+          <span className="text-sm text-base-subtle">
             {subscription.status === 'canceling'
               ? `Access until ${periodEnd.toLocaleDateString()}`
               : subscription.status === 'trialing'
@@ -319,10 +319,10 @@ export default function SubscriptionStatus({
       {subscription.pending_downgrade_plan &&
         subscription.scheduled_change_at && (
           <div className="flex items-center gap-2 py-2.5 px-3 bg-warning/5 border border-warning/15 rounded-lg">
-            <AlertTriangle size={14} className="text-warning shrink-0" />
-            <span className="text-xs text-base-content/50">
+            <AlertTriangle size={14} className="text-warning-ink shrink-0" />
+            <span className="text-xs text-base-muted">
               Switching to{' '}
-              <span className="font-semibold text-base-content/70">
+              <span className="font-semibold text-base-muted">
                 {DOWNGRADE_PLAN_NAMES[subscription.pending_downgrade_plan] ||
                   subscription.pending_downgrade_plan}
               </span>{' '}
@@ -343,8 +343,8 @@ export default function SubscriptionStatus({
       {/* Past Due Warning */}
       {subscription.status === 'past_due' && (
         <div className="flex items-center gap-2 p-3 rounded-lg bg-error/10 border border-error/20">
-          <AlertTriangle size={14} className="text-error shrink-0" />
-          <span className="text-xs text-error/80">
+          <AlertTriangle size={14} className="text-error-ink shrink-0" />
+          <span className="text-xs text-error-ink">
             Your payment failed. Update your payment method to avoid service
             interruption.
           </span>
@@ -359,7 +359,7 @@ export default function SubscriptionStatus({
             onClick={handleOpenPortal}
             disabled={openingPortal}
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold border border-error/30 rounded-lg
-                       text-error hover:bg-error/10 transition-colors disabled:opacity-50"
+                       text-error-ink hover:bg-error/10 transition-colors disabled:opacity-50"
           >
             <CreditCard size={12} />
             {openingPortal ? 'Opening...' : 'Update Payment Method'}
@@ -375,7 +375,7 @@ export default function SubscriptionStatus({
                 onClick={handleOpenPortal}
                 disabled={openingPortal}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold border border-base-content/10 rounded-lg
-                         text-base-content/40 hover:text-primary hover:border-primary/30 transition-colors disabled:opacity-50"
+                         text-base-subtle hover:text-primary hover:border-primary/30 transition-colors disabled:opacity-50"
               >
                 <CreditCard size={12} />
                 {openingPortal ? 'Opening...' : 'Manage Subscription'}
@@ -384,7 +384,7 @@ export default function SubscriptionStatus({
                 to="/uplink"
                 search={{ session_id: undefined }}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold border border-base-content/10 rounded-lg
-                         text-base-content/40 hover:text-primary hover:border-primary/30 transition-colors"
+                         text-base-subtle hover:text-primary hover:border-primary/30 transition-colors"
               >
                 Change Plan <ArrowRight size={12} />
               </Link>
@@ -392,7 +392,7 @@ export default function SubscriptionStatus({
                 onClick={() => setShowCancelModal(true)}
                 disabled={canceling}
                 className="flex-1 py-2.5 text-xs font-semibold border border-base-content/10 rounded-lg
-                         text-base-content/30 hover:text-error hover:border-error/30 transition-colors disabled:opacity-50"
+                         text-base-subtle hover:text-error-ink hover:border-error/30 transition-colors disabled:opacity-50"
               >
                 {canceling
                   ? 'Canceling...'
@@ -410,7 +410,7 @@ export default function SubscriptionStatus({
               onClick={handleOpenPortal}
               disabled={openingPortal}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold border border-base-content/10 rounded-lg
-                         text-base-content/40 hover:text-primary hover:border-primary/30 transition-colors disabled:opacity-50"
+                         text-base-subtle hover:text-primary hover:border-primary/30 transition-colors disabled:opacity-50"
             >
               <CreditCard size={12} />
               {openingPortal ? 'Opening...' : 'Resume Subscription'}
@@ -419,7 +419,7 @@ export default function SubscriptionStatus({
               to="/uplink"
               search={{ session_id: undefined }}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold border border-base-content/10 rounded-lg
-                         text-base-content/40 hover:text-primary hover:border-primary/30 transition-colors"
+                         text-base-subtle hover:text-primary hover:border-primary/30 transition-colors"
             >
               Change Plan <ArrowRight size={12} />
             </Link>
@@ -446,16 +446,16 @@ export default function SubscriptionStatus({
           <div className="relative w-full max-w-sm mx-4 bg-base-200 border border-base-content/10 rounded-xl p-6 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center">
-                <ShieldAlert size={20} className="text-error" />
+                <ShieldAlert size={20} className="text-error-ink" />
               </div>
-              <h3 className="text-sm font-semibold text-base-content/80">
+              <h3 className="text-sm font-semibold text-base-muted">
                 {isTrialing
                   ? 'Cancel your free trial?'
                   : 'Cancel your subscription?'}
               </h3>
             </div>
 
-            <div className="space-y-3 text-xs text-base-content/50 leading-relaxed">
+            <div className="space-y-3 text-xs text-base-muted leading-relaxed">
               {isTrialing ? (
                 <>
                   <p>
@@ -463,7 +463,7 @@ export default function SubscriptionStatus({
                     features immediately &mdash; including your extra widget
                     slots and Uplink Ultimate access.
                   </p>
-                  <p className="font-semibold text-base-content/70">
+                  <p className="font-semibold text-base-muted">
                     This is the only free trial offered per account. Once
                     canceled, you&apos;ll need to purchase a paid plan to access
                     premium features again.
@@ -500,7 +500,7 @@ export default function SubscriptionStatus({
               <button
                 onClick={handleConfirmCancel}
                 className="flex-1 py-2.5 text-xs font-semibold border border-error/30 rounded-lg
-                           text-error/60 hover:text-error hover:bg-error/10 transition-colors"
+                           text-error-ink hover:text-error-ink hover:bg-error/10 transition-colors"
               >
                 {isTrialing ? 'Cancel Trial' : 'Cancel Subscription'}
               </button>

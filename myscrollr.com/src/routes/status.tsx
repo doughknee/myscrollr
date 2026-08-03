@@ -121,16 +121,16 @@ const STATE_STYLE: Record<
   { dot: string; text: string; pulse: boolean }
 > = {
   healthy: { dot: 'bg-primary', text: 'text-primary', pulse: true },
-  unhealthy: { dot: 'bg-warning', text: 'text-warning', pulse: true },
-  down: { dot: 'bg-error', text: 'text-error', pulse: true },
+  unhealthy: { dot: 'bg-warning', text: 'text-warning-ink', pulse: true },
+  down: { dot: 'bg-error', text: 'text-error-ink', pulse: true },
   unknown: {
     dot: 'bg-base-content/25',
-    text: 'text-base-content/40',
+    text: 'text-base-subtle',
     pulse: false,
   },
   loading: {
     dot: 'bg-base-content/25',
-    text: 'text-base-content/40',
+    text: 'text-base-subtle',
     pulse: false,
   },
 }
@@ -222,15 +222,15 @@ function StatusPage() {
     : 'CHECKING'
 
   const overall = fetchError
-    ? { dot: 'bg-error', text: 'text-error border-error/40' }
+    ? { dot: 'bg-error', text: 'text-error-ink border-error/40' }
     : !health
       ? {
           dot: 'bg-base-content/25',
-          text: 'text-base-content/45 border-hairline',
+          text: 'text-base-subtle border-hairline',
         }
       : health.status === 'healthy'
         ? { dot: 'bg-primary', text: 'text-primary border-primary/40' }
-        : { dot: 'bg-warning', text: 'text-warning border-warning/40' }
+        : { dot: 'bg-warning', text: 'text-warning-ink border-warning/40' }
 
   return (
     <div className="min-h-dvh">
@@ -325,18 +325,18 @@ function StatusPage() {
               // Mirrors LedgerRow's mobile stacking: badge + state share
               // the top row, the message spans full width beneath.
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-[18px] gap-y-1 border-b border-hairline-minor px-2 py-5 sm:grid-cols-[90px_1fr_auto]">
-                <span className="inline-flex items-center gap-2 font-mono text-[11px] font-semibold text-error/80">
+                <span className="inline-flex items-center gap-2 font-mono text-[11px] font-semibold text-error-ink">
                   <span
                     aria-hidden="true"
                     className="animate-pulse-dot h-[7px] w-[7px] rounded-[2px] bg-error/80"
                   />
                   CHN—??
                 </span>
-                <span className="order-last col-span-full text-sm text-base-content/55 sm:order-none sm:col-span-1">
+                <span className="order-last col-span-full text-sm text-base-muted sm:order-none sm:col-span-1">
                   Unable to discover channels. The API is not reachable from
                   this browser.
                 </span>
-                <span className="font-mono text-xs text-error/80">
+                <span className="font-mono text-xs text-error-ink">
                   UNREACHABLE
                 </span>
               </div>
@@ -374,7 +374,7 @@ function StatusPage() {
               right={
                 <span
                   className={`font-mono text-[11px] tracking-[0.12em] ${
-                    fetchError ? 'text-error' : 'text-primary'
+                    fetchError ? 'text-error-ink' : 'text-primary'
                   }`}
                 >
                   {fetchError ? 'UNREACHABLE' : 'ONLINE'}
@@ -395,10 +395,10 @@ function StatusPage() {
                 <span
                   className={`font-mono text-[11px] tracking-[0.12em] ${
                     !health
-                      ? 'text-base-content/40'
+                      ? 'text-base-subtle'
                       : health.status === 'healthy'
                         ? 'text-primary'
-                        : 'text-warning'
+                        : 'text-warning-ink'
                   }`}
                 >
                   {overallLabel(health)}
@@ -472,18 +472,18 @@ function LedgerRow({
       transition={{ duration: 0.35, ease: EASE }}
       className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-hairline-minor px-2 py-[15px] sm:grid-cols-[110px_220px_minmax(0,1fr)_auto] sm:gap-x-5"
     >
-      <span className="hidden font-mono text-[11px] tracking-[0.1em] text-base-content/40 sm:block">
+      <span className="hidden font-mono text-[11px] tracking-[0.1em] text-base-subtle sm:block">
         {code}
       </span>
       <span className="flex items-baseline gap-2 text-[15px] font-bold tracking-[0.01em] text-base-content">
         {name}
         {port != null && (
-          <span className="font-mono text-[10px] font-normal text-base-content/35">
+          <span className="font-mono text-[10px] font-normal text-base-subtle">
             :{port}
           </span>
         )}
       </span>
-      <span className="order-last col-span-full min-w-0 text-[13px] text-base-content/50 sm:order-none sm:col-span-1 sm:truncate sm:text-sm">
+      <span className="order-last col-span-full min-w-0 text-[13px] text-base-muted sm:order-none sm:col-span-1 sm:truncate sm:text-sm">
         {detail}
       </span>
       <span className="justify-self-end">{right}</span>

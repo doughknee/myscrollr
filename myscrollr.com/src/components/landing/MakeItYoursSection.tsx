@@ -124,14 +124,14 @@ export function MakeItYoursSection() {
           transition={{ duration: 0.6, ease: EASE }}
           className="flex flex-col items-center text-center mb-12 lg:mb-16"
         >
-          <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-base-200/60 text-base-content/60 text-[10px] font-bold rounded-lg border border-base-300/40 uppercase tracking-wide mb-6">
+          <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-base-200/60 text-base-muted text-[10px] font-bold rounded-lg border border-base-300/40 uppercase tracking-wide mb-6">
             <Palette size={12} />9 themes &middot; light + dark on every widget
           </span>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4 text-center">
             Make it{' '}
             <span className="text-gradient-primary">unmistakably yours</span>
           </h2>
-          <p className="text-base text-base-content/45 max-w-xl leading-relaxed text-center">
+          <p className="text-base text-base-subtle max-w-xl leading-relaxed text-center">
             Pick a palette that matches the rest of your setup. Every theme
             ships with full light and dark variants and applies across every
             widget, ticker row, and config panel.
@@ -236,7 +236,7 @@ function ThemeSwitcher({
         </div>
 
         {/* Caption underneath the preview ───────────────────── */}
-        <div className="mt-4 flex items-center justify-center gap-2 text-xs text-base-content/55">
+        <div className="mt-4 flex items-center justify-center gap-2 text-xs text-base-muted">
           <span
             aria-hidden="true"
             className="h-2 w-2 rounded-full"
@@ -287,7 +287,7 @@ function ThemeSwitcher({
                 className={
                   isActive
                     ? ''
-                    : 'text-base-content/55 group-hover:text-base-content/80'
+                    : 'text-base-muted group-hover:text-base-muted'
                 }
               >
                 {theme.label}

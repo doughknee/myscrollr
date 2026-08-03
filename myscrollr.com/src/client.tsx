@@ -27,11 +27,11 @@ const logtoConfig: LogtoConfig = {
 function SentryFallback() {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-32 text-center">
-      <p className="text-sm font-semibold text-error">Error</p>
+      <p className="text-sm font-semibold text-error-ink">Error</p>
       <h1 className="mt-2 text-4xl font-bold tracking-tight sm:text-5xl">
         Something went wrong
       </h1>
-      <p className="mt-4 max-w-md text-base text-base-content/60">
+      <p className="mt-4 max-w-md text-base text-base-muted">
         An unexpected error occurred. The team has been notified.
       </p>
       <button

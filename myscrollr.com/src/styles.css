@@ -78,6 +78,34 @@
    Tailwind v4 via color-mix() — no explicit tiers needed.
    ========================================================================== */
 
+/* --------------------------------------------------------------------------
+   COLOR ROLES
+
+   `--color-primary` (and secondary / info / accent) are the BRAND values,
+   always authentic — #34d399 for Scrollr, each family's own otherwise.
+   They are used for fills, washes, borders, marks, AND text. Emerald text
+   on a light ground is a deliberate brand choice; see the note below.
+
+   `--color-*-content` is the label that sits ON a brand fill. In light
+   themes this is near-black, not white: an emerald button keeps its fill
+   and takes a dark label, which is what the dark theme always did. That
+   single flip is what fixed every primary CTA and the skip link, with the
+   brand colour untouched.
+
+   `--color-success-ink` / `-warning-ink` / `-error-ink` are the readable
+   variants of the STATE colours, used for text. State colours are not
+   brand: an error message has to be legible more than it has to be
+   on-palette, and a deep red still reads unmistakably as an error.
+
+   KNOWN, INTENTIONAL DEVIATION — brand text on light grounds
+   The brand hues measure 1.08–1.92:1 as text on our light surfaces, below
+   both the 4.5:1 text bar and the 3:1 large-text/UI bar. No size or weight
+   fixes this; only a darker ground would (the emerald is 8.8:1 on
+   #1a1b2e). This is accepted on purpose — the accent colour is load-
+   bearing for the brand. If a given spot ever needs to pass, the move is
+   to put it on a dark chip rather than to darken the hue.
+   -------------------------------------------------------------------------- */
+
 @theme {
   /* Core Colors — same across themes */
   --color-primary: #34d399;
@@ -89,10 +117,10 @@
   --color-error: #ef4444;
 
   /* Light-mode base palette */
-  --color-primary-content: #ffffff;
-  --color-secondary-content: #ffffff;
-  --color-accent-content: #ffffff;
-  --color-info-content: #ffffff;
+  --color-primary-content: #141420;
+  --color-secondary-content: #141420;
+  --color-accent-content: #141420;
+  --color-info-content: #141420;
 
   --color-base-50: #f8f8fc;
   --color-base-75: #f8f8fc;
@@ -138,6 +166,12 @@
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --color-success-ink: #11602e;
+  --color-warning-ink: #744a05;
+  --color-error-ink: #a80e0e;
+  --color-base-muted: #5c5d6b;
+  --color-base-subtle: #6a6b77;
+  --color-focus: var(--color-base-content);
 }
 
 /* ==========================================================================
@@ -177,6 +211,12 @@
   --shadow-soft-lg: 0 8px 32px rgba(0, 0, 0, 0.35);
 
   --shadow-inner-glow: inset 0 0 20px rgba(52, 211, 153, 0.02);
+  --color-success-ink: #22c55e;
+  --color-warning-ink: #fbbf24;
+  --color-error-ink: #ef4a4a;
+  --color-base-muted: #9696a1;
+  --color-base-subtle: #878792;
+  --color-focus: var(--color-primary);
 }
 
 /* ==========================================================================
@@ -236,6 +276,11 @@
   --color-accent: #8839ef;
   --outline-stroke: #40a02b;
   --ghost-stroke: #9ca0b0;
+  --color-secondary-content: #ffffff;
+  --color-accent-content: #ffffff;
+  --color-base-muted: #51546d;
+  --color-base-subtle: #5e6178;
+  --color-focus: var(--color-base-content);
 }
 .dark[data-theme-family='catppuccin'] {
   --color-base-75: #181825;
@@ -256,6 +301,12 @@
   --color-accent: #cba6f7;
   --outline-stroke: #a6e3a1;
   --ghost-stroke: #45475a;
+  --color-secondary-content: #141420;
+  --color-accent-content: #141420;
+  --color-error-ink: #f37676;
+  --color-base-muted: #979db7;
+  --color-base-subtle: #878ca5;
+  --color-focus: var(--color-primary);
 }
 
 /* ── dracula ── */
@@ -278,6 +329,11 @@
   --color-accent: #7a52d8;
   --outline-stroke: #2a9d6f;
   --ghost-stroke: #a8a89a;
+  --color-secondary-content: #ffffff;
+  --color-accent-content: #ffffff;
+  --color-base-muted: #56575f;
+  --color-base-subtle: #64666d;
+  --color-focus: var(--color-base-content);
 }
 .dark[data-theme-family='dracula'] {
   --color-base-75: #21222c;
@@ -298,6 +354,13 @@
   --color-accent: #bd93f9;
   --outline-stroke: #50fa7b;
   --ghost-stroke: #6272a4;
+  --color-secondary-content: #141420;
+  --color-accent-content: #141420;
+  --color-success-ink: #24d365;
+  --color-error-ink: #f7a1a1;
+  --color-base-muted: #a9aaab;
+  --color-base-subtle: #98999c;
+  --color-focus: var(--color-primary);
 }
 
 /* ── tokyo-night ── */
@@ -310,16 +373,21 @@
   --color-base-300: #a1a6c5;
   --color-base-350: #8990af;
   --color-base-400: #6c728c;
-  --color-base-content: #3760bf;
+  --color-base-content: #2e4f9e;
   --color-panel: #e1e2e7;
   --color-hairline: #c4c8da;
   --color-hairline-minor: color-mix(in srgb, #c4c8da 55%, #d5d6dc);
   --color-primary: #2e7de9;
   --color-secondary: #f52a65;
   --color-info: #007197;
-  --color-accent: #9854f1;
+  --color-accent: #934cf0;
   --outline-stroke: #2e7de9;
   --ghost-stroke: #8990af;
+  --color-info-content: #ffffff;
+  --color-accent-content: #ffffff;
+  --color-base-muted: #2e4f9e;
+  --color-base-subtle: #3353a0;
+  --color-focus: var(--color-base-content);
 }
 .dark[data-theme-family='tokyo-night'] {
   --color-base-75: #16161e;
@@ -340,6 +408,12 @@
   --color-accent: #bb9af7;
   --outline-stroke: #7aa2f7;
   --ghost-stroke: #414868;
+  --color-info-content: #141420;
+  --color-accent-content: #141420;
+  --color-error-ink: #f16161;
+  --color-base-muted: #9299bb;
+  --color-base-subtle: #8389a8;
+  --color-focus: var(--color-primary);
 }
 
 /* ── nord ── */
@@ -357,11 +431,14 @@
   --color-hairline: #d8dee9;
   --color-hairline-minor: color-mix(in srgb, #d8dee9 55%, #e5e9f0);
   --color-primary: #5e81ac;
-  --color-secondary: #bf616a;
+  --color-secondary: #c0646d;
   --color-info: #5d8eaf;
-  --color-accent: #9c6c8d;
+  --color-accent: #a07291;
   --outline-stroke: #5e81ac;
   --ghost-stroke: #9aa3b4;
+  --color-base-muted: #505660;
+  --color-base-subtle: #5e636d;
+  --color-focus: var(--color-base-content);
 }
 .dark[data-theme-family='nord'] {
   --color-base-75: #292e39;
@@ -377,11 +454,16 @@
   --color-hairline: #3b4252;
   --color-hairline-minor: color-mix(in srgb, #3b4252 55%, #292e39);
   --color-primary: #88c0d0;
-  --color-secondary: #bf616a;
+  --color-secondary: #c0646d;
   --color-info: #81a1c1;
   --color-accent: #b48ead;
   --outline-stroke: #88c0d0;
   --ghost-stroke: #4c566a;
+  --color-success-ink: #23c960;
+  --color-error-ink: #f69494;
+  --color-base-muted: #b1b5bc;
+  --color-base-subtle: #a0a4ac;
+  --color-focus: var(--color-primary);
 }
 
 /* ── gruvbox ── */
@@ -404,6 +486,13 @@
   --color-accent: #8f3f71;
   --outline-stroke: #79740e;
   --ghost-stroke: #a89984;
+  --color-primary-content: #ffffff;
+  --color-secondary-content: #ffffff;
+  --color-info-content: #ffffff;
+  --color-accent-content: #ffffff;
+  --color-base-muted: #57524a;
+  --color-base-subtle: #666156;
+  --color-focus: var(--color-base-content);
 }
 .dark[data-theme-family='gruvbox'] {
   --color-base-75: #282828;
@@ -424,6 +513,14 @@
   --color-accent: #d3869b;
   --outline-stroke: #b8bb26;
   --ghost-stroke: #504945;
+  --color-primary-content: #141420;
+  --color-secondary-content: #141420;
+  --color-info-content: #141420;
+  --color-accent-content: #141420;
+  --color-error-ink: #f48282;
+  --color-base-muted: #bcb091;
+  --color-base-subtle: #a99e83;
+  --color-focus: var(--color-primary);
 }
 
 /* ==========================================================================
@@ -957,7 +1054,7 @@ pre,
   }
 
   .input::placeholder {
-    @apply text-base-content/30;
+    @apply text-base-subtle;
   }
 
   .input-sm {
@@ -1114,8 +1211,14 @@ pre,
    FOCUS STATES — Accessibility
    ========================================================================== */
 
+/* The indicator has to be SEEN, so it follows the same rule as text: the
+   brand hue in dark themes (5.0–8.8:1 there), the foreground colour in
+   light themes, where the brand hue measures 1.7–3.6:1 and a keyboard
+   user simply cannot tell where focus is. Full opacity, not /50 — at 50%
+   even the dark themes dropped under the 3:1 that WCAG 2.4.11 wants. */
 *:focus-visible {
-  @apply outline-none ring-2 ring-primary/50 ring-offset-2 ring-offset-base-100;
+  @apply outline-none ring-2 ring-offset-2 ring-offset-base-100;
+  --tw-ring-color: var(--color-focus);
 }
 
 /* ==========================================================================
@@ -1157,7 +1260,7 @@ pre,
 }
 
 .table th {
-  @apply px-4 py-3 text-left text-xs font-medium text-base-content/50 bg-base-300/30 border-b border-base-300;
+  @apply px-4 py-3 text-left text-xs font-medium text-base-muted bg-base-300/30 border-b border-base-300;
 }
 
 .table td {

@@ -56,8 +56,8 @@ function Feature({ children }: { children: React.ReactNode }) {
       }}
       className="flex items-center gap-3"
     >
-      <Check size={14} className="shrink-0 text-warning" />
-      <span className="text-[13px] text-base-content/60">{children}</span>
+      <Check size={14} className="shrink-0 text-warning-ink" />
+      <span className="text-[13px] text-base-muted">{children}</span>
     </motion.div>
   )
 }
@@ -126,18 +126,18 @@ function LifetimePage() {
           animate={{ opacity: 1, y: 0 }}
           className="fixed left-1/2 top-24 z-40 flex -translate-x-1/2 items-center gap-3 rounded-[4px] border border-warning/30 bg-warning/10 px-6 py-4 backdrop-blur-sm"
         >
-          <CheckCircle2 size={18} className="text-warning" />
+          <CheckCircle2 size={18} className="text-warning-ink" />
           <div>
-            <p className="text-xs font-semibold text-warning">
+            <p className="text-xs font-semibold text-warning-ink">
               Lifetime Uplink Activated
             </p>
-            <p className="text-[10px] text-base-content/40">
+            <p className="text-[10px] text-base-subtle">
               Welcome, founding member. Your access is permanent.
             </p>
           </div>
           <button
             onClick={() => setCheckoutSuccess(false)}
-            className="ml-4 text-xs text-base-content/30 transition-colors hover:text-base-content/60"
+            className="ml-4 text-xs text-base-subtle transition-colors hover:text-base-muted"
           >
             ✕
           </button>
@@ -163,7 +163,7 @@ function LifetimePage() {
           <motion.div {...riseIn(0)}>
             <Link
               to="/uplink"
-              className="mb-10 inline-block font-mono text-[11px] tracking-[0.14em] text-base-content/45 transition-colors hover:text-base-content/70"
+              className="mb-10 inline-block font-mono text-[11px] tracking-[0.14em] text-base-subtle transition-colors hover:text-base-muted"
             >
               ← BACK TO UPLINK
             </Link>
@@ -172,7 +172,7 @@ function LifetimePage() {
           {/* Eyebrow row */}
           <motion.div
             {...riseIn(1)}
-            className="mb-10 flex flex-wrap justify-between gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-base-content/45"
+            className="mb-10 flex flex-wrap justify-between gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-base-subtle"
           >
             <span>UPLINK ／ LIFETIME</span>
             <span>128 FOUNDING MEMBER SLOTS · ONE PAYMENT</span>
@@ -190,13 +190,13 @@ function LifetimePage() {
                 <br />
                 <span className="text-primary">One Payment.</span>
                 <br />
-                <span className="text-warning">Forever.</span>
+                <span className="text-warning-ink">Forever.</span>
               </motion.h1>
 
               {/* Subtitle */}
               <motion.p
                 {...riseIn(3)}
-                className="m-0 mb-10 max-w-[480px] text-[15.5px] leading-relaxed text-base-content/60 [text-wrap:pretty]"
+                className="m-0 mb-10 max-w-[480px] text-[15.5px] leading-relaxed text-base-muted [text-wrap:pretty]"
               >
                 Lifetime members get permanent Uplink Ultimate access with a
                 single payment: unlimited widgets at once, priority support, and
@@ -257,10 +257,10 @@ function LifetimePage() {
                 <div className="relative z-10 p-8 lg:p-10">
                   {/* Mono label row */}
                   <div className="mb-8 flex items-center justify-between gap-4">
-                    <span className="font-mono text-[11px] tracking-[0.14em] text-warning">
+                    <span className="font-mono text-[11px] tracking-[0.14em] text-warning-ink">
                       LIFETIME ULTIMATE
                     </span>
-                    <span className="font-mono text-[10px] tracking-[0.12em] text-base-content/45">
+                    <span className="font-mono text-[10px] tracking-[0.12em] text-base-subtle">
                       128 SLOTS TOTAL
                     </span>
                   </div>
@@ -270,11 +270,11 @@ function LifetimePage() {
                     <span className="font-mono text-[56px] font-semibold tracking-[-0.02em]">
                       $999
                     </span>
-                    <span className="font-mono text-[13px] text-base-content/45">
+                    <span className="font-mono text-[13px] text-base-subtle">
                       ONCE
                     </span>
                   </div>
-                  <p className="mb-6 mt-1 font-mono text-[10.5px] text-base-content/45">
+                  <p className="mb-6 mt-1 font-mono text-[10.5px] text-base-subtle">
                     PAYS FOR ITSELF VS ULTIMATE ANNUAL ($399.99/YR) IN 2.5 YEARS
                   </p>
 
@@ -283,7 +283,7 @@ function LifetimePage() {
                     <p className="m-0 mb-1 text-[11px] font-semibold text-primary">
                       Everything Ultimate has. Forever.
                     </p>
-                    <p className="m-0 text-[11px] leading-relaxed text-base-content/50">
+                    <p className="m-0 text-[11px] leading-relaxed text-base-muted">
                       Every Ultimate feature, permanently included: unlimited
                       widgets at once, priority support, and early access.
                       Future Ultimate features land in your account
@@ -294,10 +294,10 @@ function LifetimePage() {
                   {/* Slot progress (marketing) */}
                   <div className="mb-8 rounded-[4px] border border-hairline-minor bg-panel p-4">
                     <div className="mb-3 flex items-center justify-between">
-                      <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-base-content/40">
+                      <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-base-subtle">
                         Available Slots
                       </span>
-                      <span className="font-mono text-xs font-bold text-warning/70">
+                      <span className="font-mono text-xs font-bold text-warning-ink">
                         128 / 128
                       </span>
                     </div>
@@ -317,7 +317,7 @@ function LifetimePage() {
 
                   {/* Purchase button */}
                   {isAlreadyLifetime ? (
-                    <div className="w-full rounded-[4px] border border-success/20 bg-success/10 px-4 py-3 text-center text-xs font-semibold text-success">
+                    <div className="w-full rounded-[4px] border border-success/20 bg-success/10 px-4 py-3 text-center text-xs font-semibold text-success-ink">
                       <CheckCircle2
                         size={14}
                         className="-mt-0.5 mr-1.5 inline"
@@ -326,7 +326,7 @@ function LifetimePage() {
                     </div>
                   ) : hasActiveSub ? (
                     <div className="space-y-3">
-                      <div className="rounded-[4px] border border-info/20 bg-info/10 px-3 py-2 text-center text-[10px] text-info/80">
+                      <div className="rounded-[4px] border border-info/20 bg-info/10 px-3 py-2 text-center text-[10px] text-info">
                         You have an active subscription. Purchasing lifetime
                         will replace it.
                       </div>
@@ -351,7 +351,7 @@ function LifetimePage() {
                   )}
 
                   {/* Trust signals */}
-                  <div className="mt-6 text-center font-mono text-[10.5px] tracking-[0.1em] text-base-content/45">
+                  <div className="mt-6 text-center font-mono text-[10.5px] tracking-[0.1em] text-base-subtle">
                     NO SUBSCRIPTION · NO RENEWAL · STRIPE
                   </div>
                 </div>

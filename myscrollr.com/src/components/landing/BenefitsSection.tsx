@@ -660,7 +660,7 @@ function BenefitBlock({
             <h3 className="text-xl sm:text-2xl font-black tracking-tight text-base-content mb-2.5 leading-tight">
               {benefit.headline}
             </h3>
-            <p className="text-[15px] text-base-content/55 leading-relaxed">
+            <p className="text-[15px] text-base-muted leading-relaxed">
               {benefit.body}
             </p>
           </div>
@@ -720,7 +720,7 @@ export function BenefitsSection() {
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4 text-center">
             What Actually <span className="text-gradient-primary">Changes</span>
           </h2>
-          <p className="text-base sm:text-lg text-base-content/55 leading-relaxed text-center max-w-lg">
+          <p className="text-base sm:text-lg text-base-muted leading-relaxed text-center max-w-lg">
             It's not another app to check. It's the reason you stop checking.
           </p>
         </motion.div>
