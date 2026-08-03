@@ -150,25 +150,25 @@ const chipColors: Record<
     border: 'border-primary/25',
     text: 'text-primary',
     bg: 'bg-primary/[0.06]',
-    sub: 'text-primary/60',
+    sub: 'text-primary',
   },
   sports: {
     border: 'border-secondary/25',
     text: 'text-secondary',
     bg: 'bg-secondary/[0.06]',
-    sub: 'text-secondary/60',
+    sub: 'text-secondary',
   },
   news: {
     border: 'border-info/25',
     text: 'text-info',
     bg: 'bg-info/[0.06]',
-    sub: 'text-info/60',
+    sub: 'text-info',
   },
   fantasy: {
     border: 'border-accent/25',
     text: 'text-accent',
     bg: 'bg-accent/[0.06]',
-    sub: 'text-accent/60',
+    sub: 'text-accent',
   },
 }
 
@@ -398,7 +398,7 @@ function ScenarioCard({ stream }: { stream: ChannelInfo }) {
           <h3 className="text-[15px] font-bold mb-1.5 text-base-content">
             {stream.scenarioTitle}
           </h3>
-          <p className="text-sm leading-relaxed text-base-content/55">
+          <p className="text-sm leading-relaxed text-base-muted">
             {stream.scenarioBody}
           </p>
 
@@ -407,7 +407,7 @@ function ScenarioCard({ stream }: { stream: ChannelInfo }) {
             <span className={`text-lg font-black font-mono ${stream.color}`}>
               {stream.stat}
             </span>
-            <span className="text-xs text-base-content/35">
+            <span className="text-xs text-base-subtle">
               {stream.statLabel}
             </span>
           </div>
@@ -469,7 +469,7 @@ export function ChannelsShowcase() {
             Everything You Follow.{' '}
             <span className="text-gradient-primary">One Ticker.</span>
           </h2>
-          <p className="text-base text-base-content/45 max-w-lg leading-relaxed text-center">
+          <p className="text-base text-base-subtle max-w-lg leading-relaxed text-center">
             Sports, stocks, crypto, news, and fantasy widgets today &mdash; with
             more on the way. Add what you want, ignore the rest.
           </p>
@@ -495,7 +495,7 @@ export function ChannelsShowcase() {
                 className={`inline-flex shrink-0 items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-[color,background-color,border-color,box-shadow] duration-300 cursor-pointer ${
                   isActive
                     ? `${stream.activeBg} ${stream.activeText} border-transparent shadow-md`
-                    : 'bg-base-200/50 text-base-content/35 border-base-300/30 hover:text-base-content/55 hover:bg-base-200/70'
+                    : 'bg-base-200/50 text-base-subtle border-base-300/30 hover:text-base-muted hover:bg-base-200/70'
                 }`}
               >
                 <Icon size={15} />
@@ -543,7 +543,7 @@ export function ChannelsShowcase() {
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
           <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
         </span>
-        <span className="text-[11px] text-base-content/30 font-medium text-center">
+        <span className="text-[11px] text-base-subtle font-medium text-center">
           <span className="sm:hidden">
             Tap filters to shape the ticker in real time.
           </span>
@@ -598,7 +598,7 @@ export function ChannelsShowcase() {
         >
           <Link
             to="/channels"
-            className="group inline-flex items-center gap-2 text-sm font-semibold text-base-content/40 hover:text-primary transition-colors"
+            className="group inline-flex items-center gap-2 text-sm font-semibold text-base-subtle hover:text-primary transition-colors"
           >
             See It in Action
             <ArrowRight

@@ -214,7 +214,7 @@ function AnswerPanel({ item }: { item: FAQItem }) {
             boxShadow: `0 0 24px ${colors.glow}, 0 0 0 1px ${colors.ring}`,
           }}
         >
-          <Icon size={22} className="text-base-content/80" />
+          <Icon size={22} className="text-base-muted" />
         </div>
       </div>
 
@@ -231,7 +231,7 @@ function AnswerPanel({ item }: { item: FAQItem }) {
             background: `linear-gradient(90deg, ${colors.ring}, transparent)`,
           }}
         />
-        <span className="text-[11px] font-semibold tracking-widest uppercase text-base-content/20">
+        <span className="text-[11px] font-semibold tracking-widest uppercase text-base-subtle">
           Details
         </span>
         <div
@@ -243,7 +243,7 @@ function AnswerPanel({ item }: { item: FAQItem }) {
       </div>
 
       {/* ── Full answer ── */}
-      <span className="relative text-[15px] text-base-content/45 leading-relaxed flex-1 block">
+      <span className="relative text-[15px] text-base-subtle leading-relaxed flex-1 block">
         {item.answer}
       </span>
     </div>
@@ -351,12 +351,12 @@ function AccordionItem({
             <Icon
               size={16}
               className={`shrink-0 transition-colors duration-200 ${
-                isOpen ? 'text-primary' : 'text-base-content/25'
+                isOpen ? 'text-primary' : 'text-base-subtle'
               }`}
             />
             <span
               className={`text-[15px] font-semibold transition-colors duration-200 leading-snug ${
-                isOpen ? 'text-base-content' : 'text-base-content/60'
+                isOpen ? 'text-base-content' : 'text-base-muted'
               }`}
             >
               {item.question}
@@ -368,7 +368,7 @@ function AccordionItem({
             className={`shrink-0 h-7 w-7 rounded-lg flex items-center justify-center transition-colors duration-200 ${
               isOpen
                 ? 'bg-primary/10 text-primary'
-                : 'bg-base-300/20 text-base-content/25'
+                : 'bg-base-300/20 text-base-subtle'
             }`}
           >
             <ChevronDown size={15} />
@@ -393,10 +393,10 @@ function AccordionItem({
             >
               <div className="px-5 pb-5 pt-0">
                 <div className="h-px bg-base-300/20 mb-3" />
-                <p className="text-[13px] font-semibold text-base-content/70 mb-2 leading-snug">
+                <p className="text-[13px] font-semibold text-base-muted mb-2 leading-snug">
                   {item.highlight}
                 </p>
-                <p className="text-sm text-base-content/40 leading-relaxed">
+                <p className="text-sm text-base-subtle leading-relaxed">
                   {item.answer}
                 </p>
               </div>
@@ -501,7 +501,7 @@ export function FAQSection({
             {title}{' '}
             <span className="text-gradient-primary">{titleHighlight}</span>
           </h2>
-          <p className="text-base text-base-content/50 leading-relaxed text-center max-w-lg">
+          <p className="text-base text-base-muted leading-relaxed text-center max-w-lg">
             {subtitle}
           </p>
         </motion.div>
@@ -531,7 +531,7 @@ export function FAQSection({
                     className={`relative w-full text-left pl-5 pr-4 py-3 rounded-xl flex items-center gap-3 cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-300 ${
                       isActive
                         ? 'bg-base-200/60 text-base-content'
-                        : 'text-base-content/40 hover:text-base-content/60 hover:bg-base-200/25'
+                        : 'text-base-subtle hover:text-base-muted hover:bg-base-200/25'
                     }`}
                   >
                     {/* Sliding accent indicator */}
@@ -592,9 +592,9 @@ export function FAQSection({
             {/* Navigation controls */}
             <div className="flex items-center justify-between">
               {/* Counter */}
-              <span className="text-sm text-base-content/30 font-medium tabular-nums">
+              <span className="text-sm text-base-subtle font-medium tabular-nums">
                 {activeIndex + 1}{' '}
-                <span className="text-base-content/15">/ {items.length}</span>
+                <span className="text-base-subtle">/ {items.length}</span>
               </span>
 
               {/* Prev / Next */}
@@ -602,7 +602,7 @@ export function FAQSection({
                 <button
                   type="button"
                   onClick={goPrev}
-                  className="h-9 w-9 rounded-lg bg-base-200/40 border border-base-300/20 flex items-center justify-center text-base-content/40 hover:text-base-content/70 hover:border-base-300/40 transition-[color,background-color,border-color,box-shadow] duration-200 cursor-pointer"
+                  className="h-9 w-9 rounded-lg bg-base-200/40 border border-base-300/20 flex items-center justify-center text-base-subtle hover:text-base-muted hover:border-base-300/40 transition-[color,background-color,border-color,box-shadow] duration-200 cursor-pointer"
                   aria-label="Previous question"
                 >
                   <ChevronUp size={16} />
@@ -610,7 +610,7 @@ export function FAQSection({
                 <button
                   type="button"
                   onClick={goNext}
-                  className="h-9 w-9 rounded-lg bg-base-200/40 border border-base-300/20 flex items-center justify-center text-base-content/40 hover:text-base-content/70 hover:border-base-300/40 transition-[color,background-color,border-color,box-shadow] duration-200 cursor-pointer"
+                  className="h-9 w-9 rounded-lg bg-base-200/40 border border-base-300/20 flex items-center justify-center text-base-subtle hover:text-base-muted hover:border-base-300/40 transition-[color,background-color,border-color,box-shadow] duration-200 cursor-pointer"
                   aria-label="Next question"
                 >
                   <ChevronDown size={16} />

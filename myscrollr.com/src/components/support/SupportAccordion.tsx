@@ -63,7 +63,7 @@ export function SupportAccordion({
             >
               <span
                 className={`text-[15px] leading-snug font-semibold transition-colors duration-200 ${
-                  isOpen ? 'text-base-content' : 'text-base-content/70'
+                  isOpen ? 'text-base-content' : 'text-base-muted'
                 }`}
               >
                 {entry.title}
@@ -74,7 +74,7 @@ export function SupportAccordion({
                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors duration-200 ${
                   isOpen
                     ? 'bg-primary/10 text-primary'
-                    : 'bg-base-300/20 text-base-content/30'
+                    : 'bg-base-300/20 text-base-subtle'
                 }`}
               >
                 <ChevronDown size={15} />
@@ -99,7 +99,7 @@ export function SupportAccordion({
                 >
                   <div className="px-5 pt-0 pb-5">
                     <div className="mb-3 h-px bg-base-300/20" />
-                    <div className="text-sm leading-relaxed text-base-content/55">
+                    <div className="text-sm leading-relaxed text-base-muted">
                       {entry.body}
                     </div>
                   </div>

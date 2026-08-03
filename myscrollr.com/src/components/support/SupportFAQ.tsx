@@ -38,7 +38,7 @@ export function SupportFAQ() {
                 </span>
                 {f.question}
               </h3>
-              <p className="relative m-0 text-[14.5px] leading-[1.65] text-base-content/60 [text-wrap:pretty]">
+              <p className="relative m-0 text-[14.5px] leading-[1.65] text-base-muted [text-wrap:pretty]">
                 {f.answer}
               </p>
             </div>

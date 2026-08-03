@@ -58,14 +58,14 @@ export function SupportSection({
           transition={{ duration: 0.5, ease: EASE }}
           className="mb-10"
         >
-          <p className="text-xs font-semibold tracking-[0.2em] text-primary/70 uppercase">
+          <p className="text-xs font-semibold tracking-[0.2em] text-primary uppercase">
             {eyebrow}
           </p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight text-base-content sm:text-3xl">
             {title}
           </h2>
           {description ? (
-            <p className="mt-3 max-w-2xl text-base text-base-content/55">
+            <p className="mt-3 max-w-2xl text-base text-base-muted">
               {description}
             </p>
           ) : null}
@@ -114,7 +114,7 @@ function SectionScreenshot({
         </span>
         <span
           aria-hidden="true"
-          className="text-xs font-mono text-base-content/40 transition-transform duration-200 group-open/details:rotate-180"
+          className="text-xs font-mono text-base-subtle transition-transform duration-200 group-open/details:rotate-180"
         >
           ▾
         </span>

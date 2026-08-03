@@ -261,7 +261,7 @@ function SectionIntro({
       <h2 className="type-display m-0 text-[clamp(30px,4vw,52px)]">
         {line1} <span className="type-outline">{outline}</span>
       </h2>
-      <p className="mb-0 mt-3 max-w-lg text-base leading-relaxed text-base-content/55">
+      <p className="mb-0 mt-3 max-w-lg text-base leading-relaxed text-base-muted">
         {sub}
       </p>
     </motion.div>
@@ -311,7 +311,7 @@ function ArchitecturePage() {
                   />
 
                   <div className="mb-4 flex items-center justify-between">
-                    <span className="font-mono text-[10px] tracking-[0.14em] text-base-content/40">
+                    <span className="font-mono text-[10px] tracking-[0.14em] text-base-subtle">
                       {String(i + 1).padStart(2, '0')}
                     </span>
                     <span
@@ -325,7 +325,7 @@ function ArchitecturePage() {
                   <h3 className="m-0 text-[15px] font-bold uppercase tracking-[0.02em] text-base-content">
                     {step.title}
                   </h3>
-                  <p className="mb-0 mt-2 text-[13px] leading-relaxed text-base-content/55">
+                  <p className="mb-0 mt-2 text-[13px] leading-relaxed text-base-muted">
                     {step.description}
                   </p>
 
@@ -336,7 +336,7 @@ function ArchitecturePage() {
                           className="h-1.5 w-1.5 rounded-[1px]"
                           style={{ background: step.hex }}
                         />
-                        <span className="font-mono text-[11px] text-base-content/45">
+                        <span className="font-mono text-[11px] text-base-subtle">
                           {item}
                         </span>
                       </div>
@@ -347,12 +347,12 @@ function ArchitecturePage() {
             </div>
 
             {/* Flow strip (desktop) */}
-            <div className="mt-8 hidden items-center justify-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/35 lg:flex">
+            <div className="mt-8 hidden items-center justify-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-base-subtle lg:flex">
               {PIPELINE_STEPS.map((step, i) => (
                 <span key={step.label} className="flex items-center gap-3">
                   <span>{step.label}</span>
                   {i < PIPELINE_STEPS.length - 1 && (
-                    <span aria-hidden="true" className="text-primary/50">
+                    <span aria-hidden="true" className="text-primary">
                       →
                     </span>
                   )}
@@ -383,7 +383,7 @@ function ArchitecturePage() {
                 {CDC_FLOW.map((step, i) => (
                   <motion.div key={step.label} {...revealX(i)}>
                     <div className="flex items-center gap-4 rounded-[4px] border border-hairline bg-panel px-4 py-3.5">
-                      <span className="font-mono text-[10px] text-base-content/35">
+                      <span className="font-mono text-[10px] text-base-subtle">
                         {String(i + 1).padStart(2, '0')}
                       </span>
                       <span
@@ -394,7 +394,7 @@ function ArchitecturePage() {
                         <p className="m-0 text-[13px] font-bold uppercase tracking-[0.02em] text-base-content">
                           {step.label}
                         </p>
-                        <p className="m-0 truncate font-mono text-[11px] text-base-content/45">
+                        <p className="m-0 truncate font-mono text-[11px] text-base-subtle">
                           {step.detail}
                         </p>
                       </div>
@@ -402,7 +402,7 @@ function ArchitecturePage() {
                     {i < CDC_FLOW.length - 1 && (
                       <div
                         aria-hidden="true"
-                        className="py-1 pl-4 font-mono text-xs text-primary/40"
+                        className="py-1 pl-4 font-mono text-xs text-primary"
                       >
                         ↓
                       </div>
@@ -718,7 +718,7 @@ function ArchitecturePage() {
                   <span className="font-display text-lg font-bold uppercase leading-tight tracking-[0.01em] text-base-content">
                     {principle.title}
                   </span>
-                  <span className="col-start-2 max-w-[640px] text-sm leading-relaxed text-base-content/55 sm:col-start-3">
+                  <span className="col-start-2 max-w-[640px] text-sm leading-relaxed text-base-muted sm:col-start-3">
                     {principle.description}
                   </span>
                 </motion.div>
@@ -769,7 +769,7 @@ function ArchitecturePage() {
                         <p className="m-0 mb-0.5 text-[13px] font-bold text-base-content">
                           {item.name}
                         </p>
-                        <p className="m-0 font-mono text-[11px] text-base-content/45">
+                        <p className="m-0 font-mono text-[11px] text-base-subtle">
                           {item.detail}
                         </p>
                       </div>
@@ -785,7 +785,7 @@ function ArchitecturePage() {
               className="mt-12 flex items-center justify-center gap-4"
             >
               <span aria-hidden="true" className="h-px w-8 bg-hairline" />
-              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-base-content/40">
+              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-base-subtle">
                 Built and deployed on self-hosted infrastructure
               </span>
               <span aria-hidden="true" className="h-px w-8 bg-hairline" />

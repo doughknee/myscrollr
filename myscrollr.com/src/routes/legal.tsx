@@ -114,7 +114,7 @@ function LegalPage() {
                 key={group.category}
                 className="border-t border-hairline first:border-t-0"
               >
-                <div className="px-3 pb-1 pt-5 font-mono text-[10px] uppercase tracking-[0.16em] text-base-content/35">
+                <div className="px-3 pb-1 pt-5 font-mono text-[10px] uppercase tracking-[0.16em] text-base-subtle">
                   {group.label}
                 </div>
                 {group.docs.map((doc) => {
@@ -144,7 +144,7 @@ function LegalPage() {
                       )}
                       <span
                         className={`font-mono text-xs ${
-                          isActive ? 'text-primary' : 'text-base-content/40'
+                          isActive ? 'text-primary' : 'text-base-subtle'
                         }`}
                       >
                         {docCodes.get(doc.slug)}
@@ -160,7 +160,7 @@ function LegalPage() {
                             </span>
                           )}
                         </span>
-                        <span className="mt-1 block text-sm text-base-content/55">
+                        <span className="mt-1 block text-sm text-base-muted">
                           Last updated {doc.lastUpdated} · Effective{' '}
                           {doc.effectiveDate}
                         </span>
@@ -217,9 +217,9 @@ function DocumentContent({ doc }: { doc: LegalDocument }) {
         <h2 className="type-display m-0 text-[clamp(28px,3.5vw,44px)]">
           {doc.title}
         </h2>
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-hairline-minor pb-8 font-mono text-[11px] uppercase tracking-[0.1em] text-base-content/40">
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-hairline-minor pb-8 font-mono text-[11px] uppercase tracking-[0.1em] text-base-subtle">
           <span>Last updated {doc.lastUpdated}</span>
-          <span className="text-base-content/20">·</span>
+          <span className="text-base-subtle">·</span>
           <span>Effective {doc.effectiveDate}</span>
           {doc.badge && (
             <span className="rounded-[3px] border border-primary/40 px-2 py-[3px] text-[10px] tracking-[0.12em] text-primary">
@@ -238,7 +238,7 @@ function DocumentContent({ doc }: { doc: LegalDocument }) {
             >
               {/* Section header */}
               <div className="mb-4 flex items-center gap-3">
-                <span className="w-6 text-right font-mono text-[10px] tabular-nums text-base-content/30">
+                <span className="w-6 text-right font-mono text-[10px] tabular-nums text-base-subtle">
                   {String(i + 1).padStart(2, '0')}
                 </span>
                 <h3 className="m-0 text-sm font-bold text-primary">
@@ -254,7 +254,7 @@ function DocumentContent({ doc }: { doc: LegalDocument }) {
                 {section.content.map((paragraph, j) => (
                   <p
                     key={j}
-                    className="m-0 text-sm leading-relaxed text-base-content/60"
+                    className="m-0 text-sm leading-relaxed text-base-muted"
                   >
                     {paragraph}
                   </p>
@@ -271,18 +271,18 @@ function DocumentContent({ doc }: { doc: LegalDocument }) {
 
         {/* Document footer */}
         <div className="mt-16 border-t border-hairline pt-8">
-          <div className="flex flex-wrap items-center gap-4 font-mono text-[10px] uppercase tracking-[0.1em] text-base-content/35">
+          <div className="flex flex-wrap items-center gap-4 font-mono text-[10px] uppercase tracking-[0.1em] text-base-subtle">
             <span>{doc.title}</span>
-            <span className="text-base-content/15">·</span>
+            <span className="text-base-subtle">·</span>
             <span>Last updated {doc.lastUpdated}</span>
-            <span className="text-base-content/15">·</span>
+            <span className="text-base-subtle">·</span>
             <span>Effective {doc.effectiveDate}</span>
           </div>
-          <p className="mt-3 max-w-2xl text-xs leading-relaxed text-base-content/40">
+          <p className="mt-3 max-w-2xl text-xs leading-relaxed text-base-subtle">
             Questions about this document? Reach out via{' '}
             <Link
               to="/support"
-              className="text-primary/70 transition-colors hover:text-primary"
+              className="text-primary transition-colors hover:text-primary"
             >
               Support
             </Link>{' '}
@@ -291,7 +291,7 @@ function DocumentContent({ doc }: { doc: LegalDocument }) {
               href="https://discord.gg/85b49TcGJa"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary/70 transition-colors hover:text-primary"
+              className="text-primary transition-colors hover:text-primary"
             >
               Discord
             </a>
@@ -322,13 +322,13 @@ function Callout({
     >
       <div className="flex items-start gap-3">
         <div
-          className={`mt-0.5 shrink-0 ${isWarning ? 'text-warning' : 'text-info'}`}
+          className={`mt-0.5 shrink-0 ${isWarning ? 'text-warning-ink' : 'text-info'}`}
         >
           {isWarning ? <AlertTriangle size={16} /> : <Info size={16} />}
         </div>
         <p
           className={`m-0 text-xs font-medium leading-relaxed ${
-            isWarning ? 'text-warning/80' : 'text-info/80'
+            isWarning ? 'text-warning-ink' : 'text-info'
           }`}
         >
           {callout.text}

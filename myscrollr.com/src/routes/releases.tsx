@@ -263,7 +263,7 @@ function ReleasesPage() {
                     dir={sortDir}
                     onClick={() => handleSort('date')}
                   />
-                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-base-content/40">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-base-subtle">
                     HIGHLIGHTS
                   </span>
                   <span aria-hidden="true" />
@@ -291,7 +291,7 @@ function ReleasesPage() {
                     type="button"
                     aria-expanded={showAll}
                     onClick={() => setShowAll((v) => !v)}
-                    className="mt-5 cursor-pointer rounded-[4px] border border-dashed border-base-content/25 px-[18px] py-2.5 font-mono text-xs tracking-[0.08em] text-base-content/55 transition-colors hover:border-primary hover:text-primary"
+                    className="mt-5 cursor-pointer rounded-[4px] border border-dashed border-base-content/25 px-[18px] py-2.5 font-mono text-xs tracking-[0.08em] text-base-muted transition-colors hover:border-primary hover:text-primary"
                   >
                     {showAll
                       ? 'SHOW RECENT ONLY ▴'
@@ -348,7 +348,7 @@ function SortHeader({
       className={`cursor-pointer text-left font-mono text-[10px] uppercase tracking-[0.14em] transition-colors ${
         active
           ? 'text-primary'
-          : 'text-base-content/40 hover:text-base-content/70'
+          : 'text-base-subtle hover:text-base-muted'
       }`}
     >
       {label} {active ? (dir === 'desc' ? '↓' : '↑') : '↕'}
@@ -395,7 +395,7 @@ function ReleaseRow({
           expanded ? 'bg-primary/5' : ''
         }`}
       >
-        <span className="hidden font-mono text-xs text-base-content/40 md:block">
+        <span className="hidden font-mono text-xs text-base-subtle md:block">
           ↳ {index}
         </span>
 
@@ -414,7 +414,7 @@ function ReleaseRow({
             <span
               aria-hidden="true"
               className={`text-xs transition-transform duration-300 ${
-                expanded ? 'rotate-180 text-primary' : 'text-base-content/40'
+                expanded ? 'rotate-180 text-primary' : 'text-base-subtle'
               }`}
             >
               ▾
@@ -426,17 +426,17 @@ function ReleaseRow({
             </span>
           ) : null}
           {release.prerelease ? (
-            <span className="rounded-[3px] border border-warning/40 px-2 py-[3px] font-mono text-[10px] tracking-[0.12em] text-warning">
+            <span className="rounded-[3px] border border-warning/40 px-2 py-[3px] font-mono text-[10px] tracking-[0.12em] text-warning-ink">
               PRE-RELEASE
             </span>
           ) : null}
         </span>
 
         {/* Date: absolute + relative (relative is client-only) */}
-        <span className="font-mono text-xs text-base-content/50">
+        <span className="font-mono text-xs text-base-muted">
           {formatDate(release.date)}
           {now !== null && release.date ? (
-            <span className="text-base-content/30">
+            <span className="text-base-subtle">
               {' '}
               · {relativeTime(release.date, now)}
             </span>
@@ -447,8 +447,8 @@ function ReleaseRow({
         <span
           className={`min-w-0 text-sm md:truncate ${
             release.headline
-              ? 'text-base-content/55'
-              : 'italic text-base-content/30'
+              ? 'text-base-muted'
+              : 'italic text-base-subtle'
           }`}
         >
           {release.headline || 'Maintenance release'}
@@ -485,7 +485,7 @@ function ReleaseRow({
                     dangerouslySetInnerHTML={{ __html: notesHtml }}
                   />
                 ) : (
-                  <p className="text-sm italic text-base-content/40">
+                  <p className="text-sm italic text-base-subtle">
                     No release notes for this version.
                   </p>
                 )}
@@ -511,10 +511,10 @@ function ReleaseRow({
 function EmptyState() {
   return (
     <div className="my-8 rounded-[8px] border border-hairline bg-panel px-8 py-12 text-center">
-      <p className="m-0 font-mono text-[11px] uppercase tracking-[0.14em] text-base-content/45">
+      <p className="m-0 font-mono text-[11px] uppercase tracking-[0.14em] text-base-subtle">
         NO RELEASE DATA
       </p>
-      <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-base-content/60">
+      <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-base-muted">
         We couldn't load the release history right now. The full changelog
         always lives on GitHub.
       </p>

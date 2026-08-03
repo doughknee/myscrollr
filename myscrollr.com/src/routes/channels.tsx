@@ -29,7 +29,7 @@ function ChannelsRedirect() {
   }, [navigate])
 
   return (
-    <div className="px-8 py-24 font-mono text-sm text-base-content/60">
+    <div className="px-8 py-24 font-mono text-sm text-base-muted">
       The catalog moved to{' '}
       <Link to="/widgets" className="text-primary">
         myscrollr.com/widgets

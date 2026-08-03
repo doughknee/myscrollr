@@ -11,7 +11,7 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.9 }}
       onClick={toggleTheme}
-      className={`relative flex items-center justify-center w-8 h-8 rounded-lg border border-base-300/60 bg-base-200/50 text-base-content/60 hover:text-base-content hover:border-base-300 transition-colors duration-200 cursor-pointer ${className}`}
+      className={`relative flex items-center justify-center w-8 h-8 rounded-lg border border-base-300/60 bg-base-200/50 text-base-muted hover:text-base-content hover:border-base-300 transition-colors duration-200 cursor-pointer ${className}`}
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >

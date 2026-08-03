@@ -10,6 +10,7 @@ import { AlertTriangle, Loader2, Lock, X } from 'lucide-react'
 import type { Appearance, StripeElementsOptions } from '@stripe/stripe-js'
 import type { PaymentIntentResponse, SetupIntentResponse } from '@/api/client'
 import { billingApi } from '@/api/client'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 const stripePromise = loadStripe(
   import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '',
@@ -250,14 +251,14 @@ function PaymentForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <h3 className="text-xs font-semibold text-base-content/50 uppercase tracking-wider">
+      <h3 className="text-xs font-semibold text-base-muted uppercase tracking-wider">
         Payment method
       </h3>
       <PaymentElement options={{ layout: 'tabs' }} onReady={onReady} />
       {error && (
         <div className="flex items-start gap-2 p-3 bg-error/10 border border-error/20 rounded-lg">
-          <AlertTriangle size={14} className="text-error mt-0.5 shrink-0" />
-          <p className="text-xs text-error">{error}</p>
+          <AlertTriangle size={14} className="text-error-ink mt-0.5 shrink-0" />
+          <p className="text-xs text-error-ink">{error}</p>
         </div>
       )}
       <button
@@ -274,7 +275,7 @@ function PaymentForm({
           buttonLabel
         )}
       </button>
-      <div className="flex items-center justify-center gap-1.5 text-[10px] text-base-content/30">
+      <div className="flex items-center justify-center gap-1.5 text-[10px] text-base-subtle">
         <Lock size={10} />
         <span>Secured by Stripe</span>
       </div>
@@ -304,7 +305,7 @@ function OrderSummary({
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h3 className="text-xs font-semibold text-base-content/50 uppercase tracking-wider mb-3">
+        <h3 className="text-xs font-semibold text-base-muted uppercase tracking-wider mb-3">
           Order summary
         </h3>
         <div className="flex items-center gap-2 mb-1">
@@ -318,7 +319,7 @@ function OrderSummary({
           {plan.name}
           {!isLifetime && ' Plan'}
         </p>
-        <p className="text-xs text-base-content/40 mt-0.5">
+        <p className="text-xs text-base-subtle mt-0.5">
           {isLifetime
             ? 'One-time payment · permanent access'
             : `${plan.interval === 'annual' ? 'Annual' : 'Monthly'} billing`}
@@ -327,7 +328,7 @@ function OrderSummary({
 
       <div className="border-t border-base-content/10 pt-4">
         <div className="flex items-baseline justify-between">
-          <span className="text-xs text-base-content/50">
+          <span className="text-xs text-base-muted">
             {isLifetime ? 'Lifetime Access' : `${plan.name} · ${plan.interval}`}
           </span>
           <span className="text-sm font-semibold text-base-content">
@@ -336,7 +337,7 @@ function OrderSummary({
           </span>
         </div>
         {!isLifetime && plan.interval === 'annual' && (
-          <p className="text-[10px] text-base-content/30 text-right mt-0.5">
+          <p className="text-[10px] text-base-subtle text-right mt-0.5">
             ${plan.perMonth.toFixed(2)}/mo
           </p>
         )}
@@ -347,7 +348,7 @@ function OrderSummary({
           <p className="text-xs font-semibold text-primary mb-1">
             7-day free trial
           </p>
-          <p className="text-[10px] text-base-content/40 leading-relaxed">
+          <p className="text-[10px] text-base-subtle leading-relaxed">
             You won&apos;t be charged today. Your card will be charged{' '}
             {amountLabel} on {trialEndDate(7)}.
           </p>
@@ -355,9 +356,7 @@ function OrderSummary({
       )}
 
       <div className="border-t border-base-content/10 pt-3 flex items-baseline justify-between">
-        <span className="text-xs font-semibold text-base-content/60">
-          Due today
-        </span>
+        <span className="text-xs font-semibold text-base-muted">Due today</span>
         <span className={`text-lg font-bold ${colors.accent}`}>
           {hasTrial && !isLifetime ? '$0.00' : amountLabel}
         </span>
@@ -407,18 +406,9 @@ export default function CheckoutModal({
     return () => observer.disconnect()
   }, [])
 
-  // Close on Escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onClose()
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    requestAnimationFrame(() => dialogRef.current?.focus())
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  // Escape, Tab containment and focus restore. This component only ever
+  // renders while open, so the trap is unconditionally active.
+  useFocusTrap(dialogRef, true, onClose)
 
   // Fetch intent on mount
   useEffect(() => {
@@ -490,16 +480,16 @@ export default function CheckoutModal({
           <button
             onClick={onClose}
             aria-label="Close checkout"
-            className="absolute top-4 right-4 text-base-content/40 hover:text-base-content transition-colors"
+            className="absolute top-4 right-4 text-base-subtle hover:text-base-content transition-colors"
           >
             <X size={18} />
           </button>
           <div className="flex flex-col items-center gap-4 text-center">
-            <AlertTriangle size={32} className="text-error" />
-            <h3 className="text-sm font-semibold text-error">
+            <AlertTriangle size={32} className="text-error-ink" />
+            <h3 className="text-sm font-semibold text-error-ink">
               Checkout Failed
             </h3>
-            <p className="text-xs text-base-content/50">{error}</p>
+            <p className="text-xs text-base-muted">{error}</p>
             <button
               onClick={onClose}
               className="mt-2 px-6 py-2 text-xs font-semibold border border-base-content/20 rounded-lg hover:bg-base-content/5 transition-colors"
@@ -526,13 +516,13 @@ export default function CheckoutModal({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-base-content/10">
-          <h2 className="text-xs font-semibold text-base-content/60 uppercase tracking-wider">
+          <h2 className="text-xs font-semibold text-base-muted uppercase tracking-wider">
             Checkout
           </h2>
           <button
             onClick={onClose}
             aria-label="Close checkout"
-            className="text-base-content/40 hover:text-base-content transition-colors"
+            className="text-base-subtle hover:text-base-content transition-colors"
           >
             <X size={18} />
           </button>

@@ -41,7 +41,7 @@ export function PromiseSection() {
               <br />
               <span className="text-primary">So is the promise.</span>
             </h2>
-            <p className="m-0 mb-7 max-w-[460px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
+            <p className="m-0 mb-7 max-w-[460px] leading-relaxed text-base-muted [text-wrap:pretty]">
               {
                 'Scrollr ships zero telemetry: no analytics, no tracking pixels, no "anonymous usage data." Tests block any deploy that breaks this. You don\'t have to take our word for it.'
               }
@@ -54,13 +54,13 @@ export function PromiseSection() {
               Read the source on GitHub ↗
             </a>
             {stats != null && (
-              <div className="pt-4 font-mono text-xs tracking-[0.08em] text-base-content/45">
+              <div className="pt-4 font-mono text-xs tracking-[0.08em] text-base-subtle">
                 {ghLine(stats)}
               </div>
             )}
           </div>
           <div>
-            <div className="border-b border-hairline pb-3 font-mono text-[11px] tracking-[0.14em] text-base-content/45">
+            <div className="border-b border-hairline pb-3 font-mono text-[11px] tracking-[0.14em] text-base-subtle">
               WHAT SCROLLR WILL NEVER DO
             </div>
             {REFUSALS.map((r, i) => (
@@ -80,7 +80,7 @@ export function PromiseSection() {
                 </span>
                 {/* The strike draws itself across each refusal once the
                     row lands — replaces the static line-through. */}
-                <span className="relative font-semibold text-base-content/75">
+                <span className="relative font-semibold text-base-muted">
                   {r}
                   <motion.span
                     aria-hidden="true"

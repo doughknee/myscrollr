@@ -162,7 +162,7 @@ function PrincipleCard({
             boxShadow: `0 0 20px ${accent.glow}, 0 0 0 1px ${accent.ring}`,
           }}
         >
-          <Icon size={20} className="text-base-content/80" />
+          <Icon size={20} className="text-base-muted" />
         </div>
       </div>
 
@@ -176,7 +176,7 @@ function PrincipleCard({
         >
           {principle.highlight}
         </p>
-        <p className="text-sm text-base-content/45 leading-relaxed">
+        <p className="text-sm text-base-subtle leading-relaxed">
           {principle.body}
         </p>
       </div>
@@ -224,10 +224,10 @@ function GitHubFooter({ stats }: { stats: GitHubStats | null }) {
               <Code size={16} className="text-primary" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-base-content/70">
+              <p className="text-sm font-semibold text-base-muted">
                 Fully open source
               </p>
-              <p className="text-xs text-base-content/30">
+              <p className="text-xs text-base-subtle">
                 Inspect, fork, or contribute on GitHub
               </p>
             </div>
@@ -243,7 +243,7 @@ function GitHubFooter({ stats }: { stats: GitHubStats | null }) {
                   target="_blank"
                   rel="noreferrer"
                   title="Star on GitHub"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-warning/50 hover:text-warning hover:bg-warning/[0.06] transition-[color,background-color] duration-200"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-warning-ink hover:text-warning-ink hover:bg-warning/[0.06] transition-[color,background-color] duration-200"
                 >
                   <Star className="size-3.5" />
                   <span className="font-semibold tabular-nums">
@@ -254,7 +254,7 @@ function GitHubFooter({ stats }: { stats: GitHubStats | null }) {
                   href={`https://github.com/${REPO}/forks`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-info/50 hover:text-info hover:bg-info/[0.06] transition-[color,background-color] duration-200"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-info hover:text-info hover:bg-info/[0.06] transition-[color,background-color] duration-200"
                 >
                   <GitFork className="size-3.5" />
                   <span className="font-semibold tabular-nums">
@@ -263,7 +263,7 @@ function GitHubFooter({ stats }: { stats: GitHubStats | null }) {
                 </a>
                 <Link
                   to="/support"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-accent/50 hover:text-accent hover:bg-accent/[0.06] transition-[color,background-color] duration-200"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-accent hover:text-accent hover:bg-accent/[0.06] transition-[color,background-color] duration-200"
                 >
                   <MessageSquare className="size-3.5" />
                   <span className="font-semibold">Discuss</span>
@@ -277,7 +277,7 @@ function GitHubFooter({ stats }: { stats: GitHubStats | null }) {
             {/* Architecture link */}
             <Link
               to="/architecture"
-              className="group inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-base-300/25 bg-base-200/40 text-sm font-semibold text-base-content/50 hover:text-primary hover:border-primary/25 transition-[color,border-color] duration-200"
+              className="group inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-base-300/25 bg-base-200/40 text-sm font-semibold text-base-muted hover:text-primary hover:border-primary/25 transition-[color,border-color] duration-200"
             >
               <span>How It Works</span>
               <ArrowRight
@@ -291,7 +291,7 @@ function GitHubFooter({ stats }: { stats: GitHubStats | null }) {
               href={`https://github.com/${REPO}`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-base-300/25 bg-base-200/40 text-sm font-semibold text-base-content/50 hover:text-primary hover:border-primary/25 transition-[color,border-color] duration-200"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-base-300/25 bg-base-200/40 text-sm font-semibold text-base-muted hover:text-primary hover:border-primary/25 transition-[color,border-color] duration-200"
             >
               <Github className="size-4" />
               <span>View on GitHub</span>
@@ -326,7 +326,7 @@ export function TrustSection() {
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4">
             Transparent by <span className="text-gradient-primary">Design</span>
           </h2>
-          <p className="text-base text-base-content/45 leading-relaxed max-w-lg">
+          <p className="text-base text-base-subtle leading-relaxed max-w-lg">
             Open source, zero analytics, no accounts. Your device, your data —
             we never see it.
           </p>
@@ -353,13 +353,13 @@ export function TrustSection() {
                 duration: 0.4,
                 ease: EASE,
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[13px] bg-error/[0.06] border border-error/[0.1] text-base-content/35 line-through decoration-error/25"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[13px] bg-error/[0.06] border border-error/[0.1] text-base-subtle line-through decoration-error/25"
             >
               <svg
                 width="12"
                 height="12"
                 viewBox="0 0 12 12"
-                className="shrink-0 text-error/40"
+                className="shrink-0 text-error-ink"
                 aria-hidden="true"
               >
                 <path
@@ -408,11 +408,11 @@ export function TrustSection() {
                   <h3 className="text-sm font-bold text-base-content">
                     Create a Data Source
                   </h3>
-                  <p className="text-[10px] text-primary/50">For developers</p>
+                  <p className="text-[10px] text-primary">For developers</p>
                 </div>
               </div>
 
-              <p className="text-sm text-base-content/40 leading-relaxed mb-6">
+              <p className="text-sm text-base-subtle leading-relaxed mb-6">
                 Every data source is a self-contained package — your own API,
                 your own service, your own UI components. Follow the
                 architecture, ship your plugin. The ecosystem grows with every
@@ -420,7 +420,7 @@ export function TrustSection() {
               </p>
 
               <div className="relative rounded-xl border border-base-300/40 bg-base-100/50 overflow-hidden mb-6 p-5">
-                <p className="text-[9px] text-base-content/20 mb-4">
+                <p className="text-[9px] text-base-subtle mb-4">
                   Each data source includes:
                 </p>
                 <div className="grid grid-cols-2 gap-2.5">
@@ -438,10 +438,10 @@ export function TrustSection() {
                       transition={{ delay: 0.3 + i * 0.06 }}
                       className="flex flex-col gap-0.5 px-3 py-2.5 rounded-lg bg-base-200/60 border border-base-300/30"
                     >
-                      <span className="text-[11px] font-semibold text-base-content/60">
+                      <span className="text-[11px] font-semibold text-base-muted">
                         {item.label}
                       </span>
-                      <span className="text-[9px] text-base-content/25">
+                      <span className="text-[9px] text-base-subtle">
                         {item.desc}
                       </span>
                     </motion.div>
@@ -453,7 +453,7 @@ export function TrustSection() {
                 href="https://github.com/brandon-relentnet/myscrollr"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group/link inline-flex items-center gap-2.5 px-5 py-2.5 text-[11px] font-semibold border border-base-300/25 text-base-content/60 rounded-lg hover:border-primary/30 hover:text-primary transition-colors"
+                className="group/link inline-flex items-center gap-2.5 px-5 py-2.5 text-[11px] font-semibold border border-base-300/25 text-base-muted rounded-lg hover:border-primary/30 hover:text-primary transition-colors"
               >
                 <Github size={14} />
                 View on GitHub
@@ -486,18 +486,18 @@ export function TrustSection() {
                   <h3 className="text-sm font-bold text-base-content whitespace-nowrap">
                     Suggest a Widget
                   </h3>
-                  <p className="text-[10px] text-info/50">For everyone</p>
+                  <p className="text-[10px] text-info">For everyone</p>
                 </div>
               </div>
 
-              <p className="text-sm text-base-content/40 leading-relaxed mb-6">
+              <p className="text-sm text-base-subtle leading-relaxed mb-6">
                 Don't code? No problem. The best widgets start as community
                 ideas. Tell us what platforms and data you want in your feed —
                 we'll make it happen.
               </p>
 
               <div className="rounded-xl border border-base-300/40 bg-base-100/50 p-5 mb-6">
-                <p className="text-[9px] text-base-content/20 mb-4">
+                <p className="text-[9px] text-base-subtle mb-4">
                   Community requested · On the roadmap
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -511,7 +511,7 @@ export function TrustSection() {
                       className="flex items-center gap-2 px-3 py-2 rounded-lg bg-base-200/60 border border-base-300/30"
                     >
                       <span className="text-sm leading-none">{item.emoji}</span>
-                      <span className="text-[10px] text-base-content/30 truncate">
+                      <span className="text-[10px] text-base-subtle truncate">
                         {item.name}
                       </span>
                     </motion.div>
@@ -522,7 +522,7 @@ export function TrustSection() {
                   whileInView={{ opacity: 1 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.7 }}
-                  className="mt-2.5 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-dashed border-primary/20 bg-primary/[0.03] text-primary/40 hover:text-primary/60 hover:border-primary/30 transition-colors cursor-default"
+                  className="mt-2.5 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-dashed border-primary/20 bg-primary/[0.03] text-primary hover:text-primary hover:border-primary/30 transition-colors cursor-default"
                 >
                   <span className="text-lg leading-none">+</span>
                   <span className="text-[10px]">Yours could be next</span>
@@ -534,7 +534,7 @@ export function TrustSection() {
                   href="https://discord.gg/85b49TcGJa"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group/link inline-flex items-center gap-2.5 px-5 py-2.5 text-[11px] font-semibold border border-base-300/25 text-base-content/60 rounded-lg hover:border-info/30 hover:text-info transition-colors"
+                  className="group/link inline-flex items-center gap-2.5 px-5 py-2.5 text-[11px] font-semibold border border-base-300/25 text-base-muted rounded-lg hover:border-info/30 hover:text-info transition-colors"
                 >
                   <MessageSquare size={14} />
                   Join Discord
@@ -545,7 +545,7 @@ export function TrustSection() {
                 </a>
                 <Link
                   to="/support"
-                  className="group/link inline-flex items-center gap-2 text-[11px] font-semibold text-base-content/30 hover:text-info transition-colors"
+                  className="group/link inline-flex items-center gap-2 text-[11px] font-semibold text-base-subtle hover:text-info transition-colors"
                 >
                   Propose an Idea
                   <ArrowUpRight

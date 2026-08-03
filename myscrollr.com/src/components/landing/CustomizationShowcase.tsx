@@ -164,14 +164,14 @@ function ShowcaseCard({
             : 'flex flex-1 flex-col gap-3 p-6 sm:p-7'
         }
       >
-        <span className="text-[11px] font-mono uppercase tracking-wider text-base-content/35">
+        <span className="text-[11px] font-mono uppercase tracking-wider text-base-subtle">
           {card.eyebrow}
         </span>
         <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-base-content">
           {card.title}
         </h3>
         <p
-          className="text-sm leading-relaxed text-base-content/55"
+          className="text-sm leading-relaxed text-base-muted"
           // Body intentionally renders an HTML entity (&mdash;) inline.
           dangerouslySetInnerHTML={{ __html: card.body }}
         />
@@ -181,9 +181,9 @@ function ShowcaseCard({
             {card.chips.map((chip) => (
               <span
                 key={chip.label}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-base-300/40 bg-base-100/40 px-2.5 py-1 text-[11px] font-semibold text-base-content/60"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-base-300/40 bg-base-100/40 px-2.5 py-1 text-[11px] font-semibold text-base-muted"
               >
-                <chip.icon size={12} className="text-base-content/45" />
+                <chip.icon size={12} className="text-base-subtle" />
                 {chip.label}
               </span>
             ))}
@@ -229,7 +229,7 @@ function CardMediaArea({ media }: { media: CardMedia }) {
     >
       {media.rows.map((row) => (
         <figure key={row.basename} className="flex min-w-0 flex-col gap-1.5">
-          <figcaption className="px-5 text-[10px] font-mono uppercase tracking-[0.18em] text-base-content/40 sm:px-0">
+          <figcaption className="px-5 text-[10px] font-mono uppercase tracking-[0.18em] text-base-subtle sm:px-0">
             {row.densityLabel}
           </figcaption>
           <div
@@ -279,7 +279,7 @@ export function CustomizationShowcase() {
             Bend it to{' '}
             <span className="text-gradient-primary">your workflow</span>
           </h2>
-          <p className="text-base text-base-content/45 max-w-xl leading-relaxed text-center">
+          <p className="text-base text-base-subtle max-w-xl leading-relaxed text-center">
             Pick the density, the speed, the color. Drop in extra widgets when
             your day calls for it. Scrollr is opinionated where it matters and
             quiet everywhere else.

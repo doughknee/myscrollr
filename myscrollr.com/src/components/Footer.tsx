@@ -63,7 +63,7 @@ function FooterLink({
 export default function Footer() {
   const year = new Date().getFullYear()
   const linkClass =
-    'text-base-content/40 transition-colors hover:text-primary hover:opacity-100'
+    'text-base-subtle transition-colors hover:text-primary hover:opacity-100'
 
   return (
     <footer className="border-t border-hairline bg-base-75">
@@ -92,13 +92,13 @@ export default function Footer() {
             failing WCAG AA for these functional links; /65 clears 4.5:1
             in both themes (/60 measured 4.41:1 in light) while staying
             visibly de-emphasized. */}
-        <div className="font-mono text-[11px] tracking-[0.1em] text-base-content/65">
+        <div className="font-mono text-[11px] tracking-[0.1em] text-base-muted">
           ZERO ADS · ZERO TELEMETRY
         </div>
       </div>
 
       <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-4 border-t border-hairline-minor px-5 py-4 sm:px-8">
-        <div className="font-mono text-[10px] tracking-[0.1em] text-base-content/65">
+        <div className="font-mono text-[10px] tracking-[0.1em] text-base-muted">
           © {year} SCROLLR · OPEN SOURCE · V{LATEST_DESKTOP_VERSION}
         </div>
         <nav
@@ -109,7 +109,7 @@ export default function Footer() {
             <FooterLink
               key={l.label}
               {...l}
-              className="text-base-content/65 transition-colors hover:text-primary hover:opacity-100"
+              className="text-base-muted transition-colors hover:text-primary hover:opacity-100"
             />
           ))}
         </nav>

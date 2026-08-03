@@ -114,14 +114,14 @@ export function TickerShowcase() {
           transition={{ duration: 0.6, ease: EASE }}
           className="flex flex-col items-center text-center mb-8 sm:mb-12 lg:mb-16"
         >
-          <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-base-200/60 text-base-content/60 text-[10px] font-bold rounded-lg border border-base-300/40 uppercase tracking-wide mb-6">
+          <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-base-200/60 text-base-muted text-[10px] font-bold rounded-lg border border-base-300/40 uppercase tracking-wide mb-6">
             The ticker, not another window
           </span>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[0.95] mb-4 text-center">
             What actually sits{' '}
             <span className="text-gradient-primary">on your screen</span>
           </h2>
-          <p className="text-base text-base-content/45 max-w-xl leading-relaxed text-center">
+          <p className="text-base text-base-subtle max-w-xl leading-relaxed text-center">
             A thin strip at the edge of your display. Real data, refreshed in
             real time. Pick the density that matches how much detail you want.
           </p>
@@ -161,10 +161,10 @@ function TickerRowCard({ row, index }: TickerRowCardProps) {
     >
       {/* Eyebrow ─────────────────────────────────────────── */}
       <figcaption className="flex sm:flex-col sm:items-start items-center gap-2 sm:gap-1 text-left">
-        <span className="text-[11px] font-bold tracking-[0.18em] text-base-content/55 uppercase">
+        <span className="text-[11px] font-bold tracking-[0.18em] text-base-muted uppercase">
           {row.channelLabel}
         </span>
-        <span className="text-[10px] font-mono text-base-content/35 sm:mt-0.5">
+        <span className="text-[10px] font-mono text-base-subtle sm:mt-0.5">
           {row.densityLabel}
         </span>
       </figcaption>

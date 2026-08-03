@@ -50,14 +50,14 @@ export function DesktopProof() {
             <br />
             <span className="text-primary">Not a mockup.</span>
           </h2>
-          <p className="m-0 mb-1.5 max-w-[400px] text-[15px] text-base-content/60 [text-wrap:pretty]">
+          <p className="m-0 mb-1.5 max-w-[400px] text-[15px] text-base-muted [text-wrap:pretty]">
             The bar pinned to the top of a real desktop (weather, MLB scores,
             and a focus timer streaming live) with the Home window open behind
             it.
           </p>
         </motion.div>
         <div className="grid items-start gap-10 pb-14 pt-7 md:grid-cols-[220px_1fr]">
-          <div className="flex flex-col gap-[22px] font-mono text-xs leading-[1.6] text-base-content/55 md:pt-[18px]">
+          <div className="flex flex-col gap-[22px] font-mono text-xs leading-[1.6] text-base-muted md:pt-[18px]">
             {ANNOTATIONS.map(([head, body], i) => (
               <motion.div
                 key={head}
@@ -95,7 +95,7 @@ export function DesktopProof() {
               alt="Scrollr on a real macOS desktop: the live ticker pinned along the top of the screen showing weather, MLB and MLS games, markets, and a timer, with the Home window open showing scores, markets, and Kalshi"
               className="block h-auto w-full rounded-[8px] border border-hairline"
             />
-            <div className="flex flex-wrap justify-between gap-2 px-1 pt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-base-content/45">
+            <div className="flex flex-wrap justify-between gap-2 px-1 pt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-base-subtle">
               <span>{`FIG. 01 — MACOS · SUN AUG 2, ${SHOT_TIME[theme]}`}</span>
               <span>NO EDITS</span>
             </div>

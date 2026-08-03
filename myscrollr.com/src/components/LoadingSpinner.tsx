@@ -17,7 +17,7 @@ export default function LoadingSpinner({
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-2 border-primary/20 border-t-primary mx-auto" />
           {label && (
-            <p className="font-mono text-sm text-base-content/50 uppercase tracking-wider">
+            <p className="font-mono text-sm text-base-muted uppercase tracking-wider">
               {label}
             </p>
           )}
@@ -34,7 +34,7 @@ export default function LoadingSpinner({
         className="flex items-center gap-3"
       >
         <div className="h-2 w-2 rounded-full bg-primary" />
-        <span className="font-mono text-sm text-base-content/50 uppercase tracking-wider">
+        <span className="font-mono text-sm text-base-muted uppercase tracking-wider">
           {label}
         </span>
       </motion.div>

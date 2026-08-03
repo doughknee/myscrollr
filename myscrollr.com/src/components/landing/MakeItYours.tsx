@@ -28,7 +28,7 @@ function ControlRow<T extends string>({
 }) {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="w-[76px] font-mono text-[11px] tracking-[0.14em] text-base-content/45">
+      <span className="w-[76px] font-mono text-[11px] tracking-[0.14em] text-base-subtle">
         {label}
       </span>
       {options.map((o) => {
@@ -42,7 +42,7 @@ function ControlRow<T extends string>({
             className={`relative cursor-pointer rounded-[4px] border px-[18px] py-[9px] font-mono text-[11px] tracking-[0.1em] transition-colors duration-150 hover:border-primary ${
               active
                 ? 'border-transparent text-primary'
-                : 'border-hairline bg-transparent text-base-content/55'
+                : 'border-hairline bg-transparent text-base-muted'
             }`}
           >
             {/* Active chip slides between options — same segmented-
@@ -87,7 +87,7 @@ export function MakeItYours() {
               <br />
               <span className="text-primary">Dress it, park it.</span>
             </h2>
-            <p className="m-0 mb-7 max-w-[440px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
+            <p className="m-0 mb-7 max-w-[440px] leading-relaxed text-base-muted [text-wrap:pretty]">
               Twenty palettes. Top or bottom of any monitor. Speed, density, all
               of it tunable. Try it right here. The bar takes orders.
             </p>
@@ -131,7 +131,7 @@ export function MakeItYours() {
             </div>
           </div>
           <div>
-            <div className="pb-3.5 font-mono text-[11px] tracking-[0.14em] text-base-content/45">
+            <div className="pb-3.5 font-mono text-[11px] tracking-[0.14em] text-base-subtle">
               THEMES — {DEMO_THEMES.length} OF {APP_FAMILY_COUNT} FAMILIES
             </div>
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
@@ -150,7 +150,15 @@ export function MakeItYours() {
                       theme === fam.id ? 'border-primary/45' : 'border-hairline'
                     }`}
                   >
+                    {/* A depiction of the app's ticker in this theme, not UI
+                        text — same treatment as DemoTickerBar. Without this
+                        the sample data lands in the button's accessible name
+                        ("AAPL 232.14 ▲ · KC 24—BUF 21, Catppuccin, pressed")
+                        and the theme name gets buried. Every colour below is
+                        the desktop theme's token verbatim, so it is exempt as
+                        a picture rather than something to recolour. */}
                     <span
+                      aria-hidden="true"
                       className="mb-2 flex items-center gap-2 rounded-[4px] px-2.5 py-2"
                       style={{
                         background: pal.bg,
@@ -176,11 +184,15 @@ export function MakeItYours() {
                         </span>
                       </span>
                     </span>
-                    <span className="flex justify-between px-0.5 font-mono text-[10px] tracking-[0.1em] text-base-content/45">
+                    <span className="flex justify-between px-0.5 font-mono text-[10px] tracking-[0.1em] text-base-subtle">
                       <span>{fam.name}</span>
                       <AnimatePresence initial={false}>
                         {theme === fam.id && (
                           <motion.span
+                            /* Visual echo of aria-pressed, which already
+                               announces the state — without this it reads
+                               as "SCROLLR● ACTIVE, pressed". */
+                            aria-hidden="true"
                             initial={{ opacity: 0, x: 6 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: 6 }}
@@ -196,7 +208,7 @@ export function MakeItYours() {
                 )
               })}
             </div>
-            <div className="pt-3 font-mono text-[11px] text-base-content/30">
+            <div className="pt-3 font-mono text-[11px] text-base-subtle">
               + {APP_FAMILY_COUNT - DEMO_THEMES.length} MORE IN THE APP · EVERY
               THEME IN LIGHT & DARK
             </div>

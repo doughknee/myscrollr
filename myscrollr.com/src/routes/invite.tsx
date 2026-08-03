@@ -150,7 +150,7 @@ function InvitePage() {
           <p className="uppercase tracking-[0.2em] text-primary animate-pulse">
             Redirecting to sign in...
           </p>
-          <p className="text-xs text-base-content/50 font-sans normal-case tracking-normal">
+          <p className="text-xs text-base-muted font-sans normal-case tracking-normal">
             Use the password you just created.
           </p>
         </div>
@@ -163,10 +163,10 @@ function InvitePage() {
       <div className="min-h-dvh text-base-content flex flex-col items-center justify-start pt-32 pb-16 px-4 font-sans">
         <div className="w-full max-w-md text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-error/10 border border-error/20 mb-4">
-            <X className="w-8 h-8 text-error" />
+            <X className="w-8 h-8 text-error-ink" />
           </div>
           <h1 className="text-2xl font-bold mb-2">Invalid Invite Link</h1>
-          <p className="text-base-content/60 text-sm">
+          <p className="text-base-muted text-sm">
             This link is missing required parameters. Please check your email
             for the correct invite link.
           </p>
@@ -184,7 +184,7 @@ function InvitePage() {
             <Shield className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-2xl font-bold mb-2">Welcome, {email}</h1>
-          <p className="text-base-content/60 text-sm">
+          <p className="text-base-muted text-sm">
             You&apos;ve been invited as a{' '}
             <span className="text-primary font-semibold">Super User</span>.
             Let&apos;s set up your account.
@@ -198,7 +198,7 @@ function InvitePage() {
             <div>
               <label
                 htmlFor="first-name"
-                className="block text-xs font-medium text-base-content/50 uppercase tracking-wider mb-1.5"
+                className="block text-xs font-medium text-base-muted uppercase tracking-wider mb-1.5"
               >
                 First Name
               </label>
@@ -217,7 +217,7 @@ function InvitePage() {
             <div>
               <label
                 htmlFor="last-name"
-                className="block text-xs font-medium text-base-content/50 uppercase tracking-wider mb-1.5"
+                className="block text-xs font-medium text-base-muted uppercase tracking-wider mb-1.5"
               >
                 Last Name
               </label>
@@ -236,7 +236,7 @@ function InvitePage() {
             <div>
               <label
                 htmlFor="username"
-                className="block text-xs font-medium text-base-content/50 uppercase tracking-wider mb-1.5"
+                className="block text-xs font-medium text-base-muted uppercase tracking-wider mb-1.5"
               >
                 Username
               </label>
@@ -254,31 +254,31 @@ function InvitePage() {
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2">
                   {usernameState === 'checking' && (
-                    <Loader2 className="w-4 h-4 text-base-content/40 animate-spin" />
+                    <Loader2 className="w-4 h-4 text-base-subtle animate-spin" />
                   )}
                   {usernameState === 'available' && (
-                    <Check className="w-4 h-4 text-success" />
+                    <Check className="w-4 h-4 text-success-ink" />
                   )}
                   {(usernameState === 'taken' ||
                     usernameState === 'invalid') && (
-                    <X className="w-4 h-4 text-error" />
+                    <X className="w-4 h-4 text-error-ink" />
                   )}
                 </div>
               </div>
-              <p className="mt-1 text-xs text-base-content/40">
+              <p className="mt-1 text-xs text-base-subtle">
                 {usernameState === 'idle' &&
                   '3-24 characters, lowercase letters, digits, or underscores'}
                 {usernameState === 'checking' && 'Checking availability...'}
                 {usernameState === 'available' && (
-                  <span className="text-success">Username is available</span>
+                  <span className="text-success-ink">Username is available</span>
                 )}
                 {usernameState === 'taken' && (
-                  <span className="text-error">
+                  <span className="text-error-ink">
                     Username is taken, try another
                   </span>
                 )}
                 {usernameState === 'invalid' && (
-                  <span className="text-error">
+                  <span className="text-error-ink">
                     3-24 characters, lowercase letters, digits, or underscores
                     only
                   </span>
@@ -290,7 +290,7 @@ function InvitePage() {
             <div>
               <label
                 htmlFor="birthday"
-                className="block text-xs font-medium text-base-content/50 uppercase tracking-wider mb-1.5"
+                className="block text-xs font-medium text-base-muted uppercase tracking-wider mb-1.5"
               >
                 Birthday
               </label>
@@ -308,7 +308,7 @@ function InvitePage() {
             <div>
               <label
                 htmlFor="gender"
-                className="block text-xs font-medium text-base-content/50 uppercase tracking-wider mb-1.5"
+                className="block text-xs font-medium text-base-muted uppercase tracking-wider mb-1.5"
               >
                 Gender
               </label>
@@ -331,7 +331,7 @@ function InvitePage() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-xs font-medium text-base-content/50 uppercase tracking-wider mb-1.5"
+                className="block text-xs font-medium text-base-muted uppercase tracking-wider mb-1.5"
               >
                 Password
               </label>
@@ -349,7 +349,7 @@ function InvitePage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70 transition-colors"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-base-subtle hover:text-base-muted transition-colors"
                 >
                   {showPassword ? (
                     <EyeOff className="w-4 h-4" />
@@ -364,7 +364,7 @@ function InvitePage() {
             <div>
               <label
                 htmlFor="confirm-password"
-                className="block text-xs font-medium text-base-content/50 uppercase tracking-wider mb-1.5"
+                className="block text-xs font-medium text-base-muted uppercase tracking-wider mb-1.5"
               >
                 Confirm Password
               </label>
@@ -382,7 +382,7 @@ function InvitePage() {
                 <button
                   type="button"
                   onClick={() => setShowConfirm(!showConfirm)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70 transition-colors"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-base-subtle hover:text-base-muted transition-colors"
                 >
                   {showConfirm ? (
                     <EyeOff className="w-4 h-4" />
@@ -396,7 +396,7 @@ function InvitePage() {
             {/* Error message */}
             {state === 'error' && error && (
               <div className="space-y-2">
-                <div className="px-3 py-2 bg-error/10 border border-error/20 rounded-lg text-sm text-error">
+                <div className="px-3 py-2 bg-error/10 border border-error/20 rounded-lg text-sm text-error-ink">
                   {error}
                 </div>
                 {/* If the token was rejected (likely because the user

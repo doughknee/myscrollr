@@ -107,7 +107,7 @@ export function SupportContactForm() {
       <TerminalContainer>
         <SectionRow tag="SEC 04 ／ OPEN A TICKET" />
         <div className="mx-auto max-w-[760px] pb-14 pt-8">
-          <p className="mb-8 max-w-[480px] text-[14.5px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
+          <p className="mb-8 max-w-[480px] text-[14.5px] leading-relaxed text-base-muted [text-wrap:pretty]">
             We read every message. Replies usually arrive within 1-2 business
             days.
           </p>
@@ -156,7 +156,7 @@ export function SupportContactForm() {
                     placeholder="you@example.com"
                   />
                   {isAuthenticated ? (
-                    <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-base-content/40">
+                    <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-base-subtle">
                       Linked to your account
                     </p>
                   ) : null}
@@ -223,12 +223,12 @@ export function SupportContactForm() {
                   className="rounded-[4px] border border-error/30 bg-error/10 p-3"
                   role="alert"
                 >
-                  <p className="m-0 text-xs text-error">{error}</p>
+                  <p className="m-0 text-xs text-error-ink">{error}</p>
                 </motion.div>
               ) : null}
 
               <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="m-0 text-xs text-base-content/40">
+                <p className="m-0 text-xs text-base-subtle">
                   {isAuthenticated
                     ? 'Submitted with your account, so we can look up your subscription if needed.'
                     : 'Submitted anonymously. Limited to 5 tickets per hour per IP.'}
@@ -303,16 +303,16 @@ function FormField({
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <label
           htmlFor={htmlFor}
-          className="font-mono text-[11px] uppercase tracking-[0.12em] text-base-content/60"
+          className="font-mono text-[11px] uppercase tracking-[0.12em] text-base-muted"
         >
           {label}
           {required ? <span className="ml-1 text-primary">*</span> : null}
           {optional ? (
-            <span className="ml-1 text-base-content/30">(optional)</span>
+            <span className="ml-1 text-base-subtle">(optional)</span>
           ) : null}
         </label>
         {counter ? (
-          <span className="font-mono text-[10px] tabular-nums text-base-content/35">
+          <span className="font-mono text-[10px] tabular-nums text-base-subtle">
             {counter}
           </span>
         ) : null}
@@ -338,7 +338,7 @@ function SuccessPanel({ onReset }: { onReset: () => void }) {
         <h3 className="m-0 text-lg font-bold text-base-content">
           Message sent. Thanks.
         </h3>
-        <p className="mt-2 max-w-md text-sm leading-relaxed text-base-content/55">
+        <p className="mt-2 max-w-md text-sm leading-relaxed text-base-muted">
           We've received your note and will get back to you within 1-2 business
           days at the email you provided.
         </p>
@@ -346,7 +346,7 @@ function SuccessPanel({ onReset }: { onReset: () => void }) {
       <button
         type="button"
         onClick={onReset}
-        className="cursor-pointer rounded-[4px] border border-hairline px-4 py-2 font-mono text-xs uppercase tracking-[0.1em] text-base-content/70 transition-colors hover:border-primary hover:text-primary"
+        className="cursor-pointer rounded-[4px] border border-hairline px-4 py-2 font-mono text-xs uppercase tracking-[0.1em] text-base-muted transition-colors hover:border-primary hover:text-primary"
       >
         Send another
       </button>

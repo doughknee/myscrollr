@@ -300,7 +300,7 @@ function DeploymentFanout({
         transition={{ delay: 0.25, duration: 0.6, ease: EASE }}
       >
         <div className="relative flex h-12 w-12 items-center justify-center rounded-[8px] border border-primary/40 bg-panel shadow-[0_0_30px_rgba(52,211,153,.18)]">
-          <Building2 size={20} className="text-primary/80" />
+          <Building2 size={20} className="text-primary" />
           <span className="animate-pulse-dot absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary" />
         </div>
       </motion.div>
@@ -363,8 +363,12 @@ function MonitorTile({
         <div className="h-1 w-[40%] rounded-[1px] bg-base-content/5" />
       </div>
 
-      {/* Ticker bar — pinned to bottom */}
+      {/* Ticker bar — pinned to bottom. A depiction of the branded product,
+          not UI text: the button already names itself via aria-label, and the
+          sample string is illustrative, so it is hidden rather than recoloured
+          away from the customer's accent. */}
       <div
+        aria-hidden="true"
         className="absolute bottom-0 left-0 right-0 flex items-center gap-1.5 border-t px-2.5 py-1.5"
         style={{ borderColor: `${accent}25`, background: `${accent}08` }}
       >
@@ -413,7 +417,7 @@ function AudiencesSection() {
                 {a.tag}
               </span>
               <span className="text-[17px] font-bold">{a.name}</span>
-              <span className="text-sm text-base-content/60 [text-wrap:pretty]">
+              <span className="text-sm text-base-muted [text-wrap:pretty]">
                 {a.copy}
               </span>
             </motion.div>
@@ -444,7 +448,7 @@ function CapabilitiesSection() {
               <div className="mb-[9px] text-lg font-bold uppercase tracking-[0.02em]">
                 {c.title}
               </div>
-              <div className="max-w-[360px] text-sm leading-[1.65] text-base-content/60 [text-wrap:pretty]">
+              <div className="max-w-[360px] text-sm leading-[1.65] text-base-muted [text-wrap:pretty]">
                 {c.body}
               </div>
             </div>
@@ -487,7 +491,7 @@ function FaqSection() {
                 <span className="font-mono text-xs text-primary">{f.num}</span>
                 <span className="text-[16.5px] font-bold">{f.q}</span>
               </div>
-              <p className="m-0 pl-[34px] text-[14.5px] leading-[1.65] text-base-content/60 [text-wrap:pretty]">
+              <p className="m-0 pl-[34px] text-[14.5px] leading-[1.65] text-base-muted [text-wrap:pretty]">
                 {f.a}
               </p>
             </motion.div>
@@ -646,9 +650,9 @@ function LeadForm() {
           <h3 className="text-lg font-bold text-base-content">
             Thanks — we got your note.
           </h3>
-          <p className="mt-2 max-w-md text-sm leading-relaxed text-base-content/60">
+          <p className="mt-2 max-w-md text-sm leading-relaxed text-base-muted">
             A confirmation email is on its way to{' '}
-            <span className="font-medium text-base-content/85">
+            <span className="font-medium text-base-muted">
               {submittedEmail}
             </span>{' '}
             with what to expect next. A real human will reply within one
@@ -660,7 +664,7 @@ function LeadForm() {
           <button
             type="button"
             onClick={handleCopyEmail}
-            className="cursor-pointer rounded-[4px] border border-hairline px-4 py-2 font-mono text-[11px] tracking-[0.08em] text-base-content/70 transition-colors hover:border-primary/40 hover:text-primary"
+            className="cursor-pointer rounded-[4px] border border-hairline px-4 py-2 font-mono text-[11px] tracking-[0.08em] text-base-muted transition-colors hover:border-primary/40 hover:text-primary"
           >
             {emailCopied ? 'COPIED' : `COPY ${CONTACT_EMAIL.toUpperCase()}`}
           </button>
@@ -677,7 +681,7 @@ function LeadForm() {
               setUseCase('')
               setMessage('')
             }}
-            className="cursor-pointer text-sm text-base-content/40 transition-colors hover:text-base-content/70"
+            className="cursor-pointer text-sm text-base-subtle transition-colors hover:text-base-muted"
           >
             Send another
           </button>
@@ -783,12 +787,12 @@ function LeadForm() {
           className="rounded-[4px] border border-error/30 bg-error/10 p-3"
           role="alert"
         >
-          <p className="m-0 text-xs text-error">{error}</p>
+          <p className="m-0 text-xs text-error-ink">{error}</p>
         </motion.div>
       ) : null}
 
       <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="m-0 text-xs text-base-content/40">
+        <p className="m-0 text-xs text-base-subtle">
           We&rsquo;ll send a confirmation to your email and reply within one
           business day.
         </p>
@@ -854,13 +858,13 @@ function FormField({
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <label
           htmlFor={htmlFor}
-          className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-base-content/60"
+          className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-base-muted"
         >
           {label}
           {required ? <span className="ml-1 text-primary">*</span> : null}
         </label>
         {counter ? (
-          <span className="font-mono text-[11px] tabular-nums text-base-content/35">
+          <span className="font-mono text-[11px] tabular-nums text-base-subtle">
             {counter}
           </span>
         ) : null}
@@ -918,11 +922,11 @@ function BusinessPage() {
             </button>
             <a
               href={`mailto:${CONTACT_EMAIL}`}
-              className="font-mono text-[11px] tracking-[0.1em] text-base-content/45 transition-colors hover:text-primary"
+              className="font-mono text-[11px] tracking-[0.1em] text-base-subtle transition-colors hover:text-primary"
             >
               ENTERPRISE@MYSCROLLR.COM
             </a>
-            <div className="flex flex-wrap items-center gap-2.5 font-mono text-[11px] tracking-[0.1em] text-base-content/45">
+            <div className="flex flex-wrap items-center gap-2.5 font-mono text-[11px] tracking-[0.1em] text-base-subtle">
               <span>TRY THE WHITE-LABEL ↘</span>
               {BRAND_IDS.map((id) => (
                 <button
@@ -933,7 +937,7 @@ function BusinessPage() {
                   className={`cursor-pointer whitespace-nowrap rounded-[4px] border px-3 py-[7px] font-mono text-[11px] tracking-[0.08em] transition-colors hover:border-primary ${
                     brand === id
                       ? 'border-primary/45 bg-primary/10 text-primary'
-                      : 'border-hairline text-base-content/55'
+                      : 'border-hairline text-base-muted'
                   }`}
                 >
                   {BRAND_DEFS[id].label}

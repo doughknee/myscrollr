@@ -16,10 +16,11 @@
  * Lives at the bottom of the Account hub. Intentionally destructive
  * visual treatment so users don't click it casually.
  */
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { AlertTriangle, Download, Loader2, Trash2, X } from 'lucide-react'
 import { motion } from 'motion/react'
 import { gdprApi } from '@/api/client'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface AccountDangerZoneProps {
   getToken: () => Promise<string | null>
@@ -87,7 +88,7 @@ export default function AccountDangerZone({
           <h2 className="text-3xl sm:text-4xl font-black tracking-tight leading-[0.95] mb-3">
             Your Data
           </h2>
-          <p className="text-sm text-base-content/45 leading-relaxed max-w-lg mx-auto">
+          <p className="text-sm text-base-subtle leading-relaxed max-w-lg mx-auto">
             Export everything we store about you, or permanently delete your
             account. Deletions have a 30-day undo window.
           </p>
@@ -113,13 +114,13 @@ export default function AccountDangerZone({
                 <h3 className="text-base font-bold text-base-content mb-1">
                   Export your data
                 </h3>
-                <p className="text-xs text-base-content/50 leading-relaxed">
+                <p className="text-xs text-base-muted leading-relaxed">
                   Download a JSON archive of your preferences, channels,
                   subscription summary, and fantasy league metadata. Yahoo OAuth
                   tokens are omitted for security.
                 </p>
                 {exportError && (
-                  <p className="mt-2 text-xs text-error">{exportError}</p>
+                  <p className="mt-2 text-xs text-error-ink">{exportError}</p>
                 )}
               </div>
               <button
@@ -141,14 +142,14 @@ export default function AccountDangerZone({
           {/* Delete */}
           <div className="relative bg-error/[0.04] border border-error/25 rounded-xl p-6 overflow-hidden">
             <div className="flex items-start gap-4">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-error/15 text-error">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-error/15 text-error-ink">
                 <Trash2 size={20} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-base font-bold text-base-content mb-1">
                   Delete your account
                 </h3>
-                <p className="text-xs text-base-content/60 leading-relaxed">
+                <p className="text-xs text-base-muted leading-relaxed">
                   Permanently removes your account, preferences, channels, and
                   Yahoo OAuth connection. Active subscriptions must be canceled
                   first. If you have a lifetime membership, we keep an
@@ -159,7 +160,7 @@ export default function AccountDangerZone({
                 type="button"
                 onClick={() => setModalOpen(true)}
                 disabled={deletionStatus === 'pending'}
-                className="shrink-0 inline-flex items-center gap-2 rounded-lg border border-error/40 bg-error/10 px-4 py-2 text-xs font-semibold text-error hover:bg-error/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="shrink-0 inline-flex items-center gap-2 rounded-lg border border-error/40 bg-error/10 px-4 py-2 text-xs font-semibold text-error-ink hover:bg-error/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Trash2 size={14} />
                 {deletionStatus === 'pending' ? 'Scheduled' : 'Delete…'}
@@ -212,28 +213,28 @@ function PendingBanner({
   return (
     <div className="max-w-2xl mx-auto mb-8 rounded-xl border border-warning/40 bg-warning/[0.08] p-5">
       <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-warning/20 text-warning">
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-warning/20 text-warning-ink">
           <AlertTriangle size={18} />
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-bold text-base-content">
             Account scheduled for deletion
           </h3>
-          <p className="mt-1 text-xs text-base-content/70 leading-relaxed">
+          <p className="mt-1 text-xs text-base-muted leading-relaxed">
             Your account will be permanently deleted on{' '}
             <span className="font-semibold text-base-content">{formatted}</span>{' '}
             ({daysLeft} {daysLeft === 1 ? 'day' : 'days'} from now). You can
             cancel any time before that.
           </p>
           {cancelError && (
-            <p className="mt-2 text-xs text-error">{cancelError}</p>
+            <p className="mt-2 text-xs text-error-ink">{cancelError}</p>
           )}
         </div>
         <button
           type="button"
           onClick={onCancel}
           disabled={canceling}
-          className="shrink-0 inline-flex items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 px-4 py-2 text-xs font-semibold text-warning hover:bg-warning/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="shrink-0 inline-flex items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 px-4 py-2 text-xs font-semibold text-warning-ink hover:bg-warning/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {canceling ? (
             <Loader2 size={14} className="animate-spin" />
@@ -259,6 +260,11 @@ function DeleteConfirmModal({
   onScheduled: () => void | Promise<void>
 }) {
   const [confirmText, setConfirmText] = useState('')
+
+  // This dialog had no keyboard exit at all — no Escape, no focus move,
+  // no trap — on the most destructive action in the product.
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useFocusTrap(dialogRef, true, onClose)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -283,6 +289,8 @@ function DeleteConfirmModal({
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       className="fixed inset-0 z-50 flex items-center justify-center bg-base-100/80 backdrop-blur-sm p-4"
       role="dialog"
       aria-modal="true"
@@ -295,7 +303,7 @@ function DeleteConfirmModal({
         className="w-full max-w-lg rounded-xl border border-error/40 bg-base-200 p-6 shadow-2xl"
       >
         <div className="flex items-start gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-error/15 text-error">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-error/15 text-error-ink">
             <AlertTriangle size={18} />
           </div>
           <div className="flex-1">
@@ -305,7 +313,7 @@ function DeleteConfirmModal({
             >
               Permanently delete your account?
             </h2>
-            <p className="mt-1 text-sm text-base-content/70 leading-relaxed">
+            <p className="mt-1 text-sm text-base-muted leading-relaxed">
               Your account will be scheduled for purge in{' '}
               <span className="font-semibold">30 days</span>. You can cancel
               from this page during that window by signing in and clicking
@@ -314,7 +322,7 @@ function DeleteConfirmModal({
           </div>
         </div>
 
-        <ul className="mb-5 space-y-1.5 text-xs text-base-content/70">
+        <ul className="mb-5 space-y-1.5 text-xs text-base-muted">
           <li>• All widget configurations and preferences will be deleted.</li>
           <li>• Connected Yahoo Fantasy account will be disconnected.</li>
           <li>• Billing records stay anonymized for tax compliance.</li>
@@ -322,8 +330,8 @@ function DeleteConfirmModal({
         </ul>
 
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-wider text-base-content/50">
-            Type <span className="font-mono text-error">{expected}</span> to
+          <span className="text-xs font-semibold uppercase tracking-wider text-base-muted">
+            Type <span className="font-mono text-error-ink">{expected}</span> to
             confirm
           </span>
           <input
@@ -333,19 +341,19 @@ function DeleteConfirmModal({
             autoFocus
             autoComplete="off"
             spellCheck={false}
-            className="mt-1.5 w-full rounded-lg border border-base-300/40 bg-base-100 px-3 py-2 font-mono text-sm text-base-content placeholder:text-base-content/30 focus:outline-none focus:border-error/60"
+            className="mt-1.5 w-full rounded-lg border border-base-300/40 bg-base-100 px-3 py-2 font-mono text-sm text-base-content placeholder:text-base-subtle focus:outline-none focus:border-error/60"
             placeholder={expected}
           />
         </label>
 
-        {error && <p className="mt-3 text-xs text-error">{error}</p>}
+        {error && <p className="mt-3 text-xs text-error-ink">{error}</p>}
 
         <div className="mt-6 flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="px-4 py-2 rounded-lg text-sm font-semibold text-base-content/70 hover:bg-base-300/30 transition-colors disabled:opacity-50"
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-base-muted hover:bg-base-300/30 transition-colors disabled:opacity-50"
           >
             Cancel
           </button>

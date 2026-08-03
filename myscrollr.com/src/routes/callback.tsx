@@ -20,12 +20,12 @@ function Callback() {
       <div className="min-h-dvh text-base-content flex items-center justify-center font-mono">
         <div className="text-center space-y-4 max-w-md">
           <div className="h-12 w-12 rounded-full border-2 border-error flex items-center justify-center mx-auto mb-4">
-            <span className="text-error text-xl">!</span>
+            <span className="text-error-ink text-xl">!</span>
           </div>
-          <p className="uppercase tracking-[0.2em] text-error">
+          <p className="uppercase tracking-[0.2em] text-error-ink">
             Authentication Failed
           </p>
-          <p className="text-xs text-base-content/50">{error.message}</p>
+          <p className="text-xs text-base-muted">{error.message}</p>
           <button
             onClick={() => navigate({ to: '/' })}
             className="btn btn-primary btn-sm mt-4"

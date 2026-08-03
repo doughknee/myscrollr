@@ -44,7 +44,7 @@ export default function HeroTextSwap({ activeIndex }: HeroTextSwapProps) {
         transition={{ duration: 0.6, delay: 0.4, ease: 'easeOut' }}
         className="block text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-none -mt-1"
       >
-        <span className="text-base-content/50">Always Visible.</span>
+        <span className="text-base-muted">Always Visible.</span>
       </motion.span>
     </h1>
   )

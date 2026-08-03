@@ -35,15 +35,15 @@ const themeScript = `;(function () {
 function RootErrorComponent({ error }: { error: Error }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-32 text-center">
-      <p className="text-sm font-semibold text-error">Error</p>
+      <p className="text-sm font-semibold text-error-ink">Error</p>
       <h1 className="mt-2 text-4xl font-bold tracking-tight sm:text-5xl">
         Something went wrong
       </h1>
-      <p className="mt-4 text-base text-base-content/60 max-w-md">
+      <p className="mt-4 text-base text-base-muted max-w-md">
         An unexpected error occurred. Please try refreshing the page.
       </p>
       {import.meta.env.DEV && (
-        <pre className="mt-6 max-w-lg text-left text-xs text-error/80 bg-error/5 p-4 rounded-lg overflow-auto border border-error/20">
+        <pre className="mt-6 max-w-lg text-left text-xs text-error-ink bg-error/5 p-4 rounded-lg overflow-auto border border-error/20">
           {error.message}
         </pre>
       )}
@@ -73,7 +73,7 @@ function NotFound() {
       <h1 className="mt-2 text-4xl font-bold tracking-tight text-base-content sm:text-5xl">
         Page not found
       </h1>
-      <p className="mt-4 text-base text-base-content/70 max-w-md">
+      <p className="mt-4 text-base text-base-muted max-w-md">
         Sorry, we couldn&rsquo;t find the page you&rsquo;re looking for. It may
         have been moved or doesn&rsquo;t exist.
       </p>
