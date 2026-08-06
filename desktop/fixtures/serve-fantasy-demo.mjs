@@ -272,16 +272,39 @@ const flag = (name, fallback) => {
 const PORT = Number(flag('port', 8788))
 const UPSTREAM = new URL(flag('upstream', 'http://localhost:18080'))
 
+// Whole-response overrides. These two feed the fantasy ACCOUNT panel
+// (YahooConnectFlow / ConnectedView).
 const OVERRIDES = {
   '/users/me/yahoo-status': { connected: true, synced: true },
   '/users/me/yahoo-leagues': payload,
 }
 
+// Response rewrites. The fantasy TABS (Overview / Matchup / Standings /
+// Roster) do NOT read /users/me/yahoo-leagues — FeedTab pulls them out
+// of `dashboard.data.fantasy` (see extractLeagues in
+// desktop/src/datawidgets/fantasy/FeedTab.tsx). Overriding only the
+// yahoo-* endpoints therefore fills the account panel and leaves every
+// tab empty, which is exactly the symptom it produced.
+//
+// So /dashboard is proxied for real and the fantasy slice is grafted
+// onto the upstream body, keeping widgets[], entitlements, and every
+// other source intact.
+const TRANSFORMS = {
+  '/dashboard': (body) => {
+    body.data = body.data ?? {}
+    body.data.fantasy = payload
+    return body
+  },
+}
+
 // Plain http.request rather than fetch: it pipes response bodies
 // straight through, which keeps SSE (/events) working. fetch would
 // force us to hand-manage the stream for no benefit.
-function proxy(req, res, path) {
+function proxy(req, res, path, transform) {
   const headers = { ...req.headers, host: UPSTREAM.host }
+  // A transform has to parse the body, so ask upstream not to compress
+  // it. Untransformed responses keep the client's original encoding.
+  if (transform) delete headers['accept-encoding']
   const upstreamReq = httpRequest(
     {
       protocol: UPSTREAM.protocol,
@@ -292,8 +315,34 @@ function proxy(req, res, path) {
       headers,
     },
     (upstreamRes) => {
-      res.writeHead(upstreamRes.statusCode ?? 502, upstreamRes.headers)
-      upstreamRes.pipe(res)
+      const status = upstreamRes.statusCode ?? 502
+      // Stream anything we're not rewriting — this is what keeps SSE
+      // (/events) working.
+      if (!transform || status !== 200) {
+        res.writeHead(status, upstreamRes.headers)
+        upstreamRes.pipe(res)
+        return
+      }
+      const chunks = []
+      upstreamRes.on('data', (c) => chunks.push(c))
+      upstreamRes.on('end', () => {
+        const raw = Buffer.concat(chunks).toString('utf8')
+        let out
+        try {
+          out = JSON.stringify(transform(JSON.parse(raw)))
+          console.log(`[fantasy-demo] grafted fixture into ${path}`)
+        } catch (err) {
+          // Upstream sent something unparseable — pass it through
+          // untouched rather than turning a working app into a 500.
+          console.error(`[fantasy-demo] ${path} not JSON, passing through: ${err.message}`)
+          out = raw
+        }
+        const headersOut = { ...upstreamRes.headers }
+        delete headersOut['content-length']
+        delete headersOut['content-encoding']
+        res.writeHead(status, headersOut)
+        res.end(out)
+      })
     },
   )
   upstreamReq.on('error', (err) => {
@@ -327,11 +376,12 @@ createServer((req, res) => {
     res.end(JSON.stringify(override))
     return
   }
-  proxy(req, res, req.url)
+  proxy(req, res, req.url, TRANSFORMS[path])
 }).listen(PORT, '127.0.0.1', () => {
   console.log(`[fantasy-demo] listening  http://localhost:${PORT}`)
   console.log(`[fantasy-demo] proxying   -> ${UPSTREAM.origin}`)
   console.log(`[fantasy-demo] overriding ${Object.keys(OVERRIDES).join('  ')}`)
+  console.log(`[fantasy-demo] grafting   ${Object.keys(TRANSFORMS).join('  ')} (.data.fantasy)`)
   console.log(
     `[fantasy-demo] scenario   Week 12 · Brunch Money ${userPoints} vs Fourth and Long ${OPPONENT_POINTS} ` +
       `(down ${Math.round((OPPONENT_POINTS - userPoints) * 100) / 100}, 1 left, proj ${userProjected})`,
