@@ -33,6 +33,7 @@
 
 import { writeFile, mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const REPO = 'brandon-relentnet/myscrollr'
 // Updated whenever we bump in production. Used only as a last-resort
@@ -135,7 +136,11 @@ export const LATEST_DESKTOP_VERSION = '${version}'
 export const DESKTOP_ASSET_SIZES: Record<string, number> = ${JSON.stringify(assetSizes, null, 2)}
 `
 
-await mkdir(dirname(OUTPUT_PATH.pathname), { recursive: true })
+// `fileURLToPath`, NOT `OUTPUT_PATH.pathname` — on Windows the latter
+// yields `/C:/...`, which node:path treats as relative and mkdir
+// explodes with a doubled drive letter (`C:\C:\...`), breaking every
+// local build and `npm run dev`. Same fix fetch-releases.mjs carries.
+await mkdir(dirname(fileURLToPath(OUTPUT_PATH)), { recursive: true })
 await writeFile(OUTPUT_PATH, content)
 
 console.log(

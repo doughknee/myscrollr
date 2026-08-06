@@ -47,6 +47,7 @@ const VIEWPORTS = [
 const ROUTES = [
   { path: '/', file: 'index.html' },
   { path: '/widgets', file: 'widgets/index.html' },
+  { path: '/fantasy', file: 'fantasy/index.html' },
   { path: '/download', file: 'download/index.html' },
   { path: '/business', file: 'business/index.html' },
   { path: '/architecture', file: 'architecture/index.html' },
