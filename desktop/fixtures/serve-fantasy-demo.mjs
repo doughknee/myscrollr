@@ -135,11 +135,16 @@ function playerAvatar(name) {
 // `pending: true` = has not played yet: no stats, scores 0 so far, and
 // `proj` feeds the projected total. Everything else is derived.
 const ROSTERS = {
-  // Live Monday night. Behind, one starter left, projected to pass them.
+  // Sunday evening: the afternoon slate is final, one starter is still
+  // to play the night game. Behind, but projected to pass them.
+  //
+  // Sunday rather than Monday so the Today window has something in it —
+  // on a Monday every Sunday stat belongs to yesterday, and the Today
+  // table would be an empty grid.
   sunday: [
     { pos: 'QB', name: 'Jalen Hurts', team: 'PHI', dp: 'QB', stats: { 4: 261, 5: 2, 6: 1, 9: 47, 10: 1 }, proj: 21.4 },
     { pos: 'WR', name: 'Ja’Marr Chase', team: 'CIN', dp: 'WR', stats: { 11: 9, 12: 121, 13: 1 }, proj: 19.8 },
-    { pos: 'WR', name: 'Nico Collins', team: 'HOU', dp: 'WR', stats: { 11: 5, 12: 74 }, proj: 14.1 },
+    { pos: 'WR', name: 'Nico Collins', team: 'HOU', dp: 'WR', stats: { 11: 5, 12: 74 }, proj: 14.1, thursday: true },
     { pos: 'RB', name: 'Bijan Robinson', team: 'ATL', dp: 'RB', stats: { 9: 88, 10: 1, 11: 4, 12: 31 }, proj: 18.9 },
     { pos: 'RB', name: 'Kenneth Walker III', team: 'SEA', dp: 'RB', stats: { 9: 52, 11: 2, 12: 18, 18: 1 }, proj: 13.2 },
     { pos: 'TE', name: 'Trey McBride', team: 'ARI', dp: 'TE', stats: { 11: 7, 12: 68 }, proj: 12.6 },
@@ -155,7 +160,7 @@ const ROSTERS = {
     { pos: 'QB', name: 'Josh Allen', team: 'BUF', dp: 'QB', stats: { 4: 317, 5: 3, 9: 62, 10: 1 }, proj: 24.1 },
     { pos: 'WR', name: 'Justin Jefferson', team: 'MIN', dp: 'WR', stats: { 11: 11, 12: 148, 13: 1 }, proj: 21.6 },
     { pos: 'WR', name: 'Malik Nabers', team: 'NYG', dp: 'WR', stats: { 11: 8, 12: 96 }, proj: 16.4 },
-    { pos: 'RB', name: 'Jahmyr Gibbs', team: 'DET', dp: 'RB', stats: { 9: 104, 10: 2, 11: 3, 12: 22 }, proj: 19.7 },
+    { pos: 'RB', name: 'Jahmyr Gibbs', team: 'DET', dp: 'RB', stats: { 9: 104, 10: 2, 11: 3, 12: 22 }, proj: 19.7, thursday: true },
     { pos: 'RB', name: 'Breece Hall', team: 'NYJ', dp: 'RB', stats: { 9: 61, 11: 5, 12: 44 }, proj: 15.1 },
     { pos: 'TE', name: 'Brock Bowers', team: 'LV', dp: 'TE', stats: { 11: 9, 12: 101, 13: 1 }, proj: 16.8 },
     { pos: 'W/R/T', name: 'Puka Nacua', team: 'LAR', dp: 'WR', stats: { 11: 7, 12: 88 }, proj: 15.9 },
@@ -167,7 +172,7 @@ const ROSTERS = {
   // Live, narrowly behind with two left. The uncomfortable one.
   work: [
     { pos: 'QB', name: 'Baker Mayfield', team: 'TB', dp: 'QB', stats: { 4: 244, 5: 2, 6: 1 }, proj: 18.2 },
-    { pos: 'WR', name: 'Amon-Ra St. Brown', team: 'DET', dp: 'WR', stats: { 11: 8, 12: 79, 13: 1 }, proj: 18.3 },
+    { pos: 'WR', name: 'Amon-Ra St. Brown', team: 'DET', dp: 'WR', stats: { 11: 8, 12: 79, 13: 1 }, proj: 18.3, thursday: true },
     { pos: 'WR', name: 'DK Metcalf', team: 'PIT', dp: 'WR', stats: { 11: 4, 12: 61 }, proj: 13.7 },
     { pos: 'RB', name: 'Josh Jacobs', team: 'GB', dp: 'RB', stats: { 9: 79, 10: 1, 11: 2, 12: 14 }, proj: 16.2 },
     { pos: 'RB', name: 'Chuba Hubbard', team: 'CAR', dp: 'RB', stats: {}, proj: 12.9, pending: true },
@@ -177,10 +182,60 @@ const ROSTERS = {
     { pos: 'BN', name: 'Isiah Pacheco', team: 'KC', dp: 'RB', stats: {}, proj: 6.4, status: 'D', status_full: 'Doubtful', injury_note: 'Ankle — did not practice Friday' },
     { pos: 'BN', name: 'Jerry Jeudy', team: 'CLE', dp: 'WR', stats: { 11: 3, 12: 38 }, proj: 9.9 },
   ],
+
+  // ── Opponents ──────────────────────────────────────────────────
+  // Without these, league.rosters had a single entry: MatchupView
+  // rendered "Roster not available yet" for the opponent and
+  // RosterView's team selector had nothing but your own team in it.
+  //
+  // No player appears on both sides of the same league — two managers
+  // can't roster the same person, and that is the first thing anyone
+  // who plays fantasy would notice.
+  sundayOpp: [
+    { pos: 'QB', name: 'Patrick Mahomes', team: 'KC', dp: 'QB', stats: { 4: 221, 5: 2, 6: 1 }, proj: 22.8 },
+    { pos: 'WR', name: 'CeeDee Lamb', team: 'DAL', dp: 'WR', stats: { 11: 10, 12: 134, 13: 1 }, proj: 20.4 },
+    { pos: 'WR', name: 'Garrett Wilson', team: 'NYJ', dp: 'WR', stats: { 11: 7, 12: 82 }, proj: 15.2 },
+    { pos: 'RB', name: 'Saquon Barkley', team: 'PHI', dp: 'RB', stats: { 9: 121, 10: 1, 11: 2, 12: 17 }, proj: 20.1 },
+    { pos: 'RB', name: 'James Cook', team: 'BUF', dp: 'RB', stats: { 9: 67, 10: 1, 11: 3, 12: 24 }, proj: 14.8, thursday: true },
+    { pos: 'TE', name: 'George Kittle', team: 'SF', dp: 'TE', stats: { 11: 6, 12: 77 }, proj: 14.2 },
+    { pos: 'W/R/T', name: 'Davante Adams', team: 'LAR', dp: 'WR', stats: { 11: 8, 12: 91 }, proj: 16.1 },
+    { pos: 'W/R/T', name: 'Kyren Williams', team: 'LAR', dp: 'RB', stats: { 9: 58, 11: 3, 12: 21 }, proj: 13.6 },
+    { pos: 'BN', name: 'Khalil Shakir', team: 'BUF', dp: 'WR', stats: { 11: 5, 12: 48 }, proj: 10.4, thursday: true },
+    { pos: 'BN', name: 'Cade Otton', team: 'TB', dp: 'TE', stats: { 11: 4, 12: 39 }, proj: 8.1 },
+  ],
+  dynastyOpp: [
+    { pos: 'QB', name: 'Lamar Jackson', team: 'BAL', dp: 'QB', stats: { 4: 188, 5: 3, 9: 54, 10: 1 }, proj: 23.4 },
+    { pos: 'WR', name: 'Drake London', team: 'ATL', dp: 'WR', stats: { 11: 9, 12: 118, 13: 1 }, proj: 15.8 },
+    { pos: 'WR', name: 'Tee Higgins', team: 'CIN', dp: 'WR', stats: { 11: 5, 12: 63, 13: 1 }, proj: 14.6 },
+    { pos: 'RB', name: 'Derrick Henry', team: 'BAL', dp: 'RB', stats: { 9: 131, 10: 2, 11: 1, 12: 6 }, proj: 18.2 },
+    { pos: 'RB', name: 'Bucky Irving', team: 'TB', dp: 'RB', stats: { 9: 77, 11: 3, 12: 26 }, proj: 12.4 },
+    { pos: 'TE', name: 'Mark Andrews', team: 'BAL', dp: 'TE', stats: { 11: 6, 12: 62, 13: 1 }, proj: 11.1 },
+    { pos: 'W/R/T', name: 'Jameson Williams', team: 'DET', dp: 'WR', stats: { 11: 4, 12: 58 }, proj: 12.9 },
+    { pos: 'W/R/T', name: 'Tony Pollard', team: 'TEN', dp: 'RB', stats: { 9: 41, 11: 2, 12: 19 }, proj: 10.7 },
+    { pos: 'BN', name: 'Wan’Dale Robinson', team: 'NYG', dp: 'WR', stats: { 11: 6, 12: 43 }, proj: 10.2 },
+  ],
+  workOpp: [
+    { pos: 'QB', name: 'Jared Goff', team: 'DET', dp: 'QB', stats: { 4: 278, 5: 2, 6: 1 }, proj: 17.6 },
+    { pos: 'WR', name: 'Terry McLaurin', team: 'WAS', dp: 'WR', stats: { 11: 8, 12: 94, 13: 1 }, proj: 14.3 },
+    { pos: 'WR', name: 'Jaylen Waddle', team: 'MIA', dp: 'WR', stats: { 11: 4, 12: 77 }, proj: 12.8 },
+    { pos: 'RB', name: 'De’Von Achane', team: 'MIA', dp: 'RB', stats: {}, proj: 14.2, pending: true },
+    { pos: 'RB', name: 'Rhamondre Stevenson', team: 'NE', dp: 'RB', stats: { 9: 63, 11: 2, 12: 12 }, proj: 12.1 },
+    { pos: 'TE', name: 'Dalton Kincaid', team: 'BUF', dp: 'TE', stats: { 11: 3, 12: 34 }, proj: 9.4, thursday: true },
+    { pos: 'W/R/T', name: 'Calvin Ridley', team: 'TEN', dp: 'WR', stats: { 11: 4, 12: 57 }, proj: 12.2 },
+    { pos: 'BN', name: 'Romeo Doubs', team: 'GB', dp: 'WR', stats: { 11: 3, 12: 31 }, proj: 8.8 },
+  ],
 }
 
 const BENCH = new Set(['BN', 'IR', 'IL', 'NA'])
 const isStarter = (p) => !BENCH.has(p.selected_position)
+
+/** Yahoo ships stat values as STRINGS — see the note on RosterPlayer. */
+const asStatMap = (stats) =>
+  Object.fromEntries(Object.entries(stats).map(([k, v]) => [k, String(v)]))
+/** "-" means "no data for this coverage window", not zero. */
+const BLANK_STATS = Object.fromEntries(
+  STAT_CATALOG.stats.map((s) => [s.stat_id, '-']),
+)
 
 function buildPlayers(roster, idBase) {
   return roster.map((p, i) => {
@@ -200,9 +255,17 @@ function buildPlayers(roster, idBase) {
       status_full: p.status_full ?? null,
       injury_note: p.injury_note ?? null,
       player_points: played ? scoreOf(p.stats) : 0,
-      player_stats: played
-        ? Object.fromEntries(Object.entries(p.stats).map(([k, v]) => [k, String(v)]))
-        : Object.fromEntries(STAT_CATALOG.stats.map((s) => [s.stat_id, '-'])),
+      player_stats: played ? asStatMap(p.stats) : BLANK_STATS,
+      // The Today toggle reads player_stats_today, and RosterView
+      // disables the toggle outright when no player has any (see
+      // hasTodayStats). Omitting it is why Today was greyed out.
+      //
+      // The scenario is Sunday evening, so for anyone whose game was
+      // today the week window and the today window are the same numbers.
+      // Players marked `thursday: true` played earlier in the week —
+      // they keep week stats but have nothing for today, which is what
+      // makes the two windows visibly different instead of identical.
+      player_stats_today: played && !p.thursday ? asStatMap(p.stats) : BLANK_STATS,
     }
   })
 }
@@ -228,14 +291,35 @@ function totalsFor(roster, players) {
  */
 function buildLeague({
   key, name, teamId, teamName, oppName, margin, week, status,
-  numTeams, rosterName, idBase, rivals,
+  rosterName, oppRosterName, idBase, rivals,
 }) {
   const teamKey = `${key}.t.${teamId}`
   const oppKey = `${key}.t.99`
   const roster = ROSTERS[rosterName]
   const players = buildPlayers(roster, idBase)
   const { banked, projected } = totalsFor(roster, players)
-  const oppPoints = round2(banked + margin)
+
+  // The opponent's score is now the sum of THEIR starters, not
+  // `banked + margin`. Once they have a visible roster, a header
+  // number that didn't reconcile to it would be the most obvious
+  // possible tell in a screenshot.
+  const oppRoster = ROSTERS[oppRosterName]
+  const oppPlayers = buildPlayers(oppRoster, idBase + 500)
+  const oppTotals = totalsFor(oppRoster, oppPlayers)
+  const oppPoints = oppTotals.banked
+
+  // `margin` is now an ASSERTION about the intended storyline rather
+  // than an input. Editing any stat line above re-derives both totals,
+  // and if that silently flips "down eleven" into "up two" — which it
+  // did once already — this fails loudly instead of shipping a
+  // screenshot that contradicts the copy pointing at it.
+  const actual = round2(oppPoints - banked)
+  if (Math.abs(actual - margin) > 0.005) {
+    throw new Error(
+      `[fantasy-demo] ${name}: intended margin ${margin} but rosters produce ${actual}. ` +
+        `Adjust a stat line, or update the expected margin if the new story is the one you want.`,
+    )
+  }
   const final = status === 'postevent'
 
   // Sorted by wins, then points-for — the usual Yahoo tiebreak — so
@@ -295,13 +379,14 @@ function buildLeague({
         winner_team_key: final ? (banked > oppPoints ? teamKey : oppKey) : null,
         teams: [
           { team_key: teamKey, team_id: teamId, name: teamName, team_logo: teamLogo(teamName), manager_name: 'You', points: banked, projected_points: projected },
-          { team_key: oppKey, team_id: 99, name: oppName, team_logo: teamLogo(oppName), manager_name: 'D. Ramos', points: oppPoints, projected_points: oppPoints },
+          { team_key: oppKey, team_id: 99, name: oppName, team_logo: teamLogo(oppName), manager_name: 'D. Ramos', points: oppPoints, projected_points: oppTotals.projected },
         ],
       },
     ],
     previous_matchups: null,
     rosters: [
       { team_key: teamKey, data: { team_key: teamKey, team_name: teamName, players } },
+      { team_key: oppKey, data: { team_key: oppKey, team_name: oppName, players: oppPlayers } },
     ],
   }
 }
@@ -310,8 +395,8 @@ const LEAGUES = [
   buildLeague({
     key: '449.l.884213', name: 'The Sunday Money League', teamId: 4,
     teamName: 'Brunch Money', oppName: 'Fourth and Long',
-    margin: 11.4, week: 12, status: 'midevent', numTeams: 8,
-    rosterName: 'sunday', idBase: 30000,
+    margin: 11.4, week: 12, status: 'midevent',
+    rosterName: 'sunday', oppRosterName: 'sundayOpp', idBase: 30000,
     rivals: {
       userRecord: [8, 3, 1289.44],
       oppRecord: [8, 3, 1301.08],
@@ -325,8 +410,8 @@ const LEAGUES = [
   buildLeague({
     key: '449.l.220417', name: 'Dynasty or Bust', teamId: 3,
     teamName: 'Regression Candidates', oppName: 'Air Yards Only',
-    margin: -33.46, week: 12, status: 'postevent', numTeams: 10,
-    rosterName: 'dynasty', idBase: 31000,
+    margin: -33.46, week: 12, status: 'postevent',
+    rosterName: 'dynasty', oppRosterName: 'dynastyOpp', idBase: 31000,
     rivals: {
       userRecord: [9, 2, 1402.3],
       oppRecord: [5, 6, 1188.44],
@@ -340,8 +425,8 @@ const LEAGUES = [
   buildLeague({
     key: '449.l.671902', name: 'Work League (Keeper)', teamId: 6,
     teamName: 'Third and Inches', oppName: 'Gridiron Ghosts',
-    margin: 2.56, week: 12, status: 'midevent', numTeams: 10,
-    rosterName: 'work', idBase: 32000,
+    margin: 2.56, week: 12, status: 'midevent',
+    rosterName: 'work', oppRosterName: 'workOpp', idBase: 32000,
     rivals: {
       userRecord: [6, 5, 1176.9],
       oppRecord: [7, 4, 1204.18],
