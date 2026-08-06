@@ -34,8 +34,41 @@ if (!token) {
 
 const url = `https://api.motion.dev/registry?package=motion-plus&version=latest&token=${token}`
 console.log('[ensure-motion-plus] installing motion-plus (--no-save)…')
-execFileSync('npm', ['install', '--no-save', '--no-audit', '--no-fund', url], {
-  cwd: root,
-  stdio: ['ignore', 'inherit', 'inherit'],
-})
+
+// Invoking npm portably is fiddlier than it looks on Windows:
+//   - bare 'npm' → spawnSync ENOENT, because the shim is `npm.cmd`
+//   - 'npm.cmd'  → EINVAL on Node >=20.12, which refuses to execFile
+//                  .cmd/.bat without a shell (the CVE-2024-27980 fix)
+//   - shell:true → cmd.exe reads the `&` in the registry URL as a
+//                  command separator and mangles the argument
+// So call npm's JS entrypoint with the node binary already running us.
+// npm_execpath is always set inside an npm lifecycle script, which is
+// the only way this file runs (predev / prebuild).
+const npmCli = process.env.npm_execpath
+if (!npmCli) {
+  console.error(
+    '[ensure-motion-plus] npm_execpath is not set — run this via `npm run dev`/`npm run build`, not directly.',
+  )
+  process.exit(1)
+}
+
+// The token rides in argv, so ANY spawn failure prints the full
+// command line — Node dumps `spawnargs` on error. That would leak the
+// licensed token into CI logs and terminal scrollback, defeating the
+// point of keeping it out of package.json. Swallow the original error
+// and re-report it redacted.
+try {
+  execFileSync(
+    process.execPath,
+    [npmCli, 'install', '--no-save', '--no-audit', '--no-fund', url],
+    { cwd: root, stdio: ['ignore', 'inherit', 'inherit'] },
+  )
+} catch (err) {
+  console.error(
+    `[ensure-motion-plus] npm install failed (${err?.code ?? err?.message ?? 'unknown error'}).\n` +
+      '  The Motion+ registry URL is redacted here on purpose — it embeds MOTION_PLUS_TOKEN.\n' +
+      '  Check that MOTION_PLUS_TOKEN is valid and that npm is on PATH.',
+  )
+  process.exit(1)
+}
 console.log('[ensure-motion-plus] installed')
