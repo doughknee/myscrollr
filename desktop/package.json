@@ -19,6 +19,7 @@
     "build": "vite build && tsc --noEmit",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
+    "tauri:dev:fantasy-demo": "tauri dev --config src-tauri/tauri.fantasy-demo.conf.json",
     "tauri:dev:mcp": "tauri dev --config src-tauri/tauri.mcp.conf.json -- --features dev-mcp-bridge",
     "tauri:build": "tauri build",
     "test": "vitest run",
