@@ -29,13 +29,17 @@ const ANNOTATIONS: ReadonlyArray<[string, string]> = [
   ['③ HOME WINDOW', 'the glanceable briefing, open only when you want it'],
 ]
 
-export function DesktopProof() {
+export function DesktopProof({
+  // Segmented landing pages reorder their sections, so the SEC number
+  // has to move with them. Defaults to the homepage's slot.
+  tag = 'SEC 02 ／ ON YOUR DESKTOP',
+}: { tag?: string } = {}) {
   const { theme } = useTheme()
   return (
     <section className="border-b border-hairline">
       <TerminalContainer>
         <SectionRow
-          tag="SEC 02 ／ ON YOUR DESKTOP"
+          tag={tag}
           stat={`SUN AUG 2 · ${SHOT_TIME[theme]} · NO EDITS`}
         />
         <motion.div
