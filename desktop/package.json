@@ -15,6 +15,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5174",
+    "dev:fantasy-demo": "vite --port 5174 --mode fantasy-demo",
     "build": "vite build && tsc --noEmit",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",

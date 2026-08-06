@@ -20,21 +20,31 @@
  * If you want a real box score in here, replace ROSTER/OPPONENT below
  * with actual numbers — the arithmetic downstream is source-agnostic.
  *
+ * HOW IT WORKS
+ * This is a PROXY, not a stub. It overrides exactly the two endpoints
+ * the fantasy widget calls (/users/me/yahoo-status and
+ * /users/me/yahoo-leagues — see desktop/src/api/queries.ts) and
+ * forwards everything else untouched to the real local core-api. So
+ * auth, the widget catalog, entitlements, and SSE all keep working;
+ * only fantasy is seeded.
+ *
+ * Do NOT use VITE_DEMO=1 for this. That flag is Kalshi-specific: it
+ * pins the widget list to ["predictions"] when the dashboard is empty
+ * (desktop/src/App.tsx) and reroutes /dashboard to the predictions
+ * bridge — it would hide the fantasy widget entirely. Sign in normally;
+ * the proxy passes your real token through.
+ *
  * USAGE
- *   node desktop/fixtures/serve-fantasy-demo.mjs          # :8788
- *   node desktop/fixtures/serve-fantasy-demo.mjs --port 9000
- *   node desktop/fixtures/serve-fantasy-demo.mjs --emit   # dump JSON, no server
+ *   make up                                   # real local stack on :18080
+ *   node desktop/fixtures/serve-fantasy-demo.mjs
+ *   cd desktop && npm run dev:fantasy-demo    # loads .env.fantasy-demo
  *
- * Then run the desktop app pointed at it, signed out:
- *   VITE_DEMO=1 VITE_API_URL=http://localhost:8788 npm run dev
- *
- * Only the two endpoints the fantasy widget calls are implemented
- * (see desktop/src/api/queries.ts): /users/me/yahoo-status and
- * /users/me/yahoo-leagues. Everything else 404s on purpose — this is a
- * screenshot rig, not a backend stub.
+ *   --port N       listen elsewhere (default 8788)
+ *   --upstream URL proxy target (default http://localhost:18080)
+ *   --emit         dump the JSON payload and exit
  */
 
-import { createServer } from 'node:http'
+import { createServer, request as httpRequest } from 'node:http'
 
 // ── Scoring ──────────────────────────────────────────────────────
 // Yahoo NFL stat_ids. Full PPR. Every point total in the payload is
@@ -251,41 +261,80 @@ const payload = {
 // ── Serve ────────────────────────────────────────────────────────
 const args = process.argv.slice(2)
 if (args.includes('--emit')) {
-  process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`)
+  process.stdout.write(`${JSON.stringify(payload, null, 2)}
+`)
   process.exit(0)
 }
-const portArg = args.indexOf('--port')
-const PORT = portArg !== -1 ? Number(args[portArg + 1]) : 8788
+const flag = (name, fallback) => {
+  const i = args.indexOf(`--${name}`)
+  return i !== -1 ? args[i + 1] : fallback
+}
+const PORT = Number(flag('port', 8788))
+const UPSTREAM = new URL(flag('upstream', 'http://localhost:18080'))
 
-const ROUTES = {
+const OVERRIDES = {
   '/users/me/yahoo-status': { connected: true, synced: true },
   '/users/me/yahoo-leagues': payload,
 }
 
-createServer((req, res) => {
-  // Wide-open CORS: this binds to localhost and serves invented data.
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204).end()
-    return
-  }
-  const path = new URL(req.url, 'http://x').pathname
-  const body = ROUTES[path]
-  if (!body) {
-    res.writeHead(404, { 'content-type': 'application/json' })
-    res.end(JSON.stringify({ status: 'error', error: `no fixture for ${path}` }))
-    return
-  }
-  res.writeHead(200, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(body))
-}).listen(PORT, '127.0.0.1', () => {
-  console.log(`[fantasy-demo] http://localhost:${PORT}`)
-  console.log(`[fantasy-demo] Week 12 · Brunch Money ${userPoints} vs Fourth and Long ${OPPONENT_POINTS}`)
-  console.log(
-    `[fantasy-demo] down ${Math.round((OPPONENT_POINTS - userPoints) * 100) / 100}, ` +
-      `1 starter left (proj ${userProjected})`,
+// Plain http.request rather than fetch: it pipes response bodies
+// straight through, which keeps SSE (/events) working. fetch would
+// force us to hand-manage the stream for no benefit.
+function proxy(req, res, path) {
+  const headers = { ...req.headers, host: UPSTREAM.host }
+  const upstreamReq = httpRequest(
+    {
+      protocol: UPSTREAM.protocol,
+      hostname: UPSTREAM.hostname,
+      port: UPSTREAM.port,
+      method: req.method,
+      path,
+      headers,
+    },
+    (upstreamRes) => {
+      res.writeHead(upstreamRes.statusCode ?? 502, upstreamRes.headers)
+      upstreamRes.pipe(res)
+    },
   )
-  console.log('[fantasy-demo] run the app with:')
-  console.log(`[fantasy-demo]   VITE_DEMO=1 VITE_API_URL=http://localhost:${PORT} npm run dev`)
+  upstreamReq.on('error', (err) => {
+    console.error(`[fantasy-demo] upstream ${path}: ${err.message}`)
+    res.writeHead(502, { 'content-type': 'application/json' })
+    res.end(
+      JSON.stringify({
+        status: 'error',
+        error: `fantasy-demo proxy could not reach ${UPSTREAM.origin} — is \`make up\` running?`,
+      }),
+    )
+  })
+  req.pipe(upstreamReq)
+}
+
+createServer((req, res) => {
+  const path = new URL(req.url, 'http://x').pathname
+  const override = OVERRIDES[path]
+
+  if (override) {
+    // CORS only on the overridden routes; proxied responses keep
+    // whatever the real API sent.
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204).end()
+      return
+    }
+    console.log(`[fantasy-demo] served fixture ${path}`)
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify(override))
+    return
+  }
+  proxy(req, res, req.url)
+}).listen(PORT, '127.0.0.1', () => {
+  console.log(`[fantasy-demo] listening  http://localhost:${PORT}`)
+  console.log(`[fantasy-demo] proxying   -> ${UPSTREAM.origin}`)
+  console.log(`[fantasy-demo] overriding ${Object.keys(OVERRIDES).join('  ')}`)
+  console.log(
+    `[fantasy-demo] scenario   Week 12 · Brunch Money ${userPoints} vs Fourth and Long ${OPPONENT_POINTS} ` +
+      `(down ${Math.round((OPPONENT_POINTS - userPoints) * 100) / 100}, 1 left, proj ${userProjected})`,
+  )
+  console.log('[fantasy-demo] then: cd desktop && npm run dev:fantasy-demo')
 })
