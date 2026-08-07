@@ -310,16 +310,38 @@ function TickerSection({
             {MODE_CAPTION[mode]}
           </span>
         </div>
-        {/* flex-wrap, not overflow-hidden: the larger modes should show
-            what they cost, not hide it behind a clipped edge. */}
-        <div className="flex min-h-[36px] flex-wrap items-center gap-2 rounded-lg bg-surface-2 p-2">
-          {chips.length === 0 ? (
-            <span className="font-mono text-[11px] text-fg-4">
-              Nothing on the ticker right now.
-            </span>
-          ) : (
-            chips.map((c) => <div key={c.key}>{c.node}</div>)
-          )}
+        {/* Wrapped rather than a single scrolling rail, because the
+            point of the preview is to show what a mode COSTS — hiding
+            two thirds of Everything behind a clipped edge would make
+            the expensive setting look as cheap as the calm one.
+
+            But it can't own the panel either: Everything emits ~24
+            chips, which unbounded is ten rows of wrap. So it's capped
+            at roughly four rows and scrolls past that, and scaled down
+            slightly — these are ticker chips being shown at desk
+            distance inside a settings card, not on a bar across the
+            top of a monitor. */}
+        <div
+          className="max-h-[168px] overflow-y-auto overflow-x-hidden rounded-lg bg-surface-2 p-2"
+          style={{ zoom: 0.9 }}
+        >
+          <div className="flex min-h-[30px] flex-wrap content-start items-center gap-1.5">
+            {chips.length === 0 ? (
+              <span className="font-mono text-[12px] text-fg-4">
+                Nothing on the ticker right now.
+              </span>
+            ) : (
+              // min-w-0 lets an over-wide chip shrink here even though
+              // chipBaseClasses pins shrink-0 for the real rail, where
+              // a compressed chip would be unreadable and there's
+              // infinite horizontal room anyway.
+              chips.map((c) => (
+                <div key={c.key} className="min-w-0 max-w-full [&>*]:shrink">
+                  {c.node}
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
 

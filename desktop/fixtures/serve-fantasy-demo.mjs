@@ -46,6 +46,9 @@
  *   --port N       listen elsewhere (default 8788)
  *   --upstream URL proxy target (default http://localhost:18080)
  *   --emit         dump the JSON payload and exit
+ *   --live         let the live players drift (see below). OFF by
+ *                  default: a recording shouldn't shift under you, and
+ *                  a static server is one you never have to restart.
  */
 
 import { createServer, request as httpRequest } from 'node:http'
@@ -185,8 +188,8 @@ const ROSTERS = {
     { pos: 'WR', name: 'Ja’Marr Chase', team: 'CIN', dp: 'WR', stats: { 11: 9, 12: 121, 13: 1 }, proj: 19.8 },
     { pos: 'WR', name: 'Nico Collins', team: 'HOU', dp: 'WR', stats: { 11: 5, 12: 74 }, proj: 14.1, thursday: true },
     { pos: 'RB', name: 'Bijan Robinson', team: 'ATL', dp: 'RB', stats: { 9: 88, 10: 1, 11: 4, 12: 31 }, proj: 18.9 },
-    { pos: 'RB', name: 'Kenneth Walker III', team: 'SEA', dp: 'RB', stats: { 9: 52, 11: 2, 12: 18, 18: 1 }, proj: 13.2 },
-    { pos: 'TE', name: 'Trey McBride', team: 'ARI', dp: 'TE', stats: { 11: 7, 12: 68 }, proj: 12.6 },
+    { pos: 'RB', name: 'Kenneth Walker III', team: 'SEA', dp: 'RB', stats: { 9: 31, 11: 1, 12: 8 }, proj: 13.2, live: true, game: 'Q2 5:18' },
+    { pos: 'TE', name: 'Trey McBride', team: 'ARI', dp: 'TE', stats: { 11: 4, 12: 39 }, proj: 12.6, live: true, game: 'Q2 5:18' },
     { pos: 'W/R/T', name: 'Jaxon Smith-Njigba', team: 'SEA', dp: 'WR', stats: { 11: 6, 12: 83, 13: 1 }, proj: 15.5 },
     // The live one. 8.30 banked of a 14.2 projection, so 5.90 still to
     // come — which is what makes the hero read "need 7.2 more".
@@ -218,9 +221,9 @@ const ROSTERS = {
     { pos: 'WR', name: 'Amon-Ra St. Brown', team: 'DET', dp: 'WR', stats: { 11: 8, 12: 79, 13: 1 }, proj: 18.3, thursday: true },
     { pos: 'WR', name: 'DK Metcalf', team: 'PIT', dp: 'WR', stats: { 11: 4, 12: 61 }, proj: 13.7 },
     { pos: 'RB', name: 'Josh Jacobs', team: 'GB', dp: 'RB', stats: { 9: 79, 10: 1, 11: 2, 12: 14 }, proj: 16.2 },
-    { pos: 'RB', name: 'Chuba Hubbard', team: 'CAR', dp: 'RB', stats: {}, proj: 12.9, pending: true },
+    { pos: 'RB', name: 'Chuba Hubbard', team: 'CAR', dp: 'RB', stats: { 9: 38, 11: 2, 12: 14 }, proj: 12.9, live: true, game: 'Q2 5:18' },
     { pos: 'TE', name: 'Sam LaPorta', team: 'DET', dp: 'TE', stats: { 11: 5, 12: 52 }, proj: 11.4 },
-    { pos: 'W/R/T', name: 'Courtland Sutton', team: 'DEN', dp: 'WR', stats: {}, proj: 12.1, pending: true },
+    { pos: 'W/R/T', name: 'Courtland Sutton', team: 'DEN', dp: 'WR', stats: { 11: 3, 12: 44 }, proj: 12.1, live: true, game: 'Q3 11:02' },
     { pos: 'BN', name: 'Zay Flowers', team: 'BAL', dp: 'WR', stats: { 11: 6, 12: 71 }, proj: 12.8 },
     { pos: 'BN', name: 'Isiah Pacheco', team: 'KC', dp: 'RB', stats: {}, proj: 6.4, status: 'D', status_full: 'Doubtful', injury_note: 'Ankle — did not practice Friday' },
     { pos: 'BN', name: 'Jerry Jeudy', team: 'CLE', dp: 'WR', stats: { 11: 3, 12: 38 }, proj: 9.9 },
@@ -240,8 +243,8 @@ const ROSTERS = {
     { pos: 'WR', name: 'Garrett Wilson', team: 'NYJ', dp: 'WR', stats: { 11: 7, 12: 82 }, proj: 15.2 },
     { pos: 'RB', name: 'Saquon Barkley', team: 'PHI', dp: 'RB', stats: { 9: 121, 10: 1, 11: 2, 12: 17 }, proj: 20.1 },
     { pos: 'RB', name: 'James Cook', team: 'BUF', dp: 'RB', stats: { 9: 67, 10: 1, 11: 3, 12: 24 }, proj: 14.8, thursday: true },
-    { pos: 'TE', name: 'George Kittle', team: 'SF', dp: 'TE', stats: { 11: 6, 12: 77 }, proj: 14.2 },
-    { pos: 'W/R/T', name: 'Davante Adams', team: 'LAR', dp: 'WR', stats: { 11: 8, 12: 91 }, proj: 16.1 },
+    { pos: 'TE', name: 'George Kittle', team: 'SF', dp: 'TE', stats: { 11: 3, 12: 41 }, proj: 14.2, live: true, game: 'Q2 5:18' },
+    { pos: 'W/R/T', name: 'Davante Adams', team: 'LAR', dp: 'WR', stats: { 11: 5, 12: 54 }, proj: 16.1, live: true, game: 'Q3 11:02' },
     { pos: 'W/R/T', name: 'Kyren Williams', team: 'LAR', dp: 'RB', stats: { 9: 58, 11: 3, 12: 21 }, proj: 13.6 },
     { pos: 'K', name: 'Brandon Aubrey', team: 'DAL', dp: 'K', stats: { 22: 1, 23: 1, 24: 3 }, proj: 9.6, game: 'Final' },
     { pos: 'DEF', name: 'Houston Texans', team: 'HOU', dp: 'DEF', stats: { 29: 3, 30: 2, 34: 10 }, proj: 8.4, game: 'Final' },
@@ -263,43 +266,13 @@ const ROSTERS = {
     { pos: 'QB', name: 'Jared Goff', team: 'DET', dp: 'QB', stats: { 4: 278, 5: 2, 6: 1 }, proj: 17.6 },
     { pos: 'WR', name: 'Terry McLaurin', team: 'WAS', dp: 'WR', stats: { 11: 8, 12: 94, 13: 1 }, proj: 14.3 },
     { pos: 'WR', name: 'Jaylen Waddle', team: 'MIA', dp: 'WR', stats: { 11: 4, 12: 77 }, proj: 12.8 },
-    { pos: 'RB', name: 'De’Von Achane', team: 'MIA', dp: 'RB', stats: {}, proj: 14.2, pending: true },
+    { pos: 'RB', name: 'De’Von Achane', team: 'MIA', dp: 'RB', stats: { 9: 27, 11: 1, 12: 11 }, proj: 14.2, live: true, game: 'Q2 5:18' },
     { pos: 'RB', name: 'Rhamondre Stevenson', team: 'NE', dp: 'RB', stats: { 9: 63, 11: 2, 12: 12 }, proj: 12.1 },
     { pos: 'TE', name: 'Dalton Kincaid', team: 'BUF', dp: 'TE', stats: { 11: 3, 12: 34 }, proj: 9.4, thursday: true },
     { pos: 'W/R/T', name: 'Calvin Ridley', team: 'TEN', dp: 'WR', stats: { 11: 4, 12: 57 }, proj: 12.2 },
     { pos: 'BN', name: 'Romeo Doubs', team: 'GB', dp: 'WR', stats: { 11: 3, 12: 31 }, proj: 8.8 },
   ],
 
-  // ── Pre-game ───────────────────────────────────────────────────
-  // Nobody has kicked off. Exists because the smart league chip has a
-  // THIRD state — preevent, showing PROJ + kickoff + record instead of
-  // a score — and with every demo league live or final it was the one
-  // state that never rendered. Same for the Overview card's pre layout.
-  thursdayNight: [
-    { pos: 'QB', name: 'Dak Prescott', team: 'DAL', dp: 'QB', stats: {}, proj: 19.8, pending: true, game: 'Thu 8:15 PM' },
-    { pos: 'WR', name: 'Brian Thomas Jr.', team: 'JAX', dp: 'WR', stats: {}, proj: 16.2, pending: true, game: 'Sun 1:00 PM' },
-    { pos: 'WR', name: 'Ladd McConkey', team: 'LAC', dp: 'WR', stats: {}, proj: 13.4, pending: true, game: 'Sun 4:05 PM' },
-    { pos: 'RB', name: 'Christian McCaffrey', team: 'SF', dp: 'RB', stats: {}, proj: 20.6, pending: true, game: 'Sun 4:25 PM' },
-    { pos: 'RB', name: 'James Conner', team: 'ARI', dp: 'RB', stats: {}, proj: 14.1, pending: true, game: 'Sun 1:00 PM' },
-    { pos: 'TE', name: 'David Njoku', team: 'CLE', dp: 'TE', stats: {}, proj: 10.9, pending: true, game: 'Sun 1:00 PM' },
-    { pos: 'W/R/T', name: 'Khalil Herbert', team: 'CHI', dp: 'RB', stats: {}, proj: 9.7, pending: true, game: 'Sun 1:00 PM' },
-    { pos: 'K', name: 'Chris Boswell', team: 'PIT', dp: 'K', stats: {}, proj: 9.1, pending: true, game: 'Sun 1:00 PM' },
-    { pos: 'DEF', name: 'Pittsburgh Steelers', team: 'PIT', dp: 'DEF', stats: {}, proj: 8.2, pending: true, game: 'Sun 1:00 PM' },
-    { pos: 'BN', name: 'Cooper Kupp', team: 'LAR', dp: 'WR', stats: {}, proj: 12.4, pending: true, game: 'Sun 4:05 PM', status: 'Q', status_full: 'Questionable', injury_note: 'Ankle — game-time decision' },
-    { pos: 'BN', name: 'Tyler Allgeier', team: 'ATL', dp: 'RB', stats: {}, proj: 7.3, pending: true, game: 'Sun 1:00 PM' },
-  ],
-  thursdayNightOpp: [
-    { pos: 'QB', name: 'Justin Herbert', team: 'LAC', dp: 'QB', stats: {}, proj: 18.9, pending: true, game: 'Sun 4:05 PM' },
-    { pos: 'WR', name: 'Marvin Harrison Jr.', team: 'ARI', dp: 'WR', stats: {}, proj: 14.8, pending: true, game: 'Sun 1:00 PM' },
-    { pos: 'WR', name: 'Xavier Worthy', team: 'KC', dp: 'WR', stats: {}, proj: 12.6, pending: true, game: 'Sun 4:25 PM' },
-    { pos: 'RB', name: 'Alvin Kamara', team: 'NO', dp: 'RB', stats: {}, proj: 15.3, pending: true, game: 'Sun 1:00 PM' },
-    { pos: 'RB', name: 'Travis Etienne Jr.', team: 'JAX', dp: 'RB', stats: {}, proj: 11.7, pending: true, game: 'Sun 1:00 PM' },
-    { pos: 'TE', name: 'Jake Ferguson', team: 'DAL', dp: 'TE', stats: {}, proj: 9.8, pending: true, game: 'Thu 8:15 PM' },
-    { pos: 'W/R/T', name: 'Keenan Allen', team: 'CHI', dp: 'WR', stats: {}, proj: 11.2, pending: true, game: 'Sun 1:00 PM' },
-    { pos: 'K', name: 'Ka’imi Fairbairn', team: 'HOU', dp: 'K', stats: {}, proj: 8.7, pending: true, game: 'Sun 1:00 PM' },
-    { pos: 'DEF', name: 'Baltimore Ravens', team: 'BAL', dp: 'DEF', stats: {}, proj: 7.9, pending: true, game: 'Sun 1:00 PM' },
-    { pos: 'BN', name: 'Jauan Jennings', team: 'SF', dp: 'WR', stats: {}, proj: 9.4, pending: true, game: 'Sun 4:25 PM' },
-  ],
 }
 
 const BENCH = new Set(['BN', 'IR', 'IL', 'NA'])
@@ -529,10 +502,10 @@ const LEAGUES = [
   buildLeague({
     key: '449.l.884213', name: 'The Sunday Money League', teamId: 4,
     teamName: 'Brunch Money', oppName: 'Fourth and Long',
-    // 165.00 - 157.90. Achane is live with 5.90 of his projection still
-    // to come, so the hero reads "need 7.2 more" — the deficit rounded
-    // up to the next tenth, i.e. the smallest number that actually wins.
-    margin: 7.1, week: 12, status: 'midevent',
+    // Four starters still on the field across both sides, so the
+    // deficit is small and the projection genuinely in play — which is
+    // the state the redesign was built to make readable.
+    margin: 1.8, week: 12, status: 'midevent',
     rosterName: 'sunday', oppRosterName: 'sundayOpp', idBase: 30000,
     rivals: {
       userRecord: [8, 3, 1289.44, 1204.9],
@@ -565,31 +538,13 @@ const LEAGUES = [
       ],
     },
   }),
-  // Pre-game. Kickoff is still ahead, so the smart chip shows PROJ +
-  // first-kick + record rather than a score, and the Overview card
-  // renders its pre layout. Neither had a demo league to render in.
-  buildLeague({
-    key: '449.l.905144', name: 'Sunday Sickos', teamId: 5,
-    teamName: 'Kickoff Pending', oppName: 'Bye Week Bandits',
-    margin: 0, week: 12, status: 'preevent',
-    rosterName: 'thursdayNight', oppRosterName: 'thursdayNightOpp', idBase: 33000,
-    rivals: {
-      userRecord: [7, 4, 1233.6, 1201.44],
-      oppRecord: [6, 5, 1198.8, 1210.06],
-      others: [
-        ['Sleeper Picks', 9, 2, 1344.2, 1188.4],
-        ['Handcuff Hoarders', 8, 3, 1290.5, 1204.7],
-        ['Kicker Truthers', 6, 5, 1211.08, 1222.3],
-        ['Flex Appeal', 5, 6, 1166.44, 1240.9],
-        ['Waiver Vultures', 4, 7, 1120.3, 1266.18],
-        ['Autodraft Andy', 2, 9, 1044.9, 1301.5],
-      ],
-    },
-  }),
   buildLeague({
     key: '449.l.671902', name: 'Work League (Keeper)', teamId: 6,
     teamName: 'Third and Inches', oppName: 'Gridiron Ghosts',
-    margin: 2.56, week: 12, status: 'midevent',
+    // Now AHEAD by 7.24 with two of your own still playing and one of
+    // theirs — a lead you can still lose, which reads differently on the
+    // card than the deficit in the other live league.
+    margin: -7.24, week: 12, status: 'midevent',
     rosterName: 'work', oppRosterName: 'workOpp', idBase: 32000,
     rivals: {
       userRecord: [6, 5, 1176.9, 1190.44],
@@ -623,6 +578,12 @@ const payload = { leagues: LEAGUES }
 // Deliberately a pure function of elapsed time rather than a mutating
 // timer: two requests one second apart get the same answer, so a
 // reload mid-demo doesn't jump the story sideways.
+//
+// OFF unless --live. Drift is useful for showing that the live
+// treatments animate, and actively unhelpful while recording: numbers
+// move between takes, the scenario ages out, and getting back to the
+// opening state means restarting the server. Static is the default
+// because that's the common case.
 
 const STARTED_AT = process.hrtime.bigint()
 const elapsedSeconds = () =>
@@ -727,14 +688,19 @@ const flag = (name, fallback) => {
   const i = args.indexOf(`--${name}`)
   return i !== -1 ? args[i + 1] : fallback
 }
+const LIVE = args.includes('--live')
 const PORT = Number(flag('port', 8788))
 const UPSTREAM = new URL(flag('upstream', 'http://localhost:18080'))
 
 // Whole-response overrides. These two feed the fantasy ACCOUNT panel
 // (YahooConnectFlow / ConnectedView).
+/** The payload as served: drifted only when --live is set. */
+const currentPayload = () =>
+  LIVE ? applyLiveDrift(payload, elapsedSeconds()) : payload
+
 const OVERRIDES = {
   '/users/me/yahoo-status': () => ({ connected: true, synced: true }),
-  '/users/me/yahoo-leagues': () => applyLiveDrift(payload, elapsedSeconds()),
+  '/users/me/yahoo-leagues': () => currentPayload(),
 }
 
 // Response rewrites. The fantasy TABS (Overview / Matchup / Standings /
@@ -750,7 +716,7 @@ const OVERRIDES = {
 const TRANSFORMS = {
   '/dashboard': (body) => {
     body.data = body.data ?? {}
-    body.data.fantasy = applyLiveDrift(payload, elapsedSeconds())
+    body.data.fantasy = currentPayload()
     return body
   },
 }
@@ -850,5 +816,8 @@ createServer((req, res) => {
         `${l.rosters[0].data.players.length} players · ${l.standings.length} teams`,
     )
   }
+  console.log(
+    `[fantasy-demo] data       ${LIVE ? 'DRIFTING (--live) — numbers move' : 'static — pass --live to animate'}`,
+  )
   console.log('[fantasy-demo] then: cd desktop && npm run tauri:dev:fantasy-demo')
 })
