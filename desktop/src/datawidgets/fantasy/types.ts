@@ -31,7 +31,14 @@ export function sportLabel(gameCode: string): string {
 export function isBenchPosition(pos: string): boolean {
   if (!pos) return true;
   const p = pos.toUpperCase();
-  return p === "BN" || p === "IR" || p === "IL" || p === "NA" || p.startsWith("IR") || p.startsWith("IL");
+  return (
+    p === "BN" ||
+    p === "IR" ||
+    p === "IL" ||
+    p === "NA" ||
+    p.startsWith("IR") ||
+    p.startsWith("IL")
+  );
 }
 
 // ── Types ────────────────────────────────────────────────────────
@@ -119,6 +126,25 @@ export interface RosterPlayer {
    * daily endpoint isn't available.
    */
   player_stats_today?: Record<string, string> | null;
+  /**
+   * Per-player projected points for the scoring window.
+   *
+   * Flagged in the handoff as needing confirmation that the API exposes
+   * it for NFL — the demo fixture supplies it today. Null means "no
+   * projection available", which every caller renders as "—".
+   */
+  projected_points?: number | null;
+  /**
+   * Per-player game state — "Q3 8:42", "Sun 8:20 PM", "Final · Thu".
+   *
+   * NOT a Yahoo field. Yahoo's fantasy payload carries no game clock or
+   * kickoff time, so this has to come from a join against the sports
+   * service (editorial_team_abbr -> NFL game) that doesn't exist yet.
+   * The demo fixture is currently its only source. Read it through
+   * `gameStateForPlayer()` rather than directly, and treat absence as
+   * normal — it is the production case today.
+   */
+  game_state?: string | null;
 }
 
 export interface RosterEntry {
@@ -201,7 +227,8 @@ export function findUserMatchup(
 ): Matchup | null {
   if (!matchups || !league.team_key) return null;
   return (
-    matchups.find((m) => m.teams.some((t) => t.team_key === league.team_key)) ?? null
+    matchups.find((m) => m.teams.some((t) => t.team_key === league.team_key)) ??
+    null
   );
 }
 
@@ -240,8 +267,12 @@ export function estimateWinProbability(
   if (!oriented || !matchup) return null;
   const { user, opponent } = oriented;
 
-  const uProj = typeof user.projected_points === "number" ? user.projected_points : null;
-  const oProj = typeof opponent.projected_points === "number" ? opponent.projected_points : null;
+  const uProj =
+    typeof user.projected_points === "number" ? user.projected_points : null;
+  const oProj =
+    typeof opponent.projected_points === "number"
+      ? opponent.projected_points
+      : null;
 
   if (isMatchupPre(matchup)) {
     if (uProj === null || oProj === null) return null;
@@ -306,7 +337,8 @@ export function playoffSpotCount(league: LeagueResponse): number {
 /** Distinguish playoff-track teams from elimination-track teams. */
 export function isPlayoffBound(entry: StandingsEntry, spots: number): boolean {
   if (entry.clinched_playoffs) return true;
-  if (typeof entry.playoff_seed === "number") return entry.playoff_seed <= spots;
+  if (typeof entry.playoff_seed === "number")
+    return entry.playoff_seed <= spots;
   if (typeof entry.rank === "number") return entry.rank <= spots;
   return false;
 }
@@ -363,6 +395,126 @@ export function statValue(
   return v;
 }
 
+// ── Per-player game state ────────────────────────────────────────
+
+export type GameStateKind = "final" | "live" | "upcoming" | "unknown";
+
+export interface PlayerGameState {
+  kind: GameStateKind;
+  /** Display text. "—" when we have nothing, which is today's norm. */
+  label: string;
+}
+
+/**
+ * Seam for per-player game state.
+ *
+ * Everything the redesign does with live treatment (red clocks, points
+ * flashes, "in play" lines) hangs off this. Today it reads the
+ * `game_state` the demo fixture supplies; when the sports-service join
+ * lands, this is the ONLY function that needs to change.
+ *
+ * Deliberately total: an absent game state returns `unknown`/"—" rather
+ * than throwing or guessing, so every caller degrades to the current
+ * behaviour without a branch of its own.
+ */
+export function gameStateForPlayer(player: RosterPlayer): PlayerGameState {
+  const raw = player.game_state?.trim();
+  if (!raw) return { kind: "unknown", label: "—" };
+  if (/^final/i.test(raw)) return { kind: "final", label: raw };
+  // A quarter/half marker with a clock is the live signal: "Q3 8:42",
+  // "OT 1:12", "H2 12:04".
+  if (/^(q[1-4]|ot|h[12])\b/i.test(raw)) return { kind: "live", label: raw };
+  return { kind: "upcoming", label: raw };
+}
+
+/** True when the player has started and not finished. */
+export function isPlayerLive(player: RosterPlayer): boolean {
+  return gameStateForPlayer(player).kind === "live";
+}
+
+/**
+ * Compact human stat line — "260 pass yds · 2 pass TD · 1 INT".
+ *
+ * Built from the league's own catalog so the labels are Yahoo's, not
+ * ours, and skips zero/missing values so a row reads as a sentence
+ * rather than a sparse grid. Display-only stats (D/ST points allowed)
+ * are included because they're descriptive even though they don't score.
+ */
+export function compactStatLine(
+  player: RosterPlayer,
+  catalog: StatCatalog | null | undefined,
+  window: "week" | "today" = "week",
+  max = 5,
+): string {
+  const stats =
+    window === "today" ? player.player_stats_today : player.player_stats;
+  if (!stats) return "";
+  const cols = statColumnsForPosition(catalog, player.position_type);
+  const parts: string[] = [];
+  for (const col of cols) {
+    const v = statValue(stats, col.stat_id);
+    if (v === "—" || v === "0") continue;
+    parts.push(`${v} ${col.display_name.toLowerCase()}`);
+    if (parts.length >= max) break;
+  }
+  return parts.join(" · ");
+}
+
+export interface SlotRow {
+  /** Slot label shown in the centre pill — "QB", "W/R/T", "DEF". */
+  slot: string;
+  user: RosterPlayer | null;
+  opponent: RosterPlayer | null;
+}
+
+/**
+ * Pair two rosters into position-vs-position rows.
+ *
+ * Walks the user's starting slots in their roster order (which is the
+ * league's lineup order) and matches each one against the opponent's
+ * next unused starter in the same slot. Leagues don't have to run
+ * identical lineups — an unmatched side yields null and the cell renders
+ * empty, which is why the row type allows it on either side.
+ */
+export function slotRows(
+  userPlayers: RosterPlayer[],
+  opponentPlayers: RosterPlayer[],
+  /** Pair the bench/IR players instead of the starters. */
+  bench = false,
+): SlotRow[] {
+  const pick = (list: RosterPlayer[]) =>
+    list.filter((p) => isBenchPosition(p.selected_position) === bench);
+  const mine = pick(userPlayers);
+  const theirs = pick(opponentPlayers);
+
+  const takenByOpponent = new Set<string>();
+  const rows: SlotRow[] = mine.map((user) => {
+    const match =
+      theirs.find(
+        (o) =>
+          o.selected_position === user.selected_position &&
+          !takenByOpponent.has(o.player_key),
+      ) ?? null;
+    if (match) takenByOpponent.add(match.player_key);
+    return { slot: user.selected_position, user, opponent: match };
+  });
+
+  // Opponent slots the user doesn't run at all still deserve a row.
+  for (const o of theirs) {
+    if (takenByOpponent.has(o.player_key)) continue;
+    rows.push({ slot: o.selected_position, user: null, opponent: o });
+  }
+  return rows;
+}
+
+/** Points still to come for a side — projection minus what's banked. */
+export function pointsRemaining(team: MatchupTeam): number {
+  const proj =
+    typeof team.projected_points === "number" ? team.projected_points : null;
+  if (proj === null) return 0;
+  return Math.max(0, proj - teamScore(team));
+}
+
 /** Short "W3" / "L2" / "T1" badge. */
 export function streakLabel(type: string, value: number): string {
   if (!type || value <= 0) return "—";
@@ -376,9 +528,11 @@ export function streakLabel(type: string, value: number): string {
 export function statusColorClass(status: string | null | undefined): string {
   if (!status) return "";
   const s = status.toUpperCase();
-  if (s === "O" || s === "IR" || s === "SUSP" || s === "DL" || s === "IL") return "bg-error/20 text-error border-error/40";
+  if (s === "O" || s === "IR" || s === "SUSP" || s === "DL" || s === "IL")
+    return "bg-error/20 text-error border-error/40";
   if (s === "D" || s === "DTD") return "bg-warn/20 text-warn border-warn/40";
-  if (s === "Q" || s === "P") return "bg-amber-500/20 text-amber-500 border-amber-500/40";
+  if (s === "Q" || s === "P")
+    return "bg-amber-500/20 text-amber-500 border-amber-500/40";
   if (s === "NA") return "bg-fg-3/20 text-fg-3 border-fg-3/40";
   return "bg-fg-3/20 text-fg-3 border-fg-3/40";
 }
@@ -421,7 +575,11 @@ export function userPreviousMatchup(league: LeagueResponse): {
   if (!previous) return null;
   const oriented = orientMatchup(previous, league.team_key);
   if (!oriented) return null;
-  return { matchup: previous, user: oriented.user, opponent: oriented.opponent };
+  return {
+    matchup: previous,
+    user: oriented.user,
+    opponent: oriented.opponent,
+  };
 }
 
 /** Return the user's standings entry, if present. */

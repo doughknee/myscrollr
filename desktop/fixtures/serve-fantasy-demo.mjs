@@ -312,6 +312,11 @@ function buildPlayers(roster, idBase) {
       status_full: p.status_full ?? null,
       injury_note: p.injury_note ?? null,
       player_points: played ? scoreOf(p.stats) : 0,
+      // Per-player projection. Yahoo's roster payload may not carry this
+      // for NFL — flagged in the handoff's data requirements — but the
+      // redesign shows "proj N" under every points cell, so the fixture
+      // supplies it and the UI renders "—" wherever it's missing.
+      projected_points: p.proj ?? null,
       player_stats: played ? asStatMap(p.stats) : BLANK_STATS,
       // The Today toggle reads player_stats_today, and RosterView
       // disables the toggle outright when no player has any (see

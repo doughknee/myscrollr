@@ -23,9 +23,20 @@ import type { LeagueResponse, RosterEntry, RosterPlayer } from "./types";
 
 interface RosterViewProps {
   league: LeagueResponse | null;
+  /**
+   * Week/Today window, owned by FeedTab and shared with MatchupView.
+   * Lifted rather than local so switching tabs doesn't silently reset
+   * the window the user just chose.
+   */
+  window: StatsWindow;
+  onWindowChange: (w: StatsWindow) => void;
 }
 
-export function RosterView({ league }: RosterViewProps) {
+export function RosterView({
+  league,
+  window,
+  onWindowChange,
+}: RosterViewProps) {
   const userRosterEntry = useMemo(
     () => (league ? userRoster(league) : null),
     [league],
@@ -33,7 +44,6 @@ export function RosterView({ league }: RosterViewProps) {
   const [teamKey, setTeamKey] = useState<string | null>(
     userRosterEntry?.team_key ?? null,
   );
-  const [window, setWindow] = useState<StatsWindow>("week");
 
   const activeRoster = useMemo(() => {
     if (!league?.rosters) return null;
@@ -54,7 +64,9 @@ export function RosterView({ league }: RosterViewProps) {
 
   const isMe = activeRoster?.team_key === league.team_key;
   const allPlayers = activeRoster?.data.players ?? [];
-  const starters = allPlayers.filter((p) => !isBenchPosition(p.selected_position));
+  const starters = allPlayers.filter(
+    (p) => !isBenchPosition(p.selected_position),
+  );
   const bench = allPlayers.filter((p) => isBenchPosition(p.selected_position));
 
   const groupedStarters = groupByPositionType(starters);
@@ -77,12 +89,13 @@ export function RosterView({ league }: RosterViewProps) {
         />
         <StatsWindowPicker
           value={window}
-          onChange={setWindow}
+          onChange={onWindowChange}
           todayDisabled={!hasTodayStats}
         />
         <div className="flex items-center gap-3 text-[11px] text-fg-3">
           <span>
-            <span className="font-bold text-fg">{starters.length}</span> starters
+            <span className="font-bold text-fg">{starters.length}</span>{" "}
+            starters
           </span>
           <span>·</span>
           <span>
@@ -136,7 +149,9 @@ export function RosterView({ league }: RosterViewProps) {
                       : "text-warn",
                   )}
                 >
-                  {isBenchPosition(p.selected_position) ? p.selected_position : "STARTING"}
+                  {isBenchPosition(p.selected_position)
+                    ? p.selected_position
+                    : "STARTING"}
                 </span>
               </div>
             ))}
