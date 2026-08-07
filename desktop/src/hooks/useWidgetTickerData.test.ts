@@ -7,9 +7,9 @@ import type { WidgetPrefs } from "../preferences";
 const storeValues = vi.hoisted(() => new Map<string, unknown>());
 
 vi.mock("../lib/store", () => ({
-  getStore: vi.fn((key: string, fallback: unknown) => (
-    storeValues.has(key) ? storeValues.get(key) : fallback
-  )),
+  getStore: vi.fn((key: string, fallback: unknown) =>
+    storeValues.has(key) ? storeValues.get(key) : fallback,
+  ),
   onStoreChange: vi.fn(() => vi.fn()),
   setStore: vi.fn(),
 }));
@@ -99,6 +99,13 @@ describe("useWidgetTickerData", () => {
           label: "Timer",
           value: "01:05",
           detail: "Stopwatch",
+          // A stopwatch counts up with no target, so it reports no
+          // spine fraction and no end time. startedAt === null is the
+          // pause marker.
+          paused: true,
+          remainingSec: undefined,
+          totalSec: undefined,
+          endsAt: undefined,
         },
       ]);
     });

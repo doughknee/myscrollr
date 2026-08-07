@@ -126,7 +126,67 @@ function getTimerChipData(
     label: "Timer",
     value,
     detail,
+    // Spine inputs. A stopwatch counts UP with no target, so it has no
+    // fraction to draw and deliberately reports neither — the chip
+    // hides the spine rather than inventing a finish line.
+    remainingSec: isCountUp ? undefined : Math.floor(totalMs / 1000),
+    totalSec: isCountUp ? undefined : state.targetSecs,
+    // startedAt === null is the pause marker: elapsed time is banked
+    // and the clock isn't running.
+    paused: !isRunning,
+    endsAt:
+      isCountUp || !isRunning ? undefined : formatEndTime(Date.now() + totalMs),
   };
+}
+
+/** "3:10 PM" — when a running timer will finish. */
+function formatEndTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * Is it night in this zone?
+ *
+ * A flat hour window rather than real sunrise/sunset: a clock chip has
+ * no location, only a timezone, and a timezone covers too much latitude
+ * to place the sun. 20:00-06:00 is the "would it be rude to call"
+ * window, which is what the dimming is actually communicating.
+ *
+ * Weather chips do NOT use this — they get isDay from the provider,
+ * which knows where the city is.
+ */
+function isNightIn(now: Date, tz: string | undefined): boolean {
+  try {
+    const hour = Number(
+      new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        hour12: false,
+        timeZone: tz,
+      }).format(now),
+    );
+    if (!Number.isFinite(hour)) return false;
+    return hour >= 20 || hour < 6;
+  } catch {
+    // Invalid timezone strings are user-supplied. No dimming beats a
+    // crashed ticker.
+    return false;
+  }
+}
+
+/** "UTC-4" for the comfort cell. Empty when the zone can't be resolved. */
+function utcOffsetLabel(now: Date, tz: string | undefined): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      timeZoneName: "shortOffset",
+    }).formatToParts(now);
+    return parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+  } catch {
+    return "";
+  }
 }
 
 // ── Hook ────────────────────────────────────────────────────────
@@ -158,6 +218,8 @@ export function useWidgetTickerData(
         label: "Local",
         value: formatTime(now, undefined, format),
         detail: formatDetail(now, undefined),
+        night: isNightIn(now, undefined),
+        offset: utcOffsetLabel(now, undefined),
       });
     }
 
@@ -172,6 +234,8 @@ export function useWidgetTickerData(
           label: tzShortLabel(tz),
           value: formatTime(now, tz, format),
           detail: formatDetail(now, tz),
+          night: isNightIn(now, tz),
+          offset: utcOffsetLabel(now, tz),
         });
       }
     }
@@ -229,6 +293,16 @@ export function useWidgetTickerData(
         detail: condition
           ? `${condition} \u00B7 Feels ${feelsLike}`
           : undefined,
+        // Range bar inputs. Raw provider units, NOT the formatted
+        // string — the bar does arithmetic and formatTemp may already
+        // have converted for display.
+        tempValue: w?.temperature,
+        high: w?.tempMax,
+        low: w?.tempMin,
+        // Provider-reported, not computed from the clock: sunrise and
+        // sunset move with latitude and season, so a hardcoded hour
+        // range would be wrong for most of the planet most of the year.
+        night: w?.isDay === false,
       });
     }
 
@@ -256,6 +330,7 @@ export function useWidgetTickerData(
         id: "sysmon-cpu",
         label: "CPU",
         value: `${pct}%`,
+        percent: pct,
         detail: [freq, temp].filter(Boolean).join(" \u00B7 ") || undefined,
         hot: pct >= 80,
       });
@@ -269,6 +344,7 @@ export function useWidgetTickerData(
         id: "sysmon-mem",
         label: "RAM",
         value: `${pct}%`,
+        percent: pct,
         detail: `${used} / ${total}`,
         hot: pct >= 85,
       });
@@ -283,6 +359,7 @@ export function useWidgetTickerData(
         id: "sysmon-gpu",
         label: "GPU",
         value: `${pct}%`,
+        percent: pct,
         detail: [clock, temp].filter(Boolean).join(" \u00B7 ") || undefined,
         hot: pct >= 80,
       });
