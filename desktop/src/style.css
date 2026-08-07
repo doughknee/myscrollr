@@ -1029,6 +1029,32 @@
     border-color 0.3s ease !important;
 }
 
+/* Alerting status cap — a monitor that's down, a CI run in progress.
+   Opacity only, so the cap never changes size and the rail never
+   reflows around it. Attribute-gated like every other chip animation:
+   the app shell stills it, the ticker window runs it. Colour alone
+   already distinguishes every cap state, so nothing is conveyed by
+   movement only. */
+@keyframes capPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+[data-motion="cap-pulse"] {
+  animation: capPulse 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-motion="cap-pulse"] {
+    animation: none;
+  }
+}
+
 /* Live spine glow — the 2px bar under a chip whose game is in progress.
    Opacity only, so it reads as a pulse rather than a movement, and the
    chip's layout never shifts.

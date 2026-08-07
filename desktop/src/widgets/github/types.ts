@@ -20,6 +20,9 @@ interface GitHubWorkflowRun {
   html_url: string;
   head_commit: { message: string } | null;
   updated_at: string;
+  /** Already in the response — we just weren't reading them. */
+  head_branch: string | null;
+  run_started_at: string | null;
 }
 
 interface GitHubActionsResponse {
@@ -60,6 +63,10 @@ export interface GitHubRepo {
   runUrl: string | null;
   commitMessage: string | null;
   updatedAt: string | null;
+  /** Branch the run is on, e.g. "main". */
+  branch: string | null;
+  /** When the run started — used for the chip's elapsed value. */
+  startedAt: string | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -84,7 +91,9 @@ function toCIStatus(status: string, conclusion: string | null): CIStatus {
 /** Valid GitHub owner/repo name: alphanumeric, hyphens, dots, underscores. */
 const GITHUB_NAME_RE = /^[a-zA-Z0-9_.-]+$/;
 
-export function parseRepoUrl(url: string): { owner: string; repo: string } | null {
+export function parseRepoUrl(
+  url: string,
+): { owner: string; repo: string } | null {
   const trimmed = url.trim().replace(/\/+$/, "");
   const match = trimmed.match(/(?:https?:\/\/)?github\.com\/([^/]+)\/([^/]+)/i);
   if (!match) return null;
@@ -120,6 +129,8 @@ export async function fetchRepoStatus(
     runUrl: null,
     commitMessage: null,
     updatedAt: null,
+    branch: null,
+    startedAt: null,
   };
 
   try {
@@ -146,6 +157,8 @@ export async function fetchRepoStatus(
       runUrl: run.html_url,
       commitMessage: run.head_commit?.message ?? null,
       updatedAt: run.updated_at,
+      branch: run.head_branch,
+      startedAt: run.run_started_at,
     };
   } catch {
     return unavailable;
@@ -174,6 +187,8 @@ export async function fetchAllRepos(
           runUrl: null,
           commitMessage: null,
           updatedAt: null,
+          branch: null,
+          startedAt: null,
         },
   );
 }

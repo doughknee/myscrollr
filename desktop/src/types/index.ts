@@ -40,7 +40,7 @@ export interface Prediction {
   category?: string;
   title: string;
   subtitle?: string;
-  yes_price: number;       // cents 0-100 == implied %
+  yes_price: number; // cents 0-100 == implied %
   yes_bid?: number;
   yes_ask?: number;
   prev_yes_price?: number; // for ▲/▼ delta
@@ -57,9 +57,9 @@ export interface Prediction {
   /** When the market resolved (once-stamped server-side, v1.1.5).
    *  Preferred over `updated_at` for "Resolved today". RFC3339. */
   settled_at?: string;
-  close_time?: string;     // RFC3339
+  close_time?: string; // RFC3339
   link?: string;
-  updated_at?: string;     // RFC3339
+  updated_at?: string; // RFC3339
 }
 
 // ── Sports ───────────────────────────────────────────────────────
@@ -123,7 +123,8 @@ export interface DashboardResponse {
     feed_enabled: boolean;
     enabled_sites: string[];
     disabled_sites: string[];
-    subscription_tier?: "anonymous" | "free" | "uplink" | "uplink_pro" | "uplink_ultimate";
+    subscription_tier?:
+      "anonymous" | "free" | "uplink" | "uplink_pro" | "uplink_ultimate";
     updated_at: string;
   };
   // Generated from the Go struct — the row shape is the server's to define.
@@ -303,6 +304,18 @@ export interface UptimeChipData {
   detail?: string;
   /** Recent heartbeat status codes for the mini bar (0=down, 1=up, 2=pending, 3=maint). */
   heartbeats?: number[];
+  /**
+   * How long the monitor has been down ("4m", "2h11m").
+   *
+   * A down monitor's uptime percentage is the least useful number on
+   * the chip — "99.98%" beside a red cap reads as reassurance when the
+   * thing is on fire. The design swaps the value slot for this instead.
+   * Derived from the heartbeat history, so it's absent when we have no
+   * history to measure against.
+   */
+  outageFor?: string;
+  /** Median response time over the heartbeat window ("187ms avg"). */
+  responseAvg?: string;
 }
 
 export interface GitHubChipData {
@@ -311,6 +324,19 @@ export interface GitHubChipData {
   status: "success" | "failure" | "in_progress" | "unavailable";
   workflowName: string;
   detail?: string;
+  /** Branch the run is on. Rendered in the widget accent at 80%. */
+  branch?: string;
+  /**
+   * Right-hand value: duration for a finished or running job, "queued"
+   * when it hasn't started. The design gives failures the failed STEP
+   * name here instead — that's the thing you'd otherwise open GitHub to
+   * find — which needs the workflow-run jobs payload we don't fetch
+   * yet, so `failedStep` stays optional and the duration is the
+   * fallback.
+   */
+  elapsed?: string;
+  /** Name of the step that failed, when known. */
+  failedStep?: string;
 }
 
 export interface WidgetTickerData {
@@ -322,11 +348,7 @@ export interface WidgetTickerData {
   github: GitHubChipData[];
 }
 
-import type {
-  Widget,
-  WidgetDef,
-  CatalogResponse,
-} from "./api.generated";
+import type { Widget, WidgetDef, CatalogResponse } from "./api.generated";
 
 // ── Widget catalog (wire types for GET /catalog) ─────────────────
 // These are aliases onto the generated contract (VISION §4.6) — the names

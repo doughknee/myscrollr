@@ -1,9 +1,25 @@
-import { useMemo, useEffect, useRef, useState, useCallback } from "react";
+import {
+  Fragment,
+  useMemo,
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import clsx from "clsx";
 import { ChevronDown, Plus, Settings2 } from "lucide-react";
 import { Ticker } from "motion-plus/react";
 import { useMotionValue, animate, AnimatePresence, motion } from "motion/react";
-import type { DashboardResponse, Trade, Game, RssItem, WidgetTickerData, Prediction } from "../types";
+import type {
+  DashboardResponse,
+  Trade,
+  Game,
+  RssItem,
+  WidgetTickerData,
+  Prediction,
+  UptimeChipData,
+  GitHubChipData,
+} from "../types";
 import type {
   MixMode,
   ChipColorMode,
@@ -15,7 +31,11 @@ import type {
 import { shouldShowOnTicker } from "../preferences";
 import type { LeagueResponse as FantasyLeague } from "../datawidgets/fantasy/types";
 import ConsolidatedChip from "./chips/ConsolidatedChip";
-import { getWatchlist, onWatchlistChange } from "../datawidgets/predictions/watchlist";
+import { GitHubCappedChip, UptimeCappedChip } from "./chips/CappedChip";
+import {
+  getWatchlist,
+  onWatchlistChange,
+} from "../datawidgets/predictions/watchlist";
 import { sourceForWidget } from "../marketplace";
 import { useCatalog } from "../hooks/useCatalog";
 import { TICKER_SOURCES } from "../datawidgets/tickerRegistry";
@@ -32,7 +52,11 @@ interface ScrollrTickerProps {
    * underlying chip has an external destination (article link, game
    * page, etc.). When undefined, the consumer should fall back to
    * opening the in-app widget page. */
-  onChipClick?: (widgetType: string, itemId: string | number, url?: string) => void;
+  onChipClick?: (
+    widgetType: string,
+    itemId: string | number,
+    url?: string,
+  ) => void;
   /** Toggle pin state for a widget (hover pin icon). */
   onTogglePin?: (widgetId: string) => void;
   /** Which widgets are pinned (excluded from scrolling ticker). */
@@ -125,6 +149,44 @@ function EmptyTickerRow({
   );
 }
 
+/**
+ * Capped widgets (uptime, GitHub) render one chip per item instead of
+ * one chip per widget — see CappedChip for why. Returns null for every
+ * other widget type so the caller falls through to ConsolidatedChip.
+ *
+ * The pin toggle rides the FIRST chip only. Pinning is a per-widget
+ * setting; a pin on every chip would imply each monitor pins on its own.
+ */
+function cappedChipsFor(
+  wt: keyof WidgetTickerData,
+  items: WidgetTickerData[keyof WidgetTickerData],
+  opts: {
+    comfort?: boolean;
+    chipColorMode?: ChipColorMode;
+    onTogglePin?: (id: string) => void;
+    onChipClick?: (type: string, id: string, url?: string) => void;
+    pinned?: boolean;
+  },
+): React.ReactNode[] | null {
+  if (wt !== "uptime" && wt !== "github") return null;
+  const { comfort, chipColorMode, onTogglePin, onChipClick, pinned } = opts;
+
+  return items.map((item, i) => {
+    const shared = {
+      comfort,
+      colorMode: chipColorMode,
+      pinned,
+      onTogglePin: i === 0 && onTogglePin ? () => onTogglePin(wt) : undefined,
+      onClick: () => onChipClick?.(wt, item.id),
+    };
+    return wt === "uptime" ? (
+      <UptimeCappedChip item={item as UptimeChipData} {...shared} />
+    ) : (
+      <GitHubCappedChip item={item as GitHubChipData} {...shared} />
+    );
+  });
+}
+
 /** Round-robin interleave across buckets:
  *  bucket0[0], bucket1[0], bucket2[0], bucket0[1], bucket1[1], ... */
 function weave<T>(buckets: T[][]): T[] {
@@ -211,21 +273,41 @@ export default function ScrollrTicker({
         const wt = tab as keyof WidgetTickerData;
         const items = widgetData?.[wt];
         if (items?.length && !isPinnedAnywhere) {
-          bucket.push(
-            wrap(`${wt}-consolidated`,
-              <ConsolidatedChip
-                type={wt}
-                items={items}
-                comfort={comfort}
-                colorMode={chipColorMode}
-                onTogglePin={onTogglePin ? () => onTogglePin(wt) : undefined}
-                // Widget chips don't have a meaningful external URL —
-                // omit the third argument so handleChipClick falls back
-                // to opening the desktop app on the widget's page.
-                onClick={() => onChipClick?.(wt, wt)}
-              />
-            )
-          );
+          // Capped widgets render ONE chip per item. Packing every
+          // monitor into a single pipe-separated chip made a lone
+          // failure impossible to pick out of the row, which is the
+          // whole point of a status cap.
+          //
+          // The pin toggle rides the first chip only: pinning is
+          // per-widget, and N pins on N chips would suggest otherwise.
+          const capped = cappedChipsFor(wt, items, {
+            comfort,
+            chipColorMode,
+            onTogglePin,
+            onChipClick,
+          });
+          if (capped) {
+            capped.forEach((node, i) =>
+              bucket.push(wrap(`${wt}-cap-${i}`, node)),
+            );
+          } else {
+            bucket.push(
+              wrap(
+                `${wt}-consolidated`,
+                <ConsolidatedChip
+                  type={wt}
+                  items={items}
+                  comfort={comfort}
+                  colorMode={chipColorMode}
+                  onTogglePin={onTogglePin ? () => onTogglePin(wt) : undefined}
+                  // Widget chips don't have a meaningful external URL —
+                  // omit the third argument so handleChipClick falls back
+                  // to opening the desktop app on the widget's page.
+                  onClick={() => onChipClick?.(wt, wt)}
+                />,
+              ),
+            );
+          }
           buckets.push(bucket);
         }
         continue;
@@ -260,17 +342,28 @@ export default function ScrollrTicker({
       // Only push a bucket that actually has chips in it.
       if (bucket.length > 0) buckets.push(bucket);
       continue;
-
     }
 
     // Combine based on mix mode. Row filtering is handled upstream now,
     // so no round-robin distribution here.
-    const allItems: React.ReactNode[] = effectiveMixMode === "weave"
-      ? weave(buckets)
-      : buckets.flat();
+    const allItems: React.ReactNode[] =
+      effectiveMixMode === "weave" ? weave(buckets) : buckets.flat();
 
     return allItems;
-  }, [dashboard, activeTabs, widgetData, onChipClick, onTogglePin, pinnedWidgets, comfort, effectiveMixMode, chipColorMode, widgetDisplay, predictionsWatchlist, catalogVersion]);
+  }, [
+    dashboard,
+    activeTabs,
+    widgetData,
+    onChipClick,
+    onTogglePin,
+    pinnedWidgets,
+    comfort,
+    effectiveMixMode,
+    chipColorMode,
+    widgetDisplay,
+    predictionsWatchlist,
+    catalogVersion,
+  ]);
 
   // ── Shared refs ─────────────────────────────────────────────────
   const containerRef = useRef<HTMLDivElement>(null);
@@ -289,7 +382,9 @@ export default function ScrollrTicker({
   const measureStepSize = useCallback((): number => {
     const container = containerRef.current;
     if (!container) return 200; // fallback
-    const firstItem = container.querySelector(".ticker-item") as HTMLElement | null;
+    const firstItem = container.querySelector(
+      ".ticker-item",
+    ) as HTMLElement | null;
     if (!firstItem) return 200;
     return firstItem.offsetWidth + gap;
   }, [gap]);
@@ -342,7 +437,17 @@ export default function ScrollrTicker({
       cancelled = true;
       stepLoopRef.current = false;
     };
-  }, [effectiveScrollMode, effectiveDirection, stepPause, pauseOnHover, effectiveSpeed, chips.length, measureStepSize, offset, transitionDuration]);
+  }, [
+    effectiveScrollMode,
+    effectiveDirection,
+    stepPause,
+    pauseOnHover,
+    effectiveSpeed,
+    chips.length,
+    measureStepSize,
+    offset,
+    transitionDuration,
+  ]);
 
   // ── Flip mode: paginated vertical slide ───────────────────────
   const [flipPage, setFlipPage] = useState(0);
@@ -391,6 +496,19 @@ export default function ScrollrTicker({
       const wt = widgetId as keyof WidgetTickerData;
       const items = widgetData?.[wt];
       if (items?.length) {
+        const cappedPinned = cappedChipsFor(wt, items, {
+          comfort,
+          chipColorMode,
+          onTogglePin,
+          onChipClick,
+          pinned: true,
+        });
+        if (cappedPinned) {
+          cappedPinned.forEach((node, i) =>
+            target.push(<Fragment key={`pinned-${wt}-${i}`}>{node}</Fragment>),
+          );
+          continue;
+        }
         target.push(
           <ConsolidatedChip
             key={`pinned-${wt}`}
@@ -404,7 +522,7 @@ export default function ScrollrTicker({
             // omit the third argument so handleChipClick falls back
             // to opening the desktop app on the widget's page.
             onClick={() => onChipClick?.(wt, wt)}
-          />
+          />,
         );
       }
     }
@@ -422,7 +540,10 @@ export default function ScrollrTicker({
   // bar with a single inline CTA that opens the catalog. The decision
   // of *when* to show this is hoisted to App.tsx — see `showSourcelessCTA`.
   const isSourceless =
-    !hasScrollingChips && !hasPinnedLeft && !hasPinnedRight && showSourcelessCTA;
+    !hasScrollingChips &&
+    !hasPinnedLeft &&
+    !hasPinnedRight &&
+    showSourcelessCTA;
 
   // Installed-but-ticker-off CTA: signed-in user has widgets installed
   // but none are currently flagged for the ticker (every widget's
@@ -431,11 +552,11 @@ export default function ScrollrTicker({
   // tab and flip the toggle. This is the "you have stuff, you just
   // turned it off" recovery state.
   const isInstalledButTickerOff =
-    !hasScrollingChips
-    && !hasPinnedLeft
-    && !hasPinnedRight
-    && showInstalledOffCTA
-    && installedWidgets.length > 0;
+    !hasScrollingChips &&
+    !hasPinnedLeft &&
+    !hasPinnedRight &&
+    showInstalledOffCTA &&
+    installedWidgets.length > 0;
 
   const containerClass = `ticker-container ${comfort ? "h-16" : "h-11"} flex items-center bg-base-150 border-b border-edge/50 flex-shrink-0 relative w-full overflow-hidden`;
 
@@ -494,8 +615,8 @@ export default function ScrollrTicker({
         tip={
           comfort && (
             <span>
-              every widget&rsquo;s settings live in the bar at the top of
-              its page.
+              every widget&rsquo;s settings live in the bar at the top of its
+              page.
             </span>
           )
         }
@@ -523,8 +644,8 @@ export default function ScrollrTicker({
                 )}
                 style={{
                   color: ch.hex,
-                  backgroundColor: `${ch.hex}14`,   // ~8% alpha
-                  borderColor: `${ch.hex}3D`,       // ~24% alpha
+                  backgroundColor: `${ch.hex}14`, // ~8% alpha
+                  borderColor: `${ch.hex}3D`, // ~24% alpha
                 }}
                 title={`Open ${ch.name}`}
               >
@@ -564,8 +685,12 @@ export default function ScrollrTicker({
       <div
         ref={containerRef}
         className={containerClass}
-        onMouseEnter={() => { isHoveredRef.current = true; }}
-        onMouseLeave={() => { isHoveredRef.current = false; }}
+        onMouseEnter={() => {
+          isHoveredRef.current = true;
+        }}
+        onMouseLeave={() => {
+          isHoveredRef.current = false;
+        }}
       >
         {accentLine}
         {pinnedZone("left", pinnedLeft)}
@@ -576,7 +701,10 @@ export default function ScrollrTicker({
               initial={{ y: "100%", opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: "-100%", opacity: 0 }}
-              transition={{ duration: transitionDuration, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{
+                duration: transitionDuration,
+                ease: [0.25, 0.1, 0.25, 1],
+              }}
               className="flex items-center h-full"
               style={{ gap }}
             >
@@ -590,15 +718,20 @@ export default function ScrollrTicker({
   }
 
   // ── Continuous / Step mode: motion-plus Ticker ────────────────
-  const velocity = effectiveDirection === "left" ? effectiveSpeed : -effectiveSpeed;
+  const velocity =
+    effectiveDirection === "left" ? effectiveSpeed : -effectiveSpeed;
   const isStepMode = effectiveScrollMode === "step";
 
   return (
     <div
       ref={containerRef}
       className={containerClass}
-      onMouseEnter={() => { isHoveredRef.current = true; }}
-      onMouseLeave={() => { isHoveredRef.current = false; }}
+      onMouseEnter={() => {
+        isHoveredRef.current = true;
+      }}
+      onMouseLeave={() => {
+        isHoveredRef.current = false;
+      }}
     >
       {accentLine}
       {pinnedZone("left", pinnedLeft)}
@@ -607,7 +740,7 @@ export default function ScrollrTicker({
           items={chips}
           velocity={isStepMode ? 0 : velocity}
           offset={isStepMode ? offset : undefined}
-          hoverFactor={isStepMode ? 1 : (pauseOnHover ? hoverSpeed : 1)}
+          hoverFactor={isStepMode ? 1 : pauseOnHover ? hoverSpeed : 1}
           gap={gap}
           fade={hasPinnedLeft || hasPinnedRight ? 20 : 40}
         />
