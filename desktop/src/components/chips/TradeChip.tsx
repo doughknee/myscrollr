@@ -40,6 +40,7 @@ const TradeChip = memo(
     // points. An effect would miss the first paint and leave the chip
     // flat for a poll cycle.
     const series = pushPrice(trade.symbol, trade.price);
+    const flat = Math.abs(Number(trade.percentage_change) || 0) < 1;
 
     // Pick the marker glyph per user preference. Empty string = no
     // marker rendered (the % itself still carries the sign).
@@ -66,9 +67,13 @@ const TradeChip = memo(
           <span className={clsx("font-semibold", c.text)}>{trade.symbol}</span>
           <Sparkline
             points={series}
-            width={comfort ? 42 : 34}
-            height={comfort ? 14 : 12}
-            className={isUp ? "text-up" : "text-down"}
+            width={comfort ? 56 : 44}
+            height={comfort ? 16 : 14}
+            // Sub-1% moves go neutral. At this size an up-tinted line
+            // and a down-tinted one look like meaningfully different
+            // days when the market barely moved. Spark only — the delta
+            // text keeps its real direction.
+            className={flat ? "text-fg-3/35" : isUp ? "text-up" : "text-down"}
           />
           <span className={c.textDim}>{formatPrice(trade.price)}</span>
           {changeStr && (

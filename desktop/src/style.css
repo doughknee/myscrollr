@@ -1029,6 +1029,30 @@
     border-color 0.3s ease !important;
 }
 
+/* Tilt-bar pulse — a close game still in play. Opacity only, so the bar
+   never changes width and the chip never reflows. Attribute-gated like
+   every other chip animation; the border tint already carries "close"
+   without it. */
+@keyframes tiltPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+[data-motion="tilt-pulse"] {
+  animation: tiltPulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-motion="tilt-pulse"] {
+    animation: none;
+  }
+}
+
 /* Alerting status cap — a monitor that's down, a CI run in progress.
    Opacity only, so the cap never changes size and the rail never
    reflows around it. Attribute-gated like every other chip animation:
