@@ -30,7 +30,8 @@ interface LeagueOpts {
 }
 
 function league(opts: LeagueOpts): LeagueResponse {
-  const userKey = opts.userTeamKey === undefined ? `${opts.key}.t.1` : opts.userTeamKey;
+  const userKey =
+    opts.userTeamKey === undefined ? `${opts.key}.t.1` : opts.userTeamKey;
   let matchups: Matchup[] | null = null;
   if (opts.matchupStatus && userKey) {
     const oppKey = `${opts.key}.t.2`;
@@ -63,6 +64,9 @@ function league(opts: LeagueOpts): LeagueResponse {
 }
 
 const DEFAULT_PREFS: FantasyDisplayPrefs = {
+  // These tests predate the simplicity dial and assert per-item venue
+  // behaviour, which only `everything` honours.
+  tickerMode: "everything",
   matchupScore: "both",
   winProbability: "both",
   matchupStatus: "both",
@@ -103,7 +107,11 @@ describe("filterEnabledLeagues", () => {
   });
 
   it("filters to the subset matching the allowed keys", () => {
-    const leagues = [league({ key: "a" }), league({ key: "b" }), league({ key: "c" })];
+    const leagues = [
+      league({ key: "a" }),
+      league({ key: "b" }),
+      league({ key: "c" }),
+    ];
     const result = filterEnabledLeagues(leagues, ["a", "c"]);
     expect(result.map((l) => l.league_key)).toEqual(["a", "c"]);
   });
@@ -131,7 +139,9 @@ describe("resolvePrimaryLeague", () => {
     const a = league({ key: "a" });
     const liveLeague = league({ key: "b", matchupStatus: "midevent" });
     const c = league({ key: "c" });
-    expect(resolvePrimaryLeague([a, liveLeague, c], "not-real")).toBe(liveLeague);
+    expect(resolvePrimaryLeague([a, liveLeague, c], "not-real")).toBe(
+      liveLeague,
+    );
   });
 
   it("falls back to live matchup when no configured key is given", () => {
@@ -330,15 +340,21 @@ describe("selectFantasyForTicker", () => {
 
 describe("fantasyEngagement", () => {
   it("returns 100 for live matchups", () => {
-    expect(fantasyEngagement(league({ key: "a", matchupStatus: "midevent" }))).toBe(100);
+    expect(
+      fantasyEngagement(league({ key: "a", matchupStatus: "midevent" })),
+    ).toBe(100);
   });
 
   it("returns 40 for preevent matchups", () => {
-    expect(fantasyEngagement(league({ key: "a", matchupStatus: "preevent" }))).toBe(40);
+    expect(
+      fantasyEngagement(league({ key: "a", matchupStatus: "preevent" })),
+    ).toBe(40);
   });
 
   it("returns 20 for postevent matchups", () => {
-    expect(fantasyEngagement(league({ key: "a", matchupStatus: "postevent" }))).toBe(20);
+    expect(
+      fantasyEngagement(league({ key: "a", matchupStatus: "postevent" })),
+    ).toBe(20);
   });
 
   it("returns 5 when no matchup context and league is active", () => {
