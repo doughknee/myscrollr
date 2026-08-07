@@ -12,6 +12,7 @@ import { useMemo, useState } from "react";
 import { clsx } from "clsx";
 import { AlertTriangle, ChevronDown } from "lucide-react";
 import {
+  gameStateForPlayer,
   isBenchPosition,
   isInjuryStatus,
   statusColorClass,
@@ -72,6 +73,11 @@ export function RosterView({
   const groupedStarters = groupByPositionType(starters);
   const groupedBench = groupByPositionType(bench);
   const injuries = allPlayers.filter((p) => isInjuryStatus(p.status));
+  // Starters mid-game. Zero whenever per-player game state is absent,
+  // which is the production case until the sports-service join lands.
+  const inPlay = starters.filter(
+    (p) => gameStateForPlayer(p).kind === "live",
+  ).length;
 
   const catalog = league.data.stat_catalog ?? null;
   const hasTodayStats = allPlayers.some(
@@ -101,6 +107,12 @@ export function RosterView({
           <span>
             <span className="font-bold text-fg">{bench.length}</span> bench/IR
           </span>
+          {inPlay > 0 && (
+            <>
+              <span>·</span>
+              <span className="font-semibold text-live">{inPlay} in play</span>
+            </>
+          )}
           {injuries.length > 0 && (
             <>
               <span>·</span>
@@ -329,7 +341,7 @@ const POSITION_TYPE_LABELS: Record<string, string> = {
   B: "Hitters",
   P: "Pitchers",
   O: "Offense",
-  D: "Defense",
+  D: "Defense / Special Teams",
   K: "Kickers",
 };
 
