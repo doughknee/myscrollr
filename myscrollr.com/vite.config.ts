@@ -43,6 +43,9 @@ export default defineConfig({
         { path: '/download/mac' },
         { path: '/download/windows' },
         { path: '/download/linux' },
+        // Segmented landing page — linked from social/ads, never from
+        // in-page <Link>, so crawlLinks can't discover it either.
+        { path: '/fantasy' },
       ],
       spa: {
         enabled: true,

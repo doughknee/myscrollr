@@ -10,10 +10,25 @@
  * of polling-only updates feel intentional instead of suspicious.
  *
  * Dismissal is per delivery-mode: dismissing "polling" suppresses the
- * banner until SSE recovers or the mode shifts to something different
- * (e.g. "offline") — a fresh outage re-notifies.
+ * banner until SSE genuinely recovers or the mode shifts to something
+ * different (e.g. "offline") — a fresh outage re-notifies.
+ *
+ * BOTH transitions are debounced, and that is the whole design:
+ *
+ *   - A reconnecting stream flaps polling -> sse -> polling every few
+ *     seconds. Reacting to each flip made the banner strobe at the top
+ *     of the widget, and — worse — every momentary "sse" cleared the
+ *     stored dismissal, so the banner reappeared seconds after being
+ *     dismissed and could not be got rid of.
+ *   - So a degraded mode has to HOLD before the banner appears, and a
+ *     recovery has to HOLD before it counts as recovered. A stream that
+ *     is merely bouncing changes nothing on screen.
+ *
+ * The asymmetry is deliberate: appearing is cheap to delay (a two-second
+ * blip needs no explanation), while clearing a dismissal is destructive
+ * and gets a much longer fuse.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { WifiOff, Zap } from "lucide-react";
 
 interface ConnectionBannerProps {
@@ -23,32 +38,69 @@ interface ConnectionBannerProps {
 
 const DISMISS_STORAGE_KEY = "scrollr:connbanner-dismissed";
 
-export default function ConnectionBanner({ deliveryMode }: ConnectionBannerProps) {
-  const [dismissed, setDismissed] = useState<boolean>(() =>
-    localStorage.getItem(DISMISS_STORAGE_KEY) === deliveryMode,
-  );
+/** How long a degraded mode must hold before it's worth telling anyone. */
+const SHOW_DELAY_MS = 4_000;
 
-  // Reset dismissal whenever the mode flips so a new outage re-notifies.
+/**
+ * How long SSE must hold before a later drop counts as a NEW outage.
+ * Long on purpose: this is what stops a flapping stream from wiping a
+ * dismissal the user just made.
+ */
+const RECOVERY_HOLD_MS = 60_000;
+
+export default function ConnectionBanner({
+  deliveryMode,
+}: ConnectionBannerProps) {
+  const [dismissed, setDismissed] = useState<boolean>(
+    () => localStorage.getItem(DISMISS_STORAGE_KEY) === deliveryMode,
+  );
+  // The mode we're willing to act on — trails the live one until it
+  // proves it's going to stay.
+  const [settledMode, setSettledMode] = useState(deliveryMode);
+  const recoveryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounce the mode itself. Nothing downstream sees a flap.
   useEffect(() => {
-    if (deliveryMode === "sse") {
+    if (deliveryMode === settledMode) return;
+    const t = setTimeout(
+      () => setSettledMode(deliveryMode),
+      // Recovering to a healthy stream can show immediately — hiding a
+      // banner early is never the wrong call. Going degraded waits.
+      deliveryMode === "sse" ? 0 : SHOW_DELAY_MS,
+    );
+    return () => clearTimeout(t);
+  }, [deliveryMode, settledMode]);
+
+  // Clear the stored dismissal only once SSE has genuinely held, so a
+  // reconnect blip can't resurrect a banner the user dismissed.
+  useEffect(() => {
+    if (recoveryTimer.current) {
+      clearTimeout(recoveryTimer.current);
+      recoveryTimer.current = null;
+    }
+    if (settledMode !== "sse") {
+      // A different degraded mode than the dismissed one still deserves
+      // a fresh notification (offline ≠ polling).
+      setDismissed(localStorage.getItem(DISMISS_STORAGE_KEY) === settledMode);
+      return;
+    }
+    recoveryTimer.current = setTimeout(() => {
       setDismissed(false);
       localStorage.removeItem(DISMISS_STORAGE_KEY);
-    } else {
-      // If a different non-sse mode is active (e.g. offline ≠ polling), the
-      // stored dismissal no longer matches — re-show.
-      setDismissed(localStorage.getItem(DISMISS_STORAGE_KEY) === deliveryMode);
-    }
-  }, [deliveryMode]);
+    }, RECOVERY_HOLD_MS);
+    return () => {
+      if (recoveryTimer.current) clearTimeout(recoveryTimer.current);
+    };
+  }, [settledMode]);
 
   // Every tier expects the live stream now, so any non-sse mode is
   // worth explaining — it means the stream dropped, not that the plan
   // doesn't include it.
-  const visible = !dismissed && deliveryMode !== "sse";
-  if (!visible) return null;
+  if (dismissed || settledMode === "sse") return null;
 
-  const Icon = deliveryMode === "offline" ? WifiOff : Zap;
+  const Icon = settledMode === "offline" ? WifiOff : Zap;
   const message =
-    deliveryMode === "offline"
+    settledMode === "offline"
       ? "You appear to be offline. Data shown is from the last successful fetch."
       : "Live updates paused — using polling. Data is still current.";
 
@@ -56,7 +108,7 @@ export default function ConnectionBanner({ deliveryMode }: ConnectionBannerProps
     <div
       role="status"
       aria-live="polite"
-      className="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-1.5 text-[11px] text-warning shrink-0"
+      className="flex shrink-0 items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-1.5 text-[11px] text-warning"
     >
       <Icon size={12} aria-hidden />
       <span className="flex-1">{message}</span>
@@ -64,9 +116,9 @@ export default function ConnectionBanner({ deliveryMode }: ConnectionBannerProps
         type="button"
         onClick={() => {
           setDismissed(true);
-          localStorage.setItem(DISMISS_STORAGE_KEY, deliveryMode);
+          localStorage.setItem(DISMISS_STORAGE_KEY, settledMode);
         }}
-        className="font-medium text-warning/80 hover:text-warning cursor-pointer"
+        className="cursor-pointer font-medium text-warning/80 hover:text-warning"
       >
         Dismiss
       </button>

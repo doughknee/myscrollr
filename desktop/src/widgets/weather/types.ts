@@ -28,6 +28,15 @@ export interface CurrentWeather {
   /** WMO weather code */
   weatherCode: number;
   isDay: boolean;
+  /**
+   * Today's forecast high/low, for the chip's range bar.
+   *
+   * Optional because a cached city fetched before these were requested
+   * won't have them — the bar hides itself rather than the chip
+   * breaking. They fill in on the next poll.
+   */
+  tempMax?: number;
+  tempMin?: number;
 }
 
 export interface SavedCity {
@@ -112,9 +121,7 @@ export function saveUnit(unit: TempUnit): void {
 
 // ── Open-Meteo API ──────────────────────────────────────────────
 
-export async function searchCities(
-  query: string,
-): Promise<WeatherLocation[]> {
+export async function searchCities(query: string): Promise<WeatherLocation[]> {
   if (query.trim().length < 2) return [];
   const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&language=en&format=json`;
   const res = await fetch(url);
@@ -142,7 +149,14 @@ export async function fetchWeather(
   lat: number,
   lon: number,
 ): Promise<CurrentWeather> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,is_day`;
+  // `daily` added for the chip's range bar. `timezone=auto` matters:
+  // without it Open-Meteo computes the day boundary in UTC, so a city
+  // several hours off would get yesterday's high in its evening.
+  // forecast_days=1 keeps the response small — we only want today.
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,is_day` +
+    `&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Weather API ${res.status}`);
   const data = (await res.json()) as {
@@ -155,8 +169,13 @@ export async function fetchWeather(
       wind_direction_10m: number;
       is_day: number;
     };
+    daily?: {
+      temperature_2m_max?: number[];
+      temperature_2m_min?: number[];
+    };
   };
   const c = data.current;
+  const d = data.daily;
   return {
     temperature: c.temperature_2m,
     feelsLike: c.apparent_temperature,
@@ -165,5 +184,7 @@ export async function fetchWeather(
     windDirection: c.wind_direction_10m,
     weatherCode: c.weather_code,
     isDay: c.is_day === 1,
+    tempMax: d?.temperature_2m_max?.[0],
+    tempMin: d?.temperature_2m_min?.[0],
   };
 }

@@ -18,6 +18,7 @@ import {
 } from "../../datawidgets/fantasy/types";
 import { findTopScorer } from "../../datawidgets/fantasy/playerStats";
 import { getChipColors, chipBaseClasses } from "./chipColors";
+import { ChipSpine } from "./ChipSpine";
 
 interface FantasyStatChipProps {
   league: LeagueResponse;
@@ -115,9 +116,11 @@ export default function FantasyStatChip({
     }
 
     if (shouldShowOnTicker(prefs.matchupStatus)) {
-      if (live) primarySegments.push({ key: "status", text: "LIVE", tone: "live" });
+      if (live)
+        primarySegments.push({ key: "status", text: "LIVE", tone: "live" });
       else if (final) primarySegments.push({ key: "status", text: "FINAL" });
-      else if (ctx.matchup.status === "preevent") primarySegments.push({ key: "status", text: "PRE" });
+      else if (ctx.matchup.status === "preevent")
+        primarySegments.push({ key: "status", text: "PRE" });
     }
 
     if (shouldShowOnTicker(prefs.matchupScore)) {
@@ -125,8 +128,14 @@ export default function FantasyStatChip({
       primarySegments.push({ key: "score", text: scoreText, tone: scoreTone });
     }
 
-    if (shouldShowOnTicker(prefs.projectedPoints) && typeof ctx.user.projected_points === "number") {
-      primarySegments.push({ key: "proj", text: `Proj ${ctx.user.projected_points.toFixed(1)}` });
+    if (
+      shouldShowOnTicker(prefs.projectedPoints) &&
+      typeof ctx.user.projected_points === "number"
+    ) {
+      primarySegments.push({
+        key: "proj",
+        text: `Proj ${ctx.user.projected_points.toFixed(1)}`,
+      });
     }
 
     if (shouldShowOnTicker(prefs.winProbability)) {
@@ -145,11 +154,15 @@ export default function FantasyStatChip({
   if (standing) {
     if (shouldShowOnTicker(prefs.record)) {
       const { wins, losses, ties } = standing;
-      const record = ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
+      const record =
+        ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
       secondarySegments.push({ key: "record", text: record });
     }
 
-    if (shouldShowOnTicker(prefs.standingsPosition) && typeof standing.rank === "number") {
+    if (
+      shouldShowOnTicker(prefs.standingsPosition) &&
+      typeof standing.rank === "number"
+    ) {
       secondarySegments.push({
         key: "rank",
         text: `${ordinal(standing.rank)}/${league.data.num_teams ?? "?"}`,
@@ -160,7 +173,9 @@ export default function FantasyStatChip({
       secondarySegments.push({
         key: "streak",
         text: streakLabel(standing.streak_type, standing.streak_value),
-        tone: standing.streak_type.toLowerCase().startsWith("w") ? "up" : "down",
+        tone: standing.streak_type.toLowerCase().startsWith("w")
+          ? "up"
+          : "down",
       });
     }
   }
@@ -170,7 +185,11 @@ export default function FantasyStatChip({
     if (shouldShowOnTicker(prefs.injuryCount)) {
       const injuries = countInjuries(roster);
       if (injuries > 0) {
-        secondarySegments.push({ key: "inj", text: `${injuries} IR`, tone: "down" });
+        secondarySegments.push({
+          key: "inj",
+          text: `${injuries} IR`,
+          tone: "down",
+        });
       }
     }
 
@@ -194,7 +213,22 @@ export default function FantasyStatChip({
   // In compact mode (single-line ticker), pour everything into a
   // single segment list. In comfort mode, the two buckets render on
   // their own rows.
-  const allSegments = comfort ? primarySegments : [...primarySegments, ...secondarySegments];
+  const allSegments = comfort
+    ? primarySegments
+    : [...primarySegments, ...secondarySegments];
+
+  // Spine fill. Win probability where we have one; otherwise the share
+  // of the combined score the user holds, which is a cruder but always
+  // available read. Null only when there's no matchup at all.
+  const spineFill = (() => {
+    if (!ctx) return null;
+    const wp = estimateWinProbability(ctx.matchup, league.team_key);
+    if (wp !== null) return wp;
+    const mine = teamScore(ctx.user);
+    const total = mine + teamScore(ctx.opponent);
+    return total > 0 ? mine / total : 0;
+  })();
+  const userWon = ctx ? teamScore(ctx.user) > teamScore(ctx.opponent) : false;
 
   // ── Render ─────────────────────────────────────────────────
 
@@ -204,7 +238,20 @@ export default function FantasyStatChip({
       onClick={onClick}
       className={chipBaseClasses(comfort, c, "font-mono whitespace-nowrap")}
     >
-      <div className={clsx("flex items-center gap-2", comfort && "text-ui-body")}>
+      {/* Spine: win probability, so a rail of league chips can be read
+          without parsing any of them. Pre-game it's a projection and
+          renders at reduced strength; final it fills and takes the
+          result's colour. */}
+      {ctx && (
+        <ChipSpine
+          fill={spineFill ?? 0}
+          state={final ? "final" : live ? "live" : "pre"}
+          tone={final ? (userWon ? "up" : "down") : "accent"}
+        />
+      )}
+      <div
+        className={clsx("flex items-center gap-2", comfort && "text-ui-body")}
+      >
         <span aria-hidden>{SPORT_EMOJI[league.game_code] ?? "🏆"}</span>
         {live && (
           <motion.span
@@ -223,7 +270,8 @@ export default function FantasyStatChip({
               "tabular-nums font-medium",
               seg.tone === "up" && "text-up",
               seg.tone === "down" && "text-down",
-              seg.tone === "live" && "text-live uppercase tracking-wider text-ui-chip",
+              seg.tone === "live" &&
+                "text-live uppercase tracking-wider text-ui-chip",
               !seg.tone && c.textDim,
             )}
           >
@@ -232,14 +280,18 @@ export default function FantasyStatChip({
         ))}
       </div>
       {comfort && (
-        <div className={clsx("flex items-center gap-2 text-ui-chip", c.textFaint)}>
+        <div
+          className={clsx("flex items-center gap-2 text-ui-chip", c.textFaint)}
+        >
           {ctx && (
             <>
               <span className="uppercase tracking-wider shrink-0">
                 {final ? "Final" : live ? "Live" : `Wk ${ctx.matchup.week}`}
               </span>
               <span aria-hidden>·</span>
-              <span className="truncate max-w-[160px]">vs {ctx.opponent.name}</span>
+              <span className="truncate max-w-[160px]">
+                vs {ctx.opponent.name}
+              </span>
             </>
           )}
           {secondarySegments.map((seg) => (

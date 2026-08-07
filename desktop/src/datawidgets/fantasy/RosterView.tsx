@@ -12,6 +12,7 @@ import { useMemo, useState } from "react";
 import { clsx } from "clsx";
 import { AlertTriangle, ChevronDown } from "lucide-react";
 import {
+  gameStateForPlayer,
   isBenchPosition,
   isInjuryStatus,
   statusColorClass,
@@ -23,9 +24,20 @@ import type { LeagueResponse, RosterEntry, RosterPlayer } from "./types";
 
 interface RosterViewProps {
   league: LeagueResponse | null;
+  /**
+   * Week/Today window, owned by FeedTab and shared with MatchupView.
+   * Lifted rather than local so switching tabs doesn't silently reset
+   * the window the user just chose.
+   */
+  window: StatsWindow;
+  onWindowChange: (w: StatsWindow) => void;
 }
 
-export function RosterView({ league }: RosterViewProps) {
+export function RosterView({
+  league,
+  window,
+  onWindowChange,
+}: RosterViewProps) {
   const userRosterEntry = useMemo(
     () => (league ? userRoster(league) : null),
     [league],
@@ -33,7 +45,6 @@ export function RosterView({ league }: RosterViewProps) {
   const [teamKey, setTeamKey] = useState<string | null>(
     userRosterEntry?.team_key ?? null,
   );
-  const [window, setWindow] = useState<StatsWindow>("week");
 
   const activeRoster = useMemo(() => {
     if (!league?.rosters) return null;
@@ -54,12 +65,19 @@ export function RosterView({ league }: RosterViewProps) {
 
   const isMe = activeRoster?.team_key === league.team_key;
   const allPlayers = activeRoster?.data.players ?? [];
-  const starters = allPlayers.filter((p) => !isBenchPosition(p.selected_position));
+  const starters = allPlayers.filter(
+    (p) => !isBenchPosition(p.selected_position),
+  );
   const bench = allPlayers.filter((p) => isBenchPosition(p.selected_position));
 
   const groupedStarters = groupByPositionType(starters);
   const groupedBench = groupByPositionType(bench);
   const injuries = allPlayers.filter((p) => isInjuryStatus(p.status));
+  // Starters mid-game. Zero whenever per-player game state is absent,
+  // which is the production case until the sports-service join lands.
+  const inPlay = starters.filter(
+    (p) => gameStateForPlayer(p).kind === "live",
+  ).length;
 
   const catalog = league.data.stat_catalog ?? null;
   const hasTodayStats = allPlayers.some(
@@ -77,17 +95,24 @@ export function RosterView({ league }: RosterViewProps) {
         />
         <StatsWindowPicker
           value={window}
-          onChange={setWindow}
+          onChange={onWindowChange}
           todayDisabled={!hasTodayStats}
         />
         <div className="flex items-center gap-3 text-[11px] text-fg-3">
           <span>
-            <span className="font-bold text-fg">{starters.length}</span> starters
+            <span className="font-bold text-fg">{starters.length}</span>{" "}
+            starters
           </span>
           <span>·</span>
           <span>
             <span className="font-bold text-fg">{bench.length}</span> bench/IR
           </span>
+          {inPlay > 0 && (
+            <>
+              <span>·</span>
+              <span className="font-semibold text-live">{inPlay} in play</span>
+            </>
+          )}
           {injuries.length > 0 && (
             <>
               <span>·</span>
@@ -136,7 +161,9 @@ export function RosterView({ league }: RosterViewProps) {
                       : "text-warn",
                   )}
                 >
-                  {isBenchPosition(p.selected_position) ? p.selected_position : "STARTING"}
+                  {isBenchPosition(p.selected_position)
+                    ? p.selected_position
+                    : "STARTING"}
                 </span>
               </div>
             ))}
@@ -314,7 +341,7 @@ const POSITION_TYPE_LABELS: Record<string, string> = {
   B: "Hitters",
   P: "Pitchers",
   O: "Offense",
-  D: "Defense",
+  D: "Defense / Special Teams",
   K: "Kickers",
 };
 

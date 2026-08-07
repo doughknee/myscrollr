@@ -10,6 +10,8 @@ import {
   findWorstStarter,
   findInjuredPlayers,
 } from "./playerStats";
+import { gameStateForPlayer, isBenchPosition } from "./types";
+import { reconcileInjuries } from "./injuryWatch";
 import type { LeagueResponse as FantasyLeague } from "./types";
 
 /**
@@ -32,6 +34,14 @@ export const fantasyTickerSource: TickerSource = {
 
     const prefs = ctx.widgetDisplay?.fantasy;
     if (!prefs) return [];
+
+    // The simplicity dial. `essential` and `standard` are presets
+    // computed here and DELIBERATELY ignore the per-item venue prefs —
+    // the prefs stay untouched underneath, so moving the dial back to
+    // `everything` restores exactly what the user had configured.
+    const mode = prefs.tickerMode ?? "everything";
+    const everything = mode === "everything";
+    const moments = mode === "standard" || everything;
 
     const chips: TickerChip[] = [];
 
@@ -74,6 +84,25 @@ export const fantasyTickerSource: TickerSource = {
       });
     }
 
+    // One reconcile per build, across every league, so a player rostered
+    // in two leagues doesn't get counted as changing twice.
+    const week =
+      leagues.find((l) => l.data.current_week != null)?.data.current_week ?? 0;
+    const breaking = moments
+      ? reconcileInjuries(
+          leagues.flatMap(
+            (l) =>
+              l.rosters?.flatMap((r) =>
+                r.data.players.map((p) => ({
+                  player_key: p.player_key,
+                  status: p.status,
+                })),
+              ) ?? [],
+          ),
+          week,
+        )
+      : new Set<string>();
+
     for (const league of selectFantasyForTicker(leagues, prefs)) {
       const playerChip = (
         suffix: string,
@@ -100,8 +129,9 @@ export const fantasyTickerSource: TickerSource = {
         ),
       });
 
-      // 1. The league summary chip (matchup-level: score, week, win-prob,
-      //    record, standings, top scorer, …).
+      // 1. The smart league chip. Present in EVERY mode — it's the one
+      //    chip per league the dial's lowest position promises, and it
+      //    adapts its own content to the matchup status internally.
       chips.push({
         key: `fan-${league.league_key}`,
         node: (
@@ -121,12 +151,39 @@ export const fantasyTickerSource: TickerSource = {
         ),
       });
 
-      // 2. Per-player chips from the user's roster in this league. Render
-      //    order mirrors the Display prefs grouping. Skip entirely when the
-      //    league has no roster (rare pre-import or partial-sync state).
-      const userTeam = league.rosters?.find((r) => r.team_key === league.team_key);
+      // 2. Per-player chips from the user's roster in this league. Skip
+      //    entirely when the league has no roster (rare pre-import or
+      //    partial-sync state).
+      const userTeam = league.rosters?.find(
+        (r) => r.team_key === league.team_key,
+      );
       if (!userTeam) continue;
       const players = userTeam.data.players;
+
+      // ── Moment chips (standard + everything) ──
+      // Lifecycle-driven rather than always-on: they earn their place
+      // by something happening, and leave when it stops.
+      if (moments) {
+        // In play — from kickoff to the final whistle. Depends on
+        // per-player game state, so it emits nothing until the
+        // sports-service join lands, which is the correct degradation:
+        // no clock, no claim that someone is playing.
+        for (const p of players) {
+          if (isBenchPosition(p.selected_position)) continue;
+          if (gameStateForPlayer(p).kind !== "live") continue;
+          chips.push(playerChip("live", p.player_key, "top"));
+        }
+
+        // Breaking injury — only while the status is actually new. See
+        // injuryWatch: a first sighting is not news.
+        for (const p of findInjuredPlayers(players)) {
+          if (!breaking.has(p.player_key)) continue;
+          chips.push(playerChip("inj", p.player_key, "injury"));
+        }
+      }
+
+      // ── Per-item venues (everything only) ──
+      if (!everything) continue;
 
       if (shouldShowOnTicker(prefs.topThreeScorers)) {
         const top3 = findTopN(players, 3, { startersOnly: true });

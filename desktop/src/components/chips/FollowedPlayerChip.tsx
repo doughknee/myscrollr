@@ -27,6 +27,8 @@ import type {
 } from "../../datawidgets/fantasy/types";
 import { isInjured, shortStatus } from "../../datawidgets/fantasy/playerStats";
 import { getChipColors, chipBaseClasses } from "./chipColors";
+import { ChipSpine } from "./ChipSpine";
+import { gameStateForPlayer } from "../../datawidgets/fantasy/types";
 
 /**
  * Why this player is on the rail. Drives a small leading mark before
@@ -42,11 +44,7 @@ import { getChipColors, chipBaseClasses } from "./chipColors";
  * When omitted, the chip behaves identically to the legacy
  * "Followed players" mode (user-selected, no contextual lead).
  */
-export type FollowedPlayerAccent =
-  | "top"
-  | "worst"
-  | "bench"
-  | "injury";
+export type FollowedPlayerAccent = "top" | "worst" | "bench" | "injury";
 
 interface FollowedPlayerChipProps {
   /** Yahoo player_key, e.g. "nfl.p.30977". */
@@ -93,6 +91,13 @@ export default function FollowedPlayerChip({
   const { player, leagueName, ownerTeamName } = found;
   const c = getChipColors(colorMode, "fantasy");
   const points = player.player_points;
+  // ChipSpine clamps, so an overperforming player pins at full rather
+  // than overflowing the chip.
+  const projection =
+    typeof player.projected_points === "number" && player.projected_points > 0
+      ? player.projected_points
+      : null;
+  const game = gameStateForPlayer(player);
   const hasPoints = points !== null && points !== undefined;
   const injured = isInjured(player.status);
   // `accent` overrides the default tone calculation so worst/injury chips
@@ -108,7 +113,10 @@ export default function FollowedPlayerChip({
             ? "up"
             : "neutral";
 
-  const positionBadge = positionLabel(player.selected_position, player.display_position);
+  const positionBadge = positionLabel(
+    player.selected_position,
+    player.display_position,
+  );
   const teamAbbr = player.editorial_team_abbr || "";
   const last = player.name.last || player.name.full;
 
@@ -119,7 +127,25 @@ export default function FollowedPlayerChip({
       className={chipBaseClasses(comfort, c, "font-mono whitespace-nowrap")}
       title={`${player.name.full}${teamAbbr ? ` (${teamAbbr})` : ""}`}
     >
-      <div className={clsx("flex items-center gap-2", comfort && "text-ui-body")}>
+      {/* Spine: progress against this player's own projection, so the
+          bar answers "are they having a good day" rather than repeating
+          the raw number beside it. Hidden without a projection — a bar
+          with nothing to measure against is decoration. */}
+      {projection !== null && (
+        <ChipSpine
+          fill={(points ?? 0) / projection}
+          state={
+            game.kind === "live"
+              ? "live"
+              : game.kind === "final"
+                ? "final"
+                : "pre"
+          }
+        />
+      )}
+      <div
+        className={clsx("flex items-center gap-2", comfort && "text-ui-body")}
+      >
         {accent && <AccentBadge accent={accent} colorClass={c.textDim} />}
         <span
           className={clsx(
@@ -134,7 +160,12 @@ export default function FollowedPlayerChip({
           {last}
         </span>
         {teamAbbr && (
-          <span className={clsx("text-ui-chip uppercase tracking-wider", c.textFaint)}>
+          <span
+            className={clsx(
+              "text-ui-chip uppercase tracking-wider",
+              c.textFaint,
+            )}
+          >
             {teamAbbr}
           </span>
         )}
@@ -165,7 +196,9 @@ export default function FollowedPlayerChip({
         // all redundant context. Use the bottom row to label WHY this
         // chip exists ("Top scorer", "Bench leader", etc) so the accent
         // glyph isn't the only hint. ~70-110px instead of ~368px.
-        <div className={clsx("text-ui-chip uppercase tracking-wider", c.textFaint)}>
+        <div
+          className={clsx("text-ui-chip uppercase tracking-wider", c.textFaint)}
+        >
           {ACCENT[accent].label}
         </div>
       ) : comfort ? (
@@ -174,7 +207,12 @@ export default function FollowedPlayerChip({
         // Show full owner / league / real-team context to disambiguate
         // when the user follows players across multiple leagues or
         // friends' teams. Format: "OwnerTeam · LeagueName · NFL Team Full Name".
-        <div className={clsx("flex items-center gap-1.5 text-ui-chip", c.textFaint)}>
+        <div
+          className={clsx(
+            "flex items-center gap-1.5 text-ui-chip",
+            c.textFaint,
+          )}
+        >
           <span className="truncate max-w-[140px]" title={ownerTeamName}>
             {ownerTeamName}
           </span>
@@ -207,7 +245,11 @@ const ACCENT: Record<
   { glyph: string; title: string; label: string }
 > = {
   top: { glyph: "↑", title: "Top scorer this week", label: "Top scorer" },
-  worst: { glyph: "↓", title: "Lowest-scoring starter", label: "Worst starter" },
+  worst: {
+    glyph: "↓",
+    title: "Lowest-scoring starter",
+    label: "Worst starter",
+  },
   bench: {
     glyph: "BN",
     title: "Bench player outscoring a starter",

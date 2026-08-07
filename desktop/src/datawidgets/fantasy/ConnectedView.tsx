@@ -18,7 +18,14 @@ import {
   Section,
   DisplayRow,
   ActionRow,
+  SegmentedRow,
+  ToggleRow,
+  Badge,
 } from "../../components/settings/SettingsControls";
+import { shouldShowOnTicker } from "../../preferences";
+import type { FantasyDisplayPrefs, FantasyTickerMode } from "../../preferences";
+import { fantasyTickerSource } from "./ticker";
+import type { TickerContext } from "../ticker";
 import { useShell } from "../../shell-context";
 import { SPORT_EMOJI, sportLabel } from "./types";
 import type { LeagueResponse } from "./types";
@@ -67,7 +74,10 @@ export function ConnectedView({
   }, [sorted, filter]);
   const enabledSet = useMemo(() => {
     // Empty enabled list means "all" — reflect that as a fully-enabled state.
-    if (!fantasyPrefs.enabledLeagueKeys || fantasyPrefs.enabledLeagueKeys.length === 0) {
+    if (
+      !fantasyPrefs.enabledLeagueKeys ||
+      fantasyPrefs.enabledLeagueKeys.length === 0
+    ) {
       return new Set(leagues.map((l) => l.league_key));
     }
     return new Set(fantasyPrefs.enabledLeagueKeys);
@@ -129,20 +139,26 @@ export function ConnectedView({
             <FilterBar
               filter={filter}
               onChange={setFilter}
-              counts={{ all: sorted.length, active: activeCount, past: pastCount }}
+              counts={{
+                all: sorted.length,
+                active: activeCount,
+                past: pastCount,
+              }}
             />
           </div>
 
           <div className="mt-2 space-y-1 px-3">
             {filtered.map((league) => (
-              <div
-                key={league.league_key}
-              >
+              <div key={league.league_key}>
                 <LeagueManagementRow
                   league={league}
                   enabled={enabledSet.has(league.league_key)}
-                  isPrimary={fantasyPrefs.primaryLeagueKey === league.league_key}
-                  onToggleEnabled={() => toggleLeagueVisibility(league.league_key)}
+                  isPrimary={
+                    fantasyPrefs.primaryLeagueKey === league.league_key
+                  }
+                  onToggleEnabled={() =>
+                    toggleLeagueVisibility(league.league_key)
+                  }
                   onSetPrimary={() => setPrimary(league.league_key)}
                   hex={hex}
                 />
@@ -154,7 +170,6 @@ export function ConnectedView({
                 No leagues match this filter.
               </p>
             )}
-
           </div>
         </Section>
       )}
@@ -164,15 +179,20 @@ export function ConnectedView({
         <div className="space-y-3 px-3 py-8 text-center">
           {noLeaguesFound ? (
             <>
-              <p className="text-sm font-medium text-fg-2">No Fantasy Leagues Found</p>
+              <p className="text-sm font-medium text-fg-2">
+                No Fantasy Leagues Found
+              </p>
               <p className="mx-auto max-w-xs text-[12px] text-fg-3">
-                Your Yahoo account doesn&rsquo;t have any Fantasy Sports leagues.
-                Join or create a league on Yahoo, then come back and search again.
+                Your Yahoo account doesn&rsquo;t have any Fantasy Sports
+                leagues. Join or create a league on Yahoo, then come back and
+                search again.
               </p>
               <div className="flex items-center justify-center gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => open("https://football.fantasysports.yahoo.com")}
+                  onClick={() =>
+                    open("https://football.fantasysports.yahoo.com")
+                  }
                   className="inline-flex items-center gap-2 rounded-lg border border-edge/30 px-4 py-2 text-[12px] font-medium text-fg-3  hover:border-edge/50 hover:text-fg-2 cursor-pointer"
                 >
                   Go to Yahoo Fantasy
@@ -206,6 +226,15 @@ export function ConnectedView({
         </div>
       )}
 
+      {/* Ticker controls */}
+      {yahooConnected && leagues.length > 0 && (
+        <TickerSection
+          leagues={leagues}
+          prefs={fantasyPrefs}
+          onPatch={updatePrefs}
+        />
+      )}
+
       {/* Account actions */}
       {yahooConnected && (
         <Section title="Account">
@@ -228,6 +257,188 @@ export function ConnectedView({
   );
 }
 
+// ── Ticker section ───────────────────────────────────────────────
+
+/**
+ * The control story: show what the ticker looks like right now, then
+ * one dial that changes it.
+ *
+ * The preview is not a mock-up of chips — it calls the real ticker
+ * source with the real leagues and renders whatever comes back. That's
+ * the whole point: a preview that can disagree with the ticker is worse
+ * than no preview, and this one cannot, because it IS the ticker's
+ * output.
+ */
+function TickerSection({
+  leagues,
+  prefs,
+  onPatch,
+}: {
+  leagues: LeagueResponse[];
+  prefs: FantasyDisplayPrefs;
+  onPatch: (patch: Partial<FantasyDisplayPrefs>) => void;
+}) {
+  const mode = prefs.tickerMode ?? "everything";
+  const everything = mode === "everything";
+
+  const chips = useMemo(
+    () =>
+      fantasyTickerSource.chips({ leagues }, {
+        widgetDisplay: { fantasy: prefs } as TickerContext["widgetDisplay"],
+        comfort: false,
+        chipColorMode: "widget",
+      } as TickerContext),
+    [leagues, prefs],
+  );
+
+  const followed = prefs.followedPlayerKeys ?? [];
+  const followedNames = useMemo(
+    () => followed.map((k) => playerName(leagues, k)).filter(Boolean),
+    [followed, leagues],
+  );
+
+  return (
+    <Section title="Ticker">
+      {/* Preview */}
+      <div className="px-3 pb-1 pt-2">
+        <div className="mb-1.5 flex items-baseline justify-between gap-3">
+          <span className="font-mono text-[11px] uppercase tracking-wider text-fg-4">
+            Preview — right now
+          </span>
+          <span className="font-mono text-[11px] text-fg-4">
+            {chips.length} chip{chips.length === 1 ? "" : "s"} ·{" "}
+            {MODE_CAPTION[mode]}
+          </span>
+        </div>
+        {/* Wrapped rather than a single scrolling rail, because the
+            point of the preview is to show what a mode COSTS — hiding
+            two thirds of Everything behind a clipped edge would make
+            the expensive setting look as cheap as the calm one.
+
+            But it can't own the panel either: Everything emits ~24
+            chips, which unbounded is ten rows of wrap. So it's capped
+            at roughly four rows and scrolls past that, and scaled down
+            slightly — these are ticker chips being shown at desk
+            distance inside a settings card, not on a bar across the
+            top of a monitor. */}
+        <div
+          className="max-h-[168px] overflow-y-auto overflow-x-hidden rounded-lg bg-surface-2 p-2"
+          style={{ zoom: 0.9 }}
+        >
+          <div className="flex min-h-[30px] flex-wrap content-start items-center gap-1.5">
+            {chips.length === 0 ? (
+              <span className="font-mono text-[12px] text-fg-4">
+                Nothing on the ticker right now.
+              </span>
+            ) : (
+              // min-w-0 lets an over-wide chip shrink here even though
+              // chipBaseClasses pins shrink-0 for the real rail, where
+              // a compressed chip would be unreadable and there's
+              // infinite horizontal room anyway.
+              chips.map((c) => (
+                <div key={c.key} className="min-w-0 max-w-full [&>*]:shrink">
+                  {c.node}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <SegmentedRow<FantasyTickerMode>
+        label="What shows on the ticker"
+        description="One setting — the rail adapts through the week on its own."
+        value={mode}
+        options={[
+          { value: "essential", label: "Essential" },
+          { value: "standard", label: "Standard" },
+          { value: "everything", label: "Everything" },
+        ]}
+        onChange={(tickerMode) => onPatch({ tickerMode })}
+      />
+
+      <DisplayRow
+        label="Followed players"
+        value={
+          followedNames.length > 0
+            ? `Always on the rail — ${followedNames.join(", ")}`
+            : "None yet"
+        }
+      />
+
+      {/* Advanced — only meaningful in Everything, and disabled rather
+          than hidden so the dial's consequence is visible. */}
+      <div
+        className={clsx(
+          "transition-none",
+          !everything && "pointer-events-none opacity-45",
+        )}
+        aria-hidden={!everything}
+      >
+        <div className="px-3 pb-1 pt-3">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-fg-3">
+              Advanced — ticker items
+            </span>
+            <Badge>Everything only</Badge>
+          </div>
+          <p className="mt-1 text-[11px] text-fg-4">
+            The feed always shows everything — these only control what joins the
+            ticker.
+          </p>
+        </div>
+        {ADVANCED_ITEMS.map(({ key, label }) => (
+          <ToggleRow
+            key={key}
+            label={label}
+            checked={shouldShowOnTicker(prefs[key])}
+            // Toggles, not Off/Feed/Ticker segments: feed content is
+            // never gated, so OFF means "feed only", never "gone".
+            onChange={(on) => onPatch({ [key]: on ? "both" : "feed" })}
+          />
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+const MODE_CAPTION: Record<FantasyTickerMode, string> = {
+  essential: "one per league",
+  standard: "+ live moments",
+  everything: "everything, always",
+};
+
+/** The venue prefs the Advanced block exposes, in the handoff's order. */
+const ADVANCED_ITEMS: Array<{
+  key: keyof FantasyDisplayPrefs & VenueKey;
+  label: string;
+}> = [
+  { key: "matchupScore", label: "Matchup score" },
+  { key: "winProbability", label: "Win probability" },
+  { key: "projectedPoints", label: "Projected points" },
+  { key: "topThreeScorers", label: "Top 3 scorers" },
+  { key: "worstStarter", label: "Worst starter" },
+  { key: "injuryDetail", label: "Injury report" },
+];
+
+type VenueKey =
+  | "matchupScore"
+  | "winProbability"
+  | "projectedPoints"
+  | "topThreeScorers"
+  | "worstStarter"
+  | "injuryDetail";
+
+function playerName(leagues: LeagueResponse[], playerKey: string): string {
+  for (const l of leagues) {
+    for (const r of l.rosters ?? []) {
+      const p = r.data.players.find((x) => x.player_key === playerKey);
+      if (p) return p.name.last || p.name.full;
+    }
+  }
+  return "";
+}
+
 // ── Filter bar ───────────────────────────────────────────────────
 
 function FilterBar({
@@ -239,7 +450,11 @@ function FilterBar({
   counts: { all: number; active: number; past: number };
   onChange: (filter: "all" | "active" | "past") => void;
 }) {
-  const options: { value: "all" | "active" | "past"; label: string; count: number }[] = [
+  const options: {
+    value: "all" | "active" | "past";
+    label: string;
+    count: number;
+  }[] = [
     { value: "all", label: "All", count: counts.all },
     { value: "active", label: "Active", count: counts.active },
     { value: "past", label: "Past", count: counts.past },
@@ -259,10 +474,13 @@ function FilterBar({
               active
                 ? "bg-accent/15 text-accent"
                 : "text-fg-3 hover:bg-surface-hover hover:text-fg-2",
-              opt.count === 0 && opt.value !== "all" && "cursor-not-allowed opacity-40",
+              opt.count === 0 &&
+                opt.value !== "all" &&
+                "cursor-not-allowed opacity-40",
             )}
           >
-            {opt.label} <span className="ml-1 font-mono text-fg-4">{opt.count}</span>
+            {opt.label}{" "}
+            <span className="ml-1 font-mono text-fg-4">{opt.count}</span>
           </button>
         );
       })}
@@ -318,7 +536,8 @@ function LeagueManagementRow({
           )}
         </div>
         <div className="mt-0.5 font-mono text-[10px] text-fg-3">
-          {sportLabel(league.game_code)} · {league.data.num_teams} teams · {league.season}
+          {sportLabel(league.game_code)} · {league.data.num_teams} teams ·{" "}
+          {league.season}
         </div>
       </div>
 
@@ -363,13 +582,17 @@ function IconButton({
       aria-label={label}
       className={clsx(
         "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border  cursor-pointer",
-        active ? "border-transparent text-white" : "border-edge/40 text-fg-3 hover:text-fg",
+        active
+          ? "border-transparent text-white"
+          : "border-edge/40 text-fg-3 hover:text-fg",
       )}
-      style={active ? { background: `${color}30`, color, borderColor: `${color}60` } : undefined}
+      style={
+        active
+          ? { background: `${color}30`, color, borderColor: `${color}60` }
+          : undefined
+      }
     >
       {children}
     </button>
   );
 }
-
-

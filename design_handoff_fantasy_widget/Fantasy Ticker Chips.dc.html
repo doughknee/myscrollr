@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <meta name="design_doc_mode" content="canvas">
+  <style>
+    body { margin:0; background:#eceef4; }
+    * { box-sizing:border-box; }
+    a { color:#34d399; } a:hover { color:#059669; }
+    @keyframes scrollrPulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    @keyframes ptsFlash { 0%,60%,100%{background:rgba(34,197,94,0)} 8%{background:rgba(34,197,94,0.22)} }
+  </style>
+</helmet>
+<div style="width:1600px;margin:0 auto;padding:48px 40px 64px;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#1a1b2e;display:flex;flex-direction:column;gap:56px">
+
+  <!-- ── Header ── -->
+  <div style="max-width:860px">
+    <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;color:#7a7a8a">Scrollr · Yahoo Fantasy · Ticker</div>
+    <h1 style="margin:8px 0 0;font-size:26px;line-height:32px;font-weight:800;letter-spacing:-0.01em">Smart league chip + moment chips</h1>
+    <p style="margin:10px 0 0;font-size:13px;line-height:20px;color:#4a4a5a">One adaptive chip per league replaces the additive venue toggles. Player chips appear only while they carry news — in-play scoring, a new injury, post-week bench regret — then leave the rail. Connect Yahoo, get 3 chips, done. Fantasy chips keep the existing purple identity, base anatomy, and compact/comfort densities from <span style="font-family:'IBM Plex Mono',monospace;font-size:12px">chipColors.ts</span>.</p>
+  </div>
+
+  <!-- ── A · Smart league chip states ── -->
+  <section style="display:flex;flex-direction:column;gap:16px">
+    <div>
+      <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;color:#a0a0b0">A</div>
+      <h2 style="margin:2px 0 0;font-size:16px;line-height:24px;font-weight:700">Smart league chip — adapts to game state, zero config</h2>
+      <p style="margin:4px 0 0;font-size:12px;line-height:18px;color:#7a7a8a">Same chip, three lives. Pre-game it sells the matchup, live it tracks the score and your players on the field, final it banks the result. The user never chooses segments.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:120px 1fr 1fr;gap:12px 24px;align-items:center">
+      <div></div>
+      <div style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#a0a0b0">Comfort (two-line rail)</div>
+      <div style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#a0a0b0">Compact (one-line rail)</div>
+
+      <!-- PRE -->
+      <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a">Pre<br><span style="font-weight:400;color:#a0a0b0">Sun 9:40 AM</span></div>
+      <div>
+        <div style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap;cursor:pointer">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px">
+            <span aria-hidden="true">🏈</span>
+            <span style="font-weight:500;color:#a855f7">The Sunday Money League</span>
+            <span style="color:rgba(168,85,247,0.7);font-variant-numeric:tabular-nums">Wk 12</span>
+            <span style="color:rgba(168,85,247,0.7);font-variant-numeric:tabular-nums">Proj 163.8–165.0</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:11px;line-height:15px;color:rgba(168,85,247,0.55);text-transform:uppercase;letter-spacing:0.04em">
+            <span>First kick 1:00 PM</span><span aria-hidden="true">·</span><span>8-3 · 2nd/8</span><span aria-hidden="true">·</span><span>vs Fourth and Long</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:18px;white-space:nowrap;cursor:pointer">
+          <span aria-hidden="true">🏈</span>
+          <span style="font-weight:500;color:#a855f7">Sunday Money</span>
+          <span style="color:rgba(168,85,247,0.7)">Wk 12</span>
+          <span style="color:rgba(168,85,247,0.7);font-variant-numeric:tabular-nums">Proj 163.8–165.0</span>
+          <span style="color:rgba(168,85,247,0.55);font-size:11px;text-transform:uppercase;letter-spacing:0.04em">Sun 1:00 PM</span>
+        </div>
+      </div>
+
+      <!-- LIVE -->
+      <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#ff4757">Live<br><span style="font-weight:400;color:#a0a0b0">Sun 4:25 PM</span></div>
+      <div>
+        <div style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap;cursor:pointer">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px">
+            <span aria-hidden="true">🏈</span>
+            <span style="width:6px;height:6px;border-radius:9999px;background:#ff4757;animation:scrollrPulse 1.3s ease-in-out infinite"></span>
+            <span style="font-weight:500;color:#a855f7">The Sunday Money League</span>
+            <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#ff4757">Live</span>
+            <span style="font-weight:500;color:#ef4444;font-variant-numeric:tabular-nums">157.9–165.0</span>
+            <span style="font-weight:500;color:#ef4444;font-variant-numeric:tabular-nums">24%</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:11px;line-height:15px;color:rgba(168,85,247,0.55);text-transform:uppercase;letter-spacing:0.04em">
+            <span style="color:#16a34a;font-weight:600;border-radius:3px;padding:0 2px;animation:ptsFlash 6s ease-in-out infinite">Achane +8.3</span><span aria-hidden="true">·</span><span style="color:#ff4757">Q3 8:42</span><span aria-hidden="true">·</span><span>need 7.2</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:18px;white-space:nowrap;cursor:pointer">
+          <span aria-hidden="true">🏈</span>
+          <span style="width:6px;height:6px;border-radius:9999px;background:#ff4757;animation:scrollrPulse 1.3s ease-in-out infinite"></span>
+          <span style="font-weight:500;color:#a855f7">Sunday Money</span>
+          <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#ff4757">Live</span>
+          <span style="font-weight:500;color:#ef4444;font-variant-numeric:tabular-nums">157.9–165.0</span>
+          <span style="color:#16a34a;font-weight:500;font-variant-numeric:tabular-nums;border-radius:3px;padding:0 2px;animation:ptsFlash 6s ease-in-out infinite">Achane +8.3</span>
+          <span style="font-size:11px;color:#ff4757">Q3</span>
+        </div>
+      </div>
+
+      <!-- FINAL -->
+      <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a">Final<br><span style="font-weight:400;color:#a0a0b0">Mon night</span></div>
+      <div>
+        <div style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap;cursor:pointer">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px">
+            <span aria-hidden="true">🏈</span>
+            <span style="font-weight:500;color:#a855f7">The Sunday Money League</span>
+            <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(168,85,247,0.55)">Final</span>
+            <span style="font-weight:500;color:#22c55e;font-variant-numeric:tabular-nums">167.4–165.0</span>
+            <span style="font-weight:600;color:#22c55e">W</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:11px;line-height:15px;color:rgba(168,85,247,0.55);text-transform:uppercase;letter-spacing:0.04em">
+            <span style="color:#22c55e">W by 2.4</span><span aria-hidden="true">·</span><span>9-3 · 2nd seed</span><span aria-hidden="true">·</span><span>Top: Hurts 28.1</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:18px;white-space:nowrap;cursor:pointer">
+          <span aria-hidden="true">🏈</span>
+          <span style="font-weight:500;color:#a855f7">Sunday Money</span>
+          <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(168,85,247,0.55)">Final</span>
+          <span style="font-weight:500;color:#22c55e;font-variant-numeric:tabular-nums">167.4–165.0</span>
+          <span style="font-weight:600;color:#22c55e">W</span>
+          <span style="color:rgba(168,85,247,0.7)">9-3</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── B · Moment chips ── -->
+  <section style="display:flex;flex-direction:column;gap:16px">
+    <div>
+      <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;color:#a0a0b0">B</div>
+      <h2 style="margin:2px 0 0;font-size:16px;line-height:24px;font-weight:700">Moment chips — news, not furniture</h2>
+      <p style="margin:4px 0 0;font-size:12px;line-height:18px;color:#7a7a8a">Each chip has a lifecycle: it enters the rail when its moment starts and leaves when it ends. Followed players are the one permanent kind — the user asked for them.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+
+      <div style="display:flex;flex-direction:column;gap:10px;border-radius:10px;border:1px solid rgba(213,215,226,0.5);background:#ffffff;padding:16px">
+        <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#ff4757">In play</div>
+        <div style="display:inline-flex;align-self:flex-start;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px">
+            <span style="display:inline-flex;align-items:center;padding:0 4px;border-radius:3px;background:rgba(122,122,138,0.15);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:rgba(168,85,247,0.7)">W/R/T</span>
+            <span style="font-weight:500;color:#a855f7">Achane</span>
+            <span style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:rgba(168,85,247,0.55)">MIA</span>
+            <span style="font-weight:500;color:#16a34a;font-variant-numeric:tabular-nums;border-radius:3px;padding:0 3px;animation:ptsFlash 6s ease-in-out infinite">+8.3</span>
+            <span style="font-size:11px;font-weight:600;color:#ff4757">Q3 8:42</span>
+          </div>
+          <div style="font-size:11px;line-height:15px;text-transform:uppercase;letter-spacing:0.04em;color:rgba(168,85,247,0.55)">In play · Sunday Money</div>
+        </div>
+        <div style="display:inline-flex;align-self:flex-start;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:18px;white-space:nowrap">
+          <span style="display:inline-flex;align-items:center;padding:0 4px;border-radius:3px;background:rgba(122,122,138,0.15);font-size:11px;font-weight:600;text-transform:uppercase;color:rgba(168,85,247,0.7)">W/R/T</span>
+          <span style="font-weight:500;color:#a855f7">Achane</span>
+          <span style="font-weight:500;color:#16a34a;font-variant-numeric:tabular-nums;border-radius:3px;padding:0 3px;animation:ptsFlash 6s ease-in-out infinite">+8.3</span>
+          <span style="font-size:11px;font-weight:600;color:#ff4757">Q3</span>
+        </div>
+        <div style="font-size:11px;line-height:16px;color:#7a7a8a">Enters at kickoff, leaves at the final whistle. Points tick with a green flash.</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;border-radius:10px;border:1px solid rgba(213,215,226,0.5);background:#ffffff;padding:16px">
+        <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#f59e0b">Breaking injury</div>
+        <div style="display:inline-flex;align-self:flex-start;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px">
+            <span aria-hidden="true" style="font-size:12px">🚨</span>
+            <span style="display:inline-flex;align-items:center;padding:0 4px;border-radius:3px;background:rgba(122,122,138,0.15);font-size:11px;font-weight:600;text-transform:uppercase;color:rgba(168,85,247,0.7)">BN</span>
+            <span style="font-weight:500;color:#a855f7">Dell</span>
+            <span style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:rgba(168,85,247,0.55)">HOU</span>
+            <span style="display:inline-flex;align-items:center;padding:0 4px;border-radius:3px;background:rgba(239,68,68,0.15);font-size:11px;font-weight:600;text-transform:uppercase;color:#ef4444">Q</span>
+          </div>
+          <div style="font-size:11px;line-height:15px;text-transform:uppercase;letter-spacing:0.04em;color:rgba(168,85,247,0.55)">New this week · hamstring</div>
+        </div>
+        <div style="display:inline-flex;align-self:flex-start;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:18px;white-space:nowrap">
+          <span aria-hidden="true" style="font-size:12px">🚨</span>
+          <span style="font-weight:500;color:#a855f7">Dell</span>
+          <span style="display:inline-flex;align-items:center;padding:0 4px;border-radius:3px;background:rgba(239,68,68,0.15);font-size:11px;font-weight:600;text-transform:uppercase;color:#ef4444">Q</span>
+        </div>
+        <div style="font-size:11px;line-height:16px;color:#7a7a8a">Only when the status is new or changed this week — never a 10-week-old IR rerun.</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;border-radius:10px;border:1px solid rgba(213,215,226,0.5);background:#ffffff;padding:16px">
+        <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a">Bench regret</div>
+        <div style="display:inline-flex;align-self:flex-start;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px">
+            <span style="display:inline-flex;align-items:center;padding:0 4px;border-radius:3px;background:rgba(122,122,138,0.15);font-size:11px;font-weight:600;text-transform:uppercase;color:rgba(168,85,247,0.7)">BN</span>
+            <span style="font-weight:500;color:#a855f7">Addison</span>
+            <span style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:rgba(168,85,247,0.55)">MIN</span>
+            <span style="font-weight:500;color:#22c55e;font-variant-numeric:tabular-nums">9.2</span>
+          </div>
+          <div style="font-size:11px;line-height:15px;text-transform:uppercase;letter-spacing:0.04em;color:rgba(168,85,247,0.55)">Outscored K. Walker by 2.2</div>
+        </div>
+        <div style="display:inline-flex;align-self:flex-start;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:18px;white-space:nowrap">
+          <span style="display:inline-flex;align-items:center;padding:0 4px;border-radius:3px;background:rgba(122,122,138,0.15);font-size:11px;font-weight:600;text-transform:uppercase;color:rgba(168,85,247,0.7)">BN</span>
+          <span style="font-weight:500;color:#a855f7">Addison</span>
+          <span style="font-weight:500;color:#22c55e;font-variant-numeric:tabular-nums">9.2</span>
+        </div>
+        <div style="font-size:11px;line-height:16px;color:#7a7a8a">Appears Monday–Wednesday after the week closes, then retires until next week.</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;border-radius:10px;border:1px solid rgba(213,215,226,0.5);background:#ffffff;padding:16px">
+        <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#a855f7">Followed player</div>
+        <div style="display:inline-flex;align-self:flex-start;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px">
+            <span style="display:inline-flex;align-items:center;padding:0 4px;border-radius:3px;background:rgba(122,122,138,0.15);font-size:11px;font-weight:600;text-transform:uppercase;color:rgba(168,85,247,0.7)">QB</span>
+            <span style="font-weight:500;color:#a855f7">Hurts</span>
+            <span style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:rgba(168,85,247,0.55)">PHI</span>
+            <span style="font-weight:500;color:#22c55e;font-variant-numeric:tabular-nums">28.1</span>
+          </div>
+          <div style="font-size:11px;line-height:15px;color:rgba(168,85,247,0.55)">Brunch Money · Sunday Money · Philadelphia Eagles</div>
+        </div>
+        <div style="display:inline-flex;align-self:flex-start;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:18px;white-space:nowrap">
+          <span style="display:inline-flex;align-items:center;padding:0 4px;border-radius:3px;background:rgba(122,122,138,0.15);font-size:11px;font-weight:600;text-transform:uppercase;color:rgba(168,85,247,0.7)">QB</span>
+          <span style="font-weight:500;color:#a855f7">Hurts</span>
+          <span style="font-size:11px;text-transform:uppercase;color:rgba(168,85,247,0.55)">PHI</span>
+          <span style="font-weight:500;color:#22c55e;font-variant-numeric:tabular-nums">28.1</span>
+        </div>
+        <div style="font-size:11px;line-height:16px;color:#7a7a8a">The one permanent chip — explicit opt-in, unchanged from today.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── C · The rail through a week ── -->
+  <section style="display:flex;flex-direction:column;gap:16px">
+    <div>
+      <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;color:#a0a0b0">C</div>
+      <h2 style="margin:2px 0 0;font-size:16px;line-height:24px;font-weight:700">The rail breathes with the week</h2>
+      <p style="margin:4px 0 0;font-size:12px;line-height:18px;color:#7a7a8a">Same user, same three leagues, zero configuration — the rail is 3 chips most of the week and grows only while games are live.</p>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a">Sunday 9:40 AM · pre-game · Essential — 3 chips</div>
+      <div style="position:relative;display:flex;align-items:center;gap:8px;padding:0 12px;height:56px;background:#ffffff;border:1px solid rgba(213,215,226,0.5);border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.05);overflow:hidden">
+        <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(52,211,153,0.3),transparent)"></div>
+        <div style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px"><span aria-hidden="true">🏈</span><span style="font-weight:500;color:#a855f7">The Sunday Money League</span><span style="color:rgba(168,85,247,0.7);font-variant-numeric:tabular-nums">Proj 163.8–165.0</span></div>
+          <div style="font-size:11px;line-height:15px;text-transform:uppercase;letter-spacing:0.04em;color:rgba(168,85,247,0.55)">First kick 1:00 PM · 8-3 · vs Fourth and Long</div>
+        </div>
+        <div style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px"><span aria-hidden="true">🏈</span><span style="font-weight:500;color:#a855f7">Work League (Keeper)</span><span style="color:rgba(168,85,247,0.7);font-variant-numeric:tabular-nums">Proj 101.3–93.0</span></div>
+          <div style="font-size:11px;line-height:15px;text-transform:uppercase;letter-spacing:0.04em;color:rgba(168,85,247,0.55)">First kick 1:00 PM · 6-5 · vs Gridiron Ghosts</div>
+        </div>
+        <div style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px"><span aria-hidden="true">🏈</span><span style="font-weight:500;color:#a855f7">Dynasty or Bust</span><span style="color:rgba(168,85,247,0.7);font-variant-numeric:tabular-nums">Proj 178.4–150.1</span></div>
+          <div style="font-size:11px;line-height:15px;text-transform:uppercase;letter-spacing:0.04em;color:rgba(168,85,247,0.55)">First kick 1:00 PM · 9-2 · vs Air Yards Only</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#ff4757">Sunday 4:25 PM · live · Standard — smart chips + live moments</div>
+      <div style="position:relative;display:flex;align-items:center;gap:8px;padding:0 12px;height:56px;background:#ffffff;border:1px solid rgba(213,215,226,0.5);border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.05);overflow:hidden">
+        <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(52,211,153,0.3),transparent)"></div>
+        <div style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px"><span aria-hidden="true">🏈</span><span style="width:6px;height:6px;border-radius:9999px;background:#ff4757;animation:scrollrPulse 1.3s ease-in-out infinite"></span><span style="font-weight:500;color:#a855f7">The Sunday Money League</span><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#ff4757">Live</span><span style="font-weight:500;color:#ef4444;font-variant-numeric:tabular-nums">157.9–165.0</span><span style="font-weight:500;color:#ef4444">24%</span></div>
+          <div style="font-size:11px;line-height:15px;text-transform:uppercase;letter-spacing:0.04em;color:rgba(168,85,247,0.55)"><span style="color:#16a34a;font-weight:600">Achane +8.3</span> · <span style="color:#ff4757">Q3 8:42</span> · need 7.2</div>
+        </div>
+        <div style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px"><span style="display:inline-flex;align-items:center;padding:0 4px;border-radius:3px;background:rgba(122,122,138,0.15);font-size:11px;font-weight:600;text-transform:uppercase;color:rgba(168,85,247,0.7)">W/R/T</span><span style="font-weight:500;color:#a855f7">Achane</span><span style="font-size:11px;text-transform:uppercase;color:rgba(168,85,247,0.55)">MIA</span><span style="font-weight:500;color:#16a34a;font-variant-numeric:tabular-nums;border-radius:3px;padding:0 3px;animation:ptsFlash 6s ease-in-out infinite">+8.3</span><span style="font-size:11px;font-weight:600;color:#ff4757">Q3 8:42</span></div>
+          <div style="font-size:11px;line-height:15px;text-transform:uppercase;letter-spacing:0.04em;color:rgba(168,85,247,0.55)">In play · Sunday Money</div>
+        </div>
+        <div style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px"><span aria-hidden="true">🏈</span><span style="width:6px;height:6px;border-radius:9999px;background:#ff4757;animation:scrollrPulse 1.3s ease-in-out infinite"></span><span style="font-weight:500;color:#a855f7">Work League (Keeper)</span><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#ff4757">Live</span><span style="font-weight:500;color:#ef4444;font-variant-numeric:tabular-nums">76.3–78.8</span><span style="font-weight:500;color:#22c55e">58%</span></div>
+          <div style="font-size:11px;line-height:15px;text-transform:uppercase;letter-spacing:0.04em;color:rgba(168,85,247,0.55)">2 yet to play · Hubbard &amp; Sutton 8:20 PM</div>
+        </div>
+        <div style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px"><span aria-hidden="true">🏈</span><span style="font-weight:500;color:#a855f7">Dynasty or Bust</span><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(168,85,247,0.55)">Final</span><span style="font-weight:500;color:#22c55e;font-variant-numeric:tabular-nums">184.5–151.0</span><span style="font-weight:600;color:#22c55e">W</span></div>
+          <div style="font-size:11px;line-height:15px;text-transform:uppercase;letter-spacing:0.04em;color:rgba(168,85,247,0.55)">W by 33.5 · Top: Allen 36.9</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a">Tuesday · week wrapped · Essential — back to 3 chips</div>
+      <div style="position:relative;display:flex;align-items:center;gap:8px;padding:0 12px;height:56px;background:#ffffff;border:1px solid rgba(213,215,226,0.5);border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.05);overflow:hidden">
+        <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(52,211,153,0.3),transparent)"></div>
+        <div style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px"><span aria-hidden="true">🏈</span><span style="font-weight:500;color:#a855f7">The Sunday Money League</span><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(168,85,247,0.55)">Final</span><span style="font-weight:500;color:#22c55e;font-variant-numeric:tabular-nums">167.4–165.0</span><span style="font-weight:600;color:#22c55e">W</span></div>
+          <div style="font-size:11px;line-height:15px;text-transform:uppercase;letter-spacing:0.04em;color:rgba(168,85,247,0.55)">W by 2.4 · 9-3 · 2nd seed</div>
+        </div>
+        <div style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px"><span aria-hidden="true">🏈</span><span style="font-weight:500;color:#a855f7">Work League (Keeper)</span><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(168,85,247,0.55)">Final</span><span style="font-weight:500;color:#22c55e;font-variant-numeric:tabular-nums">98.7–93.0</span><span style="font-weight:600;color:#22c55e">W</span></div>
+          <div style="font-size:11px;line-height:15px;text-transform:uppercase;letter-spacing:0.04em;color:rgba(168,85,247,0.55)">W by 5.7 · 7-5 · Top: St. Brown 21.9</div>
+        </div>
+        <div style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;white-space:nowrap">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px"><span aria-hidden="true">🏈</span><span style="font-weight:500;color:#a855f7">Dynasty or Bust</span><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(168,85,247,0.55)">Final</span><span style="font-weight:500;color:#22c55e;font-variant-numeric:tabular-nums">184.5–151.0</span><span style="font-weight:600;color:#22c55e">W</span></div>
+          <div style="font-size:11px;line-height:15px;text-transform:uppercase;letter-spacing:0.04em;color:rgba(168,85,247,0.55)">W by 33.5 · 9-2 · 1st seed clinched</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#a0a0b0">Same live moment · compact density — 36px rail</div>
+      <div style="position:relative;display:flex;align-items:center;gap:8px;padding:0 12px;height:36px;background:#ffffff;border:1px solid rgba(213,215,226,0.5);border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.05);overflow:hidden">
+        <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(52,211,153,0.3),transparent)"></div>
+        <div style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:18px;white-space:nowrap"><span aria-hidden="true">🏈</span><span style="width:6px;height:6px;border-radius:9999px;background:#ff4757;animation:scrollrPulse 1.3s ease-in-out infinite"></span><span style="font-weight:500;color:#a855f7">Sunday Money</span><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#ff4757">Live</span><span style="font-weight:500;color:#ef4444;font-variant-numeric:tabular-nums">157.9–165.0</span><span style="font-weight:500;color:#ef4444">24%</span></div>
+        <div style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:18px;white-space:nowrap"><span style="display:inline-flex;align-items:center;padding:0 4px;border-radius:3px;background:rgba(122,122,138,0.15);font-size:11px;font-weight:600;text-transform:uppercase;color:rgba(168,85,247,0.7)">W/R/T</span><span style="font-weight:500;color:#a855f7">Achane</span><span style="font-weight:500;color:#16a34a;font-variant-numeric:tabular-nums;border-radius:3px;padding:0 3px;animation:ptsFlash 6s ease-in-out infinite">+8.3</span><span style="font-size:11px;font-weight:600;color:#ff4757">Q3</span></div>
+        <div style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:18px;white-space:nowrap"><span aria-hidden="true">🏈</span><span style="width:6px;height:6px;border-radius:9999px;background:#ff4757;animation:scrollrPulse 1.3s ease-in-out infinite"></span><span style="font-weight:500;color:#a855f7">Work League</span><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#ff4757">Live</span><span style="font-weight:500;color:#ef4444;font-variant-numeric:tabular-nums">76.3–78.8</span><span style="font-weight:500;color:#22c55e">58%</span></div>
+        <div style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:18px;white-space:nowrap"><span aria-hidden="true">🏈</span><span style="font-weight:500;color:#a855f7">Dynasty or Bust</span><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(168,85,247,0.55)">Final</span><span style="font-weight:500;color:#22c55e;font-variant-numeric:tabular-nums">184.5–151.0</span><span style="font-weight:600;color:#22c55e">W</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── D · Modes dial ── -->
+  <section style="display:flex;flex-direction:column;gap:16px">
+    <div>
+      <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;color:#a0a0b0">D</div>
+      <h2 style="margin:2px 0 0;font-size:16px;line-height:24px;font-weight:700">Settings collapse to one dial</h2>
+      <p style="margin:4px 0 0;font-size:12px;line-height:18px;color:#7a7a8a">Replaces ~10 per-item venue toggles in Display preferences. The old toggles survive under Advanced for power users — nothing is lost.</p>
+    </div>
+    <div style="width:560px;border-radius:12px;border:1px solid rgba(213,215,226,0.5);background:#ffffff;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.05)">
+      <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;color:#7a7a8a;margin-bottom:12px">Ticker · Fantasy</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:flex-start;gap:12px;border-radius:8px;border:1px solid rgba(52,211,153,0.5);background:rgba(52,211,153,0.05);padding:12px">
+          <span style="display:flex;align-items:center;justify-content:center;width:16px;height:16px;flex-shrink:0;margin-top:1px;border-radius:9999px;border:1.5px solid #34d399"><span style="width:8px;height:8px;border-radius:9999px;background:#34d399"></span></span>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px;font-weight:600;color:#1a1b2e">Essential<span style="border-radius:4px;background:rgba(52,211,153,0.15);padding:1px 6px;font:600 8px/1.7 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;color:#34d399">Default</span></div>
+            <div style="margin-top:2px;font-size:12px;line-height:17px;color:#7a7a8a">One smart chip per league. Adapts to pre-game, live, and final on its own.</div>
+          </div>
+          <span style="flex-shrink:0;border-radius:9999px;background:#f6f7fb;border:1px solid rgba(213,215,226,0.6);padding:2px 8px;font:500 11px/15px 'IBM Plex Mono',monospace;color:#7a7a8a;white-space:nowrap">3 chips</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px;border-radius:8px;border:1px solid rgba(213,215,226,0.5);padding:12px">
+          <span style="display:flex;align-items:center;justify-content:center;width:16px;height:16px;flex-shrink:0;margin-top:1px;border-radius:9999px;border:1.5px solid #a0a0b0"></span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;line-height:18px;font-weight:600;color:#1a1b2e">Standard</div>
+            <div style="margin-top:2px;font-size:12px;line-height:17px;color:#7a7a8a">Adds live player moments: in-play scoring, breaking injuries, bench regret.</div>
+          </div>
+          <span style="flex-shrink:0;border-radius:9999px;background:#f6f7fb;border:1px solid rgba(213,215,226,0.6);padding:2px 8px;font:500 11px/15px 'IBM Plex Mono',monospace;color:#7a7a8a;white-space:nowrap">3–7 chips</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px;border-radius:8px;border:1px solid rgba(213,215,226,0.5);padding:12px">
+          <span style="display:flex;align-items:center;justify-content:center;width:16px;height:16px;flex-shrink:0;margin-top:1px;border-radius:9999px;border:1.5px solid #a0a0b0"></span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;line-height:18px;font-weight:600;color:#1a1b2e">Everything</div>
+            <div style="margin-top:2px;font-size:12px;line-height:17px;color:#7a7a8a">All venues, always on: top 3 scorers, worst starter, bench, full injury report.</div>
+          </div>
+          <span style="flex-shrink:0;border-radius:9999px;background:#f6f7fb;border:1px solid rgba(213,215,226,0.6);padding:2px 8px;font:500 11px/15px 'IBM Plex Mono',monospace;color:#7a7a8a;white-space:nowrap">12+ chips</span>
+        </div>
+      </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(213,215,226,0.4);display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+        <span style="font-size:12px;line-height:17px;color:#7a7a8a">Advanced — route individual items to ticker or feed</span>
+        <span style="display:inline-flex;width:12px;height:12px;color:#a0a0b0"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></span>
+      </div>
+    </div>
+    <div style="font-size:11px;line-height:16px;color:#a0a0b0;max-width:560px;font-family:'IBM Plex Mono',monospace">Followed players are independent of the dial — they always show. Chip URLs, colors (chipColors.ts PURPLE), and click-through to Yahoo unchanged.</div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1640,&quot;height&quot;:1500}}"></script>
+</body>
+</html>

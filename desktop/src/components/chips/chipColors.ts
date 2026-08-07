@@ -162,6 +162,13 @@ export function chipBaseClasses(
     "ticker-chip group",
     "px-3 rounded-sm border",
     "transition-colors cursor-pointer",
+    // `relative overflow-hidden` so a <ChipSpine> child can pin itself
+    // to the bottom edge without escaping the rounded corners. Harmless
+    // for chips that don't use one.
+    "relative overflow-hidden",
+    // Chips never compress on the rail — a squeezed chip is unreadable
+    // and the marquee has infinite horizontal room anyway.
+    "shrink-0",
     colors.bg,
     colors.border,
     colors.hoverBorder,

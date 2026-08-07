@@ -91,6 +91,12 @@ export interface KumaMonitor {
   /** Recent heartbeat status codes (0=down, 1=up, 2=pending, 3=maintenance).
    *  Last ~30 entries, oldest first. Used to render the mini heartbeat bar. */
   recentHeartbeats: number[];
+  /**
+   * Timestamp of the first heartbeat in the current down run, or null
+   * when the monitor isn't down. Null also when we simply don't have
+   * history — the chip then omits the duration rather than guessing.
+   */
+  downSince: string | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -98,10 +104,14 @@ export interface KumaMonitor {
 /** Map a Kuma heartbeat status code to our status string. */
 function heartbeatToStatus(code: number): MonitorStatus {
   switch (code) {
-    case 1: return "up";
-    case 0: return "down";
-    case 3: return "maintenance";
-    default: return "pending";
+    case 1:
+      return "up";
+    case 0:
+      return "down";
+    case 3:
+      return "maintenance";
+    default:
+      return "pending";
   }
 }
 
@@ -111,7 +121,9 @@ function heartbeatToStatus(code: number): MonitorStatus {
  * Input:  https://status.example.com/status/my-page
  * Output: { base: "https://status.example.com", slug: "my-page" }
  */
-function parseStatusPageUrl(statusPageUrl: string): { base: string; slug: string } | null {
+function parseStatusPageUrl(
+  statusPageUrl: string,
+): { base: string; slug: string } | null {
   const trimmed = statusPageUrl.replace(/\/+$/, "");
   const match = trimmed.match(/^(https?:\/\/[^/]+)\/status\/(.+)$/i);
   if (match) {
@@ -148,10 +160,14 @@ async function kumaFetch<T>(url: string): Promise<T> {
  * Uses @tauri-apps/plugin-http fetch to bypass CORS restrictions
  * that self-hosted Kuma instances may not have configured.
  */
-export async function fetchKumaStatus(statusPageUrl: string): Promise<KumaMonitor[]> {
+export async function fetchKumaStatus(
+  statusPageUrl: string,
+): Promise<KumaMonitor[]> {
   const parsed = parseStatusPageUrl(statusPageUrl);
   if (!parsed) {
-    throw new Error("Invalid status page URL. Expected format: https://your-kuma.com/status/page-slug");
+    throw new Error(
+      "Invalid status page URL. Expected format: https://your-kuma.com/status/page-slug",
+    );
   }
 
   const pageUrl = `${parsed.base}/api/status-page/${parsed.slug}`;
@@ -169,17 +185,35 @@ export async function fetchKumaStatus(statusPageUrl: string): Promise<KumaMonito
   for (const group of page.publicGroupList ?? []) {
     for (const mon of group.monitorList ?? []) {
       const heartbeats = heartbeat.heartbeatList?.[String(mon.id)] ?? [];
-      const latest = heartbeats.length > 0 ? heartbeats[heartbeats.length - 1] : null;
+      const latest =
+        heartbeats.length > 0 ? heartbeats[heartbeats.length - 1] : null;
 
       // Look up 24h uptime from uptimeList (keyed as "{id}_24")
       const uptimeKey = `${mon.id}_24`;
       const rawUptime = heartbeat.uptimeList?.[uptimeKey];
-      const uptimePercent = typeof rawUptime === "number"
-        ? Math.round(rawUptime * 10000) / 100  // e.g. 0.9987 → 99.87
-        : null;
+      const uptimePercent =
+        typeof rawUptime === "number"
+          ? Math.round(rawUptime * 10000) / 100 // e.g. 0.9987 → 99.87
+          : null;
 
       // Take the last 30 heartbeats (oldest first) for the mini bar
       const recent = heartbeats.slice(-30).map((hb) => hb.status);
+
+      // When did this outage start? Walk back from the newest beat to
+      // the first one in the current down run and take ITS timestamp.
+      //
+      // Counting beats and multiplying by a poll interval would be
+      // wrong: these arrive on Kuma's schedule, not ours. The
+      // timestamps are the only honest source, and if the whole window
+      // is down we can only say "at least this long", so we return the
+      // oldest beat we have rather than pretending to know more.
+      let downSince: string | null = null;
+      if (latest && heartbeatToStatus(latest.status) === "down") {
+        for (let i = heartbeats.length - 1; i >= 0; i--) {
+          if (heartbeatToStatus(heartbeats[i].status) !== "down") break;
+          downSince = heartbeats[i].time;
+        }
+      }
 
       monitors.push({
         id: mon.id,
@@ -189,6 +223,7 @@ export async function fetchKumaStatus(statusPageUrl: string): Promise<KumaMonito
         responseTime: latest?.ping ?? null,
         lastChecked: latest?.time ?? null,
         recentHeartbeats: recent,
+        downSince,
       });
     }
   }

@@ -37,23 +37,17 @@ import {
 } from "../../components/widget-bar/Segmented";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import { OverviewView } from "./OverviewView";
+import type { StatsWindow } from "./PlayerStatsTable";
 import { MatchupView } from "./MatchupView";
 import { StandingsView } from "./StandingsView";
 import { RosterView } from "./RosterView";
 import YahooConnectFlow from "./YahooConnectFlow";
-import {
-  SPORT_EMOJI,
-  isMatchupLive,
-  userMatchupContext,
-} from "./types";
+import { SPORT_EMOJI, isMatchupLive, userMatchupContext } from "./types";
 import { filterEnabledLeagues, resolvePrimaryLeague } from "./view";
 import type { FeedTabProps, DataWidgetManifest } from "../../types";
 import type { FantasySubTab } from "../../preferences";
 import type { LeagueResponse, MyLeaguesResponse } from "./types";
-import {
-  FantasyHomeRows,
-  normalizeFantasyHome,
-} from "./home";
+import { FantasyHomeRows, normalizeFantasyHome } from "./home";
 
 /** DataWidgetRow accent — kept in sync with `fantasyDataWidget.hex`. */
 const FANTASY_HEX = "#6366f1";
@@ -144,7 +138,7 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
   const activeLeague = useMemo(
     () =>
       activeLeagueKey
-        ? visibleLeagues.find((l) => l.league_key === activeLeagueKey) ?? null
+        ? (visibleLeagues.find((l) => l.league_key === activeLeagueKey) ?? null)
         : primaryLeague,
     [activeLeagueKey, visibleLeagues, primaryLeague],
   );
@@ -162,6 +156,9 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
 
   // Account view (the Yahoo OAuth/import wizard) — opened from the bar.
   const [accountOpen, setAccountOpen] = useState(false);
+  // Week/Today lives here so Matchup and Roster stay in the same window
+  // when the user switches between them.
+  const [statsWindow, setStatsWindow] = useState<StatsWindow>("week");
   // Sticky sub-tab: the pick IS the default view (the gear's explicit
   // "Default view" radios are gone).
   const pickSubTab = useCallback(
@@ -204,7 +201,10 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
               <span aria-hidden>{SPORT_EMOJI[l.game_code] ?? "🏆"}</span>
               <span className="truncate">{l.name}</span>
               {isPrimary && (
-                <Star size={10} className="shrink-0 fill-accent stroke-accent" />
+                <Star
+                  size={10}
+                  className="shrink-0 fill-accent stroke-accent"
+                />
               )}
               {live && (
                 <span className="h-1.5 w-1.5 shrink-0  rounded-full bg-live" />
@@ -236,7 +236,12 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
   return (
     // NO inner scroll container: the Source page (PageLayout) owns the
     // scroll — sticky pins against it.
-    <div className={clsx("flex min-h-full flex-col", mode === "compact" && "text-[12px]")}>
+    <div
+      className={clsx(
+        "flex min-h-full flex-col",
+        mode === "compact" && "text-[12px]",
+      )}
+    >
       {isComfort && (
         <WidgetBar>
           <Segmented
@@ -322,9 +327,21 @@ function FantasyFeedTab({ mode, feedContext }: FeedTabProps) {
                 onOpenMatchup={handleOpenMatchup}
               />
             )}
-            {subTab === "matchup" && <MatchupView league={activeLeague} />}
+            {subTab === "matchup" && (
+              <MatchupView
+                league={activeLeague}
+                window={statsWindow}
+                onWindowChange={setStatsWindow}
+              />
+            )}
             {subTab === "standings" && <StandingsView league={activeLeague} />}
-            {subTab === "roster" && <RosterView league={activeLeague} />}
+            {subTab === "roster" && (
+              <RosterView
+                league={activeLeague}
+                window={statsWindow}
+                onWindowChange={setStatsWindow}
+              />
+            )}
           </div>
         )}
       </WidgetStateTransition>

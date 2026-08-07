@@ -27,13 +27,19 @@ function ghLine(stats: GitHubStats): string {
   return `★ ${stars} · ${forks} · LAST COMMIT ${commit}`
 }
 
-export function PromiseSection() {
+export function PromiseSection({
+  tag = 'SEC 05 ／ THE PROMISE',
+  // The star/fork line is credibility on the homepage and a liability
+  // on a conversion page while the counts are still small. Opt out
+  // rather than hiding it everywhere.
+  showStats = true,
+}: { tag?: string; showStats?: boolean } = {}) {
   const stats = useGitHubStats(REPO)
 
   return (
     <section className="relative overflow-hidden border-b border-hairline">
       <TerminalContainer className="relative">
-        <SectionRow tag="SEC 05 ／ THE PROMISE" />
+        <SectionRow tag={tag} />
         <div className="grid items-start gap-10 pb-10 pt-[52px] lg:grid-cols-[1.1fr_1fr] lg:gap-16">
           <div>
             <h2 className="type-display m-0 mb-[18px] text-[clamp(30px,3.6vw,46px)] [text-wrap:balance]">
@@ -53,7 +59,7 @@ export function PromiseSection() {
             >
               Read the source on GitHub ↗
             </a>
-            {stats != null && (
+            {showStats && stats != null && (
               <div className="pt-4 font-mono text-xs tracking-[0.08em] text-base-content/45">
                 {ghLine(stats)}
               </div>

@@ -15,9 +15,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5174",
+    "dev:fantasy-demo": "vite --port 5174 --mode fantasy-demo",
     "build": "vite build && tsc --noEmit",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
+    "tauri:dev:fantasy-demo": "tauri dev --config src-tauri/tauri.fantasy-demo.conf.json",
     "tauri:dev:mcp": "tauri dev --config src-tauri/tauri.mcp.conf.json -- --features dev-mcp-bridge",
     "tauri:build": "tauri build",
     "test": "vitest run",
