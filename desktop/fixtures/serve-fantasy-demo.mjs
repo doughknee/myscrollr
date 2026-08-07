@@ -269,6 +269,37 @@ const ROSTERS = {
     { pos: 'W/R/T', name: 'Calvin Ridley', team: 'TEN', dp: 'WR', stats: { 11: 4, 12: 57 }, proj: 12.2 },
     { pos: 'BN', name: 'Romeo Doubs', team: 'GB', dp: 'WR', stats: { 11: 3, 12: 31 }, proj: 8.8 },
   ],
+
+  // ── Pre-game ───────────────────────────────────────────────────
+  // Nobody has kicked off. Exists because the smart league chip has a
+  // THIRD state — preevent, showing PROJ + kickoff + record instead of
+  // a score — and with every demo league live or final it was the one
+  // state that never rendered. Same for the Overview card's pre layout.
+  thursdayNight: [
+    { pos: 'QB', name: 'Dak Prescott', team: 'DAL', dp: 'QB', stats: {}, proj: 19.8, pending: true, game: 'Thu 8:15 PM' },
+    { pos: 'WR', name: 'Brian Thomas Jr.', team: 'JAX', dp: 'WR', stats: {}, proj: 16.2, pending: true, game: 'Sun 1:00 PM' },
+    { pos: 'WR', name: 'Ladd McConkey', team: 'LAC', dp: 'WR', stats: {}, proj: 13.4, pending: true, game: 'Sun 4:05 PM' },
+    { pos: 'RB', name: 'Christian McCaffrey', team: 'SF', dp: 'RB', stats: {}, proj: 20.6, pending: true, game: 'Sun 4:25 PM' },
+    { pos: 'RB', name: 'James Conner', team: 'ARI', dp: 'RB', stats: {}, proj: 14.1, pending: true, game: 'Sun 1:00 PM' },
+    { pos: 'TE', name: 'David Njoku', team: 'CLE', dp: 'TE', stats: {}, proj: 10.9, pending: true, game: 'Sun 1:00 PM' },
+    { pos: 'W/R/T', name: 'Khalil Herbert', team: 'CHI', dp: 'RB', stats: {}, proj: 9.7, pending: true, game: 'Sun 1:00 PM' },
+    { pos: 'K', name: 'Chris Boswell', team: 'PIT', dp: 'K', stats: {}, proj: 9.1, pending: true, game: 'Sun 1:00 PM' },
+    { pos: 'DEF', name: 'Pittsburgh Steelers', team: 'PIT', dp: 'DEF', stats: {}, proj: 8.2, pending: true, game: 'Sun 1:00 PM' },
+    { pos: 'BN', name: 'Cooper Kupp', team: 'LAR', dp: 'WR', stats: {}, proj: 12.4, pending: true, game: 'Sun 4:05 PM', status: 'Q', status_full: 'Questionable', injury_note: 'Ankle — game-time decision' },
+    { pos: 'BN', name: 'Tyler Allgeier', team: 'ATL', dp: 'RB', stats: {}, proj: 7.3, pending: true, game: 'Sun 1:00 PM' },
+  ],
+  thursdayNightOpp: [
+    { pos: 'QB', name: 'Justin Herbert', team: 'LAC', dp: 'QB', stats: {}, proj: 18.9, pending: true, game: 'Sun 4:05 PM' },
+    { pos: 'WR', name: 'Marvin Harrison Jr.', team: 'ARI', dp: 'WR', stats: {}, proj: 14.8, pending: true, game: 'Sun 1:00 PM' },
+    { pos: 'WR', name: 'Xavier Worthy', team: 'KC', dp: 'WR', stats: {}, proj: 12.6, pending: true, game: 'Sun 4:25 PM' },
+    { pos: 'RB', name: 'Alvin Kamara', team: 'NO', dp: 'RB', stats: {}, proj: 15.3, pending: true, game: 'Sun 1:00 PM' },
+    { pos: 'RB', name: 'Travis Etienne Jr.', team: 'JAX', dp: 'RB', stats: {}, proj: 11.7, pending: true, game: 'Sun 1:00 PM' },
+    { pos: 'TE', name: 'Jake Ferguson', team: 'DAL', dp: 'TE', stats: {}, proj: 9.8, pending: true, game: 'Thu 8:15 PM' },
+    { pos: 'W/R/T', name: 'Keenan Allen', team: 'CHI', dp: 'WR', stats: {}, proj: 11.2, pending: true, game: 'Sun 1:00 PM' },
+    { pos: 'K', name: 'Ka’imi Fairbairn', team: 'HOU', dp: 'K', stats: {}, proj: 8.7, pending: true, game: 'Sun 1:00 PM' },
+    { pos: 'DEF', name: 'Baltimore Ravens', team: 'BAL', dp: 'DEF', stats: {}, proj: 7.9, pending: true, game: 'Sun 1:00 PM' },
+    { pos: 'BN', name: 'Jauan Jennings', team: 'SF', dp: 'WR', stats: {}, proj: 9.4, pending: true, game: 'Sun 4:25 PM' },
+  ],
 }
 
 const BENCH = new Set(['BN', 'IR', 'IL', 'NA'])
@@ -276,6 +307,28 @@ const isStarter = (p) => !BENCH.has(p.selected_position)
 
 /** display_position -> Yahoo position_type. Everything else is offense. */
 const POSITION_TYPE = { K: 'K', DEF: 'D', 'D/ST': 'D', DST: 'D' }
+
+/**
+ * Game state for a player who wasn't given one explicitly.
+ *
+ * Hand-tagging every player is data entry that drifts the moment a
+ * roster changes, and leaving it blank was worse than it looked: the
+ * Roster view's GAME column read "—" for 57 of 64 players and the
+ * ON THE FIELD strip had exactly one card in it. The state is already
+ * implied by whether they played and when, so derive it.
+ *
+ * `live` players always carry an explicit clock — there's no honest way
+ * to invent a quarter.
+ */
+function derivedGameState(p, played) {
+  if (p.live) return null // must be explicit; see `game` on the roster
+  if (played) return p.thursday ? 'Final · Thu' : 'Final'
+  // Ruled out, not waiting to play. Giving an IR player a kickoff time
+  // is a small lie the Roster view would print in bold as "Sun 8:20 PM"
+  // next to their OUT badge.
+  if (p.pos === 'IR' || p.status === 'IR' || p.status === 'O') return null
+  return 'Sun 8:20 PM'
+}
 
 /** Yahoo ships stat values as STRINGS — see the note on RosterPlayer. */
 const asStatMap = (stats) =>
@@ -307,7 +360,7 @@ function buildPlayers(roster, idBase) {
       // the live treatments have something to render. gameStateForPlayer()
       // is the seam that reads it, and every view degrades to "—" when
       // it's absent — which is exactly what real data does today.
-      game_state: p.game ?? null,
+      game_state: p.game ?? derivedGameState(p, played),
       status: p.status ?? null,
       status_full: p.status_full ?? null,
       injury_note: p.injury_note ?? null,
@@ -512,6 +565,27 @@ const LEAGUES = [
       ],
     },
   }),
+  // Pre-game. Kickoff is still ahead, so the smart chip shows PROJ +
+  // first-kick + record rather than a score, and the Overview card
+  // renders its pre layout. Neither had a demo league to render in.
+  buildLeague({
+    key: '449.l.905144', name: 'Sunday Sickos', teamId: 5,
+    teamName: 'Kickoff Pending', oppName: 'Bye Week Bandits',
+    margin: 0, week: 12, status: 'preevent',
+    rosterName: 'thursdayNight', oppRosterName: 'thursdayNightOpp', idBase: 33000,
+    rivals: {
+      userRecord: [7, 4, 1233.6, 1201.44],
+      oppRecord: [6, 5, 1198.8, 1210.06],
+      others: [
+        ['Sleeper Picks', 9, 2, 1344.2, 1188.4],
+        ['Handcuff Hoarders', 8, 3, 1290.5, 1204.7],
+        ['Kicker Truthers', 6, 5, 1211.08, 1222.3],
+        ['Flex Appeal', 5, 6, 1166.44, 1240.9],
+        ['Waiver Vultures', 4, 7, 1120.3, 1266.18],
+        ['Autodraft Andy', 2, 9, 1044.9, 1301.5],
+      ],
+    },
+  }),
   buildLeague({
     key: '449.l.671902', name: 'Work League (Keeper)', teamId: 6,
     teamName: 'Third and Inches', oppName: 'Gridiron Ghosts',
@@ -534,6 +608,115 @@ const LEAGUES = [
 
 const payload = { leagues: LEAGUES }
 
+// ── Live drift ───────────────────────────────────────────────────
+// A static fixture can't demo anything that MOVES, and half the
+// redesign is about movement: the points flash, the spine glow, the
+// in-play chip appearing and leaving, the breaking-injury chip that by
+// design only fires when a status CHANGES. On a frozen payload
+// reconcileInjuries never sees a change and that chip can never render.
+//
+// So the base payload above stays deterministic — the margin guard and
+// `--emit` both read it untouched, which is what keeps the assertions
+// meaningful — and this transform is applied per REQUEST on top. The
+// demo evolves; the thing under test doesn't.
+//
+// Deliberately a pure function of elapsed time rather than a mutating
+// timer: two requests one second apart get the same answer, so a
+// reload mid-demo doesn't jump the story sideways.
+
+const STARTED_AT = process.hrtime.bigint()
+const elapsedSeconds = () =>
+  Number((process.hrtime.bigint() - STARTED_AT) / 1_000_000_000n)
+
+/**
+ * Q3 8:42 winding down on the SAME clock the points climb on, so the
+ * two agree: when he reaches his projection the quarter is over. Tying
+ * them to different rates had the quarter ending while he still had
+ * two thirds of his day left to score.
+ */
+function driftedClock(progress) {
+  const startSec = 8 * 60 + 42
+  const remaining = Math.max(0, Math.round(startSec * (1 - progress)))
+  const mmss = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`
+  return remaining === 0 ? 'Q4 0:00' : `Q3 ${mmss}`
+}
+
+/**
+ * Advance the live player toward his projection and flip a bench
+ * injury partway through, then recompute every total that depends on
+ * either. Recomputing is the whole point — a drifting player whose
+ * team total stayed put would put the header and the roster table into
+ * visible disagreement, which is the exact failure this fixture exists
+ * to avoid.
+ */
+function applyLiveDrift(base, elapsed) {
+  // 8.30 -> 14.20 over two minutes, then holds. Ceiling is his
+  // projection: a demo that runs all afternoon shouldn't end with a
+  // running back on 400 points.
+  const progress = Math.min(1, elapsed / 120)
+  const livePoints = round2(8.3 + (14.2 - 8.3) * progress)
+  const clock = driftedClock(progress)
+  // The injury lands at 20s — long enough to see the rail before it
+  // changes, short enough that nobody waits around for it.
+  const injuryBroken = elapsed >= 20
+
+  const leagues = base.leagues.map((league) => {
+    const rosters = (league.rosters ?? []).map((roster) => {
+      let changed = false
+      const players = roster.data.players.map((player) => {
+        let next = player
+        if (player.game_state && /^q[1-4]/i.test(player.game_state)) {
+          next = { ...next, player_points: livePoints, game_state: clock }
+          changed = true
+        }
+        if (injuryBroken && player.name.full === 'Tank Dell') {
+          next = {
+            ...next,
+            status: 'O',
+            status_full: 'Out',
+            injury_note: 'Hamstring — ruled out during warmups',
+          }
+          changed = true
+        }
+        return next
+      })
+      return changed
+        ? { ...roster, data: { ...roster.data, players } }
+        : roster
+    })
+
+    // Re-derive the matchup from the drifted rosters so the header can
+    // never disagree with the table under it.
+    const matchups = (league.matchups ?? []).map((m) => ({
+      ...m,
+      teams: m.teams.map((team) => {
+        const roster = rosters.find((r) => r.team_key === team.team_key)
+        if (!roster) return team
+        const starters = roster.data.players.filter(
+          (pl) => !BENCH.has(pl.selected_position),
+        )
+        if (!starters.some((pl) => /^q[1-4]/i.test(pl.game_state ?? ''))) {
+          return team
+        }
+        const points = round2(
+          starters.reduce((n, pl) => n + (pl.player_points ?? 0), 0),
+        )
+        // Projection is banked + whatever the live player has left.
+        const remaining = round2(Math.max(0, 14.2 - livePoints))
+        return {
+          ...team,
+          points,
+          projected_points: round2(points + remaining),
+        }
+      }),
+    }))
+
+    return { ...league, rosters, matchups }
+  })
+
+  return { leagues }
+}
+
 // ── Serve ────────────────────────────────────────────────────────
 const args = process.argv.slice(2)
 if (args.includes('--emit')) {
@@ -550,8 +733,8 @@ const UPSTREAM = new URL(flag('upstream', 'http://localhost:18080'))
 // Whole-response overrides. These two feed the fantasy ACCOUNT panel
 // (YahooConnectFlow / ConnectedView).
 const OVERRIDES = {
-  '/users/me/yahoo-status': { connected: true, synced: true },
-  '/users/me/yahoo-leagues': payload,
+  '/users/me/yahoo-status': () => ({ connected: true, synced: true }),
+  '/users/me/yahoo-leagues': () => applyLiveDrift(payload, elapsedSeconds()),
 }
 
 // Response rewrites. The fantasy TABS (Overview / Matchup / Standings /
@@ -567,7 +750,7 @@ const OVERRIDES = {
 const TRANSFORMS = {
   '/dashboard': (body) => {
     body.data = body.data ?? {}
-    body.data.fantasy = payload
+    body.data.fantasy = applyLiveDrift(payload, elapsedSeconds())
     return body
   },
 }
@@ -648,7 +831,7 @@ createServer((req, res) => {
     }
     console.log(`[fantasy-demo] served fixture ${path}`)
     res.writeHead(200, { 'content-type': 'application/json' })
-    res.end(JSON.stringify(override))
+    res.end(JSON.stringify(override()))
     return
   }
   proxy(req, res, req.url, TRANSFORMS[path])
