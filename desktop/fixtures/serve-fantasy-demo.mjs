@@ -403,10 +403,12 @@ function buildLeague({
   const rows = [
     [teamName, teamKey, teamId, ...rivals.userRecord],
     [oppName, oppKey, 99, ...rivals.oppRecord],
-    ...rivals.others.map((r, i) => [r[0], `${key}.t.${10 + i}`, 10 + i, r[1], r[2], r[3]]),
+    ...rivals.others.map((r, i) => [
+      r[0], `${key}.t.${10 + i}`, 10 + i, r[1], r[2], r[3], r[4],
+    ]),
   ]
     .sort((a, b) => b[3] - a[3] || b[5] - a[5])
-  const table = rows.map(([tName, tKey, tId, w, l, pf], i) => ({
+  const table = rows.map(([tName, tKey, tId, w, l, pf, pa], i) => ({
       team_key: tKey,
       team_id: tId,
       name: tName,
@@ -418,6 +420,9 @@ function buildLeague({
       ties: 0,
       percentage: (w / (w + l)).toFixed(3),
       points_for: pf,
+      // Season history, not derivable from one week's payload, so it's
+      // explicit data like the records. Yahoo ships it as a string.
+      points_against: String(pa),
       streak_type: i % 2 === 0 ? 'win' : 'loss',
       streak_value: (i % 3) + 1,
       playoff_seed: i < Math.ceil(rows.length / 2) ? i + 1 : null,
@@ -477,12 +482,15 @@ const LEAGUES = [
     margin: 7.1, week: 12, status: 'midevent',
     rosterName: 'sunday', oppRosterName: 'sundayOpp', idBase: 30000,
     rivals: {
-      userRecord: [8, 3, 1289.44],
-      oppRecord: [8, 3, 1301.08],
+      userRecord: [8, 3, 1289.44, 1204.9],
+      oppRecord: [8, 3, 1301.08, 1188.62],
       others: [
-        ['Waiver Wire Villains', 7, 4, 1244.9], ['Sunday Scaries', 7, 4, 1198.62],
-        ['The Autodrafters', 6, 5, 1210.16], ['Zero RB Truthers', 5, 6, 1155.38],
-        ['Bench Warmers', 4, 7, 1102.74], ['Punt Returners', 2, 9, 1017.2],
+        ['Waiver Wire Villains', 7, 4, 1244.9, 1198.3],
+        ['Sunday Scaries', 7, 4, 1198.62, 1176.04],
+        ['The Autodrafters', 6, 5, 1210.16, 1221.5],
+        ['Zero RB Truthers', 5, 6, 1155.38, 1209.7],
+        ['Bench Warmers', 4, 7, 1102.74, 1244.18],
+        ['Punt Returners', 2, 9, 1017.2, 1288.6],
       ],
     },
   }),
@@ -492,12 +500,15 @@ const LEAGUES = [
     margin: -33.46, week: 12, status: 'postevent',
     rosterName: 'dynasty', oppRosterName: 'dynastyOpp', idBase: 31000,
     rivals: {
-      userRecord: [9, 2, 1402.3],
-      oppRecord: [5, 6, 1188.44],
+      userRecord: [9, 2, 1402.3, 1188.02],
+      oppRecord: [5, 6, 1188.44, 1240.9],
       others: [
-        ['Dead Cap Dynasty', 8, 3, 1355.1], ['Rebuild Forever', 7, 4, 1290.66],
-        ['Taxi Squad', 6, 5, 1240.02], ['Contend Now', 6, 5, 1233.5],
-        ['Draft Capital', 4, 7, 1150.8], ['Win-Now Window', 3, 8, 1098.42],
+        ['Dead Cap Dynasty', 8, 3, 1355.1, 1244.7],
+        ['Rebuild Forever', 7, 4, 1290.66, 1266.2],
+        ['Taxi Squad', 6, 5, 1240.02, 1258.44],
+        ['Contend Now', 6, 5, 1233.5, 1249.8],
+        ['Draft Capital', 4, 7, 1150.8, 1301.06],
+        ['Win-Now Window', 3, 8, 1098.42, 1330.5],
       ],
     },
   }),
@@ -507,12 +518,15 @@ const LEAGUES = [
     margin: 2.56, week: 12, status: 'midevent',
     rosterName: 'work', oppRosterName: 'workOpp', idBase: 32000,
     rivals: {
-      userRecord: [6, 5, 1176.9],
-      oppRecord: [7, 4, 1204.18],
+      userRecord: [6, 5, 1176.9, 1190.44],
+      oppRecord: [7, 4, 1204.18, 1166.3],
       others: [
-        ['Copier Jam', 8, 3, 1288.44], ['HR Violations', 7, 4, 1221.06],
-        ['The Cubicles', 5, 6, 1160.3], ['Standing Desk', 5, 6, 1142.88],
-        ['Out of Office', 4, 7, 1099.5], ['Reply All', 3, 8, 1044.62],
+        ['Copier Jam', 8, 3, 1288.44, 1180.2],
+        ['HR Violations', 7, 4, 1221.06, 1198.5],
+        ['The Cubicles', 5, 6, 1160.3, 1204.66],
+        ['Standing Desk', 5, 6, 1142.88, 1188.9],
+        ['Out of Office', 4, 7, 1099.5, 1240.34],
+        ['Reply All', 3, 8, 1044.62, 1288.1],
       ],
     },
   }),

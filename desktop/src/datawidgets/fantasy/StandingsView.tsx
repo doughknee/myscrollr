@@ -7,7 +7,12 @@
 import { useMemo } from "react";
 import { clsx } from "clsx";
 import { Crown, Medal, Shield, Trophy } from "lucide-react";
-import { fmtPoints, isPlayoffBound, playoffSpotCount, streakLabel } from "./types";
+import {
+  fmtPoints,
+  isPlayoffBound,
+  playoffSpotCount,
+  streakLabel,
+} from "./types";
 import type { LeagueResponse, StandingsEntry } from "./types";
 
 interface StandingsViewProps {
@@ -23,7 +28,8 @@ export function StandingsView({ league }: StandingsViewProps) {
       if (ra !== rb) return ra - rb;
       if (b.wins !== a.wins) return b.wins - a.wins;
       return (
-        parseFloat(String(b.points_for || 0)) - parseFloat(String(a.points_for || 0))
+        parseFloat(String(b.points_for || 0)) -
+        parseFloat(String(a.points_for || 0))
       );
     });
     return {
@@ -61,11 +67,12 @@ export function StandingsView({ league }: StandingsViewProps) {
       </div>
 
       {/* Column header */}
-      <div className="grid grid-cols-[28px_minmax(0,1fr)_repeat(3,_auto)] items-center gap-3 border-b border-edge/40 px-3 pb-2 font-mono text-[9px] uppercase tracking-wider text-fg-3">
+      <div className="grid grid-cols-[28px_minmax(0,1fr)_repeat(4,_auto)] items-center gap-3 border-b border-edge/40 px-3 pb-2 font-mono text-[9px] uppercase tracking-wider text-fg-3">
         <span>#</span>
         <span>Team</span>
         <span className="text-right">W-L-T</span>
         <span className="text-right">PF</span>
+        <span className="w-[60px] text-right">PA</span>
         <span className="text-right">Streak</span>
       </div>
 
@@ -127,16 +134,17 @@ function StandingRow({
   seedCap: number;
 }) {
   const streak = streakLabel(entry.streak_type, entry.streak_value);
-  const streakColor = entry.streak_type === "win"
-    ? "text-up"
-    : entry.streak_type === "loss"
-      ? "text-down"
-      : "text-fg-3";
+  const streakColor =
+    entry.streak_type === "win"
+      ? "text-up"
+      : entry.streak_type === "loss"
+        ? "text-down"
+        : "text-fg-3";
 
   return (
     <div
       className={clsx(
-        "grid grid-cols-[28px_minmax(0,1fr)_repeat(3,_auto)] items-center gap-3 px-3 py-2 font-mono tabular-nums ",
+        "grid grid-cols-[28px_minmax(0,1fr)_repeat(4,_auto)] items-center gap-3 px-3 py-2 font-mono tabular-nums ",
         isUser && "ring-1 ring-inset ring-accent/50 bg-accent/[0.06]",
         !isUser && zone === "playoff" && "bg-up/[0.02] hover:bg-up/[0.06]",
         !isUser && zone === "outside" && "hover:bg-surface-2",
@@ -199,8 +207,18 @@ function StandingRow({
         {fmtPoints(entry.points_for)}
       </div>
 
+      {/* Points against — optional on StandingsEntry, so "—" when Yahoo
+          hasn't sent it rather than a misleading 0.0 */}
+      <div className="w-[60px] text-right text-[11px] text-fg-3">
+        {entry.points_against != null && entry.points_against !== ""
+          ? fmtPoints(entry.points_against)
+          : "—"}
+      </div>
+
       {/* Streak */}
-      <div className={clsx("text-right text-[11px] font-semibold", streakColor)}>
+      <div
+        className={clsx("text-right text-[11px] font-semibold", streakColor)}
+      >
         {streak}
       </div>
 
