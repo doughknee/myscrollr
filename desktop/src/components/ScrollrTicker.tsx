@@ -19,6 +19,9 @@ import type {
   Prediction,
   UptimeChipData,
   GitHubChipData,
+  ClockChipData,
+  WeatherChipData,
+  SysmonChipData,
 } from "../types";
 import type {
   MixMode,
@@ -30,8 +33,13 @@ import type {
 } from "../preferences";
 import { shouldShowOnTicker } from "../preferences";
 import type { LeagueResponse as FantasyLeague } from "../datawidgets/fantasy/types";
-import ConsolidatedChip from "./chips/ConsolidatedChip";
 import { GitHubCappedChip, UptimeCappedChip } from "./chips/CappedChip";
+import {
+  ClockChip,
+  SysmonChip,
+  TimerChip,
+  WeatherChip,
+} from "./chips/UtilityChips";
 import {
   getWatchlist,
   onWatchlistChange,
@@ -152,12 +160,13 @@ function EmptyTickerRow({
 /**
  * Capped widgets (uptime, GitHub) render one chip per item instead of
  * one chip per widget — see CappedChip for why. Returns null for every
- * other widget type so the caller falls through to ConsolidatedChip.
+ * Total over WIDGET_ORDER — every widget type has a branch, which is
+ * what let ConsolidatedChip and its fallbacks go.
  *
  * The pin toggle rides the FIRST chip only. Pinning is a per-widget
  * setting; a pin on every chip would imply each monitor pins on its own.
  */
-function cappedChipsFor(
+function widgetChipsFor(
   wt: keyof WidgetTickerData,
   items: WidgetTickerData[keyof WidgetTickerData],
   opts: {
@@ -167,9 +176,29 @@ function cappedChipsFor(
     onChipClick?: (type: string, id: string, url?: string) => void;
     pinned?: boolean;
   },
-): React.ReactNode[] | null {
-  if (wt !== "uptime" && wt !== "github") return null;
+): React.ReactNode[] {
   const { comfort, chipColorMode, onTogglePin, onChipClick, pinned } = opts;
+
+  // The four cell/gauge/spine utilities each render as ONE chip holding
+  // their items, unlike the capped pair which render one chip per item.
+  // That split is the design's, not an accident: three clocks are one
+  // glanceable group, three failing monitors are three separate alarms.
+  if (wt === "clock" || wt === "timer" || wt === "weather" || wt === "sysmon") {
+    const shared = {
+      comfort,
+      colorMode: chipColorMode,
+      pinned,
+      onTogglePin: onTogglePin ? () => onTogglePin(wt) : undefined,
+      onClick: () => onChipClick?.(wt, wt),
+    };
+    if (wt === "clock")
+      return [<ClockChip items={items as ClockChipData[]} {...shared} />];
+    if (wt === "timer")
+      return [<TimerChip items={items as ClockChipData[]} {...shared} />];
+    if (wt === "weather")
+      return [<WeatherChip items={items as WeatherChipData[]} {...shared} />];
+    return [<SysmonChip items={items as SysmonChipData[]} {...shared} />];
+  }
 
   return items.map((item, i) => {
     const shared = {
@@ -280,34 +309,15 @@ export default function ScrollrTicker({
           //
           // The pin toggle rides the first chip only: pinning is
           // per-widget, and N pins on N chips would suggest otherwise.
-          const capped = cappedChipsFor(wt, items, {
+          const chipsForWidget = widgetChipsFor(wt, items, {
             comfort,
             chipColorMode,
             onTogglePin,
             onChipClick,
           });
-          if (capped) {
-            capped.forEach((node, i) =>
-              bucket.push(wrap(`${wt}-cap-${i}`, node)),
-            );
-          } else {
-            bucket.push(
-              wrap(
-                `${wt}-consolidated`,
-                <ConsolidatedChip
-                  type={wt}
-                  items={items}
-                  comfort={comfort}
-                  colorMode={chipColorMode}
-                  onTogglePin={onTogglePin ? () => onTogglePin(wt) : undefined}
-                  // Widget chips don't have a meaningful external URL —
-                  // omit the third argument so handleChipClick falls back
-                  // to opening the desktop app on the widget's page.
-                  onClick={() => onChipClick?.(wt, wt)}
-                />,
-              ),
-            );
-          }
+          chipsForWidget.forEach((node, i) =>
+            bucket.push(wrap(`${wt}-chip-${i}`, node)),
+          );
           buckets.push(bucket);
         }
         continue;
@@ -496,33 +506,15 @@ export default function ScrollrTicker({
       const wt = widgetId as keyof WidgetTickerData;
       const items = widgetData?.[wt];
       if (items?.length) {
-        const cappedPinned = cappedChipsFor(wt, items, {
+        const pinnedChips = widgetChipsFor(wt, items, {
           comfort,
           chipColorMode,
           onTogglePin,
           onChipClick,
           pinned: true,
         });
-        if (cappedPinned) {
-          cappedPinned.forEach((node, i) =>
-            target.push(<Fragment key={`pinned-${wt}-${i}`}>{node}</Fragment>),
-          );
-          continue;
-        }
-        target.push(
-          <ConsolidatedChip
-            key={`pinned-${wt}`}
-            type={wt}
-            items={items}
-            comfort={comfort}
-            colorMode={chipColorMode}
-            pinned
-            onTogglePin={onTogglePin ? () => onTogglePin(wt) : undefined}
-            // Widget chips don't have a meaningful external URL —
-            // omit the third argument so handleChipClick falls back
-            // to opening the desktop app on the widget's page.
-            onClick={() => onChipClick?.(wt, wt)}
-          />,
+        pinnedChips.forEach((node, i) =>
+          target.push(<Fragment key={`pinned-${wt}-${i}`}>{node}</Fragment>),
         );
       }
     }

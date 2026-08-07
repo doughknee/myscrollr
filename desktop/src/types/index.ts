@@ -288,6 +288,19 @@ export interface ClockChipData {
   label: string;
   value: string;
   detail?: string;
+  /** Zone is in its night hours — the cell dims and shows a moon. */
+  night?: boolean;
+  /** Short UTC offset for the comfort cell, e.g. "UTC-4". */
+  offset?: string;
+
+  // ── Timer only ──
+  /** Seconds left; drives the depleting spine. */
+  remainingSec?: number;
+  /** Total duration the spine measures against. */
+  totalSec?: number;
+  paused?: boolean;
+  /** Wall-clock time the timer ends, for the comfort row. */
+  endsAt?: string;
 }
 
 export interface WeatherChipData {
@@ -296,6 +309,15 @@ export interface WeatherChipData {
   temp: string;
   icon: string;
   detail?: string;
+  /** Numeric current/high/low driving the range bar. Degrees, provider units. */
+  tempValue?: number;
+  high?: number;
+  low?: number;
+  /** Local night — dims the chip the same way a clock's night zone does. */
+  night?: boolean;
+  /** Active weather alert headline, e.g. "Storm watch". Replaces the
+   *  range bar in compact: a warning outranks a temperature. */
+  alert?: string;
 }
 
 export interface SysmonChipData {
@@ -304,6 +326,12 @@ export interface SysmonChipData {
   value: string;
   detail?: string;
   hot?: boolean;
+  /**
+   * 0-100 for the micro gauge. Separate from `value` because that's a
+   * display string that may carry a unit ("450W", "72°C") — the gauge
+   * needs a number, and not every metric is a percentage.
+   */
+  percent?: number;
 }
 
 export interface UptimeChipData {
