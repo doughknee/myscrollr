@@ -140,6 +140,9 @@ export const fantasyTickerSource: TickerSource = {
             prefs={prefs}
             comfort={ctx.comfort}
             colorMode={ctx.chipColorMode}
+            // The ticker window has no #app-shell stilling rule, so the
+            // score can roll here. The main window deliberately can't.
+            rollScore
             onClick={() =>
               ctx.onChipClick?.(
                 "fantasy",

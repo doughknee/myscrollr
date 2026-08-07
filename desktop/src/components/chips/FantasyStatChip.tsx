@@ -1,5 +1,7 @@
 import { clsx } from "clsx";
 import { motion } from "motion/react";
+import { AnimateNumber } from "motion-plus/react";
+import type { ReactNode } from "react";
 import type { ChipColorMode, FantasyDisplayPrefs } from "../../preferences";
 import { shouldShowOnTicker } from "../../preferences";
 import type { LeagueResponse } from "../../datawidgets/fantasy/types";
@@ -26,12 +28,30 @@ interface FantasyStatChipProps {
   comfort?: boolean;
   colorMode?: ChipColorMode;
   onClick?: () => void;
+  /**
+   * Roll the score's digits when it changes instead of swapping them.
+   *
+   * OFF BY DEFAULT, and that default is load-bearing. `#app-shell` stills
+   * every animation so the main window gets a steady bar — but that rule
+   * is CSS, and AnimateNumber animates through WAAPI, which
+   * `animation: none` has no authority over. So this can't be
+   * attribute-gated the way the spine glow and marquee are; it has to be
+   * refused in React or it would quietly break the calm-app decision.
+   *
+   * The ticker window, which has no such rule, opts in.
+   */
+  rollScore?: boolean;
 }
 
 interface StatSegment {
   key: string;
   text: string;
   tone?: "neutral" | "up" | "down" | "live";
+  /**
+   * Rendered instead of `text` when present. `text` stays required and
+   * accurate regardless — it's the accessible label and the fallback.
+   */
+  node?: ReactNode;
 }
 
 /**
@@ -78,6 +98,7 @@ export default function FantasyStatChip({
   comfort,
   colorMode = "widget",
   onClick,
+  rollScore = false,
 }: FantasyStatChipProps) {
   const c = getChipColors(colorMode, "fantasy");
   const ctx = userMatchupContext(league);
@@ -125,7 +146,14 @@ export default function FantasyStatChip({
 
     if (shouldShowOnTicker(prefs.matchupScore)) {
       const scoreText = `${fmtPlayerPoints(myPts)}–${fmtPlayerPoints(oppPts)}`;
-      primarySegments.push({ key: "score", text: scoreText, tone: scoreTone });
+      primarySegments.push({
+        key: "score",
+        text: scoreText,
+        tone: scoreTone,
+        node: rollScore ? (
+          <RollingScore myPts={myPts} oppPts={oppPts} label={scoreText} />
+        ) : undefined,
+      });
     }
 
     if (
@@ -275,7 +303,7 @@ export default function FantasyStatChip({
               !seg.tone && c.textDim,
             )}
           >
-            {seg.text}
+            {seg.node ?? seg.text}
           </span>
         ))}
       </div>
@@ -304,7 +332,7 @@ export default function FantasyStatChip({
                 !seg.tone && c.textDim,
               )}
             >
-              {seg.text}
+              {seg.node ?? seg.text}
             </span>
           ))}
         </div>
@@ -326,3 +354,52 @@ function ordinal(n: number): string {
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
+
+/**
+ * The score, with digits that roll when they change.
+ *
+ * Mirrors `fmtPlayerPoints` exactly — one fixed decimal — because this
+ * renders in place of that string, and a chip that switched between
+ * "151.8" and "151.80" mid-game would be worse than no animation.
+ *
+ * Not bounced. A spring that overshoots makes a settled score wobble,
+ * which on a live ticker reads as the number being unsure of itself.
+ *
+ * The `label` is not optional politeness. AnimateNumber works by
+ * rendering EVERY digit 0-9 in each column and translating the right one
+ * into view, so the element's own text content is
+ * "2345678901234567890…" — a screen reader on the rolling chip would
+ * read that instead of the score. The roller is hidden from the
+ * accessibility tree and the real string sits beside it.
+ */
+function RollingScore({
+  myPts,
+  oppPts,
+  label,
+}: {
+  myPts: number;
+  oppPts: number;
+  label: string;
+}) {
+  return (
+    <>
+      <span className="sr-only">{label}</span>
+      <span aria-hidden="true" className="inline-flex items-center">
+        <AnimateNumber {...ROLL}>{myPts}</AnimateNumber>
+        <span>–</span>
+        <AnimateNumber {...ROLL}>{oppPts}</AnimateNumber>
+      </span>
+    </>
+  );
+}
+
+const ROLL = {
+  format: { minimumFractionDigits: 1, maximumFractionDigits: 1 },
+  locales: "en-US",
+  transition: {
+    type: "spring" as const,
+    visualDuration: 0.28,
+    bounce: 0,
+    opacity: { duration: 0.15, ease: "linear" as const },
+  },
+};
