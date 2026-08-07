@@ -405,7 +405,7 @@ const ROLL = {
     trend: 1 as const,
   transition: {
     type: "spring" as const,
-    visualDuration: 0.6,
+    visualDuration: 1.8,
     bounce: 0,
     opacity: { duration: 0.15, ease: "linear" as const },
   },

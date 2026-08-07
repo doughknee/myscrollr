@@ -16,7 +16,7 @@ export function RemotionRoot() {
       <Composition
         id="Beat1Hook"
         component={Beat1Hook}
-        durationInFrames={180}
+        durationInFrames={280}
         fps={60}
         width={2560}
         height={1440}

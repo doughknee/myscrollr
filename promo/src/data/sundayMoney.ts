@@ -1,10 +1,11 @@
 /**
  * Beat 1's league, mirroring desktop/fixtures/serve-fantasy-demo.mjs.
  *
- * The numbers are deliberately the SAME ones the demo rig serves —
- * 149.9 vs 151.7, a 1.8 deficit with Achane still on the field — so a
- * screen recording of the app and a rendered promo frame can be cut
- * together without the audience noticing a seam.
+ * Mirrors the demo rig's league, teams and roster, so a screen recording
+ * of the app and a rendered promo frame sit together without an obvious
+ * seam. The OPENING SCORE deliberately differs — see below — so the two
+ * are no longer frame-identical at the start of the beat. Match them
+ * again by moving the rig to 151.6, not by moving this back.
  *
  * Same honesty boundary as the fixture: the players are real, the stat
  * lines are REPRESENTATIVE, not a verified box score. Nothing rendered
@@ -17,8 +18,17 @@ import type {
   StandingsEntry,
 } from "../../../desktop/src/datawidgets/fantasy/types";
 
-/** Where the beat opens. Achane has 22.7 banked and is still playing. */
-export const OPENING_SCORE = 149.9;
+/**
+ * Where the beat opens: a TENTH behind, not 1.8.
+ *
+ * Chosen for the roll, and it's a real constraint rather than a taste
+ * call. AnimateNumber rolls every digit column that changes, through
+ * every glyph between — so 149.9 to 151.8 moves three columns at once
+ * and at 215px renders as a stack of overlapping numerals instead of an
+ * odometer. Opening at 151.6 moves ONE column, which reads clean at any
+ * size. It is also a tenser number to be losing by.
+ */
+export const OPENING_SCORE = 151.6;
 export const OPPONENT_SCORE = 151.7;
 /** Where it lands — one score past them. */
 export const CLOSING_SCORE = 151.8;
