@@ -40,30 +40,37 @@ import { useMotionClock } from "../motionClock";
 /** The second the lead changes hands. Everything keys off this. */
 const FLIP_AT_SECONDS = 2;
 
+/** How long the score takes to climb once the play lands. */
+const ROLL_SECONDS = 0.6;
+
 /** Chip is supporting cast under the scoreboard, not the hero. */
 const CHIP_SCALE = 2.6;
 
 const MONO = "var(--font-mono, ui-monospace, monospace)";
 
 /**
- * Shared by the scoreboard and the chip so they roll in step.
+ * INSTANT, and that is the whole trick.
  *
- * bounce: 0 is deliberate. A spring that overshoots makes a settled
- * score wobble after it lands, which reads as the number being unsure of
- * itself — that was the "shaking" in the first cut.
+ * AnimateNumber exists to animate between two discrete values on its own
+ * clock, and that is exactly what Remotion cannot give it — the
+ * transition never advances across frame-stepping, so a stepped score
+ * snapped over in a single frame at every duration from 0.28s to 1.2s.
+ * Driving the value per frame instead makes it animate, and then any
+ * non-zero transition is worse still: the value changes every frame, so
+ * each slide restarts before the last finished and every digit sits
+ * permanently half-way between glyphs. That smear was the "shaking".
  *
- * 0.28s because the chip below shows the same score: at 0.5s the
- * scoreboard still read 150.5 while the chip already said 151.8.
+ * So Remotion interpolates the number and AnimateNumber only formats and
+ * lays it out. The count comes out crisp on every frame, and it is
+ * deterministic because nothing is left on Motion's clock.
+ *
+ * The chip keeps its own real transition for the app, where there IS a
+ * clock and the digits genuinely roll — see FantasyStatChip.
  */
 const ROLL = {
   format: { minimumFractionDigits: 1, maximumFractionDigits: 1 },
   locales: "en-US",
-  transition: {
-    type: "spring" as const,
-    visualDuration: 0.28,
-    bounce: 0,
-    opacity: { duration: 0.15, ease: "linear" as const },
-  },
+  transition: { duration: 0 },
 };
 
 export function Beat1Hook() {
@@ -75,11 +82,33 @@ export function Beat1Hook() {
   const { fps } = useVideoConfig();
   const flipFrame = FLIP_AT_SECONDS * fps;
 
-  // One event, not a ramp. An earlier cut had a small "drift" score at
-  // 0.8s to keep the number alive; it read as a twitch before the real
-  // moment and muddied what the shot was about.
-  const ahead = frame >= flipFrame;
-  const userPoints = ahead ? CLOSING_SCORE : OPENING_SCORE;
+  // REMOTION OWNS THE TIMING, MOTION OWNS THE PRESENTATION.
+  //
+  // The obvious way round is to step the score and let AnimateNumber
+  // animate between the two values. It does not work here: Motion's
+  // transitions never advance properly under Remotion's frame-stepping,
+  // so the number snapped to its new value inside a single frame at
+  // every duration tried, from 0.28s to 1.2s. Disabling the manual clock
+  // didn't fix it either — it just let wall-clock time finish the
+  // animation between screenshots, which is where the erratic movement
+  // came from in the first place.
+  //
+  // So the value is interpolated per frame HERE, and AnimateNumber is
+  // handed a fresh number each frame to format and slide. Every bit of
+  // timing is now Remotion's: exact duration, no overshoot, and the same
+  // output on every render.
+  const rollProgress = spring({
+    frame: frame - flipFrame,
+    fps,
+    config: { damping: 200 },
+    durationInFrames: Math.round(fps * ROLL_SECONDS),
+  });
+  const userPoints = round1(
+    interpolate(rollProgress, [0, 1], [OPENING_SCORE, CLOSING_SCORE]),
+  );
+  // Derived from the DISPLAYED score, so the colour, the arrow and the
+  // words all turn over on the exact frame the number passes them.
+  const ahead = userPoints > OPPONENT_SCORE;
   const margin = Math.abs(round1(userPoints - OPPONENT_SCORE));
 
   // Critically damped on purpose — see ROLL. This drives the lift and
@@ -143,10 +172,11 @@ export function Beat1Hook() {
             league={sundayMoney(userPoints)}
             prefs={DEFAULT_WIDGET_DISPLAY.fantasy}
             comfort
-            // The product's own digits roll too, in step with the
-            // scoreboard above. Off by default so the main window keeps
-            // its steady bar — see FantasyStatChip.
-            rollScore
+            // NOT rollScore. The chip's own roll is a real Motion
+            // transition, which smears into mush when Remotion changes
+            // the value underneath it every frame. Its score still
+            // climbs here — it's reading the same interpolated number,
+            // just rendering each frame's value crisply.
           />
           {/*
             Inside the scaled wrapper on purpose. Sized against the FRAME
@@ -225,6 +255,13 @@ function Scoreboard({
   );
 }
 
+/**
+ * NOT memoised, and that's deliberate — React.memo here silently kills
+ * the roll. AnimateNumber needs the per-frame re-renders to advance;
+ * bail out of them and the number snaps straight to its new value in a
+ * single frame. Memoising looked right (the parent re-renders 60 times a
+ * second to drive the lift) and cost the entire animation.
+ */
 function Side({
   team,
   points,
@@ -258,6 +295,19 @@ function Side({
         {team}
         {you && <span style={{ color: "#6b7280" }}> (you)</span>}
       </div>
+      {/*
+        Fixed width, and it matters more than it looks. The row is
+        centre-justified, so if the number's box changes width by even a
+        pixel mid-transition the whole scoreboard re-centres and every
+        element on the row twitches sideways.
+      */}
+      <div
+        style={{
+          width: 640,
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
       <AnimateNumber
         {...ROLL}
         style={{
@@ -271,6 +321,7 @@ function Side({
       >
         {points}
       </AnimateNumber>
+      </div>
     </div>
   );
 }

@@ -396,9 +396,16 @@ function RollingScore({
 const ROLL = {
   format: { minimumFractionDigits: 1, maximumFractionDigits: 1 },
   locales: "en-US",
+    // trend: 1 forces every digit column to spin the SAME way. On auto
+    // each column picks its own direction from its own change — going
+    // 149.9 to 151.8, the tens roll up while the units and tenths roll
+    // down — and three columns moving against each other reads as the
+    // number scrambling rather than counting. A score only ever climbs
+    // during a game, so up is also the honest direction.
+    trend: 1 as const,
   transition: {
     type: "spring" as const,
-    visualDuration: 0.28,
+    visualDuration: 0.6,
     bounce: 0,
     opacity: { duration: 0.15, ease: "linear" as const },
   },

@@ -46,6 +46,24 @@ There are two clocks to pin and only one is documented:
 Both fixed in `motionClock.ts`, with the remaining sub-pixel ceiling
 documented there.
 
+### Don't let Motion animate a value in a composition
+
+Pinning the clock is necessary but not sufficient. Motion's TRANSITIONS
+still don't advance across Remotion's frame-stepping: a score stepped
+from 149.9 to 151.8 snapped over inside one frame at every duration
+tried, 0.28s through 1.2s.
+
+The rule that came out of it — **Remotion owns timing, Motion owns
+presentation**. Interpolate the value per frame with Remotion's
+`spring`/`interpolate` and hand Motion a fresh value to format. Give
+`AnimateNumber` `transition: { duration: 0 }` when you do; anything
+longer restarts a slide every frame and leaves every digit stuck between
+glyphs, which on screen is a smear, not a roll.
+
+`FantasyStatChip`'s own `rollScore` is therefore NOT used here. In the
+app it's correct — there's a real clock and the digits genuinely roll.
+Under Remotion it turns to mush.
+
 ## Two things that will bite
 
 **Don't wrap a composition in `#desktop-shell` or `#app-shell` to get the
