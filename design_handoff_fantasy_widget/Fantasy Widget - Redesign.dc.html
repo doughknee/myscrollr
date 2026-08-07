@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; background:#e9ebf2; }
+    * { box-sizing:border-box; }
+    button { font-family:inherit; cursor:pointer; }
+    a { color:#34d399; } a:hover { color:#059669; }
+    @keyframes scrollrPulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    @keyframes ptsFlash { 0%,60%,100%{background:rgba(52,211,153,0)} 8%{background:rgba(52,211,153,0.28)} }
+    ::-webkit-scrollbar { width:10px; height:10px; }
+    ::-webkit-scrollbar-thumb { background:rgba(26,27,46,0.18); border-radius:6px; border:2px solid transparent; background-clip:content-box; }
+    ::-webkit-scrollbar-track { background:transparent; }
+  </style>
+</helmet>
+<div data-screen-label="Scrollr — Yahoo Fantasy widget (redesign)" style="width:1420px;height:1053px;margin:0 auto;background:#f6f7fb;color:#1a1b2e;font-family:'Plus Jakarta Sans',system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden;border-radius:10px;border:1px solid rgba(26,27,46,0.12);box-shadow:0 8px 32px rgba(0,0,0,0.14)">
+
+  <!-- ── TopBar ─────────────────────────────────────────── -->
+  <div style="display:flex;align-items:center;height:38px;flex-shrink:0;padding:0 12px;gap:8px;user-select:none">
+    <div style="display:flex;height:28px;flex-shrink:0;align-items:center;gap:8px;padding:0 6px">
+      <svg viewBox="0 0 639 639" aria-hidden="true" style="width:20px;height:20px;flex-shrink:0"><g transform="translate(0,639) scale(0.1,-0.1)" fill="#34d399" stroke="none"><path d="M4870 6321 c-100 -32 -157 -70 -215 -140 l-29 -36 41 37 c329 291 807 -68 501 -375 -132 -132 -60 -130 -1750 -66 -1538 57 -1544 57 -1792 9 -1687 -328 -1763 -2552 -101 -2980 253 -65 227 -64 1750 -65 1531 0 1427 4 1568 -66 371 -184 376 -666 9 -858 -160 -83 43 -75 -2157 -81 -2131 -6 -2047 -4 -2225 -61 -234 -74 -312 -243 -250 -539 54 -254 193 -701 256 -821 145 -275 578 -316 759 -72 l28 38 -39 -36 c-279 -257 -732 -25 -564 289 84 158 228 208 560 195 354 -13 3176 -93 3313 -93 895 0 1529 475 1690 1264 188 928 -386 1701 -1383 1862 -108 18 -198 19 -1510 19 l-1395 0 -78 22 c-556 158 -528 849 38 968 60 12 287 15 1525 15 1678 0 1780 4 1990 72 190 61 284 172 283 333 -2 156 -215 857 -302 991 -105 164 -326 238 -521 175z"></path></g><circle cx="492" cy="39" r="20" fill="#1a1b2e" opacity="0.6"></circle><circle cx="97" cy="599" r="20" fill="#1a1b2e" opacity="0.6"></circle></svg>
+      <span style="font-size:13px;line-height:20px;font-weight:600;letter-spacing:-0.01em">Scrollr</span>
+    </div>
+    <div style="width:1px;height:20px;background:rgba(213,215,226,0.4);margin:0 4px;flex-shrink:0"></div>
+    <button style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;border-radius:6px;border:none;background:transparent"><span style="display:inline-flex;width:14px;height:14px;color:#7a7a8a"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M9 3v18"></path><path d="m16 15-3-3 3-3"></path></svg></span></button>
+    <div style="width:1px;height:20px;background:rgba(213,215,226,0.4);margin:0 4px;flex-shrink:0"></div>
+    <div style="display:flex;align-items:center;gap:2px;flex-shrink:0">
+      <button style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:none;background:transparent"><span style="display:inline-flex;width:14px;height:14px;color:#4a4a5a"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path></svg></span></button>
+      <button style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:none;background:transparent;cursor:not-allowed"><span style="display:inline-flex;width:14px;height:14px;color:rgba(160,160,176,0.4)"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></span></button>
+    </div>
+    <div style="width:1px;height:20px;background:rgba(213,215,226,0.4);margin:0 4px;flex-shrink:0"></div>
+    <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;font-size:12px;line-height:18px">
+      <button style="border:none;background:transparent;padding:0;font-size:12px;color:#7a7a8a">Home</button>
+      <span style="color:#a0a0b0">/</span>
+      <span style="font-weight:600;color:#1a1b2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Yahoo Fantasy</span>
+    </div>
+    <button style="display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;flex-shrink:0;border-radius:6px;border:none;background:rgba(52,211,153,0.15);color:#34d399;font-size:11px;line-height:16px;font-weight:500"><span style="display:inline-flex;width:12px;height:12px;color:#34d399"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9"></path><path d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5"></path><circle cx="12" cy="9" r="2"></circle><path d="M16.2 4.8c2 2 2.26 5.11.8 7.47"></path><path d="M19.1 1.9a9.96 9.96 0 0 1 0 14.1"></path><path d="M9.5 18h5"></path><path d="m8 22 4-11 4 11"></path></svg></span><span>Ticker</span></button>
+    <div style="display:flex;align-self:stretch;margin-left:4px;margin-right:-12px">
+      <button style="display:flex;align-items:center;justify-content:center;width:44px;height:100%;border:none;background:transparent;color:#7a7a8a"><svg width="10" height="1" viewBox="0 0 10 1"><rect fill="currentColor" width="10" height="1" rx="0.5"></rect></svg></button>
+      <button style="display:flex;align-items:center;justify-content:center;width:44px;height:100%;border:none;background:transparent;color:#7a7a8a"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="1" y="1" width="8" height="8" rx="1" stroke="currentColor" stroke-width="1.2"></rect></svg></button>
+      <button style="display:flex;align-items:center;justify-content:center;width:44px;height:100%;border:none;background:transparent;color:#7a7a8a"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg></button>
+    </div>
+  </div>
+
+  <!-- ── Body ───────────────────────────────────────────── -->
+  <div style="display:flex;flex:1;min-height:0;overflow:hidden;padding-right:6px;padding-bottom:6px">
+
+    <!-- Sidebar -->
+    <div style="display:flex;flex-direction:column;flex-shrink:0;width:200px;height:100%;overflow:hidden;user-select:none">
+      <nav style="flex-shrink:0;padding:8px;display:flex;flex-direction:column;gap:2px">
+        <button style="display:flex;align-items:center;width:100%;gap:10px;padding:6px 10px;border-radius:8px;border:none;background:transparent;font-size:13px;line-height:20px;font-weight:500;color:#7a7a8a;text-align:left"><span style="display:inline-flex;width:15px;height:15px;margin:2.5px;color:#7a7a8a"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span><span>Home</span></button>
+        <button style="display:flex;align-items:center;width:100%;gap:10px;padding:6px 10px;border-radius:8px;border:none;background:transparent;font-size:13px;line-height:20px;font-weight:500;color:#7a7a8a;text-align:left"><span style="display:inline-flex;width:15px;height:15px;margin:2.5px;color:#7a7a8a"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="21" y1="4" x2="14" y2="4"></line><line x1="10" y1="4" x2="3" y2="4"></line><line x1="21" y1="12" x2="12" y2="12"></line><line x1="8" y1="12" x2="3" y2="12"></line><line x1="21" y1="20" x2="16" y2="20"></line><line x1="12" y1="20" x2="3" y2="20"></line><line x1="14" y1="2" x2="14" y2="6"></line><line x1="8" y1="10" x2="8" y2="14"></line><line x1="16" y1="18" x2="16" y2="22"></line></svg></span><span>Settings</span></button>
+        <button style="display:flex;align-items:center;width:100%;gap:10px;padding:6px 10px;border-radius:8px;border:none;background:transparent;font-size:13px;line-height:20px;font-weight:500;color:rgba(52,211,153,0.85);text-align:left"><span style="display:inline-flex;width:15px;height:15px;margin:2.5px;color:rgba(52,211,153,0.85)"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></span><span>Add widget</span></button>
+      </nav>
+      <nav style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:2px">
+        <h2 style="margin:0 0 4px;padding:0 10px;font-size:11px;line-height:16px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#7a7a8a">Widgets</h2>
+        <button style="display:flex;align-items:center;width:100%;gap:10px;padding:6px 10px;border-radius:8px;border:none;background:rgba(52,211,153,0.10);font-size:13px;line-height:20px;font-weight:500;color:#1a1b2e;text-align:left"><span style="display:flex;align-items:center;justify-content:center;width:20px;height:20px;flex-shrink:0"><span style="display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;background:linear-gradient(135deg,#6366f1 0%,rgba(99,102,241,0.72) 100%)"><span style="display:inline-flex;width:11px;height:11px;color:#ffffff"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"></polyline><line x1="13" y1="19" x2="19" y2="13"></line><line x1="16" y1="16" x2="20" y2="20"></line><line x1="19" y1="21" x2="21" y2="19"></line><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 10"></polyline><line x1="5" y1="14" x2="9" y2="18"></line><line x1="7" y1="17" x2="4" y2="20"></line><line x1="3" y1="19" x2="5" y2="21"></line></svg></span></span></span><span>Yahoo Fantasy</span></button>
+      </nav>
+      <div style="flex-shrink:0;padding:8px;display:flex;align-items:center;gap:4px">
+        <button style="display:flex;flex:1;align-items:center;gap:8px;min-width:0;padding:4px 6px;border-radius:8px;border:none;background:transparent;text-align:left">
+          <span style="position:relative;display:flex;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;border-radius:9999px;background:rgba(52,211,153,0.15);color:#34d399;font-size:11px;line-height:16px;font-weight:600">D<span style="position:absolute;bottom:-2px;right:-2px;display:flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:9999px;border:1px solid #ffffff;background:#ffffff"><span style="display:inline-flex;width:9px;height:9px;color:#22c55e"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13a10 10 0 0 1 14 0"></path><path d="M8.5 16.5a5 5 0 0 1 7 0"></path><path d="M2 8.82a15 15 0 0 1 20 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg></span></span></span>
+          <span style="display:flex;flex-direction:column;align-items:flex-start;min-width:0;line-height:1.2">
+            <span style="width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:13px;font-weight:500;color:#4a4a5a">doni</span>
+            <span style="width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:12px;color:#7a7a8a">Super User</span>
+          </span>
+          <span style="display:inline-flex;width:11px;height:11px;margin-left:auto;flex-shrink:0;color:#a0a0b0"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Content panel -->
+    <div style="display:flex;flex-direction:column;flex:1;min-width:0;overflow:hidden;position:relative;background:#ffffff;border-radius:12px;border:1px solid rgba(213,215,226,0.5);box-shadow:0 1px 2px rgba(0,0,0,0.05)">
+
+      <!-- Widget bar -->
+      <div style="position:relative;z-index:20;flex-shrink:0;border-radius:12px 12px 0 0;border-bottom:1px solid rgba(213,215,226,0.3);background:#ffffff;padding:6px 12px">
+        <div style="display:flex;width:100%;min-width:0;flex-wrap:wrap;align-items:center;gap:8px;min-height:30px">
+          <div role="tablist" style="display:flex;flex-shrink:0;align-items:center;gap:2px;border-radius:8px;border:1px solid rgba(213,215,226,0.3);background:rgba(246,247,251,0.6);padding:2px">
+            <button onClick="{{ goOverview }}" style="{{ seg.overview.btn }}"><span style="{{ seg.overview.ic }}"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg></span><span>Overview</span></button>
+            <button onClick="{{ goMatchup }}" style="{{ seg.matchup.btn }}"><span style="{{ seg.matchup.ic }}"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"></polyline><line x1="13" y1="19" x2="19" y2="13"></line><line x1="16" y1="16" x2="20" y2="20"></line><line x1="19" y1="21" x2="21" y2="19"></line><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 10"></polyline><line x1="5" y1="14" x2="9" y2="18"></line><line x1="7" y1="17" x2="4" y2="20"></line><line x1="3" y1="19" x2="5" y2="21"></line></svg></span><span>Matchup</span></button>
+            <button onClick="{{ goStandings }}" style="{{ seg.standings.btn }}"><span style="{{ seg.standings.ic }}"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg></span><span>Standings</span></button>
+            <button onClick="{{ goRoster }}" style="{{ seg.roster.btn }}"><span style="{{ seg.roster.ic }}"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span><span>Roster</span></button>
+          </div>
+          <sc-if value="{{ showLeagueSelect }}" hint-placeholder-val="{{ true }}">
+            <button style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;flex-shrink:1;min-width:0;border-radius:9999px;border:1px solid rgba(213,215,226,0.5);background:#ffffff;font-size:12px;line-height:18px;font-weight:500;color:#1a1b2e">
+              <span aria-hidden="true" style="font-size:12px">🏈</span>
+              <span style="max-width:104px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">The Sunday Money League</span>
+              <span style="display:inline-flex;width:11px;height:11px;flex-shrink:0;color:#a0a0b0"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></span>
+            </button>
+          </sc-if>
+          <div style="margin-left:auto;display:flex;min-width:0;flex-shrink:1;align-items:center;gap:12px">
+            <span style="display:inline-flex;align-items:center;gap:4px;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#ff4757"><span style="width:6px;height:6px;border-radius:9999px;background:#ff4757;animation:scrollrPulse 2s ease-in-out infinite"></span>2 live</span>
+            <button onClick="{{ goAccount }}" style="{{ accountPill }}">Account</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrolling content -->
+      <div style="flex:1;min-height:0;overflow-y:auto">
+
+        <!-- ══ MATCHUP (redesigned) ══ -->
+        <sc-if value="{{ isMatchup }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:16px;padding:16px">
+
+            <!-- Hero -->
+            <div style="position:relative;overflow:hidden;border-radius:12px;border:1px solid rgba(213,215,226,0.5);background:linear-gradient(135deg,#f6f7fb 0%,#ffffff 50%,#f6f7fb 100%);padding:20px">
+              <div style="pointer-events:none;position:absolute;inset:0;border-radius:12px;background:radial-gradient(circle at 50% 0%,rgba(244,63,94,0.10),transparent 55%)"></div>
+              <div style="position:relative;z-index:10;display:flex;align-items:center;gap:8px">
+                <span aria-hidden="true" style="font-size:15px">🏈</span>
+                <div style="display:flex;flex-direction:column;line-height:1.3;min-width:0;flex:1">
+                  <span style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a">Football · Week 12</span>
+                  <span style="font-size:12px;line-height:18px;font-weight:600;color:#1a1b2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">The Sunday Money League</span>
+                </div>
+                <span style="display:flex;flex-shrink:0;align-items:center;gap:4px;border-radius:9999px;border:1px solid rgba(255,71,87,0.4);background:rgba(255,71,87,0.15);padding:2px 8px;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#ff4757"><span style="width:6px;height:6px;border-radius:9999px;background:#ff4757;animation:scrollrPulse 2s ease-in-out infinite"></span>Live</span>
+              </div>
+              <div style="position:relative;z-index:10;margin-top:12px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px">
+                <div style="display:flex;min-width:0;align-items:center;gap:8px">
+                  <div style="width:40px;height:40px;flex-shrink:0;border-radius:6px;background:hsl(22 58% 44%);color:#ffffff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700">BM</div>
+                  <div style="display:flex;min-width:0;flex-direction:column;line-height:1.3;align-items:flex-start">
+                    <span style="display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600;color:#1a1b2e">Brunch Money<span style="margin-left:4px;border-radius:4px;background:rgba(52,211,153,0.2);padding:1px 4px;font:400 8px/1.6 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;color:#34d399;vertical-align:1px">You</span></span>
+                    <span style="display:inline-flex;align-items:center;gap:4px;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;color:#ff4757"><span style="width:5px;height:5px;border-radius:9999px;background:#ff4757;animation:scrollrPulse 2s ease-in-out infinite"></span>Achane in play</span>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">
+                  <div style="font-size:30px;line-height:36px;font-weight:700;color:#1a1b2e">157.9<span style="margin:0 4px;color:#7a7a8a">–</span>165.0</div>
+                  <div style="display:flex;align-items:center;gap:4px;font-size:11px;line-height:16px;color:#7a7a8a"><span>proj</span><span style="font-weight:600;color:#4a4a5a">163.8</span><span>·</span><span>165.0</span></div>
+                </div>
+                <div style="display:flex;min-width:0;align-items:center;gap:8px;flex-direction:row-reverse">
+                  <div style="width:40px;height:40px;flex-shrink:0;border-radius:6px;background:hsl(323 58% 44%);color:#ffffff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700">FA</div>
+                  <div style="display:flex;min-width:0;flex-direction:column;line-height:1.3;align-items:flex-end;text-align:right">
+                    <span style="display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600;color:#1a1b2e">Fourth and Long</span>
+                    <span style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;color:#a0a0b0">All players final</span>
+                  </div>
+                </div>
+              </div>
+              <div style="position:relative;z-index:10;margin-top:12px">
+                <div style="position:relative;height:6px;width:100%;overflow:hidden;border-radius:9999px;background:#f0f2f8"><div style="height:100%;border-radius:9999px;background:#22c55e;width:24%"></div></div>
+                <div style="margin-top:4px;display:flex;justify-content:space-between;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a"><span>You 24% · need 7.2 more from Achane</span><span>76% Opp</span></div>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="display:inline-flex;overflow:hidden;border-radius:6px;border:1px solid rgba(213,215,226,0.4);font-size:11px;line-height:16px">
+                <button onClick="{{ setWeek }}" style="{{ wk.weekBtn }}">Week</button>
+                <button onClick="{{ setToday }}" style="{{ wk.todayBtn }}">Today</button>
+              </div>
+              <span style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#a0a0b0">{{ wk.label }}</span>
+            </div>
+
+            <!-- Insight chips -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <sc-for list="{{ insights }}" as="c" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:10px;border-radius:8px;border:1px solid rgba(213,215,226,0.4);background:rgba(246,247,251,0.4);padding:10px 12px">
+                  <div style="{{ c.avStyle }}">{{ c.initials }}</div>
+                  <div style="min-width:0;flex:1">
+                    <div style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#a0a0b0">{{ c.label }}</div>
+                    <div style="font-size:12px;line-height:18px;font-weight:600;color:#1a1b2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</div>
+                  </div>
+                  <div style="text-align:right">
+                    <div style="font:700 14px/20px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:{{ c.valColor }}">{{ c.value }}</div>
+                    <div style="font:400 11px/15px 'IBM Plex Mono',monospace;color:#a0a0b0;white-space:nowrap">{{ c.sub }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <!-- Head-to-head slot rows -->
+            <section>
+              <div style="overflow:hidden;border-radius:8px;border:1px solid rgba(213,215,226,0.4);background:#ffffff">
+                <div style="display:grid;grid-template-columns:minmax(0,1fr) 64px 48px 64px minmax(0,1fr);gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid rgba(213,215,226,0.4);background:#f6f7fb">
+                  <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#4a4a5a">Brunch Money <span style="color:#34d399">· You</span></div>
+                  <div style="text-align:right;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;color:#a0a0b0">Pts</div>
+                  <div style="text-align:center;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;color:#a0a0b0">Slot</div>
+                  <div style="text-align:left;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;color:#a0a0b0">Pts</div>
+                  <div style="text-align:right;font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#4a4a5a">Fourth and Long</div>
+                </div>
+                <sc-for list="{{ slotRows }}" as="r" hint-placeholder-count="10">
+                  <div style="display:grid;grid-template-columns:minmax(0,1fr) 64px 48px 64px minmax(0,1fr);gap:8px;align-items:center;padding:8px 12px;border-top:1px solid rgba(213,215,226,0.2)">
+                    <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                      <div style="{{ r.u.avStyle }}">{{ r.u.initials }}</div>
+                      <div style="min-width:0">
+                        <div style="display:flex;align-items:center;gap:4px">
+                          <span style="font-size:12px;line-height:17px;font-weight:600;color:#1a1b2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.u.name }}</span>
+                          <sc-if value="{{ r.u.injured }}" hint-placeholder-val="{{ false }}"><span style="{{ r.u.badge }}">{{ r.u.status }}</span></sc-if>
+                        </div>
+                        <div style="font-size:11px;line-height:15px;color:#a0a0b0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.u.sub }} · <span style="{{ r.u.gameStyle }}">{{ r.u.game }}</span></div>
+                        <div style="font-size:11px;line-height:15px;color:#7a7a8a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.u.statline }}</div>
+                      </div>
+                    </div>
+                    <div style="text-align:right">
+                      <div style="{{ r.u.ptsStyle }}">{{ r.u.pts }}</div>
+                      <div style="font:400 11px/15px 'IBM Plex Mono',monospace;color:#a0a0b0;white-space:nowrap">{{ r.u.proj }}</div>
+                    </div>
+                    <div style="text-align:center"><span style="display:inline-block;border-radius:9999px;border:1px solid rgba(213,215,226,0.5);background:#f6f7fb;color:#7a7a8a;padding:1px 6px;font:500 8px/1.7 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap">{{ r.slot }}</span></div>
+                    <div style="text-align:left">
+                      <div style="{{ r.o.ptsStyle }}">{{ r.o.pts }}</div>
+                      <div style="font:400 11px/15px 'IBM Plex Mono',monospace;color:#a0a0b0;white-space:nowrap">{{ r.o.proj }}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;min-width:0;flex-direction:row-reverse">
+                      <div style="{{ r.o.avStyle }}">{{ r.o.initials }}</div>
+                      <div style="min-width:0;text-align:right">
+                        <div style="font-size:12px;line-height:17px;font-weight:600;color:#1a1b2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.o.name }}</div>
+                        <div style="font-size:11px;line-height:15px;color:#a0a0b0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="{{ r.o.gameStyle }}">{{ r.o.game }}</span> · {{ r.o.sub }}</div>
+                        <div style="font-size:11px;line-height:15px;color:#7a7a8a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.o.statline }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </sc-for>
+                <div style="display:grid;grid-template-columns:minmax(0,1fr) 64px 48px 64px minmax(0,1fr);gap:8px;align-items:center;padding:8px 12px;border-top:1px solid rgba(213,215,226,0.4);background:rgba(246,247,251,0.6)">
+                  <div style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;color:#7a7a8a">{{ tot.uLabel }}</div>
+                  <div style="text-align:right;font:700 13px/18px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:#1a1b2e">{{ tot.u }}</div>
+                  <div style="text-align:center;font:500 11px/16px 'IBM Plex Mono',monospace;color:#a0a0b0">TOT</div>
+                  <div style="text-align:left;font:700 13px/18px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:#1a1b2e">{{ tot.o }}</div>
+                  <div style="text-align:right;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;color:#7a7a8a">{{ tot.oLabel }}</div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Bench -->
+            <sc-if value="{{ showBench }}" hint-placeholder-val="{{ true }}">
+              <section>
+                <div style="margin-bottom:8px;display:flex;align-items:baseline;gap:8px">
+                  <h3 style="margin:0;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a">Bench &amp; IR</h3>
+                  <span style="font:400 11px/16px 'IBM Plex Mono',monospace;color:#a0a0b0">14.2 pts left on your bench · 17.7 on theirs</span>
+                </div>
+                <div style="overflow:hidden;border-radius:8px;border:1px solid rgba(213,215,226,0.3);background:rgba(246,247,251,0.4)">
+                  <sc-for list="{{ benchRows }}" as="r" hint-placeholder-count="4">
+                    <div style="display:grid;grid-template-columns:minmax(0,1fr) 64px 48px 64px minmax(0,1fr);gap:8px;align-items:center;padding:6px 12px;border-top:1px solid rgba(213,215,226,0.2)">
+                      <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                        <sc-if value="{{ r.u.name }}" hint-placeholder-val="{{ true }}">
+                          <div style="{{ r.u.avStyle }}">{{ r.u.initials }}</div>
+                          <div style="min-width:0">
+                            <div style="display:flex;align-items:center;gap:4px">
+                              <span style="font-size:12px;line-height:17px;font-weight:500;color:#4a4a5a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.u.name }}</span>
+                              <sc-if value="{{ r.u.injured }}" hint-placeholder-val="{{ false }}"><span style="{{ r.u.badge }}">{{ r.u.status }}</span></sc-if>
+                            </div>
+                            <div style="font-size:11px;line-height:15px;color:#a0a0b0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.u.sub }} · <span style="{{ r.u.gameStyle }}">{{ r.u.game }}</span></div>
+                          </div>
+                        </sc-if>
+                      </div>
+                      <div style="text-align:right">
+                        <div style="{{ r.u.ptsStyle }}">{{ r.u.pts }}</div>
+                        <div style="font:400 11px/15px 'IBM Plex Mono',monospace;color:#a0a0b0;white-space:nowrap">{{ r.u.proj }}</div>
+                      </div>
+                      <div style="text-align:center"><span style="display:inline-block;border-radius:9999px;border:1px solid rgba(213,215,226,0.3);background:rgba(240,242,248,0.5);color:#a0a0b0;padding:1px 6px;font:500 8px/1.7 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap">{{ r.slot }}</span></div>
+                      <div style="text-align:left">
+                        <div style="{{ r.o.ptsStyle }}">{{ r.o.pts }}</div>
+                        <div style="font:400 11px/15px 'IBM Plex Mono',monospace;color:#a0a0b0;white-space:nowrap">{{ r.o.proj }}</div>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:8px;min-width:0;flex-direction:row-reverse">
+                        <sc-if value="{{ r.o.name }}" hint-placeholder-val="{{ true }}">
+                          <div style="{{ r.o.avStyle }}">{{ r.o.initials }}</div>
+                          <div style="min-width:0;text-align:right">
+                            <div style="font-size:12px;line-height:17px;font-weight:500;color:#4a4a5a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.o.name }}</div>
+                            <div style="font-size:11px;line-height:15px;color:#a0a0b0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="{{ r.o.gameStyle }}">{{ r.o.game }}</span> · {{ r.o.sub }}</div>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- ══ OVERVIEW ══ -->
+        <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:16px;padding:16px">
+            <div style="border-radius:12px;border:1px solid rgba(213,215,226,0.4);background:rgba(246,247,251,0.8);padding:16px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="display:flex;width:40px;height:40px;flex-shrink:0;align-items:center;justify-content:center;border-radius:8px;background:rgba(52,211,153,0.15)"><span style="display:inline-flex;width:18px;height:18px;color:#34d399"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg></span></div>
+                <div style="flex:1;min-width:0">
+                  <div style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a">This week across all leagues</div>
+                  <div style="font-size:16px;line-height:24px;font-weight:700;color:#1a1b2e">1W · 0L<span style="margin-left:8px;font:500 11px/16px 'IBM Plex Mono',monospace;color:#ff4757">· 2 live</span></div>
+                  <div style="margin-top:4px;display:flex;align-items:center;gap:8px;font-size:11px;line-height:16px;color:#7a7a8a">
+                    <span style="display:inline-flex;align-items:center;gap:4px"><span style="display:inline-flex;width:11px;height:11px;color:#22c55e"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg></span>418.7 pts</span>
+                    <span>·</span>
+                    <span style="display:inline-flex;align-items:center;gap:4px"><span style="display:inline-flex;width:11px;height:11px;color:#ef4444"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"></polyline><polyline points="16 17 22 17 22 11"></polyline></svg></span>394.9 against</span>
+                    <span>·</span>
+                    <span style="color:#f59e0b">3 injured roster spots</span>
+                    <span>·</span>
+                    <span style="display:inline-flex;align-items:center;gap:4px;color:#ff4757;white-space:nowrap"><span style="width:5px;height:5px;border-radius:9999px;background:#ff4757;animation:scrollrPulse 2s ease-in-out infinite"></span>1 in play</span><span>·</span><span style="white-space:nowrap"><span style="font-weight:700;color:#1a1b2e">2</span> yet to play</span>
+                  </div>
+                </div>
+                <span style="display:inline-flex;width:14px;height:14px;flex-shrink:0;color:#22c55e"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.21 15 2.66 7.14a2 2 0 0 1 .13-2.2L4.4 2.8A2 2 0 0 1 6 2h12a2 2 0 0 1 1.6.8l1.6 2.14a2 2 0 0 1 .14 2.2L16.79 15"></path><path d="M11 12 5.12 2.2"></path><path d="m13 12 5.88-9.8"></path><path d="M8 7h8"></path><circle cx="12" cy="17" r="5"></circle><path d="M12 18v-2h-.5"></path></svg></span>
+              </div>
+            </div>
+
+            <!-- On the field now — cross-league -->
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <div style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a">On the field</div>
+                <div style="font:400 11px/16px 'IBM Plex Mono',monospace;color:#a0a0b0">1 live · 2 upcoming · across all leagues</div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+                <sc-for list="{{ fieldPlayers }}" as="p" hint-placeholder-count="3">
+                  <div style="{{ p.cardStyle }}">
+                    <div style="{{ p.avStyle }}">{{ p.initials }}</div>
+                    <div style="min-width:0;flex:1">
+                      <div style="font-size:12px;line-height:17px;font-weight:600;color:#1a1b2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div>
+                      <div style="font-size:11px;line-height:15px;color:#a0a0b0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.sub }}</div>
+                    </div>
+                    <div style="text-align:right">
+                      <div style="{{ p.ptsStyle }}">{{ p.pts }}</div>
+                      <div style="{{ p.statusStyle }}">{{ p.status }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <!-- League cards — one component, live first -->
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a">Your leagues</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <sc-for list="{{ leagueCards }}" as="g" hint-placeholder-count="3">
+                  <div onClick="{{ goMatchup }}" style="{{ g.cardStyle }}">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span aria-hidden="true" style="font-size:13px">🏈</span>
+                      <div style="display:flex;flex-direction:column;line-height:1.3;min-width:0;flex:1">
+                        <span style="font:500 11px/15px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#a0a0b0">{{ g.meta }}</span>
+                        <span style="font-size:12px;line-height:17px;font-weight:600;color:#1a1b2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.name }}</span>
+                      </div>
+                      <span style="{{ g.pillStyle }}"><sc-if value="{{ g.live }}" hint-placeholder-val="{{ false }}"><span style="width:5px;height:5px;border-radius:9999px;background:#ff4757;animation:scrollrPulse 2s ease-in-out infinite"></span></sc-if>{{ g.pillText }}</span>
+                    </div>
+                    <div style="margin-top:10px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:10px">
+                      <div style="min-width:0;text-align:left">
+                        <div style="font-size:12px;font-weight:600;color:#1a1b2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.uName }}<span style="margin-left:4px;border-radius:4px;background:rgba(52,211,153,0.2);padding:1px 4px;font:400 8px/1.6 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;color:#34d399;vertical-align:1px">You</span></div>
+                        <div style="font:400 11px/15px 'IBM Plex Mono',monospace;color:#7a7a8a">{{ g.rank }}</div>
+                      </div>
+                      <div style="display:flex;flex-direction:column;align-items:center;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">
+                        <div style="{{ g.scoreStyle }}">{{ g.my }}<span style="margin:0 4px;color:#7a7a8a">–</span>{{ g.opp }}</div>
+                        <div style="font-size:11px;line-height:15px;color:#a0a0b0">{{ g.proj }}</div>
+                      </div>
+                      <div style="min-width:0;text-align:right">
+                        <div style="font-size:12px;font-weight:600;color:#1a1b2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.oName }}</div>
+                        <div style="font:400 11px/15px 'IBM Plex Mono',monospace;color:#a0a0b0">{{ g.oRank }}</div>
+                      </div>
+                    </div>
+                    <sc-if value="{{ g.showBar }}" hint-placeholder-val="{{ true }}">
+                      <div style="margin-top:10px">
+                        <div style="position:relative;height:5px;width:100%;overflow:hidden;border-radius:9999px;background:#f0f2f8"><div style="height:100%;border-radius:9999px;background:#22c55e;width:{{ g.win }}"></div></div>
+                        <div style="margin-top:3px;display:flex;justify-content:space-between;font:500 11px/15px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a"><span>{{ g.winL }}</span><span>{{ g.winR }}</span></div>
+                      </div>
+                    </sc-if>
+                    <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(213,215,226,0.3);display:flex;justify-content:space-between;gap:8px;font-size:11px;line-height:16px;color:#7a7a8a">
+                      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.footL }}</span>
+                      <span style="{{ g.footRStyle }}">{{ g.footR }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ══ STANDINGS (unchanged from current) ══ -->
+        <sc-if value="{{ isStandings }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:12px;padding:16px">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#1a1b2e"><span style="display:inline-flex;width:14px;height:14px;color:#34d399"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg></span>The Sunday Money League Standings</div>
+              <div style="margin-top:2px;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a">8 teams · top 4 advance · Week 12</div>
+            </div>
+            <div style="display:grid;grid-template-columns:28px minmax(0,1fr) 48px 60px 60px 40px;gap:12px;align-items:center;padding:0 12px 8px;border-bottom:1px solid rgba(213,215,226,0.4);font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a">
+              <span>#</span><span>Team</span><span style="text-align:right">W-L-T</span><span style="text-align:right">PF</span><span style="text-align:right">PA</span><span style="text-align:right">Streak</span>
+            </div>
+            <div style="overflow:hidden;border-radius:8px;border:1px solid rgba(34,197,94,0.3);background:rgba(34,197,94,0.04)">
+              <sc-for list="{{ playoffRows }}" as="t" hint-placeholder-count="4">
+                <div style="{{ t.wrapStyle }}">
+                  <div style="display:grid;grid-template-columns:28px minmax(0,1fr) 48px 60px 60px 40px;gap:12px;align-items:center;padding:8px 12px;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">
+                    <div style="display:flex;align-items:center;gap:2px;font-size:12px;font-weight:700;color:#1a1b2e">{{ t.rank }}<sc-if value="{{ t.crown }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;width:10px;height:10px;color:#fbbf24"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z"></path><path d="M5 20h14"></path></svg></span></sc-if></div>
+                    <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                      <div style="{{ t.logoStyle }}">{{ t.initials }}</div>
+                      <div style="min-width:0">
+                        <div style="{{ t.nameStyle }}">{{ t.name }}<sc-if value="{{ t.you }}" hint-placeholder-val="{{ false }}"><span style="margin-left:4px;border-radius:4px;background:rgba(52,211,153,0.2);padding:1px 4px;font-size:8px;text-transform:uppercase;letter-spacing:0.05em">You</span></sc-if></div>
+                        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:15px;color:#7a7a8a">{{ t.mgr }}</div>
+                      </div>
+                    </div>
+                    <div style="text-align:right;font-size:11px;color:#4a4a5a">{{ t.rec }}</div>
+                    <div style="text-align:right;font-size:11px;color:#4a4a5a">{{ t.pf }}</div>
+                    <div style="text-align:right;font-size:11px;color:#7a7a8a">{{ t.pa }}</div>
+                    <div style="{{ t.streakStyle }}">{{ t.streak }}</div>
+                  </div>
+                  <div style="margin-top:-6px;padding:0 12px 8px 52px;display:flex;align-items:center;gap:8px;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:rgba(22,163,74,0.75)">
+                    <span>{{ t.seed }}</span>
+                    <sc-if value="{{ t.clinched }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;gap:4px;color:#f59e0b"><span style="display:inline-flex;width:9px;height:9px;color:#f59e0b"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg></span>Clinched</span></sc-if>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="position:relative;display:flex;align-items:center;gap:8px;padding:4px 0">
+              <div style="height:1px;flex:1;background:linear-gradient(90deg,transparent,rgba(251,191,36,0.6),transparent)"></div>
+              <span style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#fbbf24">Playoff cut line</span>
+              <div style="height:1px;flex:1;background:linear-gradient(90deg,transparent,rgba(251,191,36,0.6),transparent)"></div>
+            </div>
+            <div style="overflow:hidden;border-radius:8px;border:1px solid rgba(213,215,226,0.4);background:rgba(246,247,251,0.4)">
+              <sc-for list="{{ outsideRows }}" as="t" hint-placeholder-count="4">
+                <div style="display:grid;grid-template-columns:28px minmax(0,1fr) 48px 60px 60px 40px;gap:12px;align-items:center;padding:8px 12px;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">
+                  <div style="font-size:12px;font-weight:700;color:#1a1b2e">{{ t.rank }}</div>
+                  <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                    <div style="{{ t.logoStyle }}">{{ t.initials }}</div>
+                    <div style="min-width:0">
+                      <div style="{{ t.nameStyle }}">{{ t.name }}</div>
+                      <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:15px;color:#7a7a8a">{{ t.mgr }}</div>
+                    </div>
+                  </div>
+                  <div style="text-align:right;font-size:11px;color:#4a4a5a">{{ t.rec }}</div>
+                  <div style="text-align:right;font-size:11px;color:#4a4a5a">{{ t.pf }}</div>
+                  <div style="text-align:right;font-size:11px;color:#7a7a8a">{{ t.pa }}</div>
+                  <div style="{{ t.streakStyle }}">{{ t.streak }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ══ ROSTER (points-first) ══ -->
+        <sc-if value="{{ isRoster }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:16px;padding:16px">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+              <button style="display:flex;align-items:center;gap:8px;border-radius:6px;border:1px solid rgba(213,215,226,0.5);background:#ffffff;padding:6px 10px;font-size:12px;line-height:18px;font-weight:500;color:#1a1b2e">
+                <span style="white-space:nowrap">Brunch Money</span>
+                <span style="border-radius:4px;background:rgba(52,211,153,0.2);padding:1px 4px;font:400 8px/1.6 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;color:#34d399">You</span>
+                <span style="display:inline-flex;width:12px;height:12px;color:#7a7a8a"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></span>
+              </button>
+              <div style="display:inline-flex;overflow:hidden;border-radius:6px;border:1px solid rgba(213,215,226,0.4);font-size:11px;line-height:16px">
+                <button onClick="{{ setWeek }}" style="{{ wk.weekBtn }}">Week</button>
+                <button onClick="{{ setToday }}" style="{{ wk.todayBtn }}">Today</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;font-size:11px;line-height:16px;color:#7a7a8a">
+                <span style="white-space:nowrap"><span style="font-weight:700;color:#1a1b2e">10</span> starters</span>
+                <span>·</span>
+                <span><span style="font-weight:700;color:#1a1b2e">4</span> bench/IR</span>
+                <span>·</span>
+                <span style="white-space:nowrap;color:#ff4757"><span style="font-weight:700">1</span> in play</span>
+                <span>·</span>
+                <span style="display:inline-flex;align-items:center;gap:4px;color:#f59e0b"><span style="display:inline-flex;width:11px;height:11px;color:#f59e0b"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg></span>2 injured</span>
+              </div>
+            </div>
+
+            <div style="border-radius:8px;border:1px solid rgba(251,191,36,0.3);background:rgba(251,191,36,0.06);padding:12px">
+              <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#fbbf24"><span style="display:inline-flex;width:12px;height:12px;color:#fbbf24"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg></span>Injury watch</div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <sc-for list="{{ injuries }}" as="inj" hint-placeholder-count="2">
+                  <div style="display:flex;align-items:center;gap:8px;font-size:11px;line-height:16px">
+                    <span style="{{ inj.pill }}">{{ inj.status }}</span>
+                    <span style="font-weight:500;color:#1a1b2e;white-space:nowrap">{{ inj.name }}</span>
+                    <span style="color:#7a7a8a">({{ inj.pos }})</span>
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-style:italic;color:#7a7a8a">— {{ inj.note }}</span>
+                    <span style="margin-left:auto;font:700 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;color:#7a7a8a">{{ inj.slot }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <dc-import name="PlayerTable" title="Offense" count="8 starters" rows="{{ rosterStarters }}" cols="{{ rosterCols }}" minw="0" hint-size="100%,440px"></dc-import>
+            <dc-import name="PlayerTable" title="Kickers" count="1" rows="{{ rosterK }}" cols="{{ kCols }}" minw="0" hint-size="100%,110px"></dc-import>
+            <dc-import name="PlayerTable" title="Defense / Special Teams" count="1" rows="{{ rosterD }}" cols="{{ dCols }}" minw="0" hint-size="100%,110px"></dc-import>
+            <dc-import name="PlayerTable" title="Offense — bench &amp; IR" count="4" rows="{{ rosterBench }}" cols="{{ rosterCols }}" minw="0" subdued="{{ true }}" hint-size="100%,260px"></dc-import>
+          </div>
+        </sc-if>
+
+        <!-- ══ ACCOUNT ══ -->
+        <sc-if value="{{ isAccount }}" hint-placeholder-val="{{ false }}">
+          <div style="max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:20px;padding:24px 16px 40px">
+
+            <!-- Yahoo account -->
+            <div>
+              <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;color:#a0a0b0;margin-bottom:8px">Yahoo account</div>
+              <div style="border-radius:12px;border:1px solid rgba(213,215,226,0.55);background:#fcfcfc;box-shadow:0 1px 3px rgba(0,0,0,0.04),0 2px 8px rgba(0,0,0,0.06);overflow:hidden">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px">
+                  <div style="display:flex;align-items:center;gap:12px;min-width:0">
+                    <span style="display:flex;width:32px;height:32px;flex-shrink:0;align-items:center;justify-content:center;border-radius:8px;background:#6001d2;color:#ffffff;font-size:15px;font-weight:800">Y</span>
+                    <span style="display:flex;flex-direction:column;gap:1px;min-width:0">
+                      <span style="font-size:13px;line-height:18px;font-weight:500;color:#1a1b2e">doni@yahoo.com</span>
+                      <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;line-height:16px;color:#a0a0b0"><span style="width:6px;height:6px;border-radius:9999px;background:#22c55e"></span>Connected · synced 2 minutes ago</span>
+                    </span>
+                  </div>
+                  <button style="flex-shrink:0;border:1px solid rgba(213,215,226,0.8);border-radius:7px;padding:5px 12px;font-size:11px;line-height:1;font-weight:500;color:#7a7a8a;background:transparent">Sync now</button>
+                </div>
+                <div style="border-top:1px solid rgba(26,27,46,0.07);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px">
+                  <span style="font-size:13px;font-weight:500;color:#1a1b2e">Imported leagues</span><span style="font-size:12px;color:#a0a0b0">3</span>
+                </div>
+                <div style="border-top:1px solid rgba(26,27,46,0.07);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px">
+                  <span style="font-size:13px;font-weight:500;color:#1a1b2e">Active this season</span><span style="font-size:12px;color:#a0a0b0">3</span>
+                </div>
+                <div style="border-top:1px solid rgba(26,27,46,0.07);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px">
+                  <span style="font-size:13px;font-weight:500;color:#1a1b2e">Live right now</span><span style="display:inline-flex;align-items:center;gap:5px;font:500 12px 'IBM Plex Mono',monospace;color:#ff4757"><span style="width:6px;height:6px;border-radius:9999px;background:#ff4757;animation:scrollrPulse 2s ease-in-out infinite"></span>2 leagues</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Your leagues -->
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;color:#a0a0b0">Your leagues</div>
+                <div style="display:flex;align-items:center;gap:4px">
+                  <span style="border-radius:6px;background:rgba(52,211,153,0.15);padding:3px 8px;font-size:11px;line-height:1;font-weight:500;color:#34d399">All <span style="font-family:'IBM Plex Mono',monospace;color:rgba(52,211,153,0.7)">3</span></span>
+                  <span style="border-radius:6px;padding:3px 8px;font-size:11px;line-height:1;font-weight:500;color:#7a7a8a">Active <span style="font-family:'IBM Plex Mono',monospace;color:#a0a0b0">3</span></span>
+                  <span style="border-radius:6px;padding:3px 8px;font-size:11px;line-height:1;font-weight:500;color:#a0a0b0;opacity:0.5">Past <span style="font-family:'IBM Plex Mono',monospace">0</span></span>
+                </div>
+              </div>
+              <div style="border-radius:12px;border:1px solid rgba(213,215,226,0.55);background:#fcfcfc;box-shadow:0 1px 3px rgba(0,0,0,0.04),0 2px 8px rgba(0,0,0,0.06);overflow:hidden">
+                <sc-for list="{{ leagueRows }}" as="lg" hint-placeholder-count="3">
+                  <div style="{{ lg.rowStyle }}">
+                    <span aria-hidden="true" style="font-size:14px">🏈</span>
+                    <div style="min-width:0;flex:1">
+                      <div style="display:flex;align-items:center;gap:6px">
+                        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:18px;font-weight:600;color:#1a1b2e">{{ lg.name }}</span>
+                        <sc-if value="{{ lg.primary }}" hint-placeholder-val="{{ false }}"><span style="border-radius:9999px;background:rgba(52,211,153,0.2);padding:1px 6px;font:500 8px/1.7 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;color:#34d399">Primary</span></sc-if>
+                        <sc-if value="{{ lg.live }}" hint-placeholder-val="{{ false }}"><span style="width:6px;height:6px;border-radius:9999px;background:#ff4757;animation:scrollrPulse 2s ease-in-out infinite"></span></sc-if>
+                      </div>
+                      <div style="margin-top:1px;font:400 11px/15px 'IBM Plex Mono',monospace;color:#7a7a8a">{{ lg.meta }}</div>
+                    </div>
+                    <button title="Set as primary league" style="{{ lg.starBtn }}"><span style="{{ lg.starIc }}"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="{{ lg.starFill }}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></span></button>
+                    <button title="Hide from feed" style="display:flex;width:28px;height:28px;flex-shrink:0;align-items:center;justify-content:center;border-radius:6px;border:1px solid rgba(213,215,226,0.5);background:transparent;color:#7a7a8a"><span style="display:inline-flex;width:13px;height:13px"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg></span></button>
+                  </div>
+                </sc-for>
+                <div style="border-top:1px solid rgba(26,27,46,0.07);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px">
+                  <span style="display:flex;flex-direction:column;gap:1px"><span style="font-size:13px;font-weight:500;color:#1a1b2e">Add more leagues</span><span style="font-size:12px;line-height:16px;color:#a0a0b0">Find and import new Yahoo Fantasy leagues</span></span>
+                  <button style="flex-shrink:0;border:1px solid rgba(213,215,226,0.8);border-radius:7px;padding:5px 12px;font-size:11px;line-height:1;font-weight:500;color:#7a7a8a;background:transparent">Find leagues</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Ticker -->
+            <div>
+              <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;color:#a0a0b0;margin-bottom:8px">Ticker</div>
+              <div style="border-radius:12px;border:1px solid rgba(213,215,226,0.55);background:#fcfcfc;box-shadow:0 1px 3px rgba(0,0,0,0.04),0 2px 8px rgba(0,0,0,0.06);overflow:hidden">
+                <div style="padding:12px 16px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                    <span style="font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#a0a0b0">Preview — right now</span>
+                    <span style="font:400 11px/16px 'IBM Plex Mono',monospace;color:#7a7a8a">{{ modeCaption }}</span>
+                  </div>
+                  <div style="position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 10px;min-height:36px;background:#f6f7fb;border:1px solid rgba(213,215,226,0.5);border-radius:8px;overflow:hidden">
+                    <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(52,211,153,0.3),transparent)"></div>
+                    <sc-for list="{{ previewChips }}" as="c" hint-placeholder-count="3">
+                      <div style="position:relative;display:inline-flex;flex-shrink:0;align-items:center;gap:7px;padding:4px 10px 5px;border-radius:4px;border:1px solid rgba(168,85,247,0.25);background:rgba(168,85,247,0.06);font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden">
+                        <sc-if value="{{ c.em }}" hint-placeholder-val="{{ true }}"><span aria-hidden="true" style="font-size:11px">{{ c.em }}</span></sc-if>
+                        <sc-if value="{{ c.dot }}" hint-placeholder-val="{{ false }}"><span style="width:5px;height:5px;border-radius:9999px;background:#ff4757;animation:scrollrPulse 1.3s ease-in-out infinite"></span></sc-if>
+                        <sc-if value="{{ c.pill }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;padding:0 4px;border-radius:3px;background:rgba(122,122,138,0.15);font-size:10px;font-weight:600;text-transform:uppercase;color:rgba(168,85,247,0.7)">{{ c.pill }}</span></sc-if>
+                        <sc-for list="{{ c.parts }}" as="p" hint-placeholder-count="2"><span style="{{ p.st }}">{{ p.t }}</span></sc-for>
+                        <span style="position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(122,122,138,0.15)"></span>
+                        <sc-if value="{{ c.spine }}" hint-placeholder-val="{{ false }}"><span style="{{ c.spine }}"></span></sc-if>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="border-top:1px solid rgba(26,27,46,0.07);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px">
+                  <span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:13px;font-weight:500;color:#1a1b2e">What shows on the ticker</span><span style="font-size:12px;line-height:16px;color:#a0a0b0">One setting — the rail adapts through the week on its own</span></span>
+                  <div style="display:inline-flex;flex-shrink:0;align-items:center;gap:1px;border-radius:8px;background:rgba(228,230,238,0.5);padding:2px">
+                    <button onClick="{{ setEssential }}" style="{{ dial.essential }}">Essential</button>
+                    <button onClick="{{ setStandard }}" style="{{ dial.standard }}">Standard</button>
+                    <button onClick="{{ setEverything }}" style="{{ dial.everything }}">Everything</button>
+                  </div>
+                </div>
+                <div style="border-top:1px solid rgba(26,27,46,0.07);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px">
+                  <span style="display:flex;flex-direction:column;gap:1px"><span style="font-size:13px;font-weight:500;color:#1a1b2e">Followed players</span><span style="font-size:12px;line-height:16px;color:#a0a0b0">Always on the rail — Hurts, Chase</span></span>
+                  <button style="flex-shrink:0;border:1px solid rgba(213,215,226,0.8);border-radius:7px;padding:5px 12px;font-size:11px;line-height:1;font-weight:500;color:#7a7a8a;background:transparent">Manage · 2</button>
+                </div>
+                <div style="{{ advStyle }}">
+                  <div style="border-top:1px solid rgba(26,27,46,0.07);padding:12px 16px 4px;display:flex;flex-direction:column;gap:1px">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span style="font-size:13px;font-weight:500;color:#1a1b2e">Advanced — ticker items</span>
+                      <span style="border-radius:4px;background:rgba(228,230,238,0.6);padding:1px 6px;font:600 8px/1.7 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;color:#7a7a8a">Everything only</span>
+                    </div>
+                    <span style="font-size:12px;line-height:16px;color:#a0a0b0">The feed always shows everything — these only control what joins the ticker</span>
+                  </div>
+                  <sc-for list="{{ advRows }}" as="a" hint-placeholder-count="6">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 16px">
+                      <span style="font-size:12px;color:#4a4a5a">{{ a.label }}</span>
+                      <span style="{{ a.track }}"><span style="{{ a.knob }}"></span></span>
+                    </div>
+                  </sc-for>
+                  <div style="height:8px"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Danger zone -->
+            <div>
+              <div style="font:600 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;color:#ef4444;margin-bottom:8px">Danger zone</div>
+              <div style="border-radius:12px;border:1px solid rgba(239,68,68,0.25);background:rgba(239,68,68,0.03);overflow:hidden">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px">
+                  <span style="display:flex;flex-direction:column;gap:1px"><span style="font-size:13px;font-weight:500;color:#1a1b2e">Disconnect Yahoo</span><span style="font-size:12px;line-height:16px;color:#a0a0b0">Removes your account link and clears imported leagues</span></span>
+                  <button style="flex-shrink:0;border:none;border-radius:7px;padding:6px 12px;font-size:11px;line-height:1;font-weight:600;color:#ef4444;background:rgba(239,68,68,0.1)">Disconnect</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1460,&quot;height&quot;:1080},&quot;tab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;matchup&quot;,&quot;options&quot;:[&quot;overview&quot;,&quot;matchup&quot;,&quot;standings&quot;,&quot;roster&quot;,&quot;account&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;View&quot;},&quot;tickerMode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;essential&quot;,&quot;options&quot;:[&quot;essential&quot;,&quot;standard&quot;,&quot;everything&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Ticker&quot;},&quot;showBench&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Matchup&quot;}}">
+class Component extends DCLogic {
+  state = { tab: null, win: 'week' };
+
+  static MOD = { 4: 0.04, 5: 4, 6: -1, 9: 0.1, 10: 6, 11: 1, 12: 0.1, 13: 6, 18: -2 };
+  static hue(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h; }
+  static initials(n) { return n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase(); }
+  static pts(stats) {
+    let t = 0;
+    for (const [id, v] of Object.entries(stats)) t += (Component.MOD[id] ?? 0) * v;
+    return Math.round(t * 100) / 100;
+  }
+  static statline(stats) {
+    const p = [];
+    if (stats[4]) p.push(`${stats[4]} pass yds`);
+    if (stats[5]) p.push(`${stats[5]} pass TD`);
+    if (stats[6]) p.push(`${stats[6]} INT`);
+    if (stats[9]) p.push(`${stats[9]} rush yds`);
+    if (stats[10]) p.push(`${stats[10]} rush TD`);
+    if (stats[11]) p.push(`${stats[11]} rec` + (stats[12] ? ` · ${stats[12]} yds` : ''));
+    if (stats[13]) p.push(`${stats[13]} rec TD`);
+    if (stats[18]) p.push(`${stats[18]} fum lost`);
+    return p.join(' · ');
+  }
+  static av(name, size) {
+    const h = Component.hue(name);
+    return `width:${size}px;height:${size}px;border-radius:9999px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font:600 ${size < 26 ? 9 : 10}px system-ui;background:hsl(${h} 34% 30%);color:hsl(${h} 45% 88%)`;
+  }
+
+  // p = [name, team, dp, stats, proj, flags {pending,thu,status,fixedPts,line,raw,slot}]
+  mkSide(p, lead, win) {
+    if (!p) return { name: false, injured: false, pts: '', proj: '', ptsStyle: '', gameStyle: '', avStyle: '', initials: '', sub: '', statline: '', game: '', badge: '', slot: '' };
+    const [name, team, dp, stats, proj, f = {}] = p;
+    const played = !f.pending && (f.fixedPts != null || Object.keys(stats).length > 0);
+    const hideThu = win === 'today' && f.thu;
+    const show = played && !hideThu;
+    const pv = show ? (f.fixedPts != null ? f.fixedPts : Component.pts(stats)).toFixed(1) : '—';
+    const game = f.live ? 'Q3 8:42' : f.pending ? 'Sun 8:20 PM' : hideThu ? 'Played Thu' : f.thu ? 'Final · Thu' : played ? 'Final' : '—';
+    const amber = f.status === 'Q';
+    const bc = amber ? '245,158,11' : '239,68,68';
+    const tc = amber ? '#f59e0b' : '#ef4444';
+    return {
+      name,
+      initials: Component.initials(name),
+      avStyle: Component.av(name, 28),
+      sub: `${team} · ${dp}`,
+      statline: f.pending ? 'Yet to play' : hideThu ? 'No stats today — played Thursday' : played ? (f.line ?? Component.statline(stats)) : 'No stats recorded',
+      game,
+      gameStyle: f.live ? 'color:#ff4757;font-weight:600' : f.pending ? 'color:#4a4a5a;font-weight:600' : 'color:#a0a0b0',
+      injured: !!f.status,
+      status: f.status ?? '',
+      badge: `display:inline-flex;align-items:center;border-radius:4px;border:1px solid rgba(${bc},0.4);background:rgba(${bc},0.2);color:${tc};padding:1px 4px;font:600 8px/1.5 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em`,
+      pts: pv,
+      proj: `proj ${proj.toFixed(1)}`,
+      ptsStyle: f.live && pv !== '—'
+        ? `font:700 14px/19px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:#16a34a;border-radius:4px;padding:0 3px;animation:ptsFlash 6s ease-in-out infinite`
+        : `font:700 14px/19px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:${pv === '—' ? '#a0a0b0' : lead ? '#1a1b2e' : '#7a7a8a'}`,
+    };
+  }
+
+  static dispPts(p, win) {
+    if (!p) return -1;
+    const f = p[5] ?? {};
+    if (f.pending) return -1;
+    if (win === 'today' && f.thu) return -1;
+    if (f.fixedPts != null) return f.fixedPts;
+    return Object.keys(p[3]).length ? Component.pts(p[3]) : -1;
+  }
+
+  mkPair([slot, u, o], win) {
+    const up = Component.dispPts(u, win);
+    const op = Component.dispPts(o, win);
+    return { slot, u: this.mkSide(u, up >= op, win), o: this.mkSide(o, op >= up, win) };
+  }
+
+  mkSpecialRow(p) {
+    const [name, team, dp, , proj, f] = p;
+    const base = "padding:8px;text-align:right;border-top:1px solid rgba(213,215,226,0.2);font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:11px;";
+    const cells = [
+      { v: f.fixedPts.toFixed(1), st: base + 'color:#1a1b2e;font-weight:700' },
+      { v: proj.toFixed(1), st: base + 'color:#7a7a8a' },
+      { v: 'Final', st: base + 'color:#a0a0b0' },
+      ...f.raw.map((v) => ({ v, st: base + (v === '–' ? 'color:#a0a0b0' : 'color:#1a1b2e;font-weight:500') })),
+    ];
+    return { name, slot: f.slot, status: '', injured: false, sub: `${team} · ${dp}`, initials: Component.initials(name), avStyle: Component.av(name, 24), badge: '', badgeIcon: '', cells };
+  }
+
+  mkRosterRow(p, sub, win) {
+    const [name, team, dp, stats, proj, f = {}] = p;
+    const played = !f.pending && Object.keys(stats).length > 0;
+    const hideThu = win === 'today' && f.thu;
+    const show = played && !hideThu;
+    const IDS = ['4', '5', '6', '9', '10', '11', '12', '13', '18'];
+    const base = "padding:8px;text-align:right;border-top:1px solid rgba(213,215,226,0.2);font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:11px;";
+    const amber = f.status === 'Q';
+    const bc = amber ? '245,158,11' : '239,68,68';
+    const tc = amber ? '#f59e0b' : '#ef4444';
+    const cells = [
+      { v: show ? Component.pts(stats).toFixed(1) : '—', st: base + (f.live && show ? 'color:#16a34a;font-weight:700;animation:ptsFlash 6s ease-in-out infinite' : show ? 'color:#1a1b2e;font-weight:700' : 'color:#a0a0b0') },
+      { v: proj.toFixed(1), st: base + 'color:#7a7a8a' },
+      { v: f.live ? 'Q3 8:42' : f.pending ? 'Sun 8:20 PM' : hideThu ? 'Played Thu' : f.thu ? 'Final · Thu' : played ? 'Final' : '—', st: base + (f.live ? 'color:#ff4757;font-weight:600' : f.pending ? 'color:#4a4a5a;font-weight:600' : 'color:#a0a0b0') },
+      ...IDS.map((id) => {
+        const v = show && stats[id] != null ? String(stats[id]) : '–';
+        return { v, st: base + (v === '–' ? 'color:#a0a0b0' : sub ? 'color:#7a7a8a' : 'color:#1a1b2e;font-weight:500') };
+      }),
+    ];
+    return {
+      name, slot: f.slot ?? dp, status: f.status ?? '', injured: !!f.status,
+      sub: `${team} · ${dp}`,
+      initials: Component.initials(name),
+      avStyle: Component.av(name, 24),
+      badge: `display:inline-flex;align-items:center;gap:2px;border-radius:4px;border:1px solid rgba(${bc},0.4);background:rgba(${bc},0.2);color:${tc};padding:1px 4px;font:600 8px/1.5 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em`,
+      badgeIcon: `display:inline-flex;width:7px;height:7px;color:${tc}`,
+      cells,
+    };
+  }
+
+  accountVals() {
+    const mode = this.state.mode ?? this.props.tickerMode ?? 'essential';
+    const setMode = (m) => () => this.setState({ mode: m });
+    const dialBase = 'border:none;border-radius:6px;padding:5px 12px;font-size:11px;line-height:1;cursor:pointer;font-family:inherit;';
+    const dial = {};
+    for (const m of ['essential', 'standard', 'everything']) {
+      dial[m] = dialBase + (mode === m
+        ? 'background:#fcfcfc;box-shadow:inset 0 0 0 1px rgba(26,27,46,0.2),0 1px 3px rgba(0,0,0,0.08);font-weight:600;color:#1a1b2e'
+        : 'background:transparent;font-weight:500;color:#7a7a8a');
+    }
+    const sb = 'font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:#1a1b2e';
+    const nm = 'font-weight:500;color:#a855f7';
+    const tagR = 'font-size:10px;font-weight:600;text-transform:uppercase;color:#ff4757';
+    const flash = 'font-weight:700;font-variant-numeric:tabular-nums;color:#16a34a;border-radius:3px;padding:0 2px;animation:ptsFlash 6s ease-in-out infinite';
+    const spineLive = (w, c) => `position:absolute;left:0;bottom:0;height:2px;width:${w};background:${c};animation:spineGlow 2s ease-in-out infinite`;
+    const chips = [
+      { em: '🏈', dot: true, pill: false, parts: [{ t: '▼', st: 'font-size:10px;color:#ef4444' }, { t: '157.9–165.0', st: sb }, { t: 'Q3', st: tagR }], spine: spineLive('24%', '#22c55e') },
+      { em: '🏈', dot: true, pill: false, parts: [{ t: '▲', st: 'font-size:10px;color:#22c55e' }, { t: '76.3–78.8', st: sb }, { t: 'Q3', st: tagR }], spine: spineLive('58%', '#22c55e') },
+      { em: '🏈', dot: false, pill: false, parts: [{ t: '184.5–151.0', st: 'font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:#22c55e' }, { t: 'W', st: 'font-weight:700;color:#22c55e' }], spine: 'position:absolute;left:0;right:0;bottom:0;height:2px;background:#22c55e' },
+    ];
+    if (mode !== 'essential') {
+      chips.push(
+        { em: false, dot: false, pill: 'W/R/T', parts: [{ t: 'Achane', st: nm }, { t: '+8.3', st: flash }, { t: 'Q3', st: tagR }], spine: spineLive('58%', '#16a34a') },
+        { em: '🚨', dot: false, pill: 'BN', parts: [{ t: 'Dell', st: nm }, { t: 'Q', st: 'display:inline-flex;padding:0 4px;border-radius:3px;background:rgba(239,68,68,0.15);font-size:10px;font-weight:700;text-transform:uppercase;color:#ef4444' }], spine: false },
+      );
+    }
+    if (mode === 'everything') {
+      chips.push(
+        { em: false, dot: false, pill: 'QB', parts: [{ t: '↑', st: 'color:#22c55e' }, { t: 'Hurts', st: nm }, { t: '28.1', st: 'font-weight:500;font-variant-numeric:tabular-nums;color:#22c55e' }], spine: false },
+        { em: false, dot: false, pill: 'RB', parts: [{ t: '↓', st: 'color:#ef4444' }, { t: 'Walker', st: nm }, { t: '7.0', st: 'font-weight:500;font-variant-numeric:tabular-nums;color:#ef4444' }], spine: false },
+        { em: false, dot: false, pill: 'BN', parts: [{ t: 'Addison', st: nm }, { t: '9.2', st: 'font-weight:500;font-variant-numeric:tabular-nums;color:#22c55e' }], spine: false },
+        { em: '🚨', dot: false, pill: 'IR', parts: [{ t: 'Rice', st: nm }, { t: 'IR', st: 'display:inline-flex;padding:0 4px;border-radius:3px;background:rgba(239,68,68,0.15);font-size:10px;font-weight:700;text-transform:uppercase;color:#ef4444' }], spine: false },
+      );
+    }
+    const tgl = (on) => ({
+      track: `position:relative;display:inline-block;flex-shrink:0;width:34px;height:20px;border-radius:10px;background:${on ? '#34d399' : '#c4c6d4'};cursor:pointer`,
+      knob: `position:absolute;top:2px;left:${on ? '16px' : '2px'};width:16px;height:16px;border-radius:9999px;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,0.2)`,
+    });
+    return {
+      dial,
+      setEssential: setMode('essential'), setStandard: setMode('standard'), setEverything: setMode('everything'),
+      modeCaption: mode === 'essential' ? '3 chips · one per league' : mode === 'standard' ? '5 chips · + live moments' : '9 chips · everything, always',
+      previewChips: chips,
+      advStyle: mode === 'everything' ? '' : 'opacity:0.45;pointer-events:none',
+      advRows: [
+        { label: 'Matchup score', ...tgl(true) },
+        { label: 'Win probability', ...tgl(true) },
+        { label: 'Projected points', ...tgl(false) },
+        { label: 'Top 3 scorers', ...tgl(false) },
+        { label: 'Worst starter', ...tgl(false) },
+        { label: 'Injury report', ...tgl(true) },
+      ],
+      leagueRows: [
+        { name: 'The Sunday Money League', meta: 'Football · 8 teams · 2025', primary: true, live: true,
+          rowStyle: 'display:flex;align-items:center;gap:12px;padding:12px 16px',
+          starBtn: 'display:flex;width:28px;height:28px;flex-shrink:0;align-items:center;justify-content:center;border-radius:6px;border:1px solid rgba(99,102,241,0.4);background:rgba(99,102,241,0.15);color:#6366f1', starIc: 'display:inline-flex;width:13px;height:13px', starFill: 'currentColor' },
+        { name: 'Dynasty or Bust', meta: 'Football · 8 teams · 2025', primary: false, live: false,
+          rowStyle: 'display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid rgba(26,27,46,0.07)',
+          starBtn: 'display:flex;width:28px;height:28px;flex-shrink:0;align-items:center;justify-content:center;border-radius:6px;border:1px solid rgba(213,215,226,0.5);background:transparent;color:#7a7a8a', starIc: 'display:inline-flex;width:13px;height:13px', starFill: 'none' },
+        { name: 'Work League (Keeper)', meta: 'Football · 8 teams · 2025', primary: false, live: true,
+          rowStyle: 'display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid rgba(26,27,46,0.07)',
+          starBtn: 'display:flex;width:28px;height:28px;flex-shrink:0;align-items:center;justify-content:center;border-radius:6px;border:1px solid rgba(213,215,226,0.5);background:transparent;color:#7a7a8a', starIc: 'display:inline-flex;width:13px;height:13px', starFill: 'none' },
+      ],
+    };
+  }
+
+  renderVals() {
+    const tab = this.state.tab ?? this.props.tab ?? 'matchup';
+    const setTab = (t) => () => this.setState({ tab: t });
+    const showBench = this.props.showBench ?? true;
+    const win = this.state.win ?? 'week';
+    const setWin = (w) => () => this.setState({ win: w });
+    const pk = (a) => `padding:4px 10px;font-weight:500;border:none;background:${a ? 'rgba(52,211,153,0.15)' : 'transparent'};color:${a ? '#34d399' : '#7a7a8a'}`;
+    const wk = { weekBtn: pk(win === 'week'), todayBtn: pk(win === 'today'), label: win === 'week' ? 'Week 12' : 'Today (Eastern)' };
+
+    const seg = {};
+    for (const k of ['overview', 'matchup', 'standings', 'roster']) {
+      const active = tab === k;
+      const color = active ? '#34d399' : '#7a7a8a';
+      seg[k] = {
+        btn: `position:relative;display:inline-flex;align-items:center;gap:6px;border-radius:6px;padding:2px 10px;border:none;font-size:12px;line-height:18px;background:${active ? 'rgba(52,211,153,0.15)' : 'transparent'};color:${color};font-weight:${active ? 600 : 500}`,
+        ic: `display:inline-flex;width:13px;height:13px;color:${color}`,
+      };
+    }
+
+    // [name, team, dp, stats, proj, flags]
+    const US = [
+      ['Jalen Hurts', 'PHI', 'QB', { 4: 261, 5: 2, 6: 1, 9: 47, 10: 1 }, 21.4, { slot: 'QB' }],
+      ["Ja'Marr Chase", 'CIN', 'WR', { 11: 9, 12: 121, 13: 1 }, 19.8, { slot: 'WR' }],
+      ['Nico Collins', 'HOU', 'WR', { 11: 5, 12: 74 }, 14.1, { thu: true, slot: 'WR' }],
+      ['Bijan Robinson', 'ATL', 'RB', { 9: 88, 10: 1, 11: 4, 12: 31 }, 18.9, { slot: 'RB' }],
+      ['Kenneth Walker III', 'SEA', 'RB', { 9: 52, 11: 2, 12: 18, 18: 1 }, 13.2, { slot: 'RB' }],
+      ['Trey McBride', 'ARI', 'TE', { 11: 7, 12: 68 }, 12.6, { slot: 'TE' }],
+      ['Jaxon Smith-Njigba', 'SEA', 'WR', { 11: 6, 12: 83, 13: 1 }, 15.5, { slot: 'W/R/T' }],
+      ["De'Von Achane", 'MIA', 'RB', { 9: 34, 11: 3, 12: 19 }, 14.2, { live: true, slot: 'W/R/T' }],
+    ];
+    const UB = [
+      ['Tank Dell', 'HOU', 'WR', {}, 9.4, { status: 'Q', slot: 'BN' }],
+      ['Tyjae Spears', 'TEN', 'RB', { 9: 31, 11: 1, 12: 9 }, 7.8, { slot: 'BN' }],
+      ['Jordan Addison', 'MIN', 'WR', { 11: 4, 12: 52 }, 11.2, { slot: 'BN' }],
+      ['Rashee Rice', 'KC', 'WR', {}, 0, { status: 'IR', slot: 'IR' }],
+    ];
+    const OS = [
+      ['Patrick Mahomes', 'KC', 'QB', { 4: 221, 5: 2, 6: 1 }, 22.8, {}],
+      ['CeeDee Lamb', 'DAL', 'WR', { 11: 10, 12: 134, 13: 1 }, 20.4, {}],
+      ['Garrett Wilson', 'NYJ', 'WR', { 11: 7, 12: 82 }, 15.2, {}],
+      ['Saquon Barkley', 'PHI', 'RB', { 9: 121, 10: 1, 11: 2, 12: 17 }, 20.1, {}],
+      ['James Cook', 'BUF', 'RB', { 9: 67, 10: 1, 11: 3, 12: 24 }, 14.8, { thu: true }],
+      ['George Kittle', 'SF', 'TE', { 11: 6, 12: 77 }, 14.2, {}],
+      ['Davante Adams', 'LAR', 'WR', { 11: 8, 12: 91 }, 16.1, {}],
+      ['Kyren Williams', 'LAR', 'RB', { 9: 58, 11: 3, 12: 21 }, 13.6, {}],
+    ];
+    const OB = [
+      ['Khalil Shakir', 'BUF', 'WR', { 11: 5, 12: 48 }, 10.4, { thu: true }],
+      ['Cade Otton', 'TB', 'TE', { 11: 4, 12: 39 }, 8.1, {}],
+    ];
+    // K + D/ST — points asserted from standard Yahoo kicker/DEF scoring
+    const UK = ['Jake Bates', 'DET', 'K', {}, 8.6, { fixedPts: 11.0, line: '2/3 FG · long 52 · 3/3 XP', slot: 'K', raw: ['–', '–', '1', '–', '1', '3'] }];
+    const OK = ['Brandon Aubrey', 'DAL', 'K', {}, 9.2, { fixedPts: 13.0, line: '3/3 FG · long 51 · 1/1 XP' }];
+    const UD = ['Steelers D/ST', 'PIT', 'DEF', {}, 6.5, { fixedPts: 8.0, line: '3 sacks · 1 INT · 1 fum rec · 17 pts allowed', slot: 'DEF', raw: ['3', '1', '1', '–', '17', '–'] }];
+    const OD = ['Ravens D/ST', 'BAL', 'DEF', {}, 7.8, { fixedPts: 10.0, line: '2 sacks · 1 INT · 1 TD · 21 pts allowed' }];
+
+    const slotDefs = [
+      ['QB', US[0], OS[0]], ['WR', US[1], OS[1]], ['WR', US[2], OS[2]],
+      ['RB', US[3], OS[3]], ['RB', US[4], OS[4]], ['TE', US[5], OS[5]],
+      ['W/R/T', US[6], OS[6]], ['W/R/T', US[7], OS[7]],
+      ['K', UK, OK], ['DEF', UD, OD],
+    ];
+    const benchDefs = [
+      ['BN', UB[0], OB[0]], ['BN', UB[1], OB[1]], ['BN', UB[2], null], ['IR', UB[3], null],
+    ];
+
+    const P = [
+      { rank: 1, name: 'Fourth and Long', mgr: 'Manager 99', rec: '8-3', pf: '1301.1', pa: '1188.7', streak: 'W1', crown: true, seed: '#1 seed · bye', clinched: true },
+      { rank: 2, name: 'Brunch Money', mgr: 'You', you: true, rec: '8-3', pf: '1289.4', pa: '1194.2', streak: 'L2', crown: true, seed: '#2 seed · bye', clinched: true },
+      { rank: 3, name: 'Waiver Wire Villains', mgr: 'Manager 10', rec: '7-4', pf: '1244.9', pa: '1201.5', streak: 'W3', seed: '#3 seed' },
+      { rank: 4, name: 'Sunday Scaries', mgr: 'Manager 11', rec: '7-4', pf: '1198.6', pa: '1187.0', streak: 'L1', seed: '#4 seed' },
+    ];
+    const O = [
+      { rank: 5, name: 'The Autodrafters', mgr: 'Manager 12', rec: '6-5', pf: '1210.2', pa: '1214.8', streak: 'W2' },
+      { rank: 6, name: 'Zero RB Truthers', mgr: 'Manager 13', rec: '5-6', pf: '1155.4', pa: '1198.3', streak: 'L3' },
+      { rank: 7, name: 'Bench Warmers', mgr: 'Manager 14', rec: '4-7', pf: '1102.7', pa: '1176.4', streak: 'W1' },
+      { rank: 8, name: 'Punt Returners', mgr: 'Manager 15', rec: '2-9', pf: '1017.2', pa: '1259.6', streak: 'L2' },
+    ];
+    const mkStand = (t, zone) => {
+      const h = Component.hue(t.name);
+      const you = !!t.you;
+      return {
+        ...t, you, crown: !!t.crown, clinched: !!t.clinched, seed: t.seed ?? false,
+        initials: Component.initials(t.name),
+        wrapStyle: you ? 'box-shadow:inset 0 0 0 1px rgba(52,211,153,0.5);background:rgba(52,211,153,0.06)'
+          : zone === 'playoff' ? 'background:rgba(34,197,94,0.02)' : '',
+        logoStyle: `width:20px;height:20px;flex-shrink:0;border-radius:4px;display:flex;align-items:center;justify-content:center;font:600 8px system-ui;background:hsl(${h} 58% 44%);color:#ffffff`,
+        nameStyle: `overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:16px;font-weight:600;color:${you ? '#34d399' : '#1a1b2e'}`,
+        streakStyle: `text-align:right;font-size:11px;font-weight:600;color:${t.streak[0] === 'W' ? '#22c55e' : '#ef4444'}`,
+      };
+    };
+
+    const cardBase = 'display:flex;width:100%;align-items:center;gap:12px;border-radius:8px;padding:12px;background:rgba(246,247,251,0.4);text-align:left;cursor:pointer;font-family:inherit;';
+
+    return {
+      isOverview: tab === 'overview', isMatchup: tab === 'matchup',
+      isStandings: tab === 'standings', isRoster: tab === 'roster',
+      isAccount: tab === 'account',
+      showLeagueSelect: tab !== 'overview' && tab !== 'account',
+      showBench,
+      goOverview: setTab('overview'), goMatchup: setTab('matchup'),
+      goStandings: setTab('standings'), goRoster: setTab('roster'),
+      goAccount: () => this.setState({ tab: tab === 'account' ? 'matchup' : 'account' }),
+      accountPill: `display:inline-flex;flex-shrink:0;align-items:center;gap:4px;border-radius:9999px;border:1px solid transparent;padding:4px 10px;font-size:12px;line-height:18px;font-weight:500;background:${tab === 'account' ? 'rgba(52,211,153,0.15)' : 'transparent'};color:${tab === 'account' ? '#34d399' : '#7a7a8a'}`,
+      seg,
+      ...this.accountVals(),
+      insights: [
+        { label: 'Top scorer', name: 'Jalen Hurts', initials: 'JH', avStyle: Component.av('Jalen Hurts', 32), value: '28.1', valColor: '#22c55e', sub: 'proj 21.4' },
+        { label: 'In the game', name: "De'Von Achane", initials: 'DA', avStyle: Component.av("De'Von Achane", 32), value: '8.3', valColor: '#16a34a', sub: 'Q3 8:42 · proj 14.2' },
+        { label: 'Best on bench', name: 'Jordan Addison', initials: 'JA', avStyle: Component.av('Jordan Addison', 32), value: '9.2', valColor: '#7a7a8a', sub: '+2.2 over K. Walker' },
+      ],
+      setWeek: setWin('week'), setToday: setWin('today'), wk,
+      tot: win === 'week'
+        ? { u: '157.9', o: '165.0', uLabel: 'Scored · proj 163.8', oLabel: 'proj 165.0 · scored' }
+        : { u: '145.5', o: '146.9', uLabel: 'Today (Eastern) · week 157.9', oLabel: 'week 165.0 · Today (Eastern)' },
+      slotRows: slotDefs.map((d) => this.mkPair(d, win)),
+      benchRows: benchDefs.map((d) => this.mkPair(d, win)),
+      rosterCols: ['Pts', 'Proj', 'Game', 'Pass Yds', 'Pass TD', 'Int', 'Rush Yds', 'Rush TD', 'Rec', 'Rec Yds', 'Rec TD', 'Fum Lost'],
+      kCols: ['Pts', 'Proj', 'Game', 'FG 0-19', 'FG 20-29', 'FG 30-39', 'FG 40-49', 'FG 50+', 'PAT'],
+      dCols: ['Pts', 'Proj', 'Game', 'Sack', 'Int', 'Fum Rec', 'Ret TD', 'Pts Allow', 'Safety'],
+      rosterStarters: US.map((p) => this.mkRosterRow(p, false, win)),
+      rosterBench: UB.map((p) => this.mkRosterRow(p, true, win)),
+      rosterK: [this.mkSpecialRow(UK)],
+      rosterD: [this.mkSpecialRow(UD)],
+      playoffRows: P.map((t) => mkStand(t, 'playoff')),
+      outsideRows: O.map((t) => mkStand(t, 'outside')),
+      injuries: [
+        { status: 'Q', name: 'Tank Dell', pos: 'WR', note: 'Hamstring — limited in Friday practice', slot: 'BN', pill: "display:inline-flex;flex-shrink:0;align-items:center;border-radius:4px;border:1px solid rgba(245,158,11,0.4);background:rgba(245,158,11,0.2);color:#f59e0b;padding:1px 6px;font:600 11px/15px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em" },
+        { status: 'IR', name: 'Rashee Rice', pos: 'WR', note: 'Knee', slot: 'IR', pill: "display:inline-flex;flex-shrink:0;align-items:center;border-radius:4px;border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.2);color:#ef4444;padding:1px 6px;font:600 11px/15px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em" },
+      ],
+      fieldPlayers: (() => {
+        const base = 'display:flex;align-items:center;gap:10px;border-radius:8px;padding:10px 12px;';
+        const ptsBase = "font:700 14px/19px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;";
+        const stBase = "font:400 11px/15px 'IBM Plex Mono',monospace;white-space:nowrap;";
+        return [
+          { name: "De'Von Achane", initials: 'DA', avStyle: Component.av("De'Von Achane", 28), sub: 'MIA · RB — Sunday Money', pts: '8.3', status: 'Q3 8:42',
+            cardStyle: base + 'border:1px solid rgba(255,71,87,0.35);background:#ffffff',
+            ptsStyle: ptsBase + 'color:#16a34a;border-radius:4px;padding:0 3px;animation:ptsFlash 6s ease-in-out infinite',
+            statusStyle: stBase + 'color:#ff4757;font-weight:600' },
+          { name: 'Chuba Hubbard', initials: 'CH', avStyle: Component.av('Chuba Hubbard', 28), sub: 'CAR · RB — Work League', pts: '12.9', status: 'proj · Sun 8:20 PM',
+            cardStyle: base + 'border:1px solid rgba(213,215,226,0.4);background:rgba(246,247,251,0.4)',
+            ptsStyle: ptsBase + 'color:#7a7a8a', statusStyle: stBase + 'color:#a0a0b0' },
+          { name: 'Courtland Sutton', initials: 'CS', avStyle: Component.av('Courtland Sutton', 28), sub: 'DEN · WR — Work League', pts: '12.1', status: 'proj · Sun 8:20 PM',
+            cardStyle: base + 'border:1px solid rgba(213,215,226,0.4);background:rgba(246,247,251,0.4)',
+            ptsStyle: ptsBase + 'color:#7a7a8a', statusStyle: stBase + 'color:#a0a0b0' },
+        ];
+      })(),
+      leagueCards: (() => {
+        const base = 'border-radius:10px;background:#ffffff;padding:14px;cursor:pointer;';
+        const livePill = "display:flex;flex-shrink:0;align-items:center;gap:4px;border-radius:9999px;border:1px solid rgba(255,71,87,0.4);background:rgba(255,71,87,0.15);padding:1px 8px;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#ff4757";
+        const finalPill = "display:flex;flex-shrink:0;align-items:center;border-radius:9999px;border:1px solid rgba(213,215,226,0.6);background:#f6f7fb;padding:1px 8px;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a";
+        const score = 'font-size:22px;line-height:28px;font-weight:700;color:';
+        return [
+          { meta: 'Football · Week 12 · Primary', name: 'The Sunday Money League', live: true, pillText: 'Live', pillStyle: livePill,
+            uName: 'Brunch Money', rank: '#2 · 8-3', oName: 'Fourth and Long', oRank: '#1 · 8-3',
+            my: '157.9', opp: '165.0', scoreStyle: score + '#1a1b2e', proj: 'proj 163.8 · 165.0',
+            showBar: true, win: '24%', winL: 'You 24%', winR: '76% Opp',
+            footL: 'Top: Jalen Hurts 28.1', footR: 'Achane in play · need 7.2', footRStyle: 'white-space:nowrap;color:#ff4757;font-weight:600',
+            cardStyle: base + 'border:1px solid rgba(255,71,87,0.35);grid-column:span 2' },
+          { meta: 'Football · Week 12', name: 'Work League (Keeper)', live: true, pillText: 'Live', pillStyle: livePill,
+            uName: 'Third and Inches', rank: '#4 · 6-5', oName: 'Gridiron Ghosts', oRank: '#3 · 7-4',
+            my: '76.3', opp: '78.8', scoreStyle: score + '#1a1b2e', proj: 'proj 101.3 · 93.0',
+            showBar: true, win: '58%', winL: 'You 58%', winR: '42% Opp',
+            footL: 'Top: A. St. Brown 21.9', footR: '2 yet to play · one-score game', footRStyle: 'white-space:nowrap;color:#f59e0b;font-weight:600',
+            cardStyle: base + 'border:1px solid rgba(255,71,87,0.35)' },
+          { meta: 'Football · Week 12', name: 'Dynasty or Bust', live: false, pillText: 'Final', pillStyle: finalPill,
+            uName: 'Regression Candidates', rank: '#1 · 9-2', oName: 'Air Yards Only', oRank: '#6 · 5-6',
+            my: '184.5', opp: '151.0', scoreStyle: score + '#16a34a', proj: 'Final',
+            showBar: false, win: '100%', winL: '', winR: '',
+            footL: 'Top: Josh Allen 36.9', footR: 'Won by 33.5', footRStyle: 'white-space:nowrap;color:#16a34a;font-weight:600',
+            cardStyle: base + 'border:1px solid rgba(213,215,226,0.5)' },
+        ];
+      })(),
+    };
+  }
+}
+</script>
+</body>
+</html>

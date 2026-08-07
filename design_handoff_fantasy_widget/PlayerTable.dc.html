@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<section style="min-width:0">
+  <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
+    <h3 style="margin:0;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#7a7a8a">{{ title }}</h3>
+    <span style="font:400 11px/16px 'IBM Plex Mono',monospace;color:#a0a0b0;font-variant-numeric:tabular-nums">{{ count }}</span>
+  </div>
+  <div style="{{ wrapStyle }}">
+    <table style="width:100%;min-width:{{ minw }};border-collapse:collapse;font-size:11px">
+      <thead>
+        <tr>
+          <th style="position:sticky;left:0;z-index:2;background:#f6f7fb;padding:8px 12px;text-align:left;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#a0a0b0;border-bottom:1px solid rgba(213,215,226,0.4)">Player</th>
+          <th style="padding:8px 4px;text-align:center;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#a0a0b0;border-bottom:1px solid rgba(213,215,226,0.4)">Slot</th>
+          <sc-for list="{{ cols }}" as="c" hint-placeholder-count="9">
+            <th style="padding:8px;text-align:right;font:500 11px/16px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;color:#a0a0b0;border-bottom:1px solid rgba(213,215,226,0.4);white-space:nowrap">{{ c }}</th>
+          </sc-for>
+        </tr>
+      </thead>
+      <tbody>
+        <sc-for list="{{ rows }}" as="p" hint-placeholder-count="8">
+          <tr>
+            <td style="position:sticky;left:0;z-index:1;background:{{ cellBg }};padding:8px 12px;border-top:1px solid rgba(213,215,226,0.2)">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="{{ p.avStyle }}">{{ p.initials }}</div>
+                <div style="min-width:0">
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <span style="{{ nameStyle }}">{{ p.name }}</span>
+                    <sc-if value="{{ p.injured }}" hint-placeholder-val="{{ false }}">
+                      <span style="{{ p.badge }}"><span style="{{ p.badgeIcon }}"><svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg></span>{{ p.status }}</span>
+                    </sc-if>
+                  </div>
+                  <div style="font-size:11px;line-height:16px;color:#a0a0b0;white-space:nowrap">{{ p.sub }}</div>
+                </div>
+              </div>
+            </td>
+            <td style="padding:8px 4px;text-align:center;border-top:1px solid rgba(213,215,226,0.2)">
+              <span style="{{ slotStyle }}">{{ p.slot }}</span>
+            </td>
+            <sc-for list="{{ p.cells }}" as="c" hint-placeholder-count="9">
+              <td style="{{ c.st }}">{{ c.v }}</td>
+            </sc-for>
+          </tr>
+        </sc-for>
+      </tbody>
+    </table>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:900,&quot;height&quot;:420},&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Offense&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;count&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;8&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;subdued&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;rows&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;PlayerRow[]&quot;},&quot;cols&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string[]&quot;},&quot;minw&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const sub = !!this.props.subdued;
+    return {
+      title: this.props.title ?? '',
+      count: this.props.count ?? '',
+      cols: this.props.cols ?? [],
+      rows: this.props.rows ?? [],
+      minw: this.props.minw ?? '0',
+      wrapStyle: `overflow-x:auto;border-radius:8px;border:1px solid ${sub ? 'rgba(213,215,226,0.3)' : 'rgba(213,215,226,0.4)'};background:${sub ? 'rgba(246,247,251,0.4)' : '#ffffff'}`,
+      cellBg: sub ? '#fbfcfd' : '#ffffff',
+      nameStyle: `font-weight:500;white-space:nowrap;color:${sub ? '#7a7a8a' : '#4a4a5a'}`,
+      slotStyle: `display:inline-block;border-radius:9999px;border:1px solid ${sub ? 'rgba(213,215,226,0.3)' : 'rgba(213,215,226,0.5)'};background:${sub ? 'rgba(240,242,248,0.5)' : '#f6f7fb'};color:${sub ? '#a0a0b0' : '#7a7a8a'};padding:1px 6px;font:500 8px/1.7 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap`,
+    };
+  }
+}
+</script>
+</body>
+</html>

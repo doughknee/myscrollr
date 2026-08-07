@@ -66,13 +66,51 @@ const STAT_CATALOG = {
     { stat_id: '12', display_name: 'Rec Yds', name: 'Receiving Yards', position_type: 'O', sort_order: 7, display_only: false },
     { stat_id: '13', display_name: 'Rec TD', name: 'Receiving Touchdowns', position_type: 'O', sort_order: 8, display_only: false },
     { stat_id: '18', display_name: 'Fum Lost', name: 'Fumbles Lost', position_type: 'O', sort_order: 9, display_only: false },
+    // Kicking — position_type 'K'. The Roster view groups by
+    // position_type, so these have to carry it to land in their own table.
+    { stat_id: '19', display_name: 'FG 0-19', name: 'Field Goals 0-19 Yards', position_type: 'K', sort_order: 10, display_only: false },
+    { stat_id: '20', display_name: 'FG 20-29', name: 'Field Goals 20-29 Yards', position_type: 'K', sort_order: 11, display_only: false },
+    { stat_id: '21', display_name: 'FG 30-39', name: 'Field Goals 30-39 Yards', position_type: 'K', sort_order: 12, display_only: false },
+    { stat_id: '22', display_name: 'FG 40-49', name: 'Field Goals 40-49 Yards', position_type: 'K', sort_order: 13, display_only: false },
+    { stat_id: '23', display_name: 'FG 50+', name: 'Field Goals 50+ Yards', position_type: 'K', sort_order: 14, display_only: false },
+    { stat_id: '24', display_name: 'PAT', name: 'Point After Attempt Made', position_type: 'K', sort_order: 15, display_only: false },
+    // Defense / Special Teams — position_type 'D'.
+    { stat_id: '29', display_name: 'Sack', name: 'Sacks', position_type: 'D', sort_order: 16, display_only: false },
+    { stat_id: '30', display_name: 'Int', name: 'Interceptions', position_type: 'D', sort_order: 17, display_only: false },
+    { stat_id: '31', display_name: 'Fum Rec', name: 'Fumble Recoveries', position_type: 'D', sort_order: 18, display_only: false },
+    { stat_id: '32', display_name: 'Ret TD', name: 'Return Touchdowns', position_type: 'D', sort_order: 19, display_only: false },
+    { stat_id: '33', display_name: 'Safety', name: 'Safeties', position_type: 'D', sort_order: 20, display_only: false },
+    // Points allowed scores on a bracket, not a rate, so it can't carry a
+    // flat modifier. Shown in the table, scored via ptsAllowedBonus().
+    { stat_id: '34', display_name: 'Pts Allow', name: 'Points Allowed', position_type: 'D', sort_order: 21, display_only: true },
   ],
-  modifiers: { 4: 0.04, 5: 4, 6: -1, 9: 0.1, 10: 6, 11: 1, 12: 0.1, 13: 6, 18: -2 },
+  modifiers: {
+    4: 0.04, 5: 4, 6: -1, 9: 0.1, 10: 6, 11: 1, 12: 0.1, 13: 6, 18: -2,
+    19: 3, 20: 3, 21: 3, 22: 4, 23: 5, 24: 1,
+    29: 1, 30: 2, 31: 2, 32: 6, 33: 2,
+  },
+}
+
+/**
+ * Standard Yahoo points-allowed bracket for a D/ST. Derived from the
+ * number the table displays, so the column and the score still agree —
+ * the same rule the rest of the fixture follows.
+ */
+function ptsAllowedBonus(allowed) {
+  const n = Number(allowed)
+  if (Number.isNaN(n)) return 0
+  if (n === 0) return 10
+  if (n <= 6) return 7
+  if (n <= 13) return 4
+  if (n <= 20) return 1
+  if (n <= 27) return 0
+  if (n <= 34) return -1
+  return -4
 }
 
 const round2 = (n) => Math.round(n * 100) / 100
 
-/** points = Σ stat × modifier, at Yahoo's 2dp display precision. */
+/** points = Σ stat × modifier (+ D/ST bracket), at Yahoo's 2dp precision. */
 function scoreOf(stats) {
   let total = 0
   for (const [id, raw] of Object.entries(stats)) {
@@ -81,6 +119,7 @@ function scoreOf(stats) {
     const val = Number(raw)
     if (!Number.isNaN(val)) total += val * mod
   }
+  if (stats['34'] != null) total += ptsAllowedBonus(stats['34'])
   return round2(total)
 }
 
@@ -142,14 +181,18 @@ const ROSTERS = {
   // on a Monday every Sunday stat belongs to yesterday, and the Today
   // table would be an empty grid.
   sunday: [
-    { pos: 'QB', name: 'Jalen Hurts', team: 'PHI', dp: 'QB', stats: { 4: 261, 5: 2, 6: 1, 9: 47, 10: 1 }, proj: 21.4 },
+    { pos: 'QB', name: 'Jalen Hurts', team: 'PHI', dp: 'QB', stats: { 4: 260, 5: 2, 6: 1, 9: 47, 10: 1 }, proj: 21.4, game: 'Final' },
     { pos: 'WR', name: 'Ja’Marr Chase', team: 'CIN', dp: 'WR', stats: { 11: 9, 12: 121, 13: 1 }, proj: 19.8 },
     { pos: 'WR', name: 'Nico Collins', team: 'HOU', dp: 'WR', stats: { 11: 5, 12: 74 }, proj: 14.1, thursday: true },
     { pos: 'RB', name: 'Bijan Robinson', team: 'ATL', dp: 'RB', stats: { 9: 88, 10: 1, 11: 4, 12: 31 }, proj: 18.9 },
     { pos: 'RB', name: 'Kenneth Walker III', team: 'SEA', dp: 'RB', stats: { 9: 52, 11: 2, 12: 18, 18: 1 }, proj: 13.2 },
     { pos: 'TE', name: 'Trey McBride', team: 'ARI', dp: 'TE', stats: { 11: 7, 12: 68 }, proj: 12.6 },
     { pos: 'W/R/T', name: 'Jaxon Smith-Njigba', team: 'SEA', dp: 'WR', stats: { 11: 6, 12: 83, 13: 1 }, proj: 15.5 },
-    { pos: 'W/R/T', name: 'De’Von Achane', team: 'MIA', dp: 'RB', stats: {}, proj: 14.2, pending: true },
+    // The live one. 8.30 banked of a 14.2 projection, so 5.90 still to
+    // come — which is what makes the hero read "need 7.2 more".
+    { pos: 'W/R/T', name: 'De’Von Achane', team: 'MIA', dp: 'RB', stats: { 9: 43, 11: 2, 12: 20 }, proj: 14.2, live: true, game: 'Q3 8:42' },
+    { pos: 'K', name: 'Jake Elliott', team: 'PHI', dp: 'K', stats: { 20: 1, 21: 1, 22: 1, 24: 1 }, proj: 8.5, game: 'Final' },
+    { pos: 'DEF', name: 'Denver Broncos', team: 'DEN', dp: 'DEF', stats: { 29: 3, 30: 1, 31: 1, 34: 17 }, proj: 7.8, game: 'Final' },
     { pos: 'BN', name: 'Tank Dell', team: 'HOU', dp: 'WR', stats: {}, proj: 9.4, status: 'Q', status_full: 'Questionable', injury_note: 'Hamstring — limited in Friday practice' },
     { pos: 'BN', name: 'Tyjae Spears', team: 'TEN', dp: 'RB', stats: { 9: 31, 11: 1, 12: 9 }, proj: 7.8 },
     { pos: 'BN', name: 'Jordan Addison', team: 'MIN', dp: 'WR', stats: { 11: 4, 12: 52 }, proj: 11.2 },
@@ -192,7 +235,7 @@ const ROSTERS = {
   // can't roster the same person, and that is the first thing anyone
   // who plays fantasy would notice.
   sundayOpp: [
-    { pos: 'QB', name: 'Patrick Mahomes', team: 'KC', dp: 'QB', stats: { 4: 221, 5: 2, 6: 1 }, proj: 22.8 },
+    { pos: 'QB', name: 'Patrick Mahomes', team: 'KC', dp: 'QB', stats: { 4: 220, 5: 2, 6: 1 }, proj: 22.8, game: 'Final' },
     { pos: 'WR', name: 'CeeDee Lamb', team: 'DAL', dp: 'WR', stats: { 11: 10, 12: 134, 13: 1 }, proj: 20.4 },
     { pos: 'WR', name: 'Garrett Wilson', team: 'NYJ', dp: 'WR', stats: { 11: 7, 12: 82 }, proj: 15.2 },
     { pos: 'RB', name: 'Saquon Barkley', team: 'PHI', dp: 'RB', stats: { 9: 121, 10: 1, 11: 2, 12: 17 }, proj: 20.1 },
@@ -200,6 +243,8 @@ const ROSTERS = {
     { pos: 'TE', name: 'George Kittle', team: 'SF', dp: 'TE', stats: { 11: 6, 12: 77 }, proj: 14.2 },
     { pos: 'W/R/T', name: 'Davante Adams', team: 'LAR', dp: 'WR', stats: { 11: 8, 12: 91 }, proj: 16.1 },
     { pos: 'W/R/T', name: 'Kyren Williams', team: 'LAR', dp: 'RB', stats: { 9: 58, 11: 3, 12: 21 }, proj: 13.6 },
+    { pos: 'K', name: 'Brandon Aubrey', team: 'DAL', dp: 'K', stats: { 22: 1, 23: 1, 24: 3 }, proj: 9.6, game: 'Final' },
+    { pos: 'DEF', name: 'Houston Texans', team: 'HOU', dp: 'DEF', stats: { 29: 3, 30: 2, 34: 10 }, proj: 8.4, game: 'Final' },
     { pos: 'BN', name: 'Khalil Shakir', team: 'BUF', dp: 'WR', stats: { 11: 5, 12: 48 }, proj: 10.4, thursday: true },
     { pos: 'BN', name: 'Cade Otton', team: 'TB', dp: 'TE', stats: { 11: 4, 12: 39 }, proj: 8.1 },
   ],
@@ -229,6 +274,9 @@ const ROSTERS = {
 const BENCH = new Set(['BN', 'IR', 'IL', 'NA'])
 const isStarter = (p) => !BENCH.has(p.selected_position)
 
+/** display_position -> Yahoo position_type. Everything else is offense. */
+const POSITION_TYPE = { K: 'K', DEF: 'D', 'D/ST': 'D', DST: 'D' }
+
 /** Yahoo ships stat values as STRINGS — see the note on RosterPlayer. */
 const asStatMap = (stats) =>
   Object.fromEntries(Object.entries(stats).map(([k, v]) => [k, String(v)]))
@@ -249,8 +297,17 @@ function buildPlayers(roster, idBase) {
       display_position: p.dp,
       selected_position: p.pos,
       eligible_positions: [p.dp],
-      position_type: 'O',
+      // Drives groupByPositionType, which is what splits the Roster view
+      // into its Offense / Kickers / Defense tables.
+      position_type: POSITION_TYPE[p.dp] ?? 'O',
       image_url: playerAvatar(p.name),
+      // NOT a Yahoo field. Per-player game state has to come from a join
+      // against the sports service (team abbr -> clock/kickoff) that
+      // doesn't exist yet; the fixture is currently its only provider so
+      // the live treatments have something to render. gameStateForPlayer()
+      // is the seam that reads it, and every view degrades to "—" when
+      // it's absent — which is exactly what real data does today.
+      game_state: p.game ?? null,
       status: p.status ?? null,
       status_full: p.status_full ?? null,
       injury_note: p.injury_note ?? null,
@@ -270,15 +327,29 @@ function buildPlayers(roster, idBase) {
   })
 }
 
-/** Banked + projected for a roster, derived so views can't disagree. */
+/**
+ * Banked + projected for a roster, derived so views can't disagree.
+ *
+ * Three player states, not two. A `pending` starter contributes their
+ * whole projection; a `live` one contributes only what's LEFT of it
+ * (proj minus what they've already banked), floored at zero so a player
+ * outperforming his projection can't drag the total down. Treating live
+ * players as pending would double-count the points already on the board.
+ */
 function totalsFor(roster, players) {
+  const byName = new Map(players.map((p) => [p.name.full, p]))
   const banked = round2(
     players.filter(isStarter).reduce((n, p) => n + (p.player_points ?? 0), 0),
   )
-  const pending = round2(
-    roster.filter((p) => p.pending && !BENCH.has(p.pos)).reduce((n, p) => n + p.proj, 0),
+  const remaining = round2(
+    roster
+      .filter((p) => (p.pending || p.live) && !BENCH.has(p.pos))
+      .reduce((n, p) => {
+        const scored = byName.get(p.name)?.player_points ?? 0
+        return n + Math.max(0, p.proj - scored)
+      }, 0),
   )
-  return { banked, projected: round2(banked + pending), pending }
+  return { banked, projected: round2(banked + remaining), remaining }
 }
 
 /**
@@ -395,7 +466,10 @@ const LEAGUES = [
   buildLeague({
     key: '449.l.884213', name: 'The Sunday Money League', teamId: 4,
     teamName: 'Brunch Money', oppName: 'Fourth and Long',
-    margin: 11.4, week: 12, status: 'midevent',
+    // 165.00 - 157.90. Achane is live with 5.90 of his projection still
+    // to come, so the hero reads "need 7.2 more" — the deficit rounded
+    // up to the next tenth, i.e. the smallest number that actually wins.
+    margin: 7.1, week: 12, status: 'midevent',
     rosterName: 'sunday', oppRosterName: 'sundayOpp', idBase: 30000,
     rivals: {
       userRecord: [8, 3, 1289.44],
