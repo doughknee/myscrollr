@@ -2,24 +2,28 @@
  * Beat 01 — the hook. 3 seconds, locked camera.
  *
  * You are 1.8 points down with a player still on the field, and the
- * number crosses while you watch. No supers, no explanation: every
- * fantasy player has lived this exact number, and the storyboard is
- * right that the feeling has to land before the product does.
+ * number crosses while you watch. Every fantasy player has lived this
+ * exact number, and the storyboard is right that the feeling has to land
+ * before the product does.
  *
- * Two layers, deliberately:
+ * Read as a BROADCAST SCOREBOARD, not as one number. The first cut was a
+ * single hero figure and it was impossible to tell what was happening: a
+ * viewer needs both teams, both scores, and the state in words to follow
+ * "losing → winning" in three seconds. So:
  *
- *   the score   a promo-native hero number, rolling on AnimateNumber.
- *               This is a graphic, not a screenshot — it is not
- *               claiming the app renders a 260px score.
- *   the chip    the REAL FantasyStatChip with real league data, so the
- *               beat proves the product underneath the graphic. When
- *               the chip design changes this re-renders instead of
- *               going stale.
+ *   context     which league, which week, that it's live
+ *   scoreboard  both teams, both scores, yours coloured by the lead
+ *   state       "TRAILING BY 1.8" → "AHEAD BY 0.1", the story in words
+ *   chip        the REAL FantasyStatChip, rolling its own digits
+ *
+ * The scoreboard is a promo graphic — it isn't claiming the app renders
+ * a 180px score. The chip underneath is the actual component, so when
+ * the chip design changes this re-renders instead of going stale.
  *
  * Layout is explicit inline style rather than AbsoluteFill defaults or
- * Tailwind utilities: the composition renders at a fixed 2560x1440
- * where responsive utilities buy nothing. Styling the CHIP is
- * Tailwind's job; placing it in frame is not.
+ * Tailwind utilities: the composition renders at a fixed 2560x1440 where
+ * responsive utilities buy nothing. Styling the CHIP is Tailwind's job;
+ * placing it in frame is not.
  */
 import { AnimateNumber } from "motion-plus/react";
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
@@ -27,45 +31,39 @@ import FantasyStatChip from "../../../desktop/src/components/chips/FantasyStatCh
 import { DEFAULT_WIDGET_DISPLAY } from "../../../desktop/src/preferences";
 import {
   CLOSING_SCORE,
-  DRIFT_SCORE,
   OPENING_SCORE,
   OPPONENT_SCORE,
   sundayMoney,
 } from "../data/sundayMoney";
-
 import { useMotionClock } from "../motionClock";
 
 /** The second the lead changes hands. Everything keys off this. */
 const FLIP_AT_SECONDS = 2;
 
-/** Chip is supporting cast now, not the hero. */
-const CHIP_SCALE = 2.4;
+/** Chip is supporting cast under the scoreboard, not the hero. */
+const CHIP_SCALE = 2.6;
+
+const MONO = "var(--font-mono, ui-monospace, monospace)";
 
 /**
- * Points land as PLAYS, not as a ramp — the app's number jumps when a
- * poll lands, so the beat does too, and each landing is what
- * AnimateNumber rolls.
+ * Shared by the scoreboard and the chip so they roll in step.
  *
- * A linear ramp was the first instinct and it desyncs the shot: with
- * 1.8 of the 1.9-point climb happening before the lead actually
- * changes, the crossing lands ~14 frames after the spring fires, so the
- * flash reads as a separate event from the number. Discrete plays put
- * the number, the colour flip and the ring on one frame.
+ * bounce: 0 is deliberate. A spring that overshoots makes a settled
+ * score wobble after it lands, which reads as the number being unsure of
+ * itself — that was the "shaking" in the first cut.
  *
- * Frame-keyed rather than second-keyed so the beat is deterministic.
+ * 0.28s because the chip below shows the same score: at 0.5s the
+ * scoreboard still read 150.5 while the chip already said 151.8.
  */
-const PLAYS: readonly (readonly [frame: number, score: number])[] = [
-  [0, OPENING_SCORE], // 149.9 — where the beat opens
-  [48, DRIFT_SCORE], // 150.4 — a catch, keeps the number alive
-  [FLIP_AT_SECONDS * 60, CLOSING_SCORE], // 151.8 — the go-ahead
-];
-
-const fill: React.CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
+const ROLL = {
+  format: { minimumFractionDigits: 1, maximumFractionDigits: 1 },
+  locales: "en-US",
+  transition: {
+    type: "spring" as const,
+    visualDuration: 0.28,
+    bounce: 0,
+    opacity: { duration: 0.15, ease: "linear" as const },
+  },
 };
 
 export function Beat1Hook() {
@@ -77,23 +75,35 @@ export function Beat1Hook() {
   const { fps } = useVideoConfig();
   const flipFrame = FLIP_AT_SECONDS * fps;
 
-  const userPoints = PLAYS.reduce(
-    (score, [at, value]) => (frame >= at ? value : score),
-    OPENING_SCORE,
-  );
-  const ahead = userPoints > OPPONENT_SCORE;
+  // One event, not a ramp. An earlier cut had a small "drift" score at
+  // 0.8s to keep the number alive; it read as a twitch before the real
+  // moment and muddied what the shot was about.
+  const ahead = frame >= flipFrame;
+  const userPoints = ahead ? CLOSING_SCORE : OPENING_SCORE;
+  const margin = Math.abs(round1(userPoints - OPPONENT_SCORE));
 
-  // One spring on the crossing. Scale only — nothing that moves the
-  // chip's baseline or reflows its text mid-shot.
+  // Critically damped on purpose — see ROLL. This drives the lift and
+  // the ring, and an oscillating spring would put the wobble straight
+  // back in by another route.
   const pop = spring({
     frame: frame - flipFrame,
     fps,
-    config: { damping: 14, stiffness: 180, mass: 0.6 },
-    durationInFrames: Math.round(fps * 0.6),
+    config: { damping: 200 },
+    durationInFrames: Math.round(fps * 0.45),
   });
 
   return (
-    <div style={{ ...fill, background: "#05070a", overflow: "hidden" }}>
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#05070a",
+        overflow: "hidden",
+      }}
+    >
       {/*
         NO shell wrapper, deliberately.
 
@@ -107,41 +117,41 @@ export function Beat1Hook() {
         blank renders before the CSS explained itself.
 
         Not needed anyway: style.css's default @theme block IS the
-        scrollr-dark palette, applied at :root. A promo in another
-        palette would need those variables re-scoped WITHOUT the shell's
-        layout rules coming along.
+        scrollr-dark palette, applied at :root.
       */}
       <div
         style={{
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: 72,
+          gap: 52,
         }}
       >
-        <HeroScore points={userPoints} ahead={ahead} pop={pop} />
+        <Context />
+        <Scoreboard points={userPoints} ahead={ahead} pop={pop} />
+        <State ahead={ahead} margin={margin} />
 
         <div
           style={{
             position: "relative",
             width: "max-content",
             transform: `scale(${CHIP_SCALE})`,
+            marginTop: 28,
           }}
         >
           <FantasyStatChip
             league={sundayMoney(userPoints)}
             prefs={DEFAULT_WIDGET_DISPLAY.fantasy}
             comfort
+            // The product's own digits roll too, in step with the
+            // scoreboard above. Off by default so the main window keeps
+            // its steady bar — see FantasyStatChip.
+            rollScore
           />
           {/*
-            The crossing, felt rather than announced — the storyboard's
-            "one soft tick", made visible, tying the graphic to the
-            product underneath it.
-
-            Inside the scaled wrapper on purpose. Sized against the
-            FRAME it fired within the chip's own bounds once the chip
-            got big; inset off the chip, it wraps whatever size the chip
-            is and scales with it.
+            Inside the scaled wrapper on purpose. Sized against the FRAME
+            it fired within the chip's own bounds once the chip got big;
+            inset off the chip, it wraps whatever size the chip is.
           */}
           {ahead && <FlashRing progress={pop} />}
         </div>
@@ -150,7 +160,28 @@ export function Beat1Hook() {
   );
 }
 
-function HeroScore({
+/** Which league, which week, and that this is happening now. */
+function Context() {
+  return (
+    <div
+      style={{
+        fontFamily: MONO,
+        fontSize: 36,
+        letterSpacing: "0.22em",
+        textTransform: "uppercase",
+        color: "#6b7280",
+        display: "flex",
+        alignItems: "center",
+        gap: 22,
+      }}
+    >
+      <span style={{ color: "var(--color-live, #ef4444)" }}>● Live</span>
+      <span>The Sunday Money League · Week 12</span>
+    </div>
+  );
+}
+
+function Scoreboard({
   points,
   ahead,
   pop,
@@ -162,41 +193,108 @@ function HeroScore({
   return (
     <div
       style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 110,
         // The go-ahead lands with a small lift, so the roll reads as an
         // event rather than a value edit.
-        transform: `scale(${1 + (ahead ? pop * 0.04 : 0)})`,
+        transform: `scale(${1 + (ahead ? pop * 0.03 : 0)})`,
       }}
     >
-      <AnimateNumber
-        format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }}
-        locales="en-US"
-        /*
-          Fast on purpose. The chip below shows the same score and
-          updates instantly, so a long roll leaves the two visibly
-          disagreeing — at 0.5s the hero still read 150.5 while the chip
-          said 151.8. At 0.28s the disagreement is ~8 frames of
-          mid-roll digits and reads as the number landing.
-        */
-        transition={{
-          type: "spring",
-          visualDuration: 0.28,
-          bounce: 0.2,
-          opacity: { duration: 0.15, ease: "linear" },
-        }}
+      <Side
+        team="Brunch Money"
+        you
+        points={points}
+        color={ahead ? "var(--color-up)" : "var(--color-down)"}
+      />
+      {/*
+        Bottom-aligned so it spans the NUMBERS, not the whole column. A
+        centred divider drifts up into the team labels, because the
+        column is label + number and the row centres on that full height.
+      */}
+      <div
         style={{
-          fontSize: 260,
+          alignSelf: "flex-end",
+          width: 2,
+          height: 215,
+          background: "#2b3441",
+        }}
+      />
+      <Side team="Fourth and Long" points={OPPONENT_SCORE} color="#9ca3af" />
+    </div>
+  );
+}
+
+function Side({
+  team,
+  points,
+  color,
+  you = false,
+}: {
+  team: string;
+  points: number;
+  color: string;
+  you?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 16,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: MONO,
+          fontSize: 34,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: you ? "#e5e7eb" : "#6b7280",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {team}
+        {you && <span style={{ color: "#6b7280" }}> (you)</span>}
+      </div>
+      <AnimateNumber
+        {...ROLL}
+        style={{
+          fontSize: 215,
           lineHeight: 1,
           fontWeight: 600,
           fontVariantNumeric: "tabular-nums",
-          fontFamily: "var(--font-mono, ui-monospace, monospace)",
-          // Tone flips with the lead, using the same tokens the chip
-          // uses, so the graphic and the product agree on what red and
-          // green mean.
-          color: ahead ? "var(--color-up)" : "var(--color-down)",
+          fontFamily: MONO,
+          color,
         }}
       >
         {points}
       </AnimateNumber>
+    </div>
+  );
+}
+
+/**
+ * The story in words. Without this a viewer sees two numbers a tenth
+ * apart and has to do the arithmetic themselves, which in a 3-second
+ * shot means they don't.
+ */
+function State({ ahead, margin }: { ahead: boolean; margin: number }) {
+  return (
+    <div
+      style={{
+        fontFamily: MONO,
+        fontSize: 50,
+        fontWeight: 600,
+        letterSpacing: "0.16em",
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+        color: ahead ? "var(--color-up)" : "var(--color-down)",
+      }}
+    >
+      {ahead ? "▲ Ahead by " : "▼ Trailing by "}
+      {margin.toFixed(1)}
     </div>
   );
 }
@@ -218,4 +316,8 @@ function FlashRing({ progress }: { progress: number }) {
       }}
     />
   );
+}
+
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
 }
