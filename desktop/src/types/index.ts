@@ -103,6 +103,16 @@ export interface RssItem {
   published_at: string | null;
   created_at: string;
   updated_at: string;
+  /**
+   * Feed category ("Markets", "Tech") for the chip's kicker.
+   *
+   * NOT populated yet. The category lives on `tracked_feeds`, not on
+   * the item row, so surfacing it needs either a join in the Go RSS
+   * query or a client-side feed_url -> category map built from the
+   * catalog. The chip renders correctly without it, which is why the
+   * restyle didn't wait.
+   */
+  category?: string;
 }
 
 // ── API Responses ────────────────────────────────────────────────

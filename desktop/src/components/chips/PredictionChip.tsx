@@ -3,6 +3,7 @@ import { clsx } from "clsx";
 import type { Prediction } from "../../types";
 import type { ChipColorMode } from "../../preferences";
 import { getChipColors, chipBaseClasses } from "./chipColors";
+import { ChipDial } from "./ChipDial";
 import { formatCompactNumber, formatCloseCountdown } from "../../utils/format";
 
 interface PredictionChipProps {
@@ -10,6 +11,18 @@ interface PredictionChipProps {
   comfort?: boolean;
   colorMode?: ChipColorMode;
   onClick?: () => void;
+}
+
+/** Under 24h to close. Below that the chip switches to warning tone. */
+function isClosingSoon(
+  closeStr: string | null | undefined,
+  now: number,
+): boolean {
+  if (!closeStr) return false;
+  const t = new Date(closeStr).getTime();
+  if (Number.isNaN(t)) return false;
+  const diff = t - now;
+  return diff > 0 && diff <= 24 * 60 * 60 * 1000;
 }
 
 /**
@@ -44,18 +57,29 @@ const PredictionChip = memo(
         ? p.title
         : "";
     const countdown = formatCloseCountdown(p.close_time, Date.now());
+    // Under a day left is the state worth flagging: the market is about
+    // to resolve and the probability stops being a forecast. Border
+    // swaps to warning and the countdown gets promoted onto row 1.
+    const closingSoon = isClosingSoon(p.close_time, Date.now());
 
     return (
       <button
         onClick={onClick}
-        className={chipBaseClasses(comfort, c, "whitespace-nowrap")}
+        className={clsx(
+          chipBaseClasses(comfort, c, "whitespace-nowrap"),
+          closingSoon && "border-warning/40",
+        )}
         title={leg ? `${label} — ${leg}` : label}
       >
         {/* Row 1: question, outcome leg, probability pill, delta.
             The pill mirrors the feed's ProbabilityPill classes (chips keep
             their own chipColors system, so the classes are inlined). */}
-        <div className={clsx("flex items-center gap-2", comfort && "text-ui-body")}>
-          <span className={clsx("font-semibold max-w-[18rem] truncate", c.text)}>
+        <div
+          className={clsx("flex items-center gap-2", comfort && "text-ui-body")}
+        >
+          <span
+            className={clsx("font-semibold max-w-[18rem] truncate", c.text)}
+          >
             {label}
           </span>
           {leg && (
@@ -63,12 +87,26 @@ const PredictionChip = memo(
               {leg}
             </span>
           )}
+          {/* Dial replaces the old percentage pill. A ring reads at a
+              glance on a moving rail; the number stays beside it for
+              anyone who wants the exact figure. */}
+          <ChipDial
+            value={yes / 100}
+            size={comfort ? 26 : 18}
+            strokeWidth={comfort ? 3 : 2.5}
+            className={clsx(
+              delta > 0 && "text-up",
+              delta < 0 && "text-down",
+              delta === 0 && "text-predictions",
+            )}
+            label={`${pct} implied probability`}
+          />
           <span
             className={clsx(
-              "inline-flex items-center rounded-full border px-1.5 font-mono font-bold tabular-nums text-ui-chip",
-              delta > 0 && "border-up/40 text-up",
-              delta < 0 && "border-down/40 text-down",
-              delta === 0 && clsx("border-edge", c.textDim),
+              "font-mono font-bold tabular-nums text-ui-chip",
+              delta > 0 && "text-up",
+              delta < 0 && "text-down",
+              delta === 0 && c.textDim,
             )}
           >
             {pct}
@@ -84,24 +122,40 @@ const PredictionChip = memo(
               {Math.abs(delta)}
             </span>
           )}
+          {closingSoon && !comfort && countdown && (
+            <span className="font-mono font-bold uppercase tracking-wider text-ui-chip text-warning">
+              {countdown} left
+            </span>
+          )}
         </div>
 
         {/* Row 2 (comfort only): category · volume · close countdown */}
         {comfort && (
-          <div className={clsx("flex items-center gap-1.5 text-ui-chip", c.textFaint)}>
+          <div
+            className={clsx(
+              "flex items-center gap-1.5 text-ui-chip",
+              c.textFaint,
+            )}
+          >
             {p.category && (
               <span className="uppercase tracking-wide">{p.category}</span>
             )}
             {(p.volume_24h ?? p.volume) != null && (
               <>
                 {p.category && <span className="text-fg-3">&middot;</span>}
-                <span>Vol {formatCompactNumber(p.volume_24h ?? p.volume ?? 0)}</span>
+                <span>
+                  Vol {formatCompactNumber(p.volume_24h ?? p.volume ?? 0)}
+                </span>
               </>
             )}
             {countdown && (
               <>
                 <span className="text-fg-3">&middot;</span>
-                <span>{countdown}</span>
+                <span
+                  className={clsx(closingSoon && "font-semibold text-warning")}
+                >
+                  {closingSoon ? `closes ${countdown}` : countdown}
+                </span>
               </>
             )}
           </div>
