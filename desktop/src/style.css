@@ -1029,6 +1029,33 @@
     border-color 0.3s ease !important;
 }
 
+/* Live spine glow — the 2px bar under a chip whose game is in progress.
+   Opacity only, so it reads as a pulse rather than a movement, and the
+   chip's layout never shifts.
+
+   Attribute-gated for the same reason the marquee is: `#app-shell`
+   stills every animation, so the app gets a steady bar and the ticker
+   window gets the pulse. */
+@keyframes spineGlow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+[data-motion="spine-glow"] {
+  animation: spineGlow 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-motion="spine-glow"] {
+    animation: none;
+  }
+}
+
 /* Live points flash.
    Deliberately NOT gated on which window it's in. The `#app-shell`
    blanket rule below stills it inside the app, which is exactly the
