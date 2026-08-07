@@ -424,7 +424,8 @@ export interface FantasyDisplayPrefs {
    * How much of the fantasy story reaches the ticker.
    *
    *   essential  — one smart chip per league, nothing else
-   *   standard   — + live moment chips (in-play, breaking injury)
+   *   standard   — + live moment chips (in-play, breaking injury).
+   *                THE DEFAULT for fresh installs.
    *   everything — every per-item venue pref above is honoured, and the
    *                Advanced block in the Account panel unlocks
    *
@@ -614,9 +615,15 @@ export const DEFAULT_WIDGET_DISPLAY: WidgetDisplayPrefs = {
     benchOpportunity: "both",
     injuryDetail: "both",
     followedPlayerKeys: [],
-    // Fresh installs start calm. Existing users keep their configured
-    // ticker — see migrateFantasyDisplay.
-    tickerMode: "essential",
+    // Standard, not Essential: the smart league chip tells you a league
+    // is live but not WHO is doing it, and the player mid-game is the
+    // thing worth glancing at. Standard adds exactly those moment chips
+    // and nothing else, so it stays calm while being useful. Essential
+    // remains for anyone who wants strictly one chip per league.
+    //
+    // Existing users keep their configured ticker regardless — see
+    // migrateFantasyDisplay.
+    tickerMode: "standard",
     showStandings: true,
     showMatchups: true,
     defaultSort: "name",
