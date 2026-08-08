@@ -41,22 +41,30 @@ import {
 } from "../data/dashboard";
 import { CLOSING_SCORE, OPENING_SCORE, sundayMoney } from "../data/sundayMoney";
 import { useMotionClock } from "../motionClock";
-import { Desktop } from "../scene/Desktop";
+import { Desktop, REAL_TICKER_BOTTOM } from "../scene/Desktop";
 
 /** Seconds. The whole cut's timing, in one place. */
 const T = {
   /** Camera settled tight on the chip. */
   tight: 1.05,
-  /** The play lands. A feed gives you about 1.5s to justify yourself. */
-  hit: 1.55,
+  /**
+   * The play lands.
+   *
+   * Was 1.55s, which left the "Losing by 0.1" state on screen for about
+   * a quarter of a second — you physically could not finish reading the
+   * line before it became its own opposite. The whole shot depends on
+   * having read the deficit BEFORE it flips, so the deficit now holds
+   * for a little over a second, and so does the payoff.
+   */
+  hit: 2.2,
   /** Camera starts back out; the rail assembles. */
-  rail: 2.35,
+  rail: 3.2,
   /** Back to the desk. */
-  wide: 3.85,
+  wide: 4.7,
   /** A SECOND league takes the lead, on the rail. */
-  second: 4.6,
+  second: 5.5,
   /** Wordmark. */
-  end: 6.4,
+  end: 7.3,
 };
 
 /**
@@ -65,7 +73,13 @@ const T = {
  */
 const MAX_ZOOM = 4.2;
 
-const BAR_Y = 1389;
+/**
+ * The bar sits at the TOP, because that is where it is in the recording.
+ * The composition covers the recording's own ticker strip with its own
+ * bar of real chips so the score can be driven; everything below is the
+ * untouched photograph.
+ */
+const BAR_Y = 46;
 /**
  * Horizontal focus. Not 1280: the sibling leagues either side are
  * different widths, so centring the row leaves the hero chip a little
@@ -131,13 +145,25 @@ export function Beat1Hook() {
     easing: Easing.out(Easing.cubic),
   });
 
-  const zoom =
-    (interpolate(tightness, [0, 1], [1, MAX_ZOOM]) + tightness * creep) *
-    (1 - end * 0.08);
-  const focusY = interpolate(tightness, [0, 1], [720, BAR_Y - 55]);
-  const camera = `translate(${1280 - FOCUS_X * zoom}px, ${
-    720 - focusY * zoom + end * 70
-  }px) scale(${zoom})`;
+  /**
+   * The camera is interpolated between two KNOWN-CORRECT framings rather
+   * than by tracking a moving focus point.
+   *
+   * Focus-point tracking is what a camera normally wants, and it broke
+   * the moment the bar moved to the top edge: zoom grows faster than the
+   * focus can travel, so a third of a second in the translate had already
+   * pushed the top of the screen — the bar, the subject — off frame
+   * entirely. Interpolating the transform itself is guaranteed correct at
+   * both ends and reads as a push that also pans, which is fine.
+   *
+   * Wide: the whole screenshot fills the frame. Tight: the hero chip at
+   * frame centre-x, the bar sitting at 30% height with the type below.
+   */
+  const camZoom =
+    interpolate(tightness, [0, 1], [1, MAX_ZOOM]) + tightness * creep;
+  const camX = interpolate(tightness, [0, 1], [0, 1280 - FOCUS_X * MAX_ZOOM]);
+  const camY = interpolate(tightness, [0, 1], [0, 432 - BAR_Y * MAX_ZOOM]);
+  const camera = `translate(${camX.toFixed(1)}px, ${(camY + end * 70).toFixed(1)}px) scale(${(camZoom * (1 - end * 0.08)).toFixed(4)})`;
 
   /**
    * RACK FOCUS, not a cross-fade to black. The desk used to fade to
@@ -196,7 +222,7 @@ export function Beat1Hook() {
 
   const stakeOpacity = interpolate(
     frame,
-    [f(T.tight + 0.06), f(T.tight + 0.26), f(T.rail), f(T.rail + 0.35)],
+    [f(0.85), f(1.15), f(T.rail), f(T.rail + 0.35)],
     [0, 1, 1, 0],
     {
       extrapolateLeft: "clamp",
@@ -274,16 +300,13 @@ export function Beat1Hook() {
             position: "absolute",
             left: 0,
             right: 0,
-            bottom: 0,
-            height: 1440 - BAR_Y + 51,
-            background:
-              "linear-gradient(to bottom, rgba(8,10,16,0.74) 0%, rgba(8,10,16,0.96) 45%)",
-            borderTop: "1px solid rgba(255,255,255,0.08)",
-            backdropFilter: "blur(12px)",
-            opacity: interpolate(tightness, [0.15, 0.72], [1, 0.55], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
+            top: 0,
+            height: REAL_TICKER_BOTTOM + 16,
+            // Fully OPAQUE, and it has to be: the recording has its own
+            // ticker in exactly this strip, and any translucency lets the
+            // frozen one show through underneath the driven one.
+            background: "#0a0d14",
+            borderBottom: "1px solid rgba(255,255,255,0.09)",
           }}
         />
 
@@ -356,8 +379,8 @@ export function Beat1Hook() {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          justifyContent: "flex-start",
-          paddingTop: 392,
+          justifyContent: "flex-end",
+          paddingBottom: 330,
           gap: 30,
           opacity: stakeOpacity,
           pointerEvents: "none",
@@ -406,7 +429,9 @@ export function Beat1Hook() {
       <div
         style={{
           position: "absolute",
-          top: 30,
+          // BOTTOM-left: the bar occupies the top edge now, and the mark
+          // was landing straight on the chips.
+          bottom: 28,
           left: 36,
           fontFamily: UI,
           fontSize: 28,
@@ -429,10 +454,10 @@ function Mask({ side }: { side: "left" | "right" }) {
       style={{
         position: "absolute",
         [side]: 0,
-        bottom: 0,
+        top: 0,
         width: 150,
-        height: 120,
-        background: `linear-gradient(${side === "left" ? 90 : 270}deg, #080a10 0%, rgba(8,10,16,0) 100%)`,
+        height: REAL_TICKER_BOTTOM + 16,
+        background: `linear-gradient(${side === "left" ? 90 : 270}deg, #0a0d14 0%, rgba(10,13,20,0) 100%)`,
         pointerEvents: "none",
       }}
     />
@@ -545,7 +570,7 @@ function Endcard({
           transform: rise(b),
         }}
       >
-        Stop checking your phone.
+        The moment it happens, you already know.
       </div>
       <div
         style={{
