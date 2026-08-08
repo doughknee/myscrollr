@@ -40,8 +40,17 @@ import { Desktop, REAL_TICKER_BOTTOM } from "../scene/Desktop";
 
 /** Seconds. The whole cut's timing, in one place. */
 const T = {
+  /**
+   * How long the wide shot holds before the camera starts moving.
+   *
+   * There used to be none — the push began on frame 0, because a feed
+   * needs something moving immediately. The rail now drifts from frame 0
+   * regardless, so the motion requirement is met without the camera, and
+   * the opening can breathe long enough to read the desk.
+   */
+  linger: 0.8,
   /** Camera settled tight on the chip. */
-  tight: 1.05,
+  tight: 2.1,
   /**
    * The play lands.
    *
@@ -52,17 +61,17 @@ const T = {
    * holds ~1.4s after it: there is a lot happening on that frame (a
    * score, a colour, a chip lifting) and it needs to be watchable.
    */
-  hit: 2.3,
+  hit: 3.1,
   /** Camera starts back out; the rail assembles. */
-  rail: 3.7,
+  rail: 4.4,
   /** Back to the desk. */
-  wide: 5.1,
+  wide: 5.7,
   /** Cross-dissolve to the Matchup view. */
-  showA: 6.1,
+  showA: 6.7,
   /** Cross-dissolve to the Roster view. */
-  showB: 7.5,
+  showB: 8.0,
   /** Wordmark. */
-  end: 8.9,
+  end: 9.4,
 };
 
 /**
@@ -121,7 +130,7 @@ export function Beat1Hook() {
   // Leaves slow, arrives fast: ~12% of the travel is done by 0.15s, so
   // the frame is visibly moving by frame 9 rather than sitting still for
   // a second while a feed scrolls past it.
-  const pushIn = interpolate(frame, [0, f(T.tight)], [0, 1], {
+  const pushIn = interpolate(frame, [f(T.linger), f(T.tight)], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.bezier(0.45, 0, 0.1, 1),
@@ -147,6 +156,19 @@ export function Beat1Hook() {
   });
 
   /**
+   * The rail drifts from frame ZERO and never stops — including while
+   * the camera is tight on one chip, which is the whole point: a ticker
+   * that only moves when you are looking at the whole bar is a slideshow.
+   * It also means something is moving in frame 1 without the camera
+   * having to, which is what lets the opening hold.
+   *
+   * 30px/s is the app's own default speed, and it is also the fastest
+   * this can go without the rail running out: the row is ~3400px against
+   * a 2560 frame, so a faster drift opens a gap at the trailing edge.
+   */
+  const scrollPx = (frame / fps) * 30;
+
+  /**
    * The camera is interpolated between two KNOWN-CORRECT framings rather
    * than by tracking a moving focus point.
    *
@@ -162,7 +184,17 @@ export function Beat1Hook() {
    */
   const camZoom =
     interpolate(tightness, [0, 1], [1, MAX_ZOOM]) + tightness * creep;
-  const camX = interpolate(tightness, [0, 1], [0, 1280 - FOCUS_X * MAX_ZOOM]);
+  /*
+    The tight framing TRACKS the drifting chip — its scene position is
+    FOCUS_X minus however far the rail has travelled. So when the camera
+    is in close the hero sits still and the rest of the bar slides past
+    it, which is what watching one chip on a moving ticker looks like.
+    At wide there is no tracking and the whole rail simply scrolls.
+  */
+  const camX = interpolate(tightness, [0, 1], [
+    0,
+    1280 - (FOCUS_X - scrollPx) * MAX_ZOOM,
+  ]);
   const camY = interpolate(tightness, [0, 1], [0, 432 - BAR_Y * MAX_ZOOM]);
   /*
     NO push-back on the endcard. It used to scale the world to 0.92 and
@@ -239,17 +271,6 @@ export function Beat1Hook() {
     },
   );
 
-  // Ramps in rather than snapping from 0 to full speed in one frame, and
-  // 130px/s carries a whole chip width across the shot so chips actually
-  // enter and leave frame — otherwise it's one object sliding, not a
-  // ticker running.
-  const driftRamp = interpolate(frame, [f(T.wide), f(T.wide + 0.4)], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.out(Easing.cubic),
-  });
-  const scrollPx =
-    frame > f(T.wide) ? driftRamp * ((frame - f(T.wide)) / fps) * 130 : 0;
 
 
   /*
