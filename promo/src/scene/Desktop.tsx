@@ -29,12 +29,17 @@ import { Img, staticFile } from "remotion";
  * Where the recording's own ticker strip ends. Beat1Hook's bar has to
  * cover at least this much or the real one peeks out beneath it.
  */
-export const REAL_TICKER_BOTTOM = 80;
+export const REAL_TICKER_BOTTOM = 76;
 
-export function Desktop() {
+/**
+ * `file` lets the composition cross-dissolve between views pulled from
+ * the same recording — Overview, Matchup, Roster — so the back half
+ * shows what the app actually does rather than holding on one shot.
+ */
+export function Desktop({ file = "desk.png" }: { file?: string }) {
   return (
     <Img
-      src={staticFile("desk.png")}
+      src={staticFile(file)}
       style={{
         position: "absolute",
         inset: 0,

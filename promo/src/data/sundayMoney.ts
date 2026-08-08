@@ -19,16 +19,13 @@ import type {
 } from "../../../desktop/src/datawidgets/fantasy/types";
 
 /**
- * Where the beat opens: a TENTH behind, not 1.8.
- *
- * Chosen for the roll, and it's a real constraint rather than a taste
- * call. AnimateNumber rolls every digit column that changes, through
- * every glyph between — so 149.9 to 151.8 moves three columns at once
- * and at 215px renders as a stack of overlapping numerals instead of an
- * odometer. Opening at 151.6 moves ONE column, which reads clean at any
- * size. It is also a tenser number to be losing by.
+ * Back to the demo rig's own number. This was 151.6 for a while, chosen
+ * because AnimateNumber could only roll one digit column cleanly — that
+ * constraint died with AnimateNumber, and matching the rig matters more:
+ * a screen recording of the app and a rendered frame now show the same
+ * score.
  */
-export const OPENING_SCORE = 151.6;
+export const OPENING_SCORE = 149.9;
 export const OPPONENT_SCORE = 151.7;
 /** Where it lands — one score past them. */
 export const CLOSING_SCORE = 151.8;
@@ -42,6 +39,13 @@ const OPP_NAME = "Fourth and Long";
  * Every starter except Achane. Fixed for the whole beat — their games
  * are done, which is exactly why the one live player decides it.
  */
+/**
+ * Every starter except Achane, taken from the Roster tab of the same
+ * screen recording the desk shot comes from. Matching it is the point:
+ * the chip's "★ top scorer" segment reads Hurts 28.1 in the recording,
+ * so it has to read Hurts 28.1 here too, or the film and the footage it
+ * is cut against disagree about the same league.
+ */
 const SETTLED_STARTERS: readonly (readonly [
   last: string,
   first: string,
@@ -49,14 +53,15 @@ const SETTLED_STARTERS: readonly (readonly [
   pos: string,
   points: number,
 ])[] = [
-  ["Hurts", "Jalen", "PHI", "QB", 21.4],
-  ["Chase", "Ja'Marr", "CIN", "WR", 19.8],
-  ["Robinson", "Bijan", "ATL", "RB", 18.1],
-  ["Nacua", "Puka", "LAR", "WR", 16.2],
-  ["Smith-Njigba", "Jaxon", "SEA", "W/R/T", 14.6],
-  ["McBride", "Trey", "ARI", "TE", 13.5],
-  ["Texans", "Houston", "HOU", "DEF", 12.6],
+  ["Hurts", "Jalen", "PHI", "QB", 28.1],
+  ["Chase", "Ja'Marr", "CIN", "WR", 27.1],
+  ["Robinson", "Bijan", "ATL", "RB", 21.9],
+  ["Smith-Njigba", "Jaxon", "SEA", "W/R/T", 20.3],
+  ["Collins", "Nico", "HOU", "WR", 12.4],
   ["Aubrey", "Brandon", "DAL", "K", 11.0],
+  ["Broncos", "Denver", "DEN", "DEF", 8.0],
+  ["McBride", "Trey", "ARI", "TE", 7.9],
+  ["Walker III", "Kenneth", "SEA", "RB", 4.9],
 ];
 
 const SETTLED_TOTAL = round1(
@@ -86,7 +91,7 @@ export function sundayMoney(userPoints: number): LeagueResponse {
     team_key: TEAM_KEY,
     team_name: TEAM_NAME,
     data: {
-      num_teams: 12,
+      num_teams: 8,
       is_finished: false,
       current_week: 12,
       scoring_type: "head",
@@ -221,18 +226,24 @@ function round1(n: number): number {
 }
 
 /**
- * Achane has to stay the top scorer for the whole beat — the chip picks
- * the top scorer from the roster, and if a settled starter outscored him
- * the "★" segment would silently change player mid-shot. Cheap to
- * assert, and it fires at import rather than on camera.
+ * Achane is the one still on the field, so he absorbs the difference
+ * between the settled roster and whatever score the composition asks
+ * for. That keeps the matchup total and the roster consistent at every
+ * frame — the chip reads the matchup for the score and the roster for
+ * the top scorer, and independent values would let it contradict itself
+ * on camera.
+ *
+ * He must NOT become the top scorer: the recording's chip reads
+ * "★ Hurts 28.1", and a ★ segment that changed player mid-shot would be
+ * a visible discrepancy against the footage.
  */
 {
   const best = Math.max(...SETTLED_STARTERS.map(([, , , , pts]) => pts));
-  const lowestAchane = round1(OPENING_SCORE - SETTLED_TOTAL);
-  if (lowestAchane <= best) {
+  const highestAchane = round1(CLOSING_SCORE - SETTLED_TOTAL);
+  if (highestAchane >= best) {
     throw new Error(
-      `[promo] Achane opens on ${lowestAchane} but ${best} is already on ` +
-        `the roster, so he is not the top scorer. Adjust SETTLED_STARTERS.`,
+      `[promo] Achane tops out at ${highestAchane}, at or above ${best} — ` +
+        `he would displace the top scorer the recording shows. Fix SETTLED_STARTERS.`,
     );
   }
 }

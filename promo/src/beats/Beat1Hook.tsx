@@ -32,13 +32,8 @@ import {
 import FantasyStatChip from "../../../desktop/src/components/chips/FantasyStatChip";
 import { DEFAULT_WIDGET_DISPLAY } from "../../../desktop/src/preferences";
 import type { LeagueResponse } from "../../../desktop/src/datawidgets/fantasy/types";
-import {
-  POOL_AHEAD,
-  POOL_BEHIND,
-  RAIL_LEFT,
-  RAIL_RIGHT_TAIL,
-  collegePool,
-} from "../data/dashboard";
+import FollowedPlayerChip from "../../../desktop/src/components/chips/FollowedPlayerChip";
+import { RAIL_LEFT, RAIL_PLAYERS, RAIL_RIGHT_TAIL } from "../data/dashboard";
 import { CLOSING_SCORE, OPENING_SCORE, sundayMoney } from "../data/sundayMoney";
 import { useMotionClock } from "../motionClock";
 import { Desktop, REAL_TICKER_BOTTOM } from "../scene/Desktop";
@@ -50,21 +45,24 @@ const T = {
   /**
    * The play lands.
    *
-   * Was 1.55s, which left the "Losing by 0.1" state on screen for about
-   * a quarter of a second — you physically could not finish reading the
-   * line before it became its own opposite. The whole shot depends on
-   * having read the deficit BEFORE it flips, so the deficit now holds
-   * for a little over a second, and so does the payoff.
+   * Was 1.55s, which left the deficit on screen for about a quarter of a
+   * second — you physically could not finish reading the line before it
+   * became its own opposite. The whole shot depends on having read the
+   * deficit BEFORE it flips, so it now holds ~1.15s, and the payoff
+   * holds ~1.4s after it: there is a lot happening on that frame (a
+   * score, a colour, a chip lifting) and it needs to be watchable.
    */
-  hit: 2.2,
+  hit: 2.3,
   /** Camera starts back out; the rail assembles. */
-  rail: 3.2,
+  rail: 3.7,
   /** Back to the desk. */
-  wide: 4.7,
-  /** A SECOND league takes the lead, on the rail. */
-  second: 5.5,
+  wide: 5.1,
+  /** Cross-dissolve to the Matchup view. */
+  showA: 6.1,
+  /** Cross-dissolve to the Roster view. */
+  showB: 7.5,
   /** Wordmark. */
-  end: 7.3,
+  end: 8.9,
 };
 
 /**
@@ -79,13 +77,16 @@ const MAX_ZOOM = 4.2;
  * bar of real chips so the score can be driven; everything below is the
  * untouched photograph.
  */
-const BAR_Y = 46;
+const BAR_Y = 40;
 /**
- * Horizontal focus. Not 1280: the sibling leagues either side are
- * different widths, so centring the row leaves the hero chip a little
- * left of frame centre.
+ * Horizontal focus, in scene coordinates. Nowhere near frame centre:
+ * the rail is a row of real chips of wildly different widths (two league
+ * chips left, three narrow player chips plus two league chips right), so
+ * centring the ROW puts the hero chip well off centre. Derived by
+ * measuring the hero's edges in a tight render, and it has to be
+ * re-derived whenever the rail's composition changes.
  */
-const FOCUS_X = 1252;
+const FOCUS_X = 967;
 
 const UI =
   '"Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif';
@@ -250,13 +251,24 @@ export function Beat1Hook() {
   const scrollPx =
     frame > f(T.wide) ? driftRamp * ((frame - f(T.wide)) / fps) * 130 : 0;
 
-  const poolAhead = frame >= f(T.second);
-  const poolPulse = poolAhead
-    ? interpolate(frame - f(T.second), [0, 15], [1, 0], {
-        extrapolateRight: "clamp",
-        easing: Easing.out(Easing.quad),
-      })
-    : 0;
+
+  /*
+    The back half. After the pull-back the film used to hold one wide
+    shot for two and a half seconds, which showed the bar and nothing
+    else the product does. These dissolve the desk between three views
+    pulled from the same recording — Overview, Matchup, Roster — so the
+    app demonstrates itself while the bar carries on above it.
+  */
+  const showA = interpolate(frame, [f(T.showA), f(T.showA + 0.45)], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.inOut(Easing.cubic),
+  });
+  const showB = interpolate(frame, [f(T.showB), f(T.showB + 0.45)], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.inOut(Easing.cubic),
+  });
 
   // Head and tail ramps. Reddit and Facebook loop by default, so the seam
   // is seen on every repeat view.
@@ -296,6 +308,12 @@ export function Beat1Hook() {
       >
         <div style={{ position: "absolute", inset: 0, filter: deskFilter }}>
           <Desktop />
+          <div style={{ position: "absolute", inset: 0, opacity: showA }}>
+            <Desktop file="view-matchup.png" />
+          </div>
+          <div style={{ position: "absolute", inset: 0, opacity: showB }}>
+            <Desktop file="view-roster.png" />
+          </div>
         </div>
 
         {/* The BAR: a full-width substrate pinned to the screen edge.
@@ -346,11 +364,26 @@ export function Beat1Hook() {
             {/* Doubled either side so the row is wider than the frame plus
                 the drift, and chips clip at both edges instead of the whole
                 rail sliding as one object. Equal counts keep FOCUS_X true. */}
-            {[...RAIL_LEFT, ...RAIL_LEFT].map((l, i) => (
+            {[...RAIL_LEFT, ...RAIL_RIGHT_TAIL].map((l, i) => (
               <Chip key={`l${i}`} league={l} />
             ))}
 
-            <div style={{ position: "relative" }}>
+            {/*
+              The hero chip LIFTS on the hit — scales up and casts a
+              shadow, so the update reads as the chip coming forward
+              rather than as text quietly changing inside it.
+            */}
+            <div
+              style={{
+                position: "relative",
+                zIndex: 2,
+                transform: `scale(${hitScale.toFixed(4)})`,
+                filter:
+                  glow > 0
+                    ? `drop-shadow(0 ${(10 * glow).toFixed(1)}px ${(26 * glow).toFixed(0)}px rgba(16,185,129,${(0.55 * glow).toFixed(3)}))`
+                    : undefined,
+              }}
+            >
               <Chip league={sundayMoney(userPoints)} />
               {ringOn && <FlashRing progress={glow} />}
             </div>
@@ -359,21 +392,13 @@ export function Beat1Hook() {
                 in the real chip, with the real red-to-green swap. Quieter
                 than the hero hit so it reads as ambient rather than as a
                 second climax. */}
-            <div
-              style={{
-                borderRadius: 9,
-                boxShadow:
-                  poolPulse > 0
-                    ? `0 0 0 1px rgba(52,211,153,${(0.5 * poolPulse).toFixed(3)}), 0 0 24px rgba(52,211,153,${(0.35 * poolPulse).toFixed(3)})`
-                    : undefined,
-              }}
-            >
-              <Chip
-                league={collegePool(poolAhead ? POOL_AHEAD : POOL_BEHIND)}
-              />
-            </div>
-
-            {[...RAIL_RIGHT_TAIL, ...RAIL_LEFT].map((l, i) => (
+            {/* Standalone TOP SCORER chips, exactly as the recording's
+                rail carries them, resolved against the hero roster so
+                their numbers move with the score. */}
+            {RAIL_PLAYERS.map((key) => (
+              <PlayerChip key={key} playerKey={key} points={userPoints} />
+            ))}
+            {[...RAIL_LEFT, ...RAIL_RIGHT_TAIL].map((l, i) => (
               <Chip key={`r${i}`} league={l} />
             ))}
           </div>
@@ -501,6 +526,24 @@ function Chip({ league }: { league: LeagueResponse }) {
   return (
     <div id="app-shell" data-theme="scrollr-light" style={{ display: "flex" }}>
       <FantasyStatChip league={league} prefs={PROMO_PREFS} comfort />
+    </div>
+  );
+}
+
+function PlayerChip({
+  playerKey,
+  points,
+}: {
+  playerKey: string;
+  points: number;
+}) {
+  return (
+    <div id="app-shell" data-theme="scrollr-light" style={{ display: "flex" }}>
+      <FollowedPlayerChip
+        playerKey={playerKey}
+        leagues={[sundayMoney(points)]}
+        comfort
+      />
     </div>
   );
 }

@@ -13,6 +13,12 @@
  * promo's here, not ScrollrTicker's. If those change materially in the
  * app this beat won't follow.
  *
+ * SEEDED FROM THE DEMO RIG. These are the same three leagues
+ * serve-fantasy-demo.mjs serves and the same three visible in the screen
+ * recording the desk shot is cut from — same keys, same team names, same
+ * scores, same records. Invented extras used to sit here and the rail
+ * disagreed with the screenshot it was sitting on top of.
+ *
  * Same honesty boundary as the rest of the fixtures: real players and
  * real league shapes, representative numbers.
  */
@@ -32,81 +38,49 @@ import type {
  * screen: the same "Dynasty or Bust 184.5-151.0" twice in one bar reads
  * as a rendering bug, not as a ticker.
  */
-export const RAIL_LEFT: LeagueResponse[] = [workLeague(), dynasty()];
-export const RAIL_RIGHT_TAIL: LeagueResponse[] = [familyLeague()];
-
-/** Where the second league starts, and where it ends up. */
-export const POOL_BEHIND = 112.4;
-export const POOL_AHEAD = 119.4;
+export const RAIL_LEFT: LeagueResponse[] = [workLeague()];
+export const RAIL_RIGHT_TAIL: LeagueResponse[] = [dynasty()];
 
 /**
- * Parameterised like sundayMoney, so the back half of the film has an
- * EVENT rather than a frozen rail sliding sideways. A second league
- * taking the lead — in the real chip, with the real red-to-green token
- * swap — is what turns "look at this bar" into "it keeps doing this".
+ * The three players the recording's ticker carries as standalone
+ * TOP SCORER chips, in its order. They resolve against the hero league's
+ * roster, so their numbers move with it.
  */
-export function collegePool(mine: number): LeagueResponse {
-  return league({
-    key: "449.l.553901",
-    name: "Bowl Season Pool",
-    teamName: "Bracket Chaos",
-    oppName: "Chalk Eaters",
-    mine,
-    theirs: 118.9,
-    status: "midevent",
-    rank: 7,
-    wins: 5,
-    losses: 6,
-    streakType: "loss",
-    streakValue: 2,
-  });
-}
+export const RAIL_PLAYERS = [
+  "449.p.walkeriii",
+  "449.p.mcbride",
+  "449.p.achane",
+];
 
-/** A comfortable win, for a third tone on the bar. */
-function familyLeague(): LeagueResponse {
-  return league({
-    key: "449.l.118742",
-    name: "Thanksgiving Grudge",
-    teamName: "Uncle Ray's Revenge",
-    oppName: "Cousin Dee",
-    mine: 141.2,
-    theirs: 126.5,
-    status: "midevent",
-    rank: 2,
-    wins: 8,
-    losses: 3,
-    streakType: "win",
-    streakValue: 2,
-  });
-}
-
-/** A blowout, to contrast with the hero league's one-tenth margin. */
+/** Finished, and won comfortably. 184.5-151.0 in the recording. */
 function dynasty(): LeagueResponse {
   return league({
-    key: "449.l.220188",
+    key: "449.l.220417",
     name: "Dynasty or Bust",
-    teamName: "Regret Machine",
-    oppName: "Waiver Wire Warriors",
+    teamName: "Regression Candidates",
+    oppName: "Air Yards Only",
     mine: 184.5,
     theirs: 151.0,
+    projected: 184.5,
     status: "postevent",
     rank: 1,
     wins: 9,
     losses: 2,
     streakType: "win",
-    streakValue: 5,
+    streakValue: 1,
   });
 }
 
-/** Still early, so its chip reads quiet next to two live ones. */
+/** Still live, comfortably ahead. 90.9-83.6 in the recording. */
 function workLeague(): LeagueResponse {
   return league({
-    key: "449.l.771043",
-    name: "Cubicle Warfare",
-    teamName: "Out of Office",
-    oppName: "The Interns",
+    key: "449.l.671902",
+    name: "Work League (Keeper)",
+    teamName: "Third and Inches",
+    oppName: "Gridiron Ghosts",
     mine: 90.9,
     theirs: 83.6,
+    projected: 101.3,
     status: "midevent",
     rank: 4,
     wins: 6,
@@ -123,6 +97,7 @@ function league(o: {
   oppName: string;
   mine: number;
   theirs: number;
+  projected: number;
   status: string;
   rank: number;
   wins: number;
@@ -140,12 +115,30 @@ function league(o: {
     team_key: teamKey,
     team_name: o.teamName,
     data: {
-      num_teams: 12,
+      num_teams: 8,
       is_finished: false,
       current_week: 12,
       scoring_type: "head",
     },
-    standings: [standing(teamKey, o)],
+    standings: [
+      {
+        team_key: teamKey,
+        team_id: 1,
+        name: o.teamName,
+        team_logo: "",
+        manager_name: "You",
+        rank: o.rank,
+        wins: o.wins,
+        losses: o.losses,
+        ties: 0,
+        points_for: 1500,
+        streak_type: o.streakType,
+        streak_value: o.streakValue,
+        playoff_seed: o.rank,
+        clinched_playoffs: false,
+        waiver_priority: 5,
+      },
+    ],
     matchups: [
       {
         week: 12,
@@ -161,7 +154,7 @@ function league(o: {
             team_logo: "",
             manager_name: "You",
             points: o.mine,
-            projected_points: round1(o.mine * 1.08),
+            projected_points: o.projected,
           },
           {
             team_key: oppKey,
@@ -176,36 +169,6 @@ function league(o: {
       },
     ],
     rosters: null,
-  };
-}
-
-function standing(
-  teamKey: string,
-  o: {
-    teamName: string;
-    rank: number;
-    wins: number;
-    losses: number;
-    streakType: string;
-    streakValue: number;
-  },
-): StandingsEntry {
-  return {
-    team_key: teamKey,
-    team_id: 1,
-    name: o.teamName,
-    team_logo: "",
-    manager_name: "You",
-    rank: o.rank,
-    wins: o.wins,
-    losses: o.losses,
-    ties: 0,
-    points_for: 1500,
-    streak_type: o.streakType,
-    streak_value: o.streakValue,
-    playoff_seed: o.rank,
-    clinched_playoffs: false,
-    waiver_priority: 5,
   };
 }
 
