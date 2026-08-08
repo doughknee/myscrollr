@@ -2,161 +2,244 @@
  * The hero cut. One continuous camera move, no cuts.
  *
  * A desktop with work on it and the Scrollr bar at the screen edge. The
- * camera pushes into one chip until the rest of the world is gone, your
- * matchup turns over on a tenth of a point, and the camera pulls back
- * out to the same desk — where the bar is still sitting, having done
- * that without being asked. Then the wordmark.
+ * camera pushes into one chip, your matchup turns over on a tenth of a
+ * point, and it pulls back out to the same desk where the bar is still
+ * sitting, having done that without being asked.
  *
- * THE DESKTOP IS THE PITCH. Earlier cuts had the bar floating in black,
- * and a viewer finished them without learning that Scrollr runs on your
- * screen while you work, which is the entire product. Everything before
- * the pull-back is setup for the moment the desk comes back.
+ * THE PRODUCT IS THE HERO, and an earlier cut got that exactly backwards.
+ * It zoomed to 2.6x, which renders the chip's 13px body text at 34px in a
+ * 2560px frame — 8.5px once a feed scales the video to a quarter. Scrollr
+ * was literally illegible, while a 232px promo scoreboard that exists
+ * nowhere in the app was the biggest thing on screen. The film sold a
+ * graphic. Now the camera goes to 4.2x (body text ~55px, ~14px at feed
+ * scale), the scoreboard is gone, and what replaces it is two lines of
+ * type: what this IS, and what is at stake.
  *
- * Built for muted autoplay in a feed — Reddit, Facebook, Twitter. So
- * something moves in frame one (the camera is already creeping before
- * anything else happens), every claim is burned in rather than spoken,
- * and it ends roughly where it began so a loop doesn't jar.
+ * Built for muted autoplay on Reddit, Facebook and Twitter. So the frame
+ * is already moving at frame 0, the hit lands at 1.55s rather than making
+ * a scroller wait three seconds for it, every claim is burned in, and the
+ * head and tail are matched so the loop is a step rather than a cliff.
  *
- * The CHIPS are the real components. The rail layout and the desk are
- * the promo's — see src/data/dashboard.ts.
+ * The CHIPS are the real components. The rail layout and the desk are the
+ * promo's — see src/data/dashboard.ts and src/scene/Desktop.tsx.
  */
 import {
   Easing,
   interpolate,
-  spring,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
 import FantasyStatChip from "../../../desktop/src/components/chips/FantasyStatChip";
 import { DEFAULT_WIDGET_DISPLAY } from "../../../desktop/src/preferences";
 import type { LeagueResponse } from "../../../desktop/src/datawidgets/fantasy/types";
-import { RAIL_LEFT, RAIL_RIGHT } from "../data/dashboard";
 import {
-  CLOSING_SCORE,
-  OPENING_SCORE,
-  OPPONENT_SCORE,
-  sundayMoney,
-} from "../data/sundayMoney";
+  POOL_AHEAD,
+  POOL_BEHIND,
+  RAIL_LEFT,
+  RAIL_RIGHT_TAIL,
+  collegePool,
+} from "../data/dashboard";
+import { CLOSING_SCORE, OPENING_SCORE, sundayMoney } from "../data/sundayMoney";
 import { useMotionClock } from "../motionClock";
 import { Desktop } from "../scene/Desktop";
 
 /** Seconds. The whole cut's timing, in one place. */
 const T = {
-  /** Fully tight on the chip. The push runs from frame 0 to here. */
-  tight: 2.4,
-  /** The play lands. */
-  hit: 3.1,
+  /** Camera settled tight on the chip. */
+  tight: 1.05,
+  /** The play lands. A feed gives you about 1.5s to justify yourself. */
+  hit: 1.55,
   /** Camera starts back out; the rail assembles. */
-  rail: 4.0,
+  rail: 2.35,
   /** Back to the desk. */
-  wide: 5.8,
-  /** Bar drifts — the product simply in use. */
-  drift: 6.6,
+  wide: 3.85,
+  /** A SECOND league takes the lead, on the rail. */
+  second: 4.6,
   /** Wordmark. */
-  end: 8.4,
+  end: 6.4,
 };
 
-/** How far in the camera goes. Matches the earlier hero framing. */
-const MAX_ZOOM = 2.6;
+/**
+ * 4.2, not 2.6. This single number decides whether the product is visible
+ * at all once a feed scales the video down — see the file header.
+ */
+const MAX_ZOOM = 4.2;
 
-/** Where the bar sits in the 2560x1440 scene. */
-const BAR_Y = 1372;
+const BAR_Y = 1389;
 /**
  * Horizontal focus. Not 1280: the sibling leagues either side are
- * different widths, so centring the ROW leaves the hero chip a little
- * left of frame centre. Tuned against a tight frame.
+ * different widths, so centring the row leaves the hero chip a little
+ * left of frame centre.
  */
 const FOCUS_X = 1252;
 
-const MONO = "var(--font-mono, ui-monospace, monospace)";
-const GLOW = "rgba(34, 197, 94, 0.55)";
+const UI =
+  '"Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif';
+
+/**
+ * The app's accent, NOT --color-up. Green-up is the "your score rose"
+ * token; spending it on the brand burns the one signal the chip uses.
+ */
+const ACCENT = "#34d399";
+
 const CHIP_GAP = 8;
-const SCROLL_PX_PER_SEC = 90;
+
+/**
+ * Win probability is OFF in the promo, and that's a correctness fix
+ * rather than a taste one. At 151.6 vs 151.7 the chip computes a GREEN
+ * 72% — so the frame said "Losing by 0.1" in red while the product
+ * underneath it said you were winning, and the hit moved that number by
+ * nothing at all. Two contradictory claims in one frame is worse than one
+ * fewer stat.
+ */
+const PROMO_PREFS = {
+  ...DEFAULT_WIDGET_DISPLAY.fantasy,
+  winProbability: "off" as const,
+};
 
 export function Beat1Hook() {
   useMotionClock();
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, durationInFrames } = useVideoConfig();
   const f = (s: number) => Math.round(s * fps);
 
-  /**
-   * ONE value drives the whole camera, and everything else keys off it
-   * rather than off time. That's what keeps the move reversible: the
-   * desk fades out on the way in and back in on the way out, with no
-   * second set of timings to keep in sync.
-   */
-  // Two eased moves rather than one linear ramp. Linear meant the frame
-  // was already 22% zoomed a third of a second in, so the establishing
-  // shot — the whole point of opening on a desk — never existed. Ease-in
-  // holds the wide shot, then accelerates.
+  // Leaves slow, arrives fast: ~12% of the travel is done by 0.15s, so
+  // the frame is visibly moving by frame 9 rather than sitting still for
+  // a second while a feed scrolls past it.
   const pushIn = interpolate(frame, [0, f(T.tight)], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-    easing: Easing.in(Easing.cubic),
+    easing: Easing.bezier(0.45, 0, 0.1, 1),
   });
   const pullOut = interpolate(frame, [f(T.rail), f(T.wide)], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-    easing: Easing.inOut(Easing.cubic),
+    easing: Easing.bezier(0.3, 0, 0.15, 1),
   });
   const tightness = pushIn * (1 - pullOut);
 
-  const zoom = interpolate(tightness, [0, 1], [1, MAX_ZOOM]);
-  // Focus travels from frame centre to the chip, so the wide shot frames
-  // the whole desk instead of being centred on a bar at its bottom edge.
-  // Tight focus deliberately lands ABOVE the bar's true centre, which
-  // pushes the chip into the lower third of frame. Dead-centre left the
-  // scoreboard clipping the chip's top edge and the bottom third empty.
+  // A creep across the hold. Camera velocity reaching exactly zero reads
+  // as a stalled video in a feed, so the tight section never fully stops.
+  const creep = interpolate(frame, [f(T.tight), f(T.rail)], [0, 0.11], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  const end = interpolate(frame, [f(T.end), f(T.end + 0.55)], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.out(Easing.cubic),
+  });
+
+  const zoom =
+    (interpolate(tightness, [0, 1], [1, MAX_ZOOM]) + tightness * creep) *
+    (1 - end * 0.08);
   const focusY = interpolate(tightness, [0, 1], [720, BAR_Y - 55]);
   const camera = `translate(${1280 - FOCUS_X * zoom}px, ${
-    720 - focusY * zoom
+    720 - focusY * zoom + end * 70
   }px) scale(${zoom})`;
 
-  const desktopOpacity = interpolate(tightness, [0.2, 0.62], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const boardOpacity = interpolate(tightness, [0.68, 0.96], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const siblingOpacity = interpolate(tightness, [0.45, 0.8], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  /**
+   * RACK FOCUS, not a cross-fade to black. The desk used to fade to
+   * opacity 0 for a third of the runtime, which is the exact failure this
+   * film exists to fix — a bar floating in a void says nothing about
+   * running on your screen. Blurring and dimming keeps the screen present
+   * behind the type the whole way through, and the return is keyed to
+   * FRAME rather than tightness so the world resolves a beat after the
+   * camera stops, giving the pull-back a payoff rather than just an end.
+   */
+  const deskSharp =
+    frame < f(T.rail)
+      ? 1 - tightness
+      : interpolate(frame, [f(T.wide - 0.55), f(T.wide + 0.1)], [0, 1], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+        });
+  const deskFilter = `blur(${(15 * (1 - deskSharp)).toFixed(2)}px) brightness(${(
+    0.34 +
+    0.66 * deskSharp
+  ).toFixed(3)}) saturate(${(0.7 + 0.3 * deskSharp).toFixed(3)})`;
 
   const landed = frame >= f(T.hit);
   const userPoints = landed ? CLOSING_SCORE : OPENING_SCORE;
-  const ahead = landed;
-  const margin = Math.abs(round1(userPoints - OPPONENT_SCORE));
+  const sinceHit = frame - f(T.hit);
 
-  // The hit. The score SWAPS on one frame and a flash peaks on that same
-  // frame, so the eye never resolves the old digits. AnimateNumber was
-  // tried here: it rolls every changing digit column through every glyph
-  // between, which at this size is a stack of overlapping numerals.
-  const hit = spring({
-    frame: frame - f(T.hit),
-    fps,
-    config: { damping: 200 },
-    durationInFrames: Math.round(fps * 0.4),
+  /**
+   * The hit, staged over ten frames rather than flipped by one boolean.
+   * Changing everything at once on a single frame reads as a render
+   * glitch; a short cascade reads as an event. Attack first, then settle.
+   */
+  const hitScale = !landed
+    ? 1
+    : sinceHit <= 3
+      ? interpolate(sinceHit, [0, 3], [1, 1.14], {
+          easing: Easing.out(Easing.cubic),
+        })
+      : interpolate(sinceHit, [3, 16], [1.14, 1], {
+          extrapolateRight: "clamp",
+          easing: Easing.out(Easing.cubic),
+        });
+  const glow = landed
+    ? interpolate(sinceHit, [0, 3, 6, f(0.5)], [0, 1, 0.5, 0], {
+        extrapolateRight: "clamp",
+        easing: Easing.out(Easing.quad),
+      })
+    : 0;
+  const stakeRise = landed
+    ? interpolate(sinceHit, [6, 6 + f(0.18)], [10, 0], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+        easing: Easing.out(Easing.cubic),
+      })
+    : 0;
+  const ringOn = landed && sinceHit >= 8;
+
+  const stakeOpacity = interpolate(
+    frame,
+    [f(T.tight + 0.06), f(T.tight + 0.26), f(T.rail), f(T.rail + 0.35)],
+    [0, 1, 1, 0],
+    {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.out(Easing.cubic),
+    },
+  );
+
+  // Ramps in rather than snapping from 0 to full speed in one frame, and
+  // 130px/s carries a whole chip width across the shot so chips actually
+  // enter and leave frame — otherwise it's one object sliding, not a
+  // ticker running.
+  const driftRamp = interpolate(frame, [f(T.wide), f(T.wide + 0.4)], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.out(Easing.cubic),
   });
-  const hitScale = landed ? interpolate(hit, [0, 1], [1.22, 1]) : 1;
-  const flash = landed
-    ? interpolate(
-        frame - f(T.hit),
-        [0, 4, Math.round(fps * 0.45)],
-        [1, 0.55, 0],
-        { extrapolateRight: "clamp" },
-      )
+  const scrollPx =
+    frame > f(T.wide) ? driftRamp * ((frame - f(T.wide)) / fps) * 130 : 0;
+
+  const poolAhead = frame >= f(T.second);
+  const poolPulse = poolAhead
+    ? interpolate(frame - f(T.second), [0, 15], [1, 0], {
+        extrapolateRight: "clamp",
+        easing: Easing.out(Easing.quad),
+      })
     : 0;
 
-  const scrollPx =
-    frame > f(T.drift) ? ((frame - f(T.drift)) / fps) * SCROLL_PX_PER_SEC : 0;
-
-  const end = interpolate(frame, [f(T.end), f(T.end + 0.7)], [0, 1], {
+  // Head and tail ramps. Reddit and Facebook loop by default, so the seam
+  // is seen on every repeat view.
+  const loopIn = interpolate(frame, [0, 7], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
+  const loopOut = interpolate(
+    frame,
+    [durationInFrames - 8, durationInFrames - 1],
+    [0, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+  // Floors rather than fading to near-black: the bar has to stay visibly
+  // alive behind the endcard, because "it keeps running" is the claim.
+  const worldDim = 1 - end * 0.45 + loopOut * 0.25;
 
   return (
     <div
@@ -165,14 +248,9 @@ export function Beat1Hook() {
         inset: 0,
         background: "#05070a",
         overflow: "hidden",
+        opacity: loopIn,
       }}
     >
-      {/*
-        Desk and bar move under ONE transform — they have to be the same
-        object or the pull-back is a cut rather than a move. The
-        scoreboard is a promo graphic and sits outside the camera, which
-        is why it stays square to frame while everything else scales.
-      */}
       <div
         style={{
           position: "absolute",
@@ -180,12 +258,34 @@ export function Beat1Hook() {
           height: 1440,
           transformOrigin: "0 0",
           transform: camera,
-          filter: end > 0 ? `brightness(${1 - end * 0.75})` : undefined,
+          filter: `brightness(${worldDim.toFixed(3)})`,
         }}
       >
-        <div style={{ opacity: desktopOpacity }}>
+        <div style={{ position: "absolute", inset: 0, filter: deskFilter }}>
           <Desktop />
         </div>
+
+        {/* The BAR: a full-width substrate pinned to the screen edge.
+            Without it the chips read as graphics hovering over a desktop
+            rather than a piece of UI attached to it. It does NOT blur —
+            it's the subject. */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 1440 - BAR_Y + 51,
+            background:
+              "linear-gradient(to bottom, rgba(8,10,16,0.74) 0%, rgba(8,10,16,0.96) 45%)",
+            borderTop: "1px solid rgba(255,255,255,0.08)",
+            backdropFilter: "blur(12px)",
+            opacity: interpolate(tightness, [0.15, 0.72], [1, 0.55], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            }),
+          }}
+        />
 
         <div
           style={{
@@ -207,27 +307,48 @@ export function Beat1Hook() {
               transform: `translateX(${-scrollPx}px)`,
             }}
           >
-            {RAIL_LEFT.map((l) => (
-              <div key={l.league_key} style={{ opacity: siblingOpacity }}>
-                <Chip league={l} />
-              </div>
+            {/* Doubled either side so the row is wider than the frame plus
+                the drift, and chips clip at both edges instead of the whole
+                rail sliding as one object. Equal counts keep FOCUS_X true. */}
+            {[...RAIL_LEFT, ...RAIL_LEFT].map((l, i) => (
+              <Chip key={`l${i}`} league={l} />
             ))}
 
             <div style={{ position: "relative" }}>
               <Chip league={sundayMoney(userPoints)} />
-              {ahead && <FlashRing progress={hit} />}
+              {ringOn && <FlashRing progress={glow} />}
             </div>
 
-            {RAIL_RIGHT.map((l) => (
-              <div key={l.league_key} style={{ opacity: siblingOpacity }}>
-                <Chip league={l} />
-              </div>
+            {/* The second event: another league takes the lead 3s later,
+                in the real chip, with the real red-to-green swap. Quieter
+                than the hero hit so it reads as ambient rather than as a
+                second climax. */}
+            <div
+              style={{
+                borderRadius: 9,
+                boxShadow:
+                  poolPulse > 0
+                    ? `0 0 0 1px rgba(52,211,153,${(0.5 * poolPulse).toFixed(3)}), 0 0 24px rgba(52,211,153,${(0.35 * poolPulse).toFixed(3)})`
+                    : undefined,
+              }}
+            >
+              <Chip
+                league={collegePool(poolAhead ? POOL_AHEAD : POOL_BEHIND)}
+              />
+            </div>
+
+            {[...RAIL_RIGHT_TAIL, ...RAIL_LEFT].map((l, i) => (
+              <Chip key={`r${i}`} league={l} />
             ))}
           </div>
         </div>
+
+        {/* End masks, so the rail runs off frame rather than stopping. */}
+        <Mask side="left" />
+        <Mask side="right" />
       </div>
 
-      {/* The scoreboard graphic: only while the camera is tight. */}
+      {/* The type. Two lines: what this IS, and what's at stake. */}
       <div
         style={{
           position: "absolute",
@@ -235,223 +356,140 @@ export function Beat1Hook() {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          // TOP-anchored, not centred. The camera puts the chip at frame
-          // centre, so a centred board lands directly on top of it — the
-          // score and the chip were overlapping in the same 200px.
           justifyContent: "flex-start",
-          gap: 52,
-          paddingTop: 96,
-          opacity: boardOpacity,
+          paddingTop: 392,
+          gap: 30,
+          opacity: stakeOpacity,
           pointerEvents: "none",
+          fontFamily: UI,
+          textAlign: "center",
         }}
       >
-        <Context />
-        <Scoreboard
-          points={userPoints}
-          ahead={ahead}
-          hitScale={hitScale}
-          flash={flash}
-        />
-        <State ahead={ahead} margin={margin} />
+        {/* The film never said what Scrollr was until the endcard, by
+            which point most of a feed has already scrolled past. */}
+        <div
+          style={{
+            fontSize: 68,
+            fontWeight: 700,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            color: "rgba(255,255,255,0.5)",
+            textShadow: "0 4px 40px rgba(0,0,0,0.9)",
+          }}
+        >
+          A live ticker for your fantasy leagues
+        </div>
+        <div
+          style={{
+            fontSize: 132,
+            fontWeight: 800,
+            letterSpacing: "-0.02em",
+            color: landed
+              ? sinceHit < 2
+                ? "#ffffff"
+                : "var(--color-up, #22c55e)"
+              : "var(--color-down, #ef4444)",
+            transform: `translateY(${stakeRise.toFixed(2)}px) scale(${hitScale.toFixed(4)})`,
+            textShadow:
+              glow > 0
+                ? `0 0 ${(90 * glow).toFixed(0)}px rgba(52,211,153,${(0.75 * glow).toFixed(3)})`
+                : "0 4px 40px rgba(0,0,0,0.9)",
+          }}
+        >
+          {landed ? "Ahead by 0.1" : "Losing by 0.1"}
+        </div>
       </div>
 
-      {end > 0 && <Endcard progress={end} />}
+      {/* Owned up front, not buried at the end. Hiding it reads as legal
+          cover; stating it reads as confidence — and r/fantasyfootball is
+          exactly the audience that checks. */}
+      <div
+        style={{
+          position: "absolute",
+          top: 30,
+          left: 36,
+          fontFamily: UI,
+          fontSize: 28,
+          fontWeight: 500,
+          letterSpacing: "0.02em",
+          color: "rgba(255,255,255,0.34)",
+        }}
+      >
+        Sample data — not a live game
+      </div>
+
+      {end > 0 && <Endcard progress={end} f={f} frame={frame} />}
     </div>
   );
 }
 
-function Chip({ league }: { league: LeagueResponse }) {
+function Mask({ side }: { side: "left" | "right" }) {
   return (
-    <FantasyStatChip
-      league={league}
-      prefs={DEFAULT_WIDGET_DISPLAY.fantasy}
-      comfort
-      // NOT rollScore. At ticker size a digit roller is unreadable
-      // mid-transition. Right for the app, noise here.
+    <div
+      style={{
+        position: "absolute",
+        [side]: 0,
+        bottom: 0,
+        width: 150,
+        height: 120,
+        background: `linear-gradient(${side === "left" ? 90 : 270}deg, #080a10 0%, rgba(8,10,16,0) 100%)`,
+        pointerEvents: "none",
+      }}
     />
   );
 }
 
-function Context() {
-  return (
-    <div
-      style={{
-        fontFamily: MONO,
-        fontSize: 36,
-        letterSpacing: "0.22em",
-        textTransform: "uppercase",
-        color: "#6b7280",
-        display: "flex",
-        alignItems: "center",
-        gap: 22,
-      }}
-    >
-      <span style={{ color: "var(--color-live, #ef4444)" }}>● Live</span>
-      <span>The Sunday Money League · Week 12</span>
-    </div>
-  );
-}
-
-function Scoreboard({
-  points,
-  ahead,
-  hitScale,
-  flash,
-}: {
-  points: number;
-  ahead: boolean;
-  hitScale: number;
-  flash: number;
-}) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 110 }}>
-      <Side
-        team="Brunch Money"
-        you
-        points={points}
-        color={ahead ? "var(--color-up)" : "var(--color-down)"}
-        hitScale={hitScale}
-        flash={flash}
-      />
-      <div
-        style={{
-          alignSelf: "flex-end",
-          width: 2,
-          height: 215,
-          background: "#2b3441",
-        }}
-      />
-      <Side team="Fourth and Long" points={OPPONENT_SCORE} color="#9ca3af" />
-    </div>
-  );
-}
-
-function Side({
-  team,
-  points,
-  color,
-  you = false,
-  hitScale = 1,
-  flash = 0,
-}: {
-  team: string;
-  points: number;
-  color: string;
-  you?: boolean;
-  hitScale?: number;
-  flash?: number;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 16,
-      }}
-    >
-      <div
-        style={{
-          fontFamily: MONO,
-          fontSize: 34,
-          letterSpacing: "0.14em",
-          textTransform: "uppercase",
-          color: you ? "#e5e7eb" : "#6b7280",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {team}
-        {you && <span style={{ color: "#6b7280" }}> (you)</span>}
-      </div>
-      {/* Fixed width so the centred row can't shift when digits change. */}
-      <div
-        style={{
-          position: "relative",
-          width: 640,
-          display: "flex",
-          justifyContent: "center",
-        }}
-      >
-        {flash > 0 && (
-          <div
-            style={{
-              position: "absolute",
-              inset: "-8% -6%",
-              borderRadius: 32,
-              background: `radial-gradient(ellipse at center, ${GLOW} 0%, transparent 70%)`,
-              opacity: flash,
-            }}
-          />
-        )}
-        <span
-          style={{
-            position: "relative",
-            fontSize: 215,
-            lineHeight: 1,
-            fontWeight: 600,
-            fontVariantNumeric: "tabular-nums",
-            fontFamily: MONO,
-            color,
-            transform: `scale(${hitScale})`,
-            display: "inline-block",
-          }}
-        >
-          {points.toFixed(1)}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function State({ ahead, margin }: { ahead: boolean; margin: number }) {
-  return (
-    <div
-      style={{
-        fontFamily: MONO,
-        fontSize: 50,
-        fontWeight: 600,
-        letterSpacing: "0.16em",
-        textTransform: "uppercase",
-        whiteSpace: "nowrap",
-        color: ahead ? "var(--color-up)" : "var(--color-down)",
-      }}
-    >
-      {ahead ? "▲ Ahead by " : "▼ Trailing by "}
-      {margin.toFixed(1)}
-    </div>
-  );
+function Chip({ league }: { league: LeagueResponse }) {
+  return <FantasyStatChip league={league} prefs={PROMO_PREFS} comfort />;
 }
 
 function FlashRing({ progress }: { progress: number }) {
-  const scale = interpolate(progress, [0, 1], [1, 1.05]);
-  const opacity = interpolate(progress, [0, 0.25, 1], [0, 0.55, 0]);
   return (
     <div
       style={{
         position: "absolute",
         inset: -3,
-        border: "1px solid var(--color-up)",
-        borderRadius: 7,
-        transform: `scale(${scale})`,
-        opacity,
+        border: `1px solid ${ACCENT}`,
+        borderRadius: 9,
+        transform: `scale(${1 + progress * 0.04})`,
+        opacity: progress * 0.7,
+        pointerEvents: "none",
       }}
     />
   );
 }
 
 /**
- * The ask. Muted autoplay means every word has to be on screen, and a
- * feed viewer gives this about a second — so it's one line, one name and
- * one destination, nothing else.
+ * The ask. Muted autoplay means every word is on screen, and a feed
+ * viewer gives it about a second.
  *
- * The "demo data" mark is not optional politeness. The stat lines in
- * these fixtures are invented, and r/fantasyfootball is precisely the
- * audience that will spot an implausible Achane line. Saying so costs a
- * line of 24px type and stops the post becoming about that instead of
- * about the product.
+ * Everything is sized against a legibility FLOOR: a feed scales this to
+ * roughly a quarter, so anything meaningful has to clear ~64px to survive
+ * at 16px. The previous card had a 46px tagline and a 22px disclosure —
+ * 11px and 5px respectively, which is decoration, not communication. It
+ * also named no category, no platform and no price.
  */
-function Endcard({ progress }: { progress: number }) {
-  const rise = interpolate(progress, [0, 1], [24, 0]);
+function Endcard({
+  progress,
+  f,
+  frame,
+}: {
+  progress: number;
+  f: (s: number) => number;
+  frame: number;
+}) {
+  // Staggered, so the card assembles rather than appearing.
+  const at = (delay: number) =>
+    interpolate(frame, [f(T.end + delay), f(T.end + delay + 0.35)], [0, 1], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.out(Easing.cubic),
+    });
+  const a = at(0);
+  const b = at(0.1);
+  const c = at(0.22);
+  const rise = (v: number) => `translateY(${(28 * (1 - v)).toFixed(1)}px)`;
+
   return (
     <div
       style={{
@@ -461,62 +499,84 @@ function Endcard({ progress }: { progress: number }) {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 28,
+        gap: 24,
+        paddingBottom: 150,
         opacity: progress,
-        transform: `translateY(${rise}px)`,
+        fontFamily: UI,
+        textAlign: "center",
+        pointerEvents: "none",
       }}
     >
+      {/*
+        A scrim, because the world deliberately does NOT fade to black
+        behind this card — the bar has to stay visibly running, which is
+        the product's whole claim. Without it the tagline lands on a
+        spreadsheet grid and neither wins.
+      */}
       <div
         style={{
-          fontFamily: MONO,
-          fontSize: 132,
-          fontWeight: 700,
-          letterSpacing: "-0.02em",
-          color: "#f3f4f6",
+          position: "absolute",
+          inset: 0,
+          background:
+            "radial-gradient(1500px 900px at 50% 46%, rgba(5,7,12,0.94) 0%, rgba(5,7,12,0.82) 45%, rgba(5,7,12,0) 78%)",
+        }}
+      />
+      <div
+        style={{
+          position: "relative",
+          fontSize: 168,
+          fontWeight: 800,
+          letterSpacing: "-0.045em",
+          color: "#ffffff",
+          opacity: a,
+          transform: rise(a),
         }}
       >
         Scrollr
       </div>
       <div
         style={{
-          fontFamily: MONO,
-          fontSize: 44,
-          letterSpacing: "0.06em",
-          color: "#9ca3af",
-          textAlign: "center",
+          position: "relative",
+          fontSize: 72,
+          fontWeight: 600,
+          letterSpacing: "-0.015em",
+          color: "rgba(255,255,255,0.82)",
+          opacity: b,
+          transform: rise(b),
         }}
       >
-        Your leagues on your screen. Without checking.
+        Stop checking your phone.
       </div>
       <div
         style={{
-          marginTop: 18,
-          fontFamily: MONO,
-          fontSize: 38,
-          letterSpacing: "0.14em",
-          color: "var(--color-up)",
+          position: "relative",
+          fontSize: 44,
+          fontWeight: 500,
+          color: "#9292a4",
+          opacity: b,
+          transform: rise(b),
+        }}
+      >
+        Live fantasy ticker · Windows &amp; macOS · Free
+      </div>
+      <div
+        style={{
+          position: "relative",
+          marginTop: 20,
+          padding: "18px 46px",
+          borderRadius: 999,
+          background: "rgba(52,211,153,0.10)",
+          border: "1px solid rgba(52,211,153,0.45)",
+          fontSize: 60,
+          fontWeight: 700,
+          letterSpacing: "-0.01em",
+          color: ACCENT,
+          opacity: c,
+          transform: rise(c),
         }}
       >
         myscrollr.com
       </div>
-      <div
-        style={{
-          position: "absolute",
-          // Clears the bar, which is still visible under the dim.
-          bottom: 122,
-          fontFamily: MONO,
-          fontSize: 24,
-          letterSpacing: "0.16em",
-          textTransform: "uppercase",
-          color: "#4b5563",
-        }}
-      >
-        Demo data
-      </div>
     </div>
   );
-}
-
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
 }

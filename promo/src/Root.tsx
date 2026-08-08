@@ -1,4 +1,5 @@
 import { Composition } from "remotion";
+
 import { Beat1Hook } from "./beats/Beat1Hook";
 import "./styles.css";
 
@@ -16,7 +17,7 @@ export function RemotionRoot() {
       <Composition
         id="Beat1Hook"
         component={Beat1Hook}
-        durationInFrames={630}
+        durationInFrames={540}
         fps={60}
         width={2560}
         height={1440}

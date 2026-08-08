@@ -33,16 +33,25 @@ import type {
  * as a rendering bug, not as a ticker.
  */
 export const RAIL_LEFT: LeagueResponse[] = [workLeague(), dynasty()];
-export const RAIL_RIGHT: LeagueResponse[] = [collegePool(), familyLeague()];
+export const RAIL_RIGHT_TAIL: LeagueResponse[] = [familyLeague()];
 
-/** Different sport, so the rail isn't four rows of the same shape. */
-function collegePool(): LeagueResponse {
+/** Where the second league starts, and where it ends up. */
+export const POOL_BEHIND = 112.4;
+export const POOL_AHEAD = 119.4;
+
+/**
+ * Parameterised like sundayMoney, so the back half of the film has an
+ * EVENT rather than a frozen rail sliding sideways. A second league
+ * taking the lead — in the real chip, with the real red-to-green token
+ * swap — is what turns "look at this bar" into "it keeps doing this".
+ */
+export function collegePool(mine: number): LeagueResponse {
   return league({
     key: "449.l.553901",
     name: "Bowl Season Pool",
     teamName: "Bracket Chaos",
     oppName: "Chalk Eaters",
-    mine: 112.4,
+    mine,
     theirs: 118.9,
     status: "midevent",
     rank: 7,

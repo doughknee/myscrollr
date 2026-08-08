@@ -80,13 +80,13 @@ export function sundayMoney(userPoints: number): LeagueResponse {
 
   return {
     league_key: "449.l.884213",
-    name: "The Sunday Money League",
+    name: "Sunday Money",
     game_code: "nfl",
     season: "2025",
     team_key: TEAM_KEY,
     team_name: TEAM_NAME,
     data: {
-      num_teams: 8,
+      num_teams: 12,
       is_finished: false,
       current_week: 12,
       scoring_type: "head",
