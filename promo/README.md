@@ -46,6 +46,42 @@ There are two clocks to pin and only one is documented:
 Both fixed in `motionClock.ts`, with the remaining sub-pixel ceiling
 documented there.
 
+### AnimateNumber is not used, on purpose
+
+It was tried properly and it loses to the shot. `AnimateNumber` rolls
+every digit column that changes, through every glyph between — so
+149.9 → 151.8 moves three columns at once and at 215px renders as a
+stack of overlapping numerals rather than an odometer. Slowing it down
+makes it worse, because more intermediate glyphs are on screen.
+
+The score now SWAPS under a flash that peaks on the frame it changes.
+That reads cleaner and is truer to the product, where a score arrives
+when a poll lands rather than counting up to itself.
+
+`FantasyStatChip`'s `rollScore` still exists and is right for the app,
+where the chip is the only thing moving and one column changes at a
+time. It is not used here.
+
+### Rendering the real ScrollrTicker (groundwork, not yet landed)
+
+`stubs/`, `remotion.config.ts` and `src/data/dashboard.ts` carry the
+work needed to bundle the real ticker. Three genuine blockers are solved:
+
+1. `datawidgets/registry.ts` and `widgets/registry.ts` build themselves
+   with Vite's `import.meta.glob`, which webpack cannot execute — the
+   bundle dies on load. Replaced via `NormalModuleReplacementPlugin`.
+   NOT `resolve.alias`: **webpack aliases do not apply to relative
+   requests**, and both are imported relatively from inside desktop/src.
+   Four increasingly specific alias attempts failed silently first.
+2. `ScrollrTicker` subscribes to the pref store on mount, so the Tauri
+   stub's throw-on-everything policy took the whole ticker down.
+   Subscriptions now no-op; reads still throw.
+3. `widgetDisplay` has no default and the fantasy source asks it what to
+   show for every segment, so without it the rail builds nothing.
+
+The ticker bundles and renders without crashing, but still comes out
+EMPTY — not yet diagnosed past that. Not wired into the beat.
+
 ### Don't let Motion animate a value in a composition
 
 Pinning the clock is necessary but not sufficient. Motion's TRANSITIONS

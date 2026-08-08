@@ -47,19 +47,29 @@ export class LazyStore {
   async delete(_key: string): Promise<boolean> {
     return unreachable("delete");
   }
-  // These resolve to an unlisten function in the real plugin, and the
-  // app calls it. The declared type has to match even though the body
-  // never returns.
+  /*
+    The SUBSCRIPTIONS do not throw, unlike everything above, and the
+    distinction is deliberate.
+   
+    Reading storage and getting a plausible empty value is dangerous —
+    the composition would render default preferences while looking like
+    it rendered the shot's. Subscribing to changes that will never come
+    is not: a render is one frame of a fixed timeline, nothing mutates
+    during it, and "you will never be notified" is the truthful answer.
+   
+    ScrollrTicker subscribes on mount (watchlist), so throwing here took
+    the whole ticker down.
+  */
   async onChange<T>(
     _cb: (key: string, value: T | null) => void,
   ): Promise<UnlistenFn> {
-    return unreachable("onChange");
+    return () => {};
   }
   async onKeyChange<T>(
     _key: string,
     _cb: (value: T | null) => void,
   ): Promise<UnlistenFn> {
-    return unreachable("onKeyChange");
+    return () => {};
   }
 }
 

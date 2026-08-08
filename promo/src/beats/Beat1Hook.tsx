@@ -25,7 +25,6 @@
  * responsive utilities buy nothing. Styling the CHIP is Tailwind's job;
  * placing it in frame is not.
  */
-import { AnimateNumber } from "motion-plus/react";
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import FantasyStatChip from "../../../desktop/src/components/chips/FantasyStatChip";
 import { DEFAULT_WIDGET_DISPLAY } from "../../../desktop/src/preferences";
@@ -46,38 +45,26 @@ import { useMotionClock } from "../motionClock";
 const STEP_AT_SECONDS = 2.2;
 
 /**
- * How long the digits take to climb. Short on purpose.
+ * How long the hit takes to settle.
  *
- * The anticipation in this beat is the 2.2s of deficit BEFORE the play,
- * not the climb itself. A long roll actively hurts: 149.9 to 151.8
- * changes three digit columns at once, and AnimateNumber rolls each one
- * through every glyph between, so at 215px a slow version is a stack of
- * overlapping numerals rather than an odometer. Quick reads as a hit.
+ * The score does not roll or count — it SWAPS, under a flash that covers
+ * the frame it changes on. AnimateNumber was the obvious tool and it
+ * fought this shot the whole way: it rolls every digit column that
+ * changes through every glyph between, so at 215px the transition was a
+ * stack of overlapping numerals. Hiding the swap behind a hit is both
+ * cleaner to look at and truer to the product, where a score arrives
+ * when a poll lands rather than counting up to itself.
  */
-const ROLL_SECONDS = 0.45;
+const HIT_SECONDS = 0.4;
 
 /** Chip is supporting cast under the scoreboard, not the hero. */
 const CHIP_SCALE = 2.6;
 
 const MONO = "var(--font-mono, ui-monospace, monospace)";
 
-/**
- * AnimateNumber owns this roll, and it does advance under Remotion —
- * the manual clock in motionClock.ts is what makes that true.
- *
- * bounce: 0 because a settled score that overshoots and wobbles reads as
- * the number being unsure of itself.
- *
- * The value it animates BETWEEN must be stepped, not interpolated per
- * frame. Feeding it a fresh number every frame restarts the slide every
- * frame and leaves every digit stuck between glyphs — a smear, not a
- * roll.
- */
-const ROLL = {
-  format: { minimumFractionDigits: 1, maximumFractionDigits: 1 },
-  locales: "en-US",
-  transition: { type: "spring" as const, visualDuration: ROLL_SECONDS, bounce: 0 },
-};
+/** The go-ahead flash. Green, because it only ever fires on a lead. */
+const GLOW = "rgba(34, 197, 94, 0.55)";
+
 
 export function Beat1Hook() {
   // Above every Motion component in this tree. Without it AnimateNumber
@@ -101,21 +88,31 @@ export function Beat1Hook() {
   // had already gone green. Two clocks, one of them guessed. The short
   // overlap where the number is green and still climbing reads as the
   // lead landing, which is the point of the shot.
-  // Waits for the DIGITS, not the data. The score steps instantly but
-  // takes ROLL_SECONDS to visibly climb, so flipping on the step turns
-  // everything green over a number still reading 149-something.
-  const ahead = frame >= stepFrame + Math.round(fps * ROLL_SECONDS);
-  const margin = Math.abs(round1((ahead ? CLOSING_SCORE : OPENING_SCORE) - OPPONENT_SCORE));
+  // Nothing lags now: the number swaps on the same frame the tone and
+  // the words do, and the flash covers all three changing at once.
+  const ahead = landed;
+  const margin = Math.abs(round1(userPoints - OPPONENT_SCORE));
+
+  // The hit. Scale overshoots once and settles — the flash peaks on the
+  // swap frame itself, so the eye never resolves the old digits.
+  const hit = spring({
+    frame: frame - stepFrame,
+    fps,
+    config: { damping: 200 },
+    durationInFrames: Math.round(fps * HIT_SECONDS),
+  });
+  const hitScale = landed ? interpolate(hit, [0, 1], [1.22, 1]) : 1;
+  const flash = landed
+    ? interpolate(frame - stepFrame, [0, 4, Math.round(fps * 0.45)], [1, 0.55, 0], {
+        extrapolateRight: "clamp",
+      })
+    : 0;
 
   // Critically damped on purpose — see ROLL. This drives the lift and
   // the ring, and an oscillating spring would put the wobble straight
   // back in by another route.
-  const pop = spring({
-    frame: frame - (stepFrame + Math.round(fps * ROLL_SECONDS)),
-    fps,
-    config: { damping: 200 },
-    durationInFrames: Math.round(fps * 0.45),
-  });
+  const pop = hit;
+
 
   return (
     <div
@@ -153,7 +150,12 @@ export function Beat1Hook() {
         }}
       >
         <Context />
-        <Scoreboard points={userPoints} ahead={ahead} pop={pop} />
+        <Scoreboard
+          points={userPoints}
+          ahead={ahead}
+          hitScale={hitScale}
+          flash={flash}
+        />
         <State ahead={ahead} margin={margin} />
 
         <div
@@ -212,11 +214,13 @@ function Context() {
 function Scoreboard({
   points,
   ahead,
-  pop,
+  hitScale,
+  flash,
 }: {
   points: number;
   ahead: boolean;
-  pop: number;
+  hitScale: number;
+  flash: number;
 }) {
   return (
     <div
@@ -224,9 +228,6 @@ function Scoreboard({
         display: "flex",
         alignItems: "center",
         gap: 110,
-        // The go-ahead lands with a small lift, so the roll reads as an
-        // event rather than a value edit.
-        transform: `scale(${1 + (ahead ? pop * 0.03 : 0)})`,
       }}
     >
       <Side
@@ -234,6 +235,8 @@ function Scoreboard({
         you
         points={points}
         color={ahead ? "var(--color-up)" : "var(--color-down)"}
+        hitScale={hitScale}
+        flash={flash}
       />
       {/*
         Bottom-aligned so it spans the NUMBERS, not the whole column. A
@@ -253,23 +256,20 @@ function Scoreboard({
   );
 }
 
-/**
- * NOT memoised, and that's deliberate — React.memo here silently kills
- * the roll. AnimateNumber needs the per-frame re-renders to advance;
- * bail out of them and the number snaps straight to its new value in a
- * single frame. Memoising looked right (the parent re-renders 60 times a
- * second to drive the lift) and cost the entire animation.
- */
 function Side({
   team,
   points,
   color,
   you = false,
+  hitScale = 1,
+  flash = 0,
 }: {
   team: string;
   points: number;
   color: string;
   you?: boolean;
+  hitScale?: number;
+  flash?: number;
 }) {
   return (
     <div
@@ -294,31 +294,51 @@ function Side({
         {you && <span style={{ color: "#6b7280" }}> (you)</span>}
       </div>
       {/*
-        Fixed width, and it matters more than it looks. The row is
-        centre-justified, so if the number's box changes width by even a
-        pixel mid-transition the whole scoreboard re-centres and every
-        element on the row twitches sideways.
+        Fixed width so the row can't re-centre. The row is
+        centre-justified, so a number whose box changes width by a pixel
+        drags every element on the row sideways with it.
       */}
       <div
         style={{
+          position: "relative",
           width: 640,
           display: "flex",
           justifyContent: "center",
         }}
       >
-      <AnimateNumber
-        {...ROLL}
-        style={{
-          fontSize: 215,
-          lineHeight: 1,
-          fontWeight: 600,
-          fontVariantNumeric: "tabular-nums",
-          fontFamily: MONO,
-          color,
-        }}
-      >
-        {points}
-      </AnimateNumber>
+        {/*
+          The flash. Peaks on the exact frame the number swaps and is
+          gone in under half a second, so the eye never gets to resolve
+          the old digits — which is the entire job. Behind the number,
+          not over it, so the number stays legible throughout.
+        */}
+        {flash > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: "-8% -6%",
+              borderRadius: 32,
+              background: `radial-gradient(ellipse at center, ${GLOW} 0%, transparent 70%)`,
+              opacity: flash,
+              pointerEvents: "none",
+            }}
+          />
+        )}
+        <span
+          style={{
+            position: "relative",
+            fontSize: 215,
+            lineHeight: 1,
+            fontWeight: 600,
+            fontVariantNumeric: "tabular-nums",
+            fontFamily: MONO,
+            color,
+            transform: `scale(${hitScale})`,
+            display: "inline-block",
+          }}
+        >
+          {points.toFixed(1)}
+        </span>
       </div>
     </div>
   );
