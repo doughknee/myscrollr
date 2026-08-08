@@ -29,7 +29,7 @@ import { Img, staticFile } from "remotion";
  * Where the recording's own ticker strip ends. Beat1Hook's bar has to
  * cover at least this much or the real one peeks out beneath it.
  */
-export const REAL_TICKER_BOTTOM = 86;
+export const REAL_TICKER_BOTTOM = 80;
 
 export function Desktop() {
   return (

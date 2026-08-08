@@ -163,7 +163,14 @@ export function Beat1Hook() {
     interpolate(tightness, [0, 1], [1, MAX_ZOOM]) + tightness * creep;
   const camX = interpolate(tightness, [0, 1], [0, 1280 - FOCUS_X * MAX_ZOOM]);
   const camY = interpolate(tightness, [0, 1], [0, 432 - BAR_Y * MAX_ZOOM]);
-  const camera = `translate(${camX.toFixed(1)}px, ${(camY + end * 70).toFixed(1)}px) scale(${(camZoom * (1 - end * 0.08)).toFixed(4)})`;
+  /*
+    NO push-back on the endcard. It used to scale the world to 0.92 and
+    slide it down, which zooms out PAST the edges of the screenshot — the
+    desk is exactly 2560x1440, so anything under 1.0 reveals empty frame
+    around it and stretches the bar off the photograph. The card dims the
+    world instead; nothing moves.
+  */
+  const camera = `translate(${camX.toFixed(1)}px, ${camY.toFixed(1)}px) scale(${camZoom.toFixed(4)})`;
 
   /**
    * RACK FOCUS, not a cross-fade to black. The desk used to fade to
@@ -301,12 +308,18 @@ export function Beat1Hook() {
             left: 0,
             right: 0,
             top: 0,
-            height: REAL_TICKER_BOTTOM + 16,
-            // Fully OPAQUE, and it has to be: the recording has its own
-            // ticker in exactly this strip, and any translucency lets the
-            // frozen one show through underneath the driven one.
-            background: "#0a0d14",
-            borderBottom: "1px solid rgba(255,255,255,0.09)",
+            height: REAL_TICKER_BOTTOM,
+            /*
+              LIGHT, matching the recording. This was an opaque near-black
+              slab, which put a heavy dark band across the top of an
+              otherwise pale desktop and looked nothing like the ticker in
+              the screenshot underneath it — the app was in light theme.
+              Still fully opaque, because the recording has its own frozen
+              ticker in exactly this strip and any translucency lets it
+              show through the driven one.
+            */
+            background: "#f7f7fb",
+            borderBottom: "1px solid rgba(16,20,40,0.10)",
           }}
         />
 
@@ -431,13 +444,20 @@ export function Beat1Hook() {
           position: "absolute",
           // BOTTOM-left: the bar occupies the top edge now, and the mark
           // was landing straight on the chips.
-          bottom: 28,
-          left: 36,
+          bottom: 26,
+          left: 30,
+          // On its own pill. The desk is a light screenshot, so pale text
+          // vanished into the app window behind it; the camera also moves
+          // over both light and dark areas, so it needs to carry its own
+          // contrast rather than rely on what's underneath.
+          padding: "8px 18px",
+          borderRadius: 999,
+          background: "rgba(10,13,20,0.55)",
           fontFamily: UI,
-          fontSize: 28,
+          fontSize: 26,
           fontWeight: 500,
           letterSpacing: "0.02em",
-          color: "rgba(255,255,255,0.34)",
+          color: "rgba(255,255,255,0.72)",
         }}
       >
         Sample data — not a live game
@@ -456,16 +476,33 @@ function Mask({ side }: { side: "left" | "right" }) {
         [side]: 0,
         top: 0,
         width: 150,
-        height: REAL_TICKER_BOTTOM + 16,
-        background: `linear-gradient(${side === "left" ? 90 : 270}deg, #0a0d14 0%, rgba(10,13,20,0) 100%)`,
+        height: REAL_TICKER_BOTTOM,
+        background: `linear-gradient(${side === "left" ? 90 : 270}deg, #f7f7fb 0%, rgba(247,247,251,0) 100%)`,
         pointerEvents: "none",
       }}
     />
   );
 }
 
+/**
+ * Wrapped in `#app-shell[data-theme="scrollr-light"]`, because that is the
+ * theme the recording was made in — dark chips on a light desktop read as
+ * a different product, and the white chip outlines that came with them
+ * were the giveaway.
+ *
+ * `#app-shell` and NOT `#desktop-shell`: both carry the palette, but
+ * desktop-shell also carries real layout (height: 100vh, its own
+ * background, width: 100% !important on its last child) which wrecks a
+ * video frame. app-shell carries only the palette and the app's
+ * animation-stilling rule, and stilling CSS animation inside a promo is
+ * no loss — it makes the render marginally more deterministic.
+ */
 function Chip({ league }: { league: LeagueResponse }) {
-  return <FantasyStatChip league={league} prefs={PROMO_PREFS} comfort />;
+  return (
+    <div id="app-shell" data-theme="scrollr-light" style={{ display: "flex" }}>
+      <FantasyStatChip league={league} prefs={PROMO_PREFS} comfort />
+    </div>
+  );
 }
 
 function FlashRing({ progress }: { progress: number }) {
