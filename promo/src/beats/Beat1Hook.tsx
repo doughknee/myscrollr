@@ -1,290 +1,277 @@
 /**
- * Beat 01 — the hook. 3 seconds, locked camera.
+ * The hero cut. One continuous camera move, no cuts.
  *
- * You are a tenth of a point down with a player still on the field, and
- * the number crosses while you watch. Every fantasy player has lived this
- * exact number, and the storyboard is right that the feeling has to land
- * before the product does.
+ * A desktop with work on it and the Scrollr bar at the screen edge. The
+ * camera pushes into one chip until the rest of the world is gone, your
+ * matchup turns over on a tenth of a point, and the camera pulls back
+ * out to the same desk — where the bar is still sitting, having done
+ * that without being asked. Then the wordmark.
  *
- * Read as a BROADCAST SCOREBOARD, not as one number. The first cut was a
- * single hero figure and it was impossible to tell what was happening: a
- * viewer needs both teams, both scores, and the state in words to follow
- * "losing → winning" in three seconds. So:
+ * THE DESKTOP IS THE PITCH. Earlier cuts had the bar floating in black,
+ * and a viewer finished them without learning that Scrollr runs on your
+ * screen while you work, which is the entire product. Everything before
+ * the pull-back is setup for the moment the desk comes back.
  *
- *   context     which league, which week, that it's live
- *   scoreboard  both teams, both scores, yours coloured by the lead
- *   state       "TRAILING BY 1.8" → "AHEAD BY 0.1", the story in words
- *   chip        the REAL FantasyStatChip, rolling its own digits
+ * Built for muted autoplay in a feed — Reddit, Facebook, Twitter. So
+ * something moves in frame one (the camera is already creeping before
+ * anything else happens), every claim is burned in rather than spoken,
+ * and it ends roughly where it began so a loop doesn't jar.
  *
- * The scoreboard is a promo graphic — it isn't claiming the app renders
- * a 180px score. The chip underneath is the actual component, so when
- * the chip design changes this re-renders instead of going stale.
- *
- * Layout is explicit inline style rather than AbsoluteFill defaults or
- * Tailwind utilities: the composition renders at a fixed 2560x1440 where
- * responsive utilities buy nothing. Styling the CHIP is Tailwind's job;
- * placing it in frame is not.
+ * The CHIPS are the real components. The rail layout and the desk are
+ * the promo's — see src/data/dashboard.ts.
  */
-import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import {
+  Easing,
+  interpolate,
+  spring,
+  useCurrentFrame,
+  useVideoConfig,
+} from "remotion";
 import FantasyStatChip from "../../../desktop/src/components/chips/FantasyStatChip";
 import { DEFAULT_WIDGET_DISPLAY } from "../../../desktop/src/preferences";
+import type { LeagueResponse } from "../../../desktop/src/datawidgets/fantasy/types";
+import { RAIL_LEFT, RAIL_RIGHT } from "../data/dashboard";
 import {
   CLOSING_SCORE,
   OPENING_SCORE,
   OPPONENT_SCORE,
   sundayMoney,
 } from "../data/sundayMoney";
-import { RAIL_LEFT, RAIL_RIGHT } from "../data/dashboard";
 import { useMotionClock } from "../motionClock";
+import { Desktop } from "../scene/Desktop";
 
+/** Seconds. The whole cut's timing, in one place. */
+const T = {
+  /** Fully tight on the chip. The push runs from frame 0 to here. */
+  tight: 2.4,
+  /** The play lands. */
+  hit: 3.1,
+  /** Camera starts back out; the rail assembles. */
+  rail: 4.0,
+  /** Back to the desk. */
+  wide: 5.8,
+  /** Bar drifts — the product simply in use. */
+  drift: 6.6,
+  /** Wordmark. */
+  end: 8.4,
+};
+
+/** How far in the camera goes. Matches the earlier hero framing. */
+const MAX_ZOOM = 2.6;
+
+/** Where the bar sits in the 2560x1440 scene. */
+const BAR_Y = 1372;
 /**
- * When the play lands. Late on purpose: the whole first half of the beat
- * is the deficit sitting there doing nothing, which is what makes the
- * climb worth watching. An earlier cut stepped at 2.0s of a 3s shot and
- * the number moved before anyone had read what it was.
+ * Horizontal focus. Not 1280: the sibling leagues either side are
+ * different widths, so centring the ROW leaves the hero chip a little
+ * left of frame centre. Tuned against a tight frame.
  */
-const STEP_AT_SECONDS = 2.2;
-
-/**
- * How long the hit takes to settle.
- *
- * The score does not roll or count — it SWAPS, under a flash that covers
- * the frame it changes on. AnimateNumber was the obvious tool and it
- * fought this shot the whole way: it rolls every digit column that
- * changes through every glyph between, so at 215px the transition was a
- * stack of overlapping numerals. Hiding the swap behind a hit is both
- * cleaner to look at and truer to the product, where a score arrives
- * when a poll lands rather than counting up to itself.
- */
-const HIT_SECONDS = 0.4;
-
-/** Chip is supporting cast under the scoreboard, not the hero. */
-const CHIP_SCALE = 2.6;
-
-/** When the camera starts pulling back to show the rest of the rail. */
-const REVEAL_AT_SECONDS = 3.4;
-
-/** Rail drift once it's revealed. Faster than the app's 25px/s — a
- *  promo has three seconds to read as movement, not as a live bar. */
-const SCROLL_PX_PER_SEC = 130;
-
-/** The app's own default chip gap, so the rail spaces like the rail. */
-const CHIP_GAP = 8;
+const FOCUS_X = 1252;
 
 const MONO = "var(--font-mono, ui-monospace, monospace)";
-
-/** The go-ahead flash. Green, because it only ever fires on a lead. */
 const GLOW = "rgba(34, 197, 94, 0.55)";
-
+const CHIP_GAP = 8;
+const SCROLL_PX_PER_SEC = 90;
 
 export function Beat1Hook() {
-  // Above every Motion component in this tree. Without it AnimateNumber
-  // advances on wall clock, not video time — see motionClock.ts.
   useMotionClock();
-
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const stepFrame = Math.round(STEP_AT_SECONDS * fps);
+  const f = (s: number) => Math.round(s * fps);
 
-  // Stepped, because the roll belongs to AnimateNumber. Interpolating
-  // this per frame restarts its slide on every frame and smears every
-  // digit permanently between glyphs.
-  const landed = frame >= stepFrame;
-  const userPoints = landed ? CLOSING_SCORE : OPENING_SCORE;
-
-  // Tone flips with the DATA, on the same frame the chip's does. An
-  // earlier cut delayed it to where the digits were expected to finish
-  // climbing, and the estimate was wrong — the scoreboard sat red under
-  // a settled 151.8, reading "TRAILING BY 1.8", while the chip beside it
-  // had already gone green. Two clocks, one of them guessed. The short
-  // overlap where the number is green and still climbing reads as the
-  // lead landing, which is the point of the shot.
-  // Nothing lags now: the number swaps on the same frame the tone and
-  // the words do, and the flash covers all three changing at once.
-  const ahead = landed;
-  const margin = Math.abs(round1(userPoints - OPPONENT_SCORE));
-
-  // The hit. Scale overshoots once and settles — the flash peaks on the
-  // swap frame itself, so the eye never resolves the old digits.
-  const hit = spring({
-    frame: frame - stepFrame,
-    fps,
-    config: { damping: 200 },
-    durationInFrames: Math.round(fps * HIT_SECONDS),
-  });
-  const hitScale = landed ? interpolate(hit, [0, 1], [1.22, 1]) : 1;
-  const flash = landed
-    ? interpolate(frame - stepFrame, [0, 4, Math.round(fps * 0.45)], [1, 0.55, 0], {
-        extrapolateRight: "clamp",
-      })
-    : 0;
-
-  // Critically damped on purpose — see ROLL. This drives the lift and
-  // the ring, and an oscillating spring would put the wobble straight
-  // back in by another route.
-  const pop = hit;
-
-  // The pull-back. The hero scoreboard shrinks away while the chip it
-  // was sitting above stays put and the rest of the rail arrives around
-  // it — the shot is only a reveal if the chip the camera was already
-  // holding is the one left on the bar.
-  const revealFrame = Math.round(REVEAL_AT_SECONDS * fps);
-  const reveal = spring({
-    frame: frame - revealFrame,
-    fps,
-    config: { damping: 200 },
-    durationInFrames: Math.round(fps * 1.1),
-  });
-  const boardOpacity = interpolate(reveal, [0, 0.45], [1, 0], {
+  /**
+   * ONE value drives the whole camera, and everything else keys off it
+   * rather than off time. That's what keeps the move reversible: the
+   * desk fades out on the way in and back in on the way out, with no
+   * second set of timings to keep in sync.
+   */
+  // Two eased moves rather than one linear ramp. Linear meant the frame
+  // was already 22% zoomed a third of a second in, so the establishing
+  // shot — the whole point of opening on a desk — never existed. Ease-in
+  // holds the wide shot, then accelerates.
+  const pushIn = interpolate(frame, [0, f(T.tight)], [0, 1], {
+    extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
+    easing: Easing.in(Easing.cubic),
   });
-  // Lands at 1.7, not 1. True ticker size is genuinely small, and at
-  // 2560 wide a real-scale bar is unreadable in a video — the frame is
-  // viewed at a distance the app never is.
-  const chipScale = interpolate(reveal, [0, 1], [CHIP_SCALE, 1.7]);
-  // Siblings arrive behind the shrinking hero rather than with it, so
-  // the eye follows one object instead of watching a row assemble.
-  const railOpacity = interpolate(reveal, [0.45, 1], [0, 1], {
+  const pullOut = interpolate(frame, [f(T.rail), f(T.wide)], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.inOut(Easing.cubic),
+  });
+  const tightness = pushIn * (1 - pullOut);
+
+  const zoom = interpolate(tightness, [0, 1], [1, MAX_ZOOM]);
+  // Focus travels from frame centre to the chip, so the wide shot frames
+  // the whole desk instead of being centred on a bar at its bottom edge.
+  // Tight focus deliberately lands ABOVE the bar's true centre, which
+  // pushes the chip into the lower third of frame. Dead-centre left the
+  // scoreboard clipping the chip's top edge and the bottom third empty.
+  const focusY = interpolate(tightness, [0, 1], [720, BAR_Y - 55]);
+  const camera = `translate(${1280 - FOCUS_X * zoom}px, ${
+    720 - focusY * zoom
+  }px) scale(${zoom})`;
+
+  const desktopOpacity = interpolate(tightness, [0.2, 0.62], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  // Drift starts only once the rail is fully there; a bar that's still
-  // fading in while sliding reads as a mistake.
-  // The faded board keeps its box (opacity frees no layout), which stops
-  // the rail jumping — but left there it strands the bar in the bottom
-  // third under 70% empty frame. Rising by roughly half the board's
-  // height as it goes recentres the shot without a jump.
-  const riseY = interpolate(reveal, [0, 1], [0, -250]);
+  const boardOpacity = interpolate(tightness, [0.68, 0.96], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const siblingOpacity = interpolate(tightness, [0.45, 0.8], [1, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
 
-  const settledFrame = revealFrame + Math.round(fps * 1.1);
+  const landed = frame >= f(T.hit);
+  const userPoints = landed ? CLOSING_SCORE : OPENING_SCORE;
+  const ahead = landed;
+  const margin = Math.abs(round1(userPoints - OPPONENT_SCORE));
+
+  // The hit. The score SWAPS on one frame and a flash peaks on that same
+  // frame, so the eye never resolves the old digits. AnimateNumber was
+  // tried here: it rolls every changing digit column through every glyph
+  // between, which at this size is a stack of overlapping numerals.
+  const hit = spring({
+    frame: frame - f(T.hit),
+    fps,
+    config: { damping: 200 },
+    durationInFrames: Math.round(fps * 0.4),
+  });
+  const hitScale = landed ? interpolate(hit, [0, 1], [1.22, 1]) : 1;
+  const flash = landed
+    ? interpolate(
+        frame - f(T.hit),
+        [0, 4, Math.round(fps * 0.45)],
+        [1, 0.55, 0],
+        { extrapolateRight: "clamp" },
+      )
+    : 0;
+
   const scrollPx =
-    frame > settledFrame
-      ? ((frame - settledFrame) / fps) * SCROLL_PX_PER_SEC
-      : 0;
+    frame > f(T.drift) ? ((frame - f(T.drift)) / fps) * SCROLL_PX_PER_SEC : 0;
 
+  const end = interpolate(frame, [f(T.end), f(T.end + 0.7)], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
 
   return (
     <div
       style={{
         position: "absolute",
         inset: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
         background: "#05070a",
         overflow: "hidden",
       }}
     >
       {/*
-        NO shell wrapper, deliberately.
-
-        The obvious move is to wrap this in #desktop-shell so the theme
-        applies — and it's a trap. style.css gives that id a real layout:
-        `height: 100vh`, its own `background: var(--color-surface)`, and
-        `width: 100% !important` on its last child (style.css ~1233 and
-        ~1251, both there to make the app's ticker + feed stack behave).
-        In a video frame that silently stretched this wrapper to full
-        width, so scaling it up magnified empty chip interior — three
-        blank renders before the CSS explained itself.
-
-        Not needed anyway: style.css's default @theme block IS the
-        scrollr-dark palette, applied at :root.
+        Desk and bar move under ONE transform — they have to be the same
+        object or the pull-back is a cut rather than a move. The
+        scoreboard is a promo graphic and sits outside the camera, which
+        is why it stays square to frame while everything else scales.
       */}
       <div
         style={{
+          position: "absolute",
+          width: 2560,
+          height: 1440,
+          transformOrigin: "0 0",
+          transform: camera,
+          filter: end > 0 ? `brightness(${1 - end * 0.75})` : undefined,
+        }}
+      >
+        <div style={{ opacity: desktopOpacity }}>
+          <Desktop />
+        </div>
+
+        <div
+          style={{
+            position: "absolute",
+            top: BAR_Y,
+            left: 0,
+            width: 2560,
+            display: "flex",
+            justifyContent: "center",
+            transform: "translateY(-50%)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: CHIP_GAP,
+              width: "max-content",
+              transform: `translateX(${-scrollPx}px)`,
+            }}
+          >
+            {RAIL_LEFT.map((l) => (
+              <div key={l.league_key} style={{ opacity: siblingOpacity }}>
+                <Chip league={l} />
+              </div>
+            ))}
+
+            <div style={{ position: "relative" }}>
+              <Chip league={sundayMoney(userPoints)} />
+              {ahead && <FlashRing progress={hit} />}
+            </div>
+
+            {RAIL_RIGHT.map((l) => (
+              <div key={l.league_key} style={{ opacity: siblingOpacity }}>
+                <Chip league={l} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* The scoreboard graphic: only while the camera is tight. */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
+          // TOP-anchored, not centred. The camera puts the chip at frame
+          // centre, so a centred board lands directly on top of it — the
+          // score and the chip were overlapping in the same 200px.
+          justifyContent: "flex-start",
           gap: 52,
-          transform: `translateY(${riseY}px)`,
+          paddingTop: 96,
+          opacity: boardOpacity,
+          pointerEvents: "none",
         }}
       >
-        {/*
-          Fades but keeps its box. Opacity doesn't free layout, which is
-          exactly what's wanted: the rail below stays put instead of
-          jumping up the frame as the board disappears. It also leaves
-          the rail sitting low, which is where a ticker lives anyway.
-        */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 52,
-            opacity: boardOpacity,
-          }}
-        >
-          <Context />
-          <Scoreboard
-            points={userPoints}
-            ahead={ahead}
-            hitScale={hitScale}
-            flash={flash}
-          />
-          <State ahead={ahead} margin={margin} />
-        </div>
-
-        {/*
-          The rail. Real chips, promo layout — mounting the real
-          ScrollrTicker was tried and cost three bundling fixes before
-          rendering an empty bar, and a flex row with a gap is not the
-          part of the product worth being precious about. The scroll is
-          Remotion's rather than the app's CSS marquee, which also makes
-          it deterministic.
-
-          LEFT and RIGHT hold the same two leagues mirrored, so their
-          widths match and centring the row centres the HERO chip. That
-          is the whole trick of the reveal: the chip the camera was
-          already holding doesn't move while the rest arrives around it.
-        */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: CHIP_GAP,
-            width: "max-content",
-            marginTop: 28,
-            transform: `translateX(${-scrollPx}px) scale(${chipScale})`,
-          }}
-        >
-          {RAIL_LEFT.map((l) => (
-            <div key={l.league_key} style={{ opacity: railOpacity }}>
-              <FantasyStatChip
-                league={l}
-                prefs={DEFAULT_WIDGET_DISPLAY.fantasy}
-                comfort
-              />
-            </div>
-          ))}
-
-          <div style={{ position: "relative" }}>
-            <FantasyStatChip
-              league={sundayMoney(userPoints)}
-              prefs={DEFAULT_WIDGET_DISPLAY.fantasy}
-              comfort
-              // NOT rollScore. At ticker size a digit roller is
-              // unreadable mid-transition — it came out as "1 4 ? . 1"
-              // rather than a number. Right for the app, noise here.
-            />
-            {ahead && <FlashRing progress={pop} />}
-          </div>
-
-          {RAIL_RIGHT.map((l, i) => (
-            <div key={`${l.league_key}-${i}`} style={{ opacity: railOpacity }}>
-              <FantasyStatChip
-                league={l}
-                prefs={DEFAULT_WIDGET_DISPLAY.fantasy}
-                comfort
-              />
-            </div>
-          ))}
-        </div>
+        <Context />
+        <Scoreboard
+          points={userPoints}
+          ahead={ahead}
+          hitScale={hitScale}
+          flash={flash}
+        />
+        <State ahead={ahead} margin={margin} />
       </div>
+
+      {end > 0 && <Endcard progress={end} />}
     </div>
   );
 }
 
-/** Which league, which week, and that this is happening now. */
+function Chip({ league }: { league: LeagueResponse }) {
+  return (
+    <FantasyStatChip
+      league={league}
+      prefs={DEFAULT_WIDGET_DISPLAY.fantasy}
+      comfort
+      // NOT rollScore. At ticker size a digit roller is unreadable
+      // mid-transition. Right for the app, noise here.
+    />
+  );
+}
+
 function Context() {
   return (
     <div
@@ -317,13 +304,7 @@ function Scoreboard({
   flash: number;
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 110,
-      }}
-    >
+    <div style={{ display: "flex", alignItems: "center", gap: 110 }}>
       <Side
         team="Brunch Money"
         you
@@ -332,11 +313,6 @@ function Scoreboard({
         hitScale={hitScale}
         flash={flash}
       />
-      {/*
-        Bottom-aligned so it spans the NUMBERS, not the whole column. A
-        centred divider drifts up into the team labels, because the
-        column is label + number and the row centres on that full height.
-      */}
       <div
         style={{
           alignSelf: "flex-end",
@@ -387,11 +363,7 @@ function Side({
         {team}
         {you && <span style={{ color: "#6b7280" }}> (you)</span>}
       </div>
-      {/*
-        Fixed width so the row can't re-centre. The row is
-        centre-justified, so a number whose box changes width by a pixel
-        drags every element on the row sideways with it.
-      */}
+      {/* Fixed width so the centred row can't shift when digits change. */}
       <div
         style={{
           position: "relative",
@@ -400,12 +372,6 @@ function Side({
           justifyContent: "center",
         }}
       >
-        {/*
-          The flash. Peaks on the exact frame the number swaps and is
-          gone in under half a second, so the eye never gets to resolve
-          the old digits — which is the entire job. Behind the number,
-          not over it, so the number stays legible throughout.
-        */}
         {flash > 0 && (
           <div
             style={{
@@ -414,7 +380,6 @@ function Side({
               borderRadius: 32,
               background: `radial-gradient(ellipse at center, ${GLOW} 0%, transparent 70%)`,
               opacity: flash,
-              pointerEvents: "none",
             }}
           />
         )}
@@ -438,11 +403,6 @@ function Side({
   );
 }
 
-/**
- * The story in words. Without this a viewer sees two numbers a tenth
- * apart and has to do the arithmetic themselves, which in a 3-second
- * shot means they don't.
- */
 function State({ ahead, margin }: { ahead: boolean; margin: number }) {
   return (
     <div
@@ -463,7 +423,6 @@ function State({ ahead, margin }: { ahead: boolean; margin: number }) {
 }
 
 function FlashRing({ progress }: { progress: number }) {
-  // Expands past the chip and is gone inside half a second.
   const scale = interpolate(progress, [0, 1], [1, 1.05]);
   const opacity = interpolate(progress, [0, 0.25, 1], [0, 0.55, 0]);
   return (
@@ -475,9 +434,86 @@ function FlashRing({ progress }: { progress: number }) {
         borderRadius: 7,
         transform: `scale(${scale})`,
         opacity,
-        pointerEvents: "none",
       }}
     />
+  );
+}
+
+/**
+ * The ask. Muted autoplay means every word has to be on screen, and a
+ * feed viewer gives this about a second — so it's one line, one name and
+ * one destination, nothing else.
+ *
+ * The "demo data" mark is not optional politeness. The stat lines in
+ * these fixtures are invented, and r/fantasyfootball is precisely the
+ * audience that will spot an implausible Achane line. Saying so costs a
+ * line of 24px type and stops the post becoming about that instead of
+ * about the product.
+ */
+function Endcard({ progress }: { progress: number }) {
+  const rise = interpolate(progress, [0, 1], [24, 0]);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 28,
+        opacity: progress,
+        transform: `translateY(${rise}px)`,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: MONO,
+          fontSize: 132,
+          fontWeight: 700,
+          letterSpacing: "-0.02em",
+          color: "#f3f4f6",
+        }}
+      >
+        Scrollr
+      </div>
+      <div
+        style={{
+          fontFamily: MONO,
+          fontSize: 44,
+          letterSpacing: "0.06em",
+          color: "#9ca3af",
+          textAlign: "center",
+        }}
+      >
+        Your leagues on your screen. Without checking.
+      </div>
+      <div
+        style={{
+          marginTop: 18,
+          fontFamily: MONO,
+          fontSize: 38,
+          letterSpacing: "0.14em",
+          color: "var(--color-up)",
+        }}
+      >
+        myscrollr.com
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          // Clears the bar, which is still visible under the dim.
+          bottom: 122,
+          fontFamily: MONO,
+          fontSize: 24,
+          letterSpacing: "0.16em",
+          textTransform: "uppercase",
+          color: "#4b5563",
+        }}
+      >
+        Demo data
+      </div>
+    </div>
   );
 }
 
