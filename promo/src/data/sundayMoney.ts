@@ -27,6 +27,13 @@ import type {
  */
 export const OPENING_SCORE = 149.9;
 export const OPPONENT_SCORE = 151.7;
+/**
+ * What Achane has banked either side of the play. Exported because a
+ * SECOND league reads the same player's points — see badBeats.ts.
+ */
+export const ACHANE_BEFORE = 8.3;
+export const ACHANE_AFTER = 10.2;
+
 /** Where it lands — one score past them. */
 export const CLOSING_SCORE = 151.8;
 

@@ -34,7 +34,14 @@ import { DEFAULT_WIDGET_DISPLAY } from "../../../desktop/src/preferences";
 import type { LeagueResponse } from "../../../desktop/src/datawidgets/fantasy/types";
 import FollowedPlayerChip from "../../../desktop/src/components/chips/FollowedPlayerChip";
 import { RAIL_LEFT, RAIL_PLAYERS, RAIL_RIGHT_TAIL } from "../data/dashboard";
-import { CLOSING_SCORE, OPENING_SCORE, sundayMoney } from "../data/sundayMoney";
+import {
+  ACHANE_AFTER,
+  ACHANE_BEFORE,
+  CLOSING_SCORE,
+  OPENING_SCORE,
+  sundayMoney,
+} from "../data/sundayMoney";
+import { badBeats } from "../data/badBeats";
 import { useMotionClock } from "../motionClock";
 import { Desktop, REAL_TICKER_BOTTOM } from "../scene/Desktop";
 
@@ -62,17 +69,26 @@ const T = {
    * score, a colour, a chip lifting) and it needs to be watchable.
    */
   hit: 3.1,
-  /** Camera starts back out; the rail assembles. */
-  rail: 4.4,
   /** Back to the desk. */
-  wide: 5.7,
+  wide: 5.9,
+  /**
+   * The camera eases back to a TWO-CHIP framing right after the hit, so
+   * the consequence is visible in the same shot as the cause. Tight
+   * enough to read one chip, wide enough to hold both.
+   */
+  reveal: 3.55,
+  /** Camera starts back out properly; the rail assembles. */
+  rail: 4.6,
   /** Cross-dissolve to the Matchup view. */
-  showA: 6.7,
+  showA: 6.9,
   /** Cross-dissolve to the Roster view. */
-  showB: 8.0,
+  showB: 8.2,
   /** Wordmark. */
-  end: 9.4,
+  end: 9.6,
 };
+
+/** Zoom, as a fraction of MAX_ZOOM, at which both chips fit the frame. */
+const TWO_CHIP = 0.34;
 
 /**
  * 3.0 rather than 4.2 because CHIP_SCALE now does part of the work: the
@@ -106,9 +122,11 @@ const CHIP_SCALE = 1.4;
  * drifts through centre either side of it.
  *
  * Measured from a tight render. Re-derive it whenever the rail's
- * composition, CHIP_SCALE or the drift speed changes.
+ * composition, CHIP_SCALE or the drift speed changes — inserting the Bad
+ * Beats chip alone moved it 290px, because the row is centre-justified
+ * so widening it shifts everything left by half the addition.
  */
-const FOCUS_X = 749;
+const FOCUS_X = 459;
 
 const UI =
   '"Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif';
@@ -120,6 +138,20 @@ const UI =
 const ACCENT = "#34d399";
 
 const CHIP_GAP = 8;
+
+/**
+ * Every word the film says, and when. Hard cuts — no fades.
+ *
+ * The stake used to be asserted in type ("Losing by 1.8" / "Ahead by
+ * 0.1"). It isn't any more: two real chips changing colour in opposite
+ * directions, with signed deltas over them, say it better than a label
+ * can, and they say it using the product.
+ */
+const CAPTIONS: readonly { from: number; to: number; text: string }[] = [
+  { from: 0.3, to: 1.7, text: "This bar sits there all day." },
+  { from: 2.1, to: 3.1, text: "One player. Two of your leagues." },
+  { from: 3.6, to: 4.5, text: "He's on the other guy's team." },
+];
 
 /**
  * Win probability is OFF in the promo, and that's a correctness fix
@@ -153,7 +185,18 @@ export function Beat1Hook() {
     extrapolateRight: "clamp",
     easing: Easing.bezier(0.3, 0, 0.15, 1),
   });
-  const tightness = pushIn * (1 - pullOut);
+  /*
+    Between the push and the pull there is now a THIRD move: a fast ease
+    back to TWO_CHIP the instant the score lands, so the viewer sees the
+    other league turn red in the same shot rather than being told about
+    it later. Cause and consequence in one frame is the entire idea.
+  */
+  const reveal = interpolate(frame, [f(T.hit), f(T.reveal)], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.out(Easing.cubic),
+  });
+  const tightness = pushIn * (1 - reveal * (1 - TWO_CHIP)) * (1 - pullOut);
 
   // A creep across the hold. Camera velocity reaching exactly zero reads
   // as a stalled video in a feed, so the tight section never fully stops.
@@ -206,7 +249,20 @@ export function Beat1Hook() {
     for the whole film — the hero simply drifts through frame centre,
     arriving there on the frame the score changes.
   */
-  const camX = interpolate(tightness, [0, 1], [0, 1280 - FOCUS_X * MAX_ZOOM]);
+  /*
+    THREE framings, not two. A single focus point cannot centre one chip
+    at full zoom and centre the PAIR at the reveal — they are different
+    subjects. Keyed on tightness rather than time, so it stays correct
+    whichever direction the camera happens to be travelling.
+      0          the whole screenshot
+      TWO_CHIP   both chips, the hero and its mirror
+      1          the hero chip alone
+  */
+  const camX = interpolate(
+    tightness,
+    [0, TWO_CHIP, 1],
+    [0, 20, 1280 - FOCUS_X * MAX_ZOOM],
+  );
   const camY = interpolate(tightness, [0, 1], [0, 432 - BAR_Y * MAX_ZOOM]);
   /*
     NO push-back on the endcard. It used to scale the world to 0.92 and
@@ -240,6 +296,8 @@ export function Beat1Hook() {
 
   const landed = frame >= f(T.hit);
   const userPoints = landed ? CLOSING_SCORE : OPENING_SCORE;
+  // Both leagues read the SAME player's points. One of them is glad.
+  const achanePoints = landed ? ACHANE_AFTER : ACHANE_BEFORE;
   const sinceHit = frame - f(T.hit);
 
   /**
@@ -271,6 +329,16 @@ export function Beat1Hook() {
       })
     : 0;
   const ringOn = landed && sinceHit >= 8;
+  // Cuts in two frames after the hit, holds, then leaves before the
+  // camera does.
+  const deltaShow = landed
+    ? interpolate(
+        sinceHit,
+        [2, 6, f(1.15), f(1.35)],
+        [0, 1, 1, 0],
+        { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+      )
+    : 0;
 
   const stakeOpacity = interpolate(
     frame,
@@ -336,10 +404,23 @@ export function Beat1Hook() {
           height: 1440,
           transformOrigin: "0 0",
           transform: camera,
-          filter: `brightness(${worldDim.toFixed(3)})`,
         }}
       >
-        <div style={{ position: "absolute", inset: 0, filter: deskFilter }}>
+        {/*
+          The dim is on the DESK, not on the camera wrapper, so the bar
+          above keeps its own brightness through the endcard. Every
+          product film in this category fades to a wordmark on a dead
+          screen; this one leaves the rail running, which is the only
+          moment in the film where the always-on claim is demonstrated
+          rather than asserted.
+        */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            filter: `${deskFilter} brightness(${worldDim.toFixed(3)})`,
+          }}
+        >
           <Desktop />
           <div style={{ position: "absolute", inset: 0, opacity: showA }}>
             <Desktop file="view-matchup.png" />
@@ -404,9 +485,11 @@ export function Beat1Hook() {
             ))}
 
             {/*
-              The hero chip LIFTS on the hit — scales up and casts a
-              shadow, so the update reads as the chip coming forward
-              rather than as text quietly changing inside it.
+              THE PAIR. These two chips sit side by side because they are
+              the film's whole argument: the same player's points land in
+              both, and they disagree about it. FantasyStatChip derives
+              its own tone from myPts vs oppPts, so the green and the red
+              are the shipped component's, not a graphic laid over it.
             */}
             <div
               style={{
@@ -420,16 +503,26 @@ export function Beat1Hook() {
               }}
             >
               <Chip league={sundayMoney(userPoints)} />
-              {ringOn && <FlashRing progress={glow} />}
+              {ringOn && <FlashRing progress={glow} tone={ACCENT} />}
+              <Delta value="+1.9" tone={ACCENT} show={deltaShow} />
             </div>
 
-            {/* The second event: another league takes the lead 3s later,
-                in the real chip, with the real red-to-green swap. Quieter
-                than the hero hit so it reads as ambient rather than as a
-                second climax. */}
-            {/* Standalone TOP SCORER chips, exactly as the recording's
-                rail carries them, resolved against the hero roster so
-                their numbers move with the score. */}
+            <div
+              style={{
+                position: "relative",
+                zIndex: 2,
+                transform: `scale(${hitScale.toFixed(4)})`,
+                filter:
+                  glow > 0
+                    ? `drop-shadow(0 ${(10 * glow).toFixed(1)}px ${(26 * glow).toFixed(0)}px rgba(239,68,68,${(0.5 * glow).toFixed(3)}))`
+                    : undefined,
+              }}
+            >
+              <Chip league={badBeats(achanePoints)} />
+              {ringOn && <FlashRing progress={glow} tone="#ef4444" />}
+              <Delta value="−1.9" tone="#ef4444" show={deltaShow} />
+            </div>
+
             {RAIL_PLAYERS.map((key) => (
               <PlayerChip key={key} playerKey={key} points={userPoints} />
             ))}
@@ -444,57 +537,42 @@ export function Beat1Hook() {
         <Mask side="right" />
       </div>
 
-      {/* The type. Two lines: what this IS, and what's at stake. */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          paddingBottom: 330,
-          gap: 30,
-          opacity: stakeOpacity,
-          pointerEvents: "none",
-          fontFamily: UI,
-          textAlign: "center",
-        }}
-      >
-        {/* The film never said what Scrollr was until the endcard, by
-            which point most of a feed has already scrolled past. */}
-        <div
-          style={{
-            fontSize: 68,
-            fontWeight: 700,
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-            color: "rgba(255,255,255,0.5)",
-            textShadow: "0 4px 40px rgba(0,0,0,0.9)",
-          }}
-        >
-          A live ticker for your fantasy leagues
-        </div>
-        <div
-          style={{
-            fontSize: 132,
-            fontWeight: 800,
-            letterSpacing: "-0.02em",
-            color: landed
-              ? sinceHit < 2
-                ? "#ffffff"
-                : "var(--color-up, #22c55e)"
-              : "var(--color-down, #ef4444)",
-            transform: `translateY(${stakeRise.toFixed(2)}px) scale(${hitScale.toFixed(4)})`,
-            textShadow:
-              glow > 0
-                ? `0 0 ${(90 * glow).toFixed(0)}px rgba(52,211,153,${(0.75 * glow).toFixed(3)})`
-                : "0 4px 40px rgba(0,0,0,0.9)",
-          }}
-        >
-          {landed ? "Ahead by 0.1" : "Losing by 0.1"}
-        </div>
-      </div>
+      {/*
+        CAPTIONS, not supers.
+
+        The old line was 68px, weight 700, uppercase, 0.06em tracked,
+        centred, and cross-faded. That exact combination is what reads as
+        "advert" at half a second, before a single word is parsed — it is
+        the SHAPE, not the sentence. These are left-aligned to the same
+        96px margin as the disclosure, sentence case, and they hard-cut
+        in and out on a single frame. Same information, caption grammar.
+
+        Outside the camera transform on purpose: the desk racks to a 15px
+        blur during the push and the caption stays razor sharp through it.
+      */}
+      {CAPTIONS.map((c) =>
+        frame >= f(c.from) && frame < f(c.to) ? (
+          <div
+            key={c.text}
+            style={{
+              position: "absolute",
+              left: 96,
+              bottom: 196,
+              maxWidth: 1560,
+              fontFamily: UI,
+              fontSize: 84,
+              fontWeight: 700,
+              letterSpacing: "-0.028em",
+              lineHeight: 1.12,
+              color: "#ffffff",
+              textShadow: "0 4px 44px rgba(0,0,0,0.9), 0 2px 10px rgba(0,0,0,0.75)",
+              pointerEvents: "none",
+            }}
+          >
+            {c.text}
+          </div>
+        ) : null,
+      )}
 
       {/* Owned up front, not buried at the end. Hiding it reads as legal
           cover; stating it reads as confidence — and r/fantasyfootball is
@@ -505,7 +583,7 @@ export function Beat1Hook() {
           // BOTTOM-left: the bar occupies the top edge now, and the mark
           // was landing straight on the chips.
           bottom: 26,
-          left: 30,
+          left: 96,
           // On its own pill. The desk is a light screenshot, so pale text
           // vanished into the app window behind it; the camera also moves
           // over both light and dark areas, so it needs to carry its own
@@ -583,13 +661,57 @@ function PlayerChip({
   );
 }
 
-function FlashRing({ progress }: { progress: number }) {
+/**
+ * The signed delta, in the chip's own colour.
+ *
+ * Sign AND colour, not colour alone: at quarter feed scale a red word
+ * becoming a green word is a handful of pixels changing hue, and it is
+ * nothing at all to a colour-blind viewer. A leading + or − carries
+ * direction, magnitude and outcome in one glyph.
+ */
+function Delta({
+  value,
+  tone,
+  show,
+}: {
+  value: string;
+  tone: string;
+  show: number;
+}) {
+  if (show <= 0) return null;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        // BELOW the chips. The bar lives at the top of the screen, so a
+        // delta above it renders off-frame entirely.
+        top: "calc(100% + 30px)",
+        textAlign: "center",
+        fontFamily: UI,
+        fontSize: 96,
+        fontWeight: 800,
+        letterSpacing: "-0.03em",
+        fontVariantNumeric: "tabular-nums",
+        color: tone,
+        opacity: show,
+        textShadow: "0 4px 30px rgba(0,0,0,0.85)",
+        pointerEvents: "none",
+      }}
+    >
+      {value}
+    </div>
+  );
+}
+
+function FlashRing({ progress, tone }: { progress: number; tone: string }) {
   return (
     <div
       style={{
         position: "absolute",
         inset: -3,
-        border: `1px solid ${ACCENT}`,
+        border: `1px solid ${tone}`,
         borderRadius: 9,
         transform: `scale(${1 + progress * 0.04})`,
         opacity: progress * 0.7,
@@ -656,9 +778,13 @@ function Endcard({
       <div
         style={{
           position: "absolute",
-          inset: 0,
+          // Starts BELOW the bar, so the rail stays lit and drifting.
+          top: 96,
+          left: 0,
+          right: 0,
+          bottom: 0,
           background:
-            "radial-gradient(1500px 900px at 50% 46%, rgba(5,7,12,0.94) 0%, rgba(5,7,12,0.82) 45%, rgba(5,7,12,0) 78%)",
+            "radial-gradient(1500px 900px at 50% 42%, rgba(5,7,12,0.94) 0%, rgba(5,7,12,0.82) 45%, rgba(5,7,12,0) 78%)",
         }}
       />
       <div
@@ -685,7 +811,7 @@ function Endcard({
           transform: rise(b),
         }}
       >
-        The moment it happens, you already know.
+        You&apos;ll know before the group chat.
       </div>
       <div
         style={{
@@ -697,7 +823,7 @@ function Endcard({
           transform: rise(b),
         }}
       >
-        Live fantasy ticker · Windows &amp; macOS · Free
+        Live fantasy ticker · Unlimited leagues · Windows &amp; macOS · Free
       </div>
       <div
         style={{
