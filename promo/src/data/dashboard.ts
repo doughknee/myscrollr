@@ -1,36 +1,74 @@
 /**
- * The rail: every league the ticker shows once the camera pulls back.
+ * The other leagues on the rail, either side of the hero.
  *
- * `ScrollrTicker` is prop-driven — `dashboard` plus `activeTabs`, no
- * queries, no router, no store — so the promo can render the REAL ticker
- * rather than a row of chips arranged to look like one. Chip order,
- * spacing, the marquee and the pinned-zone layout are all the product's,
- * which means this beat can't drift from what ships.
+ * The promo lays the rail out itself rather than mounting the real
+ * ScrollrTicker. That was tried first and the bundling alone took three
+ * fixes (see remotion.config.ts) before it rendered an empty bar. It is
+ * the wrong thing to be precious about: the CHIPS are the product and
+ * they are real here, while the rail is a flex row with a gap. A
+ * Remotion-driven scroll is also strictly better for video than the
+ * app's CSS marquee, because it is deterministic.
  *
- * `activeTabs: ["fantasy"]` works because ScrollrTicker resolves a tab to
- * a source via `sourceForWidget` and falls back to the tab name when the
- * catalog has no entry — landing on TICKER_SOURCES.fantasy either way.
+ * What that does cost: chip ORDER and the pinned-zone layout are the
+ * promo's here, not ScrollrTicker's. If those change materially in the
+ * app this beat won't follow.
  *
  * Same honesty boundary as the rest of the fixtures: real players and
  * real league shapes, representative numbers.
  */
-import type { DashboardResponse } from "../../../desktop/src/types";
 import type {
   LeagueResponse,
   StandingsEntry,
 } from "../../../desktop/src/datawidgets/fantasy/types";
-import { sundayMoney } from "./sundayMoney";
 
-export function rail(userPoints: number): DashboardResponse {
-  return {
-    data: {
-      // The hero league stays FIRST so the chip the camera was holding
-      // is the chip that ends up on the rail — the pull-back has to land
-      // on the same object it started on or the shot is a cut, not a
-      // reveal.
-      fantasy: [sundayMoney(userPoints), dynasty(), workLeague()],
-    },
-  };
+/**
+ * Split left/right rather than returned as one list, because the hero
+ * chip has to stay dead centre through the pull-back — the shot is a
+ * reveal only if the chip the camera was already holding is the one left
+ * on the rail. Equal COUNTS either side keep it near enough centred.
+ *
+ * All four are distinct. An earlier version mirrored the same two
+ * leagues so the widths matched exactly, and the repeat was obvious on
+ * screen: the same "Dynasty or Bust 184.5-151.0" twice in one bar reads
+ * as a rendering bug, not as a ticker.
+ */
+export const RAIL_LEFT: LeagueResponse[] = [workLeague(), dynasty()];
+export const RAIL_RIGHT: LeagueResponse[] = [collegePool(), familyLeague()];
+
+/** Different sport, so the rail isn't four rows of the same shape. */
+function collegePool(): LeagueResponse {
+  return league({
+    key: "449.l.553901",
+    name: "Bowl Season Pool",
+    teamName: "Bracket Chaos",
+    oppName: "Chalk Eaters",
+    mine: 112.4,
+    theirs: 118.9,
+    status: "midevent",
+    rank: 7,
+    wins: 5,
+    losses: 6,
+    streakType: "loss",
+    streakValue: 2,
+  });
+}
+
+/** A comfortable win, for a third tone on the bar. */
+function familyLeague(): LeagueResponse {
+  return league({
+    key: "449.l.118742",
+    name: "Thanksgiving Grudge",
+    teamName: "Uncle Ray's Revenge",
+    oppName: "Cousin Dee",
+    mine: 141.2,
+    theirs: 126.5,
+    status: "midevent",
+    rank: 2,
+    wins: 8,
+    losses: 3,
+    streakType: "win",
+    streakValue: 2,
+  });
 }
 
 /** A blowout, to contrast with the hero league's one-tenth margin. */

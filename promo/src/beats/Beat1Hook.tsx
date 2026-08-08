@@ -34,6 +34,7 @@ import {
   OPPONENT_SCORE,
   sundayMoney,
 } from "../data/sundayMoney";
+import { RAIL_LEFT, RAIL_RIGHT } from "../data/dashboard";
 import { useMotionClock } from "../motionClock";
 
 /**
@@ -59,6 +60,16 @@ const HIT_SECONDS = 0.4;
 
 /** Chip is supporting cast under the scoreboard, not the hero. */
 const CHIP_SCALE = 2.6;
+
+/** When the camera starts pulling back to show the rest of the rail. */
+const REVEAL_AT_SECONDS = 3.4;
+
+/** Rail drift once it's revealed. Faster than the app's 25px/s — a
+ *  promo has three seconds to read as movement, not as a live bar. */
+const SCROLL_PX_PER_SEC = 130;
+
+/** The app's own default chip gap, so the rail spaces like the rail. */
+const CHIP_GAP = 8;
 
 const MONO = "var(--font-mono, ui-monospace, monospace)";
 
@@ -113,6 +124,44 @@ export function Beat1Hook() {
   // back in by another route.
   const pop = hit;
 
+  // The pull-back. The hero scoreboard shrinks away while the chip it
+  // was sitting above stays put and the rest of the rail arrives around
+  // it — the shot is only a reveal if the chip the camera was already
+  // holding is the one left on the bar.
+  const revealFrame = Math.round(REVEAL_AT_SECONDS * fps);
+  const reveal = spring({
+    frame: frame - revealFrame,
+    fps,
+    config: { damping: 200 },
+    durationInFrames: Math.round(fps * 1.1),
+  });
+  const boardOpacity = interpolate(reveal, [0, 0.45], [1, 0], {
+    extrapolateRight: "clamp",
+  });
+  // Lands at 1.7, not 1. True ticker size is genuinely small, and at
+  // 2560 wide a real-scale bar is unreadable in a video — the frame is
+  // viewed at a distance the app never is.
+  const chipScale = interpolate(reveal, [0, 1], [CHIP_SCALE, 1.7]);
+  // Siblings arrive behind the shrinking hero rather than with it, so
+  // the eye follows one object instead of watching a row assemble.
+  const railOpacity = interpolate(reveal, [0.45, 1], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  // Drift starts only once the rail is fully there; a bar that's still
+  // fading in while sliding reads as a mistake.
+  // The faded board keeps its box (opacity frees no layout), which stops
+  // the rail jumping — but left there it strands the bar in the bottom
+  // third under 70% empty frame. Rising by roughly half the board's
+  // height as it goes recentres the shot without a jump.
+  const riseY = interpolate(reveal, [0, 1], [0, -250]);
+
+  const settledFrame = revealFrame + Math.round(fps * 1.1);
+  const scrollPx =
+    frame > settledFrame
+      ? ((frame - settledFrame) / fps) * SCROLL_PX_PER_SEC
+      : 0;
+
 
   return (
     <div
@@ -147,43 +196,88 @@ export function Beat1Hook() {
           flexDirection: "column",
           alignItems: "center",
           gap: 52,
+          transform: `translateY(${riseY}px)`,
         }}
       >
-        <Context />
-        <Scoreboard
-          points={userPoints}
-          ahead={ahead}
-          hitScale={hitScale}
-          flash={flash}
-        />
-        <State ahead={ahead} margin={margin} />
-
+        {/*
+          Fades but keeps its box. Opacity doesn't free layout, which is
+          exactly what's wanted: the rail below stays put instead of
+          jumping up the frame as the board disappears. It also leaves
+          the rail sitting low, which is where a ticker lives anyway.
+        */}
         <div
           style={{
-            position: "relative",
-            width: "max-content",
-            transform: `scale(${CHIP_SCALE})`,
-            marginTop: 28,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 52,
+            opacity: boardOpacity,
           }}
         >
-          <FantasyStatChip
-            league={sundayMoney(userPoints)}
-            prefs={DEFAULT_WIDGET_DISPLAY.fantasy}
-            comfort
-            // NOT rollScore here. The chip renders at ticker size, and
-            // a digit roller that small is unreadable mid-transition —
-            // it came out as "1 4 ? . 1" rather than a number. The
-            // capability is right for the app, where the chip is the
-            // only thing moving; under a 215px scoreboard doing the same
-            // move it is noise. Its score snaps, which at this size
-            // nobody sees.
+          <Context />
+          <Scoreboard
+            points={userPoints}
+            ahead={ahead}
+            hitScale={hitScale}
+            flash={flash}
           />
-          {/*
-            Inside the scaled wrapper on purpose. Sized against the FRAME
-            it fired within the chip's own bounds once the chip got big;
-            inset off the chip, it wraps whatever size the chip is.
-          */}
-          {ahead && <FlashRing progress={pop} />}
+          <State ahead={ahead} margin={margin} />
+        </div>
+
+        {/*
+          The rail. Real chips, promo layout — mounting the real
+          ScrollrTicker was tried and cost three bundling fixes before
+          rendering an empty bar, and a flex row with a gap is not the
+          part of the product worth being precious about. The scroll is
+          Remotion's rather than the app's CSS marquee, which also makes
+          it deterministic.
+
+          LEFT and RIGHT hold the same two leagues mirrored, so their
+          widths match and centring the row centres the HERO chip. That
+          is the whole trick of the reveal: the chip the camera was
+          already holding doesn't move while the rest arrives around it.
+        */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: CHIP_GAP,
+            width: "max-content",
+            marginTop: 28,
+            transform: `translateX(${-scrollPx}px) scale(${chipScale})`,
+          }}
+        >
+          {RAIL_LEFT.map((l) => (
+            <div key={l.league_key} style={{ opacity: railOpacity }}>
+              <FantasyStatChip
+                league={l}
+                prefs={DEFAULT_WIDGET_DISPLAY.fantasy}
+                comfort
+              />
+            </div>
+          ))}
+
+          <div style={{ position: "relative" }}>
+            <FantasyStatChip
+              league={sundayMoney(userPoints)}
+              prefs={DEFAULT_WIDGET_DISPLAY.fantasy}
+              comfort
+              // NOT rollScore. At ticker size a digit roller is
+              // unreadable mid-transition — it came out as "1 4 ? . 1"
+              // rather than a number. Right for the app, noise here.
+            />
+            {ahead && <FlashRing progress={pop} />}
+          </div>
+
+          {RAIL_RIGHT.map((l, i) => (
+            <div key={`${l.league_key}-${i}`} style={{ opacity: railOpacity }}>
+              <FantasyStatChip
+                league={l}
+                prefs={DEFAULT_WIDGET_DISPLAY.fantasy}
+                comfort
+              />
+            </div>
+          ))}
         </div>
       </div>
     </div>

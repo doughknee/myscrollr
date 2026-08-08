@@ -62,25 +62,32 @@ when a poll lands rather than counting up to itself.
 where the chip is the only thing moving and one column changes at a
 time. It is not used here.
 
-### Rendering the real ScrollrTicker (groundwork, not yet landed)
+### The rail is the promo's, the chips are the product's
 
-`stubs/`, `remotion.config.ts` and `src/data/dashboard.ts` carry the
-work needed to bundle the real ticker. Three genuine blockers are solved:
+Mounting the real `ScrollrTicker` was tried first and abandoned. It
+bundles — three genuine blockers had to be solved and the fixes are still
+in `remotion.config.ts` and `stubs/` because anything importing deep into
+`desktop/src` will hit the first one:
 
 1. `datawidgets/registry.ts` and `widgets/registry.ts` build themselves
-   with Vite's `import.meta.glob`, which webpack cannot execute — the
-   bundle dies on load. Replaced via `NormalModuleReplacementPlugin`.
-   NOT `resolve.alias`: **webpack aliases do not apply to relative
-   requests**, and both are imported relatively from inside desktop/src.
-   Four increasingly specific alias attempts failed silently first.
+   with Vite's `import.meta.glob`, which webpack cannot execute; the
+   bundle dies on load. Replaced with `NormalModuleReplacementPlugin`,
+   NOT `resolve.alias` — **webpack aliases do not apply to relative
+   requests**, and both are imported relatively. Four increasingly
+   specific alias attempts failed silently before that surfaced.
 2. `ScrollrTicker` subscribes to the pref store on mount, so the Tauri
    stub's throw-on-everything policy took the whole ticker down.
-   Subscriptions now no-op; reads still throw.
-3. `widgetDisplay` has no default and the fantasy source asks it what to
-   show for every segment, so without it the rail builds nothing.
+3. `widgetDisplay` has no default and the fantasy source consults it per
+   segment, so the rail built nothing without it.
 
-The ticker bundles and renders without crashing, but still comes out
-EMPTY — not yet diagnosed past that. Not wired into the beat.
+After all that it still rendered an empty bar. It was the wrong thing to
+be precious about: a flex row with a gap is not the part of the product
+worth preserving, the CHIPS are, and they are real here. A
+Remotion-driven scroll is also better than the app's CSS marquee for
+video, because it's deterministic.
+
+What it costs: chip ORDER and the pinned-zone layout are the promo's
+here. If those change materially in the app, this beat won't follow.
 
 ### Don't let Motion animate a value in a composition
 
