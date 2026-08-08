@@ -75,10 +75,10 @@ const T = {
 };
 
 /**
- * 4.2, not 2.6. This single number decides whether the product is visible
- * at all once a feed scales the video down — see the file header.
+ * 3.0 rather than 4.2 because CHIP_SCALE now does part of the work: the
+ * chips render 1.4x, so the same on-screen size needs less camera.
  */
-const MAX_ZOOM = 4.2;
+const MAX_ZOOM = 3.0;
 
 /**
  * The bar sits at the TOP, because that is where it is in the recording.
@@ -86,16 +86,29 @@ const MAX_ZOOM = 4.2;
  * bar of real chips so the score can be driven; everything below is the
  * untouched photograph.
  */
-const BAR_Y = 40;
+const BAR_Y = 38;
+
 /**
- * Horizontal focus, in scene coordinates. Nowhere near frame centre:
- * the rail is a row of real chips of wildly different widths (two league
- * chips left, three narrow player chips plus two league chips right), so
- * centring the ROW puts the hero chip well off centre. Derived by
- * measuring the hero's edges in a tight render, and it has to be
- * re-derived whenever the rail's composition changes.
+ * The recording was made with the app at 130% display size, so its ticker
+ * chips are ~70px tall sitting 3px below the screen edge. Rendered at 1.0
+ * they came out 50px tall sitting at 10, which left a band of empty bar
+ * under them that the real one doesn't have. Measured off the frame, not
+ * chosen.
  */
-const FOCUS_X = 967;
+const CHIP_SCALE = 1.4;
+/**
+ * Horizontal focus, in scene coordinates, at the moment of the HIT.
+ *
+ * Nowhere near frame centre: the rail is a row of real chips of wildly
+ * different widths, so centring the ROW puts the hero well off centre.
+ * It also accounts for CHIP_SCALE and for how far the rail has drifted
+ * by T.hit — the hero is centred on the frame the score changes, and
+ * drifts through centre either side of it.
+ *
+ * Measured from a tight render. Re-derive it whenever the rail's
+ * composition, CHIP_SCALE or the drift speed changes.
+ */
+const FOCUS_X = 749;
 
 const UI =
   '"Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif';
@@ -185,16 +198,15 @@ export function Beat1Hook() {
   const camZoom =
     interpolate(tightness, [0, 1], [1, MAX_ZOOM]) + tightness * creep;
   /*
-    The tight framing TRACKS the drifting chip — its scene position is
-    FOCUS_X minus however far the rail has travelled. So when the camera
-    is in close the hero sits still and the rest of the bar slides past
-    it, which is what watching one chip on a moving ticker looks like.
-    At wide there is no tracking and the whole rail simply scrolls.
+    A FIXED tight focus, not one that tracks the drift.
+    
+    Tracking was tried and it reverses direction: the compensation has to
+    unwind as the camera pulls back out, so the rail visibly changed
+    course mid-shot. A fixed focus keeps everything travelling one way
+    for the whole film — the hero simply drifts through frame centre,
+    arriving there on the frame the score changes.
   */
-  const camX = interpolate(tightness, [0, 1], [
-    0,
-    1280 - (FOCUS_X - scrollPx) * MAX_ZOOM,
-  ]);
+  const camX = interpolate(tightness, [0, 1], [0, 1280 - FOCUS_X * MAX_ZOOM]);
   const camY = interpolate(tightness, [0, 1], [0, 432 - BAR_Y * MAX_ZOOM]);
   /*
     NO push-back on the endcard. It used to scale the world to 0.92 and
@@ -379,7 +391,9 @@ export function Beat1Hook() {
               alignItems: "center",
               gap: CHIP_GAP,
               width: "max-content",
-              transform: `translateX(${-scrollPx}px)`,
+              // translate THEN scale: CSS applies right-to-left, so the
+              // drift stays in scene pixels regardless of CHIP_SCALE.
+              transform: `translateX(${-scrollPx}px) scale(${CHIP_SCALE})`,
             }}
           >
             {/* Doubled either side so the row is wider than the frame plus
