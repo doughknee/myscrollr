@@ -4,8 +4,8 @@
  * `p(f)` runs 0 -> 1 across the composition and the strip is translated
  * by `-p(f) * TILE_WIDTH`. Two consequences fall out for free:
  *
- *   1. The loop is exact. p(600) = 1 means the strip has advanced by
- *      precisely one tile, and the tile is rendered twice, so frame 600
+ *   1. The loop is exact. p(780) = 1 means the strip has advanced by
+ *      precisely one tile, and the tile is rendered twice, so frame 780
  *      is pixel-identical to frame 0.
  *   2. Slowing the rail is just a flatter section of the curve. Animating
  *      SPEED instead would make the total distance depend on the shape of
@@ -41,7 +41,7 @@ const KEYS: readonly (readonly [frame: number, p: number])[] = [
  * these points overshoots on the flat section — the rail would visibly
  * creep BACKWARDS around frame 248, which on a ticker reads as a bug.
  * Linear would hold monotonicity but steps velocity at every knot, and
- * those steps are visible under a 6.2x camera.
+ * those steps are visible under the tight camera.
  */
 const SLOPES: number[] = (() => {
   const n = KEYS.length;
@@ -77,7 +77,7 @@ const SLOPES: number[] = (() => {
   return m;
 })();
 
-/** Cumulative rail position, 0 at frame 0 and exactly 1 at frame 600. */
+/** Cumulative rail position, 0 at frame 0 and exactly 1 at frame 780. */
 export function railProgress(frame: number): number {
   const n = KEYS.length;
   if (frame <= KEYS[0][0]) return KEYS[0][1];
