@@ -95,15 +95,19 @@ const CHIP_SCALE = 1.4;
  * inside a fixed width, so the chips keep their natural sizes and the
  * GAPS absorb the slack.
  *
- * WHY NOT THE SPEC'S "one frame width, ~300px per chip". A real comfort
- * chip is ~560px before CHIP_SCALE and ~780 after — nearly triple the
- * spec's assumption — so eight of them is a ~6,200px tile, not 2,560.
- * Four chips at 2,100 pre-scale is 2,940 scene px, giving ~294px/s
- * rather than the spec's 240-260. Hitting that band exactly would mean
- * three chips and a visibly sparse bar; this is the closest the real
- * component sizes allow.
+ * MEASURED, not estimated. Three chips at the app's own 8px gap come to
+ * 1,352px pre-scale; this is that plus one more gap, so the seam between
+ * the two copies is spaced exactly like every other gap in the bar.
+ *
+ * It is also the film's only speed control, and that is not obvious: the
+ * loop requires the strip to advance exactly one tile in 600 frames, so
+ * distance-per-loop IS the tile width. A tile guessed 750px too wide
+ * therefore made the rail ~35% too fast AND opened holes between the
+ * chips — one wrong number, two symptoms. Three chips gives ~232px/s
+ * through the moving sections, inside the spec's 240-260 band; adding a
+ * fourth chip pushes it to ~268 and there is no way to have both.
  */
-const TILE_WIDTH = 2100;
+const TILE_WIDTH = 1360;
 
 /**
  * Where the hero chip sits inside the tile, in scene px.
@@ -119,7 +123,10 @@ const TILE_WIDTH = 2100;
  * desk; with it second, the camera followed it past the screenshot's left
  * edge and half the frame went black.
  */
-const HERO_X = 1230;
+const HERO_X = 1095;
+
+/** The app's own ticker gap. */
+const CHIP_GAP = 8;
 
 const UI = '"Barlow Condensed", ui-sans-serif, system-ui, sans-serif';
 
@@ -180,12 +187,14 @@ export function Beat1Hook() {
   const heroSceneX = CHIP_SCALE * (HERO_X + railX);
   const camX = interpolate(zoomT, [0, 1], [0, 1280 - heroSceneX * MAX_ZOOM]);
   /*
-    The bar has to stay HUGGING the frame top, not sit a third of the way
-    down. It lives at the screen's top edge, so there is no desk above it
-    to show — aiming it lower just exposes the composition's own black
-    background. 110 is the largest target that keeps camY negative.
+    The camera never moves vertically, and that falls out rather than
+    being a choice: the bar is at the screen's TOP edge, so there is no
+    desk above it to reveal. Any target below zero crops the bar; any
+    above it exposes the composition's own black background. Zero is the
+    only value that shows the whole bar with the desk filling everything
+    under it.
   */
-  const camY = interpolate(zoomT, [0, 1], [0, 110 - BAR_Y * MAX_ZOOM]);
+  const camY = 0;
 
   // ── Desk treatment ───────────────────────────────────────────────
   // Starts twelve frames AFTER the camera and lifts six frames after it
@@ -389,19 +398,23 @@ function Tile({
         // Fixed width with space-between: the chips keep their real sizes
         // and the GAPS take the slack, which is what makes TILE_WIDTH
         // exact without measuring anything.
+        // flex-start + a real 8px gap, NOT space-between. space-between
+        // spread the difference between TILE_WIDTH and the chips' real
+        // width across the gaps, so guessing the width too high didn't
+        // look wrong — it looked like a bar with holes in it.
         width: TILE_WIDTH,
         display: "flex",
         alignItems: "center",
-        justifyContent: "space-between",
+        justifyContent: "flex-start",
+        gap: CHIP_GAP,
         flexShrink: 0,
       }}
     >
       {RAIL_RIGHT_TAIL.map((l) => (
         <Chip key={l.league_key} league={l} />
       ))}
-      <PlayerChip playerKey={RAIL_PLAYERS[2]} points={userPoints} />
-      <Chip league={sundayMoney(userPoints)} lift={heroLift} flash={heroFlash} />
       <Chip league={workLeague(workPoints)} flash={workFlash} />
+      <Chip league={sundayMoney(userPoints)} lift={heroLift} flash={heroFlash} />
     </div>
   );
 }
