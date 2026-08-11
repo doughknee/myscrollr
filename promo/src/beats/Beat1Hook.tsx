@@ -34,7 +34,12 @@ import { DEFAULT_WIDGET_DISPLAY } from "../../../desktop/src/preferences";
 import type { LeagueResponse } from "../../../desktop/src/datawidgets/fantasy/types";
 import FollowedPlayerChip from "../../../desktop/src/components/chips/FollowedPlayerChip";
 import { RAIL_LEFT, RAIL_PLAYERS, RAIL_RIGHT_TAIL } from "../data/dashboard";
-import { CLOSING_SCORE, OPENING_SCORE, sundayMoney } from "../data/sundayMoney";
+import {
+  CLOSING_SCORE,
+  OPENING_SCORE,
+  OPPONENT_SCORE,
+  sundayMoney,
+} from "../data/sundayMoney";
 import { useMotionClock } from "../motionClock";
 import { Desktop, REAL_TICKER_BOTTOM } from "../scene/Desktop";
 
@@ -240,6 +245,15 @@ export function Beat1Hook() {
 
   const landed = frame >= f(T.hit);
   const userPoints = landed ? CLOSING_SCORE : OPENING_SCORE;
+  /*
+    DERIVED, never typed. This line used to be the literal string
+    "Losing by 0.1", which was true when the film opened on 151.6 and
+    silently became a lie the moment the opening score went back to the
+    demo rig's 149.9 — the type said 0.1 while the chip directly under it
+    read 149.9-151.7. Computing it means the copy cannot drift from the
+    fixture again.
+  */
+  const margin = Math.abs(Math.round((userPoints - OPPONENT_SCORE) * 10) / 10);
   const sinceHit = frame - f(T.hit);
 
   /**
@@ -492,7 +506,8 @@ export function Beat1Hook() {
                 : "0 4px 40px rgba(0,0,0,0.9)",
           }}
         >
-          {landed ? "Ahead by 0.1" : "Losing by 0.1"}
+          {landed ? "Ahead by " : "Losing by "}
+          {margin.toFixed(1)}
         </div>
       </div>
 
