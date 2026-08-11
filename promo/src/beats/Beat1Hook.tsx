@@ -60,9 +60,25 @@ const B = {
   wide: 318,
   everyLeague: 392,
   tick: 410,
-  endcard: 480,
-  seam: 588,
+  /** Push into the ticker settings, with the bar still on screen. */
+  settings: 462,
+  settingsHold: 534,
+  /** The dial changes and the preview repopulates. */
+  settingsOut: 640,
+  endcard: 660,
+  seam: 768,
 };
+
+/**
+ * The settings beat's camera. Modest on purpose, and the number is
+ * forced rather than chosen: the bar lives at scene y~40 and the "what
+ * shows on the ticker" row at y~765, so their separation is ~725 scene
+ * px. At zoom Z that is 725Z on screen, and anything past ~1.6 pushes
+ * one of them out of a 1440 frame. Keeping the bar visible through this
+ * beat is the whole point of it, so the zoom gives way.
+ */
+const SETTINGS_ZOOM = 1.5;
+const SETTINGS_X = 1571;
 
 /**
  * 3.1x, NOT the spec's 6.2.
@@ -95,9 +111,15 @@ const CHIP_SCALE = 1.4;
  * inside a fixed width, so the chips keep their natural sizes and the
  * GAPS absorb the slack.
  *
- * MEASURED, not estimated. Three chips at the app's own 8px gap come to
- * 1,352px pre-scale; this is that plus one more gap, so the seam between
+ * MEASURED, not estimated. Five chips at the app's own 8px gap come to
+ * 1,719px pre-scale; this is that plus one more gap, so the seam between
  * the two copies is spaced exactly like every other gap in the bar.
+ *
+ * IT GREW WITH THE RUNTIME, and it had to. Distance-per-loop is the tile
+ * width, so extending the film to 13s while still advancing exactly one
+ * tile would have slowed the rail by a third. Two more chips restore
+ * roughly the speed that was working — a longer film needs a longer tile
+ * to hold its pace, which is not obvious from either constant alone.
  *
  * It is also the film's only speed control, and that is not obvious: the
  * loop requires the strip to advance exactly one tile in 600 frames, so
@@ -107,7 +129,7 @@ const CHIP_SCALE = 1.4;
  * through the moving sections, inside the spec's 240-260 band; adding a
  * fourth chip pushes it to ~268 and there is no way to have both.
  */
-const TILE_WIDTH = 1360;
+const TILE_WIDTH = 1727;
 
 /**
  * Where the hero chip sits inside the tile, in scene px.
@@ -123,7 +145,7 @@ const TILE_WIDTH = 1360;
  * desk; with it second, the camera followed it past the screenshot's left
  * edge and half the frame went black.
  */
-const HERO_X = 1095;
+const HERO_X = 1511;
 
 /** The app's own ticker gap. */
 const CHIP_GAP = 8;
@@ -168,7 +190,21 @@ export function Beat1Hook() {
           extrapolateRight: "clamp",
           easing: EASE,
         });
-  const zoom = interpolate(zoomT, [0, 1], [1, MAX_ZOOM]);
+  const zoom0 = interpolate(zoomT, [0, 1], [1, MAX_ZOOM]);
+
+  /*
+    A third camera state, blended on top rather than sequenced after: the
+    settings push runs 462-534, holds, and releases 640-660 into the
+    endcard. Keying it separately means the main zoom logic above never
+    has to know about it.
+  */
+  const settingsT = interpolate(
+    frame,
+    [B.settings, B.settingsHold, B.settingsOut, B.endcard],
+    [0, 1, 1, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: EASE },
+  );
+  const zoom = zoom0 + settingsT * (SETTINGS_ZOOM - 1);
 
   /*
     The camera tracks the hero chip's CURRENT position, not a fixed point,
@@ -185,7 +221,9 @@ export function Beat1Hook() {
     px and silently missed the chip by ~1,600px before this.
   */
   const heroSceneX = CHIP_SCALE * (HERO_X + railX);
-  const camX = interpolate(zoomT, [0, 1], [0, 1280 - heroSceneX * MAX_ZOOM]);
+  const camX =
+    interpolate(zoomT, [0, 1], [0, 1280 - heroSceneX * MAX_ZOOM]) +
+    settingsT * (1280 - SETTINGS_X * SETTINGS_ZOOM);
   /*
     The camera never moves vertically, and that falls out rather than
     being a choice: the bar is at the screen's TOP edge, so there is no
@@ -274,7 +312,18 @@ export function Beat1Hook() {
     extrapolateRight: "clamp",
   });
 
+  // The settings clip replaces the app clip for its beat, so the dial and
+  // the preview repopulating are the real footage rather than a caption
+  // claiming it happens.
+  const settingsClip = interpolate(
+    frame,
+    [B.settings - 20, B.settings, B.settingsOut, B.settingsOut + 20],
+    [0, 1, 1, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
   const stake = band(frame, B.typeIn - 8, B.pullBack + 10);
+  const makeItYours = band(frame, B.settings, B.settingsOut - 20);
   const everyLeague = band(frame, B.wide, B.everyLeague);
 
   const tile = (
@@ -325,6 +374,16 @@ export function Beat1Hook() {
               <DesktopClip file="clip-app.mp4" />
             </div>
           )}
+          {settingsClip > 0 && (
+            <div
+              style={{ position: "absolute", inset: 0, opacity: settingsClip }}
+            >
+              {/* startFrom 60 lands about a second before the dial is
+                  clicked, so the beat opens on the panel and then the
+                  preview repopulates on camera. */}
+              <DesktopClip file="clip-settings.mp4" startFrom={60} />
+            </div>
+          )}
         </div>
 
         {/* The bar. Opaque, because the screenshot has its own frozen
@@ -364,6 +423,7 @@ export function Beat1Hook() {
 
       <Stake show={stake} landed={landed} margin={margin} />
       <Super show={everyLeague} text="Every league. One bar." />
+      <Super show={makeItYours} text="Tune it once. It runs itself." scrim />
       {endMix > 0 && <Endcard progress={endMix} frame={frame} />}
 
       {/* Owned up front, not buried in the endcard. */}
@@ -430,7 +490,9 @@ function Tile({
       {RAIL_RIGHT_TAIL.map((l) => (
         <Chip key={l.league_key} league={l} />
       ))}
+      <PlayerChip playerKey={RAIL_PLAYERS[0]} points={userPoints} />
       <Chip league={workLeague(workPoints)} flash={workFlash} />
+      <PlayerChip playerKey={RAIL_PLAYERS[1]} points={userPoints} />
       <Chip league={sundayMoney(userPoints)} lift={heroLift} flash={heroFlash} />
     </div>
   );
@@ -546,9 +608,39 @@ function Stake({
   );
 }
 
-function Super({ show, text }: { show: number; text: string }) {
+function Super({
+  show,
+  text,
+  scrim = false,
+}: {
+  show: number;
+  text: string;
+  scrim?: boolean;
+}) {
   if (show <= 0) return null;
   return (
+    <>
+      {/*
+        A lower-third scrim, for captions that land over the app's own
+        light UI. White type with a drop shadow is legible over a dimmed
+        desk and completely illegible over a white settings panel — this
+        beat is the only one where the desk stays at full brightness.
+      */}
+      {scrim && (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 520,
+            background:
+              "linear-gradient(to top, rgba(5,7,12,0.88) 0%, rgba(5,7,12,0.72) 42%, rgba(5,7,12,0) 100%)",
+            opacity: show,
+            pointerEvents: "none",
+          }}
+        />
+      )}
     <div
       style={{
         position: "absolute",
@@ -556,7 +648,7 @@ function Super({ show, text }: { show: number; text: string }) {
         display: "flex",
         alignItems: "flex-end",
         justifyContent: "center",
-        paddingBottom: 260,
+        paddingBottom: 150,
         opacity: show,
         transform: `translateY(${(6 * (1 - show)).toFixed(1)}px)`,
         pointerEvents: "none",
@@ -570,6 +662,7 @@ function Super({ show, text }: { show: number; text: string }) {
     >
       {text}
     </div>
+    </>
   );
 }
 

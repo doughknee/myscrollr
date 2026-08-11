@@ -11,19 +11,27 @@
  *      SPEED instead would make the total distance depend on the shape of
  *      the easing, and any tuning would break the seam.
  *
- * The flat run between 114 and 248 is deliberate: the camera is at 6.2x
+ * The flat run between 114 and 248 is deliberate: the camera is zoomed
  * there, which multiplies apparent drift, and the frame the score lands
  * on needs the eye parked.
+ *
+ * RE-BALANCED FOR 780 FRAMES. The flat section's absolute frames are
+ * pinned to the tight beats, so extending the film could not just move
+ * the last keyframe — that would have left the rail leaving at 0.00125
+ * per frame and re-entering at 0.00204, a visible lurch on every repeat.
+ * The middle increments are unchanged and the two full-speed runs were
+ * re-solved so they match: 576 frames of travel carrying the 0.81 of a
+ * tile the middle doesn't.
  */
 
 /** Keyframes from the spec. Must stay monotonic in both columns. */
 const KEYS: readonly (readonly [frame: number, p: number])[] = [
   [0, 0.0],
-  [114, 0.233],
-  [174, 0.307],
-  [248, 0.337],
-  [318, 0.423],
-  [600, 1.0],
+  [114, 0.16],
+  [174, 0.234],
+  [248, 0.264],
+  [318, 0.35],
+  [780, 1.0],
 ];
 
 /**
@@ -102,14 +110,14 @@ export function railProgress(frame: number): number {
 {
   const d = 0.5;
   const vIn = (railProgress(d) - railProgress(0)) / d;
-  const vOut = (railProgress(600) - railProgress(600 - d)) / d;
+  const vOut = (railProgress(780) - railProgress(780 - d)) / d;
   if (Math.abs(vIn - vOut) > 1e-4) {
     throw new Error(
       `[promo] Rail loop seam would jump: entry velocity ${vIn.toFixed(6)} ` +
         `vs exit ${vOut.toFixed(6)}. Re-tune the KEYS in src/rail.ts.`,
     );
   }
-  if (railProgress(600) !== 1) {
-    throw new Error("[promo] railProgress(600) must be exactly 1.");
+  if (railProgress(780) !== 1) {
+    throw new Error("[promo] railProgress(780) must be exactly 1.");
   }
 }
