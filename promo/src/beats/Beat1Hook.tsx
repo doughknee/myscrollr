@@ -1,27 +1,24 @@
 /**
- * The hero cut. One continuous camera move, no cuts.
+ * Scrollr — Hero Loop. 10.000s, 600 frames, seamless, muted.
  *
- * A desktop with work on it and the Scrollr bar at the screen edge. The
- * camera pushes into one chip, your matchup turns over on a tenth of a
- * point, and it pulls back out to the same desk where the bar is still
- * sitting, having done that without being asked.
+ * Runs above the fold with no controls and no sound, repeating forever.
+ * Its only job is to stop the scroll and land three ideas: there's a bar
+ * on my desktop, it's showing my real leagues, it moves by itself.
  *
- * THE PRODUCT IS THE HERO, and an earlier cut got that exactly backwards.
- * It zoomed to 2.6x, which renders the chip's 13px body text at 34px in a
- * 2560px frame — 8.5px once a feed scales the video to a quarter. Scrollr
- * was literally illegible, while a 232px promo scoreboard that exists
- * nowhere in the app was the biggest thing on screen. The film sold a
- * graphic. Now the camera goes to 4.2x (body text ~55px, ~14px at feed
- * scale), the scoreboard is gone, and what replaces it is two lines of
- * type: what this IS, and what is at stake.
+ * TWO RULES HOLD THE WHOLE THING UP.
  *
- * Built for muted autoplay on Reddit, Facebook and Twitter. So the frame
- * is already moving at frame 0, the hit lands at 1.55s rather than making
- * a scroller wait three seconds for it, every claim is burned in, and the
- * head and tail are matched so the loop is a step rather than a cliff.
+ * The rail never stops. It is the only continuous object in the film —
+ * every beat is a camera move AROUND it, never a scene change past it.
+ * That single decision is what keeps this from reading as a slideshow.
  *
- * The CHIPS are the real components. The rail layout and the desk are the
- * promo's — see src/data/dashboard.ts and src/scene/Desktop.tsx.
+ * It never cuts to black. The desk dims and blurs but stays visible
+ * through the entire push, so the viewer never loses track of the fact
+ * that they are looking at a screen. Earlier cuts faded the desk out
+ * completely and the film stopped being about a desktop app.
+ *
+ * The CHIPS are the real shipped components rendered over a still from
+ * the founder's own screen recording. The rail's motion is the only
+ * fabricated thing, and it is driven frame-accurately from src/rail.ts.
  */
 import {
   Easing,
@@ -30,10 +27,16 @@ import {
   useVideoConfig,
 } from "remotion";
 import FantasyStatChip from "../../../desktop/src/components/chips/FantasyStatChip";
+import FollowedPlayerChip from "../../../desktop/src/components/chips/FollowedPlayerChip";
 import { DEFAULT_WIDGET_DISPLAY } from "../../../desktop/src/preferences";
 import type { LeagueResponse } from "../../../desktop/src/datawidgets/fantasy/types";
-import FollowedPlayerChip from "../../../desktop/src/components/chips/FollowedPlayerChip";
-import { RAIL_LEFT, RAIL_PLAYERS, RAIL_RIGHT_TAIL } from "../data/dashboard";
+import {
+  RAIL_PLAYERS,
+  RAIL_RIGHT_TAIL,
+  WORK_AFTER,
+  WORK_BEFORE,
+  workLeague,
+} from "../data/dashboard";
 import {
   CLOSING_SCORE,
   OPENING_SCORE,
@@ -41,98 +44,95 @@ import {
   sundayMoney,
 } from "../data/sundayMoney";
 import { useMotionClock } from "../motionClock";
+import { railProgress } from "../rail";
 import { Desktop, REAL_TICKER_BOTTOM } from "../scene/Desktop";
 
-/** Seconds. The whole cut's timing, in one place. */
-const T = {
-  /**
-   * How long the wide shot holds before the camera starts moving.
-   *
-   * There used to be none — the push began on frame 0, because a feed
-   * needs something moving immediately. The rail now drifts from frame 0
-   * regardless, so the motion requirement is met without the camera, and
-   * the opening can breathe long enough to read the desk.
-   */
-  linger: 0.8,
-  /** Camera settled tight on the chip. */
-  tight: 2.1,
-  /**
-   * The play lands.
-   *
-   * Was 1.55s, which left the deficit on screen for about a quarter of a
-   * second — you physically could not finish reading the line before it
-   * became its own opposite. The whole shot depends on having read the
-   * deficit BEFORE it flips, so it now holds ~1.15s, and the payoff
-   * holds ~1.4s after it: there is a lot happening on that frame (a
-   * score, a colour, a chip lifting) and it needs to be watchable.
-   */
-  hit: 3.1,
-  /** Camera starts back out; the rail assembles. */
-  rail: 4.4,
-  /** Back to the desk. */
-  wide: 5.7,
-  /** Cross-dissolve to the Matchup view. */
-  showA: 6.7,
-  /** Cross-dissolve to the Roster view. */
-  showB: 8.0,
-  /** Wordmark. */
-  end: 9.4,
+/** Beat boundaries, in frames. The spec's shot list, verbatim. */
+const B = {
+  push: 42,
+  pushDim: 54,
+  tight: 114,
+  typeIn: 126,
+  hit: 174,
+  flashOut: 176,
+  pullBack: 248,
+  dimLift: 264,
+  wide: 318,
+  everyLeague: 392,
+  tick: 410,
+  endcard: 480,
+  seam: 588,
 };
 
 /**
- * 3.0 rather than 4.2 because CHIP_SCALE now does part of the work: the
- * chips render 1.4x, so the same on-screen size needs less camera.
+ * 3.1x, NOT the spec's 6.2.
+ *
+ * A comfort chip is ~780 scene px wide once CHIP_SCALE is applied. At
+ * 6.2 that renders 4,836px into a 2,560 frame, so roughly half the chip
+ * is off-screen — and the half that goes is the right half, which is
+ * where the score lives. The beat's entire subject was outside the frame.
+ * 3.1 is the largest zoom that still holds the whole chip, and it puts
+ * the 13px body type at ~56px, ~14px at quarter scale.
  */
-const MAX_ZOOM = 3.0;
+const MAX_ZOOM = 3.1;
 
-/**
- * The bar sits at the TOP, because that is where it is in the recording.
- * The composition covers the recording's own ticker strip with its own
- * bar of real chips so the score can be driven; everything below is the
- * untouched photograph.
- */
 const BAR_Y = 38;
 
 /**
  * The recording was made with the app at 130% display size, so its ticker
  * chips are ~70px tall sitting 3px below the screen edge. Rendered at 1.0
- * they came out 50px tall sitting at 10, which left a band of empty bar
- * under them that the real one doesn't have. Measured off the frame, not
- * chosen.
+ * they came out 50px tall at y=10, leaving a band of empty bar the real
+ * one doesn't have. Measured off the frame, not chosen.
  */
 const CHIP_SCALE = 1.4;
+
 /**
- * Horizontal focus, in scene coordinates, at the moment of the HIT.
+ * Tile width in PRE-scale units. The strip is rendered twice and the
+ * curve advances it by exactly one tile across 600 frames, so frame 600
+ * is pixel-identical to frame 0 with no seam maths at all.
  *
- * Nowhere near frame centre: the rail is a row of real chips of wildly
- * different widths, so centring the ROW puts the hero well off centre.
- * It also accounts for CHIP_SCALE and for how far the rail has drifted
- * by T.hit — the hero is centred on the frame the score changes, and
- * drifts through centre either side of it.
+ * Fixed by construction rather than measured: the row is `space-between`
+ * inside a fixed width, so the chips keep their natural sizes and the
+ * GAPS absorb the slack.
  *
- * Measured from a tight render. Re-derive it whenever the rail's
- * composition, CHIP_SCALE or the drift speed changes.
+ * WHY NOT THE SPEC'S "one frame width, ~300px per chip". A real comfort
+ * chip is ~560px before CHIP_SCALE and ~780 after — nearly triple the
+ * spec's assumption — so eight of them is a ~6,200px tile, not 2,560.
+ * Four chips at 2,100 pre-scale is 2,940 scene px, giving ~294px/s
+ * rather than the spec's 240-260. Hitting that band exactly would mean
+ * three chips and a visibly sparse bar; this is the closest the real
+ * component sizes allow.
  */
-const FOCUS_X = 749;
-
-const UI =
-  '"Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif';
+const TILE_WIDTH = 2100;
 
 /**
- * The app's accent, NOT --color-up. Green-up is the "your score rose"
- * token; spending it on the brand burns the one signal the chip uses.
+ * Where the hero chip sits inside the tile, in scene px.
+ *
+ * Measured from a render, and it has to be: the tile is real product
+ * chips of wildly different widths laid out by flexbox, so there is no
+ * expression for this. Re-derive it whenever the tile's composition
+ * changes — the camera focuses here, and nothing will tell you it's wrong
+ * except the shot being off-centre.
+ *
+ * It also constrains the tile ORDER. The hero has to sit late enough that
+ * after drifting through the push it is still over the middle of the
+ * desk; with it second, the camera followed it past the screenshot's left
+ * edge and half the frame went black.
  */
-const ACCENT = "#34d399";
+const HERO_X = 1230;
 
-const CHIP_GAP = 8;
+const UI = '"Barlow Condensed", ui-sans-serif, system-ui, sans-serif';
+
+/** Tokens. */
+const LOSS = "#FF3B5C";
+const WIN = "#3EE0A4";
+const FLASH = "rgba(140, 255, 208, 0.35)";
 
 /**
- * Win probability is OFF in the promo, and that's a correctness fix
- * rather than a taste one. At 151.6 vs 151.7 the chip computes a GREEN
- * 72% — so the frame said "Losing by 0.1" in red while the product
- * underneath it said you were winning, and the hit moved that number by
- * nothing at all. Two contradictory claims in one frame is worse than one
- * fewer stat.
+ * Win probability is off in the film, and that is a correctness fix
+ * rather than a taste one. At 149.9 vs 151.7 the chip computes a GREEN
+ * 65% — so the frame would say "Losing by 1.8" in red while the product
+ * underneath it said you were winning.
  */
 const PROMO_PREFS = {
   ...DEFAULT_WIDGET_DISPLAY.fantasy,
@@ -142,196 +142,136 @@ const PROMO_PREFS = {
 export function Beat1Hook() {
   useMotionClock();
   const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
-  const f = (s: number) => Math.round(s * fps);
+  const { durationInFrames } = useVideoConfig();
 
-  // Leaves slow, arrives fast: ~12% of the travel is done by 0.15s, so
-  // the frame is visibly moving by frame 9 rather than sitting still for
-  // a second while a feed scrolls past it.
-  const pushIn = interpolate(frame, [f(T.linger), f(T.tight)], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.bezier(0.45, 0, 0.1, 1),
-  });
-  const pullOut = interpolate(frame, [f(T.rail), f(T.wide)], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.bezier(0.3, 0, 0.15, 1),
-  });
-  const tightness = pushIn * (1 - pullOut);
+  const p = railProgress(frame);
+  const railX = -p * TILE_WIDTH;
 
-  // A creep across the hold. Camera velocity reaching exactly zero reads
-  // as a stalled video in a feed, so the tight section never fully stops.
-  const creep = interpolate(frame, [f(T.tight), f(T.rail)], [0, 0.11], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  // ── Camera ───────────────────────────────────────────────────────
+  // Decelerates hard, so it settles rather than arrives.
+  const EASE = Easing.bezier(0.33, 0, 0.15, 1);
+  const zoomT =
+    frame < B.pullBack
+      ? interpolate(frame, [B.push, B.tight], [0, 1], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+          easing: EASE,
+        })
+      : interpolate(frame, [B.pullBack, B.wide], [1, 0], {
+          extrapolateRight: "clamp",
+          easing: EASE,
+        });
+  const zoom = interpolate(zoomT, [0, 1], [1, MAX_ZOOM]);
 
-  const end = interpolate(frame, [f(T.end), f(T.end + 0.55)], [0, 1], {
+  /*
+    The camera tracks the hero chip's CURRENT position, not a fixed point,
+    because the rail is still drifting underneath it. The drift curve is
+    near-flat through the tight beats precisely so this tracking has
+    almost nothing to do there — a camera chasing a fast subject at 6.2x
+    is unwatchable.
+  */
+  /*
+    CHIP_SCALE matters here. The rail's transform is `scale() translateX()`
+    and CSS applies right-to-left, so the drift happens in PRE-scale units
+    and everything the camera reasons about has to be multiplied up. It is
+    self-consistent for the loop either way, but the camera aims in scene
+    px and silently missed the chip by ~1,600px before this.
+  */
+  const heroSceneX = CHIP_SCALE * (HERO_X + railX);
+  const camX = interpolate(zoomT, [0, 1], [0, 1280 - heroSceneX * MAX_ZOOM]);
+  /*
+    The bar has to stay HUGGING the frame top, not sit a third of the way
+    down. It lives at the screen's top edge, so there is no desk above it
+    to show — aiming it lower just exposes the composition's own black
+    background. 110 is the largest target that keeps camY negative.
+  */
+  const camY = interpolate(zoomT, [0, 1], [0, 110 - BAR_Y * MAX_ZOOM]);
+
+  // ── Desk treatment ───────────────────────────────────────────────
+  // Starts twelve frames AFTER the camera and lifts six frames after it
+  // stops, so the two moves read as separate events.
+  const pushDim =
+    frame < B.pullBack
+      ? interpolate(frame, [B.pushDim, B.tight], [0, 1], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+          easing: Easing.out(Easing.cubic),
+        })
+      : interpolate(frame, [B.dimLift, B.wide], [1, 0], {
+          extrapolateRight: "clamp",
+          easing: Easing.out(Easing.cubic),
+        });
+
+  const endT = interpolate(frame, [B.endcard, B.endcard + 24], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
   });
 
-  /**
-   * The rail drifts from frame ZERO and never stops — including while
-   * the camera is tight on one chip, which is the whole point: a ticker
-   * that only moves when you are looking at the whole bar is a slideshow.
-   * It also means something is moving in frame 1 without the camera
-   * having to, which is what lets the opening hold.
-   *
-   * 30px/s is the app's own default speed, and it is also the fastest
-   * this can go without the rail running out: the row is ~3400px against
-   * a 2560 frame, so a faster drift opens a gap at the trailing edge.
-   */
-  const scrollPx = (frame / fps) * 30;
-
-  /**
-   * The camera is interpolated between two KNOWN-CORRECT framings rather
-   * than by tracking a moving focus point.
-   *
-   * Focus-point tracking is what a camera normally wants, and it broke
-   * the moment the bar moved to the top edge: zoom grows faster than the
-   * focus can travel, so a third of a second in the translate had already
-   * pushed the top of the screen — the bar, the subject — off frame
-   * entirely. Interpolating the transform itself is guaranteed correct at
-   * both ends and reads as a push that also pans, which is fine.
-   *
-   * Wide: the whole screenshot fills the frame. Tight: the hero chip at
-   * frame centre-x, the bar sitting at 30% height with the type below.
-   */
-  const camZoom =
-    interpolate(tightness, [0, 1], [1, MAX_ZOOM]) + tightness * creep;
   /*
-    A FIXED tight focus, not one that tracks the drift.
-    
-    Tracking was tried and it reverses direction: the compensation has to
-    unwind as the camera pulls back out, so the rail visibly changed
-    course mid-shot. A fixed focus keeps everything travelling one way
-    for the whole film — the hero simply drifts through frame centre,
-    arriving there on the frame the score changes.
+    The loop seam. Frame 599 is an endcard over an 8%-dim desk and frame 0
+    is a full-brightness desk, so without this the repeat is a hard flash.
+    Everything ramps back across the last twelve frames — including the
+    endcard TYPE, which the spec's checklist omits but which is far more
+    visible than the desk state it does list.
   */
-  const camX = interpolate(tightness, [0, 1], [0, 1280 - FOCUS_X * MAX_ZOOM]);
-  const camY = interpolate(tightness, [0, 1], [0, 432 - BAR_Y * MAX_ZOOM]);
-  /*
-    NO push-back on the endcard. It used to scale the world to 0.92 and
-    slide it down, which zooms out PAST the edges of the screenshot — the
-    desk is exactly 2560x1440, so anything under 1.0 reveals empty frame
-    around it and stretches the bar off the photograph. The card dims the
-    world instead; nothing moves.
-  */
-  const camera = `translate(${camX.toFixed(1)}px, ${camY.toFixed(1)}px) scale(${camZoom.toFixed(4)})`;
+  // Ends on the LAST RENDERED frame, not on durationInFrames. Frame 600
+  // never exists, so ramping to it left ~8% of the endcard still up on
+  // 599 and the loop popped it off.
+  const seam = interpolate(frame, [B.seam, durationInFrames - 1], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const endMix = endT * (1 - seam);
 
-  /**
-   * RACK FOCUS, not a cross-fade to black. The desk used to fade to
-   * opacity 0 for a third of the runtime, which is the exact failure this
-   * film exists to fix — a bar floating in a void says nothing about
-   * running on your screen. Blurring and dimming keeps the screen present
-   * behind the type the whole way through, and the return is keyed to
-   * FRAME rather than tightness so the world resolves a beat after the
-   * camera stops, giving the pull-back a payoff rather than just an end.
-   */
-  const deskSharp =
-    frame < f(T.rail)
-      ? 1 - tightness
-      : interpolate(frame, [f(T.wide - 0.55), f(T.wide + 0.1)], [0, 1], {
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-        });
-  const deskFilter = `blur(${(15 * (1 - deskSharp)).toFixed(2)}px) brightness(${(
-    0.34 +
-    0.66 * deskSharp
-  ).toFixed(3)}) saturate(${(0.7 + 0.3 * deskSharp).toFixed(3)})`;
+  const blur = 14 * pushDim + 22 * endMix;
+  const brightness = (1 - 0.55 * pushDim) * (1 - 0.92 * endMix);
 
-  const landed = frame >= f(T.hit);
+  // ── The hit ──────────────────────────────────────────────────────
+  const landed = frame >= B.hit;
   const userPoints = landed ? CLOSING_SCORE : OPENING_SCORE;
-  /*
-    DERIVED, never typed. This line used to be the literal string
-    "Losing by 0.1", which was true when the film opened on 151.6 and
-    silently became a lie the moment the opening score went back to the
-    demo rig's 149.9 — the type said 0.1 while the chip directly under it
-    read 149.9-151.7. Computing it means the copy cannot drift from the
-    fixture again.
-  */
+  // Derived, never typed. This was once the literal string "Losing by
+  // 0.1" and silently became false when the opening score changed.
   const margin = Math.abs(Math.round((userPoints - OPPONENT_SCORE) * 10) / 10);
-  const sinceHit = frame - f(T.hit);
 
-  /**
-   * The hit, staged over ten frames rather than flipped by one boolean.
-   * Changing everything at once on a single frame reads as a render
-   * glitch; a short cascade reads as an event. Attack first, then settle.
-   */
-  const hitScale = !landed
-    ? 1
-    : sinceHit <= 3
-      ? interpolate(sinceHit, [0, 3], [1, 1.14], {
-          easing: Easing.out(Easing.cubic),
-        })
-      : interpolate(sinceHit, [3, 16], [1.14, 1], {
-          extrapolateRight: "clamp",
-          easing: Easing.out(Easing.cubic),
-        });
-  const glow = landed
-    ? interpolate(sinceHit, [0, 3, 6, f(0.5)], [0, 1, 0.5, 0], {
+  // Gated on `landed`, not just clamped. extrapolateLeft holds the value
+  // at 1 BEFORE the range, so a bare interpolate left the chip tinted
+  // green from frame 0 — the flash was on for the whole film except the
+  // two frames it was meant to be.
+  const flash = landed
+    ? interpolate(frame, [B.hit, B.flashOut], [1, 0], {
+        extrapolateRight: "clamp",
+      })
+    : 0;
+  const heroLift = landed
+    ? interpolate(frame, [B.hit, B.hit + 8], [1.04, 1], {
+        extrapolateRight: "clamp",
+        easing: Easing.out(Easing.cubic),
+      })
+    : 1;
+
+  // Beat 08: a DIFFERENT chip moves, camera locked. The only shot that
+  // proves the bar is live rather than a decorated screenshot.
+  const ticked = frame >= B.tick;
+  const tickFlash = ticked
+    ? interpolate(frame, [B.tick, B.tick + 10], [1, 0], {
         extrapolateRight: "clamp",
         easing: Easing.out(Easing.quad),
       })
     : 0;
-  const stakeRise = landed
-    ? interpolate(sinceHit, [6, 6 + f(0.18)], [10, 0], {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-        easing: Easing.out(Easing.cubic),
-      })
-    : 0;
-  const ringOn = landed && sinceHit >= 8;
 
-  const stakeOpacity = interpolate(
-    frame,
-    [f(0.85), f(1.15), f(T.rail), f(T.rail + 0.35)],
-    [0, 1, 1, 0],
-    {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-      easing: Easing.out(Easing.cubic),
-    },
+  const stake = band(frame, B.typeIn - 8, B.pullBack + 10);
+  const everyLeague = band(frame, B.wide, B.everyLeague);
+
+  const tile = (
+    <Tile
+      userPoints={userPoints}
+      workPoints={ticked ? WORK_AFTER : WORK_BEFORE}
+      heroLift={heroLift}
+      heroFlash={flash}
+      workFlash={tickFlash}
+    />
   );
-
-
-
-  /*
-    The back half. After the pull-back the film used to hold one wide
-    shot for two and a half seconds, which showed the bar and nothing
-    else the product does. These dissolve the desk between three views
-    pulled from the same recording — Overview, Matchup, Roster — so the
-    app demonstrates itself while the bar carries on above it.
-  */
-  const showA = interpolate(frame, [f(T.showA), f(T.showA + 0.45)], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.inOut(Easing.cubic),
-  });
-  const showB = interpolate(frame, [f(T.showB), f(T.showB + 0.45)], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.inOut(Easing.cubic),
-  });
-
-  // Head and tail ramps. Reddit and Facebook loop by default, so the seam
-  // is seen on every repeat view.
-  const loopIn = interpolate(frame, [0, 7], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const loopOut = interpolate(
-    frame,
-    [durationInFrames - 8, durationInFrames - 1],
-    [0, 1],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
-  // Floors rather than fading to near-black: the bar has to stay visibly
-  // alive behind the endcard, because "it keeps running" is the claim.
-  const worldDim = 1 - end * 0.45 + loopOut * 0.25;
 
   return (
     <div
@@ -340,7 +280,6 @@ export function Beat1Hook() {
         inset: 0,
         background: "#05070a",
         overflow: "hidden",
-        opacity: loopIn,
       }}
     >
       <div
@@ -349,233 +288,159 @@ export function Beat1Hook() {
           width: 2560,
           height: 1440,
           transformOrigin: "0 0",
-          transform: camera,
-          filter: `brightness(${worldDim.toFixed(3)})`,
+          transform: `translate(${camX.toFixed(1)}px, ${camY.toFixed(1)}px) scale(${zoom.toFixed(4)})`,
         }}
       >
-        <div style={{ position: "absolute", inset: 0, filter: deskFilter }}>
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            filter: `blur(${blur.toFixed(2)}px) brightness(${brightness.toFixed(3)})`,
+          }}
+        >
           <Desktop />
-          <div style={{ position: "absolute", inset: 0, opacity: showA }}>
-            <Desktop file="view-matchup.png" />
-          </div>
-          <div style={{ position: "absolute", inset: 0, opacity: showB }}>
-            <Desktop file="view-roster.png" />
-          </div>
         </div>
 
-        {/* The BAR: a full-width substrate pinned to the screen edge.
-            Without it the chips read as graphics hovering over a desktop
-            rather than a piece of UI attached to it. It does NOT blur —
-            it's the subject. */}
+        {/* The bar. Opaque, because the screenshot has its own frozen
+            ticker in exactly this strip and any translucency lets it show
+            through the driven one. It does NOT dim with the desk. */}
         <div
           style={{
             position: "absolute",
+            top: 0,
             left: 0,
             right: 0,
-            top: 0,
             height: REAL_TICKER_BOTTOM,
-            /*
-              LIGHT, matching the recording. This was an opaque near-black
-              slab, which put a heavy dark band across the top of an
-              otherwise pale desktop and looked nothing like the ticker in
-              the screenshot underneath it — the app was in light theme.
-              Still fully opaque, because the recording has its own frozen
-              ticker in exactly this strip and any translucency lets it
-              show through the driven one.
-            */
             background: "#f7f7fb",
             borderBottom: "1px solid rgba(16,20,40,0.10)",
-          }}
-        />
-
-        <div
-          style={{
-            position: "absolute",
-            top: BAR_Y,
-            left: 0,
-            width: 2560,
-            display: "flex",
-            justifyContent: "center",
-            transform: "translateY(-50%)",
+            overflow: "hidden",
           }}
         >
           <div
             style={{
+              position: "absolute",
+              top: BAR_Y,
+              left: 0,
               display: "flex",
-              alignItems: "center",
-              gap: CHIP_GAP,
               width: "max-content",
-              // translate THEN scale: CSS applies right-to-left, so the
-              // drift stays in scene pixels regardless of CHIP_SCALE.
-              transform: `translateX(${-scrollPx}px) scale(${CHIP_SCALE})`,
+              transform: `translateY(-50%) scale(${CHIP_SCALE}) translateX(${railX.toFixed(2)}px)`,
+              transformOrigin: "left center",
             }}
           >
-            {/* Doubled either side so the row is wider than the frame plus
-                the drift, and chips clip at both edges instead of the whole
-                rail sliding as one object. Equal counts keep FOCUS_X true. */}
-            {[...RAIL_LEFT, ...RAIL_RIGHT_TAIL].map((l, i) => (
-              <Chip key={`l${i}`} league={l} />
-            ))}
-
-            {/*
-              The hero chip LIFTS on the hit — scales up and casts a
-              shadow, so the update reads as the chip coming forward
-              rather than as text quietly changing inside it.
-            */}
-            <div
-              style={{
-                position: "relative",
-                zIndex: 2,
-                transform: `scale(${hitScale.toFixed(4)})`,
-                filter:
-                  glow > 0
-                    ? `drop-shadow(0 ${(10 * glow).toFixed(1)}px ${(26 * glow).toFixed(0)}px rgba(16,185,129,${(0.55 * glow).toFixed(3)}))`
-                    : undefined,
-              }}
-            >
-              <Chip league={sundayMoney(userPoints)} />
-              {ringOn && <FlashRing progress={glow} />}
-            </div>
-
-            {/* The second event: another league takes the lead 3s later,
-                in the real chip, with the real red-to-green swap. Quieter
-                than the hero hit so it reads as ambient rather than as a
-                second climax. */}
-            {/* Standalone TOP SCORER chips, exactly as the recording's
-                rail carries them, resolved against the hero roster so
-                their numbers move with the score. */}
-            {RAIL_PLAYERS.map((key) => (
-              <PlayerChip key={key} playerKey={key} points={userPoints} />
-            ))}
-            {[...RAIL_LEFT, ...RAIL_RIGHT_TAIL].map((l, i) => (
-              <Chip key={`r${i}`} league={l} />
-            ))}
+            {/* Rendered TWICE. The curve advances exactly one tile across
+                the composition, so the second copy lands precisely where
+                the first began and the loop needs no seam correction. */}
+            {tile}
+            {tile}
           </div>
         </div>
-
-        {/* End masks, so the rail runs off frame rather than stopping. */}
-        <Mask side="left" />
-        <Mask side="right" />
       </div>
 
-      {/* The type. Two lines: what this IS, and what's at stake. */}
+      <Stake show={stake} landed={landed} margin={margin} />
+      <Super show={everyLeague} text="Every league. One bar." />
+      {endMix > 0 && <Endcard progress={endMix} frame={frame} />}
+
+      {/* Owned up front, not buried in the endcard. */}
       <div
         style={{
           position: "absolute",
-          inset: 0,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          paddingBottom: 330,
-          gap: 30,
-          opacity: stakeOpacity,
-          pointerEvents: "none",
-          fontFamily: UI,
-          textAlign: "center",
-        }}
-      >
-        {/* The film never said what Scrollr was until the endcard, by
-            which point most of a feed has already scrolled past. */}
-        <div
-          style={{
-            fontSize: 68,
-            fontWeight: 700,
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-            color: "rgba(255,255,255,0.5)",
-            textShadow: "0 4px 40px rgba(0,0,0,0.9)",
-          }}
-        >
-          A live ticker for your fantasy leagues
-        </div>
-        <div
-          style={{
-            fontSize: 132,
-            fontWeight: 800,
-            letterSpacing: "-0.02em",
-            color: landed
-              ? sinceHit < 2
-                ? "#ffffff"
-                : "var(--color-up, #22c55e)"
-              : "var(--color-down, #ef4444)",
-            transform: `translateY(${stakeRise.toFixed(2)}px) scale(${hitScale.toFixed(4)})`,
-            textShadow:
-              glow > 0
-                ? `0 0 ${(90 * glow).toFixed(0)}px rgba(52,211,153,${(0.75 * glow).toFixed(3)})`
-                : "0 4px 40px rgba(0,0,0,0.9)",
-          }}
-        >
-          {landed ? "Ahead by " : "Losing by "}
-          {margin.toFixed(1)}
-        </div>
-      </div>
-
-      {/* Owned up front, not buried at the end. Hiding it reads as legal
-          cover; stating it reads as confidence — and r/fantasyfootball is
-          exactly the audience that checks. */}
-      <div
-        style={{
-          position: "absolute",
-          // BOTTOM-left: the bar occupies the top edge now, and the mark
-          // was landing straight on the chips.
           bottom: 26,
-          left: 30,
-          // On its own pill. The desk is a light screenshot, so pale text
-          // vanished into the app window behind it; the camera also moves
-          // over both light and dark areas, so it needs to carry its own
-          // contrast rather than rely on what's underneath.
-          padding: "8px 18px",
+          left: 40,
+          padding: "7px 16px",
           borderRadius: 999,
-          background: "rgba(10,13,20,0.55)",
+          background: "rgba(0,0,0,0.30)",
           fontFamily: UI,
           fontSize: 26,
           fontWeight: 500,
-          letterSpacing: "0.02em",
-          color: "rgba(255,255,255,0.72)",
+          letterSpacing: "0.01em",
+          color: "rgba(255,255,255,0.60)",
         }}
       >
         Sample data — not a live game
       </div>
-
-      {end > 0 && <Endcard progress={end} f={f} frame={frame} />}
     </div>
   );
 }
 
-function Mask({ side }: { side: "left" | "right" }) {
+/** Fade up, hold, fade out. Ramps are 8 frames, paired with a 6px rise. */
+function band(frame: number, start: number, end: number): number {
+  return interpolate(frame, [start, start + 8, end - 8, end], [0, 1, 1, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+}
+
+function Tile({
+  userPoints,
+  workPoints,
+  heroLift,
+  heroFlash,
+  workFlash,
+}: {
+  userPoints: number;
+  workPoints: number;
+  heroLift: number;
+  heroFlash: number;
+  workFlash: number;
+}) {
   return (
     <div
       style={{
-        position: "absolute",
-        [side]: 0,
-        top: 0,
-        width: 150,
-        height: REAL_TICKER_BOTTOM,
-        background: `linear-gradient(${side === "left" ? 90 : 270}deg, #f7f7fb 0%, rgba(247,247,251,0) 100%)`,
-        pointerEvents: "none",
+        // Fixed width with space-between: the chips keep their real sizes
+        // and the GAPS take the slack, which is what makes TILE_WIDTH
+        // exact without measuring anything.
+        width: TILE_WIDTH,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        flexShrink: 0,
       }}
-    />
+    >
+      {RAIL_RIGHT_TAIL.map((l) => (
+        <Chip key={l.league_key} league={l} />
+      ))}
+      <PlayerChip playerKey={RAIL_PLAYERS[2]} points={userPoints} />
+      <Chip league={sundayMoney(userPoints)} lift={heroLift} flash={heroFlash} />
+      <Chip league={workLeague(workPoints)} flash={workFlash} />
+    </div>
   );
 }
 
-/**
- * Wrapped in `#app-shell[data-theme="scrollr-light"]`, because that is the
- * theme the recording was made in — dark chips on a light desktop read as
- * a different product, and the white chip outlines that came with them
- * were the giveaway.
- *
- * `#app-shell` and NOT `#desktop-shell`: both carry the palette, but
- * desktop-shell also carries real layout (height: 100vh, its own
- * background, width: 100% !important on its last child) which wrecks a
- * video frame. app-shell carries only the palette and the app's
- * animation-stilling rule, and stilling CSS animation inside a promo is
- * no loss — it makes the render marginally more deterministic.
- */
-function Chip({ league }: { league: LeagueResponse }) {
+function Chip({
+  league,
+  lift = 1,
+  flash = 0,
+}: {
+  league: LeagueResponse;
+  lift?: number;
+  flash?: number;
+}) {
   return (
-    <div id="app-shell" data-theme="scrollr-light" style={{ display: "flex" }}>
-      <FantasyStatChip league={league} prefs={PROMO_PREFS} comfort />
+    <div
+      style={{
+        position: "relative",
+        flexShrink: 0,
+        transform: lift === 1 ? undefined : `scale(${lift.toFixed(4)})`,
+        filter: lift === 1 ? undefined : "drop-shadow(0 6px 18px rgba(0,0,0,0.35))",
+      }}
+    >
+      {/* Light theme, because that is the theme the recording was made
+          in. Dark chips on a light desktop read as a different product. */}
+      <div id="app-shell" data-theme="scrollr-light" style={{ display: "flex" }}>
+        <FantasyStatChip league={league} prefs={PROMO_PREFS} comfort />
+      </div>
+      {flash > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: 8,
+            background: FLASH,
+            opacity: flash,
+            pointerEvents: "none",
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -588,7 +453,11 @@ function PlayerChip({
   points: number;
 }) {
   return (
-    <div id="app-shell" data-theme="scrollr-light" style={{ display: "flex" }}>
+    <div
+      id="app-shell"
+      data-theme="scrollr-light"
+      style={{ display: "flex", flexShrink: 0 }}
+    >
       <FollowedPlayerChip
         playerKey={playerKey}
         leagues={[sundayMoney(points)]}
@@ -598,52 +467,116 @@ function PlayerChip({
   );
 }
 
-function FlashRing({ progress }: { progress: number }) {
+/**
+ * The stake. One line, and no tagline above it.
+ *
+ * There used to be a grey "A live ticker for your fantasy leagues" here.
+ * It came out: the chip's own vernacular does the credibility work, and
+ * any product-voice line in this position competes with the strongest
+ * copy in the film for the same half second.
+ */
+function Stake({
+  show,
+  landed,
+  margin,
+}: {
+  show: number;
+  landed: boolean;
+  margin: number;
+}) {
+  if (show <= 0) return null;
   return (
     <div
       style={{
         position: "absolute",
-        inset: -3,
-        border: `1px solid ${ACCENT}`,
-        borderRadius: 9,
-        transform: `scale(${1 + progress * 0.04})`,
-        opacity: progress * 0.7,
+        inset: 0,
+        display: "flex",
+        alignItems: "flex-end",
+        justifyContent: "center",
+        paddingBottom: 300,
+        opacity: show,
+        transform: `translateY(${(6 * (1 - show)).toFixed(1)}px)`,
         pointerEvents: "none",
       }}
-    />
+    >
+      <div
+        style={{
+          fontFamily: UI,
+          fontSize: 132,
+          fontWeight: 600,
+          letterSpacing: "-0.02em",
+          color: landed ? WIN : LOSS,
+          textShadow: "0 4px 44px rgba(0,0,0,0.85)",
+        }}
+      >
+        {landed ? "Ahead by " : "Losing by "}
+        {margin.toFixed(1)}
+      </div>
+    </div>
+  );
+}
+
+function Super({ show, text }: { show: number; text: string }) {
+  if (show <= 0) return null;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        alignItems: "flex-end",
+        justifyContent: "center",
+        paddingBottom: 260,
+        opacity: show,
+        transform: `translateY(${(6 * (1 - show)).toFixed(1)}px)`,
+        pointerEvents: "none",
+        fontFamily: UI,
+        fontSize: 84,
+        fontWeight: 600,
+        letterSpacing: "-0.015em",
+        color: "#ffffff",
+        textShadow: "0 4px 44px rgba(0,0,0,0.85)",
+      }}
+    >
+      {text}
+    </div>
   );
 }
 
 /**
- * The ask. Muted autoplay means every word is on screen, and a feed
- * viewer gives it about a second.
- *
- * Everything is sized against a legibility FLOOR: a feed scales this to
- * roughly a quarter, so anything meaningful has to clear ~64px to survive
- * at 16px. The previous card had a 46px tagline and a 22px disclosure —
- * 11px and 5px respectively, which is decoration, not communication. It
- * also named no category, no platform and no price.
+ * The endcard. Staggered five frames apart so it assembles rather than
+ * appearing, over a desk at 8% with the rail still lit and drifting above
+ * it — the one moment the always-on claim is demonstrated rather than
+ * asserted.
  */
-function Endcard({
-  progress,
-  f,
-  frame,
-}: {
-  progress: number;
-  f: (s: number) => number;
-  frame: number;
-}) {
-  // Staggered, so the card assembles rather than appearing.
-  const at = (delay: number) =>
-    interpolate(frame, [f(T.end + delay), f(T.end + delay + 0.35)], [0, 1], {
+function Endcard({ progress, frame }: { progress: number; frame: number }) {
+  const at = (i: number) =>
+    interpolate(frame, [B.endcard + i * 5, B.endcard + i * 5 + 8], [0, 1], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
-      easing: Easing.out(Easing.cubic),
-    });
-  const a = at(0);
-  const b = at(0.1);
-  const c = at(0.22);
-  const rise = (v: number) => `translateY(${(28 * (1 - v)).toFixed(1)}px)`;
+    }) * progress;
+  const rise = (v: number) => `translateY(${(6 * (1 - v)).toFixed(1)}px)`;
+
+  const rows = [
+    { size: 168, weight: 700, color: "#ffffff", text: "Scrollr", gap: 22 },
+    {
+      size: 64,
+      weight: 500,
+      color: "rgba(255,255,255,0.86)",
+      text: "The moment it happens, you already know.",
+      gap: 16,
+    },
+    {
+      size: 40,
+      weight: 500,
+      color: "rgba(255,255,255,0.52)",
+      // Qualification, not clutter. Scrollr is Yahoo-only today, and an
+      // ESPN player who installs and finds nothing costs more than one
+      // who never clicked.
+      text: "Yahoo leagues · Windows & macOS · Free",
+      gap: 30,
+    },
+  ];
 
   return (
     <div
@@ -654,80 +587,38 @@ function Endcard({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 24,
-        paddingBottom: 150,
-        opacity: progress,
         fontFamily: UI,
         textAlign: "center",
         pointerEvents: "none",
       }}
     >
-      {/*
-        A scrim, because the world deliberately does NOT fade to black
-        behind this card — the bar has to stay visibly running, which is
-        the product's whole claim. Without it the tagline lands on a
-        spreadsheet grid and neither wins.
-      */}
+      {rows.map((r, i) => (
+        <div
+          key={r.text}
+          style={{
+            marginBottom: r.gap,
+            fontSize: r.size,
+            fontWeight: r.weight,
+            letterSpacing: r.size > 100 ? "-0.03em" : "-0.01em",
+            color: r.color,
+            opacity: at(i),
+            transform: rise(at(i)),
+          }}
+        >
+          {r.text}
+        </div>
+      ))}
       <div
         style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "radial-gradient(1500px 900px at 50% 46%, rgba(5,7,12,0.94) 0%, rgba(5,7,12,0.82) 45%, rgba(5,7,12,0) 78%)",
-        }}
-      />
-      <div
-        style={{
-          position: "relative",
-          fontSize: 168,
-          fontWeight: 800,
-          letterSpacing: "-0.045em",
-          color: "#ffffff",
-          opacity: a,
-          transform: rise(a),
-        }}
-      >
-        Scrollr
-      </div>
-      <div
-        style={{
-          position: "relative",
-          fontSize: 72,
-          fontWeight: 600,
-          letterSpacing: "-0.015em",
-          color: "rgba(255,255,255,0.82)",
-          opacity: b,
-          transform: rise(b),
-        }}
-      >
-        The moment it happens, you already know.
-      </div>
-      <div
-        style={{
-          position: "relative",
-          fontSize: 44,
-          fontWeight: 500,
-          color: "#9292a4",
-          opacity: b,
-          transform: rise(b),
-        }}
-      >
-        Live fantasy ticker · Windows &amp; macOS · Free
-      </div>
-      <div
-        style={{
-          position: "relative",
-          marginTop: 20,
-          padding: "18px 46px",
+          padding: "16px 40px",
           borderRadius: 999,
-          background: "rgba(52,211,153,0.10)",
-          border: "1px solid rgba(52,211,153,0.45)",
-          fontSize: 60,
-          fontWeight: 700,
-          letterSpacing: "-0.01em",
-          color: ACCENT,
-          opacity: c,
-          transform: rise(c),
+          background: "rgba(62,224,164,0.12)",
+          border: "1px solid rgba(62,224,164,0.45)",
+          fontSize: 52,
+          fontWeight: 600,
+          color: WIN,
+          opacity: at(3),
+          transform: rise(at(3)),
         }}
       >
         myscrollr.com

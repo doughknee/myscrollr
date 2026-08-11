@@ -38,8 +38,17 @@ import type {
  * screen: the same "Dynasty or Bust 184.5-151.0" twice in one bar reads
  * as a rendering bug, not as a ticker.
  */
-export const RAIL_LEFT: LeagueResponse[] = [workLeague()];
+/**
+ * Work League's score either side of beat 08, where a SECOND chip ticks
+ * over on its own with the camera locked. That shot is the only one in
+ * the film that proves the bar is live rather than a decorated
+ * screenshot, so this league has to be able to move.
+ */
+export const WORK_BEFORE = 90.9;
+export const WORK_AFTER = 97.3;
+
 export const RAIL_RIGHT_TAIL: LeagueResponse[] = [dynasty()];
+export { workLeague };
 
 /**
  * The three players the recording's ticker carries as standalone
@@ -72,13 +81,13 @@ function dynasty(): LeagueResponse {
 }
 
 /** Still live, comfortably ahead. 90.9-83.6 in the recording. */
-function workLeague(): LeagueResponse {
+function workLeague(mine: number): LeagueResponse {
   return league({
     key: "449.l.671902",
     name: "Work League (Keeper)",
     teamName: "Third and Inches",
     oppName: "Gridiron Ghosts",
-    mine: 90.9,
+    mine,
     theirs: 83.6,
     projected: 101.3,
     status: "midevent",
