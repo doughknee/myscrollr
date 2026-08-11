@@ -23,7 +23,7 @@
  *   npx remotion ffmpeg -y -ss 3 -i <recording>.mp4 \
  *     -frames:v 1 -update 1 public/desk.png
  */
-import { Img, staticFile } from "remotion";
+import { Img, OffthreadVideo, staticFile } from "remotion";
 
 /**
  * Where the recording's own ticker strip ends. Beat1Hook's bar has to
@@ -36,6 +36,44 @@ export const REAL_TICKER_BOTTOM = 82;
  * the same recording — Overview, Matchup, Roster — so the back half
  * shows what the app actually does rather than holding on one shot.
  */
+/**
+ * A CLIP, not a still.
+ *
+ * The recording's own page transitions — tabs sliding, the ticker
+ * preview repopulating as the dial changes — were being thrown away by
+ * extracting single frames. Remotion renders video perfectly well; using
+ * stills was a choice I made early and never revisited, not a limit of
+ * the tool.
+ *
+ * `startFrom` is in frames of the SOURCE clip, so a section can pick its
+ * own window without re-encoding.
+ */
+export function DesktopClip({
+  file,
+  startFrom = 0,
+}: {
+  file: string;
+  startFrom?: number;
+}) {
+  return (
+    <OffthreadVideo
+      src={staticFile(file)}
+      startFrom={startFrom}
+      // The film controls its own timeline; the clip must not advance on
+      // its own or loop back while a beat is holding on it.
+      playbackRate={1}
+      muted
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+      }}
+    />
+  );
+}
+
 export function Desktop({ file = "desk.png" }: { file?: string }) {
   return (
     <Img

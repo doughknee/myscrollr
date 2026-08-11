@@ -45,7 +45,7 @@ import {
 } from "../data/sundayMoney";
 import { useMotionClock } from "../motionClock";
 import { railProgress } from "../rail";
-import { Desktop, REAL_TICKER_BOTTOM } from "../scene/Desktop";
+import { Desktop, DesktopClip, REAL_TICKER_BOTTOM } from "../scene/Desktop";
 
 /** Beat boundaries, in frames. The spec's shot list, verbatim. */
 const B = {
@@ -269,6 +269,11 @@ export function Beat1Hook() {
       })
     : 0;
 
+  const appClip = interpolate(frame, [B.wide, B.wide + 20], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
   const stake = band(frame, B.typeIn - 8, B.pullBack + 10);
   const everyLeague = band(frame, B.wide, B.everyLeague);
 
@@ -308,6 +313,18 @@ export function Beat1Hook() {
           }}
         >
           <Desktop />
+          {/*
+            The real recording, with its real transitions, dissolved in
+            over the still once the camera is back wide. This is the
+            section that was three static screenshots cross-fading — the
+            most generic image in software marketing — when the footage
+            of the app actually animating existed the whole time.
+          */}
+          {appClip > 0 && (
+            <div style={{ position: "absolute", inset: 0, opacity: appClip }}>
+              <DesktopClip file="clip-app.mp4" />
+            </div>
+          )}
         </div>
 
         {/* The bar. Opaque, because the screenshot has its own frozen
