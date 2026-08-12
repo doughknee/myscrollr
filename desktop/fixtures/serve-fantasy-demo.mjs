@@ -52,6 +52,13 @@
  */
 
 import { createServer, request as httpRequest } from 'node:http'
+import {
+  PANEL_HTML,
+  applyControl,
+  controlState,
+  emptyOps,
+  nudgeFrame,
+} from './control-panel.mjs'
 
 // ── Scoring ──────────────────────────────────────────────────────
 // Yahoo NFL stat_ids. Full PPR. Every point total in the payload is
@@ -694,9 +701,74 @@ const UPSTREAM = new URL(flag('upstream', 'http://localhost:18080'))
 
 // Whole-response overrides. These two feed the fantasy ACCOUNT panel
 // (YahooConnectFlow / ConnectedView).
-/** The payload as served: drifted only when --live is set. */
+/**
+ * Whatever the control panel has been clicked into. Layered ON TOP of
+ * the drift rather than replacing it, so a hand-applied touchdown and a
+ * drifting live player coexist instead of one clobbering the other.
+ */
+let ops = emptyOps()
+
+/** The payload as served: drifted only when --live, then panel ops. */
 const currentPayload = () =>
-  LIVE ? applyLiveDrift(payload, elapsedSeconds()) : payload
+  applyControl(LIVE ? applyLiveDrift(payload, elapsedSeconds()) : payload, ops)
+
+/**
+ * Open SSE clients. The app polls /dashboard every 30-60s, which is far
+ * too slow to click a button and film the result — but useDashboardCDC
+ * re-fetches within a second of any yahoo_* record arriving on SSE. So
+ * every panel action writes one synthetic frame here.
+ */
+const sseClients = new Set()
+
+/** SSE frame terminator — a blank line ends a frame. */
+const BREAK = "\n\n"
+
+function nudgeClients() {
+  const frame = nudgeFrame()
+  for (const res of sseClients) res.write(frame)
+}
+
+function readJson(req) {
+  return new Promise((resolve) => {
+    const chunks = []
+    req.on('data', (c) => chunks.push(c))
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'))
+      } catch {
+        resolve({})
+      }
+    })
+  })
+}
+
+/** Panel routes. Returns true if it handled the request. */
+async function control(req, res, path) {
+  if (path === '/' || path === '/control') {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+    res.end(PANEL_HTML)
+    return true
+  }
+  if (path === '/control/state') {
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify(controlState(currentPayload())))
+    return true
+  }
+  if (path === '/control/op') {
+    const op = await readJson(req)
+    if (op.type === 'reset') ops = emptyOps()
+    else if (op.type === 'points' && op.player) {
+      ops.points[op.player] = round2((ops.points[op.player] ?? 0) + Number(op.delta || 0))
+    } else if (op.type === 'out' && op.player) ops.out[op.player] = true
+    else if (op.type === 'final' && op.league) ops.final[op.league] = true
+    console.log(`[fantasy-demo] control ${op.type} ${op.player ?? op.league ?? ''}`)
+    nudgeClients()
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ ok: true }))
+    return true
+  }
+  return false
+}
 
 const OVERRIDES = {
   '/users/me/yahoo-status': () => ({ connected: true, synced: true }),
@@ -782,8 +854,33 @@ function proxy(req, res, path, transform) {
   req.pipe(upstreamReq)
 }
 
-createServer((req, res) => {
+createServer(async (req, res) => {
   const path = new URL(req.url, 'http://x').pathname
+
+  if (await control(req, res, path)) return
+
+  // SERVED, not proxied. Injecting into a piped upstream stream works
+  // right up until upstream closes it, and /events is Ultimate-gated —
+  // on most accounts there would be nothing to inject into. Nothing is
+  // lost: fantasy has no CDC tables of its own, and the other ingesters
+  // are down in this mode anyway.
+  if (path === '/events') {
+    res.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache',
+      connection: 'keep-alive',
+      'access-control-allow-origin': '*',
+    })
+    res.write(': connected' + BREAK)
+    sseClients.add(res)
+    const beat = setInterval(() => res.write(': keep-alive' + BREAK), 15000)
+    req.on('close', () => {
+      clearInterval(beat)
+      sseClients.delete(res)
+    })
+    return
+  }
+
   const override = OVERRIDES[path]
 
   if (override) {
@@ -819,5 +916,6 @@ createServer((req, res) => {
   console.log(
     `[fantasy-demo] data       ${LIVE ? 'DRIFTING (--live) — numbers move' : 'static — pass --live to animate'}`,
   )
+  console.log(`[fantasy-demo] CONTROL    http://localhost:${PORT}/  <- open this to spark moments`)
   console.log('[fantasy-demo] then: cd desktop && npm run tauri:dev:fantasy-demo')
 })
