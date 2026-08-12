@@ -140,9 +140,17 @@ export function applyControl(base, ops) {
   return { leagues }
 }
 
-/** What the panel renders from — a flat, UI-shaped view of the payload. */
-export function controlState(payload) {
+/**
+ * What the panel renders from — a flat, UI-shaped view of the payload.
+ *
+ * `clients` is the number of open SSE connections, surfaced because a
+ * click that lands on the server but reaches no app is otherwise
+ * undiagnosable: restarting this server drops the app's stream, and it
+ * reconnects on a backoff that can take up to 30s.
+ */
+export function controlState(payload, clients = 0) {
   return {
+    clients,
     leagues: payload.leagues.map((league) => {
       const m = league.matchups[0]
       const [me, opp] = m.teams
@@ -200,6 +208,7 @@ export const PANEL_HTML = `<!doctype html>
   .tag { font-size: 10px; letter-spacing: .08em; padding: 2px 7px; border-radius: 999px; vertical-align: 2px; margin-left: 8px; }
   .live { background: #1d3b2a; color: #3ee0a4; }
   .fin  { background: #2a2f3a; color: #8b949e; }
+  .off  { background: #451a22; color: #ff9aab; }
   .score { display: flex; align-items: baseline; gap: 10px; margin: 10px 0 4px; font-variant-numeric: tabular-nums; }
   .big { font-size: 26px; font-weight: 700; }
   .vs { color: #8b949e; }
@@ -220,7 +229,7 @@ export const PANEL_HTML = `<!doctype html>
   footer { margin-top: 24px; color: #8b949e; font-size: 12px; }
   .note { max-width: 60ch; }
 </style>
-<h1>Scrollr demo control</h1>
+<h1>Scrollr demo control <span class="tag" id="conn">&hellip;</span></h1>
 <p class="sub">Every click re-renders the app in under a second. Seeded data &mdash; not a live game.</p>
 <div class="grid" id="grid"></div>
 <footer>
@@ -302,11 +311,14 @@ async function load() {
   let s
   try { s = await (await fetch('/control/state')).json() } catch { return }
   STATE = Object.fromEntries(s.leagues.map(l => [l.key, l]))
+  const conn = $('conn')
+  conn.textContent = s.clients ? 'APP CONNECTED' : 'NO APP LISTENING'
+  conn.className = 'tag ' + (s.clients ? 'live' : 'off')
   // Repaint only on an actual change, and never while a dropdown is
   // open — blowing away innerHTML on a timer snaps the picker shut
   // mid-selection, which makes the panel unusable for the one thing
   // it exists for.
-  const next = JSON.stringify(s)
+  const next = JSON.stringify(s.leagues)
   if (next === painted) return
   if (document.activeElement && document.activeElement.tagName === 'SELECT') return
   painted = next

@@ -751,7 +751,7 @@ async function control(req, res, path) {
   }
   if (path === '/control/state') {
     res.writeHead(200, { 'content-type': 'application/json' })
-    res.end(JSON.stringify(controlState(currentPayload())))
+    res.end(JSON.stringify(controlState(currentPayload(), sseClients.size)))
     return true
   }
   if (path === '/control/op') {
