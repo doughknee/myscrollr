@@ -1,6 +1,13 @@
 /**
- * SEC 06 ／ QUICK ANSWERS — renders HOMEPAGE_FAQ_ITEMS directly, so the
- * visible FAQ always matches the faqPage JSON-LD in routes/index.tsx.
+ * SEC 06 ／ QUICK ANSWERS — defaults to HOMEPAGE_FAQ_ITEMS so the
+ * homepage's visible FAQ always matches the faqPage JSON-LD in
+ * routes/index.tsx.
+ *
+ * Segmented landing pages (e.g. /fantasy) pass their own `items`. That
+ * coupling still holds as long as the route hands the SAME array to
+ * both this component and its `faqPage()` call — which is the only
+ * supported way to use the prop. Don't pass one list here and a
+ * different one to the JSON-LD; Google treats that as cloaking.
  *
  * Display treatment: each question is set in the condensed display face
  * over an oversized outlined ghost numeral (same vocabulary as the
@@ -13,17 +20,23 @@ import { EASE } from '@/lib/animations'
 import { SectionRow, TerminalContainer } from '@/components/terminal'
 import { HOMEPAGE_FAQ_ITEMS } from '@/lib/structured-data'
 
-export function QuickAnswers() {
-  const last = HOMEPAGE_FAQ_ITEMS.length - 1
+export function QuickAnswers({
+  items = HOMEPAGE_FAQ_ITEMS,
+  tag = 'SEC 06 ／ QUICK ANSWERS',
+}: {
+  items?: ReadonlyArray<{ question: string; answer: string }>
+  tag?: string
+} = {}) {
+  const last = items.length - 1
   return (
     <section className="border-b border-hairline pt-12">
       <TerminalContainer>
         <SectionRow
-          tag="SEC 06 ／ QUICK ANSWERS"
-          stat={`${HOMEPAGE_FAQ_ITEMS.length} QUESTIONS · TEN-SECOND READS`}
+          tag={tag}
+          stat={`${items.length} QUESTIONS · TEN-SECOND READS`}
         />
         <div className="grid gap-x-12 pb-12 pt-1 md:grid-cols-2">
-          {HOMEPAGE_FAQ_ITEMS.map((f, i) => (
+          {items.map((f, i) => (
             <motion.div
               key={f.question}
               initial={{ opacity: 0, y: 18 }}

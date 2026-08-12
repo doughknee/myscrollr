@@ -57,7 +57,9 @@ export const THEME_FAMILY_LABELS: Record<ThemeFamily, string> = {
 };
 
 export function isThemeFamily(value: unknown): value is ThemeFamily {
-  return typeof value === "string" && (THEME_FAMILIES as string[]).includes(value);
+  return (
+    typeof value === "string" && (THEME_FAMILIES as string[]).includes(value)
+  );
 }
 
 export function isThemeMode(value: unknown): value is ThemeMode {
@@ -275,6 +277,16 @@ export interface WidgetPrefs {
  */
 export type Venue = "off" | "feed" | "both" | "ticker";
 
+/**
+ * Fantasy ticker simplicity dial. Three positions instead of ~10
+ * per-item venue toggles; see FantasyDisplayPrefs.tickerMode.
+ *
+ * Named for the widget because `TickerMode` is already taken by the
+ * ticker's density setting (compact | comfort) — a genuinely different
+ * axis that happens to want the same word.
+ */
+export type FantasyTickerMode = "essential" | "standard" | "everything";
+
 /** True when the venue indicates the setting should render on the ticker. */
 export function shouldShowOnTicker(venue: Venue): boolean {
   return venue === "both" || venue === "ticker";
@@ -406,6 +418,26 @@ export interface FantasyDisplayPrefs {
    * Empty array = no followed players, no chips render.
    */
   followedPlayerKeys: string[];
+
+  // ── Ticker simplicity dial (2026-08) ──
+  /**
+   * How much of the fantasy story reaches the ticker.
+   *
+   *   essential  — one smart chip per league, nothing else
+   *   standard   — + live moment chips (in-play, breaking injury).
+   *                THE DEFAULT for fresh installs.
+   *   everything — every per-item venue pref above is honoured, and the
+   *                Advanced block in the Account panel unlocks
+   *
+   * A preset LAYER over the venue prefs, not a replacement: essential
+   * and standard are computed at chip-build time in ticker.tsx and
+   * ignore the per-item values, which stay untouched underneath. Moving
+   * the dial back to Everything restores exactly what the user had.
+   *
+   * Followed players are deliberately outside the dial — an explicit
+   * opt-in shouldn't be silently dropped by a simplicity setting.
+   */
+  tickerMode: FantasyTickerMode;
 
   // ── Feed-structural settings (not venue-toggled) ──
   /** Render the standings section inside the Fantasy feed view. */
@@ -583,6 +615,15 @@ export const DEFAULT_WIDGET_DISPLAY: WidgetDisplayPrefs = {
     benchOpportunity: "both",
     injuryDetail: "both",
     followedPlayerKeys: [],
+    // Standard, not Essential: the smart league chip tells you a league
+    // is live but not WHO is doing it, and the player mid-game is the
+    // thing worth glancing at. Standard adds exactly those moment chips
+    // and nothing else, so it stays calm while being useful. Essential
+    // remains for anyone who wants strictly one chip per league.
+    //
+    // Existing users keep their configured ticker regardless — see
+    // migrateFantasyDisplay.
+    tickerMode: "standard",
     showStandings: true,
     showMatchups: true,
     defaultSort: "name",
@@ -664,18 +705,25 @@ function migrateV1(saved: Record<string, unknown>): Partial<AppPreferences> {
       ...DEFAULT_TASKBAR,
       ...taskbar,
       // v1 had no pinnedActions; default to the standard set
-      pinnedActions: (taskbar.pinnedActions as string[]) ?? DEFAULT_TASKBAR.pinnedActions,
+      pinnedActions:
+        (taskbar.pinnedActions as string[]) ?? DEFAULT_TASKBAR.pinnedActions,
     };
   }
 
   // "ticker" stays the same shape
   if (saved.ticker) {
-    result.ticker = { ...DEFAULT_TICKER, ...(saved.ticker as Record<string, unknown>) };
+    result.ticker = {
+      ...DEFAULT_TICKER,
+      ...(saved.ticker as Record<string, unknown>),
+    };
   }
 
   // "window" stays the same shape
   if (saved.window) {
-    result.window = { ...DEFAULT_WINDOW, ...(saved.window as Record<string, unknown>) };
+    result.window = {
+      ...DEFAULT_WINDOW,
+      ...(saved.window as Record<string, unknown>),
+    };
   }
 
   // New keys — use defaults (appearance didn't exist in v1)
@@ -707,15 +755,22 @@ export function savePref<T>(key: string, value: T): void {
  * `widgetsOnTicker` list (mergeWidgetPrefs) and the explicit ticker
  * layout rows (loadPrefs).
  */
-function shouldAddLegacyTimerToTicker(saved: Partial<WidgetPrefs> | undefined): boolean {
+function shouldAddLegacyTimerToTicker(
+  saved: Partial<WidgetPrefs> | undefined,
+): boolean {
   if (!saved) return false;
   if (saved.timer != null && typeof saved.timer === "object") return false;
   const clockTicker = (
-    saved.clock as unknown as { ticker?: { activeTimer?: unknown } } | null | undefined
+    saved.clock as unknown as
+      { ticker?: { activeTimer?: unknown } } | null | undefined
   )?.ticker;
   if (clockTicker?.activeTimer === false) return false;
-  const enabled = Array.isArray(saved.enabledWidgets) ? saved.enabledWidgets : DEFAULT_WIDGETS.enabledWidgets;
-  const onTicker = Array.isArray(saved.widgetsOnTicker) ? saved.widgetsOnTicker : enabled;
+  const enabled = Array.isArray(saved.enabledWidgets)
+    ? saved.enabledWidgets
+    : DEFAULT_WIDGETS.enabledWidgets;
+  const onTicker = Array.isArray(saved.widgetsOnTicker)
+    ? saved.widgetsOnTicker
+    : enabled;
   return onTicker.includes("clock") && !onTicker.includes("timer");
 }
 
@@ -726,7 +781,9 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
 
   // Safe accessor for nested sub-objects that may not exist in old formats
   const obj = (v: unknown): Record<string, unknown> | undefined =>
-    v != null && typeof v === "object" ? (v as Record<string, unknown>) : undefined;
+    v != null && typeof v === "object"
+      ? (v as Record<string, unknown>)
+      : undefined;
 
   const clk = obj(saved.clock);
   const tmr = obj(saved.timer);
@@ -735,12 +792,17 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
   const upt = obj(saved.uptime);
   const ghb = obj(saved.github);
 
-  const savedEnabledWidgets = Array.isArray(saved.enabledWidgets) ? saved.enabledWidgets : DEFAULT_WIDGETS.enabledWidgets;
-  const savedWidgetsOnTicker = Array.isArray(saved.widgetsOnTicker) ? saved.widgetsOnTicker : savedEnabledWidgets;
-  const shouldEnableLegacyTimer = !tmr && savedEnabledWidgets.includes("clock");
-  const enabledWidgets = shouldEnableLegacyTimer && !savedEnabledWidgets.includes("timer")
-    ? [...savedEnabledWidgets, "timer"]
+  const savedEnabledWidgets = Array.isArray(saved.enabledWidgets)
+    ? saved.enabledWidgets
+    : DEFAULT_WIDGETS.enabledWidgets;
+  const savedWidgetsOnTicker = Array.isArray(saved.widgetsOnTicker)
+    ? saved.widgetsOnTicker
     : savedEnabledWidgets;
+  const shouldEnableLegacyTimer = !tmr && savedEnabledWidgets.includes("clock");
+  const enabledWidgets =
+    shouldEnableLegacyTimer && !savedEnabledWidgets.includes("timer")
+      ? [...savedEnabledWidgets, "timer"]
+      : savedEnabledWidgets;
   const widgetsOnTicker = shouldAddLegacyTimerToTicker(saved)
     ? [...savedWidgetsOnTicker, "timer"]
     : savedWidgetsOnTicker;
@@ -752,9 +814,12 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
       : [],
     // Migration: if widgetsOnTicker doesn't exist, default to enabledWidgets
     widgetsOnTicker,
-    pinnedWidgets: (saved.pinnedWidgets != null && typeof saved.pinnedWidgets === "object" && !Array.isArray(saved.pinnedWidgets))
-      ? saved.pinnedWidgets as Record<string, WidgetPinConfig>
-      : {},
+    pinnedWidgets:
+      saved.pinnedWidgets != null &&
+      typeof saved.pinnedWidgets === "object" &&
+      !Array.isArray(saved.pinnedWidgets)
+        ? (saved.pinnedWidgets as Record<string, WidgetPinConfig>)
+        : {},
     // 2026-07-17 unification reset: clock/timer/weather/uptime/github
     // ticker configs are forced to defaults — the exclusion/on-off UIs
     // are gone and tracked content always reaches the ticker. Stored
@@ -775,25 +840,35 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
       ticker: { ...DEFAULT_WEATHER_TICKER },
     },
     sysmon: {
-      refreshInterval: typeof sys?.refreshInterval === "number" ? sys.refreshInterval : DEFAULT_WIDGETS.sysmon.refreshInterval,
+      refreshInterval:
+        typeof sys?.refreshInterval === "number"
+          ? sys.refreshInterval
+          : DEFAULT_WIDGETS.sysmon.refreshInterval,
       tempUnit: (sys?.tempUnit as TempUnit) ?? DEFAULT_WIDGETS.sysmon.tempUnit,
       ticker: { ...DEFAULT_SYSMON_TICKER, ...obj(sys?.ticker) },
     },
     uptime: {
       url: typeof upt?.url === "string" ? upt.url : DEFAULT_WIDGETS.uptime.url,
-      pollInterval: typeof upt?.pollInterval === "number" ? upt.pollInterval : DEFAULT_WIDGETS.uptime.pollInterval,
+      pollInterval:
+        typeof upt?.pollInterval === "number"
+          ? upt.pollInterval
+          : DEFAULT_WIDGETS.uptime.pollInterval,
       ticker: { ...DEFAULT_UPTIME_TICKER },
     },
     github: {
       repos: Array.isArray(ghb?.repos)
         ? (ghb.repos as unknown[]).filter(
             (r): r is { owner: string; repo: string } =>
-              r != null && typeof r === "object" &&
+              r != null &&
+              typeof r === "object" &&
               typeof (r as Record<string, unknown>).owner === "string" &&
               typeof (r as Record<string, unknown>).repo === "string",
           )
         : DEFAULT_WIDGETS.github.repos,
-      pollInterval: typeof ghb?.pollInterval === "number" ? ghb.pollInterval : DEFAULT_WIDGETS.github.pollInterval,
+      pollInterval:
+        typeof ghb?.pollInterval === "number"
+          ? ghb.pollInterval
+          : DEFAULT_WIDGETS.github.pollInterval,
       ticker: { ...DEFAULT_GITHUB_TICKER },
     },
   };
@@ -896,6 +971,10 @@ export function migrateRssDisplay(
   };
 }
 
+export function isFantasyTickerMode(v: unknown): v is FantasyTickerMode {
+  return v === "essential" || v === "standard" || v === "everything";
+}
+
 export function migrateFantasyDisplay(
   saved: Partial<FantasyDisplayPrefs> | undefined,
 ): FantasyDisplayPrefs {
@@ -922,8 +1001,19 @@ export function migrateFantasyDisplay(
       ? "off"
       : "both";
 
+  // The dial is new. Defaulting everyone to "essential" would silently
+  // strip segments an existing user had deliberately switched on, so a
+  // prefs file that predates the dial resolves to "everything" — the
+  // mode whose behaviour IS the old behaviour (every per-item venue
+  // pref honoured). Only genuinely fresh installs, which never reach
+  // this function, get the calm default.
+  const tickerMode: FantasyTickerMode = isFantasyTickerMode(raw.tickerMode)
+    ? raw.tickerMode
+    : "everything";
+
   return {
     ...DEFAULT_WIDGET_DISPLAY.fantasy,
+    tickerMode,
     matchupScore,
     winProbability: migrateVenue(raw.winProbability),
     matchupStatus: migrateVenue(raw.matchupStatus),
@@ -991,8 +1081,7 @@ export function loadPrefs(): AppPreferences {
 
     // Deep merge with defaults so new keys are always present.
     const savedDisplay = source.widgetDisplay as
-      | Partial<WidgetDisplayPrefs>
-      | undefined;
+      Partial<WidgetDisplayPrefs> | undefined;
     // Strip the legacy `tickerRows` scalar and the `tickerLayout`
     // object that replaced it. Both described a multi-row ticker; the
     // ticker is single-row now, so neither is read and neither is
@@ -1026,10 +1115,12 @@ export function loadPrefs(): AppPreferences {
     );
     // Seed `tickerScale` from `uiScale` when missing/invalid so the
     // ticker keeps the same scale users had before the split.
-    const savedUiScale = typeof appearanceRest.uiScale === "number" ? appearanceRest.uiScale : 100;
-    const savedTickerScale = typeof appearanceRest.tickerScale === "number"
-      ? appearanceRest.tickerScale
-      : savedUiScale;
+    const savedUiScale =
+      typeof appearanceRest.uiScale === "number" ? appearanceRest.uiScale : 100;
+    const savedTickerScale =
+      typeof appearanceRest.tickerScale === "number"
+        ? appearanceRest.tickerScale
+        : savedUiScale;
     const mergedAppearance: AppearancePrefs = {
       ...DEFAULT_APPEARANCE,
       ...appearanceRest,
@@ -1069,7 +1160,9 @@ export function loadPrefs(): AppPreferences {
       startup: { ...DEFAULT_STARTUP, ...savedStartup },
       window: { ...DEFAULT_WINDOW, ...savedWindow },
       taskbar: { ...DEFAULT_TASKBAR, ...source.taskbar },
-      widgets: mergeWidgetPrefs(source.widgets as Partial<WidgetPrefs> | undefined),
+      widgets: mergeWidgetPrefs(
+        source.widgets as Partial<WidgetPrefs> | undefined,
+      ),
       widgetDisplay: {
         finance: migrateFinanceDisplay(savedDisplay?.finance),
         rss: migrateRssDisplay(savedDisplay?.rss),
@@ -1087,7 +1180,11 @@ export function loadPrefs(): AppPreferences {
     // Legacy split: users who had the combined clock/timer widget on the
     // ticker should get the timer too. This used to walk each ticker row's
     // source list; with a single row it is just the one membership list.
-    if (shouldAddLegacyTimerToTicker(source.widgets as Partial<WidgetPrefs> | undefined)) {
+    if (
+      shouldAddLegacyTimerToTicker(
+        source.widgets as Partial<WidgetPrefs> | undefined,
+      )
+    ) {
       const onTicker = merged.widgets.widgetsOnTicker;
       if (onTicker.includes("clock") && !onTicker.includes("timer")) {
         merged.widgets = {
@@ -1118,9 +1215,10 @@ export function resetCategory<K extends keyof AppPreferences>(
   category: K,
 ): AppPreferences {
   const def = DEFAULT_PREFS[category];
-  const value = typeof def === "object" && def !== null && !Array.isArray(def)
-    ? { ...def }
-    : def;
+  const value =
+    typeof def === "object" && def !== null && !Array.isArray(def)
+      ? { ...def }
+      : def;
   return { ...prefs, [category]: value };
 }
 
@@ -1134,7 +1232,7 @@ export function resetAll(): AppPreferences {
     taskbar: { ...DEFAULT_TASKBAR },
     widgets: { ...DEFAULT_WIDGETS },
     widgetDisplay: { ...DEFAULT_WIDGET_DISPLAY },
-      // Reset clears tipsShown — the user explicitly asked for a clean
+    // Reset clears tipsShown — the user explicitly asked for a clean
     // slate, so they'll re-experience first-run discovery hints.
     tipsShown: [],
   };
@@ -1225,7 +1323,10 @@ export const TICKER_HEIGHTS: Record<TickerMode, number> = {
 // ── Pure preference updaters ────────────────────────────────────
 
 /** Toggle a widget on/off the ticker. Returns a new AppPreferences. */
-export function toggleWidgetOnTicker(prefs: AppPreferences, widgetId: string): AppPreferences {
+export function toggleWidgetOnTicker(
+  prefs: AppPreferences,
+  widgetId: string,
+): AppPreferences {
   const onTicker = prefs.widgets.widgetsOnTicker;
   const next = onTicker.includes(widgetId)
     ? onTicker.filter((id) => id !== widgetId)
@@ -1248,7 +1349,10 @@ export function toggleWidgetOnTicker(prefs: AppPreferences, widgetId: string): A
  * avoid showing a phantom "Removed ___" toast for a click that did
  * nothing.
  */
-export function disableWidget(prefs: AppPreferences, widgetId: string): AppPreferences {
+export function disableWidget(
+  prefs: AppPreferences,
+  widgetId: string,
+): AppPreferences {
   const enabledWidgets = prefs.widgets.enabledWidgets;
   if (!enabledWidgets.includes(widgetId)) return prefs;
   return {
@@ -1256,7 +1360,9 @@ export function disableWidget(prefs: AppPreferences, widgetId: string): AppPrefe
     widgets: {
       ...prefs.widgets,
       enabledWidgets: enabledWidgets.filter((id) => id !== widgetId),
-      widgetsOnTicker: prefs.widgets.widgetsOnTicker.filter((id) => id !== widgetId),
+      widgetsOnTicker: prefs.widgets.widgetsOnTicker.filter(
+        (id) => id !== widgetId,
+      ),
     },
   };
 }
@@ -1280,7 +1386,10 @@ export function defaultPinForNewWidget(): WidgetPinConfig {
 }
 
 /** Toggle a widget's pin state. Returns a new AppPreferences. */
-export function toggleWidgetPin(prefs: AppPreferences, widgetId: string): AppPreferences {
+export function toggleWidgetPin(
+  prefs: AppPreferences,
+  widgetId: string,
+): AppPreferences {
   const pinned = { ...prefs.widgets.pinnedWidgets };
   if (pinned[widgetId]) {
     delete pinned[widgetId];

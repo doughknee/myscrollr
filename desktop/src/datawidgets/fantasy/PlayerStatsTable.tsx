@@ -11,6 +11,7 @@
 import { clsx } from "clsx";
 import { AlertTriangle } from "lucide-react";
 import {
+  gameStateForPlayer,
   isInjuryStatus,
   statColumnsForPosition,
   statValue,
@@ -85,6 +86,11 @@ export function PlayerStatsTable({
                 Player
               </th>
               <th className="px-1 py-2 text-center">Slot</th>
+              {/* Points-first: what a fantasy player actually reads. The
+                  raw stat columns still follow, unchanged. */}
+              <th className="px-2 py-2 text-right">Pts</th>
+              <th className="px-2 py-2 text-right">Proj</th>
+              <th className="px-2 py-2 text-left">Game</th>
               {columns.map((col) => (
                 <th
                   key={col.stat_id}
@@ -135,6 +141,10 @@ function PlayerRow({
   const injured = isInjuryStatus(player.status);
   const source =
     window === "today" ? player.player_stats_today : player.player_stats;
+  const game = gameStateForPlayer(player);
+  const live = game.kind === "live";
+  const unplayed =
+    player.player_points === null || player.player_points === undefined;
 
   return (
     <tr
@@ -205,6 +215,34 @@ function PlayerRow({
         >
           {player.selected_position || "—"}
         </span>
+      </td>
+
+      {/* Points-first columns. `pts` is the week total either way — Yahoo
+          scopes player_points to the week, not the day — so only the raw
+          stat columns below actually change with the window. */}
+      <td
+        className={clsx(
+          "px-2 py-2 text-right font-mono font-bold tabular-nums",
+          live && "pts-flash text-up",
+          !live && (unplayed ? "text-fg-4" : subdued ? "text-fg-3" : "text-fg"),
+        )}
+      >
+        {unplayed ? "—" : player.player_points!.toFixed(1)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono tabular-nums text-fg-3">
+        {typeof player.projected_points === "number"
+          ? player.projected_points.toFixed(1)
+          : "—"}
+      </td>
+      <td
+        className={clsx(
+          "whitespace-nowrap px-2 py-2 text-left font-mono",
+          game.kind === "live" && "font-semibold text-live",
+          game.kind === "upcoming" && "font-semibold text-fg-2",
+          (game.kind === "final" || game.kind === "unknown") && "text-fg-4",
+        )}
+      >
+        {game.label}
       </td>
 
       {/* One cell per stat column */}

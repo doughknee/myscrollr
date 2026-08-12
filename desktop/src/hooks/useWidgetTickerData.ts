@@ -3,23 +3,53 @@ import type { WidgetPrefs } from "../preferences";
 import type { TempUnit } from "../preferences";
 import { fetchSysmonData } from "./useSysmonData";
 import type { SystemInfo } from "./useSysmonData";
-import { LS_CLOCK_TIMEZONES, LS_CLOCK_FORMAT, LS_TIMER_STATE, LS_WEATHER_CITIES, LS_WEATHER_UNIT, LS_UPTIME_MONITORS, LS_GITHUB_REPOS } from "../constants";
+import {
+  LS_CLOCK_TIMEZONES,
+  LS_CLOCK_FORMAT,
+  LS_TIMER_STATE,
+  LS_WEATHER_CITIES,
+  LS_WEATHER_UNIT,
+  LS_UPTIME_MONITORS,
+  LS_GITHUB_REPOS,
+} from "../constants";
 import { getStore, onStoreChange } from "../lib/store";
 import { formatBytes, timeAgo, truncate } from "../utils/format";
-import { weatherCodeToIcon, weatherCodeToLabel, formatTemp } from "../widgets/weather/types";
+import {
+  weatherCodeToIcon,
+  weatherCodeToLabel,
+  formatTemp,
+} from "../widgets/weather/types";
 import { findCpuTemp, findGpuTemp } from "../widgets/sysmon/utils";
 import { tzLabel } from "../widgets/clock/storage";
-import type { ClockChipData, WeatherChipData, SysmonChipData, UptimeChipData, GitHubChipData, WidgetTickerData } from "../types";
+import type {
+  ClockChipData,
+  WeatherChipData,
+  SysmonChipData,
+  UptimeChipData,
+  GitHubChipData,
+  WidgetTickerData,
+} from "../types";
 import type { TimerState } from "../widgets/timer/types";
 import type { SavedCity } from "../widgets/weather/types";
 import { loadMonitors } from "../widgets/uptime/types";
 import { loadRepoData, repoKey } from "../widgets/github/types";
 
-const EMPTY: WidgetTickerData = { clock: [], timer: [], weather: [], sysmon: [], uptime: [], github: [] };
+const EMPTY: WidgetTickerData = {
+  clock: [],
+  timer: [],
+  weather: [],
+  sysmon: [],
+  uptime: [],
+  github: [],
+};
 
 // ── Time formatting helpers ─────────────────────────────────────
 
-function formatTime(date: Date, tz: string | undefined, format: string): string {
+function formatTime(
+  date: Date,
+  tz: string | undefined,
+  format: string,
+): string {
   const opts: Intl.DateTimeFormatOptions = {
     hour: "numeric",
     minute: "2-digit",
@@ -30,10 +60,13 @@ function formatTime(date: Date, tz: string | undefined, format: string): string 
 }
 
 function formatDetail(date: Date, tz: string | undefined): string {
-  const tzName = new Intl.DateTimeFormat("en-US", {
-    timeZoneName: "short",
-    ...(tz ? { timeZone: tz } : {}),
-  }).formatToParts(date).find((p) => p.type === "timeZoneName")?.value ?? "";
+  const tzName =
+    new Intl.DateTimeFormat("en-US", {
+      timeZoneName: "short",
+      ...(tz ? { timeZone: tz } : {}),
+    })
+      .formatToParts(date)
+      .find((p) => p.type === "timeZoneName")?.value ?? "";
 
   const dateStr = new Intl.DateTimeFormat("en-US", {
     weekday: "short",
@@ -50,14 +83,20 @@ function tzShortLabel(tz: string): string {
   // Abbreviate long city names for compact ticker chips
   if (city.length > 10) {
     const words = city.split(" ");
-    return words.map((w) => w[0]).join("").toUpperCase();
+    return words
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase();
   }
   return city;
 }
 
 // ── Timer helpers ───────────────────────────────────────────────
 
-function getTimerChipData(state: TimerState, longBreakEvery: number): ClockChipData | null {
+function getTimerChipData(
+  state: TimerState,
+  longBreakEvery: number,
+): ClockChipData | null {
   const isRunning = state.startedAt != null;
   const elapsed = isRunning
     ? state.bankedMs + (Date.now() - state.startedAt!)
@@ -66,7 +105,9 @@ function getTimerChipData(state: TimerState, longBreakEvery: number): ClockChipD
   if (!isRunning && elapsed === 0) return null; // No active timer
 
   const isCountUp = state.mode === "stopwatch";
-  const totalMs = isCountUp ? elapsed : Math.max(0, state.targetSecs * 1000 - elapsed);
+  const totalMs = isCountUp
+    ? elapsed
+    : Math.max(0, state.targetSecs * 1000 - elapsed);
   const totalSecs = Math.floor(totalMs / 1000);
   const mins = Math.floor(totalSecs / 60);
   const secs = totalSecs % 60;
@@ -74,9 +115,10 @@ function getTimerChipData(state: TimerState, longBreakEvery: number): ClockChipD
 
   const mode = state.mode.charAt(0).toUpperCase() + state.mode.slice(1);
   const sessions = state.completedSessions ?? 0;
-  const detail = state.mode === "pomodoro"
-    ? `${mode} \u00B7 ${sessions}/${longBreakEvery} sessions`
-    : mode;
+  const detail =
+    state.mode === "pomodoro"
+      ? `${mode} \u00B7 ${sessions}/${longBreakEvery} sessions`
+      : mode;
 
   return {
     id: "timer",
@@ -84,7 +126,67 @@ function getTimerChipData(state: TimerState, longBreakEvery: number): ClockChipD
     label: "Timer",
     value,
     detail,
+    // Spine inputs. A stopwatch counts UP with no target, so it has no
+    // fraction to draw and deliberately reports neither — the chip
+    // hides the spine rather than inventing a finish line.
+    remainingSec: isCountUp ? undefined : Math.floor(totalMs / 1000),
+    totalSec: isCountUp ? undefined : state.targetSecs,
+    // startedAt === null is the pause marker: elapsed time is banked
+    // and the clock isn't running.
+    paused: !isRunning,
+    endsAt:
+      isCountUp || !isRunning ? undefined : formatEndTime(Date.now() + totalMs),
   };
+}
+
+/** "3:10 PM" — when a running timer will finish. */
+function formatEndTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * Is it night in this zone?
+ *
+ * A flat hour window rather than real sunrise/sunset: a clock chip has
+ * no location, only a timezone, and a timezone covers too much latitude
+ * to place the sun. 20:00-06:00 is the "would it be rude to call"
+ * window, which is what the dimming is actually communicating.
+ *
+ * Weather chips do NOT use this — they get isDay from the provider,
+ * which knows where the city is.
+ */
+function isNightIn(now: Date, tz: string | undefined): boolean {
+  try {
+    const hour = Number(
+      new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        hour12: false,
+        timeZone: tz,
+      }).format(now),
+    );
+    if (!Number.isFinite(hour)) return false;
+    return hour >= 20 || hour < 6;
+  } catch {
+    // Invalid timezone strings are user-supplied. No dimming beats a
+    // crashed ticker.
+    return false;
+  }
+}
+
+/** "UTC-4" for the comfort cell. Empty when the zone can't be resolved. */
+function utcOffsetLabel(now: Date, tz: string | undefined): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      timeZoneName: "shortOffset",
+    }).formatToParts(now);
+    return parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+  } catch {
+    return "";
+  }
 }
 
 // ── Hook ────────────────────────────────────────────────────────
@@ -116,6 +218,8 @@ export function useWidgetTickerData(
         label: "Local",
         value: formatTime(now, undefined, format),
         detail: formatDetail(now, undefined),
+        night: isNightIn(now, undefined),
+        offset: utcOffsetLabel(now, undefined),
       });
     }
 
@@ -130,6 +234,8 @@ export function useWidgetTickerData(
           label: tzShortLabel(tz),
           value: formatTime(now, tz, format),
           detail: formatDetail(now, tz),
+          night: isNightIn(now, tz),
+          offset: utcOffsetLabel(now, tz),
         });
       }
     }
@@ -145,7 +251,10 @@ export function useWidgetTickerData(
     const state = getStore<TimerState | null>(LS_TIMER_STATE, null);
     if (!state) return [];
 
-    const chip = getTimerChipData(state, widgetPrefs.timer.pomodoro.longBreakEvery);
+    const chip = getTimerChipData(
+      state,
+      widgetPrefs.timer.pomodoro.longBreakEvery,
+    );
     return chip ? [chip] : [];
   }, [widgetPrefs.timer, enabledWidgets]);
 
@@ -163,17 +272,37 @@ export function useWidgetTickerData(
       if (cfg.ticker.excludedCities.includes(name)) continue;
 
       const w = city.weather;
-      const temp = w?.temperature != null ? formatTemp(w.temperature, unit as TempUnit, true) : "--";
-      const feelsLike = w?.feelsLike != null ? formatTemp(w.feelsLike, unit as TempUnit, true) : "--";
-      const icon = w?.weatherCode != null ? weatherCodeToIcon(w.weatherCode) : "\u2601";
-      const condition = w?.weatherCode != null ? weatherCodeToLabel(w.weatherCode) : "";
+      const temp =
+        w?.temperature != null
+          ? formatTemp(w.temperature, unit as TempUnit, true)
+          : "--";
+      const feelsLike =
+        w?.feelsLike != null
+          ? formatTemp(w.feelsLike, unit as TempUnit, true)
+          : "--";
+      const icon =
+        w?.weatherCode != null ? weatherCodeToIcon(w.weatherCode) : "\u2601";
+      const condition =
+        w?.weatherCode != null ? weatherCodeToLabel(w.weatherCode) : "";
 
       chips.push({
         id: `weather-${name}`,
         label: truncate(name, 12),
         temp,
         icon,
-        detail: condition ? `${condition} \u00B7 Feels ${feelsLike}` : undefined,
+        detail: condition
+          ? `${condition} \u00B7 Feels ${feelsLike}`
+          : undefined,
+        // Range bar inputs. Raw provider units, NOT the formatted
+        // string — the bar does arithmetic and formatTemp may already
+        // have converted for display.
+        tempValue: w?.temperature,
+        high: w?.tempMax,
+        low: w?.tempMin,
+        // Provider-reported, not computed from the clock: sunrise and
+        // sunset move with latitude and season, so a hardcoded hour
+        // range would be wrong for most of the planet most of the year.
+        night: w?.isDay === false,
       });
     }
 
@@ -192,13 +321,16 @@ export function useWidgetTickerData(
 
     if (cfg.ticker.cpu) {
       const pct = Math.round(info.cpuUsage);
-      const freq = info.cpuFreqMhz ? `${(info.cpuFreqMhz / 1000).toFixed(1)} GHz` : "";
+      const freq = info.cpuFreqMhz
+        ? `${(info.cpuFreqMhz / 1000).toFixed(1)} GHz`
+        : "";
       const sensor = findCpuTemp(info.components);
       const temp = sensor ? formatTemp(sensor.temp, tu, true) : "";
       chips.push({
         id: "sysmon-cpu",
         label: "CPU",
         value: `${pct}%`,
+        percent: pct,
         detail: [freq, temp].filter(Boolean).join(" \u00B7 ") || undefined,
         hot: pct >= 80,
       });
@@ -212,6 +344,7 @@ export function useWidgetTickerData(
         id: "sysmon-mem",
         label: "RAM",
         value: `${pct}%`,
+        percent: pct,
         detail: `${used} / ${total}`,
         hot: pct >= 85,
       });
@@ -226,6 +359,7 @@ export function useWidgetTickerData(
         id: "sysmon-gpu",
         label: "GPU",
         value: `${pct}%`,
+        percent: pct,
         detail: [clock, temp].filter(Boolean).join(" \u00B7 ") || undefined,
         hot: pct >= 80,
       });
@@ -233,7 +367,9 @@ export function useWidgetTickerData(
 
     if (cfg.ticker.gpuPower && info.gpuPowerWatts != null) {
       const watts = Math.round(info.gpuPowerWatts);
-      const cap = info.gpuPowerCapWatts ? `/ ${Math.round(info.gpuPowerCapWatts)}W` : "";
+      const cap = info.gpuPowerCapWatts
+        ? `/ ${Math.round(info.gpuPowerCapWatts)}W`
+        : "";
       chips.push({
         id: "sysmon-pwr",
         label: "GPU",
@@ -245,6 +381,23 @@ export function useWidgetTickerData(
 
     return chips;
   }, [widgetPrefs.sysmon, enabledWidgets]);
+
+  /**
+   * "45s" / "4m" / "2h11m" — short enough for a chip's value slot.
+   *
+   * Deliberately coarse above an hour: a monitor that's been down for
+   * two hours doesn't need the seconds, and a value that reflows every
+   * second would jiggle the whole rail.
+   */
+  function compactDuration(ms: number): string {
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    if (totalSec < 60) return `${totalSec}s`;
+    const totalMin = Math.floor(totalSec / 60);
+    if (totalMin < 60) return `${totalMin}m`;
+    const hours = Math.floor(totalMin / 60);
+    const mins = totalMin % 60;
+    return mins === 0 ? `${hours}h` : `${hours}h${mins}m`;
+  }
 
   // ── Build uptime chips ────────────────────────────────────────
   const buildUptimeChips = useCallback((): UptimeChipData[] => {
@@ -258,14 +411,18 @@ export function useWidgetTickerData(
     for (const mon of monitors) {
       if (cfg.ticker.excludedMonitors.includes(mon.id)) continue;
 
-      const uptimeStr = mon.uptimePercent != null
-        ? `${mon.uptimePercent.toFixed(mon.uptimePercent === 100 ? 0 : 1)}%`
-        : "--";
+      const uptimeStr =
+        mon.uptimePercent != null
+          ? `${mon.uptimePercent.toFixed(mon.uptimePercent === 100 ? 0 : 1)}%`
+          : "--";
 
-      const statusLabel = mon.status.charAt(0).toUpperCase() + mon.status.slice(1);
+      const statusLabel =
+        mon.status.charAt(0).toUpperCase() + mon.status.slice(1);
       const respTime = mon.responseTime != null ? `${mon.responseTime}ms` : "";
       const checked = timeAgo(mon.lastChecked, { suffix: true });
-      const detail = [statusLabel, respTime, checked].filter(Boolean).join(" \u00B7 ");
+      const detail = [statusLabel, respTime, checked]
+        .filter(Boolean)
+        .join(" \u00B7 ");
 
       chips.push({
         id: `uptime-${mon.id}`,
@@ -273,7 +430,15 @@ export function useWidgetTickerData(
         status: mon.status,
         uptime: uptimeStr,
         detail: detail || undefined,
-        heartbeats: mon.recentHeartbeats.length > 0 ? mon.recentHeartbeats : undefined,
+        heartbeats:
+          mon.recentHeartbeats.length > 0 ? mon.recentHeartbeats : undefined,
+        // Down chips show how long it's been down instead of an uptime
+        // percentage — see UptimeChipData.outageFor.
+        outageFor:
+          mon.status === "down" && mon.downSince
+            ? compactDuration(Date.now() - new Date(mon.downSince).getTime())
+            : undefined,
+        responseAvg: respTime ? `${respTime} avg` : undefined,
       });
     }
 
@@ -308,6 +473,21 @@ export function useWidgetTickerData(
         status: repo.status,
         workflowName: workflow,
         detail: detail || undefined,
+        branch: repo.branch ?? undefined,
+        // Duration for anything that ran; "queued" reads better than a
+        // zero for a run that hasn't started. `failedStep` would take
+        // this slot on failures but needs the jobs payload we don't
+        // fetch — see GitHubChipData.
+        elapsed:
+          repo.status === "unavailable"
+            ? "queued"
+            : repo.startedAt
+              ? compactDuration(
+                  (repo.updatedAt
+                    ? new Date(repo.updatedAt).getTime()
+                    : Date.now()) - new Date(repo.startedAt).getTime(),
+                )
+              : undefined,
       });
     }
 
@@ -324,7 +504,14 @@ export function useWidgetTickerData(
     const hasUptime = enabledWidgets.has("uptime");
     const hasGithub = enabledWidgets.has("github");
 
-    if (!hasClock && !hasTimer && !hasWeather && !hasSysmon && !hasUptime && !hasGithub) {
+    if (
+      !hasClock &&
+      !hasTimer &&
+      !hasWeather &&
+      !hasSysmon &&
+      !hasUptime &&
+      !hasGithub
+    ) {
       setData(EMPTY);
       return;
     }
@@ -342,14 +529,18 @@ export function useWidgetTickerData(
     };
 
     // Clock: update every second
-    const clockInterval = hasClock ? setInterval(() => {
-      setData((prev) => ({ ...prev, clock: buildClockChips() }));
-    }, 1000) : null;
+    const clockInterval = hasClock
+      ? setInterval(() => {
+          setData((prev) => ({ ...prev, clock: buildClockChips() }));
+        }, 1000)
+      : null;
 
     // Timer: update every second while enabled for live elapsed time
-    const timerInterval = hasTimer ? setInterval(() => {
-      setData((prev) => ({ ...prev, timer: buildTimerChips() }));
-    }, 1000) : null;
+    const timerInterval = hasTimer
+      ? setInterval(() => {
+          setData((prev) => ({ ...prev, timer: buildTimerChips() }));
+        }, 1000)
+      : null;
 
     // Weather: listen for store changes instead of polling
     // (weatherQueryOptions in __root.tsx writes to LS_WEATHER_CITIES on every fetch)
@@ -399,29 +590,39 @@ export function useWidgetTickerData(
 
     // Sysmon: poll Tauri IPC at the configured interval
     const sysmonMs = (widgetPrefs.sysmon.refreshInterval || 2) * 1000;
-    const sysmonInterval = hasSysmon ? setInterval(async () => {
-      try {
-        sysInfoRef.current = await fetchSysmonData();
-        setData((prev) => ({ ...prev, sysmon: buildSysmonChips() }));
-      } catch { /* ignore IPC failures */ }
-    }, sysmonMs) : null;
+    const sysmonInterval = hasSysmon
+      ? setInterval(async () => {
+          try {
+            sysInfoRef.current = await fetchSysmonData();
+            setData((prev) => ({ ...prev, sysmon: buildSysmonChips() }));
+          } catch {
+            /* ignore IPC failures */
+          }
+        }, sysmonMs)
+      : null;
 
-     // Uptime: re-read cached store data at poll cadence (FeedTab does the actual fetching)
+    // Uptime: re-read cached store data at poll cadence (FeedTab does the actual fetching)
     const uptimeMs = (widgetPrefs.uptime.pollInterval || 60) * 1000;
-    const uptimeInterval = hasUptime ? setInterval(() => {
-      setData((prev) => ({ ...prev, uptime: buildUptimeChips() }));
-    }, uptimeMs) : null;
+    const uptimeInterval = hasUptime
+      ? setInterval(() => {
+          setData((prev) => ({ ...prev, uptime: buildUptimeChips() }));
+        }, uptimeMs)
+      : null;
 
-     // GitHub: re-read cached store data at poll cadence (FeedTab does the actual fetching)
+    // GitHub: re-read cached store data at poll cadence (FeedTab does the actual fetching)
     const githubMs = (widgetPrefs.github.pollInterval || 120) * 1000;
-    const githubInterval = hasGithub ? setInterval(() => {
-      setData((prev) => ({ ...prev, github: buildGithubChips() }));
-    }, githubMs) : null;
+    const githubInterval = hasGithub
+      ? setInterval(() => {
+          setData((prev) => ({ ...prev, github: buildGithubChips() }));
+        }, githubMs)
+      : null;
 
     // Initial fetch for sysmon (only widget that needs async init)
     if (hasSysmon) {
       fetchSysmonData()
-        .then((info) => { sysInfoRef.current = info; })
+        .then((info) => {
+          sysInfoRef.current = info;
+        })
         .catch(() => {})
         .finally(refresh);
     } else {
@@ -442,9 +643,9 @@ export function useWidgetTickerData(
       if (uptimeInterval) clearInterval(uptimeInterval);
       if (githubInterval) clearInterval(githubInterval);
     };
-  // Suppressed: JSON.stringify stabilizes the dep by value instead of reference,
-  // so the effect only re-runs when the array contents actually change.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Suppressed: JSON.stringify stabilizes the dep by value instead of reference,
+    // so the effect only re-runs when the array contents actually change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     JSON.stringify(widgetPrefs.widgetsOnTicker),
     widgetPrefs.sysmon.refreshInterval,

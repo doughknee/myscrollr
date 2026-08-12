@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0a0a11;}
+a{color:#00d4ff;text-decoration:none;} a:hover{color:#7de6ff;}
+@keyframes spineGlow{0%,100%{opacity:1}50%{opacity:.55}}
+@keyframes dotPulse{0%,100%{opacity:1}50%{opacity:.35}}
+</style>
+</helmet>
+<div style="padding:40px 0 80px;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#e2e2ec;">
+  <div style="padding:0 44px;">
+    <h1 style="margin:0;font-size:20px;font-weight:700;">Ticker Rail — Your Picks, In Context</h1>
+    <p style="margin:8px 0 0;font-size:13px;color:rgba(226,226,236,.6);max-width:760px;">Sports <a href="#1c">1c</a> · Finance <a href="#1d">1d</a> · RSS <a href="#1h">1h</a> · Predictions <a href="#1k">1k</a> · Clock <a href="#1m">1m</a> · Timer <a href="#1n">1n</a> · Weather <a href="#1o">1o</a> · Uptime <a href="#1t">1t</a> · GitHub <a href="#1v">1v</a>. You didn't pick sysmon — I slotted <a href="#1q">1q</a> (micro gauges) for now, easy to swap. Fantasy rides along on the locked spine spec. Scroll each rail sideways.</p>
+  </div>
+
+  <!-- ══ COMPACT RAIL ══ -->
+  <div style="margin-top:36px;">
+    <div style="padding:0 44px;font:600 10px 'Plus Jakarta Sans';letter-spacing:.1em;color:rgba(226,226,236,.4);text-transform:uppercase;margin-bottom:8px;">Compact</div>
+    <div style="background:#141420;border-top:1px solid #282838;border-bottom:1px solid #282838;padding:7px 44px;overflow-x:auto;">
+      <div style="display:flex;align-items:center;gap:10px;width:max-content;">
+        <!-- sports 1c -->
+        <span style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;position:relative;overflow:hidden;white-space:nowrap;background:rgba(255,71,87,.06);border:1px solid rgba(255,71,87,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="font-size:13px;font-weight:700;color:#ff4757;">DAL 24</span>
+          <span style="display:inline-flex;width:34px;height:4px;border-radius:2px;overflow:hidden;background:rgba(226,226,236,.15);"><span style="width:64%;background:#ff4757;"></span></span>
+          <span style="font-size:13px;color:rgba(226,226,236,.6);">PHI 21</span>
+          <span style="display:inline-flex;gap:3px;margin-left:2px;"><span style="width:4px;height:8px;border-radius:1px;background:rgba(255,71,87,.9);"></span><span style="width:4px;height:8px;border-radius:1px;background:rgba(255,71,87,.9);"></span><span style="width:4px;height:8px;border-radius:1px;background:rgba(255,71,87,.45);animation:dotPulse 1.6s ease-in-out infinite;"></span><span style="width:4px;height:8px;border-radius:1px;background:rgba(226,226,236,.15);"></span></span>
+        </span>
+        <!-- sports 1c final -->
+        <span style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;position:relative;overflow:hidden;white-space:nowrap;background:rgba(255,71,87,.06);border:1px solid rgba(255,71,87,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="font-size:13px;font-weight:700;color:#ff4757;">KC 31</span>
+          <span style="display:inline-flex;width:34px;height:4px;border-radius:2px;overflow:hidden;background:rgba(226,226,236,.15);"><span style="width:100%;background:rgba(255,71,87,.55);"></span></span>
+          <span style="font-size:13px;color:rgba(226,226,236,.6);">DEN 17</span>
+          <span style="font-size:10px;font-weight:600;color:rgba(226,226,236,.45);">FINAL</span>
+        </span>
+        <!-- finance 1d -->
+        <span style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;white-space:nowrap;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="font-size:13px;font-weight:700;color:#34d399;">NVDA</span>
+          <svg width="44" height="14" viewBox="0 0 44 14" style="display:block;"><polyline points="0,11 6,9 12,10 18,6 24,7 30,4 36,5 44,2" fill="none" stroke="#22c55e" stroke-width="1.5"></polyline></svg>
+          <span style="font-size:13px;font-variant-numeric:tabular-nums;">1,204.10</span>
+          <span style="font-size:12px;font-weight:600;color:#22c55e;">▲2.4%</span>
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;white-space:nowrap;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="font-size:13px;font-weight:700;color:#34d399;">TSLA</span>
+          <svg width="44" height="14" viewBox="0 0 44 14" style="display:block;"><polyline points="0,3 6,5 12,4 18,7 24,6 30,9 36,8 44,11" fill="none" stroke="#ef4444" stroke-width="1.5"></polyline></svg>
+          <span style="font-size:13px;font-variant-numeric:tabular-nums;">241.05</span>
+          <span style="font-size:12px;font-weight:600;color:#ef4444;">▼1.1%</span>
+        </span>
+        <!-- rss 1h -->
+        <span style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;white-space:nowrap;background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.25);">
+          <span style="font:700 10px 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#00d4ff;">REUTERS</span>
+          <span style="font-size:13px;font-weight:500;">Fed holds rates steady as inflation cools to 2.4%</span>
+        </span>
+        <!-- predictions 1k -->
+        <span style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px 4px 8px;border-radius:4px;white-space:nowrap;background:rgba(31,201,160,.06);border:1px solid rgba(31,201,160,.25);font-family:'IBM Plex Mono',monospace;">
+          <svg width="18" height="18" viewBox="0 0 18 18" style="display:block;transform:rotate(-90deg);"><circle cx="9" cy="9" r="7" fill="none" stroke="rgba(226,226,236,.14)" stroke-width="2.5"></circle><circle cx="9" cy="9" r="7" fill="none" stroke="#1fc9a0" stroke-width="2.5" stroke-dasharray="31.7 44" stroke-linecap="round"></circle></svg>
+          <span style="font-size:13px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;">Rate cut by September?</span>
+          <span style="font-size:13px;font-weight:700;color:#1fc9a0;">72%</span>
+          <span style="font-size:11px;font-weight:600;color:#22c55e;">▲4</span>
+        </span>
+        <!-- fantasy spine chip (locked spec) -->
+        <span style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;position:relative;overflow:hidden;white-space:nowrap;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="font-size:11px;font-weight:600;color:rgba(168,85,247,.85);">VS PIGSKIN PIRATES</span>
+          <span style="font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;">84.2</span>
+          <span style="font-size:12px;color:rgba(226,226,236,.35);">–</span>
+          <span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;color:rgba(226,226,236,.6);">71.8</span>
+          <span style="position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(226,226,236,.12);"><span style="position:absolute;top:0;bottom:0;left:0;width:68%;background:#a855f7;animation:spineGlow 2s ease-in-out infinite;"></span></span>
+        </span>
+        <!-- clock 1m -->
+        <span style="display:inline-flex;align-items:stretch;border-radius:4px;overflow:hidden;white-space:nowrap;background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;"><span style="font-size:10px;font-weight:700;color:rgba(99,102,241,.9);">NYC</span><span style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;">2:45 PM</span></span>
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-left:1px solid rgba(99,102,241,.2);background:rgba(10,10,20,.5);"><span style="font-size:10px;font-weight:700;color:rgba(99,102,241,.55);">TYO</span><span style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:rgba(226,226,236,.6);">3:45 AM</span><span style="font-size:9px;color:rgba(99,102,241,.7);">☾</span></span>
+        </span>
+        <!-- timer 1n -->
+        <span style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;position:relative;overflow:hidden;white-space:nowrap;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="font-size:10px;font-weight:700;letter-spacing:.08em;color:rgba(245,158,11,.9);">FOCUS</span>
+          <span style="font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;color:#f59e0b;">12:34</span>
+          <span style="position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(226,226,236,.12);"><span style="position:absolute;top:0;bottom:0;left:0;width:50%;background:#f59e0b;animation:spineGlow 2s ease-in-out infinite;"></span></span>
+        </span>
+        <!-- weather 1o -->
+        <span style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:4px;white-space:nowrap;background:rgba(14,165,233,.06);border:1px solid rgba(14,165,233,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="font-size:10px;font-weight:700;color:rgba(14,165,233,.9);">SF</span>
+          <span style="font-size:14px;">⛅</span>
+          <span style="font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;">78°</span>
+          <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:rgba(226,226,236,.45);">66<span style="display:inline-flex;position:relative;width:36px;height:3px;border-radius:2px;background:linear-gradient(90deg,rgba(14,165,233,.5),rgba(245,158,11,.6));"><span style="position:absolute;top:-2px;left:64%;width:6px;height:6px;border-radius:50%;background:#e2e2ec;border:1px solid #0e0e17;"></span></span>84</span>
+        </span>
+        <!-- sysmon 1q -->
+        <span style="display:inline-flex;align-items:center;gap:12px;padding:4px 12px;border-radius:4px;white-space:nowrap;background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="display:inline-flex;align-items:center;gap:5px;"><span style="font-size:10px;font-weight:700;color:rgba(6,182,212,.8);">CPU</span><span style="display:inline-flex;align-items:flex-end;width:4px;height:12px;border-radius:1px;background:rgba(226,226,236,.12);"><span style="width:100%;height:42%;border-radius:1px;background:#06b6d4;"></span></span><span style="font-size:12px;font-variant-numeric:tabular-nums;min-width:4ch;text-align:right;">42%</span></span>
+          <span style="display:inline-flex;align-items:center;gap:5px;"><span style="font-size:10px;font-weight:700;color:rgba(6,182,212,.8);">GPU</span><span style="display:inline-flex;align-items:flex-end;width:4px;height:12px;border-radius:1px;background:rgba(226,226,236,.12);"><span style="width:100%;height:87%;border-radius:1px;background:#ef4444;"></span></span><span style="font-size:12px;font-variant-numeric:tabular-nums;min-width:4ch;text-align:right;color:#ef4444;">87%</span></span>
+          <span style="display:inline-flex;align-items:center;gap:5px;"><span style="font-size:10px;font-weight:700;color:rgba(6,182,212,.8);">RAM</span><span style="display:inline-flex;align-items:flex-end;width:4px;height:12px;border-radius:1px;background:rgba(226,226,236,.12);"><span style="width:100%;height:63%;border-radius:1px;background:#06b6d4;"></span></span><span style="font-size:12px;font-variant-numeric:tabular-nums;min-width:4ch;text-align:right;">63%</span></span>
+        </span>
+        <!-- uptime 1t -->
+        <span style="display:inline-flex;align-items:stretch;border-radius:4px;overflow:hidden;white-space:nowrap;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="display:inline-flex;align-items:center;padding:4px 8px;background:rgba(34,197,94,.16);border-right:1px solid rgba(34,197,94,.3);font-size:10px;font-weight:700;letter-spacing:.06em;color:#22c55e;">UP</span>
+          <span style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;"><span style="font-size:13px;font-weight:600;">API</span><span style="font-size:12px;color:rgba(226,226,236,.55);">99.98%</span></span>
+        </span>
+        <!-- github 1v -->
+        <span style="display:inline-flex;align-items:stretch;border-radius:4px;overflow:hidden;white-space:nowrap;background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="display:inline-flex;align-items:center;padding:4px 8px;background:rgba(34,197,94,.16);border-right:1px solid rgba(34,197,94,.3);font-size:11px;font-weight:700;color:#22c55e;">✓</span>
+          <span style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;"><span style="font-size:13px;font-weight:600;">ci</span><span style="font-size:11px;color:rgba(249,115,22,.8);">main</span><span style="font-size:11px;color:rgba(226,226,236,.45);">2m01s</span></span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ COMFORT RAIL ══ -->
+  <div style="margin-top:32px;">
+    <div style="padding:0 44px;font:600 10px 'Plus Jakarta Sans';letter-spacing:.1em;color:rgba(226,226,236,.4);text-transform:uppercase;margin-bottom:8px;">Comfort</div>
+    <div style="background:#141420;border-top:1px solid #282838;border-bottom:1px solid #282838;padding:8px 44px;overflow-x:auto;">
+      <div style="display:flex;align-items:stretch;gap:10px;width:max-content;">
+        <!-- sports 1c -->
+        <span style="display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;padding:6px 12px;border-radius:4px;position:relative;overflow:hidden;white-space:nowrap;background:rgba(255,71,87,.06);border:1px solid rgba(255,71,87,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="display:inline-flex;align-items:center;gap:8px;"><span style="font-size:13px;font-weight:700;color:#ff4757;">DAL 24</span><span style="display:inline-flex;width:44px;height:4px;border-radius:2px;overflow:hidden;background:rgba(226,226,236,.15);"><span style="width:64%;background:#ff4757;"></span></span><span style="font-size:13px;color:rgba(226,226,236,.6);">PHI 21</span></span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:rgba(226,226,236,.45);"><span style="display:inline-flex;gap:3px;"><span style="width:4px;height:8px;border-radius:1px;background:rgba(255,71,87,.9);"></span><span style="width:4px;height:8px;border-radius:1px;background:rgba(255,71,87,.9);"></span><span style="width:4px;height:8px;border-radius:1px;background:rgba(255,71,87,.45);animation:dotPulse 1.6s ease-in-out infinite;"></span><span style="width:4px;height:8px;border-radius:1px;background:rgba(226,226,236,.15);"></span></span><span style="color:#ff4757;font-weight:600;">Q3 4:12</span><span>·</span><span>DAL 64% win</span></span>
+        </span>
+        <!-- finance 1d -->
+        <span style="display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:6px 12px;border-radius:4px;white-space:nowrap;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="display:inline-flex;align-items:center;gap:8px;"><span style="font-size:13px;font-weight:700;color:#34d399;">NVDA</span><svg width="56" height="14" viewBox="0 0 56 14" style="display:block;"><polyline points="0,11 8,9 16,10 24,6 32,7 40,4 48,5 56,2" fill="none" stroke="#22c55e" stroke-width="1.5"></polyline></svg><span style="font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;">1,204.10</span><span style="font-size:12px;font-weight:600;color:#22c55e;">▲2.4%</span></span>
+          <span style="font-size:11px;color:rgba(226,226,236,.45);">Prev 1,175.50 · <span style="color:rgba(34,197,94,.75);">+28.60</span> · Vol 38.2M</span>
+        </span>
+        <!-- rss 1h -->
+        <span style="display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:6px 12px;border-radius:4px;white-space:nowrap;background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.25);">
+          <span style="display:inline-flex;align-items:center;gap:6px;font:700 10px 'IBM Plex Mono',monospace;letter-spacing:.08em;color:#00d4ff;">REUTERS · MARKETS <span style="font-weight:400;color:rgba(226,226,236,.45);letter-spacing:0;">12m ago</span></span>
+          <span style="font-size:13px;font-weight:500;">Fed holds rates steady as inflation cools to 2.4%</span>
+        </span>
+        <!-- predictions 1k -->
+        <span style="display:inline-flex;align-items:center;gap:10px;padding:6px 12px 6px 9px;border-radius:4px;white-space:nowrap;background:rgba(31,201,160,.06);border:1px solid rgba(31,201,160,.25);font-family:'IBM Plex Mono',monospace;">
+          <svg width="26" height="26" viewBox="0 0 26 26" style="display:block;transform:rotate(-90deg);"><circle cx="13" cy="13" r="10.5" fill="none" stroke="rgba(226,226,236,.14)" stroke-width="3"></circle><circle cx="13" cy="13" r="10.5" fill="none" stroke="#1fc9a0" stroke-width="3" stroke-dasharray="47.5 66" stroke-linecap="round"></circle></svg>
+          <span style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:1px;">
+            <span style="display:inline-flex;align-items:center;gap:8px;"><span style="font-size:13px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;">Rate cut by September?</span><span style="font-size:14px;font-weight:700;color:#1fc9a0;">72%</span><span style="font-size:11px;font-weight:600;color:#22c55e;">▲4</span></span>
+            <span style="font-size:11px;color:rgba(226,226,236,.45);">ECONOMICS · Vol 1.2M · closes 6d</span>
+          </span>
+        </span>
+        <!-- fantasy comfort (locked spec) -->
+        <span style="display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:6px 12px;border-radius:4px;position:relative;overflow:hidden;white-space:nowrap;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="display:inline-flex;align-items:center;gap:8px;"><span style="font-size:11px;font-weight:600;color:rgba(168,85,247,.85);">VS PIGSKIN PIRATES</span><span style="font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;">84.2</span><span style="font-size:12px;color:rgba(226,226,236,.35);">–</span><span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;color:rgba(226,226,236,.6);">71.8</span></span>
+          <span style="font-size:11px;color:rgba(226,226,236,.45);"><span style="color:#a855f7;font-weight:600;">3 live</span> · 2 yet to play · 68% win</span>
+          <span style="position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(226,226,236,.12);"><span style="position:absolute;top:0;bottom:0;left:0;width:68%;background:#a855f7;animation:spineGlow 2s ease-in-out infinite;"></span></span>
+        </span>
+        <!-- clock 1m -->
+        <span style="display:inline-flex;align-items:stretch;border-radius:4px;overflow:hidden;white-space:nowrap;background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;padding:6px 12px;"><span style="font-size:10px;font-weight:700;color:rgba(99,102,241,.9);">NEW YORK</span><span style="font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;">2:45 PM</span><span style="font-size:10px;color:rgba(226,226,236,.45);">Fri · UTC−4</span></span>
+          <span style="display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;padding:6px 12px;border-left:1px solid rgba(99,102,241,.2);background:rgba(10,10,20,.5);"><span style="font-size:10px;font-weight:700;color:rgba(99,102,241,.55);">TOKYO ☾</span><span style="font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;color:rgba(226,226,236,.6);">3:45 AM</span><span style="font-size:10px;color:rgba(226,226,236,.35);">Sat · UTC+9</span></span>
+        </span>
+        <!-- timer 1n -->
+        <span style="display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:6px 12px;border-radius:4px;position:relative;overflow:hidden;white-space:nowrap;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="display:inline-flex;align-items:center;gap:8px;"><span style="font-size:10px;font-weight:700;letter-spacing:.08em;color:rgba(245,158,11,.9);">FOCUS</span><span style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;color:#f59e0b;">12:34</span></span>
+          <span style="font-size:11px;color:rgba(226,226,236,.45);">of 25:00 · ends 3:10 PM</span>
+          <span style="position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(226,226,236,.12);"><span style="position:absolute;top:0;bottom:0;left:0;width:50%;background:#f59e0b;animation:spineGlow 2s ease-in-out infinite;"></span></span>
+        </span>
+        <!-- weather 1o -->
+        <span style="display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:6px 12px;border-radius:4px;white-space:nowrap;background:rgba(14,165,233,.06);border:1px solid rgba(14,165,233,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="display:inline-flex;align-items:center;gap:8px;"><span style="font-size:10px;font-weight:700;color:rgba(14,165,233,.9);">SAN FRANCISCO</span><span style="font-size:14px;">⛅</span><span style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;">78°</span><span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:rgba(226,226,236,.45);">66<span style="display:inline-flex;position:relative;width:48px;height:3px;border-radius:2px;background:linear-gradient(90deg,rgba(14,165,233,.5),rgba(245,158,11,.6));"><span style="position:absolute;top:-2px;left:64%;width:6px;height:6px;border-radius:50%;background:#e2e2ec;border:1px solid #0e0e17;"></span></span>84</span></span>
+          <span style="font-size:11px;color:rgba(226,226,236,.45);">Partly cloudy · wind 12mph · rain 10%</span>
+        </span>
+        <!-- sysmon 1q -->
+        <span style="display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;padding:6px 12px;border-radius:4px;white-space:nowrap;background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="display:inline-flex;align-items:center;gap:12px;">
+            <span style="display:inline-flex;align-items:center;gap:5px;"><span style="font-size:10px;font-weight:700;color:rgba(6,182,212,.8);">CPU</span><span style="display:inline-flex;align-items:flex-end;width:4px;height:13px;border-radius:1px;background:rgba(226,226,236,.12);"><span style="width:100%;height:42%;border-radius:1px;background:#06b6d4;"></span></span><span style="font-size:13px;font-variant-numeric:tabular-nums;min-width:4ch;text-align:right;">42%</span></span>
+            <span style="display:inline-flex;align-items:center;gap:5px;"><span style="font-size:10px;font-weight:700;color:rgba(6,182,212,.8);">GPU</span><span style="display:inline-flex;align-items:flex-end;width:4px;height:13px;border-radius:1px;background:rgba(226,226,236,.12);"><span style="width:100%;height:87%;border-radius:1px;background:#ef4444;"></span></span><span style="font-size:13px;font-variant-numeric:tabular-nums;min-width:4ch;text-align:right;color:#ef4444;">87%</span></span>
+            <span style="display:inline-flex;align-items:center;gap:5px;"><span style="font-size:10px;font-weight:700;color:rgba(6,182,212,.8);">RAM</span><span style="display:inline-flex;align-items:flex-end;width:4px;height:13px;border-radius:1px;background:rgba(226,226,236,.12);"><span style="width:100%;height:63%;border-radius:1px;background:#06b6d4;"></span></span><span style="font-size:13px;font-variant-numeric:tabular-nums;min-width:4ch;text-align:right;">63%</span></span>
+          </span>
+          <span style="font-size:11px;color:rgba(226,226,236,.45);">GPU 72°C hot · 16 cores · 32GB</span>
+        </span>
+        <!-- uptime 1t -->
+        <span style="display:inline-flex;align-items:stretch;border-radius:4px;overflow:hidden;white-space:nowrap;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.25);font-family:'IBM Plex Mono',monospace;">
+          <span style="display:inline-flex;align-items:center;padding:0 9px;background:rgba(34,197,94,.16);border-right:1px solid rgba(34,197,94,.3);font-size:10px;font-weight:700;letter-spacing:.06em;color:#22c55e;">UP</span>
+          <span style="display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:6px 12px;">
+            <span style="display:inline-flex;align-items:center;gap:8px;"><span style="font-size:13px;font-weight:600;">API</span><span style="font-size:13px;font-weight:700;color:#22c55e;">99.98%</span><span style="font-size:11px;color:rgba(226,226,236,.45);">45d</span></span>
+            <span style="display:inline-flex;align-items:center;gap:2px;"><span style="width:3px;height:8px;border-radius:1px;background:#22c55e;"></span><span style="width:3px;height:8px;border-radius:1px;background:#22c55e;"></span><span style="width:3px;height:8px;border-radius:1px;background:#22c55e;"></span><span style="width:3px;height:8px;border-radius:1px;background:#ef4444;"></span><span style="width:3px;height:8px;border-radius:1px;background:#22c55e;"></span><span style="width:3px;height:8px;border-radius:1px;background:#22c55e;"></span><span style="width:3px;height:8px;border-radius:1px;background:#22c55e;"></span><span style="width:3px;height:8px;border-radius:1px;background:#22c55e;"></span><span style="width:3px;height:8px;border-radius:1px;background:#22c55e;"></span><span style="width:3px;height:8px;border-radius:1px;background:#22c55e;"></span><span style="width:3px;height:8px;border-radius:1px;background:#22c55e;"></span><span style="width:3px;height:8px;border-radius:1px;background:#22c55e;"></span><span style="font-size:10px;color:rgba(226,226,236,.4);margin-left:4px;">187ms avg</span></span>
+          </span>
+        </span>
+        <!-- github 1v -->
+        <span style="display:inline-flex;align-items:stretch;border-radius:4px;overflow:hidden;white-space:nowrap;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.35);font-family:'IBM Plex Mono',monospace;">
+          <span style="display:inline-flex;align-items:center;padding:0 9px;background:rgba(239,68,68,.2);border-right:1px solid rgba(239,68,68,.35);font-size:12px;font-weight:700;color:#ef4444;">✕</span>
+          <span style="display:inline-flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:6px 12px;">
+            <span style="display:inline-flex;align-items:center;gap:8px;"><span style="font-size:13px;font-weight:600;">nightly-e2e</span><span style="font-size:11px;color:rgba(249,115,22,.8);">main</span><span style="font-size:11px;color:#ef4444;font-weight:600;">failed at test</span></span>
+            <span style="font-size:11px;color:rgba(226,226,236,.45);">d4e5f6a · "fix: race in ws reconnect" · 18m ago</span>
+          </span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:0 44px;margin-top:24px;font-size:12px;color:rgba(226,226,236,.5);max-width:760px;">Notes: compact chips share a 28px lane (the 1c tilt bar, 1k dial, and 1q gauges all fit it); comfort chips stretch to a uniform two-row height. Caps (uptime UP, github ✓/✕) read as a family. Two live spines on the rail at once (fantasy + timer) is the practical max before the pulse gets noisy.</div>
+</div>
+</x-dc>
+</body>
+</html>

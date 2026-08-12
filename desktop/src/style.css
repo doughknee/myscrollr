@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap");
 @import "tailwindcss";
 @source "./widgets/**/*.tsx";
 @source "./components/**/*.tsx";
@@ -78,9 +78,9 @@
   --color-warning: #fbbf24;
 
   /* ── Typography ───────────────────────────────────────────── */
-  --font-display: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-mono: 'IBM Plex Mono', 'SF Mono', 'Fira Code', Consolas, monospace;
+  --font-display: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", "SF Mono", "Fira Code", Consolas, monospace;
 
   /* ── Glow shadows (green-tinted, matching website) ────────── */
   --shadow-glow-sm: 0 0 20px rgba(52, 211, 153, 0.06);
@@ -90,7 +90,6 @@
   /* ── Soft elevation shadows ───────────────────────────────── */
   --shadow-soft-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
   --shadow-soft-md: 0 4px 16px rgba(0, 0, 0, 0.3);
-
 }
 
 /* ── Theme palettes ─────────────────────────────────────────────
@@ -154,41 +153,43 @@
   --shadow-glow-md: 0 0 30px rgba(52, 211, 153, 0.06);
   --shadow-glow-lg: 0 0 50px rgba(52, 211, 153, 0.08);
 
-  --shadow-soft-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.06);
-  --shadow-soft-md: 0 2px 6px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-soft-sm:
+    0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-soft-md:
+    0 2px 6px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 /* ── Catppuccin Mocha (dark) ─────────────────────────────────── */
 #desktop-shell[data-theme="catppuccin-dark"],
 #app-shell[data-theme="catppuccin-dark"] {
-  --color-surface: #1e1e2e;          /* base */
-  --color-surface-2: #181825;        /* mantle */
-  --color-surface-hover: #313244;    /* surface0 */
-  --color-surface-3: #11111b;        /* crust */
+  --color-surface: #1e1e2e; /* base */
+  --color-surface-2: #181825; /* mantle */
+  --color-surface-hover: #313244; /* surface0 */
+  --color-surface-3: #11111b; /* crust */
   --color-surface-raised: #292938;
 
   --color-base-100: #1e1e2e;
   --color-base-150: #181825;
   --color-base-200: #313244;
-  --color-base-250: #45475a;         /* surface1 */
-  --color-base-300: #585b70;         /* surface2 */
-  --color-base-350: #6c7086;         /* overlay0 */
-  --color-base-400: #7f849c;         /* overlay1 */
+  --color-base-250: #45475a; /* surface1 */
+  --color-base-300: #585b70; /* surface2 */
+  --color-base-350: #6c7086; /* overlay0 */
+  --color-base-400: #7f849c; /* overlay1 */
   --color-base-content: #cdd6f4;
 
   --color-edge: #313244;
   --color-edge-2: #45475a;
 
-  --color-primary: #a6e3a1;          /* green */
+  --color-primary: #a6e3a1; /* green */
   --color-accent: #a6e3a1;
-  --color-secondary: #f38ba8;        /* red */
-  --color-info: #89dceb;             /* sky */
-  --color-accent-purple: #cba6f7;    /* mauve */
+  --color-secondary: #f38ba8; /* red */
+  --color-info: #89dceb; /* sky */
+  --color-accent-purple: #cba6f7; /* mauve */
 
-  --color-fg: #cdd6f4;               /* text */
-  --color-fg-2: #bac2de;             /* subtext1 */
-  --color-fg-3: #a6adc8;             /* subtext0 */
-  --color-fg-4: #7f849c;             /* overlay1 */
+  --color-fg: #cdd6f4; /* text */
+  --color-fg-2: #bac2de; /* subtext1 */
+  --color-fg-3: #a6adc8; /* subtext0 */
+  --color-fg-4: #7f849c; /* overlay1 */
 
   --color-up: #a6e3a1;
   --color-down: #f38ba8;
@@ -202,34 +203,34 @@
 /* ── Catppuccin Latte (light) ────────────────────────────────── */
 #desktop-shell[data-theme="catppuccin-light"],
 #app-shell[data-theme="catppuccin-light"] {
-  --color-surface: #eff1f5;          /* base */
-  --color-surface-2: #e6e9ef;        /* mantle */
-  --color-surface-hover: #ccd0da;    /* surface0 */
-  --color-surface-3: #dce0e8;        /* crust */
+  --color-surface: #eff1f5; /* base */
+  --color-surface-2: #e6e9ef; /* mantle */
+  --color-surface-hover: #ccd0da; /* surface0 */
+  --color-surface-3: #dce0e8; /* crust */
   --color-surface-raised: #f9f9fb;
 
   --color-base-100: #eff1f5;
   --color-base-150: #e6e9ef;
   --color-base-200: #ccd0da;
-  --color-base-250: #bcc0cc;         /* surface1 */
-  --color-base-300: #acb0be;         /* surface2 */
-  --color-base-350: #9ca0b0;         /* overlay0 */
-  --color-base-400: #8c8fa1;         /* overlay1 */
+  --color-base-250: #bcc0cc; /* surface1 */
+  --color-base-300: #acb0be; /* surface2 */
+  --color-base-350: #9ca0b0; /* overlay0 */
+  --color-base-400: #8c8fa1; /* overlay1 */
   --color-base-content: #4c4f69;
 
   --color-edge: #ccd0da;
   --color-edge-2: #bcc0cc;
 
-  --color-primary: #40a02b;          /* green */
+  --color-primary: #40a02b; /* green */
   --color-accent: #40a02b;
-  --color-secondary: #d20f39;        /* red */
-  --color-info: #04a5e5;             /* sky */
-  --color-accent-purple: #8839ef;    /* mauve */
+  --color-secondary: #d20f39; /* red */
+  --color-info: #04a5e5; /* sky */
+  --color-accent-purple: #8839ef; /* mauve */
 
-  --color-fg: #4c4f69;               /* text */
-  --color-fg-2: #5c5f77;             /* subtext1 */
-  --color-fg-3: #6c6f85;             /* subtext0 */
-  --color-fg-4: #8c8fa1;             /* overlay1 */
+  --color-fg: #4c4f69; /* text */
+  --color-fg-2: #5c5f77; /* subtext1 */
+  --color-fg-3: #6c6f85; /* subtext0 */
+  --color-fg-4: #8c8fa1; /* overlay1 */
 
   --color-up: #40a02b;
   --color-down: #d20f39;
@@ -243,9 +244,9 @@
 /* ── Dracula (dark) ──────────────────────────────────────────── */
 #desktop-shell[data-theme="dracula-dark"],
 #app-shell[data-theme="dracula-dark"] {
-  --color-surface: #282a36;          /* background */
+  --color-surface: #282a36; /* background */
   --color-surface-2: #21222c;
-  --color-surface-hover: #44475a;    /* current line */
+  --color-surface-hover: #44475a; /* current line */
   --color-surface-3: #1e1f29;
   --color-surface-raised: #333540;
 
@@ -253,7 +254,7 @@
   --color-base-150: #21222c;
   --color-base-200: #44475a;
   --color-base-250: #565973;
-  --color-base-300: #6272a4;         /* comment */
+  --color-base-300: #6272a4; /* comment */
   --color-base-350: #7783b4;
   --color-base-400: #8c95c2;
   --color-base-content: #f8f8f2;
@@ -261,16 +262,16 @@
   --color-edge: #44475a;
   --color-edge-2: #6272a4;
 
-  --color-primary: #50fa7b;          /* green */
+  --color-primary: #50fa7b; /* green */
   --color-accent: #50fa7b;
-  --color-secondary: #ff5555;        /* red */
-  --color-info: #8be9fd;             /* cyan */
-  --color-accent-purple: #bd93f9;    /* purple */
+  --color-secondary: #ff5555; /* red */
+  --color-info: #8be9fd; /* cyan */
+  --color-accent-purple: #bd93f9; /* purple */
 
-  --color-fg: #f8f8f2;               /* foreground */
+  --color-fg: #f8f8f2; /* foreground */
   --color-fg-2: #d8d8d2;
   --color-fg-3: #a8a8a2;
-  --color-fg-4: #6272a4;             /* comment */
+  --color-fg-4: #6272a4; /* comment */
 
   --color-up: #50fa7b;
   --color-down: #ff5555;
@@ -343,11 +344,11 @@
   --color-edge: #2f334d;
   --color-edge-2: #414868;
 
-  --color-primary: #7aa2f7;          /* blue */
+  --color-primary: #7aa2f7; /* blue */
   --color-accent: #7aa2f7;
-  --color-secondary: #f7768e;        /* red */
-  --color-info: #7dcfff;             /* cyan */
-  --color-accent-purple: #bb9af7;    /* magenta */
+  --color-secondary: #f7768e; /* red */
+  --color-info: #7dcfff; /* cyan */
+  --color-accent-purple: #bb9af7; /* magenta */
 
   --color-fg: #c0caf5;
   --color-fg-2: #a9b1d6;
@@ -407,17 +408,17 @@
 /* ── Nord (dark) ─────────────────────────────────────────────── */
 #desktop-shell[data-theme="nord-dark"],
 #app-shell[data-theme="nord-dark"] {
-  --color-surface: #2e3440;          /* nord0 */
+  --color-surface: #2e3440; /* nord0 */
   --color-surface-2: #292e39;
-  --color-surface-hover: #3b4252;    /* nord1 */
+  --color-surface-hover: #3b4252; /* nord1 */
   --color-surface-3: #242933;
   --color-surface-raised: #383e4a;
 
   --color-base-100: #2e3440;
   --color-base-150: #292e39;
   --color-base-200: #3b4252;
-  --color-base-250: #434c5e;         /* nord2 */
-  --color-base-300: #4c566a;         /* nord3 */
+  --color-base-250: #434c5e; /* nord2 */
+  --color-base-300: #4c566a; /* nord3 */
   --color-base-350: #5e6779;
   --color-base-400: #6f7889;
   --color-base-content: #eceff4;
@@ -425,32 +426,32 @@
   --color-edge: #3b4252;
   --color-edge-2: #4c566a;
 
-  --color-primary: #88c0d0;          /* nord8 */
+  --color-primary: #88c0d0; /* nord8 */
   --color-accent: #88c0d0;
-  --color-secondary: #bf616a;        /* nord11 */
-  --color-info: #81a1c1;             /* nord9 */
-  --color-accent-purple: #b48ead;    /* nord15 */
+  --color-secondary: #bf616a; /* nord11 */
+  --color-info: #81a1c1; /* nord9 */
+  --color-accent-purple: #b48ead; /* nord15 */
 
-  --color-fg: #eceff4;               /* nord6 */
-  --color-fg-2: #e5e9f0;             /* nord5 */
-  --color-fg-3: #d8dee9;             /* nord4 */
+  --color-fg: #eceff4; /* nord6 */
+  --color-fg-2: #e5e9f0; /* nord5 */
+  --color-fg-3: #d8dee9; /* nord4 */
   --color-fg-4: #8d96a8;
 
-  --color-up: #a3be8c;               /* nord14 */
+  --color-up: #a3be8c; /* nord14 */
   --color-down: #bf616a;
   --color-success: #a3be8c;
   --color-error: #bf616a;
   --color-live: #bf616a;
-  --color-warn: #ebcb8b;             /* nord13 */
+  --color-warn: #ebcb8b; /* nord13 */
   --color-warning: #ebcb8b;
 }
 
 /* ── Nord (light, Snow Storm) ────────────────────────────────── */
 #desktop-shell[data-theme="nord-light"],
 #app-shell[data-theme="nord-light"] {
-  --color-surface: #eceff4;          /* nord6 */
-  --color-surface-2: #e5e9f0;        /* nord5 */
-  --color-surface-hover: #d8dee9;    /* nord4 */
+  --color-surface: #eceff4; /* nord6 */
+  --color-surface-2: #e5e9f0; /* nord5 */
+  --color-surface-hover: #d8dee9; /* nord4 */
   --color-surface-3: #dfe3ec;
   --color-surface-raised: #f7f9fb;
 
@@ -466,7 +467,7 @@
   --color-edge: #d8dee9;
   --color-edge-2: #c8d0dd;
 
-  --color-primary: #5e81ac;          /* nord10 */
+  --color-primary: #5e81ac; /* nord10 */
   --color-accent: #5e81ac;
   --color-secondary: #bf616a;
   --color-info: #5d8eaf;
@@ -489,70 +490,70 @@
 /* ── Gruvbox Dark Medium ─────────────────────────────────────── */
 #desktop-shell[data-theme="gruvbox-dark"],
 #app-shell[data-theme="gruvbox-dark"] {
-  --color-surface: #282828;          /* bg0 */
-  --color-surface-2: #1d2021;        /* bg0_h */
-  --color-surface-hover: #3c3836;    /* bg1 */
+  --color-surface: #282828; /* bg0 */
+  --color-surface-2: #1d2021; /* bg0_h */
+  --color-surface-hover: #3c3836; /* bg1 */
   --color-surface-3: #1d2021;
   --color-surface-raised: #333333;
 
   --color-base-100: #282828;
   --color-base-150: #32302f;
   --color-base-200: #3c3836;
-  --color-base-250: #504945;         /* bg2 */
-  --color-base-300: #665c54;         /* bg3 */
-  --color-base-350: #7c6f64;         /* bg4 */
-  --color-base-400: #928374;         /* gray */
+  --color-base-250: #504945; /* bg2 */
+  --color-base-300: #665c54; /* bg3 */
+  --color-base-350: #7c6f64; /* bg4 */
+  --color-base-400: #928374; /* gray */
   --color-base-content: #ebdbb2;
 
   --color-edge: #3c3836;
   --color-edge-2: #504945;
 
-  --color-primary: #b8bb26;          /* bright green */
+  --color-primary: #b8bb26; /* bright green */
   --color-accent: #b8bb26;
-  --color-secondary: #fb4934;        /* bright red */
-  --color-info: #83a598;             /* bright blue */
-  --color-accent-purple: #d3869b;    /* bright purple */
+  --color-secondary: #fb4934; /* bright red */
+  --color-info: #83a598; /* bright blue */
+  --color-accent-purple: #d3869b; /* bright purple */
 
-  --color-fg: #ebdbb2;               /* fg */
-  --color-fg-2: #d5c4a1;             /* fg2 */
-  --color-fg-3: #bdae93;             /* fg3 */
-  --color-fg-4: #a89984;             /* fg4 */
+  --color-fg: #ebdbb2; /* fg */
+  --color-fg-2: #d5c4a1; /* fg2 */
+  --color-fg-3: #bdae93; /* fg3 */
+  --color-fg-4: #a89984; /* fg4 */
 
   --color-up: #b8bb26;
   --color-down: #fb4934;
   --color-success: #b8bb26;
   --color-error: #fb4934;
   --color-live: #fb4934;
-  --color-warn: #fabd2f;             /* bright yellow */
+  --color-warn: #fabd2f; /* bright yellow */
   --color-warning: #fabd2f;
 }
 
 /* ── Gruvbox Light Medium ────────────────────────────────────── */
 #desktop-shell[data-theme="gruvbox-light"],
 #app-shell[data-theme="gruvbox-light"] {
-  --color-surface: #fbf1c7;          /* bg0 */
-  --color-surface-2: #f9f5d7;        /* bg0_h */
-  --color-surface-hover: #ebdbb2;    /* bg1 */
+  --color-surface: #fbf1c7; /* bg0 */
+  --color-surface-2: #f9f5d7; /* bg0_h */
+  --color-surface-hover: #ebdbb2; /* bg1 */
   --color-surface-3: #f2e5bc;
   --color-surface-raised: #fdf9e9;
 
   --color-base-100: #fbf1c7;
   --color-base-150: #f2e5bc;
   --color-base-200: #ebdbb2;
-  --color-base-250: #d5c4a1;         /* bg2 */
-  --color-base-300: #bdae93;         /* bg3 */
-  --color-base-350: #a89984;         /* bg4 */
-  --color-base-400: #928374;         /* gray */
+  --color-base-250: #d5c4a1; /* bg2 */
+  --color-base-300: #bdae93; /* bg3 */
+  --color-base-350: #a89984; /* bg4 */
+  --color-base-400: #928374; /* gray */
   --color-base-content: #3c3836;
 
   --color-edge: #ebdbb2;
   --color-edge-2: #d5c4a1;
 
-  --color-primary: #79740e;          /* faded green */
+  --color-primary: #79740e; /* faded green */
   --color-accent: #79740e;
-  --color-secondary: #9d0006;        /* faded red */
-  --color-info: #076678;             /* faded blue */
-  --color-accent-purple: #8f3f71;    /* faded purple */
+  --color-secondary: #9d0006; /* faded red */
+  --color-info: #076678; /* faded blue */
+  --color-accent-purple: #8f3f71; /* faded purple */
 
   --color-fg: #3c3836;
   --color-fg-2: #504945;
@@ -564,15 +565,15 @@
   --color-success: #79740e;
   --color-error: #9d0006;
   --color-live: #9d0006;
-  --color-warn: #b57614;             /* faded yellow */
+  --color-warn: #b57614; /* faded yellow */
   --color-warning: #b57614;
 }
 
 /* ── Solarized (dark) ────────────────────────────────────────── */
 #desktop-shell[data-theme="solarized-dark"],
 #app-shell[data-theme="solarized-dark"] {
-  --color-surface: #002b36;          /* base03 */
-  --color-surface-2: #073642;        /* base02 */
+  --color-surface: #002b36; /* base03 */
+  --color-surface-2: #073642; /* base02 */
   --color-surface-hover: #094352;
   --color-surface-3: #00212b;
   --color-surface-raised: #0d3640;
@@ -581,39 +582,39 @@
   --color-base-150: #03303b;
   --color-base-200: #073642;
   --color-base-250: #0e4250;
-  --color-base-300: #586e75;         /* base01 */
-  --color-base-350: #657b83;         /* base00 */
-  --color-base-400: #839496;         /* base0 */
+  --color-base-300: #586e75; /* base01 */
+  --color-base-350: #657b83; /* base00 */
+  --color-base-400: #839496; /* base0 */
   --color-base-content: #fdf6e3;
 
   --color-edge: #073642;
   --color-edge-2: #586e75;
 
-  --color-primary: #2aa198;          /* cyan */
+  --color-primary: #2aa198; /* cyan */
   --color-accent: #2aa198;
-  --color-secondary: #dc322f;        /* red */
-  --color-info: #268bd2;             /* blue */
-  --color-accent-purple: #6c71c4;    /* violet */
+  --color-secondary: #dc322f; /* red */
+  --color-info: #268bd2; /* blue */
+  --color-accent-purple: #6c71c4; /* violet */
 
-  --color-fg: #93a1a1;               /* base1 */
-  --color-fg-2: #839496;             /* base0 */
-  --color-fg-3: #657b83;             /* base00 */
-  --color-fg-4: #586e75;             /* base01 */
+  --color-fg: #93a1a1; /* base1 */
+  --color-fg-2: #839496; /* base0 */
+  --color-fg-3: #657b83; /* base00 */
+  --color-fg-4: #586e75; /* base01 */
 
-  --color-up: #859900;               /* green */
+  --color-up: #859900; /* green */
   --color-down: #dc322f;
   --color-success: #859900;
   --color-error: #dc322f;
   --color-live: #dc322f;
-  --color-warn: #b58900;             /* yellow */
+  --color-warn: #b58900; /* yellow */
   --color-warning: #b58900;
 }
 
 /* ── Solarized (light) ───────────────────────────────────────── */
 #desktop-shell[data-theme="solarized-light"],
 #app-shell[data-theme="solarized-light"] {
-  --color-surface: #fdf6e3;          /* base3 */
-  --color-surface-2: #eee8d5;        /* base2 */
+  --color-surface: #fdf6e3; /* base3 */
+  --color-surface-2: #eee8d5; /* base2 */
   --color-surface-hover: #e6e0cc;
   --color-surface-3: #f5efdc;
   --color-surface-raised: #fefbf4;
@@ -622,9 +623,9 @@
   --color-base-150: #f5efdc;
   --color-base-200: #eee8d5;
   --color-base-250: #ddd6c1;
-  --color-base-300: #93a1a1;         /* base1 */
-  --color-base-350: #839496;         /* base0 */
-  --color-base-400: #657b83;         /* base00 */
+  --color-base-300: #93a1a1; /* base1 */
+  --color-base-350: #839496; /* base0 */
+  --color-base-400: #657b83; /* base00 */
   --color-base-content: #002b36;
 
   --color-edge: #eee8d5;
@@ -636,10 +637,10 @@
   --color-info: #268bd2;
   --color-accent-purple: #6c71c4;
 
-  --color-fg: #586e75;               /* base01 */
-  --color-fg-2: #657b83;             /* base00 */
-  --color-fg-3: #839496;             /* base0 */
-  --color-fg-4: #93a1a1;             /* base1 */
+  --color-fg: #586e75; /* base01 */
+  --color-fg-2: #657b83; /* base00 */
+  --color-fg-3: #839496; /* base0 */
+  --color-fg-4: #93a1a1; /* base1 */
 
   --color-up: #859900;
   --color-down: #dc322f;
@@ -654,41 +655,41 @@
 /* Palette verified against rose-pine/neovim lua/rose-pine/palette.lua */
 #desktop-shell[data-theme="rose-pine-dark"],
 #app-shell[data-theme="rose-pine-dark"] {
-  --color-surface: #191724;          /* base */
-  --color-surface-2: #1f1d2e;        /* surface */
-  --color-surface-hover: #26233a;    /* overlay */
-  --color-surface-3: #16141f;        /* _nc */
+  --color-surface: #191724; /* base */
+  --color-surface-2: #1f1d2e; /* surface */
+  --color-surface-hover: #26233a; /* overlay */
+  --color-surface-3: #16141f; /* _nc */
   --color-surface-raised: #24232f;
 
-  --color-base-100: #191724;         /* base */
-  --color-base-150: #1f1d2e;         /* surface */
-  --color-base-200: #26233a;         /* overlay */
-  --color-base-250: #21202e;         /* highlight_low */
-  --color-base-300: #403d52;         /* highlight_med */
-  --color-base-350: #524f67;         /* highlight_high */
-  --color-base-400: #6e6a86;         /* muted */
-  --color-base-content: #e0def4;     /* text */
+  --color-base-100: #191724; /* base */
+  --color-base-150: #1f1d2e; /* surface */
+  --color-base-200: #26233a; /* overlay */
+  --color-base-250: #21202e; /* highlight_low */
+  --color-base-300: #403d52; /* highlight_med */
+  --color-base-350: #524f67; /* highlight_high */
+  --color-base-400: #6e6a86; /* muted */
+  --color-base-content: #e0def4; /* text */
 
-  --color-edge: #26233a;             /* overlay */
-  --color-edge-2: #403d52;           /* highlight_med */
+  --color-edge: #26233a; /* overlay */
+  --color-edge-2: #403d52; /* highlight_med */
 
-  --color-primary: #c4a7e7;          /* iris */
+  --color-primary: #c4a7e7; /* iris */
   --color-accent: #c4a7e7;
-  --color-secondary: #eb6f92;        /* love */
-  --color-info: #9ccfd8;             /* foam */
+  --color-secondary: #eb6f92; /* love */
+  --color-info: #9ccfd8; /* foam */
   --color-accent-purple: #c4a7e7;
 
-  --color-fg: #e0def4;               /* text */
-  --color-fg-2: #908caa;             /* subtle */
-  --color-fg-3: #6e6a86;             /* muted */
-  --color-fg-4: #524f67;             /* highlight_high */
+  --color-fg: #e0def4; /* text */
+  --color-fg-2: #908caa; /* subtle */
+  --color-fg-3: #6e6a86; /* muted */
+  --color-fg-4: #524f67; /* highlight_high */
 
-  --color-up: #31748f;               /* pine */
-  --color-down: #eb6f92;             /* love */
+  --color-up: #31748f; /* pine */
+  --color-down: #eb6f92; /* love */
   --color-success: #31748f;
   --color-error: #eb6f92;
   --color-live: #eb6f92;
-  --color-warn: #f6c177;             /* gold */
+  --color-warn: #f6c177; /* gold */
   --color-warning: #f6c177;
 }
 
@@ -699,41 +700,41 @@
    fg-2/fg-3/fg-4 hierarchy. */
 #desktop-shell[data-theme="rose-pine-light"],
 #app-shell[data-theme="rose-pine-light"] {
-  --color-surface: #faf4ed;          /* base */
-  --color-surface-2: #fffaf3;        /* surface */
-  --color-surface-hover: #f2e9e1;    /* overlay */
-  --color-surface-3: #f8f0e7;        /* _nc */
+  --color-surface: #faf4ed; /* base */
+  --color-surface-2: #fffaf3; /* surface */
+  --color-surface-hover: #f2e9e1; /* overlay */
+  --color-surface-3: #f8f0e7; /* _nc */
   --color-surface-raised: #fdfbf8;
 
-  --color-base-100: #faf4ed;         /* base */
-  --color-base-150: #fffaf3;         /* surface */
-  --color-base-200: #f2e9e1;         /* overlay */
-  --color-base-250: #f4ede8;         /* highlight_low */
-  --color-base-300: #dfdad9;         /* highlight_med */
-  --color-base-350: #cecacd;         /* highlight_high */
-  --color-base-400: #9893a5;         /* muted */
-  --color-base-content: #575279;     /* text */
+  --color-base-100: #faf4ed; /* base */
+  --color-base-150: #fffaf3; /* surface */
+  --color-base-200: #f2e9e1; /* overlay */
+  --color-base-250: #f4ede8; /* highlight_low */
+  --color-base-300: #dfdad9; /* highlight_med */
+  --color-base-350: #cecacd; /* highlight_high */
+  --color-base-400: #9893a5; /* muted */
+  --color-base-content: #575279; /* text */
 
-  --color-edge: #f2e9e1;             /* overlay */
-  --color-edge-2: #dfdad9;           /* highlight_med */
+  --color-edge: #f2e9e1; /* overlay */
+  --color-edge-2: #dfdad9; /* highlight_med */
 
-  --color-primary: #907aa9;          /* iris */
+  --color-primary: #907aa9; /* iris */
   --color-accent: #907aa9;
-  --color-secondary: #b4637a;        /* love */
-  --color-info: #56949f;             /* foam */
+  --color-secondary: #b4637a; /* love */
+  --color-info: #56949f; /* foam */
   --color-accent-purple: #907aa9;
 
-  --color-fg: #575279;               /* text (website spec) */
-  --color-fg-2: #797593;             /* subtle */
-  --color-fg-3: #9893a5;             /* muted */
-  --color-fg-4: #b5b0c4;             /* between muted + highlight_high */
+  --color-fg: #575279; /* text (website spec) */
+  --color-fg-2: #797593; /* subtle */
+  --color-fg-3: #9893a5; /* muted */
+  --color-fg-4: #b5b0c4; /* between muted + highlight_high */
 
-  --color-up: #286983;               /* pine */
-  --color-down: #b4637a;             /* love */
+  --color-up: #286983; /* pine */
+  --color-down: #b4637a; /* love */
   --color-success: #286983;
   --color-error: #b4637a;
   --color-live: #b4637a;
-  --color-warn: #ea9d34;             /* gold */
+  --color-warn: #ea9d34; /* gold */
   --color-warning: #ea9d34;
 }
 
@@ -758,23 +759,23 @@
   --color-edge: #3e4451;
   --color-edge-2: #4b5263;
 
-  --color-primary: #61afef;          /* blue */
+  --color-primary: #61afef; /* blue */
   --color-accent: #61afef;
-  --color-secondary: #e06c75;        /* red */
-  --color-info: #56b6c2;             /* cyan */
-  --color-accent-purple: #c678dd;    /* purple */
+  --color-secondary: #e06c75; /* red */
+  --color-info: #56b6c2; /* cyan */
+  --color-accent-purple: #c678dd; /* purple */
 
   --color-fg: #abb2bf;
   --color-fg-2: #9da5b4;
   --color-fg-3: #828997;
   --color-fg-4: #5c6370;
 
-  --color-up: #98c379;               /* green */
+  --color-up: #98c379; /* green */
   --color-down: #e06c75;
   --color-success: #98c379;
   --color-error: #e06c75;
   --color-live: #e06c75;
-  --color-warn: #e5c07b;             /* yellow */
+  --color-warn: #e5c07b; /* yellow */
   --color-warning: #e5c07b;
 }
 
@@ -799,23 +800,23 @@
   --color-edge: #e5e5e6;
   --color-edge-2: #d4d4d6;
 
-  --color-primary: #4078f2;          /* blue */
+  --color-primary: #4078f2; /* blue */
   --color-accent: #4078f2;
-  --color-secondary: #e45649;        /* red */
-  --color-info: #0184bc;             /* cyan */
-  --color-accent-purple: #a626a4;    /* purple */
+  --color-secondary: #e45649; /* red */
+  --color-info: #0184bc; /* cyan */
+  --color-accent-purple: #a626a4; /* purple */
 
   --color-fg: #383a42;
   --color-fg-2: #4d4f57;
   --color-fg-3: #696c77;
   --color-fg-4: #a0a1a7;
 
-  --color-up: #50a14f;               /* green */
+  --color-up: #50a14f; /* green */
   --color-down: #e45649;
   --color-success: #50a14f;
   --color-error: #e45649;
   --color-live: #e45649;
-  --color-warn: #c18401;             /* yellow */
+  --color-warn: #c18401; /* yellow */
   --color-warning: #c18401;
 }
 
@@ -824,41 +825,41 @@
    (background = 'medium'). */
 #desktop-shell[data-theme="everforest-dark"],
 #app-shell[data-theme="everforest-dark"] {
-  --color-surface: #2d353b;          /* bg0 */
-  --color-surface-2: #232a2e;        /* bg_dim */
-  --color-surface-hover: #343f44;    /* bg1 */
-  --color-surface-3: #232a2e;        /* bg_dim */
+  --color-surface: #2d353b; /* bg0 */
+  --color-surface-2: #232a2e; /* bg_dim */
+  --color-surface-hover: #343f44; /* bg1 */
+  --color-surface-3: #232a2e; /* bg_dim */
   --color-surface-raised: #383f45;
 
-  --color-base-100: #2d353b;         /* bg0 */
-  --color-base-150: #232a2e;         /* bg_dim */
-  --color-base-200: #343f44;         /* bg1 */
-  --color-base-250: #3d484d;         /* bg2 */
-  --color-base-300: #475258;         /* bg3 */
-  --color-base-350: #4f585e;         /* bg4 */
-  --color-base-400: #56635f;         /* bg5 */
-  --color-base-content: #d3c6aa;     /* fg */
+  --color-base-100: #2d353b; /* bg0 */
+  --color-base-150: #232a2e; /* bg_dim */
+  --color-base-200: #343f44; /* bg1 */
+  --color-base-250: #3d484d; /* bg2 */
+  --color-base-300: #475258; /* bg3 */
+  --color-base-350: #4f585e; /* bg4 */
+  --color-base-400: #56635f; /* bg5 */
+  --color-base-content: #d3c6aa; /* fg */
 
-  --color-edge: #343f44;             /* bg1 */
-  --color-edge-2: #475258;           /* bg3 */
+  --color-edge: #343f44; /* bg1 */
+  --color-edge-2: #475258; /* bg3 */
 
-  --color-primary: #a7c080;          /* green */
+  --color-primary: #a7c080; /* green */
   --color-accent: #a7c080;
-  --color-secondary: #e67e80;        /* red */
-  --color-info: #7fbbb3;             /* blue */
-  --color-accent-purple: #d699b6;    /* purple */
+  --color-secondary: #e67e80; /* red */
+  --color-info: #7fbbb3; /* blue */
+  --color-accent-purple: #d699b6; /* purple */
 
-  --color-fg: #d3c6aa;               /* fg */
-  --color-fg-2: #9da9a0;             /* grey2 (lightest grey) */
-  --color-fg-3: #859289;             /* grey1 */
-  --color-fg-4: #7a8478;             /* grey0 */
+  --color-fg: #d3c6aa; /* fg */
+  --color-fg-2: #9da9a0; /* grey2 (lightest grey) */
+  --color-fg-3: #859289; /* grey1 */
+  --color-fg-4: #7a8478; /* grey0 */
 
-  --color-up: #a7c080;               /* green */
-  --color-down: #e67e80;             /* red */
+  --color-up: #a7c080; /* green */
+  --color-down: #e67e80; /* red */
   --color-success: #a7c080;
   --color-error: #e67e80;
   --color-live: #e67e80;
-  --color-warn: #dbbc7f;             /* yellow */
+  --color-warn: #dbbc7f; /* yellow */
   --color-warning: #dbbc7f;
 }
 
@@ -867,41 +868,41 @@
    (background = 'medium'). */
 #desktop-shell[data-theme="everforest-light"],
 #app-shell[data-theme="everforest-light"] {
-  --color-surface: #fdf6e3;          /* bg0 */
-  --color-surface-2: #efebd4;        /* bg_dim */
-  --color-surface-hover: #f4f0d9;    /* bg1 */
-  --color-surface-3: #efebd4;        /* bg_dim */
+  --color-surface: #fdf6e3; /* bg0 */
+  --color-surface-2: #efebd4; /* bg_dim */
+  --color-surface-hover: #f4f0d9; /* bg1 */
+  --color-surface-3: #efebd4; /* bg_dim */
   --color-surface-raised: #fefbf4;
 
-  --color-base-100: #fdf6e3;         /* bg0 */
-  --color-base-150: #efebd4;         /* bg_dim */
-  --color-base-200: #f4f0d9;         /* bg1 */
-  --color-base-250: #efebd4;         /* bg2 */
-  --color-base-300: #e6e2cc;         /* bg3 */
-  --color-base-350: #e0dcc7;         /* bg4 */
-  --color-base-400: #bdc3af;         /* bg5 */
-  --color-base-content: #5c6a72;     /* fg */
+  --color-base-100: #fdf6e3; /* bg0 */
+  --color-base-150: #efebd4; /* bg_dim */
+  --color-base-200: #f4f0d9; /* bg1 */
+  --color-base-250: #efebd4; /* bg2 */
+  --color-base-300: #e6e2cc; /* bg3 */
+  --color-base-350: #e0dcc7; /* bg4 */
+  --color-base-400: #bdc3af; /* bg5 */
+  --color-base-content: #5c6a72; /* fg */
 
-  --color-edge: #e6e2cc;             /* bg3 */
-  --color-edge-2: #e0dcc7;           /* bg4 */
+  --color-edge: #e6e2cc; /* bg3 */
+  --color-edge-2: #e0dcc7; /* bg4 */
 
-  --color-primary: #8da101;          /* green */
+  --color-primary: #8da101; /* green */
   --color-accent: #8da101;
-  --color-secondary: #f85552;        /* red */
-  --color-info: #3a94c5;             /* blue */
-  --color-accent-purple: #df69ba;    /* purple */
+  --color-secondary: #f85552; /* red */
+  --color-info: #3a94c5; /* blue */
+  --color-accent-purple: #df69ba; /* purple */
 
-  --color-fg: #5c6a72;               /* fg */
-  --color-fg-2: #829181;             /* grey2 */
-  --color-fg-3: #939f91;             /* grey1 */
-  --color-fg-4: #a6b0a0;             /* grey0 */
+  --color-fg: #5c6a72; /* fg */
+  --color-fg-2: #829181; /* grey2 */
+  --color-fg-3: #939f91; /* grey1 */
+  --color-fg-4: #a6b0a0; /* grey0 */
 
-  --color-up: #8da101;               /* green */
-  --color-down: #f85552;             /* red */
+  --color-up: #8da101; /* green */
+  --color-down: #f85552; /* red */
   --color-success: #8da101;
   --color-error: #f85552;
   --color-live: #f85552;
-  --color-warn: #dfa000;             /* yellow */
+  --color-warn: #dfa000; /* yellow */
   --color-warning: #dfa000;
 }
 
@@ -909,16 +910,26 @@
 /* Applied via useTheme hook to the shell element */
 .font-weight-medium {
   font-weight: 500;
-  & * { font-weight: inherit; }
-  & strong, & b, & [class*="font-bold"], & [class*="font-semibold"] {
+  & * {
+    font-weight: inherit;
+  }
+  & strong,
+  & b,
+  & [class*="font-bold"],
+  & [class*="font-semibold"] {
     font-weight: 700;
   }
 }
 
 .font-weight-bold {
   font-weight: 600;
-  & * { font-weight: inherit; }
-  & strong, & b, & [class*="font-bold"], & [class*="font-semibold"] {
+  & * {
+    font-weight: inherit;
+  }
+  & strong,
+  & b,
+  & [class*="font-bold"],
+  & [class*="font-semibold"] {
     font-weight: 800;
   }
 }
@@ -982,11 +993,21 @@
 }
 
 @layer base {
-  .text-ui-body { color: var(--color-fg); }
-  .text-ui-muted { color: var(--color-fg-2); }
-  .text-ui-meta { color: var(--color-fg-3); }
-  .text-ui-chip { color: var(--color-fg-3); }
-  .text-ui-section { color: var(--color-fg-3); }
+  .text-ui-body {
+    color: var(--color-fg);
+  }
+  .text-ui-muted {
+    color: var(--color-fg-2);
+  }
+  .text-ui-meta {
+    color: var(--color-fg-3);
+  }
+  .text-ui-chip {
+    color: var(--color-fg-3);
+  }
+  .text-ui-section {
+    color: var(--color-fg-3);
+  }
 }
 
 /* Legacy compact surfaces still use Tailwind arbitrary micro sizes. Keep
@@ -1002,7 +1023,120 @@
 /* The ticker keeps its existing theme transition. */
 #desktop-shell.theme-transition,
 #desktop-shell.theme-transition * {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease !important;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease !important;
+}
+
+/* Tilt-bar pulse — a close game still in play. Opacity only, so the bar
+   never changes width and the chip never reflows. Attribute-gated like
+   every other chip animation; the border tint already carries "close"
+   without it. */
+@keyframes tiltPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+[data-motion="tilt-pulse"] {
+  animation: tiltPulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-motion="tilt-pulse"] {
+    animation: none;
+  }
+}
+
+/* Alerting status cap — a monitor that's down, a CI run in progress.
+   Opacity only, so the cap never changes size and the rail never
+   reflows around it. Attribute-gated like every other chip animation:
+   the app shell stills it, the ticker window runs it. Colour alone
+   already distinguishes every cap state, so nothing is conveyed by
+   movement only. */
+@keyframes capPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+[data-motion="cap-pulse"] {
+  animation: capPulse 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-motion="cap-pulse"] {
+    animation: none;
+  }
+}
+
+/* Live spine glow — the 2px bar under a chip whose game is in progress.
+   Opacity only, so it reads as a pulse rather than a movement, and the
+   chip's layout never shifts.
+
+   Attribute-gated for the same reason the marquee is: `#app-shell`
+   stills every animation, so the app gets a steady bar and the ticker
+   window gets the pulse. */
+@keyframes spineGlow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+[data-motion="spine-glow"] {
+  animation: spineGlow 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-motion="spine-glow"] {
+    animation: none;
+  }
+}
+
+/* Live points flash.
+   Deliberately NOT gated on which window it's in. The `#app-shell`
+   blanket rule below stills it inside the app, which is exactly the
+   intent — the calm surface keeps the green tint and drops the motion —
+   while the ticker window, which has no such rule, flashes. One class,
+   correct in both places, instead of two that can drift apart.
+
+   Reduced motion gets the same static tint the app gets, so the live
+   state is never conveyed by movement alone. */
+@keyframes ptsFlash {
+  0% {
+    background-color: transparent;
+  }
+  8% {
+    background-color: color-mix(in srgb, var(--color-up) 22%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.pts-flash {
+  border-radius: 3px;
+  animation: ptsFlash 6s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pts-flash {
+    animation: none;
+    background-color: color-mix(in srgb, var(--color-up) 12%, transparent);
+  }
 }
 
 /* The main app is intentionally motion-free. */
@@ -1191,9 +1325,10 @@ body {
    horizontally without a visible track eating vertical space in the
    already-tight (h-11 / h-16) bar. */
 @utility scrollbar-none {
-  scrollbar-width: none;        /* Firefox */
-  -ms-overflow-style: none;     /* IE/legacy Edge */
-  &::-webkit-scrollbar {        /* WebKit/Blink */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/legacy Edge */
+  &::-webkit-scrollbar {
+    /* WebKit/Blink */
     display: none;
   }
 }
@@ -1401,6 +1536,10 @@ input[data-contained-focus]:focus-visible {
    a width:max-content track, so translating exactly -50% lands on the
    seam and the loop is invisible. Same trick the Home marquee uses. */
 @keyframes chipdrift {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
 }
