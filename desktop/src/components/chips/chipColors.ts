@@ -150,6 +150,49 @@ export function getChipColors(mode: ChipColorMode, widget: string): ChipColors {
   return WIDGET_MAP[widget] ?? PURPLE;
 }
 
+// ── Stable numeric width ────────────────────────────────────────
+
+/**
+ * Reserve a fixed width for a number that changes while on screen.
+ *
+ * A score going 8.3 -> 14.9 gains a character, which widens its chip,
+ * which shifts every chip after it on the rail. The number is the one
+ * thing on a ticker guaranteed to change, so it is also the one thing
+ * that must not resize.
+ *
+ * `ch` is exact here rather than approximate: chips render in
+ * `font-mono` with `tabular-nums`, so one `ch` is one digit and the
+ * reservation is the real rendered width.
+ *
+ * Right-aligned, because a number that grows leftward from a fixed
+ * decimal point reads as counting, while one that grows rightward reads
+ * as drifting.
+ */
+export function stableNum(chars: number): React.CSSProperties {
+  return {
+    display: "inline-block",
+    minWidth: `${chars}ch`,
+    textAlign: "right",
+  };
+}
+
+/**
+ * Digits to reserve, by what the number is.
+ *
+ * Sized to the realistic ceiling rather than the theoretical one — a
+ * team that breaks 1000 points has bigger problems than a reflow, and
+ * padding every score for a case that never happens leaves a visible
+ * gap on every chip that does.
+ */
+export const NUM_WIDTH = {
+  /** Team score: "151.8", up to "999.9". */
+  teamScore: 5,
+  /** One player's points: "14.9", up to "99.9". Negative D/ST fits too. */
+  playerPoints: 4,
+  /** Win probability: "65%" up to "100%". */
+  percent: 4,
+} as const;
+
 // ── Shared chip base classes ────────────────────────────────────
 // Common className construction used by all ticker chip components.
 

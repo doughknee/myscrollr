@@ -179,6 +179,81 @@ export function controlState(payload, clients = 0) {
 }
 
 /**
+ * Scripted moments — the shots worth filming, as one click each.
+ *
+ * Clicking three buttons in the right order while also watching the
+ * screen is how you miss the take. Each of these is a timed sequence
+ * the server runs on its own, so the only thing left to do is hit
+ * record.
+ *
+ * `at` is milliseconds from the start of the sequence. Steps are
+ * DELTAS like every other operation here, so a moment can be run twice
+ * and the second run builds on the first rather than resetting it.
+ *
+ * `lead` is resolved at run time: the points needed to land 0.1 past
+ * the opponent right now. Hardcoding a number would be wrong the moment
+ * anything else on the roster moves.
+ */
+export const MOMENTS = [
+  {
+    id: "walkoff",
+    name: "Walk-off touchdown",
+    blurb: "Down late, your last live player scores, you take the lead.",
+    steps: [
+      { at: 0, kind: "points", who: "live", delta: 1.4 },
+      { at: 1400, kind: "points", who: "live", delta: "lead" },
+    ],
+  },
+  {
+    id: "surge",
+    name: "Scoring drive",
+    blurb: "Three quick gains — good for a long shot of the rail moving.",
+    steps: [
+      { at: 0, kind: "points", who: "live", delta: 0.8 },
+      { at: 1600, kind: "points", who: "live", delta: 2.1 },
+      { at: 3400, kind: "points", who: "live", delta: 6.6 },
+    ],
+  },
+  {
+    id: "heartbreak",
+    name: "They answer back",
+    blurb: "You go ahead, then the opponent scores and takes it back.",
+    steps: [
+      { at: 0, kind: "points", who: "live", delta: "lead" },
+      { at: 2200, kind: "points", who: "opp-live", delta: 7.2 },
+    ],
+  },
+  {
+    id: "injury",
+    name: "Injury scare",
+    blurb: "Your live player goes down — fires the breaking-injury chip.",
+    steps: [{ at: 0, kind: "out", who: "live" }],
+  },
+  {
+    id: "whistle",
+    name: "Final whistle",
+    blurb: "One last score, then the game goes FINAL.",
+    steps: [
+      { at: 0, kind: "points", who: "live", delta: "lead" },
+      { at: 2000, kind: "final" },
+    ],
+  },
+];
+
+/**
+ * Pick the player a moment's step applies to.
+ *
+ * Live players first — a settled player's score changing is the one
+ * thing a fantasy viewer would immediately call fake. Falls back to the
+ * highest scorer only so a moment still does something in a league with
+ * nothing left running.
+ */
+export function resolveWho(league, who) {
+  const side = who === "opp-live" ? league.theirs : league.mine;
+  return (side.find((p) => p.live) ?? side[side.length - 1])?.key ?? null;
+}
+
+/**
  * The frame that makes the app re-fetch. `yahoo_matchups` is in
  * useDashboardCDC's FANTASY_CDC_TABLES, which is what routes this down
  * the sub-second fast-path instead of the 500ms-debounced safety net.
@@ -203,6 +278,15 @@ export const PANEL_HTML = `<!doctype html>
   h1 { font-size: 16px; margin: 0 0 4px; letter-spacing: .02em; }
   .sub { color: #8b949e; margin: 0 0 20px; font-size: 12px; }
   .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
+  .moments { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 22px; }
+  .moment { text-align: left; padding: 12px 14px; border-radius: 10px; cursor: pointer;
+            background: #16241d; border: 1px solid #1f4634; color: #d7f5e6; font: inherit; }
+  .moment:hover { background: #1b2f25; border-color: #2a6349; }
+  .moment b { display: block; font-size: 14px; margin-bottom: 3px; color: #7ff0bd; }
+  .moment span { font-size: 11.5px; color: #8fb3a2; line-height: 1.35; }
+  .moment:disabled { opacity: .45; cursor: default; }
+  h2 { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #8b949e;
+       margin: 0 0 10px; font-weight: 600; }
   .card { background: #11151d; border: 1px solid #222a36; border-radius: 12px; padding: 16px; }
   .name { font-weight: 600; font-size: 15px; }
   .tag { font-size: 10px; letter-spacing: .08em; padding: 2px 7px; border-radius: 999px; vertical-align: 2px; margin-left: 8px; }
@@ -231,6 +315,9 @@ export const PANEL_HTML = `<!doctype html>
 </style>
 <h1>Scrollr demo control <span class="tag" id="conn">&hellip;</span></h1>
 <p class="sub">Every click re-renders the app in under a second. Seeded data &mdash; not a live game.</p>
+<h2>One-click moments</h2>
+<div class="moments" id="moments"></div>
+<h2>Manual control</h2>
 <div class="grid" id="grid"></div>
 <footer>
   <div class="row"><button class="warn" onclick="reset()">Reset everything</button></div>
@@ -249,6 +336,33 @@ async function post(body) {
   await load()
 }
 const reset = () => post({ type: 'reset' })
+
+// Baked in at serve time rather than fetched: the list is static, and
+// one fewer round trip means the buttons are live on first paint.
+const MOMENTS = ${JSON.stringify(MOMENTS)}
+
+let playing = false
+async function moment(id) {
+  if (playing) return
+  playing = true
+  render_moments()
+  await fetch('/control/moment', {
+    method: 'POST', headers: {'content-type':'application/json'},
+    body: JSON.stringify({ id }),
+  })
+  // Lock out re-entry for the length of the sequence plus a beat, so a
+  // second click can't interleave two moments into nonsense.
+  const span = Math.max(...MOMENTS.find(m => m.id === id).steps.map(s => s.at))
+  setTimeout(() => { playing = false; render_moments(); load() }, span + 1200)
+}
+
+function render_moments() {
+  document.getElementById('moments').innerHTML = MOMENTS.map(m =>
+    '<button class="moment" ' + (playing ? 'disabled ' : '') +
+    'onclick="moment(\\'' + m.id + '\\')">' +
+    '<b>' + m.name + '</b><span>' + m.blurb + '</span></button>').join('')
+}
+render_moments()
 const bump  = (league, delta) => post({ type: 'points', player: picks[league], delta })
 const rule  = (league) => post({ type: 'out', player: picks[league] })
 const final = (league) => post({ type: 'final', league })

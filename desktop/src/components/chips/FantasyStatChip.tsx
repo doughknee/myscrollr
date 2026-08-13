@@ -19,8 +19,14 @@ import {
   userStanding,
 } from "../../datawidgets/fantasy/types";
 import { findTopScorer } from "../../datawidgets/fantasy/playerStats";
-import { getChipColors, chipBaseClasses } from "./chipColors";
+import {
+  getChipColors,
+  chipBaseClasses,
+  stableNum,
+  NUM_WIDTH,
+} from "./chipColors";
 import { ChipSpine } from "./ChipSpine";
+import { ChipFlash, useChangeFlash } from "./ChipFlash";
 
 interface FantasyStatChipProps {
   league: LeagueResponse;
@@ -52,6 +58,13 @@ interface StatSegment {
    * accurate regardless — it's the accessible label and the fallback.
    */
   node?: ReactNode;
+  /**
+   * Characters of width to reserve, for segments whose value changes
+   * while the chip is on screen. Without it a score gaining a digit
+   * widens the chip and shoves every chip after it along the rail.
+   * Omit for segments whose text is fixed for the life of the chip.
+   */
+  width?: number;
 }
 
 /**
@@ -150,6 +163,9 @@ export default function FantasyStatChip({
         key: "score",
         text: scoreText,
         tone: scoreTone,
+        // Both sides plus the separator. Reserved as one block so the
+        // dash never walks left as a score crosses into three figures.
+        width: NUM_WIDTH.teamScore * 2 + 1,
         node: rollScore ? (
           <RollingScore myPts={myPts} oppPts={oppPts} label={scoreText} />
         ) : undefined,
@@ -173,6 +189,10 @@ export default function FantasyStatChip({
           key: "wp",
           text: `${Math.round(wp * 100)}%`,
           tone: wp >= 0.5 ? "up" : "down",
+          // 65% -> 100% gains a digit, and a win probability crossing
+          // three figures is exactly the moment the rail must hold
+          // still rather than nudge every chip along.
+          width: NUM_WIDTH.percent,
         });
       }
     }
@@ -258,6 +278,10 @@ export default function FantasyStatChip({
   })();
   const userWon = ctx ? teamScore(ctx.user) > teamScore(ctx.opponent) : false;
 
+  // Flash on the USER's score only. The opponent's moving is their
+  // business; the chip exists to answer "did anything happen to me".
+  const flashToken = useChangeFlash(ctx ? teamScore(ctx.user) : null);
+
   // ── Render ─────────────────────────────────────────────────
 
   return (
@@ -270,6 +294,7 @@ export default function FantasyStatChip({
           without parsing any of them. Pre-game it's a projection and
           renders at reduced strength; final it fills and takes the
           result's colour. */}
+      <ChipFlash token={flashToken} tone={scoreTone === "down" ? "down" : "up"} />
       {ctx && (
         <ChipSpine
           fill={spineFill ?? 0}
@@ -294,6 +319,7 @@ export default function FantasyStatChip({
         {allSegments.map((seg) => (
           <span
             key={seg.key}
+            style={seg.width ? stableNum(seg.width) : undefined}
             className={clsx(
               "tabular-nums font-medium",
               seg.tone === "up" && "text-up",
@@ -325,6 +351,7 @@ export default function FantasyStatChip({
           {secondarySegments.map((seg) => (
             <span
               key={seg.key}
+              style={seg.width ? stableNum(seg.width) : undefined}
               className={clsx(
                 "tabular-nums font-medium shrink-0",
                 seg.tone === "up" && "text-up",
