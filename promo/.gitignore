@@ -1,0 +1,6 @@
+node_modules/
+out/
+
+# Source clips are cut from the founder's screen recording and are large;
+# regenerate with the ffmpeg lines in src/scene/Desktop.tsx.
+public/clip-*.mp4

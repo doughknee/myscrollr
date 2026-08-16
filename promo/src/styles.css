@@ -1,0 +1,34 @@
+/*
+ * Pulls in the app's own stylesheet so the chips render with the real
+ * palette rather than a copy that drifts. Tailwind v4's `@source`
+ * directives inside it are relative to THAT file, so its
+ * `./components/**` scan still finds the chips correctly from here.
+ *
+ * The extra @source below adds this project's own files, which the
+ * app's stylesheet obviously doesn't know about.
+ *
+ * No web font import. The film that used to live here set its supers in
+ * Barlow Condensed; these compositions render only chips, which take
+ * their face from the app's own --font-mono. Fetching a font nothing
+ * uses just adds a network round trip to every render.
+ */
+@import "../../desktop/src/style.css";
+
+@source "./**/*.tsx";
+
+
+@source "./**/*.tsx";
+
+/*
+ * Video is not a webpage: it renders at a fixed size and gets scaled by
+ * the player, so the browser default of 16px root and the app's own
+ * responsive assumptions don't apply. Compositions set their own scale
+ * explicitly.
+ */
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
