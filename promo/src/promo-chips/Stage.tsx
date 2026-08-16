@@ -85,6 +85,9 @@ export function Stage({
           // grey, so it tracks the theme rather than drifting from it.
           background: plate ? "var(--color-surface)" : undefined,
           borderRadius: plate ? 6 : undefined,
+          // Impact rides on top of the base scale rather than replacing
+          // it, so a comp rendered at 3x still reacts by the same
+          // proportion instead of a fixed number of pixels.
           transform: `scale(${scale})`,
           // Scale about the centre so the chip stays put as `scale`
           // changes — otherwise retuning the zoom silently reframes it.

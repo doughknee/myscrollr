@@ -12,13 +12,22 @@ data and the timing; the design belongs to the app.
 ## Render
 
 ```bash
-npx remotion render LeagueChip out/league-chip.mov --codec=prores --prores-profile=4444
-npx remotion render PlayerChip out/player-chip.mov --codec=prores --prores-profile=4444
-npx remotion render ScorePop  out/score-pop.mov  --codec=prores --prores-profile=4444
+npm run render:all
 ```
 
-Or `npm run render:league` / `render:player` / `render:pop`, which are the
-same commands.
+or one at a time: `render:league`, `render:player`, `render:rail`,
+`render:pop`.
+
+| comp | canvas | what it is |
+| ---- | ------ | ---------- |
+| `LeagueChip` | 1920x640 | one league, two lines, the full matchup |
+| `PlayerChip` | 1280x520 | one player, points against projection |
+| `TickerRail` | 3840x280 | three leagues side by side, one of them scores |
+| `ScorePop` | 1080x520 | a `+13.6 PTS` pill for a music hit |
+
+`TickerRail` is 2x a 1920-wide bar: drop it on a 1080p timeline at 50%
+for a pixel-exact ticker along the top of a screen capture, or leave it
+at 100% to punch in.
 
 Confirm the alpha survived:
 
@@ -57,7 +66,7 @@ Every comp is fully prop-driven. Put the overrides in a JSON file:
   "record": { "wins": 9, "losses": 2 },
   "rank": 1,
   "numTeams": 8,
-  "countUpFrom": 170.2
+  "scoreEvents": [{ "at": 60, "points": 8.4, "kind": "big" }]
 }
 ```
 
@@ -71,24 +80,72 @@ npx remotion render LeagueChip out/dynasty.mov --codec=prores --prores-profile=4
 falls apart in PowerShell, which strips the quotes and hands Remotion
 something unparseable. A file behaves the same in every shell.
 
-## Timing contract
+## Scoring plays, not a count-up
 
-All three comps are 6s at 60fps and **settle by frame 90 (1.5s)**, then
-hold. Everything past 90 is identical, so you can trim from the tail to
-any length without the picture changing. The one exception is the LIVE
-dot, which keeps breathing on purpose — a "LIVE" badge that has stopped
-moving reads as a screenshot.
+**Fantasy points do not ramp.** A catch is +1.4 and a touchdown is +6.6,
+both delivered whole, and the gap between them is the part that hurts.
+Gliding a score from 149.9 to 157.9 reads as a dashboard refreshing;
+landing it in two discrete hits reads as two things happening on a field.
 
-| frames | what happens |
-| ------ | ------------ |
-| 0–20   | slide up + fade in |
-| 20–70  | scores count to their final value, ease-out |
-| 26–82  | spine / underline bars fill |
-| 90+    | held |
+So `scoreEvents` is the main control:
+
+```json
+"myScore": 149.9,
+"scoreEvents": [
+  { "at": 50,  "points": 1.4, "kind": "catch" },
+  { "at": 110, "points": 6.6, "kind": "td" }
+]
+```
+
+`myScore` is the total **before** the plays; each event adds to it. Kinds
+are `catch` / `fg` / `td` / `big` and only change how hard the chip
+reacts, never the arithmetic.
+
+### The shape of one hit
+
+| frames | |
+| ------ | --- |
+| −8 → 0 | **anticipation** — the chip eases *down* before the number moves |
+| 0 → 5 | **impact** — up and overshooting; the number counts in this window |
+| 5 → 30 | **settle** — decelerating back to rest |
+
+The dip is the part that matters. Eight frames is invisible if you look
+for it and unmistakable if you don't; it's the flinch before a punch, and
+without it the impact reads as a glitch rather than a blow.
+
+### What the default sequence tells
+
+The shipped defaults are a walk-off, and the middle beat is the point:
+
+- opens **149.9–151.7**, behind by 1.8
+- **f50** a catch, +1.4 → **151.3**. Still behind, by 0.4. Close enough
+  to taste and still losing is the only frame that makes a viewer lean in.
+- **f110** a touchdown, +6.6 → **157.9**, and the lead flips *inside* the
+  count. Score turns green, win% goes 73→90, the spine surges, a ring
+  flares.
+
+None of that back half is choreographed separately. **Only the score is
+animated** — win probability, spine fill and the up/down colour are all
+derived by the real chip from the matchup it is handed, so counting the
+score moves every one of them in step. Animating them by hand would have
+meant a second copy of `estimateWinProbability` living here, drifting
+from the real one the first time it was tuned.
 
 `ScorePop` is separate: it overshoots around frame 12 and settles by 34,
 so aligning comp frame 0 with a music hit puts the accent just after the
 transient, where an accent wants to sit.
+
+### Trimming
+
+Everything is 6s at 60fps. With the default events the picture is frozen
+from about **frame 192** (3.2s), leaving 168 frames of identical tail to
+trim from. That figure moves with your events — `settledAt()` in
+`scoring.ts` is the source of truth. The LIVE dot keeps breathing past it
+on purpose: a "LIVE" badge that has stopped moving reads as a screenshot.
+
+A simple `countUpFrom` still works for a chip that should just glide to a
+value. It is ignored when `scoreEvents` is set — a smooth ramp and a
+sequence of plays are two different stories and a chip can only tell one.
 
 ## Resolution
 
@@ -103,7 +160,14 @@ touching the design. The chip's geometry is never changed to make it
 bigger; it is drawn at real size and scaled, which is what keeps padding
 and wrapping identical to the product.
 
-## Two things that will look wrong until you know why
+## Three things that will look wrong until you know why
+
+**Only the chip that scored reacts.** On `TickerRail` the wash and ring
+apply to the hero chip alone while the other leagues carry on unbothered.
+That is deliberate: a whole bar lighting up reads as an app-wide alert,
+and the neighbours holding steady is exactly what makes the reacting one
+feel live. (This was a real bug first — the reaction lived on the stage
+and lit all three.)
 
 **The chip has no fill.** In the app its background is a 6% wash that
 reads against the dark bar behind it. Standing alone there is nothing

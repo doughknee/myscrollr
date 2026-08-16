@@ -8,10 +8,11 @@
     "render:league": "remotion render LeagueChip out/league-chip.mov --codec=prores --prores-profile=4444",
     "render:player": "remotion render PlayerChip out/player-chip.mov --codec=prores --prores-profile=4444",
     "render:pop": "remotion render ScorePop out/score-pop.mov --codec=prores --prores-profile=4444",
-    "render:all": "npm run render:league && npm run render:player && npm run render:pop",
+    "render:all": "npm run render:league && npm run render:player && npm run render:rail && npm run render:pop",
     "render:variant": "remotion render LeagueChip out/dynasty.mov --codec=prores --prores-profile=4444 --props=variants/dynasty.json",
     "check:alpha": "remotion ffprobe out/league-chip.mov",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "render:rail": "remotion render TickerRail out/ticker-rail.mov --codec=prores --prores-profile=4444"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.0",

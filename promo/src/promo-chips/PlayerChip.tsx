@@ -19,7 +19,9 @@ import type {
   RosterPlayer,
 } from "../../../desktop/src/datawidgets/fantasy/types";
 import { Stage } from "./Stage";
+import { Reactor } from "./Reactor";
 import { countUp, entrance } from "./anim";
+import { type ScoreEvent, impact, scoreAt } from "./scoring";
 
 /**
  * A type alias, not an interface, and that is load-bearing: Remotion's
@@ -46,6 +48,11 @@ export type PlayerChipProps = {
   /** Is his game running — drives the live treatment on the bar. */
   live?: boolean;
   countUpFrom?: number;
+  /**
+   * Scoring plays for this player. Same contract as LeagueChip:
+   * `points` is the value BEFORE the events, and each one adds to it.
+   */
+  scoreEvents?: ScoreEvent[];
   scale?: number;
   /** Give the chip an opaque ground — see Stage. */
   plate?: boolean;
@@ -56,19 +63,29 @@ const LEAGUE_KEY = "449.l.promo";
 
 export function PlayerChip(props: PlayerChipProps) {
   const frame = useCurrentFrame();
-  const points = countUp(frame, props.points, props.countUpFrom);
+  const events = props.scoreEvents ?? [];
+  const hasEvents = events.length > 0;
+  const points = hasEvents
+    ? scoreAt(frame, props.points, events)
+    : countUp(frame, props.points, props.countUpFrom);
+  const hit = hasEvents ? impact(frame, events) : 0;
 
   return (
-    <Stage scale={props.scale ?? 2} plate={props.plate}>
+    <Stage
+      scale={props.scale ?? 2}
+      plate={props.plate}
+    >
       <div style={entrance(frame)}>
+        <Reactor impact={hit} flash={Math.max(0, hit)}>
         <FollowedPlayerChip
           playerKey={PLAYER_KEY}
           leagueKey={LEAGUE_KEY}
           leagues={[buildLeague(props, points)]}
           comfort
           colorMode="widget"
-          accent={props.accent}
-        />
+            accent={props.accent}
+          />
+        </Reactor>
       </div>
     </Stage>
   );

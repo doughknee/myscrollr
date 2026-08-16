@@ -14,7 +14,7 @@
  * `estimateWinProbability` here, and then watching the two definitions
  * drift apart the first time the real one was tuned.
  */
-import { useCurrentFrame } from "remotion";
+import { useCurrentFrame, useVideoConfig } from "remotion";
 import FantasyStatChip from "../../../desktop/src/components/chips/FantasyStatChip";
 import { DEFAULT_WIDGET_DISPLAY } from "../../../desktop/src/preferences";
 import type {
@@ -22,7 +22,15 @@ import type {
   RosterPlayer,
 } from "../../../desktop/src/datawidgets/fantasy/types";
 import { Stage } from "./Stage";
+import { Reactor } from "./Reactor";
 import { countUp, entrance, livePulse } from "./anim";
+import {
+  type ScoreEvent,
+  impact,
+  leadChangeFrame,
+  leadFlare,
+  scoreAt,
+} from "./scoring";
 
 /**
  * A type alias, not an interface, and that is load-bearing: Remotion's
@@ -50,8 +58,19 @@ export type LeagueChipProps = {
    * Count the score up from here. Omit to hold the final value — a chip
    * that isn't the subject of the shot shouldn't be animating a number
    * nobody is looking at.
+   *
+   * Ignored when `scoreEvents` is set: a smooth glide and a sequence of
+   * discrete plays are two different stories and the chip can only tell
+   * one at a time.
    */
   countUpFrom?: number;
+  /**
+   * Scoring plays, each landing on its own frame. When present the
+   * chip STARTS at `myScore` and the events add to it, so `myScore` is
+   * the number before kickoff rather than after — otherwise the same
+   * total would have to be written twice and kept in sync by hand.
+   */
+  scoreEvents?: ScoreEvent[];
   /** Multiplier on the chip's real ticker size. */
   scale?: number;
   /** Give the chip an opaque ground — see Stage. */
@@ -60,7 +79,26 @@ export type LeagueChipProps = {
 
 export function LeagueChip(props: LeagueChipProps) {
   const frame = useCurrentFrame();
-  const score = countUp(frame, props.myScore, props.countUpFrom);
+  const { durationInFrames } = useVideoConfig();
+  const events = props.scoreEvents ?? [];
+  const hasEvents = events.length > 0;
+
+  const score = hasEvents
+    ? scoreAt(frame, props.myScore, events)
+    : countUp(frame, props.myScore, props.countUpFrom);
+
+  const hit = hasEvents ? impact(frame, events) : 0;
+  // The crossing is found once from the props, not tracked frame to
+  // frame, because Remotion may render frame 200 before frame 3.
+  const crossing = hasEvents
+    ? leadChangeFrame(
+        props.myScore,
+        events,
+        props.opponentScore,
+        durationInFrames,
+      )
+    : null;
+  const flare = leadFlare(frame, crossing);
 
   return (
     <Stage
@@ -70,6 +108,14 @@ export function LeagueChip(props: LeagueChipProps) {
       livePulse={props.status === "live" ? livePulse(frame) : undefined}
     >
       <div style={entrance(frame)}>
+        <Reactor
+          impact={hit}
+          // Only the upswing washes the chip; the anticipation dip is
+          // motion, not light, and tinting it green would announce the
+          // play before it has happened.
+          flash={Math.max(0, hit)}
+          flare={flare}
+        >
         <FantasyStatChip
           league={buildLeague(props, score)}
           prefs={DEFAULT_WIDGET_DISPLAY.fantasy}
@@ -80,8 +126,9 @@ export function LeagueChip(props: LeagueChipProps) {
           // not advance when Remotion steps frames — the digits would
           // sit frozen mid-roll. `countUp` above does the same job as a
           // pure function of the frame instead.
-          rollScore={false}
-        />
+            rollScore={false}
+          />
+        </Reactor>
       </div>
     </Stage>
   );
@@ -97,13 +144,20 @@ export function LeagueChip(props: LeagueChipProps) {
  * whose star player total contradicts its own score is the single most
  * obvious tell in a freeze-frame.
  */
-function buildLeague(p: LeagueChipProps, score: number): LeagueResponse {
-  const teamKey = "449.l.promo.t.1";
-  const oppKey = "449.l.promo.t.2";
+export function buildLeague(
+  p: LeagueChipProps,
+  score: number,
+): LeagueResponse {
+  // Derived from the name so a rail of chips gets distinct keys. Two
+  // chips sharing a league_key made React reuse one chip's roster for
+  // the other, which showed up as the wrong top scorer.
+  const slug = p.leagueName.toLowerCase().replace(/\W+/g, "").slice(0, 16);
+  const teamKey = `449.l.${slug}.t.1`;
+  const oppKey = `449.l.${slug}.t.2`;
   const rounded = Math.round(score * 10) / 10;
 
   return {
-    league_key: "449.l.promo",
+    league_key: `449.l.${slug}`,
     name: p.leagueName,
     game_code: "nfl",
     season: "2025",

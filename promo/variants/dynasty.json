@@ -4,14 +4,31 @@
   "opponentName": "Air Yards Only",
   "week": 12,
   "status": "final",
-  "myScore": 184.5,
+  "myScore": 176.1,
   "opponentScore": 151.0,
   "projection": 184.5,
-  "topScorer": { "name": "Allen", "team": "BUF", "position": "QB", "points": 36.9 },
-  "record": { "wins": 9, "losses": 2 },
+  "topScorer": {
+    "name": "Allen",
+    "team": "BUF",
+    "position": "QB",
+    "points": 36.9
+  },
+  "record": {
+    "wins": 9,
+    "losses": 2
+  },
   "rank": 1,
   "numTeams": 8,
-  "streak": { "type": "win", "value": 1 },
-  "countUpFrom": 170.2,
-  "scale": 2
+  "streak": {
+    "type": "win",
+    "value": 1
+  },
+  "scale": 2,
+  "scoreEvents": [
+    {
+      "at": 60,
+      "points": 8.4,
+      "kind": "big"
+    }
+  ]
 }
