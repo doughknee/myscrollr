@@ -22,6 +22,8 @@ import { TickerRail } from "./promo-chips/TickerRail";
 
 const FPS = 60;
 const SIX_SECONDS = 6 * FPS;
+/** The rail is a bed, not a beat — it runs under a whole section. */
+const THIRTY_SECONDS = 30 * FPS;
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -103,38 +105,25 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="TickerRail"
         component={TickerRail}
-        durationInFrames={SIX_SECONDS}
+        durationInFrames={THIRTY_SECONDS}
         fps={FPS}
         // 2x a 1920-wide bar. Drop it on a 1080p timeline at 50% for a
         // pixel-exact bar, or leave it at 100% to punch in.
         width={3840}
         height={280}
         defaultProps={{
-          hero: {
-            leagueName: "The Sunday Money League",
-            teamName: "Brunch Money",
-            opponentName: "Fourth and Long",
-            week: 12,
-            status: "live" as const,
-            myScore: 149.9,
-            opponentScore: 151.7,
-            projection: 168.8,
-            topScorer: {
-              name: "Hurts",
-              team: "PHI",
-              position: "QB",
-              points: 28.1,
-            },
-            record: { wins: 8, losses: 3 },
-            rank: 2,
-            numTeams: 8,
-            streak: { type: "win" as const, value: 3 },
-          },
-          scoreEvents: [
-            { at: 50, points: 1.4, kind: "catch" as const },
-            { at: 110, points: 6.6, kind: "td" as const },
-          ],
-          others: [
+          // FIVE leagues for THIRTY seconds, and the count is arithmetic
+          // rather than taste: a chip is ~548px before scaling, the
+          // viewport is 1920 of those, and the drift covers 630 across
+          // the comp. Five puts ~3.5 on screen at once and lets the
+          // fifth arrive as the first leaves, so the bar is never static
+          // and never runs out of rail.
+          //
+          // The plays are spaced so each one lands while ITS chip is on
+          // screen, and far enough apart that each reads as its own
+          // event. Most chips never score — a bar where everything is
+          // always erupting has no significant moments left.
+          leagues: [
             {
               leagueName: "Dynasty or Bust",
               teamName: "Regression Candidates",
@@ -153,6 +142,8 @@ export const RemotionRoot: React.FC = () => {
               record: { wins: 9, losses: 2 },
               rank: 1,
               numTeams: 8,
+              // Finished. Nothing left to happen, which is the point of
+              // having it here — it is the calm the others move against.
             },
             {
               leagueName: "Work League (Keeper)",
@@ -172,6 +163,77 @@ export const RemotionRoot: React.FC = () => {
               record: { wins: 6, losses: 5 },
               rank: 4,
               numTeams: 8,
+              // Already ahead, so this one extends a lead rather than
+              // stealing one. No flare — that belongs to the crossing.
+              scoreEvents: [{ at: 420, points: 6.6, kind: "td" as const }],
+            },
+            {
+              leagueName: "The Sunday Money League",
+              teamName: "Brunch Money",
+              opponentName: "Fourth and Long",
+              week: 12,
+              status: "live" as const,
+              myScore: 149.9,
+              opponentScore: 151.7,
+              projection: 168.8,
+              topScorer: {
+                name: "Hurts",
+                team: "PHI",
+                position: "QB",
+                points: 28.1,
+              },
+              record: { wins: 8, losses: 3 },
+              rank: 2,
+              numTeams: 8,
+              streak: { type: "win" as const, value: 3 },
+              // The story. Behind by 1.8; the catch at f120 gets it to
+              // 151.3 — still behind, by 0.4 — and it sits there for
+              // eleven seconds, which is the whole point. The touchdown
+              // at f780 crosses.
+              scoreEvents: [
+                { at: 120, points: 1.4, kind: "catch" as const },
+                { at: 780, points: 6.6, kind: "td" as const },
+              ],
+            },
+            {
+              leagueName: "College Buddies",
+              teamName: "Bad Beats Only",
+              opponentName: "The Group Chat",
+              week: 12,
+              status: "live" as const,
+              myScore: 112.4,
+              opponentScore: 118.9,
+              projection: 131.2,
+              topScorer: {
+                name: "Nacua",
+                team: "LAR",
+                position: "WR",
+                points: 24.3,
+              },
+              record: { wins: 7, losses: 4 },
+              rank: 3,
+              numTeams: 10,
+              scoreEvents: [{ at: 1150, points: 8.4, kind: "big" as const }],
+            },
+            {
+              leagueName: "Waiver Wire Wars",
+              teamName: "Handcuff Central",
+              opponentName: "Streaming Service",
+              week: 12,
+              status: "live" as const,
+              myScore: 96.2,
+              opponentScore: 94.8,
+              projection: 108.7,
+              topScorer: {
+                name: "Kittle",
+                team: "SF",
+                position: "TE",
+                points: 18.6,
+              },
+              record: { wins: 5, losses: 6 },
+              rank: 6,
+              numTeams: 10,
+              scoreEvents: [{ at: 1500, points: 3, kind: "fg" as const }],
             },
           ],
           drift: 0.35,

@@ -22,12 +22,13 @@ or one at a time: `render:league`, `render:player`, `render:rail`,
 | ---- | ------ | ---------- |
 | `LeagueChip` | 1920x640 | one league, two lines, the full matchup |
 | `PlayerChip` | 1280x520 | one player, points against projection |
-| `TickerRail` | 3840x280 | three leagues side by side, one of them scores |
+| `TickerRail` | 3840x280 | **30s** — five leagues, five plays landing across the length |
 | `ScorePop` | 1080x520 | a `+13.6 PTS` pill for a music hit |
 
-`TickerRail` is 2x a 1920-wide bar: drop it on a 1080p timeline at 50%
-for a pixel-exact ticker along the top of a screen capture, or leave it
-at 100% to punch in.
+The first three are 6s beats. **`TickerRail` is 30s** — it is a bed, not
+a beat, meant to run along the top of a whole section rather than being
+cut to. It is 2x a 1920-wide bar: drop it on a 1080p timeline at 50% for
+a pixel-exact ticker, or leave it at 100% to punch in.
 
 Confirm the alpha survived:
 
@@ -134,6 +135,32 @@ from the real one the first time it was tuned.
 `ScorePop` is separate: it overshoots around frame 12 and settles by 34,
 so aligning comp frame 0 with a music hit puts the accent just after the
 transient, where an accent wants to sit.
+
+### The rail's rhythm
+
+Every league on the rail carries its own `scoreEvents`, so plays land on
+different chips across the 30s rather than one designated cell being the
+only thing that ever moves. Most chips never score, on purpose — a bar
+where everything is always erupting has no significant moments left.
+
+| frame | league | play | |
+| ----- | ------ | ---- | --- |
+| 120 | Sunday Money | catch +1.4 | 151.3, still behind by 0.4 |
+| 420 | Work League | TD +6.6 | extends a lead it already had |
+| **780** | **Sunday Money** | **TD +6.6** | **crosses — the shot** |
+| 1150 | College Buddies | big play +8.4 | takes a lead, flares |
+| 1500 | Waiver Wire Wars | FG +3 | |
+
+Eleven seconds pass between the catch and the touchdown with the score
+sitting 0.4 behind. That gap is deliberate and it is the most valuable
+part of the clip.
+
+**Chip count is arithmetic, not taste.** A chip is ~548px before
+scaling, the viewport holds 1920 of those, and the drift covers 630
+across the comp. Five puts ~3.5 on screen and lets the fifth arrive as
+the first leaves — so the bar never looks static and never runs out of
+rail. Change the duration or the drift and you have to re-check that
+each play still lands while its chip is on screen.
 
 ### Trimming
 

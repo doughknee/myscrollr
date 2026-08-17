@@ -1,5 +1,6 @@
 /**
- * A row of real chips, drifting, with one of them scoring.
+ * A row of real chips, drifting, with plays landing across the whole
+ * length of it.
  *
  * The single-chip comps sell the CHIP. This one sells the PRODUCT: a
  * bar you can lay along the top of a screen capture, where the thing
@@ -7,11 +8,18 @@
  * erupts. A chip on its own can look like a notification; a rail that
  * keeps moving while one cell reacts looks like a live feed.
  *
+ * EVERY CHIP CAN SCORE. This started with one designated hero and a
+ * list of inert neighbours, which is fine for six seconds and wrong for
+ * thirty — a bar where the same cell is the only one that ever moves
+ * reads as a mock-up of a ticker rather than a ticker. Each league now
+ * carries its own `scoreEvents` and its own reaction, so the rail has a
+ * rhythm instead of a single event.
+ *
  * Drift is linear and slow on purpose. This is an overlay that will sit
  * under cuts and titles, so it has no business easing, pulsing or
- * drawing the eye on its own — the score does that.
+ * drawing the eye on its own — the scores do that.
  */
-import { useCurrentFrame } from "remotion";
+import { useCurrentFrame, useVideoConfig } from "remotion";
 import FantasyStatChip from "../../../desktop/src/components/chips/FantasyStatChip";
 import { DEFAULT_WIDGET_DISPLAY } from "../../../desktop/src/preferences";
 import { Stage } from "./Stage";
@@ -26,58 +34,37 @@ import {
   scoreAt,
 } from "./scoring";
 
+/** A league on the rail, with its own plays. */
+export type RailLeague = LeagueChipProps & {
+  /**
+   * Plays for THIS league. Omit for a chip that just sits there being
+   * alive — most of them should, most of the time, or the bar turns
+   * into a fireworks display and nothing reads as significant.
+   */
+  scoreEvents?: ScoreEvent[];
+};
+
 export type TickerRailProps = {
-  /** The chip that scores. Rendered in the middle of the rail. */
-  hero: LeagueChipProps;
-  /** Its scoring plays. */
-  scoreEvents: ScoreEvent[];
-  /** The leagues either side, which just sit there being alive. */
-  others: LeagueChipProps[];
-  /** Pixels per frame the rail travels left. */
+  leagues: RailLeague[];
+  /** Pixels per frame the rail travels left, in pre-scale units. */
   drift?: number;
-  /** Gap between chips, in pre-scale pixels — the app's own is 8. */
+  /** Gap between chips, pre-scale — the app's own is 8. */
   gap?: number;
   scale?: number;
   plate?: boolean;
 };
 
 export function TickerRail({
-  hero,
-  scoreEvents,
-  others,
+  leagues,
   drift = 0.35,
   gap = 8,
   scale = 2,
   plate = false,
 }: TickerRailProps) {
   const frame = useCurrentFrame();
-  const score = scoreAt(frame, hero.myScore, scoreEvents);
-  const hit = impact(frame, scoreEvents);
-  // Duration is not needed here: the crossing can only happen inside the
-  // events, so scanning to the last one plus its count is sufficient and
-  // avoids making this depend on the composition's length.
-  const lastEvent = scoreEvents.reduce((n, e) => Math.max(n, e.at), 0);
-  const crossing = leadChangeFrame(
-    hero.myScore,
-    scoreEvents,
-    hero.opponentScore,
-    lastEvent + 60,
-  );
-  const flare = leadFlare(frame, crossing);
-
-  // The hero sits in the middle so there is always something either
-  // side of the reaction. A rail that erupts at its own edge reads as
-  // the bar ending rather than the league scoring.
-  const middle = Math.ceil(others.length / 2);
-  const before = others.slice(0, middle);
-  const after = others.slice(middle);
 
   return (
-    <Stage
-      scale={scale}
-      plate={plate}
-      livePulse={livePulse(frame)}
-    >
+    <Stage scale={scale} plate={plate} livePulse={livePulse(frame)}>
       <div
         style={{
           ...entrance(frame),
@@ -90,20 +77,48 @@ export function TickerRail({
           transform: `translateX(${-Math.round(frame * drift)}px)`,
         }}
       >
-        {before.map((l) => (
-          <Chip key={l.leagueName} league={l} />
-        ))}
-        {/* Only the hero reacts. The rail around it holding steady is
-            what makes this read as one league scoring rather than an
-            app-wide alert. */}
-        <Reactor impact={hit} flash={Math.max(0, hit)} flare={flare}>
-          <Chip league={hero} score={score} />
-        </Reactor>
-        {after.map((l) => (
-          <Chip key={l.leagueName} league={l} />
+        {leagues.map((league) => (
+          <RailChip key={league.leagueName} league={league} />
         ))}
       </div>
     </Stage>
+  );
+}
+
+/**
+ * One cell. Owns its own score, its own reaction and its own lead
+ * change, so two leagues scoring near each other stay independent
+ * rather than sharing one envelope.
+ */
+function RailChip({ league }: { league: RailLeague }) {
+  const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
+  const events = league.scoreEvents ?? [];
+
+  if (events.length === 0) {
+    // No plays: render flat and skip the wrapper entirely. A Reactor
+    // that never fires is a transform and an overlay span per chip per
+    // frame, and on a rail this is most of them.
+    return <Chip league={league} score={league.myScore} />;
+  }
+
+  const score = scoreAt(frame, league.myScore, events);
+  const hit = impact(frame, events);
+  const crossing = leadChangeFrame(
+    league.myScore,
+    events,
+    league.opponentScore,
+    durationInFrames,
+  );
+
+  return (
+    <Reactor
+      impact={hit}
+      flash={Math.max(0, hit)}
+      flare={leadFlare(frame, crossing)}
+    >
+      <Chip league={league} score={score} />
+    </Reactor>
   );
 }
 
@@ -112,12 +127,11 @@ function Chip({
   score,
 }: {
   league: LeagueChipProps;
-  /** Overrides the static score — only the hero passes one. */
-  score?: number;
+  score: number;
 }) {
   return (
     <FantasyStatChip
-      league={buildLeague(league, score ?? league.myScore)}
+      league={buildLeague(league, score)}
       prefs={DEFAULT_WIDGET_DISPLAY.fantasy}
       comfort
       colorMode="widget"
