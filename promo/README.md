@@ -169,11 +169,11 @@ and the neighbours holding steady is exactly what makes the reacting one
 feel live. (This was a real bug first — the reaction lived on the stage
 and lit all three.)
 
-**The chip has no fill.** In the app its background is a 6% wash that
-reads against the dark bar behind it. Standing alone there is nothing
-behind it, so it composites as glass — border and text only. That looks
-good over calm footage and gets unreadable over busy footage. Pass
-`"plate": true` to give it the app's own surface colour as a ground.
+**The chip is nearly transparent.** Its fill is the app's own 6% wash,
+which is subtle by design — it reads against the dark bar behind it in
+the product, and over footage it composites as tinted glass. That looks
+good over calm footage and gets hard to read over busy footage. Pass
+`"plate": true` to give it the app's surface colour as a solid ground.
 
 **The score digits don't roll.** `rollScore` is deliberately off. The
 roll is Motion-driven and Motion animates through WAAPI on the document
@@ -188,6 +188,16 @@ pure function of the frame instead.
   encoder receives opaque images and writes an opaque file no matter what
   codec you ask for. It fails silently: the render succeeds, the file
   really is ProRes 4444, and only ffprobe tells you the alpha is gone.
+- **`@source` in `src/styles.css` must cover `.ts`, not just `.tsx`.**
+  The app's own directives are `*.tsx` only, and every chip's border,
+  background and text class is a string in `chipColors.ts` — a `.ts`
+  file. Tailwind never scanned it, so `border-accent-purple/25` and
+  `bg-accent-purple/[0.06]` were never generated. That does not fail
+  loudly: the border silently fell back to Tailwind's `currentColor`
+  default, inherited the light body foreground, and drew a hard white
+  1px line on every chip, while the fill simply did not exist. The app
+  is unaffected — its Tailwind content detection walks from `desktop/`
+  and finds the `.ts` files anyway; here the detection root is `promo/`.
 - **Prop types are `type` aliases, not `interface`s.** Remotion's
   `Composition` needs props assignable to `Record<string, unknown>`, and
   TypeScript gives an implicit index signature to type aliases but not to

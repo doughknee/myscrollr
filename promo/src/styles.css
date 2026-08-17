@@ -14,6 +14,27 @@
  */
 @import "../../desktop/src/style.css";
 
+/*
+ * THE APP'S OWN @source LINES ARE `*.tsx` ONLY, AND THAT LOSES CLASSES.
+ *
+ * `chipColors.ts` is a .ts file, and it is where every chip's border,
+ * background and text classes are defined as strings. Tailwind never
+ * scanned it here, so `border-accent-purple/25` and
+ * `bg-accent-purple/[0.06]` were never generated — which does not fail
+ * loudly. The border silently fell back to Tailwind's default of
+ * `currentColor`, inheriting the light body foreground, and rendered as
+ * a hard white 1px line on every chip. The 6% fill simply never existed.
+ *
+ * In the app this does not bite, because Tailwind's automatic content
+ * detection walks the project from desktop/ and picks the .ts files up
+ * anyway. Here the detection root is promo/, so desktop/src is covered
+ * ONLY by those explicit .tsx globs.
+ *
+ * Scanning both extensions across the app's source fixes it at the
+ * root, rather than restyling the chip to hide it.
+ */
+@source "../../desktop/src/**/*.{ts,tsx}";
+
 @source "./**/*.tsx";
 
 
