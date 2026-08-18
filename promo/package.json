@@ -12,7 +12,8 @@
     "render:variant": "remotion render LeagueChip out/dynasty.mov --codec=prores --prores-profile=4444 --props=variants/dynasty.json",
     "check:alpha": "remotion ffprobe out/league-chip.mov",
     "typecheck": "tsc --noEmit",
-    "render:rail": "remotion render TickerRail out/ticker-rail.mov --codec=prores --prores-profile=4444"
+    "render:rail": "remotion render TickerRail out/ticker-rail.mov --codec=prores --prores-profile=4444",
+    "render:themes": "node scripts/render-themes.mjs"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.0",

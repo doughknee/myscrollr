@@ -39,6 +39,8 @@ export type ScorePopProps = {
   /** How far past its final size it overshoots. 0 disables the bounce. */
   bounce?: number;
   scale?: number;
+  /** `[data-theme]` palette to render under. */
+  theme?: string;
 }
 
 export function ScorePop({
@@ -49,6 +51,7 @@ export function ScorePop({
   countUpFrom,
   bounce = 0.34,
   scale = 2,
+  theme,
 }: ScorePopProps) {
   const frame = useCurrentFrame();
   const shown = countUp(frame, value, countUpFrom);
@@ -65,7 +68,7 @@ export function ScorePop({
   const sign = showSign && shown > 0 ? "+" : "";
 
   return (
-    <Stage scale={scale}>
+    <Stage scale={scale} theme={theme}>
       <div
         style={{
           transform: `scale(${s})`,

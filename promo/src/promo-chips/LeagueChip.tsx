@@ -75,6 +75,8 @@ export type LeagueChipProps = {
   scale?: number;
   /** Give the chip an opaque ground — see Stage. */
   plate?: boolean;
+  /** `[data-theme]` palette to render under. */
+  theme?: string;
 }
 
 export function LeagueChip(props: LeagueChipProps) {
@@ -104,6 +106,7 @@ export function LeagueChip(props: LeagueChipProps) {
     <Stage
       scale={props.scale ?? 2}
       plate={props.plate}
+      theme={props.theme}
       // Only a live matchup has a dot to pulse.
       livePulse={props.status === "live" ? livePulse(frame) : undefined}
     >

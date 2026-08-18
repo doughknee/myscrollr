@@ -52,6 +52,8 @@ export type TickerRailProps = {
   gap?: number;
   scale?: number;
   plate?: boolean;
+  /** `[data-theme]` palette to render under. */
+  theme?: string;
 };
 
 export function TickerRail({
@@ -60,11 +62,17 @@ export function TickerRail({
   gap = 8,
   scale = 2,
   plate = false,
+  theme,
 }: TickerRailProps) {
   const frame = useCurrentFrame();
 
   return (
-    <Stage scale={scale} plate={plate} livePulse={livePulse(frame)}>
+    <Stage
+      scale={scale}
+      plate={plate}
+      theme={theme}
+      livePulse={livePulse(frame)}
+    >
       <div
         style={{
           ...entrance(frame),

@@ -34,6 +34,7 @@ export function Stage({
   scale = 2,
   plate = false,
   livePulse,
+  theme = "scrollr-dark",
 }: {
   children: ReactNode;
   /** Multiplier on the chip's real ticker size. */
@@ -64,6 +65,13 @@ export function Stage({
    * than failing. It's worth it to keep the shipped component untouched.
    */
   livePulse?: number;
+  /**
+   * Which `[data-theme]` palette to render under. Every colour on the
+   * chip resolves through it — accent, up/down, surfaces — so this is
+   * the only thing that needs to change to render the same chips in a
+   * different skin.
+   */
+  theme?: string;
 }) {
   return (
     <AbsoluteFill
@@ -79,7 +87,7 @@ export function Stage({
       )}
       <div
         id="app-shell"
-        data-theme="scrollr-dark"
+        data-theme={theme}
         style={{
           // The plate is the chip's own surface token, not a picked
           // grey, so it tracks the theme rather than drifting from it.

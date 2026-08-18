@@ -24,6 +24,69 @@ const FPS = 60;
 const SIX_SECONDS = 6 * FPS;
 /** The rail is a bed, not a beat — it runs under a whole section. */
 const THIRTY_SECONDS = 30 * FPS;
+/** Long enough to read the chips and see one play land. */
+const FIVE_SECONDS = 5 * FPS;
+
+/**
+ * The rail used for the theme montage.
+ *
+ * Three chips rather than five: at 5s there is no time for a fourth to
+ * arrive, and the whole point is that every clip frames IDENTICALLY so
+ * a cut between two themes reads as the skin changing and nothing else.
+ * Same reason the drift is slower — over 300 frames it travels 60px,
+ * enough to look alive, not enough to reframe.
+ *
+ * One play, at f90, and it crosses. Every theme therefore gets the same
+ * moment, which is what makes the colours comparable: the flash and the
+ * lead ring are themed too, so the montage shows off `--color-up` as
+ * well as the accent.
+ */
+const THEME_RAIL_LEAGUES = [
+  {
+    leagueName: "Dynasty or Bust",
+    teamName: "Regression Candidates",
+    opponentName: "Air Yards Only",
+    week: 12,
+    status: "final" as const,
+    myScore: 184.5,
+    opponentScore: 151.0,
+    projection: 184.5,
+    topScorer: { name: "Allen", team: "BUF", position: "QB", points: 36.9 },
+    record: { wins: 9, losses: 2 },
+    rank: 1,
+    numTeams: 8,
+  },
+  {
+    leagueName: "The Sunday Money League",
+    teamName: "Brunch Money",
+    opponentName: "Fourth and Long",
+    week: 12,
+    status: "live" as const,
+    myScore: 149.9,
+    opponentScore: 151.7,
+    projection: 168.8,
+    topScorer: { name: "Hurts", team: "PHI", position: "QB", points: 28.1 },
+    record: { wins: 8, losses: 3 },
+    rank: 2,
+    numTeams: 8,
+    streak: { type: "win" as const, value: 3 },
+    scoreEvents: [{ at: 90, points: 6.6, kind: "td" as const }],
+  },
+  {
+    leagueName: "Work League (Keeper)",
+    teamName: "Third and Inches",
+    opponentName: "Gridiron Ghosts",
+    week: 12,
+    status: "live" as const,
+    myScore: 90.9,
+    opponentScore: 83.6,
+    projection: 101.3,
+    topScorer: { name: "St. Brown", team: "DET", position: "WR", points: 21.9 },
+    record: { wins: 6, losses: 5 },
+    rank: 4,
+    numTeams: 8,
+  },
+];
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -238,6 +301,24 @@ export const RemotionRoot: React.FC = () => {
           ],
           drift: 0.35,
           scale: 2,
+        }}
+      />
+
+      <Composition
+        id="ThemeRail"
+        component={TickerRail}
+        durationInFrames={FIVE_SECONDS}
+        fps={FPS}
+        width={3840}
+        height={280}
+        defaultProps={{
+          leagues: THEME_RAIL_LEAGUES,
+          drift: 0.2,
+          scale: 2,
+          // Overridden per theme by scripts/render-themes.mjs. The
+          // default is the house palette so the comp is useful on its
+          // own in the studio.
+          theme: "scrollr-dark",
         }}
       />
 

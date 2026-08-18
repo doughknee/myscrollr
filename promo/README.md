@@ -24,6 +24,7 @@ or one at a time: `render:league`, `render:player`, `render:rail`,
 | `PlayerChip` | 1280x520 | one player, points against projection |
 | `TickerRail` | 3840x280 | **30s** — five leagues, five plays landing across the length |
 | `ScorePop` | 1080x520 | a `+13.6 PTS` pill for a music hit |
+| `ThemeRail` | 3840x280 | 5s — the same chips, rendered once per dark theme |
 
 The first three are 6s beats. **`TickerRail` is 30s** — it is a bed, not
 a beat, meant to run along the top of a whole section rather than being
@@ -48,6 +49,36 @@ node scripts/preview-alpha.mjs out/frame.png out/on-grey.png 70
 
 A transparent PNG opened on its own tells you nothing, because the viewer
 picks the backdrop. That script forces the question.
+
+## Theme montage
+
+```bash
+npm run render:themes                          # all ten
+node scripts/render-themes.mjs nord-dark       # just one
+```
+
+Ten clips into `out/themes/`, one per dark theme, 5s each. Identical in
+every respect except the palette — same leagues, same scores, the same
+play landing on the same frame — so a cut between any two reads as the
+skin changing and nothing else.
+
+Themes override `--color-accent-purple`, `--color-up` and `--color-down`
+as well as the surfaces, so the border, the score colour and the flash
+on a scoring play all change together. Gruvbox comes out warm yellow,
+Rose Pine cool blue-grey, and so on.
+
+`ThemeRail` uses three chips rather than the rail's five, and a slower
+drift: at 5s there is no time for a fourth chip to arrive, and the
+montage only works if every clip frames identically. The single play
+lands at f90 and crosses, so each theme gets the same moment.
+
+**`scrollr-dark` has no `[data-theme]` block** — it *is* the `@theme`
+default, so a list built by grepping the stylesheet finds nine and
+silently drops the house palette. The canonical list lives in
+`src/promo-chips/themes.ts`; the render script reads it and then asserts
+that every `*-dark` selector in the app's stylesheet appears in it, so
+adding a theme to the product fails loudly here instead of quietly
+shipping a montage that is missing one.
 
 ## Variants without touching code
 

@@ -56,6 +56,8 @@ export type PlayerChipProps = {
   scale?: number;
   /** Give the chip an opaque ground — see Stage. */
   plate?: boolean;
+  /** `[data-theme]` palette to render under. */
+  theme?: string;
 }
 
 const PLAYER_KEY = "449.p.promo";
@@ -74,6 +76,7 @@ export function PlayerChip(props: PlayerChipProps) {
     <Stage
       scale={props.scale ?? 2}
       plate={props.plate}
+      theme={props.theme}
     >
       <div style={entrance(frame)}>
         <Reactor impact={hit} flash={Math.max(0, hit)}>
