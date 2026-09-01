@@ -135,23 +135,24 @@ func yahooUserServer(calls *int32, inspect func(*http.Request)) *httptest.Server
 	}))
 }
 
-// TestYahooCallbackWithoutRefreshTokenNeverLinks is the reported bug.
+// TestYahooCallbackWithoutRefreshTokenStillLinks covers the bug this
+// file was written to pin down, now fixed.
 //
 // Yahoo issues a refresh token on FIRST consent. On a reconnect the user
-// re-authenticates — the consent URL sends prompt=login, which forces a
-// fresh login but not fresh consent — and the token response can come
-// back with an access token and no refresh token.
+// re-authenticates — /yahoo/start sends prompt=login, a fresh login but
+// not fresh consent — so the token response can carry an access token
+// and no refresh token.
 //
-// YahooCallback gates all linking on `token.RefreshToken != ""` and
-// returns the success page either way. So the browser says
-// "Authentication successful", the user closes it, and the desktop app
-// polls /users/me/yahoo-status forever against a row that was never
-// written, until the five-minute client timeout reports a failure that
-// looks like Yahoo's fault.
+// The handler used to gate ALL linking on `token.RefreshToken != ""`
+// and serve the success page either way: the browser said
+// "Authentication successful", nothing was written, and the desktop app
+// polled a row that did not exist until its five-minute timeout blamed
+// Yahoo. Shape: worked the first time, silently failed forever after.
 //
-// The assertion that matters is the last one: Yahoo's user endpoint is
-// never called, so no link is even attempted.
-func TestYahooCallbackWithoutRefreshTokenNeverLinks(t *testing.T) {
+// It now links regardless, reusing the refresh token already stored for
+// that Yahoo account. This test asserts the link is ATTEMPTED — the
+// exact assertion that was inverted before the fix.
+func TestYahooCallbackWithoutRefreshTokenStillLinks(t *testing.T) {
 	var linkAttempts int32
 	apiSrv := yahooUserServer(&linkAttempts, nil)
 	defer apiSrv.Close()
@@ -171,23 +172,49 @@ func TestYahooCallbackWithoutRefreshTokenNeverLinks(t *testing.T) {
 		t.Fatalf("request: %v", err)
 	}
 	defer resp.Body.Close()
+
+	// The assertion that was inverted before the fix: linking is now
+	// attempted rather than skipped.
+	if n := atomic.LoadInt32(&linkAttempts); n == 0 {
+		t.Error("no link attempted without a refresh token — the original bug is back")
+	}
+}
+
+// TestYahooCallbackWithoutRefreshTokenDoesNotClaimSuccess is the other
+// half of the same fix.
+//
+// The stub Yahoo endpoint returns no user, so the link fails. What
+// matters is that the failure REACHES THE USER. Previously any response
+// without a refresh token produced a 200 and "Authentication
+// successful" no matter what happened underneath, which is what made
+// this so hard to diagnose from the outside.
+func TestYahooCallbackWithoutRefreshTokenDoesNotClaimSuccess(t *testing.T) {
+	var linkAttempts int32
+	apiSrv := yahooUserServer(&linkAttempts, nil)
+	defer apiSrv.Close()
+
+	tokenSrv := tokenServer(t, "")
+	defer tokenSrv.Close()
+
+	app, fiberApp := newOAuthTestApp(t, tokenSrv, apiSrv)
+	const state = "state-no-refresh-no-success"
+	seedState(t, app, state, "logto|user-123")
+
+	resp, err := fiberApp.Test(
+		httptest.NewRequest("GET", "/yahoo/callback?state="+state+"&code=abc123", nil),
+		testTimeoutMs,
+	)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 
-	if resp.StatusCode != fiber.StatusOK {
-		t.Errorf("status = %d, want %d", resp.StatusCode, fiber.StatusOK)
+	if resp.StatusCode == fiber.StatusOK {
+		t.Errorf("status = 200 for a link that failed; the user is being told it worked")
 	}
-	if !strings.Contains(string(body), "Authentication successful") {
-		t.Errorf("body did not report success to the user; got %q", string(body))
-	}
-
-	// The bug, stated plainly: the user was told it worked and nothing
-	// was linked. When this is fixed the callback must either link
-	// without a refresh token or report the failure — either way this
-	// assertion changes, and it should change deliberately.
-	if n := atomic.LoadInt32(&linkAttempts); n != 0 {
-		t.Errorf("Yahoo user endpoint called %d times; expected 0 with no refresh token", n)
-	} else {
-		t.Log("CONFIRMED: success page returned to the user while no link was attempted")
+	if strings.Contains(string(body), "Authentication successful") {
+		t.Error("page claims success for a link that failed")
 	}
 }
 
@@ -288,10 +315,7 @@ func TestYahooCallbackRejectsUnknownState(t *testing.T) {
 // replayed inside the ten-minute window; this proves the GETDEL is doing
 // that job rather than a plain GET that happens to pass.
 func TestYahooCallbackStateIsSingleUse(t *testing.T) {
-	// Deliberately the no-refresh-token server: this test is about state
-	// reuse, and with a refresh token the handler would try to link,
-	// fail against the stub, and answer 409 — true, but noise here.
-	tokenSrv := tokenServer(t, "")
+	tokenSrv := tokenServer(t, "test-refresh-token")
 	defer tokenSrv.Close()
 
 	var linkAttempts int32
@@ -309,8 +333,12 @@ func TestYahooCallbackStateIsSingleUse(t *testing.T) {
 		t.Fatalf("first request: %v", err)
 	}
 	first.Body.Close()
-	if first.StatusCode != fiber.StatusOK {
-		t.Fatalf("first callback status = %d, want %d", first.StatusCode, fiber.StatusOK)
+	// Not asserting 200: the stub Yahoo endpoint returns no user, so the
+	// link legitimately fails. What matters here is that the state was
+	// ACCEPTED and consumed — anything but 400 proves it got past the
+	// CSRF check.
+	if first.StatusCode == fiber.StatusBadRequest {
+		t.Fatalf("first callback rejected the state it was given (status %d)", first.StatusCode)
 	}
 
 	second, err := fiberApp.Test(httptest.NewRequest("GET", target, nil), testTimeoutMs)

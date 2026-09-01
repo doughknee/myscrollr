@@ -143,10 +143,24 @@ func (a *App) YahooCallback(c *fiber.Ctx) error {
 	log.Printf("[YahooCallback] Token exchange succeeded — access_token_len=%d refresh_token_present=%v expires=%v",
 		len(token.AccessToken), token.RefreshToken != "", token.Expiry)
 
-	if token.RefreshToken != "" {
-		// Fetch GUID and persist — synchronous so we can return an error page
-		// if linking fails.
-		log.Printf("[YahooCallback] Linking Yahoo account (logto_sub=%s)…", logtoSub)
+	{
+		// ALWAYS link, even without a refresh token in this response.
+		//
+		// This used to be gated on `token.RefreshToken != ""`, which meant
+		// a response without one skipped linking entirely and STILL served
+		// the success page below. Yahoo issues a refresh token on first
+		// consent, and /yahoo/start sends prompt=login — a fresh login, not
+		// fresh consent — so a reconnect legitimately arrives without one.
+		// The result was: works the first time, silently fails forever
+		// after, with the desktop app polling a row that was never written
+		// until its five-minute timeout blamed Yahoo.
+		//
+		// fetchAndLinkYahooUser now falls back to the token already stored
+		// for this Yahoo account, and returns an error when there is none —
+		// so a genuine failure reaches the error page instead of being
+		// reported as success.
+		log.Printf("[YahooCallback] Linking Yahoo account (logto_sub=%s, refresh_token_in_response=%v)…",
+			logtoSub, token.RefreshToken != "")
 		linkErr := a.fetchAndLinkYahooUser(token.AccessToken, token.RefreshToken, logtoSub)
 		if linkErr != nil {
 			log.Printf("[YahooCallback] Failed to link Yahoo account: %v", linkErr)
@@ -162,8 +176,6 @@ func (a *App) YahooCallback(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusConflict).SendString(html)
 		}
 		log.Printf("[YahooCallback] Yahoo account linked successfully")
-	} else {
-		log.Println("[YahooCallback] Warning: No refresh token received from Yahoo")
 	}
 
 	frontendURL := resolveFrontendURL()
@@ -228,6 +240,27 @@ func (a *App) fetchAndLinkYahooUser(accessToken, refreshToken, logtoSub string) 
 		return fmt.Errorf("empty GUID in Yahoo response")
 	}
 
+	// Yahoo only issues a refresh token on first consent, so a reconnect
+	// can arrive without one. The token already stored for this Yahoo
+	// account is still valid, so reuse it rather than refusing to link.
+	//
+	// This has to happen HERE: after the GUID is known, and before the
+	// takeover and replace-old-link branches below, either of which can
+	// delete the very row the token would be read from.
+	//
+	// Refusing outright when there is nothing stored is deliberate — that
+	// is a first-time connect that genuinely cannot be completed, and the
+	// caller turns this error into the failure page rather than claiming
+	// success.
+	if refreshToken == "" {
+		stored, storedErr := a.storedRefreshToken(guid)
+		if storedErr != nil {
+			return fmt.Errorf("no refresh token in the Yahoo response and none stored for guid %s: %w", guid, storedErr)
+		}
+		log.Printf("[fetchAndLinkYahooUser] No refresh token in response — reusing the stored one for guid=%s", guid)
+		refreshToken = stored
+	}
+
 	// Use the logto_sub if available, otherwise fall back to Yahoo GUID
 	logtoIdentifier := logtoSub
 	if logtoIdentifier == "" {
@@ -286,6 +319,33 @@ func (a *App) fetchAndLinkYahooUser(accessToken, refreshToken, logtoSub string) 
 	}
 
 	return nil
+}
+
+// storedRefreshToken returns the decrypted refresh token already on file
+// for a Yahoo account, or an error when there is none to reuse.
+//
+// Used when Yahoo re-authenticates a user without issuing a new refresh
+// token. Reads by GUID rather than logto_sub because the GUID is the
+// stable Yahoo identity — it survives the account being re-linked to a
+// different Scrollr user.
+func (a *App) storedRefreshToken(guid string) (string, error) {
+	var encrypted string
+	if err := a.db.QueryRow(context.Background(),
+		"SELECT refresh_token FROM yahoo_users WHERE guid = $1", guid,
+	).Scan(&encrypted); err != nil {
+		return "", fmt.Errorf("look up stored refresh token: %w", err)
+	}
+	if encrypted == "" {
+		return "", fmt.Errorf("stored refresh token is empty")
+	}
+	plaintext, err := Decrypt(encrypted)
+	if err != nil {
+		return "", fmt.Errorf("decrypt stored refresh token: %w", err)
+	}
+	if plaintext == "" {
+		return "", fmt.Errorf("decrypted refresh token is empty")
+	}
+	return plaintext, nil
 }
 
 // =============================================================================
