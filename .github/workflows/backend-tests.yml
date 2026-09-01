@@ -105,7 +105,12 @@ jobs:
           cache: true
           cache-dependency-path: ${{ matrix.modroot }}/go.sum
 
-      - run: go test ./...
+      # -v so SKIPs are visible. Several tests here gate on a service
+      # being present (TEST_DATABASE_URL, TEST_REDIS_URL) and skip
+      # silently otherwise, and without -v a fully-skipped suite is
+      # indistinguishable from a passing one — which is exactly how a
+      # missing service goes unnoticed.
+      - run: go test -v ./...
         env:
           TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/scrollr_test?sslmode=disable
           TEST_REDIS_URL: redis://localhost:6379/0
