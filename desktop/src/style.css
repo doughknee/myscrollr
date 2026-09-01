@@ -1139,6 +1139,54 @@
   }
 }
 
+/* Score-change flash — a ring and a wash across the whole chip, fired
+   once when the number moves. Distinct from .pts-flash above, which
+   loops to signal "live"; this one is an EVENT, so it must not repeat.
+
+   The ring is inset so it reads on a chip that already has a border,
+   and `border-radius: inherit` keeps it on the chip's corners rather
+   than assuming a radius that could drift from chipBaseClasses.
+
+   Not listed in the #app-shell exceptions below, deliberately: the app
+   stills it and the ticker window flashes. */
+@keyframes chipFlash {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.chip-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+  box-shadow: inset 0 0 0 1.5px var(--color-up);
+  background-color: color-mix(in srgb, var(--color-up) 14%, transparent);
+  animation: chipFlash 900ms ease-out 1;
+}
+
+.chip-flash-down {
+  box-shadow: inset 0 0 0 1.5px var(--color-down);
+  background-color: color-mix(in srgb, var(--color-down) 14%, transparent);
+}
+
+/* No static fallback here, unlike .pts-flash. That one conveys an
+   ongoing STATE, which must survive without motion; this marks a moment
+   that has already passed, and a permanent ring on every chip that ever
+   scored would be worse than no cue at all. */
+@media (prefers-reduced-motion: reduce) {
+  .chip-flash {
+    animation: none;
+  }
+}
+
 /* The main app is intentionally motion-free. */
 #app-shell,
 #app-shell *,

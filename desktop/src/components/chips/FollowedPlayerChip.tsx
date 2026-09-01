@@ -26,8 +26,14 @@ import type {
   RosterPlayer,
 } from "../../datawidgets/fantasy/types";
 import { isInjured, shortStatus } from "../../datawidgets/fantasy/playerStats";
-import { getChipColors, chipBaseClasses } from "./chipColors";
+import {
+  getChipColors,
+  chipBaseClasses,
+  stableNum,
+  NUM_WIDTH,
+} from "./chipColors";
 import { ChipSpine } from "./ChipSpine";
+import { ChipFlash, useChangeFlash } from "./ChipFlash";
 import { gameStateForPlayer } from "../../datawidgets/fantasy/types";
 
 /**
@@ -86,6 +92,12 @@ export default function FollowedPlayerChip({
   onClick,
 }: FollowedPlayerChipProps) {
   const found = findPlayerByKey(playerKey, leagues, leagueKey);
+  // Above the early return on purpose — hooks can't sit behind a
+  // conditional, and this component bails when the player isn't in any
+  // roster. Passing null while unresolved is harmless: the hook ignores
+  // a first real value, so a player appearing mid-game doesn't flash
+  // merely for existing.
+  const flashToken = useChangeFlash(found?.player.player_points ?? null);
   if (!found) return null;
 
   const { player, leagueName, ownerTeamName } = found;
@@ -127,6 +139,7 @@ export default function FollowedPlayerChip({
       className={chipBaseClasses(comfort, c, "font-mono whitespace-nowrap")}
       title={`${player.name.full}${teamAbbr ? ` (${teamAbbr})` : ""}`}
     >
+      <ChipFlash token={flashToken} tone={tone === "down" ? "down" : "up"} />
       {/* Spine: progress against this player's own projection, so the
           bar answers "are they having a good day" rather than repeating
           the raw number beside it. Hidden without a projection — a bar
@@ -170,6 +183,7 @@ export default function FollowedPlayerChip({
           </span>
         )}
         <span
+          style={stableNum(NUM_WIDTH.playerPoints)}
           className={clsx(
             "tabular-nums font-medium",
             tone === "up" && "text-up",

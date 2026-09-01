@@ -53,11 +53,13 @@
 
 import { createServer, request as httpRequest } from 'node:http'
 import {
+  MOMENTS,
   PANEL_HTML,
   applyControl,
   controlState,
   emptyOps,
   nudgeFrame,
+  resolveWho,
 } from './control-panel.mjs'
 
 // ── Scoring ──────────────────────────────────────────────────────
@@ -742,6 +744,48 @@ function readJson(req) {
   })
 }
 
+/**
+ * Run a scripted moment, nudging the app after every step.
+ *
+ * Fire-and-forget: the HTTP response returns immediately so the panel
+ * stays responsive while the sequence plays out over several seconds.
+ * Each step re-reads the CURRENT state, which is what lets a step ask
+ * for "whatever it takes to lead" rather than a number decided before
+ * the previous step landed.
+ */
+function runMoment(moment) {
+  for (const step of moment.steps) {
+    setTimeout(() => {
+      const state = controlState(currentPayload())
+      // Every moment acts on the one league that can carry a story:
+      // the first still live. A FINAL league has nothing left to do.
+      const league = state.leagues.find((l) => !l.final) ?? state.leagues[0]
+      if (!league) return
+
+      if (step.kind === 'final') {
+        ops.final[league.key] = true
+      } else {
+        const player = resolveWho(league, step.who)
+        if (!player) return
+        if (step.kind === 'out') {
+          ops.out[player] = true
+        } else {
+          const delta =
+            step.delta === 'lead'
+              ? round2(league.opp.points - league.me.points + 0.1)
+              : step.delta
+          // A 'lead' step when already ahead would subtract points and
+          // play the moment backwards. Nudge it forward instead.
+          const safe = step.delta === 'lead' && delta <= 0 ? 0.4 : delta
+          ops.points[player] = round2((ops.points[player] ?? 0) + safe)
+        }
+      }
+      console.log(`[fantasy-demo] moment ${moment.id} +${step.at}ms`)
+      nudgeClients()
+    }, step.at)
+  }
+}
+
 /** Panel routes. Returns true if it handled the request. */
 async function control(req, res, path) {
   if (path === '/' || path === '/control') {
@@ -752,6 +796,14 @@ async function control(req, res, path) {
   if (path === '/control/state') {
     res.writeHead(200, { 'content-type': 'application/json' })
     res.end(JSON.stringify(controlState(currentPayload(), sseClients.size)))
+    return true
+  }
+  if (path === '/control/moment') {
+    const { id } = await readJson(req)
+    const moment = MOMENTS.find((m) => m.id === id)
+    if (moment) runMoment(moment)
+    res.writeHead(moment ? 200 : 404, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ ok: !!moment }))
     return true
   }
   if (path === '/control/op') {

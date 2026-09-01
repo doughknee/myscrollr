@@ -1,0 +1,55 @@
+/*
+ * Pulls in the app's own stylesheet so the chips render with the real
+ * palette rather than a copy that drifts. Tailwind v4's `@source`
+ * directives inside it are relative to THAT file, so its
+ * `./components/**` scan still finds the chips correctly from here.
+ *
+ * The extra @source below adds this project's own files, which the
+ * app's stylesheet obviously doesn't know about.
+ *
+ * No web font import. The film that used to live here set its supers in
+ * Barlow Condensed; these compositions render only chips, which take
+ * their face from the app's own --font-mono. Fetching a font nothing
+ * uses just adds a network round trip to every render.
+ */
+@import "../../desktop/src/style.css";
+
+/*
+ * THE APP'S OWN @source LINES ARE `*.tsx` ONLY, AND THAT LOSES CLASSES.
+ *
+ * `chipColors.ts` is a .ts file, and it is where every chip's border,
+ * background and text classes are defined as strings. Tailwind never
+ * scanned it here, so `border-accent-purple/25` and
+ * `bg-accent-purple/[0.06]` were never generated — which does not fail
+ * loudly. The border silently fell back to Tailwind's default of
+ * `currentColor`, inheriting the light body foreground, and rendered as
+ * a hard white 1px line on every chip. The 6% fill simply never existed.
+ *
+ * In the app this does not bite, because Tailwind's automatic content
+ * detection walks the project from desktop/ and picks the .ts files up
+ * anyway. Here the detection root is promo/, so desktop/src is covered
+ * ONLY by those explicit .tsx globs.
+ *
+ * Scanning both extensions across the app's source fixes it at the
+ * root, rather than restyling the chip to hide it.
+ */
+@source "../../desktop/src/**/*.{ts,tsx}";
+
+@source "./**/*.tsx";
+
+
+@source "./**/*.tsx";
+
+/*
+ * Video is not a webpage: it renders at a fixed size and gets scaled by
+ * the player, so the browser default of 16px root and the app's own
+ * responsive assumptions don't apply. Compositions set their own scale
+ * explicitly.
+ */
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}

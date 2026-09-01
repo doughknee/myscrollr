@@ -47,6 +47,16 @@ export function ChipSpine({ fill, state, tone = "accent" }: ChipSpineProps) {
         data-motion={state === "live" ? "spine-glow" : undefined}
         className={clsx(
           "absolute inset-y-0 left-0",
+          // Slide the fill rather than jumping it. The score's digits
+          // roll over ~1.8s, and a spine that snapped to its new width
+          // in one frame made the two read as unrelated — the bar had
+          // already finished before the number started.
+          //
+          // A transition, not an animation, and that matters: the
+          // `#app-shell` blanket rule kills both, so the app keeps its
+          // still bar while the ticker window slides. Same markup, right
+          // behaviour in each, no second code path.
+          "transition-[width] duration-[1600ms] ease-out",
           tone === "up" && "bg-up",
           tone === "down" && "bg-down",
           tone === "accent" && "bg-current",
