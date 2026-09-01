@@ -22,6 +22,13 @@ COPY myscrollr.com/ ./myscrollr.com/
 # during prebuild (shared CI runner IPs exhaust the anonymous 60/hr).
 # Builder-stage only; the final image is a separate stage.
 ARG GITHUB_TOKEN
+# Propagates the CI signal INTO the build. Without it every container
+# build looks like local dev to the prebuild scripts, so
+# fetch-latest-version.mjs took its offline fallback and shipped a
+# download button advertising 1.0.18 (2026-09-01). The script has a
+# guard that exits non-zero in CI precisely to stop that; the guard was
+# fine, it just never saw CI=true.
+ARG CI
 # Required: Motion+ registry token for scripts/ensure-motion-plus.mjs
 # (motion-plus is deliberately absent from package.json — this repo is
 # public and the install URL embeds the private token). Builder-stage

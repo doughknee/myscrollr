@@ -48,10 +48,22 @@ const OUTPUT_PATH = new URL(
 const IS_CI = process.env.CI === 'true' || process.env.CI === '1'
 
 async function fetchLatestReleaseFromGitHub() {
+  // Authenticated when a token is available, exactly like its sibling
+  // fetch-releases.mjs. This script did not send the header and that is
+  // what shipped a fallback version to production on 2026-09-01: the
+  // anonymous limit is 60/hr per IP, GitHub Actions runners share IPs,
+  // and the website build lost the race and got a 403. The token was
+  // already being handed to the container (deploy.yml passes
+  // GITHUB_TOKEN=$GH_API_TOKEN, the Dockerfile declares the ARG) — this
+  // was the one consumer that never picked it up.
+  const headers = { 'User-Agent': 'myscrollr.com prebuild' }
+  if (process.env.GITHUB_TOKEN) {
+    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`
+  }
   const res = await fetch(
     `https://api.github.com/repos/${REPO}/releases/latest`,
     {
-      headers: { 'User-Agent': 'myscrollr.com prebuild' },
+      headers,
       signal: AbortSignal.timeout(10_000),
     },
   )
