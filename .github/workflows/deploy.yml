@@ -290,7 +290,8 @@ jobs:
               "SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN" \
               "SENTRY_ORG=$SENTRY_ORG" \
               "MOTION_PLUS_TOKEN=$MOTION_PLUS_TOKEN" \
-              "GITHUB_TOKEN=$GH_API_TOKEN"; do
+              "GITHUB_TOKEN=$GH_API_TOKEN" \
+              "CI=true"; do
               BUILD_ARGS="$BUILD_ARGS --build-arg $arg"
             done
           fi
