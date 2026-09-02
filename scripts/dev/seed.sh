@@ -153,12 +153,37 @@ capture() {
 # trades, standings, teams and the tracked_* config tables carry no
 # time-relative read, so they are restored as-is.
 REBASE_SQL="
--- Slide the whole article window forward so its newest item lands ~1h ago,
--- preserving relative spacing rather than collapsing every item onto now().
-UPDATE rss_items SET published_at = published_at
-  + (now() - interval '1 hour' - (SELECT max(published_at) FROM rss_items))
+-- ONE delta for everything, taken from the freshest WRITE in the snapshot.
+--
+-- The first version of this anchored each table on the max of the column it
+-- was shifting -- for games, max(start_time). That is the wrong end of the
+-- data. A snapshot contains fixtures scheduled far beyond \"now\": the F1
+-- calendar runs months ahead, so pinning the LAST race to now+3h dragged every
+-- other league backwards with it and landed the entire MLB and MLS schedule in
+-- May, four months in the past. Zero games fell inside the +/-7 day window the
+-- widgets filter on, so a correctly working app rendered nothing.
+--
+-- max(updated_at) is when the ingester last wrote a row, which approximates
+-- the moment of capture. Shifting everything by (now - that) preserves each
+-- record's true relationship to \"now\": a game that was two days out when the
+-- snapshot was taken is two days out today, and a fixture scheduled months
+-- ahead stays months ahead.
+--
+-- updated_at itself is deliberately NOT shifted, so the anchor stays stable
+-- across the statements below. Nothing reads it for staleness -- the ingesters
+-- track freshness in memory, and the RSS janitor uses tracked_feeds, handled
+-- separately below.
+UPDATE games SET start_time = start_time + (now() - (SELECT max(updated_at) FROM games))
+  WHERE start_time IS NOT NULL
+    AND (SELECT max(updated_at) FROM games) IS NOT NULL;
+
+UPDATE rss_items SET published_at = published_at + (now() - (SELECT max(updated_at) FROM games))
   WHERE published_at IS NOT NULL
-    AND (SELECT max(published_at) FROM rss_items) IS NOT NULL;
+    AND (SELECT max(updated_at) FROM games) IS NOT NULL;
+
+UPDATE markets SET close_time = close_time + (now() - (SELECT max(updated_at) FROM games))
+  WHERE close_time IS NOT NULL
+    AND (SELECT max(updated_at) FROM games) IS NOT NULL;
 
 UPDATE tracked_feeds SET last_success_at = NULL,
                          created_at = now(),
@@ -166,48 +191,6 @@ UPDATE tracked_feeds SET last_success_at = NULL,
                          last_error = NULL,
                          last_error_at = NULL,
                          is_enabled = true;
-
-UPDATE markets SET close_time = close_time
-  + (now() + interval '7 days' - (SELECT max(close_time) FROM markets))
-  WHERE close_time IS NOT NULL
-    AND (SELECT max(close_time) FROM markets) IS NOT NULL;
-
--- Every id sequence is left behind by the load itself. The file opens with
--- TRUNCATE ... RESTART IDENTITY, which resets each sequence to 1, and then
--- COPYs rows carrying EXPLICIT ids -- and COPY does not advance a sequence.
--- So after a seed the data runs to (say) id 418088 while the sequence still
--- hands out 1, and the next INSERT that relies on it collides on the primary
--- key. That breaks the RSS ingester (the one service that polls with no API
--- key) and any test that inserts a fixture row. Catch every seeded table up.
-DO \$\$
-DECLARE t text; seq text; mx bigint;
-BEGIN
-  FOREACH t IN ARRAY ARRAY[
-    'tracked_symbols','tracked_leagues','tracked_markets','tracked_feeds',
-    'trades','games','standings','teams','markets','rss_items'
-  ] LOOP
-    -- Check the column exists FIRST. pg_get_serial_sequence RAISES on a
-    -- missing column rather than returning NULL, and one raise aborts the
-    -- whole DO block -- which silently left the tables listed after
-    -- tracked_feeds (games, trades, rss_items) still broken.
-    IF EXISTS (
-      SELECT 1 FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = t AND column_name = 'id'
-    ) THEN
-      seq := pg_get_serial_sequence(t, 'id');
-      IF seq IS NOT NULL THEN
-        EXECUTE format('SELECT COALESCE(max(id), 0) FROM %I', t) INTO mx;
-        PERFORM setval(seq, GREATEST(mx, 1));
-      END IF;
-    END IF;
-  END LOOP;
-END
-\$\$;
-
-UPDATE games SET start_time = start_time
-  + (now() + interval '3 hours' - (SELECT max(start_time) FROM games))
-  WHERE start_time IS NOT NULL
-    AND (SELECT max(start_time) FROM games) IS NOT NULL;
 "
 
 load() {
