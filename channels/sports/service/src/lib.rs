@@ -1522,8 +1522,23 @@ fn parse_f1_race(item: &serde_json::Value, league: &TrackedLeague) -> Option<Cle
         _ => "pre",
     };
 
-    // Skip old completed races — they'd be cleaned up anyway and waste DB writes
-    if state == "final" && start_time < Utc::now() - Duration::hours(12) {
+    // Anything that started more than 12 hours ago is history, whatever the
+    // API calls it.
+    //
+    // This used to be gated on `state == "final"`, which let exactly the wrong
+    // record through. F1 is polled from `races?season=YYYY`, which returns the
+    // WHOLE season including past races, and the live poll runs every ~60s. A
+    // past race whose status is anything but the literal "Completed" —
+    // cancelled, postponed, or a vocabulary this mapper does not know — falls
+    // through the match above to "pre" and so escaped the old guard. It was
+    // then re-inserted as an UPCOMING race on every poll: cleanup_old_games
+    // deleted it, the next poll recreated it, forever. Production ended up
+    // advertising a race 142 days in the past as the next one up, because the
+    // ticker sorts "pre" by start_time ascending (REL-152).
+    //
+    // A live session is exempt: "in" means it is happening now, whatever the
+    // scheduled start says.
+    if state != "in" && start_time < Utc::now() - Duration::hours(12) {
         return None;
     }
 
@@ -1962,6 +1977,96 @@ mod tests {
         assert_eq!(map_status_to_state("IN9"), "in");
         assert_eq!(map_status_to_state(""), "in"); // empty → falls through to "in"
         assert_eq!(map_status_to_state("LIVE"), "in"); // unknown → "in"
+    }
+
+    // ── F1 stale-race guard (REL-152) ───────────────────────────────
+    //
+    // Production served a race 142 days old as the NEXT upcoming one. F1 is
+    // polled from the whole-season endpoint every ~60s, so any past race the
+    // parser hands back is re-inserted forever — cleanup deletes it, the next
+    // poll recreates it. These pin the rule that decides what gets handed back.
+
+    fn f1_league() -> TrackedLeague {
+        TrackedLeague {
+            name: "Formula 1".to_string(),
+            sport_api: "formula-1".to_string(),
+            api_host: "v1.formula-1.api-sports.io".to_string(),
+            league_id: 1,
+            category: "Motorsport".to_string(),
+            country: None,
+            logo_url: None,
+            season: Some("2026".to_string()),
+            season_format: Some("calendar".to_string()),
+            offseason_months: None,
+        }
+    }
+
+    fn f1_race(status: &str, start: DateTime<Utc>) -> serde_json::Value {
+        serde_json::json!({
+            "id": 42,
+            "type": "Race",
+            "date": start.to_rfc3339(),
+            "status": status,
+            "competition": { "name": "Test Grand Prix" },
+            "circuit": { "name": "Test Circuit" }
+        })
+    }
+
+    #[test]
+    fn f1_past_race_with_unrecognised_status_is_dropped() {
+        // THE BUG. "Cancelled" is not "Completed", so the match fell through
+        // to "pre" and the old guard — which only skipped "final" — let it
+        // straight back into the database as an upcoming race.
+        let old = Utc::now() - Duration::days(142);
+        for status in ["Cancelled", "Postponed", "", "Some Future Vocabulary"] {
+            assert!(
+                parse_f1_race(&f1_race(status, old), &f1_league()).is_none(),
+                "a race {status:?} that started 142 days ago must not be ingested"
+            );
+        }
+    }
+
+    #[test]
+    fn f1_past_completed_race_is_still_dropped() {
+        // The behaviour the original guard did get right; keep it.
+        let old = Utc::now() - Duration::days(3);
+        assert!(parse_f1_race(&f1_race("Completed", old), &f1_league()).is_none());
+    }
+
+    #[test]
+    fn f1_upcoming_race_is_kept_as_pre() {
+        let soon = Utc::now() + Duration::days(5);
+        let got = parse_f1_race(&f1_race("Scheduled", soon), &f1_league())
+            .expect("an upcoming race must be ingested");
+        assert_eq!(got.state, "pre");
+    }
+
+    #[test]
+    fn f1_recently_finished_race_is_kept() {
+        // Inside the 12h window results are still worth showing.
+        let just_now = Utc::now() - Duration::hours(2);
+        let got = parse_f1_race(&f1_race("Completed", just_now), &f1_league())
+            .expect("a race that finished 2h ago must still be ingested");
+        assert_eq!(got.state, "final");
+    }
+
+    #[test]
+    fn f1_live_race_is_kept_however_old_the_clock_says_it_is() {
+        // The exemption: "in" means it is happening now. A long-delayed race
+        // must not be dropped just because its scheduled start has aged out.
+        let stale_start = Utc::now() - Duration::hours(30);
+        let got = parse_f1_race(&f1_race("Live", stale_start), &f1_league())
+            .expect("a live race must be ingested regardless of scheduled start");
+        assert_eq!(got.state, "in");
+    }
+
+    #[test]
+    fn f1_non_race_sessions_are_ignored() {
+        // Practice and qualifying are not races; unchanged, pinned here
+        // because the guard above sits right next to this check.
+        let mut practice = f1_race("Scheduled", Utc::now() + Duration::days(2));
+        practice["type"] = serde_json::json!("Practice");
+        assert!(parse_f1_race(&practice, &f1_league()).is_none());
     }
 
     #[test]
