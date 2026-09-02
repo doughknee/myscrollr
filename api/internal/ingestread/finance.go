@@ -38,6 +38,20 @@ const (
 	// FinanceCatalogCacheTTL is how long the symbol catalog is cached.
 	FinanceCatalogCacheTTL = 5 * time.Minute
 
+	// enabledSymbolFilter hides symbols the ingester has retired.
+	//
+	// The ingester disables a symbol when the seed config stops listing it,
+	// which is how a pair the data provider does not carry gets retired --
+	// DAI/USD and TON/USD sat in the catalog for six weeks showing $0.00
+	// because no quote ever arrived to overwrite the zero they were inserted
+	// with. Disabling them upstream did nothing on its own; this join was
+	// serving every row in `trades` regardless.
+	//
+	// COALESCE defaults to true: the join is a LEFT JOIN, so a trade with no
+	// tracked_symbols row at all must still be served rather than silently
+	// vanishing.
+	enabledSymbolFilter = `WHERE COALESCE(ts.is_enabled, true)`
+
 	// tradeColumns is the shared SELECT list for trade queries.
 	// COALESCE guards against NULL columns for rows that have been
 	// inserted but not yet updated by the Rust ingestion service.
@@ -232,6 +246,7 @@ func queryTrades(ctx context.Context) ([]Trade, error) {
 		SELECT `+tradeColumns+`
 		FROM trades t
 		LEFT JOIN tracked_symbols ts ON t.symbol = ts.symbol
+		`+enabledSymbolFilter+`
 		ORDER BY t.symbol ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("finance query failed: %w", err)
@@ -262,6 +277,7 @@ func queryTradesBySymbols(ctx context.Context, symbols []string) []Trade {
 		FROM trades t
 		LEFT JOIN tracked_symbols ts ON t.symbol = ts.symbol
 		WHERE t.symbol = ANY($1)
+		  AND COALESCE(ts.is_enabled, true)
 		ORDER BY t.symbol ASC
 	`, symbols)
 	if err != nil {

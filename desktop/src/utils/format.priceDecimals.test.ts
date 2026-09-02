@@ -12,6 +12,16 @@ describe("priceDecimals", () => {
     expect(priceDecimals(1)).toBe(2);
   });
 
+  it("goes to eight decimals in meme-coin territory", () => {
+    // PEPE/USD trades near $0.0000034. Six decimals renders that as
+    // "0.000003"; eight renders it exactly, and matches the scale of the
+    // numeric(20,8) columns behind it so the display cannot claim precision
+    // the database did not keep.
+    expect(priceDecimals(0.00000341)).toBe(8);
+    expect(formatPriceBare(0.00000341)).toBe("0.00000341");
+    expect(formatPriceBare(0.00000516)).toBe("0.00000516");
+  });
+
   it("adds digits below a dollar, where cents erase the whole day", () => {
     // 1INCH/USD trades near $0.09. At two decimals its real low and high
     // both print as "0.09" and the rail shows a range that reads as none.

@@ -108,6 +108,30 @@ pub async fn seed_tracked_symbols(pool: Arc<PgPool>, symbols: Vec<crate::types::
     Ok(())
 }
 
+/// Disable tracked symbols that are no longer in the seed config.
+///
+/// `seed_tracked_symbols` only inserts and updates, so a symbol removed from
+/// subscriptions.json lingers in every existing database forever. DAI/USD and
+/// TON/USD sat there for six weeks showing $0.00 because TwelveData does not
+/// carry either pair — a symbol search returns DAI/CAD and TONE/USD, both
+/// different instruments — so no quote ever arrived to overwrite the zero.
+///
+/// Disabled rather than deleted: the row carries a user-visible name and
+/// category, and a provider adding a pair later should be a config change
+/// rather than a resurrection. Mirrors disable_stale_leagues in the sports
+/// service.
+pub async fn disable_unlisted_symbols(pool: Arc<PgPool>, active: &[String]) -> Result<()> {
+    // An empty config almost certainly means a failed read, not "disable
+    // everything". Refuse rather than blank the catalog.
+    if active.is_empty() {
+        return Ok(());
+    }
+    let statement = "UPDATE tracked_symbols SET is_enabled = false          WHERE symbol != ALL($1) AND is_enabled = true";
+    let mut connection = pool.acquire().await?;
+    query(statement).bind(active).execute(&mut *connection).await?;
+    Ok(())
+}
+
 pub async fn insert_symbol(pool: Arc<PgPool>, symbol: String) -> Result<()> {
     let statement = "INSERT INTO trades (symbol, price, previous_close, price_change, percentage_change, direction) VALUES ($1, 0, 0, 0, 0, 'flat') ON CONFLICT (symbol) DO NOTHING";
     let mut connection = pool.acquire().await?;

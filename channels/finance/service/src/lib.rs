@@ -11,6 +11,7 @@ use crate::database::{
     update_symbol_exchange_link,
     update_sparkline,
     update_day_range,
+    disable_unlisted_symbols,
 };
 
 use crate::{types::{FinanceHealth, FinanceState, QuoteResponse, TimeSeriesResponse, TrackedSymbolConfig, TwelveDataStocksResponse}, websocket::connect};
@@ -34,7 +35,14 @@ pub async fn start_finance_services(pool: Arc<PgPool>, health_state: Arc<Mutex<F
         } else {
             info!("Syncing name/category metadata for tracked symbols...");
         }
+        // Retire anything the config no longer lists. seed_tracked_symbols
+        // only inserts and updates, so without this a symbol removed from
+        // subscriptions.json stays in every existing database forever --
+        // which is how DAI/USD and TON/USD sat in the catalog for six weeks
+        // showing $0.00, TwelveData carrying neither pair.
+        let active: Vec<String> = entries.iter().map(|e| e.symbol.clone()).collect();
         let _ = seed_tracked_symbols(pool.clone(), entries).await;
+        let _ = disable_unlisted_symbols(pool.clone(), &active).await;
     }
 
     // Local dev has no TwelveData key by default. Mirror the sports ingester:

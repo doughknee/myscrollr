@@ -112,13 +112,18 @@ export function formatPriceBare(price: number | string): string {
  * shows a range that reads as no range at all.
  *
  * The thresholds follow how exchanges quote: cents above a dollar, more
- * digits as the price shrinks.
+ * digits as the price shrinks. The bottom tier exists for meme-coin
+ * territory — PEPE/USD trades near $0.0000034, which six decimals renders as
+ * "0.000003" and eight renders exactly. Eight also matches the scale of the
+ * numeric(20,8) columns behind it, so the display cannot claim precision the
+ * database did not keep.
  */
 export function priceDecimals(value: number): number {
   const abs = Math.abs(value);
   if (abs >= 1) return 2;
   if (abs >= 0.01) return 4;
-  return 6;
+  if (abs >= 0.0001) return 6;
+  return 8;
 }
 
 /**
