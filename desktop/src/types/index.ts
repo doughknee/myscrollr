@@ -21,6 +21,19 @@ export interface Trade {
   day_volume?: number;
   last_updated?: string;
   link?: string;
+  /**
+   * Recent intraday closes, oldest first, written daily by the finance
+   * ingester. Absent or empty when nothing has been fetched for the symbol
+   * yet — the chip draws nothing rather than inventing a shape.
+   */
+  sparkline?: number[];
+  /**
+   * Today's low and high, bounding the chip's day-range rail. Zero or absent
+   * means not fetched yet — the rail renders an empty track rather than
+   * collapsing, so the chip's height never changes.
+   */
+  day_low?: number;
+  day_high?: number;
 }
 
 // ── Predictions ──────────────────────────────────────────────────

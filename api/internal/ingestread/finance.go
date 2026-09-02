@@ -50,7 +50,10 @@ const (
 			COALESCE(t.direction, 'flat'),
 			COALESCE(t.day_volume, 0),
 			COALESCE(t.last_updated, t.created_at),
-			COALESCE(ts.link, 'https://www.google.com/search?q=' || t.symbol || '+stock')`
+			COALESCE(ts.link, 'https://www.google.com/search?q=' || t.symbol || '+stock'),
+			COALESCE(t.sparkline, '[]'::jsonb),
+			COALESCE(t.day_low, 0),
+			COALESCE(t.day_high, 0)`
 )
 
 // Trade represents a financial trade from the TwelveData ingestion service.
@@ -64,6 +67,16 @@ type Trade struct {
 	DayVolume        int64     `json:"day_volume"`
 	LastUpdated      time.Time `json:"last_updated"`
 	Link             string    `json:"link"`
+	// Sparkline is the recent intraday close series, oldest first, written
+	// daily by the finance ingester. Empty until the first fetch lands, and
+	// empty for a symbol TwelveData has no bars for -- the client draws
+	// nothing rather than inventing a shape.
+	Sparkline []float64 `json:"sparkline"`
+	// DayLow/DayHigh bound the chip's day-range rail. Zero means "not
+	// fetched yet" -- the client renders an empty track rather than
+	// collapsing the row, so chip height stays constant.
+	DayLow  float64 `json:"day_low"`
+	DayHigh float64 `json:"day_high"`
 }
 
 // TrackedSymbol represents a symbol entry from the catalog.
@@ -228,7 +241,7 @@ func queryTrades(ctx context.Context) ([]Trade, error) {
 	trades := make([]Trade, 0)
 	for rows.Next() {
 		var t Trade
-		if err := rows.Scan(&t.Symbol, &t.Price, &t.PreviousClose, &t.PriceChange, &t.PercentageChange, &t.Direction, &t.DayVolume, &t.LastUpdated, &t.Link); err != nil {
+		if err := rows.Scan(&t.Symbol, &t.Price, &t.PreviousClose, &t.PriceChange, &t.PercentageChange, &t.Direction, &t.DayVolume, &t.LastUpdated, &t.Link, &t.Sparkline, &t.DayLow, &t.DayHigh); err != nil {
 			log.Printf("[Finance] Row scan failed: %v", err)
 			continue
 		}
@@ -260,7 +273,7 @@ func queryTradesBySymbols(ctx context.Context, symbols []string) []Trade {
 	trades := make([]Trade, 0)
 	for rows.Next() {
 		var t Trade
-		if err := rows.Scan(&t.Symbol, &t.Price, &t.PreviousClose, &t.PriceChange, &t.PercentageChange, &t.Direction, &t.DayVolume, &t.LastUpdated, &t.Link); err != nil {
+		if err := rows.Scan(&t.Symbol, &t.Price, &t.PreviousClose, &t.PriceChange, &t.PercentageChange, &t.Direction, &t.DayVolume, &t.LastUpdated, &t.Link, &t.Sparkline, &t.DayLow, &t.DayHigh); err != nil {
 			log.Printf("[Finance] Row scan failed: %v", err)
 			continue
 		}

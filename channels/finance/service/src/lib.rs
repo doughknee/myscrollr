@@ -9,9 +9,11 @@ use crate::database::{
     PgPool, insert_symbol, update_previous_close, update_trade, get_tracked_symbols,
     seed_tracked_symbols, get_symbols_without_exchange, get_all_enabled_symbols,
     update_symbol_exchange_link,
+    update_sparkline,
+    update_day_range,
 };
 
-use crate::{types::{FinanceHealth, FinanceState, QuoteResponse, TrackedSymbolConfig, TwelveDataStocksResponse}, websocket::connect};
+use crate::{types::{FinanceHealth, FinanceState, QuoteResponse, TimeSeriesResponse, TrackedSymbolConfig, TwelveDataStocksResponse}, websocket::connect};
 
 pub mod types;
 mod websocket;
@@ -116,8 +118,20 @@ pub async fn update_all_previous_closes(state: FinanceState) {
     info!("Updating previous closes for {} symbols...", state.subscriptions.len());
 
     // TwelveData Pro tier: 610 API credits/min, 500 WS symbols.
-    // Batch 8 at a time with 1s delay to stay within limits.
-    let batch_size = 8;
+    //
+    // Each symbol now costs TWO requests, not one: a /quote (price, previous
+    // close, day high/low) and a /time_series (the sparkline series). At the
+    // old batch of 8 that is 16 requests per second — 960/min, comfortably
+    // over the ceiling. Halved to 4 so the rate is unchanged at 8 req/s
+    // (480/min), which is what this pacing was tuned for.
+    //
+    // The cost is wall-clock: ~500 symbols now take about 125s instead of
+    // 63s. This runs once a day after close, so that is free.
+    //
+    // If a third per-symbol request is ever added here, halve this again —
+    // the June 2026 api-football exhaustion was exactly this, a multiplier
+    // added to a batched loop without redoing the arithmetic.
+    let batch_size = 4;
     for batch in state.subscriptions.chunks(batch_size) {
         time::sleep(Duration::from_millis(1_000)).await;
         let futures: Vec<_> = batch.iter().map(|symbol| {
@@ -125,6 +139,18 @@ pub async fn update_all_previous_closes(state: FinanceState) {
             let api_key = state.api_key.clone();
             let pool = &state.pool;
             async move {
+                // Fetch the sparkline series alongside the quote. Same
+                // symbol, same batch, same pacing -- one extra credit each,
+                // once a day. A failure here must not cost the quote: the
+                // price is the point of this job, the sparkline is garnish.
+                match get_time_series(symbol.to_string(), client.clone(), &api_key).await {
+                    Ok(points) if !points.is_empty() => {
+                        let _ = update_sparkline(pool.clone(), symbol.to_string(), points).await;
+                    }
+                    Ok(_) => {}
+                    Err(e) => warn!("[ TwelveData ] Sparkline error for {}: {e}", symbol),
+                }
+
                 let quote_response = get_quote(symbol.to_string(), client, &api_key).await;
                 match quote_response {
                     Ok(quote) => {
@@ -132,6 +158,16 @@ pub async fn update_all_previous_closes(state: FinanceState) {
                         if pc > 0.0 {
                             let _ = update_previous_close(pool.clone(), symbol.to_string(), pc).await;
                         }
+
+                        // Session range for the chip's day-range rail. Rides
+                        // along on this quote, so it costs nothing extra.
+                        let _ = update_day_range(
+                            pool.clone(),
+                            symbol.to_string(),
+                            quote.low_f64(),
+                            quote.high_f64(),
+                        )
+                        .await;
 
                         let close = quote.close_f64();
                         if close > 0.0 {
@@ -190,6 +226,40 @@ pub(crate) async fn get_quote(symbol: String, client: Arc<Client>, api_key: &str
         anyhow::bail!("TwelveData API error {code}: {msg}");
     }
     Ok(data)
+}
+
+/// Number of bars requested per symbol for the sparkline.
+///
+/// 30 bars at 15-minute spacing covers a full 6.5-hour US session with a
+/// little margin, and stays small enough that 500 of these fit comfortably
+/// in one jsonb column each.
+const SPARKLINE_POINTS: usize = 30;
+const SPARKLINE_INTERVAL: &str = "15min";
+
+/// Fetch the recent intraday closes for one symbol, oldest first.
+///
+/// Costs the same one API credit as the `/quote` call it runs beside, which
+/// is why it lives in the existing daily batch rather than getting a loop of
+/// its own — that loop is already paced for the 610 credits/min ceiling.
+pub(crate) async fn get_time_series(
+    symbol: String,
+    client: Arc<Client>,
+    api_key: &str,
+) -> anyhow::Result<Vec<f64>> {
+    let rest_base = std::env::var("TWELVEDATA_REST_URL")
+        .unwrap_or_else(|_| "https://api.twelvedata.com".to_string());
+    let url = format!(
+        "{}/time_series?symbol={}&interval={}&outputsize={}&apikey={}",
+        rest_base, symbol, SPARKLINE_INTERVAL, SPARKLINE_POINTS, api_key
+    );
+    let response = client.get(&url).send().await?.text().await?;
+    let data: TimeSeriesResponse = serde_json::from_str(&response)?;
+    if data.is_error() {
+        let msg = data.message.as_deref().unwrap_or("unknown error");
+        let code = data.code.unwrap_or(0);
+        anyhow::bail!("TwelveData API error {code}: {msg}");
+    }
+    Ok(data.closes_oldest_first())
 }
 
 // =============================================================================

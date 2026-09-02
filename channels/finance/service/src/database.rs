@@ -122,6 +122,53 @@ pub async fn update_previous_close(pool: Arc<PgPool>, symbol: String, prev_close
     Ok(())
 }
 
+/// Store the intraday close series behind the chip sparkline.
+///
+/// Written whole, read whole. An empty series is skipped rather than stored
+/// as `[]`: a symbol TwelveData has no bars for should keep whatever it had
+/// yesterday instead of having its line blanked on a bad fetch.
+pub async fn update_sparkline(pool: Arc<PgPool>, symbol: String, points: Vec<f64>) -> Result<()> {
+    if points.is_empty() {
+        return Ok(());
+    }
+    let statement = "UPDATE trades SET sparkline = $1 WHERE symbol = $2";
+    let mut connection = pool.acquire().await?;
+    let encoded = serde_json::to_value(&points)?;
+    query(statement).bind(encoded).bind(symbol).execute(&mut *connection).await?;
+    Ok(())
+}
+
+/// Seed the session range from a quote — authoritative, replaces what is there.
+///
+/// Only stores a sane pair. A zero or inverted range would make the rail's
+/// denominator zero or negative and pin the marker to an end of the track.
+pub async fn update_day_range(pool: Arc<PgPool>, symbol: String, low: f64, high: f64) -> Result<()> {
+    if !(low > 0.0 && high > low) {
+        return Ok(());
+    }
+    let statement = "UPDATE trades SET day_low = $1, day_high = $2 WHERE symbol = $3";
+    let mut connection = pool.acquire().await?;
+    query(statement).bind(low).bind(high).bind(symbol).execute(&mut *connection).await?;
+    Ok(())
+}
+
+/// Widen the stored range to include a live price.
+///
+/// The quote that seeds the range is fetched once a day, so without this the
+/// stored range is yesterday's for the whole of the next session and every
+/// price sits outside it — the marker would clamp to one end and never move.
+/// LEAST/GREATEST over COALESCE also handles the first tick for a symbol that
+/// has no range yet.
+pub async fn widen_day_range(pool: Arc<PgPool>, symbol: String, price: f64) -> Result<()> {
+    if price <= 0.0 {
+        return Ok(());
+    }
+    let statement = "UPDATE trades SET          day_low  = LEAST(COALESCE(day_low, $1), $1),          day_high = GREATEST(COALESCE(day_high, $1), $1)          WHERE symbol = $2";
+    let mut connection = pool.acquire().await?;
+    query(statement).bind(price).bind(symbol).execute(&mut *connection).await?;
+    Ok(())
+}
+
 pub async fn update_trade(pool: Arc<PgPool>, symbol: String, price: f64, price_change: f64, percentage_change: f64, direction: &str, day_volume: Option<u64>) -> Result<()> {
     let statement = "UPDATE trades SET price = $1, price_change = $2, percentage_change = $3, direction = $4, day_volume = COALESCE($5, day_volume), last_updated = CURRENT_TIMESTAMP WHERE symbol = $6";
     let mut connection = pool.acquire().await?;

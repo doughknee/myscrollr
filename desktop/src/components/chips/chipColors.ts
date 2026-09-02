@@ -212,11 +212,22 @@ export function chipBaseClasses(
     // Chips never compress on the rail — a squeezed chip is unreadable
     // and the marquee has infinite horizontal room anyway.
     "shrink-0",
+    // One size per mode, for every chip type.
+    //
+    // Chips used to be content-sized, so a four-letter symbol produced a
+    // narrower chip than a headline and the rail looked ragged. Each chip's
+    // flexible element (the sparkline on a trade chip, the headline on an
+    // RSS one) absorbs the difference instead, which is what the fixed box
+    // needs in order to hold varying content without clipping.
+    //
+    // Height is fixed for comfort only: compact chips are single-row and
+    // already share a height.
+    "w-[264px]",
     colors.bg,
     colors.border,
     colors.hoverBorder,
     comfort
-      ? "flex flex-col items-start py-1.5 gap-0.5"
+      ? "flex h-[52px] flex-col items-start justify-between py-1.5"
       : "flex items-center gap-2 py-1 text-ui-body",
     extra,
   );

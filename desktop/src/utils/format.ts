@@ -85,6 +85,22 @@ export function formatPrice(price: number | string): string {
 }
 
 /**
+ * Format a price with no currency glyph (e.g. "325.53").
+ *
+ * The ticker chip drops the dollar sign on purpose: every number on the row
+ * is a price, and at 8-16px the glyph is noise that costs horizontal space
+ * the day-range rail now uses.
+ */
+export function formatPriceBare(price: number | string): string {
+  const num = typeof price === "string" ? parseFloat(price) : price;
+  if (isNaN(num)) return String(price);
+  return num.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
  * Format a percentage change with sign prefix (e.g. "+1.23%").
  */
 export function formatChange(change: number | string | undefined): string {
