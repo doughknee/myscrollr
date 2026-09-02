@@ -28,7 +28,16 @@ import (
 
 // setupIntegrationDB skips unless TestMain put the package in integration
 // mode, then truncates every table the integration tests touch so each
-// test starts clean.
+// test starts clean. The fixtures here use fixed ids (user_purge_full,
+// cus_cancel_1, evt_integration_dup), so a re-run needs the previous run's
+// rows gone.
+//
+// This TRUNCATE is only safe because testsupport.Main gives each test
+// package its own Postgres schema. It used to run against the one shared
+// schema, where it would wipe rows internal/accounts had just inserted and
+// fail that package's tests with "want 4, got 0", intermittently, depending
+// on how `go test ./...` scheduled the two packages (REL-151). Do not
+// reintroduce a shared schema without also fixing this.
 func setupIntegrationDB(t *testing.T) {
 	t.Helper()
 	if platform.DBPool == nil {

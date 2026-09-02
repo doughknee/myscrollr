@@ -105,18 +105,64 @@ func apiRoot() string {
 	}
 }
 
-// migrateURL appends sslmode + a migrations-table override the same way
-// ConnectDB does, tolerating URLs with or without existing params.
-func migrateURL(dbURL, table string) string {
-	u := dbURL
-	if !strings.Contains(u, "sslmode=") {
-		if strings.Contains(u, "?") {
-			u += "&sslmode=disable"
+// testSchema is the Postgres schema this package's tests own.
+//
+// `go test ./...` runs PACKAGES in parallel, and every one of them points at
+// the single TEST_DATABASE_URL. That made the test database shared mutable
+// state: api/core's integration setup truncated user_widgets while
+// internal/accounts had rows in it mid-test, and the accounts test failed
+// with "want 4, got 0" — intermittently, depending on which package won the
+// race (REL-151).
+//
+// Giving each package its own schema removes the sharing rather than
+// negotiating over it. A truncate in one package is now invisible to every
+// other, and no future test has to know that it must not touch a table
+// somebody else uses.
+//
+// The name is derived from the directory holding the test binary, so
+// api/core becomes "test_core" and internal/accounts "test_accounts".
+func testSchema() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("[TestMain] getwd: %v", err)
+	}
+	base := filepath.Base(dir)
+	// Schema identifiers are unquoted below, so keep this to [a-z0-9_].
+	safe := make([]rune, 0, len(base))
+	for _, r := range strings.ToLower(base) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
+			safe = append(safe, r)
 		} else {
-			u += "?sslmode=disable"
+			safe = append(safe, '_')
 		}
 	}
-	return u + "&x-migrations-table=" + table
+	return "test_" + string(safe)
+}
+
+// withParams appends query parameters to a database URL, tolerating URLs
+// with or without existing ones.
+func withParams(dbURL string, params ...string) string {
+	u := dbURL
+	for _, p := range params {
+		sep := "?"
+		if strings.Contains(u, "?") {
+			sep = "&"
+		}
+		u += sep + p
+	}
+	return u
+}
+
+// migrateURL appends sslmode, the target schema, and a migrations-table
+// override, tolerating URLs with or without existing params.
+func migrateURL(dbURL, table, schema string) string {
+	u := dbURL
+	if !strings.Contains(u, "sslmode=") {
+		u = withParams(u, "sslmode=disable")
+	}
+	// golang-migrate's postgres driver reads search_path to decide which
+	// schema to migrate into, and puts its version table there too.
+	return withParams(u, "search_path="+schema, "x-migrations-table="+table)
 }
 
 // Main is the shared TestMain body. It switches a package into integration
@@ -142,25 +188,65 @@ func Main(m *testing.M) int {
 		return m.Run()
 	}
 
+	schema := testSchema()
+
+	// Recreate this package's schema from scratch. DROP ... CASCADE is safe
+	// here in a way the old table-level TRUNCATE was not: the blast radius
+	// is one package's own schema, so it cannot reach another package's
+	// rows however the parallel scheduling falls.
+	admin, err := pgxpool.New(context.Background(), dbURL)
+	if err != nil {
+		log.Fatalf("[TestMain] connect test database: %v", err)
+	}
+	if _, err := admin.Exec(context.Background(),
+		"DROP SCHEMA IF EXISTS "+schema+" CASCADE"); err != nil {
+		admin.Close()
+		log.Fatalf("[TestMain] drop schema %s: %v", schema, err)
+	}
+	if _, err := admin.Exec(context.Background(),
+		"CREATE SCHEMA "+schema); err != nil {
+		admin.Close()
+		log.Fatalf("[TestMain] create schema %s: %v", schema, err)
+	}
+	admin.Close()
+
 	// One chain, one authority (VISION 4.3): core's migrations create every
 	// table the tests touch, including the content tables the ingesters
 	// write and the yahoo_* tables the GDPR purge cascade deletes from.
 	src := "file://" + filepath.ToSlash(filepath.Join(apiRoot(), "migrations"))
-	mig, err := migrate.New(src, migrateURL(dbURL, "schema_migrations_core"))
+	mig, err := migrate.New(src, migrateURL(dbURL, "schema_migrations_core", schema))
 	if err != nil {
 		log.Fatalf("[TestMain] create migrator for %s: %v", src, err)
 	}
 	if err := mig.Up(); err != nil && err != migrate.ErrNoChange {
 		mig.Close()
-		log.Fatalf("[TestMain] migrate %s: %v", src, err)
+		log.Fatalf("[TestMain] migrate %s into %s: %v", src, schema, err)
 	}
 	mig.Close()
 
-	pool, err := pgxpool.New(context.Background(), dbURL)
+	// The pool must resolve unqualified table names to this package's
+	// schema, so every query in every test lands there without a single
+	// test needing to know the schema exists.
+	pool, err := pgxpool.New(context.Background(), withParams(dbURL, "search_path="+schema))
 	if err != nil {
-		log.Fatalf("[TestMain] connect test database: %v", err)
+		log.Fatalf("[TestMain] connect test database (schema %s): %v", schema, err)
 	}
 	defer pool.Close()
+
+	// Verify the search_path actually took effect. If pgx ever stopped
+	// honouring the parameter, every query would silently fall back to
+	// `public` — all four packages would share one schema again, the tests
+	// would still pass, and REL-151's flake would come back invisibly. A
+	// failed isolation must be loud, not subtle.
+	var active string
+	if err := pool.QueryRow(context.Background(), "SELECT current_schema()").Scan(&active); err != nil {
+		log.Fatalf("[TestMain] read current_schema: %v", err)
+	}
+	if active != schema {
+		log.Fatalf("[TestMain] schema isolation failed: current_schema()=%q, want %q. "+
+			"Tests would share one schema and corrupt each other's rows.", active, schema)
+	}
+
 	platform.DBPool = pool
 
 	mr, err := miniredis.Run()
