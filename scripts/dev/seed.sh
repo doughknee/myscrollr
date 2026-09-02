@@ -173,6 +173,38 @@ REBASE_SQL="
 -- across the statements below. Nothing reads it for staleness -- the ingesters
 -- track freshness in memory, and the RSS janitor uses tracked_feeds, handled
 -- separately below.
+-- Every id sequence is left behind by the load itself. The file opens with
+-- TRUNCATE ... RESTART IDENTITY, which resets each sequence to 1, and then
+-- COPYs rows carrying EXPLICIT ids -- and COPY does not advance a sequence.
+-- So after a seed the data runs to (say) id 418088 while the sequence still
+-- hands out 1, and the next INSERT that relies on it collides on the primary
+-- key. That breaks the RSS ingester (the one service that polls with no API
+-- key) and any test that inserts a fixture row. Catch every seeded table up.
+DO \$\$
+DECLARE t text; seq text; mx bigint;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'tracked_symbols','tracked_leagues','tracked_markets','tracked_feeds',
+    'trades','games','standings','teams','markets','rss_items'
+  ] LOOP
+    -- Check the column exists FIRST. pg_get_serial_sequence RAISES on a
+    -- missing column rather than returning NULL, and one raise aborts the
+    -- whole DO block -- which silently left the tables listed after
+    -- tracked_feeds (games, trades, rss_items) still broken.
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = t AND column_name = 'id'
+    ) THEN
+      seq := pg_get_serial_sequence(t, 'id');
+      IF seq IS NOT NULL THEN
+        EXECUTE format('SELECT COALESCE(max(id), 0) FROM %I', t) INTO mx;
+        PERFORM setval(seq, GREATEST(mx, 1));
+      END IF;
+    END IF;
+  END LOOP;
+END
+\$\$;
+
 UPDATE games SET start_time = start_time + (now() - (SELECT max(updated_at) FROM games))
   WHERE start_time IS NOT NULL
     AND (SELECT max(updated_at) FROM games) IS NOT NULL;
