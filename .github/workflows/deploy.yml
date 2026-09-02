@@ -524,17 +524,32 @@ jobs:
           fi
 
           echo "::warning::Smoke test failed — rolling every service back to its previous image."
-          while IFS='=' read -r svc img; do
+
+          # Read the whole file into an array BEFORE touching kubectl. A
+          # `while read` loop fed from a redirect shares stdin with its body,
+          # so a command in the body that consumes stdin ends the loop early
+          # — and a rollback that silently restores only the first service,
+          # while production is already broken, is the worst possible place
+          # for that failure. An array removes stdin from the loop entirely.
+          pins=()
+          while IFS= read -r line; do
+            [ -n "$line" ] && pins+=("$line")
+          done < /tmp/live-images.env
+
+          echo "Restoring ${#pins[@]} service(s)."
+          for line in "${pins[@]}"; do
+            svc="${line%%=*}"; img="${line#*=}"
             [ -n "$svc" ] && [ -n "$img" ] || continue
             echo "Restoring ${svc} -> ${img}"
             kubectl set image deployment/"${svc}" "${svc}=${img}" -n scrollr
-          done < /tmp/live-images.env
+          done
 
           rc=0
-          while IFS='=' read -r svc _; do
+          for line in "${pins[@]}"; do
+            svc="${line%%=*}"
             [ -n "$svc" ] || continue
             kubectl rollout status deployment/"${svc}" -n scrollr --timeout=300s || rc=1
-          done < /tmp/live-images.env
+          done
 
           if [ "$rc" -ne 0 ]; then
             echo "::error::Rollback did not converge. The cluster needs manual attention."
