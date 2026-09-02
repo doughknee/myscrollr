@@ -153,25 +153,26 @@ capture() {
 # trades, standings, teams and the tracked_* config tables carry no
 # time-relative read, so they are restored as-is.
 REBASE_SQL="
--- Slide the whole article window forward so its newest item lands ~1h ago,
--- preserving relative spacing rather than collapsing every item onto now().
-UPDATE rss_items SET published_at = published_at
-  + (now() - interval '1 hour' - (SELECT max(published_at) FROM rss_items))
-  WHERE published_at IS NOT NULL
-    AND (SELECT max(published_at) FROM rss_items) IS NOT NULL;
-
-UPDATE tracked_feeds SET last_success_at = NULL,
-                         created_at = now(),
-                         consecutive_failures = 0,
-                         last_error = NULL,
-                         last_error_at = NULL,
-                         is_enabled = true;
-
-UPDATE markets SET close_time = close_time
-  + (now() + interval '7 days' - (SELECT max(close_time) FROM markets))
-  WHERE close_time IS NOT NULL
-    AND (SELECT max(close_time) FROM markets) IS NOT NULL;
-
+-- ONE delta for everything, taken from the freshest WRITE in the snapshot.
+--
+-- The first version of this anchored each table on the max of the column it
+-- was shifting -- for games, max(start_time). That is the wrong end of the
+-- data. A snapshot contains fixtures scheduled far beyond \"now\": the F1
+-- calendar runs months ahead, so pinning the LAST race to now+3h dragged every
+-- other league backwards with it and landed the entire MLB and MLS schedule in
+-- May, four months in the past. Zero games fell inside the +/-7 day window the
+-- widgets filter on, so a correctly working app rendered nothing.
+--
+-- max(updated_at) is when the ingester last wrote a row, which approximates
+-- the moment of capture. Shifting everything by (now - that) preserves each
+-- record's true relationship to \"now\": a game that was two days out when the
+-- snapshot was taken is two days out today, and a fixture scheduled months
+-- ahead stays months ahead.
+--
+-- updated_at itself is deliberately NOT shifted, so the anchor stays stable
+-- across the statements below. Nothing reads it for staleness -- the ingesters
+-- track freshness in memory, and the RSS janitor uses tracked_feeds, handled
+-- separately below.
 -- Every id sequence is left behind by the load itself. The file opens with
 -- TRUNCATE ... RESTART IDENTITY, which resets each sequence to 1, and then
 -- COPYs rows carrying EXPLICIT ids -- and COPY does not advance a sequence.
@@ -204,10 +205,24 @@ BEGIN
 END
 \$\$;
 
-UPDATE games SET start_time = start_time
-  + (now() + interval '3 hours' - (SELECT max(start_time) FROM games))
+UPDATE games SET start_time = start_time + (now() - (SELECT max(updated_at) FROM games))
   WHERE start_time IS NOT NULL
-    AND (SELECT max(start_time) FROM games) IS NOT NULL;
+    AND (SELECT max(updated_at) FROM games) IS NOT NULL;
+
+UPDATE rss_items SET published_at = published_at + (now() - (SELECT max(updated_at) FROM games))
+  WHERE published_at IS NOT NULL
+    AND (SELECT max(updated_at) FROM games) IS NOT NULL;
+
+UPDATE markets SET close_time = close_time + (now() - (SELECT max(updated_at) FROM games))
+  WHERE close_time IS NOT NULL
+    AND (SELECT max(updated_at) FROM games) IS NOT NULL;
+
+UPDATE tracked_feeds SET last_success_at = NULL,
+                         created_at = now(),
+                         consecutive_failures = 0,
+                         last_error = NULL,
+                         last_error_at = NULL,
+                         is_enabled = true;
 "
 
 load() {

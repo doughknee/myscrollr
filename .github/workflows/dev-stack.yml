@@ -134,6 +134,22 @@ jobs:
           docker compose -f docker/compose.yml exec -T postgres             psql -U scrollr -d scrollr -v ON_ERROR_STOP=1             -c "INSERT INTO tracked_leagues (name, sport_api, api_host, league_id, category) VALUES ('__ci_write_probe__', 'football', 'localhost', 0, 'Test')"             -c "DELETE FROM tracked_leagues WHERE name = '__ci_write_probe__'"
           echo "seeded database accepts inserts (id sequences are in step with the data)"
 
+      # Shape is not correctness. The /public/feed assertion above passed
+      # happily while every seeded game was dated four months in the past --
+      # 225KB of perfectly-formed, entirely stale data, and an app that
+      # rendered nothing (REL-155). The widgets filter on a date window, so
+      # assert the seed actually lands inside one.
+      - name: Seeded games are dated near today
+        run: |
+          set -euo pipefail
+          n="$(docker compose -f docker/compose.yml exec -T postgres             psql -U scrollr -d scrollr -At -c             "SELECT count(*) FROM games WHERE start_time BETWEEN now() - interval '7 days' AND now() + interval '7 days'")"
+          echo "games within the +/-7 day widget window: $n"
+          case "$n" in ''|*[!0-9]*) echo "::error::could not count games"; exit 1 ;; esac
+          if [ "$n" -lt 1 ]; then
+            echo "::error::seed loaded games but none fall near today — the timestamp rebase anchor is wrong, and the app will render an empty ticker."
+            exit 1
+          fi
+
       # `make down` was broken once on its own (4047e5b0): a fresh checkout
       # could start the stack but not stop it.
       - name: make down
