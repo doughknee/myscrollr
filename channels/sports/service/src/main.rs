@@ -208,7 +208,9 @@ async fn run_service() -> Result<()> {
             // service down on every fresh checkout. Stay up and skip polling
             // — core keeps reading the rows already in Postgres.
             Err(InitError::MissingApiKey)
-                if std::env::var("ENVIRONMENT").as_deref() == Ok("development") =>
+                if sports_service::tolerate_missing_key(
+                    std::env::var("ENVIRONMENT").ok().as_deref(),
+                ) =>
             {
                 println!(
                     "[Sports] API_SPORTS_KEY not set; not polling. \

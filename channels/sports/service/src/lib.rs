@@ -2079,3 +2079,42 @@ mod tests {
         assert!(detail.is_none());
     }
 }
+
+/// Whether a missing `API_SPORTS_KEY` is survivable.
+///
+/// Extracted from `main` so it can be tested. Local dev runs with a blank
+/// key on purpose: the service stays up, skips polling, and serves whatever
+/// `make seed` loaded into Postgres — the promise made by the generated
+/// `channels/sports/.env` and by docs/LOCAL_SETUP.md. It has been broken
+/// before; the service exited on a missing key and took every fresh checkout
+/// down with it (67c8d68e).
+///
+/// Outside development a missing key must stay fatal. A production sports
+/// service that quietly stops polling still answers its readiness probe, so
+/// nothing else would notice.
+pub fn tolerate_missing_key(environment: Option<&str>) -> bool {
+    environment == Some("development")
+}
+
+#[cfg(test)]
+mod keyless_tests {
+    use super::tolerate_missing_key;
+
+    #[test]
+    fn development_tolerates_a_missing_key() {
+        assert!(tolerate_missing_key(Some("development")));
+    }
+
+    #[test]
+    fn production_does_not() {
+        assert!(!tolerate_missing_key(Some("production")));
+        assert!(!tolerate_missing_key(Some("staging")));
+    }
+
+    #[test]
+    fn unset_environment_fails_closed() {
+        // compose sets ENVIRONMENT=development explicitly; anything that has
+        // not said so is treated as a real deployment.
+        assert!(!tolerate_missing_key(None));
+    }
+}

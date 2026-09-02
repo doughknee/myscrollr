@@ -20,6 +20,8 @@ on:
       # all five Go jobs and nothing noticed until an unrelated PR touched
       # api/**.
       - ".github/workflows/backend-tests.yml"
+      # The migration guard itself, so editing it re-runs it.
+      - "scripts/migrations/**"
   pull_request:
     branches: [main]
     paths:
@@ -36,8 +38,32 @@ on:
       - "desktop/src/types/api.generated.ts"
       - "myscrollr.com/src/types/api.generated.ts"
       - ".github/workflows/backend-tests.yml"
+      # The migration guard itself, so editing it re-runs it.
+      - "scripts/migrations/**"
 
 jobs:
+  # ── Schema safety ──────────────────────────────────────────────
+  # Migrations run inside platform.ConnectDB() when core-api starts, so a
+  # destructive one is applied the moment the new pod boots — before the
+  # post-deploy smoke test runs, and before the rollback in deploy.yml could
+  # fire. Rolling an image back does not roll a schema back. This is the part
+  # of a bad deploy that automation cannot repair, so it is gated up front.
+  migrations-additive:
+    name: New migrations are additive
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history: the check diffs against the merge base to look at
+          # only the migrations this change introduces. The squashed baseline
+          # is full of statements it would otherwise flag.
+          fetch-depth: 0
+      - name: Check api/migrations for destructive statements
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref || 'main' }}" || true
+          scripts/migrations/check-additive.sh "origin/${{ github.base_ref || 'main' }}"
+
   # ── Go tests (5 independent jobs, run in parallel) ─────────────
   go-tests:
     strategy:

@@ -1,0 +1,182 @@
+name: Dev Stack
+
+# Runs the local development environment the way a new contributor runs it.
+#
+# Why this exists: nothing ever executed `make up`. The dev stack was verified
+# only by hand, on one machine, when someone happened to try it — so it rotted
+# between attempts and had to be un-broken four times in July 2026 alone
+# (f389d308, 67c8d68e, 4047e5b0, 6a1be2a0). Every one of those was "a fresh
+# checkout does not boot", and every one was found by a human after the fact,
+# usually because an unrelated refactor moved something underneath it.
+#
+# docs/LOCAL_SETUP.md makes promises. This is what enforces them.
+
+# The path list is duplicated rather than anchored: GitHub Actions does not
+# reliably resolve YAML anchors, which is why backend-tests.yml repeats its
+# list too. Keep the two in sync by hand.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Makefile"
+      - "docker/**"
+      - "scripts/dev/**"
+      - "api/**"
+      - "channels/**"
+      - ".github/workflows/dev-stack.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "Makefile"
+      - "docker/**"
+      - "scripts/dev/**"
+      - "api/**"
+      - "channels/**"
+      - ".github/workflows/dev-stack.yml"
+
+# A dev-stack run is pure verification — superseded runs have no value.
+concurrency:
+  group: dev-stack-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Does a fresh checkout actually boot? ──────────────────────────
+  fresh-checkout:
+    name: Fresh checkout boots and serves data
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # -S warning, not the default: at default severity shellcheck also
+      # fails on style/info notes, including pre-existing ones in scripts this
+      # gate did not touch. A linter that is red on arrival gets ignored.
+      - name: shellcheck the dev scripts
+        run: shellcheck -S warning scripts/dev/*.sh
+
+      # No TTY on a runner, which setup.mjs already handles by taking every
+      # default — including a blank Logto, the configuration LOCAL_SETUP.md
+      # promises will still boot and serve public data.
+      - name: make setup
+        run: make setup
+
+      - name: Every generated env file exists
+        run: |
+          missing=0
+          for f in api/.env channels/finance/.env channels/sports/.env \
+                   channels/rss/.env channels/fantasy/.env \
+                   myscrollr.com/.env desktop/.env; do
+            if [ -f "$f" ]; then echo "  ok   $f"; else echo "  MISSING $f"; missing=1; fi
+          done
+          exit $missing
+
+      - name: make doctor
+        run: make doctor
+
+      # core-api only: it depends on nothing but postgres and redis, yet it is
+      # the component that consumes every generated .env value, runs the whole
+      # migration chain on boot, and serves the read path. That is where the
+      # historical breakages lived. The four Rust ingesters are the slow half
+      # of the stack and are covered by their own cargo jobs.
+      - name: make up
+        run: make up svc=core-api
+
+      - name: make seed
+        run: make seed
+
+      # The assertion that gives this job teeth. An EMPTY stack answers
+      # /public/feed with HTTP 200 and `{"finance":[],"sports":{...}}`, so a
+      # status-code check would pass against a database with nothing in it and
+      # prove nothing. Assert on content.
+      - name: Seeded data is actually served
+        # `set -euo pipefail` is load-bearing, not decoration. Without it a
+        # missing or failing jq leaves the counts empty, `[ "" -lt 1 ]` exits 2
+        # rather than 0 or 1, the `if` takes the false branch, and the step
+        # reports success having verified nothing.
+        run: |
+          set -euo pipefail
+          command -v jq >/dev/null || { echo "::error::jq is required by this assertion"; exit 1; }
+
+          body="$(curl -fsS --max-time 30 http://localhost:18080/public/feed)"
+          echo "$body" | head -c 200; echo
+
+          n_finance="$(echo "$body" | jq '.data.finance | length')"
+          n_sports="$(echo "$body" | jq '.data.sports.sports | length')"
+          echo "finance rows: $n_finance   sports rows: $n_sports"
+
+          case "$n_finance$n_sports" in
+            ''|*[!0-9]*) echo "::error::could not read row counts from /public/feed"; exit 1 ;;
+          esac
+
+          if [ "$n_finance" -lt 1 ] || [ "$n_sports" -lt 1 ]; then
+            echo "::error::/public/feed served no data after 'make seed' — the seed load, the read path, or the Redis cache is broken."
+            exit 1
+          fi
+
+      # `make down` was broken once on its own (4047e5b0): a fresh checkout
+      # could start the stack but not stop it.
+      - name: make down
+        run: make down
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          docker compose -f docker/compose.yml ps -a || true
+          docker compose -f docker/compose.yml logs --tail=200 || true
+
+  # ── Do the dev scripts work off Linux? ────────────────────────────
+  # 6a1be2a0: `make kalshi-key` could only ever run on Windows, and the
+  # compose override was inert on every platform. That class is about shells
+  # and path resolution, not containers, so it needs no Docker — which keeps
+  # this job at about a minute.
+  dev-scripts-windows:
+    name: Dev scripts work on Windows
+    runs-on: windows-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Ensure GNU make is available
+        run: |
+          command -v make >/dev/null && { make --version | head -1; exit 0; }
+          choco install make --no-progress -y
+          command -v make >/dev/null || { echo "make still unavailable"; exit 1; }
+
+      - name: setup.mjs generates every env file
+        run: |
+          node scripts/dev/setup.mjs
+          for f in api/.env channels/finance/.env channels/sports/.env \
+                   channels/rss/.env channels/fantasy/.env \
+                   myscrollr.com/.env desktop/.env; do
+            test -f "$f" || { echo "MISSING $f"; exit 1; }
+          done
+
+      # doctor must REPORT a stopped Docker, not crash on it. It exits
+      # non-zero by design when it finds a blocking problem, so the assertion
+      # is that it produced its report.
+      - name: doctor.mjs runs without crashing
+        run: |
+          out="$(node scripts/dev/doctor.mjs 2>&1 || true)"
+          echo "$out"
+          echo "$out" | grep -qi docker || { echo "doctor produced no Docker verdict"; exit 1; }
+
+      # Recipe expansion only — no Docker needed. This is what catches a
+      # target wired to a deleted script (f389d308) and the cmd.exe-vs-Git-Bash
+      # shell resolution the Makefile header exists to work around.
+      - name: Makefile recipes expand on Windows
+        run: |
+          for t in up down seed seed-capture reset logs ps; do
+            echo "--- make -n $t ---"
+            make -n "$t" || { echo "::error::make -n $t failed to expand on Windows"; exit 1; }
+          done

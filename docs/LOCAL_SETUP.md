@@ -1,10 +1,11 @@
 # Local development
 
-Two commands from a fresh clone:
+Three commands from a fresh clone:
 
 ```bash
 make setup   # generate every .env file (once)
 make up      # start the whole backend
+make seed    # load the dev dataset (no API keys, no API calls)
 ```
 
 Then `make dev` to also open the marketing site and the desktop app, or
@@ -88,16 +89,66 @@ sign-in fails with *"resource indicator is missing, or unknown"*.
 ## Data
 
 Local Postgres is yours; production is never touched. Core applies every
-migration on boot, so a fresh volume becomes a working schema by itself.
+migration on boot, so a fresh volume becomes a working schema by itself — but
+an empty one. `make seed` fills it.
+
+```bash
+make seed
+```
+
+That loads `scripts/dev/seed.sql.gz`, a committed snapshot of the ten content
+tables (trades, games, standings, teams, markets, rss items and the tracked_*
+config). It makes **no upstream API requests**, and it is idempotent — re-run
+it whenever you want a clean dataset back.
+
+**Do not paste production API keys into `channels/*/.env`.** `make setup`
+leaves them blank on purpose, and the ingesters handle that correctly: they
+stay up, skip polling, and serve what is in Postgres. The keys that would
+work there are the production ones, and the quota they draw on belongs to
+real users — api-sports bills a shared 7,500 requests/day per sport host
+across every league. Seeding gives you the same app without spending any of it.
+
+Loading also rebases timestamps, because several read paths are
+time-relative: RSS articles older than 7 days are deleted by the ingester,
+prediction markets only show while `close_time` is in the future, and the RSS
+janitor disables curated feeds that look stale. A snapshot restored months
+later would be present in the database and invisible in the app. `seed.sh`
+documents which shift belongs to which query.
 
 - `make down` stops everything and **keeps** your data.
-- `make reset` wipes the database, Redis and the build caches.
+- `make reset` wipes the database, Redis and the build caches. Re-seed after.
+
+### Re-recording the dataset
+
+Rare, and only when the schema or the shape of the content changes:
+
+```bash
+make seed-capture                                   # from your local database
+SOURCE_DATABASE_URL=postgres://... make seed-capture # from a read-only replica
+```
+
+The second form costs **zero** upstream requests — production already paid
+for that data. Point it at a `kubectl port-forward` with
+`host.docker.internal` as the host. Only the ten content tables are read;
+nothing containing user data (`yahoo_*`, `user_*`, `stripe_*`, `support_*`)
+is touched, which is what makes the snapshot safe to commit. Commit the
+regenerated `scripts/dev/seed.sql.gz`.
 
 ## Predictions (Kalshi) — optional
 
-Off unless you have a key. `make kalshi-key` pulls one from the cluster
-(needs `kubectl`), then regenerates its env file. Everything else runs fine
-without it.
+Off unless you have a key, and you probably do not need one: `make seed`
+populates the predictions widget along with everything else.
+
+The credential in the cluster is the **live, real-money** Kalshi key, so
+`make kalshi-key` refuses to copy it unless you ask by name:
+
+```bash
+make kalshi-key prod=1
+```
+
+Prefer your own Kalshi **demo** credentials — put the key id and
+`KALSHI_ENV=demo` in `secrets/predictions.docker.env` and the PEM at
+`secrets/kalshi-private-key.pem`. Everything else runs fine without any of it.
 
 Its private key is a multiline PEM, which Docker's `env_file` cannot parse —
 hence the separate file mounted at `/run/secrets/kalshi.pem` and the
@@ -119,7 +170,17 @@ New-NetFirewallRule -DisplayName "Scrollr dev" -Direction Inbound `
 1. `make doctor` — Docker, ports, env files, tooling.
 2. `make logs svc=<service>` — one service's output.
 3. `make ps` — what's actually running.
-4. `make reset && make up` — start from a clean database.
+4. `make reset && make up && make seed` — start from a clean database.
+
+**The app is empty.** You have not run `make seed`, or you seeded within the
+last 30 seconds and are seeing a cached response. Check the database directly:
+
+```bash
+curl -s localhost:18080/public/feed | head -c 200
+```
+
+Empty arrays there with rows in Postgres means a stale cache; `make seed`
+clears it on every run.
 
 Ports already held by something else are the most common failure; `doctor`
 reports those specifically, and ignores ports held by our own containers.

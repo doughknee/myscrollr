@@ -241,14 +241,7 @@ func handleGetSports(c *fiber.Ctx) error {
 
 // handleGetSportsPublic returns all games + meta for every enabled league.
 func handleGetSportsPublic(c *fiber.Ctx) error {
-	ctx := context.Background()
-	var resp SportsResponse
-	if cacheGetJSON(ctx, CacheKeySports, &resp) {
-		c.Set("X-Cache", "HIT")
-		return c.JSON(resp)
-	}
-
-	games, err := querySportsGames(ctx, DefaultSportsLimit, nil)
+	resp, hit, err := PublicSports(context.Background())
 	if err != nil {
 		log.Printf("[Sports] getSports query failed: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
@@ -256,12 +249,28 @@ func handleGetSportsPublic(c *fiber.Ctx) error {
 			Error:  "Internal server error",
 		})
 	}
-	meta := loadLeagueMeta(ctx, allEnabledLeagueNames(ctx))
+	if hit {
+		c.Set("X-Cache", "HIT")
+	} else {
+		c.Set("X-Cache", "MISS")
+	}
+	return c.JSON(resp)
+}
 
+// PublicSports returns the payload behind GET /sports/public, along with
+// whether it came from cache. Exported for the same reason as PublicFinance.
+func PublicSports(ctx context.Context) (resp SportsResponse, cacheHit bool, err error) {
+	if cacheGetJSON(ctx, CacheKeySports, &resp) {
+		return resp, true, nil
+	}
+	games, err := querySportsGames(ctx, DefaultSportsLimit, nil)
+	if err != nil {
+		return SportsResponse{}, false, err
+	}
+	meta := loadLeagueMeta(ctx, allEnabledLeagueNames(ctx))
 	resp = SportsResponse{Sports: games, Meta: SportsMeta{Leagues: meta}}
 	cacheSetJSON(ctx, CacheKeySports, resp, SportsCacheTTL)
-	c.Set("X-Cache", "MISS")
-	return c.JSON(resp)
+	return resp, false, nil
 }
 
 // leagueStatus holds the per-league activity computed from the games table.

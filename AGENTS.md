@@ -24,7 +24,13 @@ Monorepo — each component is independently deployable with its own dependencie
 ```sh
 make setup   # generate every .env file (once)
 make up      # start the whole backend in Docker, wait until healthy
+make seed    # load the dev dataset — no API keys, no upstream requests
 ```
+
+**Never tell anyone to paste a production API key into `channels/*/.env`.**
+They are blank by design; the ingesters stay up and serve what is in
+Postgres, and `make seed` is what puts data there. A production key spends
+quota that live users depend on.
 
 `make` on its own prints every command, grouped. `make doctor` diagnoses a
 broken machine and names the fix for each problem.
@@ -104,7 +110,17 @@ TEST_DATABASE_URL="postgres://postgres@127.0.0.1:5432/scrollr_test?sslmode=disab
 - `.github/workflows/frontend-tests.yml` — Vitest suites for `myscrollr.com/` and `desktop/` on every push/PR touching them.
 - `.github/workflows/desktop-release.yml` — desktop releases. Triggers on push to `main` when `desktop/` changes, or via `workflow_dispatch`. Builds Linux/macOS/Windows via `tauri-action`. Node 22, stable Rust, `npm ci`.
   **A `preflight` job gates the build**: it skips when the version in `tauri.conf.json` already has a *published* release, because `tauri-action` would otherwise upload into it and silently replace the live binaries. So a push to `main` touching `desktop/` usually builds nothing — that's correct, not a failure. To actually cut a release, bump the version.
-- `.github/workflows/deploy.yml` — builds and deploys the API, channels, and website to production on push to `main`.
+- `.github/workflows/deploy.yml` — builds and deploys the API, channels, and website to production on push to `main`. Ends with `scripts/smoke/production-readiness.sh`; if that fails, every service is re-pinned to the image it was running before the deploy (explicit tags, because `kubectl rollout undo` is defeated by the `:latest` unpinning trap) and the workflow still fails.
+- `.github/workflows/dev-stack.yml` — runs the local dev environment the way a new contributor runs it: `make setup`, `make up svc=core-api`, `make seed`, then asserts `/public/feed` actually serves rows, then `make down`. A second job checks the dev scripts and Makefile recipes on Windows. This exists because nothing used to execute `make up`, so the dev stack rotted between manual attempts and had to be un-broken four times in July 2026.
+
+### Migrations are gated
+
+`backend-tests.yml` runs `scripts/migrations/check-additive.sh` against the
+migrations a change introduces. Destructive statements (`DROP COLUMN`,
+`SET NOT NULL`, `ALTER COLUMN ... TYPE`, renames) fail the build, because
+migrations run at core-api startup — they land before any smoke test and
+cannot be undone by an image rollback. Use expand/contract, or opt out per
+statement with `-- allow-destructive: <reason>` on the line above.
 
 ## Code Style — TypeScript
 

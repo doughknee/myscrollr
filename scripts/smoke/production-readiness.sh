@@ -176,6 +176,60 @@ check_service() {
     return "$rc"
 }
 
+# ─── Check that data actually flows ───────────────────────────────────────
+# Every check above is a readiness probe, and a readiness probe answers 200
+# against a completely empty database — a cluster that boots but ingests
+# nothing passes them all. This one asserts CONTENT: /public/feed is
+# unauthenticated and aggregates finance + sports straight out of Postgres,
+# so a non-empty response proves ingest -> Postgres -> Redis -> API is intact.
+#
+# Returns 0 when both sources return rows, 1 otherwise.
+check_data_flow() {
+    local local_port=18080 pf_pid="" body="" n_finance="" n_sports=""
+
+    kubectl -n "$NAMESPACE" port-forward         "svc/core-api" "$local_port:8080"         >"/tmp/smoke-public-feed.log" 2>&1 </dev/null &
+    pf_pid=$!
+
+    local deadline=$((SECONDS + PORT_FORWARD_TIMEOUT))
+    local tunnel_up=0
+    while ((SECONDS < deadline)); do
+        if curl -sS --max-time 1 -o /dev/null "http://localhost:$local_port/" >/dev/null 2>&1; then
+            tunnel_up=1
+            break
+        fi
+        kill -0 "$pf_pid" 2>/dev/null || break
+        sleep 0.5
+    done
+
+    if ((tunnel_up == 0)); then
+        kill "$pf_pid" 2>/dev/null || true
+        echo "port-forward failed"
+        return 1
+    fi
+
+    body="$(curl -sS --max-time 30 "http://localhost:$local_port/public/feed" 2>/dev/null || true)"
+    kill "$pf_pid" 2>/dev/null || true
+    wait "$pf_pid" 2>/dev/null || true
+
+    n_finance="$(printf '%s' "$body" | jq '.data.finance | length' 2>/dev/null || echo "")"
+    n_sports="$(printf '%s' "$body" | jq '.data.sports.sports | length' 2>/dev/null || echo "")"
+
+    case "${n_finance}${n_sports}" in
+        '' | *[!0-9]*)
+            echo "unreadable /public/feed response"
+            return 1
+            ;;
+    esac
+
+    if ((n_finance < 1)) || ((n_sports < 1)); then
+        echo "empty feed (finance=$n_finance, sports=$n_sports)"
+        return 1
+    fi
+
+    echo "finance=$n_finance, sports=$n_sports"
+    return 0
+}
+
 # ─── Main ────────────────────────────────────────────────────────────────
 echo "=================================================="
 echo "Scrollr production-readiness smoke test"
@@ -214,14 +268,31 @@ for line in "${SERVICES[@]}"; do
     fi
 done
 
+# Data-flow check. Only meaningful once core-api is actually serving, so it
+# is skipped when core-api already failed above — a second red line saying
+# the same thing helps nobody.
+checks_total=${#SERVICES[@]}
+if ((failed == 0)); then
+    checks_total=$((checks_total + 1))
+    printf '%-20s %-20s ' "core-api" "/public/feed"
+    if detail="$(check_data_flow)"; then
+        green "OK ($detail)"
+    else
+        red "FAIL ($detail)"
+        failed=$((failed + 1))
+    fi
+else
+    yellow "Skipping /public/feed data check — a service is already unhealthy."
+fi
+
 echo
 echo "=================================================="
 if ((failed == 0)); then
-    green "ALL ${#SERVICES[@]} SERVICES READY"
+    green "ALL ${checks_total} CHECKS PASSED"
     echo "=================================================="
     exit 0
 else
-    red "$failed OF ${#SERVICES[@]} SERVICES NOT READY"
+    red "$failed OF ${checks_total} CHECKS FAILED"
     echo "=================================================="
     echo
     yellow "Per-service JSON (for debugging):"

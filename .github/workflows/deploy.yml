@@ -330,8 +330,11 @@ jobs:
       # also rebuilt get re-pinned by "Roll out updated images", so a
       # k8s-only change unpins everything else. Record what is actually
       # running so the rollout step can restore it.
+      # Runs on EVERY deploy, not just k8s changes. Two consumers now: the
+      # re-pin below (which repairs what `kubectl apply` unpinned), and the
+      # rollback at the end of this job, which needs to know what was running
+      # before this deploy touched anything.
       - name: Record live image tags
-        if: needs.detect-changes.outputs.k8s == 'true'
         run: |
           : > /tmp/live-images.env
           for svc in core-api website finance-service sports-service rss-service fantasy-api predictions-service; do
@@ -492,7 +495,56 @@ jobs:
       # runs AFTER rollout so a bad release surfaces as a failed deploy
       # rather than a silently-degraded cluster.
       - name: Production-readiness smoke test
+        id: smoke
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq jq
           READINESS_TIMEOUT=180 ./scripts/smoke/production-readiness.sh
+
+      # Until now a release that rolled out cleanly and then FAILED the smoke
+      # test simply stayed live, with nothing but a red workflow to show for
+      # it. With ~200 users that is the wrong default.
+      #
+      # This re-pins each deployment to the exact image it was running before
+      # this deploy. It deliberately does not use `kubectl rollout undo`:
+      # every manifest hardcodes `:latest`, so an apply rewrites both the old
+      # and new ReplicaSets to `:latest` and `undo` resolves to the newest
+      # image — rolling back to the thing you are rolling back from (#255,
+      # #256). Explicit tags are the only reliable way back.
+      #
+      # NOT covered: schema. Migrations run at core-api startup, so anything
+      # destructive has already been applied by the time this fires. That is
+      # what the additive-only guard in backend-tests.yml is for.
+      - name: Roll back on smoke-test failure
+        if: failure() && steps.smoke.outcome == 'failure'
+        run: |
+          if [ ! -s /tmp/live-images.env ]; then
+            echo "::error::Smoke test failed and no previous image tags were recorded — cannot roll back automatically. Roll back by hand."
+            exit 1
+          fi
+
+          echo "::warning::Smoke test failed — rolling every service back to its previous image."
+          while IFS='=' read -r svc img; do
+            [ -n "$svc" ] && [ -n "$img" ] || continue
+            echo "Restoring ${svc} -> ${img}"
+            kubectl set image deployment/"${svc}" "${svc}=${img}" -n scrollr
+          done < /tmp/live-images.env
+
+          rc=0
+          while IFS='=' read -r svc _; do
+            [ -n "$svc" ] || continue
+            kubectl rollout status deployment/"${svc}" -n scrollr --timeout=300s || rc=1
+          done < /tmp/live-images.env
+
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::Rollback did not converge. The cluster needs manual attention."
+            exit 1
+          fi
+
+          echo "Rollback complete. Re-running the smoke test to confirm the previous release is healthy."
+          READINESS_TIMEOUT=180 ./scripts/smoke/production-readiness.sh
+
+          # Keep the workflow red: the deploy failed, and a green tick on a
+          # rolled-back release is how a broken deploy gets forgotten.
+          echo "::error::Deploy failed its smoke test and was rolled back to the previous images."
+          exit 1

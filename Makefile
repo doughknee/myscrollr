@@ -56,8 +56,12 @@ setup: ##setup: Generate every .env file (run this first)
 doctor: ##setup: Check Docker, ports and required tooling
 	@node scripts/dev/doctor.mjs
 
-kalshi-key: ##setup: Pull the Kalshi key from the cluster (needs kubectl)
-	@$(SHELL) scripts/dev/pull-kalshi-key.sh
+# Predictions is optional and the cluster credential is a LIVE, real-money
+# Kalshi key, so this refuses to copy it unless you ask for it by name:
+# `make kalshi-key prod=1`. `make seed` gives you a working app without any
+# upstream credential.
+kalshi-key: ##setup: Pull the Kalshi key from the cluster (prod=1 to confirm; needs kubectl)
+	@$(SHELL) scripts/dev/pull-kalshi-key.sh $(if $(prod),--prod)
 	@node scripts/dev/setup.mjs --predictions-only
 
 # ── Run ──────────────────────────────────────────────────────────────
@@ -77,6 +81,7 @@ up: ##run: Start the backend, wait until healthy (svc= for a subset)
 	  $(COMPOSE_AUTO) up -d --build --remove-orphans; \
 	fi
 	@$(SHELL) scripts/dev/wait-healthy.sh
+	@$(COMPOSE) exec -T postgres psql -U scrollr -d scrollr -At -c "SELECT count(*) FROM trades" 2>/dev/null | grep -qx 0 && echo "[hint] no data yet - run 'make seed' to load the dev dataset." || true
 
 # COMPOSE_AUTO, not COMPOSE_PRED: naming the predictions profile makes
 # compose resolve that service, and it fails outright on the missing
@@ -88,6 +93,17 @@ down: ##run: Stop the backend (keeps your database)
 	@$(COMPOSE_AUTO) down --remove-orphans
 
 restart: down up ##run: Stop and start again
+
+# ── Data ─────────────────────────────────────────────────────────────
+# Local dev runs with every upstream API key blank, so the ingesters stay up
+# and serve whatever is in Postgres — which on a fresh clone is nothing. This
+# loads a committed snapshot instead of making anyone paste a production key
+# to see a working app. See scripts/dev/seed.sh.
+seed: ##run: Load the committed dev dataset (makes no API calls)
+	@$(SHELL) scripts/dev/seed.sh load
+
+seed-capture: ##setup: Re-record the dev dataset from SOURCE_DATABASE_URL
+	@$(SHELL) scripts/dev/seed.sh capture
 
 dev: up ##run: Backend, then web + desktop in their own windows
 	@$(SHELL) scripts/dev/launch-frontends.sh
