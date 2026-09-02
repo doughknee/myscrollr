@@ -2,7 +2,9 @@ package widgets
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -43,6 +45,19 @@ func TestCatalogSnapshotMatchesServer(t *testing.T) {
 		}
 		t.Logf("regenerated %s (%d widgets, version %s)", path, len(catalogBody.Widgets), catalogBody.Version)
 		return
+	}
+
+	// desktop/ lives outside the api module, and `make shell svc=core-api`
+	// mounts only api/ (AGENTS.md points you there to compile-check without a
+	// host toolchain), so the tree is legitimately absent in that container.
+	// Skip rather than fail — but only when the whole directory is missing.
+	// A missing snapshot inside a present desktop/ is still a failure, which
+	// is the case this guard exists for. CI has the full checkout and runs
+	// `go test -v`, so a skip is visible there.
+	desktopSrc := filepath.Dir(path)
+	if _, err := os.Stat(desktopSrc); errors.Is(err, fs.ErrNotExist) {
+		t.Skipf("%s does not exist — api-only checkout (e.g. the core-api dev "+
+			"container); nothing to compare against", desktopSrc)
 	}
 
 	raw, err := os.ReadFile(path)

@@ -1,7 +1,10 @@
 package main
 
 import (
+	"errors"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -21,6 +24,25 @@ func TestGeneratedTypesAreCurrent(t *testing.T) {
 	}
 
 	for _, out := range outputPaths() {
+		// Both clients live OUTSIDE the api module. `make shell svc=core-api`
+		// mounts only api/ — and AGENTS.md sends you there to compile-check
+		// without a host Go toolchain — so in that container the client trees
+		// genuinely are not on disk and there is nothing to compare against.
+		// Skip that case instead of failing: a guard that is red for everyone
+		// following the documented workflow is a guard people learn to ignore,
+		// which is the same argument normalizeEOL below already makes about
+		// Windows line endings.
+		//
+		// A missing FILE inside a directory that exists is still a failure —
+		// that is someone deleting a generated file, precisely what this
+		// guards. Only the whole tree being absent is a skip. CI checks out
+		// the entire repo and runs `go test -v`, so a skip there is visible
+		// (that is why -v is set, see 67a83cca).
+		if _, err := os.Stat(filepath.Dir(out)); errors.Is(err, fs.ErrNotExist) {
+			t.Skipf("%s does not exist — api-only checkout (e.g. the core-api "+
+				"dev container); nothing to compare against", filepath.Dir(out))
+		}
+
 		got, err := os.ReadFile(out)
 		if err != nil {
 			t.Fatalf("%s: %v (run `go -C api run ./cmd/gents`)", out, err)
