@@ -62,7 +62,10 @@ jobs:
       - name: Check api/migrations for destructive statements
         run: |
           git fetch --no-tags --depth=1 origin "${{ github.base_ref || 'main' }}" || true
-          scripts/migrations/check-additive.sh "origin/${{ github.base_ref || 'main' }}"
+          # Invoked through bash rather than executed directly: scripts/ in
+          # this repo is committed non-executable (Windows checkouts do not
+          # carry the mode bit), so ./script.sh is exit 126 on a runner.
+          bash scripts/migrations/check-additive.sh "origin/${{ github.base_ref || 'main' }}"
 
   # ── Go tests (5 independent jobs, run in parallel) ─────────────
   go-tests:

@@ -102,7 +102,10 @@ jobs:
           command -v jq >/dev/null || { echo "::error::jq is required by this assertion"; exit 1; }
 
           body="$(curl -fsS --max-time 30 http://localhost:18080/public/feed)"
-          echo "$body" | head -c 200; echo
+          # Bash substring, NOT `| head -c 200`: head closes the pipe after
+          # 200 bytes, echo takes SIGPIPE, and pipefail turns a debug print
+          # into a failed step.
+          echo "${body:0:200}"
 
           n_finance="$(echo "$body" | jq '.data.finance | length')"
           n_sports="$(echo "$body" | jq '.data.sports.sports | length')"
@@ -149,7 +152,9 @@ jobs:
 
       - name: Ensure GNU make is available
         run: |
-          command -v make >/dev/null && { make --version | head -1; exit 0; }
+          # `|| true` on the head pipe: `shell: bash` runs with -o pipefail,
+          # so a SIGPIPE from head could fail the step on a version banner.
+          command -v make >/dev/null && { make --version | head -1 || true; exit 0; }
           choco install make --no-progress -y
           command -v make >/dev/null || { echo "make still unavailable"; exit 1; }
 
