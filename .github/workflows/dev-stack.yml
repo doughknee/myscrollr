@@ -120,6 +120,20 @@ jobs:
             exit 1
           fi
 
+      # The assertion above is a READ, and a read cannot see a broken write
+      # path. `make seed` COPYs rows carrying explicit ids; if it does not also
+      # advance the id sequences, every subsequent INSERT collides on the
+      # primary key — which broke the RSS ingester (the one service that polls
+      # without an API key) and every test that inserts a fixture row, while
+      # /public/feed kept serving the seeded rows perfectly (REL-154).
+      #
+      # So: seed, then write.
+      - name: Seeded database still accepts writes
+        run: |
+          set -euo pipefail
+          docker compose -f docker/compose.yml exec -T postgres             psql -U scrollr -d scrollr -v ON_ERROR_STOP=1             -c "INSERT INTO tracked_leagues (name, sport_api, api_host, league_id, category) VALUES ('__ci_write_probe__', 'football', 'localhost', 0, 'Test')"             -c "DELETE FROM tracked_leagues WHERE name = '__ci_write_probe__'"
+          echo "seeded database accepts inserts (id sequences are in step with the data)"
+
       # `make down` was broken once on its own (4047e5b0): a fresh checkout
       # could start the stack but not stop it.
       - name: make down
