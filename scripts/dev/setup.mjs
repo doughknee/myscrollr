@@ -70,15 +70,23 @@ LOGTO_SUPER_USER_ROLE_ID=
   "channels/finance/.env": `DATABASE_URL=${DB}
 PORT=3001
 ENCRYPTION_KEY=${enc}
-# Optional: without a key the finance ingester serves whatever is already
-# in the database and logs that it is not polling.
+# Leave this BLANK. Without a key the finance ingester stays up, skips
+# polling, and serves whatever is in Postgres -- and \`make seed\` puts a real
+# snapshot there, so you get a populated app with no key at all.
+#
+# The key that would work here is the PRODUCTION TwelveData key, on a plan
+# sized for real users. Pasting it spends their quota to look at your laptop.
 TWELVEDATA_API_KEY=
 `,
   "channels/sports/.env": `DATABASE_URL=${DB}
 PORT=3002
 ENCRYPTION_KEY=${enc}
-# Optional: without a key the sports ingester serves whatever is already
-# in the database and logs that it is not polling.
+# Leave this BLANK. Same as finance: no key means no polling, and
+# \`make seed\` supplies the data instead.
+#
+# api-sports bills a shared 7,500-requests-per-day budget per sport host,
+# split across every league in production. A dev box polling on the
+# production key takes that budget from live users.
 API_SPORTS_KEY=
 `,
   "channels/rss/.env": `DATABASE_URL=${DB}
@@ -240,5 +248,9 @@ console.log(`
   core encrypts third-party tokens and the channels decrypt them, so they
   must match.
 
-  Next:  make up
+  Every upstream API key is intentionally blank. Do not paste production keys
+  in: \`make seed\` loads a committed snapshot so the app has real data
+  without spending the quota that live users depend on.
+
+  Next:  make up  &&  make seed
 `);

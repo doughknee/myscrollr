@@ -40,11 +40,10 @@ pub async fn start_finance_services(pool: Arc<PgPool>, health_state: Arc<Mutex<F
     // Postgres. Seeding above still runs, so a fresh database gets its symbol
     // rows. Outside development `FinanceState::new` still exits via
     // `fatal_env`, so a real deploy cannot silently stop ingesting.
-    if std::env::var("ENVIRONMENT").as_deref() == Ok("development")
-        && std::env::var("TWELVEDATA_API_KEY")
-            .map(|v| v.trim().is_empty())
-            .unwrap_or(true)
-    {
+    if !should_poll(
+        std::env::var("ENVIRONMENT").ok().as_deref(),
+        std::env::var("TWELVEDATA_API_KEY").ok().as_deref(),
+    ) {
         info!("TWELVEDATA_API_KEY not set; not polling. Existing database rows are still served.");
         return;
     }
@@ -349,4 +348,56 @@ async fn verify_exchange_metadata(state: FinanceState) {
     }
     
     info!("[ TwelveData ] Exchange metadata verification complete.");
+}
+
+/// Whether this process should poll TwelveData.
+///
+/// Extracted from `run` so it can be tested. Local dev deliberately runs with
+/// a blank key: the service stays up, skips polling, and serves whatever
+/// `make seed` put in Postgres. That promise is written in the generated
+/// `channels/finance/.env` and in docs/LOCAL_SETUP.md, and it has been broken
+/// before — the service used to require the key and exit, so a fresh checkout
+/// could not boot (67c8d68e).
+///
+/// The other half matters just as much: OUTSIDE development a blank key must
+/// NOT be tolerated, or a misconfigured production deploy would silently stop
+/// ingesting while looking healthy.
+pub fn should_poll(environment: Option<&str>, api_key: Option<&str>) -> bool {
+    let have_key = api_key.map(|k| !k.trim().is_empty()).unwrap_or(false);
+    if have_key {
+        return true;
+    }
+    // No key: only development is allowed to carry on without one.
+    environment != Some("development")
+}
+
+#[cfg(test)]
+mod keyless_tests {
+    use super::should_poll;
+
+    #[test]
+    fn development_without_a_key_does_not_poll() {
+        assert!(!should_poll(Some("development"), None));
+        assert!(!should_poll(Some("development"), Some("")));
+        assert!(!should_poll(Some("development"), Some("   ")));
+    }
+
+    #[test]
+    fn development_with_a_key_still_polls() {
+        assert!(should_poll(Some("development"), Some("real-key")));
+    }
+
+    #[test]
+    fn production_without_a_key_must_not_be_tolerated() {
+        // Reaching polling with no key is what makes the caller fatal out.
+        // Silently skipping here would mean a production deploy stops
+        // ingesting and still reports itself healthy.
+        assert!(should_poll(Some("production"), None));
+        assert!(should_poll(Some("production"), Some("")));
+    }
+
+    #[test]
+    fn unset_environment_fails_closed() {
+        assert!(should_poll(None, None));
+    }
 }

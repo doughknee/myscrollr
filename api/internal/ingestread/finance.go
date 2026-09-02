@@ -91,14 +91,7 @@ func RegisterFinanceRoutes(app *fiber.App) {
 
 // handleGetFinance returns the latest trades for every tracked symbol.
 func handleGetFinance(c *fiber.Ctx) error {
-	ctx := context.Background()
-	var trades []Trade
-	if cacheGetJSON(ctx, CacheKeyFinance, &trades) {
-		c.Set("X-Cache", "HIT")
-		return c.JSON(trades)
-	}
-
-	trades, err := queryTrades(ctx)
+	trades, hit, err := PublicFinance(context.Background())
 	if err != nil {
 		log.Printf("[Finance] getFinance query failed: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
@@ -106,10 +99,28 @@ func handleGetFinance(c *fiber.Ctx) error {
 			Error:  "Internal server error",
 		})
 	}
-
-	cacheSetJSON(ctx, CacheKeyFinance, trades, FinanceCacheTTL)
-	c.Set("X-Cache", "MISS")
+	if hit {
+		c.Set("X-Cache", "HIT")
+	} else {
+		c.Set("X-Cache", "MISS")
+	}
 	return c.JSON(trades)
+}
+
+// PublicFinance returns the payload behind GET /finance/public, along with
+// whether it came from cache. Exported so HandlePublicFeed can aggregate it
+// in-process: since ADR-0002 finance is a local source, not a discovered
+// channel, so there is nothing to reach over HTTP.
+func PublicFinance(ctx context.Context) (trades []Trade, cacheHit bool, err error) {
+	if cacheGetJSON(ctx, CacheKeyFinance, &trades) {
+		return trades, true, nil
+	}
+	trades, err = queryTrades(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	cacheSetJSON(ctx, CacheKeyFinance, trades, FinanceCacheTTL)
+	return trades, false, nil
 }
 
 // handleGetSymbolCatalog returns all enabled tracked symbols for the
