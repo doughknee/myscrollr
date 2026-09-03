@@ -90,6 +90,9 @@ func widgetUserCacheKeys(userSub string) []string {
 	return []string{
 		"cache:finance:" + userSub,
 		"cache:sports:" + userSub,
+		// Sports alone has two per-user payloads on two keys: the full
+		// widget-page games list and the fair-shared dashboard preview.
+		"cache:sports:dash:" + userSub,
 		"cache:rss:" + userSub,
 		"cache:predictions:" + userSub,
 	}

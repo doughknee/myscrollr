@@ -30,6 +30,23 @@ const (
 	// caches. Must stay in sync with widgetUserCacheKeys (redis.go).
 	CacheKeySportsPrefix = "cache:sports:"
 
+	// CacheKeySportsDashPrefix is the same, for the DASHBOARD payload.
+	//
+	// It has to be a separate key. Two producers cache a per-user
+	// SportsResponse and they do not agree on what it holds:
+	// handleGetSports (the full widget page) asks for DefaultSportsLimit
+	// with fair-share OFF -- every game for every selected league --
+	// while sportsDashboard asks for DashboardSportsLimit with it ON, a
+	// per-league preview. Sharing one key meant whichever ran first won
+	// for the next 10 seconds and the other served a payload built to
+	// the wrong contract. The widget page, whose entire job is to show
+	// everything and let the user filter, was the loser: a Formula 1
+	// page would get the dashboard's ~10-per-league slice of a 13-race
+	// season. The dashboard lost the other way, silently dropping its
+	// fair-share guarantee whenever the widget page had cached first.
+	// Must stay in sync with widgetUserCacheKeys (redis.go).
+	CacheKeySportsDashPrefix = "cache:sports:dash:"
+
 	// CacheKeySportsCatalog is the Redis key for the cached league catalog.
 	CacheKeySportsCatalog = "cache:sports:catalog"
 
@@ -500,7 +517,7 @@ func sportsDashboard(ctx context.Context, userSub string) map[string]interface{}
 		"sports_meta": SportsMeta{Leagues: []LeagueMeta{}},
 	}
 
-	cacheKey := CacheKeySportsPrefix + userSub
+	cacheKey := CacheKeySportsDashPrefix + userSub
 	var resp SportsResponse
 	if cacheGetJSON(ctx, cacheKey, &resp) {
 		return map[string]interface{}{
@@ -538,7 +555,13 @@ func sportsDashboard(ctx context.Context, userSub string) map[string]interface{}
 // invalidateSportsUserCache drops the per-user games cache after a sports
 // widget config change.
 func invalidateSportsUserCache(userSub string) {
-	if err := platform.Rdb.Del(context.Background(), CacheKeySportsPrefix+userSub).Err(); err != nil {
+	// Both keys: the widget-page payload and the dashboard payload are
+	// built from the same league set, so whatever staleness one, staleness
+	// the other.
+	if err := platform.Rdb.Del(context.Background(),
+		CacheKeySportsPrefix+userSub,
+		CacheKeySportsDashPrefix+userSub,
+	).Err(); err != nil {
 		log.Printf("[Sports] Failed to invalidate cache for %s: %v", userSub, err)
 	}
 }

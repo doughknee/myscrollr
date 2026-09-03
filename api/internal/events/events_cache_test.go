@@ -21,6 +21,7 @@ func userCacheKeysFor(userSub string) []string {
 		platform.RedisDashboardCachePrefix + userSub,
 		"cache:finance:" + userSub,
 		"cache:sports:" + userSub,
+		"cache:sports:dash:" + userSub,
 		"cache:rss:" + userSub,
 	}
 }
