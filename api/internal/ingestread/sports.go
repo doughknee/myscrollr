@@ -314,6 +314,7 @@ func loadLeagueStatus(ctx context.Context, names []string) (map[string]leagueSta
 			       COUNT(*) FILTER (WHERE state = 'in') AS live_count,
 			       MIN(start_time) FILTER (WHERE state = 'pre') AS next_game
 			FROM games
+			WHERE ` + notStaleUpcoming + `
 			GROUP BY league`)
 	} else {
 		rows, err = platform.DBPool.Query(ctx, `
@@ -322,7 +323,7 @@ func loadLeagueStatus(ctx context.Context, names []string) (map[string]leagueSta
 			       COUNT(*) FILTER (WHERE state = 'in') AS live_count,
 			       MIN(start_time) FILTER (WHERE state = 'pre') AS next_game
 			FROM games
-			WHERE league = ANY($1)
+			WHERE league = ANY($1) AND ` + notStaleUpcoming + `
 			GROUP BY league`, names)
 	}
 	if err != nil {
@@ -580,12 +581,13 @@ func querySportsGames(ctx context.Context, limit int, favoriteTeams map[string]F
 			COALESCE(status_short, ''), COALESCE(status_long, ''),
 			COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')
 		FROM games
+		WHERE %s
 		ORDER BY
 			CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
 			CASE WHEN home_team_name = ANY($1) OR away_team_name = ANY($1) THEN 0 ELSE 1 END,
 			CASE WHEN state = 'pre' THEN start_time END ASC,
 			CASE WHEN state != 'pre' THEN start_time END DESC
-		LIMIT %d`, limit), favNames)
+		LIMIT %d`, notStaleUpcoming, limit), favNames)
 	if err != nil {
 		return nil, fmt.Errorf("sports query failed: %w", err)
 	}
@@ -593,6 +595,28 @@ func querySportsGames(ctx context.Context, limit int, favoriteTeams map[string]F
 
 	return scanGames(rows), nil
 }
+
+// notStaleUpcoming excludes games still marked 'pre' whose start time has
+// already passed -- which is never a real state. It is a fixture that
+// finished without anyone fetching the result: poll_schedule only reads
+// today..+7, so once a game falls out of that window nothing re-reads it to
+// mark it final, and it sits as "upcoming" until cleanup_old_games removes
+// it 7 days later.
+//
+// That matters because every ordering here puts 'pre' ahead of finals and
+// sorts it by start_time ASC, so a stale row sorts to the FRONT of upcoming
+// -- a finished game presented as the next one to watch. It also poisoned
+// LeagueMeta.NextGame (MIN(start_time) FILTER (WHERE state = 'pre')), which
+// is what the desktop's empty state reads to say when a league returns: it
+// could name a date in the past.
+//
+// REL-152 fixed the F1 parser that manufactured these permanently. This is
+// the read-side guard for the transient kind, which the ingester still
+// produces for any league whose fixture drifts out of the 7-day window.
+//
+// 12 hours matches parse_f1_race's guard, so a game that kicked off an hour
+// ago and has not been polled to 'in' yet is left alone.
+const notStaleUpcoming = `(state <> 'pre' OR start_time >= NOW() - INTERVAL '12 hours')`
 
 // MinPerLeagueShare is the minimum number of candidate games each selected
 // league gets before the global LIMIT applies. Used only in fair-share mode
@@ -667,7 +691,7 @@ func queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favor
 							CASE WHEN state != 'pre' THEN start_time END DESC
 					) AS side_rn
 				FROM games
-				WHERE league = ANY($1)
+				WHERE league = ANY($1) AND %s
 			)
 			SELECT id, league, COALESCE(sport, ''), external_game_id, COALESCE(link, ''),
 				home_team_name, COALESCE(home_team_logo, ''), COALESCE(home_team_score::text, ''), COALESCE(home_team_code, ''),
@@ -683,7 +707,7 @@ func queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favor
 				CASE WHEN home_team_name = ANY($2) OR away_team_name = ANY($2) THEN 0 ELSE 1 END,
 				CASE WHEN state = 'pre' THEN start_time END ASC,
 				CASE WHEN state != 'pre' THEN start_time END DESC
-			LIMIT %d`, upShare, downShare, limit)
+			LIMIT %d`, notStaleUpcoming, upShare, downShare, limit)
 	} else {
 		// No per-league cap. Show every game for every selected league.
 		query = fmt.Sprintf(`
@@ -694,13 +718,13 @@ func queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favor
 				COALESCE(status_short, ''), COALESCE(status_long, ''),
 				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')
 			FROM games
-			WHERE league = ANY($1)
+			WHERE league = ANY($1) AND %s
 			ORDER BY
 				CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
 				CASE WHEN home_team_name = ANY($2) OR away_team_name = ANY($2) THEN 0 ELSE 1 END,
 				CASE WHEN state = 'pre' THEN start_time END ASC,
 				CASE WHEN state != 'pre' THEN start_time END DESC
-			LIMIT %d`, limit)
+			LIMIT %d`, notStaleUpcoming, limit)
 	}
 
 	rows, err := platform.DBPool.Query(ctx, query, leagues, favNames)

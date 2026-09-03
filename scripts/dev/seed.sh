@@ -217,6 +217,29 @@ UPDATE markets SET close_time = close_time + (now() - (SELECT max(updated_at) FR
   WHERE close_time IS NOT NULL
     AND (SELECT max(updated_at) FROM games) IS NOT NULL;
 
+-- Runs LAST on purpose: the shifts above anchor on
+-- (SELECT max(updated_at) FROM games), so removing rows before they
+-- have all run could move the anchor out from under them.
+-- Drop games still marked 'pre' after the shift whose start time has passed.
+--
+-- A snapshot catches whatever was mid-flight, and 'pre' with a past start
+-- time is never a real state -- it is a game that finished without anyone
+-- fetching the result. poll_schedule only looks today..+7, so once a
+-- fixture falls out of that window nothing ever re-reads it to mark it
+-- final; it sits as "upcoming" until cleanup_old_games deletes it at 7
+-- days. The ticker sorts pre games by start_time ASC, so these sort to the
+-- FRONT of upcoming and a finished game presents as the next one to watch.
+--
+-- The August 2026 snapshot carried 63 of them, including two Formula 1
+-- races four months stale -- the permanent-loop bug fixed in REL-152. The
+-- parser no longer creates those, but the committed dataset predates the
+-- fix, and any future capture can still catch the transient kind. Cheaper
+-- to normalise on load than to depend on when the snapshot was taken.
+--
+-- 12 hours, matching parse_f1_race's guard, so a fixture that kicked off
+-- an hour ago and has not been polled to 'in' yet is left alone.
+DELETE FROM games WHERE state = 'pre' AND start_time < now() - interval '12 hours';
+
 UPDATE tracked_feeds SET last_success_at = NULL,
                          created_at = now(),
                          consecutive_failures = 0,
