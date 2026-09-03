@@ -105,6 +105,12 @@ seed: ##run: Load the committed dev dataset (makes no API calls)
 seed-capture: ##setup: Re-record the dev dataset from SOURCE_DATABASE_URL
 	@$(SHELL) scripts/dev/seed.sh capture
 
+# Production's database is on DigitalOcean's PRIVATE endpoint and cannot be
+# reached from a laptop, so this runs psql in a throwaway pod inside the
+# cluster and streams the result back. Read-only, content tables only.
+seed-capture-prod: ##setup: Re-record the dev dataset from PRODUCTION (needs kubectl)
+	@$(SHELL) scripts/dev/seed.sh capture --from-cluster
+
 dev: up ##run: Backend, then web + desktop in their own windows
 	@$(SHELL) scripts/dev/launch-frontends.sh
 
