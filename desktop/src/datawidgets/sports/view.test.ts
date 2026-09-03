@@ -248,16 +248,20 @@ describe("selectSportsForTicker", () => {
   it("shows a fixture three weeks out once the window is widened", () => {
     // The reported symptom, end to end: the next F1 race was 9 days away
     // and the Scores tab was empty at every setting.
+    //
+    // Asserted on the FEED, not the ticker. This is about the widget
+    // page's day window; the ticker applies its own near-term horizon on
+    // top and would answer a different question.
     const race = mk({
       id: 900,
       state: "pre",
       start_time: new Date(NOW.getTime() + 21 * 86_400_000).toISOString(),
     });
     const wide = normalizeSportsDisplayConfig({ daysBack: 7, daysAhead: 365 });
-    expect(selectSportsForTicker([race], wide, NOW.getTime())).toHaveLength(1);
+    expect(selectSportsForFeed([race], wide, new Set(), NOW.getTime())).toHaveLength(1);
     // ...and is still correctly hidden by the default week-ahead window.
     const dflt = normalizeSportsDisplayConfig({});
-    expect(selectSportsForTicker([race], dflt, NOW.getTime())).toHaveLength(0);
+    expect(selectSportsForFeed([race], dflt, new Set(), NOW.getTime())).toHaveLength(0);
   });
 
   it("returns [] for empty input", () => {
@@ -346,12 +350,20 @@ describe("selectSportsForTicker", () => {
     // bar empty 13 days in 14, so a widget the user deliberately added
     // would show nothing at all. The floor is one chip, not zero.
     const races = [
-      preGame(1, 10 * 86_400_000),
-      preGame(2, 24 * 86_400_000),
-      preGame(3, 31 * 86_400_000),
+      preGame(1, 3 * 86_400_000),
+      preGame(2, 17 * 86_400_000),
+      preGame(3, 24 * 86_400_000),
     ];
     const result = selectSportsForTicker(races, { daysBack: 7, daysAhead: 365 });
     expect(result.map((g) => g.id)).toEqual([1]); // the soonest, and only it
+  });
+
+  it("does not reach past a week for that one fixture", () => {
+    // Uncapped, the floor surfaced fixtures a month out, which sat beside
+    // a 19h chip reading as an arbitrary date rather than as "this is all
+    // this league has". A league between seasons now stays off the bar.
+    const races = [preGame(1, 10 * 86_400_000), preGame(2, 24 * 86_400_000)];
+    expect(selectSportsForTicker(races, { daysBack: 7, daysAhead: 365 })).toEqual([]);
   });
 
   it("does not invent a chip for a league with nothing upcoming at all", () => {

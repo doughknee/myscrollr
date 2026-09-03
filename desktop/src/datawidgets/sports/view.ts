@@ -174,18 +174,31 @@ export const TICKER_UPCOMING_HOURS = 24;
 export const TICKER_FINAL_HOURS = 18;
 
 /**
+ * How far ahead the floor below will reach for a league's next fixture.
+ *
+ * The floor exists so a league you follow is never absent from the bar.
+ * Left unbounded it also surfaced fixtures a month out, which sat beside
+ * a 19h chip reading as an arbitrary date rather than as "this is all
+ * this league has". A week is the compromise: F1 and Champions League
+ * appear in the run-up to a fixture, and a league between seasons stays
+ * off the bar entirely rather than advertising a date nobody is thinking
+ * about yet.
+ */
+export const TICKER_FLOOR_DAYS = 7;
+
+/**
  * The ticker's own tightening of the widget's day window.
  *
  * Live games always pass. Everything else has to be near enough in time to
  * be worth a slot on a bar you glance at.
  *
  * The floor matters as much as the horizon: if a league contributes
- * NOTHING, its single soonest fixture is admitted anyway. Without that,
- * following Formula 1 -- races one to three weeks apart -- would mean an
- * empty bar 13 days in 14, and a widget you deliberately added would
- * silently show nothing at all. The guarantee is "a league you follow is
- * always represented"; the horizon only decides how much MORE than one
- * slot it gets.
+ * NOTHING, its single soonest fixture is admitted anyway, provided it is
+ * within TICKER_FLOOR_DAYS. Without the floor, following Formula 1 --
+ * races one to three weeks apart -- would mean an empty bar 13 days in
+ * 14, and a widget you deliberately added would silently show nothing at
+ * all. Without the cap, it reached a month out and the chip read as an
+ * arbitrary date rather than as the league's only news.
  */
 function onTicker(games: Game[], now: number): Game[] {
   const kept = games.filter((g) => {
@@ -199,8 +212,13 @@ function onTicker(games: Game[], now: number): Game[] {
   });
   if (kept.length > 0) return kept;
 
+  const floorLimit = now + TICKER_FLOOR_DAYS * 86_400_000;
   const soonest = games
-    .filter((g) => g.state === "pre" && new Date(g.start_time).getTime() > now)
+    .filter((g) => {
+      if (g.state !== "pre") return false;
+      const t = new Date(g.start_time).getTime();
+      return t > now && t <= floorLimit;
+    })
     .sort((a, b) => +new Date(a.start_time) - +new Date(b.start_time))[0];
   return soonest ? [soonest] : [];
 }
