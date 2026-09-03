@@ -105,6 +105,13 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
     return scopedLeague ? all.filter((g) => g.league === scopedLeague) : all;
   }, [sportsData?.sports, scopedLeague]);
 
+  // Scoped the same way the games are: on /widget/sports_mls the empty
+  // state must speak about MLS, not about every league the user follows.
+  const leagueMeta = useMemo(() => {
+    const all = sportsData?.meta?.leagues ?? [];
+    return scopedLeague ? all.filter((l) => l.name === scopedLeague) : all;
+  }, [sportsData?.meta?.leagues, scopedLeague]);
+
   // Favorite team names as a Set for fast lookup
   const favoriteTeamNames = useMemo(
     () => buildFavoriteSet(favoriteTeams),
@@ -170,12 +177,14 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
                 display={display}
                 favoriteTeams={favoriteTeamNames}
                 showLeagueHeaders={!scopedLeague}
+                leagueMeta={leagueMeta}
               />
             )}
             {tab === "schedule" && (
               <ScheduleTab
                 games={games}
                 favoriteTeams={favoriteTeamNames}
+                leagueMeta={leagueMeta}
               />
             )}
             {tab === "standings" && (

@@ -1,14 +1,17 @@
 import { useMemo } from "react";
 import { clsx } from "clsx";
-import { CalendarOff } from "lucide-react";
 import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import TeamLogo from "../../components/TeamLogo";
 import { isPre, formatCountdown, displayTeamCode } from "../../utils/gameHelpers";
+import SportsEmptyState from "./EmptyState";
+import type { LeagueMeta } from "../../api/queries";
 import type { Game } from "../../types";
 
 interface ScheduleTabProps {
   games: Game[];
   favoriteTeams: Set<string>;
+  /** Per-league season/polling status, for the empty state. */
+  leagueMeta: LeagueMeta[];
 }
 
 function dateLabel(dateStr: string): string {
@@ -37,6 +40,7 @@ function isFavoriteGame(game: Game, favorites: Set<string>): boolean {
 export function ScheduleTab({
   games,
   favoriteTeams,
+  leagueMeta,
 }: ScheduleTabProps) {
   const upcoming = useMemo(() => {
     return games
@@ -61,10 +65,11 @@ export function ScheduleTab({
   }, [upcoming]);
 
   if (upcoming.length === 0) {
+    // "No upcoming games scheduled" is true whether the league is between
+    // seasons or simply quiet, and never said which. SportsEmptyState does.
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-3">
-        <CalendarOff size={28} className="text-fg-3" />
-        <p className="text-fg-3 text-xs">No upcoming games scheduled</p>
+      <div className="flex items-center justify-center py-16">
+        <SportsEmptyState leagues={leagueMeta} />
       </div>
     );
   }

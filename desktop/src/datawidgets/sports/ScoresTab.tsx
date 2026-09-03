@@ -3,6 +3,8 @@ import { clsx } from "clsx";
 import { GameItem } from "./GameItem";
 import { isLive } from "../../utils/gameHelpers";
 import { selectSportsForFeed } from "./view";
+import SportsEmptyState from "./EmptyState";
+import type { LeagueMeta } from "../../api/queries";
 import type { Game, FeedMode } from "../../types";
 import type { SportsDisplayPrefs } from "../../hooks/useSportsConfig";
 
@@ -12,6 +14,8 @@ interface ScoresTabProps {
   display: SportsDisplayPrefs;
   favoriteTeams: Set<string>;
   showLeagueHeaders: boolean;
+  /** Per-league season/polling status, for the empty state. */
+  leagueMeta: LeagueMeta[];
 }
 
 function isFavoriteGame(game: Game, favorites: Set<string>): boolean {
@@ -24,6 +28,7 @@ export function ScoresTab({
   display,
   favoriteTeams,
   showLeagueHeaders,
+  leagueMeta,
 }: ScoresTabProps) {
   const ordered = useMemo(
     () => selectSportsForFeed(games, display, favoriteTeams),
@@ -47,9 +52,26 @@ export function ScoresTab({
   }, [ordered]);
 
   if (ordered.length === 0) {
+    // Two different nothings, and conflating them was the confusing part:
+    // the league has no games at all (off-season, or nothing scheduled --
+    // SportsEmptyState says which), versus games exist and the user's own
+    // time window or favourites-only filter hid every one of them. Only
+    // the second is fixed by touching a control, so only the second says so.
+    if (games.length > 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 gap-1 text-center">
+          <p className="text-xs text-fg-3 font-medium">
+            No games in this time window
+          </p>
+          <p className="text-[11px] text-fg-4">
+            {games.length} {games.length === 1 ? "game is" : "games are"} hidden by your filters
+          </p>
+        </div>
+      );
+    }
     return (
-      <div className="flex items-center justify-center py-12 text-fg-3 text-xs">
-        No games to show
+      <div className="flex items-center justify-center py-12">
+        <SportsEmptyState leagues={leagueMeta} />
       </div>
     );
   }
