@@ -32,11 +32,29 @@ export interface SportsDisplayConfig {
 export const SPORTS_WINDOW_DEFAULTS = { daysBack: 1, daysAhead: 7 } as const;
 
 /**
- * Hard ceiling for both steppers — the server only retains games ±7 days
- * (cleanup_old_games in the sports service), so offering more would show
- * windows with no data in them.
+ * Hard ceiling looking BACK. cleanup_old_games (sports service) deletes
+ * finals and postponements older than 7 days, so a wider back window can
+ * only ever show emptiness.
  */
 export const SPORTS_WINDOW_MAX_DAYS = 7;
+
+/**
+ * Hard ceiling looking AHEAD, and deliberately not the same number.
+ *
+ * The retention job prunes only the PAST -- forward fixtures are never
+ * deleted, so the server holds a full season of them (F1 through
+ * December, ~135 upcoming MLB games). Capping both directions at 7 was
+ * therefore right on one side and wrong on the other, and the wrong side
+ * broke every league that does not play weekly: with races 1-3 weeks
+ * apart, an F1 user whose next race was 9 days out had NO setting -- not
+ * even "Everything" -- that could show it. The Scores tab was
+ * permanently empty and the widget looked broken.
+ *
+ * A year is effectively unbounded against what the server stores, which
+ * is what "Everything" should mean. It stays a finite clamp so a corrupt
+ * stored config cannot produce an infinite window.
+ */
+export const SPORTS_WINDOW_MAX_DAYS_AHEAD = 365;
 
 const DAY_MS = 86_400_000;
 
@@ -67,9 +85,9 @@ function inDayWindow(
   return t >= lower && t < upper;
 }
 
-function clampWindowDays(v: unknown, fallback: number): number {
+function clampWindowDays(v: unknown, fallback: number, max: number): number {
   return typeof v === "number" && Number.isFinite(v)
-    ? Math.min(SPORTS_WINDOW_MAX_DAYS, Math.max(0, Math.round(v)))
+    ? Math.min(max, Math.max(0, Math.round(v)))
     : fallback;
 }
 
@@ -204,10 +222,12 @@ export function normalizeSportsDisplayConfig(
     daysBack: clampWindowDays(
       obj.daysBack,
       legacyFinal === "off" ? 0 : SPORTS_WINDOW_DEFAULTS.daysBack,
+      SPORTS_WINDOW_MAX_DAYS,
     ),
     daysAhead: clampWindowDays(
       obj.daysAhead,
       legacyUpcoming === "off" ? 0 : SPORTS_WINDOW_DEFAULTS.daysAhead,
+      SPORTS_WINDOW_MAX_DAYS_AHEAD,
     ),
   };
 }

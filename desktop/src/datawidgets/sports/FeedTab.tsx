@@ -208,7 +208,10 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
 const WINDOW_OPTIONS: { value: string; label: string; back: number; ahead: number }[] = [
   { value: "0/0", label: "Today", back: 0, ahead: 0 },
   { value: "1/7", label: "This week", back: 1, ahead: 7 },
-  { value: "7/7", label: "Everything", back: 7, ahead: 7 },
+  // 365 ahead, not 7. Forward fixtures are never pruned, so this is
+  // "everything the server holds" -- and at 7 an F1 or Champions League
+  // user could not reach their next fixture from any preset at all.
+  { value: "7/365", label: "Everything", back: 7, ahead: 365 },
 ];
 
 function SportsBarControls({

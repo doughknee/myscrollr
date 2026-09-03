@@ -6,6 +6,7 @@ import {
   normalizeSportsDisplayConfig,
   SPORTS_WINDOW_DEFAULTS,
   SPORTS_WINDOW_MAX_DAYS,
+  SPORTS_WINDOW_MAX_DAYS_AHEAD,
 } from "./view";
 import type { SportsDisplayConfig } from "./view";
 import type { Game } from "../../types";
@@ -221,14 +222,42 @@ describe("selectSportsForTicker", () => {
     expect(cfg.daysBack).toBe(SPORTS_WINDOW_DEFAULTS.daysBack);
   });
 
-  it("explicit stored day values beat the legacy inference and clamp", () => {
+  it("explicit stored day values beat the legacy inference", () => {
     const cfg = normalizeSportsDisplayConfig({
       showFinal: "off", // would infer 0…
       daysBack: 3,      // …but explicit wins
-      daysAhead: 99,    // clamped to the retention horizon
+      daysAhead: 99,
     });
     expect(cfg.daysBack).toBe(3);
-    expect(cfg.daysAhead).toBe(SPORTS_WINDOW_MAX_DAYS);
+    // 99 days ahead is a legitimate window: forward fixtures are never
+    // pruned, so the server really does hold a season of them.
+    expect(cfg.daysAhead).toBe(99);
+  });
+
+  it("clamps each direction to its own ceiling, which are not the same", () => {
+    // cleanup_old_games deletes past games after 7 days but never touches
+    // future ones. Clamping ahead to 7 as well was what left an F1 user
+    // -- races 1-3 weeks apart -- with no window that could reach the
+    // next race, from any preset including "Everything".
+    const cfg = normalizeSportsDisplayConfig({ daysBack: 400, daysAhead: 400 });
+    expect(cfg.daysBack).toBe(SPORTS_WINDOW_MAX_DAYS);
+    expect(cfg.daysAhead).toBe(SPORTS_WINDOW_MAX_DAYS_AHEAD);
+    expect(SPORTS_WINDOW_MAX_DAYS_AHEAD).toBeGreaterThan(SPORTS_WINDOW_MAX_DAYS);
+  });
+
+  it("shows a fixture three weeks out once the window is widened", () => {
+    // The reported symptom, end to end: the next F1 race was 9 days away
+    // and the Scores tab was empty at every setting.
+    const race = mk({
+      id: 900,
+      state: "pre",
+      start_time: new Date(NOW.getTime() + 21 * 86_400_000).toISOString(),
+    });
+    const wide = normalizeSportsDisplayConfig({ daysBack: 7, daysAhead: 365 });
+    expect(selectSportsForTicker([race], wide, NOW.getTime())).toHaveLength(1);
+    // ...and is still correctly hidden by the default week-ahead window.
+    const dflt = normalizeSportsDisplayConfig({});
+    expect(selectSportsForTicker([race], dflt, NOW.getTime())).toHaveLength(0);
   });
 
   it("returns [] for empty input", () => {

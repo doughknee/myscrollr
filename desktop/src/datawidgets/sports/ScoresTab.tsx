@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { clsx } from "clsx";
 import { GameItem } from "./GameItem";
-import { isLive } from "../../utils/gameHelpers";
+import { isLive, isPre, formatCountdown } from "../../utils/gameHelpers";
 import { selectSportsForFeed } from "./view";
 import SportsEmptyState from "./EmptyState";
 import type { LeagueMeta } from "../../api/queries";
@@ -58,13 +58,22 @@ export function ScoresTab({
     // time window or favourites-only filter hid every one of them. Only
     // the second is fixed by touching a control, so only the second says so.
     if (games.length > 0) {
+      // Naming the next fixture is the whole point. A fortnightly league
+      // sits outside the default week-ahead window most of the time, so
+      // "5 games are hidden" on its own tells the user something is
+      // wrong without telling them it is only a date away.
+      const next = games
+        .filter((g) => isPre(g) && +new Date(g.start_time) > Date.now())
+        .sort((a, b) => +new Date(a.start_time) - +new Date(b.start_time))[0];
       return (
         <div className="flex flex-col items-center justify-center py-12 gap-1 text-center">
           <p className="text-xs text-fg-3 font-medium">
             No games in this time window
           </p>
           <p className="text-[11px] text-fg-4">
-            {games.length} {games.length === 1 ? "game is" : "games are"} hidden by your filters
+            {next
+              ? `Next ${formatCountdown(next.start_time)} — widen the window to see it`
+              : `${games.length} ${games.length === 1 ? "game is" : "games are"} hidden by your filters`}
           </p>
         </div>
       );
