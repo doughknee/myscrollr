@@ -340,11 +340,10 @@ markets|close_time|prediction chip countdowns
 # reached production yet, so no capture can contain them. Each entry is a
 # promise to delete this line when that ships.
 #
-#   trades.sparkline/day_low/day_high -- REL-157, still on
-#   bch713/rel-157-real-sparkline. Migration 000006 has never been
-#   deployed, so production's trades table has no such columns. Re-capture
-#   once it is released and remove these three.
-CONTENT_EXPECTED_EMPTY='trades.sparkline trades.day_low trades.day_high'
+# Empty right now: the one known gap, trades.sparkline/day_low/day_high,
+# is filled by backfill_derived above rather than excused here, so these
+# checks genuinely assert that a trade chip can render.
+CONTENT_EXPECTED_EMPTY=''
 
 check_content() {
   local spec table column breaks total filled stale=0 expected=0
@@ -397,6 +396,80 @@ check_content() {
   return 0
 }
 
+
+# -- Derived columns the snapshot cannot carry -------------------------
+# trades.sparkline / day_low / day_high are filled by REL-157, which is
+# still on a branch. Production's schema does not have those columns, so
+# no capture can contain them and every trade chip on a seeded stack
+# renders a flat line and an empty rail -- including in CI, which
+# therefore cannot cover that path at all.
+#
+# This DERIVES them from the two real prices each row already carries,
+# previous_close and price. The shape between those endpoints is INVENTED:
+# it is a smooth interpolation with a deterministic wiggle, not market
+# data, and nobody should read anything into its form. The endpoints and
+# the direction are real.
+#
+# Deterministic (seeded from the symbol, not random) so a reseed produces
+# the same chart and a visual diff of the app stays meaningful. The wiggle
+# is tapered to zero at both ends by sin(pi*i/29), so point 0 is exactly
+# previous_close and point 29 is exactly the current price -- otherwise
+# the last point of the sparkline would disagree with the price printed
+# next to it.
+#
+# Guarded on IS NULL, so the day this ships and a real capture carries the
+# columns, this stops doing anything. Delete it then.
+SYNTH_SQL="
+WITH src AS (
+  SELECT symbol,
+         price,
+         COALESCE(NULLIF(previous_close, 0), price) AS base,
+         (abs(hashtext(symbol)) % 100)::numeric / 16 AS phase
+    FROM trades
+   WHERE sparkline IS NULL AND price > 0
+), pts AS (
+  SELECT src.symbol,
+         i,
+         -- ::numeric because sin() yields double precision, and the column
+         -- (and round/2) are numeric(20,8).
+         GREATEST(
+           src.base + (src.price - src.base) * (i::numeric / 29)
+           + GREATEST(abs(src.price - src.base) * 0.5, src.price * 0.005)
+             * (sin(pi() * i / 29) * sin(i * 0.9 + src.phase))::numeric,
+           src.price * 0.0001
+         )::numeric AS v
+    FROM src, generate_series(0, 29) AS i
+), agg AS (
+  SELECT symbol,
+         jsonb_agg(round(v, 8) ORDER BY i) AS series,
+         min(v) AS lo,
+         max(v) AS hi
+    FROM pts
+   GROUP BY symbol
+)
+UPDATE trades t
+   SET sparkline = agg.series,
+       day_low   = round(agg.lo, 8),
+       day_high  = round(agg.hi, 8)
+  FROM agg
+ WHERE t.symbol = agg.symbol;
+"
+
+backfill_derived() {
+  # Nothing to do once the columns exist upstream and arrive populated.
+  if [ "$(psql_in "$LOCAL_DB" -At -c "SELECT count(*) FROM information_schema.columns
+           WHERE table_schema = current_schema() AND table_name = 'trades'
+             AND column_name = 'sparkline'")" = "0" ]; then
+    return 0
+  fi
+  local n
+  n="$(psql_in "$LOCAL_DB" -At -c "SELECT count(*) FROM trades WHERE sparkline IS NULL AND price > 0")"
+  [ "$n" = "0" ] && return 0
+  psql_in "$LOCAL_DB" -q -c "$SYNTH_SQL"
+  echo "[seed] derived sparkline + day range for $n symbols"
+  echo "       (endpoints real: previous_close -> price; the shape between them is not)"
+}
+
 load() {
   [ -f "$SEED_FILE" ] || { echo "[seed] no dataset at $SEED_FILE (run: make seed-capture)" >&2; exit 1; }
 
@@ -423,6 +496,8 @@ load() {
   #
   # Scoped to cache:* rather than FLUSHALL: Redis also holds SSE subscriber
   # sets and channel registrations that have nothing to do with seeding.
+  backfill_derived
+
   echo "[seed] dropping stale read caches"
   local keys
   keys="$(redis_in --scan --pattern 'cache:*' | tr -d '
