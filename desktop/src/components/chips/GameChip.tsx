@@ -9,6 +9,7 @@ import {
   gameStatusLabel,
   gameStatusCompact,
   displayTeamCode,
+  leagueCode,
   sameGame,
 } from "../../utils/gameHelpers";
 import { useScoreFlash } from "../../hooks/useScoreFlash";
@@ -147,7 +148,7 @@ const GameChip = memo(
                   close ? "text-live" : "text-fg-4",
                 )}
               >
-                {game.league}
+                {leagueCode(game.league)}
               </span>
             )}
           </div>

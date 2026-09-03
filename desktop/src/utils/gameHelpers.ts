@@ -162,3 +162,74 @@ export function sameGame(a: Game, b: Game): boolean {
     a.start_time === b.start_time
   );
 }
+
+/**
+ * League codes for the chip's 34px status column.
+ *
+ * The chip rendered `game.league` raw, which is fine for the leagues whose
+ * names are already codes (MLS, NFL, UFC) and clips everything else:
+ * "FORMULA 1" is nine characters and needs ~55px at 8px uppercase with
+ * 0.08em tracking, in a column 34px wide. The column cannot grow -- it is
+ * paid for out of the 164px the team names need, which were sized against
+ * the real catalog in REL-158.
+ *
+ * ~5 characters fit. Codes are the ones a viewer of that sport would
+ * recognise (UCL, EPL, F1) rather than mechanical truncation, because
+ * "FORMU" identifies nothing. Every league in tracked_leagues as of
+ * 2026-09 is listed; the fallback below covers a league added later.
+ */
+const LEAGUE_CODES: Record<string, string> = {
+  AFL: "AFL",
+  "Champions League": "UCL",
+  "FIFA World Cup": "WC",
+  "Formula 1": "F1",
+  "Handball Bundesliga": "HBL",
+  "Handball Champions League": "HCL",
+  "La Liga": "LIGA",
+  MLB: "MLB",
+  MLS: "MLS",
+  NBA: "NBA",
+  "NCAA Basketball": "NCAAB",
+  "NCAA Football": "NCAAF",
+  NFL: "NFL",
+  NHL: "NHL",
+  "Premier League": "EPL",
+  // Distinct from the football Premier League above, which takes EPL.
+  "Premiership Rugby": "PREM",
+  "Six Nations": "6N",
+  Starligue: "SLG",
+  "Super Rugby": "SUPER",
+  UFC: "UFC",
+  "Volleyball Champions League": "VCL",
+  "Volleyball Nations League": "VNL",
+};
+
+/** Longest code the 34px column fits. Enforced by the tests. */
+export const LEAGUE_CODE_MAX = 5;
+
+/**
+ * A short, recognisable code for `league`, guaranteed to fit the column.
+ *
+ * Unmapped leagues fall back to initials ("Super Duper League" -> "SDL"),
+ * which is right far more often than truncation for the multi-word names
+ * that are the only ones too long in the first place.
+ */
+export function leagueCode(league: string): string {
+  const known = LEAGUE_CODES[league];
+  if (known) return known;
+
+  const trimmed = league.trim();
+  if (trimmed.length <= LEAGUE_CODE_MAX) return trimmed.toUpperCase();
+
+  const words = trimmed.split(/\s+/);
+  if (words.length > 1) {
+    const initials = words
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase();
+    if (initials.length <= LEAGUE_CODE_MAX) return initials;
+    return initials.slice(0, LEAGUE_CODE_MAX);
+  }
+  // One long word, no initials to take: clipping is all that is left.
+  return trimmed.slice(0, LEAGUE_CODE_MAX).toUpperCase();
+}
