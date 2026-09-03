@@ -116,7 +116,18 @@ func DispatchLifecycle(source, event, userSub string, config, oldConfig map[stri
 			enabledVal = *enabled
 		}
 		src.lifecycle(event, userSub, config, oldConfig, enabledVal)
-	} else if src.invalidateUser != nil && (event == "updated" || event == "deleted") {
+	} else if src.invalidateUser != nil {
+		// Every event, "created" included. Dropping created here looked
+		// safe -- a widget that did not exist cannot have a stale cache --
+		// but the cache is keyed by USER, not by widget: a user who already
+		// had sports_nfl holds a cache:sports:<sub> entry built from the
+		// NFL-only league set. Adding sports_mls left that entry in place,
+		// so the desktop's post-create refetch got a cache HIT with no MLS
+		// games in it, and nothing refetched again (the query has a
+		// staleTime and no interval). The widget stayed empty until some
+		// unrelated add invalidated the key. Same for finance and
+		// predictions; rss was unaffected only because it has its own
+		// lifecycle hook that already handled "created".
 		src.invalidateUser(userSub)
 	}
 	return true
