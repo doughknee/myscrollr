@@ -294,20 +294,79 @@ describe("selectSportsForTicker", () => {
     // Regression test for the marquee-snap bug: dashboard refetches
     // every ~30s would re-evaluate the time-bucketed engagement and
     // produce a different order, causing the rail to snap.
+    //
+    // Every game here sits far enough inside the ticker horizon to stay
+    // inside it after the clock advance, so this tests ORDER stability
+    // alone. Membership changing as a game ages out is the horizon doing
+    // its job, and is covered separately below.
     const games = [
-      preGame(1, 90 * 60_000),  // crosses old 1h boundary as time advances
-      preGame(2, 30 * 60_000),  // already inside old 1h boundary
+      preGame(1, 20 * 3_600_000),
+      preGame(2, 18 * 3_600_000),
       liveGame(3),
-      finalGame(4, 90 * 60_000), // crosses old 2h boundary as time advances
-      finalGame(5, 30 * 60_000), // already inside old 2h boundary
+      finalGame(4, 4 * 3_600_000),
+      finalGame(5, 2 * 3_600_000),
     ];
     const orderAtT0 = selectSportsForTicker(games, null).map((g) => g.id);
+    expect(orderAtT0).toHaveLength(5);
 
-    // Advance past every old boundary.
+    // Advance past every old engagement boundary.
     vi.setSystemTime(new Date(NOW.getTime() + 3 * 3_600_000));
     const orderAtT1 = selectSportsForTicker(games, null).map((g) => g.id);
 
     expect(orderAtT1).toEqual(orderAtT0);
+  });
+
+  // ── Ticker horizon ────────────────────────────────────────────
+  //
+  // The bar showed every game in the widget's day window -- up to a week.
+  // Three league widgets produced 38 chips, 30 from MLS alone, none live:
+  // a fixture list rather than a glance.
+
+  it("keeps only near-term games, but never drops a live one", () => {
+    const games = [
+      liveGame(1),
+      preGame(2, 3 * 3_600_000), // tonight
+      preGame(3, 5 * 86_400_000), // five days out
+      finalGame(4, 4 * 3_600_000), // this afternoon
+      finalGame(5, 5 * 86_400_000), // last week
+    ];
+    const wide = { daysBack: 7, daysAhead: 365 };
+    expect(selectSportsForTicker(games, wide).map((g) => g.id)).toEqual([1, 2, 4]);
+  });
+
+  it("keeps a live game that started long before the horizon", () => {
+    // A test match or a rain delay can run for hours. State wins over
+    // clock: nothing live is ever cut.
+    const stillOn = { ...liveGame(1), start_time: new Date(NOW.getTime() - 30 * 3_600_000).toISOString() };
+    expect(selectSportsForTicker([stillOn], { daysBack: 7, daysAhead: 365 })).toHaveLength(1);
+  });
+
+  it("still shows one fixture for a league with nothing near-term", () => {
+    // Formula 1: races 1-3 weeks apart. A pure horizon would leave the
+    // bar empty 13 days in 14, so a widget the user deliberately added
+    // would show nothing at all. The floor is one chip, not zero.
+    const races = [
+      preGame(1, 10 * 86_400_000),
+      preGame(2, 24 * 86_400_000),
+      preGame(3, 31 * 86_400_000),
+    ];
+    const result = selectSportsForTicker(races, { daysBack: 7, daysAhead: 365 });
+    expect(result.map((g) => g.id)).toEqual([1]); // the soonest, and only it
+  });
+
+  it("does not invent a chip for a league with nothing upcoming at all", () => {
+    // The floor admits the next fixture; it does not resurrect old ones.
+    const games = [finalGame(1, 6 * 86_400_000)];
+    expect(selectSportsForTicker(games, { daysBack: 7, daysAhead: 365 })).toEqual([]);
+  });
+
+  it("leaves the widget page showing the full day window", () => {
+    // The horizon is a rule about a glanceable bar. The page you open to
+    // read the whole slate must not inherit it.
+    const games = [preGame(1, 3 * 3_600_000), preGame(2, 5 * 86_400_000)];
+    const wide = { daysBack: 7, daysAhead: 365 };
+    expect(selectSportsForTicker(games, wide)).toHaveLength(1);
+    expect(selectSportsForFeed(games, wide, new Set())).toHaveLength(2);
   });
 });
 

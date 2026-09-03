@@ -143,13 +143,82 @@ export function selectSportsForTicker(
   config: SportsDisplayConfig | null | undefined,
   now: number = Date.now(),
 ): Game[] {
+  return sortForDisplay(onTicker(withinDayWindow(games, config, now), now));
+}
+
+/**
+ * How long before kickoff an upcoming game earns a ticker slot.
+ *
+ * The ticker used to show every game in the widget's day window, which is
+ * up to a week: three league widgets produced 38 chips, 30 of them from
+ * MLS, none of them live. The bar became a fixture list. A horizon rather
+ * than a fixed count because it is a rule that can be stated -- "what is
+ * on soon" -- and it breathes: a busy Saturday fills the bar and a quiet
+ * Tuesday nearly empties it, where a fixed count pads a quiet day with
+ * games nobody is thinking about yet.
+ *
+ * 24h is the line where the chip stops reading as a countdown ("3h05")
+ * and starts reading as a date ("1d"), which is also roughly where a
+ * fixture stops being something you are about to watch.
+ */
+export const TICKER_UPCOMING_HOURS = 24;
+
+/**
+ * How long a finished game keeps its slot, measured from KICKOFF (not the
+ * final whistle -- nothing records that; `updated_at` is the ingester's
+ * write time and `make seed` deliberately does not rebase it).
+ *
+ * 18h so last night's results are still there over breakfast, which is
+ * most of the value a final has on a glanceable bar.
+ */
+export const TICKER_FINAL_HOURS = 18;
+
+/**
+ * The ticker's own tightening of the widget's day window.
+ *
+ * Live games always pass. Everything else has to be near enough in time to
+ * be worth a slot on a bar you glance at.
+ *
+ * The floor matters as much as the horizon: if a league contributes
+ * NOTHING, its single soonest fixture is admitted anyway. Without that,
+ * following Formula 1 -- races one to three weeks apart -- would mean an
+ * empty bar 13 days in 14, and a widget you deliberately added would
+ * silently show nothing at all. The guarantee is "a league you follow is
+ * always represented"; the horizon only decides how much MORE than one
+ * slot it gets.
+ */
+function onTicker(games: Game[], now: number): Game[] {
+  const kept = games.filter((g) => {
+    if (isLive(g)) return true;
+    const t = new Date(g.start_time).getTime();
+    if (!Number.isFinite(t)) return true; // same defensive stance as inDayWindow
+    const hours = (t - now) / 3_600_000;
+    return g.state === "final"
+      ? hours >= -TICKER_FINAL_HOURS
+      : hours >= 0 && hours <= TICKER_UPCOMING_HOURS;
+  });
+  if (kept.length > 0) return kept;
+
+  const soonest = games
+    .filter((g) => g.state === "pre" && new Date(g.start_time).getTime() > now)
+    .sort((a, b) => +new Date(a.start_time) - +new Date(b.start_time))[0];
+  return soonest ? [soonest] : [];
+}
+
+/** The day-window filter, shared by the ticker and the feed. */
+function withinDayWindow(
+  games: Game[],
+  config: SportsDisplayConfig | null | undefined,
+  now: number,
+): Game[] {
   const cfg = config ?? {};
   const daysBack = cfg.daysBack ?? SPORTS_WINDOW_DEFAULTS.daysBack;
   const daysAhead = cfg.daysAhead ?? SPORTS_WINDOW_DEFAULTS.daysAhead;
+  return games.filter((g) => inDayWindow(g, daysBack, daysAhead, now));
+}
 
-  const filtered = games.filter((g) => inDayWindow(g, daysBack, daysAhead, now));
-
-  return filtered.sort((a, b) => {
+function sortForDisplay(games: Game[]): Game[] {
+  return games.sort((a, b) => {
     const eDiff = gameEngagement(b) - gameEngagement(a);
     if (eDiff !== 0) return eDiff;
     // Same engagement bucket — break ties by start_time. Finals sort
@@ -171,7 +240,10 @@ export function selectSportsForFeed(
   favoriteTeams: ReadonlySet<string>,
   now: number = Date.now(),
 ): Game[] {
-  return selectSportsForTicker(games, config, now).sort((a, b) => {
+  // Deliberately NOT selectSportsForTicker: the ticker's near-term horizon
+  // is a rule about a glanceable bar. The widget page is where you go to
+  // read the whole slate, so it keeps everything the day window allows.
+  return sortForDisplay(withinDayWindow(games, config, now)).sort((a, b) => {
     const aFavorite =
       favoriteTeams.has(a.home_team_name) || favoriteTeams.has(a.away_team_name);
     const bFavorite =
