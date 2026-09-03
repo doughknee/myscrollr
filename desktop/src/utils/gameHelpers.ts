@@ -66,6 +66,48 @@ export function gameStatusLabel(game: Game): string {
   return "";
 }
 
+/**
+ * A status short enough for the chip's 34px status column.
+ *
+ * `gameStatusLabel` is the roomy version — it returns "Finished" and
+ * "in 3h 20m", which overflow a column sized for "88'" and "FT". This trades
+ * words for glyphs at the same information: the period, the wait, or that it
+ * is over.
+ */
+export function gameStatusCompact(game: Game): string {
+  if (isLive(game)) return game.timer || game.status_short || "LIVE";
+  if (isFinal(game)) return "FT";
+  if (isPre(game)) return formatCountdownCompact(game.start_time);
+  if (game.state === "postponed") return "PPD";
+  return "";
+}
+
+/**
+ * A countdown that fits four characters: "3h05", "22h", "45m", "2d", "Sep 9".
+ *
+ * Same thresholds as formatCountdown, without the words. Minutes are dropped
+ * past ten hours: "22h28" is five characters and 30px at 10px mono, which is
+ * the entire usable width of the chip's status column, and at that range the
+ * minutes are noise anyway.
+ */
+export function formatCountdownCompact(startTime: string): string {
+  const diff = new Date(startTime).getTime() - Date.now();
+  if (diff <= 0) return "NOW";
+  const h = Math.floor(diff / 3_600_000);
+  const m = Math.floor((diff % 3_600_000) / 60_000);
+  if (h >= 48) {
+    return new Date(startTime).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+  }
+  if (h >= 24) return `${Math.floor(h / 24)}d`;
+  if (h >= 10) return `${h}h`;
+  if (h > 0) return `${h}h${String(m).padStart(2, "0")}`;
+  if (m > 0) return `${m}m`;
+  return "SOON";
+}
+
 /** Display a team code, falling back to first 3 chars of name if code is missing. */
 export function displayTeamCode(code: string, name: string): string {
   return code || name.slice(0, 3).toUpperCase();

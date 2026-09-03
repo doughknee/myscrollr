@@ -200,6 +200,12 @@ export function chipBaseClasses(
   comfort: boolean | undefined,
   colors: ChipColors,
   extra?: string,
+  // Comfort chips stack their two rows by default. A chip whose comfort
+  // layout is columns side by side (the game chip: two scoreboard rows beside
+  // a status column) passes "row" — appending a flex-direction class to
+  // `extra` would not reliably win, since Tailwind utilities resolve by
+  // stylesheet order rather than by position in the class string.
+  comfortDirection: "col" | "row" = "col",
 ): string {
   return clsx(
     "ticker-chip group",
@@ -227,7 +233,9 @@ export function chipBaseClasses(
     colors.border,
     colors.hoverBorder,
     comfort
-      ? "flex h-[52px] flex-col items-start justify-between py-1.5"
+      ? comfortDirection === "row"
+        ? "flex h-[52px] items-stretch py-1.5"
+        : "flex h-[52px] flex-col items-start justify-between py-1.5"
       : "flex items-center gap-2 py-1 text-ui-body",
     extra,
   );
