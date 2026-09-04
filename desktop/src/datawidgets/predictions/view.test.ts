@@ -325,30 +325,13 @@ describe("groupEventsByCategory", () => {
 // ── selectPredictionsForTicker ──────────────────────────────────
 
 describe("selectPredictionsForTicker", () => {
-  it("applies defaultSort=movers from prefs", () => {
-    const items = [
-      mk({ id: "A", yes_price: 52, prev_yes_price: 50 }),
-      mk({ id: "B", yes_price: 30, prev_yes_price: 50 }),
-      mk({ id: "C", yes_price: 55, prev_yes_price: 50 }),
-    ];
-    const result = selectPredictionsForTicker(items, {
-      ...DEFAULT_PREFS,
-      defaultSort: "movers",
-    });
-    expect(result.map((p) => p.id)).toEqual(["B", "C", "A"]);
-  });
-
-  it("applies defaultSort=trending from prefs", () => {
+  it("orders the fallback rail by trailing volume, whatever the feed page's sort is", () => {
     const items = [
       mk({ id: "A", volume_24h: 10 }),
       mk({ id: "B", volume_24h: 30 }),
       mk({ id: "C", volume_24h: 20 }),
     ];
-    const result = selectPredictionsForTicker(items, {
-      ...DEFAULT_PREFS,
-      defaultSort: "trending",
-    });
-    expect(result.map((p) => p.id)).toEqual(["B", "C", "A"]);
+    expect(selectPredictionsForTicker(items).map((p) => p.id)).toEqual(["B", "C", "A"]);
   });
 
   it("excludes dropped and resolved markets from the fallback rail", () => {
@@ -357,36 +340,11 @@ describe("selectPredictionsForTicker", () => {
       mk({ id: "dead", volume_24h: 999, in_sweep: false }),
       mk({ id: "settled", volume_24h: 500, status: "finalized" }),
     ];
-    const result = selectPredictionsForTicker(items, {
-      ...DEFAULT_PREFS,
-      defaultSort: "trending",
-    });
-    expect(result.map((p) => p.id)).toEqual(["live"]);
+    expect(selectPredictionsForTicker(items).map((p) => p.id)).toEqual(["live"]);
   });
 
-  it("applies defaultSort=alpha from prefs", () => {
-    const items = [
-      mk({ id: "3", title: "C" }),
-      mk({ id: "1", title: "A" }),
-      mk({ id: "2", title: "B" }),
-    ];
-    const result = selectPredictionsForTicker(items, {
-      ...DEFAULT_PREFS,
-      defaultSort: "alpha",
-    });
-    expect(result.map((p) => p.title)).toEqual(["A", "B", "C"]);
-  });
-
-  it("applies defaultSort=closing from prefs", () => {
-    const items = [
-      mk({ id: "A", close_time: "2026-06-01T00:00:00Z" }),
-      mk({ id: "B", close_time: "2026-01-01T00:00:00Z" }),
-    ];
-    const result = selectPredictionsForTicker(items, {
-      ...DEFAULT_PREFS,
-      defaultSort: "closing",
-    });
-    expect(result.map((p) => p.id)).toEqual(["B", "A"]);
+  it("takes no preferences at all", () => {
+    expect(selectPredictionsForTicker.length).toBeLessThanOrEqual(2);
   });
 });
 
@@ -475,11 +433,7 @@ describe("selectPredictionsForTicker scoping", () => {
       mk({ id: "B", event_rank: 2, volume: 90 }),
       mk({ id: "C", event_rank: 1, volume: 80 }),
     ];
-    const out = selectPredictionsForTicker(
-      items,
-      { ...DEFAULT_PREFS, defaultSort: "trending" },
-      new Set(["B"]),
-    );
+    const out = selectPredictionsForTicker(items, new Set(["B"]));
     expect(out.map((p) => p.id)).toEqual(["B"]);
   });
 
@@ -489,10 +443,7 @@ describe("selectPredictionsForTicker scoping", () => {
       mk({ id: "done", in_sweep: false, status: "settled", result: "no" }),
       mk({ id: "live" }),
     ];
-    const out = selectPredictionsForTicker(
-      items,
-      { ...DEFAULT_PREFS, defaultSort: "trending" },
-      new Set(["gone", "done", "live"]),
+    const out = selectPredictionsForTicker(items, new Set(["gone", "done", "live"]),
     );
     expect(out.map((p) => p.id).sort()).toEqual(["done", "live"]);
   });
@@ -505,10 +456,7 @@ describe("selectPredictionsForTicker scoping", () => {
         volume: 1000 - i,
       }),
     );
-    const out = selectPredictionsForTicker(
-      items,
-      { ...DEFAULT_PREFS, defaultSort: "trending" },
-      new Set(),
+    const out = selectPredictionsForTicker(items, new Set(),
     );
     expect(out.length).toBe(TICKER_FALLBACK_LIMIT);
     expect(out.every((p) => (p.event_rank ?? 1) === 1)).toBe(true);
@@ -517,10 +465,7 @@ describe("selectPredictionsForTicker scoping", () => {
 
   it("treats missing event_rank as rank 1 (pre-backfill rows)", () => {
     const items = [mk({ id: "LEGACY", volume: 5 })];
-    const out = selectPredictionsForTicker(
-      items,
-      { ...DEFAULT_PREFS, defaultSort: "trending" },
-      new Set(),
+    const out = selectPredictionsForTicker(items, new Set(),
     );
     expect(out.map((p) => p.id)).toEqual(["LEGACY"]);
   });

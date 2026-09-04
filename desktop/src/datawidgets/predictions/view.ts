@@ -153,36 +153,35 @@ export function selectLens(
  */
 export const TICKER_FALLBACK_LIMIT = 15;
 
+/** Markets on the rail at once; the rest rotate through these. Not a setting. */
+export const TICKER_PREDICTIONS_SLOTS = 4;
+
 /**
- * Baseline pipeline used by the ticker (v1.1.4 scoping):
- *   - Watchlist non-empty → starred markets only (any event rank).
- *   - Otherwise → the top TICKER_FALLBACK_LIMIT rank-1 legs (one per
- *     event) by the user's `defaultSort`.
+ * The ticker's pool (v1.1.4 scoping, minus the prefs):
+ *   - Watchlist non-empty -> starred markets only (any event rank).
+ *   - Otherwise -> the top TICKER_FALLBACK_LIMIT rank-1 legs (one per event).
+ *
+ * Ordered by trailing volume as one fixed rule rather than the feed
+ * page's sort: the rail is independent of how the list is being read,
+ * and with rotation the order only decides which markets take the slots
+ * first -- every one still comes round.
  */
 export function selectPredictionsForTicker(
   items: Prediction[],
-  prefs: PredictionsDisplayPrefs,
   watchlist?: ReadonlySet<string>,
 ): Prediction[] {
-  const sortKey: PredictionsSortKey = prefs.defaultSort ?? "trending";
   if (watchlist && watchlist.size > 0) {
-    // Starred markets only. Dropped-but-unresolved stars are excluded —
+    // Starred markets only. Dropped-but-unresolved stars are excluded --
     // their frozen price scrolling by forever IS the stale-data bug.
     // Resolved stars stay (final odds are closure, and the resolved-today
     // payload window bounds how long they linger).
     return sortPredictions(
-      items.filter(
-        (p) =>
-          watchlist.has(p.ticker) &&
-          (p.in_sweep !== false || isResolved(p)),
-      ),
-      sortKey,
+      items.filter((p) => watchlist.has(p.ticker) && (p.in_sweep !== false || isResolved(p))),
+      "trending",
     );
   }
-  const primaries = items.filter(
-    (p) => isDisplayable(p) && (p.event_rank ?? 1) === 1,
-  );
-  return sortPredictions(primaries, sortKey).slice(0, TICKER_FALLBACK_LIMIT);
+  const primaries = items.filter((p) => isDisplayable(p) && (p.event_rank ?? 1) === 1);
+  return sortPredictions(primaries, "trending").slice(0, TICKER_FALLBACK_LIMIT);
 }
 
 // ── Pure: event grouping (v1.1.4 Kalshi-style cards) ─────────────

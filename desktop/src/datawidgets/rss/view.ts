@@ -11,6 +11,8 @@
  * sort order) to work on the feed but not the ticker prior to this module.
  */
 import type { RssItem } from "../../types";
+import { rotateSlots } from "../ticker";
+import { plainText } from "../../utils/rssText";
 import { migrateRssDisplay, type RssDisplayPrefs } from "../../preferences";
 
 export type RssSortOrder = "newest" | "oldest";
@@ -92,79 +94,77 @@ export function limitPerSource(items: RssItem[], limit: number): RssItem[] {
  * sort toggle). If those are added later, surface them as arguments here.
  */
 /**
- * The ticker's own horizon for headlines, applied on top of the widget's
- * prefs and never inherited by the widget page.
+ * The ticker's own horizon for headlines. Independent of the widget page:
+ * the feed's sort, source filters, "Show N" and time window are about
+ * reading a list, and none of them reach the rail. The rail has one rule
+ * and the user never configures it.
  *
- * A per-feed news widget put every article in its window on the rail, and
- * the default window is unlimited -- the per-source cap only ever applied
- * to multi-feed widgets. So a Yahoo Sports widget was 297 chips. On the
- * rail a feed now shows its newest TICKER_RSS_PER_FEED items from the last
- * TICKER_RSS_HOURS. A feed with nothing in that window still gets its
- * latest item, provided that item is itself under TICKER_RSS_FLOOR_HOURS
- * old: the floor keeps a QUIET feed represented, not a dead one. The
- * window and cap stop a wire from becoming the whole bar. Same shape the
- * sports ticker got.
+ * Eligible is everything from the last TICKER_RSS_HOURS. A feed with
+ * nothing in that window still gets its latest item, provided that item
+ * is under TICKER_RSS_FLOOR_HOURS old: the floor keeps a QUIET feed
+ * represented, not a dead one. What is eligible then rotates through
+ * TICKER_RSS_SLOTS fixed positions (arrangeRssSlots), so a wire that
+ * posts thirty articles in an hour is still three chips on the bar and
+ * every article still comes round.
  */
 export const TICKER_RSS_HOURS = 6;
-export const TICKER_RSS_PER_FEED = 5;
-/**
- * How stale the floor's one item may be.
- *
- * The floor exists so a quiet feed still has a presence on the rail, not so
- * a dead one does. Past two days an item is not news and the chip is just
- * occupying width; a feed that has said nothing since then says nothing.
- */
 export const TICKER_RSS_FLOOR_HOURS = 48;
+/**
+ * Three headlines on the rail at once. Headline chips are the widest on
+ * the bar (up to the 640 cap) and a news widget is usually one feed, so
+ * three is about the width a league's four game chips take.
+ */
+export const TICKER_RSS_SLOTS = 3;
 
-function onTicker(items: RssItem[], now: number, perFeedCap = TICKER_RSS_PER_FEED): RssItem[] {
-  // `items` arrive newest-first; keep that order within each feed.
+/**
+ * Everything eligible for the rail, newest first but interleaved by feed,
+ * so on a multi-feed widget one loud wire cannot own the front of every
+ * slot's rotation.
+ */
+export function selectRssForTicker(items: RssItem[], now: number = Date.now()): RssItem[] {
+  const sorted = sortRssItems(items, "newest");
   const cutoff = now - TICKER_RSS_HOURS * 3_600_000;
   const floorCutoff = now - TICKER_RSS_FLOOR_HOURS * 3_600_000;
   const perFeed = new Map<string, RssItem[]>();
   const newest = new Map<string, RssItem>();
-  for (const it of items) {
+  for (const it of sorted) {
     const t = new Date(it.published_at ?? it.created_at).getTime();
     // An undated item is treated as current rather than dropped: the feed
     // gave us no reason to think it is old.
     if (!newest.has(it.feed_url) && !(Number.isFinite(t) && t < floorCutoff)) newest.set(it.feed_url, it);
     if (Number.isFinite(t) && t < cutoff) continue;
-    const list = perFeed.get(it.feed_url) ?? [];
-    if (list.length < perFeedCap) list.push(it);
-    perFeed.set(it.feed_url, list);
+    perFeed.set(it.feed_url, [...(perFeed.get(it.feed_url) ?? []), it]);
   }
   for (const [feed, top] of newest) {
     if (!perFeed.has(feed)) perFeed.set(feed, [top]);
   }
-  const keep = new Set<RssItem>();
-  for (const list of perFeed.values()) for (const it of list) keep.add(it);
-  return items.filter((it) => keep.has(it));
+  // Interleave: feeds in order of their newest item, one item from each in turn.
+  const lists = [...perFeed.values()];
+  const out: RssItem[] = [];
+  for (let i = 0; lists.some((l) => i < l.length); i++) {
+    for (const l of lists) if (i < l.length) out.push(l[i]);
+  }
+  return out;
 }
 
-export function selectRssForTicker(
-  items: RssItem[],
-  prefs: RssDisplayPrefs,
-  now: number = Date.now(),
-): RssItem[] {
-  // Age window first (v1.1.3) so the per-source balancer only allocates
-  // slots among articles that are actually eligible to show.
-  const fresh = filterByArticleAge(items, prefs.maxArticleAgeDays ?? 0, now);
-  // The widget's own "Show N" is the cap when it is set. That control is
-  // the answer to "how many of these do I want to see", and the ticker
-  // ignoring it while the feed obeyed it was the surprise -- one widget,
-  // two different numbers. TICKER_RSS_PER_FEED is only the default for
-  // "All", where the rail still needs a bound the feed page does not.
-  //
-  // Per FEED, not per widget: on a multi-feed widget a shared total would
-  // let the loudest wire spend the whole allowance, which is the flood the
-  // horizon exists to stop.
-  const perFeedCap = prefs.maxArticles > 0 ? prefs.maxArticles : TICKER_RSS_PER_FEED;
-  const ordered = onTicker(sortRssItems(fresh, "newest"), now, perFeedCap);
-  // Single-outlet widgets (news_bbc, news_npr, ...) have exactly one
-  // source — a per-source cap there just hides articles for no reason
-  // (v1.1.1 "smart removal"). The balancer only makes sense when
-  // multiple feeds compete for space (Custom RSS, legacy News).
-  if (distinctSourceCount(ordered) <= 1) return ordered;
-  return limitPerSource(ordered, prefs.articlesPerSource);
+/** One rail position for headlines. */
+export interface RssSlot {
+  key: string;
+  item: RssItem;
+  rotateSlot?: string;
+  /** The longest headline this slot will show, so its width holds across swaps. */
+  reserveTitle?: string;
+}
+
+/** Eligible headlines laid out as TICKER_RSS_SLOTS rotating positions. */
+export function arrangeRssSlots(
+  eligible: RssItem[],
+  cycles: Readonly<Record<string, number>>,
+  keyPrefix: string,
+): RssSlot[] {
+  return rotateSlots(eligible, TICKER_RSS_SLOTS, cycles, keyPrefix, (it) => it.id, (cls) =>
+    cls.map((it) => plainText(it.title)).reduce((a, b) => (b.length > a.length ? b : a), ""),
+  ).map((r) => ({ key: r.key, item: r.item, rotateSlot: r.rotateSlot, reserveTitle: r.reserve }));
 }
 
 /** Number of distinct sources present in a payload. Widgets are already

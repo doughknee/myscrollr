@@ -70,6 +70,59 @@ export interface TickerSource {
   chips(raw: unknown, ctx: TickerContext): TickerChip[];
 }
 
+/** One rotating position on the rail. */
+export interface RotatingSlot<T, R> {
+  /** Stable key; the slot keeps it while its item changes. */
+  key: string;
+  item: T;
+  /** Present on slots that rotate; absent when the pool fit and nothing does. */
+  rotateSlot?: string;
+  /** What the chip must reserve so no item in this slot's class resizes it. */
+  reserve?: R;
+}
+
+/**
+ * Cycle a pool through a fixed number of slots, one step per lap.
+ *
+ * Shared by every source that can produce more chips than a bar should
+ * hold at once. The horizon decides what is eligible; this decides how
+ * many are on the rail, and the rest come round instead of being dropped.
+ * The user configures none of it -- the number is the source's own
+ * judgement of its chip width and its typical volume, and the rail just
+ * works.
+ *
+ * Each slot owns a residue class of the pool: slot i shows pool[i], then
+ * pool[i+k], then pool[i+2k], advancing when ITS cycle count does. Slots
+ * leave the viewport at different moments, so each has its own count and
+ * none of them need to agree for every item to come round. `reserve` is
+ * computed over the class, not the whole pool, so a slot only reserves
+ * the width it will actually use.
+ *
+ * When the pool fits, nothing rotates and every item is keyed by `id`.
+ */
+export function rotateSlots<T, R>(
+  pool: T[],
+  slots: number,
+  cycles: Readonly<Record<string, number>>,
+  keyPrefix: string,
+  id: (item: T) => string | number,
+  reserve: (cls: T[]) => R,
+): RotatingSlot<T, R>[] {
+  if (pool.length <= slots) {
+    return pool.map((item) => ({ key: `${keyPrefix}-${id(item)}`, item }));
+  }
+  const k = Math.max(1, slots);
+  const out: RotatingSlot<T, R>[] = [];
+  for (let i = 0; i < k; i++) {
+    const cls = pool.filter((_, idx) => idx % k === i);
+    if (cls.length === 0) continue;
+    const slotKey = `${keyPrefix}-slot-${i}`;
+    const turn = cycles[slotKey] ?? 0;
+    out.push({ key: slotKey, item: cls[turn % cls.length], rotateSlot: slotKey, reserve: reserve(cls) });
+  }
+  return out;
+}
+
 /**
  * Narrow a raw payload to this widget's own rows.
  *

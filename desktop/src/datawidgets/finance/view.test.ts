@@ -255,38 +255,20 @@ describe("applyFinancePipeline", () => {
 // ── selectFinanceForTicker ──────────────────────────────────────
 
 describe("selectFinanceForTicker", () => {
-  it("applies defaultSort=alpha from prefs", () => {
-    const trades = [mk({ symbol: "C" }), mk({ symbol: "A" }), mk({ symbol: "B" })];
-    const result = selectFinanceForTicker(trades, { ...DEFAULT_PREFS, defaultSort: "alpha" });
-    expect(result.map((t) => t.symbol)).toEqual(["A", "B", "C"]);
+  it("orders by the watchlist as the user built it, not by any sort", () => {
+    const trades = [mk({ symbol: "C", price: 1 }), mk({ symbol: "A", price: 30 }), mk({ symbol: "B", price: 20 })];
+    expect(selectFinanceForTicker(trades, ["B", "C", "A"]).map((t) => t.symbol)).toEqual(["B", "C", "A"]);
   });
 
-  it("applies defaultSort=price from prefs", () => {
-    const trades = [
-      mk({ symbol: "A", price: 10 }),
-      mk({ symbol: "B", price: 30 }),
-      mk({ symbol: "C", price: 20 }),
-    ];
-    const result = selectFinanceForTicker(trades, { ...DEFAULT_PREFS, defaultSort: "price" });
-    expect(result.map((t) => t.symbol)).toEqual(["B", "C", "A"]);
+  it("drops nothing the watchlist names but the payload lacks, silently", () => {
+    const trades = [mk({ symbol: "A" })];
+    expect(selectFinanceForTicker(trades, ["Z", "A"]).map((t) => t.symbol)).toEqual(["A"]);
   });
 
-  it("applies defaultSort=change from prefs", () => {
-    const trades = [
-      mk({ symbol: "A", percentage_change: -2 }),
-      mk({ symbol: "B", percentage_change: 5 }),
-      mk({ symbol: "C", percentage_change: 1 }),
-    ];
-    const result = selectFinanceForTicker(trades, { ...DEFAULT_PREFS, defaultSort: "change" });
-    expect(result.map((t) => t.symbol)).toEqual(["B", "C", "A"]);
-  });
-
-  it("applies defaultSort=updated from prefs", () => {
-    const trades = [
-      mk({ symbol: "A", last_updated: "2026-01-01T00:00:00Z" }),
-      mk({ symbol: "B", last_updated: "2026-06-01T00:00:00Z" }),
-    ];
-    const result = selectFinanceForTicker(trades, { ...DEFAULT_PREFS, defaultSort: "updated" });
-    expect(result.map((t) => t.symbol)).toEqual(["B", "A"]);
+  it("trails unlisted rows alphabetically so a legacy widget still shows everything", () => {
+    const trades = [mk({ symbol: "Z" }), mk({ symbol: "M" }), mk({ symbol: "A" })];
+    expect(selectFinanceForTicker(trades, ["M"]).map((t) => t.symbol)).toEqual(["M", "A", "Z"]);
+    expect(selectFinanceForTicker(trades, []).map((t) => t.symbol)).toEqual(["A", "M", "Z"]);
   });
 });
+

@@ -7,7 +7,7 @@ import {
   selectSportsForTicker,
   getSportsDisplayConfig,
   arrangeTickerSlots,
-  TICKER_SLOTS_DEFAULT,
+  TICKER_SLOTS,
 } from "./view";
 import { catalogItemById } from "../../marketplace";
 
@@ -40,7 +40,7 @@ export const sportsTickerSource: TickerSource = {
     const slots = arrangeTickerSlots(
       eligible,
       favorites,
-      config.tickerSlots ?? TICKER_SLOTS_DEFAULT,
+      TICKER_SLOTS,
       ctx.cycles ?? {},
       `spo-${ctx.tab}`,
     );

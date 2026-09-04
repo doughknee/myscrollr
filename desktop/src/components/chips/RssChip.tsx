@@ -21,6 +21,12 @@ interface RssChipProps {
    * cap the number that explains why five are showing and not thirty.
    */
   feedCountToday?: number;
+  /**
+   * The longest headline this chip will ever be asked to show, when it is
+   * a rotating slot. Rendered as a second hidden sizer so the headline
+   * column holds its width across swaps. Fixed chips leave it unset.
+   */
+  reserveTitle?: string;
   onClick?: () => void;
 }
 
@@ -62,6 +68,7 @@ const RssChip = memo(
     colorMode = "widget",
     accent,
     feedCountToday,
+    reserveTitle,
     onClick,
   }: RssChipProps) {
     const c = getChipColors(colorMode, "rss");
@@ -140,6 +147,16 @@ const RssChip = memo(
             >
               {title}
             </span>
+            {/* A rotating slot also sizes to the longest headline it will
+                ever hold, so a swap cannot widen or narrow the chip. */}
+            {reserveTitle && reserveTitle !== title && (
+              <span
+                aria-hidden
+                className="invisible col-start-2 row-start-1 h-0 overflow-hidden whitespace-nowrap px-2.5 font-sans text-[13px] font-semibold"
+              >
+                {reserveTitle}
+              </span>
+            )}
             <span ref={cellRef} className="col-start-2 row-span-full flex min-w-0 items-center px-2.5">
               <span
                 data-testid="headline-block"
@@ -162,11 +179,21 @@ const RssChip = memo(
             </span>
           </>
         ) : (
-          <span className="col-start-2 row-start-1 flex min-w-0 items-center px-2.5">
-            <span className={clsx("min-w-0 truncate text-left font-sans text-[13px] font-semibold", stale ? "text-fg/55" : "text-fg")}>
-              {title}
+          <>
+            {reserveTitle && reserveTitle !== title && (
+              <span
+                aria-hidden
+                className="invisible col-start-2 row-start-1 h-0 overflow-hidden whitespace-nowrap px-2.5 font-sans text-[13px] font-semibold"
+              >
+                {reserveTitle}
+              </span>
+            )}
+            <span className="col-start-2 row-start-1 flex min-w-0 items-center px-2.5">
+              <span className={clsx("min-w-0 truncate text-left font-sans text-[13px] font-semibold", stale ? "text-fg/55" : "text-fg")}>
+                {title}
+              </span>
             </span>
-          </span>
+          </>
         )}
 
         <span
@@ -187,6 +214,7 @@ const RssChip = memo(
     prev.colorMode === next.colorMode &&
     prev.accent === next.accent &&
     prev.feedCountToday === next.feedCountToday &&
+    prev.reserveTitle === next.reserveTitle &&
     prev.onClick === next.onClick &&
     prev.item.guid === next.item.guid &&
     prev.item.feed_url === next.item.feed_url &&

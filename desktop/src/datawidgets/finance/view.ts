@@ -142,15 +142,27 @@ export function selectStockView(
 // ── Pure: selector for the ticker ────────────────────────────────
 
 /**
- * Baseline pipeline used by the ticker: applies the user's `defaultSort`
- * from Display prefs. Ticker does not expose interactive filters.
+ * Symbols on the rail at once. Beyond this the watchlist rotates through
+ * the same four positions one lap at a time, so a list of three and a
+ * list of thirty take the same width. Not a setting.
  */
-export function selectFinanceForTicker(
-  trades: Trade[],
-  prefs: FinanceDisplayPrefs,
-): Trade[] {
-  const sortKey: FinanceSortKey = prefs.defaultSort ?? "alpha";
-  return sortTrades(trades, sortKey);
+export const TICKER_FINANCE_SLOTS = 4;
+
+/**
+ * The ticker's pool: the widget's watchlist, in the order the user built
+ * it. Independent of the feed page -- its sort is about reading a list,
+ * and re-sorting a list must not rearrange the rail. A symbol the
+ * watchlist names but the payload lacks is simply absent; a payload row
+ * the watchlist does not name trails, alphabetically, so a legacy widget
+ * with no symbol list still shows everything.
+ */
+export function selectFinanceForTicker(trades: Trade[], watchlist: readonly string[]): Trade[] {
+  const rank = new Map(watchlist.map((s, i) => [s, i] as const));
+  const listed = trades
+    .filter((t) => rank.has(t.symbol))
+    .sort((a, b) => rank.get(a.symbol)! - rank.get(b.symbol)!);
+  const rest = sortTrades(trades.filter((t) => !rank.has(t.symbol)), "alpha");
+  return [...listed, ...rest];
 }
 
 // ── Pipeline for FeedTab ─────────────────────────────────────────

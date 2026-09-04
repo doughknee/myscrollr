@@ -466,15 +466,3 @@ describe("arrangeTickerSlots", () => {
     expect(out.map((s) => s.key)).toEqual(["p-1", "p-2", "p-3", "p-4"]);
   });
 });
-
-describe("normalizeSportsDisplayConfig tickerSlots", () => {
-  it("defaults, rounds and clamps", async () => {
-    const { normalizeSportsDisplayConfig, TICKER_SLOTS_DEFAULT, TICKER_SLOTS_MAX } =
-      await import("./view");
-    expect(normalizeSportsDisplayConfig({}).tickerSlots).toBe(TICKER_SLOTS_DEFAULT);
-    expect(normalizeSportsDisplayConfig({ tickerSlots: 2.6 }).tickerSlots).toBe(3);
-    expect(normalizeSportsDisplayConfig({ tickerSlots: 0 }).tickerSlots).toBe(1);
-    expect(normalizeSportsDisplayConfig({ tickerSlots: 99 }).tickerSlots).toBe(TICKER_SLOTS_MAX);
-    expect(normalizeSportsDisplayConfig({ tickerSlots: "4" }).tickerSlots).toBe(TICKER_SLOTS_DEFAULT);
-  });
-});
