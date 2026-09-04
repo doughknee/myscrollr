@@ -5,7 +5,7 @@
  * determine game status across the app. Canonical source of truth
  * for game state classification.
  */
-import type { Game } from "../types";
+import type { Game, TeamStanding } from "../types";
 
 // ── State classification ────────────────────────────────────────
 
@@ -159,7 +159,23 @@ export function sameGame(a: Game, b: Game): boolean {
     a.status_short === b.status_short &&
     a.status_long === b.status_long &&
     a.short_detail === b.short_detail &&
-    a.start_time === b.start_time
+    a.start_time === b.start_time &&
+    sameStanding(a.home_standing, b.home_standing) &&
+    sameStanding(a.away_standing, b.away_standing)
+  );
+}
+
+function sameStanding(a?: TeamStanding, b?: TeamStanding): boolean {
+  if (!a || !b) return a === b;
+  return (
+    a.rank === b.rank &&
+    a.wins === b.wins &&
+    a.losses === b.losses &&
+    a.draws === b.draws &&
+    a.points === b.points &&
+    a.points_for === b.points_for &&
+    a.points_against === b.points_against &&
+    a.otl === b.otl
   );
 }
 

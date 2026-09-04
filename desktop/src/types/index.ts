@@ -101,6 +101,27 @@ export interface Game {
   season?: string;
   created_at?: string;
   updated_at?: string;
+  /**
+   * Current-season table row for each side, when the league has one.
+   * Attached by the API on every games read so the chip's detailed row --
+   * rank, record, differential or points -- costs no second request.
+   * Absent for UFC and Formula 1, which have no table.
+   */
+  home_standing?: TeamStanding;
+  away_standing?: TeamStanding;
+}
+
+/** One side's line in the current-season standings. */
+export interface TeamStanding {
+  rank: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  points: number;
+  goal_diff: number;
+  points_for: number;
+  points_against: number;
+  otl: number;
 }
 
 // ── RSS ─────────────────────────────────────────────────────────

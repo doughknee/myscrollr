@@ -5,19 +5,21 @@ import {
   isFinal,
   isPre,
   isCloseGame,
-  getWinner,
-  gameStatusLabel,
   gameStatusCompact,
-  displayTeamCode,
   leagueCode,
   sameGame,
 } from "../../utils/gameHelpers";
+import { teamShortName } from "../../utils/teamShortName";
+import {
+  reservationFor,
+  ordinal,
+  recordText,
+  metricText,
+} from "../../utils/sportsChipLayout";
 import { useScoreFlash } from "../../hooks/useScoreFlash";
-import { getChipColors, chipBaseClasses } from "./chipColors";
+import { getChipColors, chipShellClasses } from "./chipColors";
 import TeamLogo from "../TeamLogo";
-import { TiltBar } from "./TiltBar";
-import { winProbabilityForGame } from "../../utils/winProbability";
-import type { Game } from "../../types";
+import type { Game, TeamStanding } from "../../types";
 import type { ChipColorMode } from "../../preferences";
 
 // ── Props ───────────────────────────────────────────────────────
@@ -31,6 +33,27 @@ interface GameChipProps {
 
 // ── Component ───────────────────────────────────────────────────
 
+/**
+ * The sports chip: four boxed cells -- league, away, home, status -- with
+ * one rule running the full height between the two teams. Compact is the
+ * scoreboard row; detailed is the same row plus each team's table line
+ * beneath it. Nothing in the top row moves when the second appears.
+ *
+ * Content-sized, not 264px. Each team column is as wide as its own
+ * content, so a Cubs-Tigers chip is short and a Revolution-Minnesota chip
+ * is longer, with nothing padded to match. What makes that safe on a
+ * moving rail is that every slot which can change while the chip is on
+ * screen holds its widest plausible width from first render -- see
+ * sportsChipLayout for the per-league numbers -- so a chip's width settles
+ * once, when the fixture first renders, and never moves again. The live
+ * dot always occupies its slot and is merely invisible before tip and
+ * after the final; reserving the text alone left every live chip ~9px
+ * wider than the same game either side of it.
+ *
+ * Team identity is the short name (teamShortName), never the API's code:
+ * codes are empty for NCAA, MLB, NBA and NHL and the three-letter fallback
+ * made "NOR" fourteen different teams.
+ */
 const GameChip = memo(
   function GameChip({
     game,
@@ -40,196 +63,141 @@ const GameChip = memo(
   }: GameChipProps) {
     const c = getChipColors(colorMode, "sports");
     const live = isLive(game);
-    const close = isCloseGame(game);
-    const winner = getWinner(game);
-    const status = gameStatusLabel(game);
+    const close = live && isCloseGame(game);
     const final_ = isFinal(game);
     const pre_ = isPre(game);
+    const ppd = game.state === "postponed";
     const flash = useScoreFlash(game.away_team_score, game.home_team_score);
-    // Score share today, a real model when the seam is fed — see
-    // winProbabilityForGame. Nothing prints it as a percentage until it
-    // reports isRealProbability.
-    const tilt = winProbabilityForGame(game);
+    const r = reservationFor(game.league);
 
-    // ── Render ──────────────────────────────────────────────────
+    // Weight follows the score: the side ahead carries it, the side behind
+    // dims. Colour and weight only -- the teams never trade places, so a
+    // lead changing hands is not a layout event.
+    const away = Number(game.away_team_score);
+    const home = Number(game.home_team_score);
+    const scored = !pre_ && Number.isFinite(away) && Number.isFinite(home);
+    const awayLeads = scored && away >= home;
+    const homeLeads = scored && home >= away;
 
-    // One scoreboard row: logo, full name, score. Comfort only — compact
-    // keeps the single-line code layout below.
-    const teamRow = (
-      side: "away" | "home",
-      logo: string,
-      name: string,
-      score: number | string,
-    ) => {
-      const won = winner === side;
-      const lost = final_ && winner !== null && winner !== side;
+    const rule = close ? "border-live/40" : "border-secondary/20";
+
+    const scoreText = (v: number | string) =>
+      pre_ || v === null || v === "" ? "" : String(v);
+
+    // ── Cells ─────────────────────────────────────────────────
+
+    const top = (side: "away" | "home", logo: string, name: string, score: number | string, leads: boolean) => (
+      <span
+        className={clsx(
+          "row-start-1 flex min-w-0 items-center gap-1.5 px-2.5",
+          side === "away" ? "col-start-2" : clsx("col-start-3 border-l", rule),
+        )}
+      >
+        <TeamLogo src={logo} alt={name} size="xs" />
+        <span
+          className={clsx(
+            "min-w-0 truncate text-left text-[12px] leading-none",
+            pre_ ? "font-medium text-fg" : leads ? "font-semibold text-fg" : "font-medium text-fg-2",
+          )}
+          title={name}
+        >
+          {teamShortName(game.league, name)}
+        </span>
+        <span className="min-w-[6px] flex-1" />
+        <span
+          className={clsx(
+            "text-right text-[13px] leading-none tabular-nums",
+            leads ? "font-bold text-fg" : "font-medium text-fg-2",
+          )}
+          style={{ minWidth: `${r.score}ch` }}
+        >
+          {scoreText(score)}
+        </span>
+      </span>
+    );
+
+    const bottom = (side: "away" | "home", s: TeamStanding | undefined) => {
+      const m = s ? metricText(s, r) : null;
       return (
-        <div className="flex min-w-0 items-center gap-[5px]">
-          <TeamLogo
-            src={logo}
-            alt={name}
-            size="xs"
-            className={clsx(lost && "opacity-50")}
-          />
-          {/* Full name, not a code. displayTeamCode falls back to the first
-              three letters, which renders three different MLS teams as "NEW"
-              and both LA teams as "LOS". 11px fits 24 characters here, which
-              covers 95% of the 190 teams in the catalog. */}
-          <span
-            className={clsx(
-              // text-left is load-bearing: a <button> is centred by the UA
-              // stylesheet, and a flex-1 span inherits that, so names float
-              // in the middle of their row instead of lining up under each
-              // other. Invisible on the old chip, where the codes were short
-              // and sat adjacent with no slack to centre within.
-              "min-w-0 flex-1 truncate text-left text-ui-chip leading-[18px]",
-              won ? "font-semibold text-fg" : "font-medium text-fg-2",
-              lost && "text-fg-4",
-            )}
-            title={name}
-          >
-            {name}
-          </span>
-          <span
-            className={clsx(
-              "w-5 shrink-0 text-right leading-[18px] tabular-nums",
-              won ? "font-bold text-fg" : "text-fg-2",
-              lost && "text-fg-4",
-              pre_ && "text-fg-4/60",
-            )}
-          >
-            {pre_ ? "–" : score === null || score === "" ? "-" : String(score)}
-          </span>
-        </div>
+        <span
+          className={clsx(
+            "row-start-2 flex items-center gap-1.5 px-2.5 text-[10px] leading-none",
+            side === "away" ? "col-start-2" : clsx("col-start-3 border-l", rule),
+          )}
+        >
+          {s ? (
+            <>
+              <span className="font-bold text-fg-2" style={{ minWidth: `${r.rank}ch` }}>
+                {ordinal(s.rank)}
+              </span>
+              <span className="text-fg-3 tabular-nums" style={{ minWidth: `${r.record}ch` }}>
+                {recordText(s, r)}
+              </span>
+              {m && (
+                <span
+                  className={clsx(
+                    "text-right tabular-nums",
+                    m.tone === "pos" && "text-up",
+                    m.tone === "neg" && "text-down",
+                    m.tone === "zero" && "text-fg-3",
+                  )}
+                  style={{ minWidth: `${r.metric}ch` }}
+                >
+                  {m.text}
+                  <span className="ml-0.5 text-[8px] tracking-[0.06em] text-fg-4">{r.unit}</span>
+                </span>
+              )}
+            </>
+          ) : (
+            // No table for this league (UFC, F1). Hold the height, say so.
+            <span className="text-fg-4">—</span>
+          )}
+        </span>
       );
     };
 
-    if (comfort) {
-      return (
-        <button
-          onClick={onClick}
-          className={chipBaseClasses(
-            comfort,
-            c,
-            clsx(
-              "font-mono whitespace-nowrap gap-[5px] transition-colors duration-700",
-              // Closeness is the whole weighting. Lateness would need a period
-              // count per sport and `short_detail` is an unstructured string
-              // ("Inning 4"), so it is deliberately left out rather than guessed.
-              close && "border-live/70 bg-live/[0.13] shadow-[0_0_14px_rgba(255,71,87,0.2)]",
-              flash && "bg-live/20",
-            ),
-            "row",
-          )}
-        >
-          <div className="flex min-w-0 flex-1 flex-col justify-between">
-            {teamRow("away", game.away_team_logo, game.away_team_name, game.away_team_score)}
-            {teamRow("home", game.home_team_logo, game.home_team_name, game.home_team_score)}
-          </div>
-
-          <div className={clsx("w-px shrink-0", close ? "bg-live/40" : "bg-secondary/20")} />
-
-          <div className="flex w-[34px] shrink-0 flex-col items-center justify-center gap-[3px]">
-            <span
-              className={clsx(
-                "flex items-center gap-[3px] whitespace-nowrap text-[10px] font-semibold leading-none",
-                live ? "text-live" : final_ ? "text-fg-4" : "text-fg-2",
-              )}
-            >
-              {live && (
-                <span className="h-1 w-1 shrink-0 animate-pulse rounded-full bg-live" />
-              )}
-              {gameStatusCompact(game)}
-            </span>
-            {game.league && (
-              <span
-                className={clsx(
-                  "text-[8px] uppercase leading-none tracking-[0.08em]",
-                  close ? "text-live" : "text-fg-4",
-                )}
-              >
-                {leagueCode(game.league)}
-              </span>
-            )}
-          </div>
-        </button>
-      );
-    }
-
-    // Compact: unchanged single-line layout. Team codes still collide here —
-    // see REL-158's follow-up note; a single row cannot fit two full names.
     return (
       <button
         onClick={onClick}
-        className={chipBaseClasses(
-          comfort,
-          c,
-          clsx(
-            "font-mono whitespace-nowrap transition-colors duration-700",
-            flash && "bg-live/15",
-            close && "border-live/40",
-          ),
+        className={clsx(
+          chipShellClasses(c, "font-mono whitespace-nowrap transition-colors duration-700"),
+          "grid max-w-[520px] grid-cols-[max-content_max-content_max-content_max-content]",
+          comfort ? "grid-rows-[30px_20px]" : "grid-rows-[28px]",
+          // Closeness is the whole weighting; the rules brighten with it.
+          close && "border-live/70 bg-live/[0.13] shadow-[0_0_14px_rgba(255,71,87,0.2)]",
+          // A result recedes behind what is still being played.
+          final_ && "opacity-[0.82]",
+          flash && "bg-live/20",
         )}
       >
-        <div className="flex items-center gap-1.5">
-          <TeamLogo src={game.away_team_logo} alt={game.away_team_name} size="xs" />
-          <span
-            className={clsx(
-              c.text,
-              winner === "away" ? "font-bold" : "font-semibold",
-              final_ && winner === "home" && "opacity-50",
-            )}
-          >
-            {displayTeamCode(game.away_team_code, game.away_team_name)}
+        <span className={clsx("col-start-1 row-span-full flex items-center border-r px-[9px]", rule)}>
+          <span className="text-[10px] font-bold tracking-[0.08em] text-fg-3">
+            {leagueCode(game.league)}
           </span>
-          <span
-            className={clsx(
-              "tabular-nums",
-              winner === "away" ? "font-bold " + c.text : c.textDim,
-              final_ && winner === "home" && "opacity-50",
-              pre_ && "opacity-30",
-            )}
-          >
-            {pre_ ? "_" : game.away_team_score == null || game.away_team_score === "" ? "-" : String(game.away_team_score)}
-          </span>
+        </span>
 
-          <TiltBar value={tilt.away} dimmed={pre_} settled={final_} live={live && close} />
+        {top("away", game.away_team_logo, game.away_team_name, game.away_team_score, awayLeads)}
+        {top("home", game.home_team_logo, game.home_team_name, game.home_team_score, homeLeads)}
 
+        {comfort && bottom("away", game.away_standing)}
+        {comfort && bottom("home", game.home_standing)}
+
+        <span className={clsx("col-start-4 row-span-full flex items-center justify-center border-l px-[9px]", rule)}>
           <span
             className={clsx(
-              "tabular-nums",
-              winner === "home" ? "font-bold " + c.text : c.textDim,
-              final_ && winner === "away" && "opacity-50",
-              pre_ && "opacity-30",
+              "inline-flex items-center gap-1 text-[11px] font-semibold tracking-[0.04em] leading-none",
+              live ? "text-live" : final_ ? "text-fg-4" : ppd ? "text-warning" : "text-fg-2",
             )}
           >
-            {pre_ ? "_" : game.home_team_score == null || game.home_team_score === "" ? "-" : String(game.home_team_score)}
-          </span>
-          <span
-            className={clsx(
-              c.text,
-              winner === "home" ? "font-bold" : "font-semibold",
-              final_ && winner === "away" && "opacity-50",
-            )}
-          >
-            {displayTeamCode(game.home_team_code, game.home_team_name)}
-          </span>
-          <TeamLogo src={game.home_team_logo} alt={game.home_team_name} size="xs" />
-
-          {status && (
             <span
-              className={clsx(
-                "ml-0.5 flex items-center gap-1 text-ui-chip uppercase tracking-wider",
-                live ? "font-semibold text-live" : "text-fg-3",
-              )}
-            >
-              {live && (
-                <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-live" />
-              )}
-              {status}
+              data-testid="live-dot"
+              className={clsx("h-[5px] w-[5px] shrink-0 rounded-full bg-live", !live && "invisible")}
+            />
+            <span className="inline-block text-center" style={{ minWidth: `${r.status}ch` }}>
+              {gameStatusCompact(game)}
             </span>
-          )}
-        </div>
+          </span>
+        </span>
       </button>
     );
   },

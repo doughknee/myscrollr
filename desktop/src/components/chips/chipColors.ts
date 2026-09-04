@@ -196,6 +196,29 @@ export const NUM_WIDTH = {
 // ── Shared chip base classes ────────────────────────────────────
 // Common className construction used by all ticker chip components.
 
+/**
+ * The part of a chip every chip shares -- colours, border, hover, the
+ * overflow/positioning contract -- and nothing about its size or layout.
+ *
+ * chipBaseClasses adds the fixed 264px box and a flex layout on top. The
+ * sports chip is content-sized and lays itself out as a grid, so it takes
+ * only this and owns the rest; it still hovers, clips and colours like
+ * every other chip on the rail.
+ */
+export function chipShellClasses(colors: ChipColors, extra?: string): string {
+  return clsx(
+    "ticker-chip group",
+    "rounded-sm border",
+    "transition-colors cursor-pointer",
+    "relative overflow-hidden",
+    "shrink-0",
+    colors.bg,
+    colors.border,
+    colors.hoverBorder,
+    extra,
+  );
+}
+
 export function chipBaseClasses(
   comfort: boolean | undefined,
   colors: ChipColors,
