@@ -6,8 +6,9 @@ import {
   distinctSourceCount,
   filterByArticleAge,
   TICKER_RSS_HOURS,
-  TICKER_RSS_PER_FEED,
   TICKER_RSS_FLOOR_HOURS,
+  TICKER_RSS_SLOTS,
+  arrangeRssSlots,
 } from "./view";
 import type { RssItem } from "../../types";
 import type { RssDisplayPrefs } from "../../preferences";
@@ -87,19 +88,6 @@ describe("filterByArticleAge", () => {
   it("keeps items with unparseable timestamps visible", () => {
     const weird = { ...mk(1, "a", "not-a-date"), created_at: "also-bad" };
     expect(filterByArticleAge([weird], 1, NOW)).toHaveLength(1);
-  });
-
-  it("applies inside the ticker selector via prefs", () => {
-    const items = [
-      mk(1, "a", hoursAgo(2)),
-      mk(2, "b", hoursAgo(24 * 5)),
-    ];
-    const result = selectRssForTicker(
-      items,
-      { ...DEFAULT_PREFS, maxArticleAgeDays: 2 },
-      NOW,
-    );
-    expect(result.map((i) => i.id)).toEqual([1]);
   });
 
   it("applies inside applyRssPipeline before per-source limiting", () => {
@@ -314,32 +302,6 @@ describe("applyRssPipeline", () => {
 
 // ── selectRssForTicker ──────────────────────────────────────────
 
-describe("selectRssForTicker", () => {
-  it("applies articlesPerSource from prefs", () => {
-    const items = [
-      mk(1, "a"),
-      mk(2, "a"),
-      mk(3, "a"),
-      mk(4, "b"),
-    ];
-    const result = selectRssForTicker(items, { ...DEFAULT_PREFS, articlesPerSource: 2 }, FIXTURE_NOW);
-    expect(result).toHaveLength(3);
-    expect(result.filter((i) => i.source_name === "a")).toHaveLength(2);
-  });
-
-  it("returns all items when articlesPerSource is 0", () => {
-    const items = [mk(1, "a"), mk(2, "a"), mk(3, "b")];
-    const result = selectRssForTicker(items, { ...DEFAULT_PREFS, articlesPerSource: 0 }, FIXTURE_NOW);
-    expect(result).toHaveLength(3);
-  });
-
-  it("preserves input (newest-first) order", () => {
-    const items = [mk(1, "a"), mk(2, "b"), mk(3, "a")];
-    const result = selectRssForTicker(items, { ...DEFAULT_PREFS, articlesPerSource: 10 }, FIXTURE_NOW);
-    expect(result.map((i) => i.id)).toEqual([1, 2, 3]);
-  });
-});
-
 // ── v1.1.1 smart removal: single-source payloads skip the cap ───
 
 describe("single-source smart removal (v1.1.1)", () => {
@@ -349,18 +311,6 @@ describe("single-source smart removal (v1.1.1)", () => {
     expect(distinctSourceCount([])).toBe(0);
     expect(distinctSourceCount([mk(1, "a"), mk(2, "a")])).toBe(1);
     expect(distinctSourceCount([mk(1, "a"), mk(2, "b"), mk(3, "a")])).toBe(2);
-  });
-
-  it("ticker: a single-outlet widget shows its whole feed despite a cap", () => {
-    const items = [mk(1, "bbc"), mk(2, "bbc"), mk(3, "bbc"), mk(4, "bbc")];
-    expect(selectRssForTicker(items, capped, FIXTURE_NOW)).toHaveLength(4);
-  });
-
-  it("ticker: multi-source payloads still balance per source", () => {
-    const items = [mk(1, "a"), mk(2, "a"), mk(3, "a"), mk(4, "b")];
-    const result = selectRssForTicker(items, capped, FIXTURE_NOW);
-    expect(result.filter((i) => i.source_name === "a")).toHaveLength(2);
-    expect(result.filter((i) => i.source_name === "b")).toHaveLength(1);
   });
 
   it("pipeline: single-source ignores the cap and reports nothing hidden", () => {
@@ -398,64 +348,82 @@ describe("selectRssForTicker horizon", () => {
   const ago = (h: number) => new Date(NOW_T - h * 3_600_000).toISOString();
   const feed = "https://sports.yahoo.com/rss/";
 
-  it("keeps only the newest few from the last few hours of a busy feed", () => {
-    const items = Array.from({ length: 40 }, (_, i) => mk(i + 1, "yahoo", ago(i * 0.25), feed)); // one every 15 min
-    const out = selectRssForTicker(items, DEFAULT_PREFS, NOW_T);
-    expect(out).toHaveLength(TICKER_RSS_PER_FEED);
-    expect(out.map((i) => i.id)).toEqual([1, 2, 3, 4, 5]); // the newest, in order
+  it("admits everything inside the window -- the slots do the limiting, not a cap", () => {
+    const items = Array.from({ length: 40 }, (_, i) => mk(i + 1, "yahoo", ago(i * 0.1), feed));
+    expect(selectRssForTicker(items, NOW_T)).toHaveLength(40);
   });
 
   it("drops what is older than the window", () => {
     const items = [mk(1, "a", ago(1), feed), mk(2, "a", ago(TICKER_RSS_HOURS + 1), feed)];
-    expect(selectRssForTicker(items, DEFAULT_PREFS, NOW_T).map((i) => i.id)).toEqual([1]);
+    expect(selectRssForTicker(items, NOW_T).map((i) => i.id)).toEqual([1]);
   });
 
   it("stands the newest item in for a quiet feed", () => {
     const items = [mk(1, "a", ago(30), feed), mk(2, "a", ago(50), feed)];
-    expect(selectRssForTicker(items, DEFAULT_PREFS, NOW_T).map((i) => i.id)).toEqual([1]);
+    expect(selectRssForTicker(items, NOW_T).map((i) => i.id)).toEqual([1]);
   });
 
   it("drops a dead feed rather than floor it: nothing older than 48h", () => {
     const items = [mk(1, "a", ago(TICKER_RSS_FLOOR_HOURS + 1), feed), mk(2, "a", ago(90), feed)];
-    expect(selectRssForTicker(items, DEFAULT_PREFS, NOW_T)).toEqual([]);
+    expect(selectRssForTicker(items, NOW_T)).toEqual([]);
   });
 
   it("floors an item with no readable date, having no reason to call it old", () => {
     const items = [{ ...mk(1, "a", "not-a-date", feed), created_at: "also-bad" }];
-    expect(selectRssForTicker(items, DEFAULT_PREFS, NOW_T).map((i) => i.id)).toEqual([1]);
+    expect(selectRssForTicker(items, NOW_T).map((i) => i.id)).toEqual([1]);
   });
 
-  it("takes the widget's own Show N as the per-feed cap", () => {
-    const items = Array.from({ length: 9 }, (_, i) => mk(i + 1, "a", ago(i * 0.25), feed));
-    const out = selectRssForTicker(items, { ...DEFAULT_PREFS, maxArticles: 2 }, NOW_T);
-    expect(out.map((i) => i.id)).toEqual([1, 2]);
-  });
-
-  it("falls back to the default cap when Show is set to All", () => {
-    const items = Array.from({ length: 9 }, (_, i) => mk(i + 1, "a", ago(i * 0.25), feed));
-    const out = selectRssForTicker(items, { ...DEFAULT_PREFS, maxArticles: 0 }, NOW_T);
-    expect(out).toHaveLength(TICKER_RSS_PER_FEED);
-  });
-
-  it("spends Show N per feed, so the loudest wire cannot take it all", () => {
+  it("interleaves feeds so one wire cannot own the front of the rotation", () => {
     const a = "https://a.example.com/feed", b = "https://b.example.com/feed";
     const items = [
       ...Array.from({ length: 6 }, (_, i) => mk(100 + i, "a", ago(i * 0.1), a)),
-      mk(1, "b", ago(2), b),
+      mk(1, "b", ago(0.05), b),
+      mk(2, "b", ago(2), b),
     ];
-    const out = selectRssForTicker(items, { ...DEFAULT_PREFS, maxArticles: 2, articlesPerSource: 0 }, NOW_T);
-    expect(out.filter((i) => i.feed_url === a)).toHaveLength(2);
-    expect(out.filter((i) => i.feed_url === b)).toHaveLength(1);
+    const out = selectRssForTicker(items, NOW_T).map((i) => i.id);
+    // a's newest (item 100, right now) beats b's (item 1, three minutes
+    // ago), so a leads; then the two feeds alternate, item for item,
+    // rather than a's six running first.
+    expect(out.slice(0, 4)).toEqual([100, 1, 101, 2]);
+    expect(out).toHaveLength(8);
   });
 
-  it("applies per feed, so one wire cannot crowd out another", () => {
-    const a = "https://a.example.com/feed", b = "https://b.example.com/feed";
-    const items = [
-      ...Array.from({ length: 10 }, (_, i) => mk(100 + i, "a", ago(i * 0.1), a)),
-      mk(1, "b", ago(2), b),
-    ];
-    const out = selectRssForTicker(items, { ...DEFAULT_PREFS, articlesPerSource: 0 }, NOW_T);
-    expect(out.filter((i) => i.feed_url === a)).toHaveLength(TICKER_RSS_PER_FEED);
-    expect(out.filter((i) => i.feed_url === b)).toHaveLength(1);
+  it("ignores the feed page's prefs entirely", () => {
+    // No prefs argument exists any more; the rail has one rule.
+    expect(selectRssForTicker.length).toBeLessThanOrEqual(2);
+  });
+});
+
+describe("arrangeRssSlots", () => {
+  const NOW_T = new Date("2026-09-04T12:00:00Z").getTime();
+  const ago = (h: number) => new Date(NOW_T - h * 3_600_000).toISOString();
+  const feed = "https://www.theguardian.com/world/rss";
+  const titled = (id: number, title: string) => ({ ...mk(id, "g", ago(id * 0.2), feed), title });
+  const pool = [
+    titled(1, "Short one"),
+    titled(2, "A considerably longer headline about something"),
+    titled(3, "Mid-length headline here"),
+    titled(4, "Tiny"),
+    titled(5, "The longest headline of the whole set, by some distance"),
+  ];
+
+  it("keys by id and reserves nothing when the pool fits", () => {
+    const out = arrangeRssSlots(pool.slice(0, 3), {}, "r");
+    expect(out.map((s) => s.key)).toEqual(["r-1", "r-2", "r-3"]);
+    expect(out.every((s) => !s.rotateSlot && !s.reserveTitle)).toBe(true);
+  });
+
+  it("rotates a bigger pool through TICKER_RSS_SLOTS positions", () => {
+    const out = arrangeRssSlots(pool, {}, "r");
+    expect(out).toHaveLength(TICKER_RSS_SLOTS);
+    expect(out.map((s) => s.item.id)).toEqual([1, 2, 3]);
+    expect(arrangeRssSlots(pool, { "r-slot-0": 1 }, "r").map((s) => s.item.id)).toEqual([4, 2, 3]);
+  });
+
+  it("reserves the longest headline in each slot's own class", () => {
+    const [s0, s1, s2] = arrangeRssSlots(pool, {}, "r");
+    expect(s0.reserveTitle).toBe("Tiny".length > "Short one".length ? "Tiny" : "Short one"); // class: 1, 4
+    expect(s1.reserveTitle).toBe("The longest headline of the whole set, by some distance"); // class: 2, 5
+    expect(s2.reserveTitle).toBe("Mid-length headline here"); // class: 3
   });
 });

@@ -473,7 +473,7 @@ function RssLimitInput({
         // The pill's own pr-2 is chevron room; a field has none.
         "pr-2.5",
       )}
-      title="How many articles to show, here and on the ticker"
+      title="How many articles to show in the feed"
     >
       <Hash
         size={12}
