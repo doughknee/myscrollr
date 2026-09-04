@@ -93,7 +93,10 @@ const GameChip = memo(
           side === "away" ? "col-start-2" : clsx("col-start-3 border-l", rule),
         )}
       >
-        <TeamLogo src={logo} alt={name} size="xs" />
+        {/* 20px, not the 12px the old chip used: a crest is the identity a
+            short name only labels, and at 12px on a 30px row it read as a
+            bullet. ESPN runs ~18px against 12px type for the same reason. */}
+        <TeamLogo src={logo} alt={name} size="lg" />
         <span
           className={clsx(
             "min-w-0 truncate text-left text-[12px] leading-none",
