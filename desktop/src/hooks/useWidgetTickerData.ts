@@ -59,23 +59,22 @@ function formatTime(
   return new Intl.DateTimeFormat("en-US", opts).format(date);
 }
 
+/**
+ * The zone's date, e.g. "Fri, Sep 4".
+ *
+ * Date only. This used to lead with the zone's short name ("CDT \u00B7 Fri,
+ * Sep 4"), but the chip's detail row already ends with the numeric
+ * offset, so the row read "CDT \u00B7 Fri, Sep 4 \u00B7 GMT-5" \u2014 the same zone
+ * named twice, and for a non-local zone the name is often just "GMT+9"
+ * again. The offset is the one that is unambiguous; the name goes.
+ */
 function formatDetail(date: Date, tz: string | undefined): string {
-  const tzName =
-    new Intl.DateTimeFormat("en-US", {
-      timeZoneName: "short",
-      ...(tz ? { timeZone: tz } : {}),
-    })
-      .formatToParts(date)
-      .find((p) => p.type === "timeZoneName")?.value ?? "";
-
-  const dateStr = new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
     ...(tz ? { timeZone: tz } : {}),
   }).format(date);
-
-  return `${tzName} \u00B7 ${dateStr}`;
 }
 
 function tzShortLabel(tz: string): string {
