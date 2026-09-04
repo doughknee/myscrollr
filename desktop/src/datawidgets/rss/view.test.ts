@@ -7,6 +7,7 @@ import {
   filterByArticleAge,
   TICKER_RSS_HOURS,
   TICKER_RSS_PER_FEED,
+  TICKER_RSS_FLOOR_HOURS,
 } from "./view";
 import type { RssItem } from "../../types";
 import type { RssDisplayPrefs } from "../../preferences";
@@ -409,8 +410,18 @@ describe("selectRssForTicker horizon", () => {
     expect(selectRssForTicker(items, DEFAULT_PREFS, NOW_T).map((i) => i.id)).toEqual([1]);
   });
 
-  it("never leaves a feed with nothing: the newest item stands in, however old", () => {
+  it("stands the newest item in for a quiet feed", () => {
     const items = [mk(1, "a", ago(30), feed), mk(2, "a", ago(50), feed)];
+    expect(selectRssForTicker(items, DEFAULT_PREFS, NOW_T).map((i) => i.id)).toEqual([1]);
+  });
+
+  it("drops a dead feed rather than floor it: nothing older than 48h", () => {
+    const items = [mk(1, "a", ago(TICKER_RSS_FLOOR_HOURS + 1), feed), mk(2, "a", ago(90), feed)];
+    expect(selectRssForTicker(items, DEFAULT_PREFS, NOW_T)).toEqual([]);
+  });
+
+  it("floors an item with no readable date, having no reason to call it old", () => {
+    const items = [{ ...mk(1, "a", "not-a-date", feed), created_at: "also-bad" }];
     expect(selectRssForTicker(items, DEFAULT_PREFS, NOW_T).map((i) => i.id)).toEqual([1]);
   });
 

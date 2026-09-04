@@ -99,21 +99,34 @@ export function limitPerSource(items: RssItem[], limit: number): RssItem[] {
  * the default window is unlimited -- the per-source cap only ever applied
  * to multi-feed widgets. So a Yahoo Sports widget was 297 chips. On the
  * rail a feed now shows its newest TICKER_RSS_PER_FEED items from the last
- * TICKER_RSS_HOURS, and never fewer than one: the floor keeps a quiet feed
- * represented by its latest item, the window and cap stop a wire from
- * becoming the whole bar. Same shape the sports ticker got.
+ * TICKER_RSS_HOURS. A feed with nothing in that window still gets its
+ * latest item, provided that item is itself under TICKER_RSS_FLOOR_HOURS
+ * old: the floor keeps a QUIET feed represented, not a dead one. The
+ * window and cap stop a wire from becoming the whole bar. Same shape the
+ * sports ticker got.
  */
 export const TICKER_RSS_HOURS = 6;
 export const TICKER_RSS_PER_FEED = 5;
+/**
+ * How stale the floor's one item may be.
+ *
+ * The floor exists so a quiet feed still has a presence on the rail, not so
+ * a dead one does. Past two days an item is not news and the chip is just
+ * occupying width; a feed that has said nothing since then says nothing.
+ */
+export const TICKER_RSS_FLOOR_HOURS = 48;
 
 function onTicker(items: RssItem[], now: number): RssItem[] {
   // `items` arrive newest-first; keep that order within each feed.
   const cutoff = now - TICKER_RSS_HOURS * 3_600_000;
+  const floorCutoff = now - TICKER_RSS_FLOOR_HOURS * 3_600_000;
   const perFeed = new Map<string, RssItem[]>();
   const newest = new Map<string, RssItem>();
   for (const it of items) {
-    if (!newest.has(it.feed_url)) newest.set(it.feed_url, it);
     const t = new Date(it.published_at ?? it.created_at).getTime();
+    // An undated item is treated as current rather than dropped: the feed
+    // gave us no reason to think it is old.
+    if (!newest.has(it.feed_url) && !(Number.isFinite(t) && t < floorCutoff)) newest.set(it.feed_url, it);
     if (Number.isFinite(t) && t < cutoff) continue;
     const list = perFeed.get(it.feed_url) ?? [];
     if (list.length < TICKER_RSS_PER_FEED) list.push(it);
