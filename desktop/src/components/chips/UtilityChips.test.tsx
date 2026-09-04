@@ -121,3 +121,31 @@ describe("SysmonChip", () => {
     expect(held).toBe(true);
   });
 });
+
+describe("cell dividers", () => {
+  it("draws inner rules in the widget's colour, not the near-invisible edge", () => {
+    const { container } = render(<ClockChip items={zones} comfort />);
+    const rules = Array.from(container.querySelectorAll("span")).filter((el) =>
+      el.classList.contains("border-l") || el.classList.contains("border-r"),
+    );
+    // Tab's right rule, plus the second zone's left rule on both rows.
+    expect(rules.length).toBeGreaterThanOrEqual(3);
+    for (const el of rules) {
+      expect(el.classList.contains("border-widget-clock/45")).toBe(true);
+      expect(el.classList.contains("border-edge/40")).toBe(false);
+    }
+  });
+
+  it("keeps the divider stronger than the chip's own outer border", () => {
+    // 45% inside vs 25% outside: an inner rule separates two things that
+    // share a ground, so it needs the contrast the outer edge gets free.
+    const { container } = render(<SysmonChip items={[
+      { id: "cpu", label: "CPU", value: "47%", percent: 47 },
+      { id: "ram", label: "RAM", value: "71%", percent: 71 },
+    ]} comfort />);
+    const btn = container.querySelector("button") as HTMLButtonElement;
+    expect(btn.className).toContain("border-widget-sysmon/25");
+    const inner = container.querySelector(".border-l") as HTMLElement;
+    expect(inner.classList.contains("border-widget-sysmon/45")).toBe(true);
+  });
+});

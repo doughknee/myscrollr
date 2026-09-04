@@ -145,7 +145,8 @@ function CapShell({
       {end != null && (
         <span
           className={clsx(
-            "flex shrink-0 select-none items-center justify-center self-stretch border-l border-edge/40 px-2",
+            "flex shrink-0 select-none items-center justify-center self-stretch border-l px-2",
+            c.divider,
             "font-semibold tabular-nums",
             comfort ? "text-[13px]" : "text-ui-chip",
           )}

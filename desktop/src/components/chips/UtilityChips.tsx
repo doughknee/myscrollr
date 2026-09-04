@@ -127,8 +127,9 @@ function UtilityShell({
       {/* The tab: the widget's name, painted, spanning both rows. */}
       <span
         className={clsx(
-          "col-start-1 row-span-full flex items-center border-r border-edge/40 px-[9px]",
+          "col-start-1 row-span-full flex items-center border-r px-[9px]",
           "text-[10px] font-bold tracking-[0.08em]",
+          c.divider,
           c.text,
         )}
       >
@@ -143,11 +144,14 @@ function UtilityShell({
 function Cell({
   col,
   first,
+  rule,
   dim,
   children,
 }: {
   col: number;
   first: boolean;
+  /** The palette's divider class. */
+  rule: string;
   dim?: boolean;
   children: React.ReactNode;
 }) {
@@ -156,7 +160,7 @@ function Cell({
       style={{ gridColumn: col + 1 }}
       className={clsx(
         "row-start-1 flex min-w-0 items-center gap-1.5 px-2.5",
-        !first && "border-l border-edge/40",
+        !first && clsx("border-l", rule),
         dim && "opacity-55",
       )}
     >
@@ -170,11 +174,14 @@ function Cell({
 function Meta({
   col,
   first,
+  rule,
   bleed,
   children,
 }: {
   col: number;
   first: boolean;
+  /** The palette's divider class. */
+  rule: string;
   bleed?: boolean;
   children: React.ReactNode;
 }) {
@@ -184,7 +191,7 @@ function Meta({
       className={clsx(
         "row-start-2 flex min-w-0 items-center",
         bleed ? "px-0" : "gap-1 px-2.5 text-[10px] leading-none text-fg-4",
-        !first && "border-l border-edge/40",
+        !first && clsx("border-l", rule),
       )}
     >
       {children}
@@ -234,7 +241,7 @@ export function ClockChip({
       onClick={onClick}
     >
       {items.map((item, i) => (
-        <Cell key={item.id} col={i + 1} first={i === 0} dim={item.night}>
+        <Cell key={item.id} col={i + 1} first={i === 0} rule={c.divider} dim={item.night}>
           <span className={clsx(LABEL, c.textDim)}>{item.label}</span>
           <span className={clsx(VALUE, c.text)}>{item.value}</span>
           {/* A moon says "middle of the night there" faster than dimming. */}
@@ -247,7 +254,7 @@ export function ClockChip({
       ))}
       {comfort &&
         items.map((item, i) => (
-          <Meta key={item.id} col={i + 1} first={i === 0}>
+          <Meta key={item.id} col={i + 1} first={i === 0} rule={c.divider}>
             <span className="truncate">
               {[item.detail, item.offset].filter(Boolean).join(" · ")}
             </span>
@@ -298,7 +305,7 @@ export function TimerChip({
       extra={anyUrgent ? "border-live/40" : undefined}
     >
       {items.map((item, i) => (
-        <Cell key={item.id} col={i + 1} first={i === 0} dim={item.paused}>
+        <Cell key={item.id} col={i + 1} first={i === 0} rule={c.divider} dim={item.paused}>
           <span className={clsx(LABEL, c.textDim)}>{item.label}</span>
           <span
             className={clsx(VALUE, isUrgent(item) ? "text-live" : c.text)}
@@ -318,7 +325,7 @@ export function TimerChip({
           const { remainingSec: rem, totalSec: total } = item;
           const drawable = rem != null && total != null && total > 0;
           return (
-            <Meta key={item.id} col={i + 1} first={i === 0} bleed={drawable}>
+            <Meta key={item.id} col={i + 1} first={i === 0} rule={c.divider} bleed={drawable}>
               {drawable ? (
                 <span className="h-[3px] w-full bg-fg-3/15">
                   <span
@@ -376,7 +383,7 @@ export function WeatherChip({
       extra={anyAlert ? "border-warning/45" : undefined}
     >
       {items.map((item, i) => (
-        <Cell key={item.id} col={i + 1} first={i === 0} dim={item.night}>
+        <Cell key={item.id} col={i + 1} first={i === 0} rule={c.divider} dim={item.night}>
           <span className={clsx(LABEL, c.textDim)}>{item.label}</span>
           <span aria-hidden className="text-[13px] leading-none">
             {item.icon}
@@ -388,7 +395,7 @@ export function WeatherChip({
       ))}
       {comfort &&
         items.map((item, i) => (
-          <Meta key={item.id} col={i + 1} first={i === 0}>
+          <Meta key={item.id} col={i + 1} first={i === 0} rule={c.divider}>
             {/* An alert outranks a range: it takes the cell rather than
                 sitting beside it, and stays under ITS city so you can
                 see which one it belongs to. */}
@@ -477,7 +484,7 @@ export function SysmonChip({
       extra={anyHot ? "border-error/30" : undefined}
     >
       {items.map((item, i) => (
-        <Cell key={item.id} col={i + 1} first={i === 0}>
+        <Cell key={item.id} col={i + 1} first={i === 0} rule={c.divider}>
           <span className={clsx(LABEL, c.textDim)}>{item.label}</span>
           <Gauge percent={item.percent} hot={item.hot} />
           {/* 5ch reserved: values flip digit counts ("5%" -> "100%",
@@ -498,7 +505,7 @@ export function SysmonChip({
           const points = series[i];
           const drawable = points.length >= 2;
           return (
-            <Meta key={item.id} col={i + 1} first={i === 0} bleed={drawable}>
+            <Meta key={item.id} col={i + 1} first={i === 0} rule={c.divider} bleed={drawable}>
               {drawable ? (
                 <Sparkline
                   points={points}
