@@ -47,6 +47,7 @@ import {
 import { sourceForWidget } from "../marketplace";
 import { useCatalog } from "../hooks/useCatalog";
 import { TICKER_SOURCES } from "../datawidgets/tickerRegistry";
+import { rotateSlots } from "../datawidgets/ticker";
 import { stepItemIndex } from "./tickerStep";
 import { advanceCycles, visibleSlots } from "./tickerRotation";
 import { WIDGET_ORDER } from "../widgets/registry";
@@ -177,9 +178,10 @@ function widgetChipsFor(
     onTogglePin?: (id: string) => void;
     onChipClick?: (type: string, id: string, url?: string) => void;
     pinned?: boolean;
+    cycles?: Readonly<Record<string, number>>;
   },
-): React.ReactNode[] {
-  const { comfort, chipColorMode, onTogglePin, onChipClick, pinned } = opts;
+): Array<{ key: string; node: React.ReactNode; rotateSlot?: string }> {
+  const { comfort, chipColorMode, onTogglePin, onChipClick, pinned, cycles } = opts;
 
   // The four cell/gauge/spine utilities each render as ONE chip holding
   // their items, unlike the capped pair which render one chip per item.
@@ -193,16 +195,27 @@ function widgetChipsFor(
       onTogglePin: onTogglePin ? () => onTogglePin(wt) : undefined,
       onClick: () => onChipClick?.(wt, wt),
     };
-    if (wt === "clock")
-      return [<ClockChip items={items as ClockChipData[]} {...shared} />];
-    if (wt === "timer")
-      return [<TimerChip items={items as ClockChipData[]} {...shared} />];
-    if (wt === "weather")
-      return [<WeatherChip items={items as WeatherChipData[]} {...shared} />];
-    return [<SysmonChip items={items as SysmonChipData[]} {...shared} />];
+    const node =
+      wt === "clock" ? <ClockChip items={items as ClockChipData[]} {...shared} />
+      : wt === "timer" ? <TimerChip items={items as ClockChipData[]} {...shared} />
+      : wt === "weather" ? <WeatherChip items={items as WeatherChipData[]} {...shared} />
+      : <SysmonChip items={items as SysmonChipData[]} {...shared} />;
+    return [{ key: `${wt}-chip`, node }];
   }
 
-  return items.map((item, i) => {
+  // One chip per monitor or repo, rotating through a fixed number of
+  // slots once there are more than that -- thirty monitors is still four
+  // chips, and a failing one still comes round. Fixed-width chips, so the
+  // slot needs no reservation.
+  const slots = rotateSlots(
+    items as Array<UptimeChipData | GitHubChipData>,
+    CAPPED_WIDGET_SLOTS,
+    cycles ?? {},
+    wt,
+    (item) => item.id,
+    () => undefined,
+  );
+  return slots.map(({ key, item, rotateSlot }, i) => {
     const shared = {
       comfort,
       colorMode: chipColorMode,
@@ -210,13 +223,18 @@ function widgetChipsFor(
       onTogglePin: i === 0 && onTogglePin ? () => onTogglePin(wt) : undefined,
       onClick: () => onChipClick?.(wt, item.id),
     };
-    return wt === "uptime" ? (
-      <UptimeCappedChip item={item as UptimeChipData} {...shared} />
-    ) : (
-      <GitHubCappedChip item={item as GitHubChipData} {...shared} />
-    );
+    const node =
+      wt === "uptime" ? (
+        <UptimeCappedChip item={item as UptimeChipData} {...shared} />
+      ) : (
+        <GitHubCappedChip item={item as GitHubChipData} {...shared} />
+      );
+    return { key, node, rotateSlot };
   });
 }
+
+/** Monitors or workflow runs on the rail at once. Not a setting. */
+const CAPPED_WIDGET_SLOTS = 4;
 
 /** Round-robin interleave across buckets:
  *  bucket0[0], bucket1[0], bucket2[0], bucket0[1], bucket1[1], ... */
@@ -321,9 +339,10 @@ export default function ScrollrTicker({
             chipColorMode,
             onTogglePin,
             onChipClick,
+            cycles,
           });
-          chipsForWidget.forEach((node, i) =>
-            bucket.push(wrap(`${wt}-chip-${i}`, node)),
+          chipsForWidget.forEach(({ key, node, rotateSlot }) =>
+            bucket.push(wrap(key, node, rotateSlot)),
           );
           buckets.push(bucket);
         }
@@ -558,7 +577,7 @@ export default function ScrollrTicker({
           onChipClick,
           pinned: true,
         });
-        pinnedChips.forEach((node, i) =>
+        pinnedChips.forEach(({ node }, i) =>
           target.push(<Fragment key={`pinned-${wt}-${i}`}>{node}</Fragment>),
         );
       }
