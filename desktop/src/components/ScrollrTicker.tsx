@@ -47,6 +47,7 @@ import {
 import { sourceForWidget } from "../marketplace";
 import { useCatalog } from "../hooks/useCatalog";
 import { TICKER_SOURCES } from "../datawidgets/tickerRegistry";
+import { stepItemIndex } from "./tickerStep";
 import { WIDGET_ORDER } from "../widgets/registry";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -385,24 +386,35 @@ export default function ScrollrTicker({
 
   const transitionDuration = speedToTransitionDuration(effectiveSpeed);
 
-  // Measure the width of the first ticker item + gap to determine step size.
+  // Measure the ticker item the next step will travel across, plus gap.
   // Queries .ticker-item inside containerRef — works because <Ticker> renders
   // its items as descendants of our wrapper div. Only called once per step
   // cycle (~5s apart), not in a tight loop, so the layout read is safe.
+  //
+  // WHICH item matters now that chips are content-sized. This used to
+  // measure the first item every time, which stepped correctly only while
+  // every chip was 264px; with a short Cubs-Tigers chip next to a long
+  // Revolution-Minnesota one the rail drifted, pausing mid-chip after a
+  // few steps. stepItemIndex names the item at the leading edge for this
+  // step and direction (originals come first in the DOM, in order).
+  const stepCountRef = useRef(0);
   const measureStepSize = useCallback((): number => {
     const container = containerRef.current;
     if (!container) return 200; // fallback
-    const firstItem = container.querySelector(
-      ".ticker-item",
-    ) as HTMLElement | null;
-    if (!firstItem) return 200;
-    return firstItem.offsetWidth + gap;
-  }, [gap]);
+    const items = container.querySelectorAll<HTMLElement>(".ticker-item");
+    if (!items.length) return 200;
+    const count = Math.min(items.length, chips.length || items.length);
+    const item = items[stepItemIndex(stepCountRef.current, count, effectiveDirection)];
+    return (item ?? items[0]).offsetWidth + gap;
+  }, [gap, chips.length, effectiveDirection]);
 
   // Reset step offset when entering step mode or when direction changes,
   // so the ticker doesn't start from a stale accumulated position.
   useEffect(() => {
-    if (effectiveScrollMode === "step") offset.set(0);
+    if (effectiveScrollMode === "step") {
+      offset.set(0);
+      stepCountRef.current = 0;
+    }
   }, [effectiveScrollMode, effectiveDirection, offset]);
 
   // Step loop: animate offset by one item width, pause, repeat
@@ -435,6 +447,7 @@ export default function ScrollrTicker({
         });
 
         if (cancelled) break;
+        stepCountRef.current += 1;
 
         // Pause between steps
         await sleep(stepPause * 1000);
