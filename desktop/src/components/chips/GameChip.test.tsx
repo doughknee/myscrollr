@@ -129,6 +129,16 @@ describe("GameChip", () => {
     expect(scoreSlots.length).toBe(0);
   });
 
+  it("tints from the league's brand colour in widget mode only", () => {
+    const { container, rerender } = render(<GameChip game={game()} accent="#e10600" />);
+    const btn = container.querySelector("button") as HTMLButtonElement;
+    expect(btn.style.getPropertyValue("--accent")).toBe("#e10600");
+    expect(btn.className).toContain("var(--accent)");
+    // The other two colour modes are shared palettes and ignore the brand.
+    rerender(<GameChip game={game()} accent="#e10600" colorMode="muted" />);
+    expect((container.querySelector("button") as HTMLButtonElement).style.getPropertyValue("--accent")).toBe("");
+  });
+
   it("writes a soccer record as W-D-L with points, not a differential", () => {
     render(
       <GameChip

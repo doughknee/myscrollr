@@ -28,6 +28,13 @@ interface GameChipProps {
   game: Game;
   comfort?: boolean;
   colorMode?: ChipColorMode;
+  /**
+   * The league widget's catalog brand colour (#rrggbb). Used only in the
+   * "widget" colour mode; "accent" and "muted" keep their shared palettes.
+   * Absent (no catalog yet, or a coarse legacy row) falls back to the
+   * sports palette.
+   */
+  accent?: string;
   onClick?: () => void;
 }
 
@@ -59,9 +66,16 @@ const GameChip = memo(
     game,
     comfort,
     colorMode = "widget",
+    accent,
     onClick,
   }: GameChipProps) {
     const c = getChipColors(colorMode, "sports");
+    // Brand tints derive from one CSS variable so the same 6% fill / 25%
+    // border / 40% hover recipe every chip uses applies to a colour that is
+    // only known at runtime. Tailwind cannot mint a class per hex, and a
+    // variable keeps hover in CSS where it belongs.
+    const branded = colorMode === "widget" && !!accent;
+    const accentStyle = branded ? ({ "--accent": accent } as React.CSSProperties) : undefined;
     const live = isLive(game);
     const close = live && isCloseGame(game);
     const final_ = isFinal(game);
@@ -79,7 +93,11 @@ const GameChip = memo(
     const awayLeads = scored && away >= home;
     const homeLeads = scored && home >= away;
 
-    const rule = close ? "border-live/40" : "border-secondary/20";
+    const rule = close
+      ? "border-live/40"
+      : branded
+        ? "border-[color-mix(in_srgb,var(--accent)_22%,transparent)]"
+        : "border-secondary/20";
 
     const scoreText = (v: number | string) =>
       pre_ || v === null || v === "" ? "" : String(v);
@@ -162,8 +180,19 @@ const GameChip = memo(
     return (
       <button
         onClick={onClick}
+        style={accentStyle}
         className={clsx(
-          chipShellClasses(c, "font-mono whitespace-nowrap transition-colors duration-700"),
+          chipShellClasses(
+            branded
+              ? {
+                  ...c,
+                  bg: "bg-[color-mix(in_srgb,var(--accent)_6%,transparent)]",
+                  border: "border-[color-mix(in_srgb,var(--accent)_25%,transparent)]",
+                  hoverBorder: "hover:border-[color-mix(in_srgb,var(--accent)_40%,transparent)]",
+                }
+              : c,
+            "font-mono whitespace-nowrap transition-colors duration-700",
+          ),
           "grid max-w-[520px] grid-cols-[max-content_max-content_max-content_max-content]",
           comfort ? "grid-rows-[30px_20px]" : "grid-rows-[28px]",
           // Closeness is the whole weighting; the rules brighten with it.
@@ -174,7 +203,12 @@ const GameChip = memo(
         )}
       >
         <span className={clsx("col-start-1 row-span-full flex items-center border-r px-[9px]", rule)}>
-          <span className="text-[10px] font-bold tracking-[0.08em] text-fg-3">
+          <span
+            className={clsx(
+              "text-[10px] font-bold tracking-[0.08em]",
+              branded ? "text-[var(--accent)]" : "text-fg-3",
+            )}
+          >
             {leagueCode(game.league)}
           </span>
         </span>
