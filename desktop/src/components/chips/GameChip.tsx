@@ -37,6 +37,12 @@ interface GameChipProps {
    * sports palette.
    */
   accent?: string;
+  /**
+   * The widest short names this chip will ever be asked to show, when it
+   * is a rotating slot. The name cells reserve their width so a swap
+   * between games never resizes the chip. Fixed chips leave it unset.
+   */
+  reserveNames?: { away: string; home: string };
   onClick?: () => void;
 }
 
@@ -72,6 +78,7 @@ const GameChip = memo(
     comfort,
     colorMode = "widget",
     accent,
+    reserveNames,
     onClick,
   }: GameChipProps) {
     const c = getChipColors(colorMode, "sports");
@@ -87,7 +94,9 @@ const GameChip = memo(
     const final_ = isFinal(game);
     const pre_ = isPre(game);
     const ppd = game.state === "postponed";
-    const flash = useScoreFlash(game.away_team_score, game.home_team_score);
+    // Keyed on the game: a rotating slot swapping games must not flash as
+    // if somebody scored.
+    const flash = useScoreFlash(game.away_team_score, game.home_team_score, game.id);
     const r = reservationFor(game.league);
 
     // At the cap the chip is pinned at CHIP_MAX_PX and the names truncate.
@@ -156,15 +165,29 @@ const GameChip = memo(
             short name only labels, and at 12px on a 30px row it read as a
             bullet. ESPN runs ~18px against 12px type for the same reason. */}
         <TeamLogo src={logo} alt={name} size="lg" />
-        <span
-          className={clsx(
-            // 14px against a 20px crest; 12px read as a caption under it.
-            "min-w-0 truncate text-left text-[14px] leading-none",
-            pre_ ? "font-medium text-fg" : leads ? "font-semibold text-fg" : "font-medium text-fg-2",
-          )}
-          title={name}
-        >
-          {teamShortName(game.league, name)}
+        {/* The name and, underneath it in the same grid cell, an invisible
+            copy of the widest name this slot will ever show. The cell is as
+            wide as the wider of the two, so a rotating slot swapping
+            "Rays" for "Diamondbacks" does not resize the chip and shove
+            the rail. Still min-w-0, so the cap can truncate both. Fixed
+            chips pass no reserve and the sizer is empty. */}
+        <span className="grid min-w-0 grid-cols-[minmax(0,1fr)]">
+          <span
+            className={clsx(
+              // 14px against a 20px crest; 12px read as a caption under it.
+              "col-start-1 row-start-1 min-w-0 truncate text-left text-[14px] leading-none",
+              pre_ ? "font-medium text-fg" : leads ? "font-semibold text-fg" : "font-medium text-fg-2",
+            )}
+            title={name}
+          >
+            {teamShortName(game.league, name)}
+          </span>
+          <span
+            aria-hidden
+            className="invisible col-start-1 row-start-1 h-0 min-w-0 overflow-hidden whitespace-nowrap text-[14px] font-semibold leading-none"
+          >
+            {reserveNames?.[side] ?? ""}
+          </span>
         </span>
         <span className="min-w-[6px] flex-1" />
         <span
@@ -342,6 +365,8 @@ const GameChip = memo(
     prev.comfort === next.comfort &&
     prev.colorMode === next.colorMode &&
     prev.onClick === next.onClick &&
+    prev.reserveNames?.away === next.reserveNames?.away &&
+    prev.reserveNames?.home === next.reserveNames?.home &&
     sameGame(prev.game, next.game),
 );
 

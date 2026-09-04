@@ -48,6 +48,7 @@ import { sourceForWidget } from "../marketplace";
 import { useCatalog } from "../hooks/useCatalog";
 import { TICKER_SOURCES } from "../datawidgets/tickerRegistry";
 import { stepItemIndex } from "./tickerStep";
+import { advanceCycles, visibleSlots } from "./tickerRotation";
 import { WIDGET_ORDER } from "../widgets/registry";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -280,9 +281,14 @@ export default function ScrollrTicker({
   // subscribing, a server-added widget renders with no source and is skipped.
   const catalogVersion = useCatalog();
 
+  // Laps completed by each rotating slot, keyed by slot. Bumped by the
+  // rotation effect below when a slot has fully left the viewport; read by
+  // sources through ctx.cycles to decide what the slot shows this lap.
+  const [cycles, setCycles] = useState<Readonly<Record<string, number>>>({});
+
   const chips = useMemo(() => {
-    const wrap = (key: string, chip: React.ReactNode) => (
-      <div key={key} className="py-1">
+    const wrap = (key: string, chip: React.ReactNode, rotateSlot?: string) => (
+      <div key={key} className="py-1" data-rotate-slot={rotateSlot}>
         {chip}
       </div>
     );
@@ -345,9 +351,10 @@ export default function ScrollrTicker({
         chipColorMode,
         widgetDisplay,
         predictionsWatchlist,
+        cycles,
         onChipClick,
       })) {
-        bucket.push(wrap(chip.key, chip.node));
+        bucket.push(wrap(chip.key, chip.node, chip.rotateSlot));
       }
 
       // Only push a bucket that actually has chips in it.
@@ -374,11 +381,36 @@ export default function ScrollrTicker({
     widgetDisplay,
     predictionsWatchlist,
     catalogVersion,
+    cycles,
   ]);
 
   // ── Shared refs ─────────────────────────────────────────────────
   const containerRef = useRef<HTMLDivElement>(null);
   const isHoveredRef = useRef(false);
+
+  // ── Slot rotation: advance a slot once it has fully left the viewport ──
+  //
+  // motion-plus has no loop callback, so this polls. Four reads a second
+  // of a handful of rects is nothing next to the marquee's own per-frame
+  // transform, and the check is skipped entirely when no slot rotates.
+  // Flip mode paginates rather than scrolls, so nothing there is ever
+  // "off screen" in the sense that matters; it keeps its first page.
+  const wasVisibleRef = useRef<Set<string>>(new Set());
+  const hasRotatingSlots = useMemo(
+    () => chips.some((c) => (c as React.ReactElement<{ "data-rotate-slot"?: string }>).props?.["data-rotate-slot"]),
+    [chips],
+  );
+  useEffect(() => {
+    if (!hasRotatingSlots || effectiveScrollMode === "flip") return;
+    const id = window.setInterval(() => {
+      const container = containerRef.current;
+      if (!container) return;
+      const now = visibleSlots(container);
+      setCycles((prev) => advanceCycles(prev, wasVisibleRef.current, now));
+      wasVisibleRef.current = now;
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [hasRotatingSlots, effectiveScrollMode]);
 
   // ── Step mode: external offset driven by async animate loop ──
   const offset = useMotionValue(0);

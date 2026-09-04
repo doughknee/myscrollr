@@ -15,6 +15,7 @@ import { useShellData } from "../shell-context";
 import {
   normalizeSportsDisplayConfig,
   SPORTS_WINDOW_DEFAULTS,
+  TICKER_SLOTS_DEFAULT,
 } from "../datawidgets/sports/view";
 
 export interface FavoriteTeam {
@@ -26,6 +27,8 @@ export interface SportsDisplayPrefs {
   /** Day window (v1.1.3 Time Controls) — see SportsDisplayConfig. */
   daysBack: number;
   daysAhead: number;
+  /** Rotating ticker slots for non-favourite games — see SportsDisplayConfig. */
+  tickerSlots: number;
 }
 
 export interface SportsConfig {
@@ -37,6 +40,7 @@ export interface SportsConfig {
 const DEFAULT_DISPLAY: SportsDisplayPrefs = {
   daysBack: SPORTS_WINDOW_DEFAULTS.daysBack,
   daysAhead: SPORTS_WINDOW_DEFAULTS.daysAhead,
+  tickerSlots: TICKER_SLOTS_DEFAULT,
 };
 
 export function useSportsConfig(widgetType: string = "sports") {
@@ -59,6 +63,7 @@ export function useSportsConfig(widgetType: string = "sports") {
       display: {
         daysBack: normalizedDisplay.daysBack ?? DEFAULT_DISPLAY.daysBack,
         daysAhead: normalizedDisplay.daysAhead ?? DEFAULT_DISPLAY.daysAhead,
+        tickerSlots: normalizedDisplay.tickerSlots ?? DEFAULT_DISPLAY.tickerSlots,
       },
       favoriteTeams:
         typeof raw.favoriteTeams === "object" && raw.favoriteTeams !== null
