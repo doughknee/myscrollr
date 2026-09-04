@@ -159,6 +159,17 @@ describe("GameChip", () => {
     expect((long.parentElement as HTMLElement).style.minWidth).toBe("7ch");
   });
 
+  it("lets the names give way at the cap, never the status", () => {
+    const { container } = render(<GameChip game={game()} />);
+    const cls = (container.querySelector("button") as HTMLButtonElement).className;
+    // Team tracks can shrink; league and status tracks cannot.
+    expect(cls).toContain("grid-cols-[max-content_minmax(0,max-content)_minmax(0,max-content)_max-content]");
+    expect(cls).toContain("max-w-[600px]");
+    // And the name cells are the ones that carry the ellipsis.
+    const names = Array.from(container.querySelectorAll("span")).filter((el) => el.className.includes("truncate"));
+    expect(names.length).toBe(2);
+  });
+
   it("writes a soccer record as W-D-L with points, not a differential", () => {
     render(
       <GameChip

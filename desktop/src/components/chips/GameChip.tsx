@@ -211,7 +211,17 @@ const GameChip = memo(
               : c,
             "font-mono whitespace-nowrap transition-colors duration-700",
           ),
-          "grid max-w-[520px] grid-cols-[max-content_max-content_max-content_max-content]",
+          // The two team tracks are minmax(0, max-content), not max-content:
+          // when the cap binds they are what shrinks, and the names inside
+          // them -- the only cells with an ellipsis -- truncate. As plain
+          // max-content tracks the grid could not shrink at all; it overflowed
+          // and overflow-hidden sliced off the LAST cell, so "PPD" showed as
+          // "PPI" while both names stayed whole.
+          //
+          // 600px, not 520: at 14px the widest real pairing -- two 20-character
+          // names -- runs ~575px, and the cap exists for the pathological case,
+          // not the worst ordinary one.
+          "grid max-w-[600px] grid-cols-[max-content_minmax(0,max-content)_minmax(0,max-content)_max-content]",
           comfort ? "grid-rows-[30px_20px]" : "grid-rows-[28px]",
           // Closeness is the whole weighting; the rules brighten with it.
           close && "border-live/70 bg-live/[0.13] shadow-[0_0_14px_rgba(255,71,87,0.2)]",
