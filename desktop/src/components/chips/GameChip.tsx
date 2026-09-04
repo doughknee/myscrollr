@@ -40,8 +40,8 @@ interface GameChipProps {
   onClick?: () => void;
 }
 
-/** The chip's width cap, in px. Mirrors the max-w-[600px] class below. */
-const CHIP_MAX_PX = 600;
+/** The chip's width cap, in px. Mirrors the max-w-[640px] class below. */
+const CHIP_MAX_PX = 640;
 
 // ── Component ───────────────────────────────────────────────────
 
@@ -99,6 +99,12 @@ const GameChip = memo(
     const ref = useRef<HTMLButtonElement>(null);
     const capped = useLatchedCap(ref, CHIP_MAX_PX);
     const scoreReserve = capped ? undefined : `${r.score}ch`;
+    // Same logic for the status: 7ch is held so "Q4 2:14" cannot move the
+    // chip, but at the cap nothing can move it, and "89" in a 7ch box is
+    // ~27px the names could be showing.
+    const statusReserve = capped ? undefined : `${r.status}ch`;
+    // And the team cells' padding, 10px a side off the cap, 6px on it.
+    const cellPad = capped ? "px-1.5" : "px-2.5";
 
     // Weight follows the score: the side ahead carries it, the side behind
     // dims. Colour and weight only -- the teams never trade places, so a
@@ -137,7 +143,8 @@ const GameChip = memo(
     const top = (side: "away" | "home", logo: string, name: string, score: number | string, leads: boolean) => (
       <span
         className={clsx(
-          "row-start-1 flex min-w-0 items-center gap-1.5 px-2.5",
+          "row-start-1 flex min-w-0 items-center gap-1.5",
+          cellPad,
           side === "away" ? "col-start-2" : clsx("col-start-3 border-l", rule),
         )}
       >
@@ -174,7 +181,8 @@ const GameChip = memo(
       return (
         <span
           className={clsx(
-            "row-start-2 flex items-center gap-1.5 px-2.5 text-[10px] leading-none",
+            "row-start-2 flex items-center gap-1.5 text-[10px] leading-none",
+            cellPad,
             side === "away" ? "col-start-2" : clsx("col-start-3 border-l", rule),
           )}
         >
@@ -233,10 +241,10 @@ const GameChip = memo(
           // and overflow-hidden sliced off the LAST cell, so "PPD" showed as
           // "PPI" while both names stayed whole.
           //
-          // 600px, not 520: at 14px the widest real pairing -- two 20-character
-          // names -- runs ~575px, and the cap exists for the pathological case,
-          // not the worst ordinary one.
-          "grid max-w-[600px] grid-cols-[max-content_minmax(0,max-content)_minmax(0,max-content)_max-content]",
+          // 640px: at 14px the widest real pairing -- two 20-character names --
+          // runs ~575px with every reservation held, and the cap exists for the
+          // pathological case, not the worst ordinary one.
+          "grid max-w-[640px] grid-cols-[max-content_minmax(0,max-content)_minmax(0,max-content)_max-content]",
           // (max-w-[600px] and CHIP_MAX_PX must agree; the latter is what the
           // chip measures itself against to know it has hit the cap.)
           comfort ? "grid-rows-[30px_20px]" : "grid-rows-[28px]",
@@ -304,7 +312,7 @@ const GameChip = memo(
               data-testid="live-dot"
               className={clsx("h-[5px] w-[5px] shrink-0 rounded-full bg-live", !live && "invisible")}
             />
-            <span className="inline-block text-center" style={{ minWidth: `${r.status}ch` }}>
+            <span className="inline-block text-center" style={{ minWidth: statusReserve }}>
               <span data-testid="status-text" className={clsx("leading-none", statusSize)}>
                 {statusText}
               </span>

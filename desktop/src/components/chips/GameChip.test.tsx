@@ -164,7 +164,7 @@ describe("GameChip", () => {
     const cls = (container.querySelector("button") as HTMLButtonElement).className;
     // Team tracks can shrink; league and status tracks cannot.
     expect(cls).toContain("grid-cols-[max-content_minmax(0,max-content)_minmax(0,max-content)_max-content]");
-    expect(cls).toContain("max-w-[600px]");
+    expect(cls).toContain("max-w-[640px]");
     // And the name cells are the ones that carry the ellipsis.
     const names = Array.from(container.querySelectorAll("span")).filter((el) => el.className.includes("truncate"));
     expect(names.length).toBe(2);
@@ -191,11 +191,16 @@ describe("GameChip", () => {
       withWidth(420);
       const a = render(<GameChip game={game()} />);
       expect(scoreMins(a.container)).toEqual(["2ch", "2ch"]); // off the cap: reserved
+      expect((screen.getByTestId("status-text").parentElement as HTMLElement).style.minWidth).toBe("7ch");
       a.unmount();
 
-      withWidth(600);
+      withWidth(640);
       const b = render(<GameChip game={game()} />);
       expect(scoreMins(b.container)).toEqual(["", ""]); // at the cap: released
+      // The status gives its 7ch back too, and the cells pull their padding in.
+      expect((screen.getByTestId("status-text").parentElement as HTMLElement).style.minWidth).toBe("");
+      const tight = Array.from(b.container.querySelectorAll("span")).filter((el) => el.classList.contains("px-1.5"));
+      expect(tight.length).toBeGreaterThan(0);
       b.unmount();
     } finally {
       globalThis.ResizeObserver = real;
