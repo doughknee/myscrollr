@@ -14,7 +14,7 @@
  * FOOTER as content, not chrome.
  */
 import { memo, useMemo, useState, useCallback } from "react";
-import { Rss, Newspaper, CalendarRange } from "lucide-react";
+import { Rss, Newspaper, CalendarRange, Hash } from "lucide-react";
 import { clsx } from "clsx";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -31,6 +31,7 @@ import {
 } from "../../components/widget-bar/Segmented";
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
+import { barPillClasses } from "../../components/widget-bar/Menu";
 import FeedManager from "./FeedManager";
 import { useDataWidgetConfig } from "../../hooks/useDataWidgetConfig";
 import { useShell } from "../../shell-context";
@@ -464,9 +465,22 @@ function RssLimitInput({
   maxArticles: number;
   onPick: (maxArticles: number) => void;
 }) {
+  const set = maxArticles > 0;
   return (
-    <label className="flex h-7 items-center gap-1 rounded-lg border border-edge/30 bg-base-150/60 px-2 text-ui-meta text-fg-3">
-      <span>Show</span>
+    <label
+      className={clsx(
+        barPillClasses(set),
+        // The pill's own pr-2 is chevron room; a field has none.
+        "pr-2.5",
+      )}
+      title="How many articles to show, here and on the ticker"
+    >
+      <Hash
+        size={12}
+        aria-hidden
+        className={clsx("shrink-0", set ? "text-accent/70" : "text-fg-4")}
+      />
+      <span className="shrink-0">Show</span>
       <input
         key={maxArticles}
         type="number"
@@ -485,7 +499,13 @@ function RssLimitInput({
           e.currentTarget.value = next ? String(next) : "";
           onPick(next);
         }}
-        className="w-10 bg-transparent text-center font-mono text-fg outline-none placeholder:text-fg-4"
+        className={clsx(
+          // Spinners are the giveaway that this is a raw number input;
+          // the rest of the bar has no such affordance.
+          "w-9 bg-transparent text-center font-mono outline-none [appearance:textfield]",
+          "[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+          set ? "text-accent" : "text-fg-2 placeholder:text-fg-4",
+        )}
       />
     </label>
   );

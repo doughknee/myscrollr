@@ -8,6 +8,24 @@ import { Check, ChevronDown } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { controlTransition, popoverMotion } from "../../lib/motion";
 
+/**
+ * The bar's control pill.
+ *
+ * Every control in a widget bar is this shape -- rounded-full, one border
+ * weight, quiet until it is doing something and accented once it is. It
+ * lives here rather than inside MenuTrigger because not every control is a
+ * menu: the news bar's article limit is a text field wearing the same pill,
+ * and it looked like a foreign object while it drew its own box.
+ */
+export function barPillClasses(lit?: boolean): string {
+  return clsx(
+    "flex cursor-pointer items-center gap-1 rounded-full border py-1 pl-2.5 pr-2 text-ui-meta font-medium",
+    lit
+      ? "border-accent/40 bg-accent/15 text-accent"
+      : "border-edge/30 bg-base-150/60 text-fg-3 hover:text-fg-2",
+  );
+}
+
 /** Close an open popover on outside-mousedown or Escape. */
 export function useDismiss<T extends HTMLElement>(
   ref: React.RefObject<T | null>,
@@ -168,12 +186,7 @@ function MenuTrigger({
       aria-expanded={open}
       aria-haspopup="menu"
       aria-label={ariaLabel}
-      className={clsx(
-        "flex max-w-40 cursor-pointer items-center gap-1 rounded-full border py-1 pl-2.5 pr-2 text-ui-meta font-medium ",
-        lit
-          ? "border-accent/40 bg-accent/15 text-accent"
-          : "border-edge/30 bg-base-150/60 text-fg-3 hover:text-fg-2",
-      )}
+      className={clsx(barPillClasses(lit), "max-w-40")}
     >
       {children}
       <motion.span

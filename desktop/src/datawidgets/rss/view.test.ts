@@ -425,6 +425,29 @@ describe("selectRssForTicker horizon", () => {
     expect(selectRssForTicker(items, DEFAULT_PREFS, NOW_T).map((i) => i.id)).toEqual([1]);
   });
 
+  it("takes the widget's own Show N as the per-feed cap", () => {
+    const items = Array.from({ length: 9 }, (_, i) => mk(i + 1, "a", ago(i * 0.25), feed));
+    const out = selectRssForTicker(items, { ...DEFAULT_PREFS, maxArticles: 2 }, NOW_T);
+    expect(out.map((i) => i.id)).toEqual([1, 2]);
+  });
+
+  it("falls back to the default cap when Show is set to All", () => {
+    const items = Array.from({ length: 9 }, (_, i) => mk(i + 1, "a", ago(i * 0.25), feed));
+    const out = selectRssForTicker(items, { ...DEFAULT_PREFS, maxArticles: 0 }, NOW_T);
+    expect(out).toHaveLength(TICKER_RSS_PER_FEED);
+  });
+
+  it("spends Show N per feed, so the loudest wire cannot take it all", () => {
+    const a = "https://a.example.com/feed", b = "https://b.example.com/feed";
+    const items = [
+      ...Array.from({ length: 6 }, (_, i) => mk(100 + i, "a", ago(i * 0.1), a)),
+      mk(1, "b", ago(2), b),
+    ];
+    const out = selectRssForTicker(items, { ...DEFAULT_PREFS, maxArticles: 2, articlesPerSource: 0 }, NOW_T);
+    expect(out.filter((i) => i.feed_url === a)).toHaveLength(2);
+    expect(out.filter((i) => i.feed_url === b)).toHaveLength(1);
+  });
+
   it("applies per feed, so one wire cannot crowd out another", () => {
     const a = "https://a.example.com/feed", b = "https://b.example.com/feed";
     const items = [

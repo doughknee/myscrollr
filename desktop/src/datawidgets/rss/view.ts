@@ -116,7 +116,7 @@ export const TICKER_RSS_PER_FEED = 5;
  */
 export const TICKER_RSS_FLOOR_HOURS = 48;
 
-function onTicker(items: RssItem[], now: number): RssItem[] {
+function onTicker(items: RssItem[], now: number, perFeedCap = TICKER_RSS_PER_FEED): RssItem[] {
   // `items` arrive newest-first; keep that order within each feed.
   const cutoff = now - TICKER_RSS_HOURS * 3_600_000;
   const floorCutoff = now - TICKER_RSS_FLOOR_HOURS * 3_600_000;
@@ -129,7 +129,7 @@ function onTicker(items: RssItem[], now: number): RssItem[] {
     if (!newest.has(it.feed_url) && !(Number.isFinite(t) && t < floorCutoff)) newest.set(it.feed_url, it);
     if (Number.isFinite(t) && t < cutoff) continue;
     const list = perFeed.get(it.feed_url) ?? [];
-    if (list.length < TICKER_RSS_PER_FEED) list.push(it);
+    if (list.length < perFeedCap) list.push(it);
     perFeed.set(it.feed_url, list);
   }
   for (const [feed, top] of newest) {
@@ -148,7 +148,17 @@ export function selectRssForTicker(
   // Age window first (v1.1.3) so the per-source balancer only allocates
   // slots among articles that are actually eligible to show.
   const fresh = filterByArticleAge(items, prefs.maxArticleAgeDays ?? 0, now);
-  const ordered = onTicker(sortRssItems(fresh, "newest"), now);
+  // The widget's own "Show N" is the cap when it is set. That control is
+  // the answer to "how many of these do I want to see", and the ticker
+  // ignoring it while the feed obeyed it was the surprise -- one widget,
+  // two different numbers. TICKER_RSS_PER_FEED is only the default for
+  // "All", where the rail still needs a bound the feed page does not.
+  //
+  // Per FEED, not per widget: on a multi-feed widget a shared total would
+  // let the loudest wire spend the whole allowance, which is the flood the
+  // horizon exists to stop.
+  const perFeedCap = prefs.maxArticles > 0 ? prefs.maxArticles : TICKER_RSS_PER_FEED;
+  const ordered = onTicker(sortRssItems(fresh, "newest"), now, perFeedCap);
   // Single-outlet widgets (news_bbc, news_npr, ...) have exactly one
   // source — a per-source cap there just hides articles for no reason
   // (v1.1.1 "smart removal"). The balancer only makes sense when
