@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useRef } from "react";
 import { clsx } from "clsx";
 import {
   isLive,
@@ -17,6 +17,7 @@ import {
   metricText,
 } from "../../utils/sportsChipLayout";
 import { useScoreFlash } from "../../hooks/useScoreFlash";
+import { useLatchedCap } from "../../hooks/useLatchedCap";
 import { liftForTint } from "../../utils/chipAccent";
 import { getChipColors, chipShellClasses } from "./chipColors";
 import TeamLogo from "../TeamLogo";
@@ -38,6 +39,9 @@ interface GameChipProps {
   accent?: string;
   onClick?: () => void;
 }
+
+/** The chip's width cap, in px. Mirrors the max-w-[600px] class below. */
+const CHIP_MAX_PX = 600;
 
 // ── Component ───────────────────────────────────────────────────
 
@@ -85,6 +89,16 @@ const GameChip = memo(
     const ppd = game.state === "postponed";
     const flash = useScoreFlash(game.away_team_score, game.home_team_score);
     const r = reservationFor(game.league);
+
+    // At the cap the chip is pinned at CHIP_MAX_PX and the names truncate.
+    // There the score slot's reservation buys nothing -- width cannot move
+    // -- so it is released and the name gets the empty characters back:
+    // the whole name before kickoff, one more character while the score
+    // is a single digit. Off the cap the reservation stays, because there
+    // it is what stops the chip growing when the score arrives.
+    const ref = useRef<HTMLButtonElement>(null);
+    const capped = useLatchedCap(ref, CHIP_MAX_PX);
+    const scoreReserve = capped ? undefined : `${r.score}ch`;
 
     // Weight follows the score: the side ahead carries it, the side behind
     // dims. Colour and weight only -- the teams never trade places, so a
@@ -148,7 +162,7 @@ const GameChip = memo(
             "text-right text-[15px] leading-none tabular-nums",
             leads ? "font-bold text-fg" : "font-medium text-fg-2",
           )}
-          style={{ minWidth: `${r.score}ch` }}
+          style={{ minWidth: scoreReserve }}
         >
           {scoreText(score)}
         </span>
@@ -197,6 +211,7 @@ const GameChip = memo(
 
     return (
       <button
+        ref={ref}
         onClick={onClick}
         style={accentStyle}
         className={clsx(
@@ -222,6 +237,8 @@ const GameChip = memo(
           // names -- runs ~575px, and the cap exists for the pathological case,
           // not the worst ordinary one.
           "grid max-w-[600px] grid-cols-[max-content_minmax(0,max-content)_minmax(0,max-content)_max-content]",
+          // (max-w-[600px] and CHIP_MAX_PX must agree; the latter is what the
+          // chip measures itself against to know it has hit the cap.)
           comfort ? "grid-rows-[30px_20px]" : "grid-rows-[28px]",
           // Closeness is the whole weighting; the rules brighten with it.
           close && "border-live/70 bg-live/[0.13] shadow-[0_0_14px_rgba(255,71,87,0.2)]",

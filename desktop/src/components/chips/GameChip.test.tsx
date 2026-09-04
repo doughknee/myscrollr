@@ -170,6 +170,38 @@ describe("GameChip", () => {
     expect(names.length).toBe(2);
   });
 
+  it("gives the name the score's reserved space only once the chip is at the cap", () => {
+    // jsdom has no layout; stand in a ResizeObserver that reports a width.
+    const real = globalThis.ResizeObserver;
+    const withWidth = (w: number) => {
+      class RO {
+        cb: ResizeObserverCallback;
+        constructor(cb: ResizeObserverCallback) { this.cb = cb; }
+        observe(el: Element) { this.cb([{ contentRect: { width: w } } as ResizeObserverEntry], this as unknown as ResizeObserver); }
+        disconnect() {}
+        unobserve() {}
+      }
+      globalThis.ResizeObserver = RO as unknown as typeof ResizeObserver;
+    };
+    const scoreMins = (c: HTMLElement) =>
+      Array.from(c.querySelectorAll("span"))
+        .filter((el) => el.className.includes("tabular-nums") && el.className.includes("text-[15px]"))
+        .map((el) => (el as HTMLElement).style.minWidth);
+    try {
+      withWidth(420);
+      const a = render(<GameChip game={game()} />);
+      expect(scoreMins(a.container)).toEqual(["2ch", "2ch"]); // off the cap: reserved
+      a.unmount();
+
+      withWidth(600);
+      const b = render(<GameChip game={game()} />);
+      expect(scoreMins(b.container)).toEqual(["", ""]); // at the cap: released
+      b.unmount();
+    } finally {
+      globalThis.ResizeObserver = real;
+    }
+  });
+
   it("writes a soccer record as W-D-L with points, not a differential", () => {
     render(
       <GameChip
