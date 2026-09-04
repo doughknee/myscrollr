@@ -31,6 +31,13 @@ export interface ChipReservation {
   metricKind: "diff" | "pts";
   /** Its unit label. */
   unit: string;
+  /**
+   * One event at one venue rather than two sides -- Formula 1. The chip
+   * renders a single cell: the grand prix on top, the circuit beneath, no
+   * score slot. Two columns of blanks and dashes is the wrong shape for a
+   * race, not missing data.
+   */
+  single?: boolean;
 }
 
 const DEFAULT: ChipReservation = {
@@ -54,6 +61,7 @@ const BY_LEAGUE: Record<string, ChipReservation> = {
   "Champions League": SOCCER,
   "FIFA World Cup": SOCCER,
   MLS: SOCCER,
+  "Formula 1": { ...DEFAULT, score: 0, single: true },
 };
 
 export function reservationFor(league: string): ChipReservation {

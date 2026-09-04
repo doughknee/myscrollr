@@ -179,11 +179,30 @@ const GameChip = memo(
           </span>
         </span>
 
-        {top("away", game.away_team_logo, game.away_team_name, game.away_team_score, awayLeads)}
-        {top("home", game.home_team_logo, game.home_team_name, game.home_team_score, homeLeads)}
-
-        {comfort && bottom("away", game.away_standing)}
-        {comfort && bottom("home", game.home_standing)}
+        {r.single ? (
+          // One event, one venue. The feed models a race as home = grand
+          // prix, away = circuit; the chip shows them stacked in one cell.
+          <>
+            <span className="col-start-2 col-span-2 row-start-1 flex min-w-0 items-center gap-1.5 px-2.5">
+              <TeamLogo src={game.home_team_logo} alt={game.home_team_name} size="lg" />
+              <span className="min-w-0 truncate text-[12px] font-semibold leading-none text-fg" title={game.home_team_name}>
+                {teamShortName(game.league, game.home_team_name)}
+              </span>
+            </span>
+            {comfort && (
+              <span className="col-start-2 col-span-2 row-start-2 flex items-center px-2.5 text-[10px] leading-none text-fg-3">
+                {teamShortName(game.league, game.away_team_name)}
+              </span>
+            )}
+          </>
+        ) : (
+          <>
+            {top("away", game.away_team_logo, game.away_team_name, game.away_team_score, awayLeads)}
+            {top("home", game.home_team_logo, game.home_team_name, game.home_team_score, homeLeads)}
+            {comfort && bottom("away", game.away_standing)}
+            {comfort && bottom("home", game.home_standing)}
+          </>
+        )}
 
         <span className={clsx("col-start-4 row-span-full flex items-center justify-center border-l px-[9px]", rule)}>
           <span
@@ -199,6 +218,10 @@ const GameChip = memo(
             <span className="inline-block text-center" style={{ minWidth: `${r.status}ch` }}>
               {gameStatusCompact(game)}
             </span>
+            {/* Mirror of the dot's slot, never visible: the dot reserves
+                space on the left, so without this the text sat ~4px right
+                of centre in every state. Width is unchanged either way. */}
+            <span className="invisible h-[5px] w-[5px] shrink-0" />
           </span>
         </span>
       </button>

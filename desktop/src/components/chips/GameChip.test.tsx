@@ -102,6 +102,33 @@ describe("GameChip", () => {
     expect(container.textContent?.match(/—/g)?.length).toBe(2);
   });
 
+  it("draws a Formula 1 race as one event, not two blank sides", () => {
+    const { container } = render(
+      <GameChip
+        game={game({
+          league: "Formula 1",
+          home_team_name: "Italy Grand Prix",
+          away_team_name: "Autodromo Nazionale Monza",
+          home_team_score: "",
+          away_team_score: "",
+          state: "pre",
+          status_short: "NS",
+          away_standing: undefined,
+          home_standing: undefined,
+        })}
+        comfort
+      />,
+    );
+    expect(screen.getByText("Italy Grand Prix")).toBeTruthy();
+    expect(screen.getByText("Monza")).toBeTruthy(); // circuit, shortened, beneath
+    expect(container.textContent).not.toContain("—"); // no empty-table dashes
+    // No score slots reserved: a race has no score.
+    const scoreSlots = Array.from(container.querySelectorAll("span")).filter(
+      (el) => /ch$/.test((el as HTMLElement).style.minWidth) && (el as HTMLElement).style.minWidth !== "7ch",
+    );
+    expect(scoreSlots.length).toBe(0);
+  });
+
   it("writes a soccer record as W-D-L with points, not a differential", () => {
     render(
       <GameChip
