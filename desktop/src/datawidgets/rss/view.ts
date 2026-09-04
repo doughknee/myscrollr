@@ -91,6 +91,42 @@ export function limitPerSource(items: RssItem[], limit: number): RssItem[] {
  * The ticker doesn't expose interactive filters (source/category selection,
  * sort toggle). If those are added later, surface them as arguments here.
  */
+/**
+ * The ticker's own horizon for headlines, applied on top of the widget's
+ * prefs and never inherited by the widget page.
+ *
+ * A per-feed news widget put every article in its window on the rail, and
+ * the default window is unlimited -- the per-source cap only ever applied
+ * to multi-feed widgets. So a Yahoo Sports widget was 297 chips. On the
+ * rail a feed now shows its newest TICKER_RSS_PER_FEED items from the last
+ * TICKER_RSS_HOURS, and never fewer than one: the floor keeps a quiet feed
+ * represented by its latest item, the window and cap stop a wire from
+ * becoming the whole bar. Same shape the sports ticker got.
+ */
+export const TICKER_RSS_HOURS = 6;
+export const TICKER_RSS_PER_FEED = 5;
+
+function onTicker(items: RssItem[], now: number): RssItem[] {
+  // `items` arrive newest-first; keep that order within each feed.
+  const cutoff = now - TICKER_RSS_HOURS * 3_600_000;
+  const perFeed = new Map<string, RssItem[]>();
+  const newest = new Map<string, RssItem>();
+  for (const it of items) {
+    if (!newest.has(it.feed_url)) newest.set(it.feed_url, it);
+    const t = new Date(it.published_at ?? it.created_at).getTime();
+    if (Number.isFinite(t) && t < cutoff) continue;
+    const list = perFeed.get(it.feed_url) ?? [];
+    if (list.length < TICKER_RSS_PER_FEED) list.push(it);
+    perFeed.set(it.feed_url, list);
+  }
+  for (const [feed, top] of newest) {
+    if (!perFeed.has(feed)) perFeed.set(feed, [top]);
+  }
+  const keep = new Set<RssItem>();
+  for (const list of perFeed.values()) for (const it of list) keep.add(it);
+  return items.filter((it) => keep.has(it));
+}
+
 export function selectRssForTicker(
   items: RssItem[],
   prefs: RssDisplayPrefs,
@@ -99,7 +135,7 @@ export function selectRssForTicker(
   // Age window first (v1.1.3) so the per-source balancer only allocates
   // slots among articles that are actually eligible to show.
   const fresh = filterByArticleAge(items, prefs.maxArticleAgeDays ?? 0, now);
-  const ordered = sortRssItems(fresh, "newest");
+  const ordered = onTicker(sortRssItems(fresh, "newest"), now);
   // Single-outlet widgets (news_bbc, news_npr, ...) have exactly one
   // source — a per-source cap there just hides articles for no reason
   // (v1.1.1 "smart removal"). The balancer only makes sense when
