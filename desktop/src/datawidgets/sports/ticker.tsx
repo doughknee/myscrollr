@@ -4,7 +4,7 @@ import { chipUrlForSports } from "../../utils/chipUrl";
 import type { TickerChip, TickerContext, TickerSource } from "../ticker";
 import { scopedRows } from "../ticker";
 import { selectSportsForTicker, getSportsDisplayConfig } from "./view";
-import { catalogItemById } from "../../marketplace";
+import { sportsDataWidget } from "./FeedTab";
 
 /**
  * Sports ticker chips.
@@ -18,11 +18,14 @@ export const sportsTickerSource: TickerSource = {
     const config = getSportsDisplayConfig(ctx.dashboard, ctx.tab);
 
     const rows = scopedRows<Game>(raw, ctx);
-    // Each league is its own widget and the catalog gives it a brand colour
-    // (F1 #e10600, NBA #c9082a, MLS #001838). The chip used to paint every
-    // league the old single "sports channel" red; it now takes the widget's
-    // own colour, as the catalog cards and Home ticker already do.
-    const accent = catalogItemById(ctx.tab)?.hex;
+    // One colour for every league: the sports widget's own orange. Per-league
+    // brand tints were tried (catalogItemById(ctx.tab)?.hex, lifted for the
+    // dark surface) and rejected on the rail -- a red F1 chip beside a blue
+    // MLS one beside a red La Liga one read as noise, not identity, and the
+    // league code in the tab already says which is which. The old
+    // --color-secondary red was the pre-widgets "sports channel" colour and
+    // never matched this manifest.
+    const accent = sportsDataWidget.hex;
     return selectSportsForTicker(rows, config).map((game) => ({
       key: `spo-${game.id}`,
       node: (
