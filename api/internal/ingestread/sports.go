@@ -109,7 +109,55 @@ type Game struct {
 	Timer          string    `json:"timer,omitempty"`
 	Venue          string    `json:"venue,omitempty"`
 	Season         string    `json:"season,omitempty"`
+	// Current-season table row for each side, when the league keeps one.
+	// Attached on every games read so the desktop's detailed chip -- rank,
+	// record, differential or points under each team -- costs no second
+	// request and can never disagree with the score beside it. Nil for
+	// UFC and Formula 1, which have no table.
+	HomeStanding *TeamStanding `json:"home_standing,omitempty"`
+	AwayStanding *TeamStanding `json:"away_standing,omitempty"`
 }
+
+// TeamStanding is one side's line in the current-season standings.
+type TeamStanding struct {
+	Rank          int `json:"rank"`
+	Wins          int `json:"wins"`
+	Losses        int `json:"losses"`
+	Draws         int `json:"draws"`
+	Points        int `json:"points"`
+	GoalDiff      int `json:"goal_diff"`
+	PointsFor     int `json:"points_for"`
+	PointsAgainst int `json:"points_against"`
+	OTL           int `json:"otl"`
+}
+
+// standingsJoin attaches each side's current-season standings row to a
+// games query. `g` must be the alias of the games-shaped relation.
+//
+// LATERAL rather than a plain LEFT JOIN so the season filter is applied per
+// row -- the standings table keeps last season beside this one, and a bare
+// join on (league, team_name) doubled every game. Lexical max(season) is
+// exact for every league's format (see handleGetStandings).
+const standingsJoin = `
+		LEFT JOIN LATERAL (
+			SELECT rank, wins, losses, draws, points, goal_diff, points_for, points_against, otl
+			FROM standings s
+			WHERE s.league = g.league AND s.team_name = g.home_team_name
+			  AND s.season = (SELECT max(season) FROM standings s2 WHERE s2.league = g.league)
+			LIMIT 1
+		) hs ON TRUE
+		LEFT JOIN LATERAL (
+			SELECT rank, wins, losses, draws, points, goal_diff, points_for, points_against, otl
+			FROM standings s
+			WHERE s.league = g.league AND s.team_name = g.away_team_name
+			  AND s.season = (SELECT max(season) FROM standings s2 WHERE s2.league = g.league)
+			LIMIT 1
+		) aw ON TRUE`
+
+// standingsColumns is the SELECT tail that pairs with standingsJoin.
+const standingsColumns = `,
+			hs.rank, hs.wins, hs.losses, hs.draws, hs.points, hs.goal_diff, hs.points_for, hs.points_against, hs.otl,
+			aw.rank, aw.wins, aw.losses, aw.draws, aw.points, aw.goal_diff, aw.points_for, aw.points_against, aw.otl`
 
 // TrackedLeague represents a league entry from the catalog, enriched with
 // current game activity counts and polling-health for the dashboard league browser.
@@ -579,8 +627,8 @@ func querySportsGames(ctx context.Context, limit int, favoriteTeams map[string]F
 			away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
 			start_time, COALESCE(short_detail, ''), state,
 			COALESCE(status_short, ''), COALESCE(status_long, ''),
-			COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')
-		FROM games
+			COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')` + standingsColumns + `
+		FROM games g` + standingsJoin + `
 		WHERE %s
 		ORDER BY
 			CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
@@ -698,8 +746,8 @@ func queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favor
 				away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
 				start_time, COALESCE(short_detail, ''), state,
 				COALESCE(status_short, ''), COALESCE(status_long, ''),
-				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')
-			FROM ranked
+				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')` + standingsColumns + `
+			FROM ranked g` + standingsJoin + `
 			WHERE (upcoming_side AND side_rn <= %d)
 			   OR (NOT upcoming_side AND side_rn <= %d)
 			ORDER BY
@@ -716,8 +764,8 @@ func queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favor
 				away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
 				start_time, COALESCE(short_detail, ''), state,
 				COALESCE(status_short, ''), COALESCE(status_long, ''),
-				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')
-			FROM games
+				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')` + standingsColumns + `
+			FROM games g` + standingsJoin + `
 			WHERE league = ANY($1) AND %s
 			ORDER BY
 				CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
@@ -741,19 +789,44 @@ func scanGames(rows pgx.Rows) []Game {
 	games := make([]Game, 0)
 	for rows.Next() {
 		var g Game
+		// Nullable: a side with no standings row scans as nil pointers.
+		var h, a [9]*int
 		if err := rows.Scan(
 			&g.ID, &g.League, &g.Sport, &g.ExternalGameID, &g.Link,
 			&g.HomeTeamName, &g.HomeTeamLogo, &g.HomeTeamScore, &g.HomeTeamCode,
 			&g.AwayTeamName, &g.AwayTeamLogo, &g.AwayTeamScore, &g.AwayTeamCode,
 			&g.StartTime, &g.ShortDetail, &g.State,
 			&g.StatusShort, &g.StatusLong, &g.Timer, &g.Venue, &g.Season,
+			&h[0], &h[1], &h[2], &h[3], &h[4], &h[5], &h[6], &h[7], &h[8],
+			&a[0], &a[1], &a[2], &a[3], &a[4], &a[5], &a[6], &a[7], &a[8],
 		); err != nil {
 			log.Printf("[Sports] Row scan failed: %v", err)
 			continue
 		}
+		g.HomeStanding = standingFrom(h)
+		g.AwayStanding = standingFrom(a)
 		games = append(games, g)
 	}
 	return games
+}
+
+// standingFrom builds a TeamStanding from the nine scanned columns, or nil
+// when the row had no standings -- rank is the presence test, since every
+// real row has one. Other nullable columns default to zero.
+func standingFrom(c [9]*int) *TeamStanding {
+	if c[0] == nil {
+		return nil
+	}
+	v := func(p *int) int {
+		if p == nil {
+			return 0
+		}
+		return *p
+	}
+	return &TeamStanding{
+		Rank: *c[0], Wins: v(c[1]), Losses: v(c[2]), Draws: v(c[3]), Points: v(c[4]),
+		GoalDiff: v(c[5]), PointsFor: v(c[6]), PointsAgainst: v(c[7]), OTL: v(c[8]),
+	}
 }
 
 // getUserSportsLeagues extracts the league list across a user's sports

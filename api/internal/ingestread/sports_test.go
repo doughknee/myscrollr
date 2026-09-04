@@ -17,9 +17,9 @@ func TestFairShareSideSplit(t *testing.T) {
 	}{
 		{60, 30, 30}, // single-league widget at the dashboard limit
 		{10, 5, 5},   // six leagues at limit 60
-		{5, 3, 2},    // odd share — the extra slot goes to upcoming
+		{5, 3, 2},    // odd share â€” the extra slot goes to upcoming
 		{3, 2, 1},
-		{2, 1, 1}, // MinPerLeagueShare floor — both sides stay visible
+		{2, 1, 1}, // MinPerLeagueShare floor â€” both sides stay visible
 		{1, 1, 0}, // degenerate: upcoming wins the only slot
 	}
 	for _, tt := range tests {
@@ -112,7 +112,7 @@ func TestStaleUpcomingGamesAreNotServed(t *testing.T) {
 		t.Error("a genuinely upcoming game was dropped")
 	}
 	if !got["just-started"] {
-		t.Error("a game that kicked off 30 minutes ago was dropped — the guard is too aggressive " +
+		t.Error("a game that kicked off 30 minutes ago was dropped â€” the guard is too aggressive " +
 			"and would blank out fixtures during the gap before polling marks them live")
 	}
 
@@ -123,7 +123,7 @@ func TestStaleUpcomingGamesAreNotServed(t *testing.T) {
 	meta := loadLeagueMeta(ctx, []string{league})
 	for _, m := range meta {
 		if m.NextGame != nil && m.NextGame.Before(time.Now()) {
-			t.Errorf("next_game is in the past (%s) — the empty state would say a league returns on a date that has been and gone", m.NextGame)
+			t.Errorf("next_game is in the past (%s) â€” the empty state would say a league returns on a date that has been and gone", m.NextGame)
 		}
 	}
 }
@@ -198,5 +198,80 @@ func TestStandingsReturnsOneSeasonPerTeam(t *testing.T) {
 		if n != 1 {
 			t.Errorf("%s appears %d times; a team holds one row in a table", team, n)
 		}
+	}
+}
+
+// TestGamesCarryCurrentSeasonStandings pins the lateral join that attaches
+// each side's table row to a game -- and that it picks THIS season. A bare
+// join on (league, team_name) matched both stored seasons and doubled
+// every game; the lateral applies max(season) per row.
+func TestGamesCarryCurrentSeasonStandings(t *testing.T) {
+	if platform.DBPool == nil {
+		t.Skip("needs TEST_DATABASE_URL")
+	}
+	ctx := context.Background()
+	const league = "TestStandingsJoinLeague"
+	clean := func() {
+		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM games WHERE league = $1`, league)
+		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM standings WHERE league = $1`, league)
+	}
+	clean()
+	defer clean()
+
+	if _, err := platform.DBPool.Exec(ctx, `
+		INSERT INTO games (league, external_game_id, home_team_name, away_team_name, start_time, state)
+		VALUES ($1, 'sj-1', 'Home FC', 'Away FC', $2, 'pre')`, league, time.Now().Add(2*time.Hour)); err != nil {
+		t.Fatalf("insert game: %v", err)
+	}
+	for _, r := range []struct {
+		team, season string
+		rank, w, l   int
+	}{
+		{"Home FC", "2025", 1, 30, 4}, // last season: must NOT be attached
+		{"Home FC", "2026", 3, 2, 1},  // this season
+		{"Away FC", "2026", 7, 1, 2},
+	} {
+		if _, err := platform.DBPool.Exec(ctx, `
+			INSERT INTO standings (league, team_name, season, rank, wins, losses, draws, games_played)
+			VALUES ($1, $2, $3, $4, $5, $6, 0, $7)`,
+			league, r.team, r.season, r.rank, r.w, r.l, r.w+r.l); err != nil {
+			t.Fatalf("insert standing: %v", err)
+		}
+	}
+
+	for _, fair := range []bool{false, true} {
+		games, err := queryGamesByLeagues(ctx, []string{league}, 10, nil, fair)
+		if err != nil {
+			t.Fatalf("query (fairShare=%v): %v", fair, err)
+		}
+		if len(games) != 1 {
+			t.Fatalf("fairShare=%v: got %d games; want 1 -- a join that matched both seasons would double it", fair, len(games))
+		}
+		g := games[0]
+		if g.HomeStanding == nil || g.AwayStanding == nil {
+			t.Fatalf("fairShare=%v: standings not attached: home=%v away=%v", fair, g.HomeStanding, g.AwayStanding)
+		}
+		if g.HomeStanding.Wins != 2 || g.HomeStanding.Rank != 3 {
+			t.Errorf("fairShare=%v: home carries %+v; want this season (3rd, 2-1), not last (1st, 30-4)", fair, *g.HomeStanding)
+		}
+		if g.AwayStanding.Rank != 7 {
+			t.Errorf("fairShare=%v: away rank %d; want 7", fair, g.AwayStanding.Rank)
+		}
+	}
+
+	// A side with no table row is nil, not a zeroed struct: the chip draws
+	// a dash for nil and would draw "0th 0-0" for zeros.
+	if _, err := platform.DBPool.Exec(ctx, `DELETE FROM standings WHERE league = $1 AND team_name = 'Away FC'`, league); err != nil {
+		t.Fatal(err)
+	}
+	games, err := queryGamesByLeagues(ctx, []string{league}, 10, nil, false)
+	if err != nil || len(games) != 1 {
+		t.Fatalf("requery: %v (%d games)", err, len(games))
+	}
+	if games[0].AwayStanding != nil {
+		t.Errorf("away with no standings row came back %+v; want nil", *games[0].AwayStanding)
+	}
+	if games[0].HomeStanding == nil {
+		t.Error("home lost its standings when away had none")
 	}
 }
