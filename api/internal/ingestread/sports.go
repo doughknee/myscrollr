@@ -845,7 +845,18 @@ func handleGetStandings(c *fiber.Ctx) error {
 			COALESCE(otl, 0), COALESCE(goals_for, 0), COALESCE(goals_against, 0),
 			COALESCE(points_for, 0), COALESCE(points_against, 0), COALESCE(streak, '')
 		FROM standings
+		-- Latest season only. The unique key is (league, team_name, season), so
+		-- the table deliberately keeps last season alongside this one -- and
+		-- without this filter every team came back TWICE, its finished 38-game
+		-- record interleaved with its 3-game one and both claiming the same
+		-- rank. La Liga returned 40 rows for 23 teams.
+		--
+		-- Lexical max is exact here rather than lucky: no league mixes season
+		-- formats (plain years, or "2025-2026" where a league spans the new
+		-- year) and none is null, so the greatest string is the current season
+		-- in every case.
 		WHERE league = $1
+		  AND season = (SELECT max(season) FROM standings s2 WHERE s2.league = $1)
 		ORDER BY COALESCE(rank, 9999) ASC`, league)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{

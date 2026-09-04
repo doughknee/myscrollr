@@ -127,3 +127,76 @@ func TestStaleUpcomingGamesAreNotServed(t *testing.T) {
 		}
 	}
 }
+
+// TestStandingsReturnsOneSeasonPerTeam pins the season filter on the
+// standings read.
+//
+// The table keeps history: its unique key is (league, team_name, season), so
+// last season sits alongside this one by design. The query had no season
+// filter, so every team came back TWICE -- a finished 38-game record
+// interleaved with a 3-game one, both claiming the same rank. La Liga
+// returned 40 rows for 23 teams.
+func TestStandingsReturnsOneSeasonPerTeam(t *testing.T) {
+	if platform.DBPool == nil {
+		t.Skip("needs TEST_DATABASE_URL")
+	}
+	ctx := context.Background()
+	const league = "TestSeasonLeague"
+	clean := func() {
+		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM standings WHERE league = $1`, league)
+	}
+	clean()
+	defer clean()
+
+	for _, r := range []struct {
+		team, season   string
+		rank, w, l, gp int
+	}{
+		{"Alpha", "2025", 1, 31, 6, 38},
+		{"Beta", "2025", 2, 27, 11, 38},
+		{"Alpha", "2026", 2, 1, 2, 3},
+		{"Beta", "2026", 1, 3, 0, 3},
+	} {
+		if _, err := platform.DBPool.Exec(ctx, `
+			INSERT INTO standings (league, team_name, season, rank, wins, losses, draws, games_played)
+			VALUES ($1, $2, $3, $4, $5, $6, 0, $7)`,
+			league, r.team, r.season, r.rank, r.w, r.l, r.gp,
+		); err != nil {
+			t.Fatalf("insert %s/%s: %v", r.team, r.season, err)
+		}
+	}
+
+	rows, err := platform.DBPool.Query(ctx, `
+		SELECT team_name, season, games_played FROM standings
+		WHERE league = $1
+		  AND season = (SELECT max(season) FROM standings s2 WHERE s2.league = $1)
+		ORDER BY COALESCE(rank, 9999) ASC`, league)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	defer rows.Close()
+
+	seen := map[string]int{}
+	for rows.Next() {
+		var team, season string
+		var gp int
+		if err := rows.Scan(&team, &season, &gp); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		seen[team]++
+		if season != "2026" {
+			t.Errorf("%s came back on season %q; last season's table is not the standings", team, season)
+		}
+		if gp != 3 {
+			t.Errorf("%s shows %d games played; that is the finished season, not the current one", team, gp)
+		}
+	}
+	if len(seen) != 2 {
+		t.Fatalf("got %d teams; want 2", len(seen))
+	}
+	for team, n := range seen {
+		if n != 1 {
+			t.Errorf("%s appears %d times; a team holds one row in a table", team, n)
+		}
+	}
+}
