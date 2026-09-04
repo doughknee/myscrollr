@@ -13,7 +13,7 @@
  * and coarse `sports` rows can't exist post-migration-000014.
  */
 import { useState, useMemo, useCallback } from "react";
-import { Trophy, CalendarRange } from "lucide-react";
+import { Trophy, CalendarRange, Layers } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { sportsFullQueryOptions, sportsTeamsOptions } from "../../api/queries";
 import type { TeamInfo } from "../../api/queries";
@@ -292,6 +292,28 @@ function SportsBarControls({
           if (o) setDisplay({ daysBack: o.back, daysAhead: o.ahead });
         }}
       />
+      {/* How many non-favourite games hold a place on the ticker at once;
+          the rest rotate through those places one lap at a time. The
+          favourite is always pinned on top of this. */}
+      <SelectMenu
+        ariaLabel="Games on the ticker at once"
+        icon={Layers}
+        value={String(display.tickerSlots)}
+        options={slotOptions(display.tickerSlots)}
+        onChange={(v) => setDisplay({ tickerSlots: Number(v) })}
+      />
     </>
   );
+}
+
+const SLOT_OPTIONS = [2, 3, 4, 6, 8].map((n) => ({
+  value: String(n),
+  label: `${n} on the bar`,
+}));
+
+/** A stored value outside the menu gets its own row, as the window does. */
+function slotOptions(current: number) {
+  return SLOT_OPTIONS.some((o) => o.value === String(current))
+    ? SLOT_OPTIONS
+    : [...SLOT_OPTIONS, { value: String(current), label: `${current} on the bar` }];
 }

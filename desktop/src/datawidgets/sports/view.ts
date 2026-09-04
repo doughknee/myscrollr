@@ -10,6 +10,7 @@
  */
 import type { Game } from "../../types";
 import { isLive, isCloseGame } from "../../utils/gameHelpers";
+import { teamShortName } from "../../utils/teamShortName";
 import { migrateVenue } from "../../preferences";
 
 // ── Display prefs shape (mirrors server-side widget config.display) ─
@@ -26,10 +27,31 @@ export interface SportsDisplayConfig {
    */
   daysBack?: number;
   daysAhead?: number;
+  /**
+   * Rotating ticker slots for games that are NOT a favourite's. The
+   * horizon decides what is eligible; this decides how many of those are
+   * on the rail at once, with the rest cycling through the same slots one
+   * lap at a time. Favourites are pinned on top of this number, never
+   * counted against it.
+   */
+  tickerSlots?: number;
 }
 
 /** Defaults: yesterday's finals through next week's slate. */
 export const SPORTS_WINDOW_DEFAULTS = { daysBack: 1, daysAhead: 7 } as const;
+
+/**
+ * Four non-favourite games at once.
+ *
+ * A full MLB day is ~30 eligible games; four slots means the whole slate
+ * comes round in about eight laps, and a league widget stops being able
+ * to bury the clock and the weather behind twenty-six chips in a row.
+ * Bounded so a misconfigured value cannot either empty the rail or
+ * recreate the flood.
+ */
+export const TICKER_SLOTS_DEFAULT = 4;
+export const TICKER_SLOTS_MIN = 1;
+export const TICKER_SLOTS_MAX = 12;
 
 /**
  * Hard ceiling looking BACK. cleanup_old_games (sports service) deletes
@@ -319,5 +341,85 @@ export function normalizeSportsDisplayConfig(
       legacyUpcoming === "off" ? 0 : SPORTS_WINDOW_DEFAULTS.daysAhead,
       SPORTS_WINDOW_MAX_DAYS_AHEAD,
     ),
+    tickerSlots:
+      typeof obj.tickerSlots === "number" && Number.isFinite(obj.tickerSlots)
+        ? Math.min(TICKER_SLOTS_MAX, Math.max(TICKER_SLOTS_MIN, Math.round(obj.tickerSlots)))
+        : TICKER_SLOTS_DEFAULT,
   };
+}
+
+// ── Pure: rotating slots for the ticker ──────────────────────────
+
+/** One position on the rail: a fixed game, or a slot cycling through several. */
+export interface TickerSlot {
+  /** Stable key. A rotating slot keeps its key while its game changes. */
+  key: string;
+  game: Game;
+  /** Set on rotating slots; the ticker counts this slot's laps under it. */
+  rotateSlot?: string;
+  /**
+   * The longest short names this slot will ever show, so the chip can
+   * reserve their width and a swap never resizes it. Absent on fixed
+   * games, whose names never change.
+   */
+  reserveNames?: { away: string; home: string };
+}
+
+/**
+ * Lay eligible games out as pinned games plus rotating slots.
+ *
+ * Favourites are pinned: every one of them is on the rail, keyed by the
+ * game, exempt from the count. Everything else goes into a pool in the
+ * display order (live and close first, then live, soonest upcoming,
+ * newest finals) and `slots` positions cycle through it.
+ *
+ * Each slot owns a residue class of the pool -- slot i shows pool[i],
+ * then pool[i + slots], then pool[i + 2·slots] -- advancing once per
+ * lap. No coordination between slots is needed for every game to come
+ * round, which matters because the slots leave the viewport at
+ * different moments and so have different cycle counts. The reservation
+ * is per class too: a slot reserves the widest names IT will show, not
+ * the widest in the league, so the whitespace cost is only what its own
+ * rotation actually needs.
+ *
+ * When the pool fits in the slots nothing rotates and the games are keyed
+ * by id like any fixed chip.
+ */
+export function arrangeTickerSlots(
+  eligible: Game[],
+  favoriteTeams: ReadonlySet<string>,
+  slots: number,
+  cycles: Readonly<Record<string, number>>,
+  keyPrefix: string,
+): TickerSlot[] {
+  const pinned: Game[] = [];
+  const pool: Game[] = [];
+  for (const g of eligible) {
+    const fav = favoriteTeams.has(g.home_team_name) || favoriteTeams.has(g.away_team_name);
+    (fav ? pinned : pool).push(g);
+  }
+  const forGame = (g: Game): TickerSlot => ({ key: `${keyPrefix}-${g.id}`, game: g });
+  if (pool.length <= slots) return [...pinned.map(forGame), ...pool.map(forGame)];
+
+  const k = Math.max(1, slots);
+  const rotating: TickerSlot[] = [];
+  for (let i = 0; i < k; i++) {
+    const cls = pool.filter((_, idx) => idx % k === i);
+    if (cls.length === 0) continue;
+    const slotKey = `${keyPrefix}-slot-${i}`;
+    const turn = cycles[slotKey] ?? 0;
+    const game = cls[turn % cls.length];
+    const widest = (pick: (g: Game) => string) =>
+      cls.map((g) => teamShortName(g.league, pick(g))).reduce((a, b) => (b.length > a.length ? b : a), "");
+    rotating.push({
+      key: slotKey,
+      game,
+      rotateSlot: slotKey,
+      reserveNames: {
+        away: widest((g) => g.away_team_name),
+        home: widest((g) => g.home_team_name),
+      },
+    });
+  }
+  return [...pinned.map(forGame), ...rotating];
 }

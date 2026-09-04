@@ -399,3 +399,82 @@ describe("selectSportsForFeed", () => {
     expect(result.map((g) => g.id)).toEqual([4, 3, 2, 1]);
   });
 });
+
+// ── arrangeTickerSlots ──────────────────────────────────────────
+
+import { arrangeTickerSlots } from "./view";
+
+describe("arrangeTickerSlots", () => {
+  const g = (id: number, away: string, home: string, state = "pre") =>
+    mk({ id, state, away_team_name: away, home_team_name: home, league: "MLB" });
+  const pool = [
+    g(1, "Tampa Bay Rays", "Texas Rangers"),
+    g(2, "Arizona Diamondbacks", "Houston Astros"),
+    g(3, "Toronto Blue Jays", "Kansas City Royals"),
+    g(4, "New York Yankees", "San Diego Padres"),
+    g(5, "Chicago Cubs", "Miami Marlins"),
+  ];
+  const NONE = new Set<string>();
+
+  it("keys every game by id when the pool fits the slots", () => {
+    const out = arrangeTickerSlots(pool.slice(0, 3), NONE, 4, {}, "p");
+    expect(out.map((s) => s.key)).toEqual(["p-1", "p-2", "p-3"]);
+    expect(out.every((s) => !s.rotateSlot && !s.reserveNames)).toBe(true);
+  });
+
+  it("gives a bigger pool exactly `slots` rotating positions", () => {
+    const out = arrangeTickerSlots(pool, NONE, 2, {}, "p");
+    expect(out.map((s) => s.key)).toEqual(["p-slot-0", "p-slot-1"]);
+    expect(out.map((s) => s.game.id)).toEqual([1, 2]);
+  });
+
+  it("walks each slot through its own residue class as its laps advance", () => {
+    // slot 0 owns games 1,3,5; slot 1 owns 2,4. Independent counters.
+    const at = (c: Record<string, number>) =>
+      arrangeTickerSlots(pool, NONE, 2, c, "p").map((s) => s.game.id);
+    expect(at({ "p-slot-0": 1 })).toEqual([3, 2]);
+    expect(at({ "p-slot-0": 2, "p-slot-1": 1 })).toEqual([5, 4]);
+    expect(at({ "p-slot-0": 3, "p-slot-1": 2 })).toEqual([1, 2]); // wrapped
+  });
+
+  it("reserves the widest names a slot will actually show, not the league's", () => {
+    const [s0, s1] = arrangeTickerSlots(pool, NONE, 2, {}, "p");
+    // The reserve is what the chip RENDERS, and teamShortName leaves any
+    // name within its 20-character budget untouched -- so these are the
+    // widest full names in each slot's class, not abbreviations.
+    // slot 0: games 1, 3, 5
+    expect(s0.reserveNames).toEqual({ away: "Toronto Blue Jays", home: "Kansas City Royals" });
+    // slot 1: games 2, 4
+    expect(s1.reserveNames).toEqual({ away: "Arizona Diamondbacks", home: "San Diego Padres" });
+  });
+
+  it("pins a favourite's game outside the slot count", () => {
+    const favs = new Set(["Chicago Cubs"]);
+    const out = arrangeTickerSlots(pool, favs, 2, {}, "p");
+    expect(out.map((s) => s.key)).toEqual(["p-5", "p-slot-0", "p-slot-1"]);
+    // and the favourite never appears in a rotating slot's class
+    const rotating = arrangeTickerSlots(pool, favs, 2, { "p-slot-0": 9, "p-slot-1": 9 }, "p")
+      .filter((s) => s.rotateSlot)
+      .map((s) => s.game.id);
+    expect(rotating).not.toContain(5);
+  });
+
+  it("does not rotate when the favourites alone exceed the slots", () => {
+    const favs = new Set(["Tampa Bay Rays", "Arizona Diamondbacks", "Toronto Blue Jays"]);
+    const out = arrangeTickerSlots(pool.slice(0, 4), favs, 1, {}, "p");
+    // three pinned, one non-favourite fits in the single slot: no rotation
+    expect(out.map((s) => s.key)).toEqual(["p-1", "p-2", "p-3", "p-4"]);
+  });
+});
+
+describe("normalizeSportsDisplayConfig tickerSlots", () => {
+  it("defaults, rounds and clamps", async () => {
+    const { normalizeSportsDisplayConfig, TICKER_SLOTS_DEFAULT, TICKER_SLOTS_MAX } =
+      await import("./view");
+    expect(normalizeSportsDisplayConfig({}).tickerSlots).toBe(TICKER_SLOTS_DEFAULT);
+    expect(normalizeSportsDisplayConfig({ tickerSlots: 2.6 }).tickerSlots).toBe(3);
+    expect(normalizeSportsDisplayConfig({ tickerSlots: 0 }).tickerSlots).toBe(1);
+    expect(normalizeSportsDisplayConfig({ tickerSlots: 99 }).tickerSlots).toBe(TICKER_SLOTS_MAX);
+    expect(normalizeSportsDisplayConfig({ tickerSlots: "4" }).tickerSlots).toBe(TICKER_SLOTS_DEFAULT);
+  });
+});

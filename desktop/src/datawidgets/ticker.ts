@@ -23,6 +23,14 @@ import { scopeSourceData } from "../utils/widgetScope";
 export interface TickerChip {
   key: string;
   node: ReactNode;
+  /**
+   * Set when this chip is a rotating SLOT rather than a fixed item: the
+   * key stays, the content cycles. The ticker tags the wrapper with it
+   * and counts how many times the slot has left the viewport, and the
+   * source reads that count back out of `ctx.cycles` to decide what the
+   * slot shows this lap.
+   */
+  rotateSlot?: string;
 }
 
 /** Everything a source needs to build its chips. */
@@ -37,6 +45,13 @@ export interface TickerContext {
   widgetDisplay?: WidgetDisplayPrefs;
   /** Starred prediction markets, live across windows. */
   predictionsWatchlist: ReadonlySet<string>;
+  /**
+   * How many times each rotating slot has left the viewport, by slot key.
+   * A slot's content advances only when this changes, which is how a chip
+   * never swaps while someone is reading it. Absent from callers that do
+   * not scroll (the fantasy preview): nothing rotates there.
+   */
+  cycles?: Readonly<Record<string, number>>;
   onChipClick?: (
     widgetType: string,
     itemId: string | number,
