@@ -55,6 +55,17 @@ const TradeChip = memo(
             : "\u2212"
           : "";
 
+    // formatChange already signs the number ("+0.89%"), so the "sign"
+    // marker rendered a second one: "++0.89%" up, "−-0.55%" down. The
+    // marker and the sign are two spellings of one fact, so when the
+    // marker IS the sign, the number drops its own.
+    //
+    // Only that mode. "arrow" deliberately keeps both -- an arrow reads as
+    // direction and the sign as arithmetic, and that pairing is what ships
+    // today -- and "none" needs the sign because nothing else carries it.
+    const changeText =
+      directionMarker === "sign" ? changeStr.replace(/^[+−-]/, "") : changeStr;
+
     return (
       <button
         onClick={onClick}
@@ -87,7 +98,7 @@ const TradeChip = memo(
               )}
             >
               {marker}
-              {changeStr}
+              {changeText}
             </span>
           )}
         </div>

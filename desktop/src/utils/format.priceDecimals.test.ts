@@ -3,8 +3,7 @@ import {
   formatPrice,
   formatPriceBare,
   formatPriceChange,
-  priceDecimals,
-} from "./format";
+  priceDecimals, formatChange } from "./format";
 
 describe("priceDecimals", () => {
   it("uses cents at and above a dollar", () => {
@@ -71,5 +70,25 @@ describe("formatPriceChange", () => {
   it("does not flatten a real sub-dollar move to a penny", () => {
     // -0.0025 on a $0.13 coin is a ~1.8% day. "-$0.00" says nothing.
     expect(formatPriceChange(-0.0025)).toBe("-$0.0025");
+  });
+});
+
+describe("formatChange beside a direction marker", () => {
+  // The marker is a user preference (tickerDirectionMarker). formatChange
+  // signs its own output, so the "sign" marker rendered a SECOND one:
+  // "++0.89%" going up, "−-0.55%" going down. TradeChip now strips the
+  // number's sign in that mode only -- "arrow" deliberately keeps both.
+  it("signs its own output", () => {
+    expect(formatChange(0.89)).toBe("+0.89%");
+    expect(formatChange(-0.55)).toBe("-0.55%");
+    // Flat counts as up and still carries a "+".
+    expect(formatChange(0)).toBe("+0.00%");
+  });
+
+  it("leaves a sign the marker can strip, in either direction", () => {
+    const strip = (s: string) => s.replace(/^[+−-]/, "");
+    expect(strip(formatChange(0.89))).toBe("0.89%");
+    expect(strip(formatChange(-0.55))).toBe("0.55%");
+    expect(strip(formatChange(0))).toBe("0.00%");
   });
 });
