@@ -130,6 +130,7 @@ function UtilityShell({
           "col-start-1 row-span-full flex items-center border-r px-[9px]",
           "text-[10px] font-bold tracking-[0.08em]",
           c.divider,
+          c.tabBg,
           c.text,
         )}
       >

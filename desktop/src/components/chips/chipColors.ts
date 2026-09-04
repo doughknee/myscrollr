@@ -28,6 +28,13 @@ export interface ChipColors {
    * is what the game chip does with the league's brand.
    */
   divider: string;
+  /**
+   * Fill behind the chip's tab — the one place the widget's colour is
+   * PAINTED rather than whispered. The game chip introduced it for the
+   * league tab: with only a tinted border and a 6% ground, a branded chip
+   * looked no different from an unbranded one. Same 18% every chip uses.
+   */
+  tabBg: string;
 }
 
 const PRIMARY: ChipColors = {
@@ -38,6 +45,7 @@ const PRIMARY: ChipColors = {
   textDim: "text-primary/70",
   textFaint: "text-primary/55",
   divider: "border-primary/45",
+  tabBg: "bg-primary/[0.18]",
 };
 
 const SECONDARY: ChipColors = {
@@ -48,6 +56,7 @@ const SECONDARY: ChipColors = {
   textDim: "text-secondary/70",
   textFaint: "text-secondary/55",
   divider: "border-secondary/45",
+  tabBg: "bg-secondary/[0.18]",
 };
 
 const INFO: ChipColors = {
@@ -58,6 +67,7 @@ const INFO: ChipColors = {
   textDim: "text-info/70",
   textFaint: "text-info/55",
   divider: "border-info/45",
+  tabBg: "bg-info/[0.18]",
 };
 
 const PURPLE: ChipColors = {
@@ -68,6 +78,7 @@ const PURPLE: ChipColors = {
   textDim: "text-accent-purple/70",
   textFaint: "text-accent-purple/55",
   divider: "border-accent-purple/45",
+  tabBg: "bg-accent-purple/[0.18]",
 };
 
 const MUTED: ChipColors = {
@@ -78,6 +89,7 @@ const MUTED: ChipColors = {
   textDim: "text-fg-3",
   textFaint: "text-fg-3",
   divider: "border-fg-3/35",
+  tabBg: "bg-fg-3/[0.14]",
 };
 
 const PREDICTIONS: ChipColors = {
@@ -88,6 +100,7 @@ const PREDICTIONS: ChipColors = {
   textDim: "text-predictions/70",
   textFaint: "text-predictions/55",
   divider: "border-predictions/45",
+  tabBg: "bg-predictions/[0.18]",
 };
 
 // ── Widget color palettes ───────────────────────────────────────
@@ -100,6 +113,7 @@ const WIDGET_CLOCK: ChipColors = {
   textDim: "text-widget-clock/70",
   textFaint: "text-widget-clock/55",
   divider: "border-widget-clock/45",
+  tabBg: "bg-widget-clock/[0.18]",
 };
 
 const WIDGET_TIMER: ChipColors = {
@@ -110,6 +124,7 @@ const WIDGET_TIMER: ChipColors = {
   textDim: "text-widget-timer/70",
   textFaint: "text-widget-timer/55",
   divider: "border-widget-timer/45",
+  tabBg: "bg-widget-timer/[0.18]",
 };
 
 const WIDGET_WEATHER: ChipColors = {
@@ -120,6 +135,7 @@ const WIDGET_WEATHER: ChipColors = {
   textDim: "text-widget-weather/70",
   textFaint: "text-widget-weather/55",
   divider: "border-widget-weather/45",
+  tabBg: "bg-widget-weather/[0.18]",
 };
 
 const WIDGET_SYSMON: ChipColors = {
@@ -130,6 +146,7 @@ const WIDGET_SYSMON: ChipColors = {
   textDim: "text-widget-sysmon/70",
   textFaint: "text-widget-sysmon/55",
   divider: "border-widget-sysmon/45",
+  tabBg: "bg-widget-sysmon/[0.18]",
 };
 
 const WIDGET_UPTIME: ChipColors = {
@@ -140,6 +157,7 @@ const WIDGET_UPTIME: ChipColors = {
   textDim: "text-widget-uptime/70",
   textFaint: "text-widget-uptime/55",
   divider: "border-widget-uptime/45",
+  tabBg: "bg-widget-uptime/[0.18]",
 };
 
 const WIDGET_GITHUB: ChipColors = {
@@ -150,6 +168,7 @@ const WIDGET_GITHUB: ChipColors = {
   textDim: "text-widget-github/70",
   textFaint: "text-widget-github/55",
   divider: "border-widget-github/45",
+  tabBg: "bg-widget-github/[0.18]",
 };
 
 // ── Widget id → color mapping (data + utility alike) ────────────
