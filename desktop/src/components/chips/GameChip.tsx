@@ -104,6 +104,20 @@ const GameChip = memo(
     const scoreText = (v: number | string) =>
       pre_ || v === null || v === "" ? "" : String(v);
 
+    // The clock scales to its length: "FT" and "Q4" get 16px, "78'" 15px,
+    // "3h05" 13px, "Sep 26" 12px, "Q4 2:14" the base 11px. Short strings
+    // were lost in a box sized for the long ones. Safe for the no-shift
+    // contract because the WIDTH is reserved on the outer span at the base
+    // size -- `ch` follows its own element's font -- so the box is 7ch of
+    // 11px whatever the inner text is set at.
+    const statusText = gameStatusCompact(game);
+    const statusSize =
+      statusText.length <= 2 ? "text-[16px]"
+        : statusText.length <= 3 ? "text-[15px]"
+          : statusText.length <= 4 ? "text-[13px]"
+            : statusText.length <= 6 ? "text-[12px]"
+              : "text-[11px]";
+
     // ── Cells ─────────────────────────────────────────────────
 
     const top = (side: "away" | "home", logo: string, name: string, score: number | string, leads: boolean) => (
@@ -262,7 +276,9 @@ const GameChip = memo(
               className={clsx("h-[5px] w-[5px] shrink-0 rounded-full bg-live", !live && "invisible")}
             />
             <span className="inline-block text-center" style={{ minWidth: `${r.status}ch` }}>
-              {gameStatusCompact(game)}
+              <span data-testid="status-text" className={clsx("leading-none", statusSize)}>
+                {statusText}
+              </span>
             </span>
             {/* Mirror of the dot's slot, never visible: the dot reserves
                 space on the left, so without this the text sat ~4px right

@@ -139,6 +139,26 @@ describe("GameChip", () => {
     expect((container.querySelector("button") as HTMLButtonElement).style.getPropertyValue("--accent")).toBe("");
   });
 
+  it("scales the clock to its length without touching the reserved width", () => {
+    const { rerender } = render(<GameChip game={game()} />); // final -> "FT"
+    const short = screen.getByTestId("status-text");
+    expect(short.textContent).toBe("FT");
+    expect(short.className).toContain("text-[16px]");
+    // The box that holds the width is the parent, still at 7ch.
+    expect((short.parentElement as HTMLElement).style.minWidth).toBe("7ch");
+
+    // Twenty days out renders as a date ("Sep 24"): six characters.
+    rerender(
+      <GameChip
+        game={game({ state: "pre", status_short: "NS", start_time: new Date(Date.now() + 20 * 86_400_000).toISOString() })}
+      />,
+    );
+    const long = screen.getByTestId("status-text");
+    expect(long.textContent?.length).toBeGreaterThanOrEqual(5);
+    expect(long.className).toContain("text-[12px]");
+    expect((long.parentElement as HTMLElement).style.minWidth).toBe("7ch");
+  });
+
   it("writes a soccer record as W-D-L with points, not a differential", () => {
     render(
       <GameChip
