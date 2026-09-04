@@ -17,6 +17,7 @@ import {
   metricText,
 } from "../../utils/sportsChipLayout";
 import { useScoreFlash } from "../../hooks/useScoreFlash";
+import { liftForTint } from "../../utils/chipAccent";
 import { getChipColors, chipShellClasses } from "./chipColors";
 import TeamLogo from "../TeamLogo";
 import type { Game, TeamStanding } from "../../types";
@@ -75,7 +76,8 @@ const GameChip = memo(
     // only known at runtime. Tailwind cannot mint a class per hex, and a
     // variable keeps hover in CSS where it belongs.
     const branded = colorMode === "widget" && !!accent;
-    const accentStyle = branded ? ({ "--accent": accent } as React.CSSProperties) : undefined;
+    // Lifted, not raw: a navy brand tints invisibly on this surface.
+    const accentStyle = branded ? ({ "--accent": liftForTint(accent) } as React.CSSProperties) : undefined;
     const live = isLive(game);
     const close = live && isCloseGame(game);
     const final_ = isFinal(game);
@@ -202,7 +204,17 @@ const GameChip = memo(
           flash && "bg-live/20",
         )}
       >
-        <span className={clsx("col-start-1 row-span-full flex items-center border-r px-[9px]", rule)}>
+        {/* The league tab is where the colour is SEEN. A tinted border and a
+            6% fill are the recipe every chip shares, and by design they
+            whisper; without one place the brand is painted properly, a
+            branded chip looked no different from the old red one. */}
+        <span
+          className={clsx(
+            "col-start-1 row-span-full flex items-center border-r px-[9px]",
+            rule,
+            branded && "bg-[color-mix(in_srgb,var(--accent)_18%,transparent)]",
+          )}
+        >
           <span
             className={clsx(
               "text-[10px] font-bold tracking-[0.08em]",
