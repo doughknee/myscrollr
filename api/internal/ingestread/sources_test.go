@@ -90,3 +90,31 @@ func TestProbeIngestion_EmptyURLIsNoOp(t *testing.T) {
 		t.Errorf("probeIngestion(''): got %d, want 0", code)
 	}
 }
+
+// TestDispatchLifecycle_InvalidatesOnEveryEvent pins the fix for the
+// "added MLS, widget stayed empty" bug: the per-user cache key is keyed
+// by USER, not by widget, so a "created" event has a stale cache to drop
+// whenever the user already had another widget from the same source.
+// Excluding "created" left cache:sports:<sub> holding the pre-add league
+// set for its full TTL, which is exactly the window the desktop refetches
+// in after POST /users/me/widgets returns.
+func TestDispatchLifecycle_InvalidatesOnEveryEvent(t *testing.T) {
+	const name = "test_lifecycle_source"
+	var got []string
+	LocalSources[name] = localSource{
+		invalidateUser: func(userSub string) { got = append(got, userSub) },
+	}
+	t.Cleanup(func() { delete(LocalSources, name) })
+
+	for _, event := range []string{"created", "updated", "deleted"} {
+		got = nil
+		if !DispatchLifecycle(name, event, "user_1", nil, nil, nil) {
+			t.Fatalf("DispatchLifecycle(%q) reported the source as non-local", event)
+		}
+		if len(got) != 1 {
+			t.Errorf("event %q invalidated %d times; want exactly 1 — a missed "+
+				"invalidation serves the pre-change cache to the refetch that "+
+				"follows the write", event, len(got))
+		}
+	}
+}

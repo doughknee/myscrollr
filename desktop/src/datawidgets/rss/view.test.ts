@@ -5,6 +5,9 @@ import {
   selectRssForTicker,
   distinctSourceCount,
   filterByArticleAge,
+  TICKER_RSS_HOURS,
+  TICKER_RSS_PER_FEED,
+  TICKER_RSS_FLOOR_HOURS,
 } from "./view";
 import type { RssItem } from "../../types";
 import type { RssDisplayPrefs } from "../../preferences";
@@ -30,6 +33,11 @@ function mk(
     updated_at: "2026-01-01T00:00:00Z",
   };
 }
+
+// One hour after the fixtures' default published_at. The ticker selector
+// now applies a freshness horizon, so tests of its OTHER rules must ask
+// about a moment when the fixtures are fresh.
+const FIXTURE_NOW = new Date("2026-01-01T01:00:00Z").getTime();
 
 const DEFAULT_PREFS: RssDisplayPrefs = {
   feedSort: "newest",
@@ -314,20 +322,20 @@ describe("selectRssForTicker", () => {
       mk(3, "a"),
       mk(4, "b"),
     ];
-    const result = selectRssForTicker(items, { ...DEFAULT_PREFS, articlesPerSource: 2 });
+    const result = selectRssForTicker(items, { ...DEFAULT_PREFS, articlesPerSource: 2 }, FIXTURE_NOW);
     expect(result).toHaveLength(3);
     expect(result.filter((i) => i.source_name === "a")).toHaveLength(2);
   });
 
   it("returns all items when articlesPerSource is 0", () => {
     const items = [mk(1, "a"), mk(2, "a"), mk(3, "b")];
-    const result = selectRssForTicker(items, { ...DEFAULT_PREFS, articlesPerSource: 0 });
+    const result = selectRssForTicker(items, { ...DEFAULT_PREFS, articlesPerSource: 0 }, FIXTURE_NOW);
     expect(result).toHaveLength(3);
   });
 
   it("preserves input (newest-first) order", () => {
     const items = [mk(1, "a"), mk(2, "b"), mk(3, "a")];
-    const result = selectRssForTicker(items, { ...DEFAULT_PREFS, articlesPerSource: 10 });
+    const result = selectRssForTicker(items, { ...DEFAULT_PREFS, articlesPerSource: 10 }, FIXTURE_NOW);
     expect(result.map((i) => i.id)).toEqual([1, 2, 3]);
   });
 });
@@ -345,12 +353,12 @@ describe("single-source smart removal (v1.1.1)", () => {
 
   it("ticker: a single-outlet widget shows its whole feed despite a cap", () => {
     const items = [mk(1, "bbc"), mk(2, "bbc"), mk(3, "bbc"), mk(4, "bbc")];
-    expect(selectRssForTicker(items, capped)).toHaveLength(4);
+    expect(selectRssForTicker(items, capped, FIXTURE_NOW)).toHaveLength(4);
   });
 
   it("ticker: multi-source payloads still balance per source", () => {
     const items = [mk(1, "a"), mk(2, "a"), mk(3, "a"), mk(4, "b")];
-    const result = selectRssForTicker(items, capped);
+    const result = selectRssForTicker(items, capped, FIXTURE_NOW);
     expect(result.filter((i) => i.source_name === "a")).toHaveLength(2);
     expect(result.filter((i) => i.source_name === "b")).toHaveLength(1);
   });
@@ -376,5 +384,78 @@ describe("single-source smart removal (v1.1.1)", () => {
     expect(visibleItems).toHaveLength(3);
     expect(totalHidden).toBe(1);
     expect(overflowCounts.get("a")).toBe(1);
+  });
+});
+
+
+// ── Ticker horizon ──────────────────────────────────────────────
+//
+// A per-feed news widget put every article in its window on the rail, and
+// the default window is unlimited. A Yahoo Sports widget was 297 chips.
+
+describe("selectRssForTicker horizon", () => {
+  const NOW_T = new Date("2026-09-04T12:00:00Z").getTime();
+  const ago = (h: number) => new Date(NOW_T - h * 3_600_000).toISOString();
+  const feed = "https://sports.yahoo.com/rss/";
+
+  it("keeps only the newest few from the last few hours of a busy feed", () => {
+    const items = Array.from({ length: 40 }, (_, i) => mk(i + 1, "yahoo", ago(i * 0.25), feed)); // one every 15 min
+    const out = selectRssForTicker(items, DEFAULT_PREFS, NOW_T);
+    expect(out).toHaveLength(TICKER_RSS_PER_FEED);
+    expect(out.map((i) => i.id)).toEqual([1, 2, 3, 4, 5]); // the newest, in order
+  });
+
+  it("drops what is older than the window", () => {
+    const items = [mk(1, "a", ago(1), feed), mk(2, "a", ago(TICKER_RSS_HOURS + 1), feed)];
+    expect(selectRssForTicker(items, DEFAULT_PREFS, NOW_T).map((i) => i.id)).toEqual([1]);
+  });
+
+  it("stands the newest item in for a quiet feed", () => {
+    const items = [mk(1, "a", ago(30), feed), mk(2, "a", ago(50), feed)];
+    expect(selectRssForTicker(items, DEFAULT_PREFS, NOW_T).map((i) => i.id)).toEqual([1]);
+  });
+
+  it("drops a dead feed rather than floor it: nothing older than 48h", () => {
+    const items = [mk(1, "a", ago(TICKER_RSS_FLOOR_HOURS + 1), feed), mk(2, "a", ago(90), feed)];
+    expect(selectRssForTicker(items, DEFAULT_PREFS, NOW_T)).toEqual([]);
+  });
+
+  it("floors an item with no readable date, having no reason to call it old", () => {
+    const items = [{ ...mk(1, "a", "not-a-date", feed), created_at: "also-bad" }];
+    expect(selectRssForTicker(items, DEFAULT_PREFS, NOW_T).map((i) => i.id)).toEqual([1]);
+  });
+
+  it("takes the widget's own Show N as the per-feed cap", () => {
+    const items = Array.from({ length: 9 }, (_, i) => mk(i + 1, "a", ago(i * 0.25), feed));
+    const out = selectRssForTicker(items, { ...DEFAULT_PREFS, maxArticles: 2 }, NOW_T);
+    expect(out.map((i) => i.id)).toEqual([1, 2]);
+  });
+
+  it("falls back to the default cap when Show is set to All", () => {
+    const items = Array.from({ length: 9 }, (_, i) => mk(i + 1, "a", ago(i * 0.25), feed));
+    const out = selectRssForTicker(items, { ...DEFAULT_PREFS, maxArticles: 0 }, NOW_T);
+    expect(out).toHaveLength(TICKER_RSS_PER_FEED);
+  });
+
+  it("spends Show N per feed, so the loudest wire cannot take it all", () => {
+    const a = "https://a.example.com/feed", b = "https://b.example.com/feed";
+    const items = [
+      ...Array.from({ length: 6 }, (_, i) => mk(100 + i, "a", ago(i * 0.1), a)),
+      mk(1, "b", ago(2), b),
+    ];
+    const out = selectRssForTicker(items, { ...DEFAULT_PREFS, maxArticles: 2, articlesPerSource: 0 }, NOW_T);
+    expect(out.filter((i) => i.feed_url === a)).toHaveLength(2);
+    expect(out.filter((i) => i.feed_url === b)).toHaveLength(1);
+  });
+
+  it("applies per feed, so one wire cannot crowd out another", () => {
+    const a = "https://a.example.com/feed", b = "https://b.example.com/feed";
+    const items = [
+      ...Array.from({ length: 10 }, (_, i) => mk(100 + i, "a", ago(i * 0.1), a)),
+      mk(1, "b", ago(2), b),
+    ];
+    const out = selectRssForTicker(items, { ...DEFAULT_PREFS, articlesPerSource: 0 }, NOW_T);
+    expect(out.filter((i) => i.feed_url === a)).toHaveLength(TICKER_RSS_PER_FEED);
+    expect(out.filter((i) => i.feed_url === b)).toHaveLength(1);
   });
 });

@@ -196,10 +196,39 @@ export const NUM_WIDTH = {
 // ── Shared chip base classes ────────────────────────────────────
 // Common className construction used by all ticker chip components.
 
+/**
+ * The part of a chip every chip shares -- colours, border, hover, the
+ * overflow/positioning contract -- and nothing about its size or layout.
+ *
+ * chipBaseClasses adds the fixed 264px box and a flex layout on top. The
+ * sports chip is content-sized and lays itself out as a grid, so it takes
+ * only this and owns the rest; it still hovers, clips and colours like
+ * every other chip on the rail.
+ */
+export function chipShellClasses(colors: ChipColors, extra?: string): string {
+  return clsx(
+    "ticker-chip group",
+    "rounded-sm border",
+    "transition-colors cursor-pointer",
+    "relative overflow-hidden",
+    "shrink-0",
+    colors.bg,
+    colors.border,
+    colors.hoverBorder,
+    extra,
+  );
+}
+
 export function chipBaseClasses(
   comfort: boolean | undefined,
   colors: ChipColors,
   extra?: string,
+  // Comfort chips stack their two rows by default. A chip whose comfort
+  // layout is columns side by side (the game chip: two scoreboard rows beside
+  // a status column) passes "row" — appending a flex-direction class to
+  // `extra` would not reliably win, since Tailwind utilities resolve by
+  // stylesheet order rather than by position in the class string.
+  comfortDirection: "col" | "row" = "col",
 ): string {
   return clsx(
     "ticker-chip group",
@@ -212,11 +241,24 @@ export function chipBaseClasses(
     // Chips never compress on the rail — a squeezed chip is unreadable
     // and the marquee has infinite horizontal room anyway.
     "shrink-0",
+    // One size per mode, for every chip type.
+    //
+    // Chips used to be content-sized, so a four-letter symbol produced a
+    // narrower chip than a headline and the rail looked ragged. Each chip's
+    // flexible element (the sparkline on a trade chip, the headline on an
+    // RSS one) absorbs the difference instead, which is what the fixed box
+    // needs in order to hold varying content without clipping.
+    //
+    // Height is fixed for comfort only: compact chips are single-row and
+    // already share a height.
+    "w-[264px]",
     colors.bg,
     colors.border,
     colors.hoverBorder,
     comfort
-      ? "flex flex-col items-start py-1.5 gap-0.5"
+      ? comfortDirection === "row"
+        ? "flex h-[52px] items-stretch py-1.5"
+        : "flex h-[52px] flex-col items-start justify-between py-1.5"
       : "flex items-center gap-2 py-1 text-ui-body",
     extra,
   );

@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import RouteError from "../components/RouteError";
+import SportsEmptyState from "../datawidgets/sports/EmptyState";
+import type { LeagueMeta } from "../api/queries";
 import { WidgetBar } from "../components/widget-bar/Bar";
 import SectionNav from "../components/layout/SectionNav";
 import PageLayout from "../components/layout/PageLayout";
@@ -456,6 +458,13 @@ function ScoresCard({
   items: Resolved[];
   openWidget: (id: string) => void;
 }) {
+  // Read straight from the shell rather than threading a prop down: the
+  // layout component in between has no other reason to know about sports.
+  const { dashboard } = useShellData();
+  const leagueMeta =
+    ((dashboard?.data as Record<string, unknown> | undefined)?.sports_meta as
+      | { leagues?: LeagueMeta[] }
+      | undefined)?.leagues ?? [];
   // Merged for reading, but each row still knows which widget owns it.
   const rows = items
     .flatMap((r) =>
@@ -478,7 +487,8 @@ function ScoresCard({
       }))}
     >
       {rows.length === 0 ? (
-        <EmptyBody>No games right now.</EmptyBody>
+        // Same reasoning as the widget page: say WHY it is quiet.
+        <SportsEmptyState leagues={leagueMeta} />
       ) : (
         rows.map(({ g, id, tag }, i) => (
           <button

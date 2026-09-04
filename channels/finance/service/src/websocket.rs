@@ -7,7 +7,7 @@ use tokio_tungstenite::{
     tungstenite::protocol::{Message, WebSocketConfig},
 };
 use futures_util::{SinkExt, StreamExt, stream::{self, SplitSink, SplitStream}};
-use crate::{database::{PgPool, DatabaseTradeData, Utc, get_trades, insert_symbol, update_previous_close, update_trade}, log::{error, info, warn}};
+use crate::{database::{PgPool, DatabaseTradeData, Utc, get_trades, insert_symbol, update_previous_close, update_trade, widen_day_range}, log::{error, info, warn}};
 
 /// Maximum WebSocket message / frame size we will accept from TwelveData.
 /// The real feed sends ~200 byte price events; anything larger is either a
@@ -494,6 +494,12 @@ async fn process_single_trade(trade: TradeData, trades_map: Arc<HashMap<String, 
         direction,
         day_volume,
     ).await;
+
+    // Keep the session range honest. The quote that seeds day_low/day_high
+    // is fetched once a day, so without this the stored range is yesterday's
+    // for the whole of the next session and the rail's marker clamps to one
+    // end and never moves.
+    let _ = widen_day_range(Arc::clone(&pool), symbol.clone(), current_price).await;
 
     Ok(())
 }

@@ -108,6 +108,30 @@ pub async fn seed_tracked_symbols(pool: Arc<PgPool>, symbols: Vec<crate::types::
     Ok(())
 }
 
+/// Disable tracked symbols that are no longer in the seed config.
+///
+/// `seed_tracked_symbols` only inserts and updates, so a symbol removed from
+/// subscriptions.json lingers in every existing database forever. DAI/USD and
+/// TON/USD sat there for six weeks showing $0.00 because TwelveData does not
+/// carry either pair — a symbol search returns DAI/CAD and TONE/USD, both
+/// different instruments — so no quote ever arrived to overwrite the zero.
+///
+/// Disabled rather than deleted: the row carries a user-visible name and
+/// category, and a provider adding a pair later should be a config change
+/// rather than a resurrection. Mirrors disable_stale_leagues in the sports
+/// service.
+pub async fn disable_unlisted_symbols(pool: Arc<PgPool>, active: &[String]) -> Result<()> {
+    // An empty config almost certainly means a failed read, not "disable
+    // everything". Refuse rather than blank the catalog.
+    if active.is_empty() {
+        return Ok(());
+    }
+    let statement = "UPDATE tracked_symbols SET is_enabled = false          WHERE symbol != ALL($1) AND is_enabled = true";
+    let mut connection = pool.acquire().await?;
+    query(statement).bind(active).execute(&mut *connection).await?;
+    Ok(())
+}
+
 pub async fn insert_symbol(pool: Arc<PgPool>, symbol: String) -> Result<()> {
     let statement = "INSERT INTO trades (symbol, price, previous_close, price_change, percentage_change, direction) VALUES ($1, 0, 0, 0, 0, 'flat') ON CONFLICT (symbol) DO NOTHING";
     let mut connection = pool.acquire().await?;
@@ -119,6 +143,53 @@ pub async fn update_previous_close(pool: Arc<PgPool>, symbol: String, prev_close
     let statement = "UPDATE trades SET previous_close = $1 WHERE symbol = $2";
     let mut connection = pool.acquire().await?;
     query(statement).bind(prev_close).bind(symbol).execute(&mut *connection).await?;
+    Ok(())
+}
+
+/// Store the intraday close series behind the chip sparkline.
+///
+/// Written whole, read whole. An empty series is skipped rather than stored
+/// as `[]`: a symbol TwelveData has no bars for should keep whatever it had
+/// yesterday instead of having its line blanked on a bad fetch.
+pub async fn update_sparkline(pool: Arc<PgPool>, symbol: String, points: Vec<f64>) -> Result<()> {
+    if points.is_empty() {
+        return Ok(());
+    }
+    let statement = "UPDATE trades SET sparkline = $1 WHERE symbol = $2";
+    let mut connection = pool.acquire().await?;
+    let encoded = serde_json::to_value(&points)?;
+    query(statement).bind(encoded).bind(symbol).execute(&mut *connection).await?;
+    Ok(())
+}
+
+/// Seed the session range from a quote — authoritative, replaces what is there.
+///
+/// Only stores a sane pair. A zero or inverted range would make the rail's
+/// denominator zero or negative and pin the marker to an end of the track.
+pub async fn update_day_range(pool: Arc<PgPool>, symbol: String, low: f64, high: f64) -> Result<()> {
+    if !(low > 0.0 && high > low) {
+        return Ok(());
+    }
+    let statement = "UPDATE trades SET day_low = $1, day_high = $2 WHERE symbol = $3";
+    let mut connection = pool.acquire().await?;
+    query(statement).bind(low).bind(high).bind(symbol).execute(&mut *connection).await?;
+    Ok(())
+}
+
+/// Widen the stored range to include a live price.
+///
+/// The quote that seeds the range is fetched once a day, so without this the
+/// stored range is yesterday's for the whole of the next session and every
+/// price sits outside it — the marker would clamp to one end and never move.
+/// LEAST/GREATEST over COALESCE also handles the first tick for a symbol that
+/// has no range yet.
+pub async fn widen_day_range(pool: Arc<PgPool>, symbol: String, price: f64) -> Result<()> {
+    if price <= 0.0 {
+        return Ok(());
+    }
+    let statement = "UPDATE trades SET          day_low  = LEAST(COALESCE(day_low, $1), $1),          day_high = GREATEST(COALESCE(day_high, $1), $1)          WHERE symbol = $2";
+    let mut connection = pool.acquire().await?;
+    query(statement).bind(price).bind(symbol).execute(&mut *connection).await?;
     Ok(())
 }
 

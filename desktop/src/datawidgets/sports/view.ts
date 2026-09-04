@@ -32,11 +32,29 @@ export interface SportsDisplayConfig {
 export const SPORTS_WINDOW_DEFAULTS = { daysBack: 1, daysAhead: 7 } as const;
 
 /**
- * Hard ceiling for both steppers — the server only retains games ±7 days
- * (cleanup_old_games in the sports service), so offering more would show
- * windows with no data in them.
+ * Hard ceiling looking BACK. cleanup_old_games (sports service) deletes
+ * finals and postponements older than 7 days, so a wider back window can
+ * only ever show emptiness.
  */
 export const SPORTS_WINDOW_MAX_DAYS = 7;
+
+/**
+ * Hard ceiling looking AHEAD, and deliberately not the same number.
+ *
+ * The retention job prunes only the PAST -- forward fixtures are never
+ * deleted, so the server holds a full season of them (F1 through
+ * December, ~135 upcoming MLB games). Capping both directions at 7 was
+ * therefore right on one side and wrong on the other, and the wrong side
+ * broke every league that does not play weekly: with races 1-3 weeks
+ * apart, an F1 user whose next race was 9 days out had NO setting -- not
+ * even "Everything" -- that could show it. The Scores tab was
+ * permanently empty and the widget looked broken.
+ *
+ * A year is effectively unbounded against what the server stores, which
+ * is what "Everything" should mean. It stays a finite clamp so a corrupt
+ * stored config cannot produce an infinite window.
+ */
+export const SPORTS_WINDOW_MAX_DAYS_AHEAD = 365;
 
 const DAY_MS = 86_400_000;
 
@@ -67,9 +85,9 @@ function inDayWindow(
   return t >= lower && t < upper;
 }
 
-function clampWindowDays(v: unknown, fallback: number): number {
+function clampWindowDays(v: unknown, fallback: number, max: number): number {
   return typeof v === "number" && Number.isFinite(v)
-    ? Math.min(SPORTS_WINDOW_MAX_DAYS, Math.max(0, Math.round(v)))
+    ? Math.min(max, Math.max(0, Math.round(v)))
     : fallback;
 }
 
@@ -125,13 +143,100 @@ export function selectSportsForTicker(
   config: SportsDisplayConfig | null | undefined,
   now: number = Date.now(),
 ): Game[] {
+  return sortForDisplay(onTicker(withinDayWindow(games, config, now), now));
+}
+
+/**
+ * How long before kickoff an upcoming game earns a ticker slot.
+ *
+ * The ticker used to show every game in the widget's day window, which is
+ * up to a week: three league widgets produced 38 chips, 30 of them from
+ * MLS, none of them live. The bar became a fixture list. A horizon rather
+ * than a fixed count because it is a rule that can be stated -- "what is
+ * on soon" -- and it breathes: a busy Saturday fills the bar and a quiet
+ * Tuesday nearly empties it, where a fixed count pads a quiet day with
+ * games nobody is thinking about yet.
+ *
+ * 24h is the line where the chip stops reading as a countdown ("3h05")
+ * and starts reading as a date ("1d"), which is also roughly where a
+ * fixture stops being something you are about to watch.
+ */
+export const TICKER_UPCOMING_HOURS = 24;
+
+/**
+ * How long a finished game keeps its slot, measured from KICKOFF (not the
+ * final whistle -- nothing records that; `updated_at` is the ingester's
+ * write time and `make seed` deliberately does not rebase it).
+ *
+ * 18h so last night's results are still there over breakfast, which is
+ * most of the value a final has on a glanceable bar.
+ */
+export const TICKER_FINAL_HOURS = 18;
+
+/**
+ * How far ahead the floor below will reach for a league's next fixture.
+ *
+ * The floor exists so a league you follow is never absent from the bar.
+ * Left unbounded it also surfaced fixtures a month out, which sat beside
+ * a 19h chip reading as an arbitrary date rather than as "this is all
+ * this league has". A week is the compromise: F1 and Champions League
+ * appear in the run-up to a fixture, and a league between seasons stays
+ * off the bar entirely rather than advertising a date nobody is thinking
+ * about yet.
+ */
+export const TICKER_FLOOR_DAYS = 7;
+
+/**
+ * The ticker's own tightening of the widget's day window.
+ *
+ * Live games always pass. Everything else has to be near enough in time to
+ * be worth a slot on a bar you glance at.
+ *
+ * The floor matters as much as the horizon: if a league contributes
+ * NOTHING, its single soonest fixture is admitted anyway, provided it is
+ * within TICKER_FLOOR_DAYS. Without the floor, following Formula 1 --
+ * races one to three weeks apart -- would mean an empty bar 13 days in
+ * 14, and a widget you deliberately added would silently show nothing at
+ * all. Without the cap, it reached a month out and the chip read as an
+ * arbitrary date rather than as the league's only news.
+ */
+function onTicker(games: Game[], now: number): Game[] {
+  const kept = games.filter((g) => {
+    if (isLive(g)) return true;
+    const t = new Date(g.start_time).getTime();
+    if (!Number.isFinite(t)) return true; // same defensive stance as inDayWindow
+    const hours = (t - now) / 3_600_000;
+    return g.state === "final"
+      ? hours >= -TICKER_FINAL_HOURS
+      : hours >= 0 && hours <= TICKER_UPCOMING_HOURS;
+  });
+  if (kept.length > 0) return kept;
+
+  const floorLimit = now + TICKER_FLOOR_DAYS * 86_400_000;
+  const soonest = games
+    .filter((g) => {
+      if (g.state !== "pre") return false;
+      const t = new Date(g.start_time).getTime();
+      return t > now && t <= floorLimit;
+    })
+    .sort((a, b) => +new Date(a.start_time) - +new Date(b.start_time))[0];
+  return soonest ? [soonest] : [];
+}
+
+/** The day-window filter, shared by the ticker and the feed. */
+function withinDayWindow(
+  games: Game[],
+  config: SportsDisplayConfig | null | undefined,
+  now: number,
+): Game[] {
   const cfg = config ?? {};
   const daysBack = cfg.daysBack ?? SPORTS_WINDOW_DEFAULTS.daysBack;
   const daysAhead = cfg.daysAhead ?? SPORTS_WINDOW_DEFAULTS.daysAhead;
+  return games.filter((g) => inDayWindow(g, daysBack, daysAhead, now));
+}
 
-  const filtered = games.filter((g) => inDayWindow(g, daysBack, daysAhead, now));
-
-  return filtered.sort((a, b) => {
+function sortForDisplay(games: Game[]): Game[] {
+  return games.sort((a, b) => {
     const eDiff = gameEngagement(b) - gameEngagement(a);
     if (eDiff !== 0) return eDiff;
     // Same engagement bucket — break ties by start_time. Finals sort
@@ -153,7 +258,10 @@ export function selectSportsForFeed(
   favoriteTeams: ReadonlySet<string>,
   now: number = Date.now(),
 ): Game[] {
-  return selectSportsForTicker(games, config, now).sort((a, b) => {
+  // Deliberately NOT selectSportsForTicker: the ticker's near-term horizon
+  // is a rule about a glanceable bar. The widget page is where you go to
+  // read the whole slate, so it keeps everything the day window allows.
+  return sortForDisplay(withinDayWindow(games, config, now)).sort((a, b) => {
     const aFavorite =
       favoriteTeams.has(a.home_team_name) || favoriteTeams.has(a.away_team_name);
     const bFavorite =
@@ -204,10 +312,12 @@ export function normalizeSportsDisplayConfig(
     daysBack: clampWindowDays(
       obj.daysBack,
       legacyFinal === "off" ? 0 : SPORTS_WINDOW_DEFAULTS.daysBack,
+      SPORTS_WINDOW_MAX_DAYS,
     ),
     daysAhead: clampWindowDays(
       obj.daysAhead,
       legacyUpcoming === "off" ? 0 : SPORTS_WINDOW_DEFAULTS.daysAhead,
+      SPORTS_WINDOW_MAX_DAYS_AHEAD,
     ),
   };
 }

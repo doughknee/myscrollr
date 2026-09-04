@@ -30,6 +30,23 @@ const (
 	// caches. Must stay in sync with widgetUserCacheKeys (redis.go).
 	CacheKeySportsPrefix = "cache:sports:"
 
+	// CacheKeySportsDashPrefix is the same, for the DASHBOARD payload.
+	//
+	// It has to be a separate key. Two producers cache a per-user
+	// SportsResponse and they do not agree on what it holds:
+	// handleGetSports (the full widget page) asks for DefaultSportsLimit
+	// with fair-share OFF -- every game for every selected league --
+	// while sportsDashboard asks for DashboardSportsLimit with it ON, a
+	// per-league preview. Sharing one key meant whichever ran first won
+	// for the next 10 seconds and the other served a payload built to
+	// the wrong contract. The widget page, whose entire job is to show
+	// everything and let the user filter, was the loser: a Formula 1
+	// page would get the dashboard's ~10-per-league slice of a 13-race
+	// season. The dashboard lost the other way, silently dropping its
+	// fair-share guarantee whenever the widget page had cached first.
+	// Must stay in sync with widgetUserCacheKeys (redis.go).
+	CacheKeySportsDashPrefix = "cache:sports:dash:"
+
 	// CacheKeySportsCatalog is the Redis key for the cached league catalog.
 	CacheKeySportsCatalog = "cache:sports:catalog"
 
@@ -92,7 +109,55 @@ type Game struct {
 	Timer          string    `json:"timer,omitempty"`
 	Venue          string    `json:"venue,omitempty"`
 	Season         string    `json:"season,omitempty"`
+	// Current-season table row for each side, when the league keeps one.
+	// Attached on every games read so the desktop's detailed chip -- rank,
+	// record, differential or points under each team -- costs no second
+	// request and can never disagree with the score beside it. Nil for
+	// UFC and Formula 1, which have no table.
+	HomeStanding *TeamStanding `json:"home_standing,omitempty"`
+	AwayStanding *TeamStanding `json:"away_standing,omitempty"`
 }
+
+// TeamStanding is one side's line in the current-season standings.
+type TeamStanding struct {
+	Rank          int `json:"rank"`
+	Wins          int `json:"wins"`
+	Losses        int `json:"losses"`
+	Draws         int `json:"draws"`
+	Points        int `json:"points"`
+	GoalDiff      int `json:"goal_diff"`
+	PointsFor     int `json:"points_for"`
+	PointsAgainst int `json:"points_against"`
+	OTL           int `json:"otl"`
+}
+
+// standingsJoin attaches each side's current-season standings row to a
+// games query. `g` must be the alias of the games-shaped relation.
+//
+// LATERAL rather than a plain LEFT JOIN so the season filter is applied per
+// row -- the standings table keeps last season beside this one, and a bare
+// join on (league, team_name) doubled every game. Lexical max(season) is
+// exact for every league's format (see handleGetStandings).
+const standingsJoin = `
+		LEFT JOIN LATERAL (
+			SELECT rank, wins, losses, draws, points, goal_diff, points_for, points_against, otl
+			FROM standings s
+			WHERE s.league = g.league AND s.team_name = g.home_team_name
+			  AND s.season = (SELECT max(season) FROM standings s2 WHERE s2.league = g.league)
+			LIMIT 1
+		) hs ON TRUE
+		LEFT JOIN LATERAL (
+			SELECT rank, wins, losses, draws, points, goal_diff, points_for, points_against, otl
+			FROM standings s
+			WHERE s.league = g.league AND s.team_name = g.away_team_name
+			  AND s.season = (SELECT max(season) FROM standings s2 WHERE s2.league = g.league)
+			LIMIT 1
+		) aw ON TRUE`
+
+// standingsColumns is the SELECT tail that pairs with standingsJoin.
+const standingsColumns = `,
+			hs.rank, hs.wins, hs.losses, hs.draws, hs.points, hs.goal_diff, hs.points_for, hs.points_against, hs.otl,
+			aw.rank, aw.wins, aw.losses, aw.draws, aw.points, aw.goal_diff, aw.points_for, aw.points_against, aw.otl`
 
 // TrackedLeague represents a league entry from the catalog, enriched with
 // current game activity counts and polling-health for the dashboard league browser.
@@ -297,6 +362,7 @@ func loadLeagueStatus(ctx context.Context, names []string) (map[string]leagueSta
 			       COUNT(*) FILTER (WHERE state = 'in') AS live_count,
 			       MIN(start_time) FILTER (WHERE state = 'pre') AS next_game
 			FROM games
+			WHERE ` + notStaleUpcoming + `
 			GROUP BY league`)
 	} else {
 		rows, err = platform.DBPool.Query(ctx, `
@@ -305,7 +371,7 @@ func loadLeagueStatus(ctx context.Context, names []string) (map[string]leagueSta
 			       COUNT(*) FILTER (WHERE state = 'in') AS live_count,
 			       MIN(start_time) FILTER (WHERE state = 'pre') AS next_game
 			FROM games
-			WHERE league = ANY($1)
+			WHERE league = ANY($1) AND ` + notStaleUpcoming + `
 			GROUP BY league`, names)
 	}
 	if err != nil {
@@ -500,7 +566,7 @@ func sportsDashboard(ctx context.Context, userSub string) map[string]interface{}
 		"sports_meta": SportsMeta{Leagues: []LeagueMeta{}},
 	}
 
-	cacheKey := CacheKeySportsPrefix + userSub
+	cacheKey := CacheKeySportsDashPrefix + userSub
 	var resp SportsResponse
 	if cacheGetJSON(ctx, cacheKey, &resp) {
 		return map[string]interface{}{
@@ -538,7 +604,13 @@ func sportsDashboard(ctx context.Context, userSub string) map[string]interface{}
 // invalidateSportsUserCache drops the per-user games cache after a sports
 // widget config change.
 func invalidateSportsUserCache(userSub string) {
-	if err := platform.Rdb.Del(context.Background(), CacheKeySportsPrefix+userSub).Err(); err != nil {
+	// Both keys: the widget-page payload and the dashboard payload are
+	// built from the same league set, so whatever staleness one, staleness
+	// the other.
+	if err := platform.Rdb.Del(context.Background(),
+		CacheKeySportsPrefix+userSub,
+		CacheKeySportsDashPrefix+userSub,
+	).Err(); err != nil {
 		log.Printf("[Sports] Failed to invalidate cache for %s: %v", userSub, err)
 	}
 }
@@ -555,14 +627,15 @@ func querySportsGames(ctx context.Context, limit int, favoriteTeams map[string]F
 			away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
 			start_time, COALESCE(short_detail, ''), state,
 			COALESCE(status_short, ''), COALESCE(status_long, ''),
-			COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')
-		FROM games
+			COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')` + standingsColumns + `
+		FROM games g` + standingsJoin + `
+		WHERE %s
 		ORDER BY
 			CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
 			CASE WHEN home_team_name = ANY($1) OR away_team_name = ANY($1) THEN 0 ELSE 1 END,
 			CASE WHEN state = 'pre' THEN start_time END ASC,
 			CASE WHEN state != 'pre' THEN start_time END DESC
-		LIMIT %d`, limit), favNames)
+		LIMIT %d`, notStaleUpcoming, limit), favNames)
 	if err != nil {
 		return nil, fmt.Errorf("sports query failed: %w", err)
 	}
@@ -570,6 +643,28 @@ func querySportsGames(ctx context.Context, limit int, favoriteTeams map[string]F
 
 	return scanGames(rows), nil
 }
+
+// notStaleUpcoming excludes games still marked 'pre' whose start time has
+// already passed -- which is never a real state. It is a fixture that
+// finished without anyone fetching the result: poll_schedule only reads
+// today..+7, so once a game falls out of that window nothing re-reads it to
+// mark it final, and it sits as "upcoming" until cleanup_old_games removes
+// it 7 days later.
+//
+// That matters because every ordering here puts 'pre' ahead of finals and
+// sorts it by start_time ASC, so a stale row sorts to the FRONT of upcoming
+// -- a finished game presented as the next one to watch. It also poisoned
+// LeagueMeta.NextGame (MIN(start_time) FILTER (WHERE state = 'pre')), which
+// is what the desktop's empty state reads to say when a league returns: it
+// could name a date in the past.
+//
+// REL-152 fixed the F1 parser that manufactured these permanently. This is
+// the read-side guard for the transient kind, which the ingester still
+// produces for any league whose fixture drifts out of the 7-day window.
+//
+// 12 hours matches parse_f1_race's guard, so a game that kicked off an hour
+// ago and has not been polled to 'in' yet is left alone.
+const notStaleUpcoming = `(state <> 'pre' OR start_time >= NOW() - INTERVAL '12 hours')`
 
 // MinPerLeagueShare is the minimum number of candidate games each selected
 // league gets before the global LIMIT applies. Used only in fair-share mode
@@ -644,15 +739,15 @@ func queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favor
 							CASE WHEN state != 'pre' THEN start_time END DESC
 					) AS side_rn
 				FROM games
-				WHERE league = ANY($1)
+				WHERE league = ANY($1) AND %s
 			)
 			SELECT id, league, COALESCE(sport, ''), external_game_id, COALESCE(link, ''),
 				home_team_name, COALESCE(home_team_logo, ''), COALESCE(home_team_score::text, ''), COALESCE(home_team_code, ''),
 				away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
 				start_time, COALESCE(short_detail, ''), state,
 				COALESCE(status_short, ''), COALESCE(status_long, ''),
-				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')
-			FROM ranked
+				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')` + standingsColumns + `
+			FROM ranked g` + standingsJoin + `
 			WHERE (upcoming_side AND side_rn <= %d)
 			   OR (NOT upcoming_side AND side_rn <= %d)
 			ORDER BY
@@ -660,7 +755,7 @@ func queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favor
 				CASE WHEN home_team_name = ANY($2) OR away_team_name = ANY($2) THEN 0 ELSE 1 END,
 				CASE WHEN state = 'pre' THEN start_time END ASC,
 				CASE WHEN state != 'pre' THEN start_time END DESC
-			LIMIT %d`, upShare, downShare, limit)
+			LIMIT %d`, notStaleUpcoming, upShare, downShare, limit)
 	} else {
 		// No per-league cap. Show every game for every selected league.
 		query = fmt.Sprintf(`
@@ -669,15 +764,15 @@ func queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favor
 				away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
 				start_time, COALESCE(short_detail, ''), state,
 				COALESCE(status_short, ''), COALESCE(status_long, ''),
-				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')
-			FROM games
-			WHERE league = ANY($1)
+				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')` + standingsColumns + `
+			FROM games g` + standingsJoin + `
+			WHERE league = ANY($1) AND %s
 			ORDER BY
 				CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
 				CASE WHEN home_team_name = ANY($2) OR away_team_name = ANY($2) THEN 0 ELSE 1 END,
 				CASE WHEN state = 'pre' THEN start_time END ASC,
 				CASE WHEN state != 'pre' THEN start_time END DESC
-			LIMIT %d`, limit)
+			LIMIT %d`, notStaleUpcoming, limit)
 	}
 
 	rows, err := platform.DBPool.Query(ctx, query, leagues, favNames)
@@ -694,19 +789,44 @@ func scanGames(rows pgx.Rows) []Game {
 	games := make([]Game, 0)
 	for rows.Next() {
 		var g Game
+		// Nullable: a side with no standings row scans as nil pointers.
+		var h, a [9]*int
 		if err := rows.Scan(
 			&g.ID, &g.League, &g.Sport, &g.ExternalGameID, &g.Link,
 			&g.HomeTeamName, &g.HomeTeamLogo, &g.HomeTeamScore, &g.HomeTeamCode,
 			&g.AwayTeamName, &g.AwayTeamLogo, &g.AwayTeamScore, &g.AwayTeamCode,
 			&g.StartTime, &g.ShortDetail, &g.State,
 			&g.StatusShort, &g.StatusLong, &g.Timer, &g.Venue, &g.Season,
+			&h[0], &h[1], &h[2], &h[3], &h[4], &h[5], &h[6], &h[7], &h[8],
+			&a[0], &a[1], &a[2], &a[3], &a[4], &a[5], &a[6], &a[7], &a[8],
 		); err != nil {
 			log.Printf("[Sports] Row scan failed: %v", err)
 			continue
 		}
+		g.HomeStanding = standingFrom(h)
+		g.AwayStanding = standingFrom(a)
 		games = append(games, g)
 	}
 	return games
+}
+
+// standingFrom builds a TeamStanding from the nine scanned columns, or nil
+// when the row had no standings -- rank is the presence test, since every
+// real row has one. Other nullable columns default to zero.
+func standingFrom(c [9]*int) *TeamStanding {
+	if c[0] == nil {
+		return nil
+	}
+	v := func(p *int) int {
+		if p == nil {
+			return 0
+		}
+		return *p
+	}
+	return &TeamStanding{
+		Rank: *c[0], Wins: v(c[1]), Losses: v(c[2]), Draws: v(c[3]), Points: v(c[4]),
+		GoalDiff: v(c[5]), PointsFor: v(c[6]), PointsAgainst: v(c[7]), OTL: v(c[8]),
+	}
 }
 
 // getUserSportsLeagues extracts the league list across a user's sports
@@ -798,7 +918,18 @@ func handleGetStandings(c *fiber.Ctx) error {
 			COALESCE(otl, 0), COALESCE(goals_for, 0), COALESCE(goals_against, 0),
 			COALESCE(points_for, 0), COALESCE(points_against, 0), COALESCE(streak, '')
 		FROM standings
+		-- Latest season only. The unique key is (league, team_name, season), so
+		-- the table deliberately keeps last season alongside this one -- and
+		-- without this filter every team came back TWICE, its finished 38-game
+		-- record interleaved with its 3-game one and both claiming the same
+		-- rank. La Liga returned 40 rows for 23 teams.
+		--
+		-- Lexical max is exact here rather than lucky: no league mixes season
+		-- formats (plain years, or "2025-2026" where a league spans the new
+		-- year) and none is null, so the greatest string is the current season
+		-- in every case.
 		WHERE league = $1
+		  AND season = (SELECT max(season) FROM standings s2 WHERE s2.league = $1)
 		ORDER BY COALESCE(rank, 9999) ASC`, league)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{

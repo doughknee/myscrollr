@@ -4,6 +4,7 @@ import { chipUrlForSports } from "../../utils/chipUrl";
 import type { TickerChip, TickerContext, TickerSource } from "../ticker";
 import { scopedRows } from "../ticker";
 import { selectSportsForTicker, getSportsDisplayConfig } from "./view";
+import { catalogItemById } from "../../marketplace";
 
 /**
  * Sports ticker chips.
@@ -17,6 +18,11 @@ export const sportsTickerSource: TickerSource = {
     const config = getSportsDisplayConfig(ctx.dashboard, ctx.tab);
 
     const rows = scopedRows<Game>(raw, ctx);
+    // Each league is its own widget and the catalog gives it a brand colour
+    // (F1 #e10600, NBA #c9082a, MLS #001838). The chip used to paint every
+    // league the old single "sports channel" red; it now takes the widget's
+    // own colour, as the catalog cards and Home ticker already do.
+    const accent = catalogItemById(ctx.tab)?.hex;
     return selectSportsForTicker(rows, config).map((game) => ({
       key: `spo-${game.id}`,
       node: (
@@ -24,6 +30,7 @@ export const sportsTickerSource: TickerSource = {
           game={game}
           comfort={ctx.comfort}
           colorMode={ctx.chipColorMode}
+          accent={accent}
           onClick={() =>
             ctx.onChipClick?.("sports", game.id, chipUrlForSports(game))
           }

@@ -91,6 +91,55 @@ export function limitPerSource(items: RssItem[], limit: number): RssItem[] {
  * The ticker doesn't expose interactive filters (source/category selection,
  * sort toggle). If those are added later, surface them as arguments here.
  */
+/**
+ * The ticker's own horizon for headlines, applied on top of the widget's
+ * prefs and never inherited by the widget page.
+ *
+ * A per-feed news widget put every article in its window on the rail, and
+ * the default window is unlimited -- the per-source cap only ever applied
+ * to multi-feed widgets. So a Yahoo Sports widget was 297 chips. On the
+ * rail a feed now shows its newest TICKER_RSS_PER_FEED items from the last
+ * TICKER_RSS_HOURS. A feed with nothing in that window still gets its
+ * latest item, provided that item is itself under TICKER_RSS_FLOOR_HOURS
+ * old: the floor keeps a QUIET feed represented, not a dead one. The
+ * window and cap stop a wire from becoming the whole bar. Same shape the
+ * sports ticker got.
+ */
+export const TICKER_RSS_HOURS = 6;
+export const TICKER_RSS_PER_FEED = 5;
+/**
+ * How stale the floor's one item may be.
+ *
+ * The floor exists so a quiet feed still has a presence on the rail, not so
+ * a dead one does. Past two days an item is not news and the chip is just
+ * occupying width; a feed that has said nothing since then says nothing.
+ */
+export const TICKER_RSS_FLOOR_HOURS = 48;
+
+function onTicker(items: RssItem[], now: number, perFeedCap = TICKER_RSS_PER_FEED): RssItem[] {
+  // `items` arrive newest-first; keep that order within each feed.
+  const cutoff = now - TICKER_RSS_HOURS * 3_600_000;
+  const floorCutoff = now - TICKER_RSS_FLOOR_HOURS * 3_600_000;
+  const perFeed = new Map<string, RssItem[]>();
+  const newest = new Map<string, RssItem>();
+  for (const it of items) {
+    const t = new Date(it.published_at ?? it.created_at).getTime();
+    // An undated item is treated as current rather than dropped: the feed
+    // gave us no reason to think it is old.
+    if (!newest.has(it.feed_url) && !(Number.isFinite(t) && t < floorCutoff)) newest.set(it.feed_url, it);
+    if (Number.isFinite(t) && t < cutoff) continue;
+    const list = perFeed.get(it.feed_url) ?? [];
+    if (list.length < perFeedCap) list.push(it);
+    perFeed.set(it.feed_url, list);
+  }
+  for (const [feed, top] of newest) {
+    if (!perFeed.has(feed)) perFeed.set(feed, [top]);
+  }
+  const keep = new Set<RssItem>();
+  for (const list of perFeed.values()) for (const it of list) keep.add(it);
+  return items.filter((it) => keep.has(it));
+}
+
 export function selectRssForTicker(
   items: RssItem[],
   prefs: RssDisplayPrefs,
@@ -99,7 +148,17 @@ export function selectRssForTicker(
   // Age window first (v1.1.3) so the per-source balancer only allocates
   // slots among articles that are actually eligible to show.
   const fresh = filterByArticleAge(items, prefs.maxArticleAgeDays ?? 0, now);
-  const ordered = sortRssItems(fresh, "newest");
+  // The widget's own "Show N" is the cap when it is set. That control is
+  // the answer to "how many of these do I want to see", and the ticker
+  // ignoring it while the feed obeyed it was the surprise -- one widget,
+  // two different numbers. TICKER_RSS_PER_FEED is only the default for
+  // "All", where the rail still needs a bound the feed page does not.
+  //
+  // Per FEED, not per widget: on a multi-feed widget a shared total would
+  // let the loudest wire spend the whole allowance, which is the flood the
+  // horizon exists to stop.
+  const perFeedCap = prefs.maxArticles > 0 ? prefs.maxArticles : TICKER_RSS_PER_FEED;
+  const ordered = onTicker(sortRssItems(fresh, "newest"), now, perFeedCap);
   // Single-outlet widgets (news_bbc, news_npr, ...) have exactly one
   // source — a per-source cap there just hides articles for no reason
   // (v1.1.1 "smart removal"). The balancer only makes sense when

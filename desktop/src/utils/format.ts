@@ -78,10 +78,52 @@ export function timeAgo(
 export function formatPrice(price: number | string): string {
   const num = typeof price === "string" ? parseFloat(price) : price;
   if (isNaN(num)) return String(price);
-  if (num >= 10_000) {
-    return `$${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  }
-  return `$${num.toFixed(2)}`;
+  // Decimals follow the magnitude, not a fixed two. A sub-dollar asset shown
+  // to the cent loses its whole day: ADA near $0.1975 prints as "$0.20".
+  const dp = priceDecimals(num);
+  return `$${num.toLocaleString(undefined, {
+    minimumFractionDigits: dp,
+    maximumFractionDigits: dp,
+  })}`;
+}
+
+/**
+ * Format a price with no currency glyph (e.g. "325.53").
+ *
+ * The ticker chip drops the dollar sign on purpose: every number on the row
+ * is a price, and at 8-16px the glyph is noise that costs horizontal space
+ * the day-range rail now uses.
+ */
+export function formatPriceBare(price: number | string): string {
+  const num = typeof price === "string" ? parseFloat(price) : price;
+  if (isNaN(num)) return String(price);
+  return num.toLocaleString(undefined, {
+    minimumFractionDigits: priceDecimals(num),
+    maximumFractionDigits: priceDecimals(num),
+  });
+}
+
+/**
+ * Decimal places appropriate to a price's magnitude.
+ *
+ * Two decimals is whole cents, which is right for equities and wrong for
+ * crypto: a coin near $0.09 has its whole day compressed into one digit, so
+ * a low of 0.0885 and a high of 0.0912 both print as "0.09" and the chip
+ * shows a range that reads as no range at all.
+ *
+ * The thresholds follow how exchanges quote: cents above a dollar, more
+ * digits as the price shrinks. The bottom tier exists for meme-coin
+ * territory — PEPE/USD trades near $0.0000034, which six decimals renders as
+ * "0.000003" and eight renders exactly. Eight also matches the scale of the
+ * numeric(20,8) columns behind it, so the display cannot claim precision the
+ * database did not keep.
+ */
+export function priceDecimals(value: number): number {
+  const abs = Math.abs(value);
+  if (abs >= 1) return 2;
+  if (abs >= 0.01) return 4;
+  if (abs >= 0.0001) return 6;
+  return 8;
 }
 
 /**
@@ -103,7 +145,20 @@ export function formatPriceChange(change: number | string | undefined): string {
   const num = typeof change === "string" ? parseFloat(change) : change;
   if (isNaN(num)) return String(change);
   const sign = num >= 0 ? "+" : "-";
-  return `${sign}$${Math.abs(num).toFixed(2)}`;
+  const abs = Math.abs(num);
+  // NOT priceDecimals(abs): the decimals a change needs follow the PRICE, not
+  // the size of the move, and a change never knows its own price. Sizing off
+  // the change gives "-$0.7700" for a 77-cent move on a $180 stock, because
+  // 0.77 is itself under a dollar.
+  //
+  // Show cents by default and let real precision through when it exists,
+  // trailing zeros trimmed: "-$0.77" stays "-$0.77", and a 0.0025 move on a
+  // sub-dollar coin — a ~1.8% day that "+$0.00" would erase — keeps its
+  // digits.
+  return `${sign}$${abs.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  })}`;
 }
 
 /**

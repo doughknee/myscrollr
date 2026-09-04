@@ -24,6 +24,12 @@ interface SportsEmptyStateProps {
  *   3. all leagues is_offseason=true  → "Off-season — X returns in Yd"
  *   4. any league has next_game      → "Next: X • in Y"
  *   5. otherwise                      → "No games scheduled — check back later"
+ *
+ * Every branch reads differently for ONE league than for several, because
+ * a per-league widget page (`/widget/sports_mls`) passes exactly one:
+ * "All your leagues are off-season" is a strange thing to tell someone
+ * looking at the MLS page, and "Next: MLS • Mar 3" repeats the league name
+ * already in the header. Named `only` below.
  */
 export default function SportsEmptyState({ leagues, onConfigure }: SportsEmptyStateProps) {
   // Branch 1: no leagues selected
@@ -64,19 +70,27 @@ export default function SportsEmptyState({ leagues, onConfigure }: SportsEmptySt
     );
   }
 
+  // A per-league widget page passes exactly one league; phrase for it.
+  const only = leagues.length === 1 ? leagues[0] : null;
+
   // Branch 3: all leagues are off-season
   const allOffseason = leagues.every((l) => l.is_offseason);
   if (allOffseason) {
     const withNext = leagues
       .filter((l) => l.next_game != null)
       .sort((a, b) => +new Date(a.next_game!) - +new Date(b.next_game!));
+    const heading = only
+      ? `${only.name} is off-season`
+      : "All your leagues are off-season";
     if (withNext.length > 0) {
       const target = withNext[0];
       return (
         <div className="px-4 py-5 text-center">
-          <p className="text-xs text-fg-3 font-medium mb-1">All your leagues are off-season</p>
+          <p className="text-xs text-fg-3 font-medium mb-1">{heading}</p>
           <p className="text-[11px] text-fg-4">
-            {target.name} returns {formatCountdown(target.next_game!)}
+            {only
+              ? `Returns ${formatCountdown(target.next_game!)}`
+              : `${target.name} returns ${formatCountdown(target.next_game!)}`}
           </p>
         </div>
       );
@@ -85,8 +99,10 @@ export default function SportsEmptyState({ leagues, onConfigure }: SportsEmptySt
     const fallback = [...leagues].sort((a, b) => a.name.localeCompare(b.name))[0];
     return (
       <div className="px-4 py-5 text-center">
-        <p className="text-xs text-fg-3 font-medium mb-1">All your leagues are off-season</p>
-        <p className="text-[11px] text-fg-4">{fallback.name} returns next season</p>
+        <p className="text-xs text-fg-3 font-medium mb-1">{heading}</p>
+        <p className="text-[11px] text-fg-4">
+          {only ? "Returns next season" : `${fallback.name} returns next season`}
+        </p>
       </div>
     );
   }
@@ -104,16 +120,24 @@ export default function SportsEmptyState({ leagues, onConfigure }: SportsEmptySt
       <div className="px-4 py-5 text-center">
         <p className="text-xs text-fg-3 font-medium mb-1">No games right now</p>
         <p className="text-[11px] text-fg-4">
-          Next: {target.name} • {formatCountdown(target.next_game!)}
+          {only
+            ? `Next game ${formatCountdown(target.next_game!)}`
+            : `Next: ${target.name} • ${formatCountdown(target.next_game!)}`}
         </p>
       </div>
     );
   }
 
-  // Branch 5: in-season but nothing scheduled
+  // Branch 5: in-season, nothing on the schedule. Distinct from branch 3 --
+  // between seasons the league tells us when it returns; here it is simply
+  // a quiet stretch (an international break, an All-Star break, the gap
+  // before a fixture list is published).
   return (
     <div className="px-4 py-5 text-center">
-      <p className="text-xs text-fg-3 font-medium">No games scheduled — check back later</p>
+      <p className="text-xs text-fg-3 font-medium mb-1">
+        {only ? `${only.name} has nothing scheduled` : "No games scheduled"}
+      </p>
+      <p className="text-[11px] text-fg-4">In season — check back later</p>
     </div>
   );
 }

@@ -21,6 +21,19 @@ export interface Trade {
   day_volume?: number;
   last_updated?: string;
   link?: string;
+  /**
+   * Recent intraday closes, oldest first, written daily by the finance
+   * ingester. Absent or empty when nothing has been fetched for the symbol
+   * yet — the chip draws nothing rather than inventing a shape.
+   */
+  sparkline?: number[];
+  /**
+   * Today's low and high, bounding the chip's day-range rail. Zero or absent
+   * means not fetched yet — the rail renders an empty track rather than
+   * collapsing, so the chip's height never changes.
+   */
+  day_low?: number;
+  day_high?: number;
 }
 
 // ── Predictions ──────────────────────────────────────────────────
@@ -88,6 +101,27 @@ export interface Game {
   season?: string;
   created_at?: string;
   updated_at?: string;
+  /**
+   * Current-season table row for each side, when the league has one.
+   * Attached by the API on every games read so the chip's detailed row --
+   * rank, record, differential or points -- costs no second request.
+   * Absent for UFC and Formula 1, which have no table.
+   */
+  home_standing?: TeamStanding;
+  away_standing?: TeamStanding;
+}
+
+/** One side's line in the current-season standings. */
+export interface TeamStanding {
+  rank: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  points: number;
+  goal_diff: number;
+  points_for: number;
+  points_against: number;
+  otl: number;
 }
 
 // ── RSS ─────────────────────────────────────────────────────────

@@ -105,6 +105,13 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
     return scopedLeague ? all.filter((g) => g.league === scopedLeague) : all;
   }, [sportsData?.sports, scopedLeague]);
 
+  // Scoped the same way the games are: on /widget/sports_mls the empty
+  // state must speak about MLS, not about every league the user follows.
+  const leagueMeta = useMemo(() => {
+    const all = sportsData?.meta?.leagues ?? [];
+    return scopedLeague ? all.filter((l) => l.name === scopedLeague) : all;
+  }, [sportsData?.meta?.leagues, scopedLeague]);
+
   // Favorite team names as a Set for fast lookup
   const favoriteTeamNames = useMemo(
     () => buildFavoriteSet(favoriteTeams),
@@ -170,12 +177,14 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
                 display={display}
                 favoriteTeams={favoriteTeamNames}
                 showLeagueHeaders={!scopedLeague}
+                leagueMeta={leagueMeta}
               />
             )}
             {tab === "schedule" && (
               <ScheduleTab
                 games={games}
                 favoriteTeams={favoriteTeamNames}
+                leagueMeta={leagueMeta}
               />
             )}
             {tab === "standings" && (
@@ -199,7 +208,10 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
 const WINDOW_OPTIONS: { value: string; label: string; back: number; ahead: number }[] = [
   { value: "0/0", label: "Today", back: 0, ahead: 0 },
   { value: "1/7", label: "This week", back: 1, ahead: 7 },
-  { value: "7/7", label: "Everything", back: 7, ahead: 7 },
+  // 365 ahead, not 7. Forward fixtures are never pruned, so this is
+  // "everything the server holds" -- and at 7 an F1 or Champions League
+  // user could not reach their next fixture from any preset at all.
+  { value: "7/365", label: "Everything", back: 7, ahead: 365 },
 ];
 
 function SportsBarControls({

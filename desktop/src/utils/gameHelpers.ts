@@ -5,7 +5,7 @@
  * determine game status across the app. Canonical source of truth
  * for game state classification.
  */
-import type { Game } from "../types";
+import type { Game, TeamStanding } from "../types";
 
 // ── State classification ────────────────────────────────────────
 
@@ -66,6 +66,48 @@ export function gameStatusLabel(game: Game): string {
   return "";
 }
 
+/**
+ * A status short enough for the chip's 34px status column.
+ *
+ * `gameStatusLabel` is the roomy version — it returns "Finished" and
+ * "in 3h 20m", which overflow a column sized for "88'" and "FT". This trades
+ * words for glyphs at the same information: the period, the wait, or that it
+ * is over.
+ */
+export function gameStatusCompact(game: Game): string {
+  if (isLive(game)) return game.timer || game.status_short || "LIVE";
+  if (isFinal(game)) return "FT";
+  if (isPre(game)) return formatCountdownCompact(game.start_time);
+  if (game.state === "postponed") return "PPD";
+  return "";
+}
+
+/**
+ * A countdown that fits four characters: "3h05", "22h", "45m", "2d", "Sep 9".
+ *
+ * Same thresholds as formatCountdown, without the words. Minutes are dropped
+ * past ten hours: "22h28" is five characters and 30px at 10px mono, which is
+ * the entire usable width of the chip's status column, and at that range the
+ * minutes are noise anyway.
+ */
+export function formatCountdownCompact(startTime: string): string {
+  const diff = new Date(startTime).getTime() - Date.now();
+  if (diff <= 0) return "NOW";
+  const h = Math.floor(diff / 3_600_000);
+  const m = Math.floor((diff % 3_600_000) / 60_000);
+  if (h >= 48) {
+    return new Date(startTime).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+  }
+  if (h >= 24) return `${Math.floor(h / 24)}d`;
+  if (h >= 10) return `${h}h`;
+  if (h > 0) return `${h}h${String(m).padStart(2, "0")}`;
+  if (m > 0) return `${m}m`;
+  return "SOON";
+}
+
 /** Display a team code, falling back to first 3 chars of name if code is missing. */
 export function displayTeamCode(code: string, name: string): string {
   return code || name.slice(0, 3).toUpperCase();
@@ -117,6 +159,93 @@ export function sameGame(a: Game, b: Game): boolean {
     a.status_short === b.status_short &&
     a.status_long === b.status_long &&
     a.short_detail === b.short_detail &&
-    a.start_time === b.start_time
+    a.start_time === b.start_time &&
+    sameStanding(a.home_standing, b.home_standing) &&
+    sameStanding(a.away_standing, b.away_standing)
   );
+}
+
+function sameStanding(a?: TeamStanding, b?: TeamStanding): boolean {
+  if (!a || !b) return a === b;
+  return (
+    a.rank === b.rank &&
+    a.wins === b.wins &&
+    a.losses === b.losses &&
+    a.draws === b.draws &&
+    a.points === b.points &&
+    a.points_for === b.points_for &&
+    a.points_against === b.points_against &&
+    a.otl === b.otl
+  );
+}
+
+/**
+ * League codes for the chip's 34px status column.
+ *
+ * The chip rendered `game.league` raw, which is fine for the leagues whose
+ * names are already codes (MLS, NFL, UFC) and clips everything else:
+ * "FORMULA 1" is nine characters and needs ~55px at 8px uppercase with
+ * 0.08em tracking, in a column 34px wide. The column cannot grow -- it is
+ * paid for out of the 164px the team names need, which were sized against
+ * the real catalog in REL-158.
+ *
+ * ~5 characters fit. Codes are the ones a viewer of that sport would
+ * recognise (UCL, EPL, F1) rather than mechanical truncation, because
+ * "FORMU" identifies nothing. Every league in tracked_leagues as of
+ * 2026-09 is listed; the fallback below covers a league added later.
+ */
+const LEAGUE_CODES: Record<string, string> = {
+  AFL: "AFL",
+  "Champions League": "UCL",
+  "FIFA World Cup": "WC",
+  "Formula 1": "F1",
+  "Handball Bundesliga": "HBL",
+  "Handball Champions League": "HCL",
+  "La Liga": "LIGA",
+  MLB: "MLB",
+  MLS: "MLS",
+  NBA: "NBA",
+  "NCAA Basketball": "NCAAB",
+  "NCAA Football": "NCAAF",
+  NFL: "NFL",
+  NHL: "NHL",
+  "Premier League": "EPL",
+  // Distinct from the football Premier League above, which takes EPL.
+  "Premiership Rugby": "PREM",
+  "Six Nations": "6N",
+  Starligue: "SLG",
+  "Super Rugby": "SUPER",
+  UFC: "UFC",
+  "Volleyball Champions League": "VCL",
+  "Volleyball Nations League": "VNL",
+};
+
+/** Longest code the 34px column fits. Enforced by the tests. */
+export const LEAGUE_CODE_MAX = 5;
+
+/**
+ * A short, recognisable code for `league`, guaranteed to fit the column.
+ *
+ * Unmapped leagues fall back to initials ("Super Duper League" -> "SDL"),
+ * which is right far more often than truncation for the multi-word names
+ * that are the only ones too long in the first place.
+ */
+export function leagueCode(league: string): string {
+  const known = LEAGUE_CODES[league];
+  if (known) return known;
+
+  const trimmed = league.trim();
+  if (trimmed.length <= LEAGUE_CODE_MAX) return trimmed.toUpperCase();
+
+  const words = trimmed.split(/\s+/);
+  if (words.length > 1) {
+    const initials = words
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase();
+    if (initials.length <= LEAGUE_CODE_MAX) return initials;
+    return initials.slice(0, LEAGUE_CODE_MAX);
+  }
+  // One long word, no initials to take: clipping is all that is left.
+  return trimmed.slice(0, LEAGUE_CODE_MAX).toUpperCase();
 }

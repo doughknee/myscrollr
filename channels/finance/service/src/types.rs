@@ -81,6 +81,10 @@ pub(crate) struct BatchStats {
 pub(crate) struct QuoteResponse {
     pub close: Option<String>,
     pub previous_close: Option<String>,
+    /// Session high/low, used for the chip's day-range rail. Free — they
+    /// ride along on the quote this job already fetches.
+    pub high: Option<String>,
+    pub low: Option<String>,
     pub change: Option<String>,
     pub percent_change: Option<String>,
     /// Present on error responses (e.g. 400, 401, 429).
@@ -106,6 +110,64 @@ impl QuoteResponse {
     }
     pub fn percent_change_f64(&self) -> f64 {
         self.percent_change.as_deref().and_then(|s| s.parse().ok()).unwrap_or(0.0)
+    }
+    pub fn high_f64(&self) -> f64 {
+        self.high.as_deref().and_then(|s| s.parse().ok()).unwrap_or(0.0)
+    }
+    pub fn low_f64(&self) -> f64 {
+        self.low.as_deref().and_then(|s| s.parse().ok()).unwrap_or(0.0)
+    }
+}
+
+/// TwelveData `/time_series` — the intraday closes behind the chip sparkline.
+///
+/// Success example (values are NEWEST first, which is why the caller
+/// reverses them before storing):
+/// ```json
+/// {"values":[{"datetime":"2026-09-02 15:45:00","close":"149.40"},
+///            {"datetime":"2026-09-02 15:30:00","close":"149.12"}],"status":"ok"}
+/// ```
+///
+/// Errors share the shape `QuoteResponse` uses, so the same detection applies.
+#[derive(Debug, Deserialize)]
+pub(crate) struct TimeSeriesResponse {
+    pub values: Option<Vec<TimeSeriesPoint>>,
+    /// Present on error responses (e.g. 400, 401, 429).
+    pub code: Option<u16>,
+    pub message: Option<String>,
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct TimeSeriesPoint {
+    pub close: Option<String>,
+}
+
+impl TimeSeriesResponse {
+    pub fn is_error(&self) -> bool {
+        self.code.is_some() || self.status.as_deref() == Some("error")
+    }
+
+    /// Closing prices oldest-first, dropping anything unparseable or
+    /// non-positive.
+    ///
+    /// A zero or negative close is TwelveData saying "no data for this
+    /// bar", not a price — storing it would draw the line through the
+    /// floor. Dropping rather than zero-filling keeps the series honest
+    /// about shape at the cost of a slightly uneven time axis, which a
+    /// sparkline does not show anyway.
+    pub fn closes_oldest_first(&self) -> Vec<f64> {
+        let Some(values) = &self.values else {
+            return Vec::new();
+        };
+        let mut out: Vec<f64> = values
+            .iter()
+            .filter_map(|v| v.close.as_deref())
+            .filter_map(|s| s.parse::<f64>().ok())
+            .filter(|p| *p > 0.0)
+            .collect();
+        out.reverse();
+        out
     }
 }
 
@@ -225,6 +287,8 @@ mod tests {
     #[test]
     fn test_quote_response_success() {
         let qr = QuoteResponse {
+            high: None,
+            low: None,
             close: Some("150.75".to_string()),
             previous_close: Some("149.50".to_string()),
             change: Some("1.25".to_string()),
@@ -243,6 +307,8 @@ mod tests {
     #[test]
     fn test_quote_response_error_by_code() {
         let qr = QuoteResponse {
+            high: None,
+            low: None,
             close: None, previous_close: None, change: None, percent_change: None,
             code: Some(429), message: Some("Rate limit".to_string()), status: None,
         };
@@ -252,6 +318,8 @@ mod tests {
     #[test]
     fn test_quote_response_error_by_status() {
         let qr = QuoteResponse {
+            high: None,
+            low: None,
             close: None, previous_close: None, change: None, percent_change: None,
             code: None, message: None, status: Some("error".to_string()),
         };
@@ -261,6 +329,8 @@ mod tests {
     #[test]
     fn test_quote_response_no_error() {
         let qr = QuoteResponse {
+            high: None,
+            low: None,
             close: None, previous_close: None, change: None, percent_change: None,
             code: None, message: None, status: Some("ok".to_string()),
         };
@@ -270,6 +340,8 @@ mod tests {
     #[test]
     fn test_quote_response_missing_fields_defaults_to_zero() {
         let qr = QuoteResponse {
+            high: None,
+            low: None,
             close: Some("invalid".to_string()),
             previous_close: Some("".to_string()),
             change: None,
@@ -285,6 +357,8 @@ mod tests {
     #[test]
     fn test_quote_response_negative_values() {
         let qr = QuoteResponse {
+            high: None,
+            low: None,
             close: Some("-5.50".to_string()),
             previous_close: Some("-5.00".to_string()),
             change: Some("-0.50".to_string()),
@@ -300,6 +374,8 @@ mod tests {
     #[test]
     fn test_quote_response_large_numbers() {
         let qr = QuoteResponse {
+            high: None,
+            low: None,
             close: Some("999999999.99".to_string()),
             previous_close: Some("1000000000.00".to_string()),
             change: Some("-0.01".to_string()),
@@ -307,5 +383,56 @@ mod tests {
             code: None, message: None, status: None,
         };
         assert!((qr.close_f64() - 999999999.99).abs() < 0.001);
+    }
+}
+
+#[cfg(test)]
+mod time_series_tests {
+    use super::TimeSeriesResponse;
+
+    /// A REAL captured TwelveData response, trimmed to six bars.
+    ///
+    /// A hand-written fixture would only prove the parser matches my
+    /// assumptions about the API. This proves it matches the API. The two
+    /// things worth pinning: closes arrive as STRINGS, and TwelveData returns
+    /// them NEWEST-first while a sparkline must draw oldest-first.
+    const FIXTURE: &str = include_str!("../tests/fixtures/time_series_A.json");
+
+    #[test]
+    fn parses_a_real_response_oldest_first() {
+        let parsed: TimeSeriesResponse =
+            serde_json::from_str(FIXTURE).expect("real TwelveData response must parse");
+        assert!(!parsed.is_error());
+        assert_eq!(
+            parsed.closes_oldest_first(),
+            vec![151.19, 151.48, 151.73, 151.85, 151.485, 151.04],
+        );
+    }
+
+    #[test]
+    fn an_error_response_is_detected_rather_than_parsed_as_empty() {
+        // Silently returning an empty series would blank a symbol's line on
+        // every rate-limit response instead of leaving yesterday's in place.
+        let body = r#"{"code":429,"message":"Too many requests","status":"error"}"#;
+        let parsed: TimeSeriesResponse = serde_json::from_str(body).unwrap();
+        assert!(parsed.is_error());
+        assert!(parsed.closes_oldest_first().is_empty());
+    }
+
+    #[test]
+    fn unusable_bars_are_dropped_not_zero_filled() {
+        // TwelveData uses a non-positive close to mean "no data for this
+        // bar". Storing it would draw the line through the floor.
+        let body = r#"{"status":"ok","values":[
+            {"close":"12.0"},{"close":"0"},{"close":"-1"},{"close":"junk"},{"close":"10.0"}
+        ]}"#;
+        let parsed: TimeSeriesResponse = serde_json::from_str(body).unwrap();
+        assert_eq!(parsed.closes_oldest_first(), vec![10.0, 12.0]);
+    }
+
+    #[test]
+    fn a_missing_values_array_yields_nothing_rather_than_panicking() {
+        let parsed: TimeSeriesResponse = serde_json::from_str(r#"{"status":"ok"}"#).unwrap();
+        assert!(parsed.closes_oldest_first().is_empty());
     }
 }
