@@ -133,7 +133,8 @@ const GameChip = memo(
         <TeamLogo src={logo} alt={name} size="lg" />
         <span
           className={clsx(
-            "min-w-0 truncate text-left text-[12px] leading-none",
+            // 14px against a 20px crest; 12px read as a caption under it.
+            "min-w-0 truncate text-left text-[14px] leading-none",
             pre_ ? "font-medium text-fg" : leads ? "font-semibold text-fg" : "font-medium text-fg-2",
           )}
           title={name}
@@ -143,7 +144,8 @@ const GameChip = memo(
         <span className="min-w-[6px] flex-1" />
         <span
           className={clsx(
-            "text-right text-[13px] leading-none tabular-nums",
+            // A step above the name, so the number still leads the row.
+            "text-right text-[15px] leading-none tabular-nums",
             leads ? "font-bold text-fg" : "font-medium text-fg-2",
           )}
           style={{ minWidth: `${r.score}ch` }}
@@ -245,7 +247,7 @@ const GameChip = memo(
           <>
             <span className="col-start-2 col-span-2 row-start-1 flex min-w-0 items-center gap-1.5 px-2.5">
               <TeamLogo src={game.home_team_logo} alt={game.home_team_name} size="lg" />
-              <span className="min-w-0 truncate text-[12px] font-semibold leading-none text-fg" title={game.home_team_name}>
+              <span className="min-w-0 truncate text-[14px] font-semibold leading-none text-fg" title={game.home_team_name}>
                 {teamShortName(game.league, game.home_team_name)}
               </span>
             </span>
