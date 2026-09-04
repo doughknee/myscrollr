@@ -139,14 +139,17 @@ describe("GameChip", () => {
     expect((container.querySelector("button") as HTMLButtonElement).style.getPropertyValue("--accent")).toBe("");
   });
 
-  it("gives the close-game glow the league tab too, brand or not", () => {
+  it("glows a close game in its own league colour, never red", () => {
     const tight = game({ state: "in", status_short: "89", away_team_score: 2, home_team_score: 2 });
     const { container } = render(<GameChip game={tight} accent="#00A0DF" />);
-    const tab = container.querySelector("span") as HTMLSpanElement;
-    // Red chip, red tab: the brand fill would leave a blue badge on it.
-    expect(tab.className).toContain("bg-live/20");
-    expect(tab.className).not.toContain("var(--accent)_18%");
-    expect((tab.firstElementChild as HTMLElement).className).toContain("text-live");
+    const btn = container.querySelector("button") as HTMLButtonElement;
+    // A red MLS chip reads as the wrong league; brightness carries closeness.
+    expect(btn.className).toContain("var(--accent)_70%");
+    expect(btn.className).not.toContain("border-live/70");
+    expect(btn.className).not.toContain("bg-live/[0.13]");
+    // Unbranded modes have no colour of their own, so red still says close.
+    const { container: muted } = render(<GameChip game={tight} colorMode="muted" />);
+    expect((muted.querySelector("button") as HTMLButtonElement).className).toContain("border-live/70");
   });
 
   it("scales the clock to its length without touching the reserved width", () => {

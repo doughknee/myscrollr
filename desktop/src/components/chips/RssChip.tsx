@@ -82,14 +82,6 @@ const RssChip = memo(
     const second =
       summary || (fits && feedCountToday ? `${item.source_name} · ${feedCountToday} today` : "");
 
-    // The block hangs from the top row like every other chip's first row --
-    // the headline sits where a team name or a symbol sits, and line two
-    // follows tight underneath. Centring the pair in the full 50px was the
-    // one chip on the rail whose text floated in the middle of its box.
-    // A headline that fits alone with nothing under it still centres:
-    // there is no second row for it to be the top of.
-    const oneLine = fits === true && !second;
-
     // The clock's scale, so the two read as the same cell: "29m" at 15px,
     // "1h56" at 13px, "Sep 3" at 12px. Width is fixed either way.
     const ageText = timeAgo(item.published_at);
@@ -148,16 +140,14 @@ const RssChip = memo(
             >
               {title}
             </span>
-            <span
-              ref={cellRef}
-              className={clsx(
-                "col-start-2 row-span-full flex min-w-0 px-2.5",
-                oneLine ? "items-center" : "items-start pt-[7px]",
-              )}
-            >
+            <span ref={cellRef} className="col-start-2 row-span-full flex min-w-0 items-center px-2.5">
               <span
                 data-testid="headline-block"
-                className="w-0 min-w-full overflow-hidden whitespace-normal font-sans leading-[17px] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
+                // text-left is load-bearing: a <button> centres its text by
+                // UA default. A single truncated line fills the width and
+                // hides it, but a wrapped block centres whichever of its two
+                // lines is shorter, which reads as a random indent.
+                className="w-0 min-w-full overflow-hidden whitespace-normal text-left font-sans leading-[17px] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
               >
                 <span className={clsx("text-[13px] font-semibold", stale ? "text-fg/55" : "text-fg")}>{title}</span>
                 {second && (
@@ -173,7 +163,7 @@ const RssChip = memo(
           </>
         ) : (
           <span className="col-start-2 row-start-1 flex min-w-0 items-center px-2.5">
-            <span className={clsx("min-w-0 truncate font-sans text-[13px] font-semibold", stale ? "text-fg/55" : "text-fg")}>
+            <span className={clsx("min-w-0 truncate text-left font-sans text-[13px] font-semibold", stale ? "text-fg/55" : "text-fg")}>
               {title}
             </span>
           </span>

@@ -115,10 +115,14 @@ const GameChip = memo(
     const awayLeads = scored && away >= home;
     const homeLeads = scored && home >= away;
 
-    const rule = close
-      ? "border-live/40"
-      : branded
-        ? "border-[color-mix(in_srgb,var(--accent)_22%,transparent)]"
+    // Literal classes, never interpolated: Tailwind reads source text, so a
+    // class assembled from a variable compiles to nothing at all.
+    const rule = branded
+      ? close
+        ? "border-[color-mix(in_srgb,var(--accent)_40%,transparent)]"
+        : "border-[color-mix(in_srgb,var(--accent)_22%,transparent)]"
+      : close
+        ? "border-live/40"
         : "border-secondary/20";
 
     const scoreText = (v: number | string) =>
@@ -249,7 +253,15 @@ const GameChip = memo(
           // chip measures itself against to know it has hit the cap.)
           comfort ? "grid-rows-[30px_20px]" : "grid-rows-[28px]",
           // Closeness is the whole weighting; the rules brighten with it.
-          close && "border-live/70 bg-live/[0.13] shadow-[0_0_14px_rgba(255,71,87,0.2)]",
+          //
+          // In the league's OWN colour, not a shared red. A red chip on a
+          // rail where colour means league reads as the wrong league -- an
+          // MLS game wearing La Liga's paint -- and the live dot already
+          // says it is live. Brightness carries closeness instead of hue.
+          close &&
+            (branded
+              ? "border-[color-mix(in_srgb,var(--accent)_70%,transparent)] bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] shadow-[0_0_14px_color-mix(in_srgb,var(--accent)_25%,transparent)]"
+              : "border-live/70 bg-live/[0.13] shadow-[0_0_14px_rgba(255,71,87,0.2)]"),
           // A result recedes behind what is still being played.
           final_ && "opacity-[0.82]",
           flash && "bg-live/20",
@@ -263,19 +275,13 @@ const GameChip = memo(
           className={clsx(
             "col-start-1 row-span-full flex items-center border-r px-[9px]",
             rule,
-            // A close game turns the whole chip live-red -- border, fill,
-            // glow. The tab has to come with it: a red card wearing a blue
-            // MLS badge reads as two chips stuck together, and the brand
-            // whispers everywhere else on the rail anyway.
-            close
-              ? "bg-live/20"
-              : branded && "bg-[color-mix(in_srgb,var(--accent)_18%,transparent)]",
+            branded && "bg-[color-mix(in_srgb,var(--accent)_18%,transparent)]",
           )}
         >
           <span
             className={clsx(
               "text-[10px] font-bold tracking-[0.08em]",
-              close ? "text-live" : branded ? "text-[var(--accent)]" : "text-fg-3",
+              branded ? "text-[var(--accent)]" : "text-fg-3",
             )}
           >
             {leagueCode(game.league)}
