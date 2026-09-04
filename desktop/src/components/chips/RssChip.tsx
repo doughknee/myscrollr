@@ -27,8 +27,15 @@ interface RssChipProps {
 /** Older than this and the chip dims — the news has stopped being news. */
 const STALE_AFTER_MS = 2 * 60 * 60 * 1000;
 
-/** The age cell, fixed in both modes. "Sep 3" at 11px mono is 33px. */
-const AGE_PX = 36;
+/**
+ * The age cell, fixed in both modes.
+ *
+ * Written as a literal class, not interpolated: Tailwind reads source text,
+ * so `grid-cols-[..._${AGE_PX}px]` compiles to nothing and the column falls
+ * back to auto -- which is why the cell sized itself to its own text and
+ * looked like an afterthought next to the game chip's clock.
+ */
+const GRID_COLS = "grid-cols-[max-content_minmax(0,max-content)_46px]";
 
 /**
  * The headline chip.
@@ -75,6 +82,20 @@ const RssChip = memo(
     const second =
       summary || (fits && feedCountToday ? `${item.source_name} · ${feedCountToday} today` : "");
 
+    // The block hangs from the top row like every other chip's first row --
+    // the headline sits where a team name or a symbol sits, and line two
+    // follows tight underneath. Centring the pair in the full 50px was the
+    // one chip on the rail whose text floated in the middle of its box.
+    // A headline that fits alone with nothing under it still centres:
+    // there is no second row for it to be the top of.
+    const oneLine = fits === true && !second;
+
+    // The clock's scale, so the two read as the same cell: "29m" at 15px,
+    // "1h56" at 13px, "Sep 3" at 12px. Width is fixed either way.
+    const ageText = timeAgo(item.published_at);
+    const ageSize =
+      ageText.length <= 3 ? "text-[15px]" : ageText.length <= 4 ? "text-[13px]" : "text-[12px]";
+
     return (
       <button
         onClick={onClick}
@@ -93,7 +114,7 @@ const RssChip = memo(
             "whitespace-nowrap",
           ),
           "grid max-w-[640px]",
-          `grid-cols-[max-content_minmax(0,max-content)_${AGE_PX}px]`,
+          GRID_COLS,
           comfort ? "grid-rows-[30px_20px]" : "grid-rows-[28px]",
           stale && "border-edge/55",
         )}
@@ -127,7 +148,13 @@ const RssChip = memo(
             >
               {title}
             </span>
-            <span ref={cellRef} className="col-start-2 row-span-full flex min-w-0 items-center px-2.5">
+            <span
+              ref={cellRef}
+              className={clsx(
+                "col-start-2 row-span-full flex min-w-0 px-2.5",
+                oneLine ? "items-center" : "items-start pt-[7px]",
+              )}
+            >
               <span
                 data-testid="headline-block"
                 className="w-0 min-w-full overflow-hidden whitespace-normal font-sans leading-[17px] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
@@ -154,9 +181,13 @@ const RssChip = memo(
 
         <span
           data-testid="age-cell"
-          className={clsx("col-start-3 row-span-full flex items-center justify-center border-l font-mono text-[11px] font-semibold tracking-[0.04em] text-fg-2", rule)}
+          className={clsx(
+            "col-start-3 row-span-full flex items-center justify-center border-l font-mono font-semibold leading-none tracking-[0.04em] text-fg-2",
+            ageSize,
+            rule,
+          )}
         >
-          {timeAgo(item.published_at)}
+          {ageText}
         </span>
       </button>
     );

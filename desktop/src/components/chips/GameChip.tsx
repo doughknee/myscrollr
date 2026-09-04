@@ -263,13 +263,19 @@ const GameChip = memo(
           className={clsx(
             "col-start-1 row-span-full flex items-center border-r px-[9px]",
             rule,
-            branded && "bg-[color-mix(in_srgb,var(--accent)_18%,transparent)]",
+            // A close game turns the whole chip live-red -- border, fill,
+            // glow. The tab has to come with it: a red card wearing a blue
+            // MLS badge reads as two chips stuck together, and the brand
+            // whispers everywhere else on the rail anyway.
+            close
+              ? "bg-live/20"
+              : branded && "bg-[color-mix(in_srgb,var(--accent)_18%,transparent)]",
           )}
         >
           <span
             className={clsx(
               "text-[10px] font-bold tracking-[0.08em]",
-              branded ? "text-[var(--accent)]" : "text-fg-3",
+              close ? "text-live" : branded ? "text-[var(--accent)]" : "text-fg-3",
             )}
           >
             {leagueCode(game.league)}

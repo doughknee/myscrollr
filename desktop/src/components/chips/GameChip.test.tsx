@@ -139,6 +139,16 @@ describe("GameChip", () => {
     expect((container.querySelector("button") as HTMLButtonElement).style.getPropertyValue("--accent")).toBe("");
   });
 
+  it("gives the close-game glow the league tab too, brand or not", () => {
+    const tight = game({ state: "in", status_short: "89", away_team_score: 2, home_team_score: 2 });
+    const { container } = render(<GameChip game={tight} accent="#00A0DF" />);
+    const tab = container.querySelector("span") as HTMLSpanElement;
+    // Red chip, red tab: the brand fill would leave a blue badge on it.
+    expect(tab.className).toContain("bg-live/20");
+    expect(tab.className).not.toContain("var(--accent)_18%");
+    expect((tab.firstElementChild as HTMLElement).className).toContain("text-live");
+  });
+
   it("scales the clock to its length without touching the reserved width", () => {
     const { rerender } = render(<GameChip game={game()} />); // final -> "FT"
     const short = screen.getByTestId("status-text");

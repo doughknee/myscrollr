@@ -80,9 +80,9 @@ describe("RssChip", () => {
   it("fixes the age column at the same width in both modes", () => {
     const { container, rerender } = render(<RssChip item={item()} />);
     const cls = () => (container.querySelector("button") as HTMLButtonElement).className;
-    expect(cls()).toContain("_36px]");
+    expect(cls()).toContain("_46px]");
     rerender(<RssChip item={item()} comfort />);
-    expect(cls()).toContain("_36px]");
+    expect(cls()).toContain("_46px]");
   });
 
   it("tints from the widget's brand in widget mode only", () => {
