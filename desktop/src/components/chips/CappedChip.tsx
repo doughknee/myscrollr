@@ -62,6 +62,8 @@ interface ShellProps {
   pinned?: boolean;
   onTogglePin?: () => void;
   onClick?: () => void;
+  /** Right-hand fixed cell: the one value that changes while on screen. */
+  end?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -75,6 +77,7 @@ function CapShell({
   pinned,
   onTogglePin,
   onClick,
+  end,
   children,
 }: ShellProps) {
   const c = getChipColors(colorMode, type);
@@ -129,12 +132,27 @@ function CapShell({
       </ChipCap>
       <span
         className={clsx(
-          "flex min-w-0 flex-col justify-center px-3",
+          "flex min-w-0 flex-1 flex-col justify-center px-3",
           comfort ? "gap-0.5 py-1.5" : "py-1",
         )}
       >
         {children}
       </span>
+      {/* The one number that changes, in its own bound cell on the right
+          — the game chip's clock slot. Keeping it out of the flowing
+          middle is what stops "99.98%" becoming "4m" and dragging the
+          monitor's name sideways with it. */}
+      {end != null && (
+        <span
+          className={clsx(
+            "flex shrink-0 select-none items-center justify-center self-stretch border-l border-edge/40 px-2",
+            "font-semibold tabular-nums",
+            comfort ? "text-[13px]" : "text-ui-chip",
+          )}
+        >
+          {end}
+        </span>
+      )}
     </button>
   );
 }
@@ -148,17 +166,35 @@ const HB_COLORS: Record<number, string> = {
   2: "bg-warning",
 };
 
-function HeartbeatBar({ heartbeats }: { heartbeats: number[] }) {
+/**
+ * Recent checks, as a row of bars.
+ *
+ * `bleed` stretches each bar to share the full width it is given rather
+ * than sitting at a fixed 3px. On the detailed row the history owns the
+ * whole cell, so the bar count stops being a width — twelve checks and
+ * four checks draw the same size chip, which is what keeps the rail
+ * from reflowing as a monitor's history fills up.
+ */
+function HeartbeatBar({
+  heartbeats,
+  bleed,
+}: {
+  heartbeats: number[];
+  bleed?: boolean;
+}) {
   return (
     <span
-      className="inline-flex items-center gap-px"
+      className={clsx(
+        "flex items-center",
+        bleed ? "h-[7px] w-full gap-px" : "inline-flex gap-px",
+      )}
       aria-label="Recent heartbeat history"
     >
       {heartbeats.map((status, i) => (
         <span
           key={i}
           className={clsx(
-            "h-2 w-[3px] rounded-[1px]",
+            bleed ? "h-full flex-1" : "h-2 w-[3px] rounded-[1px]",
             HB_COLORS[status] ?? "bg-fg-4/30",
           )}
         />
@@ -200,32 +236,30 @@ export function UptimeCappedChip({
       pinned={pinned}
       onTogglePin={onTogglePin}
       onClick={onClick}
+      end={
+        <span className={down ? "text-down" : c.textDim}>{value}</span>
+      }
     >
-      <span className="flex items-baseline gap-1.5">
-        <span className={clsx("font-semibold", c.text)}>{item.label}</span>
-        <span
-          className={clsx(
-            "tabular-nums",
-            down ? "font-semibold text-down" : c.textDim,
-          )}
-        >
-          {value}
+      {/* The monitor's name owns the flexible middle; the number sits in
+          its own cell on the right, the way every other chip's clock
+          does. Compact is cap, name, number and nothing else. */}
+      <span className="flex min-w-0 items-center">
+        <span className={clsx("min-w-0 truncate font-semibold", c.text)}>
+          {item.label}
         </span>
       </span>
       {comfort && (
-        <span
-          className={clsx(
-            "flex items-center gap-1.5 text-ui-chip",
-            c.textFaint,
-          )}
-        >
+        // The whole detail row is the history, edge to edge. Uptime is
+        // the one widget whose past matters more than its present, and
+        // a percentage already sits on the row above.
+        <span className="flex items-center pt-1">
           {item.heartbeats?.length ? (
-            <HeartbeatBar heartbeats={item.heartbeats} />
-          ) : null}
-          {/* Down chips lead with the incident, not the average. */}
-          <span className="truncate">
-            {down ? item.detail : (item.responseAvg ?? item.detail)}
-          </span>
+            <HeartbeatBar heartbeats={item.heartbeats} bleed />
+          ) : (
+            <span className={clsx("truncate text-ui-chip", c.textFaint)}>
+              {down ? item.detail : (item.responseAvg ?? item.detail)}
+            </span>
+          )}
         </span>
       )}
     </CapShell>
