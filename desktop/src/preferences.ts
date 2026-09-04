@@ -331,12 +331,6 @@ function oneOf<T extends string>(
 
 export interface FinanceDisplayPrefs {
   defaultSort: "alpha" | "price" | "change" | "updated";
-  /**
-   * Direction marker on the ticker chip. "arrow" uses ▲▼ glyphs,
-   * "sign" uses +/− text, "none" hides the marker entirely
-   * (% change still renders, just without the leading marker).
-   */
-  tickerDirectionMarker: "arrow" | "sign" | "none";
 }
 
 export interface PredictionsDisplayPrefs {
@@ -582,7 +576,6 @@ export const DEFAULT_GITHUB_TICKER: GitHubTickerConfig = {
 export const DEFAULT_WIDGET_DISPLAY: WidgetDisplayPrefs = {
   finance: {
     defaultSort: "alpha",
-    tickerDirectionMarker: "arrow",
   },
   rss: {
     feedSort: "newest",
@@ -910,11 +903,6 @@ export function migrateFinanceDisplay(
       raw.defaultSort,
       ["alpha", "price", "change", "updated"],
       DEFAULT_WIDGET_DISPLAY.finance.defaultSort,
-    ),
-    tickerDirectionMarker: oneOf(
-      raw.tickerDirectionMarker,
-      ["arrow", "sign", "none"],
-      DEFAULT_WIDGET_DISPLAY.finance.tickerDirectionMarker,
     ),
   };
 }

@@ -22,7 +22,6 @@ function mk(partial: Partial<Trade> & { symbol: string }): Trade {
 
 const DEFAULT_PREFS: FinanceDisplayPrefs = {
   defaultSort: "alpha",
-  tickerDirectionMarker: "arrow",
 };
 
 // ── sortTrades ──────────────────────────────────────────────────

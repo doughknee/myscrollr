@@ -24,7 +24,6 @@ export const financeTickerSource: TickerSource = {
           trade={trade}
           comfort={ctx.comfort}
           colorMode={ctx.chipColorMode}
-          directionMarker={prefs.tickerDirectionMarker ?? "arrow"}
           onClick={() =>
             ctx.onChipClick?.("finance", trade.symbol, chipUrlForFinance(trade))
           }

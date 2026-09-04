@@ -8,14 +8,10 @@ import { Sparkline } from "./Sparkline";
 import { pushPrice } from "./priceHistory";
 import { DayRangeRail } from "./DayRangeRail";
 
-export type TickerDirectionMarker = "arrow" | "sign" | "none";
-
 interface TradeChipProps {
   trade: Trade;
   comfort?: boolean;
   colorMode?: ChipColorMode;
-  /** How to render the up/down marker. Defaults to "arrow" (▲▼). */
-  directionMarker?: TickerDirectionMarker;
   onClick?: () => void;
 }
 
@@ -24,7 +20,6 @@ const TradeChip = memo(
     trade,
     comfort,
     colorMode = "widget",
-    directionMarker = "arrow",
     onClick,
   }: TradeChipProps) {
     const c = getChipColors(colorMode, "finance");
@@ -42,29 +37,9 @@ const TradeChip = memo(
     // flat for a poll cycle.
     const series = pushPrice(trade.symbol, trade.price, trade.sparkline);
 
-    // Pick the marker glyph per user preference. Empty string = no
-    // marker rendered (the % itself still carries the sign).
-    const marker =
-      directionMarker === "arrow"
-        ? isUp
-          ? "\u25B2"
-          : "\u25BC"
-        : directionMarker === "sign"
-          ? isUp
-            ? "+"
-            : "\u2212"
-          : "";
-
-    // formatChange already signs the number ("+0.89%"), so the "sign"
-    // marker rendered a second one: "++0.89%" up, "−-0.55%" down. The
-    // marker and the sign are two spellings of one fact, so when the
-    // marker IS the sign, the number drops its own.
-    //
-    // Only that mode. "arrow" deliberately keeps both -- an arrow reads as
-    // direction and the sign as arithmetic, and that pairing is what ships
-    // today -- and "none" needs the sign because nothing else carries it.
-    const changeText =
-      directionMarker === "sign" ? changeStr.replace(/^[+−-]/, "") : changeStr;
+    // The arrow reads as direction and the sign formatChange already
+    // carries reads as arithmetic. Both, deliberately.
+    const marker = isUp ? "▲" : "▼";
 
     return (
       <button
@@ -98,7 +73,7 @@ const TradeChip = memo(
               )}
             >
               {marker}
-              {changeText}
+              {changeStr}
             </span>
           )}
         </div>
@@ -119,7 +94,6 @@ const TradeChip = memo(
   (prev, next) =>
     prev.comfort === next.comfort &&
     prev.colorMode === next.colorMode &&
-    prev.directionMarker === next.directionMarker &&
     prev.onClick === next.onClick &&
     prev.trade.symbol === next.trade.symbol &&
     prev.trade.price === next.trade.price &&

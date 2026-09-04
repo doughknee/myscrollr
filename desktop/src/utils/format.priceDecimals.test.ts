@@ -73,22 +73,11 @@ describe("formatPriceChange", () => {
   });
 });
 
-describe("formatChange beside a direction marker", () => {
-  // The marker is a user preference (tickerDirectionMarker). formatChange
-  // signs its own output, so the "sign" marker rendered a SECOND one:
-  // "++0.89%" going up, "−-0.55%" going down. TradeChip now strips the
-  // number's sign in that mode only -- "arrow" deliberately keeps both.
-  it("signs its own output", () => {
+describe("formatChange", () => {
+  it("signs its own output, which is why the chip's arrow does not", () => {
     expect(formatChange(0.89)).toBe("+0.89%");
     expect(formatChange(-0.55)).toBe("-0.55%");
     // Flat counts as up and still carries a "+".
     expect(formatChange(0)).toBe("+0.00%");
-  });
-
-  it("leaves a sign the marker can strip, in either direction", () => {
-    const strip = (s: string) => s.replace(/^[+−-]/, "");
-    expect(strip(formatChange(0.89))).toBe("0.89%");
-    expect(strip(formatChange(-0.55))).toBe("0.55%");
-    expect(strip(formatChange(0))).toBe("0.00%");
   });
 });
