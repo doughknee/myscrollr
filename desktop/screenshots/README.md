@@ -23,6 +23,14 @@ Captured 2026-05-10 from a live dev build with real data flowing through the rea
 
 ## How these were made
 
+> **Windows, since 2026-09-05:** `make screenshots` re-shoots the website's
+> ticker captures from the running dev build — the dev command bus
+> (`scripts/dev/devctl.mjs`) sets theme, density and which widgets are on
+> the bar, `scripts/dev/capture-window.ps1` captures the window pixel-exact,
+> and the site's optimizer picks the PNGs up. The recipe below is the
+> original macOS one for the app-window shots in this folder.
+
+
 Two-tool hybrid:
 
 1. **Tauri MCP server** drives the UI: `webview_execute_js` to navigate routes, dismiss tooltips, and prep state.

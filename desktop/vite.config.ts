@@ -6,6 +6,7 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
+import { devBus } from "./scripts/dev-bus";
 import { resolve } from "path";
 
 // https://v2.tauri.app/start/frontend/vite/
@@ -29,6 +30,8 @@ export default defineConfig({
     }),
     react(),
     tailwindcss(),
+    // Dev only (apply: "serve"): lets scripts/dev/devctl.mjs run code in a window.
+    devBus(),
     // Sentry plugin MUST be last so it sees the final bundle output.
     // Disabled automatically when SENTRY_AUTH_TOKEN isn't set (local builds).
     sentryVitePlugin({
