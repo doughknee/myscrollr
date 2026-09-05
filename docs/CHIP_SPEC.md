@@ -405,6 +405,70 @@ GitHub: ✓/✗/●/○. Only `down` and `in_progress` pulse (`data-motion="cap-
 
 ## 8. What is on the rail
 
+### 8.0 The feed page and the ticker are different products
+
+They render the same `dashboard.data`, through different selectors, for different jobs.
+
+| | Feed page (widget page) | Ticker (rail) |
+|---|---|---|
+| Job | Reading a list the user opened on purpose | Glancing at what is happening now, unattended, all day |
+| Selector | `applyXPipeline` / `selectXForFeed` — takes prefs | `selectXForTicker` — takes **no** prefs |
+| Amount shown | Whatever the user asks for (all, or "Show N") | A fixed number of slots per source; the rest rotate |
+| Order | The user's sort | One fixed rule per source |
+| Time window | The user's window (`daysBack/daysAhead`, `maxArticleAgeDays`) | The source's horizon constant |
+| Filters | Source / category / lens filters | None |
+| User settings | All of the above are theirs | **None** for selection; presentation only (§8.0.1) |
+
+The rule that follows from the table, stated so it can be enforced in review:
+
+> **Anything about *reading* belongs to the feed page and must not reach the rail.
+> Anything about *what is on the rail* is a constant, not a setting.**
+
+Concretely, a ticker source or selector must not read `widgetDisplay.<source>.defaultSort`,
+`articlesPerSource`, `maxArticles`, `maxArticleAgeDays`, `feedSort`, or any feed filter
+state. It may read widget **config** (the user's inputs — see §8.0.1) and `ctx.cycles`.
+
+The design that makes "no settings" workable is the pair introduced together: **fixed
+slots per source** (§8.1) and **rotation inside the same chips** (§8.2). Together they
+remove both questions a setting would otherwise have to answer — "how many?" and "which
+ones?" — and they keep the rail's chip count and width constant, so the bar never grows,
+shrinks or jumps as a slate fills.
+
+#### 8.0.1 The control inventory
+
+**The user controls their inputs** (widget config; read by ticker sources as data):
+
+| Widget | Inputs the user owns |
+|---|---|
+| All | Which widgets are on the ticker (`widgetsOnTicker`); pinned widgets |
+| Finance | `config.symbols` (the watchlist, in the user's order) |
+| Predictions | starred markets (`predictionsWatchlist`) |
+| Sports | `config.favoriteTeams[league]` |
+| News | `config.feeds` (custom RSS) |
+| Clock | `localTime`, `showTimezones`, `excludedTimezones`, zones |
+| Timer | `activeTimer`, pomodoro durations |
+| Weather | saved cities, `excludedCities` |
+| Sysmon | `cpu`, `memory`, `gpu`, `gpuPower` toggles |
+| Uptime | `url`, `excludedMonitors` |
+| GitHub | `repos`, `excludedRepos` |
+
+**The user controls presentation** (`TickerPrefs`): `showTicker`, `tickerSpeed`,
+`pauseOnHover`, `hoverSpeed`, `tickerGap`, `tickerMode` (compact / detailed),
+`mixMode` (grouped / weave), `chipColors` (widget / accent / muted), `tickerDirection`,
+`scrollMode` (continuous / step / flip), `stepPause`, `tickerPosition`,
+`hideOnFullscreen`, `showWidgetGlyphIcons`, pinning.
+
+**The user does not control selection.** Never add a setting for: how many chips a
+widget contributes; which eligible items appear; their order; the horizon or floor;
+rotation cadence or slot count. The one such control ever added (sports "N on the
+bar", 2026-09-04) was removed the same day.
+
+**Documented exception, to be reconciled:** fantasy's `tickerMode` dial (essential /
+standard / everything) plus its per-item venue prefs are selection controls that
+predate this rule. When fantasy is rebuilt (REL-184), the dial becomes the fixed
+`standard` rule and the per-item venue toggles go; followed players remain, since they
+are an input.
+
 ### 8.1 Per-source constants (not settings)
 
 | Source | Eligible (horizon) | Floor | Slots | Pool order | Reserve |

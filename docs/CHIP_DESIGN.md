@@ -78,6 +78,48 @@ saying, the row stays empty rather than getting filler.
 - Things that are paused don't pulse. Only things that need your attention do: a close
   live game, a down monitor, a build in progress.
 
+## The feed page and the ticker are two different things
+
+They show the same data and they are not the same product.
+
+**The feed page is for reading.** You open it on purpose, you sit with it, and you make it
+yours: sort it, filter it, cut it to today, show ten or show all. Every control there is a
+way of reading a list, and all of them are yours.
+
+**The ticker is for glancing.** It's on all day whether you're looking or not. It has one
+job: show you what's happening now, in a fixed amount of room, without ever needing
+you. So it has no controls of its own. It decides what's on it, how many, and in what
+order, from one rule per kind of thing, and then it rotates through everything eligible
+so you still see it all.
+
+The line between them is simple. **Anything about *reading* belongs to the feed page and
+never reaches the bar. Anything about *what's on the bar* isn't a setting at all.**
+
+That's why we did two things together: gave every source a fixed number of places on
+the bar, and made the chips rotate their contents rather than adding and removing chips.
+A user never has to answer "how many do I want on the ticker", and the bar never grows,
+shrinks or jumps. It just works.
+
+## What you control, and what you don't
+
+**You control your inputs.** Which widgets are on the ticker at all. Your watchlist, your
+starred markets, your favourite team, your feeds, your time zones, your cities, which
+system metrics matter to you, which monitors and repos to watch. These are *what you
+care about*, and they're yours everywhere.
+
+**You control how the bar looks and moves.** Compact or detailed. Speed, direction, gap,
+whether it pauses on hover. Continuous, step or flip. Grouped or woven. Colour mode. Pin a
+widget so it never scrolls. Where the bar sits.
+
+**You don't control selection.** How many of a widget's things are on the bar at once,
+which of them, in what order, how far back or ahead it looks, or how the rotation runs.
+Those are fixed per kind of thing, chosen once from real data, and they never appear as
+a setting. If a user could set them, a user could get them wrong.
+
+One leftover from before this rule: the fantasy widget still has an Essential / Standard
+/ Everything dial for its ticker. It's a selection control, and it will be reconciled
+when fantasy is rebuilt (REL-184). Followed players stay, since that's an input.
+
 ## What goes on the bar
 
 The bar isn't the feed. It has one rule per kind of thing, and there are no settings for
