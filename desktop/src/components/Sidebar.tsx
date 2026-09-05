@@ -42,6 +42,8 @@ import {
   Sparkles,
   Trash2,
   UserCircle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "motion/react";
@@ -597,9 +599,9 @@ function NavItem({
                 aria-hidden
                 data-testid="ticker-mark"
                 data-on="false"
-                className="absolute -right-1 -bottom-1 flex h-3 w-3 items-center justify-center rounded-full border border-surface bg-surface-2"
+                className="absolute -right-1.5 -bottom-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-surface bg-surface-2 text-fg-3"
               >
-                <span className="block h-[7px] w-[1.5px] rotate-45 rounded bg-fg-3" />
+                <EyeOff size={9} strokeWidth={2.25} />
               </span>
             )}
           </span>
@@ -629,14 +631,13 @@ function NavItem({
                 onTicker && "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
               )}
             >
-              <span
-                aria-hidden
-                className={clsx(
-                  "block h-2 w-2 rounded-full transition-colors",
-                  onTicker ? "" : "border-[1.5px] border-fg-3",
-                )}
-                style={onTicker ? { background: accent } : undefined}
-              />
+              {/* An eye: open when the widget is on the bar, shut when it
+                  is not. Reads as "visible / hidden" without a legend. */}
+              {onTicker ? (
+                <Eye size={13} strokeWidth={2} aria-hidden style={{ color: accent }} />
+              ) : (
+                <EyeOff size={13} strokeWidth={2} aria-hidden className="text-fg-3 group-hover:text-fg-2" />
+              )}
             </button>
           </Tooltip>
         )}
