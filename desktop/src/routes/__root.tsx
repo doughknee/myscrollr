@@ -65,8 +65,6 @@ import {
   reconcileSidebarOrder,
   resolveThemeMode,
 } from "../preferences";
-import {
-  } from "../utils/tickerStatus";
 import type { AppPreferences } from "../preferences";
 import { showTipOnce, TIP_IDS } from "../lib/tips";
 
