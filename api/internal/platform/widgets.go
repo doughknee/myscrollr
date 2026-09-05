@@ -65,6 +65,12 @@ type WidgetDef struct {
 	// Order is the canonical display position, assigned from this file's
 	// declaration order at init.
 	Order int `json:"order"`
+
+	// Hidden keeps a widget out of the catalog's add grid without removing
+	// it: existing rows still resolve by id, still render, still count
+	// against slots. For turning something off "for now" without stranding
+	// the people who already have it.
+	Hidden bool `json:"hidden,omitempty"`
 }
 
 // Shared usage recipes — most widgets in a family follow the same steps, so
@@ -335,7 +341,19 @@ var catalog = []WidgetDef{
 		About: "Technology, science, art, and culture from The Verge.",
 	},
 	{
-		ID: "rss_custom", Name: "Custom RSS", Category: "news", Source: "rss",
+		ID: "news_drudge", Name: "Drudge Report", Category: "news", Source: "rss",
+		Color: "#4b5563", LogoURL: "https://icon.horse/icon/drudgereport.com", LogoLight: true,
+		Description: "The Drudge Report's headline links, as they post.",
+		DefaultConfig: map[string]any{"feeds": []map[string]string{
+			{"name": "Drudge Report", "url": "https://feeds.feedburner.com/DrudgeReportFeed"},
+		}},
+		Usage: usageNews,
+		About: "Matt Drudge's link aggregator, headline by headline. The feed carries the site's link list as it updates.",
+	},
+	{
+		// Off the add grid for now (2026-09-05) -- the feeds view and its
+		// flood behaviour need another pass. Anyone who already has it keeps it.
+		ID: "rss_custom", Name: "Custom RSS", Category: "news", Source: "rss", Hidden: true,
 		Color: "#ee802f",
 		Description:   "Follow any RSS or Atom feed by pasting its URL.",
 		DefaultConfig: map[string]any{"feeds": []map[string]string{}},

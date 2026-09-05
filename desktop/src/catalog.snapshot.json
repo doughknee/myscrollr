@@ -1,5 +1,5 @@
 {
-    "version": "9036b3f6e1de4f68",
+    "version": "6e70d60047f305a3",
     "widgets": [
         {
             "id": "finance_stocks",
@@ -601,6 +601,32 @@
             "order": 25
         },
         {
+            "id": "news_drudge",
+            "name": "Drudge Report",
+            "description": "The Drudge Report's headline links, as they post.",
+            "source": "rss",
+            "category": "news",
+            "color": "#4b5563",
+            "logo_url": "https://icon.horse/icon/drudgereport.com",
+            "logo_light": true,
+            "default_config": {
+                "feeds": [
+                    {
+                        "name": "Drudge Report",
+                        "url": "https://feeds.feedburner.com/DrudgeReportFeed"
+                    }
+                ]
+            },
+            "required_tier": "free",
+            "about": "Matt Drudge's link aggregator, headline by headline. The feed carries the site's link list as it updates.",
+            "usage": [
+                "Headlines refresh automatically as new stories publish.",
+                "Open any headline from the feed to read the full story.",
+                "Pin it to keep the latest news in view."
+            ],
+            "order": 26
+        },
+        {
             "id": "rss_custom",
             "name": "Custom RSS",
             "description": "Follow any RSS or Atom feed by pasting its URL.",
@@ -617,7 +643,8 @@
                 "Add as many feeds as you like — they merge into one stream.",
                 "Perfect for niche blogs, newsletters, or subreddits with a feed."
             ],
-            "order": 26
+            "order": 27,
+            "hidden": true
         },
         {
             "id": "fantasy_yahoo",
@@ -634,7 +661,7 @@
                 "Leagues, matchups, and standings sync automatically.",
                 "Live scoring updates while your players are on the field."
             ],
-            "order": 27
+            "order": 28
         },
         {
             "id": "predictions",
@@ -651,7 +678,7 @@
                 "Follow the events and questions you care about.",
                 "Display-only — Scrollr shows the market, it never places a trade."
             ],
-            "order": 28
+            "order": 29
         },
         {
             "id": "clock",
@@ -660,7 +687,7 @@
             "category": "utility",
             "color": "#6366f1",
             "required_tier": "free",
-            "order": 29
+            "order": 30
         },
         {
             "id": "timer",
@@ -669,7 +696,7 @@
             "category": "utility",
             "color": "#f59e0b",
             "required_tier": "free",
-            "order": 30
+            "order": 31
         },
         {
             "id": "weather",
@@ -678,7 +705,7 @@
             "category": "utility",
             "color": "#0ea5e9",
             "required_tier": "free",
-            "order": 31
+            "order": 32
         },
         {
             "id": "sysmon",
@@ -687,7 +714,7 @@
             "category": "utility",
             "color": "#06b6d4",
             "required_tier": "free",
-            "order": 32
+            "order": 33
         },
         {
             "id": "uptime",
@@ -697,7 +724,7 @@
             "color": "#10b981",
             "logo_url": "https://icon.horse/icon/uptime.kuma.pet",
             "required_tier": "free",
-            "order": 33
+            "order": 34
         },
         {
             "id": "github",
@@ -707,7 +734,7 @@
             "color": "#f97316",
             "logo_url": "https://icon.horse/icon/github.com",
             "required_tier": "free",
-            "order": 34
+            "order": 35
         }
     ]
 }

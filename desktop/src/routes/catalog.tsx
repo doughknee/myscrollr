@@ -97,7 +97,9 @@ function CatalogPage() {
   // The catalog is the one surface whose entire content IS the catalog,
   // so it subscribes: a refresh must swap the shelves underneath it.
   const catalogVersion = useCatalog();
-  const allItems = useMemo(() => getCatalogItems(), [catalogVersion]);
+  // Hidden entries are off the add grid but still resolve by id, so a
+  // widget someone already has keeps its name, colour and page.
+  const allItems = useMemo(() => getCatalogItems().filter((i) => !i.hidden), [catalogVersion]);
 
   // Deliberately two different sets. "Added" counts every row so a
   // disabled widget still reads as added and can't be added twice; the
