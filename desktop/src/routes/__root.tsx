@@ -14,7 +14,7 @@ import {
 } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   enable as enableAutostart,
   disable as disableAutostart,
@@ -62,14 +62,11 @@ import {
   savePref,
   loadPrefs,
   savePrefs,
-  toggleWidgetOnTicker,
   reconcileSidebarOrder,
   resolveThemeMode,
 } from "../preferences";
 import {
-  isDataWidgetOnTicker,
-  getEffectiveWidgetTickerStatus,
-} from "../utils/tickerStatus";
+  } from "../utils/tickerStatus";
 import type { AppPreferences } from "../preferences";
 import { showTipOnce, TIP_IDS } from "../lib/tips";
 
@@ -88,8 +85,9 @@ import { useDeliveryHealth } from "../hooks/useDeliveryHealth";
 import { useNavHistory } from "../hooks/useNavHistory";
 import { useStartupUpdateCheck } from "../hooks/useStartupUpdateCheck";
 import { weatherQueryOptions } from "../api/queries";
-import { fetchSubscription, toggleDataWidgetVisibility } from "../api/client";
-import type { WidgetId } from "../api/client";
+import { fetchSubscription } from "../api/client";
+import { useToggleOnTicker } from "../hooks/useToggleOnTicker";
+import { isOnTicker } from "../utils/tickerMembership";
 import { queryKeys } from "../api/queries";
 import { getValidToken } from "../auth";
 
@@ -548,24 +546,20 @@ function RootLayout() {
     [navigate],
   );
 
-  const handleToggleItemTicker = useCallback(
-    async (source: { id: string; kind: "data" | "utility"; onTicker: boolean }) => {
-      if (source.kind !== "data") {
-        persistPrefs(toggleWidgetOnTicker(prefs, source.id));
-        return;
-      }
-      const visible = !source.onTicker;
-      try {
-        await toggleDataWidgetVisibility(source.id as WidgetId, visible, true);
-        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
-      } catch (err) {
-        console.error("[Scrollr] Widget toggle failed:", err);
-        toast.error(
-          `Couldn't ${visible ? "show" : "hide"} ${catalogItemById(source.id)?.name ?? source.id}`,
-        );
-      }
+  // The same toggle the ticker window's menu uses (hooks/useToggleOnTicker).
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
+  const toggleOnTicker = useToggleOnTicker({
+    getPrefs: () => prefsRef.current,
+    persistPrefs,
+    onError: (id, on, err) => {
+      console.error("[Scrollr] Widget toggle failed:", err);
+      toast.error(`Couldn't ${on ? "show" : "hide"} ${catalogItemById(id)?.name ?? id}`);
     },
-    [prefs, persistPrefs, queryClient],
+  });
+  const handleToggleItemTicker = useCallback(
+    (source: { id: string }) => void toggleOnTicker(source.id),
+    [toggleOnTicker],
   );
 
   const handleRemoveItem = useCallback(
@@ -626,7 +620,7 @@ function RootLayout() {
             // row-assigned widgets read permanently "on" and the menu
             // toggle one-way. The effective helper is what the feed page
             // uses for exactly this question.
-            onTicker: isDataWidgetOnTicker(prefs, widget),
+            onTicker: isOnTicker(prefs, dashboard?.widgets ?? [], id),
           });
         }
       } else if (enabledWidgetIds.has(id)) {
@@ -644,8 +638,7 @@ function RootLayout() {
             // widgets live in widgetsOnTicker/pinnedWidgets and never
             // appear in rows[].sources — the raw getter read them as
             // "off" and inverted the menu toggle.
-            onTicker:
-              getEffectiveWidgetTickerStatus(prefs, id).kind !== "off",
+            onTicker: isOnTicker(prefs, dashboard?.widgets ?? [], id),
           });
         }
       }

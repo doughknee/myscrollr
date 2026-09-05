@@ -16,7 +16,7 @@ pub fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let open = MenuItemBuilder::with_id("open", "Open Scrollr").build(app)?;
     let sep1 = PredefinedMenuItem::separator(app)?;
     let toggle_ticker = MenuItemBuilder::with_id("toggle_ticker", "Toggle Ticker").build(app)?;
-    let pin_on_top = CheckMenuItemBuilder::with_id("pin_on_top", "Pin on Top")
+    let pin_on_top = CheckMenuItemBuilder::with_id("pin_on_top", "Always on Top")
         .checked(false)
         .build(app)?;
     let sep2 = PredefinedMenuItem::separator(app)?;

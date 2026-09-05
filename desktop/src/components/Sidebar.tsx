@@ -343,6 +343,9 @@ export default function Sidebar({
                   e.preventDefault();
                   setMenu({ source, x: e.clientX, y: e.clientY });
                 }}
+                onTicker={source.onTicker}
+                onToggleTicker={() => onToggleItemTicker(source)}
+                accent={source.hex}
               />
             </motion.div>
           ))}
@@ -534,6 +537,9 @@ function NavItem({
   collapsed,
   onClick,
   onContextMenu,
+  onTicker,
+  onToggleTicker,
+  accent,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -542,30 +548,91 @@ function NavItem({
   onClick: () => void;
   /** Right-click handler — source rows open their context menu. */
   onContextMenu?: (e: React.MouseEvent) => void;
+  /**
+   * Whether this source has chips on the ticker. When given, the row
+   * carries an "on air" mark: a dot in the source's colour when on, a
+   * hollow one when off, so the whole list answers "what is on my bar"
+   * at a glance. Hovering the row turns the mark into the toggle.
+   */
+  onTicker?: boolean;
+  onToggleTicker?: () => void;
+  accent?: string;
 }) {
+  const hasTicker = onTicker !== undefined && !!onToggleTicker;
+  const tickerLabel = onTicker ? "On the ticker — click to hide" : "Off the ticker — click to show";
   return (
     <Tooltip content={collapsed ? label : undefined} side="right">
-      <button
-        onClick={onClick}
-        onContextMenu={onContextMenu}
-        data-sidebar-active={active}
-        aria-current={active ? "page" : undefined}
-        aria-label={collapsed ? label : undefined}
+      <div
         className={clsx(
-          "relative flex items-center w-full rounded-lg font-medium",
-          collapsed
-            ? "justify-center py-1.5 px-0"
-            : "gap-2.5 px-2.5 py-1.5 text-ui-body",
+          "group relative flex items-center w-full rounded-lg font-medium",
+          collapsed ? "justify-center" : "",
           active ? "text-fg" : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
         )}
       >
-        <span className="relative z-10 shrink-0 flex items-center justify-center w-5 h-5">
-          {icon}
-        </span>
-        {!collapsed && (
-          <span className="relative z-10 truncate">{label}</span>
+        <button
+          onClick={onClick}
+          onContextMenu={onContextMenu}
+          data-sidebar-active={active}
+          aria-current={active ? "page" : undefined}
+          aria-label={collapsed ? label : undefined}
+          className={clsx(
+            "relative flex min-w-0 flex-1 items-center rounded-lg text-left",
+            collapsed
+              ? "justify-center py-1.5 px-0"
+              : "gap-2.5 px-2.5 py-1.5 text-ui-body",
+          )}
+        >
+          <span className="relative z-10 shrink-0 flex items-center justify-center w-5 h-5">
+            {icon}
+            {/* Collapsed: the mark rides the icon's corner. */}
+            {hasTicker && collapsed && (
+              <span
+                aria-hidden
+                data-testid="ticker-mark"
+                data-on={onTicker}
+                className={clsx(
+                  "absolute -right-0.5 -bottom-0.5 h-2 w-2 rounded-full border-2 border-surface",
+                  onTicker ? "" : "bg-fg-4/50",
+                )}
+                style={onTicker ? { background: accent } : undefined}
+              />
+            )}
+          </span>
+          {!collapsed && (
+            <span className="relative z-10 truncate">{label}</span>
+          )}
+        </button>
+        {hasTicker && !collapsed && (
+          <Tooltip content={tickerLabel} side="right">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={onTicker}
+              aria-label={`${label}: ${tickerLabel}`}
+              data-testid="ticker-toggle"
+              data-on={onTicker}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleTicker?.();
+              }}
+              className={clsx(
+                "relative z-10 mr-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                "transition-colors hover:bg-surface-2",
+              )}
+            >
+              {/* The mark itself: filled in the source's colour when on, hollow when off. */}
+              <span
+                aria-hidden
+                className={clsx(
+                  "block h-2 w-2 rounded-full transition-colors",
+                  onTicker ? "" : "border border-fg-4/60 group-hover:border-fg-3",
+                )}
+                style={onTicker ? { background: accent, boxShadow: `0 0 6px ${accent}80` } : undefined}
+              />
+            </button>
+          </Tooltip>
         )}
-      </button>
+      </div>
     </Tooltip>
   );
 }
