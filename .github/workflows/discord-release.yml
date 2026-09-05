@@ -1,0 +1,60 @@
+# Announce a published desktop release in Discord with its real notes.
+#
+# Why a separate workflow, on `release: published`, rather than a last job
+# in desktop-release.yml: that workflow runs on push to main and creates a
+# DRAFT release with a placeholder body; the hand-written notes only exist
+# once the draft is published by hand (v1.5.1: built 21:10, published
+# 21:25). A job at the end of the build would announce a draft nobody can
+# download yet, with "See the full changelog" as the notes, and
+# `github.ref_name` there is `main`, not the tag. Publishing the draft is
+# what fires this, and `github.event.release` carries the final title,
+# URL and body -- no API calls needed.
+#
+# Replaces the repo-level GitHub -> Discord webhook, whose payload for
+# release events is a fixed one-liner without the body. Delete that webhook
+# (Settings -> Webhooks, the URL ending in /github) or every release posts
+# twice: once bare from the bot, once from here. REL-193.
+name: Announce Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  announce:
+    if: startsWith(github.event.release.tag_name, 'desktop-v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post release to Discord
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          NAME: ${{ github.event.release.name }}
+          URL: ${{ github.event.release.html_url }}
+          BODY: ${{ github.event.release.body }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then echo "No webhook configured, skipping"; exit 0; fi
+
+          # Discord embeds do not render markdown headings; promote them to
+          # bold. Notes typed in the web editor arrive with CRLF, which
+          # would defeat the `$` anchor, so strip CRs first.
+          printf '%s' "$BODY" | tr -d '\r' | sed -E 's/^#{1,3} (.*)$/**\1**/' > body.txt
+
+          # jq builds the payload -- release notes carry quotes, emoji and
+          # newlines that break hand-rolled JSON -- and does the length cap,
+          # so a multi-byte character is never split (Discord's limit is
+          # 4096 characters; the title still links to the full notes).
+          jq -n --arg n "Scrollr $NAME" --rawfile b body.txt --arg u "$URL" '{
+            content: "Update at <https://myscrollr.com/download>.",
+            embeds: [{
+              title: $n,
+              url: $u,
+              description: ($b | if length > 3900 then .[:3900] + "…" else . end),
+              color: 8313509
+            }]
+          }' > payload.json
+
+          curl -sS --fail-with-body -X POST -H "Content-Type: application/json" -d @payload.json "$WEBHOOK"
+          echo "Announced $NAME"
