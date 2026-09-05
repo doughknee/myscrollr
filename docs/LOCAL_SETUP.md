@@ -139,6 +139,33 @@ nothing containing user data (`yahoo_*`, `user_*`, `stripe_*`, `support_*`)
 is touched, which is what makes the snapshot safe to commit. Commit the
 regenerated `scripts/dev/seed.sql.gz`.
 
+## Driving the app from a script
+
+The dev build listens for commands from the dev server, so a script (or an
+AI agent) can set state in either window and read back what it rendered:
+
+```bash
+node scripts/dev/devctl.mjs ticker 'text().slice(0, 200)'          # what the bar shows
+node scripts/dev/devctl.mjs main 'router.navigate({ to: "/catalog" })'
+node scripts/dev/devctl.mjs main 'savePrefs({ ...prefs(), appearance: { ...prefs().appearance, themeMode: "light" } })'
+```
+
+`prefs()`, `savePrefs`, `qc` (the query client), `invoke`, `text()`, `rect()` and
+`router` (main window) are in scope; `await import("/src/…")` reaches anything
+else. Set prefs from the **main** window: the ticker listens cross-window and
+ignores writes that match its own cache. Dev builds only.
+
+To see a window as it really is, capture it (no screen grab, other windows do
+not matter):
+
+```bash
+powershell -File scripts/dev/capture-window.ps1 -Title "Scrollr Ticker" -Out ticker.png
+```
+
+`make screenshots` chains the two to re-shoot every ticker screenshot on the
+website (theme × density × channel) from the running app, then runs the site's
+optimizer. It puts your prefs and bar back afterwards. Windows only.
+
 ## Predictions (Kalshi) — optional
 
 Off unless you have a key, and you probably do not need one: `make seed`

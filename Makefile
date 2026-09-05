@@ -42,7 +42,7 @@ COMPOSE_AUTO  = $(shell [ -f secrets/predictions.docker.env ] && echo "$(COMPOSE
 
 .DEFAULT_GOAL := help
 .PHONY: help setup doctor up down restart rebuild reset logs ps shell \
-        web desktop dev kalshi-key check
+        web desktop dev screenshots kalshi-key check
 
 # ── Help ─────────────────────────────────────────────────────────────
 # Targets are documented with `##<group>: description` and grouped below.
@@ -126,6 +126,9 @@ web: ##run: Marketing site only, natively (Vite :3000)
 
 desktop: ##run: Desktop app only, natively (Tauri)
 	@cd desktop && npm run tauri:dev
+
+screenshots: ##run: Re-shoot the site's ticker screenshots from the running dev app (Windows)
+	@cd myscrollr.com && node scripts/capture-ticker.mjs $(args)
 
 # ── Iterate ──────────────────────────────────────────────────────────
 # Editing Go/Rust source needs NO command here — the containers watch and

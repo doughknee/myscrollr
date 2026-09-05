@@ -12,9 +12,11 @@ import "./api/fetchOverride";
 import { initStore } from "./lib/store";
 import { createQueryClient } from "./query";
 import App from "./App";
+import { startDevBus } from "./dev/bus";
 import "./style.css";
 
 const queryClient = createQueryClient();
+startDevBus("ticker", { qc: queryClient });
 
 initStore().catch((err) => console.error("[Scrollr] Store init failed:", err)).then(() => {
   ReactDOM.createRoot(document.getElementById("root")!).render(

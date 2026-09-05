@@ -306,7 +306,7 @@ export default function ScrollrTicker({
 
   const chips = useMemo(() => {
     const wrap = (key: string, chip: React.ReactNode, rotateSlot?: string) => (
-      <div key={key} className="py-1" data-rotate-slot={rotateSlot}>
+      <div key={key} className="py-1" data-chip="" data-rotate-slot={rotateSlot}>
         {chip}
       </div>
     );

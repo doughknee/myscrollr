@@ -13,6 +13,7 @@ import "./api/fetchOverride";
 import { initStore } from "./lib/store";
 import { createQueryClient } from "./query";
 import { createAppRouter } from "./router";
+import { startDevBus } from "./dev/bus";
 import "./style.css";
 // Sonner CSS must ship in the entry bundle, not a code-split route chunk,
 // so toasts fired during/right after first paint are styled correctly.
@@ -22,6 +23,7 @@ const queryClient = createQueryClient();
 
 initStore().catch((err) => console.error("[Scrollr] Store init failed:", err)).then(() => {
   const router = createAppRouter(queryClient);
+  startDevBus("main", { qc: queryClient, router });
 
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <StrictMode>

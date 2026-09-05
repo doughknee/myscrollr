@@ -211,6 +211,7 @@ Components are rendered at build time in a Node environment. Any module-scope ac
 - Commands: `#[tauri::command]`, `Result<(), String>` + `.map_err(|e| format!("context: {e}"))`.
 - State: custom structs via `app.manage()`. Two windows: `ticker` (always-on-top, 1920x228) and `main` (960x640 default). Close hides instead of destroying.
 - MCP bridge plugin: opt-in behind the `dev-mcp-bridge` Cargo feature, dev-only, non-Windows — `#[cfg(all(feature = "dev-mcp-bridge", debug_assertions, not(target_os = "windows")))]`. Release builds never link the crate. Run it with `npm run tauri:dev:mcp`.
+- Dev command bus (works on Windows, where the MCP bridge does not): `node scripts/dev/devctl.mjs <ticker|main> '<js>'` runs code inside a window of the running dev build and prints the result. It is a Vite middleware (`desktop/scripts/dev-bus.ts`) plus a poller behind `import.meta.env.DEV` (`desktop/src/dev/bus.ts`); nothing of it exists in a release build. Change prefs from the `main` window -- the ticker listens cross-window and ignores its own writes. `scripts/dev/capture-window.ps1 -Title "Scrollr Ticker" -Out x.png` captures a window pixel-exact (PrintWindow, no screen grab). `make screenshots` chains both to re-shoot the site's ticker screenshots.
 
 ## Architecture Rules
 
