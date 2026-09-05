@@ -6,6 +6,14 @@ Operational guide for AI coding agents working in this repository.
 
 MyScrollr aggregates financial market data, sports scores, RSS feeds, and Yahoo Fantasy Sports. Tauri desktop app (primary product), React marketing website, Go gateway API, and independent channel services. Infrastructure: PostgreSQL, Redis, Logto (auth), Sequin (CDC), Stripe (billing). Deployed on DigitalOcean Kubernetes (DOKS) with images stored in DigitalOcean Container Registry (DOCR). See `k8s/` for manifests and `.github/workflows/deploy.yml` for the build-and-deploy pipeline.
 
+## Ticker chips
+
+Before building or changing any chip on the ticker (`desktop/src/components/chips/`,
+any `desktop/src/datawidgets/*/ticker.tsx`), read **`docs/CHIP_SPEC.md`** in full and
+follow its build recipe (§12) and review checklist (§13). It is the exact contract:
+geometry, reservations, palette fields, the ticker's horizon/slot/rotation rules, and
+the traps. `docs/CHIP_DESIGN.md` is the short human version.
+
 ## Repository Layout
 
 Monorepo — each component is independently deployable with its own dependencies:
