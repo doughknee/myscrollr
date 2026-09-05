@@ -77,11 +77,17 @@ WITH live AS (
   SELECT id, sport, extract(epoch FROM (now() - start_time)) / 60.0 AS mins
   FROM games WHERE state = 'in'
 ), roll AS (
+  -- Real scoring rates, per side, per tick. Derived from a typical game and
+  -- the sport's length: MLB ~4.5 runs a side over 170 min, college football
+  -- ~4 scoring plays a side over 190, soccer ~1.3 goals a side over 110, AFL
+  -- ~25 scoring shots a side over 130. Scaled by the tick length so TICK=5
+  -- does not triple the scoring. The first version rolled ~15x too often
+  -- and had the Red Sox 14 runs up in the second inning.
   SELECT l.id, l.sport, l.mins,
-         random() < CASE l.sport WHEN 'baseball' THEN 0.10 WHEN 'american-football' THEN 0.08
-                                 WHEN 'football' THEN 0.03 WHEN 'afl' THEN 0.12 ELSE 0.0 END AS home_scores,
-         random() < CASE l.sport WHEN 'baseball' THEN 0.10 WHEN 'american-football' THEN 0.08
-                                 WHEN 'football' THEN 0.03 WHEN 'afl' THEN 0.12 ELSE 0.0 END AS away_scores,
+         random() < (:tick / 15.0) * CASE l.sport WHEN 'baseball' THEN 0.0066 WHEN 'american-football' THEN 0.0053
+                                 WHEN 'football' THEN 0.0030 WHEN 'afl' THEN 0.048 ELSE 0.0 END AS home_scores,
+         random() < (:tick / 15.0) * CASE l.sport WHEN 'baseball' THEN 0.0066 WHEN 'american-football' THEN 0.0053
+                                 WHEN 'football' THEN 0.0030 WHEN 'afl' THEN 0.048 ELSE 0.0 END AS away_scores,
          CASE l.sport WHEN 'american-football' THEN (ARRAY[3,7,7,6])[1 + floor(random()*4)::int]
                       WHEN 'afl' THEN (ARRAY[1,6,6])[1 + floor(random()*3)::int] ELSE 1 END AS pts
   FROM live l
@@ -158,7 +164,7 @@ drop_caches() {
 }
 
 tick() {
-  printf '%s' "$TICK_SQL" | psql_in -q
+  printf '%s' "$TICK_SQL" | psql_in -q -v "tick=$TICK"
   drop_caches
 }
 
@@ -184,6 +190,22 @@ psql_in -q -c "
   )
   UPDATE games g SET start_time = now() - (random() * interval '25 minutes') - interval '1 minute'
   FROM soon WHERE g.id = soon.id;"
+
+# Keep the day ahead populated. Each start eats the nearest fixtures, and the
+# snapshot's schedule has gaps, so after a few starts nothing is due for a
+# day and the bar is live games and finals only. If fewer than ten fixtures
+# fall in the next 24h, pull the next twenty forward and spread them over
+# the coming six hours -- they still kick off in order, just sooner.
+psql_in -q -c "
+  WITH due AS (
+    SELECT count(*) AS n FROM games WHERE state = 'pre' AND start_time BETWEEN now() AND now() + interval '24 hours'
+  ), next AS (
+    SELECT id, row_number() OVER (ORDER BY start_time) AS k
+    FROM games WHERE state = 'pre' AND start_time > now() + interval '24 hours'
+    ORDER BY start_time LIMIT 20
+  )
+  UPDATE games g SET start_time = now() + (next.k * interval '18 minutes')
+  FROM next, due WHERE g.id = next.id AND due.n < 10;"
 
 tick
 echo "[live] $(status)"
