@@ -111,6 +111,13 @@ seed-capture: ##setup: Re-record the dev dataset from SOURCE_DATABASE_URL
 seed-capture-prod: ##setup: Re-record the dev dataset from PRODUCTION (needs kubectl)
 	@$(SHELL) scripts/dev/seed.sh capture --from-cluster
 
+# The seed is a snapshot and does not move. This gives it a clock: games kick
+# off, scores change, finals land, prices drift, and the app's caches are
+# dropped each tick so what you see is what is in the database. No upstream
+# requests, no API keys. Ctrl-C to stop. Re-anchors the data on "now" first.
+live: ##run: Make the seeded dev data move (games, scores, prices) — no API calls
+	@$(SHELL) scripts/dev/live.sh
+
 dev: up ##run: Backend, then web + desktop in their own windows
 	@$(SHELL) scripts/dev/launch-frontends.sh
 

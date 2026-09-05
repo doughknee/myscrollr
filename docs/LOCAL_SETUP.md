@@ -6,6 +6,11 @@ Three commands from a fresh clone:
 make setup   # generate every .env file (once)
 make up      # start the whole backend
 make seed    # load the dev dataset (no API keys, no API calls)
+
+The seed is a snapshot and does not move on its own; a day later the ticker shows only
+floors and stale finals. `make live` re-anchors it on "now" and then advances it every
+few seconds (games kick off, scores change, finals land, prices drift) with no upstream
+requests. Ctrl-C to stop. `scripts/dev/seed.sh rebase` re-anchors without the loop.
 ```
 
 Then `make dev` to also open the marketing site and the desktop app, or
