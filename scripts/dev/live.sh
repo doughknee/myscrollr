@@ -185,8 +185,10 @@ bash scripts/dev/seed.sh rebase
 # Spread over the last 25 minutes so the clocks differ.
 psql_in -q -c "
   WITH soon AS (
+    -- Only up to six live at once: a restart must not pile more on.
     SELECT id FROM games WHERE state = 'pre' AND start_time > now()
-    ORDER BY start_time LIMIT 6
+    ORDER BY start_time
+    LIMIT greatest(0, 6 - (SELECT count(*) FROM games WHERE state = 'in'))
   )
   UPDATE games g SET start_time = now() - (random() * interval '25 minutes') - interval '1 minute'
   FROM soon WHERE g.id = soon.id;"
