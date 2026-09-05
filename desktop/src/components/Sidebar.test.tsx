@@ -284,11 +284,20 @@ describe("Sidebar ticker mark", () => {
     expect(onSelectItem).not.toHaveBeenCalled();
   });
 
-  it("keeps the mark on the icon's corner when collapsed", () => {
+  it("marks only the OFF rows when collapsed, and leaves on rows clean", () => {
     renderWithTicker(true);
     const marks = screen.getAllByTestId("ticker-mark");
-    expect(marks.map((m) => m.dataset.on)).toEqual(["true", "false"]);
-    // No switch in the collapsed rail: the row is the toggle's context menu.
+    expect(marks).toHaveLength(1);
+    expect(marks[0].dataset.on).toBe("false");
+    // No switch in the collapsed rail: the row's context menu is the toggle.
     expect(screen.queryByRole("switch")).toBeNull();
+  });
+
+  it("recedes a row that is off the ticker, so on is the normal look", () => {
+    renderWithTicker();
+    const off = screen.getByRole("button", { name: "Clock" });
+    const on = screen.getByRole("button", { name: "MLB" });
+    expect(off.dataset.offTicker).toBe("true");
+    expect(on.dataset.offTicker).toBeUndefined();
   });
 });

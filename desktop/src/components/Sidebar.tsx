@@ -573,6 +573,7 @@ function NavItem({
           onClick={onClick}
           onContextMenu={onContextMenu}
           data-sidebar-active={active}
+          data-off-ticker={hasTicker && !onTicker ? "true" : undefined}
           aria-current={active ? "page" : undefined}
           aria-label={collapsed ? label : undefined}
           className={clsx(
@@ -580,22 +581,26 @@ function NavItem({
             collapsed
               ? "justify-center py-1.5 px-0"
               : "gap-2.5 px-2.5 py-1.5 text-ui-body",
+            // Off the ticker is the exception, so it is the state that
+            // shows: the row recedes. On is the norm and looks normal.
+            hasTicker && !onTicker && "opacity-50 saturate-50",
           )}
         >
           <span className="relative z-10 shrink-0 flex items-center justify-center w-5 h-5">
             {icon}
             {/* Collapsed: the mark rides the icon's corner. */}
-            {hasTicker && collapsed && (
+            {hasTicker && collapsed && !onTicker && (
+              // Collapsed rail, off the ticker: a small slash across the
+              // icon's corner. Nothing is drawn when it is on -- the
+              // normal state has no badge to compete with the icon.
               <span
                 aria-hidden
                 data-testid="ticker-mark"
-                data-on={onTicker}
-                className={clsx(
-                  "absolute -right-0.5 -bottom-0.5 h-2 w-2 rounded-full border-2 border-surface",
-                  onTicker ? "" : "bg-fg-4/50",
-                )}
-                style={onTicker ? { background: accent } : undefined}
-              />
+                data-on="false"
+                className="absolute -right-1 -bottom-1 flex h-3 w-3 items-center justify-center rounded-full border border-surface bg-surface-2"
+              >
+                <span className="block h-[7px] w-[1.5px] rotate-45 rounded bg-fg-3" />
+              </span>
             )}
           </span>
           {!collapsed && (
@@ -617,17 +622,20 @@ function NavItem({
               }}
               className={clsx(
                 "relative z-10 mr-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
-                "transition-colors hover:bg-surface-2",
+                "transition-opacity hover:bg-surface-2",
+                // On: the affordance appears only when the row is hovered,
+                // so a list where everything is on stays quiet. Off: it is
+                // always there, because off is the thing worth noticing.
+                onTicker && "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
               )}
             >
-              {/* The mark itself: filled in the source's colour when on, hollow when off. */}
               <span
                 aria-hidden
                 className={clsx(
                   "block h-2 w-2 rounded-full transition-colors",
-                  onTicker ? "" : "border border-fg-4/60 group-hover:border-fg-3",
+                  onTicker ? "" : "border-[1.5px] border-fg-3",
                 )}
-                style={onTicker ? { background: accent, boxShadow: `0 0 6px ${accent}80` } : undefined}
+                style={onTicker ? { background: accent } : undefined}
               />
             </button>
           </Tooltip>
