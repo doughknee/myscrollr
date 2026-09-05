@@ -188,6 +188,7 @@ export interface WidgetDef {
   about?: string;
   usage?: string[];
   order: number;
+  hidden?: boolean;
 }
 
 export interface WidgetLimits {

@@ -486,6 +486,9 @@ load() {
 
   echo "[seed] rebasing timestamps to now"
   psql_in "$LOCAL_DB" -q -c "$REBASE_SQL"
+  # Stamp the anchor so a later `rebase` (what `make live` runs first) is a
+  # no-op instead of shifting the schedule a second time -- see rebase().
+  psql_in "$LOCAL_DB" -q -c "UPDATE games SET updated_at = now();"
 
   # Core caches every widget read in Redis for 10-30s (cache:finance,
   # cache:sports, cache:public:feed, ...). Seeding changes the data those
@@ -530,8 +533,39 @@ for arg in "$@"; do
   esac
 done
 
+# Re-anchor the seeded data on "now" without reloading it. The dataset is a
+# snapshot: it does not move on its own, so two days after `make seed` every
+# fixture that was "tonight" is in the past and the app looks broken. This is
+# what `make live` runs first, and what to run by hand after a long gap.
+rebase() {
+  echo "[seed] rebasing timestamps to now"
+  psql_in "$LOCAL_DB" -q -c "$REBASE_SQL"
+  # Move the anchor WITH the data. REBASE_SQL shifts every time column by
+  # (now - max(games.updated_at)) and leaves updated_at alone so the anchor
+  # is stable across its own statements -- which also means a second run
+  # shifts by the same amount again and lands the schedule two days in the
+  # future. `load` runs once per dataset so it never noticed; `make live`
+  # runs this every start. Stamping the anchor makes the next run a no-op.
+  psql_in "$LOCAL_DB" -q -c "UPDATE games SET updated_at = now();"
+  drop_caches
+  echo "[seed] rebased."
+}
+
+drop_caches() {
+  local keys
+  keys="$(redis_in --scan --pattern 'cache:*' 2>/dev/null | tr '
+' ' ')"
+  # shellcheck disable=SC2086
+  [ -n "$keys" ] && redis_in DEL $keys >/dev/null 2>&1 || true
+  keys="$(redis_in --scan --pattern 'dashboard:*' 2>/dev/null | tr '
+' ' ')"
+  # shellcheck disable=SC2086
+  [ -n "$keys" ] && redis_in DEL $keys >/dev/null 2>&1 || true
+}
+
 case "$cmd" in
   load)    load ;;
   capture) capture ;;
-  *) echo "usage: seed.sh {load|capture [--from-cluster]}" >&2; exit 2 ;;
+  rebase)  rebase ;;
+  *) echo "usage: seed.sh {load|capture [--from-cluster]|rebase}" >&2; exit 2 ;;
 esac

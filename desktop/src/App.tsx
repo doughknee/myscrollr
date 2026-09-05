@@ -9,8 +9,8 @@ import { Menu, Submenu, CheckMenuItem, MenuItem, PredefinedMenuItem } from "@tau
 import { dashboardQueryOptions, queryKeys } from "./api/queries";
 import { onStoreChange, setStore } from "./lib/store";
 import ScrollrTicker from "./components/ScrollrTicker";
-import TickerToolbar from "./components/TickerToolbar";
-import { useReliableHover } from "./hooks/useReliableHover";
+import { useToggleOnTicker } from "./hooks/useToggleOnTicker";
+import { isOnTicker } from "./utils/tickerMembership";
 import {
   getValidToken,
   isAuthenticated as checkAuth,
@@ -29,10 +29,8 @@ import {
   TICKER_GAPS,
   TICKER_HEIGHTS,
   toggleWidgetPin,
-  toggleWidgetOnTicker,
-} from "./preferences";
+  } from "./preferences";
 import type { SubscriptionTier } from "./auth";
-import type { WidgetId } from "./api/client";
 import type { DeliveryMode } from "./types";
 import type { AppPreferences, TickerPosition } from "./preferences";
 import { getCatalogItems, sourceForWidget } from "./marketplace";
@@ -177,20 +175,11 @@ export default function App() {
     loadPref("tickerPosition", "top"),
   );
 
-  // Hover state for toolbar visibility.
-  //
-  // We use a custom `useReliableHover` hook instead of plain
-  // `onMouseEnter` / `onMouseLeave` because the ticker is a
-  // borderless, always-on-top Tauri window where standard
-  // `mouseleave` sticks: alt-tabbing, switching desktops, or
-  // clicking through to a window behind the ticker leaves the
-  // hover state stuck in `true`, keeping the toolbar visible and
-  // the persistent right-click hint hidden indefinitely. The hook
-  // layers `pointerleave` + `window.blur` +
-  // `document.visibilitychange` + a grace-poll backstop so the
-  // state always settles back to `false` when the user's
-  // attention is elsewhere. See `hooks/useReliableHover.ts`.
-  const { hovered, bind: hoverBind } = useReliableHover();
+  // The ticker window has no hover chrome. Every action lives in the
+  // right-click menu and the system tray; the hover toolbar that used to
+  // sit on the right edge was the thing users found rather than the menu,
+  // and it duplicated three of the menu's items.
+
 
   // Settings preferences
   const [prefs, setPrefs] = useState<AppPreferences>(loadPrefs);
@@ -501,27 +490,15 @@ export default function App() {
   // handlers mirror the row-change logic in routes/feed.tsx exactly.
   // See preferences.ts §"Unified ticker row selector helpers".
 
-  const handleDataWidgetTickerChange = useCallback(
-    async (widgetType: WidgetId, onTicker: boolean) => {
-      // Server-side only: a data widget's ticker membership lives on
-      // DataWidgetRow.ticker_enabled, not in prefs.
-      try {
-        await toggleDataWidgetVisibility(widgetType, onTicker);
-        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
-      } catch {
-        // Silently fail — will sync on next dashboard poll/CDC event.
-      }
+  // One toggle for both kinds of widget, shared with the main window's
+  // sidebar so the two surfaces cannot drift (utils/tickerMembership).
+  const toggleOnTicker = useToggleOnTicker({
+    getPrefs: () => prefsRef.current,
+    persistPrefs: (next) => {
+      setPrefs(next);
+      savePrefs(next);
     },
-    [queryClient],
-  );
-
-  const handleWidgetTickerChange = useCallback((widgetId: string) => {
-    setPrefs((prev) => {
-      const updated = toggleWidgetOnTicker(prev, widgetId);
-      savePrefs(updated);
-      return updated;
-    });
-  }, []);
+  });
 
   // ── Widget pin toggle (hover icon on consolidated chip) ─────────
 
@@ -624,21 +601,12 @@ export default function App() {
         const label =
           metaById.get(ch.widget_type)?.name ??
           `${ch.widget_type.charAt(0).toUpperCase()}${ch.widget_type.slice(1)}`;
-        const onTicker = isWidgetTickerEnabled(ch);
         widgetSubmenus.push(
           await CheckMenuItem.new({
             text: label,
-            checked: onTicker,
-            enabled: ch.enabled !== false,
-            action: () => {
-              // Optimistic — flip the ref so the next menu build reflects
-              // the change without waiting for the API round trip.
-              const target = widgetsRef.current.find(
-                (c) => c.widget_type === ch.widget_type,
-              );
-              if (target) target.ticker_enabled = !onTicker;
-              handleDataWidgetTickerChange(ch.widget_type, !onTicker);
-            },
+            // The same answer the sidebar gives: enabled AND ticker_enabled.
+            checked: isOnTicker(prefsRef.current, chs, ch.widget_type),
+            action: () => void toggleOnTicker(ch.widget_type),
           }),
         );
       }
@@ -667,8 +635,8 @@ export default function App() {
         widgetSubmenus.push(
           await CheckMenuItem.new({
             text: widget.name,
-            checked: wp.widgetsOnTicker.includes(widget.id),
-            action: () => handleWidgetTickerChange(widget.id),
+            checked: isOnTicker(prefsRef.current, chs, widget.id),
+            action: () => void toggleOnTicker(widget.id),
           }),
         );
       }
@@ -681,10 +649,13 @@ export default function App() {
 
       items.push(await PredefinedMenuItem.new({ item: "Separator" }));
 
-      // Pin on Top
+      // Always on top -- the WINDOW staying above others. Named for what it
+      // does, because "pin" already means parking a widget at the edge of
+      // the bar, and one word for two features is where the confusion
+      // started.
       items.push(
         await CheckMenuItem.new({
-          text: "Pin on Top",
+          text: "Always on Top",
           checked: prefsRef.current.window.pinned,
           action: handleToggleWindowPin,
         }),
@@ -752,7 +723,7 @@ export default function App() {
     }
     document.addEventListener("contextmenu", onContextMenu);
     return () => document.removeEventListener("contextmenu", onContextMenu);
-  }, [handleDataWidgetTickerChange, handleWidgetTickerChange, handleTogglePosition]);
+  }, [toggleOnTicker, handleTogglePosition]);
 
   // ── Merge widget + widget tabs ──────────────────────────────
   const activeTabs = useMemo(
@@ -768,15 +739,9 @@ export default function App() {
   const showTicker = prefs.ticker.showTicker;
 
   return (
-    <div id="desktop-shell" {...hoverBind}>
+    <div id="desktop-shell">
       {showTicker && (
         <>
-          <TickerToolbar
-            position={tickerPosition}
-            hovered={hovered}
-            onTogglePosition={handleTogglePosition}
-            onHideTicker={() => handleToggleTicker(true)}
-          />
           {(() => {
             // Empty-state CTAs, both gated on "the ticker would otherwise
             // render nothing":

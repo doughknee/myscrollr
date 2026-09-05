@@ -240,3 +240,64 @@ describe("Sidebar widget ordering", () => {
     expect(await screen.findByRole("menuitem", { name: "Move up" })).toBeDisabled();
   });
 });
+
+// ── On-air mark: what is on the ticker, at a glance, with a one-click toggle ──
+
+describe("Sidebar ticker mark", () => {
+  function renderWithTicker(collapsed = false) {
+    const onToggleItemTicker = vi.fn();
+    const onSelectItem = vi.fn();
+    const sources = [
+      { id: "sports_mlb", name: "MLB", hex: "#3b82f6", icon: TrendingUp, kind: "data" as const, onTicker: true },
+      { id: "clock", name: "Clock", hex: "#6366f1", icon: TrendingUp, kind: "utility" as const, onTicker: false },
+    ];
+    render(
+      <div id="app-shell">
+        <Sidebar
+          isCustomize={false} isAccount={false} isMarketplace={false} isSupport={false}
+          isUpdates={false} collapsed={collapsed} isStatus={false} isFeed={false}
+          activeItem="" tier="free"
+          health={{ state: "live", ageMs: 0, label: "Live", description: "Connected" }}
+          sources={sources}
+          onNavigateHome={() => {}} onNavigateToMarketplace={() => {}} onNavigateToCustomize={() => {}}
+          onNavigateToAccount={() => {}} onNavigateToSupport={() => {}} onNavigateToReleases={() => {}}
+          onNavigateToStatus={() => {}} onSelectItem={onSelectItem} onInfoItem={() => {}}
+          onToggleItemTicker={onToggleItemTicker} onMoveItem={() => {}} onRemoveItem={() => {}}
+        />
+      </div>,
+    );
+    return { onToggleItemTicker, onSelectItem };
+  }
+
+  it("shows each source's ticker state as a switch you can read without opening anything", () => {
+    renderWithTicker();
+    const on = screen.getByRole("switch", { name: /MLB: On the ticker/ });
+    const off = screen.getByRole("switch", { name: /Clock: Off the ticker/ });
+    expect(on).toHaveAttribute("aria-checked", "true");
+    expect(off).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("toggles on one click without navigating to the widget", () => {
+    const { onToggleItemTicker, onSelectItem } = renderWithTicker();
+    fireEvent.click(screen.getByRole("switch", { name: /Clock: Off the ticker/ }));
+    expect(onToggleItemTicker).toHaveBeenCalledWith(expect.objectContaining({ id: "clock" }));
+    expect(onSelectItem).not.toHaveBeenCalled();
+  });
+
+  it("marks only the OFF rows when collapsed, and leaves on rows clean", () => {
+    renderWithTicker(true);
+    const marks = screen.getAllByTestId("ticker-mark");
+    expect(marks).toHaveLength(1);
+    expect(marks[0].dataset.on).toBe("false");
+    // No switch in the collapsed rail: the row's context menu is the toggle.
+    expect(screen.queryByRole("switch")).toBeNull();
+  });
+
+  it("recedes a row that is off the ticker, so on is the normal look", () => {
+    renderWithTicker();
+    const off = screen.getByRole("button", { name: "Clock" });
+    const on = screen.getByRole("button", { name: "MLB" });
+    expect(off.dataset.offTicker).toBe("true");
+    expect(on.dataset.offTicker).toBeUndefined();
+  });
+});

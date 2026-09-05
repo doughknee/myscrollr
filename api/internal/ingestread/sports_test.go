@@ -275,3 +275,53 @@ func TestGamesCarryCurrentSeasonStandings(t *testing.T) {
 		t.Error("home lost its standings when away had none")
 	}
 }
+
+// A season whose only row is a blank team must not win the season pick.
+// NCAA Football 2026 was one such row beside 293 real 2025 rows, and every
+// game in the league joined to nothing.
+func TestBlankSeasonRowDoesNotHideStandings(t *testing.T) {
+	if platform.DBPool == nil {
+		t.Skip("needs TEST_DATABASE_URL")
+	}
+	ctx := context.Background()
+	const league = "TestBlankSeasonLeague"
+	clean := func() {
+		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM games WHERE league = $1`, league)
+		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM standings WHERE league = $1`, league)
+	}
+	clean()
+	defer clean()
+
+	if _, err := platform.DBPool.Exec(ctx, `
+		INSERT INTO games (league, external_game_id, home_team_name, away_team_name, start_time, state)
+		VALUES ($1, 'bs-1', 'Ole Miss', 'Virginia', $2, 'pre')`, league, time.Now().Add(2*time.Hour)); err != nil {
+		t.Fatalf("insert game: %v", err)
+	}
+	for _, r := range []struct {
+		team, season string
+		rank, w, l   int
+	}{
+		{"Ole Miss", "2025", 1, 13, 2},
+		{"Virginia", "2025", 2, 11, 3},
+		{"", "2026", 0, 0, 0}, // the ingester's placeholder for a season with no table yet
+	} {
+		if _, err := platform.DBPool.Exec(ctx, `
+			INSERT INTO standings (league, team_name, season, rank, wins, losses, draws, games_played)
+			VALUES ($1, $2, $3, $4, $5, $6, 0, $7)`,
+			league, r.team, r.season, r.rank, r.w, r.l, r.w+r.l); err != nil {
+			t.Fatalf("insert standing: %v", err)
+		}
+	}
+
+	games, err := queryGamesByLeagues(ctx, []string{league}, 10, nil, false)
+	if err != nil || len(games) != 1 {
+		t.Fatalf("query: %v (%d games)", err, len(games))
+	}
+	g := games[0]
+	if g.HomeStanding == nil || g.AwayStanding == nil {
+		t.Fatalf("standings not attached: home=%v away=%v -- the blank 2026 row won the season pick", g.HomeStanding, g.AwayStanding)
+	}
+	if g.HomeStanding.Wins != 13 || g.AwayStanding.Rank != 2 {
+		t.Errorf("home %+v away %+v; want the newest REAL season (2025)", *g.HomeStanding, *g.AwayStanding)
+	}
+}

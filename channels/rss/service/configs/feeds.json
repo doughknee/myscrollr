@@ -57,6 +57,7 @@
   { "name": "NPR News", "url": "https://feeds.npr.org/1001/rss.xml", "category": "News & Politics" },
   { "name": "Al Jazeera", "url": "https://www.aljazeera.com/xml/rss/all.xml", "category": "News & Politics" },
   { "name": "The Guardian", "url": "https://www.theguardian.com/world/rss", "category": "News & Politics" },
+  { "name": "Drudge Report", "url": "https://feeds.feedburner.com/DrudgeReportFeed", "category": "News & Politics" },
   { "name": "ABC News", "url": "https://abcnews.go.com/abcnews/topstories", "category": "News & Politics" },
   { "name": "PBS NewsHour", "url": "https://www.pbs.org/newshour/feeds/rss/headlines", "category": "News & Politics" },
   { "name": "France 24", "url": "https://www.france24.com/en/rss", "category": "News & Politics" },

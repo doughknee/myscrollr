@@ -42,6 +42,8 @@ import {
   Sparkles,
   Trash2,
   UserCircle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "motion/react";
@@ -343,6 +345,9 @@ export default function Sidebar({
                   e.preventDefault();
                   setMenu({ source, x: e.clientX, y: e.clientY });
                 }}
+                onTicker={source.onTicker}
+                onToggleTicker={() => onToggleItemTicker(source)}
+                accent={source.hex}
               />
             </motion.div>
           ))}
@@ -534,6 +539,9 @@ function NavItem({
   collapsed,
   onClick,
   onContextMenu,
+  onTicker,
+  onToggleTicker,
+  accent,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -542,30 +550,98 @@ function NavItem({
   onClick: () => void;
   /** Right-click handler — source rows open their context menu. */
   onContextMenu?: (e: React.MouseEvent) => void;
+  /**
+   * Whether this source has chips on the ticker. When given, the row
+   * carries an "on air" mark: a dot in the source's colour when on, a
+   * hollow one when off, so the whole list answers "what is on my bar"
+   * at a glance. Hovering the row turns the mark into the toggle.
+   */
+  onTicker?: boolean;
+  onToggleTicker?: () => void;
+  accent?: string;
 }) {
+  const hasTicker = onTicker !== undefined && !!onToggleTicker;
+  const tickerLabel = onTicker ? "On the ticker — click to hide" : "Off the ticker — click to show";
   return (
     <Tooltip content={collapsed ? label : undefined} side="right">
-      <button
-        onClick={onClick}
-        onContextMenu={onContextMenu}
-        data-sidebar-active={active}
-        aria-current={active ? "page" : undefined}
-        aria-label={collapsed ? label : undefined}
+      <div
         className={clsx(
-          "relative flex items-center w-full rounded-lg font-medium",
-          collapsed
-            ? "justify-center py-1.5 px-0"
-            : "gap-2.5 px-2.5 py-1.5 text-ui-body",
+          "group relative flex items-center w-full rounded-lg font-medium",
+          collapsed ? "justify-center" : "",
           active ? "text-fg" : "text-fg-3 hover:text-fg-2 hover:bg-surface-hover",
         )}
       >
-        <span className="relative z-10 shrink-0 flex items-center justify-center w-5 h-5">
-          {icon}
-        </span>
-        {!collapsed && (
-          <span className="relative z-10 truncate">{label}</span>
+        <button
+          onClick={onClick}
+          onContextMenu={onContextMenu}
+          data-sidebar-active={active}
+          data-off-ticker={hasTicker && !onTicker ? "true" : undefined}
+          aria-current={active ? "page" : undefined}
+          aria-label={collapsed ? label : undefined}
+          className={clsx(
+            "relative flex min-w-0 flex-1 items-center rounded-lg text-left",
+            collapsed
+              ? "justify-center py-1.5 px-0"
+              : "gap-2.5 px-2.5 py-1.5 text-ui-body",
+            // Off the ticker is the exception, so it is the state that
+            // shows: the row recedes. On is the norm and looks normal.
+            hasTicker && !onTicker && "opacity-50 saturate-50",
+          )}
+        >
+          <span className="relative z-10 shrink-0 flex items-center justify-center w-5 h-5">
+            {icon}
+            {/* Collapsed: the mark rides the icon's corner. */}
+            {hasTicker && collapsed && !onTicker && (
+              // Collapsed rail, off the ticker: a small slash across the
+              // icon's corner. Nothing is drawn when it is on -- the
+              // normal state has no badge to compete with the icon.
+              <span
+                aria-hidden
+                data-testid="ticker-mark"
+                data-on="false"
+                className="absolute -right-1.5 -bottom-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-surface bg-surface-2 text-fg-3"
+              >
+                <EyeOff size={9} strokeWidth={2.25} />
+              </span>
+            )}
+          </span>
+          {!collapsed && (
+            <span className="relative z-10 truncate">{label}</span>
+          )}
+        </button>
+        {hasTicker && !collapsed && (
+          <Tooltip content={tickerLabel} side="right">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={onTicker}
+              aria-label={`${label}: ${tickerLabel}`}
+              data-testid="ticker-toggle"
+              data-on={onTicker}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleTicker?.();
+              }}
+              className={clsx(
+                "relative z-10 mr-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                "transition-opacity hover:bg-surface-2",
+                // On: the affordance appears only when the row is hovered,
+                // so a list where everything is on stays quiet. Off: it is
+                // always there, because off is the thing worth noticing.
+                onTicker && "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+              )}
+            >
+              {/* An eye: open when the widget is on the bar, shut when it
+                  is not. Reads as "visible / hidden" without a legend. */}
+              {onTicker ? (
+                <Eye size={13} strokeWidth={2} aria-hidden style={{ color: accent }} />
+              ) : (
+                <EyeOff size={13} strokeWidth={2} aria-hidden className="text-fg-3 group-hover:text-fg-2" />
+              )}
+            </button>
+          </Tooltip>
         )}
-      </button>
+      </div>
     </Tooltip>
   );
 }

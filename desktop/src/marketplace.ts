@@ -134,6 +134,8 @@ export interface CatalogItem {
   logoUrl?: string;
   /** Render the logo on a light tile (transparent/dark marks like UFC). */
   logoLight?: boolean;
+  /** Kept out of the add grid; still resolves for anyone who has it. */
+  hidden?: boolean;
   category: WidgetCategory;
   /**
    * The source that owns the renderer + data
@@ -271,6 +273,7 @@ function buildItem(w: CatalogWidget): CatalogItem | null {
     icon: renderer.icon,
     hex: w.color,
     logoUrl: w.logo_url,
+    hidden: w.hidden === true,
     logoLight: w.logo_light,
     // The wire keeps these as plain strings so the server can add a category
     // or tier without a client release. Narrow here, defaulting anything this

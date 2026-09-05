@@ -136,21 +136,25 @@ type TeamStanding struct {
 //
 // LATERAL rather than a plain LEFT JOIN so the season filter is applied per
 // row -- the standings table keeps last season beside this one, and a bare
-// join on (league, team_name) doubled every game. Lexical max(season) is
+// join on (league, team_name) doubled every game. The season is the newest
+// one with a REAL row in it: an ingester can write a season's first row as a
+// blank team with zeros (NCAA Football 2026 was exactly one such row beside
+// 293 real 2025 rows), and a bare max(season) then picks the empty season and
+// every game in that league joins to nothing. Lexical max(season) is
 // exact for every league's format (see handleGetStandings).
 const standingsJoin = `
 		LEFT JOIN LATERAL (
 			SELECT rank, wins, losses, draws, points, goal_diff, points_for, points_against, otl
 			FROM standings s
 			WHERE s.league = g.league AND s.team_name = g.home_team_name
-			  AND s.season = (SELECT max(season) FROM standings s2 WHERE s2.league = g.league)
+			  AND s.season = (SELECT max(season) FROM standings s2 WHERE s2.league = g.league AND s2.team_name <> '')
 			LIMIT 1
 		) hs ON TRUE
 		LEFT JOIN LATERAL (
 			SELECT rank, wins, losses, draws, points, goal_diff, points_for, points_against, otl
 			FROM standings s
 			WHERE s.league = g.league AND s.team_name = g.away_team_name
-			  AND s.season = (SELECT max(season) FROM standings s2 WHERE s2.league = g.league)
+			  AND s.season = (SELECT max(season) FROM standings s2 WHERE s2.league = g.league AND s2.team_name <> '')
 			LIMIT 1
 		) aw ON TRUE`
 
@@ -929,7 +933,7 @@ func handleGetStandings(c *fiber.Ctx) error {
 		-- year) and none is null, so the greatest string is the current season
 		-- in every case.
 		WHERE league = $1
-		  AND season = (SELECT max(season) FROM standings s2 WHERE s2.league = $1)
+		  AND season = (SELECT max(season) FROM standings s2 WHERE s2.league = $1 AND s2.team_name <> '')
 		ORDER BY COALESCE(rank, 9999) ASC`, league)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{

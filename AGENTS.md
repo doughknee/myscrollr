@@ -33,7 +33,14 @@ Monorepo — each component is independently deployable with its own dependencie
 make setup   # generate every .env file (once)
 make up      # start the whole backend in Docker, wait until healthy
 make seed    # load the dev dataset — no API keys, no upstream requests
+make live    # optional: make that data move (games, scores, prices) — still no API calls
 ```
+
+The seed is a snapshot and does not move on its own. Two days after `make seed`
+every fixture that was "tonight" is in the past and the app looks broken; that
+is the seed's clock, not the app. `make live` re-anchors the data on "now" and
+then advances it every few seconds. `scripts/dev/seed.sh rebase` re-anchors
+without the loop.
 
 **Never tell anyone to paste a production API key into `channels/*/.env`.**
 They are blank by design; the ingesters stay up and serve what is in
