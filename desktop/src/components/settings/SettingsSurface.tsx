@@ -219,6 +219,10 @@ export default function SettingsSurface({
               {page === "data" && (
                 <DataPrivacyPage
                   authenticated={shell.authenticated}
+                  privacy={prefs.privacy}
+                  onPrivacyChange={(privacy) =>
+                    onPrefsChange({ ...prefs, privacy })
+                  }
                   onResetAll={handleResetAll}
                 />
               )}

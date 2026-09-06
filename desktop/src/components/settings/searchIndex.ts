@@ -264,6 +264,13 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
   },
   {
     page: "data",
+    rowId: "crashReports",
+    label: "Send crash reports",
+    description: "Send errors and stack traces to Sentry",
+    keywords: "sentry telemetry privacy error diagnostics",
+  },
+  {
+    page: "data",
     rowId: "resetAll",
     label: "Reset all settings",
     description: "Clear every local preference",

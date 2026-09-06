@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
+import { setCrashReports } from "./sentry";
 import { open } from "@tauri-apps/plugin-shell";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTauriListener } from "./hooks/useTauriListener";
@@ -183,6 +184,11 @@ export default function App() {
 
   // Settings preferences
   const [prefs, setPrefs] = useState<AppPreferences>(loadPrefs);
+
+  // Mirror the Data & privacy switch into both Sentry clients.
+  useEffect(() => {
+    setCrashReports(prefs.privacy.sendCrashReports);
+  }, [prefs.privacy.sendCrashReports]);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
 

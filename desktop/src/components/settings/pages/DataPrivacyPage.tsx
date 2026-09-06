@@ -9,17 +9,22 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { exportUserData } from "../../../api/client";
-import { ActionRow, RowList, SettingsGroup } from "../SettingsControls";
+import { ActionRow, RowList, SettingsGroup, ToggleRow } from "../SettingsControls";
 import ConfirmDialog from "../../ConfirmDialog";
 import { Row } from "./Row";
+import type { PrivacyPrefs } from "../../../preferences";
 
 interface DataPrivacyPageProps {
   authenticated: boolean;
+  privacy: PrivacyPrefs;
+  onPrivacyChange: (privacy: PrivacyPrefs) => void;
   onResetAll: () => void;
 }
 
 export default function DataPrivacyPage({
   authenticated,
+  privacy,
+  onPrivacyChange,
   onResetAll,
 }: DataPrivacyPageProps) {
   const [exportState, setExportState] = useState<"idle" | "loading">("idle");
@@ -65,6 +70,21 @@ export default function DataPrivacyPage({
           </RowList>
         </SettingsGroup>
       )}
+
+      <SettingsGroup>
+        <RowList>
+          <Row id="crashReports">
+            <ToggleRow
+              label="Send crash reports"
+              description="When something breaks, send the error, stack trace, app version and OS to Sentry. Never your account, IP address or file paths."
+              checked={privacy.sendCrashReports}
+              onChange={(v) =>
+                onPrivacyChange({ ...privacy, sendCrashReports: v })
+              }
+            />
+          </Row>
+        </RowList>
+      </SettingsGroup>
 
       <SettingsGroup label="Danger zone" tone="danger">
         <RowList>

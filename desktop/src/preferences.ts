@@ -131,6 +131,15 @@ export interface StartupPrefs {
   autoCheckUpdates: boolean;
 }
 
+export interface PrivacyPrefs {
+  /**
+   * When false, neither Sentry client (webview or Rust) lets an event
+   * leave the machine: `beforeSend` drops it and the SDK is disabled.
+   * Defaults to true. See sentry.tsx / lib.rs `set_crash_reports`.
+   */
+  sendCrashReports: boolean;
+}
+
 export type TickerPosition = "top" | "bottom";
 
 export interface WindowPrefs {
@@ -472,6 +481,7 @@ export interface AppPreferences {
   appearance: AppearancePrefs;
   ticker: TickerPrefs;
   startup: StartupPrefs;
+  privacy: PrivacyPrefs;
   window: WindowPrefs;
   taskbar: TaskbarPrefs;
   widgets: WidgetPrefs;
@@ -518,6 +528,10 @@ const DEFAULT_TICKER: TickerPrefs = {
 
 const DEFAULT_STARTUP: StartupPrefs = {
   autoCheckUpdates: true,
+};
+
+const DEFAULT_PRIVACY: PrivacyPrefs = {
+  sendCrashReports: true,
 };
 
 const DEFAULT_WINDOW: WindowPrefs = {
@@ -675,6 +689,7 @@ const DEFAULT_PREFS: AppPreferences = {
   appearance: DEFAULT_APPEARANCE,
   ticker: DEFAULT_TICKER,
   startup: DEFAULT_STARTUP,
+  privacy: DEFAULT_PRIVACY,
   window: DEFAULT_WINDOW,
   taskbar: DEFAULT_TASKBAR,
   widgets: DEFAULT_WIDGETS,
@@ -1154,6 +1169,11 @@ export function loadPrefs(): AppPreferences {
       appearance: mergedAppearance,
       ticker: { ...DEFAULT_TICKER, ...source.ticker },
       startup: { ...DEFAULT_STARTUP, ...savedStartup },
+      // Absent on every pre-REL-209 install → on. Only a literal
+      // `false` turns reporting off; anything else is the default.
+      privacy: {
+        sendCrashReports: source.privacy?.sendCrashReports !== false,
+      },
       window: {
         ...DEFAULT_WINDOW,
         ...savedWindow,
@@ -1232,6 +1252,7 @@ export function resetAll(): AppPreferences {
     appearance: { ...DEFAULT_APPEARANCE },
     ticker: { ...DEFAULT_TICKER },
     startup: { ...DEFAULT_STARTUP },
+    privacy: { ...DEFAULT_PRIVACY },
     window: { ...DEFAULT_WINDOW },
     taskbar: { ...DEFAULT_TASKBAR },
     widgets: { ...DEFAULT_WIDGETS },
