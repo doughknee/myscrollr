@@ -1,6 +1,23 @@
 import * as Sentry from "@sentry/react";
+import { invoke } from "@tauri-apps/api/core";
 
 declare const __APP_VERSION__: string;
+
+let crashReports = true;
+
+/**
+ * Mirror of the `privacy.sendCrashReports` preference (REL-209). Off
+ * means nothing leaves the machine: `beforeSend` drops every event, the
+ * client's transport is switched off (sessions, transactions), and the
+ * Rust client is told the same via `set_crash_reports`. Each window
+ * calls this on launch and whenever the pref changes.
+ */
+export function setCrashReports(enabled: boolean) {
+  crashReports = enabled;
+  const client = Sentry.getClient();
+  if (client) client.getOptions().enabled = enabled;
+  invoke("set_crash_reports", { enabled }).catch(() => {});
+}
 
 /**
  * Initialize Sentry for the Tauri webview (ticker + main windows).
@@ -39,6 +56,7 @@ export function initSentry(window: "ticker" | "app") {
     tracePropagationTargets: [/^https:\/\/api\.myscrollr\./],
 
     beforeSend(event) {
+      if (!crashReports) return null;
       // Strip filesystem paths — Tauri webviews surface fs:// and
       // tauri:// URLs in stack frames that can leak install paths.
       if (event.exception?.values) {

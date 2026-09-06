@@ -29,6 +29,7 @@ import {
   mergeWidgetPrefs,
   reconcileSidebarOrder,
   loadPrefs,
+  resetAll,
 } from "./preferences";
 import type { AppPreferences, WidgetPrefs } from "./preferences";
 
@@ -704,5 +705,34 @@ describe("window.tickerMonitors (REL-200)", () => {
 
     storeValues.set("scrollr:settings", { window: { tickerMonitors: "DISPLAY1" } });
     expect(loadPrefs().window.tickerMonitors).toEqual([]);
+  });
+});
+
+describe("privacy.sendCrashReports (REL-209)", () => {
+  it("defaults to on — fresh install and pre-REL-209 blob alike", () => {
+    expect(loadPrefs().privacy.sendCrashReports).toBe(true);
+    storeValues.set("scrollr:settings", { appearance: {}, startup: {} });
+    expect(loadPrefs().privacy.sendCrashReports).toBe(true);
+  });
+
+  it("only a literal false turns it off; reset turns it back on", () => {
+    storeValues.set("scrollr:settings", {
+      appearance: {},
+      privacy: { sendCrashReports: false },
+    });
+    expect(loadPrefs().privacy.sendCrashReports).toBe(false);
+
+    storeValues.set("scrollr:settings", {
+      appearance: {},
+      privacy: { sendCrashReports: "no" },
+    });
+    expect(loadPrefs().privacy.sendCrashReports).toBe(true);
+
+    storeValues.set("scrollr:settings", {
+      appearance: {},
+      privacy: { sendCrashReports: false },
+    });
+    expect(resetAll().privacy.sendCrashReports).toBe(true);
+    expect(loadPrefs().privacy.sendCrashReports).toBe(true);
   });
 });

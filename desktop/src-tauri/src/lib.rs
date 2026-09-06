@@ -6,8 +6,48 @@ mod state;
 mod titlebar;
 mod tray;
 
-use std::sync::{atomic::AtomicBool, Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
 use tauri::Manager;
+
+/// Mirror of the `privacy.sendCrashReports` preference (REL-209). The
+/// webview pushes it through `set_crash_reports` on launch and on every
+/// change; `before_send` drops every event while it is false.
+pub static CRASH_REPORTS: AtomicBool = AtomicBool::new(true);
+
+#[tauri::command]
+fn set_crash_reports(enabled: bool) {
+    CRASH_REPORTS.store(enabled, Ordering::Relaxed);
+}
+
+/// Sentry `before_send`: honour the crash-report switch, then scrub the
+/// user's home directory from stack frame filenames and drop user info.
+fn before_send(
+    mut event: sentry::protocol::Event<'static>,
+) -> Option<sentry::protocol::Event<'static>> {
+    if !CRASH_REPORTS.load(Ordering::Relaxed) {
+        return None;
+    }
+    let home = std::env::home_dir()
+        .map(|h| h.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    for exc in event.exception.iter_mut() {
+        if let Some(st) = exc.stacktrace.as_mut() {
+            for frame in st.frames.iter_mut() {
+                if let Some(filename) = frame.filename.as_mut() {
+                    if !home.is_empty() {
+                        let s: String = filename.to_string();
+                        *filename = s.replace(&home, "~");
+                    }
+                }
+            }
+        }
+    }
+    event.user = None;
+    Some(event)
+}
 
 /// Initialize the Sentry client for the Rust process. Returns a guard
 /// that flushes events on drop — the caller MUST keep it alive for the
@@ -38,26 +78,7 @@ fn init_sentry() -> sentry::ClientInitGuard {
 
         traces_sample_rate: 0.1,
 
-        before_send: Some(std::sync::Arc::new(|mut event| {
-            // Strip the user's home directory from stack frame filenames.
-            let home = std::env::home_dir()
-                .map(|h| h.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            for exc in event.exception.iter_mut() {
-                if let Some(st) = exc.stacktrace.as_mut() {
-                    for frame in st.frames.iter_mut() {
-                        if let Some(filename) = frame.filename.as_mut() {
-                            if !home.is_empty() {
-                                let s: String = filename.to_string();
-                                *filename = s.replace(&home, "~");
-                            }
-                        }
-                    }
-                }
-            }
-            event.user = None;
-            Some(event)
-        })),
+        before_send: Some(Arc::new(before_send)),
 
         ..Default::default()
     })
@@ -172,6 +193,7 @@ pub fn run() {
             commands::system_info::get_system_info,
             commands::diagnostics::collect_diagnostics,
             tray::sync_tray_pin,
+            set_crash_reports,
         ])
         .on_window_event(|window, event| {
             // Intercept close on every window — hide instead of destroy.
@@ -292,4 +314,18 @@ pub fn run() {
             let _ = &event;
         }
     });
+}
+
+#[cfg(test)]
+mod crash_reports_tests {
+    use super::*;
+
+    #[test]
+    fn before_send_drops_every_event_while_off() {
+        let event = sentry::protocol::Event::default();
+        set_crash_reports(false);
+        assert!(before_send(event.clone()).is_none());
+        set_crash_reports(true);
+        assert!(before_send(event).is_some());
+    }
 }

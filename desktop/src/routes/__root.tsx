@@ -104,6 +104,7 @@ import {
 // Store
 import { onStoreChange, setStore, removeStore } from "../lib/store";
 import { invoke } from "@tauri-apps/api/core";
+import { setCrashReports } from "../sentry";
 
 /** One ticker window per chosen-and-attached monitor; Rust resolves an
  *  empty list, or a list with nothing attached, to the primary. */
@@ -295,6 +296,11 @@ function RootLayout() {
   // whole shell is covered until the update installs. Fails open on
   // any fetch/parse error — see useUpdateGate.
   const updateGate = useUpdateGate(appVersion);
+
+  // Mirror the Data & privacy switch into both Sentry clients.
+  useEffect(() => {
+    setCrashReports(prefs.privacy.sendCrashReports);
+  }, [prefs.privacy.sendCrashReports]);
 
   // Persist helper shared by the tip-firing effects, the shell
   // context, and the TopBar ticker toggle.
