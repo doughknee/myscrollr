@@ -464,10 +464,11 @@ rotation cadence or slot count. The one such control ever added (sports "N on th
 bar", 2026-09-04) was removed the same day.
 
 **Documented exception, to be reconciled:** fantasy's `tickerMode` dial (essential /
-standard / everything) plus its per-item venue prefs are selection controls that
-predate this rule. When fantasy is rebuilt (REL-184), the dial becomes the fixed
-`standard` rule and the per-item venue toggles go; followed players remain, since they
-are an input.
+standard / everything) is a selection control that predates this rule. Its per-item
+venue toggles and the 14 venue prefs behind them went in REL-208 (2026-09-06); each
+dial position is now a fixed set built in the fantasy ticker source. When fantasy is
+rebuilt (REL-184), the dial becomes the fixed `standard` rule; followed players remain,
+since they are an input.
 
 ### 8.1 Per-source constants (not settings)
 

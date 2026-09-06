@@ -1,4 +1,3 @@
-import { shouldShowOnTicker } from "../../preferences";
 import FantasyStatChip from "../../components/chips/FantasyStatChip";
 import FollowedPlayerChip from "../../components/chips/FollowedPlayerChip";
 import { buildYahooLeagueUrl, buildYahooPlayerUrl } from "../../utils/chipUrl";
@@ -35,10 +34,12 @@ export const fantasyTickerSource: TickerSource = {
     const prefs = ctx.widgetDisplay?.fantasy;
     if (!prefs) return [];
 
-    // The simplicity dial. `essential` and `standard` are presets
-    // computed here and DELIBERATELY ignore the per-item venue prefs —
-    // the prefs stay untouched underneath, so moving the dial back to
-    // `everything` restores exactly what the user had configured.
+    // The simplicity dial. Each position is a fixed set, built right
+    // here — there is no per-item control underneath it (REL-208;
+    // docs/CHIP_SPEC.md §8: nothing on the rail is user-selected).
+    //   essential  — the league chip only
+    //   standard   — + moment chips (in play, breaking injury)
+    //   everything — + top scorers, worst starter, bench top, injury report
     const mode = prefs.tickerMode ?? "everything";
     const everything = mode === "everything";
     const moments = mode === "standard" || everything;
@@ -137,7 +138,6 @@ export const fantasyTickerSource: TickerSource = {
         node: (
           <FantasyStatChip
             league={league}
-            prefs={prefs}
             comfort={ctx.comfort}
             colorMode={ctx.chipColorMode}
             // The ticker window has no #app-shell stilling rule, so the
@@ -185,36 +185,25 @@ export const fantasyTickerSource: TickerSource = {
         }
       }
 
-      // ── Per-item venues (everything only) ──
+      // ── Player chips (everything only) ──
       if (!everything) continue;
 
-      if (shouldShowOnTicker(prefs.topThreeScorers)) {
-        const top3 = findTopN(players, 3, { startersOnly: true });
-        // Skip top1 when topScorer is also enabled — it is already on the
-        // league chip as "★ Mahomes 32" and would duplicate.
-        const startIdx =
-          shouldShowOnTicker(prefs.topScorer) && top3.length > 0 ? 1 : 0;
-        for (let i = startIdx; i < top3.length; i++) {
-          chips.push(playerChip("top", top3[i].player_key, "top"));
-        }
+      // Top starters 2 and 3: the top scorer is already on the league
+      // chip as "★ Mahomes 32" and would duplicate.
+      for (const p of findTopN(players, 3, { startersOnly: true }).slice(1)) {
+        chips.push(playerChip("top", p.player_key, "top"));
       }
 
-      if (shouldShowOnTicker(prefs.worstStarter)) {
-        const worst = findWorstStarter(players);
-        if (worst) chips.push(playerChip("worst", worst.player_key, "worst"));
+      const worst = findWorstStarter(players);
+      if (worst) chips.push(playerChip("worst", worst.player_key, "worst"));
+
+      const topBench = findTopBench(players);
+      if (topBench) {
+        chips.push(playerChip("bench", topBench.player_key, "bench"));
       }
 
-      if (shouldShowOnTicker(prefs.benchOpportunity)) {
-        const topBench = findTopBench(players);
-        if (topBench) {
-          chips.push(playerChip("bench", topBench.player_key, "bench"));
-        }
-      }
-
-      if (shouldShowOnTicker(prefs.injuryDetail)) {
-        for (const p of findInjuredPlayers(players)) {
-          chips.push(playerChip("inj", p.player_key, "injury"));
-        }
+      for (const p of findInjuredPlayers(players)) {
+        chips.push(playerChip("inj", p.player_key, "injury"));
       }
     }
 

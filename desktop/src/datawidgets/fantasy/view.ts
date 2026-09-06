@@ -91,42 +91,16 @@ export function rankFantasyLeagues(
 
 // ── Selector for the ticker ─────────────────────────────────────
 
-import { shouldShowOnTicker } from "../../preferences";
-
 /**
  * Baseline pipeline used by the ticker: applies `enabledLeagueKeys`
  * filter, promotes `primaryLeagueKey` to the front, sorts remaining
- * by engagement.
- *
- * Returns `[]` when NONE of the per-item venue toggles are set to
- * "both" or "ticker" — no point rendering a chip with no content. The
- * per-item filtering (which fields actually render) happens downstream
- * in `FantasyStatChip` / `ScrollrTicker`.
+ * by engagement. Those two are the user's INPUTS (which leagues, which
+ * one leads); what each league chip shows is fixed (docs/CHIP_SPEC.md §8).
  */
 export function selectFantasyForTicker(
   leagues: LeagueResponse[],
   prefs: FantasyDisplayPrefs,
 ): LeagueResponse[] {
-  const anyItemOnTicker =
-    shouldShowOnTicker(prefs.matchupScore) ||
-    shouldShowOnTicker(prefs.winProbability) ||
-    shouldShowOnTicker(prefs.matchupStatus) ||
-    shouldShowOnTicker(prefs.projectedPoints) ||
-    shouldShowOnTicker(prefs.week) ||
-    shouldShowOnTicker(prefs.record) ||
-    shouldShowOnTicker(prefs.standingsPosition) ||
-    shouldShowOnTicker(prefs.streak) ||
-    shouldShowOnTicker(prefs.injuryCount) ||
-    shouldShowOnTicker(prefs.topScorer) ||
-    // Phase 1 player-stats segments — same OR-gate semantics: if any
-    // of these is on the ticker, the league chip should render so
-    // FantasyStatChip can compose the enabled segments.
-    shouldShowOnTicker(prefs.topThreeScorers) ||
-    shouldShowOnTicker(prefs.worstStarter) ||
-    shouldShowOnTicker(prefs.benchOpportunity) ||
-    shouldShowOnTicker(prefs.injuryDetail);
-  if (!anyItemOnTicker) return [];
-
   const visible = filterEnabledLeagues(leagues, prefs.enabledLeagueKeys);
   if (visible.length === 0) return [];
   const primary = resolvePrimaryLeague(visible, prefs.primaryLeagueKey);

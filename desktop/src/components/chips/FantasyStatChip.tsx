@@ -2,8 +2,7 @@ import { clsx } from "clsx";
 import { motion } from "motion/react";
 import { AnimateNumber } from "motion-plus/react";
 import type { ReactNode } from "react";
-import type { ChipColorMode, FantasyDisplayPrefs } from "../../preferences";
-import { shouldShowOnTicker } from "../../preferences";
+import type { ChipColorMode } from "../../preferences";
 import type { LeagueResponse } from "../../datawidgets/fantasy/types";
 import {
   SPORT_EMOJI,
@@ -30,7 +29,6 @@ import { ChipFlash, useChangeFlash } from "./ChipFlash";
 
 interface FantasyStatChipProps {
   league: LeagueResponse;
-  prefs: FantasyDisplayPrefs;
   comfort?: boolean;
   colorMode?: ChipColorMode;
   onClick?: () => void;
@@ -68,46 +66,25 @@ interface StatSegment {
 }
 
 /**
- * Compact fantasy ticker chip that renders the ENABLED subset of the
- * per-league items gated by the user's per-item `Venue` prefs.
+ * Compact fantasy ticker chip: one per league, a fixed set of segments
+ * (docs/CHIP_SPEC.md §8 — nothing on the rail is user-selected).
  *
- * This chip replaces the older `FantasyChip` for ticker use. It keeps
- * the same visual footprint (single row when `comfort=false`, two rows
- * when true) but composes the contents from whichever items the user
- * has routed to the ticker.
+ * Single row when `comfort=false`, two rows when true. The segments:
+ *   Matchup-derived:  "Wk 5" · LIVE / FINAL / PRE · "89.5–76.2" ·
+ *                     "Proj 95.2" · "62%"
+ *   Standings-derived: "6-3" · "3rd/10" · "W3"
+ *   Roster-derived:    "2 IR" · "★ LeBron 42.3"
  *
- * Each segment is opt-in:
- *   Matchup-derived:
- *   - `matchupScore` — "My Team 89.5 — 76.2 Opp"
- *   - `matchupStatus` — LIVE / FINAL / PRE badge
- *   - `week` — "Wk 5"
- *   - `projectedPoints` — "Proj 95.2"
- *   - `winProbability` — "62%"
- *   Standings-derived:
- *   - `record` — "6-3"
- *   - `standingsPosition` — "3rd / 10"
- *   - `streak` — "W3"
- *   Roster-derived:
- *   - `injuryCount` — "2 IR"
- *   - `topScorer` — "★ LeBron 42.3"
+ * Each renders only when its data exists for this league (standings
+ * skip pre-season; the top scorer skips an all-zero roster), so a
+ * league with nothing yet collapses to a name-only chip.
  *
- * Segments render only when their data is available for this league
- * (e.g. `standingsPosition` skips pre-season; `topScorer` skips rosters
- * with all-zero points). A league with ZERO ticker-enabled items
- * collapses to a name-only chip so the user still sees something
- * meaningful per-league.
- *
- * The 4 "Player stats" venues (`topThreeScorers`, `worstStarter`,
- * `benchOpportunity`, `injuryDetail`) used to render here as inline
- * segments. They are now emitted as standalone chips on the rail by
- * `ScrollrTicker`'s fantasy bucket builder, using `FollowedPlayerChip`
- * with an `accent` prop. This keeps the league chip focused on
- * matchup-level context while letting per-player stats stand on their
- * own where they're easier to scan.
+ * Per-player items (top scorers, worst starter, bench top, injury
+ * report) are standalone chips emitted by the fantasy ticker source
+ * with `FollowedPlayerChip` + an `accent`, not segments here.
  */
 export default function FantasyStatChip({
   league,
-  prefs,
   comfort,
   colorMode = "widget",
   onClick,
@@ -145,79 +122,63 @@ export default function FantasyStatChip({
     if (myPts > oppPts) scoreTone = "up";
     else if (myPts < oppPts) scoreTone = "down";
 
-    if (shouldShowOnTicker(prefs.week)) {
-      primarySegments.push({ key: "week", text: `Wk ${ctx.matchup.week}` });
-    }
+    primarySegments.push({ key: "week", text: `Wk ${ctx.matchup.week}` });
 
-    if (shouldShowOnTicker(prefs.matchupStatus)) {
-      if (live)
-        primarySegments.push({ key: "status", text: "LIVE", tone: "live" });
-      else if (final) primarySegments.push({ key: "status", text: "FINAL" });
-      else if (ctx.matchup.status === "preevent")
-        primarySegments.push({ key: "status", text: "PRE" });
-    }
+    if (live)
+      primarySegments.push({ key: "status", text: "LIVE", tone: "live" });
+    else if (final) primarySegments.push({ key: "status", text: "FINAL" });
+    else if (ctx.matchup.status === "preevent")
+      primarySegments.push({ key: "status", text: "PRE" });
 
-    if (shouldShowOnTicker(prefs.matchupScore)) {
-      const scoreText = `${fmtPlayerPoints(myPts)}–${fmtPlayerPoints(oppPts)}`;
-      primarySegments.push({
-        key: "score",
-        text: scoreText,
-        tone: scoreTone,
-        // Both sides plus the separator. Reserved as one block so the
-        // dash never walks left as a score crosses into three figures.
-        width: NUM_WIDTH.teamScore * 2 + 1,
-        node: rollScore ? (
-          <RollingScore myPts={myPts} oppPts={oppPts} label={scoreText} />
-        ) : undefined,
-      });
-    }
+    const scoreText = `${fmtPlayerPoints(myPts)}–${fmtPlayerPoints(oppPts)}`;
+    primarySegments.push({
+      key: "score",
+      text: scoreText,
+      tone: scoreTone,
+      // Both sides plus the separator. Reserved as one block so the
+      // dash never walks left as a score crosses into three figures.
+      width: NUM_WIDTH.teamScore * 2 + 1,
+      node: rollScore ? (
+        <RollingScore myPts={myPts} oppPts={oppPts} label={scoreText} />
+      ) : undefined,
+    });
 
-    if (
-      shouldShowOnTicker(prefs.projectedPoints) &&
-      typeof ctx.user.projected_points === "number"
-    ) {
+    if (typeof ctx.user.projected_points === "number") {
       primarySegments.push({
         key: "proj",
         text: `Proj ${ctx.user.projected_points.toFixed(1)}`,
       });
     }
 
-    if (shouldShowOnTicker(prefs.winProbability)) {
-      const wp = estimateWinProbability(ctx.matchup, league.team_key);
-      if (wp !== null) {
-        primarySegments.push({
-          key: "wp",
-          text: `${Math.round(wp * 100)}%`,
-          tone: wp >= 0.5 ? "up" : "down",
-          // 65% -> 100% gains a digit, and a win probability crossing
-          // three figures is exactly the moment the rail must hold
-          // still rather than nudge every chip along.
-          width: NUM_WIDTH.percent,
-        });
-      }
+    const wp = estimateWinProbability(ctx.matchup, league.team_key);
+    if (wp !== null) {
+      primarySegments.push({
+        key: "wp",
+        text: `${Math.round(wp * 100)}%`,
+        tone: wp >= 0.5 ? "up" : "down",
+        // 65% -> 100% gains a digit, and a win probability crossing
+        // three figures is exactly the moment the rail must hold
+        // still rather than nudge every chip along.
+        width: NUM_WIDTH.percent,
+      });
     }
   }
 
   // ── Standings-derived (secondary row) ───────────────────────
   if (standing) {
-    if (shouldShowOnTicker(prefs.record)) {
-      const { wins, losses, ties } = standing;
-      const record =
-        ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
-      secondarySegments.push({ key: "record", text: record });
-    }
+    const { wins, losses, ties } = standing;
+    const record =
+      ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
+    secondarySegments.push({ key: "record", text: record });
 
-    if (
-      shouldShowOnTicker(prefs.standingsPosition) &&
-      typeof standing.rank === "number"
-    ) {
+    if (typeof standing.rank === "number") {
       secondarySegments.push({
         key: "rank",
         text: `${ordinal(standing.rank)}/${league.data.num_teams ?? "?"}`,
       });
     }
 
-    if (shouldShowOnTicker(prefs.streak) && standing.streak_value > 0) {
+    if (standing.streak_value > 0) {
       secondarySegments.push({
         key: "streak",
         text: streakLabel(standing.streak_type, standing.streak_value),
@@ -230,32 +191,23 @@ export default function FantasyStatChip({
 
   // ── Roster-derived (secondary row) ──────────────────────────
   if (roster) {
-    if (shouldShowOnTicker(prefs.injuryCount)) {
-      const injuries = countInjuries(roster);
-      if (injuries > 0) {
-        secondarySegments.push({
-          key: "inj",
-          text: `${injuries} IR`,
-          tone: "down",
-        });
-      }
+    const injuries = countInjuries(roster);
+    if (injuries > 0) {
+      secondarySegments.push({
+        key: "inj",
+        text: `${injuries} IR`,
+        tone: "down",
+      });
     }
 
-    if (shouldShowOnTicker(prefs.topScorer)) {
-      const top = findTopScorer(roster.data.players);
-      if (top) {
-        secondarySegments.push({
-          key: "top",
-          text: `★ ${top.name.last} ${top.player_points!.toFixed(1)}`,
-          tone: "up",
-        });
-      }
+    const top = findTopScorer(roster.data.players);
+    if (top) {
+      secondarySegments.push({
+        key: "top",
+        text: `★ ${top.name.last} ${top.player_points!.toFixed(1)}`,
+        tone: "up",
+      });
     }
-
-    // The four "Player stats" venues (topThreeScorers, worstStarter,
-    // benchOpportunity, injuryDetail) USED to render here as inline
-    // segments. They are now emitted as standalone chips on the rail
-    // by ScrollrTicker — see the fantasy bucket builder there.
   }
 
   // In compact mode (single-line ticker), pour everything into a

@@ -1,9 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  limitPerSource,
   applyRssPipeline,
   selectRssForTicker,
-  distinctSourceCount,
   filterByArticleAge,
   TICKER_RSS_HOURS,
   TICKER_RSS_FLOOR_HOURS,
@@ -11,7 +9,6 @@ import {
   arrangeRssSlots,
 } from "./view";
 import type { RssItem } from "../../types";
-import type { RssDisplayPrefs } from "../../preferences";
 
 // ── Fixtures ────────────────────────────────────────────────────
 
@@ -39,13 +36,6 @@ function mk(
 // now applies a freshness horizon, so tests of its OTHER rules must ask
 // about a moment when the fixtures are fresh.
 const FIXTURE_NOW = new Date("2026-01-01T01:00:00Z").getTime();
-
-const DEFAULT_PREFS: RssDisplayPrefs = {
-  feedSort: "newest",
-  articlesPerSource: 4,
-  maxArticles: 0,
-  maxArticleAgeDays: 0,
-};
 
 // ── filterByArticleAge (v1.1.3 Time Controls) ───────────────────
 
@@ -90,7 +80,7 @@ describe("filterByArticleAge", () => {
     expect(filterByArticleAge([weird], 1, NOW)).toHaveLength(1);
   });
 
-  it("applies inside applyRssPipeline before per-source limiting", () => {
+  it("applies inside applyRssPipeline before the total cap", () => {
     const items = [
       mk(1, "a", hoursAgo(1)),
       mk(2, "a", hoursAgo(24 * 9)), // stale — must not consume a slot
@@ -99,58 +89,11 @@ describe("filterByArticleAge", () => {
     const result = applyRssPipeline(items, {
       categoryMap: new Map(),
       sortOrder: "newest",
-      articlesPerSource: 1,
+      maxArticles: 2,
       maxArticleAgeDays: 2,
       now: NOW,
     });
-    expect(result.visibleItems.map((i) => i.id)).toEqual([1, 3]);
-    expect(result.totalHidden).toBe(0);
-  });
-});
-
-// ── limitPerSource ──────────────────────────────────────────────
-
-describe("limitPerSource", () => {
-  it("returns all items when limit is 0", () => {
-    const items = [mk(1, "a"), mk(2, "a"), mk(3, "b")];
-    const result = limitPerSource(items, 0);
-    expect(result).toHaveLength(3);
-    // returns same reference when limit is zero
-    expect(result).toBe(items);
-  });
-
-  it("returns all items when limit is negative", () => {
-    const items = [mk(1, "a"), mk(2, "a")];
-    expect(limitPerSource(items, -1)).toBe(items);
-  });
-
-  it("caps items per source at the given limit", () => {
-    const items = [mk(1, "a"), mk(2, "a"), mk(3, "a"), mk(4, "b"), mk(5, "b")];
-    const result = limitPerSource(items, 2);
-    expect(result).toHaveLength(4);
-    expect(result.filter((i) => i.source_name === "a")).toHaveLength(2);
-    expect(result.filter((i) => i.source_name === "b")).toHaveLength(2);
-  });
-
-  it("keeps the first N items per source in input order", () => {
-    const items = [mk(1, "a"), mk(2, "a"), mk(3, "a")];
-    const result = limitPerSource(items, 2);
-    expect(result.map((i) => i.id)).toEqual([1, 2]);
-  });
-
-  it("preserves interleaved input order", () => {
-    const items = [mk(1, "a"), mk(2, "b"), mk(3, "a"), mk(4, "b"), mk(5, "a")];
-    const result = limitPerSource(items, 2);
-    expect(result.map((i) => i.id)).toEqual([1, 2, 3, 4]);
-  });
-
-  it("handles a single-source dataset", () => {
-    const items = [mk(1, "a"), mk(2, "a"), mk(3, "a"), mk(4, "a")];
-    expect(limitPerSource(items, 2).map((i) => i.id)).toEqual([1, 2]);
-  });
-
-  it("handles an empty input", () => {
-    expect(limitPerSource([], 5)).toEqual([]);
+    expect(result.map((i) => i.id)).toEqual([1, 3]);
   });
 });
 
@@ -178,9 +121,8 @@ describe("applyRssPipeline", () => {
       selectedSources: new Set(["a"]),
       categoryMap,
       sortOrder: "newest",
-      articlesPerSource: 0,
     });
-    expect(result.visibleItems.map((i) => i.source_name)).toEqual(["a", "a"]);
+    expect(result.map((i) => i.source_name)).toEqual(["a", "a"]);
   });
 
   it("ignores selectedSources when empty", () => {
@@ -188,9 +130,8 @@ describe("applyRssPipeline", () => {
       selectedSources: new Set(),
       categoryMap,
       sortOrder: "newest",
-      articlesPerSource: 0,
     });
-    expect(result.visibleItems).toHaveLength(5);
+    expect(result).toHaveLength(5);
   });
 
   it("filters by selectedCategories when non-empty", () => {
@@ -198,10 +139,9 @@ describe("applyRssPipeline", () => {
       selectedCategories: new Set(["tech"]),
       categoryMap,
       sortOrder: "newest",
-      articlesPerSource: 0,
     });
     // tech = feeds a + c, so ids 1, 2, 5
-    expect(result.visibleItems.map((i) => i.id).sort()).toEqual([1, 2, 5]);
+    expect(result.map((i) => i.id).sort()).toEqual([1, 2, 5]);
   });
 
   it("drops items whose feed is not in the category map under a category filter", () => {
@@ -213,9 +153,8 @@ describe("applyRssPipeline", () => {
       selectedCategories: new Set(["tech"]),
       categoryMap,
       sortOrder: "newest",
-      articlesPerSource: 0,
     });
-    expect(result.visibleItems.map((i) => i.id)).toEqual([1]);
+    expect(result.map((i) => i.id)).toEqual([1]);
   });
 
   it("leaves input order untouched when sortOrder=newest", () => {
@@ -224,43 +163,17 @@ describe("applyRssPipeline", () => {
     const result = applyRssPipeline(items, {
       categoryMap,
       sortOrder: "newest",
-      articlesPerSource: 0,
     });
-    expect(result.visibleItems.map((i) => i.id)).toEqual([1, 2, 3, 4, 5]);
+    expect(result.map((i) => i.id)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("sorts oldest-first by published_at when sortOrder=oldest", () => {
     const result = applyRssPipeline(makeItems(), {
       categoryMap,
       sortOrder: "oldest",
-      articlesPerSource: 0,
     });
     // ids by date ascending: 4 (2026-01-01), 2 (2026-01-15), 1 (2026-02-01), 5 (2026-02-15), 3 (2026-03-01)
-    expect(result.visibleItems.map((i) => i.id)).toEqual([4, 2, 1, 5, 3]);
-  });
-
-  it("applies per-source limit and reports overflow counts", () => {
-    const result = applyRssPipeline(makeItems(), {
-      categoryMap,
-      sortOrder: "newest",
-      articlesPerSource: 1,
-    });
-    expect(result.visibleItems).toHaveLength(3); // one per source
-    expect(result.overflowCounts.get("a")).toBe(1);
-    expect(result.overflowCounts.get("b")).toBe(1);
-    expect(result.overflowCounts.get("c")).toBeUndefined();
-    expect(result.totalHidden).toBe(2);
-  });
-
-  it("bypasses per-source limit when showAll=true", () => {
-    const result = applyRssPipeline(makeItems(), {
-      categoryMap,
-      sortOrder: "newest",
-      articlesPerSource: 1,
-      showAll: true,
-    });
-    expect(result.visibleItems).toHaveLength(5);
-    expect(result.totalHidden).toBe(0);
+    expect(result.map((i) => i.id)).toEqual([4, 2, 1, 5, 3]);
   });
 
   it("falls back to created_at when published_at is null (oldest sort)", () => {
@@ -273,9 +186,8 @@ describe("applyRssPipeline", () => {
     const result = applyRssPipeline(items, {
       categoryMap,
       sortOrder: "oldest",
-      articlesPerSource: 0,
     });
-    expect(result.visibleItems.map((i) => i.id)).toEqual([1, 2]);
+    expect(result.map((i) => i.id)).toEqual([1, 2]);
   });
 
   it("applies a finite total cap after filters and ordering", () => {
@@ -283,60 +195,20 @@ describe("applyRssPipeline", () => {
       selectedCategories: new Set(["tech"]),
       categoryMap,
       sortOrder: "oldest",
-      articlesPerSource: 0,
       maxArticles: 2,
     });
-    expect(result.visibleItems.map((i) => i.id)).toEqual([2, 1]);
+    expect(result.map((i) => i.id)).toEqual([2, 1]);
   });
 
   it("shows all eligible articles when the total cap is unlimited", () => {
     const result = applyRssPipeline(makeItems(), {
       categoryMap,
       sortOrder: "newest",
-      articlesPerSource: 0,
       maxArticles: 0,
     });
-    expect(result.visibleItems).toHaveLength(5);
+    expect(result).toHaveLength(5);
   });
 });
-
-// ── selectRssForTicker ──────────────────────────────────────────
-
-// ── v1.1.1 smart removal: single-source payloads skip the cap ───
-
-describe("single-source smart removal (v1.1.1)", () => {
-  const capped: RssDisplayPrefs = { ...DEFAULT_PREFS, articlesPerSource: 2 };
-
-  it("distinctSourceCount counts unique sources", () => {
-    expect(distinctSourceCount([])).toBe(0);
-    expect(distinctSourceCount([mk(1, "a"), mk(2, "a")])).toBe(1);
-    expect(distinctSourceCount([mk(1, "a"), mk(2, "b"), mk(3, "a")])).toBe(2);
-  });
-
-  it("pipeline: single-source ignores the cap and reports nothing hidden", () => {
-    const items = [mk(1, "bbc"), mk(2, "bbc"), mk(3, "bbc")];
-    const { visibleItems, totalHidden } = applyRssPipeline(items, {
-      categoryMap: new Map(),
-      sortOrder: "newest",
-      articlesPerSource: 2,
-    });
-    expect(visibleItems).toHaveLength(3);
-    expect(totalHidden).toBe(0);
-  });
-
-  it("pipeline: multi-source still caps and reports overflow", () => {
-    const items = [mk(1, "a"), mk(2, "a"), mk(3, "a"), mk(4, "b")];
-    const { visibleItems, totalHidden, overflowCounts } = applyRssPipeline(items, {
-      categoryMap: new Map(),
-      sortOrder: "newest",
-      articlesPerSource: 2,
-    });
-    expect(visibleItems).toHaveLength(3);
-    expect(totalHidden).toBe(1);
-    expect(overflowCounts.get("a")).toBe(1);
-  });
-});
-
 
 // ── Ticker horizon ──────────────────────────────────────────────
 //

@@ -1,22 +1,17 @@
 /**
- * Tests for the Display-page venue-toggle migration helpers.
+ * Tests for the prefs migration helpers.
  *
  * These lock in the contract that lets us upgrade user prefs in place:
- *  - legacy boolean `true`  becomes `"both"` (visible everywhere — preserves
- *    the old behaviour where a true boolean meant "show this")
- *  - legacy boolean `false` becomes `"off"`  (hidden everywhere — preserves
- *    the old behaviour where a false boolean meant "hide this")
- *  - legacy `tickerShowMatchup` and `showInjuryCount` booleans on Fantasy
- *    fold into their new venue-aware replacements without losing the user's
- *    prior on/off choice
- *  - unknown / corrupt values fall back to `"both"` so loadPrefs never
+ *  - legacy booleans coerce to a well-formed `Venue` (sports still folds
+ *    `showUpcoming` / `showFinal` this way)
+ *  - retired fields are DROPPED, not carried: loadPrefs builds the object
+ *    that gets saved back, so anything it doesn't spread falls off disk
+ *  - unknown / corrupt values fall back to defaults so loadPrefs never
  *    throws or produces a bad shape
  */
 import { describe, it, expect, afterEach, vi } from "vitest";
 import {
   migrateVenue,
-  shouldShowOnFeed,
-  shouldShowOnTicker,
   migrateFinanceDisplay,
   migrateRssDisplay,
   migratePredictionsDisplay,
@@ -57,11 +52,15 @@ it("reconciles sidebar ordering across widget types", () => {
   ).toEqual(["clock", "finance", "sports", "github"]);
 });
 
-interface LegacyClockTimerWidgetPrefs extends Omit<Partial<WidgetPrefs>, "clock"> {
+// The pre-split combined clock/timer widget's stored shape, plus the
+// per-widget `ticker` sub-configs that REL-208 removed from the type.
+interface LegacyClockTimerWidgetPrefs extends Omit<Partial<WidgetPrefs>, "timer"> {
   clock?: {
-    ticker?: Partial<WidgetPrefs["clock"]["ticker"]> & {
-      activeTimer?: boolean;
-    };
+    ticker?: Record<string, unknown> & { activeTimer?: boolean };
+    pomodoro?: Partial<WidgetPrefs["timer"]["pomodoro"]>;
+  };
+  timer?: {
+    ticker?: { activeTimer?: boolean };
     pomodoro?: Partial<WidgetPrefs["timer"]["pomodoro"]>;
   };
 }
@@ -91,20 +90,6 @@ describe("migrateVenue", () => {
     expect(migrateVenue(42)).toBe("both");
     expect(migrateVenue(null)).toBe("both");
     expect(migrateVenue(undefined)).toBe("both");
-  });
-});
-
-describe("shouldShowOnFeed / shouldShowOnTicker", () => {
-  it("routes each venue to the correct surface", () => {
-    expect(shouldShowOnFeed("off")).toBe(false);
-    expect(shouldShowOnFeed("feed")).toBe(true);
-    expect(shouldShowOnFeed("both")).toBe(true);
-    expect(shouldShowOnFeed("ticker")).toBe(false);
-
-    expect(shouldShowOnTicker("off")).toBe(false);
-    expect(shouldShowOnTicker("feed")).toBe(false);
-    expect(shouldShowOnTicker("both")).toBe(true);
-    expect(shouldShowOnTicker("ticker")).toBe(true);
   });
 });
 
@@ -153,34 +138,17 @@ describe("migrateFinanceDisplay", () => {
 });
 
 describe("migrateRssDisplay", () => {
-  it("preserves articlesPerSource and ignores unknown stored keys", () => {
+  it("drops the retired per-source cap and unknown stored keys (REL-208)", () => {
     const legacy = {
       showDescription: true,
       showSource: false,
       articlesPerSource: 3,
+      feedSort: "oldest",
     } as unknown as Parameters<typeof migrateRssDisplay>[0];
 
-    expect(migrateRssDisplay(legacy).articlesPerSource).toBe(3);
-  });
-
-  it("falls back to default for non-number articlesPerSource", () => {
-    const migrated = migrateRssDisplay({
-      articlesPerSource: "lots",
-    } as unknown as Parameters<typeof migrateRssDisplay>[0]);
-    expect(migrated.articlesPerSource).toBe(0);
-  });
-
-  it("migrates the old untouched default (4) to All (0) — v1.1.1", () => {
-    // 4 was the pre-widget-era default and never appeared in the picker
-    // (1/3/5/10), so a stored 4 is not a user's choice.
-    const migrated = migrateRssDisplay({ articlesPerSource: 4 });
-    expect(migrated.articlesPerSource).toBe(0);
-  });
-
-  it("keeps deliberately chosen per-source caps (picker values)", () => {
-    for (const chosen of [1, 3, 5, 10]) {
-      expect(migrateRssDisplay({ articlesPerSource: chosen }).articlesPerSource).toBe(chosen);
-    }
+    const migrated = migrateRssDisplay(legacy);
+    expect(migrated.feedSort).toBe("oldest");
+    expect("articlesPerSource" in migrated).toBe(false);
   });
 
   it("keeps positive total article caps and maps invalid values to All", () => {
@@ -214,125 +182,49 @@ describe("migratePredictionsDisplay", () => {
 });
 
 describe("migrateFantasyDisplay", () => {
-  it("folds legacy tickerShowMatchup=true into matchupScore='both'", () => {
-    const legacy = { tickerShowMatchup: true } as unknown as Parameters<
-      typeof migrateFantasyDisplay
-    >[0];
-    const migrated = migrateFantasyDisplay(legacy);
-    expect(migrated.matchupScore).toBe("both");
-  });
-
-  it("folds legacy tickerShowMatchup=false into matchupScore='feed'", () => {
-    // Rationale: user explicitly hid the matchup from the ticker but had no
-    // way to hide it from the feed under the old model. Keep it visible in
-    // the feed after migration so no feed-page content disappears silently.
-    const legacy = { tickerShowMatchup: false } as unknown as Parameters<
-      typeof migrateFantasyDisplay
-    >[0];
-    const migrated = migrateFantasyDisplay(legacy);
-    expect(migrated.matchupScore).toBe("feed");
-  });
-
-  it("folds legacy showInjuryCount boolean into injuryCount venue", () => {
-    expect(
-      migrateFantasyDisplay({ showInjuryCount: true } as unknown as Parameters<
-        typeof migrateFantasyDisplay
-      >[0]).injuryCount,
-    ).toBe("both");
-    expect(
-      migrateFantasyDisplay({ showInjuryCount: false } as unknown as Parameters<
-        typeof migrateFantasyDisplay
-      >[0]).injuryCount,
-    ).toBe("off");
-  });
-
-  it("preserves feed-layout booleans (showStandings, showMatchups)", () => {
+  it("preserves the user's inputs", () => {
     const migrated = migrateFantasyDisplay({
-      showStandings: false,
-      showMatchups: true,
-    });
-    expect(migrated.showStandings).toBe(false);
-    expect(migrated.showMatchups).toBe(true);
-  });
-
-  it("preserves non-venue scalar fields", () => {
-    const migrated = migrateFantasyDisplay({
+      tickerMode: "essential",
       defaultSubTab: "matchup",
-      defaultSort: "record",
       enabledLeagueKeys: ["nfl.l.12345"],
       primaryLeagueKey: "nfl.l.12345",
+      followedPlayerKeys: ["449.p.1", 7, null] as unknown as string[],
     });
 
+    expect(migrated.tickerMode).toBe("essential");
     expect(migrated.defaultSubTab).toBe("matchup");
-    expect(migrated.defaultSort).toBe("record");
     expect(migrated.enabledLeagueKeys).toEqual(["nfl.l.12345"]);
     expect(migrated.primaryLeagueKey).toBe("nfl.l.12345");
+    expect(migrated.followedPlayerKeys).toEqual(["449.p.1"]);
   });
 
-  it("new-shape venue fields survive migration unchanged", () => {
-    const current = {
-      matchupScore: "ticker",
-      winProbability: "feed",
-      matchupStatus: "off",
-      projectedPoints: "both",
-      week: "ticker",
-      record: "feed",
-      standingsPosition: "both",
-      streak: "off",
-      injuryCount: "feed",
-      topScorer: "ticker",
-    } as Parameters<typeof migrateFantasyDisplay>[0];
-    const migrated = migrateFantasyDisplay(current);
-    expect(migrated.matchupScore).toBe("ticker");
-    expect(migrated.winProbability).toBe("feed");
-    expect(migrated.matchupStatus).toBe("off");
-    expect(migrated.projectedPoints).toBe("both");
-    expect(migrated.streak).toBe("off");
-    expect(migrated.topScorer).toBe("ticker");
+  it("resolves a pre-dial prefs file to 'everything' (the ticker it already had)", () => {
+    expect(migrateFantasyDisplay({}).tickerMode).toBe("everything");
+    expect(
+      migrateFantasyDisplay({ tickerMode: "loud" } as unknown as Parameters<
+        typeof migrateFantasyDisplay
+      >[0]).tickerMode,
+    ).toBe("everything");
   });
 
-  it("legacy tickerShowMatchup is dropped from the returned object", () => {
-    const migrated = migrateFantasyDisplay({
-      tickerShowMatchup: true,
-    } as unknown as Parameters<typeof migrateFantasyDisplay>[0]);
-    // @ts-expect-error — legacy key shouldn't exist on the migrated shape
-    expect(migrated.tickerShowMatchup).toBeUndefined();
-  });
-
-  it("new-shape value wins over legacy boolean when both are present", () => {
-    // A user whose prefs file was partially migrated (new key set, old key
-    // still present) should not regress to the legacy value.
+  it("drops the retired venue prefs, legacy booleans and feed-layout fields (REL-208)", () => {
     const migrated = migrateFantasyDisplay({
       tickerShowMatchup: false,
+      showInjuryCount: true,
       matchupScore: "ticker",
+      injuryDetail: "off",
+      showStandings: false,
+      showMatchups: true,
+      defaultSort: "record",
     } as unknown as Parameters<typeof migrateFantasyDisplay>[0]);
-    expect(migrated.matchupScore).toBe("ticker");
-  });
 
-  it("Phase 1 player-stats fields default to 'both' for upgrading users", () => {
-    // A user upgrading from a build that predates these fields will have
-    // no key for them in their prefs file. migrateVenue's unknown-input
-    // fallback returns "both" — fields appear visible-everywhere by
-    // default, matching what users have been asking for ("when can we
-    // see player stats on the ticker?").
-    const migrated = migrateFantasyDisplay({});
-    expect(migrated.topThreeScorers).toBe("both");
-    expect(migrated.worstStarter).toBe("both");
-    expect(migrated.benchOpportunity).toBe("both");
-    expect(migrated.injuryDetail).toBe("both");
-  });
-
-  it("Phase 1 player-stats fields preserve user choices on subsequent loads", () => {
-    const migrated = migrateFantasyDisplay({
-      topThreeScorers: "ticker",
-      worstStarter: "feed",
-      benchOpportunity: "off",
-      injuryDetail: "both",
-    });
-    expect(migrated.topThreeScorers).toBe("ticker");
-    expect(migrated.worstStarter).toBe("feed");
-    expect(migrated.benchOpportunity).toBe("off");
-    expect(migrated.injuryDetail).toBe("both");
+    expect(Object.keys(migrated).sort()).toEqual([
+      "defaultSubTab",
+      "enabledLeagueKeys",
+      "followedPlayerKeys",
+      "primaryLeagueKey",
+      "tickerMode",
+    ]);
   });
 });
 
@@ -472,18 +364,10 @@ describe("widget timer preference migration", () => {
       },
     }));
 
-    // 2026-07-17 unification: stored per-item ticker values are ignored —
-    // tracked content always reaches the ticker.
-    expect(prefs.clock).toMatchObject({
-      ticker: {
-        localTime: true,
-        showTimezones: true,
-        excludedTimezones: [],
-      },
-    });
-    expect("activeTimer" in prefs.clock.ticker).toBe(false);
+    // REL-208: the clock block and every per-item ticker value are
+    // dropped — tracked content always reaches the ticker.
+    expect("clock" in prefs).toBe(false);
     expect(prefs.timer).toEqual({
-      ticker: { activeTimer: true },
       pomodoro: {
         workMins: 50,
         shortBreakMins: 10,
@@ -518,7 +402,6 @@ describe("widget timer preference migration", () => {
     }));
 
     expect(prefs.timer).toEqual({
-      ticker: { activeTimer: true },
       pomodoro: {
         workMins: 20,
         shortBreakMins: 4,
@@ -597,9 +480,6 @@ describe("widget timer preference migration", () => {
 
     expect(prefs.enabledWidgets).toEqual(["clock", "timer"]);
     expect(prefs.widgetsOnTicker).toEqual(["clock"]);
-    // 2026-07-17 unification: a running timer always reaches the ticker;
-    // the stored activeTimer:false is deliberately ignored.
-    expect(prefs.timer.ticker.activeTimer).toBe(true);
   });
 
   it("does not auto-add timer visibility when current timer prefs exist", () => {
@@ -622,7 +502,6 @@ describe("widget timer preference migration", () => {
 
     expect(prefs.enabledWidgets).toEqual(["clock"]);
     expect(prefs.widgetsOnTicker).toEqual(["clock"]);
-    expect(prefs.timer.ticker.activeTimer).toBe(true);
   });
 
   it("does not auto-enable timer for current timer prefs", () => {
@@ -686,6 +565,31 @@ describe("widget timer preference migration", () => {
     });
 
     expect(loadPrefs().widgets.widgetsOnTicker).toEqual(["clock", "timer"]);
+  });
+});
+
+describe("dead prefs are shed on load (REL-208)", () => {
+  it("drops the taskbar block and the per-widget ticker sub-configs", () => {
+    storeValues.set("scrollr:settings", {
+      taskbar: { showWidgetGlyphIcons: false, taskbarHeight: "compact" },
+      widgets: {
+        enabledWidgets: ["clock", "weather", "uptime"],
+        widgetsOnTicker: ["clock"],
+        clock: { ticker: { localTime: false, excludedTimezones: ["UTC"] } },
+        weather: { ticker: { excludedCities: ["Oslo"] } },
+        uptime: { url: "https://status.example", pollInterval: 30, ticker: { excludedMonitors: [1] } },
+        github: { repos: [], pollInterval: 90, ticker: { excludedRepos: ["a/b"] } },
+      },
+    });
+
+    const prefs = loadPrefs();
+    expect("taskbar" in prefs).toBe(false);
+    expect("clock" in prefs.widgets).toBe(false);
+    expect("weather" in prefs.widgets).toBe(false);
+    expect(prefs.widgets.uptime).toEqual({ url: "https://status.example", pollInterval: 30 });
+    expect(prefs.widgets.github).toEqual({ repos: [], pollInterval: 90 });
+    // Sysmon's stat toggles are real content selection and stay.
+    expect(prefs.widgets.sysmon.ticker).toEqual({ cpu: true, memory: true, gpu: true, gpuPower: true });
   });
 });
 
