@@ -10,6 +10,7 @@
 //!   unregister()   -> ABM_REMOVE
 
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, MutexGuard};
 use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::UI::Shell::{
     SHAppBarMessage, ABE_BOTTOM, ABE_TOP, ABM_ACTIVATE, ABM_NEW, ABM_QUERYPOS, ABM_REMOVE,
@@ -22,8 +23,14 @@ use windows_sys::Win32::UI::WindowsAndMessaging::WM_USER;
 /// to register us.
 const APPBAR_CALLBACK_MSG: u32 = WM_USER + 1;
 
-/// Tracks AppBar registration. Prevents double-register/unregister.
-static REGISTERED: AtomicBool = AtomicBool::new(false);
+/// HWNDs currently registered as AppBars — one per ticker window, so
+/// several tickers (one per monitor) can each reserve their edge.
+/// Prevents double-register/unregister per window.
+static REGISTERED: Mutex<Vec<isize>> = Mutex::new(Vec::new());
+
+fn registered() -> MutexGuard<'static, Vec<isize>> {
+    REGISTERED.lock().unwrap_or_else(|p| p.into_inner())
+}
 
 /// Whether to hide the ticker when a fullscreen app appears.
 /// Default: true (taskbar-like behavior). When false, ticker stays
@@ -49,10 +56,10 @@ fn hwnd_of(window: &tauri::Window) -> Result<HWND, String> {
 
 /// Register the ticker as a Shell AppBar. Idempotent.
 pub fn register(window: &tauri::Window) -> Result<(), String> {
-    if REGISTERED.load(Ordering::Relaxed) {
+    let hwnd = hwnd_of(window)?;
+    if registered().contains(&(hwnd as isize)) {
         return Ok(());
     }
-    let hwnd = hwnd_of(window)?;
 
     let mut data: APPBARDATA = unsafe { std::mem::zeroed() };
     data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
@@ -63,7 +70,7 @@ pub fn register(window: &tauri::Window) -> Result<(), String> {
     if result == 0 {
         return Err("SHAppBarMessage(ABM_NEW) failed".into());
     }
-    REGISTERED.store(true, Ordering::Relaxed);
+    registered().push(hwnd as isize);
     log::info!("[AppBar] registered, hwnd={hwnd:?}");
 
     // Install the style-stripping subclass FIRST so subsequent style
@@ -74,29 +81,30 @@ pub fn register(window: &tauri::Window) -> Result<(), String> {
     Ok(())
 }
 
-/// Unregister the AppBar. Idempotent.
+/// Unregister this window's AppBar. Idempotent.
 pub fn unregister(window: &tauri::Window) -> Result<(), String> {
-    if !REGISTERED.load(Ordering::Relaxed) {
-        return Ok(());
-    }
     let hwnd = hwnd_of(window)?;
-
-    let mut data: APPBARDATA = unsafe { std::mem::zeroed() };
-    data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
-    data.hWnd = hwnd;
-
-    unsafe {
-        SHAppBarMessage(ABM_REMOVE, &mut data);
-        // Force the shell to reflow now that our slot is gone. Without
-        // this, maximized windows can be slow to reclaim the space.
-        let mut wpc_data: APPBARDATA = std::mem::zeroed();
-        wpc_data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
-        wpc_data.hWnd = hwnd;
-        SHAppBarMessage(ABM_WINDOWPOSCHANGED, &mut wpc_data);
+    let was_registered = {
+        let mut reg = registered();
+        let before = reg.len();
+        reg.retain(|&h| h != hwnd as isize);
+        reg.len() != before
+    };
+    if was_registered {
+        remove(hwnd);
+        log::info!("[AppBar] unregistered hwnd={hwnd:?}");
     }
-    REGISTERED.store(false, Ordering::Relaxed);
-    log::info!("[AppBar] unregistered");
     Ok(())
+}
+
+/// ABM_REMOVE every registered AppBar. Called on exit: the shell keeps
+/// the work area shrunk until logoff if a registration outlives us.
+pub fn unregister_all() {
+    let all = std::mem::take(&mut *registered());
+    for h in &all {
+        remove(*h as HWND);
+    }
+    log::info!("[AppBar] unregistered all ({})", all.len());
 }
 
 /// Defensive unregister called during app startup BEFORE any
@@ -107,18 +115,23 @@ pub fn unregister(window: &tauri::Window) -> Result<(), String> {
 /// Scrollr process registered the same HWND and never called
 /// ABM_REMOVE, the work area stays shrunk until logoff or
 /// explorer.exe restart. This call is a harmless no-op if there's
-/// no stale entry.
-///
-/// We bypass the REGISTERED atomic (which is false at startup) and
-/// don't update it — the next register() call will set it cleanly.
+/// no stale entry. It bypasses REGISTERED (empty at startup).
 pub fn force_unregister_stale(window: &tauri::Window) -> Result<(), String> {
-    let hwnd = hwnd_of(window)?;
+    remove(hwnd_of(window)?);
+    log::info!("[AppBar] force_unregister_stale (defensive startup cleanup)");
+    Ok(())
+}
+
+/// ABM_REMOVE plus a reflow nudge: without ABM_WINDOWPOSCHANGED,
+/// maximized windows can be slow to reclaim the space.
+fn remove(hwnd: HWND) {
     let mut data: APPBARDATA = unsafe { std::mem::zeroed() };
     data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
     data.hWnd = hwnd;
-    unsafe { SHAppBarMessage(ABM_REMOVE, &mut data) };
-    log::info!("[AppBar] force_unregister_stale (defensive startup cleanup)");
-    Ok(())
+    unsafe {
+        SHAppBarMessage(ABM_REMOVE, &mut data);
+        SHAppBarMessage(ABM_WINDOWPOSCHANGED, &mut data);
+    }
 }
 
 /// Set the AppBar position. Caller must register() first.
@@ -131,10 +144,10 @@ pub fn set_position(
     physical_width: i32,
     physical_height: i32,
 ) -> Result<(), String> {
-    if !REGISTERED.load(Ordering::Relaxed) {
+    let hwnd = hwnd_of(window)?;
+    if !registered().contains(&(hwnd as isize)) {
         return Err("AppBar not registered — call register() first".into());
     }
-    let hwnd = hwnd_of(window)?;
     let edge = match position {
         "top" => ABE_TOP,
         "bottom" => ABE_BOTTOM,

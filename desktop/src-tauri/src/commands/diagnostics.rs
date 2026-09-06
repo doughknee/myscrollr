@@ -69,13 +69,71 @@ struct SystemInfo {
     hostname_hash: String,
 }
 
-#[derive(Serialize)]
+/// One attached monitor in LOGICAL (DPI-scaled) coordinates — the same
+/// space `position_ticker` computes in. `name` is the OS identifier
+/// (`\\.\DISPLAY1` on Windows; `monitor-<index>` when the platform has
+/// none) and is what `position_ticker` accepts.
+#[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
-struct MonitorInfo {
-    name: Option<String>,
-    width: u32,
-    height: u32,
-    scale_factor: f64,
+pub struct MonitorInfo {
+    pub name: String,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub scale_factor: f64,
+    pub is_primary: bool,
+}
+
+impl MonitorInfo {
+    pub fn from_monitor(m: &tauri::Monitor, is_primary: bool) -> Self {
+        let scale = m.scale_factor();
+        Self {
+            name: m.name().cloned().unwrap_or_default(),
+            x: m.position().x as f64 / scale,
+            y: m.position().y as f64 / scale,
+            width: m.size().width as f64 / scale,
+            height: m.size().height as f64 / scale,
+            scale_factor: scale,
+            is_primary,
+        }
+    }
+}
+
+/// Every attached monitor, primary flagged. Empty if the platform
+/// cannot enumerate (callers fall back to the window's own monitor).
+pub fn monitors(app: &AppHandle) -> Vec<MonitorInfo> {
+    let primary = app.primary_monitor().ok().flatten();
+    let is_primary = |m: &tauri::Monitor| {
+        primary
+            .as_ref()
+            .is_some_and(|p| p.position() == m.position() && p.size() == m.size())
+    };
+    app.available_monitors()
+        .map(|list| {
+            list.iter()
+                .enumerate()
+                .map(|(i, m)| {
+                    let mut info = MonitorInfo::from_monitor(m, is_primary(m));
+                    if info.name.is_empty() {
+                        info.name = format!("monitor-{i}");
+                    }
+                    info
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The monitor called `name`, else the primary, else the first.
+/// `None` only when there are no monitors at all. Never errors: a
+/// stale name from prefs (monitor unplugged) lands on the primary.
+pub fn pick_monitor<'a>(monitors: &'a [MonitorInfo], name: &str) -> Option<&'a MonitorInfo> {
+    monitors
+        .iter()
+        .find(|m| m.name == name)
+        .or_else(|| monitors.iter().find(|m| m.is_primary))
+        .or_else(|| monitors.first())
 }
 
 #[derive(Serialize)]
@@ -262,27 +320,10 @@ pub async fn collect_diagnostics(app: AppHandle) -> Result<DiagnosticReport, Str
     drop(static_info);
 
     // Environment
-    let monitors: Vec<MonitorInfo> = app
-        .available_monitors()
-        .map(|list| {
-            list.into_iter()
-                .map(|m| {
-                    let size = m.size();
-                    MonitorInfo {
-                        name: m.name().map(String::from),
-                        width: size.width,
-                        height: size.height,
-                        scale_factor: m.scale_factor(),
-                    }
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-
     let environment = EnvironmentInfo {
         desktop_environment: get_desktop_environment(),
         session_type: get_session_type(),
-        monitors,
+        monitors: monitors(&app),
     };
 
     // Window state
@@ -337,4 +378,33 @@ pub async fn collect_diagnostics(app: AppHandle) -> Result<DiagnosticReport, Str
         runtime,
         logs,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn mon(name: &str, is_primary: bool) -> MonitorInfo {
+        MonitorInfo {
+            name: name.into(),
+            x: 0.0,
+            y: 0.0,
+            width: 1920.0,
+            height: 1080.0,
+            scale_factor: 1.0,
+            is_primary,
+        }
+    }
+
+    #[test]
+    fn pick_monitor_prefers_name_then_primary_then_first() {
+        let list = [mon(r"\.\DISPLAY2", false), mon(r"\.\DISPLAY1", true)];
+        assert_eq!(pick_monitor(&list, r"\.\DISPLAY2"), Some(&list[0]));
+        assert_eq!(pick_monitor(&list, "unplugged"), Some(&list[1]));
+
+        let no_primary = [mon("a", false), mon("b", false)];
+        assert_eq!(pick_monitor(&no_primary, "unplugged"), Some(&no_primary[0]));
+
+        assert_eq!(pick_monitor(&[], "a"), None);
+    }
 }

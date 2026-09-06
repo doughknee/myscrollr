@@ -49,7 +49,7 @@ fn init_sentry() -> sentry::ClientInitGuard {
                         if let Some(filename) = frame.filename.as_mut() {
                             if !home.is_empty() {
                                 let s: String = filename.to_string();
-                                *filename = s.replace(&home, "~").into();
+                                *filename = s.replace(&home, "~");
                             }
                         }
                     }
@@ -152,6 +152,7 @@ pub fn run() {
         })))
         .invoke_handler(tauri::generate_handler![
             commands::window::position_ticker,
+            commands::window::list_monitors,
             commands::window::pin_window,
             commands::window::set_hide_on_fullscreen,
             commands::window::set_ticker_visible,
@@ -273,18 +274,16 @@ pub fn run() {
                 }
             }
         }
-        // Windows AppBar cleanup. MUST call ABM_REMOVE before the
-        // process exits or the work area stays shrunk until logout
-        // or explorer restart.
+        // Windows AppBar cleanup. MUST call ABM_REMOVE on every
+        // registered ticker before the process exits or the work area
+        // stays shrunk until logout or explorer restart.
         #[cfg(target_os = "windows")]
         {
             if matches!(
                 &event,
                 tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
             ) {
-                if let Some(ticker) = app_handle.get_webview_window("ticker") {
-                    let _ = crate::commands::appbar_win::unregister(&ticker.as_ref().window());
-                }
+                crate::commands::appbar_win::unregister_all();
             }
         }
 
