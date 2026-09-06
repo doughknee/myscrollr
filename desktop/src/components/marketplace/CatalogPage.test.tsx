@@ -2,7 +2,9 @@
  * Catalog route — hub ↔ directory over the URL, against the bundled
  * snapshot catalog (REL-215). The real `Route` is mounted under a test
  * root that stands in for RootLayout's providers, so search-param
- * handling is the production code, not a re-statement of it.
+ * handling is the production code, not a re-statement of it. Lives here
+ * rather than in routes/ because the router plugin treats every file
+ * there as a route.
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
@@ -15,21 +17,21 @@ import {
 } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-import { Route } from "./catalog";
-import { buildBlocks } from "../components/marketplace/CatalogDirectory";
-import { getCatalogItems } from "../marketplace";
-import { ShellContext, ShellDataContext } from "../shell-context";
-import type { ShellState } from "../shell-context";
-import { loadPrefs } from "../preferences";
-import type { SubscriptionTier } from "../auth";
-import type { DataWidgetRow } from "../api/client";
+import { Route } from "../../routes/catalog";
+import { buildBlocks } from "./CatalogDirectory";
+import { getCatalogItems } from "../../marketplace";
+import { ShellContext, ShellDataContext } from "../../shell-context";
+import type { ShellState } from "../../shell-context";
+import { loadPrefs } from "../../preferences";
+import type { SubscriptionTier } from "../../auth";
+import type { DataWidgetRow } from "../../api/client";
 
 vi.mock("@tauri-apps/plugin-shell", () => ({ open: vi.fn() }));
 vi.mock("@tauri-apps/plugin-http", () => ({
   fetch: vi.fn(() => Promise.reject(new Error("no tauri in tests"))),
 }));
-vi.mock("../api/client", async (importOriginal) => {
-  const mod = await importOriginal<typeof import("../api/client")>();
+vi.mock("../../api/client", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("../../api/client")>();
   return {
     ...mod,
     requestCatalogWidget: vi.fn(async (query: string) => ({ query, count: 3 })),
