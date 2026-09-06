@@ -153,7 +153,9 @@ node scripts/dev/devctl.mjs main 'savePrefs({ ...prefs(), appearance: { ...prefs
 `prefs()`, `savePrefs`, `qc` (the query client), `invoke`, `text()`, `rect()` and
 `router` (main window) are in scope; `await import("/src/…")` reaches anything
 else. Set prefs from the **main** window: the ticker listens cross-window and
-ignores writes that match its own cache. Dev builds only.
+ignores writes that match its own cache. Dev builds only. The window name is
+the Tauri label, so with the ticker on two monitors `ticker-2` addresses the
+second one (its window title is "Scrollr Ticker 2").
 
 To see a window as it really is, capture it (no screen grab, other windows do
 not matter):

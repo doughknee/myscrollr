@@ -6,6 +6,7 @@ initSentry("ticker");
 import { StrictMode } from "react";
 import * as Sentry from "@sentry/react";
 import ReactDOM from "react-dom/client";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { MotionConfig } from "motion/react";
 import "./api/fetchOverride";
@@ -16,7 +17,9 @@ import { startDevBus } from "./dev/bus";
 import "./style.css";
 
 const queryClient = createQueryClient();
-startDevBus("ticker", { qc: queryClient });
+// This entry serves every ticker window ("ticker", "ticker-2", …); the
+// dev bus addresses each by its own label.
+startDevBus(getCurrentWindow().label, { qc: queryClient });
 
 initStore().catch((err) => console.error("[Scrollr] Store init failed:", err)).then(() => {
   ReactDOM.createRoot(document.getElementById("root")!).render(

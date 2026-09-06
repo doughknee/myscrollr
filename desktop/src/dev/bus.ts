@@ -26,7 +26,8 @@ const r = (el: Element) => {
   return { x: b.x, y: b.y, w: b.width, h: b.height };
 };
 
-export function startDevBus(win: "ticker" | "main", extra: Record<string, unknown> = {}): void {
+/** `win` is the Tauri window label: "main", "ticker", "ticker-2", … */
+export function startDevBus(win: string, extra: Record<string, unknown> = {}): void {
   if (!import.meta.env.DEV) return;
   const ctx: Record<string, unknown> = {
     prefs: loadPrefs,

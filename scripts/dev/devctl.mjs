@@ -5,6 +5,7 @@
 //   node scripts/dev/devctl.mjs main   'router.navigate({ to: "/catalog" })'
 //   node scripts/dev/devctl.mjs ticker 'savePrefs({ ...prefs(), appearance: { ...prefs().appearance, themeMode: "light" } })'
 //   node scripts/dev/devctl.mjs ticker --file scripts/dev/some-scenario.js
+//   node scripts/dev/devctl.mjs ticker-2 'text().slice(0, 80)'   # the second monitor's ticker
 //
 // The code runs in the window with `ctx` spread into scope (see
 // desktop/src/dev/bus.ts for what is in it: prefs(), savePrefs, qc, invoke,

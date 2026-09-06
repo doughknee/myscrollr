@@ -543,6 +543,17 @@ export default function App() {
   // ── System tray "Show/Hide Ticker" → toggle via prefs ──────────
   useTauriListener("toggle-ticker", () => handleToggleTicker());
 
+  // ── Monitor set changed → re-place this window ──────────────────
+  // The main window runs `sync_ticker_windows` on a tickerMonitors
+  // change; Rust rewrites its label → monitor map and then pokes each
+  // surviving ticker with this event. `position_ticker` without a
+  // `monitor` resolves the screen from that map by our own label.
+  useTauriListener("ticker-reposition", () => {
+    const p = prefsRef.current;
+    if (!p.ticker.showTicker) return;
+    invoke("position_ticker", { position: p.window.tickerPosition, height: tickerHeight(p) }).catch(() => {});
+  });
+
   const handleToggleWindowPin = useCallback(() => {
     const next = !prefsRef.current.window.pinned;
     setPinned(next);

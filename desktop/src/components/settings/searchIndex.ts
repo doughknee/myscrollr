@@ -66,6 +66,13 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
   // ── Window & startup ──────────────────────────────────────────
   {
     page: "window",
+    rowId: "tickerMonitors",
+    label: "Monitors",
+    description: "Choose which screens show the ticker",
+    keywords: "display screen second dual multi monitor",
+  },
+  {
+    page: "window",
     rowId: "alwaysOnTop",
     label: "Always on top",
     description: "Keep the ticker above all other windows",

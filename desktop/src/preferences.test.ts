@@ -687,3 +687,22 @@ describe("widget timer preference migration", () => {
     expect(loadPrefs().widgets.widgetsOnTicker).toEqual(["clock", "timer"]);
   });
 });
+
+describe("window.tickerMonitors (REL-200)", () => {
+  it("defaults to empty (= primary monitor) when the saved prefs predate it", () => {
+    storeValues.set("scrollr:settings", {
+      window: { pinned: true, tickerPosition: "top", hideOnFullscreen: true },
+    });
+    expect(loadPrefs().window.tickerMonitors).toEqual([]);
+  });
+
+  it("keeps the saved names and drops anything that is not a string", () => {
+    storeValues.set("scrollr:settings", {
+      window: { tickerMonitors: ["\\.\DISPLAY2", 7, null, "\\.\DISPLAY1"] },
+    });
+    expect(loadPrefs().window.tickerMonitors).toEqual(["\\.\DISPLAY2", "\\.\DISPLAY1"]);
+
+    storeValues.set("scrollr:settings", { window: { tickerMonitors: "DISPLAY1" } });
+    expect(loadPrefs().window.tickerMonitors).toEqual([]);
+  });
+});

@@ -239,6 +239,8 @@ interface ToggleRowProps {
   badge?: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  /** Shown but inert, e.g. the last monitor that cannot be turned off. */
+  disabled?: boolean;
 }
 
 export function ToggleRow({
@@ -247,16 +249,21 @@ export function ToggleRow({
   badge,
   checked,
   onChange,
+  disabled = false,
 }: ToggleRowProps) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
       className={clsx(
         ROW_BASE,
-        "group w-full cursor-pointer text-left hover:bg-surface-hover/40",
+        "group w-full text-left",
+        disabled
+          ? "cursor-not-allowed opacity-60"
+          : "cursor-pointer hover:bg-surface-hover/40",
       )}
     >
       <RowText label={label} description={description} badge={badge} />
