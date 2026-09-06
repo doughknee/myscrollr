@@ -470,6 +470,13 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 		return fmt.Errorf("read stripe_customers: %w", err)
 	}
 
+	// Catalog requests ("tell me when X ships") are keyed on the user.
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM catalog_requests WHERE logto_sub = $1`, logtoSub,
+	); err != nil {
+		return fmt.Errorf("delete catalog_requests: %w", err)
+	}
+
 	// Preferences (must come after anything that might reference them).
 	if _, err := tx.Exec(ctx,
 		`DELETE FROM user_preferences WHERE logto_sub = $1`, logtoSub,

@@ -14,6 +14,11 @@
 //
 // A test fails the build if this file is stale.
 
+export interface CatalogRequestResponse {
+  query: string;
+  count: number;
+}
+
 export interface CatalogResponse {
   version: string;
   widgets: WidgetDef[];
@@ -189,6 +194,9 @@ export interface WidgetDef {
   usage?: string[];
   order: number;
   hidden?: boolean;
+  group?: string;
+  keywords?: string[];
+  added_at?: string;
 }
 
 export interface WidgetLimits {

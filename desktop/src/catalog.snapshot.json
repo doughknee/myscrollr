@@ -1,5 +1,5 @@
 {
-    "version": "6e70d60047f305a3",
+    "version": "c703724dd8854d88",
     "widgets": [
         {
             "id": "finance_stocks",
@@ -19,7 +19,17 @@
                 "Quotes stream in real time during market hours.",
                 "Pin it to keep your watchlist always visible."
             ],
-            "order": 0
+            "order": 0,
+            "group": "Markets",
+            "keywords": [
+                "shares",
+                "etf",
+                "s\u0026p",
+                "nasdaq",
+                "dow",
+                "tickers"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "finance_crypto",
@@ -39,7 +49,17 @@
                 "Prices stream 24/7 — crypto never closes.",
                 "Pin it so every big move catches your eye."
             ],
-            "order": 1
+            "order": 1,
+            "group": "Markets",
+            "keywords": [
+                "bitcoin",
+                "btc",
+                "eth",
+                "ethereum",
+                "solana",
+                "coins"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "sports_nfl",
@@ -61,7 +81,12 @@
                 "Set a favorite team from the top bar to keep it front and center.",
                 "Pin it on game days so scores stay on screen."
             ],
-            "order": 2
+            "order": 2,
+            "group": "Football",
+            "keywords": [
+                "football"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "sports_nba",
@@ -83,7 +108,12 @@
                 "Set a favorite team from the top bar to keep it front and center.",
                 "Pin it on game days so scores stay on screen."
             ],
-            "order": 3
+            "order": 3,
+            "group": "Basketball",
+            "keywords": [
+                "basketball"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "sports_nhl",
@@ -105,7 +135,12 @@
                 "Set a favorite team from the top bar to keep it front and center.",
                 "Pin it on game days so scores stay on screen."
             ],
-            "order": 4
+            "order": 4,
+            "group": "Hockey",
+            "keywords": [
+                "hockey"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "sports_mlb",
@@ -127,7 +162,12 @@
                 "Set a favorite team from the top bar to keep it front and center.",
                 "Pin it on game days so scores stay on screen."
             ],
-            "order": 5
+            "order": 5,
+            "group": "Baseball",
+            "keywords": [
+                "baseball"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "sports_f1",
@@ -149,7 +189,14 @@
                 "See the podium the second the race ends.",
                 "Pin it during a Grand Prix to follow every session."
             ],
-            "order": 6
+            "order": 6,
+            "group": "Motorsport",
+            "keywords": [
+                "formula 1",
+                "formula one",
+                "grand prix"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "sports_worldcup",
@@ -171,7 +218,14 @@
                 "Every fixture on the calendar, updated automatically.",
                 "Pin it during the tournament so you never miss a goal."
             ],
-            "order": 7
+            "order": 7,
+            "group": "Soccer",
+            "keywords": [
+                "fifa",
+                "soccer",
+                "football"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "sports_ncaaf",
@@ -193,7 +247,13 @@
                 "Set a favorite team from the top bar to keep it front and center.",
                 "Pin it on game days so scores stay on screen."
             ],
-            "order": 8
+            "order": 8,
+            "group": "Football",
+            "keywords": [
+                "college football",
+                "cfb"
+            ],
+            "added_at": "2026-07-21"
         },
         {
             "id": "sports_ncaab",
@@ -215,7 +275,13 @@
                 "Set a favorite team from the top bar to keep it front and center.",
                 "Pin it on game days so scores stay on screen."
             ],
-            "order": 9
+            "order": 9,
+            "group": "Basketball",
+            "keywords": [
+                "college basketball",
+                "march madness"
+            ],
+            "added_at": "2026-07-21"
         },
         {
             "id": "sports_premierleague",
@@ -237,7 +303,15 @@
                 "Set a favorite team from the top bar to keep it front and center.",
                 "Pin it on game days so scores stay on screen."
             ],
-            "order": 10
+            "order": 10,
+            "group": "Soccer",
+            "keywords": [
+                "epl",
+                "english",
+                "soccer",
+                "football"
+            ],
+            "added_at": "2026-07-21"
         },
         {
             "id": "sports_laliga",
@@ -259,7 +333,13 @@
                 "Set a favorite team from the top bar to keep it front and center.",
                 "Pin it on game days so scores stay on screen."
             ],
-            "order": 11
+            "order": 11,
+            "group": "Soccer",
+            "keywords": [
+                "spanish",
+                "soccer"
+            ],
+            "added_at": "2026-07-21"
         },
         {
             "id": "sports_mls",
@@ -281,7 +361,13 @@
                 "Set a favorite team from the top bar to keep it front and center.",
                 "Pin it on game days so scores stay on screen."
             ],
-            "order": 12
+            "order": 12,
+            "group": "Soccer",
+            "keywords": [
+                "american",
+                "soccer"
+            ],
+            "added_at": "2026-07-21"
         },
         {
             "id": "sports_championsleague",
@@ -303,7 +389,14 @@
                 "Set a favorite team from the top bar to keep it front and center.",
                 "Pin it on game days so scores stay on screen."
             ],
-            "order": 13
+            "order": 13,
+            "group": "Soccer",
+            "keywords": [
+                "ucl",
+                "uefa",
+                "europe"
+            ],
+            "added_at": "2026-07-21"
         },
         {
             "id": "sports_ufc",
@@ -326,7 +419,13 @@
                 "Follow the main card and prelims in one place.",
                 "Pin it during an event to catch every finish."
             ],
-            "order": 14
+            "order": 14,
+            "group": "Combat",
+            "keywords": [
+                "mma",
+                "fights"
+            ],
+            "added_at": "2026-07-21"
         },
         {
             "id": "sports_afl",
@@ -348,7 +447,13 @@
                 "Set a favorite team from the top bar to keep it front and center.",
                 "Pin it on game days so scores stay on screen."
             ],
-            "order": 15
+            "order": 15,
+            "group": "Football",
+            "keywords": [
+                "aussie rules",
+                "australian football"
+            ],
+            "added_at": "2026-07-21"
         },
         {
             "id": "news_bbc",
@@ -373,7 +478,9 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 16
+            "order": 16,
+            "group": "World",
+            "added_at": "2026-07-02"
         },
         {
             "id": "news_npr",
@@ -398,7 +505,9 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 17
+            "order": 17,
+            "group": "World",
+            "added_at": "2026-07-21"
         },
         {
             "id": "news_guardian",
@@ -423,7 +532,9 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 18
+            "order": 18,
+            "group": "World",
+            "added_at": "2026-07-21"
         },
         {
             "id": "news_aljazeera",
@@ -448,7 +559,9 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 19
+            "order": 19,
+            "group": "World",
+            "added_at": "2026-07-21"
         },
         {
             "id": "news_propublica",
@@ -473,7 +586,9 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 20
+            "order": 20,
+            "group": "World",
+            "added_at": "2026-07-21"
         },
         {
             "id": "news_bloomberg",
@@ -498,7 +613,9 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 21
+            "order": 21,
+            "group": "Business",
+            "added_at": "2026-07-21"
         },
         {
             "id": "news_cnbc",
@@ -523,7 +640,9 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 22
+            "order": 22,
+            "group": "Business",
+            "added_at": "2026-07-21"
         },
         {
             "id": "news_nasa",
@@ -548,7 +667,9 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 23
+            "order": 23,
+            "group": "Tech \u0026 Science",
+            "added_at": "2026-07-21"
         },
         {
             "id": "news_hackernews",
@@ -573,7 +694,15 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 24
+            "order": 24,
+            "group": "Tech \u0026 Science",
+            "keywords": [
+                "hn",
+                "ycombinator",
+                "tech",
+                "startups"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "news_theverge",
@@ -598,7 +727,9 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 25
+            "order": 25,
+            "group": "Tech \u0026 Science",
+            "added_at": "2026-07-21"
         },
         {
             "id": "news_drudge",
@@ -624,7 +755,9 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 26
+            "order": 26,
+            "group": "World",
+            "added_at": "2026-09-05"
         },
         {
             "id": "rss_custom",
@@ -644,7 +777,8 @@
                 "Perfect for niche blogs, newsletters, or subreddits with a feed."
             ],
             "order": 27,
-            "hidden": true
+            "hidden": true,
+            "added_at": "2026-07-02"
         },
         {
             "id": "fantasy_yahoo",
@@ -661,7 +795,13 @@
                 "Leagues, matchups, and standings sync automatically.",
                 "Live scoring updates while your players are on the field."
             ],
-            "order": 28
+            "order": 28,
+            "group": "Fantasy",
+            "keywords": [
+                "fantasy football",
+                "league"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "predictions",
@@ -678,7 +818,14 @@
                 "Follow the events and questions you care about.",
                 "Display-only — Scrollr shows the market, it never places a trade."
             ],
-            "order": 29
+            "order": 29,
+            "group": "Predictions",
+            "keywords": [
+                "odds",
+                "prediction market",
+                "bets"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "clock",
@@ -687,7 +834,14 @@
             "category": "utility",
             "color": "#6366f1",
             "required_tier": "free",
-            "order": 30
+            "order": 30,
+            "group": "Desk",
+            "keywords": [
+                "time",
+                "timezone",
+                "world clock"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "timer",
@@ -696,7 +850,14 @@
             "category": "utility",
             "color": "#f59e0b",
             "required_tier": "free",
-            "order": 31
+            "order": 31,
+            "group": "Desk",
+            "keywords": [
+                "pomodoro",
+                "stopwatch",
+                "countdown"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "weather",
@@ -705,7 +866,14 @@
             "category": "utility",
             "color": "#0ea5e9",
             "required_tier": "free",
-            "order": 32
+            "order": 32,
+            "group": "Desk",
+            "keywords": [
+                "forecast",
+                "temperature",
+                "rain"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "sysmon",
@@ -714,7 +882,15 @@
             "category": "utility",
             "color": "#06b6d4",
             "required_tier": "free",
-            "order": 33
+            "order": 33,
+            "group": "Dev",
+            "keywords": [
+                "cpu",
+                "gpu",
+                "ram",
+                "memory"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "uptime",
@@ -724,7 +900,14 @@
             "color": "#10b981",
             "logo_url": "https://icon.horse/icon/uptime.kuma.pet",
             "required_tier": "free",
-            "order": 34
+            "order": 34,
+            "group": "Dev",
+            "keywords": [
+                "kuma",
+                "status",
+                "monitor"
+            ],
+            "added_at": "2026-07-02"
         },
         {
             "id": "github",
@@ -734,7 +917,14 @@
             "color": "#f97316",
             "logo_url": "https://icon.horse/icon/github.com",
             "required_tier": "free",
-            "order": 35
+            "order": 35,
+            "group": "Dev",
+            "keywords": [
+                "actions",
+                "ci",
+                "pull requests"
+            ],
+            "added_at": "2026-07-02"
         }
     ]
 }
