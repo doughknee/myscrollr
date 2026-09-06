@@ -27,6 +27,7 @@ import type {
   HoverBehavior,
   MixMode,
   ScrollMode,
+  TickerMode,
   TickerPosition,
   TickerPrefs,
   WindowPrefs,
@@ -41,15 +42,18 @@ import {
   ToggleRow,
 } from "../SettingsControls";
 import { Row } from "./Row";
+import { SETTINGS_ROWS } from "../rows";
+
+const R = SETTINGS_ROWS.ticker;
 
 const POSITION_OPTIONS: { value: TickerPosition; label: string }[] = [
   { value: "top", label: "Top" },
   { value: "bottom", label: "Bottom" },
 ];
 
-const DETAIL_LEVEL_OPTIONS: { value: "compact" | "comfort"; label: string }[] = [
+const DETAIL_LEVEL_OPTIONS: { value: TickerMode; label: string }[] = [
   { value: "compact", label: "Compact" },
-  { value: "comfort", label: "Detailed" },
+  { value: "detailed", label: "Detailed" },
 ];
 
 const SIZE_OPTIONS = SCALE_PRESETS.map((v) => ({
@@ -59,13 +63,13 @@ const SIZE_OPTIONS = SCALE_PRESETS.map((v) => ({
 
 const CHIP_COLOR_OPTIONS: { value: ChipColorMode; label: string }[] = [
   { value: "widget", label: "Widget" },
-  { value: "accent", label: "Theme" },
-  { value: "muted", label: "Subtle" },
+  { value: "theme", label: "Theme" },
+  { value: "subtle", label: "Subtle" },
 ];
 
 const SCROLL_MODE_OPTIONS: { value: ScrollMode; label: string }[] = [
   { value: "continuous", label: "Continuous" },
-  { value: "step", label: "Page" },
+  { value: "page", label: "Page" },
 ];
 
 const SPEED_OPTIONS = [
@@ -87,7 +91,7 @@ const STEP_PAUSE_OPTIONS = STEP_PAUSES.map((v) => ({
 
 const MIX_OPTIONS: { value: MixMode; label: string }[] = [
   { value: "grouped", label: "By source" },
-  { value: "weave", label: "Mixed" },
+  { value: "mixed", label: "Mixed" },
 ];
 
 interface TickerPageProps {
@@ -97,7 +101,7 @@ interface TickerPageProps {
 
 export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
   const { ticker, window: window_ } = prefs;
-  const paged = ticker.scrollMode === "step";
+  const paged = ticker.scrollMode === "page";
 
   const setTicker = useCallback(
     <K extends keyof TickerPrefs>(key: K, value: TickerPrefs[K]) =>
@@ -116,8 +120,8 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
         <RowList>
           <Row id="showTicker">
             <ToggleRow
-              label="Show the ticker"
-              description="The bar on your screen. Ctrl+T, the tray and the ticker's right-click menu do the same."
+              label={R.showTicker.label}
+              description={R.showTicker.description}
               checked={ticker.showTicker}
               onChange={(v) => setTicker("showTicker", v)}
             />
@@ -133,8 +137,8 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
         <RowList>
           <Row id="screenEdge">
             <SegmentedRow
-              label="Screen edge"
-              description="Which edge of the screen the ticker sits on."
+              label={R.screenEdge.label}
+              description={R.screenEdge.description}
               value={window_.tickerPosition}
               options={POSITION_OPTIONS}
               onChange={(v) => setWindow("tickerPosition", v)}
@@ -147,8 +151,8 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
         <RowList>
           <Row id="detailLevel">
             <SegmentedRow
-              label="Detail level"
-              description="One line per chip, or a detail row under each."
+              label={R.detailLevel.label}
+              description={R.detailLevel.description}
               value={ticker.tickerMode}
               options={DETAIL_LEVEL_OPTIONS}
               onChange={(v) => setTicker("tickerMode", v)}
@@ -156,8 +160,8 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
           </Row>
           <Row id="tickerScale">
             <SegmentedRow
-              label="Size"
-              description="Resize the bar. The app window has its own size."
+              label={R.tickerScale.label}
+              description={R.tickerScale.description}
               value={String(prefs.appearance.tickerScale)}
               options={SIZE_OPTIONS}
               onChange={(v) =>
@@ -170,8 +174,8 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
           </Row>
           <Row id="chipColors">
             <SegmentedRow
-              label="Chip colors"
-              description="Each widget's own color, the theme accent, or subtle grays."
+              label={R.chipColors.label}
+              description={R.chipColors.description}
               value={ticker.chipColors}
               options={CHIP_COLOR_OPTIONS}
               onChange={(v) => setTicker("chipColors", v)}
@@ -184,8 +188,8 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
         <RowList>
           <Row id="scrollMode">
             <SegmentedRow
-              label="Scroll mode"
-              description="Scroll without stopping, or show a page at a time."
+              label={R.scrollMode.label}
+              description={R.scrollMode.description}
               value={ticker.scrollMode}
               options={SCROLL_MODE_OPTIONS}
               onChange={(v) => setTicker("scrollMode", v)}
@@ -193,11 +197,9 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
           </Row>
           <Row id="speed">
             <SegmentedRow
-              label="Speed"
+              label={R.speed.label}
               description={
-                paged
-                  ? "How quickly each page slides in."
-                  : "How fast the chips travel."
+                paged ? "How quickly each page slides in." : R.speed.description
               }
               value={String(ticker.tickerSpeed)}
               options={SPEED_OPTIONS}
@@ -206,11 +208,11 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
           </Row>
           <Row id="onHover">
             <SegmentedRow
-              label="On hover"
+              label={R.onHover.label}
               description={
                 paged
                   ? "Whether the page holds still while your mouse is over it."
-                  : "What the bar does while your mouse is over it."
+                  : R.onHover.description
               }
               value={ticker.onHover}
               options={HOVER_OPTIONS}
@@ -220,8 +222,8 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
           {paged && (
             <Row id="stepPause">
               <SegmentedRow
-                label="Time per page"
-                description="How long each page stays before the next one."
+                label={R.stepPause.label}
+                description={R.stepPause.description}
                 value={String(ticker.stepPause)}
                 options={STEP_PAUSE_OPTIONS}
                 onChange={(v) => setTicker("stepPause", Number(v))}
@@ -235,8 +237,8 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
         <RowList>
           <Row id="alwaysOnTop">
             <ToggleRow
-              label="Stay above other windows"
-              description="Keep the ticker visible over whatever else is open."
+              label={R.alwaysOnTop.label}
+              description={R.alwaysOnTop.description}
               checked={window_.pinned}
               onChange={(v) => setWindow("pinned", v)}
             />
@@ -244,8 +246,8 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
           {IS_WINDOWS && (
             <Row id="hideFullscreen">
               <ToggleRow
-                label="Hide when an app goes fullscreen"
-                description="Get out of the way of games, videos and presentations."
+                label={R.hideFullscreen.label}
+                description={R.hideFullscreen.description}
                 checked={window_.hideOnFullscreen}
                 onChange={(v) => setWindow("hideOnFullscreen", v)}
               />
@@ -253,8 +255,8 @@ export default function TickerPage({ prefs, onPrefsChange }: TickerPageProps) {
           )}
           <Row id="itemOrder">
             <SegmentedRow
-              label="Item order"
-              description="Keep each widget's items together, or mix them."
+              label={R.itemOrder.label}
+              description={R.itemOrder.description}
               value={ticker.mixMode}
               options={MIX_OPTIONS}
               onChange={(v) => setTicker("mixMode", v)}

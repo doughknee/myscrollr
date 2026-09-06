@@ -32,7 +32,7 @@ interface GameChipProps {
   colorMode?: ChipColorMode;
   /**
    * The league widget's catalog brand colour (#rrggbb). Used only in the
-   * "widget" colour mode; "accent" and "muted" keep their shared palettes.
+   * "widget" colour mode; "theme" and "subtle" keep their shared palettes.
    * Absent (no catalog yet, or a coarse legacy row) falls back to the
    * sports palette.
    */

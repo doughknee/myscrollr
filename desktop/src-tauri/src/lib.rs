@@ -193,7 +193,7 @@ pub fn run() {
             commands::window::quit_app,
             commands::system_info::get_system_info,
             commands::diagnostics::collect_diagnostics,
-            tray::sync_tray_pin,
+            tray::sync_tray_ticker,
             set_crash_reports,
         ])
         .on_window_event(|window, event| {

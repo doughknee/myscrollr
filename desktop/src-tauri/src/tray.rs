@@ -6,18 +6,19 @@ use tauri::{
     Emitter, Manager, Wry,
 };
 
-/// State slot for the "Pin on Top" tray menu item. The frontend owns
-/// `prefs.window.pinned` as the source of truth, so this holds a handle
-/// we can update via `sync_tray_pin` whenever the frontend state flips.
-pub struct PinTrayItem(pub Mutex<Option<CheckMenuItem<Wry>>>);
+/// State slot for the "Show ticker" tray item. The frontend owns
+/// `prefs.ticker.showTicker` as the source of truth, so this holds a
+/// handle it updates via `sync_tray_ticker` whenever the pref flips.
+pub struct ShowTickerItem(pub Mutex<Option<CheckMenuItem<Wry>>>);
 
 /// Build the system tray with menu items and event handlers.
 pub fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let open = MenuItemBuilder::with_id("open", "Open Scrollr").build(app)?;
     let sep1 = PredefinedMenuItem::separator(app)?;
-    let toggle_ticker = MenuItemBuilder::with_id("toggle_ticker", "Toggle Ticker").build(app)?;
-    let pin_on_top = CheckMenuItemBuilder::with_id("pin_on_top", "Always on Top")
-        .checked(false)
+    // Same words as the settings row and the ticker's right-click menu.
+    // Built checked (the pref's default); JS settles it at launch.
+    let show_ticker = CheckMenuItemBuilder::with_id("show_ticker", "Show ticker")
+        .checked(true)
         .build(app)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
     let report_bug = MenuItemBuilder::with_id("report_bug", "Report a Bug").build(app)?;
@@ -27,8 +28,7 @@ pub fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .items(&[
             &open,
             &sep1,
-            &toggle_ticker,
-            &pin_on_top,
+            &show_ticker,
             &sep2,
             &report_bug,
             &sep3,
@@ -36,9 +36,9 @@ pub fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build()?;
 
-    // Park the CheckMenuItem in app state so the `sync_tray_pin` command
-    // can update its checkmark when the frontend flips prefs.window.pinned.
-    app.manage(PinTrayItem(Mutex::new(Some(pin_on_top.clone()))));
+    // Park the CheckMenuItem in app state so `sync_tray_ticker` can settle
+    // its checkmark when the frontend flips prefs.ticker.showTicker.
+    app.manage(ShowTickerItem(Mutex::new(Some(show_ticker.clone()))));
 
     // Monochrome icon for the system tray. On macOS, icon_as_template(true)
     // tells the OS to tint it white/black to match the menu bar appearance.
@@ -57,17 +57,12 @@ pub fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let _ = w.set_focus();
                 }
             }
-            "toggle_ticker" => {
+            "show_ticker" => {
                 // JS owns prefs.ticker.showTicker — emit and let it toggle.
+                // Don't mutate the CheckMenuItem here: the OS already
+                // flipped it visually and JS's `sync_tray_ticker` echo is
+                // authoritative.
                 let _ = app.emit("toggle-ticker", ());
-            }
-            "pin_on_top" => {
-                // Same pattern as toggle_ticker. The frontend listener
-                // flips prefs.window.pinned, invokes pin_window, then calls
-                // sync_tray_pin to settle our checkmark. Don't mutate the
-                // CheckMenuItem here — the OS already toggled it visually
-                // and JS's echo is authoritative.
-                let _ = app.emit("toggle-pin", ());
             }
             "report_bug" => {
                 if let Some(main) = app.get_webview_window("main") {
@@ -100,14 +95,14 @@ pub fn setup(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Update the "Pin on Top" tray checkmark to match the given state.
-/// Called from JS whenever `prefs.window.pinned` changes, so the tray
-/// menu and the right-click menu stay visually consistent.
+/// Update the "Show ticker" tray checkmark to match the given state.
+/// Called from JS whenever `prefs.ticker.showTicker` changes, so the
+/// tray, the right-click menu and the settings row all agree.
 #[tauri::command]
-pub fn sync_tray_pin(state: tauri::State<'_, PinTrayItem>, pinned: bool) {
+pub fn sync_tray_ticker(state: tauri::State<'_, ShowTickerItem>, shown: bool) {
     if let Ok(slot) = state.0.lock() {
         if let Some(item) = slot.as_ref() {
-            let _ = item.set_checked(pinned);
+            let _ = item.set_checked(shown);
         }
     }
 }

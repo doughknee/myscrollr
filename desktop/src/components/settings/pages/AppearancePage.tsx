@@ -29,6 +29,9 @@ import {
   ToggleRow,
 } from "../SettingsControls";
 import { Row } from "./Row";
+import { SETTINGS_ROWS } from "../rows";
+
+const R = SETTINGS_ROWS.appearance;
 
 const THEME_MODE_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: "light", label: "Light" },
@@ -82,13 +85,15 @@ export default function AppearancePage({
         <RowList>
           <Row id="theme">
             <div className="px-4 py-3">
-              <div className="text-ui-body font-medium text-fg">Theme</div>
+              <div className="text-ui-body font-medium text-fg">
+                {R.theme.label}
+              </div>
               <div className="mt-0.5 text-ui-meta text-fg-3">
-                Pick a color palette
+                {R.theme.description}
               </div>
               <div
                 role="radiogroup"
-                aria-label="Theme"
+                aria-label={R.theme.label}
                 className="mt-3 grid grid-cols-5 gap-2"
               >
                 {THEME_FAMILIES.map((family) => {
@@ -136,8 +141,8 @@ export default function AppearancePage({
           </Row>
           <Row id="colorMode">
             <SegmentedRow
-              label="Color mode"
-              description="Light, dark, or follow the system"
+              label={R.colorMode.label}
+              description={R.colorMode.description}
               value={appearance.themeMode}
               options={THEME_MODE_OPTIONS}
               onChange={(v) => set("themeMode", v)}
@@ -145,8 +150,8 @@ export default function AppearancePage({
           </Row>
           <Row id="appSize">
             <SegmentedRow
-              label="App size"
-              description="Resize the main app window. The ticker has its own scale."
+              label={R.appSize.label}
+              description={R.appSize.description}
               value={String(appearance.uiScale)}
               options={APP_SCALE_OPTIONS}
               onChange={(v) => set("uiScale", Number(v))}
@@ -159,8 +164,8 @@ export default function AppearancePage({
         <RowList>
           <Row id="fontWeight">
             <SegmentedRow
-              label="Font weight"
-              description="Increase text thickness for readability"
+              label={R.fontWeight.label}
+              description={R.fontWeight.description}
               value={appearance.fontWeight}
               options={FONT_WEIGHT_OPTIONS}
               onChange={(v) =>
@@ -170,8 +175,8 @@ export default function AppearancePage({
           </Row>
           <Row id="highContrast">
             <ToggleRow
-              label="High contrast text"
-              description="Brighten muted text for easier reading"
+              label={R.highContrast.label}
+              description={R.highContrast.description}
               checked={appearance.highContrast}
               onChange={(v) => set("highContrast", v)}
             />
@@ -183,8 +188,8 @@ export default function AppearancePage({
         <RowList>
           <Row id="temperature">
             <SegmentedRow
-              label="Temperature"
-              description="Used by Weather and System monitor"
+              label={R.temperature.label}
+              description={R.temperature.description}
               value={appearance.units.temperature}
               options={TEMPERATURE_OPTIONS}
               onChange={(v) => setUnit("temperature", v)}
@@ -192,8 +197,8 @@ export default function AppearancePage({
           </Row>
           <Row id="timeFormat">
             <SegmentedRow
-              label="Time"
-              description="Used by Clock and the ticker"
+              label={R.timeFormat.label}
+              description={R.timeFormat.description}
               value={appearance.units.timeFormat}
               options={TIME_FORMAT_OPTIONS}
               onChange={(v) => setUnit("timeFormat", v)}

@@ -12,6 +12,9 @@ import { exportUserData } from "../../../api/client";
 import { ActionRow, RowList, SettingsGroup, ToggleRow } from "../SettingsControls";
 import ConfirmDialog from "../../ConfirmDialog";
 import { Row } from "./Row";
+import { SETTINGS_ROWS } from "../rows";
+
+const R = SETTINGS_ROWS.data;
 import type { PrivacyPrefs } from "../../../preferences";
 
 interface DataPrivacyPageProps {
@@ -59,8 +62,8 @@ export default function DataPrivacyPage({
           <RowList>
             <Row id="export">
               <ActionRow
-                label="Export your data"
-                description="Download your sources, preferences, and account metadata as JSON."
+                label={R.export.label}
+                description={R.export.description}
                 action={exportState === "loading" ? "Exporting…" : "Export"}
                 tone="accent"
                 muted={exportState === "loading"}
@@ -75,8 +78,8 @@ export default function DataPrivacyPage({
         <RowList>
           <Row id="crashReports">
             <ToggleRow
-              label="Send crash reports"
-              description="When something breaks, send the error, stack trace, app version and OS to Sentry. Never your account, IP address or file paths."
+              label={R.crashReports.label}
+              description={R.crashReports.description}
               checked={privacy.sendCrashReports}
               onChange={(v) =>
                 onPrivacyChange({ ...privacy, sendCrashReports: v })
@@ -90,8 +93,8 @@ export default function DataPrivacyPage({
         <RowList>
           <Row id="resetAll">
             <ActionRow
-              label="Reset all settings"
-              description="Clear every local preference. Your account, billing, and server data are untouched."
+              label={R.resetAll.label}
+              description={R.resetAll.description}
               action="Reset…"
               tone="error"
               onClick={() => setConfirmResetAll(true)}
@@ -103,7 +106,7 @@ export default function DataPrivacyPage({
       <ConfirmDialog
         open={confirmResetAll}
         title="Reset all settings?"
-        description="This will set everything back to the original settings. Your account and saved content won't change."
+        description="Every setting goes back to its default, Launch at login is turned off, and your local widgets are removed. Your account and saved content won't change."
         confirmLabel="Reset everything"
         destructive
         onConfirm={() => {
