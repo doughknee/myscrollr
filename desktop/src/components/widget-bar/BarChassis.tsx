@@ -29,8 +29,8 @@ interface BarChassisValue {
   /** DOM node WidgetBar portals its row into (null for a beat on boot
    *  while the slot's ref settles — render nothing, not a local shell). */
   host: HTMLElement | null;
-  /** Row mount bookkeeping — the shell hides itself at zero rows so
-   *  barless pages (e.g. widget info) don't show an empty chrome band. */
+  /** Row mount bookkeeping — at zero rows any pinned elevation is
+   *  dropped. (Hiding the shell on barless pages is CSS, see the slot.) */
   report: (delta: 1 | -1) => void;
   /** Pinned-state elevation, reported by the sentinel that still lives
    *  in the page's scroll flow. */
@@ -94,21 +94,22 @@ export function BarChassisSlot() {
     // Same anatomy as WidgetBar's standalone shell (rounded-t-xl seats
     // the bar against the content panel's top radius). backdrop-blur is gone:
     // nothing ever renders behind a non-overlapping chassis row.
+    //
+    // The shell IS the portal host, and it hides itself with `:empty`
+    // rather than off `rowCount`: state catches up one commit after a
+    // row lands, and for that commit the row sits inside a display:none
+    // shell — where a mounting control's autoFocus is silently dropped
+    // (REL-218, the catalog search). CSS sees the row the instant it is
+    // in the DOM. Grid-stacked: outgoing + incoming rows occupy the same
+    // cell during a swap so they overlap instead of stacking.
     <div
+      ref={ctx.setHost}
       className={clsx(
-        "@container relative z-20 shrink-0 rounded-t-xl border-b bg-surface px-3 py-1.5 ",
+        "@container relative z-20 grid shrink-0 items-center rounded-t-xl border-b bg-surface px-3 py-1.5 empty:hidden [&>*]:col-start-1 [&>*]:row-start-1",
         ctx.stuck
           ? "border-edge/50 shadow-[0_6px_16px_-8px_rgba(0,0,0,0.35)]"
           : "border-edge/30",
-        ctx.rowCount === 0 && "hidden",
       )}
-    >
-      {/* Grid-stacked host: outgoing + incoming rows occupy the same
-          cell during a swap so they overlap instead of stacking. */}
-      <div
-        ref={ctx.setHost}
-        className="grid items-center [&>*]:col-start-1 [&>*]:row-start-1"
-      />
-    </div>
+    />
   );
 }
