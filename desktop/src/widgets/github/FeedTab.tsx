@@ -27,13 +27,6 @@ import {
   CI_STATUS_TEXT,
 } from "./types";
 import { useShell } from "../../shell-context";
-import { WidgetBar } from "../../components/widget-bar/Bar";
-import {
-  SelectMenu,
-  type SelectOption,
-} from "../../components/widget-bar/SelectMenu";
-import { useWidgetConfig } from "../../hooks/useWidgetConfig";
-import { formatPollInterval } from "../../utils/format";
 import { savePrefs, updateWidgetPrefs } from "../../preferences";
 import { useSyncedQuery } from "../../hooks/useSyncedQuery";
 import { LS_GITHUB_REPOS } from "../../constants";
@@ -55,7 +48,6 @@ export const githubWidget: WidgetManifest = {
       "Paste a GitHub repo URL to add it (e.g. https://github.com/org/repo).",
       "Each repo shows its latest GitHub Actions workflow run status.",
       "Click a repo row to open the workflow run on GitHub.",
-      "Set how often workflows refresh from the top bar.",
     ],
   },
   FeedTab: GitHubFeedTab,
@@ -63,10 +55,8 @@ export const githubWidget: WidgetManifest = {
 
 // ── FeedTab ─────────────────────────────────────────────────────
 
-const POLL_OPTIONS: SelectOption<string>[] = Array.from({ length: 9 }, (_, i) => {
-  const v = 60 + i * 30;
-  return { value: String(v), label: formatPollInterval(v) };
-});
+/** Seconds between GitHub fetches. Not a user setting (REL-206). */
+const POLL_INTERVAL = 120;
 
 const REMOVE_MOTION = {
   hidden: {
@@ -81,39 +71,10 @@ const REMOVE_MOTION = {
   },
 };
 
-function GitHubFeedTab(props: FeedTabProps) {
-  return (
-    <div className="flex min-h-full flex-col">
-      {props.mode === "comfort" && <GitHubBar />}
-      <GitHubFeedBody {...props} />
-    </div>
-  );
-}
-
-function GitHubBar() {
-  const { prefs, onPrefsChange } = useShell();
-  const { config, update } = useWidgetConfig("github", prefs, onPrefsChange);
-  return (
-    <WidgetBar>
-      {/* Config selects live in the right cluster — standard grammar. */}
-      <div className="ml-auto">
-        <SelectMenu
-          ariaLabel="Refresh interval"
-          prefix="Refresh"
-          value={String(config.pollInterval)}
-          options={POLL_OPTIONS}
-          onChange={(v) => update({ pollInterval: Number(v) })}
-        />
-      </div>
-    </WidgetBar>
-  );
-}
-
-function GitHubFeedBody({ mode: feedMode }: FeedTabProps) {
+function GitHubFeedTab({ mode: feedMode }: FeedTabProps) {
   const compact = feedMode === "compact";
   const shell = useShell();
   const configRepos = shell.prefs.widgets.github.repos;
-  const pollInterval = shell.prefs.widgets.github.pollInterval;
 
   const [inputUrl, setInputUrl] = useState("");
   const [inputError, setInputError] = useState<string | null>(null);
@@ -131,7 +92,7 @@ function GitHubFeedBody({ mode: feedMode }: FeedTabProps) {
     queryKey: ["github-actions", configRepos.map(repoKey)],
     queryFn: () => fetchAllRepos(configRepos),
     enabled: configRepos.length > 0,
-    pollInterval,
+    pollInterval: POLL_INTERVAL,
     retry: 1,
   });
 

@@ -39,7 +39,7 @@ import SettingsRail from "./SettingsRail";
 import { CARD_SURFACE, SettingsButton } from "./SettingsControls";
 import PageHeader from "./pages/PageHeader";
 import AppearancePage from "./pages/AppearancePage";
-import WindowStartupPage from "./pages/WindowStartupPage";
+import StartupPage from "./pages/StartupPage";
 import ShortcutsPage from "./pages/ShortcutsPage";
 import TickerPage, { RESET_TICKER_LABEL, useTickerReset } from "./pages/TickerPage";
 import ProfilePlanPage from "./pages/ProfilePlanPage";
@@ -135,9 +135,14 @@ export default function SettingsSurface({
     onQueryChange("");
   }, [page, onQueryChange]);
 
+  // "Launch at login" is not a pref (the autostart plugin owns it), so
+  // resetting prefs alone would leave it on. "Reset everything" means
+  // everything on these pages — turn it off explicitly (REL-206).
+  const { onAutostartChange } = shell;
   const handleResetAll = useCallback(() => {
     onPrefsChange(resetAll());
-  }, [onPrefsChange]);
+    onAutostartChange(false);
+  }, [onPrefsChange, onAutostartChange]);
 
   return (
     <div className="flex h-full min-h-0">
@@ -185,8 +190,8 @@ export default function SettingsSurface({
                 />
               )}
 
-              {page === "window" && (
-                <WindowStartupPage
+              {page === "startup" && (
+                <StartupPage
                   startup={prefs.startup}
                   onStartupChange={(startup) =>
                     onPrefsChange({ ...prefs, startup })

@@ -11,8 +11,8 @@
  * holds under the unified surface because only the active page is
  * mounted; switching rail entries unmounts this one.
  *
- * The auto-check toggle moved to Window & startup — the subtitle of the
- * check row points there rather than duplicating the control.
+ * There is no auto-check toggle any more (REL-206): the startup check
+ * always runs, this page is the manual one.
  */
 import { useCallback, useRef, useState } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
@@ -227,7 +227,7 @@ function UpdateRow({
               Check for new versions
             </span>
             <span className="text-ui-meta text-fg-4">
-              Startup auto-check lives under Window &amp; startup.
+              Scrollr also checks each time it launches.
             </span>
           </div>
           <SettingsButton onClick={onCheck}>Check for updates</SettingsButton>

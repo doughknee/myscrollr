@@ -4,13 +4,14 @@
  * One route (`/customize?page=`) renders seven pages behind a rail. The
  * ids double as the search-param values, so they are part of the URL
  * contract — renaming one breaks saved links and the tray/cross-window
- * navigate channel.
+ * navigate channel. When a page is renamed anyway, keep the old id as
+ * an alias in `LEGACY_SETTINGS_PAGES` so `resolveSettingsPage` maps it.
  */
 import {
-  AppWindow,
   Database,
   Keyboard,
   Palette,
+  Power,
   RadioTower,
   RefreshCw,
   User,
@@ -19,7 +20,7 @@ import {
 
 export const SETTINGS_PAGES = [
   "appearance",
-  "window",
+  "startup",
   "shortcuts",
   "ticker",
   "profile",
@@ -30,6 +31,21 @@ export const SETTINGS_PAGES = [
 export type SettingsPage = (typeof SETTINGS_PAGES)[number];
 
 export const DEFAULT_SETTINGS_PAGE: SettingsPage = "appearance";
+
+/** Old ids still accepted in `?page=` so saved links keep working. */
+const LEGACY_SETTINGS_PAGES: Record<string, SettingsPage> = {
+  // "Window & startup" became "Startup" (REL-206).
+  window: "startup",
+};
+
+/** `?page=` value → page. Legacy ids map forward; anything else → default. */
+export function resolveSettingsPage(value: unknown): SettingsPage {
+  if (isSettingsPage(value)) return value;
+  if (typeof value === "string" && value in LEGACY_SETTINGS_PAGES) {
+    return LEGACY_SETTINGS_PAGES[value];
+  }
+  return DEFAULT_SETTINGS_PAGE;
+}
 
 export function isSettingsPage(value: unknown): value is SettingsPage {
   return (
@@ -56,12 +72,12 @@ export const SETTINGS_PAGE_META: Record<SettingsPage, SettingsPageMeta> = {
     subtitle: "How the app looks. The ticker follows the same theme.",
     icon: Palette,
   },
-  window: {
-    id: "window",
-    label: "Window & startup",
-    title: "Window & startup",
-    subtitle: "How Scrollr behaves on your desktop.",
-    icon: AppWindow,
+  startup: {
+    id: "startup",
+    label: "Startup",
+    title: "Startup",
+    subtitle: "What happens when your computer starts.",
+    icon: Power,
   },
   shortcuts: {
     id: "shortcuts",
@@ -104,7 +120,7 @@ export const SETTINGS_PAGE_META: Record<SettingsPage, SettingsPageMeta> = {
 
 /** Rail grouping, in display order. */
 export const SETTINGS_RAIL_GROUPS: { label: string; pages: SettingsPage[] }[] = [
-  { label: "Customize", pages: ["appearance", "window", "shortcuts", "ticker"] },
+  { label: "Customize", pages: ["appearance", "startup", "shortcuts", "ticker"] },
   { label: "Account", pages: ["profile", "data"] },
   { label: "App", pages: ["updates"] },
 ];

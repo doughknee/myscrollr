@@ -10,7 +10,7 @@ import {
   SETTINGS_SEARCH_INDEX,
   searchSettings,
 } from "./searchIndex";
-import { SETTINGS_PAGES, isSettingsPage } from "./pages";
+import { SETTINGS_PAGES, isSettingsPage, resolveSettingsPage } from "./pages";
 
 // Page sources as raw strings, via Vite rather than node:fs. This file
 // lives under src/, where tsconfig exposes only vite/client + vitest
@@ -129,5 +129,14 @@ describe("searchSettings", () => {
     expect(searchSettings("windows").map((h) => h.rowId)).toContain(
       "hideFullscreen",
     );
+  });
+});
+
+describe("resolveSettingsPage", () => {
+  it("maps the renamed page's old id forward and everything else to the default", () => {
+    expect(resolveSettingsPage("startup")).toBe("startup");
+    expect(resolveSettingsPage("window")).toBe("startup"); // REL-206 rename
+    expect(resolveSettingsPage("nope")).toBe("appearance");
+    expect(resolveSettingsPage(undefined)).toBe("appearance");
   });
 });

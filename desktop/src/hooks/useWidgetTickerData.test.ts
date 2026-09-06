@@ -31,7 +31,6 @@ function makeWidgetPrefs(widgetsOnTicker: string[]): WidgetPrefs {
       },
     },
     sysmon: {
-      refreshInterval: 2,
       ticker: {
         cpu: false,
         memory: false,
@@ -41,11 +40,9 @@ function makeWidgetPrefs(widgetsOnTicker: string[]): WidgetPrefs {
     },
     uptime: {
       url: "",
-      pollInterval: 60,
     },
     github: {
       repos: [],
-      pollInterval: 120,
     },
   };
 }

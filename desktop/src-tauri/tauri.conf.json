@@ -68,7 +68,7 @@
         "alwaysOnTop": false,
         "resizable": true,
         "skipTaskbar": false,
-        "visible": true,
+        "visible": false,
         "center": true
       }
     ],

@@ -16,8 +16,7 @@ import { useState } from "react";
 import RouteError from "../components/RouteError";
 import SettingsSurface from "../components/settings/SettingsSurface";
 import {
-  DEFAULT_SETTINGS_PAGE,
-  isSettingsPage,
+  resolveSettingsPage,
   type SettingsPage,
 } from "../components/settings/pages";
 
@@ -27,9 +26,10 @@ export const Route = createFileRoute("/customize")({
   // Materialise the default so the URL always names the page it is
   // showing — otherwise `/customize` and `/customize?page=appearance`
   // are the same screen under two addresses, and the rail's
-  // aria-current has to guess.
+  // aria-current has to guess. Renamed pages keep answering to their
+  // old id (`?page=window` → startup) so saved links still land.
   validateSearch: (search: Record<string, unknown>): { page: SettingsPage } => ({
-    page: isSettingsPage(search.page) ? search.page : DEFAULT_SETTINGS_PAGE,
+    page: resolveSettingsPage(search.page),
   }),
 });
 

@@ -284,11 +284,9 @@ function RootLayout() {
   }, []);
 
   // Silent update check on startup — toasts only if a real update is
-  // available. The user opts out via Customize → Updates.
-  useStartupUpdateCheck({
-    enabled: prefs.startup.autoCheckUpdates,
-    appVersion,
-  });
+  // available. Always on (REL-206): nobody wants to *not* be told, and
+  // Customize → Updates has the manual check for the impatient.
+  useStartupUpdateCheck({ appVersion });
 
   // Mandatory-update gate: unlike the toast above, this one can't be
   // dismissed or disabled. When the API's /app/min-version says this
