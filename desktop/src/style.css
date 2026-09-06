@@ -121,9 +121,21 @@
      everforest-light  (Everforest Light Medium)
 */
 
+/* The Appearance page previews every palette at once: each swatch
+   carries its own data-theme, so the blocks below match `.theme-swatch`
+   too. Scrollr Dark is the @theme default and has no block, so the three
+   preview tokens are restated here — a swatch inside a Nord shell would
+   otherwise inherit Nord's. Keep in step with @theme above. */
+.theme-swatch[data-theme="scrollr-dark"] {
+  --color-accent: #34d399;
+  --color-info: #00d4ff;
+  --color-accent-purple: #a855f7;
+}
+
 /* ── Scrollr Light ───────────────────────────────────────────── */
 #desktop-shell[data-theme="scrollr-light"],
-#app-shell[data-theme="scrollr-light"] {
+#app-shell[data-theme="scrollr-light"],
+.theme-swatch[data-theme="scrollr-light"] {
   --color-surface: #ffffff;
   --color-surface-2: #f6f7fb;
   --color-surface-hover: #eef0f6;
@@ -161,7 +173,8 @@
 
 /* ── Catppuccin Mocha (dark) ─────────────────────────────────── */
 #desktop-shell[data-theme="catppuccin-dark"],
-#app-shell[data-theme="catppuccin-dark"] {
+#app-shell[data-theme="catppuccin-dark"],
+.theme-swatch[data-theme="catppuccin-dark"] {
   --color-surface: #1e1e2e; /* base */
   --color-surface-2: #181825; /* mantle */
   --color-surface-hover: #313244; /* surface0 */
@@ -202,7 +215,8 @@
 
 /* ── Catppuccin Latte (light) ────────────────────────────────── */
 #desktop-shell[data-theme="catppuccin-light"],
-#app-shell[data-theme="catppuccin-light"] {
+#app-shell[data-theme="catppuccin-light"],
+.theme-swatch[data-theme="catppuccin-light"] {
   --color-surface: #eff1f5; /* base */
   --color-surface-2: #e6e9ef; /* mantle */
   --color-surface-hover: #ccd0da; /* surface0 */
@@ -243,7 +257,8 @@
 
 /* ── Dracula (dark) ──────────────────────────────────────────── */
 #desktop-shell[data-theme="dracula-dark"],
-#app-shell[data-theme="dracula-dark"] {
+#app-shell[data-theme="dracula-dark"],
+.theme-swatch[data-theme="dracula-dark"] {
   --color-surface: #282a36; /* background */
   --color-surface-2: #21222c;
   --color-surface-hover: #44475a; /* current line */
@@ -284,7 +299,8 @@
 
 /* ── Dracula (light, Scrollr-adapted) ────────────────────────── */
 #desktop-shell[data-theme="dracula-light"],
-#app-shell[data-theme="dracula-light"] {
+#app-shell[data-theme="dracula-light"],
+.theme-swatch[data-theme="dracula-light"] {
   --color-surface: #f8f8f2;
   --color-surface-2: #efefe6;
   --color-surface-hover: #e4e4d8;
@@ -325,7 +341,8 @@
 
 /* ── Tokyo Night (dark) ──────────────────────────────────────── */
 #desktop-shell[data-theme="tokyo-night-dark"],
-#app-shell[data-theme="tokyo-night-dark"] {
+#app-shell[data-theme="tokyo-night-dark"],
+.theme-swatch[data-theme="tokyo-night-dark"] {
   --color-surface: #1a1b26;
   --color-surface-2: #16161e;
   --color-surface-hover: #24283b;
@@ -366,7 +383,8 @@
 
 /* ── Tokyo Night Day (light) ─────────────────────────────────── */
 #desktop-shell[data-theme="tokyo-night-light"],
-#app-shell[data-theme="tokyo-night-light"] {
+#app-shell[data-theme="tokyo-night-light"],
+.theme-swatch[data-theme="tokyo-night-light"] {
   --color-surface: #e1e2e7;
   --color-surface-2: #d5d6dc;
   --color-surface-hover: #c4c8da;
@@ -407,7 +425,8 @@
 
 /* ── Nord (dark) ─────────────────────────────────────────────── */
 #desktop-shell[data-theme="nord-dark"],
-#app-shell[data-theme="nord-dark"] {
+#app-shell[data-theme="nord-dark"],
+.theme-swatch[data-theme="nord-dark"] {
   --color-surface: #2e3440; /* nord0 */
   --color-surface-2: #292e39;
   --color-surface-hover: #3b4252; /* nord1 */
@@ -448,7 +467,8 @@
 
 /* ── Nord (light, Snow Storm) ────────────────────────────────── */
 #desktop-shell[data-theme="nord-light"],
-#app-shell[data-theme="nord-light"] {
+#app-shell[data-theme="nord-light"],
+.theme-swatch[data-theme="nord-light"] {
   --color-surface: #eceff4; /* nord6 */
   --color-surface-2: #e5e9f0; /* nord5 */
   --color-surface-hover: #d8dee9; /* nord4 */
@@ -489,7 +509,8 @@
 
 /* ── Gruvbox Dark Medium ─────────────────────────────────────── */
 #desktop-shell[data-theme="gruvbox-dark"],
-#app-shell[data-theme="gruvbox-dark"] {
+#app-shell[data-theme="gruvbox-dark"],
+.theme-swatch[data-theme="gruvbox-dark"] {
   --color-surface: #282828; /* bg0 */
   --color-surface-2: #1d2021; /* bg0_h */
   --color-surface-hover: #3c3836; /* bg1 */
@@ -530,7 +551,8 @@
 
 /* ── Gruvbox Light Medium ────────────────────────────────────── */
 #desktop-shell[data-theme="gruvbox-light"],
-#app-shell[data-theme="gruvbox-light"] {
+#app-shell[data-theme="gruvbox-light"],
+.theme-swatch[data-theme="gruvbox-light"] {
   --color-surface: #fbf1c7; /* bg0 */
   --color-surface-2: #f9f5d7; /* bg0_h */
   --color-surface-hover: #ebdbb2; /* bg1 */
@@ -571,7 +593,8 @@
 
 /* ── Solarized (dark) ────────────────────────────────────────── */
 #desktop-shell[data-theme="solarized-dark"],
-#app-shell[data-theme="solarized-dark"] {
+#app-shell[data-theme="solarized-dark"],
+.theme-swatch[data-theme="solarized-dark"] {
   --color-surface: #002b36; /* base03 */
   --color-surface-2: #073642; /* base02 */
   --color-surface-hover: #094352;
@@ -612,7 +635,8 @@
 
 /* ── Solarized (light) ───────────────────────────────────────── */
 #desktop-shell[data-theme="solarized-light"],
-#app-shell[data-theme="solarized-light"] {
+#app-shell[data-theme="solarized-light"],
+.theme-swatch[data-theme="solarized-light"] {
   --color-surface: #fdf6e3; /* base3 */
   --color-surface-2: #eee8d5; /* base2 */
   --color-surface-hover: #e6e0cc;
@@ -654,7 +678,8 @@
 /* ── Rose Pine (dark, "main") ────────────────────────────────── */
 /* Palette verified against rose-pine/neovim lua/rose-pine/palette.lua */
 #desktop-shell[data-theme="rose-pine-dark"],
-#app-shell[data-theme="rose-pine-dark"] {
+#app-shell[data-theme="rose-pine-dark"],
+.theme-swatch[data-theme="rose-pine-dark"] {
   --color-surface: #191724; /* base */
   --color-surface-2: #1f1d2e; /* surface */
   --color-surface-hover: #26233a; /* overlay */
@@ -699,7 +724,8 @@
    the neovim port's darker #464261 — the lighter shade preserves our
    fg-2/fg-3/fg-4 hierarchy. */
 #desktop-shell[data-theme="rose-pine-light"],
-#app-shell[data-theme="rose-pine-light"] {
+#app-shell[data-theme="rose-pine-light"],
+.theme-swatch[data-theme="rose-pine-light"] {
   --color-surface: #faf4ed; /* base */
   --color-surface-2: #fffaf3; /* surface */
   --color-surface-hover: #f2e9e1; /* overlay */
@@ -740,7 +766,8 @@
 
 /* ── One Dark (Atom) ─────────────────────────────────────────── */
 #desktop-shell[data-theme="one-dark"],
-#app-shell[data-theme="one-dark"] {
+#app-shell[data-theme="one-dark"],
+.theme-swatch[data-theme="one-dark"] {
   --color-surface: #282c34;
   --color-surface-2: #21252b;
   --color-surface-hover: #2c313a;
@@ -781,7 +808,8 @@
 
 /* ── One Light (Atom) ────────────────────────────────────────── */
 #desktop-shell[data-theme="one-light"],
-#app-shell[data-theme="one-light"] {
+#app-shell[data-theme="one-light"],
+.theme-swatch[data-theme="one-light"] {
   --color-surface: #fafafa;
   --color-surface-2: #f0f0f1;
   --color-surface-hover: #e5e5e6;
@@ -824,7 +852,8 @@
 /* Palette verified against sainnhe/everforest autoload/everforest.vim
    (background = 'medium'). */
 #desktop-shell[data-theme="everforest-dark"],
-#app-shell[data-theme="everforest-dark"] {
+#app-shell[data-theme="everforest-dark"],
+.theme-swatch[data-theme="everforest-dark"] {
   --color-surface: #2d353b; /* bg0 */
   --color-surface-2: #232a2e; /* bg_dim */
   --color-surface-hover: #343f44; /* bg1 */
@@ -867,7 +896,8 @@
 /* Palette verified against sainnhe/everforest autoload/everforest.vim
    (background = 'medium'). */
 #desktop-shell[data-theme="everforest-light"],
-#app-shell[data-theme="everforest-light"] {
+#app-shell[data-theme="everforest-light"],
+.theme-swatch[data-theme="everforest-light"] {
   --color-surface: #fdf6e3; /* bg0 */
   --color-surface-2: #efebd4; /* bg_dim */
   --color-surface-hover: #f4f0d9; /* bg1 */

@@ -49,10 +49,8 @@ import { formatTemp, weatherCodeToIcon } from "../widgets/weather/types";
 import { loadMonitors } from "../widgets/uptime/types";
 import { loadRepoData } from "../widgets/github/types";
 import {
-  LS_CLOCK_FORMAT,
   LS_TIMER_STATE,
   LS_WEATHER_CITIES,
-  LS_WEATHER_UNIT,
   LS_SYSMON_DATA,
 } from "../constants";
 import HomeTicker from "../components/home/HomeTicker";
@@ -73,7 +71,7 @@ import type {
   Trade,
   WidgetManifest,
 } from "../types";
-import type { TempUnit } from "../preferences";
+import type { UnitsPrefs } from "../preferences";
 import type { SystemInfo } from "../hooks/useSysmonData";
 import type { TimerState } from "../widgets/timer/types";
 import type { SavedCity } from "../widgets/weather/types";
@@ -104,6 +102,7 @@ function greeting(d: Date): string {
 function HomePage() {
   const navigate = useNavigate();
   const shell = useShell();
+  const units = shell.prefs.appearance.units;
   const { widgets, dashboard } = useShellData();
   const catalogVersion = useCatalog();
   const addWidget = useAddWidget();
@@ -236,11 +235,11 @@ function HomePage() {
         });
     }
     for (const u of utilities) {
-      const v = getWidgetValue(u.id);
+      const v = getWidgetValue(u.id, units);
       if (v) out.push({ id: u.id, hex: u.hex, text: v });
     }
     return out;
-  }, [sports, finance, rss, utilities]);
+  }, [sports, finance, rss, utilities, units]);
 
   // A widget that returned no rows AND owns a config is unconfigured —
   // distinct from a zero-config source that simply has nothing on right
@@ -762,10 +761,11 @@ function UtilityTiles({
   items: WidgetManifest[];
   openWidget: (id: string) => void;
 }) {
+  const units = useShell().prefs.appearance.units;
   return (
     <div className="grid grid-cols-2 gap-3.5">
       {items.map((w) => {
-        const value = getWidgetValue(w.id);
+        const value = getWidgetValue(w.id, units);
         // The six sentinel strings getWidgetValue returns when a widget
         // has nothing configured. Turning them into a CTA keeps the tile
         // in place rather than hiding a widget the user did add.
@@ -931,21 +931,19 @@ function getTimerValue(): string {
 
 // ── Route ───────────────────────────────────────────────────────
 
-function getWidgetValue(id: string): string {
+function getWidgetValue(id: string, units: UnitsPrefs): string {
   switch (id) {
-    case "clock": {
-      const format = getStore<string>(LS_CLOCK_FORMAT, "12h");
+    case "clock":
       return new Intl.DateTimeFormat("en-US", {
         hour: "numeric",
         minute: "2-digit",
-        hour12: format === "12h",
+        hour12: units.timeFormat === "12h",
       }).format(new Date());
-    }
     case "timer":
       return getTimerValue();
     case "weather": {
       const cities = getStore<SavedCity[]>(LS_WEATHER_CITIES, []);
-      const unit = getStore<string>(LS_WEATHER_UNIT, "fahrenheit") as TempUnit;
+      const unit = units.temperature;
       if (cities.length === 0) return "No cities";
       const first = cities[0];
       if (!first.weather) return first.location.name;

@@ -1,14 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import type { WidgetPrefs } from "../preferences";
-import type { TempUnit } from "../preferences";
+import type { UnitsPrefs, WidgetPrefs } from "../preferences";
 import { fetchSysmonData } from "./useSysmonData";
 import type { SystemInfo } from "./useSysmonData";
 import {
   LS_CLOCK_TIMEZONES,
-  LS_CLOCK_FORMAT,
   LS_TIMER_STATE,
   LS_WEATHER_CITIES,
-  LS_WEATHER_UNIT,
   LS_UPTIME_MONITORS,
   LS_GITHUB_REPOS,
 } from "../constants";
@@ -192,6 +189,8 @@ function utcOffsetLabel(now: Date, tz: string | undefined): string {
 
 export function useWidgetTickerData(
   widgetPrefs: WidgetPrefs,
+  /** App-wide °F/°C and 12h/24h (`prefs.appearance.units`). */
+  units: UnitsPrefs,
 ): WidgetTickerData {
   const [data, setData] = useState<WidgetTickerData>(EMPTY);
   const sysInfoRef = useRef<SystemInfo | null>(null);
@@ -206,7 +205,7 @@ export function useWidgetTickerData(
     if (!enabledWidgets.has("clock")) return [];
     const chips: ClockChipData[] = [];
     const now = new Date();
-    const format = getStore<string>(LS_CLOCK_FORMAT, "12h");
+    const format = units.timeFormat;
 
     // Local time, then every tracked world clock: if you track it, it's
     // on the ticker (docs/CHIP_SPEC.md §8 — no per-item selection).
@@ -234,7 +233,7 @@ export function useWidgetTickerData(
     }
 
     return chips;
-  }, [enabledWidgets]);
+  }, [enabledWidgets, units.timeFormat]);
 
   // ── Build timer chips ─────────────────────────────────────────
   const buildTimerChips = useCallback((): ClockChipData[] => {
@@ -254,7 +253,7 @@ export function useWidgetTickerData(
   const buildWeatherChips = useCallback((): WeatherChipData[] => {
     if (!enabledWidgets.has("weather")) return [];
     const chips: WeatherChipData[] = [];
-    const unit = getStore<string>(LS_WEATHER_UNIT, "fahrenheit");
+    const unit = units.temperature;
 
     const cities = getStore<SavedCity[]>(LS_WEATHER_CITIES, []);
 
@@ -263,11 +262,11 @@ export function useWidgetTickerData(
       const w = city.weather;
       const temp =
         w?.temperature != null
-          ? formatTemp(w.temperature, unit as TempUnit, true)
+          ? formatTemp(w.temperature, unit, true)
           : "--";
       const feelsLike =
         w?.feelsLike != null
-          ? formatTemp(w.feelsLike, unit as TempUnit, true)
+          ? formatTemp(w.feelsLike, unit, true)
           : "--";
       const icon =
         w?.weatherCode != null ? weatherCodeToIcon(w.weatherCode) : "\u2601";
@@ -296,7 +295,7 @@ export function useWidgetTickerData(
     }
 
     return chips;
-  }, [enabledWidgets]);
+  }, [enabledWidgets, units.temperature]);
 
   // ── Build sysmon chips ────────────────────────────────────────
   const buildSysmonChips = useCallback((): SysmonChipData[] => {
@@ -306,7 +305,7 @@ export function useWidgetTickerData(
 
     const cfg = widgetPrefs.sysmon;
     const chips: SysmonChipData[] = [];
-    const tu = cfg.tempUnit;
+    const tu = units.temperature;
 
     if (cfg.ticker.cpu) {
       const pct = Math.round(info.cpuUsage);
@@ -369,7 +368,7 @@ export function useWidgetTickerData(
     }
 
     return chips;
-  }, [widgetPrefs.sysmon, enabledWidgets]);
+  }, [widgetPrefs.sysmon, enabledWidgets, units.temperature]);
 
   /**
    * "45s" / "4m" / "2h11m" — short enough for a chip's value slot.
@@ -532,11 +531,6 @@ export function useWidgetTickerData(
           setData((prev) => ({ ...prev, weather: buildWeatherChips() }));
         })
       : null;
-    const unsubWeatherUnit = hasWeather
-      ? onStoreChange<string>(LS_WEATHER_UNIT, () => {
-          setData((prev) => ({ ...prev, weather: buildWeatherChips() }));
-        })
-      : null;
 
     // Timer: listen for store changes
     const unsubTimerState = hasTimer
@@ -545,14 +539,9 @@ export function useWidgetTickerData(
         })
       : null;
 
-    // Clock: listen for store changes (timezones, format)
+    // Clock: listen for store changes (timezones)
     const unsubClockTimezones = hasClock
       ? onStoreChange<string[]>(LS_CLOCK_TIMEZONES, () => {
-          setData((prev) => ({ ...prev, clock: buildClockChips() }));
-        })
-      : null;
-    const unsubClockFormat = hasClock
-      ? onStoreChange<string>(LS_CLOCK_FORMAT, () => {
           setData((prev) => ({ ...prev, clock: buildClockChips() }));
         })
       : null;
@@ -616,10 +605,8 @@ export function useWidgetTickerData(
       if (clockInterval) clearInterval(clockInterval);
       if (timerInterval) clearInterval(timerInterval);
       unsubWeatherCities?.();
-      unsubWeatherUnit?.();
       unsubTimerState?.();
       unsubClockTimezones?.();
-      unsubClockFormat?.();
       unsubUptimeMonitors?.();
       unsubGithubRepos?.();
       if (sysmonInterval) clearInterval(sysmonInterval);

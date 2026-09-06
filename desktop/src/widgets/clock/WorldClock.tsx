@@ -1,7 +1,8 @@
 /**
  * WorldClock section — displays local + user-selected time zones.
  *
- * Timezone selections and format (12h/24h) are persisted to Tauri store.
+ * Timezone selections are persisted to Tauri store; the 12h/24h format
+ * is the app-wide `appearance.units.timeFormat` pref.
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { X } from "lucide-react";

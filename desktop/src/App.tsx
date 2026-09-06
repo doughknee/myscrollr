@@ -748,7 +748,7 @@ export default function App() {
   );
 
   // ── Widget ticker data (local polling for clock/weather/sysmon) ──
-  const widgetData = useWidgetTickerData(prefs.widgets);
+  const widgetData = useWidgetTickerData(prefs.widgets, prefs.appearance.units);
 
   // ── Render ─────────────────────────────────────────────────────
 

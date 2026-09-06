@@ -6,15 +6,11 @@ import {
   SelectMenu,
   type SelectOption,
 } from "../../components/widget-bar/SelectMenu";
-import {
-  Segmented,
-  type SegmentedOption,
-} from "../../components/widget-bar/Segmented";
 import { MenuPopover, MenuRow } from "../../components/widget-bar/Menu";
 import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import { useShell } from "../../shell-context";
 import { useWidgetConfig } from "../../hooks/useWidgetConfig";
-import type { SysmonTickerConfig, TempUnit } from "../../preferences";
+import type { SysmonTickerConfig } from "../../preferences";
 import { useSysmonData } from "../../hooks/useSysmonData";
 import { formatBytes, formatTemp, formatUptime } from "../../utils/format";
 import { findCpuTemp, findGpuTemp, usageColor, usageColorClass, tempColorClass, formatFreq, formatWatts, formatRate } from "./utils";
@@ -57,11 +53,6 @@ const REFRESH_OPTIONS: SelectOption<string>[] = [
   { value: "5", label: "5s" },
 ];
 
-const TEMP_OPTIONS: SegmentedOption<TempUnit>[] = [
-  { value: "fahrenheit", label: "°F" },
-  { value: "celsius", label: "°C" },
-];
-
 function SysmonFeedTab(props: FeedTabProps) {
   return (
     <div className="flex min-h-full flex-col">
@@ -75,16 +66,10 @@ function SysmonBar() {
   const { prefs, onPrefsChange } = useShell();
   const { config, update, setTicker } = useWidgetConfig("sysmon", prefs, onPrefsChange);
   return (
-    // Standard bar grammar: Segmented first, content menus left,
-    // config selects in the right cluster (matches clock/weather's
-    // unit-first layout and uptime/github's right-side Refresh).
+    // Standard bar grammar: content menus left, config selects in the
+    // right cluster (matches uptime/github's right-side Refresh). °F/°C
+    // is app-wide now — Settings → Appearance → Units & formats.
     <WidgetBar>
-      <Segmented
-        ariaLabel="Temperature unit"
-        value={config.tempUnit}
-        onChange={(v) => update({ tempUnit: v })}
-        options={TEMP_OPTIONS}
-      />
       <StatsMenu ticker={config.ticker} setTicker={setTicker} />
       <div className="ml-auto">
         <SelectMenu
@@ -148,7 +133,7 @@ function SysmonFeedBody({ mode: feedMode }: FeedTabProps) {
   // under `ticker` for storage compatibility.)
   const { prefs } = useShell();
   const stats = prefs.widgets.sysmon.ticker;
-  const tempUnit = prefs.widgets.sysmon.tempUnit;
+  const tempUnit = prefs.appearance.units.temperature;
 
   // ── Loading state ───────────────────────────────────────────
   if (!info) {

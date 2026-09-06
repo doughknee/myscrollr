@@ -12,17 +12,12 @@ import { CloudSun, LocateFixed } from "lucide-react";
 import { WeatherCard } from "./WeatherCard";
 import { CitySearch } from "./CitySearch";
 import { WidgetBar, BarPill } from "../../components/widget-bar/Bar";
-import {
-  Segmented,
-  type SegmentedOption,
-} from "../../components/widget-bar/Segmented";
 import { SearchBox } from "../../components/widget-bar/SearchBox";
-import { useStoreData } from "../../hooks/useStoreData";
-import { LS_WEATHER_UNIT } from "../../constants";
+import { useShell } from "../../shell-context";
 import { weatherQueryOptions, queryKeys } from "../../api/queries";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 import type { TempUnit, WeatherLocation } from "./types";
-import { loadCities, saveCities, loadUnit, saveUnit } from "./types";
+import { loadCities, saveCities } from "./types";
 import { toast } from "sonner";
 
 // ── Widget manifest ─────────────────────────────────────────────
@@ -42,7 +37,7 @@ export const weatherWidget: WidgetManifest = {
       "Search for a city in the feed view to add it to your weather locations.",
       "Each location appears on the ticker with temperature, conditions, and an icon.",
       "Add multiple cities to track weather across different locations.",
-      "Use the °F/°C control in the top bar to change units.",
+      "Switch between °F and °C under Settings → Appearance → Units & formats.",
     ],
   },
   FeedTab: WeatherFeedTab,
@@ -50,24 +45,11 @@ export const weatherWidget: WidgetManifest = {
 
 // ── FeedTab ─────────────────────────────────────────────────────
 
-const UNIT_OPTIONS: SegmentedOption<TempUnit>[] = [
-  { value: "fahrenheit", label: "°F" },
-  { value: "celsius", label: "°C" },
-];
-
 function WeatherFeedTab(props: FeedTabProps) {
-  // Unit + city-add state live here because the bar writes them and the
-  // body renders from them — useStoreData only relays cross-window
-  // writes, so bar and body as siblings would desync in-window.
-  const [unit, setUnitState] = useStoreData(LS_WEATHER_UNIT, loadUnit);
-  const handleUnitChange = useCallback(
-    (v: TempUnit) => {
-      setUnitState(v);
-      saveUnit(v);
-    },
-    [setUnitState],
-  );
-
+  // °F/°C is an app-wide setting (Appearance → Units & formats).
+  const unit = useShell().prefs.appearance.units.temperature;
+  // City-add state lives here because the bar writes it and the body
+  // renders from it.
   const [cityQuery, setCityQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const [detecting, setDetecting] = useState(false);
@@ -125,12 +107,6 @@ function WeatherFeedTab(props: FeedTabProps) {
     <div className="flex min-h-full flex-col">
       {comfort && (
         <WidgetBar>
-          <Segmented
-            ariaLabel="Temperature unit"
-            value={unit}
-            onChange={handleUnitChange}
-            options={UNIT_OPTIONS}
-          />
           {/* Right-cluster grammar: search → action pills last (same
               order as fantasy's Account pill). */}
           <div className="ml-auto flex min-w-0 shrink items-center gap-2">

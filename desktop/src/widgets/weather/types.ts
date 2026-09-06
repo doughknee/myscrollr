@@ -5,7 +5,7 @@
  * Import from here — do not redefine locally.
  */
 import type { TempUnit } from "../../preferences";
-import { LS_WEATHER_CITIES, LS_WEATHER_UNIT } from "../../constants";
+import { LS_WEATHER_CITIES } from "../../constants";
 import { getStore, setStore } from "../../lib/store";
 
 export type { TempUnit };
@@ -108,15 +108,6 @@ export function loadCities(): SavedCity[] {
 
 export function saveCities(cities: SavedCity[]): void {
   setStore(LS_WEATHER_CITIES, cities);
-}
-
-export function loadUnit(): TempUnit {
-  const unit = getStore<string>(LS_WEATHER_UNIT, "fahrenheit");
-  return unit === "celsius" || unit === "fahrenheit" ? unit : "fahrenheit";
-}
-
-export function saveUnit(unit: TempUnit): void {
-  setStore(LS_WEATHER_UNIT, unit);
 }
 
 // ── Open-Meteo API ──────────────────────────────────────────────
