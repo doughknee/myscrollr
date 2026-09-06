@@ -17,7 +17,8 @@ import { SETTINGS_PAGES, isSettingsPage } from "./pages";
 // globals — reaching for node builtins here type-checks fine under
 // vitest (Vite resolves them at runtime) but fails `tsc --noEmit`, which
 // is the second half of `npm run build` and therefore the release build.
-const PAGE_SOURCES = import.meta.glob("./pages/*.tsx", {
+// Groups shared between pages (MonitorMap.tsx) sit one level up.
+const PAGE_SOURCES = import.meta.glob(["./pages/*.tsx", "./*.tsx"], {
   query: "?raw",
   import: "default",
   eager: true,

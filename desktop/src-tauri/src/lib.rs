@@ -154,6 +154,7 @@ pub fn run() {
             commands::window::position_ticker,
             commands::window::list_monitors,
             commands::window::sync_ticker_windows,
+            commands::window::identify_monitors,
             commands::window::pin_window,
             commands::window::set_hide_on_fullscreen,
             commands::window::set_ticker_visible,

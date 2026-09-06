@@ -3,7 +3,7 @@ use crate::compositor::{self, Compositor};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use tauri::{Emitter, Manager};
 
-/// Every attached monitor in logical coordinates, primary flagged.
+/// Every attached monitor, logical and physical rects, primary flagged.
 /// The `name` values are what `position_ticker`'s `monitor` takes.
 #[tauri::command]
 pub fn list_monitors(app: tauri::AppHandle) -> Vec<MonitorInfo> {
@@ -292,12 +292,23 @@ pub fn position_ticker(
             {
                 use crate::commands::appbar_win;
                 appbar_win::register(&window)?;
-                let phys_x = (monitor_x * scale).round() as i32;
-                let phys_y = (new_y * scale).round() as i32;
-                let phys_w = (screen_width * scale).round() as i32;
+                // The monitor's own physical rect, not logical × scale:
+                // on a 300 % screen the logical x is a third and would
+                // round-trip inexactly (REL-203). Only the bar height
+                // is ours to scale.
                 let phys_h = (win_height * scale).round() as i32;
+                let phys_y = if position == "top" {
+                    target.physical_y
+                } else {
+                    target.physical_y + target.physical_height as i32 - phys_h
+                };
                 return appbar_win::set_position(
-                    &window, &position, phys_x, phys_y, phys_w, phys_h,
+                    &window,
+                    &position,
+                    target.physical_x,
+                    phys_y,
+                    target.physical_width as i32,
+                    phys_h,
                 );
             }
 
@@ -311,6 +322,79 @@ pub fn position_ticker(
             }
         }
     }
+}
+
+// ── Identify: flash each screen's number on it ───────────────────
+//
+// Settings › Monitors numbers the screens in `list_monitors` order;
+// this shows that number on each one for a moment (Windows' own
+// "Identify" button) so the user can tell which switch is which
+// without a ticker being on it. One tiny always-on-top window per
+// monitor, `identify-N`, destroyed after `IDENTIFY_MS`.
+
+const IDENTIFY_MS: u64 = 1500;
+/// Tile side in logical px — scaled by the screen's own factor so it
+/// looks the same size on every screen.
+const IDENTIFY_SIZE: f64 = 220.0;
+
+/// `(x, y, w, h)` of the tile, centred on `m`, in physical pixels.
+fn identify_tile(m: &MonitorInfo) -> (i32, i32, i32, i32) {
+    let side = (IDENTIFY_SIZE * m.scale_factor).round() as i32;
+    (
+        m.physical_x + (m.physical_width as i32 - side) / 2,
+        m.physical_y + (m.physical_height as i32 - side) / 2,
+        side,
+        side,
+    )
+}
+
+/// `async` for the same reason as `sync_ticker_windows`: window
+/// creation from the main thread deadlocks on Windows.
+#[tauri::command]
+pub async fn identify_monitors(app: tauri::AppHandle) -> Result<(), String> {
+    if app.get_webview_window("identify-1").is_some() {
+        return Ok(()); // already flashing
+    }
+    let list = monitors(&app);
+    for (i, m) in list.iter().enumerate() {
+        let n = i + 1;
+        let (x, y, w, h) = identify_tile(m);
+        let win = tauri::WebviewWindowBuilder::new(
+            &app,
+            format!("identify-{n}"),
+            tauri::WebviewUrl::App("identify.html".into()),
+        )
+        // The page has no script of its own (CSP); this runs before
+        // it and fills in the number.
+        .initialization_script(format!(
+            "document.addEventListener('DOMContentLoaded',()=>{{document.getElementById('n').textContent='{n}'}})"
+        ))
+        .title(format!("Scrollr Display {n}"))
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .resizable(false)
+        .focused(false)
+        .visible(false)
+        .build()
+        .map_err(|e| format!("identify-{n}: {e}"))?;
+        let _ = win.set_background_color(Some(tauri::webview::Color(20, 20, 32, 255)));
+        // Physical, after build: the builder's logical position would
+        // be resolved against the wrong scale on a mixed-DPI desktop.
+        let _ = win.set_position(tauri::PhysicalPosition::new(x, y));
+        let _ = win.set_size(tauri::PhysicalSize::new(w as u32, h as u32));
+        let _ = win.show();
+    }
+    let count = list.len();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(IDENTIFY_MS));
+        for n in 1..=count {
+            if let Some(w) = app.get_webview_window(&format!("identify-{n}")) {
+                let _ = w.destroy();
+            }
+        }
+    });
+    Ok(())
 }
 
 // ── Pin (always-on-top) via compositor IPC ───────────────────────
@@ -386,15 +470,17 @@ mod tests {
     use super::*;
 
     fn mon(name: &str, is_primary: bool) -> MonitorInfo {
-        MonitorInfo {
-            name: name.into(),
-            x: 0.0,
-            y: 0.0,
-            width: 3440.0,
-            height: 1440.0,
-            scale_factor: 1.0,
-            is_primary,
-        }
+        MonitorInfo::new(name.into(), (0, 0), (3440, 1440), 1.0, is_primary)
+    }
+
+    #[test]
+    fn identify_tile_is_centred_in_physical_pixels() {
+        // 300 % screen right of the primary: the tile is 3× bigger and
+        // sits at that screen's physical centre, not at 1/3 of it.
+        let d3 = MonitorInfo::new("d3".into(), (3440, 0), (3840, 2160), 3.0, false);
+        assert_eq!(identify_tile(&d3), (3440 + 1920 - 330, 1080 - 330, 660, 660));
+        let d2 = MonitorInfo::new("d2".into(), (-3440, 0), (3440, 1440), 1.0, false);
+        assert_eq!(identify_tile(&d2), (-3440 + 1720 - 110, 720 - 110, 220, 220));
     }
 
     #[test]

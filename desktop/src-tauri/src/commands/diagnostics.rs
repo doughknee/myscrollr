@@ -69,10 +69,17 @@ struct SystemInfo {
     hostname_hash: String,
 }
 
-/// One attached monitor in LOGICAL (DPI-scaled) coordinates — the same
-/// space `position_ticker` computes in. `name` is the OS identifier
-/// (`\\.\DISPLAY1` on Windows; `monitor-<index>` when the platform has
-/// none) and is what `position_ticker` accepts.
+/// One attached monitor. `name` is the OS identifier (`\\.\DISPLAY1` on
+/// Windows; `monitor-<index>` when the platform has none) and is what
+/// `position_ticker` accepts.
+///
+/// Two coordinate sets on purpose. `physical_*` is the OS's one shared
+/// plane (the Display-settings arrangement): only there do rects of
+/// mixed-DPI monitors sit side by side, which is what a map or a
+/// window placement needs. `x/y/width/height` divide each monitor by
+/// ITS OWN scale — right for sizing content on that screen, wrong for
+/// comparing screens (a 3840 px screen at 300 % reads as 1280 wide and
+/// "overlaps" its 100 % neighbour, REL-203).
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MonitorInfo {
@@ -83,19 +90,36 @@ pub struct MonitorInfo {
     pub height: f64,
     pub scale_factor: f64,
     pub is_primary: bool,
+    pub physical_x: i32,
+    pub physical_y: i32,
+    pub physical_width: u32,
+    pub physical_height: u32,
 }
 
 impl MonitorInfo {
     pub fn from_monitor(m: &tauri::Monitor, is_primary: bool) -> Self {
-        let scale = m.scale_factor();
+        Self::new(
+            m.name().cloned().unwrap_or_default(),
+            (m.position().x, m.position().y),
+            (m.size().width, m.size().height),
+            m.scale_factor(),
+            is_primary,
+        )
+    }
+
+    pub fn new(name: String, (px, py): (i32, i32), (pw, ph): (u32, u32), scale: f64, is_primary: bool) -> Self {
         Self {
-            name: m.name().cloned().unwrap_or_default(),
-            x: m.position().x as f64 / scale,
-            y: m.position().y as f64 / scale,
-            width: m.size().width as f64 / scale,
-            height: m.size().height as f64 / scale,
+            name,
+            x: px as f64 / scale,
+            y: py as f64 / scale,
+            width: pw as f64 / scale,
+            height: ph as f64 / scale,
             scale_factor: scale,
             is_primary,
+            physical_x: px,
+            physical_y: py,
+            physical_width: pw,
+            physical_height: ph,
         }
     }
 }
@@ -435,15 +459,15 @@ mod tests {
     use super::*;
 
     fn mon(name: &str, is_primary: bool) -> MonitorInfo {
-        MonitorInfo {
-            name: name.into(),
-            x: 0.0,
-            y: 0.0,
-            width: 1920.0,
-            height: 1080.0,
-            scale_factor: 1.0,
-            is_primary,
-        }
+        MonitorInfo::new(name.into(), (0, 0), (1920, 1080), 1.0, is_primary)
+    }
+
+    #[test]
+    fn logical_rect_is_physical_over_own_scale() {
+        // Brandon's DISPLAY3: 3840×2160 at 300 %, right of a 3440 primary.
+        let m = MonitorInfo::new("d3".into(), (3440, 0), (3840, 2160), 3.0, false);
+        assert_eq!((m.physical_x, m.physical_width, m.physical_height), (3440, 3840, 2160));
+        assert_eq!((m.x, m.width, m.height), (3440.0 / 3.0, 1280.0, 720.0));
     }
 
     #[test]
