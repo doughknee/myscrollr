@@ -16,11 +16,14 @@ import { CATEGORY_LABELS } from "../../marketplace";
 //   compact — sports. League descriptions are boilerplate ("Live NFL
 //             scores…"), so a shelf of 14 rich cards is 14 restatements
 //             of the same sentence. Logo + name + add button, 4-across.
+//   row     — the directory (Hub → Directory redesign). Compact anatomy
+//             plus a one-line description, no card chrome: a hover wash
+//             on a 2-across list, so ~90 widgets still read as a list.
 
 interface CatalogCardProps {
   item: CatalogItem;
   added: boolean;
-  variant?: "rich" | "compact";
+  variant?: "rich" | "compact" | "row";
   /** Open the detail panel. The card body is the hit target. */
   onOpen: (item: CatalogItem) => void;
   /**
@@ -29,11 +32,16 @@ interface CatalogCardProps {
    * panel instead, where the upgrade path is explained.
    */
   onAdd?: (item: CatalogItem) => void;
+  /**
+   * Make the ✓ a remove button. Directory rows take it (the design's
+   * "✓ removes with a toast undo"); the older shelves leave it a badge.
+   */
+  onRemove?: (item: CatalogItem) => void;
 }
 
 // ── Logo tile ───────────────────────────────────────────────────
 
-function LogoTile({
+export function LogoTile({
   item,
   size,
   radius,
@@ -87,11 +95,29 @@ function AddControl({
   item,
   added,
   onAdd,
+  onRemove,
 }: {
   item: CatalogItem;
   added: boolean;
   onAdd?: (item: CatalogItem) => void;
+  onRemove?: (item: CatalogItem) => void;
 }) {
+  if (added && onRemove) {
+    return (
+      <button
+        type="button"
+        aria-label={`Remove ${item.name}`}
+        title="Remove from your ticker"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove(item);
+        }}
+        className="flex size-[26px] shrink-0 cursor-pointer items-center justify-center rounded-[7px] bg-accent/14 text-accent hover:bg-warn/20 hover:text-warn"
+      >
+        <Check size={13} strokeWidth={3} />
+      </button>
+    );
+  }
   if (added) {
     return (
       <span
@@ -129,6 +155,7 @@ export default function CatalogCard({
   variant = "rich",
   onOpen,
   onAdd,
+  onRemove,
 }: CatalogCardProps) {
   const shared = {
     role: "button" as const,
@@ -142,6 +169,26 @@ export default function CatalogCard({
       }
     },
   };
+
+  if (variant === "row") {
+    return (
+      <div
+        {...shared}
+        className="group/card flex min-w-0 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 hover:bg-base-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+      >
+        <LogoTile item={item} size={26} radius="rounded-md" />
+        <span className="flex min-w-0 flex-1 flex-col leading-4">
+          <span className="truncate text-[12.5px] font-semibold text-fg">
+            {item.name}
+          </span>
+          <span className="truncate text-ui-chip text-fg-4">
+            {item.description}
+          </span>
+        </span>
+        <AddControl item={item} added={added} onAdd={onAdd} onRemove={onRemove} />
+      </div>
+    );
+  }
 
   if (variant === "compact") {
     return (

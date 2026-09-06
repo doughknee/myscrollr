@@ -141,8 +141,8 @@ export default function PageLayout({
         <div className="flex-1 min-h-0 flex flex-col">
           <div
             className={clsx(
-              "mx-auto px-5 pt-5 pb-0 w-full flex-1 min-h-0 flex flex-col",
-              widthClass,
+              "w-full flex-1 min-h-0 flex flex-col",
+              !noContentPadding && clsx("mx-auto px-5 pt-5 pb-0", widthClass),
             )}
           >
             {children}

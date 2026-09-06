@@ -105,6 +105,21 @@ export async function fetchCatalog(): Promise<import("../types").CatalogPayload>
   return request<import("../types").CatalogPayload>("/catalog");
 }
 
+/**
+ * POST /catalog/requests — "I looked for X and it isn't here". One row per
+ * (user, query) server-side, so the count that comes back is people, not
+ * clicks. Authenticated: the row is the hook for a later "it shipped" note.
+ */
+export async function requestCatalogWidget(
+  query: string,
+): Promise<import("../types/api.generated").CatalogRequestResponse> {
+  return authFetch("/catalog/requests", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+}
+
 // ── Health ──────────────────────────────────────────────────────
 
 /** Core's own view of its dependencies (public — no auth). Generated. */

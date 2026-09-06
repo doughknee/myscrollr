@@ -153,6 +153,12 @@ export interface CatalogItem {
   addConfig?: Record<string, unknown>;
   info: SourceInfo;
   requiredTier: SubscriptionTier;
+  /** Sub-shelf inside a category ("Soccer"). Missing → ungrouped. */
+  group?: string;
+  /** Search aliases the name and description don't contain ("btc"). */
+  keywords?: string[];
+  /** ISO date the widget joined the catalog; drives "new". */
+  addedAt?: string;
 }
 
 /** The source widget id for a data-widget id, or undefined for a utility /
@@ -286,6 +292,9 @@ function buildItem(w: CatalogWidget): CatalogItem | null {
       usage: w.usage ?? renderer.info.usage,
     },
     requiredTier: w.required_tier as SubscriptionTier,
+    group: w.group,
+    keywords: w.keywords,
+    addedAt: w.added_at,
   };
 }
 
