@@ -2,7 +2,8 @@
 // Centralized types, defaults, and helpers for all desktop settings.
 // All prefs are persisted via Tauri plugin-store (disk-backed).
 
-import { getStore, setStore } from "./lib/store";
+import { getStore, removeStore, setStore } from "./lib/store";
+import { LS_CLOCK_FORMAT, LS_WEATHER_UNIT } from "./constants";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -90,7 +91,12 @@ export interface AppearancePrefs {
    * `data-theme="catppuccin-dark"`.
    */
   themeFamily: ThemeFamily;
-  uiScale: number; // 75–150, default 100 — app window only
+  /**
+   * App-window zoom, one of `SCALE_PRESETS`. Older builds allowed any
+   * of 75–150; `snapToPreset` folds those onto the nearest preset on
+   * load so the App size control always has something selected.
+   */
+  uiScale: number;
   /**
    * Independent zoom for the ticker window (75–150, default 100). Lets
    * users size the ticker chips without affecting the main app, and
@@ -100,6 +106,47 @@ export interface AppearancePrefs {
   tickerScale: number;
   fontWeight: FontWeight;
   highContrast: boolean;
+  /** App-wide units — read by the Weather, Sysmon and Clock widgets. */
+  units: UnitsPrefs;
+}
+
+export type TempUnit = "celsius" | "fahrenheit";
+export type TimeFormat = "12h" | "24h";
+
+export interface UnitsPrefs {
+  temperature: TempUnit;
+  timeFormat: TimeFormat;
+}
+
+/**
+ * Units used to live in three places: the Weather bar wrote
+ * `LS_WEATHER_UNIT`, the Clock bar `LS_CLOCK_FORMAT`, and the Sysmon
+ * bar `widgets.sysmon.tempUnit`. One-shot fold into `appearance.units`
+ * (REL-205). A saved block wins; otherwise Weather's key decides the
+ * temperature. Sysmon's stored value is ignored on purpose: its default
+ * ("celsius") was written to disk for everyone, so it cannot tell a
+ * choice from a default, and Weather was what most people looked at.
+ */
+export function migrateUnits(
+  saved: unknown,
+  legacy: { weather?: unknown; clock?: unknown },
+): UnitsPrefs {
+  const s = (saved ?? {}) as Partial<Record<keyof UnitsPrefs, unknown>>;
+  const isTemp = (v: unknown): v is TempUnit =>
+    v === "celsius" || v === "fahrenheit";
+  const isTime = (v: unknown): v is TimeFormat => v === "12h" || v === "24h";
+  return {
+    temperature: isTemp(s.temperature)
+      ? s.temperature
+      : isTemp(legacy.weather)
+        ? legacy.weather
+        : "fahrenheit",
+    timeFormat: isTime(s.timeFormat)
+      ? s.timeFormat
+      : isTime(legacy.clock)
+        ? legacy.clock
+        : "12h",
+  };
 }
 
 export interface TickerPrefs {
@@ -200,7 +247,6 @@ export interface TimerWidgetConfig {
   pomodoro: TimerPomodoroConfig;
 }
 
-export type TempUnit = "celsius" | "fahrenheit";
 
 export interface SysmonTickerConfig {
   cpu: boolean;
@@ -211,7 +257,6 @@ export interface SysmonTickerConfig {
 
 export interface SysmonWidgetConfig {
   refreshInterval: number;
-  tempUnit: TempUnit;
   ticker: SysmonTickerConfig;
 }
 
@@ -424,6 +469,7 @@ const DEFAULT_APPEARANCE: AppearancePrefs = {
   tickerScale: 100,
   fontWeight: "normal",
   highContrast: false,
+  units: { temperature: "fahrenheit", timeFormat: "12h" },
 };
 
 const DEFAULT_TICKER: TickerPrefs = {
@@ -514,7 +560,6 @@ const DEFAULT_WIDGETS: WidgetPrefs = {
   },
   sysmon: {
     refreshInterval: 2,
-    tempUnit: "celsius",
     ticker: { ...DEFAULT_SYSMON_TICKER },
   },
   uptime: {
@@ -685,7 +730,6 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
         typeof sys?.refreshInterval === "number"
           ? sys.refreshInterval
           : DEFAULT_WIDGETS.sysmon.refreshInterval,
-      tempUnit: (sys?.tempUnit as TempUnit) ?? DEFAULT_WIDGETS.sysmon.tempUnit,
       ticker: { ...DEFAULT_SYSMON_TICKER, ...obj(sys?.ticker) },
     },
     uptime: {
@@ -899,9 +943,18 @@ export function loadPrefs(): AppPreferences {
       typeof appearanceRest.tickerScale === "number"
         ? appearanceRest.tickerScale
         : savedUiScale;
+    const legacyWeatherUnit = getStore<unknown>(LS_WEATHER_UNIT, undefined);
+    const legacyClockFormat = getStore<unknown>(LS_CLOCK_FORMAT, undefined);
+    const hadLegacyUnits =
+      legacyWeatherUnit !== undefined || legacyClockFormat !== undefined;
     const mergedAppearance: AppearancePrefs = {
       ...DEFAULT_APPEARANCE,
       ...appearanceRest,
+      uiScale: snapToPreset(
+        appearanceRest.uiScale,
+        SCALE_PRESETS,
+        DEFAULT_APPEARANCE.uiScale,
+      ),
       tickerScale: snapToPreset(
         savedTickerScale,
         SCALE_PRESETS,
@@ -909,6 +962,10 @@ export function loadPrefs(): AppPreferences {
       ),
       themeFamily,
       themeMode,
+      units: migrateUnits(appearanceRest.units, {
+        weather: legacyWeatherUnit,
+        clock: legacyClockFormat,
+      }),
     };
     // Strip the retired startup/window fields the same way the legacy
     // appearance keys above are stripped. Spreading saved-over-defaults
@@ -990,9 +1047,13 @@ export function loadPrefs(): AppPreferences {
       }
     }
 
-    // If migrated from v1, persist the new format
-    if (isV1) {
+    // Persist the migrated shape so it runs once: v1 → v2, and the
+    // legacy unit keys folding into appearance.units (their store keys
+    // go away here; sysmon.tempUnit falls off on the next save).
+    if (isV1 || hadLegacyUnits) {
       setStore(PREFIX, merged);
+      removeStore(LS_WEATHER_UNIT);
+      removeStore(LS_CLOCK_FORMAT);
     }
 
     return merged;

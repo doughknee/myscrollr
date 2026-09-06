@@ -32,7 +32,8 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     rowId: "theme",
     label: "Theme",
     description: "Pick a color palette",
-    keywords: "palette colors catppuccin dracula nord",
+    keywords:
+      "palette colors scrollr catppuccin dracula tokyo night nord gruvbox solarized rose pine one everforest",
   },
   {
     page: "appearance",
@@ -43,10 +44,10 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
   },
   {
     page: "appearance",
-    rowId: "displaySize",
-    label: "Display size",
-    description: "Resize the main app window",
-    keywords: "zoom scale ui",
+    rowId: "appSize",
+    label: "App size",
+    description: "Resize the main app window. The ticker has its own scale.",
+    keywords: "zoom scale ui display size",
   },
   {
     page: "appearance",
@@ -60,7 +61,21 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     rowId: "highContrast",
     label: "High contrast text",
     description: "Brighten muted text for easier reading",
-    keywords: "accessibility a11y",
+    keywords: "accessibility a11y readability",
+  },
+  {
+    page: "appearance",
+    rowId: "temperature",
+    label: "Temperature",
+    description: "Used by Weather and System monitor",
+    keywords: "units fahrenheit celsius degrees °F °C sysmon",
+  },
+  {
+    page: "appearance",
+    rowId: "timeFormat",
+    label: "Time",
+    description: "Used by Clock and the ticker",
+    keywords: "units format 12h 24h 12-hour 24-hour hour clock am pm",
   },
 
   // ── Window & startup ──────────────────────────────────────────

@@ -28,6 +28,7 @@ import {
   resetTickerPage,
   TICKER_SPEEDS,
   resetAll,
+  migrateUnits,
 } from "./preferences";
 import type { AppPreferences, WidgetPrefs } from "./preferences";
 
@@ -39,6 +40,9 @@ vi.mock("./lib/store", () => ({
   )),
   setStore: vi.fn((key: string, value: unknown) => {
     storeValues.set(key, value);
+  }),
+  removeStore: vi.fn((key: string) => {
+    storeValues.delete(key);
   }),
 }));
 
@@ -709,5 +713,80 @@ describe("resetTickerPage (REL-204)", () => {
     expect(after.ticker).toEqual(before.ticker);
     expect(after.window).toEqual(before.window);
     expect(after.appearance).toEqual({ ...changed.appearance, tickerScale: 100 });
+  });
+});
+
+describe("uiScale snaps to the App size presets on load (REL-205)", () => {
+  it("keeps the four presets, folds retired values, and defaults garbage", () => {
+    for (const [saved, want] of [
+      [85, 85], [100, 100], [115, 115], [130, 130],
+      [75, 85], [90, 85], [110, 115], [150, 130],
+      ["115", 100], [NaN, 100], [undefined, 100],
+    ] as [unknown, number][]) {
+      storeValues.set("scrollr:settings", { appearance: { uiScale: saved } });
+      expect(loadPrefs().appearance.uiScale, String(saved)).toBe(want);
+    }
+  });
+});
+
+describe("appearance.units migration (REL-205)", () => {
+  it("defaults to °F and 12h with nothing saved anywhere", () => {
+    expect(migrateUnits(undefined, {})).toEqual({
+      temperature: "fahrenheit",
+      timeFormat: "12h",
+    });
+  });
+
+  it("seeds from the legacy Weather and Clock store keys", () => {
+    expect(
+      migrateUnits(undefined, { weather: "celsius", clock: "24h" }),
+    ).toEqual({ temperature: "celsius", timeFormat: "24h" });
+  });
+
+  it("prefers a saved units block over the legacy keys", () => {
+    expect(
+      migrateUnits(
+        { temperature: "fahrenheit", timeFormat: "12h" },
+        { weather: "celsius", clock: "24h" },
+      ),
+    ).toEqual({ temperature: "fahrenheit", timeFormat: "12h" });
+  });
+
+  it("ignores garbage in either place", () => {
+    expect(
+      migrateUnits({ temperature: "kelvin" }, { weather: 7, clock: "13h" }),
+    ).toEqual({ temperature: "fahrenheit", timeFormat: "12h" });
+  });
+
+  it("runs once: folds the keys into prefs, persists, and deletes them", () => {
+    storeValues.set("scrollr:widget:weather:unit", "celsius");
+    storeValues.set("scrollr:widget:clock:format", "24h");
+    storeValues.set("scrollr:settings", {
+      appearance: { uiScale: 100 },
+      widgets: { sysmon: { refreshInterval: 2, tempUnit: "fahrenheit" } },
+    });
+
+    const prefs = loadPrefs();
+    expect(prefs.appearance.units).toEqual({
+      temperature: "celsius",
+      timeFormat: "24h",
+    });
+    expect(storeValues.has("scrollr:widget:weather:unit")).toBe(false);
+    expect(storeValues.has("scrollr:widget:clock:format")).toBe(false);
+    const persisted = storeValues.get("scrollr:settings") as AppPreferences;
+    expect(persisted.appearance.units).toEqual(prefs.appearance.units);
+    expect("tempUnit" in persisted.widgets.sysmon).toBe(false);
+
+    // Second load: nothing legacy left, the saved block is what counts.
+    expect(loadPrefs().appearance.units).toEqual(prefs.appearance.units);
+  });
+
+  it("does not persist on load when there is nothing to migrate", () => {
+    storeValues.set("scrollr:settings", {
+      appearance: { units: { temperature: "celsius", timeFormat: "12h" } },
+    });
+    const before = storeValues.get("scrollr:settings");
+    expect(loadPrefs().appearance.units.temperature).toBe("celsius");
+    expect(storeValues.get("scrollr:settings")).toBe(before);
   });
 });

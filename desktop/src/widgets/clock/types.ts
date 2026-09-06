@@ -1,4 +1,4 @@
-export type TimeFormat = "12h" | "24h";
+export type { TimeFormat } from "../../preferences";
 
 export interface TimezoneEntry {
   tz: string;

@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
-import { LS_CLOCK_FORMAT, LS_CLOCK_TIMEZONES, LS_TIMER_STATE } from "../constants";
+import { LS_CLOCK_TIMEZONES, LS_TIMER_STATE } from "../constants";
 import { useWidgetTickerData } from "./useWidgetTickerData";
-import type { WidgetPrefs } from "../preferences";
+import type { UnitsPrefs, WidgetPrefs } from "../preferences";
+
+const UNITS: UnitsPrefs = { temperature: "fahrenheit", timeFormat: "12h" };
 
 const storeValues = vi.hoisted(() => new Map<string, unknown>());
 
@@ -30,7 +32,6 @@ function makeWidgetPrefs(widgetsOnTicker: string[]): WidgetPrefs {
     },
     sysmon: {
       refreshInterval: 2,
-      tempUnit: "celsius",
       ticker: {
         cpu: false,
         memory: false,
@@ -56,7 +57,6 @@ afterEach(() => {
 
 describe("useWidgetTickerData", () => {
   it("keeps clock and timer chips in separate buckets", async () => {
-    storeValues.set(LS_CLOCK_FORMAT, "12h");
     storeValues.set(LS_TIMER_STATE, {
       mode: "stopwatch",
       startedAt: null,
@@ -66,7 +66,7 @@ describe("useWidgetTickerData", () => {
     });
 
     const prefs = makeWidgetPrefs(["clock", "timer"]);
-    const { result } = renderHook(() => useWidgetTickerData(prefs));
+    const { result } = renderHook(() => useWidgetTickerData(prefs, UNITS));
 
     await waitFor(() => {
       expect(result.current.clock.map((c) => c.id)).toEqual(["clock-local"]);
@@ -95,7 +95,7 @@ describe("useWidgetTickerData", () => {
     storeValues.set(LS_CLOCK_TIMEZONES, ["Asia/Tokyo", "Europe/London"]);
 
     const prefs = makeWidgetPrefs(["clock"]);
-    const { result } = renderHook(() => useWidgetTickerData(prefs));
+    const { result } = renderHook(() => useWidgetTickerData(prefs, UNITS));
 
     await waitFor(() => {
       expect(result.current.clock.map((c) => c.id)).toEqual([
@@ -126,7 +126,7 @@ describe("useWidgetTickerData", () => {
         },
       },
     };
-    const { result } = renderHook(() => useWidgetTickerData(customPrefs));
+    const { result } = renderHook(() => useWidgetTickerData(customPrefs, UNITS));
 
     await waitFor(() => {
       expect(result.current.timer).toHaveLength(1);
