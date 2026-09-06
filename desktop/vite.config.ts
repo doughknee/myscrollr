@@ -59,7 +59,8 @@ export default defineConfig({
     watch: { ignored: ["**/src-tauri/target/**"] },
   },
 
-  // Multi-page build: ticker (index.html) + app window (app.html)
+  // Multi-page build: ticker (index.html) + app window (app.html) +
+  // the Identify tile (identify.html, no JS of its own)
   build: {
     outDir: "dist",
     emptyOutDir: true,
@@ -71,6 +72,7 @@ export default defineConfig({
       input: {
         main: resolve(projectRoot, "index.html"),
         app: resolve(projectRoot, "app.html"),
+        identify: resolve(projectRoot, "identify.html"),
       },
     },
   },

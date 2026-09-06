@@ -35,11 +35,16 @@ public static class Win {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr dc, uint flags);
   [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+  [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr ctx);
   [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr h, int a, out RECT r, int size);
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
 }
 "@
-[void][Win]::SetProcessDPIAware()
+# Per-monitor-v2, not system-DPI: with mixed scaling (a 300 % screen next
+# to 100 % ones) a system-aware process sees other screens' windows
+# virtualised to a third of their size and PrintWindow paints them at
+# that DPI, leaving the rest of the bitmap blank. Falls back on old Windows.
+if (-not [Win]::SetProcessDpiAwarenessContext([IntPtr]::op_Explicit(-4))) { [void][Win]::SetProcessDPIAware() }
 
 $pids = @(Get-Process -Name $Process -ErrorAction SilentlyContinue | ForEach-Object { [uint32]$_.Id })
 if ($pids.Count -eq 0) { throw "no process named $Process is running" }

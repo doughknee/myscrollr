@@ -241,6 +241,8 @@ interface ToggleRowProps {
   onChange: (checked: boolean) => void;
   /** Shown but inert, e.g. the last monitor that cannot be turned off. */
   disabled?: boolean;
+  /** Native tooltip — the place to say WHY a row is disabled. */
+  title?: string;
 }
 
 export function ToggleRow({
@@ -250,6 +252,7 @@ export function ToggleRow({
   checked,
   onChange,
   disabled = false,
+  title,
 }: ToggleRowProps) {
   return (
     <button
@@ -257,6 +260,7 @@ export function ToggleRow({
       role="switch"
       aria-checked={checked}
       disabled={disabled}
+      title={title}
       onClick={() => onChange(!checked)}
       className={clsx(
         ROW_BASE,
