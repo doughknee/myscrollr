@@ -3,8 +3,8 @@
  *
  * A static, hand-maintained list of every jumpable row. It is not
  * derived from the rendered pages on purpose: rows appear and disappear
- * with preference state (Direction hides on Rotate, Hover speed only on
- * continuous scroll), and a search that could only find the settings you
+ * with preference state (Time per page only in Page mode, Hide when
+ * fullscreen only on Windows), and a search that could only find the settings you
  * had already configured your way into would be worse than useless.
  * Everything is findable; following a result may land you on a row that
  * is currently conditional-hidden, which is the honest outcome — the
@@ -66,31 +66,6 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
   // ── Window & startup ──────────────────────────────────────────
   {
     page: "window",
-    rowId: "tickerMonitors",
-    label: "Monitors",
-    description: "Choose which screens show the ticker",
-    keywords: "display screen second dual multi monitor",
-  },
-  {
-    page: "window",
-    rowId: "alwaysOnTop",
-    label: "Always on top",
-    description: "Keep the ticker above all other windows",
-    keywords: "pin float",
-  },
-  {
-    // The prototype's index still carried "— Windows only" here even
-    // though the redesign moves that caveat out of the description and
-    // into a badge chip. Kept as a keyword so searching "windows" still
-    // finds it, without the result card contradicting the row.
-    page: "window",
-    rowId: "hideFullscreen",
-    label: "Hide when an app goes fullscreen",
-    description: "Hides the ticker during fullscreen apps",
-    keywords: "youtube games movie windows only",
-  },
-  {
-    page: "window",
     rowId: "autostart",
     label: "Launch on system startup",
     description: "Open Scrollr when you start your computer",
@@ -113,57 +88,20 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     keywords: "hotkey keys cmd ctrl",
   },
 
-  // ── Ticker ────────────────────────────────────────────────────
+  // ── Ticker (page order: On · Where · Look · Motion · Behaviour) ──
   {
     page: "ticker",
-    rowId: "scrollMode",
-    label: "Scroll mode",
-    description: "Continuous scroll, page through, or rotate",
-    keywords: "continuous page rotate flip step",
+    rowId: "showTicker",
+    label: "Show the ticker",
+    description: "The bar on your screen",
+    keywords: "enable disable on off hide toggle visible",
   },
   {
     page: "ticker",
-    rowId: "direction",
-    label: "Direction",
-    description: "Which way the ticker moves",
-    keywords: "left right",
-  },
-  {
-    page: "ticker",
-    rowId: "itemOrder",
-    label: "Item order",
-    description: "Group items by source or weave them together",
-    keywords: "mix grouped weave",
-  },
-  {
-    page: "ticker",
-    rowId: "speed",
-    label: "Speed",
-    description: "How fast the ticker scrolls",
-    keywords: "fast slow velocity",
-  },
-  {
-    // Absent from the prototype (both the page and its index) but
-    // required by the handoff spec, and backed by a live pref.
-    page: "ticker",
-    rowId: "stepPause",
-    label: "Time per page",
-    description: "How long each page stays put before the ticker advances",
-    keywords: "dwell pause step rotate interval",
-  },
-  {
-    page: "ticker",
-    rowId: "pauseOnHover",
-    label: "Slow down on hover",
-    description: "Ease off while you hover so chips are easier to read",
-    keywords: "pause mouse",
-  },
-  {
-    page: "ticker",
-    rowId: "hoverSpeed",
-    label: "Hover speed",
-    description: "How far it slows while hovered",
-    keywords: "pause stop",
+    rowId: "tickerMonitors",
+    label: "Monitors",
+    description: "Which screens show the ticker",
+    keywords: "display screen second dual multi monitor identify",
   },
   {
     page: "ticker",
@@ -176,29 +114,75 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     page: "ticker",
     rowId: "detailLevel",
     label: "Detail level",
-    description: "Single line vs. detail row under each chip",
+    description: "One line per chip, or a detail row under each",
     keywords: "compact detailed comfort",
   },
   {
     page: "ticker",
-    rowId: "spacing",
-    label: "Spacing",
-    description: "Gap between chips",
-    keywords: "tight wide gap density",
+    rowId: "tickerScale",
+    label: "Size",
+    description: "Resize the bar",
+    keywords: "scale zoom bigger smaller",
   },
   {
     page: "ticker",
     rowId: "chipColors",
     label: "Chip colors",
-    description: "Source colors, accent theme, or subtle grayscale",
-    keywords: "color widget subtle",
+    description: "Each widget's own color, the theme accent, or subtle grays",
+    keywords: "color widget subtle theme",
   },
   {
     page: "ticker",
-    rowId: "tickerScale",
-    label: "Scale",
-    description: "Resize the ticker window",
-    keywords: "size zoom",
+    rowId: "scrollMode",
+    label: "Scroll mode",
+    description: "Scroll without stopping, or show a page at a time",
+    keywords: "continuous page step rotate",
+  },
+  {
+    page: "ticker",
+    rowId: "speed",
+    label: "Speed",
+    description: "How fast the chips travel",
+    keywords: "fast slow normal velocity",
+  },
+  {
+    page: "ticker",
+    rowId: "onHover",
+    label: "On hover",
+    description: "What the bar does while your mouse is over it",
+    keywords: "pause stop slow down keep moving mouse hover",
+  },
+  {
+    // Only rendered in Page mode; following the result in Continuous
+    // mode lands on the Motion group, which is the honest outcome.
+    page: "ticker",
+    rowId: "stepPause",
+    label: "Time per page",
+    description: "How long each page stays before the next one",
+    keywords: "dwell pause step interval seconds",
+  },
+  {
+    page: "ticker",
+    rowId: "alwaysOnTop",
+    label: "Stay above other windows",
+    description: "Keep the ticker visible over whatever else is open",
+    keywords: "pin float always on top",
+  },
+  {
+    // Windows-only row; "windows" stays a keyword so the platform name
+    // finds it.
+    page: "ticker",
+    rowId: "hideFullscreen",
+    label: "Hide when an app goes fullscreen",
+    description: "Get out of the way of games, videos and presentations",
+    keywords: "youtube games movie windows only",
+  },
+  {
+    page: "ticker",
+    rowId: "itemOrder",
+    label: "Item order",
+    description: "Keep each widget's items together, or mix them",
+    keywords: "mix grouped weave by source",
   },
 
   // ── Profile & plan ────────────────────────────────────────────

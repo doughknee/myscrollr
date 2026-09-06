@@ -113,7 +113,7 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
     ],
     steps: [
       "Press Ctrl+T (Cmd+T on macOS) to toggle ticker visibility.",
-      "Or go to Customize > Ticker and turn on \"Enable ticker\".",
+      "Or go to Settings > Ticker and turn on \"Show the ticker\".",
       "Or click the Ticker toggle in the title bar (next to the Pin button).",
       "Or right-click the system tray icon and choose \"Toggle Ticker\".",
     ],

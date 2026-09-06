@@ -24,6 +24,9 @@ import {
   mergeWidgetPrefs,
   reconcileSidebarOrder,
   loadPrefs,
+  migrateTicker,
+  resetTickerPage,
+  TICKER_SPEEDS,
   resetAll,
 } from "./preferences";
 import type { AppPreferences, WidgetPrefs } from "./preferences";
@@ -638,5 +641,73 @@ describe("privacy.sendCrashReports (REL-209)", () => {
     });
     expect(resetAll().privacy.sendCrashReports).toBe(true);
     expect(loadPrefs().privacy.sendCrashReports).toBe(true);
+  });
+});
+
+describe("migrateTicker (REL-204: presets + one hover row)", () => {
+  it("folds pauseOnHover + hoverSpeed into onHover", () => {
+    expect(migrateTicker({ pauseOnHover: false, hoverSpeed: 0.3 }).onHover).toBe("keep");
+    expect(migrateTicker({ pauseOnHover: true, hoverSpeed: 0 }).onHover).toBe("pause");
+    expect(migrateTicker({ pauseOnHover: true, hoverSpeed: 0.3 }).onHover).toBe("slow");
+    expect(migrateTicker({}).onHover).toBe("slow");
+    expect(migrateTicker({ onHover: "pause", pauseOnHover: false }).onHover).toBe("pause");
+  });
+
+  it("folds Rotate into Page and keeps the other modes", () => {
+    expect(migrateTicker({ scrollMode: "flip" }).scrollMode).toBe("step");
+    expect(migrateTicker({ scrollMode: "step" }).scrollMode).toBe("step");
+    expect(migrateTicker({ scrollMode: "continuous" }).scrollMode).toBe("continuous");
+    expect(migrateTicker({ scrollMode: "sideways" }).scrollMode).toBe("continuous");
+  });
+
+  it("snaps old slider values to the nearest preset", () => {
+    expect(migrateTicker({ tickerSpeed: 25 }).tickerSpeed).toBe(TICKER_SPEEDS.slow);
+    expect(migrateTicker({ tickerSpeed: 55 }).tickerSpeed).toBe(TICKER_SPEEDS.normal);
+    expect(migrateTicker({ tickerSpeed: 150 }).tickerSpeed).toBe(TICKER_SPEEDS.fast);
+    expect(migrateTicker({ tickerSpeed: "fast" }).tickerSpeed).toBe(TICKER_SPEEDS.normal);
+    expect(migrateTicker({ stepPause: 1 }).stepPause).toBe(3);
+    expect(migrateTicker({ stepPause: 10 }).stepPause).toBe(8);
+    expect(migrateTicker({ stepPause: 6 }).stepPause).toBe(5);
+  });
+
+  it("drops Spacing, Direction and the legacy hover pair from the saved shape", () => {
+    const out = migrateTicker({
+      tickerGap: "spacious",
+      tickerDirection: "right",
+      pauseOnHover: true,
+      hoverSpeed: 0.5,
+      tickerMode: "compact",
+    });
+    expect(out).not.toHaveProperty("tickerGap");
+    expect(out).not.toHaveProperty("tickerDirection");
+    expect(out).not.toHaveProperty("pauseOnHover");
+    expect(out).not.toHaveProperty("hoverSpeed");
+    expect(out.tickerMode).toBe("compact");
+  });
+
+  it("runs on load, and Size snaps to the App-size presets too", () => {
+    storeValues.set("scrollr:settings", {
+      appearance: { tickerScale: 150 },
+      ticker: { scrollMode: "flip", pauseOnHover: true, hoverSpeed: 0, tickerSpeed: 5 },
+    });
+    const p = loadPrefs();
+    expect(p.ticker).toMatchObject({ scrollMode: "step", onHover: "pause", tickerSpeed: 20 });
+    expect(p.appearance.tickerScale).toBe(130);
+  });
+});
+
+describe("resetTickerPage (REL-204)", () => {
+  it("resets everything the Ticker page shows and nothing else", () => {
+    const before = loadPrefs();
+    const changed: AppPreferences = {
+      ...before,
+      ticker: { ...before.ticker, scrollMode: "step", onHover: "pause", tickerSpeed: 80 },
+      window: { ...before.window, pinned: false, tickerPosition: "bottom", tickerMonitors: ["X"] },
+      appearance: { ...before.appearance, tickerScale: 130, uiScale: 115, themeFamily: "nord" },
+    };
+    const after = resetTickerPage(changed);
+    expect(after.ticker).toEqual(before.ticker);
+    expect(after.window).toEqual(before.window);
+    expect(after.appearance).toEqual({ ...changed.appearance, tickerScale: 100 });
   });
 });

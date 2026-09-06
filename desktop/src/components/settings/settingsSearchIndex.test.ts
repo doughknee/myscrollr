@@ -72,8 +72,8 @@ describe("searchSettings", () => {
   });
 
   it("matches on label", () => {
-    const hits = searchSettings("hover speed");
-    expect(hits.map((h) => h.rowId)).toContain("hoverSpeed");
+    const hits = searchSettings("on hover");
+    expect(hits.map((h) => h.rowId)).toContain("onHover");
   });
 
   it("matches on description", () => {
@@ -92,11 +92,32 @@ describe("searchSettings", () => {
     expect(searchSettings("CATPPUCCIN").map((h) => h.rowId)).toEqual(["theme"]);
   });
 
-  /** The behaviour the design reference shows: "speed" → 2 ticker rows. */
+  /** Hover speed folded into On hover (REL-204): "speed" → one ticker row. */
   it("reproduces the reference query", () => {
     const hits = searchSettings("speed");
-    expect(hits.map((h) => h.label)).toEqual(["Speed", "Hover speed"]);
+    expect(hits.map((h) => h.label)).toEqual(["Speed"]);
     expect(hits.every((h) => h.page === "ticker")).toBe(true);
+  });
+
+  /** The Ticker page's rows, in page order, are all findable (REL-204). */
+  it("indexes every Ticker page row in page order", () => {
+    expect(
+      SETTINGS_SEARCH_INDEX.filter((e) => e.page === "ticker").map((e) => e.rowId),
+    ).toEqual([
+      "showTicker",
+      "tickerMonitors",
+      "screenEdge",
+      "detailLevel",
+      "tickerScale",
+      "chipColors",
+      "scrollMode",
+      "speed",
+      "onHover",
+      "stepPause",
+      "alwaysOnTop",
+      "hideFullscreen",
+      "itemOrder",
+    ]);
   });
 
   /**

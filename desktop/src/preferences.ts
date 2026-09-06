@@ -65,12 +65,14 @@ export function isThemeFamily(value: unknown): value is ThemeFamily {
 export function isThemeMode(value: unknown): value is ThemeMode {
   return value === "light" || value === "dark" || value === "system";
 }
-export type TickerGap = "tight" | "normal" | "spacious";
 export type TickerMode = "compact" | "comfort";
 export type MixMode = "grouped" | "weave";
 export type ChipColorMode = "widget" | "accent" | "muted";
-export type TickerDirection = "left" | "right";
-export type ScrollMode = "continuous" | "step" | "flip";
+/** "step" = Page. Rotate ("flip") folded into it 2026-09-06 (REL-204). */
+export type ScrollMode = "continuous" | "step";
+/** What the bar does under the mouse. Continuous: keep / slow to 30 % /
+ *  stop. Page: keep advancing / hold the page (slow and pause alike). */
+export type HoverBehavior = "keep" | "slow" | "pause";
 export type PinSide = "left" | "right";
 
 export type FontWeight = "normal" | "medium" | "bold";
@@ -102,16 +104,33 @@ export interface AppearancePrefs {
 
 export interface TickerPrefs {
   showTicker: boolean;
+  /** px/s; one of TICKER_SPEEDS (Slow / Normal / Fast on the page). */
   tickerSpeed: number;
-  pauseOnHover: boolean;
-  hoverSpeed: number;
-  tickerGap: TickerGap;
+  onHover: HoverBehavior;
   tickerMode: TickerMode;
   mixMode: MixMode;
   chipColors: ChipColorMode;
-  tickerDirection: TickerDirection;
   scrollMode: ScrollMode;
-  stepPause: number; // seconds between transitions (1–10)
+  /** Seconds each page stays put; one of STEP_PAUSES (Page mode only). */
+  stepPause: number;
+}
+
+// The Ticker page offers presets, never raw numbers (SETTINGS_AUDIT §3).
+// The prefs stay numbers so nothing downstream changes; a value off the
+// list (an old slider position) is snapped to the nearest preset on load.
+export const TICKER_SPEEDS = { slow: 20, normal: 40, fast: 80 } as const;
+export const STEP_PAUSES = [3, 5, 8] as const;
+export const SCALE_PRESETS = [85, 100, 115, 130] as const;
+
+export function snapToPreset(
+  value: unknown,
+  presets: readonly number[],
+  fallback: number,
+): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return presets.reduce((best, p) =>
+    Math.abs(p - value) < Math.abs(best - value) ? p : best,
+  );
 }
 
 export interface StartupPrefs {
@@ -409,14 +428,11 @@ const DEFAULT_APPEARANCE: AppearancePrefs = {
 
 const DEFAULT_TICKER: TickerPrefs = {
   showTicker: true,
-  tickerSpeed: 40,
-  pauseOnHover: true,
-  hoverSpeed: 0.3,
-  tickerGap: "tight",
+  tickerSpeed: TICKER_SPEEDS.normal,
+  onHover: "slow",
   tickerMode: "comfort",
   mixMode: "weave",
   chipColors: "widget",
-  tickerDirection: "left",
   scrollMode: "continuous",
   stepPause: 5,
 };
@@ -886,7 +902,11 @@ export function loadPrefs(): AppPreferences {
     const mergedAppearance: AppearancePrefs = {
       ...DEFAULT_APPEARANCE,
       ...appearanceRest,
-      tickerScale: savedTickerScale,
+      tickerScale: snapToPreset(
+        savedTickerScale,
+        SCALE_PRESETS,
+        DEFAULT_APPEARANCE.tickerScale,
+      ),
       themeFamily,
       themeMode,
     };
@@ -918,7 +938,7 @@ export function loadPrefs(): AppPreferences {
     };
     const merged: AppPreferences = {
       appearance: mergedAppearance,
-      ticker: { ...DEFAULT_TICKER, ...source.ticker },
+      ticker: migrateTicker(source.ticker),
       startup: { ...DEFAULT_STARTUP, ...savedStartup },
       // Absent on every pre-REL-209 install → on. Only a literal
       // `false` turns reporting off; anything else is the default.
@@ -981,6 +1001,61 @@ export function loadPrefs(): AppPreferences {
   }
 }
 
+/**
+ * REL-204 (2026-09-06): the Ticker page went from sliders and switches to
+ * presets and one hover row. Retired keys are dropped, not carried:
+ *  - `pauseOnHover` + `hoverSpeed` → `onHover`
+ *    (false → keep; true + 0 → pause; true otherwise → slow)
+ *  - scrollMode "flip" (Rotate) → "step" (Page)
+ *  - `tickerGap` (Spacing) and `tickerDirection` (Direction) → gone
+ *  - `tickerSpeed` / `stepPause` snap to the nearest preset
+ */
+export function migrateTicker(raw: unknown): TickerPrefs {
+  const saved = (raw && typeof raw === "object" ? raw : {}) as Omit<
+    Partial<TickerPrefs>,
+    "scrollMode"
+  > & {
+    pauseOnHover?: unknown;
+    hoverSpeed?: unknown;
+    tickerGap?: unknown;
+    tickerDirection?: unknown;
+    scrollMode?: unknown;
+  };
+  const {
+    pauseOnHover,
+    hoverSpeed,
+    tickerGap: _gap,
+    tickerDirection: _direction,
+    scrollMode,
+    onHover,
+    ...rest
+  } = saved;
+  void _gap;
+  void _direction;
+  const isHover = (v: unknown): v is HoverBehavior =>
+    v === "keep" || v === "slow" || v === "pause";
+  const migratedHover: HoverBehavior = isHover(onHover)
+    ? onHover
+    : pauseOnHover === false
+      ? "keep"
+      : pauseOnHover === true && hoverSpeed === 0
+        ? "pause"
+        : DEFAULT_TICKER.onHover;
+  return {
+    ...DEFAULT_TICKER,
+    ...rest,
+    onHover: migratedHover,
+    scrollMode:
+      scrollMode === "step" || scrollMode === "flip" ? "step" : "continuous",
+    tickerSpeed: snapToPreset(
+      rest.tickerSpeed,
+      Object.values(TICKER_SPEEDS),
+      DEFAULT_TICKER.tickerSpeed,
+    ),
+    stepPause: snapToPreset(rest.stepPause, STEP_PAUSES, DEFAULT_TICKER.stepPause),
+  };
+}
+
 export function savePrefs(prefs: AppPreferences): void {
   setStore(PREFIX, prefs);
 }
@@ -996,6 +1071,23 @@ export function resetCategory<K extends keyof AppPreferences>(
       ? { ...def }
       : def;
   return { ...prefs, [category]: value };
+}
+
+/**
+ * Everything the Ticker page shows: `ticker.*`, the whole `window.*`
+ * block (edge, monitors, stay-above, hide-on-fullscreen) and the bar's
+ * own scale. The button, toast and undo all say "Reset ticker settings".
+ */
+export function resetTickerPage(prefs: AppPreferences): AppPreferences {
+  return {
+    ...prefs,
+    ticker: { ...DEFAULT_TICKER },
+    window: { ...DEFAULT_WINDOW },
+    appearance: {
+      ...prefs.appearance,
+      tickerScale: DEFAULT_APPEARANCE.tickerScale,
+    },
+  };
 }
 
 /** Reset everything to defaults. */
@@ -1076,12 +1168,6 @@ export function migrateAppearanceTheme(
 }
 
 // ── Derived values ──────────────────────────────────────────────
-
-export const TICKER_GAPS: Record<TickerGap, number> = {
-  tight: 8,
-  normal: 12,
-  spacious: 20,
-};
 
 export const TICKER_HEIGHTS: Record<TickerMode, number> = {
   compact: 44,
