@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0b12;font-family:"Plus Jakarta Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;color:#e2e2ec}
+*{box-sizing:border-box}
+a{color:#34d399}a:hover{color:#6ee7b7}
+</style>
+</helmet>
+<section style="padding:48px;display:flex;flex-direction:column;gap:40px">
+  <div style="display:flex;flex-direction:column;gap:8px;max-width:960px">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#9292a4">Scrollr · Catalog · Reference</div>
+    <h1 style="margin:0;font-size:26px;line-height:32px;font-weight:700;letter-spacing:-0.01em">Hub → Directory catalog</h1>
+    <p style="margin:0;font-size:13.5px;line-height:21px;color:#9292a4">One route, two views. The <strong style="color:#e2e2ec;font-weight:600">hub</strong> is where you arrive: a search hero, one tile per kind, what's new, what's yours. A tile or a query drops into the <strong style="color:#e2e2ec;font-weight:600">directory</strong>: a kind rail on the left, grouped rows on the right. Every frame below is the same live prototype — click and type in it. Source: <a href="Catalog G - Hub Directory.dc.html">Catalog G - Hub Directory.dc.html</a>.</p>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:48px 40px;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px;max-width:1144px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#34d399;background:rgba(52,211,153,.15);border-radius:6px;padding:2px 8px">01</span><span style="font-size:14px;font-weight:700">Hub</span><span style="font-size:12.5px;color:#9292a4">Landing. Search hero with example chips, kind tiles (count, logos, “n new”, “n added”), New this month, In your ticker.</span></div>
+      <dc-import name="Catalog G - Hub Directory" view="hub" hint-size="1144px,787px"></dc-import>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px;max-width:1144px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#34d399;background:rgba(52,211,153,.15);border-radius:6px;padding:2px 8px">02</span><span style="font-size:14px;font-weight:700">Directory · Sports</span><span style="font-size:12.5px;color:#9292a4">After a tile click. Rail shows every kind with counts; rows are grouped (Football, Soccer…) with group pills as anchors. “Overview” returns to the hub.</span></div>
+      <dc-import name="Catalog G - Hub Directory" view="dir" cat="sports" hint-size="1144px,787px"></dc-import>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px;max-width:1144px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#34d399;background:rgba(52,211,153,.15);border-radius:6px;padding:2px 8px">03</span><span style="font-size:14px;font-weight:700">Search · hit</span><span style="font-size:12.5px;color:#9292a4">“soccer” from anywhere lands in the directory as results grouped by kind. Aliases (bitcoin → Crypto, epl → Premier League) are part of the match.</span></div>
+      <dc-import name="Catalog G - Hub Directory" view="dir" cat="all" query="soccer" hint-size="1144px,787px"></dc-import>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px;max-width:1144px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#34d399;background:rgba(52,211,153,.15);border-radius:6px;padding:2px 8px">04</span><span style="font-size:14px;font-weight:700">Search · miss</span><span style="font-size:12.5px;color:#9292a4">“Eredivisie” has no widget. The card counts the request and promises a nudge when it ships; the closest group (Soccer) fills the page instead of an empty state.</span></div>
+      <dc-import name="Catalog G - Hub Directory" view="dir" cat="all" query="Eredivisie" hint-size="1144px,787px"></dc-import>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px;max-width:1144px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#34d399;background:rgba(52,211,153,.15);border-radius:6px;padding:2px 8px">05</span><span style="font-size:14px;font-weight:700">Free tier · at cap</span><span style="font-size:12.5px;color:#9292a4">6 of 6 slots. Slot count rides the sidebar chip and the rail; the Upgrade pill sits on the In-your-ticker line; + still opens the panel with the upgrade path.</span></div>
+      <dc-import name="Catalog G - Hub Directory" view="hub" tier="free" hint-size="1144px,787px"></dc-import>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:10px;max-width:1144px"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#34d399;background:rgba(52,211,153,.15);border-radius:6px;padding:2px 8px">06</span><span style="font-size:14px;font-weight:700">Directory · All widgets</span><span style="font-size:12.5px;color:#9292a4">The long view for people who want to scroll everything: one titled block per kind, grouped inside. Rail stays put for jumping.</span></div>
+      <dc-import name="Catalog G - Hub Directory" view="dir" cat="all" hint-size="1144px,787px"></dc-import>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;max-width:2328px;margin-top:8px">
+    <div style="border-radius:12px;border:1px solid #282838;background:#141420;padding:20px 22px;display:flex;flex-direction:column;gap:10px">
+      <h2 style="margin:0;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#9292a4">Behavior rules</h2>
+      <ul style="margin:0;padding-left:16px;font-size:12.5px;line-height:19px;color:#b7b7c6;display:flex;flex-direction:column;gap:6px">
+        <li>Hub is the default landing. Directory is a sub-state of the same route (<code style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#9292a4">?kind=sports</code>, <code style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#9292a4">?q=…</code>) so Back and deep links work.</li>
+        <li>Typing anywhere switches to directory results grouped by kind; clearing the field returns to the last kind, not the hub.</li>
+        <li>Picking a kind in the rail clears the query (same rule as today's segmented tabs).</li>
+        <li>+ adds in place; ✓ removes on click with a toast undo. Row body still opens the existing slide-over panel.</li>
+        <li>Zero matches → request card + closest group. Request is one click, counted server-side, and subscribes the user to a “shipped” notification.</li>
+        <li>At slot cap, + opens the panel with the upgrade path (unchanged); the cap reads on the sidebar chip, the rail, and the hub line.</li>
+      </ul>
+    </div>
+    <div style="border-radius:12px;border:1px solid #282838;background:#141420;padding:20px 22px;display:flex;flex-direction:column;gap:10px">
+      <h2 style="margin:0;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#9292a4">Growth rules</h2>
+      <ul style="margin:0;padding-left:16px;font-size:12.5px;line-height:19px;color:#b7b7c6;display:flex;flex-direction:column;gap:6px">
+        <li>A new kind is a new hub tile and a new rail item — server-only, no client release (same contract as today).</li>
+        <li>Kinds with more than ~8 widgets must carry groups (Soccer, Motorsport, Business, Dev…). Under that, the group header is hidden.</li>
+        <li>Group pills in the directory header become jump anchors once a kind passes ~24 rows; add an A–Z sort past ~60.</li>
+        <li>Hub tiles show 5 logos + “+n”; the “n new” tag uses <code style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#9292a4">added_at</code> within 30 days.</li>
+        <li>“New this month” caps at 4; overflow goes to a “See all new” link into the directory sorted by date.</li>
+        <li>The rail scrolls independently; at 12+ kinds it still fits without collapsing.</li>
+      </ul>
+    </div>
+    <div style="border-radius:12px;border:1px solid #282838;background:#141420;padding:20px 22px;display:flex;flex-direction:column;gap:10px">
+      <h2 style="margin:0;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#9292a4">Catalog schema additions</h2>
+      <ul style="margin:0;padding-left:16px;font-size:12.5px;line-height:19px;color:#b7b7c6;display:flex;flex-direction:column;gap:6px">
+        <li><code style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#e2e2ec">group</code> — sub-shelf label inside a category (“Soccer”). Optional; missing → ungrouped.</li>
+        <li><code style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#e2e2ec">keywords[]</code> — search aliases (“bitcoin btc eth”). Included in the match haystack with name, description, group, category.</li>
+        <li><code style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#e2e2ec">added_at</code> — drives “new” tags and the New this month strip.</li>
+        <li><code style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#e2e2ec">POST /catalog/requests</code> — { query, user } ; returns count. Powers the miss card and the roadmap.</li>
+        <li>Category order stays server-defined; the hub grid is 4-across so 7–8 kinds fill two rows with the “Something else?” tile last.</li>
+      </ul>
+      <div style="margin-top:6px;padding-top:10px;border-top:1px solid #282838;font-size:12px;line-height:18px;color:#78788a">Reused as-is: TopBar, Sidebar, WidgetBar chassis, Segmented, CatalogCard compact row anatomy, WidgetPanel, SlotPills, tokens and type scale.</div>
+    </div>
+  </div>
+</section>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0b12;font-family:"Plus Jakarta Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;color:#e2e2ec}
+*{box-sizing:border-box}
+a{color:#34d399}a:hover{color:#6ee7b7}
+button,input{font-family:inherit}
+input::placeholder{color:#78788a}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:#303040;border-radius:4px}::-webkit-scrollbar-track{background:transparent}
+</style>
+</helmet>
+<div style="width:1144px;height:787px;display:flex;flex-direction:column;background:#1c1c2a;color:#e2e2ec;overflow:hidden;border:1px solid #2b2b3a;border-radius:8px;font-size:13px;line-height:20px">
+  <div style="display:flex;align-items:center;height:38px;flex-shrink:0;padding:0 12px;gap:8px;user-select:none">
+    <div style="display:flex;height:28px;align-items:center;gap:8px;padding:0 6px">
+      <svg viewBox="0 0 639 639" style="width:20px;height:20px;flex-shrink:0"><g transform="translate(0,639) scale(0.1,-0.1)" fill="#34d399"><path d="M4870 6321 c-100 -32 -157 -70 -215 -140 l-29 -36 41 37 c329 291 807 -68 501 -375 -132 -132 -60 -130 -1750 -66 -1538 57 -1544 57 -1792 9 -1687 -328 -1763 -2552 -101 -2980 253 -65 227 -64 1750 -65 1531 0 1427 4 1568 -66 371 -184 376 -666 9 -858 -160 -83 43 -75 -2157 -81 -2131 -6 -2047 -4 -2225 -61 -234 -74 -312 -243 -250 -539 54 -254 193 -701 256 -821 145 -275 578 -316 759 -72 l28 38 -39 -36 c-279 -257 -732 -25 -564 289 84 158 228 208 560 195 354 -13 3176 -93 3313 -93 895 0 1529 475 1690 1264 188 928 -386 1701 -1383 1862 -108 18 -198 19 -1510 19 l-1395 0 -78 22 c-556 158 -528 849 38 968 60 12 287 15 1525 15 1678 0 1780 4 1990 72 190 61 284 172 283 333 -2 156 -215 857 -302 991 -105 164 -326 238 -521 175z"></path></g><circle cx="492" cy="39" r="20" fill="#e2e2ec" opacity="0.6"></circle><circle cx="97" cy="599" r="20" fill="#e2e2ec" opacity="0.6"></circle></svg>
+      <span style="font-size:13px;font-weight:600;letter-spacing:-0.01em">Scrollr</span>
+    </div>
+    <div style="width:1px;height:20px;background:rgba(40,40,56,.4);margin:0 4px;flex-shrink:0"></div>
+    <div style="display:flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:6px;color:#9292a4"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path><path d="m16 15-3-3 3-3"></path></svg></div>
+    <div style="width:1px;height:20px;background:rgba(40,40,56,.4);margin:0 4px;flex-shrink:0"></div>
+    <div style="display:flex;align-items:center;gap:2px;flex-shrink:0">
+      <div style="display:flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:6px;color:#b7b7c6;cursor:pointer" onClick="{{ goHub }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></div>
+      <div style="display:flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:6px;color:rgba(120,120,138,.4)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></div>
+    </div>
+    <div style="width:1px;height:20px;background:rgba(40,40,56,.4);margin:0 4px;flex-shrink:0"></div>
+    <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;font-size:12px;line-height:18px">
+      <span style="font-weight:600;color:#e2e2ec;cursor:pointer" onClick="{{ goHub }}">Catalog</span>
+      <sc-if value="{{ isDir }}" hint-placeholder-val="{{ false }}"><span style="color:#78788a">/</span><span style="color:#9292a4">{{ crumb }}</span></sc-if>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:6px;background:rgba(52,211,153,.15);color:#34d399;font-size:11px;line-height:16px;font-weight:500"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9"></path><path d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5"></path><circle cx="12" cy="9" r="2"></circle><path d="M16.2 4.8c2 2 2.26 5.11.8 7.47"></path><path d="M19.1 1.9a9.96 9.96 0 0 1 0 14.1"></path><path d="M9.5 18h5"></path><path d="m8 22 4-11 4 11"></path></svg><span>Ticker</span></div>
+    </div>
+    <div style="display:flex;align-self:stretch;margin-left:4px;margin-right:-12px;color:#9292a4">
+      <div style="display:flex;width:44px;align-items:center;justify-content:center"><svg width="10" height="1" viewBox="0 0 10 1"><rect fill="currentColor" width="10" height="1" rx="0.5"></rect></svg></div>
+      <div style="display:flex;width:44px;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="1" y="1" width="8" height="8" rx="1" stroke="currentColor" stroke-width="1.2"></rect></svg></div>
+      <div style="display:flex;width:44px;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg></div>
+    </div>
+  </div>
+  <div style="display:flex;flex:1;min-height:0;overflow:hidden;padding:0 6px 6px 0">
+    <aside style="width:200px;flex-shrink:0;display:flex;flex-direction:column;height:100%;overflow:hidden;user-select:none">
+      <nav style="padding:8px;display:flex;flex-direction:column;gap:2px;flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:8px;font-weight:500;color:#9292a4"><span style="display:flex;width:20px;height:20px;align-items:center;justify-content:center;flex-shrink:0"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></span><span>Home</span></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:8px;font-weight:500;color:#9292a4"><span style="display:flex;width:20px;height:20px;align-items:center;justify-content:center;flex-shrink:0"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" x2="14" y1="4" y2="4"></line><line x1="10" x2="3" y1="4" y2="4"></line><line x1="21" x2="12" y1="12" y2="12"></line><line x1="8" x2="3" y1="12" y2="12"></line><line x1="21" x2="16" y1="20" y2="20"></line><line x1="12" x2="3" y1="20" y2="20"></line><line x1="14" x2="14" y1="2" y2="6"></line><line x1="8" x2="8" y1="10" y2="14"></line><line x1="16" x2="16" y1="18" y2="22"></line></svg></span><span>Settings</span></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:8px;font-weight:500;color:#34d399;background:rgba(52,211,153,.15);cursor:pointer" onClick="{{ goHub }}"><span style="display:flex;width:20px;height:20px;align-items:center;justify-content:center;flex-shrink:0"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></span><span>{{ addLabel }}</span><sc-if value="{{ isFree }}" hint-placeholder-val="{{ false }}"><span style="margin-left:auto;font-size:12px;color:#78788a">{{ railSlots }}</span></sc-if></div>
+      </nav>
+      <nav style="padding:8px;display:flex;flex-direction:column;gap:2px;flex:1;min-height:0;overflow-y:auto">
+        <h2 style="padding:0 10px;margin:0 0 4px;font-size:11px;line-height:16px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9292a4">Widgets</h2>
+        <sc-for list="{{ sidebarList }}" as="s" hint-placeholder-count="13">
+          <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:8px;font-weight:500;color:#9292a4;min-width:0">
+            <span style="display:flex;width:20px;height:20px;align-items:center;justify-content:center;flex-shrink:0">
+              <sc-if value="{{ s.hasLogo }}" hint-placeholder-val="{{ true }}"><img src="{{ s.logoUrl }}" alt="" style="width:16px;height:16px;border-radius:4px;object-fit:contain;background:{{ s.logoBg }};padding:{{ s.logoPad }}"></sc-if>
+              <sc-if value="{{ s.noLogo }}" hint-placeholder-val="{{ false }}"><span style="display:flex;width:16px;height:16px;align-items:center;justify-content:center;border-radius:4px;color:#fff;background:{{ s.tileBg }}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ s.iconPath }}"></path></svg></span></sc-if>
+            </span>
+            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.name }}</span>
+          </div>
+        </sc-for>
+      </nav>
+      <div style="padding:8px;display:flex;align-items:center;gap:4px;flex-shrink:0">
+        <div style="flex:1;display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:8px;min-width:0">
+          <span style="position:relative;display:flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:50%;background:rgba(52,211,153,.15);color:#34d399;font-size:11px;font-weight:600;flex-shrink:0">D<span style="position:absolute;bottom:-2px;right:-2px;display:flex;width:14px;height:14px;align-items:center;justify-content:center;border-radius:50%;border:1px solid #141420;background:#141420;color:#22c55e"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></svg></span></span>
+          <span style="display:flex;flex-direction:column;min-width:0;line-height:1.25"><span style="font-size:13px;font-weight:500;color:#b7b7c6">doni</span><span style="font-size:12px;color:#78788a">Super User</span></span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:auto;color:#78788a;flex-shrink:0"><path d="m6 9 6 6 6-6"></path></svg>
+        </div>
+      </div>
+    </aside>
+    <main style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;position:relative;background:#141420;border-radius:12px;border:1px solid rgba(40,40,56,.5)">
+
+      <sc-if value="{{ isHub }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1;min-height:0;overflow-y:auto;scrollbar-gutter:stable;padding:0 20px 20px">
+          <div style="max-width:880px;margin:0 auto;padding:44px 0 28px">
+            <h1 style="margin:0 0 14px;text-align:center;font-size:22px;line-height:28px;font-weight:700;letter-spacing:-0.01em;color:#e2e2ec">What do you want on your ticker?</h1>
+            <div style="position:relative;max-width:640px;margin:0 auto 10px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#78788a;pointer-events:none"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+              <input type="search" value="{{ query }}" onChange="{{ onSearch }}" placeholder="Search {{ total }} widgets — a league, a publication, a tool" style="width:100%;height:44px;border-radius:10px;border:1px solid rgba(52,211,153,.35);background:#20202b;padding:0 14px 0 40px;font-size:14px;color:#e2e2ec;outline:none;box-shadow:0 0 0 3px rgba(52,211,153,.08)">
+            </div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;margin-bottom:32px;font-size:12px;line-height:18px;color:#78788a">
+              <span>Try</span>
+              <sc-for list="{{ tries }}" as="t" hint-placeholder-count="6"><span onClick="{{ t.go }}" style="border-radius:999px;border:1px solid rgba(40,40,56,.8);padding:2px 10px;color:#9292a4;white-space:nowrap;cursor:pointer" style-hover="border-color:#303040;color:#b7b7c6">{{ t.label }}</span></sc-for>
+            </div>
+            <h2 style="margin:0 0 10px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:16px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9292a4">Browse by kind</h2>
+            <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:26px">
+              <sc-for list="{{ hubs }}" as="h" hint-placeholder-count="7">
+                <div onClick="{{ h.go }}" style="position:relative;overflow:hidden;display:flex;flex-direction:column;gap:10px;border-radius:12px;border:1px solid rgba(40,40,56,.55);background:#20202b;padding:12px 12px 10px;min-height:104px;cursor:pointer" style-hover="border-color:#303040">
+                  <div style="position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom, {{ h.wash }}, transparent 60%)"></div>
+                  <div style="position:relative;display:flex;align-items:flex-start;gap:8px">
+                    <div style="min-width:0;flex:1">
+                      <div style="font-size:14px;line-height:20px;font-weight:700;color:#e2e2ec">{{ h.label }}</div>
+                      <div style="font-size:11.5px;line-height:16px;color:#9292a4">{{ h.blurb }}</div>
+                    </div>
+                    <span style="border-radius:999px;background:rgba(23,23,38,.9);padding:1px 7px;font-size:11px;line-height:16px;font-weight:600;color:#9292a4;flex-shrink:0">{{ h.count }}</span>
+                  </div>
+                  <div style="position:relative;display:flex;align-items:center;gap:5px;margin-top:auto">
+                    <sc-for list="{{ h.logos }}" as="w" hint-placeholder-count="5">
+                      <sc-if value="{{ w.hasLogo }}" hint-placeholder-val="{{ true }}"><img src="{{ w.logoUrl }}" alt="" style="width:22px;height:22px;border-radius:5px;object-fit:contain;background:{{ w.logoBg }};padding:{{ w.logoPad }}"></sc-if>
+                      <sc-if value="{{ w.noLogo }}" hint-placeholder-val="{{ false }}"><span style="display:flex;width:22px;height:22px;align-items:center;justify-content:center;border-radius:5px;color:#fff;background:{{ w.tileBg }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ w.iconPath }}"></path></svg></span></sc-if>
+                    </sc-for>
+                    <span style="font-size:11px;line-height:16px;color:#78788a;margin-left:2px">{{ h.more }}</span>
+                    <span style="margin-left:auto;display:flex;gap:6px;font-size:11px;line-height:16px;white-space:nowrap"><span style="color:#a855f7;font-weight:500">{{ h.newLabel }}</span><span style="color:#34d399;font-weight:500">{{ h.addedLabel }}</span></span>
+                  </div>
+                </div>
+              </sc-for>
+              <div style="display:flex;flex-direction:column;justify-content:center;gap:3px;border-radius:12px;border:1px dashed rgba(40,40,56,.8);padding:12px;min-height:104px">
+                <div style="font-size:13px;line-height:18px;font-weight:600;color:#e2e2ec">Something else?</div>
+                <div style="font-size:11.5px;line-height:16px;color:#78788a">Paste any RSS feed, or tell us what's missing.</div>
+                <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><span style="border-radius:7px;border:1px solid rgba(40,40,56,.8);padding:3px 9px;font-size:11px;line-height:16px;font-weight:500;color:#9292a4;white-space:nowrap">Custom RSS</span><span style="border-radius:7px;border:1px solid rgba(40,40,56,.8);padding:3px 9px;font-size:11px;line-height:16px;font-weight:500;color:#9292a4;white-space:nowrap">Request</span></div>
+              </div>
+            </div>
+            <h2 style="margin:0 0 8px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:16px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9292a4">New this month</h2>
+            <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:26px">
+              <sc-for list="{{ fresh }}" as="w" hint-placeholder-count="4">
+                <div style="position:relative;display:flex;align-items:center;gap:10px;overflow:hidden;border-radius:10px;border:1px solid rgba(40,40,56,.55);background:#20202b;padding:7px 10px">
+                  <div style="position:absolute;inset:0;pointer-events:none;background:linear-gradient(to right, {{ w.wash }}, transparent 70%)"></div>
+                  <div style="position:relative;display:flex;width:100%;align-items:center;gap:10px">
+                    <sc-if value="{{ w.hasLogo }}" hint-placeholder-val="{{ true }}"><img src="{{ w.logoUrl }}" alt="" style="width:28px;height:28px;border-radius:7px;object-fit:contain;flex-shrink:0;background:{{ w.logoBg }};padding:{{ w.logoPad }}"></sc-if>
+                    <sc-if value="{{ w.noLogo }}" hint-placeholder-val="{{ false }}"><span style="display:flex;width:28px;height:28px;flex-shrink:0;align-items:center;justify-content:center;border-radius:7px;color:#fff;background:{{ w.tileBg }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ w.iconPath }}"></path></svg></span></sc-if>
+                    <span style="min-width:0;flex:1;display:flex;flex-direction:column;line-height:15px"><span style="font-size:12.5px;font-weight:600;color:#e2e2ec;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ w.name }}</span><span style="font-size:11px;color:#78788a">{{ w.categoryLabel }} · {{ w.group }}</span></span>
+                    <sc-if value="{{ w.added }}" hint-placeholder-val="{{ false }}"><span onClick="{{ w.toggle }}" style="display:flex;width:24px;height:24px;flex-shrink:0;align-items:center;justify-content:center;border-radius:6px;background:rgba(52,211,153,.14);color:#34d399;cursor:pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></sc-if>
+                    <sc-if value="{{ w.notAdded }}" hint-placeholder-val="{{ true }}"><span onClick="{{ w.toggle }}" style="display:flex;width:24px;height:24px;flex-shrink:0;align-items:center;justify-content:center;border-radius:6px;border:1px solid rgba(40,40,56,.7);color:#34d399;cursor:pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></span></sc-if>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <h2 style="margin:0;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:16px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9292a4">In your ticker</h2>
+              <span style="margin-left:auto;font-size:11px;line-height:16px;color:#78788a">{{ slotLabel }}</span>
+              <sc-if value="{{ capped }}" hint-placeholder-val="{{ false }}"><span style="border-radius:8px;background:rgba(251,191,36,.15);color:#fbbf24;padding:3px 10px;font-size:11px;line-height:16px;font-weight:600">Upgrade for unlimited</span></sc-if>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <sc-for list="{{ your }}" as="w" hint-placeholder-count="13">
+                <div style="display:flex;align-items:center;gap:7px;border-radius:8px;border:1px solid rgba(40,40,56,.55);background:#20202b;padding:5px 9px 5px 6px">
+                  <sc-if value="{{ w.hasLogo }}" hint-placeholder-val="{{ true }}"><img src="{{ w.logoUrl }}" alt="" style="width:16px;height:16px;border-radius:4px;object-fit:contain;background:{{ w.logoBg }};padding:{{ w.logoPad }}"></sc-if>
+                  <sc-if value="{{ w.noLogo }}" hint-placeholder-val="{{ false }}"><span style="display:flex;width:16px;height:16px;align-items:center;justify-content:center;border-radius:4px;color:#fff;background:{{ w.tileBg }}"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ w.iconPath }}"></path></svg></span></sc-if>
+                  <span style="font-size:12px;line-height:18px;font-weight:500;color:#e2e2ec;white-space:nowrap">{{ w.name }}</span>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isDir }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:8px 12px;border-bottom:1px solid rgba(40,40,56,.3);flex-shrink:0">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-height:30px">
+            <div style="position:relative;width:300px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#78788a;pointer-events:none"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+              <input type="search" value="{{ query }}" onChange="{{ onSearch }}" placeholder="Search {{ total }} widgets" style="width:100%;border-radius:7px;border:1px solid rgba(40,40,56,.8);background:#20202b;padding:6px 10px 6px 28px;font-size:12px;line-height:18px;color:#e2e2ec;outline:none">
+            </div>
+            <sc-if value="{{ hasQuery }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;line-height:18px;color:#78788a">{{ resultSummary }}</span></sc-if>
+            <sc-if value="{{ capped }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:6px;font-size:11px;line-height:16px;color:#fbbf24;background:rgba(251,191,36,.12);border-radius:8px;padding:4px 10px;font-weight:600;white-space:nowrap">All 6 slots used · remove one to swap, or upgrade</span></sc-if>
+            <div style="margin-left:auto;display:flex;flex-shrink:0;align-items:center;gap:2px;border-radius:8px;border:1px solid rgba(40,40,56,.3);background:rgba(23,23,38,.6);padding:2px;font-size:12px;line-height:18px;font-weight:500;color:#9292a4;white-space:nowrap">
+              <span style="padding:2px 10px;border-radius:6px;background:rgba(52,211,153,.15);color:#34d399;font-weight:600">By kind</span><span style="padding:2px 10px">A–Z</span><span style="padding:2px 10px">Popular</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex:1;min-height:0">
+          <nav style="width:184px;flex-shrink:0;border-right:1px solid rgba(40,40,56,.4);padding:10px 8px;display:flex;flex-direction:column;gap:2px;overflow-y:auto">
+            <div onClick="{{ goHub }}" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;font-size:12.5px;font-weight:500;color:#9292a4;cursor:pointer" style-hover="background:#1c1c2a"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg><span>Overview</span></div>
+            <div style="height:1px;background:rgba(40,40,56,.5);margin:6px 10px"></div>
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;font-size:12.5px;font-weight:500;color:#e2e2ec">
+              <span style="display:flex;width:16px;height:16px;align-items:center;justify-content:center;border-radius:4px;background:rgba(52,211,153,.15);color:#34d399"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>
+              <span style="flex:1">Your ticker</span><span style="font-size:11px;color:#78788a">{{ railSlots }}</span>
+            </div>
+            <div style="height:1px;background:rgba(40,40,56,.5);margin:6px 10px"></div>
+            <sc-for list="{{ rail }}" as="c" hint-placeholder-count="8">
+              <div onClick="{{ c.go }}" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;font-size:12.5px;font-weight:500;cursor:pointer;color:{{ c.fg }};background:{{ c.bg }}"><span style="flex:1">{{ c.label }}</span><span style="font-size:11px;color:{{ c.countFg }}">{{ c.count }}</span></div>
+            </sc-for>
+            <div style="margin-top:auto;padding:10px 10px 4px;font-size:11px;line-height:16px;color:#78788a">Don't see it? <a href="#" style="color:#9292a4;text-decoration:underline;text-decoration-color:rgba(146,146,164,.4)">Request a widget</a></div>
+          </nav>
+          <div style="flex:1;min-width:0;overflow-y:auto;scrollbar-gutter:stable;padding:16px 20px 28px">
+
+            <sc-if value="{{ isMiss }}" hint-placeholder-val="{{ false }}">
+              <section style="display:flex;align-items:center;gap:16px;border-radius:12px;border:1px solid rgba(40,40,56,.6);background:rgba(23,23,38,.6);padding:14px 16px;margin-bottom:22px">
+                <div style="min-width:0;flex:1">
+                  <div style="font-size:14px;line-height:20px;font-weight:700;color:#e2e2ec">No “{{ missName }}” widget yet</div>
+                  <div style="font-size:12px;line-height:18px;color:#9292a4;margin-top:2px">Requests are counted and the most-asked ones ship first — we'll tell you when it lands. Below are the closest things we do have.</div>
+                </div>
+                <span style="flex-shrink:0;display:flex;align-items:center;gap:6px;border-radius:8px;background:#34d399;color:#0b1a14;padding:7px 12px;font-size:12px;line-height:18px;font-weight:600;white-space:nowrap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>Request {{ missName }}</span>
+                <span style="flex-shrink:0;border-radius:8px;border:1px solid rgba(40,40,56,.9);padding:7px 12px;font-size:12px;line-height:18px;font-weight:500;color:#9292a4;white-space:nowrap">Use a custom RSS feed</span>
+              </section>
+            </sc-if>
+
+            <sc-for list="{{ blocks }}" as="b" hint-placeholder-count="1">
+              <div style="margin-bottom:22px">
+                <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+                  <h1 style="margin:0;font-size:16px;line-height:22px;font-weight:700;color:#e2e2ec">{{ b.title }}</h1>
+                  <span style="font-size:12px;color:#78788a;white-space:nowrap">{{ b.sub }}</span>
+                  <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;font-size:11px;line-height:16px;color:#9292a4">
+                    <sc-for list="{{ b.pills }}" as="g" hint-placeholder-count="4"><span style="padding:2px 8px;border-radius:999px;border:1px solid rgba(40,40,56,.7);white-space:nowrap">{{ g.key }}</span></sc-for>
+                  </div>
+                </div>
+                <sc-for list="{{ b.groups }}" as="g" hint-placeholder-count="4">
+                  <section style="margin-bottom:16px">
+                    <sc-if value="{{ g.showHead }}" hint-placeholder-val="{{ true }}">
+                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;padding:0 10px">
+                        <h2 style="margin:0;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:16px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9292a4;white-space:nowrap">{{ g.key }}</h2>
+                        <span style="font-size:11px;line-height:16px;color:#78788a">{{ g.count }}</span>
+                        <div style="flex:1;height:1px;background:rgba(40,40,56,.5)"></div>
+                      </div>
+                    </sc-if>
+                    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 12px">
+                      <sc-for list="{{ g.items }}" as="w" hint-placeholder-count="4">
+                        <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:8px;min-width:0" style-hover="background:#1c1c2a">
+                          <sc-if value="{{ w.hasLogo }}" hint-placeholder-val="{{ true }}"><img src="{{ w.logoUrl }}" alt="" style="width:26px;height:26px;border-radius:6px;object-fit:contain;flex-shrink:0;background:{{ w.logoBg }};padding:{{ w.logoPad }}"></sc-if>
+                          <sc-if value="{{ w.noLogo }}" hint-placeholder-val="{{ false }}"><span style="display:flex;width:26px;height:26px;flex-shrink:0;align-items:center;justify-content:center;border-radius:6px;color:#fff;background:{{ w.tileBg }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ w.iconPath }}"></path></svg></span></sc-if>
+                          <div style="min-width:0;flex:1;display:flex;flex-direction:column;line-height:16px">
+                            <span style="font-size:12.5px;font-weight:600;color:#e2e2ec;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ w.name }}</span>
+                            <span style="font-size:11px;color:#78788a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ w.description }}</span>
+                          </div>
+                          <sc-if value="{{ w.added }}" hint-placeholder-val="{{ false }}"><span onClick="{{ w.toggle }}" style="display:flex;width:24px;height:24px;flex-shrink:0;align-items:center;justify-content:center;border-radius:6px;background:rgba(52,211,153,.14);color:#34d399;cursor:pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></sc-if>
+                          <sc-if value="{{ w.notAdded }}" hint-placeholder-val="{{ true }}"><span onClick="{{ w.toggle }}" style="display:flex;width:24px;height:24px;flex-shrink:0;align-items:center;justify-content:center;border-radius:6px;border:1px solid rgba(40,40,56,.7);color:#34d399;cursor:pointer" style-hover="border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></span></sc-if>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </section>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1160,&quot;height&quot;:800},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;hub&quot;,&quot;dir&quot;],&quot;default&quot;:&quot;hub&quot;,&quot;tsType&quot;:&quot;'hub' | 'dir'&quot;,&quot;section&quot;:&quot;Start state&quot;},&quot;cat&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;all&quot;,&quot;sports&quot;,&quot;finance&quot;,&quot;news&quot;,&quot;fantasy&quot;,&quot;predictions&quot;,&quot;utility&quot;,&quot;gaming&quot;],&quot;default&quot;:&quot;all&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Start state&quot;},&quot;query&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Start state&quot;},&quot;tier&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;unlimited&quot;,&quot;free&quot;],&quot;default&quot;:&quot;unlimited&quot;,&quot;tsType&quot;:&quot;'unlimited' | 'free'&quot;,&quot;section&quot;:&quot;Account&quot;}}">
+class Component extends DCLogic {
+  state = { d: null, view: null, cat: null, query: null, added: null };
+  componentDidMount() { import("./catalog-data.js").then((d) => this.setState({ d, added: [...d.ADDED] })); }
+  renderVals() {
+    const d = this.state.d;
+    if (!d) return {};
+    const view = this.state.view ?? this.props.view ?? "hub";
+    const cat = this.state.cat ?? this.props.cat ?? "all";
+    const query = this.state.query ?? this.props.query ?? "";
+    const free = (this.props.tier ?? "unlimited") === "free";
+    const CAP = 6;
+    const FREE_ADDED = ["finance_stocks", "sports_mlb", "sports_ncaaf", "news_guardian", "clock", "weather"];
+    const added = free && !this.state.added_touched ? FREE_ADDED : this.state.added;
+    const NEW = ["sports_bundesliga", "news_reuters", "vercel", "twitch"];
+    const capped = free && added.length >= CAP;
+    const all = [...d.WIDGETS, ...d.FUTURE].map((w) => ({
+      ...d.decorate(w, added), notAdded: !added.includes(w.id), isNew: NEW.includes(w.id),
+      toggle: (e) => { e.stopPropagation(); this.setState((s) => { const cur = free && !s.added_touched ? FREE_ADDED : s.added; if (!cur.includes(w.id) && free && cur.length >= CAP) return {}; return { added_touched: true, added: cur.includes(w.id) ? cur.filter((x) => x !== w.id) : [...cur, w.id] }; }); },
+    }));
+    const find = (id) => all.find((i) => i.id === id);
+    const cats = d.FUTURE_CATEGORIES;
+    const label = (id) => (cats.find((c) => c.id === id) || { label: "All widgets" }).label;
+    const order = ["Football", "Basketball", "Baseball", "Hockey", "Soccer", "Motorsport", "Combat", "Golf & Tennis", "Cricket & Rugby", "Markets", "Calendar", "World", "Business", "Tech & Science", "Sports & Culture", "Social", "Desk", "Dev"];
+    const grp = (list) => d.groupBy(list, "group").sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)).map((g) => ({ ...g, showHead: true }));
+    const go = (patch) => () => this.setState(patch);
+    const blurbs = { sports: "Live scores from the leagues you follow", finance: "Quotes, watchlists and calendars", news: "Headlines from publications and feeds", fantasy: "Your leagues, matchups and standings", predictions: "Live odds from prediction markets", utility: "Clocks, weather, dev status and more", gaming: "Streams, esports and store watch" };
+    const hubWash = { sports: "#0b427a", finance: "#16a34a", news: "#b80000", fantasy: "#6001d2", predictions: "#1fc9a0", utility: "#6366f1", gaming: "#9146ff" };
+
+    // Blocks: one titled section per category in view.
+    const q = query.trim().toLowerCase();
+    // Aliases: what people type that the name/description doesn't contain. Would be a server-side `keywords` field.
+    const aliases = { finance_crypto: "bitcoin btc eth ethereum solana coins", finance_stocks: "shares etf s&p nasdaq dow tickers", predictions: "odds prediction market bets", news_hackernews: "hn ycombinator tech startups", sports_ncaaf: "college football cfb", sports_ncaab: "college basketball march madness", sports_f1: "formula 1 formula one grand prix", sports_ufc: "mma fights", sports_premierleague: "epl english soccer football", sports_laliga: "spanish soccer", sports_mls: "american soccer", sports_championsleague: "ucl uefa europe", weather: "forecast temperature rain", sysmon: "cpu gpu ram memory", github: "actions ci pull requests", timer: "pomodoro stopwatch countdown", clock: "time timezone world clock" };
+    let blocks = [], isMiss = false, missName = "", resultSummary = "";
+    if (q) {
+      const hits = all.filter((w) => `${w.name} ${w.description} ${w.group} ${w.categoryLabel} ${aliases[w.id] || ""}`.toLowerCase().includes(q));
+      if (hits.length) {
+        resultSummary = `${hits.length} match${hits.length === 1 ? "" : "es"}`;
+        blocks = cats.filter((c) => hits.some((w) => w.category === c.id)).map((c) => {
+          const list = hits.filter((w) => w.category === c.id);
+          return { title: c.label, sub: `${list.length} match${list.length === 1 ? "" : "es"}`, pills: [], groups: [{ key: "", count: list.length, items: list, showHead: false }] };
+        });
+      } else {
+        isMiss = true;
+        missName = query.trim().replace(/\b\w/g, (m) => m.toUpperCase());
+        resultSummary = "0 exact matches";
+        const hints = [["liga", "Soccer"], ["serie", "Soccer"], ["eredivisie", "Soccer"], ["league", "Soccer"], ["fc", "Soccer"], ["cup", "Soccer"], ["ball", "Basketball"], ["hockey", "Hockey"], ["race", "Motorsport"], ["gp", "Motorsport"], ["fight", "Combat"], ["tennis", "Golf & Tennis"], ["golf", "Golf & Tennis"], ["cricket", "Cricket & Rugby"], ["rugby", "Cricket & Rugby"], ["news", "World"], ["times", "World"], ["post", "World"], ["journal", "Business"], ["tech", "Tech & Science"], ["coin", "Markets"], ["stock", "Markets"], ["etf", "Markets"], ["ci", "Dev"], ["deploy", "Dev"], ["twitch", "Gaming"], ["game", "Gaming"]];
+        const hit = hints.find(([k]) => q.includes(k));
+        const group = hit ? hit[1] : (cat !== "all" ? null : "Soccer");
+        const list = group ? all.filter((w) => w.group === group) : all.filter((w) => w.category === cat);
+        blocks = [{ title: "Closest matches", sub: group || label(cat), pills: [], groups: [{ key: "", count: list.length, items: list, showHead: false }] }];
+      }
+    } else if (cat === "all") {
+      blocks = cats.map((c) => { const list = all.filter((w) => w.category === c.id); const groups = grp(list); return { title: c.label, sub: `${list.length} · ${list.filter((w) => w.added).length} in your ticker`, pills: groups.length > 1 ? groups : [], groups }; });
+    } else {
+      const list = all.filter((w) => w.category === cat); const groups = grp(list);
+      blocks = [{ title: label(cat), sub: `${list.length} widgets · ${list.filter((w) => w.added).length} in your ticker`, pills: groups.length > 1 ? groups : [], groups }];
+    }
+
+    return {
+      isHub: view === "hub", isDir: view === "dir", hasQuery: Boolean(q), isMiss, missName, resultSummary,
+      query, crumb: q ? `Search “${query.trim()}”` : label(cat),
+      total: all.length, yourCount: added.length,
+      slotLabel: free ? `${added.length} of ${CAP} slots used` : `${added.length} added · unlimited slots`,
+      railSlots: free ? `${added.length}/${CAP}` : String(added.length),
+      capped, isFree: free,
+      fresh: NEW.map(find),
+      sidebarList: free ? FREE_ADDED.map(find) : d.SIDEBAR.map(find),
+      addLabel: capped ? "Get more slots" : "Add widget",
+      sidebar: d.SIDEBAR.map(find),
+      your: all.filter((w) => w.added),
+      goHub: go({ view: "hub", query: "" }),
+      onSearch: (e) => this.setState({ query: e.target.value, view: "dir" }),
+      tries: ["NFL", "Bitcoin", "Weather", "Hacker News", "Kalshi", "Eredivisie"].map((t) => ({ label: t, go: go({ view: "dir", cat: "all", query: t }) })),
+      hubs: cats.map((c) => { const list = all.filter((w) => w.category === c.id); const n = list.filter((w) => w.added).length; const nw = list.filter((w) => w.isNew).length; return { ...c, count: list.length, blurb: blurbs[c.id], wash: hubWash[c.id] + "26", logos: list.slice(0, 5), more: list.length > 5 ? `+${list.length - 5}` : "", addedLabel: n ? `${n} added` : "", newLabel: nw ? `${nw} new` : "", go: go({ view: "dir", cat: c.id, query: "" }) }; }),
+      rail: [{ id: "all", label: "All widgets" }, ...cats].map((c) => { const active = !q && c.id === cat; const count = c.id === "all" ? all.length : all.filter((w) => w.category === c.id).length; return { ...c, count, fg: active ? "#34d399" : "#9292a4", bg: active ? "rgba(52,211,153,.12)" : "transparent", countFg: active ? "rgba(52,211,153,.7)" : "#78788a", go: go({ cat: c.id, query: "" }) }; }),
+      blocks,
+    };
+  }
+}
+</script>
+</body>
+</html>
