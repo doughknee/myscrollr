@@ -262,6 +262,29 @@ pub fn run() {
             // ── System tray ──────────────────────────────────────
             tray::setup(app)?;
 
+            // ── Start in the background ──────────────────────────
+            // `startup.startInBackground` (Settings → Startup, saved by
+            // the JS side under `scrollr:settings` in scrollr.json) keeps
+            // the main window hidden at launch: only the ticker comes up.
+            // tauri.conf.json starts `main` with `visible: false` so this
+            // decides before anything paints. The hidden webview still
+            // runs, so it keeps driving the ticker as usual; the tray's
+            // "Open Scrollr", a second launch and the dock show it.
+            {
+                use tauri_plugin_store::StoreExt;
+                let in_background = app
+                    .store("scrollr.json")
+                    .ok()
+                    .and_then(|s| s.get("scrollr:settings"))
+                    .and_then(|v| v.pointer("/startup/startInBackground")?.as_bool())
+                    .unwrap_or(false);
+                if in_background {
+                    log::info!("startInBackground: keeping the main window hidden");
+                } else if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.show();
+                }
+            }
+
             Ok(())
         })
         .build(tauri::generate_context!())

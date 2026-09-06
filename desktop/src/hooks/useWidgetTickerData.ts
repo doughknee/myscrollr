@@ -560,8 +560,9 @@ export function useWidgetTickerData(
         })
       : null;
 
-    // Sysmon: poll Tauri IPC at the configured interval
-    const sysmonMs = (widgetPrefs.sysmon.refreshInterval || 2) * 1000;
+    // Sysmon: poll Tauri IPC every 2 s (same cadence as the feed tab;
+    // fixed since REL-206 dropped the inert "Every Ns" select)
+    const sysmonMs = 2_000;
     const sysmonInterval = hasSysmon
       ? setInterval(async () => {
           try {
@@ -573,16 +574,17 @@ export function useWidgetTickerData(
         }, sysmonMs)
       : null;
 
-    // Uptime: re-read cached store data at poll cadence (FeedTab does the actual fetching)
-    const uptimeMs = (widgetPrefs.uptime.pollInterval || 60) * 1000;
+    // Uptime: re-read cached store data at the FeedTab's fixed poll
+    // cadence (the FeedTab does the actual fetching)
+    const uptimeMs = 60_000;
     const uptimeInterval = hasUptime
       ? setInterval(() => {
           setData((prev) => ({ ...prev, uptime: buildUptimeChips() }));
         }, uptimeMs)
       : null;
 
-    // GitHub: re-read cached store data at poll cadence (FeedTab does the actual fetching)
-    const githubMs = (widgetPrefs.github.pollInterval || 120) * 1000;
+    // GitHub: same, at the GitHub FeedTab's fixed cadence
+    const githubMs = 120_000;
     const githubInterval = hasGithub
       ? setInterval(() => {
           setData((prev) => ({ ...prev, github: buildGithubChips() }));
@@ -618,9 +620,6 @@ export function useWidgetTickerData(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     JSON.stringify(widgetPrefs.widgetsOnTicker),
-    widgetPrefs.sysmon.refreshInterval,
-    widgetPrefs.uptime.pollInterval,
-    widgetPrefs.github.pollInterval,
     buildClockChips,
     buildTimerChips,
     buildWeatherChips,

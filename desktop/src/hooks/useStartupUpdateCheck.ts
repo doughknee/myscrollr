@@ -28,19 +28,16 @@ const STARTUP_DELAY_MS = 4_000;
 const TOAST_ID = "scrollr-startup-update";
 
 interface Options {
-  /** When false (user disabled it in Settings), the hook does nothing. */
-  enabled: boolean;
   /** Current installed version, shown in the toast description. */
   appVersion: string;
 }
 
-export function useStartupUpdateCheck({ enabled, appVersion }: Options) {
+export function useStartupUpdateCheck({ appVersion }: Options) {
   // Latch so the check runs at most once per mount, even if React strict
   // mode double-invokes effects or props change after the first run.
   const ranRef = useRef(false);
 
   useEffect(() => {
-    if (!enabled) return;
     if (!appVersion) return;
     if (ranRef.current) return;
     ranRef.current = true;
@@ -65,7 +62,7 @@ export function useStartupUpdateCheck({ enabled, appVersion }: Options) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [enabled, appVersion]);
+  }, [appVersion]);
 }
 
 // ── Toast flow ──────────────────────────────────────────────────

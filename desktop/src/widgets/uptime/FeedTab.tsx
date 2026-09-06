@@ -6,8 +6,9 @@
  * store so the ticker window can read it via cross-window sync.
  *
  * Setup flow: paste URL → fetch → display monitors.
- * Connected state: auto-refresh via TanStack Query at the configured
- * poll interval, sync results to the store for the ticker.
+ * Connected state: auto-refresh via TanStack Query every POLL_INTERVAL
+ * seconds (fixed — REL-206 dropped the bar's Refresh select), sync
+ * results to the store for the ticker.
  */
 import { useState, useCallback } from "react";
 import { clsx } from "clsx";
@@ -21,13 +22,6 @@ import type { KumaMonitor } from "./types";
 import { fetchKumaStatus, loadMonitors, saveMonitors, MONITOR_STATUS_LABELS, MONITOR_STATUS_COLORS, MONITOR_STATUS_TEXT } from "./types";
 import { toast } from "sonner";
 import { useShell } from "../../shell-context";
-import { WidgetBar } from "../../components/widget-bar/Bar";
-import {
-  SelectMenu,
-  type SelectOption,
-} from "../../components/widget-bar/SelectMenu";
-import { useWidgetConfig } from "../../hooks/useWidgetConfig";
-import { formatPollInterval } from "../../utils/format";
 import { savePrefs, updateWidgetPrefs } from "../../preferences";
 import { useSyncedQuery } from "../../hooks/useSyncedQuery";
 import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
@@ -49,7 +43,6 @@ export const uptimeWidget: WidgetManifest = {
     usage: [
       "Paste your Uptime Kuma public status page URL to connect.",
       "All monitors from your status page appear with their current status.",
-      "Set how often monitors refresh from the top bar.",
     ],
   },
   FeedTab: UptimeFeedTab,
@@ -57,45 +50,14 @@ export const uptimeWidget: WidgetManifest = {
 
 // ── FeedTab ─────────────────────────────────────────────────────
 
-const POLL_OPTIONS: SelectOption<string>[] = Array.from({ length: 10 }, (_, i) => {
-  const v = 30 + i * 30;
-  return { value: String(v), label: formatPollInterval(v) };
-});
+/** Seconds between status-page fetches. Not a user setting (REL-206). */
+const POLL_INTERVAL = 60;
 
-function UptimeFeedTab(props: FeedTabProps) {
-  return (
-    <div className="flex min-h-full flex-col">
-      {props.mode === "comfort" && <UptimeBar />}
-      <UptimeFeedBody {...props} />
-    </div>
-  );
-}
-
-function UptimeBar() {
-  const { prefs, onPrefsChange } = useShell();
-  const { config, update } = useWidgetConfig("uptime", prefs, onPrefsChange);
-  return (
-    <WidgetBar>
-      {/* Config selects live in the right cluster — standard grammar. */}
-      <div className="ml-auto">
-        <SelectMenu
-          ariaLabel="Refresh interval"
-          prefix="Refresh"
-          value={String(config.pollInterval)}
-          options={POLL_OPTIONS}
-          onChange={(v) => update({ pollInterval: Number(v) })}
-        />
-      </div>
-    </WidgetBar>
-  );
-}
-
-function UptimeFeedBody({ mode: feedMode }: FeedTabProps) {
+function UptimeFeedTab({ mode: feedMode }: FeedTabProps) {
   const compact = feedMode === "compact";
   const shell = useShell();
   const queryClient = useQueryClient();
   const url = shell.prefs.widgets.uptime.url;
-  const pollInterval = shell.prefs.widgets.uptime.pollInterval;
 
   const [inputUrl, setInputUrl] = useState("");
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -109,7 +71,7 @@ function UptimeFeedBody({ mode: feedMode }: FeedTabProps) {
     queryKey: ["uptime-kuma", url],
     queryFn: () => fetchKumaStatus(url),
     enabled: url.length > 0,
-    pollInterval,
+    pollInterval: POLL_INTERVAL,
   });
 
   // ── Connect handler ───────────────────────────────────────────

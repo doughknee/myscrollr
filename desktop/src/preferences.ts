@@ -182,18 +182,19 @@ export function snapToPreset(
 
 export interface StartupPrefs {
   /**
-   * When true, the main window runs a single update check shortly after
-   * launch and surfaces a toast if a new version is available. The user
-   * confirms before any download happens — we never auto-install.
-   * Defaults to true; opt out via Customize → Updates.
+   * When true, launching Scrollr brings up the ticker only; the main
+   * window stays hidden until the tray's "Open Scrollr", a second
+   * launch, or the dock shows it. Read by the Rust side at setup
+   * (lib.rs) straight from the store file, so the window never flashes.
+   * Defaults to false.
    *
-   * The only field here. `defaultView`, `refreshInterval` and
-   * `autostart` used to sit alongside it and were all dead: nothing
-   * read them, and the real autostart state is owned by the Tauri
-   * autostart plugin (see `autostartOn` in routes/__root.tsx), not by
-   * this object.
+   * The only field here. `autoCheckUpdates` (REL-206: the check always
+   * runs now), `defaultView`, `refreshInterval` and `autostart` used to
+   * sit alongside it and are stripped on load. The real launch-at-login
+   * state is owned by the Tauri autostart plugin (see `autostartOn` in
+   * routes/__root.tsx), not by this object.
    */
-  autoCheckUpdates: boolean;
+  startInBackground: boolean;
 }
 
 export interface PrivacyPrefs {
@@ -256,22 +257,17 @@ export interface SysmonTickerConfig {
 }
 
 export interface SysmonWidgetConfig {
-  refreshInterval: number;
   ticker: SysmonTickerConfig;
 }
 
 export interface UptimeWidgetConfig {
   /** The user's Uptime Kuma public status page URL. Empty = not configured. */
   url: string;
-  /** Poll interval in seconds (default 60). */
-  pollInterval: number;
 }
 
 export interface GitHubWidgetConfig {
   /** Configured repos to track. */
   repos: Array<{ owner: string; repo: string }>;
-  /** Poll interval in seconds (default 120). */
-  pollInterval: number;
 }
 
 export interface WidgetPinConfig {
@@ -484,7 +480,7 @@ const DEFAULT_TICKER: TickerPrefs = {
 };
 
 const DEFAULT_STARTUP: StartupPrefs = {
-  autoCheckUpdates: true,
+  startInBackground: false,
 };
 
 const DEFAULT_PRIVACY: PrivacyPrefs = {
@@ -559,16 +555,13 @@ const DEFAULT_WIDGETS: WidgetPrefs = {
     pomodoro: { ...DEFAULT_TIMER_POMODORO },
   },
   sysmon: {
-    refreshInterval: 2,
     ticker: { ...DEFAULT_SYSMON_TICKER },
   },
   uptime: {
     url: "",
-    pollInterval: 60,
   },
   github: {
     repos: [],
-    pollInterval: 120,
   },
 };
 
@@ -591,11 +584,11 @@ const PREFIX = "scrollr:settings";
 function migrateV1(saved: Record<string, unknown>): Partial<AppPreferences> {
   const result: Record<string, unknown> = {};
 
-  // Old "general" → split into startup + appearance. Only
-  // autoCheckUpdates survives the split: v1's defaultView,
-  // refreshInterval and autostart were migrated forward for years
-  // without anything ever reading them, so they're dropped rather than
-  // carried again. smoothScroll and scrollSmoothness went earlier.
+  // Old "general" → split into startup + appearance. Nothing survives
+  // the split: v1's defaultView, refreshInterval and autostart were
+  // migrated forward for years without anything ever reading them, and
+  // autoCheckUpdates went with REL-206 (the check always runs now).
+  // smoothScroll and scrollSmoothness went earlier.
   if (saved.general) {
     result.startup = { ...DEFAULT_STARTUP };
   }
@@ -725,19 +718,14 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
         ...obj(tmr?.pomodoro),
       },
     },
+    // sysmon.refreshInterval and uptime/github.pollInterval are not
+    // carried (REL-206): the sysmon select was inert and poll cadence is
+    // not a user decision, so the feed tabs hold fixed intervals now.
     sysmon: {
-      refreshInterval:
-        typeof sys?.refreshInterval === "number"
-          ? sys.refreshInterval
-          : DEFAULT_WIDGETS.sysmon.refreshInterval,
       ticker: { ...DEFAULT_SYSMON_TICKER, ...obj(sys?.ticker) },
     },
     uptime: {
       url: typeof upt?.url === "string" ? upt.url : DEFAULT_WIDGETS.uptime.url,
-      pollInterval:
-        typeof upt?.pollInterval === "number"
-          ? upt.pollInterval
-          : DEFAULT_WIDGETS.uptime.pollInterval,
     },
     github: {
       repos: Array.isArray(ghb?.repos)
@@ -749,10 +737,6 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
               typeof (r as Record<string, unknown>).repo === "string",
           )
         : DEFAULT_WIDGETS.github.repos,
-      pollInterval:
-        typeof ghb?.pollInterval === "number"
-          ? ghb.pollInterval
-          : DEFAULT_WIDGETS.github.pollInterval,
     },
   };
 }
@@ -969,16 +953,18 @@ export function loadPrefs(): AppPreferences {
     };
     // Strip the retired startup/window fields the same way the legacy
     // appearance keys above are stripped. Spreading saved-over-defaults
-    // would otherwise carry `defaultView`, `refreshInterval`,
-    // `autostart`, `defaultWidth`, `narrowWidth` and `skipTaskbar`
-    // straight back out to disk on the next save, so removing them from
-    // the types alone would never actually shed them.
+    // would otherwise carry `autoCheckUpdates`, `defaultView`,
+    // `refreshInterval`, `autostart`, `defaultWidth`, `narrowWidth` and
+    // `skipTaskbar` straight back out to disk on the next save, so
+    // removing them from the types alone would never actually shed them.
     const {
+      autoCheckUpdates: _autoCheckUpdates,
       defaultView: _defaultView,
       refreshInterval: _refreshInterval,
       autostart: _autostart,
       ...savedStartup
     } = (source.startup ?? {}) as Partial<StartupPrefs> & {
+      autoCheckUpdates?: unknown;
       defaultView?: unknown;
       refreshInterval?: unknown;
       autostart?: unknown;

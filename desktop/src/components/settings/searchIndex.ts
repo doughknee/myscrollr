@@ -78,20 +78,20 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     keywords: "units format 12h 24h 12-hour 24-hour hour clock am pm",
   },
 
-  // ── Window & startup ──────────────────────────────────────────
+  // ── Startup ───────────────────────────────────────────────────
   {
-    page: "window",
+    page: "startup",
     rowId: "autostart",
-    label: "Launch on system startup",
-    description: "Open Scrollr when you start your computer",
-    keywords: "boot login autostart",
+    label: "Launch at login",
+    description: "Open Scrollr when you sign in to your computer",
+    keywords: "boot startup system autostart start automatically",
   },
   {
-    page: "window",
-    rowId: "autoCheck",
-    label: "Check for updates on startup",
-    description: "Notify me when a new version is available",
-    keywords: "update auto",
+    page: "startup",
+    rowId: "startInBackground",
+    label: "Start in the background",
+    description: "Show only the ticker; open the window from the tray",
+    keywords: "hidden minimized tray ticker only main window launch",
   },
 
   // ── Shortcuts ─────────────────────────────────────────────────

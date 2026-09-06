@@ -2,10 +2,6 @@ import { Activity } from "lucide-react";
 import { clsx } from "clsx";
 import type { FeedTabProps, WidgetManifest } from "../../types";
 import { WidgetBar } from "../../components/widget-bar/Bar";
-import {
-  SelectMenu,
-  type SelectOption,
-} from "../../components/widget-bar/SelectMenu";
 import { MenuPopover, MenuRow } from "../../components/widget-bar/Menu";
 import { FEED_CARD, FEED_CARD_STATIC } from "../../components/feedCard";
 import { useShell } from "../../shell-context";
@@ -46,13 +42,6 @@ const STAT_ROWS: { key: StatKey; label: string }[] = [
   { key: "gpuPower", label: "GPU power draw" },
 ];
 
-const REFRESH_OPTIONS: SelectOption<string>[] = [
-  { value: "1", label: "1s" },
-  { value: "2", label: "2s" },
-  { value: "3", label: "3s" },
-  { value: "5", label: "5s" },
-];
-
 function SysmonFeedTab(props: FeedTabProps) {
   return (
     <div className="flex min-h-full flex-col">
@@ -64,22 +53,13 @@ function SysmonFeedTab(props: FeedTabProps) {
 
 function SysmonBar() {
   const { prefs, onPrefsChange } = useShell();
-  const { config, update, setTicker } = useWidgetConfig("sysmon", prefs, onPrefsChange);
+  const { config, setTicker } = useWidgetConfig("sysmon", prefs, onPrefsChange);
   return (
-    // Standard bar grammar: content menus left, config selects in the
-    // right cluster (matches uptime/github's right-side Refresh). °F/°C
-    // is app-wide now — Settings → Appearance → Units & formats.
+    // Content menu only. °F/°C is app-wide now (Settings → Appearance →
+    // Units & formats) and the "Every Ns" select was inert — the feed
+    // and the ticker both poll at the fixed POLL_INTERVAL (REL-206).
     <WidgetBar>
       <StatsMenu ticker={config.ticker} setTicker={setTicker} />
-      <div className="ml-auto">
-        <SelectMenu
-          ariaLabel="Update speed"
-          prefix="Every"
-          value={String(config.refreshInterval)}
-          options={REFRESH_OPTIONS}
-          onChange={(v) => update({ refreshInterval: Number(v) })}
-        />
-      </div>
     </WidgetBar>
   );
 }

@@ -28,6 +28,7 @@ import {
   resetTickerPage,
   TICKER_SPEEDS,
   resetAll,
+  savePrefs,
   migrateUnits,
 } from "./preferences";
 import type { AppPreferences, WidgetPrefs } from "./preferences";
@@ -593,10 +594,46 @@ describe("dead prefs are shed on load (REL-208)", () => {
     expect("taskbar" in prefs).toBe(false);
     expect("clock" in prefs.widgets).toBe(false);
     expect("weather" in prefs.widgets).toBe(false);
-    expect(prefs.widgets.uptime).toEqual({ url: "https://status.example", pollInterval: 30 });
-    expect(prefs.widgets.github).toEqual({ repos: [], pollInterval: 90 });
+    // pollInterval went with REL-206 (see below).
+    expect(prefs.widgets.uptime).toEqual({ url: "https://status.example" });
+    expect(prefs.widgets.github).toEqual({ repos: [] });
     // Sysmon's stat toggles are real content selection and stay.
     expect(prefs.widgets.sysmon.ticker).toEqual({ cpu: true, memory: true, gpu: true, gpuPower: true });
+  });
+});
+
+describe("startup page folds (REL-206)", () => {
+  it("startInBackground defaults off — fresh install and pre-REL-206 blob alike", () => {
+    expect(loadPrefs().startup).toEqual({ startInBackground: false });
+    storeValues.set("scrollr:settings", { startup: { autoCheckUpdates: false } });
+    expect(loadPrefs().startup).toEqual({ startInBackground: false });
+  });
+
+  it("keeps a saved startInBackground and reset turns it back off", () => {
+    storeValues.set("scrollr:settings", { startup: { startInBackground: true } });
+    expect(loadPrefs().startup.startInBackground).toBe(true);
+    expect(resetAll().startup.startInBackground).toBe(false);
+  });
+
+  it("sheds autoCheckUpdates and the three interval prefs from what gets saved", () => {
+    storeValues.set("scrollr:settings", {
+      startup: { autoCheckUpdates: false, startInBackground: true },
+      widgets: {
+        sysmon: { refreshInterval: 5, ticker: { cpu: true, memory: false, gpu: true, gpuPower: false } },
+        uptime: { url: "https://status.example", pollInterval: 30 },
+        github: { repos: [{ owner: "a", repo: "b" }], pollInterval: 90 },
+      },
+    });
+
+    const prefs = loadPrefs();
+    savePrefs(prefs);
+    const persisted = storeValues.get("scrollr:settings") as AppPreferences;
+    expect(persisted.startup).toEqual({ startInBackground: true });
+    expect(persisted.widgets.sysmon).toEqual({
+      ticker: { cpu: true, memory: false, gpu: true, gpuPower: false },
+    });
+    expect(persisted.widgets.uptime).toEqual({ url: "https://status.example" });
+    expect(persisted.widgets.github).toEqual({ repos: [{ owner: "a", repo: "b" }] });
   });
 });
 

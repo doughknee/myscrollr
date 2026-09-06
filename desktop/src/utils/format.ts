@@ -230,19 +230,6 @@ export function formatUptime(secs: number): string {
   return `${mins}m`;
 }
 
-/**
- * Format a poll interval in seconds as human-readable duration.
- * Returns "2m", "2m 30s", or "30s".
- */
-export function formatPollInterval(secs: number): string {
-  if (secs >= 60) {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return s ? `${m}m ${s}s` : `${m}m`;
-  }
-  return `${secs}s`;
-}
-
 function toFahrenheit(celsius: number): number {
   return (celsius * 9) / 5 + 32;
 }
