@@ -211,6 +211,9 @@ func (s *Server) setupRoutes() {
 	s.App.Get("/channels", s.listChannels)
 	// The widget catalog — the single authority clients render from.
 	s.App.Get("/catalog", widgets.HandleGetCatalog)
+	// "Request it" from the catalog's zero-match card: one row per user
+	// and query, count across users. Authenticated; IP-rate-limited.
+	s.App.Post("/catalog/requests", platform.LogtoAuth, widgets.HandleCatalogRequest)
 	s.App.Get("/tier-limits", widgets.HandleGetTierLimits)
 	s.App.Get("/app/min-version", HandleGetMinDesktopVersion)
 	s.App.Get("/", s.landingPage)

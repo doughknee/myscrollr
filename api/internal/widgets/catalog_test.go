@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
@@ -66,6 +67,25 @@ func TestHandleGetCatalogServesFullCatalog(t *testing.T) {
 	}
 	if !kalshi {
 		t.Error("predictions/Kalshi missing from the served catalog")
+	}
+
+	// The directory's shelf, search aliases and "new" tag all ride these
+	// three fields (REL-214); a lost tag here is a flat, unsearchable catalog.
+	var epl bool
+	for _, w := range body.Widgets {
+		if w.ID != "sports_premierleague" {
+			continue
+		}
+		epl = true
+		if w.Group != "Soccer" || w.AddedAt == "" {
+			t.Errorf("premier league lost group/added_at over the wire: %+v", w)
+		}
+		if !slices.Contains(w.Keywords, "epl") {
+			t.Errorf("premier league keywords = %v, want to include %q", w.Keywords, "epl")
+		}
+	}
+	if !epl {
+		t.Error("sports_premierleague missing from the served catalog")
 	}
 
 	// Order must survive JSON encoding — the client renders in array order.

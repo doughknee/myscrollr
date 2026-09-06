@@ -1,6 +1,9 @@
 package platform
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 // The catalog is the single authority clients render from (VISION §4.2), so
 // a malformed entry is a client-wide bug. Check the invariants the client
@@ -44,6 +47,12 @@ func TestCatalogIsWellFormed(t *testing.T) {
 
 		if !IsKnownWidgetType(w.ID) {
 			t.Errorf("catalog %q: not accepted by IsKnownWidgetType", w.ID)
+		}
+
+		// AddedAt drives the "new" tag: a missing or malformed date is a
+		// widget that can never be new, or a client-side parse error.
+		if _, err := time.Parse("2006-01-02", w.AddedAt); err != nil {
+			t.Errorf("catalog %q: AddedAt %q is not a YYYY-MM-DD date", w.ID, w.AddedAt)
 		}
 	}
 }
