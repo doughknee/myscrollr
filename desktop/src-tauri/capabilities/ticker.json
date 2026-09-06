@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "ticker-capability",
   "description": "Minimal capabilities for the ticker overlay window",
-  "windows": ["ticker"],
+  "windows": ["ticker", "ticker-*"],
   "permissions": [
     "core:default",
     "core:window:default",

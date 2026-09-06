@@ -153,6 +153,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::window::position_ticker,
             commands::window::list_monitors,
+            commands::window::sync_ticker_windows,
             commands::window::pin_window,
             commands::window::set_hide_on_fullscreen,
             commands::window::set_ticker_visible,
@@ -173,11 +174,13 @@ pub fn run() {
             tray::sync_tray_pin,
         ])
         .on_window_event(|window, event| {
-            // Intercept close on both windows — hide instead of destroy.
+            // Intercept close on every window — hide instead of destroy.
             // Only tray "Quit" or context menu "Quit" actually exits.
+            // (`sync_ticker_windows` removes surplus tickers with
+            // destroy(), which does not raise this event.)
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let label = window.label();
-                if label == "main" || label == "ticker" {
+                if label == "main" || commands::window::is_ticker_label(label) {
                     api.prevent_close();
                     let _ = window.hide();
                 }
@@ -188,25 +191,17 @@ pub fn run() {
             // Size the ticker to fill the screen width. Visibility is
             // managed by the JS side based on the showTicker preference;
             // tauri.conf.json starts the window with `visible: false`.
+            // Further tickers (one per chosen monitor) are created at
+            // runtime by `sync_ticker_windows`, which preps them the
+            // same way. Exit cleanup is `appbar_win::unregister_all`,
+            // which covers every ticker HWND.
             if let Some(ticker) = app.get_webview_window("ticker") {
                 if let Ok(Some(monitor)) = ticker.current_monitor() {
                     let scale = monitor.scale_factor();
                     let screen_width = monitor.size().width as f64 / scale;
                     let _ = ticker.set_size(tauri::LogicalSize::new(screen_width, 200.0));
                 }
-                // Force WebView2 surface background to dark so the
-                // area outside the HTML body doesn't show as white.
-                let _ = ticker.set_background_color(Some(tauri::webview::Color(20, 20, 32, 255)));
-
-                // Defensive: clear any stale AppBar registration from
-                // a previous session that crashed without calling
-                // ABM_REMOVE. Harmless no-op if there's no stale entry.
-                #[cfg(target_os = "windows")]
-                {
-                    let _ = crate::commands::appbar_win::force_unregister_stale(
-                        &ticker.as_ref().window(),
-                    );
-                }
+                commands::window::prepare_ticker(&ticker);
             } else {
                 log::error!("Failed to create ticker window — continuing without it");
             }

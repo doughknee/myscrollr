@@ -145,6 +145,13 @@ export interface WindowPrefs {
    * No effect on macOS / Linux.
    */
   hideOnFullscreen: boolean;
+  /**
+   * Monitor names (from the `list_monitors` command) that get a ticker
+   * window, identical content on each. Empty = the primary monitor only,
+   * which is what every install did before this existed. Names that are
+   * no longer attached are ignored, never an error.
+   */
+  tickerMonitors: string[];
 }
 
 interface TaskbarPrefs {
@@ -517,6 +524,7 @@ const DEFAULT_WINDOW: WindowPrefs = {
   pinned: true,
   tickerPosition: "top",
   hideOnFullscreen: true,
+  tickerMonitors: [],
 };
 
 const DEFAULT_TASKBAR: TaskbarPrefs = {
@@ -1146,7 +1154,15 @@ export function loadPrefs(): AppPreferences {
       appearance: mergedAppearance,
       ticker: { ...DEFAULT_TICKER, ...source.ticker },
       startup: { ...DEFAULT_STARTUP, ...savedStartup },
-      window: { ...DEFAULT_WINDOW, ...savedWindow },
+      window: {
+        ...DEFAULT_WINDOW,
+        ...savedWindow,
+        // Absent on every pre-REL-200 install; anything but a string
+        // list is treated as "primary only" rather than trusted.
+        tickerMonitors: Array.isArray(savedWindow.tickerMonitors)
+          ? savedWindow.tickerMonitors.filter((m): m is string => typeof m === "string")
+          : [],
+      },
       taskbar: { ...DEFAULT_TASKBAR, ...source.taskbar },
       widgets: mergeWidgetPrefs(
         source.widgets as Partial<WidgetPrefs> | undefined,

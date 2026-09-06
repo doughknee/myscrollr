@@ -103,6 +103,7 @@ import {
 
 // Store
 import { onStoreChange, setStore, removeStore } from "../lib/store";
+import { invoke } from "@tauri-apps/api/core";
 
 // ── Route context ────────────────────────────────────────────────
 
@@ -492,6 +493,21 @@ function RootLayout() {
     });
     return () => { unsub1(); unsub2(); };
   }, [navigate]);
+
+  // ── Ticker windows: one per chosen monitor ──────────────────
+  // The MAIN window owns this call, not the tickers: there is exactly
+  // one main window and it outlives every ticker, whereas each ticker
+  // would otherwise fire the sync on the same store change — including
+  // the ticker the sync is about to destroy. Runs once at launch to
+  // recreate the saved set, then whenever the pref changes. Rust
+  // resolves an empty list to the primary monitor.
+  const tickerMonitorsKey = prefs.window.tickerMonitors.join("\n");
+  useEffect(() => {
+    invoke("sync_ticker_windows", { monitors: prefs.window.tickerMonitors }).catch((err) =>
+      console.error("[Scrollr] sync_ticker_windows failed:", err),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickerMonitorsKey]);
 
   useEffect(() => {
     isAutostartEnabled().then(setAutostartOn).catch(() => {});
