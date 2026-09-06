@@ -1,8 +1,20 @@
+use crate::commands::diagnostics::{monitors, pick_monitor, MonitorInfo};
 use crate::compositor::{self, Compositor};
 use tauri::Manager;
 
+/// Every attached monitor in logical coordinates, primary flagged.
+/// The `name` values are what `position_ticker`'s `monitor` takes.
+#[tauri::command]
+pub fn list_monitors(app: tauri::AppHandle) -> Vec<MonitorInfo> {
+    monitors(&app)
+}
+
 /// Snap the ticker window to a screen edge and stretch it to full monitor width.
 /// Sets x = monitor left edge, width = monitor width, y = top or bottom edge.
+///
+/// `monitor` names the target screen (see `list_monitors`). An unknown
+/// name lands on the primary; omitted keeps the window on the monitor
+/// it is currently on.
 ///
 /// Wayland compositors ignore GTK's `set_position()` and may ignore `set_size()`.
 /// We detect the compositor and use native IPC:
@@ -15,6 +27,7 @@ pub fn position_ticker(
     window: tauri::Window,
     position: String,
     height: Option<f64>,
+    monitor: Option<String>,
 ) -> Result<(), String> {
     // Validate inputs
     if position != "top" && position != "bottom" {
@@ -26,16 +39,21 @@ pub fn position_ticker(
         }
     }
 
-    let monitor = window
-        .current_monitor()
-        .map_err(|e| format!("monitor query failed: {e}"))?
+    let current = || {
+        let m = window.current_monitor().ok().flatten()?;
+        Some(MonitorInfo::from_monitor(&m, false))
+    };
+    let target = monitor
+        .as_deref()
+        .and_then(|name| pick_monitor(&monitors(window.app_handle()), name).cloned())
+        .or_else(current)
         .ok_or("no monitor found")?;
 
-    let scale = monitor.scale_factor();
-    let screen_width = monitor.size().width as f64 / scale;
-    let screen_height = monitor.size().height as f64 / scale;
-    let monitor_x = monitor.position().x as f64 / scale;
-    let monitor_y = monitor.position().y as f64 / scale;
+    let scale = target.scale_factor;
+    let screen_width = target.width;
+    let screen_height = target.height;
+    let monitor_x = target.x;
+    let monitor_y = target.y;
 
     // Use explicit height if provided; otherwise read from window.
     // On Wayland, a preceding set_size() may not have propagated yet,
