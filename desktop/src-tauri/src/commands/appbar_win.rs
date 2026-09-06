@@ -6,15 +6,25 @@
 //!
 //! Lifecycle:
 //!   register()     -> ABM_NEW
-//!   set_position() -> ABM_QUERYPOS -> ABM_SETPOS
+//!   set_position() -> GetMonitorInfo(rcWork) -> ABM_SETPOS
 //!   unregister()   -> ABM_REMOVE
+//!
+//! Placement is by the bar's OWN monitor's work area, never by
+//! ABM_QUERYPOS: the shell stacks same-edge appbars across the whole
+//! virtual desktop, so with a sibling ticker holding the top edge of
+//! another monitor QUERYPOS hands the second bar the space BELOW where
+//! the sibling would be (REL-202). ABM_SETPOS is kept so the reservation
+//! exists for maximized-window accounting.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard};
 use windows_sys::Win32::Foundation::{HWND, RECT};
+use windows_sys::Win32::Graphics::Gdi::{
+    GetMonitorInfoW, MonitorFromRect, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+};
 use windows_sys::Win32::UI::Shell::{
-    SHAppBarMessage, ABE_BOTTOM, ABE_TOP, ABM_ACTIVATE, ABM_NEW, ABM_QUERYPOS, ABM_REMOVE,
-    ABM_SETPOS, ABM_WINDOWPOSCHANGED, APPBARDATA,
+    SHAppBarMessage, ABE_BOTTOM, ABE_TOP, ABM_ACTIVATE, ABM_NEW, ABM_REMOVE, ABM_SETPOS,
+    ABM_WINDOWPOSCHANGED, APPBARDATA,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::WM_USER;
 
@@ -30,6 +40,16 @@ static REGISTERED: Mutex<Vec<isize>> = Mutex::new(Vec::new());
 
 fn registered() -> MutexGuard<'static, Vec<isize>> {
     REGISTERED.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// The rect the shell last reserved for each registered HWND. A
+/// monitor's work area already excludes it, so `edge_rect` adds it back
+/// before placing the bar — otherwise every same-edge re-position
+/// (height change, hotplug re-sync) would drift one bar-height inward.
+static RESERVED: Mutex<Vec<(isize, RECT)>> = Mutex::new(Vec::new());
+
+fn reserved() -> MutexGuard<'static, Vec<(isize, RECT)>> {
+    RESERVED.lock().unwrap_or_else(|p| p.into_inner())
 }
 
 /// Whether to hide the ticker when a fullscreen app appears.
@@ -125,6 +145,7 @@ pub fn force_unregister_stale(window: &tauri::Window) -> Result<(), String> {
 /// ABM_REMOVE plus a reflow nudge: without ABM_WINDOWPOSCHANGED,
 /// maximized windows can be slow to reclaim the space.
 fn remove(hwnd: HWND) {
+    reserved().retain(|(h, _)| *h != hwnd as isize);
     let mut data: APPBARDATA = unsafe { std::mem::zeroed() };
     data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
     data.hWnd = hwnd;
@@ -154,40 +175,58 @@ pub fn set_position(
         _ => return Err(format!("invalid position: {position}")),
     };
 
-    let mut data: APPBARDATA = unsafe { std::mem::zeroed() };
-    data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
-    data.hWnd = hwnd;
-    data.uEdge = edge;
-    data.rc = RECT {
+    // Where the bar goes: this monitor's work area (taskbar-adjusted by
+    // the shell) at the chosen edge, less nothing but our own previous
+    // reservation. Not ABM_QUERYPOS — see the module doc.
+    let requested = RECT {
         left: physical_x,
         top: physical_y,
         right: physical_x + physical_width,
         bottom: physical_y + physical_height,
     };
-
-    // Let the shell adjust our requested rect if it conflicts with
-    // another appbar (e.g. the taskbar on the same edge).
-    unsafe { SHAppBarMessage(ABM_QUERYPOS, &mut data) };
-
-    // Re-clamp height after the shell may have adjusted left/top/right.
-    match edge {
-        ABE_TOP => {
-            data.rc.bottom = data.rc.top + physical_height;
-        }
-        ABE_BOTTOM => {
-            data.rc.top = data.rc.bottom - physical_height;
-        }
-        _ => unreachable!(),
+    let mut mi: MONITORINFO = unsafe { std::mem::zeroed() };
+    mi.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+    let ok = unsafe {
+        let hmon = MonitorFromRect(&requested, MONITOR_DEFAULTTONEAREST);
+        GetMonitorInfoW(hmon, &mut mi)
+    };
+    if ok == 0 {
+        return Err("GetMonitorInfoW failed".into());
     }
+    let own = reserved().iter().find(|(h, _)| *h == hwnd as isize).map(|(_, r)| *r);
+    let rc = edge_rect(mi.rcWork, own, edge, physical_height);
 
     log::info!(
-        "[AppBar] set_position edge={edge} rect=({},{})-({},{})",
-        data.rc.left, data.rc.top, data.rc.right, data.rc.bottom
+        "[AppBar] set_position edge={edge} work=({},{})-({},{}) own={:?} rect=({},{})-({},{})",
+        mi.rcWork.left, mi.rcWork.top, mi.rcWork.right, mi.rcWork.bottom,
+        own.map(|o| (o.left, o.top, o.right, o.bottom)),
+        rc.left, rc.top, rc.right, rc.bottom
     );
 
+    // Reserve the space. The shell may still hand back an adjusted rect;
+    // we remember what it actually reserved (that is what its work area
+    // excludes) but the window stays where we put it.
+    let mut data: APPBARDATA = unsafe { std::mem::zeroed() };
+    data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
+    data.hWnd = hwnd;
+    data.uEdge = edge;
+    data.rc = rc;
     let result = unsafe { SHAppBarMessage(ABM_SETPOS, &mut data) };
     if result == 0 {
         return Err("SHAppBarMessage(ABM_SETPOS) failed".into());
+    }
+    if (data.rc.left, data.rc.top, data.rc.right, data.rc.bottom)
+        != (rc.left, rc.top, rc.right, rc.bottom)
+    {
+        log::warn!(
+            "[AppBar] shell reserved ({},{})-({},{}) instead",
+            data.rc.left, data.rc.top, data.rc.right, data.rc.bottom
+        );
+    }
+    {
+        let mut res = reserved();
+        res.retain(|(h, _)| *h != hwnd as isize);
+        res.push((hwnd as isize, data.rc));
     }
 
     // Tell the shell our window is now in its final position and it
@@ -208,27 +247,26 @@ pub fn set_position(
         SHAppBarMessage(ABM_WINDOWPOSCHANGED, &mut wpc_data);
     }
 
-    // Move the window to the rect the shell granted us. Use Win32
-    // SetWindowPos directly rather than Tauri's set_size/set_position,
-    // because the latter applies AdjustWindowRectEx which adds back
-    // the non-client margins we just stripped (was producing +16
-    // horizontal, +9 vertical bleed past the requested rect).
-    use windows_sys::Win32::UI::WindowsAndMessaging::{SWP_NOZORDER, SWP_NOACTIVATE};
-    unsafe {
-        let w = data.rc.right - data.rc.left;
-        let h = data.rc.bottom - data.rc.top;
-        let ok = SetWindowPos(
+    // Move the window LAST: a work-area change makes the shell shove
+    // windows out of the newly reserved band, our own included, so a
+    // move before ABM_SETPOS ends up one bar-height off. Win32
+    // SetWindowPos rather than Tauri's set_size/set_position: the latter
+    // applies AdjustWindowRectEx, which adds back the non-client margins
+    // we strip (+16 horizontal, +9 vertical bleed past the requested rect).
+    use windows_sys::Win32::UI::WindowsAndMessaging::{SWP_NOACTIVATE, SWP_NOZORDER};
+    let ok = unsafe {
+        SetWindowPos(
             hwnd,
             std::ptr::null_mut(),
-            data.rc.left,
-            data.rc.top,
-            w,
-            h,
+            rc.left,
+            rc.top,
+            rc.right - rc.left,
+            rc.bottom - rc.top,
             SWP_NOZORDER | SWP_NOACTIVATE,
-        );
-        if ok == 0 {
-            return Err("SetWindowPos failed".into());
-        }
+        )
+    };
+    if ok == 0 {
+        return Err("SetWindowPos failed".into());
     }
 
     // Re-apply styling after geometry settles. DWM attributes
@@ -237,6 +275,104 @@ pub fn set_position(
     let _ = force_systembar_appearance(window);
 
     Ok(())
+}
+
+/// A bar of `height` px on `edge` of a monitor whose work area is `work`.
+/// `own` is the rect the shell currently reserves for this same bar; the
+/// work area excludes it, so it is given back before placing — a stale
+/// `own` on the other edge (or a different monitor) does not touch it.
+/// Width is the work area's: a left/right taskbar keeps its column.
+fn edge_rect(work: RECT, own: Option<RECT>, edge: u32, height: i32) -> RECT {
+    let mut w = work;
+    if let Some(o) = own {
+        let same_monitor = o.left < w.right && o.right > w.left;
+        if edge == ABE_TOP && same_monitor && o.bottom == w.top {
+            w.top = o.top;
+        }
+        if edge == ABE_BOTTOM && same_monitor && o.top == w.bottom {
+            w.bottom = o.bottom;
+        }
+    }
+    let (top, bottom) = if edge == ABE_TOP {
+        (w.top, w.top + height)
+    } else {
+        (w.bottom - height, w.bottom)
+    };
+    RECT { left: w.left, top, right: w.right, bottom }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn r(left: i32, top: i32, right: i32, bottom: i32) -> RECT {
+        RECT { left, top, right, bottom }
+    }
+    fn t(a: RECT) -> (i32, i32, i32, i32) {
+        (a.left, a.top, a.right, a.bottom)
+    }
+
+    // Two 3440x1440 monitors, secondary at x=-3440, taskbar (48 px)
+    // at the bottom of the primary.
+    const PRIMARY_WORK: RECT = RECT { left: 0, top: 0, right: 3440, bottom: 1392 };
+    const SECONDARY_WORK: RECT = RECT { left: -3440, top: 0, right: 0, bottom: 1440 };
+
+    #[test]
+    fn top_edge_sits_at_its_own_monitor_top() {
+        assert_eq!(t(edge_rect(PRIMARY_WORK, None, ABE_TOP, 40)), (0, 0, 3440, 40));
+        // The sibling's reservation on the primary is not in this work area.
+        assert_eq!(t(edge_rect(SECONDARY_WORK, None, ABE_TOP, 40)), (-3440, 0, 0, 40));
+    }
+
+    #[test]
+    fn bottom_edge_sits_above_the_taskbar() {
+        assert_eq!(t(edge_rect(PRIMARY_WORK, None, ABE_BOTTOM, 40)), (0, 1352, 3440, 1392));
+        assert_eq!(t(edge_rect(SECONDARY_WORK, None, ABE_BOTTOM, 40)), (-3440, 1400, 0, 1440));
+    }
+
+    #[test]
+    fn same_edge_repeat_does_not_drift() {
+        // Our own 40 px top reservation has shrunk the work area to 40.
+        let shrunk = r(0, 40, 3440, 1392);
+        let own = r(0, 0, 3440, 40);
+        assert_eq!(t(edge_rect(shrunk, Some(own), ABE_TOP, 40)), (0, 0, 3440, 40));
+        // Height change on the same edge: still from the true edge.
+        assert_eq!(t(edge_rect(shrunk, Some(own), ABE_TOP, 60)), (0, 0, 3440, 60));
+        // Bottom, over the taskbar.
+        let shrunk = r(0, 0, 3440, 1352);
+        let own = r(0, 1352, 3440, 1392);
+        assert_eq!(t(edge_rect(shrunk, Some(own), ABE_BOTTOM, 40)), (0, 1352, 3440, 1392));
+    }
+
+    #[test]
+    fn toggling_edges_ignores_the_stale_reservation() {
+        // Was at the bottom (over the taskbar); now asked for top.
+        let work = r(0, 0, 3440, 1352);
+        let own = r(0, 1352, 3440, 1392);
+        assert_eq!(t(edge_rect(work, Some(own), ABE_TOP, 40)), (0, 0, 3440, 40));
+        // Was at the top; now asked for bottom.
+        let work = r(0, 40, 3440, 1392);
+        let own = r(0, 0, 3440, 40);
+        assert_eq!(t(edge_rect(work, Some(own), ABE_BOTTOM, 40)), (0, 1352, 3440, 1392));
+    }
+
+    #[test]
+    fn taskbar_at_top_stacks_the_bar_under_it() {
+        let work = r(0, 48, 3440, 1440);
+        assert_eq!(t(edge_rect(work, None, ABE_TOP, 40)), (0, 48, 3440, 88));
+        // …and stays there on a repeat.
+        let shrunk = r(0, 88, 3440, 1440);
+        let own = r(0, 48, 3440, 88);
+        assert_eq!(t(edge_rect(shrunk, Some(own), ABE_TOP, 40)), (0, 48, 3440, 88));
+    }
+
+    #[test]
+    fn a_reservation_on_another_monitor_is_not_ours_to_give_back() {
+        // Same y-band, different monitor (x ranges do not overlap).
+        let own = r(-3440, 0, 0, 40);
+        let work = r(0, 40, 3440, 1392);
+        assert_eq!(t(edge_rect(work, Some(own), ABE_TOP, 40)), (0, 40, 3440, 80));
+    }
 }
 
 // ─── Force system-bar window styling ─────────────────────────────
