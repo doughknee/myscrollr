@@ -73,12 +73,9 @@ export function WidgetBar({ children }: { children: React.ReactNode }) {
     return () => io.disconnect();
   }, [sentinelEl, reportStuck]);
 
-  // Chassis-visibility bookkeeping (portal mode only). LAYOUT effect,
-  // not passive: the portal row enters/leaves the chassis DOM in the
-  // commit itself, so the shell's hidden-at-zero-rows class must flip
-  // pre-paint too — a passive effect painted one frame of empty band
-  // (or of a row inside a display:none shell) on every barless↔bar
-  // (e.g. predictions Markets↔Positions).
+  // Chassis row bookkeeping (portal mode only): at zero rows the chassis
+  // drops any pinned elevation. Visibility itself is CSS (`empty:hidden`
+  // on the shell), so it flips in the very commit the row lands.
   const report = chassis?.report;
   useLayoutEffect(() => {
     if (!report) return;

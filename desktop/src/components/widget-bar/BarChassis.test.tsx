@@ -13,7 +13,7 @@
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
-import { BarChassisProvider, BarChassisSlot, useBarChassis } from "./BarChassis";
+import { BarChassisProvider, BarChassisSlot } from "./BarChassis";
 import { WidgetBar } from "./Bar";
 
 // jsdom has no IntersectionObserver and WidgetBar constructs one on mount.
@@ -45,16 +45,13 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-/** The chassis shell — the element carrying `hidden` and the elevation.
- *
- *  Selected via the grid-stacked host, which ONLY BarChassisSlot renders.
+/** The chassis shell — the grid-stacked portal host, carrying the
+ *  elevation and `empty:hidden`. ONLY BarChassisSlot renders a grid:
  *  `@container` alone is ambiguous — WidgetBar's standalone shell carries
  *  it too, so matching on that silently reads the wrong element in the
  *  no-provider case. */
 const shell = () =>
-  (document.querySelector(".grid.items-center")?.parentElement ?? null) as
-    | HTMLElement
-    | null;
+  document.querySelector(".grid.items-center") as HTMLElement | null;
 
 /** WidgetBar's own sticky shell, rendered only when there is no chassis. */
 const standaloneShell = () =>
@@ -112,24 +109,26 @@ describe("BarChassis", () => {
   it("hides the shell while no row is mounted, without unmounting the host", () => {
     const { rerender } = render(<Frame bars={0} />);
     // Hidden, NOT removed: the host node has to survive or the next
-    // bar's portal has nowhere to land.
+    // bar's portal has nowhere to land. Hiding is `:empty` in CSS so it
+    // can never lag the row by a commit (REL-218).
     expect(shell()).toBeTruthy();
-    expect(shell()).toHaveClass("hidden");
+    expect(shell()).toHaveClass("empty:hidden");
+    expect(shell()).toBeEmptyDOMElement();
 
     rerender(<Frame bars={1} />);
-    expect(shell()).not.toHaveClass("hidden");
+    expect(shell()).not.toBeEmptyDOMElement();
   });
 
   it("stays visible through a swap, then hides once the last row leaves", () => {
     // Two bars coexist mid-swap (outgoing + incoming, grid-stacked).
     const { rerender } = render(<Frame bars={2} />);
-    expect(shell()).not.toHaveClass("hidden");
+    expect(shell()!.childElementCount).toBe(2);
 
     rerender(<Frame bars={1} />);   // outgoing finishes exiting
-    expect(shell()).not.toHaveClass("hidden");
+    expect(shell()!.childElementCount).toBe(1);
 
     rerender(<Frame bars={0} />);   // barless page
-    expect(shell()).toHaveClass("hidden");
+    expect(shell()).toBeEmptyDOMElement();
   });
 
   it("raises elevation when the bar pins and drops it when it unpins", () => {
@@ -159,37 +158,3 @@ describe("BarChassis", () => {
   });
 });
 
-describe("BarChassis row bookkeeping", () => {
-  // report() fires from a layout effect on every bar mount/unmount, so an
-  // unbalanced -1 is reachable (double cleanup, StrictMode double-invoke).
-  // It must clamp at zero, because the shell hides on `rowCount === 0`
-  // exactly — a count of -1 is not 0, so the shell would render VISIBLE
-  // with no row portaled into it: an empty chrome band, the precise thing
-  // hiding-at-zero exists to prevent.
-  function Reporter({ onReady }: { onReady: (r: (d: 1 | -1) => void) => void }) {
-    const ctx = useBarChassis();
-    if (ctx) onReady(ctx.report);
-    return null;
-  }
-
-  it("clamps at zero so a stray unmount can't leave an empty band showing", () => {
-    let report!: (d: 1 | -1) => void;
-    render(
-      <BarChassisProvider active>
-        <BarChassisSlot />
-        <Reporter onReady={(r) => (report = r)} />
-      </BarChassisProvider>,
-    );
-    expect(shell()).toHaveClass("hidden");
-
-    // Stray cleanups with nothing mounted. Unclamped this reaches -2, and
-    // `rowCount === 0` is then false — the shell would un-hide itself.
-    act(() => { report(-1); report(-1); });
-    expect(shell()).toHaveClass("hidden");
-
-    // And the count must still be at zero, not -2: one real bar mounting
-    // has to be enough to show the shell.
-    act(() => { report(1); });
-    expect(shell()).not.toHaveClass("hidden");
-  });
-});

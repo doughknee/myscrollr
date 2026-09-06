@@ -8,6 +8,7 @@
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import {
   Outlet,
   RouterProvider,
@@ -21,6 +22,7 @@ import { Route } from "../../routes/catalog";
 import { buildBlocks } from "./CatalogDirectory";
 import { getCatalogItems } from "../../marketplace";
 import { ShellContext, ShellDataContext } from "../../shell-context";
+import { BarChassisProvider, BarChassisSlot } from "../widget-bar/BarChassis";
 import type { ShellState } from "../../shell-context";
 import { loadPrefs } from "../../preferences";
 import type { SubscriptionTier } from "../../auth";
@@ -77,12 +79,17 @@ function mount(
     defaultOptions: { queries: { retry: false } },
   });
 
+  // The chassis is active on /catalog in the app, so the directory's bar
+  // row goes through the portal here too — that is where REL-218 lived.
   const rootRoute = createRootRoute({
     component: () => (
       <QueryClientProvider client={queryClient}>
         <ShellContext.Provider value={shell}>
           <ShellDataContext.Provider value={{ widgets, dashboard: undefined }}>
-            <Outlet />
+            <BarChassisProvider active>
+              <BarChassisSlot />
+              <Outlet />
+            </BarChassisProvider>
           </ShellDataContext.Provider>
         </ShellContext.Provider>
       </QueryClientProvider>
@@ -152,6 +159,38 @@ describe("hub", () => {
       target: { value: "soccer" },
     });
     await waitFor(() => expect(router.state.location.search).toEqual({ q: "soccer" }));
+  });
+
+  // REL-218: the first character swaps the hub's field for the
+  // directory's. Keys go to whatever is focused, so every character
+  // after the first is lost unless the new field takes the focus.
+  it("keeps every keystroke and the focus across the hub → directory swap", async () => {
+    const { router } = mount("/catalog");
+    const user = userEvent.setup({ delay: 40 });
+    await user.click(await screen.findByLabelText("Search widgets"));
+    await user.keyboard("bit");
+    await waitFor(() => expect(router.state.location.search).toEqual({ q: "bit" }));
+    const field = screen.getByLabelText<HTMLInputElement>("Search widgets");
+    expect(field).toHaveValue("bit");
+    await waitFor(() => expect(field).toHaveFocus());
+    expect(field.selectionStart).toBe(3);
+    expect(await screen.findByText("Crypto")).toBeInTheDocument();
+
+    // Backspace to empty: the last kind, still this field, still focused.
+    await user.keyboard("{Backspace}{Backspace}{Backspace}");
+    await waitFor(() => expect(router.state.location.search).toEqual({ kind: "all" }));
+    expect(screen.getByLabelText("Search widgets")).toBe(field);
+    expect(field).toHaveFocus();
+  });
+
+  it("a Try chip opens the directory with the query in a focused field", async () => {
+    const { router } = mount("/catalog");
+    fireEvent.click(await screen.findByRole("button", { name: "Bitcoin" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ q: "Bitcoin" }));
+    const field = screen.getByLabelText<HTMLInputElement>("Search widgets");
+    expect(field).toHaveValue("Bitcoin");
+    await waitFor(() => expect(field).toHaveFocus());
+    expect(field.selectionStart).toBe("Bitcoin".length);
   });
 });
 

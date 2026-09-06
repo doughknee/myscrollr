@@ -286,6 +286,9 @@ export default function CatalogDirectory({
           <input
             type="search"
             value={draft}
+            // The query came in from the hub's field or a Try chip, so
+            // the caret follows it here. Works on mount only because the
+            // chassis shell hides via :empty, not state (REL-218).
             autoFocus={query !== ""}
             onChange={(e) => {
               setDraft(e.target.value);
