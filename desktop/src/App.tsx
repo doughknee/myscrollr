@@ -27,7 +27,6 @@ import {
   savePref,
   loadPrefs,
   savePrefs,
-  TICKER_GAPS,
   TICKER_HEIGHTS,
   toggleWidgetPin,
   } from "./preferences";
@@ -789,14 +788,11 @@ export default function App() {
                 onTogglePin={handleTogglePin}
                 pinnedWidgets={prefs.widgets.pinnedWidgets}
                 speed={prefs.ticker.tickerSpeed}
-                gap={TICKER_GAPS[prefs.ticker.tickerGap]}
-                pauseOnHover={prefs.ticker.pauseOnHover}
-                hoverSpeed={prefs.ticker.hoverSpeed}
+                onHover={prefs.ticker.onHover}
                 mixMode={prefs.ticker.mixMode}
                 chipColorMode={prefs.ticker.chipColors}
                 widgetDisplay={prefs.widgetDisplay}
                 comfort={prefs.ticker.tickerMode === "comfort"}
-                direction={prefs.ticker.tickerDirection}
                 scrollMode={prefs.ticker.scrollMode}
                 stepPause={prefs.ticker.stepPause}
                 showSourcelessCTA={showSourcelessCTA}

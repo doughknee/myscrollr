@@ -796,7 +796,7 @@ function RootLayout() {
   }, []);
 
   // ── TopBar ticker-toggle handler ─────────────────────────────
-  // Same pref as Customize → Ticker "Enable ticker" — one source of
+  // Same pref as Settings → Ticker "Show the ticker" — one source of
   // truth for the always-visible chrome control.
   const handleTickerToggle = useCallback(() => {
     persistPrefs({

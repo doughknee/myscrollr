@@ -1,8 +1,8 @@
 /**
  * Monitors: the map, the per-screen switches, and the Identify button.
  *
- * Shared by Settings pages (Window & startup today, the Ticker page
- * next — REL-204), so nothing here knows which page it is on.
+ * Rendered by the Ticker page under "Where" (REL-204); the page owns
+ * the group, this owns the rows and the Identify button.
  *
  * The map draws PHYSICAL rects: that is the one plane where mixed-DPI
  * screens sit side by side the way Windows' Display settings shows
@@ -16,7 +16,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTauriListener } from "../../hooks/useTauriListener";
-import { RowList, SettingsButton, SettingsGroup, ToggleRow } from "./SettingsControls";
+import { RowList, SettingsButton, ToggleRow } from "./SettingsControls";
 import { Row } from "./pages/Row";
 
 /** One `list_monitors` entry. `x/y/width/height` are logical (that
@@ -112,13 +112,22 @@ export function MonitorMap({
   );
 }
 
+/** Flashes each screen's number on it, so switch matches glass. */
+export function IdentifyButton() {
+  return (
+    <SettingsButton onClick={() => void invoke("identify_monitors").catch(() => {})}>
+      Identify
+    </SettingsButton>
+  );
+}
+
 /**
- * The whole Monitors group. `chosen` is `window.tickerMonitors` (names;
- * empty means primary, so a fresh install shows the primary switched
- * on with nothing saved). The main window turns the pref into windows
- * (routes/__root.tsx).
+ * The map plus one switch per screen. `chosen` is `window.tickerMonitors`
+ * (names; empty means primary, so a fresh install shows the primary
+ * switched on with nothing saved). The main window turns the pref into
+ * windows (routes/__root.tsx). Renders nothing until the list arrives.
  */
-export function MonitorsGroup({
+export function MonitorsRows({
   chosen,
   onChange,
 }: {
@@ -142,18 +151,11 @@ export function MonitorsGroup({
     );
 
   return (
-    <SettingsGroup
-      label="Monitors"
-      action={
-        <SettingsButton onClick={() => void invoke("identify_monitors").catch(() => {})}>
-          Identify
-        </SettingsButton>
-      }
-    >
-      <Row id="tickerMonitors">
-        <div className="border-b border-edge/60 px-4 py-3">
-          <MonitorMap monitors={monitors} on={on} onToggle={toggle} />
-        </div>
+    <Row id="tickerMonitors">
+      <div className="border-b border-edge/60 px-4 py-3">
+        <MonitorMap monitors={monitors} on={on} onToggle={toggle} />
+      </div>
+      <div className="border-b border-edge/60">
         <RowList>
           {monitors.map((m, i) => {
             const locked = on.size === 1 && on.has(m.name);
@@ -170,7 +172,7 @@ export function MonitorsGroup({
             );
           })}
         </RowList>
-      </Row>
-    </SettingsGroup>
+      </div>
+    </Row>
   );
 }

@@ -8,9 +8,11 @@ import { useState, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import Tooltip from "./Tooltip";
 
-export const IS_MACOS =
+const UA_PLATFORM =
   (navigator as { userAgentData?: { platform?: string } }).userAgentData
-    ?.platform === "macOS" || /Mac/.test(navigator.platform);
+    ?.platform ?? navigator.platform;
+export const IS_MACOS = /Mac/.test(UA_PLATFORM);
+export const IS_WINDOWS = /Win/.test(UA_PLATFORM);
 
 const appWindow = getCurrentWindow();
 

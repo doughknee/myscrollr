@@ -41,7 +41,7 @@ import PageHeader from "./pages/PageHeader";
 import AppearancePage from "./pages/AppearancePage";
 import WindowStartupPage from "./pages/WindowStartupPage";
 import ShortcutsPage from "./pages/ShortcutsPage";
-import TickerPage, { useTickerReset } from "./pages/TickerPage";
+import TickerPage, { RESET_TICKER_LABEL, useTickerReset } from "./pages/TickerPage";
 import ProfilePlanPage from "./pages/ProfilePlanPage";
 import DataPrivacyPage from "./pages/DataPrivacyPage";
 import UpdatesPage from "./pages/UpdatesPage";
@@ -169,7 +169,7 @@ export default function SettingsSurface({
                   action={
                     page === "ticker" ? (
                       <SettingsButton onClick={resetTicker}>
-                        Reset ticker settings
+                        {RESET_TICKER_LABEL}
                       </SettingsButton>
                     ) : undefined
                   }
@@ -187,10 +187,6 @@ export default function SettingsSurface({
 
               {page === "window" && (
                 <WindowStartupPage
-                  window_={prefs.window}
-                  onWindowChange={(window_) =>
-                    onPrefsChange({ ...prefs, window: window_ })
-                  }
                   startup={prefs.startup}
                   onStartupChange={(startup) =>
                     onPrefsChange({ ...prefs, startup })

@@ -9,7 +9,7 @@ import {
 import clsx from "clsx";
 import { ChevronDown, Plus, Settings2 } from "lucide-react";
 import { Ticker } from "motion-plus/react";
-import { useMotionValue, animate, AnimatePresence, motion } from "motion/react";
+import { useMotionValue, animate } from "motion/react";
 import type {
   DashboardResponse,
   Trade,
@@ -24,9 +24,9 @@ import type {
   SysmonChipData,
 } from "../types";
 import type {
+  HoverBehavior,
   MixMode,
   ChipColorMode,
-  TickerDirection,
   ScrollMode,
   WidgetPinConfig,
   WidgetDisplayPrefs,
@@ -75,10 +75,9 @@ interface ScrollrTickerProps {
   speed?: number;
   /** Gap between chips in px (default 8) */
   gap?: number;
-  /** Whether hovering slows the ticker (default true) */
-  pauseOnHover?: boolean;
-  /** Speed multiplier on hover, 0 = full pause (default 0.3) */
-  hoverSpeed?: number;
+  /** Continuous: keep / slow to 30 % / stop under the mouse.
+   *  Page: keep advancing, or hold the page (slow and pause alike). */
+  onHover?: HoverBehavior;
   /** Show 2-row comfort chips with extra detail */
   comfort?: boolean;
   /** How items from different widgets are ordered */
@@ -87,11 +86,9 @@ interface ScrollrTickerProps {
   chipColorMode?: ChipColorMode;
   /** Per-widget display preferences (controls what data chips show) */
   widgetDisplay?: WidgetDisplayPrefs;
-  /** Scroll direction: left (default) or right */
-  direction?: TickerDirection;
-  /** Scroll mode: continuous, step, or flip */
+  /** Scroll mode: continuous or step (Page) */
   scrollMode?: ScrollMode;
-  /** Seconds to pause between transitions in step/flip modes (default 2) */
+  /** Seconds each page stays put in step mode (default 5) */
   stepPause?: number;
   /**
    * When true, this row should render the "no sources installed yet"
@@ -260,13 +257,11 @@ export default function ScrollrTicker({
   pinnedWidgets = {},
   speed = 25,
   gap = 8,
-  pauseOnHover = true,
-  hoverSpeed = 0.3,
+  onHover = "slow",
   mixMode = "grouped",
   chipColorMode = "widget",
   widgetDisplay,
   comfort = false,
-  direction = "left",
   scrollMode = "continuous",
   stepPause = 5,
   showSourcelessCTA = false,
@@ -276,7 +271,9 @@ export default function ScrollrTicker({
   onOpenWidget,
 }: ScrollrTickerProps) {
   const effectiveScrollMode: ScrollMode = scrollMode;
-  const effectiveDirection: TickerDirection = direction;
+  // Direction left the settings 2026-09-06 (REL-204): tickers go left.
+  const effectiveDirection = "left" as const;
+  const holdOnHover = onHover !== "keep";
   const effectiveSpeed: number = speed;
   const effectiveMixMode: MixMode = mixMode;
 
@@ -411,15 +408,13 @@ export default function ScrollrTicker({
   // motion-plus has no loop callback, so this polls. Four reads a second
   // of a handful of rects is nothing next to the marquee's own per-frame
   // transform, and the check is skipped entirely when no slot rotates.
-  // Flip mode paginates rather than scrolls, so nothing there is ever
-  // "off screen" in the sense that matters; it keeps its first page.
   const wasVisibleRef = useRef<Set<string>>(new Set());
   const hasRotatingSlots = useMemo(
     () => chips.some((c) => (c as React.ReactElement<{ "data-rotate-slot"?: string }>).props?.["data-rotate-slot"]),
     [chips],
   );
   useEffect(() => {
-    if (!hasRotatingSlots || effectiveScrollMode === "flip") return;
+    if (!hasRotatingSlots) return;
     const id = window.setInterval(() => {
       const container = containerRef.current;
       if (!container) return;
@@ -479,8 +474,8 @@ export default function ScrollrTicker({
       await sleep(500);
 
       while (!cancelled && stepLoopRef.current) {
-        // Skip advancing while hovered and pauseOnHover is enabled
-        if (pauseOnHover && isHoveredRef.current) {
+        // Hold the page while hovered unless the user chose Keep moving
+        if (holdOnHover && isHoveredRef.current) {
           await sleep(100);
           continue;
         }
@@ -514,45 +509,13 @@ export default function ScrollrTicker({
     effectiveScrollMode,
     effectiveDirection,
     stepPause,
-    pauseOnHover,
+    holdOnHover,
     effectiveSpeed,
     chips.length,
     measureStepSize,
     offset,
     transitionDuration,
   ]);
-
-  // ── Flip mode: paginated vertical slide ───────────────────────
-  const [flipPage, setFlipPage] = useState(0);
-
-  // Estimate how many chips fit visually, then rotate the array
-  const visibleCount = useMemo(() => {
-    const containerWidth = containerRef.current?.clientWidth ?? 1200;
-    const avgChipWidth = comfort ? 180 : 120;
-    return Math.max(1, Math.floor(containerWidth / (avgChipWidth + gap)));
-  }, [comfort, gap, chips.length]); // re-estimate when chip count changes
-
-  const flipChips = useMemo(() => {
-    if (chips.length === 0) return [];
-    const shift = (flipPage * visibleCount) % chips.length;
-    return [...chips.slice(shift), ...chips.slice(0, shift)];
-  }, [chips, flipPage, visibleCount]);
-
-  // Flip timer: cycle pages on stepPause interval.
-  // Also resets flipPage when chips change (chips.length in deps triggers
-  // cleanup → fresh start) avoiding a separate effect with ordering concerns.
-  useEffect(() => {
-    if (effectiveScrollMode !== "flip" || chips.length === 0) return;
-
-    setFlipPage(0);
-
-    const timer = setInterval(() => {
-      if (pauseOnHover && isHoveredRef.current) return;
-      setFlipPage((p) => p + 1);
-    }, stepPause * 1000);
-
-    return () => clearInterval(timer);
-  }, [effectiveScrollMode, stepPause, pauseOnHover, chips.length]);
 
   // ── Build pinned chip arrays (rendered inside this row) ─────────
   //
@@ -734,44 +697,6 @@ export default function ScrollrTicker({
       </div>
     ) : null;
 
-  // ── Flip mode: AnimatePresence with vertical slide ────────────
-  if (effectiveScrollMode === "flip") {
-    return (
-      <div
-        ref={containerRef}
-        className={containerClass}
-        onMouseEnter={() => {
-          isHoveredRef.current = true;
-        }}
-        onMouseLeave={() => {
-          isHoveredRef.current = false;
-        }}
-      >
-        {accentLine}
-        {pinnedZone("left", pinnedLeft)}
-        <div className="ticker-scroll-wrapper">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={flipPage}
-              initial={{ y: "100%", opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: "-100%", opacity: 0 }}
-              transition={{
-                duration: transitionDuration,
-                ease: [0.25, 0.1, 0.25, 1],
-              }}
-              className="flex items-center h-full"
-              style={{ gap }}
-            >
-              {flipChips}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-        {pinnedZone("right", pinnedRight)}
-      </div>
-    );
-  }
-
   // ── Continuous / Step mode: motion-plus Ticker ────────────────
   const velocity =
     effectiveDirection === "left" ? effectiveSpeed : -effectiveSpeed;
@@ -795,7 +720,7 @@ export default function ScrollrTicker({
           items={chips}
           velocity={isStepMode ? 0 : velocity}
           offset={isStepMode ? offset : undefined}
-          hoverFactor={isStepMode ? 1 : pauseOnHover ? hoverSpeed : 1}
+          hoverFactor={isStepMode ? 1 : HOVER_FACTOR[onHover]}
           gap={gap}
           fade={hasPinnedLeft || hasPinnedRight ? 20 : 40}
         />
@@ -807,14 +732,16 @@ export default function ScrollrTicker({
 
 // ── Helpers (module-level) ───────────────────────────────────────
 
+/** Continuous-mode speed multiplier under the mouse; 0 stops the marquee. */
+const HOVER_FACTOR: Record<HoverBehavior, number> = { keep: 1, slow: 0.3, pause: 0 };
+
 /** Promise-based sleep helper. */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Map speed slider (5–150) to transition duration for step/flip modes.
- *  speed 5 → ~1.2s (crawl), speed 25 → ~0.9s (default),
- *  speed 60 → ~0.55s, speed 150 → ~0.15s (blazing). */
+/** Map speed (px/s) to the step transition duration in Page mode.
+ *  Slow 20 → ~1.1s, Normal 40 → ~0.95s, Fast 80 → ~0.66s. */
 function speedToTransitionDuration(speed: number): number {
   return Math.max(0.15, 1.2 - (speed - 5) * 0.0072);
 }

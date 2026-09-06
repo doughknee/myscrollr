@@ -74,7 +74,7 @@ export const SETTINGS_PAGE_META: Record<SettingsPage, SettingsPageMeta> = {
     id: "ticker",
     label: "Ticker",
     title: "Ticker",
-    subtitle: "How the pinned ticker strip moves and looks.",
+    subtitle: "The bar: whether it's on, where it lives, how it looks, moves and behaves.",
     icon: RadioTower,
   },
   profile: {
