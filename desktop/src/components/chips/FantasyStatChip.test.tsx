@@ -1,10 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import FantasyStatChip from "./FantasyStatChip";
-import { DEFAULT_WIDGET_DISPLAY } from "../../preferences";
 import type { LeagueResponse } from "../../datawidgets/fantasy/types";
-
-const prefs = DEFAULT_WIDGET_DISPLAY.fantasy;
 
 function league(): LeagueResponse {
   return {
@@ -64,7 +61,7 @@ describe("FantasyStatChip score rolling", () => {
    */
   it("renders the score as one plain string by default", () => {
     const { container } = render(
-      <FantasyStatChip league={league()} prefs={prefs} />,
+      <FantasyStatChip league={league()} />,
     );
     expect(screen.getByText("149.9–151.7")).toBeTruthy();
     // No roller mounted, so no digit columns in the markup.
@@ -79,7 +76,7 @@ describe("FantasyStatChip score rolling", () => {
    */
   it("rolls the digits when opted in without losing the accessible score", () => {
     const { container } = render(
-      <FantasyStatChip league={league()} prefs={prefs} rollScore />,
+      <FantasyStatChip league={league()} rollScore />,
     );
     expect(container.textContent).toContain("0123456789");
     expect(screen.getByText("149.9–151.7")).toBeTruthy();

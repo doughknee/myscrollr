@@ -65,7 +65,6 @@ export function isThemeFamily(value: unknown): value is ThemeFamily {
 export function isThemeMode(value: unknown): value is ThemeMode {
   return value === "light" || value === "dark" || value === "system";
 }
-type TaskbarHeight = "compact" | "default" | "comfortable";
 export type TickerGap = "tight" | "normal" | "spacious";
 export type TickerMode = "compact" | "comfort";
 export type MixMode = "grouped" | "weave";
@@ -163,31 +162,13 @@ export interface WindowPrefs {
   tickerMonitors: string[];
 }
 
-interface TaskbarPrefs {
-  showWidgetGlyphIcons: boolean;
-  showConnectionIndicator: boolean;
-  showCanvasToggle: boolean;
-  taskbarHeight: TaskbarHeight;
-  pinnedActions: string[];
-}
-
 // ── Per-widget config types ─────────────────────────────────────
-
-export interface ClockTickerConfig {
-  localTime: boolean;
-  /** Whether to show world clocks on the ticker at all (default false). */
-  showTimezones: boolean;
-  /** Timezone IANA IDs excluded from the ticker (empty = all configured TZs shown). */
-  excludedTimezones: string[];
-}
-
-export interface ClockWidgetConfig {
-  ticker: ClockTickerConfig;
-}
-
-export interface TimerTickerConfig {
-  activeTimer: boolean;
-}
+//
+// Only what the user can actually set lives here. The per-widget
+// `ticker.excluded*` lists and the clock/timer on-off gates were
+// force-reset to their defaults on every load from 2026-07-17 until
+// REL-208 removed them: tracked content always reaches the ticker, so
+// the readers in useWidgetTickerData no longer consult a pref at all.
 
 export interface TimerPomodoroConfig {
   workMins: number;
@@ -197,17 +178,7 @@ export interface TimerPomodoroConfig {
 }
 
 export interface TimerWidgetConfig {
-  ticker: TimerTickerConfig;
   pomodoro: TimerPomodoroConfig;
-}
-
-export interface WeatherTickerConfig {
-  /** City display names excluded from the ticker (empty = all configured cities shown). */
-  excludedCities: string[];
-}
-
-export interface WeatherWidgetConfig {
-  ticker: WeatherTickerConfig;
 }
 
 export type TempUnit = "celsius" | "fahrenheit";
@@ -225,22 +196,11 @@ export interface SysmonWidgetConfig {
   ticker: SysmonTickerConfig;
 }
 
-export interface UptimeTickerConfig {
-  /** Monitor IDs excluded from the ticker (empty = all configured monitors shown). */
-  excludedMonitors: number[];
-}
-
 export interface UptimeWidgetConfig {
   /** The user's Uptime Kuma public status page URL. Empty = not configured. */
   url: string;
   /** Poll interval in seconds (default 60). */
   pollInterval: number;
-  ticker: UptimeTickerConfig;
-}
-
-export interface GitHubTickerConfig {
-  /** Repo keys ("owner/repo") excluded from the ticker. */
-  excludedRepos: string[];
 }
 
 export interface GitHubWidgetConfig {
@@ -248,7 +208,6 @@ export interface GitHubWidgetConfig {
   repos: Array<{ owner: string; repo: string }>;
   /** Poll interval in seconds (default 120). */
   pollInterval: number;
-  ticker: GitHubTickerConfig;
 }
 
 export interface WidgetPinConfig {
@@ -265,9 +224,7 @@ export interface WidgetPrefs {
   /** Per-widget pin state: removes the chip from the scrolling ticker and
    *  places it as a static element on the chosen side. Keyed by widget ID. */
   pinnedWidgets: Record<string, WidgetPinConfig>;
-  clock: ClockWidgetConfig;
   timer: TimerWidgetConfig;
-  weather: WeatherWidgetConfig;
   sysmon: SysmonWidgetConfig;
   uptime: UptimeWidgetConfig;
   github: GitHubWidgetConfig;
@@ -285,33 +242,21 @@ export interface WidgetPrefs {
  *   both    — shown in both places (default for migrated `true` booleans)
  *   ticker  — shown on the always-on-top ticker only; hidden from the feed
  *
- * There is no longer a UI for switching these: the `VenueRow` segmented
- * control lived on the Configure pages, which v1.1.9 retired. The values
- * still drive rendering — `shouldShowOnTicker` / `shouldShowOnFeed` are read
- * by the ticker and the chips — they just come from stored prefs and the
- * per-widget defaults now, not from a settings screen.
+ * Nothing reads a Venue any more: the last per-item toggles (fantasy's
+ * Advanced block) went in REL-208, and the ticker shows a fixed set per
+ * source (docs/CHIP_SPEC.md §8). The type survives only so the sports
+ * migration can coerce the legacy `showUpcoming` / `showFinal` booleans.
  */
 export type Venue = "off" | "feed" | "both" | "ticker";
 
 /**
- * Fantasy ticker simplicity dial. Three positions instead of ~10
- * per-item venue toggles; see FantasyDisplayPrefs.tickerMode.
+ * Fantasy ticker simplicity dial; see FantasyDisplayPrefs.tickerMode.
  *
  * Named for the widget because `TickerMode` is already taken by the
  * ticker's density setting (compact | comfort) — a genuinely different
  * axis that happens to want the same word.
  */
 export type FantasyTickerMode = "essential" | "standard" | "everything";
-
-/** True when the venue indicates the setting should render on the ticker. */
-export function shouldShowOnTicker(venue: Venue): boolean {
-  return venue === "both" || venue === "ticker";
-}
-
-/** True when the venue indicates the setting should render on the feed page. */
-export function shouldShowOnFeed(venue: Venue): boolean {
-  return venue === "both" || venue === "feed";
-}
 
 /**
  * Coerce a saved value (boolean from the pre-v1.0.2 era, or any other
@@ -363,7 +308,6 @@ export interface RssDisplayPrefs {
    *  persists per widget via the config.display override; this is the
    *  global fallback. */
   feedSort: "newest" | "oldest";
-  articlesPerSource: number; // 0 = all (the default since v1.1.1); 1/3/5/10 legacy per-source caps
   /** Maximum eligible articles shown in the feed. 0 = all. */
   maxArticles: number;
   /** v1.1.3 Time Controls: hide articles older than N days (published_at,
@@ -375,44 +319,6 @@ export interface RssDisplayPrefs {
 export type FantasySubTab = "overview" | "matchup" | "standings" | "roster";
 
 export interface FantasyDisplayPrefs {
-  // ── Per-item venue controls (visibility) ──
-  /** Live matchup score: "My Team 89.5 — 76.2 Opponent". */
-  matchupScore: Venue;
-  /** "62% win" — uses estimateWinProbability. */
-  winProbability: Venue;
-  /** LIVE / FINAL / PRE badge on the matchup summary. */
-  matchupStatus: Venue;
-  /** "Proj 95.2" on the user's team this week. */
-  projectedPoints: Venue;
-  /** "Week 5" label. */
-  week: Venue;
-  /** Season record "6-3-1". */
-  record: Venue;
-  /** "3rd of 10" standings position. */
-  standingsPosition: Venue;
-  /** Streak badge ("W3" / "L2"). */
-  streak: Venue;
-  /** Injury count on the user's roster ("2 injured"). */
-  injuryCount: Venue;
-  /** Top scorer on the user's active roster this week ("LeBron 42.3"). */
-  topScorer: Venue;
-
-  // ── Player-stats segments (Phase 1, 2026-04-25) ──
-  /** Top three active starters by current points
-   *  ("Mahomes 32 · Hill 18 · CMC 14"). One combined segment, not three. */
-  topThreeScorers: Venue;
-  /** Lowest-scoring active starter ("Worst: Andrews 0.0"). Surfaces
-   *  sit/start regret. Skipped silently when there are no starters. */
-  worstStarter: Venue;
-  /** Highest-scoring bench player ("Bench top: Pacheco 18.0"). Hidden
-   *  when no bench player has any points yet — avoids a meaningless
-   *  "Bench top: someone 0.0" cluttering the chip pre-kickoff. */
-  benchOpportunity: Venue;
-  /** Names + statuses for injured players on the roster
-   *  ("🚨 Saquon OUT, Mixon DTD"). Capped at 3 names; spillover shown
-   *  as "+N more". Complementary to `injuryCount` — both can be on. */
-  injuryDetail: Venue;
-
   // ── Followed players (Phase 2, 2026-04-25) ──
   /**
    * Yahoo player_keys the user wants surfaced as their own dedicated
@@ -431,30 +337,20 @@ export interface FantasyDisplayPrefs {
 
   // ── Ticker simplicity dial (2026-08) ──
   /**
-   * How much of the fantasy story reaches the ticker.
+   * How much of the fantasy story reaches the ticker. Each position is
+   * a fixed set built in ticker.tsx — there is no per-item control
+   * underneath it any more (REL-208; docs/CHIP_SPEC.md §8).
    *
    *   essential  — one smart chip per league, nothing else
    *   standard   — + live moment chips (in-play, breaking injury).
    *                THE DEFAULT for fresh installs.
-   *   everything — every per-item venue pref above is honoured, and the
-   *                Advanced block in the Account panel unlocks
-   *
-   * A preset LAYER over the venue prefs, not a replacement: essential
-   * and standard are computed at chip-build time in ticker.tsx and
-   * ignore the per-item values, which stay untouched underneath. Moving
-   * the dial back to Everything restores exactly what the user had.
+   *   everything — + top scorers, worst starter, bench top, injury report
    *
    * Followed players are deliberately outside the dial — an explicit
    * opt-in shouldn't be silently dropped by a simplicity setting.
    */
   tickerMode: FantasyTickerMode;
 
-  // ── Feed-structural settings (not venue-toggled) ──
-  /** Render the standings section inside the Fantasy feed view. */
-  showStandings: boolean;
-  /** Render the matchups section inside the Fantasy feed view. */
-  showMatchups: boolean;
-  defaultSort: "name" | "season" | "record" | "matchup";
   /** Which sub-tab the Feed view opens on. Defaults to overview when in 2+ leagues, matchup otherwise. */
   defaultSubTab: FantasySubTab;
   /** The user-preferred "primary" league key shown as the hero in Overview/Matchup tabs. */
@@ -483,7 +379,6 @@ export interface AppPreferences {
   startup: StartupPrefs;
   privacy: PrivacyPrefs;
   window: WindowPrefs;
-  taskbar: TaskbarPrefs;
   widgets: WidgetPrefs;
   widgetDisplay: WidgetDisplayPrefs;
   /**
@@ -541,31 +436,6 @@ const DEFAULT_WINDOW: WindowPrefs = {
   tickerMonitors: [],
 };
 
-const DEFAULT_TASKBAR: TaskbarPrefs = {
-  showWidgetGlyphIcons: true,
-  showConnectionIndicator: true,
-  showCanvasToggle: true,
-  taskbarHeight: "default",
-  pinnedActions: ["showTicker", "width", "pinned"],
-};
-
-// 2026-07-17 settings-model unification: per-item ticker exclusions and
-// the on/off ticker gates left the UI — "if you track it, it's on the
-// ticker". These defaults are FORCED at migration (stored values are
-// ignored); the fields survive so the ticker-data readers stay
-// untouched (empty exclusion lists filter nothing). Sysmon is the one
-// exception: its stat toggles remain user-editable content selection.
-export const DEFAULT_CLOCK_TICKER: ClockTickerConfig = {
-  localTime: true,
-  // true since the unification — tracked world clocks appear.
-  showTimezones: true,
-  excludedTimezones: [],
-};
-
-export const DEFAULT_TIMER_TICKER: TimerTickerConfig = {
-  activeTimer: true,
-};
-
 export const DEFAULT_TIMER_POMODORO: TimerPomodoroConfig = {
   workMins: 25,
   shortBreakMins: 5,
@@ -573,26 +443,15 @@ export const DEFAULT_TIMER_POMODORO: TimerPomodoroConfig = {
   longBreakEvery: 4,
 };
 
-export const DEFAULT_WEATHER_TICKER: WeatherTickerConfig = {
-  excludedCities: [],
-};
-
-// All-on since the unification: the stat toggles are content selection
-// now and gate BOTH the feed cards and the ticker chips, so defaults
-// must match what the feed always showed (everything the hardware has).
+// All-on since the 2026-07-17 unification: the stat toggles are content
+// selection and gate BOTH the feed cards and the ticker chips, so
+// defaults must match what the feed always showed (everything the
+// hardware has). Sysmon is the one widget that kept a ticker sub-config.
 export const DEFAULT_SYSMON_TICKER: SysmonTickerConfig = {
   cpu: true,
   memory: true,
   gpu: true,
   gpuPower: true,
-};
-
-export const DEFAULT_UPTIME_TICKER: UptimeTickerConfig = {
-  excludedMonitors: [],
-};
-
-export const DEFAULT_GITHUB_TICKER: GitHubTickerConfig = {
-  excludedRepos: [],
 };
 
 export const DEFAULT_WIDGET_DISPLAY: WidgetDisplayPrefs = {
@@ -601,7 +460,6 @@ export const DEFAULT_WIDGET_DISPLAY: WidgetDisplayPrefs = {
   },
   rss: {
     feedSort: "newest",
-    articlesPerSource: 0,
     maxArticles: 0,
     maxArticleAgeDays: 0,
   },
@@ -609,26 +467,6 @@ export const DEFAULT_WIDGET_DISPLAY: WidgetDisplayPrefs = {
     defaultSort: "trending",
   },
   fantasy: {
-    matchupScore: "both",
-    winProbability: "both",
-    matchupStatus: "both",
-    projectedPoints: "both",
-    week: "both",
-    record: "both",
-    standingsPosition: "both",
-    streak: "both",
-    injuryCount: "both",
-    topScorer: "both",
-    // Phase 1 player-stats: all default to "both" — users have been
-    // explicitly asking for these, so make them visible on the ticker
-    // out of the box. Users who find the chip too dense can flip
-    // individual ones to "feed" or "off" via Display tab. The
-    // migration helper also defaults these to "both" via its
-    // unknown-input fallback, so existing users see them post-upgrade.
-    topThreeScorers: "both",
-    worstStarter: "both",
-    benchOpportunity: "both",
-    injuryDetail: "both",
     followedPlayerKeys: [],
     // Standard, not Essential: the smart league chip tells you a league
     // is live but not WHO is doing it, and the player mid-game is the
@@ -639,9 +477,6 @@ export const DEFAULT_WIDGET_DISPLAY: WidgetDisplayPrefs = {
     // Existing users keep their configured ticker regardless — see
     // migrateFantasyDisplay.
     tickerMode: "standard",
-    showStandings: true,
-    showMatchups: true,
-    defaultSort: "name",
     defaultSubTab: "overview",
     primaryLeagueKey: null,
     enabledLeagueKeys: [],
@@ -658,15 +493,8 @@ const DEFAULT_WIDGETS: WidgetPrefs = {
   sidebarOrder: [],
   widgetsOnTicker: ["clock"],
   pinnedWidgets: {},
-  clock: {
-    ticker: { ...DEFAULT_CLOCK_TICKER },
-  },
   timer: {
-    ticker: { ...DEFAULT_TIMER_TICKER },
     pomodoro: { ...DEFAULT_TIMER_POMODORO },
-  },
-  weather: {
-    ticker: { ...DEFAULT_WEATHER_TICKER },
   },
   sysmon: {
     refreshInterval: 2,
@@ -676,12 +504,10 @@ const DEFAULT_WIDGETS: WidgetPrefs = {
   uptime: {
     url: "",
     pollInterval: 60,
-    ticker: { ...DEFAULT_UPTIME_TICKER },
   },
   github: {
     repos: [],
     pollInterval: 120,
-    ticker: { ...DEFAULT_GITHUB_TICKER },
   },
 };
 
@@ -691,7 +517,6 @@ const DEFAULT_PREFS: AppPreferences = {
   startup: DEFAULT_STARTUP,
   privacy: DEFAULT_PRIVACY,
   window: DEFAULT_WINDOW,
-  taskbar: DEFAULT_TASKBAR,
   widgets: DEFAULT_WIDGETS,
   widgetDisplay: DEFAULT_WIDGET_DISPLAY,
   tipsShown: [],
@@ -714,17 +539,7 @@ function migrateV1(saved: Record<string, unknown>): Partial<AppPreferences> {
     result.startup = { ...DEFAULT_STARTUP };
   }
 
-  // Old "taskbar" → taskbar (add pinnedActions)
-  const taskbar = saved.taskbar as Record<string, unknown> | undefined;
-  if (taskbar) {
-    result.taskbar = {
-      ...DEFAULT_TASKBAR,
-      ...taskbar,
-      // v1 had no pinnedActions; default to the standard set
-      pinnedActions:
-        (taskbar.pinnedActions as string[]) ?? DEFAULT_TASKBAR.pinnedActions,
-    };
-  }
+  // v1's "taskbar" block is dropped: nothing ever read it (REL-208).
 
   // "ticker" stays the same shape
   if (saved.ticker) {
@@ -776,8 +591,10 @@ function shouldAddLegacyTimerToTicker(
 ): boolean {
   if (!saved) return false;
   if (saved.timer != null && typeof saved.timer === "object") return false;
+  // `clock` is no longer on WidgetPrefs (REL-208); this reads the raw
+  // pre-split blob, where the timer lived under the clock widget.
   const clockTicker = (
-    saved.clock as unknown as
+    (saved as Record<string, unknown>).clock as
       { ticker?: { activeTimer?: unknown } } | null | undefined
   )?.ticker;
   if (clockTicker?.activeTimer === false) return false;
@@ -801,9 +618,9 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
       ? (v as Record<string, unknown>)
       : undefined;
 
-  const clk = obj(saved.clock);
+  // Pre-split blobs kept the pomodoro config under `clock`.
+  const clk = obj((saved as Record<string, unknown>).clock);
   const tmr = obj(saved.timer);
-  const wth = obj(saved.weather);
   const sys = obj(saved.sysmon);
   const upt = obj(saved.uptime);
   const ghb = obj(saved.github);
@@ -836,24 +653,16 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
       !Array.isArray(saved.pinnedWidgets)
         ? (saved.pinnedWidgets as Record<string, WidgetPinConfig>)
         : {},
-    // 2026-07-17 unification reset: clock/timer/weather/uptime/github
-    // ticker configs are forced to defaults — the exclusion/on-off UIs
-    // are gone and tracked content always reaches the ticker. Stored
-    // values are deliberately ignored (idempotent, zero-write; same
-    // idiom as the display-venue reset).
-    clock: {
-      ticker: { ...DEFAULT_CLOCK_TICKER },
-    },
+    // Stored clock/weather blocks and the per-widget `ticker` sub-configs
+    // (other than sysmon's) are dropped here: the fields were force-reset
+    // on every load since 2026-07-17 and REL-208 removed them outright.
+    // Not spreading them is what sheds them from disk on the next save.
     timer: {
-      ticker: { ...DEFAULT_TIMER_TICKER },
       pomodoro: {
         ...DEFAULT_TIMER_POMODORO,
         ...obj(clk?.pomodoro),
         ...obj(tmr?.pomodoro),
       },
-    },
-    weather: {
-      ticker: { ...DEFAULT_WEATHER_TICKER },
     },
     sysmon: {
       refreshInterval:
@@ -869,7 +678,6 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
         typeof upt?.pollInterval === "number"
           ? upt.pollInterval
           : DEFAULT_WIDGETS.uptime.pollInterval,
-      ticker: { ...DEFAULT_UPTIME_TICKER },
     },
     github: {
       repos: Array.isArray(ghb?.repos)
@@ -885,7 +693,6 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
         typeof ghb?.pollInterval === "number"
           ? ghb.pollInterval
           : DEFAULT_WIDGETS.github.pollInterval,
-      ticker: { ...DEFAULT_GITHUB_TICKER },
     },
   };
 }
@@ -958,14 +765,8 @@ export function migrateRssDisplay(
       ["newest", "oldest"],
       DEFAULT_WIDGET_DISPLAY.rss.feedSort,
     ),
-    // One-shot migration (v1.1.1): 4 was the pre-widget-era DEFAULT and
-    // never appeared in the picker (1/3/5/10), so a stored 4 is an
-    // untouched default, not a user's choice — map it to 0 (all).
-    // Deliberately chosen values (1/3/5/10) survive.
-    articlesPerSource:
-      typeof raw.articlesPerSource === "number" && raw.articlesPerSource !== 4
-        ? raw.articlesPerSource
-        : DEFAULT_WIDGET_DISPLAY.rss.articlesPerSource,
+    // A stored `articlesPerSource` (the retired per-source cap, REL-208)
+    // is not carried: the feed shows every eligible article per source.
     maxArticles:
       typeof raw.maxArticles === "number" &&
       Number.isFinite(raw.maxArticles) &&
@@ -991,33 +792,16 @@ export function migrateFantasyDisplay(
 ): FantasyDisplayPrefs {
   const raw = (saved ?? {}) as Record<string, unknown>;
 
-  // tickerShowMatchup (pre-v1.0.2 boolean) folds into matchupScore:
-  //   true  → "both" (score visible everywhere)
-  //   false → "feed" (hide from ticker; keep in feed cards)
-  // If the user already has a `matchupScore` Venue stored, use it.
-  const legacyTickerMatchup = raw.tickerShowMatchup;
-  const explicitMatchupScore = raw.matchupScore;
-  const matchupScore: Venue = explicitMatchupScore
-    ? migrateVenue(explicitMatchupScore)
-    : legacyTickerMatchup === false
-      ? "feed"
-      : "both";
-
-  // showInjuryCount (pre-v1.0.2 boolean) folds into injuryCount.
-  const legacyInjuryCount = raw.showInjuryCount;
-  const explicitInjuryCount = raw.injuryCount;
-  const injuryCount: Venue = explicitInjuryCount
-    ? migrateVenue(explicitInjuryCount)
-    : legacyInjuryCount === false
-      ? "off"
-      : "both";
-
-  // The dial is new. Defaulting everyone to "essential" would silently
-  // strip segments an existing user had deliberately switched on, so a
-  // prefs file that predates the dial resolves to "everything" — the
-  // mode whose behaviour IS the old behaviour (every per-item venue
-  // pref honoured). Only genuinely fresh installs, which never reach
-  // this function, get the calm default.
+  // A prefs file that predates the dial resolves to "everything": every
+  // per-item venue pref defaulted to "both" back then, so that is the
+  // ticker those users already had. Only genuinely fresh installs, which
+  // never reach this function, get the calm default.
+  //
+  // The 14 venue prefs, the two legacy booleans they were folded from
+  // (`tickerShowMatchup`, `showInjuryCount`), and the never-read
+  // `showStandings` / `showMatchups` / `defaultSort` are not carried
+  // (REL-208) — the object built here is what gets saved back, so they
+  // fall off on the next write.
   const tickerMode: FantasyTickerMode = isFantasyTickerMode(raw.tickerMode)
     ? raw.tickerMode
     : "everything";
@@ -1025,26 +809,6 @@ export function migrateFantasyDisplay(
   return {
     ...DEFAULT_WIDGET_DISPLAY.fantasy,
     tickerMode,
-    matchupScore,
-    winProbability: migrateVenue(raw.winProbability),
-    matchupStatus: migrateVenue(raw.matchupStatus),
-    projectedPoints: migrateVenue(raw.projectedPoints),
-    week: migrateVenue(raw.week),
-    record: migrateVenue(raw.record),
-    standingsPosition: migrateVenue(raw.standingsPosition),
-    streak: migrateVenue(raw.streak),
-    injuryCount,
-    topScorer: migrateVenue(raw.topScorer),
-    // Phase 1 player-stats fields. New fields default to "both" via
-    // migrateVenue's fallback for unknown inputs, so existing prefs
-    // files (which won't have these keys) get the new segments
-    // visible by default. The DEFAULT_WIDGET_DISPLAY values above
-    // are what fresh installs and `handleReset` produce; this
-    // migration is what existing users see post-upgrade.
-    topThreeScorers: migrateVenue(raw.topThreeScorers),
-    worstStarter: migrateVenue(raw.worstStarter),
-    benchOpportunity: migrateVenue(raw.benchOpportunity),
-    injuryDetail: migrateVenue(raw.injuryDetail),
     // Followed players is just a string array — no enum migration.
     // Filter to strings defensively in case the persisted shape is
     // garbled (older prefs files with no key get [] from the default).
@@ -1053,19 +817,6 @@ export function migrateFantasyDisplay(
           (k): k is string => typeof k === "string",
         )
       : DEFAULT_WIDGET_DISPLAY.fantasy.followedPlayerKeys,
-    showStandings:
-      typeof raw.showStandings === "boolean"
-        ? raw.showStandings
-        : DEFAULT_WIDGET_DISPLAY.fantasy.showStandings,
-    showMatchups:
-      typeof raw.showMatchups === "boolean"
-        ? raw.showMatchups
-        : DEFAULT_WIDGET_DISPLAY.fantasy.showMatchups,
-    defaultSort: oneOf(
-      raw.defaultSort,
-      ["name", "season", "record", "matchup"],
-      DEFAULT_WIDGET_DISPLAY.fantasy.defaultSort,
-    ),
     defaultSubTab: oneOf(
       raw.defaultSubTab,
       ["overview", "matchup", "standings", "roster"],
@@ -1183,7 +934,8 @@ export function loadPrefs(): AppPreferences {
           ? savedWindow.tickerMonitors.filter((m): m is string => typeof m === "string")
           : [],
       },
-      taskbar: { ...DEFAULT_TASKBAR, ...source.taskbar },
+      // No `taskbar`: the block was migrated, defaulted and reset for
+      // years without a reader. Not carrying it here sheds it on save.
       widgets: mergeWidgetPrefs(
         source.widgets as Partial<WidgetPrefs> | undefined,
       ),
@@ -1254,7 +1006,6 @@ export function resetAll(): AppPreferences {
     startup: { ...DEFAULT_STARTUP },
     privacy: { ...DEFAULT_PRIVACY },
     window: { ...DEFAULT_WINDOW },
-    taskbar: { ...DEFAULT_TASKBAR },
     widgets: { ...DEFAULT_WIDGETS },
     widgetDisplay: { ...DEFAULT_WIDGET_DISPLAY },
     // Reset clears tipsShown — the user explicitly asked for a clean
@@ -1325,12 +1076,6 @@ export function migrateAppearanceTheme(
 }
 
 // ── Derived values ──────────────────────────────────────────────
-
-export const TASKBAR_HEIGHTS: Record<TaskbarHeight, number> = {
-  compact: 28,
-  default: 36,
-  comfortable: 44,
-};
 
 export const TICKER_GAPS: Record<TickerGap, number> = {
   tight: 8,

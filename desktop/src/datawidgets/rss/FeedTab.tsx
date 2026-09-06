@@ -40,7 +40,6 @@ import { useSetToggle, latestTimestamp } from "../feedHooks";
 import {
   applyRssPipeline,
   type RssSortOrder,
-  distinctSourceCount,
   getRssDisplayPrefs,
 } from "./view";
 import type {
@@ -202,8 +201,6 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   const [sortOrder, setSortOrder] = useState<SortOrder>(
     () => dp.feedSort ?? "newest",
   );
-  const [showAll, setShowAll] = useState(false);
-
   // Per-source article counts — menu rows carry the numbers now.
   const sourceCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -231,7 +228,6 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   const pickSort = useCallback(
     (next: SortOrder) => {
       setSortOrder(next);
-      setShowAll(false);
       persistDisplay({ ...displayOverride, feedSort: next });
     },
     [displayOverride, persistDisplay],
@@ -264,29 +260,17 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
   );
 
   // ── Data pipeline ────────────────────────────────────────────
-  // Delegates to the shared `applyRssPipeline` selector so the feed page
-  // and the ticker apply the same filter/sort/limit logic.
-  const { visibleItems, totalHidden } = useMemo(
+  const visibleItems = useMemo(
     () =>
       applyRssPipeline(rssItems, {
         selectedSources,
         selectedCategories,
         categoryMap,
         sortOrder,
-        articlesPerSource: dp.articlesPerSource,
         maxArticles: dp.maxArticles,
         maxArticleAgeDays: dp.maxArticleAgeDays,
-        showAll,
       }),
-    [rssItems, selectedSources, selectedCategories, sortOrder, dp.articlesPerSource, dp.maxArticles, dp.maxArticleAgeDays, categoryMap, showAll],
-  );
-
-  // Single-outlet widgets have exactly one source; the per-source
-  // limit UI only exists for multi-feed widgets (Custom RSS, legacy
-  // News) — see v1.1.1 smart removal.
-  const multiSource = useMemo(
-    () => distinctSourceCount(rssItems) > 1,
-    [rssItems],
+    [rssItems, selectedSources, selectedCategories, sortOrder, dp.maxArticles, dp.maxArticleAgeDays, categoryMap],
   );
 
   const showEmpty = rssItems.length === 0;
@@ -416,33 +400,6 @@ function RssFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
                   now={now}
                 />
               ))}
-            </div>
-          )}
-
-          {/* Per-source limit — list FOOTER content, not chrome (the old
-              info bands above the list are gone). Multi-source only:
-              single-outlet widgets have no per-source concept. */}
-          {multiSource && totalHidden > 0 && !showAll && (
-            <div className="flex items-center justify-center gap-3 px-3 py-3">
-              <button
-                onClick={() => setShowAll(true)}
-                className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20  cursor-pointer"
-              >
-                Show all
-              </button>
-              <span className="text-xs text-fg-3 tabular-nums font-mono">
-                {totalHidden} hidden · {dp.articlesPerSource} per source
-              </span>
-            </div>
-          )}
-          {multiSource && showAll && totalHidden === 0 && dp.articlesPerSource > 0 && (
-            <div className="flex items-center justify-center px-3 py-3">
-              <button
-                onClick={() => setShowAll(false)}
-                className="px-4 py-1.5 rounded-md text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20  cursor-pointer"
-              >
-                Limit to {dp.articlesPerSource} per source
-              </button>
             </div>
           )}
           </>

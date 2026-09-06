@@ -204,48 +204,41 @@ export function useWidgetTickerData(
   // ── Build clock chips ─────────────────────────────────────────
   const buildClockChips = useCallback((): ClockChipData[] => {
     if (!enabledWidgets.has("clock")) return [];
-    const cfg = widgetPrefs.clock;
     const chips: ClockChipData[] = [];
     const now = new Date();
     const format = getStore<string>(LS_CLOCK_FORMAT, "12h");
 
-    // Local time
-    if (cfg.ticker.localTime) {
+    // Local time, then every tracked world clock: if you track it, it's
+    // on the ticker (docs/CHIP_SPEC.md §8 — no per-item selection).
+    chips.push({
+      id: "clock-local",
+      kind: "clock",
+      label: "Local",
+      value: formatTime(now, undefined, format),
+      detail: formatDetail(now, undefined),
+      night: isNightIn(now, undefined),
+      offset: utcOffsetLabel(now, undefined),
+    });
+
+    const tzs = getStore<string[]>(LS_CLOCK_TIMEZONES, []);
+    for (const tz of Array.isArray(tzs) ? tzs : []) {
       chips.push({
-        id: "clock-local",
+        id: `clock-${tz}`,
         kind: "clock",
-        label: "Local",
-        value: formatTime(now, undefined, format),
-        detail: formatDetail(now, undefined),
-        night: isNightIn(now, undefined),
-        offset: utcOffsetLabel(now, undefined),
+        label: tzShortLabel(tz),
+        value: formatTime(now, tz, format),
+        detail: formatDetail(now, tz),
+        night: isNightIn(now, tz),
+        offset: utcOffsetLabel(now, tz),
       });
     }
 
-    // Configured timezones (gated by showTimezones, then filtered by excludedTimezones)
-    if (cfg.ticker.showTimezones) {
-      const tzs = getStore<string[]>(LS_CLOCK_TIMEZONES, []);
-      for (const tz of Array.isArray(tzs) ? tzs : []) {
-        if (cfg.ticker.excludedTimezones.includes(tz)) continue;
-        chips.push({
-          id: `clock-${tz}`,
-          kind: "clock",
-          label: tzShortLabel(tz),
-          value: formatTime(now, tz, format),
-          detail: formatDetail(now, tz),
-          night: isNightIn(now, tz),
-          offset: utcOffsetLabel(now, tz),
-        });
-      }
-    }
-
     return chips;
-  }, [widgetPrefs.clock, enabledWidgets]);
+  }, [enabledWidgets]);
 
   // ── Build timer chips ─────────────────────────────────────────
   const buildTimerChips = useCallback((): ClockChipData[] => {
     if (!enabledWidgets.has("timer")) return [];
-    if (!widgetPrefs.timer.ticker.activeTimer) return [];
 
     const state = getStore<TimerState | null>(LS_TIMER_STATE, null);
     if (!state) return [];
@@ -260,7 +253,6 @@ export function useWidgetTickerData(
   // ── Build weather chips ───────────────────────────────────────
   const buildWeatherChips = useCallback((): WeatherChipData[] => {
     if (!enabledWidgets.has("weather")) return [];
-    const cfg = widgetPrefs.weather;
     const chips: WeatherChipData[] = [];
     const unit = getStore<string>(LS_WEATHER_UNIT, "fahrenheit");
 
@@ -268,8 +260,6 @@ export function useWidgetTickerData(
 
     for (const city of Array.isArray(cities) ? cities : []) {
       const name = city.location.name;
-      if (cfg.ticker.excludedCities.includes(name)) continue;
-
       const w = city.weather;
       const temp =
         w?.temperature != null
@@ -306,7 +296,7 @@ export function useWidgetTickerData(
     }
 
     return chips;
-  }, [widgetPrefs.weather, enabledWidgets]);
+  }, [enabledWidgets]);
 
   // ── Build sysmon chips ────────────────────────────────────────
   const buildSysmonChips = useCallback((): SysmonChipData[] => {
@@ -404,12 +394,9 @@ export function useWidgetTickerData(
     const monitors = loadMonitors();
     if (monitors.length === 0) return [];
 
-    const cfg = widgetPrefs.uptime;
     const chips: UptimeChipData[] = [];
 
     for (const mon of monitors) {
-      if (cfg.ticker.excludedMonitors.includes(mon.id)) continue;
-
       const uptimeStr =
         mon.uptimePercent != null
           ? `${mon.uptimePercent.toFixed(mon.uptimePercent === 100 ? 0 : 1)}%`
@@ -442,7 +429,7 @@ export function useWidgetTickerData(
     }
 
     return chips;
-  }, [widgetPrefs.uptime, enabledWidgets]);
+  }, [enabledWidgets]);
 
   // ── Build github chips ────────────────────────────────────────
   const buildGithubChips = useCallback((): GitHubChipData[] => {
@@ -450,13 +437,10 @@ export function useWidgetTickerData(
     const repos = loadRepoData();
     if (repos.length === 0) return [];
 
-    const cfg = widgetPrefs.github;
     const chips: GitHubChipData[] = [];
 
     for (const repo of repos) {
       const key = repoKey(repo);
-      if (cfg.ticker.excludedRepos.includes(key)) continue;
-
       const repoLabel = truncate(repo.repo, 20);
       const workflow = repo.workflowName ?? "CI";
 
@@ -491,7 +475,7 @@ export function useWidgetTickerData(
     }
 
     return chips;
-  }, [widgetPrefs.github, enabledWidgets]);
+  }, [enabledWidgets]);
 
   // ── Polling intervals ─────────────────────────────────────────
 

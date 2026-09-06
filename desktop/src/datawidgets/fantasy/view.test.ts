@@ -64,30 +64,8 @@ function league(opts: LeagueOpts): LeagueResponse {
 }
 
 const DEFAULT_PREFS: FantasyDisplayPrefs = {
-  // These tests predate the simplicity dial and assert per-item venue
-  // behaviour, which only `everything` honours.
   tickerMode: "everything",
-  matchupScore: "both",
-  winProbability: "both",
-  matchupStatus: "both",
-  projectedPoints: "both",
-  week: "both",
-  record: "both",
-  standingsPosition: "both",
-  streak: "both",
-  injuryCount: "both",
-  topScorer: "both",
-  // Phase 1 player-stats fields. Match production defaults so any
-  // selectFantasyForTicker test using DEFAULT_PREFS exercises the
-  // anyItemOnTicker check the same way as a real install.
-  topThreeScorers: "both",
-  worstStarter: "both",
-  benchOpportunity: "both",
-  injuryDetail: "both",
   followedPlayerKeys: [],
-  showStandings: true,
-  showMatchups: true,
-  defaultSort: "name",
   defaultSubTab: "overview",
   primaryLeagueKey: null,
   enabledLeagueKeys: [],
@@ -204,98 +182,11 @@ describe("rankFantasyLeagues", () => {
 // ── selectFantasyForTicker ──────────────────────────────────────
 
 describe("selectFantasyForTicker", () => {
-  it("returns [] when every per-item venue toggle is off", () => {
+  it("returns every enabled league — there is no per-item gate (REL-208)", () => {
     const leagues = [league({ key: "a" })];
-    const allOff: FantasyDisplayPrefs = {
-      ...DEFAULT_PREFS,
-      matchupScore: "off",
-      winProbability: "off",
-      matchupStatus: "off",
-      projectedPoints: "off",
-      week: "off",
-      record: "off",
-      standingsPosition: "off",
-      streak: "off",
-      injuryCount: "off",
-      topScorer: "off",
-      // Phase 1 player-stats — must also be off, otherwise the
-      // selector should still return leagues.
-      topThreeScorers: "off",
-      worstStarter: "off",
-      benchOpportunity: "off",
-      injuryDetail: "off",
-    };
-    expect(selectFantasyForTicker(leagues, allOff)).toEqual([]);
-  });
-
-  it("returns [] when every per-item venue toggle is feed-only (nothing routes to ticker)", () => {
-    const leagues = [league({ key: "a" })];
-    const allFeed: FantasyDisplayPrefs = {
-      ...DEFAULT_PREFS,
-      matchupScore: "feed",
-      winProbability: "feed",
-      matchupStatus: "feed",
-      projectedPoints: "feed",
-      week: "feed",
-      record: "feed",
-      standingsPosition: "feed",
-      streak: "feed",
-      injuryCount: "feed",
-      topScorer: "feed",
-      topThreeScorers: "feed",
-      worstStarter: "feed",
-      benchOpportunity: "feed",
-      injuryDetail: "feed",
-    };
-    expect(selectFantasyForTicker(leagues, allFeed)).toEqual([]);
-  });
-
-  it("returns the leagues when at least one item is routed to the ticker", () => {
-    const leagues = [league({ key: "a" })];
-    const onlyScoreOnTicker: FantasyDisplayPrefs = {
-      ...DEFAULT_PREFS,
-      matchupScore: "ticker",
-      winProbability: "off",
-      matchupStatus: "off",
-      projectedPoints: "off",
-      week: "off",
-      record: "off",
-      standingsPosition: "off",
-      streak: "off",
-      injuryCount: "off",
-      topScorer: "off",
-      topThreeScorers: "off",
-      worstStarter: "off",
-      benchOpportunity: "off",
-      injuryDetail: "off",
-    };
-    expect(selectFantasyForTicker(leagues, onlyScoreOnTicker)).toHaveLength(1);
-  });
-
-  it("renders leagues when ONLY a player-stats segment is on the ticker", () => {
-    // Phase 1 player-stats are part of the OR-gate. If a user disabled
-    // every "old" item but turned on, e.g. injuryDetail for the ticker,
-    // their league chip must still render.
-    const leagues = [league({ key: "a" })];
-    const onlyInjuryDetailOnTicker: FantasyDisplayPrefs = {
-      ...DEFAULT_PREFS,
-      matchupScore: "off",
-      winProbability: "off",
-      matchupStatus: "off",
-      projectedPoints: "off",
-      week: "off",
-      record: "off",
-      standingsPosition: "off",
-      streak: "off",
-      injuryCount: "off",
-      topScorer: "off",
-      topThreeScorers: "off",
-      worstStarter: "off",
-      benchOpportunity: "off",
-      injuryDetail: "ticker",
-    };
+    expect(selectFantasyForTicker(leagues, DEFAULT_PREFS)).toHaveLength(1);
     expect(
-      selectFantasyForTicker(leagues, onlyInjuryDetailOnTicker),
+      selectFantasyForTicker(leagues, { ...DEFAULT_PREFS, tickerMode: "essential" }),
     ).toHaveLength(1);
   });
 

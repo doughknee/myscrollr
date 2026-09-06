@@ -31,7 +31,6 @@ import type {
   WidgetPinConfig,
   WidgetDisplayPrefs,
 } from "../preferences";
-import { shouldShowOnTicker } from "../preferences";
 import type { LeagueResponse as FantasyLeague } from "../datawidgets/fantasy/types";
 import { GitHubCappedChip, UptimeCappedChip } from "./chips/CappedChip";
 import {

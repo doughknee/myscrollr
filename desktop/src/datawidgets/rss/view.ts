@@ -63,36 +63,8 @@ export function filterByArticleAge(
   });
 }
 
-// ── Pure: per-source limit ───────────────────────────────────────
-
-/**
- * Cap the number of items shown per source. `limit === 0` means "no limit".
- * Keeps the first N items encountered per source, in the order given
- * (so pair this with a sort step that establishes the desired ordering).
- */
-export function limitPerSource(items: RssItem[], limit: number): RssItem[] {
-  if (limit <= 0) return items;
-  const counts = new Map<string, number>();
-  const result: RssItem[] = [];
-  for (const item of items) {
-    const count = counts.get(item.source_name) ?? 0;
-    if (count < limit) {
-      result.push(item);
-      counts.set(item.source_name, count + 1);
-    }
-  }
-  return result;
-}
-
 // ── Pure: selector for the ticker ────────────────────────────────
 
-/**
- * Baseline pipeline used by the ticker: applies per-source limit (from Display
- * prefs) and ensures the default "newest-first" ordering.
- *
- * The ticker doesn't expose interactive filters (source/category selection,
- * sort toggle). If those are added later, surface them as arguments here.
- */
 /**
  * The ticker's own horizon for headlines. Independent of the widget page:
  * the feed's sort, source filters, "Show N" and time window are about
@@ -167,15 +139,6 @@ export function arrangeRssSlots(
   ).map((r) => ({ key: r.key, item: r.item, rotateSlot: r.rotateSlot, reserveTitle: r.reserve }));
 }
 
-/** Number of distinct sources present in a payload. Widgets are already
- *  scoped per widget upstream, so this is "how many feeds does THIS
- *  widget aggregate" — 1 for outlet widgets, N for Custom RSS. */
-export function distinctSourceCount(items: RssItem[]): number {
-  const sources = new Set<string>();
-  for (const item of items) sources.add(item.source_name);
-  return sources.size;
-}
-
 // ── Helper: per-widget display prefs (global + config.display) ──
 
 import type { DashboardResponse } from "../../types";
@@ -223,48 +186,35 @@ export interface RssPipelineOptions {
   categoryMap: Map<string, string>;
   /** Current sort order. */
   sortOrder: RssSortOrder;
-  /** Per-source limit (from Display prefs). 0 = no limit. */
-  articlesPerSource: number;
   /** Total feed limit after filtering and sorting. 0 = no limit. */
   maxArticles?: number;
   /** Article-age window in days (v1.1.3). 0 = no filter. */
   maxArticleAgeDays?: number;
   /** Injectable clock for tests; defaults to Date.now(). */
   now?: number;
-  /** Feed-page interactive toggle that disables the per-source limit. */
-  showAll?: boolean;
-}
-
-export interface RssPipelineResult {
-  visibleItems: RssItem[];
-  /** Map of source_name → hidden count (only populated when limit > 0). */
-  overflowCounts: Map<string, number>;
-  /** Total items hidden by the per-source limit. */
-  totalHidden: number;
 }
 
 /**
- * Full interactive pipeline used by the feed page. Applies source + category
- * filters, sort, and per-source limit with per-source expansion support.
+ * Full interactive pipeline used by the feed page: age window, source +
+ * category filters, sort, total cap. (The per-source cap and its
+ * "Show all" toggle went in REL-208 — nothing ever set the pref.)
  */
 export function applyRssPipeline(
   items: RssItem[],
   opts: RssPipelineOptions,
-): RssPipelineResult {
+): RssItem[] {
   const {
     selectedSources,
     selectedCategories,
     categoryMap,
     sortOrder,
-    articlesPerSource,
     maxArticles = 0,
     maxArticleAgeDays = 0,
     now = Date.now(),
-    showAll,
   } = opts;
 
-  // Age window first (v1.1.3) — everything downstream (filters, limit,
-  // overflow counts) should only ever see eligible articles.
+  // Age window first (v1.1.3) — everything downstream should only ever
+  // see eligible articles.
   let filtered = filterByArticleAge(items, maxArticleAgeDays, now);
 
   if (selectedSources && selectedSources.size > 0) {
@@ -279,42 +229,5 @@ export function applyRssPipeline(
   }
 
   const sorted = sortRssItems(filtered, sortOrder);
-
-  const overflow = new Map<string, number>();
-  // Per-source limiting only means anything when several sources are
-  // competing — single-outlet widgets show their whole feed (v1.1.1).
-  const multiSource = distinctSourceCount(items) > 1;
-
-  if (multiSource && articlesPerSource > 0 && !showAll) {
-    const sourceCounts = new Map<string, number>();
-    const limited: RssItem[] = [];
-
-    for (const item of sorted) {
-      const count = sourceCounts.get(item.source_name) ?? 0;
-      if (count < articlesPerSource) {
-        limited.push(item);
-      }
-      sourceCounts.set(item.source_name, count + 1);
-    }
-
-    let hidden = 0;
-    for (const [source, total] of sourceCounts) {
-      if (total > articlesPerSource) {
-        overflow.set(source, total - articlesPerSource);
-        hidden += total - articlesPerSource;
-      }
-    }
-
-    return {
-      visibleItems: maxArticles > 0 ? limited.slice(0, maxArticles) : limited,
-      overflowCounts: overflow,
-      totalHidden: hidden,
-    };
-  }
-
-  return {
-    visibleItems: maxArticles > 0 ? sorted.slice(0, maxArticles) : sorted,
-    overflowCounts: overflow,
-    totalHidden: 0,
-  };
+  return maxArticles > 0 ? sorted.slice(0, maxArticles) : sorted;
 }

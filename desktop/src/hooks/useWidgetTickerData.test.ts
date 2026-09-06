@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
-import { LS_CLOCK_FORMAT, LS_TIMER_STATE } from "../constants";
+import { LS_CLOCK_FORMAT, LS_CLOCK_TIMEZONES, LS_TIMER_STATE } from "../constants";
 import { useWidgetTickerData } from "./useWidgetTickerData";
 import type { WidgetPrefs } from "../preferences";
 
@@ -20,15 +20,7 @@ function makeWidgetPrefs(widgetsOnTicker: string[]): WidgetPrefs {
     sidebarOrder: [],
     widgetsOnTicker,
     pinnedWidgets: {},
-    clock: {
-      ticker: {
-        localTime: false,
-        showTimezones: false,
-        excludedTimezones: [],
-      },
-    },
     timer: {
-      ticker: { activeTimer: true },
       pomodoro: {
         workMins: 25,
         shortBreakMins: 5,
@@ -36,7 +28,6 @@ function makeWidgetPrefs(widgetsOnTicker: string[]): WidgetPrefs {
         longBreakEvery: 4,
       },
     },
-    weather: { ticker: { excludedCities: [] } },
     sysmon: {
       refreshInterval: 2,
       tempUnit: "celsius",
@@ -50,23 +41,10 @@ function makeWidgetPrefs(widgetsOnTicker: string[]): WidgetPrefs {
     uptime: {
       url: "",
       pollInterval: 60,
-      ticker: { excludedMonitors: [] },
     },
     github: {
       repos: [],
       pollInterval: 120,
-      ticker: { excludedRepos: [] },
-    },
-  };
-}
-
-function makeTimerPrefs(activeTimer: boolean): WidgetPrefs {
-  const prefs = makeWidgetPrefs(["timer"]);
-  return {
-    ...prefs,
-    timer: {
-      ...prefs.timer,
-      ticker: { activeTimer },
     },
   };
 }
@@ -91,7 +69,7 @@ describe("useWidgetTickerData", () => {
     const { result } = renderHook(() => useWidgetTickerData(prefs));
 
     await waitFor(() => {
-      expect(result.current.clock).toEqual([]);
+      expect(result.current.clock.map((c) => c.id)).toEqual(["clock-local"]);
       expect(result.current.timer).toEqual([
         {
           id: "timer",
@@ -111,20 +89,20 @@ describe("useWidgetTickerData", () => {
     });
   });
 
-  it("suppresses timer chips when the timer ticker setting is disabled", async () => {
-    storeValues.set(LS_TIMER_STATE, {
-      mode: "stopwatch",
-      startedAt: null,
-      bankedMs: 65_000,
-      targetSecs: 0,
-      completedSessions: 0,
-    });
+  // If you track it, it's on the ticker (docs/CHIP_SPEC.md §8): every
+  // saved world clock becomes a chip, with no per-zone exclusion pref.
+  it("puts local time and every tracked timezone on the ticker", async () => {
+    storeValues.set(LS_CLOCK_TIMEZONES, ["Asia/Tokyo", "Europe/London"]);
 
-    const prefs = makeTimerPrefs(false);
+    const prefs = makeWidgetPrefs(["clock"]);
     const { result } = renderHook(() => useWidgetTickerData(prefs));
 
     await waitFor(() => {
-      expect(result.current.timer).toEqual([]);
+      expect(result.current.clock.map((c) => c.id)).toEqual([
+        "clock-local",
+        "clock-Asia/Tokyo",
+        "clock-Europe/London",
+      ]);
     });
   });
 

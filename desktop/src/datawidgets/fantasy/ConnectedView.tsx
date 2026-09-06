@@ -19,10 +19,7 @@ import {
   DisplayRow,
   ActionRow,
   SegmentedRow,
-  ToggleRow,
-  Badge,
 } from "../../components/settings/SettingsControls";
-import { shouldShowOnTicker } from "../../preferences";
 import type { FantasyDisplayPrefs, FantasyTickerMode } from "../../preferences";
 import { fantasyTickerSource } from "./ticker";
 import type { TickerContext } from "../ticker";
@@ -279,7 +276,6 @@ function TickerSection({
   onPatch: (patch: Partial<FantasyDisplayPrefs>) => void;
 }) {
   const mode = prefs.tickerMode ?? "everything";
-  const everything = mode === "everything";
 
   const chips = useMemo(
     () =>
@@ -365,39 +361,6 @@ function TickerSection({
             : "None yet"
         }
       />
-
-      {/* Advanced — only meaningful in Everything, and disabled rather
-          than hidden so the dial's consequence is visible. */}
-      <div
-        className={clsx(
-          "transition-none",
-          !everything && "pointer-events-none opacity-45",
-        )}
-        aria-hidden={!everything}
-      >
-        <div className="px-3 pb-1 pt-3">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[11px] uppercase tracking-wider text-fg-3">
-              Advanced — ticker items
-            </span>
-            <Badge>Everything only</Badge>
-          </div>
-          <p className="mt-1 text-[11px] text-fg-4">
-            The feed always shows everything — these only control what joins the
-            ticker.
-          </p>
-        </div>
-        {ADVANCED_ITEMS.map(({ key, label }) => (
-          <ToggleRow
-            key={key}
-            label={label}
-            checked={shouldShowOnTicker(prefs[key])}
-            // Toggles, not Off/Feed/Ticker segments: feed content is
-            // never gated, so OFF means "feed only", never "gone".
-            onChange={(on) => onPatch({ [key]: on ? "both" : "feed" })}
-          />
-        ))}
-      </div>
     </Section>
   );
 }
@@ -405,29 +368,8 @@ function TickerSection({
 const MODE_CAPTION: Record<FantasyTickerMode, string> = {
   essential: "one per league",
   standard: "+ live moments",
-  everything: "everything, always",
+  everything: "+ top scorers, worst starter, bench, injuries",
 };
-
-/** The venue prefs the Advanced block exposes, in the handoff's order. */
-const ADVANCED_ITEMS: Array<{
-  key: keyof FantasyDisplayPrefs & VenueKey;
-  label: string;
-}> = [
-  { key: "matchupScore", label: "Matchup score" },
-  { key: "winProbability", label: "Win probability" },
-  { key: "projectedPoints", label: "Projected points" },
-  { key: "topThreeScorers", label: "Top 3 scorers" },
-  { key: "worstStarter", label: "Worst starter" },
-  { key: "injuryDetail", label: "Injury report" },
-];
-
-type VenueKey =
-  | "matchupScore"
-  | "winProbability"
-  | "projectedPoints"
-  | "topThreeScorers"
-  | "worstStarter"
-  | "injuryDetail";
 
 function playerName(leagues: LeagueResponse[], playerKey: string): string {
   for (const l of leagues) {
