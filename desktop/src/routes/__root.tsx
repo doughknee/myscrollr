@@ -105,6 +105,13 @@ import {
 import { onStoreChange, setStore, removeStore } from "../lib/store";
 import { invoke } from "@tauri-apps/api/core";
 
+/** One ticker window per chosen-and-attached monitor; Rust resolves an
+ *  empty list, or a list with nothing attached, to the primary. */
+const syncTickerWindows = (monitors: string[]) =>
+  invoke("sync_ticker_windows", { monitors }).catch((err) =>
+    console.error("[Scrollr] sync_ticker_windows failed:", err),
+  );
+
 // ── Route context ────────────────────────────────────────────────
 
 interface RouterContext {
@@ -503,11 +510,15 @@ function RootLayout() {
   // resolves an empty list to the primary monitor.
   const tickerMonitorsKey = prefs.window.tickerMonitors.join("\n");
   useEffect(() => {
-    invoke("sync_ticker_windows", { monitors: prefs.window.tickerMonitors }).catch((err) =>
-      console.error("[Scrollr] sync_ticker_windows failed:", err),
-    );
+    syncTickerWindows(prefs.window.tickerMonitors);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickerMonitorsKey]);
+  // A monitor came or went (Rust polls, and Windows gets WM_DISPLAYCHANGE):
+  // the pref is unchanged but which of its screens are attached is not.
+  // Same owner, same call — Rust drops the vanished screen's window,
+  // gives a returning one its bar back, and falls back to the primary
+  // when none of the chosen screens is present.
+  useTauriListener("monitors-changed", () => syncTickerWindows(prefs.window.tickerMonitors));
 
   useEffect(() => {
     isAutostartEnabled().then(setAutostartOn).catch(() => {});

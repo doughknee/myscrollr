@@ -205,6 +205,9 @@ pub fn run() {
             } else {
                 log::error!("Failed to create ticker window — continuing without it");
             }
+            // Monitor hotplug: poll + WM_DISPLAYCHANGE → `monitors-changed`,
+            // which the main window answers with `sync_ticker_windows`.
+            commands::window::watch_monitors(app.handle());
 
             // ── App window: strip native chrome on Linux/Windows ─
             // macOS keeps decorations on purpose: tauri.conf.json sets

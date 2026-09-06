@@ -1,6 +1,6 @@
 use crate::commands::diagnostics::{monitors, pick_monitor, MonitorInfo};
 use crate::compositor::{self, Compositor};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 use tauri::{Emitter, Manager};
 
 /// Every attached monitor in logical coordinates, primary flagged.
@@ -37,6 +37,64 @@ fn monitor_for_label(label: &str) -> Option<String> {
         .find(|(l, _)| l == label)
         .map(|(_, m)| m.clone())
 }
+
+/// A copy of the `label → monitor name` map (for diagnostics).
+pub fn ticker_monitor_map() -> Vec<(String, String)> {
+    ticker_monitors().clone()
+}
+
+// ── Monitor hotplug ──────────────────────────────────────────────
+//
+// Tauri has no monitor-changed event. `check_monitors` compares the
+// attached set with the last one seen and emits `monitors-changed` to
+// every window when it differs; the main window answers by re-running
+// `sync_ticker_windows` against the unchanged pref (routes/__root.tsx),
+// Settings › Window by re-listing. Two things drive it: a 5 s poll
+// (every platform) and WM_DISPLAYCHANGE in the ticker's AppBar
+// subclass (Windows, instant). Both funnel through the same last-seen
+// state, so the burst of WM_DISPLAYCHANGE a Win+P switch produces
+// emits once per real change, not once per message.
+
+static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
+static LAST_MONITORS: Mutex<Option<Vec<MonitorInfo>>> = Mutex::new(None);
+
+/// Records `now`; true when it differs from the previous set. The first
+/// observation only records — launch is not a hotplug.
+fn monitors_changed(last: &mut Option<Vec<MonitorInfo>>, now: Vec<MonitorInfo>) -> bool {
+    let changed = last.as_ref().is_some_and(|l| *l != now);
+    *last = Some(now);
+    changed
+}
+
+/// Re-enumerate and emit `monitors-changed` if the set moved. Safe from
+/// any thread, including the ticker's window proc.
+pub fn check_monitors() {
+    let Some(app) = APP.get() else { return };
+    let now = monitors(app);
+    let changed = monitors_changed(&mut LAST_MONITORS.lock().unwrap_or_else(|p| p.into_inner()), now);
+    if changed {
+        log::info!("[ticker] monitor set changed");
+        let _ = app.emit("monitors-changed", ());
+    }
+}
+
+/// Record the launch-time set and start the poll. Once, from setup.
+pub fn watch_monitors(app: &tauri::AppHandle) {
+    if APP.set(app.clone()).is_err() {
+        return;
+    }
+    check_monitors();
+    std::thread::spawn(|| loop {
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        check_monitors();
+    });
+}
+
+/// Serialises `sync_ticker_windows`: hotplug can fire it twice in quick
+/// succession, and two syncs building the same `ticker-N` at once is a
+/// duplicate-label error. The later caller enumerates after the earlier
+/// one finished, so the final set is the current one.
+static SYNC: Mutex<()> = Mutex::new(());
 
 pub fn is_ticker_label(label: &str) -> bool {
     label == "ticker" || label.starts_with("ticker-")
@@ -87,6 +145,7 @@ pub fn prepare_ticker(win: &tauri::WebviewWindow) {
 /// building a window from there deadlocks on Windows (Tauri docs).
 #[tauri::command]
 pub async fn sync_ticker_windows(app: tauri::AppHandle, monitors: Vec<String>) -> Result<Vec<String>, String> {
+    let _serial = SYNC.lock().unwrap_or_else(|p| p.into_inner());
     let wanted = choose_monitors(&monitors, &crate::commands::diagnostics::monitors(&app));
     *ticker_monitors() = wanted
         .iter()
@@ -103,10 +162,23 @@ pub async fn sync_ticker_windows(app: tauri::AppHandle, monitors: Vec<String>) -
         .cloned()
         .ok_or("no ticker window in tauri.conf.json")?;
 
-    let mut live = Vec::new();
-    for i in 0..wanted.len().max(1) {
-        let label = ticker_label(i);
-        if app.get_webview_window(&label).is_some() {
+    let live: Vec<String> = (0..wanted.len().max(1)).map(ticker_label).collect();
+
+    // Surplus first: a window whose monitor vanished has been shoved
+    // onto a surviving screen by the OS, AppBar reservation and all,
+    // and a survivor re-querying its edge while that reservation
+    // stands gets pushed down by one bar height.
+    for (label, win) in app.webview_windows() {
+        if is_ticker_label(&label) && !live.contains(&label) {
+            #[cfg(target_os = "windows")]
+            let _ = crate::commands::appbar_win::unregister(&win.as_ref().window());
+            let _ = win.destroy();
+            log::info!("[ticker] destroyed {label}");
+        }
+    }
+
+    for (i, label) in live.iter().enumerate() {
+        if app.get_webview_window(label).is_some() {
             let _ = app.emit_to(label.as_str(), "ticker-reposition", ());
         } else {
             let mut cfg = template.clone();
@@ -117,16 +189,6 @@ pub async fn sync_ticker_windows(app: tauri::AppHandle, monitors: Vec<String>) -
                 .map_err(|e| format!("create {label} failed: {e}"))?;
             prepare_ticker(&win);
             log::info!("[ticker] created {label} for {:?}", wanted.get(i));
-        }
-        live.push(label);
-    }
-
-    for (label, win) in app.webview_windows() {
-        if is_ticker_label(&label) && !live.contains(&label) {
-            #[cfg(target_os = "windows")]
-            let _ = crate::commands::appbar_win::unregister(&win.as_ref().window());
-            let _ = win.destroy();
-            log::info!("[ticker] destroyed {label}");
         }
     }
     Ok(live)
@@ -162,12 +224,23 @@ pub fn position_ticker(
         }
     }
 
+    // A ticker the last sync dropped from its map is on its way out:
+    // its own JS can still fire this between the sync's AppBar
+    // unregister and the destroy, and registering then leaves the
+    // shell reserving an edge for a dead HWND until logoff. (The map
+    // is only empty before the first sync, when `ticker` positions
+    // itself at launch.)
+    let assigned = monitor_for_label(window.label());
+    if is_ticker_label(window.label()) && assigned.is_none() && !ticker_monitors().is_empty() {
+        return Err(format!("{} is being removed", window.label()));
+    }
+
     let current = || {
         let m = window.current_monitor().ok().flatten()?;
         Some(MonitorInfo::from_monitor(&m, false))
     };
     let target = monitor
-        .or_else(|| monitor_for_label(window.label()))
+        .or(assigned)
         .as_deref()
         .and_then(|name| pick_monitor(&monitors(window.app_handle()), name).cloned())
         .or_else(current)
@@ -347,5 +420,20 @@ mod tests {
         assert_eq!(choose_monitors(&["gone".to_string()], &attached), vec![r"\.\DISPLAY2".to_string()]);
         // nothing enumerable: no mapping, caller still keeps one window
         assert!(choose_monitors(&two, &[]).is_empty());
+    }
+
+    #[test]
+    fn monitors_changed_ignores_first_observation_and_repeats() {
+        let two = vec![mon(r"\.\DISPLAY1", false), mon(r"\.\DISPLAY2", true)];
+        let one = vec![mon(r"\.\DISPLAY2", true)];
+        let mut last = None;
+        assert!(!monitors_changed(&mut last, two.clone()), "launch is not a hotplug");
+        assert!(!monitors_changed(&mut last, two.clone()), "same set, no event");
+        assert!(monitors_changed(&mut last, one.clone()), "unplugged");
+        assert!(monitors_changed(&mut last, two), "plugged back in");
+        // primary moving counts too: the fallback screen follows it
+        let mut moved = one.clone();
+        moved[0].is_primary = false;
+        assert!(monitors_changed(&mut Some(one), moved));
     }
 }

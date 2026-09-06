@@ -141,7 +141,12 @@ pub fn pick_monitor<'a>(monitors: &'a [MonitorInfo], name: &str) -> Option<&'a M
 struct EnvironmentInfo {
     desktop_environment: Option<String>,
     session_type: String,
+    /// Attached right now.
     monitors: Vec<MonitorInfo>,
+    /// `window.tickerMonitors` from prefs: the screens the user chose,
+    /// attached or not. Compare with `monitors` to spot an unplugged
+    /// choice; empty means "the primary".
+    chosen_monitors: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -161,8 +166,19 @@ struct WindowState {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+struct TickerWindowState {
+    #[serde(flatten)]
+    window: WindowState,
+    /// The monitor `sync_ticker_windows` assigned this window.
+    monitor: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct WindowsState {
-    ticker: Option<WindowState>,
+    /// Every live ticker window (`ticker`, `ticker-2`, …), one per
+    /// chosen-and-attached monitor.
+    tickers: Vec<TickerWindowState>,
     main: Option<WindowState>,
 }
 
@@ -204,6 +220,39 @@ fn get_window_state(app: &AppHandle, label: &str) -> Option<WindowState> {
         maximized,
         minimized,
     })
+}
+
+fn ticker_windows(app: &AppHandle) -> Vec<TickerWindowState> {
+    let assigned = crate::commands::window::ticker_monitor_map();
+    let mut labels: Vec<String> = app
+        .webview_windows()
+        .into_keys()
+        .filter(|l| crate::commands::window::is_ticker_label(l))
+        .collect();
+    labels.sort();
+    labels
+        .iter()
+        .filter_map(|label| {
+            Some(TickerWindowState {
+                window: get_window_state(app, label)?,
+                monitor: assigned.iter().find(|(l, _)| l == label).map(|(_, m)| m.clone()),
+            })
+        })
+        .collect()
+}
+
+/// `window.tickerMonitors` as saved by the JS side (lib/store.ts keeps
+/// prefs under `scrollr:settings` in `scrollr.json`).
+fn chosen_monitors(app: &AppHandle) -> Vec<String> {
+    use tauri_plugin_store::StoreExt;
+    app.store("scrollr.json")
+        .ok()
+        .and_then(|s| s.get("scrollr:settings"))
+        .and_then(|v| v.pointer("/window/tickerMonitors")?.as_array().cloned())
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|v| v.as_str().map(String::from))
+        .collect()
 }
 
 fn get_session_type() -> String {
@@ -324,11 +373,12 @@ pub async fn collect_diagnostics(app: AppHandle) -> Result<DiagnosticReport, Str
         desktop_environment: get_desktop_environment(),
         session_type: get_session_type(),
         monitors: monitors(&app),
+        chosen_monitors: chosen_monitors(&app),
     };
 
     // Window state
     let windows = WindowsState {
-        ticker: get_window_state(&app, "ticker"),
+        tickers: ticker_windows(&app),
         main: get_window_state(&app, "main"),
     };
 

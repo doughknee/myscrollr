@@ -14,6 +14,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { StartupPrefs, WindowPrefs } from "../../../preferences";
+import { useTauriListener } from "../../../hooks/useTauriListener";
 import { RowList, SettingsGroup, ToggleRow } from "../SettingsControls";
 import { Row } from "./Row";
 
@@ -84,9 +85,12 @@ function MonitorsGroup({
   onChange: (names: string[]) => void;
 }) {
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
+  const refresh = () => invoke<MonitorInfo[]>("list_monitors").then(setMonitors).catch(() => {});
   useEffect(() => {
-    invoke<MonitorInfo[]>("list_monitors").then(setMonitors).catch(() => {});
-  }, []);
+    void refresh();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Plugged / unplugged while the page is open: re-list on Rust's event.
+  useTauriListener("monitors-changed", refresh);
   if (monitors.length === 0) return null;
 
   const primary = monitors.find((m) => m.isPrimary) ?? monitors[0];

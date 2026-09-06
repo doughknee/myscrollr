@@ -416,7 +416,7 @@ use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 use windows_sys::Win32::UI::Shell::{
     DefSubclassProc, SetWindowSubclass,
 };
-use windows_sys::Win32::UI::WindowsAndMessaging::WM_STYLECHANGING;
+use windows_sys::Win32::UI::WindowsAndMessaging::{WM_DISPLAYCHANGE, WM_STYLECHANGING};
 
 const SUBCLASS_ID: usize = 0xA9B_0001;
 
@@ -458,6 +458,13 @@ unsafe extern "system" fn appbar_subclass_proc(
     // with the window class's background brush (white).
     if msg == WM_NCCALCSIZE && wparam != 0 {
         return 0;
+    }
+
+    // A monitor came, went, or moved (Win+P, a cable, a resolution
+    // change). Every top-level window gets this broadcast, so each
+    // ticker re-checks; `check_monitors` emits once per real change.
+    if msg == WM_DISPLAYCHANGE {
+        crate::commands::window::check_monitors();
     }
 
     // AppBar callback: Windows notifies us of system events that affect
