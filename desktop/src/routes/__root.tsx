@@ -494,10 +494,12 @@ function RootLayout() {
     const unsub1 = onStoreChange<AppPreferences>("scrollr:settings", (val) => {
       if (val) setPrefs(val);
     });
-    // Cross-window navigation requests (e.g. ticker context menu → "Customize Ticker")
+    // Cross-window navigation requests (e.g. ticker context menu →
+    // "Customize Ticker"). `href`, not `to`: the path may carry a query
+    // ("/customize?page=ticker") and the route's validateSearch reads it.
     const unsub2 = onStoreChange<string>("scrollr:navigate", (path) => {
       if (path) {
-        navigate({ to: path });
+        navigate({ href: path });
         // Clear the key so it can be triggered again
         removeStore("scrollr:navigate");
       }
@@ -740,12 +742,13 @@ function RootLayout() {
       // Ctrl+Shift+T → cycle color mode (theme family stays put)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "T") {
         e.preventDefault();
+        // light → dark → auto, as the Shortcuts page says.
         const cycle: Record<string, "light" | "dark" | "system"> = {
-          dark: "light",
-          light: "system",
-          system: "dark",
+          light: "dark",
+          dark: "system",
+          system: "light",
         };
-        const nextMode = cycle[prefs.appearance.themeMode] ?? "dark";
+        const nextMode = cycle[prefs.appearance.themeMode] ?? "light";
         const next = {
           ...prefs,
           appearance: {

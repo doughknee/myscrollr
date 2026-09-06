@@ -167,14 +167,6 @@ export default function App() {
   const widgetsRef = useRef(widgets);
   widgetsRef.current = widgets;
 
-  // Pin (always-on-top) state
-  const [pinned, setPinned] = useState(() => loadPref("feedPinned", true));
-
-  // Ticker position state (top/bottom of screen)
-  const [tickerPosition, setTickerPosition] = useState<TickerPosition>(() =>
-    loadPref("tickerPosition", "top"),
-  );
-
   // The ticker window has no hover chrome. Every action lives in the
   // right-click menu and the system tray; the hover toolbar that used to
   // sit on the right edge was the thing users found rather than the menu,
@@ -315,11 +307,7 @@ export default function App() {
 
       // Side effects: pin toggle
       if (next.window.pinned !== prev.window.pinned) {
-        setPinned(next.window.pinned);
-        savePref("feedPinned", next.window.pinned);
         invoke("pin_window", { pinned: next.window.pinned }).catch(() => {});
-        // Keep the tray's "Pin on Top" checkmark in sync with the pref.
-        invoke("sync_tray_pin", { pinned: next.window.pinned }).catch(() => {});
       }
 
       // Side effects: hide-on-fullscreen toggle (Windows AppBar)
@@ -331,8 +319,6 @@ export default function App() {
 
       // Side effects: ticker position
       if (next.window.tickerPosition !== prev.window.tickerPosition) {
-        setTickerPosition(next.window.tickerPosition);
-        savePref("tickerPosition", next.window.tickerPosition);
         invoke("position_ticker", { position: next.window.tickerPosition, height: tickerHeight(next) }).catch(() => {});
       }
 
@@ -363,15 +349,14 @@ export default function App() {
     const tickerH = prefs.ticker.showTicker ? tickerHeight(prefs) : 0;
     if (tickerH > 0) {
       // position_ticker sets size + position atomically via compositor
-      invoke("position_ticker", { position: tickerPosition, height: tickerH })
+      invoke("position_ticker", {
+        position: prefs.window.tickerPosition,
+        height: tickerH,
+      })
         .then(() => getCurrentWindow().show())
         .catch(() => {});
     }
-    invoke("pin_window", { pinned }).catch(() => {});
-    // Initial state sync for the system-tray "Pin on Top" checkmark.
-    // The tray is built with checked=false by default; mirror the stored
-    // pref so the checkmark is accurate on app launch.
-    invoke("sync_tray_pin", { pinned }).catch(() => {});
+    invoke("pin_window", { pinned: prefs.window.pinned }).catch(() => {});
     // Initial sync for the Windows AppBar hide-on-fullscreen behavior.
     invoke("set_hide_on_fullscreen", {
       value: prefs.window.hideOnFullscreen,
@@ -388,14 +373,28 @@ export default function App() {
   useEffect(() => {
     const tickerH = prefs.ticker.showTicker ? tickerHeight(prefs) : 0;
     if (tickerH > 0) {
-      invoke("position_ticker", { position: tickerPosition, height: tickerH }).catch(() => {});
+      invoke("position_ticker", {
+        position: prefs.window.tickerPosition,
+        height: tickerH,
+      }).catch(() => {});
     }
   }, [
     prefs.ticker.tickerMode,
     prefs.appearance.tickerScale,
     prefs.ticker.showTicker,
-    tickerPosition,
+    prefs.window.tickerPosition,
   ]);
+
+  // The tray's "Show ticker" checkmark mirrors the pref. Every window
+  // that flips it (Ctrl+T in the main window, the settings row, the
+  // tray, the right-click menu) ends up here through the store, so
+  // this is the one place the tray is told — including at launch,
+  // where the tray is built checked and the pref may say otherwise.
+  useEffect(() => {
+    invoke("sync_tray_ticker", { shown: prefs.ticker.showTicker }).catch(
+      () => {},
+    );
+  }, [prefs.ticker.showTicker]);
 
   // ── Show/hide ticker window based on visibility ────────────────
   //
@@ -521,9 +520,8 @@ export default function App() {
   // ── Ticker position toggle ─────────────────────────────────────
 
   const handleTogglePosition = useCallback(() => {
-    const next: TickerPosition = tickerPosition === "top" ? "bottom" : "top";
-    setTickerPosition(next);
-    savePref("tickerPosition", next);
+    const next: TickerPosition =
+      prefsRef.current.window.tickerPosition === "top" ? "bottom" : "top";
     const updated = {
       ...prefsRef.current,
       window: { ...prefsRef.current.window, tickerPosition: next },
@@ -531,7 +529,7 @@ export default function App() {
     setPrefs(updated);
     savePrefs(updated);
     invoke("position_ticker", { position: next, height: tickerHeight(updated) }).catch(() => {});
-  }, [tickerPosition]);
+  }, []);
 
   // ── Toggle ticker visibility ─────────────────────────────────
 
@@ -545,7 +543,7 @@ export default function App() {
     savePrefs(updated);
   }, []);
 
-  // ── System tray "Show/Hide Ticker" → toggle via prefs ──────────
+  // ── System tray "Show ticker" → toggle via prefs ───────────────
   useTauriListener("toggle-ticker", () => handleToggleTicker());
 
   // ── Monitor set changed → re-place this window ──────────────────
@@ -561,8 +559,6 @@ export default function App() {
 
   const handleToggleWindowPin = useCallback(() => {
     const next = !prefsRef.current.window.pinned;
-    setPinned(next);
-    savePref("feedPinned", next);
     const updated = {
       ...prefsRef.current,
       window: { ...prefsRef.current.window, pinned: next },
@@ -570,14 +566,7 @@ export default function App() {
     setPrefs(updated);
     savePrefs(updated);
     invoke("pin_window", { pinned: next }).catch(() => {});
-    // Mirror the new state back into the system-tray "Pin on Top"
-    // CheckMenuItem so its checkmark stays in sync with the right-click
-    // menu. Harmless if the tray command is unavailable (e.g. dev mode).
-    invoke("sync_tray_pin", { pinned: next }).catch(() => {});
   }, []);
-
-  // ── System tray "Pin on Top" → same handler as the right-click menu ──
-  useTauriListener("toggle-pin", () => handleToggleWindowPin());
 
   // ── Right-click → native context menu ──────────────────────────
 
@@ -677,16 +666,12 @@ export default function App() {
         }),
       );
 
-      // Customize Ticker — opens main app to ticker settings
+      // Customize Ticker — the Ticker page of Settings, not the default
+      // (Appearance) page it used to land on.
       items.push(
         await MenuItem.new({
           text: "Customize Ticker",
-          action: () => {
-            invoke("show_app_window").catch(() => {});
-            // /ticker merged into /customize (its default tab); the
-            // redirect shim that used to cover this is gone.
-            setStore("scrollr:navigate", "/customize");
-          },
+          action: () => navigateMainWindow("/customize?page=ticker"),
         }),
       );
 
@@ -716,11 +701,13 @@ export default function App() {
 
       items.push(await PredefinedMenuItem.new({ item: "Separator" }));
 
-      // Hide Ticker — action verb, not a checkbox
+      // Same words and shape as the tray and the settings row: a checked
+      // "Show ticker". Unchecking it hides the bar; the tray brings it back.
       items.push(
-        await MenuItem.new({
-          text: "Hide Ticker",
-          action: () => handleToggleTicker(true),
+        await CheckMenuItem.new({
+          text: "Show ticker",
+          checked: prefsRef.current.ticker.showTicker,
+          action: () => handleToggleTicker(),
         }),
       );
 
@@ -739,7 +726,7 @@ export default function App() {
     }
     document.addEventListener("contextmenu", onContextMenu);
     return () => document.removeEventListener("contextmenu", onContextMenu);
-  }, [toggleOnTicker, handleTogglePosition]);
+  }, [toggleOnTicker, handleTogglePosition, navigateMainWindow]);
 
   // ── Merge widget + widget tabs ──────────────────────────────
   const activeTabs = useMemo(
@@ -792,7 +779,7 @@ export default function App() {
                 mixMode={prefs.ticker.mixMode}
                 chipColorMode={prefs.ticker.chipColors}
                 widgetDisplay={prefs.widgetDisplay}
-                comfort={prefs.ticker.tickerMode === "comfort"}
+                comfort={prefs.ticker.tickerMode === "detailed"}
                 scrollMode={prefs.ticker.scrollMode}
                 stepPause={prefs.ticker.stepPause}
                 showSourcelessCTA={showSourcelessCTA}

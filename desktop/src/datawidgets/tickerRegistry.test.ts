@@ -16,7 +16,7 @@ function ctx(over: Partial<TickerContext> = {}): TickerContext {
     source: "finance",
     dashboard: null,
     comfort: false,
-    chipColorMode: "accent",
+    chipColorMode: "theme",
     widgetDisplay: DEFAULT_WIDGET_DISPLAY,
     predictionsWatchlist: new Set<string>(),
     ...over,

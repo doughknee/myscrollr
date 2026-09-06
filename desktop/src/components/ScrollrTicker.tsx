@@ -380,7 +380,7 @@ export default function ScrollrTicker({
     // Combine based on mix mode. Row filtering is handled upstream now,
     // so no round-robin distribution here.
     const allItems: React.ReactNode[] =
-      effectiveMixMode === "weave" ? weave(buckets) : buckets.flat();
+      effectiveMixMode === "mixed" ? weave(buckets) : buckets.flat();
 
     return allItems;
   }, [
@@ -456,7 +456,7 @@ export default function ScrollrTicker({
   // Reset step offset when entering step mode or when direction changes,
   // so the ticker doesn't start from a stale accumulated position.
   useEffect(() => {
-    if (effectiveScrollMode === "step") {
+    if (effectiveScrollMode === "page") {
       offset.set(0);
       stepCountRef.current = 0;
     }
@@ -464,7 +464,7 @@ export default function ScrollrTicker({
 
   // Step loop: animate offset by one item width, pause, repeat
   useEffect(() => {
-    if (effectiveScrollMode !== "step" || chips.length === 0) return;
+    if (effectiveScrollMode !== "page" || chips.length === 0) return;
 
     stepLoopRef.current = true;
     let cancelled = false;
@@ -700,7 +700,7 @@ export default function ScrollrTicker({
   // ── Continuous / Step mode: motion-plus Ticker ────────────────
   const velocity =
     effectiveDirection === "left" ? effectiveSpeed : -effectiveSpeed;
-  const isStepMode = effectiveScrollMode === "step";
+  const isStepMode = effectiveScrollMode === "page";
 
   return (
     <div

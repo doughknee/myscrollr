@@ -453,10 +453,10 @@ shrinks or jumps as a slate fills.
 | GitHub | `repos`, `excludedRepos` |
 
 **The user controls presentation** (`TickerPrefs`): `showTicker`, `tickerSpeed`,
-`pauseOnHover`, `hoverSpeed`, `tickerGap`, `tickerMode` (compact / detailed),
-`mixMode` (grouped / weave), `chipColors` (widget / accent / muted), `tickerDirection`,
-`scrollMode` (continuous / step / flip), `stepPause`, `tickerPosition`,
-`hideOnFullscreen`, `showWidgetGlyphIcons`, pinning.
+`onHover` (keep / slow / pause), `tickerMode` (compact / detailed),
+`mixMode` (grouped / mixed), `chipColors` (widget / theme / subtle),
+`scrollMode` (continuous / page), `stepPause`, `tickerPosition`,
+`hideOnFullscreen`, pinning.
 
 **The user does not control selection.** Never add a setting for: how many chips a
 widget contributes; which eligible items appear; their order; the horizon or floor;

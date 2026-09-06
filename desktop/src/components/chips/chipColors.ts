@@ -192,8 +192,8 @@ const WIDGET_MAP: Record<string, ChipColors> = {
 // ── Resolver ────────────────────────────────────────────────────
 
 export function getChipColors(mode: ChipColorMode, widget: string): ChipColors {
-  if (mode === "accent") return PRIMARY;
-  if (mode === "muted") return MUTED;
+  if (mode === "theme") return PRIMARY;
+  if (mode === "subtle") return MUTED;
   return WIDGET_MAP[widget] ?? PURPLE;
 }
 

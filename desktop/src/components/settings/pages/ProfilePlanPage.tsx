@@ -37,6 +37,9 @@ import {
 import ProfileField from "../ProfileField";
 import ConfirmDialog from "../../ConfirmDialog";
 import { Row } from "./Row";
+import { SETTINGS_ROWS } from "../rows";
+
+const R = SETTINGS_ROWS.profile;
 
 // ── Status helpers (unchanged semantics) ────────────────────────
 
@@ -93,6 +96,8 @@ export default function ProfilePlanPage({
     "idle",
   );
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  // The email is the account's identity, so the inline edit asks first.
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const slots = useSlotUsage();
@@ -215,10 +220,10 @@ export default function ProfilePlanPage({
     return (
       <SettingsGroup>
         <RowList>
-          <Row id="signedIn">
+          <Row id="signIn">
             <ActionRow
-              label="Sign in to Scrollr"
-              description="Signing in syncs your subscription, profile, and source preferences across devices and unlocks billing management."
+              label={R.signIn.label}
+              description={R.signIn.description}
               action="Sign in"
               tone="accent"
               onClick={onLogin}
@@ -237,8 +242,11 @@ export default function ProfilePlanPage({
   return (
     <>
       {/* ── Identity card ──────────────────────────────────── */}
+      {/* Two search targets, one card: "Signed in as" and "Plan" both
+          land here (flashRow matches data-row tokens). The plan anchor
+          used to sit on the 20px badge, so "plan" focused a chip. */}
       <div
-        data-row="signedIn"
+        data-row="signedIn plan"
         className={`${CARD_SURFACE} flex items-center gap-3.5 p-4`}
       >
         <span
@@ -261,7 +269,6 @@ export default function ProfilePlanPage({
           )}
         </div>
         <span
-          data-row="plan"
           className="shrink-0 rounded-full bg-accent/12 px-3 py-1 text-ui-chip font-bold tracking-wide text-accent uppercase"
         >
           {TIER_LABELS[displayTier]} · {slots.used} widget
@@ -274,7 +281,7 @@ export default function ProfilePlanPage({
         <RowList>
           <Row id="displayName">
             <ProfileField
-              label="Display name"
+              label={R.displayName.label}
               value={overview?.identity.name ?? ""}
               placeholder="Add a display name"
               onSave={(next) => handleProfileSave({ name: next }, "Display name")}
@@ -282,17 +289,17 @@ export default function ProfilePlanPage({
           </Row>
           <Row id="email">
             <ProfileField
-              label="Email"
+              label={R.email.label}
               type="email"
               value={overview?.identity.email ?? ""}
               placeholder="you@example.com"
-              onSave={(next) => handleProfileSave({ email: next }, "Email")}
+              onSave={async (next) => setPendingEmail(next)}
             />
           </Row>
           <Row id="password">
             <ActionRow
-              label="Password"
-              description="We'll email you a reset link."
+              label={R.password.label}
+              description={R.password.description}
               action={passwordResetLabel}
               muted={resetState !== "idle"}
               onClick={() => {
@@ -418,8 +425,8 @@ export default function ProfilePlanPage({
         <RowList>
           <Row id="signOut">
             <ActionRow
-              label="Sign out"
-              description="Sign out of this device. Local preferences stay intact."
+              label={R.signOut.label}
+              description={R.signOut.description}
               action="Sign out"
               tone="error"
               onClick={() => setConfirmSignOut(true)}
@@ -427,6 +434,25 @@ export default function ProfilePlanPage({
           </Row>
         </RowList>
       </SettingsGroup>
+
+      <ConfirmDialog
+        open={pendingEmail !== null}
+        title="Change your account email?"
+        description={`Sign-in and billing emails will go to ${pendingEmail ?? ""} from now on.`}
+        confirmLabel="Change email"
+        onConfirm={() => {
+          const next = pendingEmail;
+          setPendingEmail(null);
+          if (next) {
+            handleProfileSave({ email: next }, "Email").catch((err) =>
+              toast.error(
+                err instanceof Error ? err.message : "Failed to update email",
+              ),
+            );
+          }
+        }}
+        onCancel={() => setPendingEmail(null)}
+      />
 
       <ConfirmDialog
         open={confirmSignOut}

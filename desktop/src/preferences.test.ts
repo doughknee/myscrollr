@@ -695,8 +695,8 @@ describe("migrateTicker (REL-204: presets + one hover row)", () => {
   });
 
   it("folds Rotate into Page and keeps the other modes", () => {
-    expect(migrateTicker({ scrollMode: "flip" }).scrollMode).toBe("step");
-    expect(migrateTicker({ scrollMode: "step" }).scrollMode).toBe("step");
+    expect(migrateTicker({ scrollMode: "flip" }).scrollMode).toBe("page");
+    expect(migrateTicker({ scrollMode: "step" }).scrollMode).toBe("page");
     expect(migrateTicker({ scrollMode: "continuous" }).scrollMode).toBe("continuous");
     expect(migrateTicker({ scrollMode: "sideways" }).scrollMode).toBe("continuous");
   });
@@ -732,7 +732,7 @@ describe("migrateTicker (REL-204: presets + one hover row)", () => {
       ticker: { scrollMode: "flip", pauseOnHover: true, hoverSpeed: 0, tickerSpeed: 5 },
     });
     const p = loadPrefs();
-    expect(p.ticker).toMatchObject({ scrollMode: "step", onHover: "pause", tickerSpeed: 20 });
+    expect(p.ticker).toMatchObject({ scrollMode: "page", onHover: "pause", tickerSpeed: 20 });
     expect(p.appearance.tickerScale).toBe(130);
   });
 });
@@ -742,7 +742,7 @@ describe("resetTickerPage (REL-204)", () => {
     const before = loadPrefs();
     const changed: AppPreferences = {
       ...before,
-      ticker: { ...before.ticker, scrollMode: "step", onHover: "pause", tickerSpeed: 80 },
+      ticker: { ...before.ticker, scrollMode: "page", onHover: "pause", tickerSpeed: 80 },
       window: { ...before.window, pinned: false, tickerPosition: "bottom", tickerMonitors: ["X"] },
       appearance: { ...before.appearance, tickerScale: 130, uiScale: 115, themeFamily: "nord" },
     };
@@ -825,5 +825,65 @@ describe("appearance.units migration (REL-205)", () => {
     const before = storeValues.get("scrollr:settings");
     expect(loadPrefs().appearance.units.temperature).toBe("celsius");
     expect(storeValues.get("scrollr:settings")).toBe(before);
+  });
+});
+
+describe("ticker values renamed to match their labels (REL-207)", () => {
+  it("maps every old spelling forward", () => {
+    const out = migrateTicker({
+      tickerMode: "comfort",
+      mixMode: "weave",
+      chipColors: "accent",
+      scrollMode: "step",
+    });
+    expect(out).toMatchObject({
+      tickerMode: "detailed",
+      mixMode: "mixed",
+      chipColors: "theme",
+      scrollMode: "page",
+    });
+    expect(migrateTicker({ chipColors: "muted" }).chipColors).toBe("subtle");
+    expect(migrateTicker({ scrollMode: "flip" }).scrollMode).toBe("page");
+  });
+
+  it("keeps the new spellings and defaults anything unknown", () => {
+    const out = migrateTicker({
+      tickerMode: "compact",
+      mixMode: "grouped",
+      chipColors: "subtle",
+      scrollMode: "page",
+    });
+    expect(out).toMatchObject({
+      tickerMode: "compact",
+      mixMode: "grouped",
+      chipColors: "subtle",
+      scrollMode: "page",
+    });
+    expect(migrateTicker({ tickerMode: "huge", chipColors: 3 })).toMatchObject({
+      tickerMode: "detailed",
+      chipColors: "widget",
+    });
+  });
+
+  it("sheds the ticker window's mirror keys on load", () => {
+    storeValues.set("scrollr:feedPinned", false);
+    storeValues.set("scrollr:tickerPosition", "bottom");
+    storeValues.set("scrollr:settings", {
+      appearance: {},
+      window: { pinned: false, tickerPosition: "bottom" },
+    });
+    const prefs = loadPrefs();
+    expect(prefs.window).toMatchObject({ pinned: false, tickerPosition: "bottom" });
+    expect(storeValues.has("scrollr:feedPinned")).toBe(false);
+    expect(storeValues.has("scrollr:tickerPosition")).toBe(false);
+  });
+
+  it("no longer reads or writes the widget-bar unit keys REL-205 folded", () => {
+    storeValues.set("scrollr:settings", {
+      appearance: { units: { temperature: "celsius", timeFormat: "24h" } },
+    });
+    loadPrefs();
+    expect(storeValues.has("scrollr:widget:weather:unit")).toBe(false);
+    expect(storeValues.has("scrollr:widget:clock:format")).toBe(false);
   });
 });

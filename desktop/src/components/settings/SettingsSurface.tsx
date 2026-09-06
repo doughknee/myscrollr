@@ -66,7 +66,10 @@ export default function SettingsSurface({
   const resetTicker = useTickerReset();
 
   const searching = query.trim().length > 0;
-  const results = useMemo(() => searchSettings(query), [query]);
+  const results = useMemo(
+    () => searchSettings(query, shell.authenticated),
+    [query, shell.authenticated],
+  );
   const meta = SETTINGS_PAGE_META[page] ?? SETTINGS_PAGE_META[DEFAULT_SETTINGS_PAGE];
 
   const goTo = useCallback(

@@ -112,10 +112,10 @@ export const TROUBLESHOOTING_ARTICLES: TroubleshootingArticle[] = [
       "Only the main window shows",
     ],
     steps: [
-      "Press Ctrl+T (Cmd+T on macOS) to toggle ticker visibility.",
+      "Press Ctrl+T (Cmd+T on macOS) to show or hide the ticker.",
       "Or go to Settings > Ticker and turn on \"Show the ticker\".",
       "Or click the Ticker toggle in the title bar (next to the Pin button).",
-      "Or right-click the system tray icon and choose \"Toggle Ticker\".",
+      "Or right-click the system tray icon and check \"Show ticker\".",
     ],
   },
   {

@@ -66,11 +66,14 @@ export function isThemeFamily(value: unknown): value is ThemeFamily {
 export function isThemeMode(value: unknown): value is ThemeMode {
   return value === "light" || value === "dark" || value === "system";
 }
-export type TickerMode = "compact" | "comfort";
-export type MixMode = "grouped" | "weave";
-export type ChipColorMode = "widget" | "accent" | "muted";
-/** "step" = Page. Rotate ("flip") folded into it 2026-09-06 (REL-204). */
-export type ScrollMode = "continuous" | "step";
+// Stored values match their labels on the Ticker page (REL-207). The
+// old spellings — comfort, weave, accent/muted, step/flip — are mapped
+// forward in `migrateTicker`.
+export type TickerMode = "compact" | "detailed";
+export type MixMode = "grouped" | "mixed";
+export type ChipColorMode = "widget" | "theme" | "subtle";
+/** Rotate ("flip") folded into Page 2026-09-06 (REL-204). */
+export type ScrollMode = "continuous" | "page";
 /** What the bar does under the mouse. Continuous: keep / slow to 30 % /
  *  stop. Page: keep advancing / hold the page (slow and pause alike). */
 export type HoverBehavior = "keep" | "slow" | "pause";
@@ -313,7 +316,7 @@ export type Venue = "off" | "feed" | "both" | "ticker";
  * Fantasy ticker simplicity dial; see FantasyDisplayPrefs.tickerMode.
  *
  * Named for the widget because `TickerMode` is already taken by the
- * ticker's density setting (compact | comfort) — a genuinely different
+ * ticker's density setting (compact | detailed) — a genuinely different
  * axis that happens to want the same word.
  */
 export type FantasyTickerMode = "essential" | "standard" | "everything";
@@ -472,8 +475,8 @@ const DEFAULT_TICKER: TickerPrefs = {
   showTicker: true,
   tickerSpeed: TICKER_SPEEDS.normal,
   onHover: "slow",
-  tickerMode: "comfort",
-  mixMode: "weave",
+  tickerMode: "detailed",
+  mixMode: "mixed",
   chipColors: "widget",
   scrollMode: "continuous",
   stepPause: 5,
@@ -579,6 +582,8 @@ const DEFAULT_PREFS: AppPreferences = {
 // ── Storage helpers ─────────────────────────────────────────────
 
 const PREFIX = "scrollr:settings";
+/** Pre-REL-207 per-window mirrors of `window.pinned` / `window.tickerPosition`. */
+const LEGACY_MIRROR_KEYS = ["scrollr:feedPinned", "scrollr:tickerPosition"];
 
 /** Migrate v1 prefs (general/taskbar/ticker/window) to v2 shape. */
 function migrateV1(saved: Record<string, unknown>): Partial<AppPreferences> {
@@ -1041,6 +1046,12 @@ export function loadPrefs(): AppPreferences {
       removeStore(LS_WEATHER_UNIT);
       removeStore(LS_CLOCK_FORMAT);
     }
+    // The ticker window used to mirror `window.pinned` and
+    // `window.tickerPosition` into their own keys and read those first
+    // (REL-207). It reads the prefs now; shed the mirrors once.
+    for (const key of LEGACY_MIRROR_KEYS) {
+      if (getStore<unknown>(key, undefined) !== undefined) removeStore(key);
+    }
 
     return merged;
   } catch {
@@ -1053,20 +1064,29 @@ export function loadPrefs(): AppPreferences {
  * presets and one hover row. Retired keys are dropped, not carried:
  *  - `pauseOnHover` + `hoverSpeed` → `onHover`
  *    (false → keep; true + 0 → pause; true otherwise → slow)
- *  - scrollMode "flip" (Rotate) → "step" (Page)
  *  - `tickerGap` (Spacing) and `tickerDirection` (Direction) → gone
  *  - `tickerSpeed` / `stepPause` snap to the nearest preset
+ *
+ * REL-207: stored values renamed to match their labels. Anything
+ * unrecognised falls back to the default:
+ *  - tickerMode  comfort → detailed
+ *  - mixMode     weave → mixed
+ *  - chipColors  accent → theme, muted → subtle
+ *  - scrollMode  step → page, and flip (Rotate, REL-204) → page
  */
 export function migrateTicker(raw: unknown): TickerPrefs {
   const saved = (raw && typeof raw === "object" ? raw : {}) as Omit<
     Partial<TickerPrefs>,
-    "scrollMode"
+    "scrollMode" | "tickerMode" | "mixMode" | "chipColors"
   > & {
     pauseOnHover?: unknown;
     hoverSpeed?: unknown;
     tickerGap?: unknown;
     tickerDirection?: unknown;
     scrollMode?: unknown;
+    tickerMode?: unknown;
+    mixMode?: unknown;
+    chipColors?: unknown;
   };
   const {
     pauseOnHover,
@@ -1074,6 +1094,9 @@ export function migrateTicker(raw: unknown): TickerPrefs {
     tickerGap: _gap,
     tickerDirection: _direction,
     scrollMode,
+    tickerMode,
+    mixMode,
+    chipColors,
     onHover,
     ...rest
   } = saved;
@@ -1092,8 +1115,18 @@ export function migrateTicker(raw: unknown): TickerPrefs {
     ...DEFAULT_TICKER,
     ...rest,
     onHover: migratedHover,
+    tickerMode: tickerMode === "compact" ? "compact" : "detailed",
+    mixMode: mixMode === "grouped" ? "grouped" : "mixed",
+    chipColors:
+      chipColors === "theme" || chipColors === "accent"
+        ? "theme"
+        : chipColors === "subtle" || chipColors === "muted"
+          ? "subtle"
+          : "widget",
     scrollMode:
-      scrollMode === "step" || scrollMode === "flip" ? "step" : "continuous",
+      scrollMode === "page" || scrollMode === "step" || scrollMode === "flip"
+        ? "page"
+        : "continuous",
     tickerSpeed: snapToPreset(
       rest.tickerSpeed,
       Object.values(TICKER_SPEEDS),
@@ -1218,7 +1251,7 @@ export function migrateAppearanceTheme(
 
 export const TICKER_HEIGHTS: Record<TickerMode, number> = {
   compact: 44,
-  comfort: 64,
+  detailed: 64,
 };
 
 // ── Ticker layout helpers ───────────────────────────────────────

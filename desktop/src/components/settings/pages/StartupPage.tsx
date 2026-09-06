@@ -13,6 +13,9 @@
 import type { StartupPrefs } from "../../../preferences";
 import { RowList, SettingsGroup, ToggleRow } from "../SettingsControls";
 import { Row } from "./Row";
+import { SETTINGS_ROWS } from "../rows";
+
+const R = SETTINGS_ROWS.startup;
 
 interface StartupPageProps {
   startup: StartupPrefs;
@@ -32,16 +35,16 @@ export default function StartupPage({
       <RowList>
         <Row id="autostart">
           <ToggleRow
-            label="Launch at login"
-            description="Open Scrollr when you sign in to your computer"
+            label={R.autostart.label}
+            description={R.autostart.description}
             checked={autostartEnabled}
             onChange={onAutostartChange}
           />
         </Row>
         <Row id="startInBackground">
           <ToggleRow
-            label="Start in the background"
-            description="Show only the ticker. Open the Scrollr window from the tray when you want it."
+            label={R.startInBackground.label}
+            description={R.startInBackground.description}
             checked={startup.startInBackground}
             onChange={(v) =>
               onStartupChange({ ...startup, startInBackground: v })

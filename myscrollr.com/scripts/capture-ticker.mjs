@@ -45,7 +45,7 @@ const BUS = process.env.SCROLLR_DEV_URL ?? "http://localhost:5174";
 
 // What the site lays each row out for (TickerShowcase.tsx ASPECT_*).
 const ASPECT = { compact: 2930 / 80, detailed: 2930 / 124 };
-const MODE = { compact: "compact", detailed: "comfort" };
+const MODE = { compact: "compact", detailed: "detailed" };
 // Which server-backed widgets belong on the bar for each channel shot.
 const CHANNELS = {
   sports: (id) => id.startsWith("sports_"),

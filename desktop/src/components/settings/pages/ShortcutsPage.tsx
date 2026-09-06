@@ -11,8 +11,8 @@ import { Row } from "./Row";
 const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ["⌘/Ctrl", ","], label: "Open Settings" },
   { keys: ["⌘/Ctrl", "F"], label: "Search settings" },
-  { keys: ["⌘/Ctrl", "T"], label: "Toggle ticker visibility" },
-  { keys: ["⌘/Ctrl", "Shift", "T"], label: "Cycle theme (light → dark → auto)" },
+  { keys: ["⌘/Ctrl", "T"], label: "Show/hide the ticker" },
+  { keys: ["⌘/Ctrl", "Shift", "T"], label: "Cycle color mode (light → dark → auto)" },
   { keys: ["Esc"], label: "Back / close current view" },
 ];
 

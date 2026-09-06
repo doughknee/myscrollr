@@ -27,6 +27,9 @@ import { RowList, SettingsButton, SettingsGroup } from "../SettingsControls";
 import ReleaseNotes from "../ReleaseNotes";
 import PageHeader from "./PageHeader";
 import { Row } from "./Row";
+import { SETTINGS_ROWS } from "../rows";
+
+const R = SETTINGS_ROWS.updates;
 
 type UpdateStatus =
   | { step: "idle" }
@@ -224,13 +227,13 @@ function UpdateRow({
         <div className={row}>
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className="text-ui-body font-medium text-fg">
-              Check for new versions
+              {R.checkNow.label}
             </span>
             <span className="text-ui-meta text-fg-4">
-              Scrollr also checks each time it launches.
+              {R.checkNow.description}
             </span>
           </div>
-          <SettingsButton onClick={onCheck}>Check for updates</SettingsButton>
+          <SettingsButton onClick={onCheck}>Check now</SettingsButton>
         </div>
       );
 

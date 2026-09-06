@@ -89,7 +89,7 @@ describe("RssChip", () => {
     const { container, rerender } = render(<RssChip item={item()} accent="#052962" />);
     const btn = () => container.querySelector("button") as HTMLButtonElement;
     expect(btn().style.getPropertyValue("--accent")).not.toBe("");
-    rerender(<RssChip item={item()} accent="#052962" colorMode="muted" />);
+    rerender(<RssChip item={item()} accent="#052962" colorMode="subtle" />);
     expect(btn().style.getPropertyValue("--accent")).toBe("");
   });
 });

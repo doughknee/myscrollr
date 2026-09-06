@@ -135,7 +135,7 @@ describe("GameChip", () => {
     expect(btn.style.getPropertyValue("--accent")).toBe("#e10600");
     expect(btn.className).toContain("var(--accent)");
     // The other two colour modes are shared palettes and ignore the brand.
-    rerender(<GameChip game={game()} accent="#e10600" colorMode="muted" />);
+    rerender(<GameChip game={game()} accent="#e10600" colorMode="subtle" />);
     expect((container.querySelector("button") as HTMLButtonElement).style.getPropertyValue("--accent")).toBe("");
   });
 
@@ -148,7 +148,7 @@ describe("GameChip", () => {
     expect(btn.className).not.toContain("border-live/70");
     expect(btn.className).not.toContain("bg-live/[0.13]");
     // Unbranded modes have no colour of their own, so red still says close.
-    const { container: muted } = render(<GameChip game={tight} colorMode="muted" />);
+    const { container: muted } = render(<GameChip game={tight} colorMode="subtle" />);
     expect((muted.querySelector("button") as HTMLButtonElement).className).toContain("border-live/70");
   });
 
