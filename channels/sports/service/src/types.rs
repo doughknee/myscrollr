@@ -4,6 +4,22 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::RwLock;
 
+/// api-sports.io Pro plan: 7,500 requests/day per sport host. The fallback
+/// daily quota until a response carries `x-ratelimit-requests-limit`, and the
+/// baseline the live-poll cadence is scaled from.
+pub const DEFAULT_DAILY_QUOTA: u32 = 7500;
+
+/// Live-poll interval for the effective daily quota, in seconds.
+///
+/// Pro (7,500/day) polls live games every `max_secs`; a bigger plan earns a
+/// proportionally shorter interval, floored at `min_secs`. Ultra (75,000/day)
+/// lands on the floor. The idle interval is always `max_secs`.
+pub fn live_poll_interval_secs(daily_quota: u32, min_secs: u64, max_secs: u64) -> u64 {
+    let pro = u64::from(DEFAULT_DAILY_QUOTA);
+    let quota = u64::from(daily_quota).max(1);
+    (max_secs * pro / quota).clamp(min_secs.min(max_secs), max_secs)
+}
+
 #[derive(Serialize, Clone)]
 pub struct SportsHealth {
     pub status: String,
@@ -68,6 +84,11 @@ impl SportsHealth {
 /// to a per-host shared pool. When a league exhausts its reserved budget, it
 /// falls back to the shared pool before being skipped.
 pub struct RateLimiter {
+    /// Effective daily quota per host: the config value until a response
+    /// carries `x-ratelimit-requests-limit`, then whatever upstream last said
+    /// (up or down). Buckets are reseeded from it at UTC midnight and whenever
+    /// it changes.
+    host_limit: HashMap<String, AtomicU32>,
     /// Legacy per-sport bucket — preserved for the health endpoint snapshot.
     /// Updated from `x-ratelimit-requests-remaining` headers as before, but
     /// no longer used for consumption decisions when per-league budgets are
@@ -96,6 +117,7 @@ impl RateLimiter {
             host_remaining.insert(s.clone(), AtomicU32::new(initial));
         }
         Self {
+            host_limit: HashMap::new(),
             host_remaining,
             league_reserved: HashMap::new(),
             league_to_host: HashMap::new(),
@@ -114,46 +136,54 @@ impl RateLimiter {
     ///   - Off-season leagues (current UTC month is in offseason_months) get
     ///     `reserved = 0` and donate their share to the host's shared pool.
     pub fn new_per_league(leagues: &[crate::database::TrackedLeague], daily_total: u32) -> Self {
-        use std::collections::HashMap as Map;
-
-        let current_month: i32 = Utc::now().month() as i32;
-
-        // Group leagues by host (== sport_api here; one host per sport_api in practice).
-        let mut by_host: Map<String, Vec<&crate::database::TrackedLeague>> = Map::new();
-        for l in leagues {
-            by_host.entry(l.sport_api.clone()).or_default().push(l);
-        }
-
         let mut league_reserved = HashMap::new();
         let mut league_to_host = HashMap::new();
         let mut host_shared = HashMap::new();
         let mut host_remaining = HashMap::new();
-        let mut offseason = HashSet::new();
-
-        for (host, host_leagues) in &by_host {
-            let n = host_leagues.len().max(1) as u32;
-            let share = daily_total / n;
-            let mut donated = 0u32;
-            for l in host_leagues {
-                let is_offseason = l.is_offseason(current_month);
-                let reserved = if is_offseason { 0 } else { share };
-                if is_offseason {
-                    donated += share;
-                    offseason.insert(l.name.clone());
-                }
-                league_reserved.insert(l.name.clone(), AtomicU32::new(reserved));
-                league_to_host.insert(l.name.clone(), host.clone());
-            }
-            host_shared.insert(host.clone(), AtomicU32::new(donated));
-            host_remaining.insert(host.clone(), AtomicU32::new(daily_total));
+        let mut host_limit = HashMap::new();
+        for l in leagues {
+            league_reserved.insert(l.name.clone(), AtomicU32::new(0));
+            league_to_host.insert(l.name.clone(), l.sport_api.clone());
+            host_shared.entry(l.sport_api.clone()).or_insert_with(|| AtomicU32::new(0));
+            host_remaining.entry(l.sport_api.clone()).or_insert_with(|| AtomicU32::new(daily_total));
+            host_limit.entry(l.sport_api.clone()).or_insert_with(|| AtomicU32::new(daily_total));
         }
-
-        Self {
+        let rl = Self {
+            host_limit,
             host_remaining,
             league_reserved,
             league_to_host,
             host_shared,
-            offseason_leagues: RwLock::new(offseason),
+            offseason_leagues: RwLock::new(HashSet::new()),
+        };
+        rl.reset_daily(leagues);
+        rl
+    }
+
+    /// Refill one host's buckets from `limit`: each league on the host gets
+    /// `limit / N`; in-season leagues keep their share as `reserved`,
+    /// off-season leagues donate theirs to the host's shared pool.
+    fn seed_host(&self, host: &str, limit: u32) {
+        let leagues: Vec<&String> = self.league_to_host.iter()
+            .filter(|(_, h)| h.as_str() == host)
+            .map(|(l, _)| l)
+            .collect();
+        let share = limit / leagues.len().max(1) as u32;
+        let offseason = self.offseason_leagues.read()
+            .map(|s| s.clone())
+            .unwrap_or_default();
+        let mut donated = 0u32;
+        for l in leagues {
+            let reserved = if offseason.contains(l) { donated += share; 0 } else { share };
+            if let Some(slot) = self.league_reserved.get(l) {
+                slot.store(reserved, Ordering::Relaxed);
+            }
+        }
+        if let Some(slot) = self.host_shared.get(host) {
+            slot.store(donated, Ordering::Relaxed);
+        }
+        if let Some(slot) = self.host_remaining.get(host) {
+            slot.store(limit, Ordering::Relaxed);
         }
     }
 
@@ -216,45 +246,62 @@ impl RateLimiter {
             .unwrap_or(0)
     }
 
-    /// Reset all per-league reserved + per-host shared pools. Called at UTC
-    /// midnight by the daily reset task in main.rs.
-    pub fn reset_daily(&self, leagues: &[crate::database::TrackedLeague], daily_total: u32) {
-        use std::collections::HashMap as Map;
+    /// Reset all per-league reserved + per-host shared pools from each host's
+    /// effective daily quota. Called at UTC midnight by the daily reset task
+    /// in main.rs.
+    pub fn reset_daily(&self, leagues: &[crate::database::TrackedLeague]) {
+        // Re-derive the off-season set first — the month may have rolled
+        // over, moving leagues into or out of their off-season window.
         let current_month: i32 = Utc::now().month() as i32;
-
-        let mut by_host: Map<String, Vec<&crate::database::TrackedLeague>> = Map::new();
-        for l in leagues {
-            by_host.entry(l.sport_api.clone()).or_default().push(l);
-        }
-
-        let mut offseason = HashSet::new();
-        for (host, host_leagues) in &by_host {
-            let n = host_leagues.len().max(1) as u32;
-            let share = daily_total / n;
-            let mut donated = 0u32;
-            for l in host_leagues {
-                let is_offseason = l.is_offseason(current_month);
-                let reserved = if is_offseason { 0 } else { share };
-                if is_offseason {
-                    donated += share;
-                    offseason.insert(l.name.clone());
-                }
-                if let Some(slot) = self.league_reserved.get(&l.name) {
-                    slot.store(reserved, Ordering::Relaxed);
-                }
-            }
-            if let Some(slot) = self.host_shared.get(host) {
-                slot.store(donated, Ordering::Relaxed);
-            }
-            if let Some(slot) = self.host_remaining.get(host) {
-                slot.store(daily_total, Ordering::Relaxed);
-            }
-        }
-        // Re-derive the off-season set — the month may have rolled over,
-        // moving leagues into or out of their off-season window.
+        let offseason: HashSet<String> = leagues.iter()
+            .filter(|l| l.is_offseason(current_month))
+            .map(|l| l.name.clone())
+            .collect();
         if let Ok(mut s) = self.offseason_leagues.write() {
             *s = offseason;
         }
+        for (host, limit) in &self.host_limit {
+            self.seed_host(host, limit.load(Ordering::Relaxed));
+        }
+    }
+
+    /// Adopt the plan's daily quota for a host from `x-ratelimit-requests-limit`.
+    /// Header truth in both directions: a raise (Pro → Ultra) reseeds the
+    /// host's buckets from the new quota, a cut reseeds them smaller. The
+    /// caller follows with `update(remaining)`, whose clamp then pulls the
+    /// fresh buckets down to what upstream says is actually left today.
+    pub fn set_daily_quota(&self, host: &str, limit: u32) {
+        let Some(slot) = self.host_limit.get(host) else { return };
+        let prev = slot.swap(limit, Ordering::Relaxed);
+        if prev != limit {
+            crate::log::info!("[Rate Budget] {host}: daily quota {prev} → {limit} (x-ratelimit-requests-limit)");
+            self.seed_host(host, limit);
+        }
+    }
+
+    /// Effective daily quota for a host (config until a header has been seen).
+    pub fn daily_quota(&self, host: &str) -> u32 {
+        self.host_limit.get(host)
+            .map(|c| c.load(Ordering::Relaxed))
+            .unwrap_or(DEFAULT_DAILY_QUOTA)
+    }
+
+    /// Plan-wide quota for cadence decisions: the largest any host has
+    /// reported. One key, one plan — a host that never gets polled (all its
+    /// leagues off-season) never sees a header and would otherwise pin the
+    /// cadence at the config fallback.
+    pub fn max_daily_quota(&self) -> u32 {
+        self.host_limit.values()
+            .map(|c| c.load(Ordering::Relaxed))
+            .max()
+            .unwrap_or(DEFAULT_DAILY_QUOTA)
+    }
+
+    /// Hosts known to the limiter, sorted, for startup logging.
+    pub fn hosts(&self) -> Vec<String> {
+        let mut v: Vec<String> = self.host_limit.keys().cloned().collect();
+        v.sort();
+        v
     }
 
     // ── Legacy methods (preserved for the health endpoint + standings/teams polls) ──
@@ -541,7 +588,7 @@ mod tests {
         }
         assert!(!rl.try_consume("Premier League"));
         // Reset
-        rl.reset_daily(&leagues, 100);
+        rl.reset_daily(&leagues);
         assert_eq!(rl.reserved("Premier League"), 100);
     }
 
@@ -601,7 +648,7 @@ mod tests {
         assert_eq!(rl.shared_remaining("football"), 50);
 
         // Only the daily reset refills.
-        rl.reset_daily(&leagues, 1000);
+        rl.reset_daily(&leagues);
         assert_eq!(rl.reserved("Premier League"), 500);
     }
 
@@ -634,5 +681,74 @@ mod tests {
         rl.update("football", 10);
         assert_eq!(rl.reserved("Premier League"), 10);
         assert_eq!(rl.reserved("NBA"), 1000); // untouched
+    }
+
+    // ── Effective quota from the plan header (REL-219) ──────────────────────
+
+    #[test]
+    fn test_plan_header_pro_to_ultra_and_back() {
+        let leagues = vec![
+            make_league("Premier League", "football", None),
+            make_league("La Liga", "football", None),
+        ];
+        // Config fallback until a header has been seen.
+        let rl = RateLimiter::new_per_league(&leagues, DEFAULT_DAILY_QUOTA);
+        assert_eq!(rl.daily_quota("football"), 7500);
+        assert_eq!(rl.reserved("Premier League"), 3750);
+
+        // Pro header: same number, nothing moves.
+        rl.set_daily_quota("football", 7500);
+        rl.update("football", 7000);
+        assert_eq!(rl.daily_quota("football"), 7500);
+        assert_eq!(rl.reserved("Premier League"), 3500); // clamped to 7000/2
+
+        // Ultra header: buckets reseeded UP, then clamped to what is left.
+        rl.set_daily_quota("football", 75_000);
+        rl.update("football", 70_000);
+        assert_eq!(rl.daily_quota("football"), 75_000);
+        assert_eq!(rl.max_daily_quota(), 75_000);
+        assert_eq!(rl.reserved("Premier League"), 35_000);
+        assert_eq!(rl.remaining("football"), 70_000);
+
+        // Back to Pro: reseeded DOWN, clamp still applies.
+        rl.set_daily_quota("football", 7500);
+        rl.update("football", 400);
+        assert_eq!(rl.daily_quota("football"), 7500);
+        assert_eq!(rl.reserved("Premier League"), 200);
+
+        // Midnight refills from the last header, not the config.
+        rl.set_daily_quota("football", 75_000);
+        rl.update("football", 10);
+        rl.reset_daily(&leagues);
+        assert_eq!(rl.reserved("Premier League"), 37_500);
+        assert_eq!(rl.remaining("football"), 75_000);
+
+        // Unknown host: ignored, config fallback reported.
+        rl.set_daily_quota("hockey", 75_000);
+        assert_eq!(rl.daily_quota("hockey"), DEFAULT_DAILY_QUOTA);
+    }
+
+    #[test]
+    fn test_max_daily_quota_ignores_unpolled_hosts() {
+        let leagues = vec![
+            make_league("NHL", "hockey", None),
+            make_league("Premier League", "football", None),
+        ];
+        let rl = RateLimiter::new_per_league(&leagues, 7500);
+        assert_eq!(rl.max_daily_quota(), 7500);
+        rl.set_daily_quota("football", 75_000);
+        assert_eq!(rl.max_daily_quota(), 75_000); // hockey never saw a header
+        assert_eq!(rl.hosts(), vec!["football".to_string(), "hockey".to_string()]);
+    }
+
+    #[test]
+    fn test_live_poll_interval_tracks_quota() {
+        assert_eq!(live_poll_interval_secs(7500, 15, 60), 60);   // Pro
+        assert_eq!(live_poll_interval_secs(75_000, 15, 60), 15); // Ultra -> floor
+        assert_eq!(live_poll_interval_secs(75_000, 20, 60), 20); // floor is config
+        assert_eq!(live_poll_interval_secs(15_000, 15, 60), 30); // in between
+        assert_eq!(live_poll_interval_secs(3000, 15, 60), 60);   // smaller plan -> ceiling
+        assert_eq!(live_poll_interval_secs(0, 15, 60), 60);      // never divide by zero
+        assert_eq!(live_poll_interval_secs(75_000, 90, 60), 60); // min > max -> max wins
     }
 }

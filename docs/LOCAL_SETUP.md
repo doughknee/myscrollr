@@ -110,7 +110,7 @@ it whenever you want a clean dataset back.
 leaves them blank on purpose, and the ingesters handle that correctly: they
 stay up, skip polling, and serve what is in Postgres. The keys that would
 work there are the production ones, and the quota they draw on belongs to
-real users — api-sports bills a shared 7,500 requests/day per sport host
+real users — api-sports bills a shared daily quota per sport host (7,500 on Pro, 75,000 on Ultra)
 across every league. Seeding gives you the same app without spending any of it.
 
 Loading also rebases timestamps, because several read paths are

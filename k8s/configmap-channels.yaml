@@ -13,6 +13,14 @@ data:
   # fantasy is the one remaining channel service)
   FANTASY_CHANNEL_URL: "http://fantasy-api:8084"
 
+  # Sports ingester (sports-service). Fallback daily quota per api-sports
+  # host until a response carries x-ratelimit-requests-limit; the header
+  # then wins in both directions (Ultra for all sports until ~2026-12-06,
+  # REL-219). Live games poll every MIN seconds on Ultra, MAX on Pro.
+  SPORTS_DAILY_QUOTA: "7500"
+  SPORTS_LIVE_POLL_MIN_SECS: "15"
+  SPORTS_LIVE_POLL_MAX_SECS: "60"
+
   # Fantasy-specific
   YAHOO_CALLBACK_URL: "https://api.myscrollr.com/yahoo/callback"
   SYNC_ENABLED: "true"

@@ -11,7 +11,7 @@ use crate::database::{
     LeagueConfig, TrackedLeague, upsert_game, CleanedData, Team,
     StandingData, upsert_standing, TeamData, upsert_team,
 };
-pub use crate::types::{SportsHealth, RateLimiter};
+pub use crate::types::{live_poll_interval_secs, RateLimiter, SportsHealth, DEFAULT_DAILY_QUOTA};
 
 pub mod log;
 pub mod database;
@@ -127,6 +127,23 @@ pub async fn init_sports_service(
 
 // =============================================================================
 // Live polling (fast — today + yesterday when needed, every 30s-1min)
+/// Feed a response's daily-quota headers into the limiter for one host.
+/// `x-ratelimit-requests-limit` is the plan's daily allocation (adopted in
+/// both directions), `x-ratelimit-requests-remaining` what is left today
+/// (only ever clamps). Limit first, so a raised plan is reseeded before the
+/// remaining-clamp trims it to today's real balance.
+fn adopt_rate_headers(headers: &header::HeaderMap, host: &str, rate_limiter: &RateLimiter) {
+    let read = |name: &str| headers.get(name)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.trim().parse::<u32>().ok());
+    if let Some(limit) = read("x-ratelimit-requests-limit") {
+        rate_limiter.set_daily_quota(host, limit);
+    }
+    if let Some(remaining) = read("x-ratelimit-requests-remaining") {
+        rate_limiter.update(host, remaining);
+    }
+}
+
 // =============================================================================
 
 /// Poll today's games for live score updates. Called on the fast interval.
@@ -369,13 +386,7 @@ pub async fn poll_standings(
 
         match client.get(&url).send().await {
             Ok(resp) => {
-                if let Some(remaining) = resp.headers()
-                    .get("x-ratelimit-requests-remaining")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<u32>().ok())
-                {
-                    rate_limiter.update(&league.sport_api, remaining);
-                }
+                adopt_rate_headers(resp.headers(), &league.sport_api, rate_limiter);
                 if !resp.status().is_success() {
                     warn!("[{}] Standings API returned {}", league.name, resp.status());
                     continue;
@@ -922,13 +933,7 @@ pub async fn poll_teams(
 
         match client.get(&url).send().await {
             Ok(resp) => {
-                if let Some(remaining) = resp.headers()
-                    .get("x-ratelimit-requests-remaining")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<u32>().ok())
-                {
-                    rate_limiter.update(&league.sport_api, remaining);
-                }
+                adopt_rate_headers(resp.headers(), &league.sport_api, rate_limiter);
                 if !resp.status().is_success() {
                     warn!("[{}] Teams API returned {}", league.name, resp.status());
                     continue;
@@ -1037,13 +1042,7 @@ async fn poll_league(
     let resp = client.get(&url).send().await?;
 
     // Extract rate limit info from headers — update only this sport's bucket
-    if let Some(remaining) = resp.headers()
-        .get("x-ratelimit-requests-remaining")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<u32>().ok())
-    {
-        rate_limiter.update(&league.sport_api, remaining);
-    }
+    adopt_rate_headers(resp.headers(), &league.sport_api, rate_limiter);
 
     let status = resp.status();
     if !status.is_success() {

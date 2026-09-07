@@ -10,8 +10,8 @@ use sports_service::{
     init::{fatal, spawn_supervised, ReadinessGate, ReadinessSnapshot},
     init_sports_service,
     log::init_async_logger,
-    poll_live, poll_schedule, poll_standings, poll_teams,
-    InitError, RateLimiter, SportsHealth,
+    live_poll_interval_secs, poll_live, poll_schedule, poll_standings, poll_teams,
+    InitError, RateLimiter, SportsHealth, DEFAULT_DAILY_QUOTA,
 };
 
 #[derive(Clone)]
@@ -30,27 +30,53 @@ struct ReadyPayload {
 /// Interval for the schedule poll (upcoming games + cleanup).
 const SCHEDULE_POLL_SECS: u64 = 30 * 60; // 30 minutes
 
-/// Fastest "live" poll interval. Actual interval is adaptive (30s when
-/// leagues_live > 0, 60s otherwise) but for staleness calculations we use
-/// the widest reasonable gap.
+/// Live poll interval bounds (seconds), overridable via
+/// `SPORTS_LIVE_POLL_MIN_SECS` / `SPORTS_LIVE_POLL_MAX_SECS`. Idle polls run
+/// at MAX; live games run at an interval scaled from the effective daily
+/// quota: MAX on Pro, MIN on Ultra (see `live_poll_interval_secs`).
+const LIVE_POLL_MIN_INTERVAL_SECS: u64 = 15;
 const LIVE_POLL_MAX_INTERVAL_SECS: u64 = 60;
 
-/// Maximum acceptable staleness before `/health/ready` returns 503. The
-/// staleness threshold is deliberately 2x the widest expected gap between
-/// successful polls, so transient rate-limits or a slow external API don't
-/// flap readiness. If no poll has succeeded in this window something is
-/// actually wrong.
-const MAX_POLL_STALENESS_SECS: u64 = LIVE_POLL_MAX_INTERVAL_SECS * 2;
+/// Config knobs read once at startup. Every value has a compiled default;
+/// an unparsable env var logs and falls back to it.
+struct PollConfig {
+    /// Daily request budget per api-sports.io sport host. The fallback until
+    /// a response carries `x-ratelimit-requests-limit`; then the header wins.
+    daily_quota: u32,
+    live_min_secs: u64,
+    live_max_secs: u64,
+}
+
+impl PollConfig {
+    fn from_env() -> Self {
+        Self {
+            daily_quota: env_or("SPORTS_DAILY_QUOTA", DEFAULT_DAILY_QUOTA),
+            live_min_secs: env_or("SPORTS_LIVE_POLL_MIN_SECS", LIVE_POLL_MIN_INTERVAL_SECS),
+            live_max_secs: env_or("SPORTS_LIVE_POLL_MAX_SECS", LIVE_POLL_MAX_INTERVAL_SECS),
+        }
+    }
+
+    /// Maximum acceptable staleness before `/health/ready` returns 503:
+    /// deliberately 2x the widest expected gap between successful polls, so
+    /// transient rate-limits or a slow external API don't flap readiness.
+    fn max_poll_staleness_secs(&self) -> u64 {
+        self.live_max_secs * 2
+    }
+}
+
+fn env_or<T: std::str::FromStr + std::fmt::Display>(key: &str, default: T) -> T {
+    match std::env::var(key) {
+        Ok(v) => v.trim().parse().unwrap_or_else(|_| {
+            eprintln!("[Config] {key}={v:?} is not a valid number; using {default}");
+            default
+        }),
+        Err(_) => default,
+    }
+}
 
 /// How often the bridge loop checks `SportsHealth.last_poll` and forwards
 /// it to the readiness gate. Cheap, runs on a tight interval.
 const READINESS_BRIDGE_INTERVAL: Duration = Duration::from_secs(10);
-
-/// Daily request budget per api-sports.io sport host (Pro plan, 7,500/day).
-/// Used by both the initial budget allocation and the UTC-midnight daily
-/// reset. Keep these in lockstep — drift between them would silently corrupt
-/// the per-league budget allocation.
-const SPORTS_DAILY_QUOTA: u32 = 7500;
 
 /// Initialize Sentry. The returned guard MUST live for the lifetime of
 /// the process — Drop flushes pending events on shutdown. Sentry MUST
@@ -139,9 +165,10 @@ async fn run_service() -> Result<()> {
     // a Tokio 1.x runtime".
     let _ = init_async_logger("./logs");
 
+    let config = PollConfig::from_env();
     let health = Arc::new(Mutex::new(SportsHealth::new()));
     let readiness = Arc::new(ReadinessGate::new(Some(Duration::from_secs(
-        MAX_POLL_STALENESS_SECS,
+        config.max_poll_staleness_secs(),
     ))));
 
     // Cancellation token for coordinated shutdown
@@ -231,13 +258,20 @@ async fn run_service() -> Result<()> {
             }
         };
 
-        // Pro plan: 7,500 requests/day per sport host. Each league on a host
-        // gets a reserved share of host_budget / N_leagues_on_host. Off-season
-        // leagues donate their share to a per-host shared pool that any
-        // in-season league can borrow from when its reserved budget is
-        // exhausted. Prevents Champions League knockout nights from starving
-        // Premier League polls.
-        let rate_limiter = Arc::new(RateLimiter::new_per_league(&leagues, SPORTS_DAILY_QUOTA));
+        // Each league on a host gets a reserved share of
+        // host_budget / N_leagues_on_host. Off-season leagues donate their
+        // share to a per-host shared pool that any in-season league can
+        // borrow from when its reserved budget is exhausted. Prevents
+        // Champions League knockout nights from starving Premier League
+        // polls. The host budget starts at the config quota and follows
+        // `x-ratelimit-requests-limit` once responses arrive.
+        let rate_limiter = Arc::new(RateLimiter::new_per_league(&leagues, config.daily_quota));
+        for host in rate_limiter.hosts() {
+            println!(
+                "[Rate Budget] {host}: daily quota {}/day (config; header overrides)",
+                rate_limiter.daily_quota(&host)
+            );
+        }
 
         let client = Arc::new(client);
         let leagues = Arc::new(leagues);
@@ -269,15 +303,16 @@ async fn run_service() -> Result<()> {
             }
         });
 
-        // ── Fast poll: live scores (today only, 30s live / 1min idle) ─────
+        // ── Fast poll: live scores (today only, quota-scaled live / MAX idle) ─
         let pool_live = pool.clone();
         let client_live = client.clone();
         let leagues_live = leagues.clone();
         let health_live = health_bg.clone();
         let rl_live = rate_limiter.clone();
         let cancel_live = cancel_bg.clone();
+        let (live_min, live_max) = (config.live_min_secs, config.live_max_secs);
         spawn_supervised("sports-live-poll", async move {
-            println!("Starting live poll loop (adaptive intervals)...");
+            println!("Starting live poll loop (live {live_min}-{live_max}s by quota, idle {live_max}s)...");
             loop {
                 tokio::select! {
                     _ = cancel_live.cancelled() => {
@@ -287,14 +322,12 @@ async fn run_service() -> Result<()> {
                     _ = async {
                         poll_live(&pool_live, &client_live, &leagues_live, &health_live, &rl_live).await;
 
-                        // Adaptive interval: poll more frequently when there are live games
-                        let interval = {
-                            let h = health_live.lock().await;
-                            if h.leagues_live > 0 {
-                                30  // 30s when live games are happening
-                            } else {
-                                60  // 1 min when no live games
-                            }
+                        // Adaptive interval: live games poll at a cadence the
+                        // plan can afford (Ultra -> MIN, Pro -> MAX); idle at MAX.
+                        let interval = if health_live.lock().await.leagues_live > 0 {
+                            live_poll_interval_secs(rl_live.max_daily_quota(), live_min, live_max)
+                        } else {
+                            live_max
                         };
 
                         tokio::time::sleep(std::time::Duration::from_secs(interval)).await;
@@ -395,8 +428,10 @@ async fn run_service() -> Result<()> {
                         break;
                     }
                     _ = tokio::time::sleep(std::time::Duration::from_secs(wait_secs)) => {
-                        rl_reset.reset_daily(&leagues_reset, SPORTS_DAILY_QUOTA);
-                        println!("[Rate Budget] Daily reset completed at UTC midnight");
+                        rl_reset.reset_daily(&leagues_reset);
+                        for host in rl_reset.hosts() {
+                            println!("[Rate Budget] {host}: daily reset to {}/day at UTC midnight", rl_reset.daily_quota(&host));
+                        }
                     }
                 }
             }
