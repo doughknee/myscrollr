@@ -6,7 +6,7 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 use sports_service::{
-    database::initialize_pool,
+    database::{get_tracked_leagues, initialize_pool},
     init::{fatal, spawn_supervised, ReadinessGate, ReadinessSnapshot},
     init_sports_service,
     log::init_async_logger,
@@ -39,6 +39,7 @@ const LIVE_POLL_MAX_INTERVAL_SECS: u64 = 60;
 
 /// Config knobs read once at startup. Every value has a compiled default;
 /// an unparsable env var logs and falls back to it.
+#[derive(Clone)]
 struct PollConfig {
     /// Daily request budget per api-sports.io sport host. The fallback until
     /// a response carries `x-ratelimit-requests-limit`; then the header wins.
@@ -243,6 +244,11 @@ async fn run_service() -> Result<()> {
                     "[Sports] API_SPORTS_KEY not set; not polling. \
                      Existing database rows are still served."
                 );
+                // Still report the config quota per host so /health/ready
+                // shows the same shape keyless as it does in production.
+                let leagues = get_tracked_leagues(pool.clone()).await;
+                let rl = RateLimiter::new_per_league(&leagues, config.daily_quota);
+                publish_quota(&health_bg, &rl, &config).await;
                 readiness_bg.mark_ready().await;
                 return;
             }
@@ -272,6 +278,7 @@ async fn run_service() -> Result<()> {
                 rate_limiter.daily_quota(&host)
             );
         }
+        publish_quota(&health_bg, &rate_limiter, &config).await;
 
         let client = Arc::new(client);
         let leagues = Arc::new(leagues);
@@ -311,6 +318,7 @@ async fn run_service() -> Result<()> {
         let rl_live = rate_limiter.clone();
         let cancel_live = cancel_bg.clone();
         let (live_min, live_max) = (config.live_min_secs, config.live_max_secs);
+        let config_live = config.clone();
         spawn_supervised("sports-live-poll", async move {
             println!("Starting live poll loop (live {live_min}-{live_max}s by quota, idle {live_max}s)...");
             loop {
@@ -324,8 +332,11 @@ async fn run_service() -> Result<()> {
 
                         // Adaptive interval: live games poll at a cadence the
                         // plan can afford (Ultra -> MIN, Pro -> MAX); idle at MAX.
+                        // The header may have moved the quota this cycle, so
+                        // republish before choosing.
+                        let live_secs = publish_quota(&health_live, &rl_live, &config_live).await;
                         let interval = if health_live.lock().await.leagues_live > 0 {
-                            live_poll_interval_secs(rl_live.max_daily_quota(), live_min, live_max)
+                            live_secs
                         } else {
                             live_max
                         };
@@ -470,6 +481,19 @@ async fn shutdown_signal() {
         _ = ctrl_c => {},
         _ = terminate => {},
     }
+}
+
+/// Copy the limiter's effective quota per host and the live cadence it earns
+/// into the health snapshot `/health/ready` serves. Returns that cadence.
+async fn publish_quota(
+    health: &Mutex<SportsHealth>,
+    rl: &RateLimiter,
+    config: &PollConfig,
+) -> u64 {
+    let live_secs =
+        live_poll_interval_secs(rl.max_daily_quota(), config.live_min_secs, config.live_max_secs);
+    health.lock().await.set_quota(rl.quota_snapshot(), live_secs);
+    live_secs
 }
 
 /// Liveness probe: 200 as long as the process is up.
