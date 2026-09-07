@@ -1,0 +1,35 @@
+{
+  "totalMutations": 6590,
+  "byKind": {
+    "utility": {
+      "total": 2137,
+      "repaint-visible": 725,
+      "repaint-hidden": 1407,
+      "swap-hidden": 4,
+      "swap-visible": 1
+    },
+    "sports": {
+      "total": 82,
+      "swap-hidden": 67,
+      "repaint-hidden": 8,
+      "repaint-visible": 6,
+      "swap-visible": 1
+    },
+    "finance": {
+      "total": 87,
+      "repaint-hidden": 23,
+      "swap-hidden": 64
+    },
+    "predictions": {
+      "total": 23,
+      "swap-hidden": 23
+    }
+  }
+}
+
+--- SWAPS WHILE VISIBLE (rule 6 violations) ---
+[page] utility null: "MLBSan Francisco GiantsWashington Nationals2New York MetsLos Angeles Dodgers44th59-85−75RD5th65-78−4" -> "SYSMONCPU63%RAM84%GPU45%"
+[page] sports spo-sports_mlb-slot-2: "A150.86▲+0.59%147.78151.59" -> "MLBCleveland GuardiansCleveland GuardiansBaltimore OriolesKansas City Royals2nd73-71−14RD5th69-75−29"
+
+total swap-while-visible events: 2
+total remount-while-visible events: 0

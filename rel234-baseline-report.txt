@@ -1,0 +1,72 @@
+{
+  "totalMutations": 3467,
+  "byKind": {
+    "utility": {
+      "total": 605,
+      "repaint-visible": 98,
+      "swap-visible": 128,
+      "swap-hidden": 250,
+      "repaint-hidden": 129
+    },
+    "sports": {
+      "total": 164,
+      "repaint-visible": 23,
+      "repaint-hidden": 18,
+      "swap-hidden": 81,
+      "swap-visible": 42
+    },
+    "finance": {
+      "total": 3,
+      "swap-hidden": 3
+    },
+    "predictions": {
+      "total": 10,
+      "repaint-hidden": 10
+    }
+  }
+}
+
+--- SWAPS WHILE VISIBLE (rule 6 violations) ---
+[baseline] utility null: "BNB/USD745.72▼-0.97%744.92756.43" -> "SYSMONCPU87%RAM73%GPU39%"
+[baseline] utility null: "SYSMONCPU82%RAM73%GPU45%" -> "BNB/USD745.80▼-0.96%744.92756.43"
+[baseline] utility null: "BNB/USD745.80▼-0.96%744.92756.43" -> "SYSMONCPU70%RAM73%GPU45%"
+[baseline] utility null: "SYSMONCPU70%RAM73%GPU45%" -> "BNB/USD745.81▼-0.95%744.92756.43"
+[baseline] utility null: "BNB/USD745.83▼-0.95%744.92756.43" -> "SYSMONCPU86%RAM73%GPU39%"
+[baseline] utility null: "SYSMONCPU86%RAM73%GPU39%" -> "BNB/USD745.84▼-0.95%744.92756.43"
+[baseline] utility null: "BNB/USD745.84▼-0.95%744.92756.43" -> "SYSMONCPU74%RAM73%GPU47%"
+[baseline] utility null: "SYSMONCPU72%RAM73%GPU48%" -> "BNB/USD745.83▼-0.95%744.92756.43"
+[baseline] utility null: "BNB/USD745.83▼-0.95%744.92756.43" -> "SYSMONCPU74%RAM73%GPU47%"
+[baseline] utility null: "BNB/USD745.73▼-0.97%744.92756.43" -> "SYSMONCPU71%RAM73%GPU47%"
+[baseline] utility null: "BNB/USD745.71▼-0.97%744.92756.43" -> "SYSMONCPU72%RAM73%GPU45%"
+[baseline] utility null: "BNB/USD745.70▼-0.97%744.92756.43" -> "SYSMONCPU83%RAM73%GPU42%"
+[baseline] utility null: "BNB/USD745.71▼-0.97%744.92756.43" -> "SYSMONCPU89%RAM73%GPU32%"
+[baseline] utility null: "SYSMONCPU89%RAM73%GPU32%" -> "CLOCKLocal1:48 AM☾Tokyo3:48 PMMon, Sep 7 · GMT-5Mon, Sep 7 · GMT+9"
+[baseline] utility null: "CLOCKLocal1:48 AM☾Tokyo3:48 PMMon, Sep 7 · GMT-5Mon, Sep 7 · GMT+9" -> "SYSMONCPU94%RAM73%GPU39%"
+[baseline] utility null: "BNB/USD745.70▼-0.97%744.92756.43" -> "SYSMONCPU66%RAM73%GPU40%"
+[baseline] utility null: "BNB/USD745.71▼-0.97%744.92756.43" -> "SYSMONCPU71%RAM73%GPU47%"
+[baseline] utility null: "BNB/USD745.78▼-0.96%744.92756.43" -> "SYSMONCPU75%RAM73%GPU43%"
+[baseline] utility null: "BNB/USD745.78▼-0.96%744.92756.43" -> "SYSMONCPU82%RAM73%GPU44%"
+[baseline] utility null: "BNB/USD745.83▼-0.95%744.92756.43" -> "SYSMONCPU76%RAM73%GPU43%"
+[baseline] utility null: "BNB/USD745.84▼-0.95%744.92756.43" -> "SYSMONCPU70%RAM73%GPU43%"
+[baseline] utility null: "BNB/USD745.83▼-0.95%744.92756.43" -> "SYSMONCPU69%RAM73%GPU43%"
+[baseline] utility null: "BNB/USD745.84▼-0.95%744.92756.43" -> "SYSMONCPU75%RAM73%GPU43%"
+[baseline] utility null: "BNB/USD745.83▼-0.95%744.92756.43" -> "SYSMONCPU91%RAM74%GPU46%"
+[baseline] utility null: "BNB/USD745.84▼-0.95%744.92756.43" -> "SYSMONCPU96%RAM74%GPU35%"
+[baseline] utility null: "BNB/USD745.83▼-0.95%744.92756.43" -> "SYSMONCPU87%RAM74%GPU36%"
+[baseline] utility null: "BNB/USD745.80▼-0.96%744.92756.43" -> "SYSMONCPU94%RAM75%GPU36%"
+[baseline] utility null: "BNB/USD745.79▼-0.96%744.92756.43" -> "SYSMONCPU92%RAM74%GPU38%"
+[baseline] utility null: "BNB/USD745.85▼-0.95%744.92756.43" -> "SYSMONCPU94%RAM74%GPU37%"
+[baseline] utility null: "BNB/USD745.88▼-0.95%744.92756.43" -> "SYSMONCPU96%RAM74%GPU38%"
+[baseline] utility null: "BNB/USD745.89▼-0.94%744.92756.43" -> "CLOCKLocal1:49 AM☾Tokyo3:49 PMMon, Sep 7 · GMT-5Mon, Sep 7 · GMT+9"
+[baseline] utility null: "CLOCKLocal1:49 AM☾Tokyo3:49 PMMon, Sep 7 · GMT-5Mon, Sep 7 · GMT+9" -> "SYSMONCPU99%RAM75%GPU31%"
+[baseline] utility null: "BNB/USD745.88▼-0.95%744.92756.43" -> "SYSMONCPU95%RAM71%GPU30%"
+[baseline] utility null: "SYSMONCPU84%RAM73%GPU42%" -> "BNB/USD745.91▼-0.94%744.92756.43"
+[baseline] sports spo-sports_mlb-slot-2: "MLBCleveland GuardiansCleveland GuardiansBaltimore OriolesKansas City Royals2nd73-71−14RD5th69-75−29" -> "MLBCleveland GuardiansCleveland GuardiansBaltimore OriolesKansas City Royals——10h"
+[baseline] sports spo-sports_mlb-slot-2: "MLBCleveland GuardiansCleveland GuardiansBaltimore OriolesKansas City Royals——10h" -> "MLBCleveland GuardiansCleveland GuardiansBaltimore OriolesKansas City Royals2nd73-71−14RD5th69-75−29"
+[baseline] sports spo-sports_mlb-slot-2: "MLBCleveland GuardiansCleveland GuardiansBaltimore OriolesKansas City Royals2nd73-71−14RD5th69-75−29" -> "MLBCleveland GuardiansCleveland GuardiansBaltimore OriolesKansas City Royals——10h"
+[baseline] sports spo-sports_mlb-slot-2: "MLBCleveland GuardiansCleveland GuardiansBaltimore OriolesKansas City Royals——10h" -> "MLBCleveland GuardiansCleveland GuardiansBaltimore OriolesKansas City Royals2nd73-71−14RD5th69-75−29"
+[baseline] sports spo-sports_mlb-slot-2: "MLBCleveland GuardiansCleveland GuardiansBaltimore OriolesKansas City Royals2nd73-71−14RD5th69-75−29" -> "MLBCleveland GuardiansCleveland GuardiansBaltimore OriolesKansas City Royals——10h"
+[baseline] sports spo-sports_mlb-slot-2: "MLBCleveland GuardiansCleveland GuardiansBaltimore OriolesKansas City Royals——10h" -> "MLBCleveland GuardiansCleveland GuardiansBaltimore OriolesKansas City Royals2nd73-71−14RD5th69-75−29"
+
+total swap-while-visible events: 170
+total remount-while-visible events: 0
