@@ -372,7 +372,7 @@ func loadLeagueStatus(ctx context.Context, names []string) (map[string]leagueSta
 			       COUNT(*) FILTER (WHERE state = 'in') AS live_count,
 			       MIN(start_time) FILTER (WHERE state = 'pre') AS next_game
 			FROM games
-			WHERE ` + notStaleUpcoming + `
+			WHERE `+notStaleUpcoming+`
 			GROUP BY league`)
 	} else {
 		rows, err = platform.DBPool.Query(ctx, `
@@ -381,7 +381,7 @@ func loadLeagueStatus(ctx context.Context, names []string) (map[string]leagueSta
 			       COUNT(*) FILTER (WHERE state = 'in') AS live_count,
 			       MIN(start_time) FILTER (WHERE state = 'pre') AS next_game
 			FROM games
-			WHERE league = ANY($1) AND ` + notStaleUpcoming + `
+			WHERE league = ANY($1) AND `+notStaleUpcoming+`
 			GROUP BY league`, names)
 	}
 	if err != nil {
@@ -637,8 +637,8 @@ func querySportsGames(ctx context.Context, limit int, favoriteTeams map[string]F
 			away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
 			start_time, COALESCE(short_detail, ''), state,
 			COALESCE(status_short, ''), COALESCE(status_long, ''),
-			COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, ''), g.updated_at` + standingsColumns + `
-		FROM games g` + standingsJoin + `
+			COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, ''), g.updated_at`+standingsColumns+`
+		FROM games g`+standingsJoin+`
 		WHERE %s
 		ORDER BY
 			CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
@@ -756,8 +756,8 @@ func queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favor
 				away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
 				start_time, COALESCE(short_detail, ''), state,
 				COALESCE(status_short, ''), COALESCE(status_long, ''),
-				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, ''), g.updated_at` + standingsColumns + `
-			FROM ranked g` + standingsJoin + `
+				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, ''), g.updated_at`+standingsColumns+`
+			FROM ranked g`+standingsJoin+`
 			WHERE (upcoming_side AND side_rn <= %d)
 			   OR (NOT upcoming_side AND side_rn <= %d)
 			ORDER BY
@@ -774,8 +774,8 @@ func queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favor
 				away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
 				start_time, COALESCE(short_detail, ''), state,
 				COALESCE(status_short, ''), COALESCE(status_long, ''),
-				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, ''), g.updated_at` + standingsColumns + `
-			FROM games g` + standingsJoin + `
+				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, ''), g.updated_at`+standingsColumns+`
+			FROM games g`+standingsJoin+`
 			WHERE league = ANY($1) AND %s
 			ORDER BY
 				CASE state WHEN 'in' THEN 0 WHEN 'pre' THEN 1 ELSE 2 END,
@@ -836,6 +836,44 @@ func standingFrom(c [9]*int) *TeamStanding {
 	return &TeamStanding{
 		Rank: *c[0], Wins: v(c[1]), Losses: v(c[2]), Draws: v(c[3]), Points: v(c[4]),
 		GoalDiff: v(c[5]), PointsFor: v(c[6]), PointsAgainst: v(c[7]), OTL: v(c[8]),
+	}
+}
+
+// AttachStandings adds home_standing / away_standing to a raw games row --
+// a Sequin CDC record -- so it carries what every games query above
+// carries. The desktop merges a CDC record by REPLACING the game in its
+// dashboard cache, so a bare row stripped both sides' standings and the
+// chip flapped to "--" every live-poll upsert until the next poll put them
+// back (REL-235). Same join, same presence rule as scanGames; a side with
+// no row stays absent, as it is in the polled payload. A lookup failure
+// leaves the record as it came -- a stale chip beats a dropped event.
+func AttachStandings(ctx context.Context, record map[string]interface{}) {
+	league, _ := record["league"].(string)
+	home, _ := record["home_team_name"].(string)
+	away, _ := record["away_team_name"].(string)
+	if league == "" || home == "" || away == "" {
+		return
+	}
+	var h, a [9]*int
+	// standingsColumns opens with the comma that follows a games SELECT
+	// list; here it is the whole list.
+	err := platform.DBPool.QueryRow(ctx, `SELECT`+standingsColumns[1:]+`
+		FROM (SELECT $1::text AS league, $2::text AS home_team_name, $3::text AS away_team_name) g`+standingsJoin,
+		league, home, away).Scan(
+		&h[0], &h[1], &h[2], &h[3], &h[4], &h[5], &h[6], &h[7], &h[8],
+		&a[0], &a[1], &a[2], &a[3], &a[4], &a[5], &a[6], &a[7], &a[8],
+	)
+	if err != nil {
+		log.Printf("[Sports] standings lookup for CDC game %v failed: %v", record["id"], err)
+		return
+	}
+	delete(record, "home_standing")
+	delete(record, "away_standing")
+	if s := standingFrom(h); s != nil {
+		record["home_standing"] = s
+	}
+	if s := standingFrom(a); s != nil {
+		record["away_standing"] = s
 	}
 }
 

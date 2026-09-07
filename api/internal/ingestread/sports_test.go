@@ -277,6 +277,62 @@ func TestGamesCarryCurrentSeasonStandings(t *testing.T) {
 }
 
 // A season whose only row is a blank team must not win the season pick.
+// A Sequin CDC games record is a bare table row; the desktop replaces
+// its copy of the game with it, so it must carry the same standings the
+// polled payload does, or the chip flaps to a dash on every live upsert
+// (REL-235).
+func TestCDCGameRecordCarriesStandings(t *testing.T) {
+	if platform.DBPool == nil {
+		t.Skip("needs TEST_DATABASE_URL")
+	}
+	ctx := context.Background()
+	const league = "TestCDCStandingsLeague"
+	clean := func() {
+		_, _ = platform.DBPool.Exec(ctx, `DELETE FROM standings WHERE league = $1`, league)
+	}
+	clean()
+	defer clean()
+
+	for _, r := range []struct {
+		team, season string
+		rank         int
+	}{
+		{"Home FC", "2025", 1}, // last season: must NOT be attached
+		{"Home FC", "2026", 3},
+	} {
+		if _, err := platform.DBPool.Exec(ctx, `
+			INSERT INTO standings (league, team_name, season, rank, wins, losses, draws, games_played)
+			VALUES ($1, $2, $3, $4, 2, 1, 0, 3)`, league, r.team, r.season, r.rank); err != nil {
+			t.Fatalf("insert standing: %v", err)
+		}
+	}
+
+	record := map[string]interface{}{
+		"id": float64(1), "league": league,
+		"home_team_name": "Home FC", "away_team_name": "Away FC",
+		"away_standing": "stale value from an earlier merge",
+	}
+	AttachStandings(ctx, record)
+
+	hs, ok := record["home_standing"].(*TeamStanding)
+	if !ok || hs == nil {
+		t.Fatalf("home_standing not attached: %#v", record["home_standing"])
+	}
+	if hs.Rank != 3 || hs.Wins != 2 {
+		t.Errorf("home carries %+v; want this season (3rd, 2-1)", *hs)
+	}
+	if _, present := record["away_standing"]; present {
+		t.Errorf("away has no standings row but the record still says %v; want the key absent, as the polled payload leaves it", record["away_standing"])
+	}
+
+	// A record that isn't a game (no team names) is left alone, not errored on.
+	partial := map[string]interface{}{"league": league}
+	AttachStandings(ctx, partial)
+	if len(partial) != 1 {
+		t.Errorf("partial record was rewritten: %v", partial)
+	}
+}
+
 // NCAA Football 2026 was one such row beside 293 real 2025 rows, and every
 // game in the league joined to nothing.
 func TestBlankSeasonRowDoesNotHideStandings(t *testing.T) {
