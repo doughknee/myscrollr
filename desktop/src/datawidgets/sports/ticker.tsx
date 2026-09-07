@@ -43,6 +43,7 @@ export const sportsTickerSource: TickerSource = {
       TICKER_SLOTS,
       ctx.cycles ?? {},
       `spo-${ctx.tab}`,
+      ctx.rotationMemo,
     );
     return slots.map(({ key, game, rotateSlot, reserveNames }) => ({
       key,

@@ -11,7 +11,7 @@
  * sort order) to work on the feed but not the ticker prior to this module.
  */
 import type { RssItem } from "../../types";
-import { rotateSlots } from "../ticker";
+import { rotateSlots, type RotationMemo } from "../ticker";
 import { plainText } from "../../utils/rssText";
 import { migrateRssDisplay, type RssDisplayPrefs } from "../../preferences";
 
@@ -133,10 +133,11 @@ export function arrangeRssSlots(
   eligible: RssItem[],
   cycles: Readonly<Record<string, number>>,
   keyPrefix: string,
+  memo?: RotationMemo,
 ): RssSlot[] {
   return rotateSlots(eligible, TICKER_RSS_SLOTS, cycles, keyPrefix, (it) => it.id, (cls) =>
     cls.map((it) => plainText(it.title)).reduce((a, b) => (b.length > a.length ? b : a), ""),
-  ).map((r) => ({ key: r.key, item: r.item, rotateSlot: r.rotateSlot, reserveTitle: r.reserve }));
+  memo).map((r) => ({ key: r.key, item: r.item, rotateSlot: r.rotateSlot, reserveTitle: r.reserve }));
 }
 
 // ── Helper: per-widget display prefs (global + config.display) ──

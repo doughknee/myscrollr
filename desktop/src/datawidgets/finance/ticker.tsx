@@ -30,6 +30,7 @@ export const financeTickerSource: TickerSource = {
       `fin-${ctx.tab}`,
       (t) => t.symbol,
       () => undefined,
+      ctx.rotationMemo,
     );
     return slots.map(({ key, item: trade, rotateSlot }) => ({
       key,

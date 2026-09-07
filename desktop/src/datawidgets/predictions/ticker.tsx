@@ -23,6 +23,7 @@ export const predictionsTickerSource: TickerSource = {
       `pred-${ctx.tab}`,
       (p) => p.id,
       () => undefined,
+      ctx.rotationMemo,
     );
     return slots.map(({ key, item: p, rotateSlot }) => ({
       key,
