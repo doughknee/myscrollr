@@ -260,7 +260,9 @@ MLB    : rank 3, record 7, unit "RD"      NFL: rank 3, record 6
 NBA    : score 3, record 5                NHL: rank 3, record 7, metric 3, "pts", "PTS"
 NCAA Football: record 4                   NCAA Basketball: score 3, record 5
 AFL    : score 3, record 6
-La Liga / Premier League / Champions League / FIFA World Cup / MLS: SOCCER
+La Liga / Premier League / Champions League / FIFA World Cup / MLS / Bundesliga / Serie A / Ligue 1: SOCCER
+EuroLeague: as NBA            KHL: as NHL            NPB: as MLB
+Six Nations / Super Rugby / Premiership Rugby / handball / volleyball: DEFAULT (scores < 100, W-L records)
 Formula 1: score 0, single: true   (one cell: grand prix over circuit, no score slot)
 ```
 A new league gets a row here, measured from what it actually produces.
@@ -312,8 +314,8 @@ button's UA default is `text-align: center`; a wrapped block centres its shorter
 - `UFC`: drop leading given names → surname.
 - `Formula 1`: "Grand Prix"→"GP"; strip Autódromo/Circuit/International/Street; then drop
   trailing words.
-- US pro (`MLB NBA NHL NFL MLS AFL`): strip club suffix; if still long, the **last word**
-  (the nickname).
+- "City Nickname" leagues (`MLB NBA NHL NFL MLS AFL NPB`): strip club suffix; if still long,
+  the **last word** (the nickname).
 - Everything else (NCAA…): strip institutional words (`STRIP`), AP-style abbreviations
   (`ABBREV`), keep a trailing "(KY)" qualifier, then drop trailing words.
 - Tested over `utils/__fixtures__/team-names.json` (2,022 names) with

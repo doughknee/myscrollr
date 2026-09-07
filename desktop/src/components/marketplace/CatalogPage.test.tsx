@@ -285,7 +285,9 @@ describe("buildBlocks sorts", () => {
     const { blocks } = buildBlocks(items, "all", "", "new", none);
     expect(blocks).toHaveLength(1);
     expect(blocks[0].title).toBe("Newest first");
-    expect(blocks[0].shelves[0].items[0].id).toBe("news_drudge");
+    // The newest dated entry: the REL-220 league expansion (2026-09-06),
+    // whose first declared entry is the Bundesliga.
+    expect(blocks[0].shelves[0].items[0].id).toBe("sports_bundesliga");
   });
 
   it("by kind shelves Sports by group with headers, Finance without", () => {

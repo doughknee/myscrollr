@@ -223,5 +223,65 @@
     "country": "Australia",
     "season_format": "calendar",
     "offseason_months": [10, 11, 12, 1, 2]
+  },
+  {
+    "name": "Bundesliga",
+    "sport_api": "football",
+    "api_host": "v3.football.api-sports.io",
+    "league_id": 78,
+    "category": "Soccer",
+    "country": "Germany",
+    "season_format": "fall-august",
+    "offseason_months": [6, 7]
+  },
+  {
+    "name": "Serie A",
+    "sport_api": "football",
+    "api_host": "v3.football.api-sports.io",
+    "league_id": 135,
+    "category": "Soccer",
+    "country": "Italy",
+    "season_format": "fall-august",
+    "offseason_months": [6, 7]
+  },
+  {
+    "name": "Ligue 1",
+    "sport_api": "football",
+    "api_host": "v3.football.api-sports.io",
+    "league_id": 61,
+    "category": "Soccer",
+    "country": "France",
+    "season_format": "fall-august",
+    "offseason_months": [6, 7]
+  },
+  {
+    "name": "EuroLeague",
+    "sport_api": "basketball",
+    "api_host": "v1.basketball.api-sports.io",
+    "league_id": 120,
+    "category": "Basketball",
+    "country": "Europe",
+    "season_format": "fall-october",
+    "offseason_months": [6, 7, 8, 9]
+  },
+  {
+    "name": "KHL",
+    "sport_api": "hockey",
+    "api_host": "v1.hockey.api-sports.io",
+    "league_id": 35,
+    "category": "Hockey",
+    "country": "Russia",
+    "season_format": "fall-august",
+    "offseason_months": [6, 7, 8]
+  },
+  {
+    "name": "NPB",
+    "sport_api": "baseball",
+    "api_host": "v1.baseball.api-sports.io",
+    "league_id": 2,
+    "category": "Baseball",
+    "country": "Japan",
+    "season_format": "calendar",
+    "offseason_months": [12, 1, 2]
   }
 ]

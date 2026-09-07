@@ -61,6 +61,16 @@ const BY_LEAGUE: Record<string, ChipReservation> = {
   "Champions League": SOCCER,
   "FIFA World Cup": SOCCER,
   MLS: SOCCER,
+  Bundesliga: SOCCER,
+  "Serie A": SOCCER,
+  "Ligue 1": SOCCER,
+  // Same shapes as their North American counterparts: basketball reaches
+  // 100, hockey standings are points, a baseball record is "100-62".
+  EuroLeague: { ...DEFAULT, score: 3, record: 5 },
+  KHL: { ...DEFAULT, rank: 3, record: 7, metric: 3, metricKind: "pts", unit: "PTS" },
+  NPB: { ...DEFAULT, rank: 3, record: 7, unit: "RD" },
+  // Rugby, handball and volleyball ride DEFAULT: scores stay under 100,
+  // records are W-L with draws appended only when they happen.
   "Formula 1": { ...DEFAULT, score: 0, single: true },
 };
 

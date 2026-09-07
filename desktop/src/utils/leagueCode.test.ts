@@ -10,12 +10,16 @@ import { leagueCode, LEAGUE_CODE_MAX } from "./gameHelpers";
 // Every league in tracked_leagues as of 2026-09.
 const CATALOG = [
   "AFL",
+  "Bundesliga",
   "Champions League",
+  "EuroLeague",
   "FIFA World Cup",
   "Formula 1",
   "Handball Bundesliga",
   "Handball Champions League",
+  "KHL",
   "La Liga",
+  "Ligue 1",
   "MLB",
   "MLS",
   "NBA",
@@ -23,8 +27,10 @@ const CATALOG = [
   "NCAA Football",
   "NFL",
   "NHL",
+  "NPB",
   "Premier League",
   "Premiership Rugby",
+  "Serie A",
   "Six Nations",
   "Starligue",
   "Super Rugby",
@@ -61,6 +67,8 @@ describe("leagueCode", () => {
   it("falls back to initials for a league added after this map", () => {
     expect(leagueCode("Super Duper League")).toBe("SDL");
     // Single long word has no initials to take; clipping is all that is left.
-    expect(leagueCode("Bundesliga")).toBe("BUNDE");
+    expect(leagueCode("Eredivisie")).toBe("EREDI");
+    // Bundesliga is in the map now, so it gets the shorthand, not "BUNDE".
+    expect(leagueCode("Bundesliga")).toBe("BULI");
   });
 });
