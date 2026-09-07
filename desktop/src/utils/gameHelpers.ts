@@ -6,6 +6,7 @@
  * for game state classification.
  */
 import type { Game, TeamStanding } from "../types";
+import { ordinal } from "./sportsChipLayout";
 
 // ── State classification ────────────────────────────────────────
 
@@ -67,16 +68,43 @@ export function gameStatusLabel(game: Game): string {
 }
 
 /**
+ * api-sports codes that mean something only to api-sports, in the words a
+ * viewer expects. Checked before `state`: the ingester's state map
+ * (channels/sports/service/src/lib.rs, map_status_to_state) knows
+ * "PST"/"SUSP" but not baseball's "POST"/"INTR", which fall through to
+ * "in", and "CANC" stays "pre" with a countdown.
+ */
+const CODE_TEXT: Record<string, string> = {
+  POST: "PPD",
+  INTR: "Delay",
+  CANC: "CANC",
+  ABD: "ABD",
+};
+
+/**
  * A status short enough for the chip's 34px status column.
  *
  * `gameStatusLabel` is the roomy version — it returns "Finished" and
- * "in 3h 20m", which overflow a column sized for "88'" and "FT". This trades
- * words for glyphs at the same information: the period, the wait, or that it
- * is over.
+ * "in 3h 20m", which overflow a column sized for "88'" and "Final". This
+ * trades words for glyphs at the same information: the period, the wait,
+ * or that it is over.
+ *
+ * Live text is api-sports' own vocabulary (see the ingester's parsers): a
+ * running clock where the sport has one ("14:32", "67′"), else the period
+ * code ("Q3", "2H"). Baseball has neither — api-sports sends `status_short`
+ * "IN8" (extra innings "IN10"…) with no timer, and "IN8" on a bar is noise,
+ * so it becomes "8th". Top/bottom is not in the payload and is not invented.
  */
 export function gameStatusCompact(game: Game): string {
-  if (isLive(game)) return game.timer || game.status_short || "LIVE";
-  if (isFinal(game)) return "FT";
+  const code = game.status_short ?? "";
+  if (CODE_TEXT[code]) return CODE_TEXT[code];
+  if (isLive(game)) {
+    const inning = /^IN(\d+)$/.exec(code);
+    // "IN0" is the statsapi fallback before a linescore exists: live, no inning.
+    if (inning) return Number(inning[1]) > 0 ? ordinal(Number(inning[1])) : "LIVE";
+    return game.timer || code || "LIVE";
+  }
+  if (isFinal(game)) return "Final";
   if (isPre(game)) return formatCountdownCompact(game.start_time);
   if (game.state === "postponed") return "PPD";
   return "";
