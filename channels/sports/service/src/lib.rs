@@ -28,10 +28,6 @@ pub mod types;
 /// ~6,000 of the 7,500/day quota for live polling.
 const SCHEDULE_DAYS_AHEAD: i64 = 7;
 
-/// Delay between league requests on startup burst to avoid rate limits.
-/// 200ms spacing between requests spreads ~60 requests across ~12 seconds.
-const STARTUP_REQUEST_DELAY_MS: u64 = 200;
-
 /// Why a poll produced no data. `Throttled` is api-sports' per-minute limit
 /// answering — HTTP 200 with `errors.rateLimit` and an empty `response`, or a
 /// 429 — and is deliberately not an error: the limiter has already backed the
@@ -401,9 +397,6 @@ pub async fn poll_schedule(
                     crate::database::record_poll_error(pool, &league.name, &e.to_string()).await;
                 }
             }
-
-            // Spread requests to avoid rate limiting on startup
-            tokio::time::sleep(std::time::Duration::from_millis(STARTUP_REQUEST_DELAY_MS)).await;
         }
     }
 
@@ -453,9 +446,6 @@ pub async fn poll_standings(
             }
             Err(e) => warn!("[{}] Standings poll skipped: {}", league.name, e),
         }
-
-        // Spread requests to avoid rate limiting on startup
-        tokio::time::sleep(std::time::Duration::from_millis(STARTUP_REQUEST_DELAY_MS)).await;
     }
     info!("Standings poll complete");
 }
@@ -996,9 +986,6 @@ pub async fn poll_teams(
             }
             Err(e) => warn!("[{}] Teams poll skipped: {}", league.name, e),
         }
-
-        // Spread requests to avoid rate limiting on startup
-        tokio::time::sleep(std::time::Duration::from_millis(STARTUP_REQUEST_DELAY_MS)).await;
     }
     info!("Teams poll complete");
 }
