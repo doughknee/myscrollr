@@ -109,6 +109,12 @@ type Game struct {
 	Timer          string    `json:"timer,omitempty"`
 	Venue          string    `json:"venue,omitempty"`
 	Season         string    `json:"season,omitempty"`
+	// When the ingester last wrote this row. A live game whose updated_at
+	// is minutes old is being polled and upstream is what is stale; one
+	// whose updated_at is hours old has fallen out of the ingester's
+	// date window (REL-230). Visible on every games read so staleness can
+	// be told apart from outside.
+	UpdatedAt time.Time `json:"updated_at"`
 	// Current-season table row for each side, when the league keeps one.
 	// Attached on every games read so the desktop's detailed chip -- rank,
 	// record, differential or points under each team -- costs no second
@@ -631,7 +637,7 @@ func querySportsGames(ctx context.Context, limit int, favoriteTeams map[string]F
 			away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
 			start_time, COALESCE(short_detail, ''), state,
 			COALESCE(status_short, ''), COALESCE(status_long, ''),
-			COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')` + standingsColumns + `
+			COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, ''), g.updated_at` + standingsColumns + `
 		FROM games g` + standingsJoin + `
 		WHERE %s
 		ORDER BY
@@ -732,7 +738,7 @@ func queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favor
 					home_team_name, home_team_logo, home_team_score, home_team_code,
 					away_team_name, away_team_logo, away_team_score, away_team_code,
 					start_time, short_detail, state, status_short, status_long,
-					timer, venue, season,
+					timer, venue, season, updated_at,
 					(state IN ('in', 'pre')) AS upcoming_side,
 					ROW_NUMBER() OVER (
 						PARTITION BY league, (state IN ('in', 'pre'))
@@ -750,7 +756,7 @@ func queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favor
 				away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
 				start_time, COALESCE(short_detail, ''), state,
 				COALESCE(status_short, ''), COALESCE(status_long, ''),
-				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')` + standingsColumns + `
+				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, ''), g.updated_at` + standingsColumns + `
 			FROM ranked g` + standingsJoin + `
 			WHERE (upcoming_side AND side_rn <= %d)
 			   OR (NOT upcoming_side AND side_rn <= %d)
@@ -768,7 +774,7 @@ func queryGamesByLeagues(ctx context.Context, leagues []string, limit int, favor
 				away_team_name, COALESCE(away_team_logo, ''), COALESCE(away_team_score::text, ''), COALESCE(away_team_code, ''),
 				start_time, COALESCE(short_detail, ''), state,
 				COALESCE(status_short, ''), COALESCE(status_long, ''),
-				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, '')` + standingsColumns + `
+				COALESCE(timer, ''), COALESCE(venue, ''), COALESCE(season, ''), g.updated_at` + standingsColumns + `
 			FROM games g` + standingsJoin + `
 			WHERE league = ANY($1) AND %s
 			ORDER BY
@@ -800,7 +806,7 @@ func scanGames(rows pgx.Rows) []Game {
 			&g.HomeTeamName, &g.HomeTeamLogo, &g.HomeTeamScore, &g.HomeTeamCode,
 			&g.AwayTeamName, &g.AwayTeamLogo, &g.AwayTeamScore, &g.AwayTeamCode,
 			&g.StartTime, &g.ShortDetail, &g.State,
-			&g.StatusShort, &g.StatusLong, &g.Timer, &g.Venue, &g.Season,
+			&g.StatusShort, &g.StatusLong, &g.Timer, &g.Venue, &g.Season, &g.UpdatedAt,
 			&h[0], &h[1], &h[2], &h[3], &h[4], &h[5], &h[6], &h[7], &h[8],
 			&a[0], &a[1], &a[2], &a[3], &a[4], &a[5], &a[6], &a[7], &a[8],
 		); err != nil {

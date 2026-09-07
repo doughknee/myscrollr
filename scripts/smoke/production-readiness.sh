@@ -262,12 +262,18 @@ for line in "${SERVICES[@]}"; do
         green "OK (HTTP $(echo "$result" | jq -r '.status'))"
         # Sports: show the effective api-sports daily quota per host so the
         # deploy log proves which plan the ingester is budgeting from
-        # (REL-222). Informational only — never a failure condition.
+        # (REL-222), and the per-minute window it is pacing itself to
+        # (REL-229). Informational only — never a failure condition.
         if [[ "$svc" == "sports-service" ]]; then
             echo "$result" | jq -r '
                 .body.health as $h
                 | ($h.quota // {}) | to_entries[]
-                | "    \(.key): quota \(.value.daily_quota) (\(.value.source)), remaining \(.value.remaining), live poll \($h.live_poll_secs // "?")s"
+                | ($h.minute[.key] // {}) as $m
+                | "    \(.key): quota \(.value.daily_quota) (\(.value.source)), remaining \(.value.remaining), per-minute \($m.limit // "?") (\($m.throttle_events // 0) throttles), live poll \($h.live_poll_secs // "?")s"
+            ' 2>/dev/null || true
+            echo "$result" | jq -r '
+                .body.health | .minute_budget as $b
+                | "    per-minute budget: limit \($b.limit // "?"), sent \($b.sent_last_minute // 0) in the last minute, backoff \($b.backoff_secs // 0)s; throttled polls since start: \(.throttled_polls // 0)"
             ' 2>/dev/null || true
         fi
     else

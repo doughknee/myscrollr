@@ -10,7 +10,7 @@ use sports_service::{
     init::{fatal, spawn_supervised, ReadinessGate, ReadinessSnapshot},
     init_sports_service,
     log::init_async_logger,
-    live_poll_interval_secs, poll_live, poll_schedule, poll_standings, poll_teams,
+    live_poll_interval_secs, poll_live, poll_schedule, poll_standings, poll_teams, sweep_stale_live,
     InitError, RateLimiter, SportsHealth, DEFAULT_DAILY_QUOTA,
 };
 
@@ -30,6 +30,14 @@ struct ReadyPayload {
 /// Interval for the schedule poll (upcoming games + cleanup).
 const SCHEDULE_POLL_SECS: u64 = 30 * 60; // 30 minutes
 
+/// Interval for the stale-live sweep (re-fetch frozen live rows by id).
+const STALE_SWEEP_SECS: u64 = 5 * 60;
+
+/// A live (or overdue) row nobody has written for this long has fallen out
+/// of the date-window polls; the sweep re-fetches it by id. Overridable via
+/// `SPORTS_STALE_LIVE_MINS`.
+const STALE_LIVE_MINS: i64 = 10;
+
 /// Live poll interval bounds (seconds), overridable via
 /// `SPORTS_LIVE_POLL_MIN_SECS` / `SPORTS_LIVE_POLL_MAX_SECS`. Idle polls run
 /// at MAX; live games run at an interval scaled from the effective daily
@@ -46,6 +54,7 @@ struct PollConfig {
     daily_quota: u32,
     live_min_secs: u64,
     live_max_secs: u64,
+    stale_live_mins: i64,
 }
 
 impl PollConfig {
@@ -54,6 +63,7 @@ impl PollConfig {
             daily_quota: env_or("SPORTS_DAILY_QUOTA", DEFAULT_DAILY_QUOTA),
             live_min_secs: env_or("SPORTS_LIVE_POLL_MIN_SECS", LIVE_POLL_MIN_INTERVAL_SECS),
             live_max_secs: env_or("SPORTS_LIVE_POLL_MAX_SECS", LIVE_POLL_MAX_INTERVAL_SECS),
+            stale_live_mins: env_or("SPORTS_STALE_LIVE_MINS", STALE_LIVE_MINS).max(1),
         }
     }
 
@@ -347,6 +357,30 @@ async fn run_service() -> Result<()> {
             }
         });
 
+        // ── Stale-live sweep: frozen live rows re-fetched by id (every 5 min) ─
+        let pool_sweep = pool.clone();
+        let client_sweep = client.clone();
+        let leagues_sweep = leagues.clone();
+        let health_sweep = health_bg.clone();
+        let rl_sweep = rate_limiter.clone();
+        let cancel_sweep = cancel_bg.clone();
+        let stale_live_mins = config.stale_live_mins;
+        spawn_supervised("sports-stale-sweep", async move {
+            println!("Starting stale-live sweep loop (every {} min, rows idle > {} min)...", STALE_SWEEP_SECS / 60, stale_live_mins);
+            loop {
+                tokio::select! {
+                    _ = cancel_sweep.cancelled() => {
+                        println!("Stale-live sweep loop shutting down...");
+                        break;
+                    }
+                    _ = async {
+                        tokio::time::sleep(std::time::Duration::from_secs(STALE_SWEEP_SECS)).await;
+                        sweep_stale_live(&pool_sweep, &client_sweep, &leagues_sweep, &health_sweep, &rl_sweep, stale_live_mins).await;
+                    } => {}
+                }
+            }
+        });
+
         // ── Slow poll: schedule + cleanup (today + 7 days, every 30 min) ──
         let pool_sched = pool.clone();
         let client_sched = client.clone();
@@ -483,8 +517,9 @@ async fn shutdown_signal() {
     }
 }
 
-/// Copy the limiter's effective quota per host and the live cadence it earns
-/// into the health snapshot `/health/ready` serves. Returns that cadence.
+/// Copy the limiter's effective quota and per-minute state per host, and the
+/// live cadence the quota earns, into the health snapshot `/health/ready`
+/// serves. Returns that cadence.
 async fn publish_quota(
     health: &Mutex<SportsHealth>,
     rl: &RateLimiter,
@@ -492,7 +527,10 @@ async fn publish_quota(
 ) -> u64 {
     let live_secs =
         live_poll_interval_secs(rl.max_daily_quota(), config.live_min_secs, config.live_max_secs);
-    health.lock().await.set_quota(rl.quota_snapshot(), live_secs);
+    let (hosts, budget) = rl.minute_snapshot();
+    let mut h = health.lock().await;
+    h.set_quota(rl.quota_snapshot(), live_secs);
+    h.set_minute(hosts, budget);
     live_secs
 }
 
