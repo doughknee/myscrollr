@@ -383,6 +383,52 @@ pub async fn cleanup_old_games(pool: &Arc<PgPool>) -> Result<u64> {
     Ok(result.rows_affected())
 }
 
+/// Every column the MLB statsapi fallback (REL-233) needs to preserve on a
+/// row it's about to correct — everything api-sports last wrote except the
+/// score/state/status fields the fallback itself is replacing. Fetched fresh
+/// right before the fallback writes, rather than threaded through from
+/// `get_stale_live_games`, so the sweep's common path stays untouched.
+#[derive(Debug, Clone, FromRow)]
+pub struct GameRow {
+    pub league: String,
+    pub sport: String,
+    pub external_game_id: String,
+    pub link: Option<String>,
+    pub home_team_name: String,
+    pub home_team_logo: Option<String>,
+    pub home_team_score: Option<i32>,
+    pub home_team_code: Option<String>,
+    pub away_team_name: String,
+    pub away_team_logo: Option<String>,
+    pub away_team_score: Option<i32>,
+    pub away_team_code: Option<String>,
+    pub start_time: chrono::DateTime<Utc>,
+    pub short_detail: Option<String>,
+    pub state: String,
+    pub status_short: Option<String>,
+    pub status_long: Option<String>,
+    pub timer: Option<String>,
+    pub venue: Option<String>,
+    pub season: Option<String>,
+}
+
+/// Load one game row exactly as it stands right now.
+pub async fn get_game_row(pool: &Arc<PgPool>, league: &str, external_game_id: &str) -> Result<Option<GameRow>> {
+    let mut conn = pool.acquire().await?;
+    let row = query_as(
+        "SELECT league, sport, external_game_id, link,
+                home_team_name, home_team_logo, home_team_score, home_team_code,
+                away_team_name, away_team_logo, away_team_score, away_team_code,
+                start_time, short_detail, state, status_short, status_long, timer, venue, season
+         FROM games WHERE league = $1 AND external_game_id = $2"
+    )
+    .bind(league)
+    .bind(external_game_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(row)
+}
+
 // =============================================================================
 // Game upsert
 // =============================================================================
