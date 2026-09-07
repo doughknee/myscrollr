@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/brandon-relentnet/myscrollr/api/internal/ingestread"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
 )
@@ -81,6 +82,12 @@ func parseCDCRecords(body []byte) ([]CDCRecord, error) {
 // to all subscribed clients in-memory.
 func routeCDCRecord(ctx context.Context, rec CDCRecord) {
 	table := rec.Metadata.TableName
+
+	// A games row is relayed as the desktop's whole picture of that game,
+	// so it needs the standings the polled payload joins in (REL-235).
+	if table == "games" {
+		ingestread.AttachStandings(ctx, rec.Record)
+	}
 
 	// Build the SSE payload envelope
 	envelope := map[string]interface{}{
