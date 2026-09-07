@@ -17,8 +17,12 @@ data:
   # host until a response carries x-ratelimit-requests-limit; the header
   # then wins in both directions (Ultra for all sports until ~2026-12-06,
   # REL-219). Live games poll every MIN seconds on Ultra, MAX on Pro.
+  # MIN is held at 60 (the pre-Ultra cadence) until the ingester honours
+  # the PER-MINUTE limit: 28 leagues at 15 s tripped api-sports'
+  # per-minute throttle and live rows froze (REL-229). Lower it again
+  # once the per-minute token bucket has shipped.
   SPORTS_DAILY_QUOTA: "7500"
-  SPORTS_LIVE_POLL_MIN_SECS: "15"
+  SPORTS_LIVE_POLL_MIN_SECS: "60"
   SPORTS_LIVE_POLL_MAX_SECS: "60"
 
   # Fantasy-specific
