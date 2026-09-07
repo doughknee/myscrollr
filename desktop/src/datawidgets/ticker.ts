@@ -52,6 +52,8 @@ export interface TickerContext {
    * not scroll (the fantasy preview): nothing rotates there.
    */
   cycles?: Readonly<Record<string, number>>;
+  /** Freezes a rotating slot's item across renders (see `rotateSlots`). */
+  rotationMemo?: RotationMemo;
   onChipClick?: (
     widgetType: string,
     itemId: string | number,
@@ -82,6 +84,23 @@ export interface RotatingSlot<T, R> {
 }
 
 /**
+ * What a slot showed last time it was resolved, and at which `turn`.
+ *
+ * Untyped because one Map is shared across every source on the rail
+ * (ScrollrTicker owns a single `useRef`) — each entry is only ever read
+ * back by the slot key that wrote it, which is namespaced per source
+ * (§8.2), so cross-source collisions can't happen.
+ */
+interface RotationMemoEntry {
+  turn: number;
+  item: unknown;
+  reserve: unknown;
+}
+
+/** Per-ticker cache that lets `rotateSlots` freeze a slot's item across renders. */
+export type RotationMemo = Map<string, RotationMemoEntry>;
+
+/**
  * Cycle a pool through a fixed number of slots, one step per lap.
  *
  * Shared by every source that can produce more chips than a bar should
@@ -98,7 +117,22 @@ export interface RotatingSlot<T, R> {
  * computed over the class, not the whole pool, so a slot only reserves
  * the width it will actually use.
  *
- * When the pool fits, nothing rotates and every item is keyed by `id`.
+ * When the pool fits, nothing rotates and every item is keyed by `id` --
+ * unless a `memo` is supplied (below), in which case every slot, small
+ * pool or not, is keyed and frozen the same way.
+ *
+ * Without `memo`, `cls` is recomputed from `pool` on every call, which
+ * makes the *membership* of slot i whatever the live pool says right now
+ * -- fine for a pure, one-shot read, but wrong for a ticker: a refetch or
+ * a sort-order change reshuffles which item lands at each residue index
+ * with no cycle advance, so a visible slot's item can flip with nobody
+ * having looked away (CHIP_DESIGN.md rule 6, CHIP_SPEC.md §8.4). Passing
+ * `memo` (one persistent `Map` owned by the caller, e.g. a `useRef` in
+ * ScrollrTicker) fixes that: a slot's `(item, reserve)` is cached against
+ * the `turn` that produced it, and only recomputed from `pool` when
+ * `cycles[slotKey]` has actually moved on -- i.e. once the slot has fully
+ * left the viewport and come back. A pool change between those moments
+ * changes nothing the viewer can see.
  */
 export function rotateSlots<T, R>(
   pool: T[],
@@ -107,18 +141,43 @@ export function rotateSlots<T, R>(
   keyPrefix: string,
   id: (item: T) => string | number,
   reserve: (cls: T[]) => R,
+  memo?: RotationMemo,
 ): RotatingSlot<T, R>[] {
-  if (pool.length <= slots) {
-    return pool.map((item) => ({ key: `${keyPrefix}-${id(item)}`, item }));
+  if (!memo) {
+    if (pool.length <= slots) {
+      return pool.map((item) => ({ key: `${keyPrefix}-${id(item)}`, item }));
+    }
+    const k = Math.max(1, slots);
+    const out: RotatingSlot<T, R>[] = [];
+    for (let i = 0; i < k; i++) {
+      const cls = pool.filter((_, idx) => idx % k === i);
+      if (cls.length === 0) continue;
+      const slotKey = `${keyPrefix}-slot-${i}`;
+      const turn = cycles[slotKey] ?? 0;
+      out.push({ key: slotKey, item: cls[turn % cls.length], rotateSlot: slotKey, reserve: reserve(cls) });
+    }
+    return out;
   }
+
   const k = Math.max(1, slots);
   const out: RotatingSlot<T, R>[] = [];
   for (let i = 0; i < k; i++) {
-    const cls = pool.filter((_, idx) => idx % k === i);
-    if (cls.length === 0) continue;
     const slotKey = `${keyPrefix}-slot-${i}`;
     const turn = cycles[slotKey] ?? 0;
-    out.push({ key: slotKey, item: cls[turn % cls.length], rotateSlot: slotKey, reserve: reserve(cls) });
+    const cached = memo.get(slotKey);
+    if (cached && cached.turn === turn) {
+      out.push({ key: slotKey, item: cached.item as T, rotateSlot: slotKey, reserve: cached.reserve as R });
+      continue;
+    }
+    const cls = pool.filter((_, idx) => idx % k === i);
+    if (cls.length === 0) {
+      memo.delete(slotKey);
+      continue;
+    }
+    const item = cls[turn % cls.length];
+    const res = reserve(cls);
+    memo.set(slotKey, { turn, item, reserve: res });
+    out.push({ key: slotKey, item, rotateSlot: slotKey, reserve: res });
   }
   return out;
 }

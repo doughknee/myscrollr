@@ -490,13 +490,39 @@ slot count.
 
 ### 8.2 `rotateSlots` semantics
 
+`rotateSlots` takes an optional 7th param, `memo: RotationMemo` (one `Map`, shared by the
+whole rail, owned by `ScrollrTicker` as a `useRef` and passed down through
+`ctx.rotationMemo`). Every real call site passes it; only unit tests exercising the
+plain arithmetic omit it.
+
+**Without `memo`** (pure, for tests):
 - If `pool.length <= slots`: return every item keyed `${prefix}-${id(item)}`, no
   `rotateSlot`, no `reserve`.
 - Else for `i in 0..k-1`: class `cls = pool.filter((_, idx) => idx % k === i)`; slot key
   `${prefix}-slot-${i}`; `turn = cycles[slotKey] ?? 0`; item `cls[turn % cls.length]`;
   `reserve = reserve(cls)`.
-- Keys must be namespaced by widget: prefixes are `spo-${ctx.tab}`, `rss-${ctx.tab}`,
-  `fin-${ctx.tab}`, `pred-${ctx.tab}`, `uptime`, `github`.
+
+**With `memo`** (real rail traffic — REL-234): every slot, small pool or not, is keyed
+`${prefix}-slot-${i}` and resolved the same way. For each `i in 0..k-1`: `slotKey =
+${prefix}-slot-${i}`, `turn = cycles[slotKey] ?? 0`. If `memo` already holds an entry
+for `slotKey` recorded at this same `turn`, that entry's `item`/`reserve` are reused
+**without touching `pool`** — a refetch, a reorder, or a member entering/leaving the
+pool changes nothing a slot is currently showing. Only when `turn` has moved past the
+memoized value (the slot went fully off screen and back, §8.4) is `cls` recomputed
+from the live `pool` and the memo updated. If a slot's `cls` comes back empty (every
+member of its residue class left the pool), its memo entry is dropped and it renders
+nothing that frame — a corner case (a whole class vacating between two laps of a
+`pool.length > slots` source) that isn't itself frozen, since there is no old value to
+hold onto.
+
+This is why the small-pool case no longer keys by item id: an item's own identity is
+not what has to survive a pool change while it's on screen — a *slot's* is. Keying by
+slot, and freezing what a slot resolves to until its own turn advances, is what makes
+CHIP_DESIGN.md rule 6 hold for both branches.
+
+Keys must be namespaced by widget: prefixes are `spo-${ctx.tab}`, `rss-${ctx.tab}`,
+`fin-${ctx.tab}`, `pred-${ctx.tab}`, `uptime`, `github` — this is also what keeps one
+shared `RotationMemo` collision-free across every source on the rail.
 
 ### 8.3 Ticker wiring (already done; do not duplicate)
 

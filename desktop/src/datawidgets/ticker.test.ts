@@ -3,7 +3,7 @@
  * their own reservations; this covers the arithmetic with none.
  */
 import { describe, it, expect } from "vitest";
-import { rotateSlots } from "./ticker";
+import { rotateSlots, type RotationMemo } from "./ticker";
 
 const ids = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `s${i + 1}` }));
 const run = (n: number, slots: number, cycles: Record<string, number> = {}) =>
@@ -44,5 +44,42 @@ describe("rotateSlots", () => {
     const seen: string[][] = [];
     rotateSlots(ids(5), 2, {}, "p", (x) => x.id, (cls) => { seen.push(cls.map((x) => x.id)); return null; });
     expect(seen).toEqual([["s1", "s3", "s5"], ["s2", "s4"]]);
+  });
+});
+
+describe("rotateSlots with a rotation memo (CHIP_DESIGN.md rule 6)", () => {
+  const runMemo = (pool: ReturnType<typeof ids>, slots: number, cycles: Record<string, number>, memo: RotationMemo) =>
+    rotateSlots(pool, slots, cycles, "p", (x) => x.id, () => undefined, memo);
+
+  it("pool change while visible (same turn) does not change the shown item", () => {
+    const memo: RotationMemo = new Map();
+    // Rotating case: 5 items into 4 slots, slot-0 owns {s1, s5}.
+    const before = runMemo(ids(5), 4, {}, memo);
+    expect(before.map((s) => s.item.id)).toEqual(["s1", "s2", "s3", "s4"]);
+
+    // A refetch inserts a new item and reorders the pool -- turn hasn't
+    // moved, so every slot must still show what it showed a moment ago.
+    const reshuffled = [{ id: "s0" }, ...ids(5)];
+    const after = runMemo(reshuffled, 4, {}, memo);
+    expect(after.map((s) => s.item.id)).toEqual(["s1", "s2", "s3", "s4"]);
+
+    // Once the slot's own turn advances (it went off screen and back),
+    // it is free to pick up the new pool.
+    const nextLap = runMemo(reshuffled, 4, { "p-slot-0": 1 }, memo);
+    expect(nextLap[0].item.id).not.toBe("s1");
+  });
+
+  it("freezes the small-pool case too, keyed by slot instead of id", () => {
+    const memo: RotationMemo = new Map();
+    const before = runMemo(ids(2), 4, {}, memo);
+    expect(before.map((s) => s.key)).toEqual(["p-slot-0", "p-slot-1"]);
+    expect(before.map((s) => s.item.id)).toEqual(["s1", "s2"]);
+
+    // A third item joins the pool with the turn unchanged: the two
+    // already-visible slots must not repaint. The new item lands in its
+    // own, previously-empty slot rather than displacing one on screen.
+    const after = runMemo(ids(3), 4, {}, memo);
+    expect(after.find((s) => s.key === "p-slot-0")?.item.id).toBe("s1");
+    expect(after.find((s) => s.key === "p-slot-1")?.item.id).toBe("s2");
   });
 });

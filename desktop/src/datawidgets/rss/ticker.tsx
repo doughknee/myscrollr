@@ -29,7 +29,12 @@ export const rssTickerSource: TickerSource = {
       const t = new Date(r.published_at ?? r.created_at).getTime();
       if (Number.isFinite(t) && t >= dayAgo) perFeed.set(r.feed_url, (perFeed.get(r.feed_url) ?? 0) + 1);
     }
-    const slots = arrangeRssSlots(selectRssForTicker(rows), ctx.cycles ?? {}, `rss-${ctx.tab}`);
+    const slots = arrangeRssSlots(
+      selectRssForTicker(rows),
+      ctx.cycles ?? {},
+      `rss-${ctx.tab}`,
+      ctx.rotationMemo,
+    );
     return slots.map(({ key, item, rotateSlot, reserveTitle }) => ({
       key,
       rotateSlot,

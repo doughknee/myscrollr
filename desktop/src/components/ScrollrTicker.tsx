@@ -46,7 +46,7 @@ import {
 import { sourceForWidget } from "../marketplace";
 import { useCatalog } from "../hooks/useCatalog";
 import { TICKER_SOURCES } from "../datawidgets/tickerRegistry";
-import { rotateSlots } from "../datawidgets/ticker";
+import { rotateSlots, type RotationMemo } from "../datawidgets/ticker";
 import { stepItemIndex } from "./tickerStep";
 import { advanceCycles, visibleSlots } from "./tickerRotation";
 import { WIDGET_ORDER } from "../widgets/registry";
@@ -175,9 +175,10 @@ function widgetChipsFor(
     onChipClick?: (type: string, id: string, url?: string) => void;
     pinned?: boolean;
     cycles?: Readonly<Record<string, number>>;
+    rotationMemo?: RotationMemo;
   },
 ): Array<{ key: string; node: React.ReactNode; rotateSlot?: string }> {
-  const { comfort, chipColorMode, onTogglePin, onChipClick, pinned, cycles } = opts;
+  const { comfort, chipColorMode, onTogglePin, onChipClick, pinned, cycles, rotationMemo } = opts;
 
   // The four cell/gauge/spine utilities each render as ONE chip holding
   // their items, unlike the capped pair which render one chip per item.
@@ -210,6 +211,7 @@ function widgetChipsFor(
     wt,
     (item) => item.id,
     () => undefined,
+    rotationMemo,
   );
   return slots.map(({ key, item, rotateSlot }, i) => {
     const shared = {
@@ -300,6 +302,14 @@ export default function ScrollrTicker({
   // sources through ctx.cycles to decide what the slot shows this lap.
   const [cycles, setCycles] = useState<Readonly<Record<string, number>>>({});
 
+  // One Map for the whole rail's rotation, so a slot's item is frozen
+  // across renders until its own turn (above) advances -- a dashboard
+  // refetch or a reorder between advances must not change what a slot
+  // shows (CHIP_DESIGN.md rule 6). Keys are namespaced per source+tab+i
+  // (§8.2), so sharing one Map across every source is safe. A ref, not
+  // state: mutating it must never itself trigger a re-render.
+  const rotationMemoRef = useRef<RotationMemo>(new Map());
+
   const chips = useMemo(() => {
     const wrap = (key: string, chip: React.ReactNode, rotateSlot?: string) => (
       <div key={key} className="py-1" data-chip="" data-rotate-slot={rotateSlot}>
@@ -336,6 +346,7 @@ export default function ScrollrTicker({
             onTogglePin,
             onChipClick,
             cycles,
+            rotationMemo: rotationMemoRef.current,
           });
           chipsForWidget.forEach(({ key, node, rotateSlot }) =>
             bucket.push(wrap(key, node, rotateSlot)),
@@ -367,6 +378,7 @@ export default function ScrollrTicker({
         widgetDisplay,
         predictionsWatchlist,
         cycles,
+        rotationMemo: rotationMemoRef.current,
         onChipClick,
       })) {
         bucket.push(wrap(chip.key, chip.node, chip.rotateSlot));

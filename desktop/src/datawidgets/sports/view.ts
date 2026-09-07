@@ -11,7 +11,7 @@
 import type { Game } from "../../types";
 import { isLive, isCloseGame } from "../../utils/gameHelpers";
 import { teamShortName } from "../../utils/teamShortName";
-import { rotateSlots } from "../ticker";
+import { rotateSlots, type RotationMemo } from "../ticker";
 import { migrateVenue } from "../../preferences";
 
 // ── Display prefs shape (mirrors server-side widget config.display) ─
@@ -368,6 +368,7 @@ export function arrangeTickerSlots(
   slots: number,
   cycles: Readonly<Record<string, number>>,
   keyPrefix: string,
+  memo?: RotationMemo,
 ): TickerSlot[] {
   const pinned: Game[] = [];
   const pool: Game[] = [];
@@ -380,7 +381,7 @@ export function arrangeTickerSlots(
   const rotating = rotateSlots(pool, slots, cycles, keyPrefix, (g) => g.id, (cls) => ({
     away: widest(cls, (g) => g.away_team_name),
     home: widest(cls, (g) => g.home_team_name),
-  }));
+  }), memo);
   return [
     ...pinned.map((g) => ({ key: `${keyPrefix}-${g.id}`, game: g })),
     ...rotating.map((r) => ({ key: r.key, game: r.item, rotateSlot: r.rotateSlot, reserveNames: r.reserve })),
