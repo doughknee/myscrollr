@@ -48,6 +48,10 @@ pub struct HostMinute {
 /// on the rugby host after ~10 requests/min to it while the account as a
 /// whole was bursting at startup, so api-sports counts the minute across
 /// the subscription. The limit is the smallest any host has advertised.
+///
+/// It is also a RATE, not a 60 s counter: every host advertised 450/min and
+/// the same pod was throttled 3 s after start, ~45 requests in. So sends are
+/// spaced `60 s / limit` apart (133 ms at 450) as well as capped per window.
 #[derive(Serialize, Clone, Debug, PartialEq, Eq, Default)]
 pub struct MinuteBudget {
     pub limit: Option<u32>,
@@ -63,6 +67,10 @@ pub struct MinuteBudget {
 pub const THROTTLE_BACKOFF_BASE: Duration = Duration::from_secs(10);
 pub const THROTTLE_BACKOFF_MAX: Duration = Duration::from_secs(120);
 const MINUTE: Duration = Duration::from_secs(60);
+
+/// Pacing before the first response has told us the real limit: 300/min,
+/// the 200 ms the schedule loop always spread its startup burst with.
+pub const UNKNOWN_LIMIT_PER_MINUTE: u32 = 300;
 
 #[derive(Default)]
 struct MinuteState {
@@ -83,6 +91,11 @@ impl MinuteState {
         self.hosts.values().filter_map(|h| h.limit).min()
     }
 
+    /// Minimum gap between two sends: the advertised rate spread evenly.
+    fn gap(&self) -> Duration {
+        MINUTE / self.limit().unwrap_or(UNKNOWN_LIMIT_PER_MINUTE).max(1)
+    }
+
     fn block_until(&mut self, until: Instant) {
         self.blocked_until = Some(self.blocked_until.map_or(until, |b| b.max(until)));
     }
@@ -91,14 +104,32 @@ impl MinuteState {
     fn wait(&mut self, now: Instant) -> Option<Duration> {
         self.prune(now);
         let mut until: Option<Instant> = self.blocked_until.filter(|b| *b > now);
+        let mut hold = |at: Instant| {
+            if at > now {
+                until = Some(until.map_or(at, |u| u.max(at)));
+            }
+        };
         if let Some(limit) = self.limit()
             && self.sent.len() as u32 >= limit.max(1)
             && let Some(oldest) = self.sent.front()
         {
-            let free_at = *oldest + MINUTE;
-            until = Some(until.map_or(free_at, |u| u.max(free_at)));
+            hold(*oldest + MINUTE);
+        }
+        if let Some(last) = self.sent.back() {
+            hold(*last + self.gap());
         }
         until.map(|u| u.duration_since(now))
+    }
+
+    /// Take a token now if one is free (recording the send), else say how
+    /// long to wait. One critical section, so two loops racing for the same
+    /// instant cannot both go.
+    fn try_take(&mut self, now: Instant) -> Option<Duration> {
+        let wait = self.wait(now);
+        if wait.is_none() {
+            self.sent.push_back(now);
+        }
+        wait
     }
 
     fn budget(&mut self, now: Instant) -> MinuteBudget {
@@ -487,12 +518,9 @@ impl RateLimiter {
     /// the loop re-checks because a throttle may land meanwhile.
     pub async fn acquire_minute(&self) {
         loop {
-            match self.minute_wait() {
+            match self.with_minute(|m, now| m.try_take(now)) {
                 Some(wait) => tokio::time::sleep(wait).await,
-                None => {
-                    self.minute_sent();
-                    return;
-                }
+                None => return,
             }
         }
     }
@@ -1061,15 +1089,35 @@ mod tests {
         assert!(rl.minute_wait().unwrap() > Duration::from_secs(115));
     }
 
-    #[tokio::test]
-    async fn test_acquire_minute_returns_immediately_when_free_and_records_the_send() {
+    #[test]
+    fn test_sends_are_spaced_to_the_advertised_rate() {
         let rl = RateLimiter::new(&["afl".to_string()], 1000);
-        rl.note_minute_headers("afl", Some(10), Some(10));
-        for _ in 0..10 {
+        // No header yet: 300/min pacing, i.e. 200 ms between sends.
+        rl.minute_sent();
+        let wait = rl.minute_wait().expect("second send right away must wait");
+        assert!(wait > Duration::from_millis(150) && wait <= Duration::from_millis(200), "{wait:?}");
+
+        // 450/min advertised: 133 ms apart. A 45-request burst in 3 s is
+        // exactly what got a fresh pod throttled on 2026-09-07.
+        let rl = RateLimiter::new(&["afl".to_string()], 1000);
+        rl.note_minute_headers("afl", Some(450), Some(449));
+        rl.minute_sent();
+        let wait = rl.minute_wait().expect("must space");
+        assert!(wait > Duration::from_millis(100) && wait <= Duration::from_millis(134), "{wait:?}");
+    }
+
+    #[tokio::test]
+    async fn test_acquire_minute_paces_and_records_each_send() {
+        let rl = RateLimiter::new(&["afl".to_string()], 1000);
+        rl.note_minute_headers("afl", Some(600), Some(600)); // 100 ms apart
+        let started = Instant::now();
+        for _ in 0..5 {
             rl.acquire_minute().await;
         }
-        assert_eq!(rl.minute_snapshot().1.sent_last_minute, 10);
-        assert!(rl.minute_wait().is_some(), "11th send must wait");
+        let took = started.elapsed();
+        assert!(took >= Duration::from_millis(380) && took < Duration::from_secs(3), "{took:?}");
+        assert_eq!(rl.minute_snapshot().1.sent_last_minute, 5);
+        assert!(rl.minute_wait().is_some(), "6th send right away must wait");
     }
 
     #[test]
