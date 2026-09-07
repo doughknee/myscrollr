@@ -1,17 +1,17 @@
-use std::{env, fs, sync::Arc};
+use std::{collections::{BTreeMap, HashMap, VecDeque}, env, fs, sync::Arc};
 use anyhow::{Context, Result};
-use reqwest::{Client, header};
+use reqwest::{Client, header, StatusCode};
 use tokio::sync::Mutex;
 use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveDateTime, Utc};
 use crate::log::{error, info, warn};
 use crate::database::{
     PgPool,
     get_tracked_leagues, seed_tracked_leagues, disable_stale_leagues,
-    cleanup_old_games, get_live_yesterday_leagues,
+    cleanup_old_games, get_live_yesterday_leagues, get_stale_live_games,
     LeagueConfig, TrackedLeague, upsert_game, CleanedData, Team,
     StandingData, upsert_standing, TeamData, upsert_team,
 };
-pub use crate::types::{live_poll_interval_secs, HostQuota, RateLimiter, SportsHealth, DEFAULT_DAILY_QUOTA};
+pub use crate::types::{live_poll_interval_secs, HostMinute, HostQuota, MinuteBudget, RateLimiter, SportsHealth, DEFAULT_DAILY_QUOTA};
 
 pub mod log;
 pub mod database;
@@ -31,6 +31,35 @@ const SCHEDULE_DAYS_AHEAD: i64 = 7;
 /// Delay between league requests on startup burst to avoid rate limits.
 /// 200ms spacing between requests spreads ~60 requests across ~12 seconds.
 const STARTUP_REQUEST_DELAY_MS: u64 = 200;
+
+/// Why a poll produced no data. `Throttled` is api-sports' per-minute limit
+/// answering — HTTP 200 with `errors.rateLimit` and an empty `response`, or a
+/// 429 — and is deliberately not an error: the limiter has already backed the
+/// host off, the poll is not counted, and no game row is touched (REL-229).
+#[derive(Debug)]
+pub enum PollError {
+    Throttled(std::time::Duration),
+    Other(anyhow::Error),
+}
+
+impl std::fmt::Display for PollError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PollError::Throttled(backoff) => {
+                write!(f, "throttled by api-sports (per-minute limit), backing off {}s", backoff.as_secs())
+            }
+            PollError::Other(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl From<anyhow::Error> for PollError {
+    fn from(e: anyhow::Error) -> Self { PollError::Other(e) }
+}
+
+impl From<reqwest::Error> for PollError {
+    fn from(e: reqwest::Error) -> Self { PollError::Other(e.into()) }
+}
 
 // =============================================================================
 // Service initialization (runs once on startup)
@@ -127,11 +156,16 @@ pub async fn init_sports_service(
 
 // =============================================================================
 // Live polling (fast — today + yesterday when needed, every 30s-1min)
-/// Feed a response's daily-quota headers into the limiter for one host.
-/// `x-ratelimit-requests-limit` is the plan's daily allocation (adopted in
-/// both directions), `x-ratelimit-requests-remaining` what is left today
-/// (only ever clamps). Limit first, so a raised plan is reseeded before the
-/// remaining-clamp trims it to today's real balance.
+/// Feed a response's rate headers into the limiter for one host.
+///
+/// Daily: `x-ratelimit-requests-limit` is the plan's daily allocation
+/// (adopted in both directions), `x-ratelimit-requests-remaining` what is
+/// left today (only ever clamps). Limit first, so a raised plan is reseeded
+/// before the remaining-clamp trims it to today's real balance.
+///
+/// Per minute: the capitalised `X-RateLimit-Limit` / `X-RateLimit-Remaining`
+/// pair (header names are case-insensitive) sizes the shared token bucket
+/// (REL-229). Distinct names, distinct windows — do not conflate them.
 fn adopt_rate_headers(headers: &header::HeaderMap, host: &str, rate_limiter: &RateLimiter) {
     let read = |name: &str| headers.get(name)
         .and_then(|v| v.to_str().ok())
@@ -142,6 +176,51 @@ fn adopt_rate_headers(headers: &header::HeaderMap, host: &str, rate_limiter: &Ra
     if let Some(remaining) = read("x-ratelimit-requests-remaining") {
         rate_limiter.update(host, remaining);
     }
+    rate_limiter.note_minute_headers(host, read("x-ratelimit-limit"), read("x-ratelimit-remaining"));
+}
+
+/// One api-sports request, gated by the per-minute bucket.
+///
+/// Waits for a token, sends, feeds the rate headers back, and unwraps the
+/// `{"response": [...], "errors": {...}}` envelope. An in-band
+/// `errors.rateLimit` or a 429 backs the host off and returns
+/// [`PollError::Throttled`] — the caller must treat that as "no poll
+/// happened", never as an empty result.
+pub async fn fetch_response(
+    client: &Client,
+    host: &str,
+    label: &str,
+    url: &str,
+    rate_limiter: &RateLimiter,
+) -> Result<Vec<serde_json::Value>, PollError> {
+    rate_limiter.acquire_minute().await;
+    let resp = client.get(url).send().await?;
+    adopt_rate_headers(resp.headers(), host, rate_limiter);
+
+    let status = resp.status();
+    if status == StatusCode::TOO_MANY_REQUESTS {
+        return Err(PollError::Throttled(rate_limiter.note_throttled(host)));
+    }
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(anyhow::anyhow!("[{}] API returned {}: {}", label, status, body).into());
+    }
+
+    let body: serde_json::Value = resp.json().await?;
+    if let Some(errors) = body.get("errors").and_then(|e| e.as_object())
+        && !errors.is_empty()
+    {
+        if errors.contains_key("rateLimit") {
+            return Err(PollError::Throttled(rate_limiter.note_throttled(host)));
+        }
+        warn!("[{}] API returned errors: {}", label, serde_json::Value::Object(errors.clone()));
+    }
+    rate_limiter.note_minute_ok();
+
+    Ok(body.get("response")
+        .and_then(|r| r.as_array())
+        .cloned()
+        .unwrap_or_default())
 }
 
 // =============================================================================
@@ -179,7 +258,9 @@ pub async fn poll_live(
 
     let current_month = now.month() as i32;
 
-    for league in leagues {
+    // Consecutive requests go to different hosts: whichever way api-sports
+    // scopes its per-minute window, no single host sees a burst from us.
+    for league in interleave_by_host(leagues) {
         // Off-season leagues have no fixtures — polling them burns the shared
         // budget pool on requests that return empty. Skip silently (this loop
         // runs every 30-60s; logging would flood).
@@ -187,39 +268,21 @@ pub async fn poll_live(
             continue;
         }
 
-        if !rate_limiter.try_consume(&league.name) {
-            warn!("[{}] Skipping live poll — per-league budget exhausted (reserved={}, shared={})",
-                league.name,
-                rate_limiter.reserved(&league.name),
-                rate_limiter.shared_remaining(&league.sport_api));
-            continue;
-        }
-
-        // Always poll today
-        match poll_league(client, league, &today, rate_limiter).await {
-            Ok(games) => {
-                let (upserted, failed, has_live) = upsert_games(pool, league, games).await;
-                if has_live {
-                    leagues_with_live += 1;
-                }
-                total_upserted += upserted;
-                total_failed += failed;
-                crate::database::record_poll_success(pool, &league.name).await;
-            }
-            Err(e) => {
-                error!("[{}] Live poll error: {}", league.name, e);
-                health_state.lock().await.record_error(e.to_string());
-                crate::database::record_poll_error(pool, &league.name, &e.to_string()).await;
-            }
-        }
-
-        // Also poll yesterday if this league has live games from yesterday
+        // Today always; yesterday too while this league still has live
+        // games from yesterday's UTC date.
+        let mut dates = vec![(&today, "Live poll")];
         if yesterday_set.contains(league.name.as_str()) {
+            dates.push((&yesterday, "Yesterday poll"));
+        }
+        for (date, what) in dates {
             if !rate_limiter.try_consume(&league.name) {
-                warn!("[{}] Skipping yesterday poll — per-league budget exhausted", league.name);
-                continue;
+                warn!("[{}] Skipping {} — per-league budget exhausted (reserved={}, shared={})",
+                    league.name, what.to_lowercase(),
+                    rate_limiter.reserved(&league.name),
+                    rate_limiter.shared_remaining(&league.sport_api));
+                break;
             }
-            match poll_league(client, league, &yesterday, rate_limiter).await {
+            match poll_league(client, league, date, rate_limiter).await {
                 Ok(games) => {
                     let (upserted, failed, has_live) = upsert_games(pool, league, games).await;
                     if has_live {
@@ -229,8 +292,14 @@ pub async fn poll_live(
                     total_failed += failed;
                     crate::database::record_poll_success(pool, &league.name).await;
                 }
-                Err(e) => {
-                    error!("[{}] Yesterday poll error: {}", league.name, e);
+                Err(PollError::Throttled(backoff)) => {
+                    // Not a poll: no success, no error, no row touched. The
+                    // host is backing off; the next cycle simply tries again.
+                    warn!("[{}] {} throttled — per-minute limit; backing off {}s", league.name, what, backoff.as_secs());
+                    health_state.lock().await.record_throttle();
+                }
+                Err(PollError::Other(e)) => {
+                    error!("[{}] {} error: {}", league.name, what, e);
                     health_state.lock().await.record_error(e.to_string());
                     crate::database::record_poll_error(pool, &league.name, &e.to_string()).await;
                 }
@@ -322,7 +391,12 @@ pub async fn poll_schedule(
                     total_failed += failed;
                     crate::database::record_poll_success(pool, &league.name).await;
                 }
-                Err(e) => {
+                Err(PollError::Throttled(backoff)) => {
+                    // The next 30-min cycle covers the same dates; nothing to record.
+                    warn!("[{}] Schedule poll for {} throttled — per-minute limit; backing off {}s",
+                        league.name, date, backoff.as_secs());
+                }
+                Err(PollError::Other(e)) => {
                     error!("[{}] Schedule poll error for {}: {}", league.name, date, e);
                     crate::database::record_poll_error(pool, &league.name, &e.to_string()).await;
                 }
@@ -372,34 +446,12 @@ pub async fn poll_standings(
         let default_season = compute_current_season(format_str);
         let season = league.season.as_deref().unwrap_or(&default_season).to_string();
 
-        let (base, is_mock) = match std::env::var("API_SPORTS_BASE_URL") {
-            Ok(override_url) => (override_url.trim_end_matches('/').to_string(), true),
-            Err(_) => (format!("https://{}", league.api_host), false),
-        };
-        let mut url = format!(
-            "{}/standings?league={}&season={}",
-            base, league.league_id, season
-        );
-        if is_mock {
-            url = format!("{}&sport={}", url, league.sport_api);
-        }
-
-        match client.get(&url).send().await {
-            Ok(resp) => {
-                adopt_rate_headers(resp.headers(), &league.sport_api, rate_limiter);
-                if !resp.status().is_success() {
-                    warn!("[{}] Standings API returned {}", league.name, resp.status());
-                    continue;
-                }
-                match resp.json::<serde_json::Value>().await {
-                    Ok(body) => {
-                        let response = body.get("response").and_then(|r| r.as_array()).cloned().unwrap_or_default();
-                        parse_and_upsert_standings(pool, &league.name, &season, &league.sport_api, &response).await;
-                    }
-                    Err(e) => warn!("[{}] Failed to parse standings JSON: {}", league.name, e),
-                }
+        let url = api_url(league, &format!("/standings?league={}&season={}", league.league_id, season));
+        match fetch_response(client, &league.sport_api, &league.name, &url, rate_limiter).await {
+            Ok(response) => {
+                parse_and_upsert_standings(pool, &league.name, &season, &league.sport_api, &response).await;
             }
-            Err(e) => error!("[{}] Standings request failed: {}", league.name, e),
+            Err(e) => warn!("[{}] Standings poll skipped: {}", league.name, e),
         }
 
         // Spread requests to avoid rate limiting on startup
@@ -919,52 +971,30 @@ pub async fn poll_teams(
         let default_season = compute_current_season(format_str);
         let season = league.season.as_deref().unwrap_or(&default_season).to_string();
 
-        let (base, is_mock) = match std::env::var("API_SPORTS_BASE_URL") {
-            Ok(override_url) => (override_url.trim_end_matches('/').to_string(), true),
-            Err(_) => (format!("https://{}", league.api_host), false),
-        };
-        let mut url = format!(
-            "{}/teams?league={}&season={}",
-            base, league.league_id, season
-        );
-        if is_mock {
-            url = format!("{}&sport={}", url, league.sport_api);
-        }
-
-        match client.get(&url).send().await {
-            Ok(resp) => {
-                adopt_rate_headers(resp.headers(), &league.sport_api, rate_limiter);
-                if !resp.status().is_success() {
-                    warn!("[{}] Teams API returned {}", league.name, resp.status());
-                    continue;
-                }
-                match resp.json::<serde_json::Value>().await {
-                    Ok(body) => {
-                        let response = body.get("response").and_then(|r| r.as_array()).cloned().unwrap_or_default();
-                        for item in &response {
-                            let team = item.get("team").or(Some(item));
-                            if let Some(t) = team {
-                                let ext_id = t.get("id").and_then(|i| i.as_i64()).unwrap_or(0) as i32;
-                                if ext_id == 0 { continue; }
-                                let data = TeamData {
-                                    league: league.name.clone(),
-                                    external_id: ext_id,
-                                    name: t.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string(),
-                                    code: t.get("code").and_then(|c| c.as_str()).map(|s| s.to_string()),
-                                    logo: t.get("logo").and_then(|l| l.as_str()).map(|s| s.to_string()),
-                                    country: t.get("country").and_then(|c| c.as_str()).map(|s| s.to_string()),
-                                    season: Some(season.clone()),
-                                };
-                                if let Err(e) = upsert_team(pool, data).await {
-                                    error!("[{}] Failed to upsert team: {}", league.name, e);
-                                }
-                            }
+        let url = api_url(league, &format!("/teams?league={}&season={}", league.league_id, season));
+        match fetch_response(client, &league.sport_api, &league.name, &url, rate_limiter).await {
+            Ok(response) => {
+                for item in &response {
+                    let team = item.get("team").or(Some(item));
+                    if let Some(t) = team {
+                        let ext_id = t.get("id").and_then(|i| i.as_i64()).unwrap_or(0) as i32;
+                        if ext_id == 0 { continue; }
+                        let data = TeamData {
+                            league: league.name.clone(),
+                            external_id: ext_id,
+                            name: t.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string(),
+                            code: t.get("code").and_then(|c| c.as_str()).map(|s| s.to_string()),
+                            logo: t.get("logo").and_then(|l| l.as_str()).map(|s| s.to_string()),
+                            country: t.get("country").and_then(|c| c.as_str()).map(|s| s.to_string()),
+                            season: Some(season.clone()),
+                        };
+                        if let Err(e) = upsert_team(pool, data).await {
+                            error!("[{}] Failed to upsert team: {}", league.name, e);
                         }
                     }
-                    Err(e) => warn!("[{}] Failed to parse teams JSON: {}", league.name, e),
                 }
             }
-            Err(e) => error!("[{}] Teams request failed: {}", league.name, e),
+            Err(e) => warn!("[{}] Teams poll skipped: {}", league.name, e),
         }
 
         // Spread requests to avoid rate limiting on startup
@@ -1006,6 +1036,110 @@ async fn upsert_games(
     (upserted, failed, has_live)
 }
 
+/// Round-robin the leagues across their hosts: consecutive requests hit
+/// different api-sports hosts, so a per-minute wait on one host is never
+/// immediately followed by another request to it.
+fn interleave_by_host(leagues: &[TrackedLeague]) -> Vec<&TrackedLeague> {
+    let mut by_host: BTreeMap<&str, VecDeque<&TrackedLeague>> = BTreeMap::new();
+    for l in leagues {
+        by_host.entry(l.sport_api.as_str()).or_default().push_back(l);
+    }
+    let mut out = Vec::with_capacity(leagues.len());
+    while out.len() < leagues.len() {
+        for queue in by_host.values_mut() {
+            if let Some(l) = queue.pop_front() {
+                out.push(l);
+            }
+        }
+    }
+    out
+}
+
+// =============================================================================
+// Stale-live sweep (every few minutes)
+// =============================================================================
+
+/// Most rows one sweep re-fetches. Each is one request on the game's host,
+/// budgeted like any poll; the cap keeps a Saturday of uncovered FCS
+/// fixtures from spending the day's quota on games nobody scores.
+const STALE_SWEEP_MAX_ROWS: i64 = 20;
+
+/// Re-fetch BY ID every game that should be moving but is not (REL-230).
+///
+/// The date-window polls only ever see today and, while something is still
+/// live, yesterday. A game that is still `in` (or `pre` past its start) once
+/// its date has fallen out of that window is never asked about again — it
+/// sits frozen until the 24 h cleanup deletes it. This sweep asks upstream
+/// about the row itself. It also re-asks about rows whose date poll keeps
+/// returning a stale status (the Sep 6 2026 MLB stall: `IN8` for hours while
+/// the game was final) — a second endpoint is a second chance, and the log
+/// line records when upstream still says the same thing, so a stale row can
+/// be told apart from a stale ingester.
+pub async fn sweep_stale_live(
+    pool: &Arc<PgPool>,
+    client: &Client,
+    leagues: &[TrackedLeague],
+    health_state: &Arc<Mutex<SportsHealth>>,
+    rate_limiter: &Arc<RateLimiter>,
+    stale_after_mins: i64,
+) {
+    let rows = match get_stale_live_games(pool, stale_after_mins, STALE_SWEEP_MAX_ROWS).await {
+        Ok(rows) => rows,
+        Err(e) => {
+            warn!("Stale-live sweep skipped — query failed: {}", e);
+            return;
+        }
+    };
+    if rows.is_empty() {
+        return;
+    }
+    info!("Stale-live sweep: {} row(s) to re-fetch by id", rows.len());
+
+    let by_name: HashMap<&str, &TrackedLeague> =
+        leagues.iter().map(|l| (l.name.as_str(), l)).collect();
+    let (mut refreshed, mut unchanged) = (0u32, 0u32);
+    for row in rows {
+        // A league that is no longer tracked keeps its rows until cleanup.
+        let Some(league) = by_name.get(row.league.as_str()) else { continue };
+        if !rate_limiter.try_consume(&league.name) {
+            warn!("[{}] Stale-live sweep skipped — per-league budget exhausted", league.name);
+            continue;
+        }
+        let url = build_api_url_by_id(league, &row.external_game_id);
+        match fetch_games(client, league, &url, rate_limiter).await {
+            Ok(games) => {
+                let Some(game) = games.into_iter().find(|g| g.external_game_id == row.external_game_id) else {
+                    warn!("[{}] Stale-live {}: upstream returned nothing for this id (was {} {}, started {} min ago)",
+                        league.name, row.external_game_id, row.state,
+                        row.status_short.as_deref().unwrap_or("?"), row.started_mins_ago);
+                    continue;
+                };
+                let same = game.status_short == row.status_short;
+                info!("[{}] Stale-live {}: {} {} → {} {} (row updated {} min ago, started {} min ago){}",
+                    league.name, row.external_game_id,
+                    row.state, row.status_short.as_deref().unwrap_or("?"),
+                    game.state, game.status_short.as_deref().unwrap_or("?"),
+                    row.updated_mins_ago, row.started_mins_ago,
+                    if same { " — unchanged upstream, api-sports lag" } else { "" });
+                if same { unchanged += 1 } else { refreshed += 1 }
+                if let Err(e) = upsert_game(pool.clone(), game).await {
+                    error!("[{}] Stale-live {}: upsert failed: {}", league.name, row.external_game_id, e);
+                }
+            }
+            Err(PollError::Throttled(backoff)) => {
+                warn!("[{}] Stale-live sweep throttled — per-minute limit; backing off {}s and stopping this round",
+                    league.name, backoff.as_secs());
+                health_state.lock().await.record_throttle();
+                break;
+            }
+            Err(PollError::Other(e)) => {
+                error!("[{}] Stale-live {}: {}", league.name, row.external_game_id, e);
+            }
+        }
+    }
+    info!("Stale-live sweep complete: {} moved, {} unchanged upstream", refreshed, unchanged);
+}
+
 // =============================================================================
 // HTTP client
 // =============================================================================
@@ -1036,43 +1170,20 @@ async fn poll_league(
     league: &TrackedLeague,
     date: &str,
     rate_limiter: &RateLimiter,
-) -> anyhow::Result<Vec<CleanedData>> {
-    let url = build_api_url(league, date);
+) -> Result<Vec<CleanedData>, PollError> {
+    fetch_games(client, league, &build_api_url(league, date), rate_limiter).await
+}
 
-    let resp = client.get(&url).send().await?;
-
-    // Extract rate limit info from headers — update only this sport's bucket
-    adopt_rate_headers(resp.headers(), &league.sport_api, rate_limiter);
-
-    let status = resp.status();
-    if !status.is_success() {
-        let body = resp.text().await.unwrap_or_default();
-        anyhow::bail!("[{}] API returned {}: {}", league.name, status, body);
-    }
-
-    let body: serde_json::Value = resp.json().await?;
-
-    // api-sports.io wraps all responses in: {"get": "...", "results": N, "response": [...]}
-    let response_array = body.get("response")
-        .and_then(|r| r.as_array())
-        .cloned()
-        .unwrap_or_default();
-
-    if let Some(errors) = body.get("errors")
-        && errors.is_object()
-        && errors.as_object().is_some_and(|m| !m.is_empty())
-    {
-        warn!("[{}] API returned errors: {}", league.name, errors);
-    }
-
-    let mut cleaned_games = Vec::new();
-    for item in &response_array {
-        if let Some(game) = parse_game(item, league) {
-            cleaned_games.push(game);
-        }
-    }
-
-    Ok(cleaned_games)
+/// Fetch one games URL for a league and parse every item the sport's
+/// parser accepts. The URL is the caller's so tests can point it at a mock.
+pub async fn fetch_games(
+    client: &Client,
+    league: &TrackedLeague,
+    url: &str,
+    rate_limiter: &RateLimiter,
+) -> Result<Vec<CleanedData>, PollError> {
+    let response = fetch_response(client, &league.sport_api, &league.name, url, rate_limiter).await?;
+    Ok(response.iter().filter_map(|item| parse_game(item, league)).collect())
 }
 
 /// Compute the current season string dynamically based on the league's
@@ -1110,31 +1221,26 @@ fn compute_current_season(season_format: &str) -> String {
     }
 }
 
-/// Build the correct API URL based on the sport type.
+/// Absolute URL for `path_and_query` on the league's api-sports host.
 ///
 /// When `API_SPORTS_BASE_URL` is set (e.g. `http://localhost:9090`), all
 /// requests are redirected to that host instead of the real api-sports.io
-/// endpoints.  The original `api_host` is sent as a query parameter so the
+/// endpoints. The original `sport_api` is sent as a query parameter so the
 /// mock server can distinguish between sports.
-fn build_api_url(league: &TrackedLeague, date: &str) -> String {
-    let (base, is_mock) = match std::env::var("API_SPORTS_BASE_URL") {
-        Ok(override_url) => (override_url.trim_end_matches('/').to_string(), true),
-        Err(_) => (format!("https://{}", league.api_host), false),
-    };
-    let format_str = league.season_format.as_deref().unwrap_or("calendar");
-    let default_season = compute_current_season(format_str);
-    let season = league.season.as_deref().unwrap_or(&default_season);
+fn api_url(league: &TrackedLeague, path_and_query: &str) -> String {
+    match std::env::var("API_SPORTS_BASE_URL") {
+        Ok(mock) => format!("{}{}&sport={}", mock.trim_end_matches('/'), path_and_query, league.sport_api),
+        Err(_) => format!("https://{}{}", league.api_host, path_and_query),
+    }
+}
 
-    let url = match league.sport_api.as_str() {
-        "football" => {
-            format!("{}/fixtures?league={}&season={}&date={}", base, league.league_id, season, date)
-        }
-        "formula-1" => {
-            format!("{}/races?season={}", base, season)
-        }
-        "mma" => {
-            format!("{}/fights?date={}", base, date)
-        }
+/// The endpoint that lists a league's games: football is `/fixtures`,
+/// Formula 1 `/races`, MMA `/fights`, every other host `/games`.
+fn games_endpoint(league: &TrackedLeague) -> &'static str {
+    match league.sport_api.as_str() {
+        "football" => "/fixtures",
+        "formula-1" => "/races",
+        "mma" => "/fights",
         other => {
             if !matches!(other,
                 "basketball" | "hockey" | "baseball" | "american-football" |
@@ -1142,15 +1248,31 @@ fn build_api_url(league: &TrackedLeague, date: &str) -> String {
             ) {
                 warn!("Unknown sport_api '{}', falling back to /games", other);
             }
-            format!("{}/games?league={}&season={}&date={}", base, league.league_id, season, date)
+            "/games"
         }
-    };
-
-    if is_mock {
-        format!("{}&sport={}", url, league.sport_api)
-    } else {
-        url
     }
+}
+
+/// Build the correct API URL for one league on one date.
+fn build_api_url(league: &TrackedLeague, date: &str) -> String {
+    let format_str = league.season_format.as_deref().unwrap_or("calendar");
+    let default_season = compute_current_season(format_str);
+    let season = league.season.as_deref().unwrap_or(&default_season);
+
+    let endpoint = games_endpoint(league);
+    let query = match league.sport_api.as_str() {
+        "formula-1" => format!("?season={}", season),
+        "mma" => format!("?date={}", date),
+        _ => format!("?league={}&season={}&date={}", league.league_id, season, date),
+    };
+    api_url(league, &format!("{endpoint}{query}"))
+}
+
+/// The same endpoint asked about one game by its api-sports id — every host
+/// supports `?id=` on its games listing (`/fixtures?id=` on football,
+/// `/races?id=` on Formula 1, `/fights?id=` on MMA, `/games?id=` elsewhere).
+fn build_api_url_by_id(league: &TrackedLeague, id: &str) -> String {
+    api_url(league, &format!("{}?id={}", games_endpoint(league), id))
 }
 
 // =============================================================================
@@ -2066,6 +2188,48 @@ mod tests {
         let mut practice = f1_race("Scheduled", Utc::now() + Duration::days(2));
         practice["type"] = serde_json::json!("Practice");
         assert!(parse_f1_race(&practice, &f1_league()).is_none());
+    }
+
+    fn league(name: &str, sport_api: &str) -> TrackedLeague {
+        TrackedLeague {
+            name: name.to_string(),
+            sport_api: sport_api.to_string(),
+            api_host: format!("v1.{sport_api}.api-sports.io"),
+            league_id: 7,
+            category: "Test".to_string(),
+            country: None,
+            logo_url: None,
+            season: Some("2026".to_string()),
+            season_format: None,
+            offseason_months: None,
+        }
+    }
+
+    #[test]
+    fn by_id_urls_use_each_hosts_games_endpoint() {
+        assert_eq!(build_api_url_by_id(&league("MLB", "baseball"), "184965"),
+            "https://v1.baseball.api-sports.io/games?id=184965");
+        assert_eq!(build_api_url_by_id(&league("Serie A", "football"), "99"),
+            "https://v1.football.api-sports.io/fixtures?id=99");
+        assert_eq!(build_api_url_by_id(&league("Formula 1", "formula-1"), "5"),
+            "https://v1.formula-1.api-sports.io/races?id=5");
+        assert_eq!(build_api_url_by_id(&league("UFC", "mma"), "12"),
+            "https://v1.mma.api-sports.io/fights?id=12");
+        // The date URL still carries league + season.
+        assert_eq!(build_api_url(&league("MLB", "baseball"), "2026-09-07"),
+            "https://v1.baseball.api-sports.io/games?league=7&season=2026&date=2026-09-07");
+    }
+
+    #[test]
+    fn live_polls_alternate_hosts() {
+        let leagues = vec![
+            league("MLB", "baseball"), league("NPB", "baseball"),
+            league("NFL", "american-football"), league("NCAA Football", "american-football"),
+            league("KHL", "hockey"),
+        ];
+        let order: Vec<&str> = interleave_by_host(&leagues).iter().map(|l| l.name.as_str()).collect();
+        assert_eq!(order, ["NFL", "MLB", "KHL", "NCAA Football", "NPB"]);
+        assert_eq!(interleave_by_host(&[]).len(), 0);
     }
 
     #[test]

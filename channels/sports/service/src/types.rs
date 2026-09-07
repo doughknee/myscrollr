@@ -1,8 +1,9 @@
 use chrono::{DateTime, Datelike, Utc};
 use serde::Serialize;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::RwLock;
+use std::sync::{Mutex, RwLock};
+use std::time::{Duration, Instant};
 
 /// api-sports.io Pro plan: 7,500 requests/day per sport host. The fallback
 /// daily quota until a response carries `x-ratelimit-requests-limit`, and the
@@ -30,6 +31,88 @@ pub struct HostQuota {
     pub source: &'static str,
 }
 
+/// What one api-sports host advertises about the per-minute window, as
+/// `/health/ready` reports it (REL-229): the capitalised `X-RateLimit-Limit`
+/// / `X-RateLimit-Remaining` pair from its last response, and how often it
+/// has answered with the in-band throttle (HTTP 200, `errors.rateLimit`,
+/// empty `response` — not a 429).
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, Default)]
+pub struct HostMinute {
+    pub limit: Option<u32>,
+    pub remaining: Option<u32>,
+    pub throttle_events: u32,
+}
+
+/// The per-minute budget this process paces itself to. It is ONE bucket for
+/// the whole key, not one per host: on 2026-09-07 a fresh pod was throttled
+/// on the rugby host after ~10 requests/min to it while the account as a
+/// whole was bursting at startup, so api-sports counts the minute across
+/// the subscription. The limit is the smallest any host has advertised.
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, Default)]
+pub struct MinuteBudget {
+    pub limit: Option<u32>,
+    /// Requests this process sent, to any host, in the last 60 s.
+    pub sent_last_minute: u32,
+    /// Seconds until the next request may go out; 0 when not backing off.
+    pub backoff_secs: u64,
+}
+
+/// First in-band throttle backs off this long; each consecutive one doubles
+/// it up to [`THROTTLE_BACKOFF_MAX`]. The window is a minute, so a longer
+/// wait than that would only leave tokens unused.
+pub const THROTTLE_BACKOFF_BASE: Duration = Duration::from_secs(10);
+pub const THROTTLE_BACKOFF_MAX: Duration = Duration::from_secs(120);
+const MINUTE: Duration = Duration::from_secs(60);
+
+#[derive(Default)]
+struct MinuteState {
+    hosts: HashMap<String, HostMinute>,
+    sent: VecDeque<Instant>,
+    blocked_until: Option<Instant>,
+    streak: u32,
+}
+
+impl MinuteState {
+    fn prune(&mut self, now: Instant) {
+        while self.sent.front().is_some_and(|t| now.duration_since(*t) >= MINUTE) {
+            self.sent.pop_front();
+        }
+    }
+
+    fn limit(&self) -> Option<u32> {
+        self.hosts.values().filter_map(|h| h.limit).min()
+    }
+
+    fn block_until(&mut self, until: Instant) {
+        self.blocked_until = Some(self.blocked_until.map_or(until, |b| b.max(until)));
+    }
+
+    /// How long the next request must wait, or `None` when it may go now.
+    fn wait(&mut self, now: Instant) -> Option<Duration> {
+        self.prune(now);
+        let mut until: Option<Instant> = self.blocked_until.filter(|b| *b > now);
+        if let Some(limit) = self.limit()
+            && self.sent.len() as u32 >= limit.max(1)
+            && let Some(oldest) = self.sent.front()
+        {
+            let free_at = *oldest + MINUTE;
+            until = Some(until.map_or(free_at, |u| u.max(free_at)));
+        }
+        until.map(|u| u.duration_since(now))
+    }
+
+    fn budget(&mut self, now: Instant) -> MinuteBudget {
+        self.prune(now);
+        MinuteBudget {
+            limit: self.limit(),
+            sent_last_minute: self.sent.len() as u32,
+            backoff_secs: self.blocked_until
+                .filter(|b| *b > now)
+                .map_or(0, |b| b.duration_since(now).as_secs()),
+        }
+    }
+}
+
 #[derive(Serialize, Clone)]
 pub struct SportsHealth {
     pub status: String,
@@ -41,6 +124,14 @@ pub struct SportsHealth {
     pub quota: BTreeMap<String, HostQuota>,
     /// What live games poll at right now, derived from the effective quota.
     pub live_poll_secs: Option<u64>,
+    /// Per host: the per-minute limit upstream advertises and how often it
+    /// has throttled us.
+    pub minute: BTreeMap<String, HostMinute>,
+    /// The one per-minute bucket the process paces itself to.
+    pub minute_budget: MinuteBudget,
+    /// Polls that came back throttled (in-band `errors.rateLimit` or 429).
+    /// They are not counted as polls and never touch a game row.
+    pub throttled_polls: u64,
     pub error_count: u64,
     pub last_error: Option<String>,
 }
@@ -61,6 +152,9 @@ impl SportsHealth {
             rate_limits: None,
             quota: BTreeMap::new(),
             live_poll_secs: None,
+            minute: BTreeMap::new(),
+            minute_budget: MinuteBudget::default(),
+            throttled_polls: 0,
             error_count: 0,
             last_error: None,
         }
@@ -87,6 +181,19 @@ impl SportsHealth {
     pub fn set_quota(&mut self, quota: BTreeMap<String, HostQuota>, live_poll_secs: u64) {
         self.quota = quota;
         self.live_poll_secs = Some(live_poll_secs);
+    }
+
+    /// Publish the per-minute picture: what each host advertises and the
+    /// bucket the process is pacing itself to.
+    pub fn set_minute(&mut self, hosts: BTreeMap<String, HostMinute>, budget: MinuteBudget) {
+        self.minute = hosts;
+        self.minute_budget = budget;
+    }
+
+    /// A poll was refused by the per-minute throttle. Not an error — the
+    /// limiter is already backing off — but worth counting.
+    pub fn record_throttle(&mut self) {
+        self.throttled_polls += 1;
     }
 
     pub fn get_health(&self) -> Self {
@@ -131,6 +238,8 @@ pub struct RateLimiter {
     /// Hosts whose quota has been adopted from `x-ratelimit-requests-limit`,
     /// so the health snapshot can say header vs config.
     header_seen: RwLock<HashSet<String>>,
+    /// The per-minute window (REL-229). Never held across an await.
+    minute: Mutex<MinuteState>,
 }
 
 impl RateLimiter {
@@ -149,6 +258,7 @@ impl RateLimiter {
             host_shared: HashMap::new(),
             offseason_leagues: RwLock::new(HashSet::new()),
             header_seen: RwLock::new(HashSet::new()),
+            minute: Mutex::new(MinuteState::default()),
         }
     }
 
@@ -182,6 +292,7 @@ impl RateLimiter {
             host_shared,
             offseason_leagues: RwLock::new(HashSet::new()),
             header_seen: RwLock::new(HashSet::new()),
+            minute: Mutex::new(MinuteState::default()),
         };
         rl.reset_daily(leagues);
         rl
@@ -348,6 +459,94 @@ impl RateLimiter {
             };
             (host, q)
         }).collect()
+    }
+
+    // ── Per-minute window (REL-229) ─────────────────────────────────────────
+
+    fn with_minute<T>(&self, f: impl FnOnce(&mut MinuteState, Instant) -> T) -> T {
+        let now = Instant::now();
+        let mut m = self.minute.lock().unwrap_or_else(|e| e.into_inner());
+        f(&mut m, now)
+    }
+
+    /// How long the next request has to wait for a per-minute token, or
+    /// `None` when it may go out now. Does not record the send.
+    pub fn minute_wait(&self) -> Option<Duration> {
+        self.with_minute(|m, now| m.wait(now))
+    }
+
+    /// Record that a request is going out now.
+    pub fn minute_sent(&self) {
+        self.with_minute(|m, now| {
+            m.prune(now);
+            m.sent.push_back(now);
+        });
+    }
+
+    /// Wait for a per-minute token, then take it. Sleeps outside the lock;
+    /// the loop re-checks because a throttle may land meanwhile.
+    pub async fn acquire_minute(&self) {
+        loop {
+            match self.minute_wait() {
+                Some(wait) => tokio::time::sleep(wait).await,
+                None => {
+                    self.minute_sent();
+                    return;
+                }
+            }
+        }
+    }
+
+    /// Feed the capitalised per-minute pair from one host's response.
+    /// `remaining == 0` blocks for a minute: the window edge is not
+    /// reported, so a full minute is the only wait guaranteed to cross it.
+    pub fn note_minute_headers(&self, host: &str, limit: Option<u32>, remaining: Option<u32>) {
+        self.with_minute(|m, now| {
+            let h = m.hosts.entry(host.to_string()).or_default();
+            if limit.is_some() {
+                h.limit = limit;
+            }
+            if remaining.is_some() {
+                h.remaining = remaining;
+            }
+            if remaining == Some(0) {
+                m.block_until(now + MINUTE);
+            }
+        });
+    }
+
+    /// An in-band `errors.rateLimit` (or a 429) came back from `host`.
+    /// Backs everything off exponentially from [`THROTTLE_BACKOFF_BASE`],
+    /// capped at [`THROTTLE_BACKOFF_MAX`], and returns the backoff applied.
+    pub fn note_throttled(&self, host: &str) -> Duration {
+        self.with_minute(|m, now| {
+            m.hosts.entry(host.to_string()).or_default().throttle_events += 1;
+            let backoff = THROTTLE_BACKOFF_BASE
+                .checked_mul(1u32 << m.streak.min(10))
+                .unwrap_or(THROTTLE_BACKOFF_MAX)
+                .min(THROTTLE_BACKOFF_MAX);
+            m.streak += 1;
+            m.block_until(now + backoff);
+            backoff
+        })
+    }
+
+    /// A response carried data: the throttle streak is over.
+    pub fn note_minute_ok(&self) {
+        self.with_minute(|m, _| m.streak = 0);
+    }
+
+    /// Per-host advertised limits and the shared bucket, for `/health/ready`.
+    pub fn minute_snapshot(&self) -> (BTreeMap<String, HostMinute>, MinuteBudget) {
+        self.with_minute(|m, now| {
+            let mut hosts: BTreeMap<String, HostMinute> = self.hosts().into_iter()
+                .map(|h| (h, HostMinute::default()))
+                .collect();
+            for (host, h) in &m.hosts {
+                hosts.insert(host.clone(), h.clone());
+            }
+            (hosts, m.budget(now))
+        })
     }
 
     // ── Legacy methods (preserved for the health endpoint + standings/teams polls) ──
@@ -805,6 +1004,72 @@ mod tests {
         assert_eq!(snap["football"], HostQuota { daily_quota: 75_000, remaining: 74_980, source: "header" });
         assert_eq!(snap["hockey"], config);
         assert_eq!(snap.keys().collect::<Vec<_>>(), vec!["football", "hockey"]); // stable order
+    }
+
+    // ── Per-minute window (REL-229) ─────────────────────────────────────────
+
+    #[test]
+    fn test_minute_headers_gate_our_own_send_rate_across_hosts() {
+        let rl = RateLimiter::new(&["baseball".to_string(), "hockey".to_string()], 1000);
+        // Nothing known yet: no per-minute gating, only the daily budget.
+        assert_eq!(rl.minute_wait(), None);
+        rl.minute_sent();
+        rl.note_minute_headers("baseball", Some(300), Some(299));
+        rl.note_minute_headers("hockey", Some(3), Some(2));
+        rl.minute_sent();
+        rl.minute_sent();
+        // The bucket is shared and sized by the smallest advertised limit:
+        // three sent inside the window against hockey's 3 → wait ≤ 60 s,
+        // whichever host the next request is for.
+        let wait = rl.minute_wait().expect("must wait at the limit");
+        assert!(wait <= MINUTE && wait > Duration::from_secs(55), "wait {wait:?}");
+        let (hosts, budget) = rl.minute_snapshot();
+        assert_eq!(hosts["baseball"], HostMinute { limit: Some(300), remaining: Some(299), throttle_events: 0 });
+        assert_eq!(hosts["hockey"], HostMinute { limit: Some(3), remaining: Some(2), throttle_events: 0 });
+        assert_eq!(budget, MinuteBudget { limit: Some(3), sent_last_minute: 3, backoff_secs: 0 });
+    }
+
+    #[test]
+    fn test_remaining_zero_blocks_for_a_minute() {
+        let rl = RateLimiter::new(&["baseball".to_string()], 1000);
+        rl.note_minute_headers("baseball", Some(300), Some(0));
+        let wait = rl.minute_wait().expect("remaining 0 must block");
+        assert!(wait > Duration::from_secs(55) && wait <= MINUTE, "wait {wait:?}");
+        assert_eq!(rl.minute_snapshot().1.backoff_secs, 59);
+    }
+
+    #[test]
+    fn test_throttle_backoff_doubles_and_caps() {
+        let rl = RateLimiter::new(&["hockey".to_string()], 1000);
+        assert_eq!(rl.note_throttled("hockey"), Duration::from_secs(10));
+        assert_eq!(rl.note_throttled("hockey"), Duration::from_secs(20));
+        assert_eq!(rl.note_throttled("rugby"), Duration::from_secs(40));
+        assert_eq!(rl.note_throttled("hockey"), Duration::from_secs(80));
+        assert_eq!(rl.note_throttled("hockey"), THROTTLE_BACKOFF_MAX);
+        assert_eq!(rl.note_throttled("hockey"), THROTTLE_BACKOFF_MAX);
+        let wait = rl.minute_wait().expect("throttled account must wait");
+        assert!(wait > Duration::from_secs(115) && wait <= THROTTLE_BACKOFF_MAX);
+        let (hosts, budget) = rl.minute_snapshot();
+        assert_eq!(hosts["hockey"].throttle_events, 5);
+        assert_eq!(hosts["rugby"].throttle_events, 1);
+        assert_eq!(budget.backoff_secs, 119);
+
+        // A real response ends the streak; the next throttle starts small
+        // again, but the backoff already in force is not shortened.
+        rl.note_minute_ok();
+        assert_eq!(rl.note_throttled("hockey"), Duration::from_secs(10));
+        assert!(rl.minute_wait().unwrap() > Duration::from_secs(115));
+    }
+
+    #[tokio::test]
+    async fn test_acquire_minute_returns_immediately_when_free_and_records_the_send() {
+        let rl = RateLimiter::new(&["afl".to_string()], 1000);
+        rl.note_minute_headers("afl", Some(10), Some(10));
+        for _ in 0..10 {
+            rl.acquire_minute().await;
+        }
+        assert_eq!(rl.minute_snapshot().1.sent_last_minute, 10);
+        assert!(rl.minute_wait().is_some(), "11th send must wait");
     }
 
     #[test]

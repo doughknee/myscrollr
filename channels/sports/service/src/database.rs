@@ -311,6 +311,51 @@ pub async fn get_live_yesterday_leagues(pool: &Arc<PgPool>) -> Vec<String> {
     }
 }
 
+/// A game row that should be moving but is not — see `get_stale_live_games`.
+#[derive(Debug, Clone, FromRow, PartialEq, Eq)]
+pub struct StaleGame {
+    pub league: String,
+    pub external_game_id: String,
+    pub state: String,
+    pub status_short: Option<String>,
+    pub updated_mins_ago: i64,
+    pub started_mins_ago: i64,
+}
+
+/// Rows the stale-live sweep re-fetches by id (REL-230), newest first, at
+/// most `limit`:
+///
+/// - any `in` / `pre` row nobody has written for `stale_after_mins` — its
+///   date fell out of the today/yesterday window, so the date polls will
+///   never see it again;
+/// - an `in` row that started more than 5 h ago — no game runs that long,
+///   upstream's date listing is stuck (Sep 6 2026: `IN8` for hours);
+/// - a `pre` row whose start is 15 min–5 h behind us — it should have kicked
+///   off; after 5 h it is an uncovered fixture and not worth a request.
+///
+/// Only the last two days: anything older is cleanup's business.
+pub async fn get_stale_live_games(pool: &Arc<PgPool>, stale_after_mins: i64, limit: i64) -> Result<Vec<StaleGame>> {
+    let mut conn = pool.acquire().await?;
+    let rows = query_as(
+        "SELECT league, external_game_id, state, status_short,
+                (EXTRACT(EPOCH FROM NOW() - updated_at) / 60)::bigint AS updated_mins_ago,
+                (EXTRACT(EPOCH FROM NOW() - start_time) / 60)::bigint AS started_mins_ago
+         FROM games
+         WHERE state IN ('in', 'pre')
+           AND start_time BETWEEN NOW() - INTERVAL '2 days' AND NOW() - INTERVAL '15 minutes'
+           AND (updated_at < NOW() - make_interval(mins => $1::int)
+                OR (state = 'in'  AND start_time < NOW() - INTERVAL '5 hours')
+                OR (state = 'pre' AND start_time > NOW() - INTERVAL '5 hours'))
+         ORDER BY start_time DESC
+         LIMIT $2"
+    )
+    .bind(stale_after_mins as i32)
+    .bind(limit)
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(rows)
+}
+
 /// Delete stale games using per-state thresholds.
 ///
 /// - `final` / `postponed`: 7 days past `start_time`. Was 12 hours until
