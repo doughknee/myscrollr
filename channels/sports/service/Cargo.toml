@@ -36,6 +36,7 @@ sentry = { version = "0.42", default-features = false, features = [
 ] }
 sentry-anyhow = "0.42"
 dirs = "5"
+chrono-tz = "0.10"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

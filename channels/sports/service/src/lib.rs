@@ -10,6 +10,7 @@ use crate::database::{
     cleanup_old_games, get_live_yesterday_leagues, get_stale_live_games,
     LeagueConfig, TrackedLeague, upsert_game, CleanedData, Team,
     StandingData, upsert_standing, TeamData, upsert_team,
+    GameRow, get_game_row, StaleGame,
 };
 pub use crate::types::{live_poll_interval_secs, HostMinute, HostQuota, MinuteBudget, RateLimiter, SportsHealth, DEFAULT_DAILY_QUOTA};
 
@@ -1085,6 +1086,8 @@ pub async fn sweep_stale_live(
     let by_name: HashMap<&str, &TrackedLeague> =
         leagues.iter().map(|l| (l.name.as_str(), l)).collect();
     let (mut refreshed, mut unchanged) = (0u32, 0u32);
+    // One statsapi request per date per sweep, not per row (REL-233).
+    let mut statsapi_cache: HashMap<String, serde_json::Value> = HashMap::new();
     for row in rows {
         // A league that is no longer tracked keeps its rows until cleanup.
         let Some(league) = by_name.get(row.league.as_str()) else { continue };
@@ -1099,6 +1102,9 @@ pub async fn sweep_stale_live(
                     warn!("[{}] Stale-live {}: upstream returned nothing for this id (was {} {}, started {} min ago)",
                         league.name, row.external_game_id, row.state,
                         row.status_short.as_deref().unwrap_or("?"), row.started_mins_ago);
+                    if league.name == "MLB" {
+                        mlb_statsapi_fallback(pool, client, &row, &mut statsapi_cache).await;
+                    }
                     continue;
                 };
                 let same = game.status_short == row.status_short;
@@ -1109,8 +1115,15 @@ pub async fn sweep_stale_live(
                     row.updated_mins_ago, row.started_mins_ago,
                     if same { " — unchanged upstream, api-sports lag" } else { "" });
                 if same { unchanged += 1 } else { refreshed += 1 }
-                if let Err(e) = upsert_game(pool.clone(), game).await {
-                    error!("[{}] Stale-live {}: upsert failed: {}", league.name, row.external_game_id, e);
+                // Still stale upstream too — MLB gets a second opinion from
+                // statsapi before falling back to writing the same data.
+                let fixed_via_statsapi = same
+                    && league.name == "MLB"
+                    && mlb_statsapi_fallback(pool, client, &row, &mut statsapi_cache).await;
+                if !fixed_via_statsapi {
+                    if let Err(e) = upsert_game(pool.clone(), game).await {
+                        error!("[{}] Stale-live {}: upsert failed: {}", league.name, row.external_game_id, e);
+                    }
                 }
             }
             Err(PollError::Throttled(backoff)) => {
@@ -1125,6 +1138,195 @@ pub async fn sweep_stale_live(
         }
     }
     info!("Stale-live sweep complete: {} moved, {} unchanged upstream", refreshed, unchanged);
+}
+
+// =============================================================================
+// MLB statsapi fallback for stuck stale-live rows (REL-233)
+// =============================================================================
+//
+// api-sports occasionally keeps re-serving the same live status by id for
+// hours (the Sep 6 2026 MLB stall this ticket follows up on). MLB alone has a
+// free, keyless second source — statsapi.mlb.com — so when the by-id re-fetch
+// above comes back unchanged or empty for an MLB row, this checks statsapi's
+// schedule for the row's game date before giving up. Never primary, never
+// through the api-sports rate limiter (different host, different budget),
+// and MLB only: other baseball leagues (NPB) have no statsapi to fall back to.
+
+/// One game's relevant fields out of a statsapi `/schedule?hydrate=linescore`
+/// response.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StatsApiGame {
+    pub detailed_state: String,
+    pub home_name: String,
+    pub away_name: String,
+    pub home_score: Option<i32>,
+    pub away_score: Option<i32>,
+    pub inning: Option<i64>,
+}
+
+/// Pull every game out of a statsapi schedule response (one date, possibly
+/// several games). A game missing a field this needs is dropped rather than
+/// guessed at.
+pub fn parse_statsapi_schedule(body: &serde_json::Value) -> Vec<StatsApiGame> {
+    body.get("dates")
+        .and_then(|d| d.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|d| d.get("games")?.as_array())
+        .flatten()
+        .filter_map(|g| {
+            let status = g.get("status")?;
+            let detailed_state = status.get("detailedState")?.as_str()?.to_string();
+            let teams = g.get("teams")?;
+            let home = teams.get("home")?;
+            let away = teams.get("away")?;
+            let home_name = home.get("team")?.get("name")?.as_str()?.to_string();
+            let away_name = away.get("team")?.get("name")?.as_str()?.to_string();
+            let home_score = home.get("score").and_then(|s| s.as_i64()).map(|s| s as i32);
+            let away_score = away.get("score").and_then(|s| s.as_i64()).map(|s| s as i32);
+            let inning = g.get("linescore").and_then(|l| l.get("currentInning")).and_then(|i| i.as_i64());
+            Some(StatsApiGame { detailed_state, home_name, away_name, home_score, away_score, inning })
+        })
+        .collect()
+}
+
+/// Map statsapi's `detailedState` onto the api-sports short/long status
+/// vocabulary `map_status_to_state` and `build_detail` already render —
+/// exactly the vocabulary this ticket named, nothing guessed for the rest.
+pub fn statsapi_status_to_api_sports(detailed_state: &str, inning: Option<i64>) -> Option<(String, String)> {
+    match detailed_state {
+        "Final" | "Game Over" | "Completed Early" => Some(("FT".to_string(), detailed_state.to_string())),
+        "In Progress" => Some((format!("IN{}", inning.unwrap_or(0)), detailed_state.to_string())),
+        "Postponed" => Some(("PST".to_string(), detailed_state.to_string())),
+        "Suspended" => Some(("SUSP".to_string(), detailed_state.to_string())),
+        "Cancelled" => Some(("CANC".to_string(), detailed_state.to_string())),
+        _ => None,
+    }
+}
+
+/// Turn a statsapi match into the same `CleanedData` shape `parse_baseball_game`
+/// produces, so `upsert_game` and the chip formatter can't tell the
+/// difference. Everything statsapi doesn't know (logos, codes, venue, link,
+/// season, start_time) is carried forward from the row already in the
+/// database rather than nulled out.
+pub fn statsapi_game_to_cleaned_data(existing: &GameRow, game: &StatsApiGame, mapped: (String, String)) -> CleanedData {
+    let (status_short, status_long) = mapped;
+    let state = map_status_to_state(&status_short).to_string();
+    let timer = if state == "in" { game.inning.map(|i| format!("Inn {}", i)) } else { None };
+    let detail = build_detail(&status_short, Some(status_long.as_str()), timer.as_deref());
+    CleanedData {
+        league: existing.league.clone(),
+        sport: existing.sport.clone(),
+        external_game_id: existing.external_game_id.clone(),
+        link: existing.link.clone(),
+        home_team: Team {
+            name: existing.home_team_name.clone(),
+            logo: existing.home_team_logo.clone(),
+            score: game.home_score.or(existing.home_team_score),
+            code: existing.home_team_code.clone(),
+        },
+        away_team: Team {
+            name: existing.away_team_name.clone(),
+            logo: existing.away_team_logo.clone(),
+            score: game.away_score.or(existing.away_team_score),
+            code: existing.away_team_code.clone(),
+        },
+        start_time: existing.start_time,
+        short_detail: detail,
+        state,
+        status_short: Some(status_short),
+        status_long: Some(status_long),
+        timer,
+        venue: existing.venue.clone(),
+        season: existing.season.clone(),
+    }
+}
+
+/// `statsapi.mlb.com`'s schedule URL for one date. `STATSAPI_BASE_URL`
+/// redirects to a mock the same way `API_SPORTS_BASE_URL` does for
+/// api-sports, so tests never hit the real host.
+fn statsapi_schedule_url(date: &str) -> String {
+    let base = env::var("STATSAPI_BASE_URL").unwrap_or_else(|_| "https://statsapi.mlb.com".to_string());
+    format!("{}/api/v1/schedule?sportId=1&date={}&hydrate=linescore", base.trim_end_matches('/'), date)
+}
+
+/// One request, cached by the caller so a sweep never asks statsapi about
+/// the same date twice. Not routed through `RateLimiter` — a different host
+/// with its own (much looser) limits, not api-sports' per-minute budget.
+async fn fetch_statsapi_schedule(client: &Client, date: &str) -> Result<serde_json::Value> {
+    let url = statsapi_schedule_url(date);
+    let resp = client.get(&url).send().await.context("statsapi request failed")?;
+    if !resp.status().is_success() {
+        anyhow::bail!("statsapi returned HTTP {}", resp.status());
+    }
+    resp.json::<serde_json::Value>().await.context("statsapi response wasn't JSON")
+}
+
+/// Check statsapi for one stuck MLB row: today's (row's local date)
+/// schedule, then yesterday's if no match. Returns true when it found and
+/// wrote a match, so the caller can skip re-writing the still-stale
+/// api-sports data.
+async fn mlb_statsapi_fallback(
+    pool: &Arc<PgPool>,
+    client: &Client,
+    row: &StaleGame,
+    cache: &mut HashMap<String, serde_json::Value>,
+) -> bool {
+    let existing = match get_game_row(pool, &row.league, &row.external_game_id).await {
+        Ok(Some(r)) => r,
+        Ok(None) => return false, // row vanished between the sweep query and now
+        Err(e) => {
+            warn!("[MLB] Stale-live {}: couldn't reload row for statsapi fallback: {}", row.external_game_id, e);
+            return false;
+        }
+    };
+
+    let ny_date = existing.start_time.with_timezone(&chrono_tz::America::New_York).date_naive();
+    let candidate_dates = [ny_date, ny_date - Duration::days(1)];
+    for date in candidate_dates {
+        let date_str = date.format("%Y-%m-%d").to_string();
+        let body = match cache.get(&date_str) {
+            Some(cached) => cached.clone(),
+            None => match fetch_statsapi_schedule(client, &date_str).await {
+                Ok(b) => {
+                    cache.insert(date_str.clone(), b.clone());
+                    b
+                }
+                Err(e) => {
+                    warn!("[MLB] statsapi schedule fetch for {} failed: {}", date_str, e);
+                    continue;
+                }
+            },
+        };
+        let games = parse_statsapi_schedule(&body);
+        let Some(g) = games.iter().find(|g| {
+            g.home_name == existing.home_team_name && g.away_name == existing.away_team_name
+        }) else {
+            continue;
+        };
+        let Some(mapped) = statsapi_status_to_api_sports(&g.detailed_state, g.inning) else {
+            warn!("[MLB] Stale-live {}: statsapi says '{}' — unrecognized, leaving row alone",
+                row.external_game_id, g.detailed_state);
+            return false;
+        };
+        let old_short = existing.status_short.as_deref().unwrap_or("?");
+        let (old_home, old_away) = (existing.home_team_score.unwrap_or(0), existing.away_team_score.unwrap_or(0));
+        let cleaned = statsapi_game_to_cleaned_data(&existing, g, mapped);
+        info!("[MLB] Stale-live {}: {} {}-{} → {} {}-{} via statsapi",
+            row.external_game_id, old_short, old_home, old_away,
+            cleaned.state, cleaned.home_team.score.unwrap_or(0), cleaned.away_team.score.unwrap_or(0));
+        return match upsert_game(pool.clone(), cleaned).await {
+            Ok(_) => true,
+            Err(e) => {
+                error!("[MLB] Stale-live {}: statsapi upsert failed: {}", row.external_game_id, e);
+                false
+            }
+        };
+    }
+    warn!("[MLB] Stale-live {}: no statsapi match for '{}' @ '{}' on {} or {} — leaving row alone",
+        row.external_game_id, existing.away_team_name, existing.home_team_name,
+        candidate_dates[0], candidate_dates[1]);
+    false
 }
 
 // =============================================================================

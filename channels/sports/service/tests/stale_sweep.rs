@@ -1,11 +1,17 @@
 //! Which rows the stale-live sweep picks up (REL-230): the query behind
 //! `sweep_stale_live`, against a real Postgres. Skips without
 //! `TEST_DATABASE_URL`.
+//!
+//! The MLB statsapi fallback (REL-233) is covered below with a fixture
+//! response instead — it's pure parsing/mapping, no database needed.
 
 mod common;
 
 use std::sync::Arc;
-use sports_service::database::get_stale_live_games;
+use chrono::{TimeZone, Utc};
+use serde_json::json;
+use sports_service::database::{get_stale_live_games, GameRow};
+use sports_service::{parse_statsapi_schedule, statsapi_game_to_cleaned_data, statsapi_status_to_api_sports};
 use sqlx::query;
 
 const LEAGUE: &str = "__stale_sweep__";
@@ -59,4 +65,81 @@ async fn sweep_picks_frozen_and_overdue_rows_only() {
     assert!(capped.len() <= 1);
 
     query("DELETE FROM games WHERE league = $1").bind(LEAGUE).execute(&*pool).await.unwrap();
+}
+
+/// A row stuck reporting "IN1" for hours (the Sep 6 2026 stall) gets
+/// corrected from a fixture statsapi schedule response: matched by exact
+/// team name, mapped onto the api-sports status vocabulary, and everything
+/// statsapi doesn't know (logo, code, venue, season, start_time) is carried
+/// forward from the row untouched — the fallback must never null those out.
+#[test]
+fn statsapi_fallback_maps_final_score_and_preserves_the_rest() {
+    let existing = GameRow {
+        league: "MLB".to_string(),
+        sport: "baseball".to_string(),
+        external_game_id: "184965".to_string(),
+        link: None,
+        home_team_name: "Chicago White Sox".to_string(),
+        home_team_logo: Some("https://example.com/cws.png".to_string()),
+        home_team_score: Some(0),
+        home_team_code: Some("CWS".to_string()),
+        away_team_name: "Minnesota Twins".to_string(),
+        away_team_logo: Some("https://example.com/min.png".to_string()),
+        away_team_score: Some(0),
+        away_team_code: Some("MIN".to_string()),
+        start_time: Utc.with_ymd_and_hms(2026, 9, 6, 22, 20, 0).unwrap(),
+        short_detail: Some("IN1 · Inn 1".to_string()),
+        state: "in".to_string(),
+        status_short: Some("IN1".to_string()),
+        status_long: Some("Inning 1".to_string()),
+        timer: Some("Inn 1".to_string()),
+        venue: Some("Guaranteed Rate Field".to_string()),
+        season: Some("2026".to_string()),
+    };
+
+    // Real statsapi shape: dates[].games[].{status.detailedState, teams.home/away.{score,team.name}, linescore.currentInning}.
+    let fixture = json!({
+        "dates": [{
+            "date": "2026-09-06",
+            "games": [{
+                "status": {"detailedState": "Final"},
+                "teams": {
+                    "home": {"score": 10, "team": {"name": "Chicago White Sox"}},
+                    "away": {"score": 1, "team": {"name": "Minnesota Twins"}}
+                },
+                "linescore": {"currentInning": 9}
+            }]
+        }]
+    });
+
+    let games = parse_statsapi_schedule(&fixture);
+    assert_eq!(games.len(), 1);
+    let game = games.into_iter()
+        .find(|g| g.home_name == existing.home_team_name && g.away_name == existing.away_team_name)
+        .expect("exact team-name match");
+    assert_eq!(game.detailed_state, "Final");
+    assert_eq!((game.home_score, game.away_score), (Some(10), Some(1)));
+
+    let mapped = statsapi_status_to_api_sports(&game.detailed_state, game.inning)
+        .expect("Final is recognized vocabulary");
+    assert_eq!(mapped, ("FT".to_string(), "Final".to_string()));
+
+    let cleaned = statsapi_game_to_cleaned_data(&existing, &game, mapped);
+    assert_eq!(cleaned.state, "final");
+    assert_eq!(cleaned.status_short.as_deref(), Some("FT"));
+    assert_eq!((cleaned.home_team.score, cleaned.away_team.score), (Some(10), Some(1)));
+    // Nothing statsapi doesn't know got nulled out.
+    assert_eq!(cleaned.home_team.logo.as_deref(), Some("https://example.com/cws.png"));
+    assert_eq!(cleaned.home_team.code.as_deref(), Some("CWS"));
+    assert_eq!(cleaned.venue.as_deref(), Some("Guaranteed Rate Field"));
+    assert_eq!(cleaned.season.as_deref(), Some("2026"));
+    assert_eq!(cleaned.start_time, existing.start_time);
+
+    // No match for a team pair not in the fixture: never guess.
+    let fixture_games = parse_statsapi_schedule(&fixture);
+    assert!(fixture_games.iter().find(|g| g.home_name == "Some Other Team").is_none());
+
+    // A detailedState this ticket didn't name maps to nothing — the fallback
+    // must leave the row alone rather than invent a status.
+    assert_eq!(statsapi_status_to_api_sports("Warmup", None), None);
 }
