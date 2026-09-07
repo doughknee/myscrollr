@@ -1,5 +1,5 @@
 {
-    "version": "c703724dd8854d88",
+    "version": "e53c33da3c52a6c6",
     "widgets": [
         {
             "id": "finance_stocks",
@@ -456,6 +456,424 @@
             "added_at": "2026-07-21"
         },
         {
+            "id": "sports_bundesliga",
+            "name": "Bundesliga",
+            "description": "Live scores from Germany's Bundesliga.",
+            "source": "sports",
+            "category": "sports",
+            "color": "#d20515",
+            "logo_url": "https://icon.horse/icon/bundesliga.com",
+            "default_config": {
+                "leagues": [
+                    "Bundesliga"
+                ]
+            },
+            "required_tier": "free",
+            "about": "Live scores from Germany's Bundesliga — all 18 clubs, every matchday.",
+            "usage": [
+                "Live scores and game state update automatically.",
+                "Set a favorite team from the top bar to keep it front and center.",
+                "Pin it on game days so scores stay on screen."
+            ],
+            "order": 16,
+            "group": "Soccer",
+            "keywords": [
+                "german",
+                "germany",
+                "soccer",
+                "football"
+            ],
+            "added_at": "2026-09-06"
+        },
+        {
+            "id": "sports_seriea",
+            "name": "Serie A",
+            "description": "Live scores from Italy's Serie A.",
+            "source": "sports",
+            "category": "sports",
+            "color": "#0473ff",
+            "logo_url": "https://icon.horse/icon/legaseriea.it",
+            "default_config": {
+                "leagues": [
+                    "Serie A"
+                ]
+            },
+            "required_tier": "free",
+            "about": "Live scores from Italy's Serie A, from the Scudetto race to the relegation fight.",
+            "usage": [
+                "Live scores and game state update automatically.",
+                "Set a favorite team from the top bar to keep it front and center.",
+                "Pin it on game days so scores stay on screen."
+            ],
+            "order": 17,
+            "group": "Soccer",
+            "keywords": [
+                "italian",
+                "italy",
+                "soccer",
+                "football"
+            ],
+            "added_at": "2026-09-06"
+        },
+        {
+            "id": "sports_ligue1",
+            "name": "Ligue 1",
+            "description": "Live scores from France's Ligue 1.",
+            "source": "sports",
+            "category": "sports",
+            "color": "#085fff",
+            "logo_url": "https://icon.horse/icon/ligue1.com",
+            "default_config": {
+                "leagues": [
+                    "Ligue 1"
+                ]
+            },
+            "required_tier": "free",
+            "about": "Live scores from France's Ligue 1, every matchday of the season.",
+            "usage": [
+                "Live scores and game state update automatically.",
+                "Set a favorite team from the top bar to keep it front and center.",
+                "Pin it on game days so scores stay on screen."
+            ],
+            "order": 18,
+            "group": "Soccer",
+            "keywords": [
+                "french",
+                "france",
+                "soccer",
+                "football"
+            ],
+            "added_at": "2026-09-06"
+        },
+        {
+            "id": "sports_euroleague",
+            "name": "EuroLeague",
+            "description": "Live EuroLeague basketball scores.",
+            "source": "sports",
+            "category": "sports",
+            "color": "#fa5500",
+            "logo_url": "https://www.google.com/s2/favicons?domain=euroleague.net\u0026sz=128",
+            "default_config": {
+                "leagues": [
+                    "EuroLeague"
+                ]
+            },
+            "required_tier": "free",
+            "about": "Live EuroLeague scores through the regular season, the play-ins and playoffs, and the Final Four.",
+            "usage": [
+                "Live scores and game state update automatically.",
+                "Set a favorite team from the top bar to keep it front and center.",
+                "Pin it on game days so scores stay on screen."
+            ],
+            "order": 19,
+            "group": "Basketball",
+            "keywords": [
+                "europe",
+                "european",
+                "basketball"
+            ],
+            "added_at": "2026-09-06"
+        },
+        {
+            "id": "sports_khl",
+            "name": "KHL",
+            "description": "Live Kontinental Hockey League scores.",
+            "source": "sports",
+            "category": "sports",
+            "color": "#17272c",
+            "logo_url": "https://icon.horse/icon/khl.ru",
+            "default_config": {
+                "leagues": [
+                    "KHL"
+                ]
+            },
+            "required_tier": "free",
+            "about": "Live KHL scores and period-by-period game state across the Kontinental Hockey League.",
+            "usage": [
+                "Live scores and game state update automatically.",
+                "Set a favorite team from the top bar to keep it front and center.",
+                "Pin it on game days so scores stay on screen."
+            ],
+            "order": 20,
+            "group": "Hockey",
+            "keywords": [
+                "kontinental",
+                "russia",
+                "russian",
+                "hockey"
+            ],
+            "added_at": "2026-09-06"
+        },
+        {
+            "id": "sports_npb",
+            "name": "NPB",
+            "description": "Live Nippon Professional Baseball scores.",
+            "source": "sports",
+            "category": "sports",
+            "color": "#0091db",
+            "logo_url": "https://icon.horse/icon/npb.jp",
+            "default_config": {
+                "leagues": [
+                    "NPB"
+                ]
+            },
+            "required_tier": "free",
+            "about": "Live NPB scores and innings across the Central and Pacific Leagues, Japan Series included.",
+            "usage": [
+                "Live scores and game state update automatically.",
+                "Set a favorite team from the top bar to keep it front and center.",
+                "Pin it on game days so scores stay on screen."
+            ],
+            "order": 21,
+            "group": "Baseball",
+            "keywords": [
+                "japan",
+                "japanese",
+                "nippon",
+                "baseball"
+            ],
+            "added_at": "2026-09-06"
+        },
+        {
+            "id": "sports_sixnations",
+            "name": "Six Nations",
+            "description": "Live Six Nations rugby scores.",
+            "source": "sports",
+            "category": "sports",
+            "color": "#0d1c1c",
+            "logo_url": "https://icon.horse/icon/sixnationsrugby.com",
+            "default_config": {
+                "leagues": [
+                    "Six Nations"
+                ]
+            },
+            "required_tier": "free",
+            "about": "Live Six Nations scores — five rounds every spring between England, France, Ireland, Italy, Scotland and Wales.",
+            "usage": [
+                "Live scores and game state update automatically.",
+                "Set a favorite team from the top bar to keep it front and center.",
+                "Pin it on game days so scores stay on screen."
+            ],
+            "order": 22,
+            "group": "Rugby",
+            "keywords": [
+                "rugby",
+                "rugby union",
+                "6n"
+            ],
+            "added_at": "2026-09-06"
+        },
+        {
+            "id": "sports_superrugby",
+            "name": "Super Rugby",
+            "description": "Live Super Rugby Pacific scores.",
+            "source": "sports",
+            "category": "sports",
+            "color": "#00245d",
+            "logo_url": "https://icon.horse/icon/super.rugby",
+            "default_config": {
+                "leagues": [
+                    "Super Rugby"
+                ]
+            },
+            "required_tier": "free",
+            "about": "Live Super Rugby scores from Australia, New Zealand and the Pacific, through the regular season and the finals.",
+            "usage": [
+                "Live scores and game state update automatically.",
+                "Set a favorite team from the top bar to keep it front and center.",
+                "Pin it on game days so scores stay on screen."
+            ],
+            "order": 23,
+            "group": "Rugby",
+            "keywords": [
+                "rugby",
+                "rugby union",
+                "pacific",
+                "australia",
+                "new zealand"
+            ],
+            "added_at": "2026-09-06"
+        },
+        {
+            "id": "sports_premrugby",
+            "name": "Premiership Rugby",
+            "description": "Live scores from England's Premiership Rugby.",
+            "source": "sports",
+            "category": "sports",
+            "color": "#2a2b6b",
+            "logo_url": "https://icon.horse/icon/premiershiprugby.com",
+            "default_config": {
+                "leagues": [
+                    "Premiership Rugby"
+                ]
+            },
+            "required_tier": "free",
+            "about": "Live Premiership Rugby scores — England's top flight, every round through to the final.",
+            "usage": [
+                "Live scores and game state update automatically.",
+                "Set a favorite team from the top bar to keep it front and center.",
+                "Pin it on game days so scores stay on screen."
+            ],
+            "order": 24,
+            "group": "Rugby",
+            "keywords": [
+                "rugby",
+                "rugby union",
+                "english",
+                "england",
+                "gallagher"
+            ],
+            "added_at": "2026-09-06"
+        },
+        {
+            "id": "sports_handballcl",
+            "name": "Handball Champions League",
+            "description": "Live EHF Champions League handball scores.",
+            "source": "sports",
+            "category": "sports",
+            "color": "#001432",
+            "logo_url": "https://icon.horse/icon/ehfcl.eurohandball.com",
+            "default_config": {
+                "leagues": [
+                    "Handball Champions League"
+                ]
+            },
+            "required_tier": "free",
+            "about": "Live EHF Champions League scores through the group phase, the playoffs and the Final4.",
+            "usage": [
+                "Live scores and game state update automatically.",
+                "Set a favorite team from the top bar to keep it front and center.",
+                "Pin it on game days so scores stay on screen."
+            ],
+            "order": 25,
+            "group": "Handball",
+            "keywords": [
+                "handball",
+                "ehf",
+                "europe"
+            ],
+            "added_at": "2026-09-06"
+        },
+        {
+            "id": "sports_hbl",
+            "name": "Handball Bundesliga",
+            "description": "Live scores from Germany's Handball-Bundesliga.",
+            "source": "sports",
+            "category": "sports",
+            "color": "#1d2f56",
+            "logo_url": "https://icon.horse/icon/liquimoly-hbl.de",
+            "default_config": {
+                "leagues": [
+                    "Handball Bundesliga"
+                ]
+            },
+            "required_tier": "free",
+            "about": "Live Handball-Bundesliga scores — Germany's top flight, every matchday.",
+            "usage": [
+                "Live scores and game state update automatically.",
+                "Set a favorite team from the top bar to keep it front and center.",
+                "Pin it on game days so scores stay on screen."
+            ],
+            "order": 26,
+            "group": "Handball",
+            "keywords": [
+                "handball",
+                "german",
+                "germany",
+                "hbl"
+            ],
+            "added_at": "2026-09-06"
+        },
+        {
+            "id": "sports_starligue",
+            "name": "Starligue",
+            "description": "Live scores from France's Starligue.",
+            "source": "sports",
+            "category": "sports",
+            "color": "#e42027",
+            "logo_url": "https://icon.horse/icon/lnh.fr",
+            "default_config": {
+                "leagues": [
+                    "Starligue"
+                ]
+            },
+            "required_tier": "free",
+            "about": "Live Starligue scores — France's top handball division, every round.",
+            "usage": [
+                "Live scores and game state update automatically.",
+                "Set a favorite team from the top bar to keep it front and center.",
+                "Pin it on game days so scores stay on screen."
+            ],
+            "order": 27,
+            "group": "Handball",
+            "keywords": [
+                "handball",
+                "french",
+                "france",
+                "lnh"
+            ],
+            "added_at": "2026-09-06"
+        },
+        {
+            "id": "sports_volleyballcl",
+            "name": "Volleyball Champions League",
+            "description": "Live CEV Champions League volleyball scores.",
+            "source": "sports",
+            "category": "sports",
+            "color": "#0000ff",
+            "logo_url": "https://icon.horse/icon/championsleague.cev.eu",
+            "default_config": {
+                "leagues": [
+                    "Volleyball Champions League"
+                ]
+            },
+            "required_tier": "free",
+            "about": "Live CEV Champions League scores, set by set, through the pools and the knockout rounds.",
+            "usage": [
+                "Live scores and game state update automatically.",
+                "Set a favorite team from the top bar to keep it front and center.",
+                "Pin it on game days so scores stay on screen."
+            ],
+            "order": 28,
+            "group": "Volleyball",
+            "keywords": [
+                "volleyball",
+                "cev",
+                "europe"
+            ],
+            "added_at": "2026-09-06"
+        },
+        {
+            "id": "sports_vnl",
+            "name": "Volleyball Nations League",
+            "description": "Live Volleyball Nations League scores.",
+            "source": "sports",
+            "category": "sports",
+            "color": "#bbeb00",
+            "logo_url": "https://icon.horse/icon/volleyballworld.com",
+            "default_config": {
+                "leagues": [
+                    "Volleyball Nations League"
+                ]
+            },
+            "required_tier": "free",
+            "about": "Live Volleyball Nations League scores, set by set, from the preliminary rounds to the finals.",
+            "usage": [
+                "Live scores and game state update automatically.",
+                "Set a favorite team from the top bar to keep it front and center.",
+                "Pin it on game days so scores stay on screen."
+            ],
+            "order": 29,
+            "group": "Volleyball",
+            "keywords": [
+                "volleyball",
+                "vnl",
+                "fivb",
+                "nations"
+            ],
+            "added_at": "2026-09-06"
+        },
+        {
             "id": "news_bbc",
             "name": "BBC News",
             "description": "World, UK and breaking news from the BBC.",
@@ -478,7 +896,7 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 16,
+            "order": 30,
             "group": "World",
             "added_at": "2026-07-02"
         },
@@ -505,7 +923,7 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 17,
+            "order": 31,
             "group": "World",
             "added_at": "2026-07-21"
         },
@@ -532,7 +950,7 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 18,
+            "order": 32,
             "group": "World",
             "added_at": "2026-07-21"
         },
@@ -559,7 +977,7 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 19,
+            "order": 33,
             "group": "World",
             "added_at": "2026-07-21"
         },
@@ -586,7 +1004,7 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 20,
+            "order": 34,
             "group": "World",
             "added_at": "2026-07-21"
         },
@@ -613,7 +1031,7 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 21,
+            "order": 35,
             "group": "Business",
             "added_at": "2026-07-21"
         },
@@ -640,7 +1058,7 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 22,
+            "order": 36,
             "group": "Business",
             "added_at": "2026-07-21"
         },
@@ -667,7 +1085,7 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 23,
+            "order": 37,
             "group": "Tech \u0026 Science",
             "added_at": "2026-07-21"
         },
@@ -694,7 +1112,7 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 24,
+            "order": 38,
             "group": "Tech \u0026 Science",
             "keywords": [
                 "hn",
@@ -727,7 +1145,7 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 25,
+            "order": 39,
             "group": "Tech \u0026 Science",
             "added_at": "2026-07-21"
         },
@@ -755,7 +1173,7 @@
                 "Open any headline from the feed to read the full story.",
                 "Pin it to keep the latest news in view."
             ],
-            "order": 26,
+            "order": 40,
             "group": "World",
             "added_at": "2026-09-05"
         },
@@ -776,7 +1194,7 @@
                 "Add as many feeds as you like — they merge into one stream.",
                 "Perfect for niche blogs, newsletters, or subreddits with a feed."
             ],
-            "order": 27,
+            "order": 41,
             "hidden": true,
             "added_at": "2026-07-02"
         },
@@ -795,7 +1213,7 @@
                 "Leagues, matchups, and standings sync automatically.",
                 "Live scoring updates while your players are on the field."
             ],
-            "order": 28,
+            "order": 42,
             "group": "Fantasy",
             "keywords": [
                 "fantasy football",
@@ -818,7 +1236,7 @@
                 "Follow the events and questions you care about.",
                 "Display-only — Scrollr shows the market, it never places a trade."
             ],
-            "order": 29,
+            "order": 43,
             "group": "Predictions",
             "keywords": [
                 "odds",
@@ -834,7 +1252,7 @@
             "category": "utility",
             "color": "#6366f1",
             "required_tier": "free",
-            "order": 30,
+            "order": 44,
             "group": "Desk",
             "keywords": [
                 "time",
@@ -850,7 +1268,7 @@
             "category": "utility",
             "color": "#f59e0b",
             "required_tier": "free",
-            "order": 31,
+            "order": 45,
             "group": "Desk",
             "keywords": [
                 "pomodoro",
@@ -866,7 +1284,7 @@
             "category": "utility",
             "color": "#0ea5e9",
             "required_tier": "free",
-            "order": 32,
+            "order": 46,
             "group": "Desk",
             "keywords": [
                 "forecast",
@@ -882,7 +1300,7 @@
             "category": "utility",
             "color": "#06b6d4",
             "required_tier": "free",
-            "order": 33,
+            "order": 47,
             "group": "Dev",
             "keywords": [
                 "cpu",
@@ -900,7 +1318,7 @@
             "color": "#10b981",
             "logo_url": "https://icon.horse/icon/uptime.kuma.pet",
             "required_tier": "free",
-            "order": 34,
+            "order": 48,
             "group": "Dev",
             "keywords": [
                 "kuma",
@@ -917,7 +1335,7 @@
             "color": "#f97316",
             "logo_url": "https://icon.horse/icon/github.com",
             "required_tier": "free",
-            "order": 35,
+            "order": 49,
             "group": "Dev",
             "keywords": [
                 "actions",

@@ -196,12 +196,16 @@ function sameStanding(a?: TeamStanding, b?: TeamStanding): boolean {
  */
 const LEAGUE_CODES: Record<string, string> = {
   AFL: "AFL",
+  // "BULI" is the shorthand German coverage uses; the fallback would give "B".
+  Bundesliga: "BULI",
   "Champions League": "UCL",
+  EuroLeague: "EL",
   "FIFA World Cup": "WC",
   "Formula 1": "F1",
   "Handball Bundesliga": "HBL",
   "Handball Champions League": "HCL",
   "La Liga": "LIGA",
+  "Ligue 1": "L1",
   MLB: "MLB",
   MLS: "MLS",
   NBA: "NBA",
@@ -212,6 +216,7 @@ const LEAGUE_CODES: Record<string, string> = {
   "Premier League": "EPL",
   // Distinct from the football Premier League above, which takes EPL.
   "Premiership Rugby": "PREM",
+  "Serie A": "SERIE",
   "Six Nations": "6N",
   Starligue: "SLG",
   "Super Rugby": "SUPER",

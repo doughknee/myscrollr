@@ -65,7 +65,7 @@ const KNOWN: Record<string, string> = {
 };
 
 /** Leagues where "City Nickname" is the convention and the nickname identifies. */
-const US_PRO = new Set(["MLB", "NBA", "NHL", "NFL", "MLS", "AFL"]);
+const US_PRO = new Set(["MLB", "NBA", "NHL", "NFL", "MLS", "AFL", "NPB"]);
 
 /**
  * Institutional noise. The "X of" forms leave a space behind; the

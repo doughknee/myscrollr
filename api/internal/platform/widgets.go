@@ -95,6 +95,10 @@ const (
 	addedV110  = "2026-07-02" // v1.1.0: the catalog itself; every widget that predates it
 	addedV1110 = "2026-07-21" // v1.1.10: the sports and news expansion
 	addedV152  = "2026-09-05" // v1.5.2
+	// The Ultra-plan league expansion (REL-220). The desktop release that
+	// carries it had not been cut when this was written, so the day is the
+	// PR's date rather than a tag's.
+	addedV170 = "2026-09-06"
 )
 
 // Shared usage recipes — most widgets in a family follow the same steps, so
@@ -293,6 +297,139 @@ var catalog = []WidgetDef{
 		Description:   "Live Australian Football League scores.",
 		DefaultConfig: map[string]any{"leagues": []string{"AFL"}}, Usage: usageTeamSport,
 		About: "Live Australian Football League scores across the home-and-away season and finals.",
+	},
+
+	// Colours below are measured from each league's own mark (the modal
+	// colour of its favicon or official logo), never picked by hand.
+	{
+		ID: "sports_bundesliga", Name: "Bundesliga", Category: "sports", Source: "sports",
+		Group: "Soccer", AddedAt: addedV170,
+		Keywords: []string{"german", "germany", "soccer", "football"},
+		Color:    "#d20515", LogoURL: "https://icon.horse/icon/bundesliga.com",
+		Description:   "Live scores from Germany's Bundesliga.",
+		DefaultConfig: map[string]any{"leagues": []string{"Bundesliga"}}, Usage: usageTeamSport,
+		About: "Live scores from Germany's Bundesliga — all 18 clubs, every matchday.",
+	},
+	{
+		ID: "sports_seriea", Name: "Serie A", Category: "sports", Source: "sports",
+		Group: "Soccer", AddedAt: addedV170,
+		Keywords: []string{"italian", "italy", "soccer", "football"},
+		Color:    "#0473ff", LogoURL: "https://icon.horse/icon/legaseriea.it",
+		Description:   "Live scores from Italy's Serie A.",
+		DefaultConfig: map[string]any{"leagues": []string{"Serie A"}}, Usage: usageTeamSport,
+		About: "Live scores from Italy's Serie A, from the Scudetto race to the relegation fight.",
+	},
+	{
+		ID: "sports_ligue1", Name: "Ligue 1", Category: "sports", Source: "sports",
+		Group: "Soccer", AddedAt: addedV170,
+		Keywords: []string{"french", "france", "soccer", "football"},
+		Color:    "#085fff", LogoURL: "https://icon.horse/icon/ligue1.com",
+		Description:   "Live scores from France's Ligue 1.",
+		DefaultConfig: map[string]any{"leagues": []string{"Ligue 1"}}, Usage: usageTeamSport,
+		About: "Live scores from France's Ligue 1, every matchday of the season.",
+	},
+	{
+		// icon.horse returns its letter placeholder for every EuroLeague
+		// domain, so this is pinned to Google's favicon service, which serves
+		// the orange mark.
+		ID: "sports_euroleague", Name: "EuroLeague", Category: "sports", Source: "sports",
+		Group: "Basketball", AddedAt: addedV170,
+		Keywords:      []string{"europe", "european", "basketball"},
+		Color:         "#fa5500",
+		LogoURL:       "https://www.google.com/s2/favicons?domain=euroleague.net&sz=128",
+		Description:   "Live EuroLeague basketball scores.",
+		DefaultConfig: map[string]any{"leagues": []string{"EuroLeague"}}, Usage: usageTeamSport,
+		About: "Live EuroLeague scores through the regular season, the play-ins and playoffs, and the Final Four.",
+	},
+	{
+		ID: "sports_khl", Name: "KHL", Category: "sports", Source: "sports",
+		Group: "Hockey", AddedAt: addedV170,
+		Keywords: []string{"kontinental", "russia", "russian", "hockey"},
+		Color:    "#17272c", LogoURL: "https://icon.horse/icon/khl.ru",
+		Description:   "Live Kontinental Hockey League scores.",
+		DefaultConfig: map[string]any{"leagues": []string{"KHL"}}, Usage: usageTeamSport,
+		About: "Live KHL scores and period-by-period game state across the Kontinental Hockey League.",
+	},
+	{
+		ID: "sports_npb", Name: "NPB", Category: "sports", Source: "sports",
+		Group: "Baseball", AddedAt: addedV170,
+		Keywords: []string{"japan", "japanese", "nippon", "baseball"},
+		Color:    "#0091db", LogoURL: "https://icon.horse/icon/npb.jp",
+		Description:   "Live Nippon Professional Baseball scores.",
+		DefaultConfig: map[string]any{"leagues": []string{"NPB"}}, Usage: usageTeamSport,
+		About: "Live NPB scores and innings across the Central and Pacific Leagues, Japan Series included.",
+	},
+	{
+		ID: "sports_sixnations", Name: "Six Nations", Category: "sports", Source: "sports",
+		Group: "Rugby", AddedAt: addedV170,
+		Keywords: []string{"rugby", "rugby union", "6n"},
+		Color:    "#0d1c1c", LogoURL: "https://icon.horse/icon/sixnationsrugby.com",
+		Description:   "Live Six Nations rugby scores.",
+		DefaultConfig: map[string]any{"leagues": []string{"Six Nations"}}, Usage: usageTeamSport,
+		About: "Live Six Nations scores — five rounds every spring between England, France, Ireland, Italy, Scotland and Wales.",
+	},
+	{
+		ID: "sports_superrugby", Name: "Super Rugby", Category: "sports", Source: "sports",
+		Group: "Rugby", AddedAt: addedV170,
+		Keywords: []string{"rugby", "rugby union", "pacific", "australia", "new zealand"},
+		Color:    "#00245d", LogoURL: "https://icon.horse/icon/super.rugby",
+		Description:   "Live Super Rugby Pacific scores.",
+		DefaultConfig: map[string]any{"leagues": []string{"Super Rugby"}}, Usage: usageTeamSport,
+		About: "Live Super Rugby scores from Australia, New Zealand and the Pacific, through the regular season and the finals.",
+	},
+	{
+		ID: "sports_premrugby", Name: "Premiership Rugby", Category: "sports", Source: "sports",
+		Group: "Rugby", AddedAt: addedV170,
+		Keywords: []string{"rugby", "rugby union", "english", "england", "gallagher"},
+		Color:    "#2a2b6b", LogoURL: "https://icon.horse/icon/premiershiprugby.com",
+		Description:   "Live scores from England's Premiership Rugby.",
+		DefaultConfig: map[string]any{"leagues": []string{"Premiership Rugby"}}, Usage: usageTeamSport,
+		About: "Live Premiership Rugby scores — England's top flight, every round through to the final.",
+	},
+	{
+		ID: "sports_handballcl", Name: "Handball Champions League", Category: "sports", Source: "sports",
+		Group: "Handball", AddedAt: addedV170,
+		Keywords: []string{"handball", "ehf", "europe"},
+		Color:    "#001432", LogoURL: "https://icon.horse/icon/ehfcl.eurohandball.com",
+		Description:   "Live EHF Champions League handball scores.",
+		DefaultConfig: map[string]any{"leagues": []string{"Handball Champions League"}}, Usage: usageTeamSport,
+		About: "Live EHF Champions League scores through the group phase, the playoffs and the Final4.",
+	},
+	{
+		ID: "sports_hbl", Name: "Handball Bundesliga", Category: "sports", Source: "sports",
+		Group: "Handball", AddedAt: addedV170,
+		Keywords: []string{"handball", "german", "germany", "hbl"},
+		Color:    "#1d2f56", LogoURL: "https://icon.horse/icon/liquimoly-hbl.de",
+		Description:   "Live scores from Germany's Handball-Bundesliga.",
+		DefaultConfig: map[string]any{"leagues": []string{"Handball Bundesliga"}}, Usage: usageTeamSport,
+		About: "Live Handball-Bundesliga scores — Germany's top flight, every matchday.",
+	},
+	{
+		ID: "sports_starligue", Name: "Starligue", Category: "sports", Source: "sports",
+		Group: "Handball", AddedAt: addedV170,
+		Keywords: []string{"handball", "french", "france", "lnh"},
+		Color:    "#e42027", LogoURL: "https://icon.horse/icon/lnh.fr",
+		Description:   "Live scores from France's Starligue.",
+		DefaultConfig: map[string]any{"leagues": []string{"Starligue"}}, Usage: usageTeamSport,
+		About: "Live Starligue scores — France's top handball division, every round.",
+	},
+	{
+		ID: "sports_volleyballcl", Name: "Volleyball Champions League", Category: "sports", Source: "sports",
+		Group: "Volleyball", AddedAt: addedV170,
+		Keywords: []string{"volleyball", "cev", "europe"},
+		Color:    "#0000ff", LogoURL: "https://icon.horse/icon/championsleague.cev.eu",
+		Description:   "Live CEV Champions League volleyball scores.",
+		DefaultConfig: map[string]any{"leagues": []string{"Volleyball Champions League"}}, Usage: usageTeamSport,
+		About: "Live CEV Champions League scores, set by set, through the pools and the knockout rounds.",
+	},
+	{
+		ID: "sports_vnl", Name: "Volleyball Nations League", Category: "sports", Source: "sports",
+		Group: "Volleyball", AddedAt: addedV170,
+		Keywords: []string{"volleyball", "vnl", "fivb", "nations"},
+		Color:    "#bbeb00", LogoURL: "https://icon.horse/icon/volleyballworld.com",
+		Description:   "Live Volleyball Nations League scores.",
+		DefaultConfig: map[string]any{"leagues": []string{"Volleyball Nations League"}}, Usage: usageTeamSport,
+		About: "Live Volleyball Nations League scores, set by set, from the preliminary rounds to the finals.",
 	},
 
 	// ── News — curated feeds, each its own widget over the rss source ───
