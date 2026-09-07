@@ -11,7 +11,7 @@ use crate::database::{
     LeagueConfig, TrackedLeague, upsert_game, CleanedData, Team,
     StandingData, upsert_standing, TeamData, upsert_team,
 };
-pub use crate::types::{live_poll_interval_secs, RateLimiter, SportsHealth, DEFAULT_DAILY_QUOTA};
+pub use crate::types::{live_poll_interval_secs, HostQuota, RateLimiter, SportsHealth, DEFAULT_DAILY_QUOTA};
 
 pub mod log;
 pub mod database;

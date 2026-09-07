@@ -1,6 +1,6 @@
 use chrono::{DateTime, Datelike, Utc};
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::RwLock;
 
@@ -20,6 +20,16 @@ pub fn live_poll_interval_secs(daily_quota: u32, min_secs: u64, max_secs: u64) -
     (max_secs * pro / quota).clamp(min_secs.min(max_secs), max_secs)
 }
 
+/// One host's effective daily quota as `/health/ready` reports it (REL-222):
+/// the number the limiter is actually budgeting from and where it came from.
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct HostQuota {
+    pub daily_quota: u32,
+    pub remaining: u32,
+    /// "header" once `x-ratelimit-requests-limit` has been adopted, else "config".
+    pub source: &'static str,
+}
+
 #[derive(Serialize, Clone)]
 pub struct SportsHealth {
     pub status: String,
@@ -27,6 +37,10 @@ pub struct SportsHealth {
     pub leagues_active: u32,
     pub leagues_live: u32,
     pub rate_limits: Option<HashMap<String, u32>>,
+    /// Effective daily quota per host; empty until the limiter exists.
+    pub quota: BTreeMap<String, HostQuota>,
+    /// What live games poll at right now, derived from the effective quota.
+    pub live_poll_secs: Option<u64>,
     pub error_count: u64,
     pub last_error: Option<String>,
 }
@@ -45,6 +59,8 @@ impl SportsHealth {
             leagues_active: 0,
             leagues_live: 0,
             rate_limits: None,
+            quota: BTreeMap::new(),
+            live_poll_secs: None,
             error_count: 0,
             last_error: None,
         }
@@ -65,6 +81,12 @@ impl SportsHealth {
 
     pub fn set_rate_limits(&mut self, limits: HashMap<String, u32>) {
         self.rate_limits = Some(limits);
+    }
+
+    /// Publish the limiter's effective quota and the live cadence it earns.
+    pub fn set_quota(&mut self, quota: BTreeMap<String, HostQuota>, live_poll_secs: u64) {
+        self.quota = quota;
+        self.live_poll_secs = Some(live_poll_secs);
     }
 
     pub fn get_health(&self) -> Self {
@@ -106,6 +128,9 @@ pub struct RateLimiter {
     /// donated. Refreshed at construction and at each daily reset (the month
     /// can change at UTC midnight).
     offseason_leagues: RwLock<HashSet<String>>,
+    /// Hosts whose quota has been adopted from `x-ratelimit-requests-limit`,
+    /// so the health snapshot can say header vs config.
+    header_seen: RwLock<HashSet<String>>,
 }
 
 impl RateLimiter {
@@ -123,6 +148,7 @@ impl RateLimiter {
             league_to_host: HashMap::new(),
             host_shared: HashMap::new(),
             offseason_leagues: RwLock::new(HashSet::new()),
+            header_seen: RwLock::new(HashSet::new()),
         }
     }
 
@@ -155,6 +181,7 @@ impl RateLimiter {
             league_to_host,
             host_shared,
             offseason_leagues: RwLock::new(HashSet::new()),
+            header_seen: RwLock::new(HashSet::new()),
         };
         rl.reset_daily(leagues);
         rl
@@ -272,6 +299,9 @@ impl RateLimiter {
     /// fresh buckets down to what upstream says is actually left today.
     pub fn set_daily_quota(&self, host: &str, limit: u32) {
         let Some(slot) = self.host_limit.get(host) else { return };
+        if let Ok(mut seen) = self.header_seen.write() {
+            seen.insert(host.to_string());
+        }
         let prev = slot.swap(limit, Ordering::Relaxed);
         if prev != limit {
             crate::log::info!("[Rate Budget] {host}: daily quota {prev} → {limit} (x-ratelimit-requests-limit)");
@@ -302,6 +332,22 @@ impl RateLimiter {
         let mut v: Vec<String> = self.host_limit.keys().cloned().collect();
         v.sort();
         v
+    }
+
+    /// Per-host effective quota for `/health/ready`: what is being budgeted
+    /// from, what is left, and whether the number came from the plan header
+    /// or the config fallback.
+    pub fn quota_snapshot(&self) -> BTreeMap<String, HostQuota> {
+        let seen = self.header_seen.read().ok();
+        self.hosts().into_iter().map(|host| {
+            let from_header = seen.as_ref().is_some_and(|s| s.contains(&host));
+            let q = HostQuota {
+                daily_quota: self.daily_quota(&host),
+                remaining: self.remaining(&host),
+                source: if from_header { "header" } else { "config" },
+            };
+            (host, q)
+        }).collect()
     }
 
     // ── Legacy methods (preserved for the health endpoint + standings/teams polls) ──
@@ -739,6 +785,26 @@ mod tests {
         rl.set_daily_quota("football", 75_000);
         assert_eq!(rl.max_daily_quota(), 75_000); // hockey never saw a header
         assert_eq!(rl.hosts(), vec!["football".to_string(), "hockey".to_string()]);
+    }
+
+    #[test]
+    fn test_quota_snapshot_names_its_source() {
+        let leagues = vec![
+            make_league("NHL", "hockey", None),
+            make_league("Premier League", "football", None),
+        ];
+        let rl = RateLimiter::new_per_league(&leagues, 7500);
+        let config = HostQuota { daily_quota: 7500, remaining: 7500, source: "config" };
+        assert_eq!(rl.quota_snapshot()["football"], config);
+        assert_eq!(rl.quota_snapshot()["hockey"], config);
+
+        // Ultra header on football only: it flips to "header", hockey stays config.
+        rl.set_daily_quota("football", 75_000);
+        rl.update("football", 74_980);
+        let snap = rl.quota_snapshot();
+        assert_eq!(snap["football"], HostQuota { daily_quota: 75_000, remaining: 74_980, source: "header" });
+        assert_eq!(snap["hockey"], config);
+        assert_eq!(snap.keys().collect::<Vec<_>>(), vec!["football", "hockey"]); // stable order
     }
 
     #[test]

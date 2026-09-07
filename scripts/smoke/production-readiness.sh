@@ -260,6 +260,16 @@ for line in "${SERVICES[@]}"; do
 
     if echo "$result" | jq -e '.ok == true' >/dev/null; then
         green "OK (HTTP $(echo "$result" | jq -r '.status'))"
+        # Sports: show the effective api-sports daily quota per host so the
+        # deploy log proves which plan the ingester is budgeting from
+        # (REL-222). Informational only — never a failure condition.
+        if [[ "$svc" == "sports-service" ]]; then
+            echo "$result" | jq -r '
+                .body.health as $h
+                | ($h.quota // {}) | to_entries[]
+                | "    \(.key): quota \(.value.daily_quota) (\(.value.source)), remaining \(.value.remaining), live poll \($h.live_poll_secs // "?")s"
+            ' 2>/dev/null || true
+        fi
     else
         reason=$(echo "$result" | jq -r '.reason // "unknown"')
         status=$(echo "$result" | jq -r '.status // "n/a"')
