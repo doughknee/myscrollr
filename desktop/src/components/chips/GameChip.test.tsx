@@ -153,10 +153,12 @@ describe("GameChip", () => {
   });
 
   it("scales the clock to its length without touching the reserved width", () => {
-    const { rerender } = render(<GameChip game={game()} />); // final -> "FT"
+    // A live inning arrives as api-sports' "IN8" and reads "8th": three
+    // characters.
+    const { rerender } = render(<GameChip game={game({ state: "in", status_short: "IN8", status_long: "Inning 8" })} />);
     const short = screen.getByTestId("status-text");
-    expect(short.textContent).toBe("FT");
-    expect(short.className).toContain("text-[16px]");
+    expect(short.textContent).toBe("8th");
+    expect(short.className).toContain("text-[15px]");
     // The box that holds the width is the parent, still at 7ch.
     expect((short.parentElement as HTMLElement).style.minWidth).toBe("7ch");
 

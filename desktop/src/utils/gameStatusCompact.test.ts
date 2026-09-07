@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { gameStatusCompact, formatCountdownCompact } from "./gameHelpers";
 import type { Game } from "../types";
+import mlb from "./__fixtures__/mlb-game.production.json";
 
 // Only the fields the status helpers read.
 const game = (over: Partial<Game>): Game =>
@@ -26,22 +27,81 @@ afterEach(() => vi.useRealTimers());
 
 describe("gameStatusCompact", () => {
   // The roomy gameStatusLabel returns "Finished" and "in 3h 20m", which
-  // overflow the chip's 34px status column.
-  it("uses the period for a live game", () => {
-    expect(gameStatusCompact(game({ state: "in", status_short: "IN4" }))).toBe("IN4");
+  // overflow the chip's 34px status column. The codes below are what the
+  // ingester actually writes (channels/sports/service/src/lib.rs), per
+  // family; the dev clock (scripts/dev/live.sh) emits the same ones.
+  it("names a baseball inning by its ordinal, extras included", () => {
+    expect(gameStatusCompact(game({ state: "in", status_short: "IN1", status_long: "Inning 1" }))).toBe("1st");
+    expect(gameStatusCompact(game({ state: "in", status_short: "IN2" }))).toBe("2nd");
+    expect(gameStatusCompact(game({ state: "in", status_short: "IN3" }))).toBe("3rd");
+    expect(gameStatusCompact(game({ state: "in", status_short: "IN8", status_long: "Inning 8" }))).toBe("8th");
+    expect(gameStatusCompact(game({ state: "in", status_short: "IN10" }))).toBe("10th");
+    expect(gameStatusCompact(game({ state: "in", status_short: "IN12" }))).toBe("12th");
+  });
+
+  it("ignores the statsapi fallback's timer and still reads the inning", () => {
+    // REL-233's sweep writes status_short IN{n}, status_long "In Progress",
+    // timer "Inn n" — same word on the bar either way.
+    expect(
+      gameStatusCompact(game({ state: "in", status_short: "IN7", status_long: "In Progress", timer: "Inn 7" })),
+    ).toBe("7th");
+  });
+
+  it("does not print an inning it does not have", () => {
+    // The fallback writes IN0 before the linescore exists.
+    expect(gameStatusCompact(game({ state: "in", status_short: "IN0" }))).toBe("LIVE");
+  });
+
+  it("keeps the period code for sports that carry one", () => {
+    expect(gameStatusCompact(game({ sport: "american-football", state: "in", status_short: "Q3" }))).toBe("Q3");
+    expect(gameStatusCompact(game({ sport: "football", state: "in", status_short: "HT" }))).toBe("HT");
   });
 
   it("prefers a running timer when one exists", () => {
-    expect(gameStatusCompact(game({ state: "in", timer: "88'", status_short: "2H" }))).toBe("88'");
+    expect(gameStatusCompact(game({ sport: "football", state: "in", timer: "67′", status_short: "2H" }))).toBe("67′");
+    expect(
+      gameStatusCompact(game({ sport: "american-football", state: "in", timer: "04:32", status_short: "Q4" })),
+    ).toBe("04:32");
   });
 
-  it("shortens a finished game to two glyphs", () => {
-    // status_long is "Finished" — eight characters do not fit.
-    expect(gameStatusCompact(game({ state: "final", status_long: "Finished" }))).toBe("FT");
+  it("counts down to a game not started, in every sport", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-07T14:00:00Z"));
+    expect(gameStatusCompact(game({ state: "pre", status_short: "NS", start_time: "2026-09-07T17:05:00Z" }))).toBe("3h05");
   });
 
-  it("marks a postponed game", () => {
-    expect(gameStatusCompact(game({ state: "postponed" }))).toBe("PPD");
+  it("says Final, not the code", () => {
+    // status_long is "Finished" — eight characters do not fit; "FT" is
+    // soccer's word for it and means nothing at a ballpark.
+    expect(gameStatusCompact(game({ state: "final", status_short: "FT", status_long: "Finished" }))).toBe("Final");
+    expect(gameStatusCompact(game({ sport: "football", state: "final", status_short: "FT", timer: "90′" }))).toBe("Final");
+  });
+
+  it("marks postponed, delayed, cancelled and abandoned games by their code, whatever the state", () => {
+    expect(gameStatusCompact(game({ state: "postponed", status_short: "PST" }))).toBe("PPD");
+    // The ingester's state map does not know baseball's POST/INTR, so they
+    // arrive as "in"; the code is still the truth.
+    expect(gameStatusCompact(game({ state: "in", status_short: "POST", status_long: "Postponed" }))).toBe("PPD");
+    expect(gameStatusCompact(game({ state: "in", status_short: "INTR", status_long: "Interrupted" }))).toBe("Delay");
+    expect(gameStatusCompact(game({ state: "pre", status_short: "CANC", status_long: "Cancelled" }))).toBe("CANC");
+    expect(gameStatusCompact(game({ state: "final", status_short: "ABD", status_long: "Abandoned" }))).toBe("ABD");
+  });
+
+  it("renders production-shaped MLB rows as the bar shows them", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-07T14:00:00Z"));
+    const rows = mlb as unknown as Record<"pre" | "live" | "final", Game>;
+    expect({
+      pre: gameStatusCompact(rows.pre),
+      live: gameStatusCompact(rows.live),
+      final: gameStatusCompact(rows.final),
+    }).toMatchInlineSnapshot(`
+      {
+        "final": "Final",
+        "live": "8th",
+        "pre": "3h05",
+      }
+    `);
   });
 });
 

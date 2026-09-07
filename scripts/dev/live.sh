@@ -55,19 +55,37 @@ fi
 # script of events, so a second run is a different evening. A quoted heredoc,
 # so it is plain SQL: '' is a literal apostrophe, nothing here is bash.
 TICK_SQL=$(cat <<'SQL'
+-- Status fields are exactly what the ingester writes (channels/sports/
+-- service/src/lib.rs: the per-sport parsers and build_detail), so the
+-- chip's formatter is exercised against production vocabulary, not a dev
+-- dialect. api-sports codes: baseball IN1..IN9 with status_long
+-- "Inning n" and no timer (top/bottom is not in the payload); NFL "Q1".."Q4"
+-- with a "mm:ss" timer; soccer "1H"/"HT"/"2H" with a "67′" timer;
+-- short_detail is "<code> · <timer>" when there is a timer, else the long
+-- status. Finals: "FT" / "Finished" ("Match Finished" for soccer).
+--
 -- 1. Kick off: anything scheduled and past due is now in play.
 UPDATE games SET
   state = 'in',
   home_team_score = 0, away_team_score = 0,
   status_short = CASE sport
-    WHEN 'baseball' THEN 'T1'
-    WHEN 'american-football' THEN 'Q1 15:00'
-    WHEN 'football' THEN '1'''
+    WHEN 'baseball' THEN 'IN1'
+    WHEN 'american-football' THEN 'Q1'
+    WHEN 'football' THEN '1H'
     WHEN 'formula-1' THEN 'L1'
     WHEN 'mma' THEN 'R1'
     WHEN 'afl' THEN 'Q1'
     ELSE 'LIVE' END,
-  short_detail = 'In Progress', status_long = 'In Progress',
+  timer = CASE sport
+    WHEN 'american-football' THEN '15:00'
+    WHEN 'football' THEN '1′'
+    ELSE NULL END,
+  status_long = CASE sport WHEN 'baseball' THEN 'Inning 1' ELSE 'In Progress' END,
+  short_detail = CASE sport
+    WHEN 'baseball' THEN 'Inning 1'
+    WHEN 'american-football' THEN 'Q1 · 15:00'
+    WHEN 'football' THEN '1H · 1′'
+    ELSE 'In Progress' END,
   updated_at = now()
 WHERE state = 'pre' AND start_time <= now() AND start_time > now() - interval '6 hours';
 
@@ -89,27 +107,50 @@ WITH live AS (
          random() < (:tick / 15.0) * CASE l.sport WHEN 'baseball' THEN 0.0066 WHEN 'american-football' THEN 0.0053
                                  WHEN 'football' THEN 0.0030 WHEN 'afl' THEN 0.048 ELSE 0.0 END AS away_scores,
          CASE l.sport WHEN 'american-football' THEN (ARRAY[3,7,7,6])[1 + floor(random()*4)::int]
-                      WHEN 'afl' THEN (ARRAY[1,6,6])[1 + floor(random()*3)::int] ELSE 1 END AS pts
+                      WHEN 'afl' THEN (ARRAY[1,6,6])[1 + floor(random()*3)::int] ELSE 1 END AS pts,
+         -- The clock, in each sport's own units: an inning every 20 min;
+         -- a quarter every 45 with a counting-down "mm:ss"; 110 real
+         -- minutes compressed to 90 of soccer with the break at 45.
+         least(9, 1 + floor(l.mins/20))::int AS inning,
+         least(4, 1 + floor(l.mins/45))::int AS quarter,
+         lpad((14 - (floor(l.mins)::int % 15))::text, 2, '0') || ':' || lpad((59 - (floor(l.mins*7)::int % 60))::text, 2, '0') AS clock,
+         least(90, floor(l.mins * 0.85))::int AS minute
   FROM live l
+), status AS (
+  SELECT r.*,
+         CASE r.sport
+           WHEN 'baseball' THEN 'IN' || r.inning
+           WHEN 'american-football' THEN 'Q' || r.quarter
+           WHEN 'football' THEN CASE WHEN r.minute < 45 THEN '1H' WHEN r.minute < 50 THEN 'HT' ELSE '2H' END
+           WHEN 'formula-1' THEN 'L' || least(57, 1 + floor(r.mins/1.8))::text
+           WHEN 'mma' THEN 'R' || least(5, 1 + floor(r.mins/5))::text
+           WHEN 'afl' THEN 'Q' || least(4, 1 + floor(r.mins/30))::text
+           ELSE 'LIVE' END AS short,
+         CASE r.sport
+           WHEN 'american-football' THEN r.clock
+           WHEN 'football' THEN (CASE WHEN r.minute < 50 THEN least(45, r.minute) ELSE r.minute END)::text || '′'
+           ELSE NULL END AS timer
+  FROM roll r
 )
 UPDATE games g SET
-  home_team_score = g.home_team_score + CASE WHEN r.home_scores THEN r.pts ELSE 0 END,
-  away_team_score = g.away_team_score + CASE WHEN r.away_scores THEN r.pts ELSE 0 END,
-  status_short = CASE r.sport
-    WHEN 'baseball' THEN (CASE WHEN (floor(r.mins/10)::int % 2) = 0 THEN 'T' ELSE 'B' END) || least(9, 1 + floor(r.mins/20))::text
-    WHEN 'american-football' THEN 'Q' || least(4, 1 + floor(r.mins/45))::text || ' '
-         || lpad((14 - (floor(r.mins)::int % 15))::text, 2, '0') || ':' || lpad((59 - (floor(r.mins*7)::int % 60))::text, 2, '0')
-    WHEN 'football' THEN least(90, floor(r.mins * 0.85))::int::text || ''''
-    WHEN 'formula-1' THEN 'L' || least(57, 1 + floor(r.mins/1.8))::text
-    WHEN 'mma' THEN 'R' || least(5, 1 + floor(r.mins/5))::text
-    WHEN 'afl' THEN 'Q' || least(4, 1 + floor(r.mins/30))::text
-    ELSE 'LIVE' END,
+  home_team_score = g.home_team_score + CASE WHEN s.home_scores THEN s.pts ELSE 0 END,
+  away_team_score = g.away_team_score + CASE WHEN s.away_scores THEN s.pts ELSE 0 END,
+  status_short = s.short,
+  timer = s.timer,
+  status_long = CASE s.sport WHEN 'baseball' THEN 'Inning ' || s.inning ELSE g.status_long END,
+  short_detail = CASE
+    WHEN s.timer IS NOT NULL THEN s.short || ' · ' || s.timer
+    WHEN s.sport = 'baseball' THEN 'Inning ' || s.inning
+    ELSE g.short_detail END,
   updated_at = now()
-FROM roll r WHERE g.id = r.id;
+FROM status s WHERE g.id = s.id;
 
 -- 3. Full time: past the sport's length, the game is a result.
 UPDATE games SET
-  state = 'final', status_short = 'FT', short_detail = 'Final', status_long = 'Match Finished',
+  state = 'final', status_short = 'FT',
+  status_long = CASE sport WHEN 'football' THEN 'Match Finished' ELSE 'Finished' END,
+  short_detail = CASE sport WHEN 'football' THEN 'Match Finished' ELSE 'Finished' END,
+  timer = CASE sport WHEN 'football' THEN '90′' ELSE NULL END,
   updated_at = now()
 WHERE state = 'in' AND now() - start_time > CASE sport
   WHEN 'baseball' THEN interval '170 minutes'
