@@ -108,6 +108,11 @@ func main() {
 	// (REL-245). No-op when Discord isn't configured.
 	support.StartSupportDigest(ctx)
 
+	// Sends the drafts whose hold has run out (REL-249). This is what makes
+	// doing nothing the thing that answers a user, so it runs wherever the
+	// support pipeline does.
+	support.StartAutoSendSweeper(ctx)
+
 	// Build and start the gateway server
 	srv := core.NewServer()
 	srv.Setup()

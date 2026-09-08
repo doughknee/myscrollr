@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"time"
 	_ "time/tzdata" // the scratch-based api image carries no zoneinfo
@@ -92,7 +93,16 @@ type digestStats struct {
 	Sent      int
 	Edited    int
 	Skipped   int
+	// REL-249: what happened without anyone watching, and whether the bot is
+	// still earning the right to do it.
+	Unattended int                    // replies that went out yesterday with nobody in the loop
+	Escalated  int                    // drafts that refused to send and asked for a person
+	Rates      []categoryIntervention // per-category intervention rate, worst first
 }
+
+// triageCategories is the classifier's enum. Fixed, so the digest can report a
+// rate per category without a DISTINCT scan.
+var triageCategories = []string{"bug", "feature", "feedback", "billing", "account", "widget"}
 
 type staleDraft struct {
 	TicketNumber string
@@ -103,7 +113,8 @@ type staleDraft struct {
 // Empty reports whether there is nothing worth posting. An empty queue and
 // a quiet yesterday means no digest at all.
 func (d digestStats) Empty() bool {
-	return d.Pending == 0 && d.Sent == 0 && d.Edited == 0 && d.Skipped == 0
+	return d.Pending == 0 && d.Sent == 0 && d.Edited == 0 && d.Skipped == 0 &&
+		d.Unattended == 0 && d.Escalated == 0
 }
 
 // collectDigestStats reads the queue state in three queries.
@@ -129,12 +140,30 @@ func collectDigestStats(ctx context.Context, loc *time.Location) (digestStats, e
 			(SELECT COUNT(*) FROM support_drafts
 			  WHERE status = 'edited' AND decided_at >= $1 AND decided_at < $2),
 			(SELECT COUNT(*) FROM support_drafts
-			  WHERE status = 'skipped' AND decided_at >= $1 AND decided_at < $2)
+			  WHERE status = 'skipped' AND decided_at >= $1 AND decided_at < $2),
+			(SELECT COUNT(*) FROM support_drafts
+			  WHERE disposition IN ('auto_send', 'auto_ask', 'auto_close')
+			    AND intervened = false
+			    AND status IN ('approved', 'sent', 'asked')
+			    AND decided_at >= $1 AND decided_at < $2),
+			(SELECT COUNT(*) FROM support_drafts
+			  WHERE disposition = 'escalate' AND created_at >= $1 AND created_at < $2)
 	`
 	if err := platform.DBPool.QueryRow(ctx, counts, yesterdayStart, dayStart).Scan(
-		&s.Pending, &s.FollowUps, &s.Sent, &s.Edited, &s.Skipped); err != nil {
+		&s.Pending, &s.FollowUps, &s.Sent, &s.Edited, &s.Skipped,
+		&s.Unattended, &s.Escalated); err != nil {
 		return s, fmt.Errorf("digest counts: %w", err)
 	}
+
+	// The rates the bot is judged on. Only categories with a window worth
+	// reading are listed: a rate over two drafts is noise, and printing it
+	// every morning would make it look like a number.
+	for _, category := range triageCategories {
+		if ci := interventionRate(ctx, category); ci.Window >= demoteMinSample {
+			s.Rates = append(s.Rates, ci)
+		}
+	}
+	sort.Slice(s.Rates, func(i, j int) bool { return s.Rates[i].Rate > s.Rates[j].Rate })
 
 	const stale = `
 		SELECT ticket_number, COALESCE(NULLIF(ai_summary,''), original_subject, ''), created_at
@@ -189,7 +218,22 @@ func renderDigest(s digestStats, day time.Time) string {
 	}
 
 	fmt.Fprintf(&b, "\n**Yesterday:** %d sent · %d edited · %d skipped\n", s.Sent, s.Edited, s.Skipped)
-	b.WriteString("\n`/inbox` to work the queue · `/search <text>` to look something up")
+	fmt.Fprintf(&b, "🤖 **%d went out unattended** · 🚨 %d escalated\n", s.Unattended, s.Escalated)
+
+	// The number that decides whether the hold drops from 60 minutes to 15,
+	// and the number that takes a category's autonomy away.
+	if len(s.Rates) > 0 {
+		fmt.Fprintf(&b, "\n**Intervention rate** (last %d auto-eligible drafts per category):\n", demoteWindow)
+		for _, r := range s.Rates {
+			line := fmt.Sprintf("• `%s` — %.0f%% (%d of %d)", r.Category, r.Rate*100, r.Interventions, r.Window)
+			if r.Demoted {
+				line += fmt.Sprintf("  ⛔ **demoted** — every `%s` escalates until `/resume %s`", r.Category, r.Category)
+			}
+			b.WriteString(line + "\n")
+		}
+	}
+
+	b.WriteString("\n`/inbox` to work the queue · `/search <text>` to look something up · `/pause` to stop unattended sends")
 	return b.String()
 }
 

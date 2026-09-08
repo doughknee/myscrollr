@@ -1,6 +1,7 @@
 package support
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -230,9 +231,14 @@ func TestButtonsRideOnTheLastMessage(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, rest := buildDraftMessages(tc.draft, true)
+			// Five per row is Discord's maximum, and REL-249's Hold makes
+			// six, so "File as bug" moved to a row of its own.
 			buttons := buildDraftActionButtons(tc.draft.ID)
-			if len(buttons) != 1 || len(buttons[0].Components) != 5 {
-				t.Fatalf("expected one row of 5 buttons, got %d row(s)", len(buttons))
+			if len(buttons) != 2 || len(buttons[0].Components) != 5 || len(buttons[1].Components) != 1 {
+				t.Fatalf("expected rows of 5 and 1 buttons, got %d row(s)", len(buttons))
+			}
+			if buttons[0].Components[1].CustomID != fmt.Sprintf("support_hold:%d", tc.draft.ID) {
+				t.Errorf("Hold is not the second button: %+v", buttons[0].Components[1].CustomID)
 			}
 			// notifyDiscordForDraft attaches `buttons` to rest's last entry
 			// when rest is non-empty, and to the starter otherwise. Assert

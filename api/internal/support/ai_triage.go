@@ -61,14 +61,23 @@ type TriageResult struct {
 	Summary     string
 	DuplicateOf string
 	NeedsInfo   bool
+	// Sentiment is the classifier's read of the user's tone (REL-249). An
+	// angry or frustrated reporter is escalated rather than answered
+	// automatically — it is the trigger a support system most needs.
+	Sentiment string
 
 	// From the drafter.
 	DraftReplyHTML string
 	Confidence     string
-	GroundedIn     []string
-	Unknowns       []string
-	AskUserFor     []string
-	InternalNote   string
+	// DrafterCategory is what the drafting call thought it was answering.
+	// The server escalates when it disagrees with the classifier's Category:
+	// two models reading the same ticket differently is the cheapest signal
+	// there is that the ticket is ambiguous.
+	DrafterCategory string
+	GroundedIn      []string
+	Unknowns        []string
+	AskUserFor      []string
+	InternalNote    string
 
 	// ShouldClose is true only when BOTH calls agree the user has told us
 	// the issue is resolved. Closing a ticket is the one triage decision
@@ -163,6 +172,7 @@ func triageTicket(ctx context.Context, input TriageInput) *TriageResult {
 		Summary:     cls.Summary,
 		DuplicateOf: cls.DuplicateOf,
 		NeedsInfo:   cls.NeedsInfo,
+		Sentiment:   cls.Sentiment,
 		Usage:       clsUsage,
 	}
 
@@ -172,6 +182,7 @@ func triageTicket(ctx context.Context, input TriageInput) *TriageResult {
 		return result
 	}
 	result.DraftReplyHTML = draft.ReplyHTML
+	result.DrafterCategory = draft.Category
 	result.Confidence = draft.Confidence
 	result.GroundedIn = draft.GroundedIn
 	result.Unknowns = draft.Unknowns
@@ -183,8 +194,8 @@ func triageTicket(ctx context.Context, input TriageInput) *TriageResult {
 	result.Usage.CacheRead += draftUsage.CacheRead
 	result.Usage.CacheWrite += draftUsage.CacheWrite
 
-	log.Printf("[Triage] OK: category=%s priority=%s confidence=%s needs_info=%t summary=%q usage=[%s]",
-		result.Category, result.Priority, result.Confidence, result.NeedsInfo, result.Summary, result.Usage)
+	log.Printf("[Triage] OK: category=%s priority=%s confidence=%s sentiment=%s needs_info=%t summary=%q usage=[%s]",
+		result.Category, result.Priority, result.Confidence, result.Sentiment, result.NeedsInfo, result.Summary, result.Usage)
 	return result
 }
 
@@ -198,6 +209,7 @@ type classification struct {
 	DuplicateOf string `json:"duplicate_of"`
 	ShouldClose bool   `json:"should_close"`
 	NeedsInfo   bool   `json:"needs_info"`
+	Sentiment   string `json:"sentiment"`
 }
 
 var classifyTool = map[string]interface{}{
@@ -234,8 +246,14 @@ var classifyTool = map[string]interface{}{
 				"type":        "boolean",
 				"description": "True when this is a bug report and we cannot troubleshoot it with what we have: no OS, no app version, or no description of what actually happened.",
 			},
+			"sentiment": map[string]interface{}{
+				"type": "string",
+				"enum": []string{"calm", "frustrated", "angry"},
+				"description": "How the user sounds. frustrated: they are visibly out of patience, or this has gone on. " +
+					"angry: they are hostile, threatening to leave, or writing in anger. calm otherwise, including a blunt bug report.",
+			},
 		},
-		"required": []string{"category", "priority", "summary", "widget", "duplicate_of", "should_close", "needs_info"},
+		"required": []string{"category", "priority", "summary", "widget", "duplicate_of", "should_close", "needs_info", "sentiment"},
 	},
 }
 
@@ -262,6 +280,7 @@ func classifyTicket(ctx context.Context, in TriageInput) (*classification, Triag
 
 type replyDraft struct {
 	ReplyHTML    string   `json:"reply_html"`
+	Category     string   `json:"category"`
 	Confidence   string   `json:"confidence"`
 	GroundedIn   []string `json:"grounded_in"`
 	Unknowns     []string `json:"unknowns"`
@@ -279,6 +298,12 @@ var draftTool = map[string]interface{}{
 			"reply_html": map[string]interface{}{
 				"type":        "string",
 				"description": "The reply to the user, as HTML paragraphs. Ends with the two sign-off lines.",
+			},
+			"category": map[string]interface{}{
+				"type": "string",
+				"enum": []string{"bug", "feature", "feedback", "billing", "account", "widget"},
+				"description": "What YOU think this ticket is, having written the reply. Answer independently: " +
+					"the triage block above is what another pass decided, and disagreeing with it is useful information.",
 			},
 			"confidence": map[string]interface{}{
 				"type": "string",
@@ -310,7 +335,7 @@ var draftTool = map[string]interface{}{
 				"description": "For the partner reviewing this draft. Never shown to the user. When the ticket matches a known open issue, this is its issue key. Empty when there is nothing to add.",
 			},
 		},
-		"required": []string{"reply_html", "confidence", "grounded_in", "unknowns", "ask_user_for", "should_close", "internal_note"},
+		"required": []string{"reply_html", "category", "confidence", "grounded_in", "unknowns", "ask_user_for", "should_close", "internal_note"},
 	},
 }
 

@@ -216,6 +216,10 @@ func HandleSupportEditSubmit(c *fiber.Ctx) error {
 		log.Printf("[Approval] markDraftDecided: %v", err)
 		return errorHTMLResponse(c, fiber.StatusInternalServerError, "Failed to save decision")
 	}
+	// Counts against the category's autonomy the same way the Discord
+	// Edit button does: the record is about the draft needing a person,
+	// not about which surface the person used (REL-249).
+	markIntervened(c.Context(), draft.ID)
 
 	if err := sendApprovedReply(c.Context(), draft, editedBody); err != nil {
 		markDraftFailed(c.Context(), draft.ID)
@@ -259,6 +263,7 @@ func handleApprovalAction(c *fiber.Ctx, action string) error {
 			}
 			return errorHTMLResponse(c, fiber.StatusInternalServerError, "Failed to save decision")
 		}
+		markIntervened(c.Context(), draft.ID)
 		return successHTMLResponse(c, "Skipped. The ticket is open in osTicket; handle it manually.")
 	default:
 		return errorHTMLResponse(c, fiber.StatusBadRequest, "Unknown action")
