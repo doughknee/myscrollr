@@ -1,0 +1,213 @@
+<!--
+  app-shim.html — the main window WITHOUT Tauri, for verifying REL-238.
+
+  Serve with `npx vite --port 5180` and open /app-shim.html in any browser.
+  A fake __TAURI_INTERNALS__ supplies an in-memory store and a stub
+  plugin:http, seeded to reproduce the production failure exactly:
+
+    scrollr:auth looks valid on disk (expiresAt is a day out)
+      → GET  /dashboard                 401  invalid or expired token
+      → POST /extension/token/refresh   400  invalid_grant, refresh expired
+      → clearAuth() deletes scrollr:auth
+      → GET  /public/feed               200  app still renders, looks healthy
+
+  Before the fix that ended with a silent dead session and one toast per
+  write. Now it ends with the session-expired banner and a Sign in CTA.
+  `window.__shimCalls` holds the full invoke trace. Dev-only; not a build
+  input (vite builds index/app/identify).
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scrollr</title>
+    <script>
+      // Pre-paint theme resolution to prevent dark-flash on light-system users
+      // AND to honour the user's chosen theme family (Catppuccin, Dracula, …).
+      //
+      // Reads a small mirror written to localStorage by useTheme on every
+      // theme change. Two formats are tolerated:
+      //
+      //   1. Current format (multi-theme):
+      //        { family: "catppuccin", mode: "system" }
+      //   2. Legacy format (pre-multi-theme):
+      //        "light" | "dark" | "system"
+      //
+      // Falls back to Scrollr + system if no mirror exists yet (first launch).
+      // Sets data-theme on <html> before React or any stylesheet paints so
+      // the body background matches the resolved theme.
+      (function () {
+        var KNOWN_FAMILIES = [
+          "scrollr",
+          "catppuccin",
+          "dracula",
+          "tokyo-night",
+          "nord",
+          "gruvbox",
+          "solarized",
+          "rose-pine",
+          "one",
+          "everforest",
+        ];
+
+        function resolveMode(mode) {
+          if (mode === "light" || mode === "dark") return mode;
+          // mode === "system" or anything else -> use OS preference
+          return window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+        }
+
+        var family = "scrollr";
+        var mode = "system";
+        try {
+          var saved = localStorage.getItem("scrollr:theme-mirror");
+          if (saved) {
+            if (saved.charAt(0) === "{") {
+              // New JSON format.
+              var parsed = JSON.parse(saved);
+              if (parsed && typeof parsed === "object") {
+                if (KNOWN_FAMILIES.indexOf(parsed.family) !== -1) {
+                  family = parsed.family;
+                }
+                if (
+                  parsed.mode === "light" ||
+                  parsed.mode === "dark" ||
+                  parsed.mode === "system"
+                ) {
+                  mode = parsed.mode;
+                }
+              }
+            } else if (saved === "light" || saved === "dark" || saved === "system") {
+              // Legacy format from pre-multi-theme builds.
+              mode = saved;
+            }
+          }
+        } catch (e) {
+          // Defensive: any failure -> Scrollr + system default.
+        }
+
+        var resolvedMode = resolveMode(mode);
+        document.documentElement.setAttribute(
+          "data-theme",
+          family + "-" + resolvedMode,
+        );
+        // Also expose the resolved mode separately so the inline style
+        // block below can paint the correct background colour without
+        // having to enumerate every family.
+        document.documentElement.setAttribute("data-mode", resolvedMode);
+      })();
+    </script>
+    <style>
+      /* Prevent flash on load — paint a sane background that matches the
+         resolved mode. Per-family backgrounds are applied by style.css
+         once the stylesheet loads; this just covers the brief gap. */
+      html, body { margin: 0; padding: 0; }
+      html[data-mode="dark"], html[data-mode="dark"] body { background: #141420; }
+      html[data-mode="light"], html[data-mode="light"] body { background: #ffffff; }
+    </style>
+  </head>
+    <script>
+      // ── REL-238 verification shim ─────────────────────────────────
+      // Runs the main window in a plain browser with no Tauri. Seeds a
+      // session that LOOKS valid on disk, then has the server reject it
+      // (401) and Logto refuse the refresh (400 invalid_grant) — exactly
+      // Brandon's production picture on 1.6.1.
+      (function () {
+        var label = "main";
+        var store = new Map([
+          ["scrollr:store-migrated", true],
+          ["scrollr:auth", {
+            accessToken: "expired.access.token",
+            refreshToken: "expired-refresh-token",
+            // Looks fresh on disk — the whole point. The server disagrees.
+            expiresAt: Date.now() + 864e5,
+            userSub: "logto|rel238",
+          }],
+        ]);
+
+        var bodies = new Map();
+        var nextRid = 1;
+
+        function reply(url) {
+          if (/\/extension\/token\/refresh/.test(url)) {
+            // Logto: the refresh token is expired too. This is the branch
+            // that runs clearAuth() and leaves the app with no session.
+            return [400, '{"error":"invalid_grant","error_description":"refresh token expired"}'];
+          }
+          if (/\/dashboard/.test(url)) {
+            return [401, '{"status":"error","error":"Invalid or expired token"}'];
+          }
+          if (/\/public\/feed/.test(url)) {
+            // The fallback that keeps the app looking healthy.
+            return [200, '{"data":{}}'];
+          }
+          if (/\/catalog/.test(url)) return [200, '{"widgets":[]}'];
+          if (/\/health/.test(url)) return [200, '{"status":"healthy","database":"healthy","redis":"healthy","services":{}}'];
+          return [500, '{"error":"not stubbed"}'];
+        }
+
+        window.__shimCalls = [];
+        function invoke(cmd, args) {
+          window.__shimCalls.push(cmd + " " + JSON.stringify(args || {}).slice(0, 160));
+          if (cmd.indexOf("plugin:event|") === 0) return Promise.resolve(1);
+          if (cmd === "plugin:store|load" || cmd === "plugin:store|get_store") return Promise.resolve(1);
+          if (cmd === "plugin:store|entries") return Promise.resolve([...store.entries()]);
+          if (cmd === "plugin:store|keys") return Promise.resolve([...store.keys()]);
+          if (cmd === "plugin:store|get") {
+            var v = store.get(args.key);
+            return Promise.resolve([v, v !== undefined]);
+          }
+          if (cmd === "plugin:store|set") { store.set(args.key, args.value); return Promise.resolve(); }
+          if (cmd === "plugin:store|delete") { store.delete(args.key); return Promise.resolve(true); }
+          if (cmd === "plugin:store|save" || cmd === "plugin:store|reload") return Promise.resolve();
+          if (cmd === "plugin:http|fetch") {
+            var rid = nextRid++;
+            bodies.set(rid, args.clientConfig.url);
+            return Promise.resolve(rid);
+          }
+          if (cmd === "plugin:http|fetch_send") {
+            var url = bodies.get(args.rid);
+            var r = reply(url);
+            bodies.set(args.rid, r[1]);
+            return Promise.resolve({
+              status: r[0], statusText: "", url: url,
+              headers: [["content-type", "application/json"]], rid: args.rid,
+            });
+          }
+          if (cmd === "plugin:http|fetch_read_body") {
+            var body = bodies.get(args.rid);
+            if (typeof body === "string") {
+              bodies.set(args.rid, null);
+              return Promise.resolve([...new TextEncoder().encode(body), 0]);
+            }
+            return Promise.resolve([1]);
+          }
+          if (cmd === "get_system_info") {
+            return Promise.resolve({ cpu_usage: 12, memory_used: 8e9, memory_total: 32e9, disk_used: 2e11, disk_total: 1e12 });
+          }
+          window.__shimCalls.push("!! UNHANDLED " + cmd);
+          return Promise.reject("shim: no handler for " + cmd);
+        }
+
+        window.__TAURI_INTERNALS__ = {
+          metadata: {
+            currentWindow: { label: label },
+            currentWebview: { label: label, windowLabel: label },
+            windows: [{ label: label }],
+            webviews: [{ label: label, windowLabel: label }],
+          },
+          transformCallback: function () { return Math.floor(Math.random() * 1e9); },
+          convertFileSrc: function (p) { return p; },
+          postMessage: function () {},
+          unregisterListener: function () {},
+          invoke: invoke,
+        };
+      })();
+    </script>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/app-main.tsx"></script>
+  </body>
+</html>

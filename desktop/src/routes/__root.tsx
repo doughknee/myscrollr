@@ -84,7 +84,7 @@ import { useDeliveryHealth } from "../hooks/useDeliveryHealth";
 import { useNavHistory } from "../hooks/useNavHistory";
 import { useStartupUpdateCheck } from "../hooks/useStartupUpdateCheck";
 import { weatherQueryOptions } from "../api/queries";
-import { fetchSubscription } from "../api/client";
+import { fetchSubscription, ApiError } from "../api/client";
 import { useToggleOnTicker } from "../hooks/useToggleOnTicker";
 import { isOnTicker } from "../utils/tickerMembership";
 import { queryKeys } from "../api/queries";
@@ -379,8 +379,16 @@ function RootLayout() {
   // users land directly on /feed which renders an empty hero card.
   // Demo mode (VITE_DEMO=1) bypasses the Logto auth wall so the live Kalshi
   // demo runs signed-out against the no-auth bridge. Strictly dev-only.
-  const showAuthGate = !auth.authenticated && !DEMO;
-  const showApp = auth.authenticated || DEMO;
+  //
+  // `sessionExpired` holds the shell open. Without it the banner below is
+  // unreachable code: it renders inside `showApp`, but the only things that
+  // set `sessionExpired` also set `authenticated` false, which swaps the
+  // whole shell for the full-screen gate in the same commit. A session that
+  // dies mid-use should be recoverable where the user is standing — banner,
+  // one "Sign in", back to work — not by throwing their view away. A fresh
+  // install (never authenticated, never expired) still gets the gate.
+  const showAuthGate = !auth.authenticated && !auth.sessionExpired && !DEMO;
+  const showApp = auth.authenticated || auth.sessionExpired || DEMO;
 
   // ── SSE status tracking ─────────────────────────────────────
   // Listen directly for SSE status events from the Rust backend.
@@ -585,8 +593,25 @@ function RootLayout() {
     getPrefs: () => prefsRef.current,
     persistPrefs,
     onError: (id, on, err) => {
-      console.error("[Scrollr] Widget toggle failed:", err);
-      toast.error(`Couldn't ${on ? "show" : "hide"} ${catalogItemById(id)?.name ?? id}`);
+      // Status + the server's own `error` string, because "Widget toggle
+      // failed: ApiError" cost hours on REL-238: the console said nothing
+      // about WHICH failure it was and the server logged nothing at all.
+      const status = err instanceof ApiError ? err.status : undefined;
+      console.error(
+        `[Scrollr] Widget toggle failed: ${on ? "show" : "hide"} ${id}` +
+          (status ? ` — HTTP ${status}` : "") +
+          (err instanceof Error ? `: ${err.message}` : ""),
+        err,
+      );
+      const name = catalogItemById(id)?.name ?? id;
+      // A 401 is not "that widget wouldn't budge", it is "you are signed
+      // out". The session-expired banner is already up by now (authFetch
+      // fires notifySessionExpired); this stops the toast contradicting it.
+      toast.error(
+        status === 401
+          ? `Your session expired — sign in again to change ${name}`
+          : `Couldn't ${on ? "show" : "hide"} ${name}`,
+      );
     },
   });
   const handleToggleItemTicker = useCallback(

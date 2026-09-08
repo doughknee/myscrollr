@@ -218,6 +218,24 @@ function extractSub(jwt: string): string | null {
 }
 
 /**
+ * When the access token actually expires.
+ *
+ * `expires_in` is a duration measured against OUR clock at the moment the
+ * response lands; the JWT's own `exp` is the absolute instant every API
+ * replica checks. When the two disagree — a system clock that was wrong at
+ * save time and later corrected, a suspended laptop, a slow exchange —
+ * `Date.now() + expires_in` can sit comfortably in the future while the
+ * token is already dead. getValidToken() then hands that corpse to every
+ * request, never refreshes it (it looks fresh), and the server answers 401
+ * with "token is expired". That is how a session gets stuck (REL-238).
+ * Prefer `exp`; fall back to `expires_in` only when the JWT has none.
+ */
+function expiryOf(accessToken: string, expiresIn: number): number {
+  const exp = decodeJwtPayload(accessToken)?.exp;
+  return typeof exp === "number" ? exp * 1000 : Date.now() + expiresIn * 1000;
+}
+
+/**
  * Extract the subscription tier from the JWT's `roles` claim.
  * Logto injects roles via Custom JWT (e.g. ["uplink_ultimate"]).
  *
@@ -448,7 +466,7 @@ export async function login(): Promise<AuthState | null> {
     const authState: AuthState = {
       accessToken: tokenRes.access_token,
       refreshToken: tokenRes.refresh_token ?? null,
-      expiresAt: Date.now() + tokenRes.expires_in * 1000,
+      expiresAt: expiryOf(tokenRes.access_token, tokenRes.expires_in),
       userSub: extractSub(tokenRes.access_token),
     };
 
@@ -531,7 +549,7 @@ async function doRefresh(refreshToken: string): Promise<string | null> {
     const authState: AuthState = {
       accessToken: tokenRes.access_token,
       refreshToken: tokenRes.refresh_token ?? null,
-      expiresAt: Date.now() + tokenRes.expires_in * 1000,
+      expiresAt: expiryOf(tokenRes.access_token, tokenRes.expires_in),
       userSub: extractSub(tokenRes.access_token),
     };
 
@@ -635,6 +653,46 @@ export function logout(): Promise<void> {
 export function hasRefreshToken(): boolean {
   const auth = loadAuth();
   return auth !== null && auth.refreshToken !== null;
+}
+
+/**
+ * True when nothing usable is stored at all — never signed in, or signed
+ * out by `clearAuth()` after a refresh the server refused. Distinct from
+ * `!isAuthenticated()`, which is also true while a refresh token could
+ * still restore the session.
+ */
+export function isSignedOut(): boolean {
+  return loadAuth() === null;
+}
+
+// ── Session-expired signal ───────────────────────────────────────
+//
+// A 401 nobody can refresh past means the session is over, but until
+// REL-238 nothing in the UI said so. `fetchDashboard` catches the 401
+// and falls back to /public/feed, so reads kept rendering and the app
+// looked healthy; only writes failed, one per-action toast at a time
+// ("Couldn't hide Crypto"). With no way back to a sign-in prompt, the
+// only escape anyone found was reinstalling — which works solely
+// because it deletes scrollr.json.
+//
+// A plain module-level listener set rather than the store: this is a
+// per-window signal about the here and now, not state to persist, and
+// each window's React tree wants it immediately.
+
+const sessionExpiredListeners = new Set<() => void>();
+
+/** Subscribe to the signal. Returns an unsubscribe fn. */
+export function onSessionExpired(listener: () => void): () => void {
+  sessionExpiredListeners.add(listener);
+  return () => {
+    sessionExpiredListeners.delete(listener);
+  };
+}
+
+/** Announce that the stored session is gone and cannot be refreshed. */
+export function notifySessionExpired(): void {
+  // Copy first: a listener may unsubscribe itself while we iterate.
+  for (const listener of [...sessionExpiredListeners]) listener();
 }
 
 // ── Initialize proactive refresh on module load ──────────────────
