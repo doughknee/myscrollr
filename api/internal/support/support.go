@@ -249,6 +249,8 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 		Body:            originalBody,
 		RecentSummaries: recentSummaries,
 		Widget:          req.Widget,
+		Context: buildTicketContext(c.Context(), userID,
+			platform.TierFromRoles(platform.GetUserRoles(c)), req.Diagnostics),
 	})
 
 	// Resolve effective category — use AI's pick only on high confidence.
@@ -372,7 +374,9 @@ func resolveOSTicketTopicID(category string) string {
 		if id := os.Getenv("OSTICKET_TOPIC_ID_ACCOUNT"); id != "" {
 			topicID = id
 		}
-	case "channel":
+	// "channel" is the wire value the desktop form still sends; "widget" is
+	// what triage answers with since the REL-42 rename. Same topic.
+	case "channel", "widget":
 		if id := os.Getenv("OSTICKET_TOPIC_ID_CHANNEL"); id != "" {
 			topicID = id
 		}
@@ -408,6 +412,11 @@ func persistTriageSideEffects(ticketNumber, userEmail, userName, subject, origin
 			AIDuplicateOf:   triage.DuplicateOf,
 			AIConfidence:    triage.Confidence,
 			ShouldClose:     triage.ShouldClose,
+			AINeedsInfo:     triage.NeedsInfo,
+			AIGroundedIn:    triage.GroundedIn,
+			AIUnknowns:      triage.Unknowns,
+			AIAskUserFor:    triage.AskUserFor,
+			AIInternalNote:  triage.InternalNote,
 		})
 		if err != nil {
 			log.Printf("[Support] createSupportDraft failed for ticket %s: %v", ticketNumber, err)

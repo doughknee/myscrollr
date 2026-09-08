@@ -49,13 +49,27 @@ type SupportDraft struct {
 	EditedBodyHTML        string
 	OSTicketThreadEntryID int64 // 0 = unknown (legacy rows + initial /support/ticket flow)
 	ShouldClose           bool  // AI-detected resolution signal — when true, send-time also closes the ticket
-	DecidedAt             *time.Time
-	SentAt                *time.Time
-	CreatedAt             time.Time
+	// Grounding, from the drafting call (REL-244). All nullable in the
+	// table: rows written before that split have none of them, and a
+	// triage run that fails soft writes only what it got.
+	AINeedsInfo    bool
+	AIGroundedIn   []string // what each claim in the draft rests on
+	AIUnknowns     []string // what the draft had to leave open
+	AIAskUserFor   []string // what the draft asks the user to send back
+	AIInternalNote string   // partner-only; never reaches the user
+	DecidedAt      *time.Time
+	SentAt         *time.Time
+	CreatedAt      time.Time
 }
 
 // ErrAlreadyDecided indicates a draft was already actioned (single-use enforcement).
 var ErrAlreadyDecided = errors.New("draft already decided")
+
+// ErrNoDraftBody is returned when triage classified a ticket but the
+// drafting call failed. There is nothing for the partner to approve, so
+// no row is written and no notification fires — the ticket is still in
+// osTicket with the right category and priority, waiting for a human.
+var ErrNoDraftBody = errors.New("triage produced no reply body")
 
 // createSupportDraft persists a new pending draft. The caller hands us
 // a fully-populated SupportDraft (other than ID/CreatedAt/Status) and
@@ -65,6 +79,9 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 	if platform.DBPool == nil {
 		return nil, fmt.Errorf("DB not initialized")
 	}
+	if strings.TrimSpace(draft.DraftBodyHTML) == "" {
+		return nil, ErrNoDraftBody
+	}
 
 	const q = `
 		INSERT INTO support_drafts
@@ -72,8 +89,9 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 			 user_message_html,
 			 draft_body_html, ai_summary, ai_category, ai_priority,
 			 ai_widget, ai_duplicate_of, ai_confidence, status,
-			 osticket_thread_entry_id, should_close)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',$13,$14)
+			 osticket_thread_entry_id, should_close,
+			 ai_needs_info, ai_grounded_in, ai_unknowns, ai_ask_user_for, ai_internal_note)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',$13,$14,$15,$16,$17,$18,NULLIF($19,''))
 		RETURNING id, created_at
 	`
 	// 0 → NULL via NULLIF so the partial unique index doesn't reject
@@ -105,6 +123,11 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 		draft.AIConfidence,
 		entryID,
 		draft.ShouldClose,
+		draft.AINeedsInfo,
+		nilIfEmpty(draft.AIGroundedIn),
+		nilIfEmpty(draft.AIUnknowns),
+		nilIfEmpty(draft.AIAskUserFor),
+		draft.AIInternalNote,
 	).Scan(&draft.ID, &draft.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("createSupportDraft: %w", err)
@@ -135,11 +158,13 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 			   draft_body_html, ai_summary, ai_category, ai_priority,
 			   ai_widget, ai_duplicate_of, ai_confidence, status,
 			   edited_body_html, decided_at, sent_at, created_at,
-			   should_close
+			   should_close,
+			   ai_needs_info, ai_grounded_in, ai_unknowns, ai_ask_user_for, ai_internal_note
 		FROM support_drafts WHERE id = $1
 	`
 	var d SupportDraft
-	var userName, userMsg, summary, category, priority, widget, dupOf, confidence, editedBody *string
+	var userName, userMsg, summary, category, priority, widget, dupOf, confidence, editedBody, note *string
+	var needsInfo *bool
 	err := platform.DBPool.QueryRow(ctx, q, id).Scan(
 		&d.ID, &d.TicketNumber, &d.UserEmail, &userName, &d.OriginalSubject,
 		&userMsg,
@@ -147,6 +172,7 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 		&dupOf, &confidence, &d.Status,
 		&editedBody, &d.DecidedAt, &d.SentAt, &d.CreatedAt,
 		&d.ShouldClose,
+		&needsInfo, &d.AIGroundedIn, &d.AIUnknowns, &d.AIAskUserFor, &note,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -181,7 +207,22 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 	if editedBody != nil {
 		d.EditedBodyHTML = *editedBody
 	}
+	if needsInfo != nil {
+		d.AINeedsInfo = *needsInfo
+	}
+	if note != nil {
+		d.AIInternalNote = *note
+	}
 	return &d, nil
+}
+
+// nilIfEmpty writes an empty list as NULL rather than as `{}` — the column
+// means "the drafter did not say", and an empty array would claim it did.
+func nilIfEmpty(v []string) []string {
+	if len(v) == 0 {
+		return nil
+	}
+	return v
 }
 
 // markDraftDecided atomically transitions a pending draft to the new
@@ -237,29 +278,6 @@ func markDraftFailed(ctx context.Context, id int64) {
 	if _, err := platform.DBPool.Exec(ctx, `UPDATE support_drafts SET status='failed' WHERE id=$1`, id); err != nil {
 		log.Printf("[Drafts] markDraftFailed for %d failed: %v", id, err)
 	}
-}
-
-// loadLatestSentDraftBody returns the most recent SENT reply we've
-// posted on this ticket. Used by the reply-loop webhook to give the
-// AI continuity (so it doesn't repeat the same suggestion verbatim
-// when the user follows up). Returns "" when no sent draft exists or
-// on any DB error — the triage call still succeeds without it.
-func loadLatestSentDraftBody(ctx context.Context, ticketNumber string) string {
-	const q = `
-		SELECT COALESCE(NULLIF(edited_body_html, ''), draft_body_html)
-		FROM support_drafts
-		WHERE ticket_number = $1 AND status = 'sent'
-		ORDER BY sent_at DESC NULLS LAST, id DESC
-		LIMIT 1
-	`
-	var body string
-	if err := platform.DBPool.QueryRow(ctx, q, ticketNumber).Scan(&body); err != nil {
-		if !errors.Is(err, pgx.ErrNoRows) {
-			log.Printf("[Drafts] loadLatestSentDraftBody for ticket %s: %v", ticketNumber, err)
-		}
-		return ""
-	}
-	return body
 }
 
 // hasDraftForThreadEntry returns true if a support_drafts row already

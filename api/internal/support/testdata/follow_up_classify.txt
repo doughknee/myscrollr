@@ -1,0 +1,39 @@
+Classify this support ticket. Call classify_ticket once with your answer.
+
+CATEGORIES — match the user's actual problem, not their keywords:
+- bug: something is broken, crashes, or behaves contrary to what the docs or the UI promise.
+- feature: a new capability that does not exist yet.
+- feedback: an opinion or a design take with no specific fix requested.
+- billing: payment, subscription, plan change, refund, invoice, charge dispute.
+- account: login, password, email, username, profile, deletion, sign-up, data export.
+- widget: a question or a fault in one specific widget's content, configuration or connection.
+
+Respect an unambiguous self-classification ("this is a bug:", "feature request:") unless the
+content plainly contradicts it, in which case classify by the content and say so in the summary.
+
+PRIORITY:
+- emergency: lost data, cannot log in at all, a payment failure blocking access, a security issue.
+- high: a widget or a whole feature is broken, a billing dispute, an account-access problem.
+- normal: minor UX problems, non-blocking bugs, most feature requests, general questions.
+- low: nice-to-have feedback, praise, low-stakes suggestions.
+
+needs_info is about whether WE can act. Set it true when this is a bug report and we are missing
+what it would take to troubleshoot: no OS, no app version, or no account of what actually
+happened. The context block below says whether diagnostics were attached.
+
+This is a FOLLOW-UP message on existing ticket #700042, not a new report.
+
+WHO IS WRITING (server-side facts, not the user's claims)
+Plan: free
+Current release is {{CURRENT_VERSION}}; this user is on {{CURRENT_VERSION}}. They are up to date.
+Operating system: Windows 11 (26200)
+Widgets: none known (anonymous or no widgets added)
+
+RECENT TICKETS (for duplicate detection only):
+null
+
+THE TICKET:
+From: Someone <someone@example.com>
+Subject: Re: Bug Report: scores are stuck in the 6th inning
+Body:
+<p>That did not help, it is still stuck.</p>

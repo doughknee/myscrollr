@@ -76,7 +76,14 @@ data:
   # AI Triage (Phase: ai-support-triage)
   #
   # The following secrets MUST be added manually to k8s/secrets.yaml:
-  #   - ANTHROPIC_API_KEY              (Claude Haiku for triage; sk-ant-...)
+  #   - ANTHROPIC_API_KEY              (Haiku classifies, Sonnet drafts; sk-ant-...)
+  #   - LINEAR_API_KEY                 (OPTIONAL, read-only personal API key)
+  #     Lets a draft say "that is a known issue and it is being fixed"
+  #     instead of guessing: triage reads the open bugs and the urgent/high
+  #     work in the Linear project named by LINEAR_PROJECT and caches them
+  #     in Redis for 10 minutes. Read-only on purpose — nothing here ever
+  #     writes to Linear. Unset is a supported state: the known-issues block
+  #     says it is unavailable and the draft claims nothing either way.
   #   - SUPPORT_APPROVAL_HMAC_SECRET   (any high-entropy string ≥32 chars)
   #   - SCROLLR_WEBHOOK_SECRET         (any high-entropy string ≥32 chars)
   #     used to authenticate the osTicket reply-loop webhook coming
@@ -112,6 +119,7 @@ data:
   # as initial-ticket triage. See scripts/osticket-plugin/
   # README.md for plugin install + config.
   AI_TRIAGE_ENABLED: "true"                       # set "false" to bypass triage and fall back to legacy flow
+  LINEAR_PROJECT: "Scrollr"                       # Linear project whose open issues feed the known-issues block
   SUPPORT_AGENT_EMAIL: "doni@myscrollr.com"       # partner's email for approval notifications
   APPROVAL_BASE_URL: "https://api.myscrollr.com"  # base URL embedded in Send/Edit/Skip links
   SUPPORT_REPLY_FROM_EMAIL: "support@myscrollr.com"  # FROM address for partner-notification emails (Resend)

@@ -156,10 +156,6 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 		}
 	}
 
-	// Pull the most recent SENT reply on this ticket so the triage
-	// prompt has continuity context. Best-effort — empty string is OK.
-	previousReply := loadLatestSentDraftBody(ctx, ev.TicketNumber)
-
 	// Resolve user name with a fallback. osTicket may have stripped
 	// it depending on how the email arrived.
 	userName := strings.TrimSpace(ev.UserName)
@@ -177,15 +173,20 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 	recent := FetchRecentTicketSummaries(ctx)
 
 	triage := triageTicket(ctx, TriageInput{
-		UserCategory:        "", // user didn't pick anything — they're replying to email
-		UserEmail:           ev.UserEmail,
-		UserName:            userName,
-		Subject:             ev.Subject,
-		Body:                body,
-		RecentSummaries:     recent,
-		IsReply:             true,
-		ReplyTicketNumber:   ev.TicketNumber,
-		PreviousAIReplyHTML: previousReply,
+		UserCategory:      "", // user didn't pick anything — they're replying to email
+		UserEmail:         ev.UserEmail,
+		UserName:          userName,
+		Subject:           ev.Subject,
+		Body:              body,
+		RecentSummaries:   recent,
+		IsReply:           true,
+		ReplyTicketNumber: ev.TicketNumber,
+		// The whole conversation, not just our last reply: a follow-up
+		// usually only makes sense against what came before it. The case
+		// row is also the only thing that remembers who this user is —
+		// the webhook carries an email address and nothing else.
+		Thread:  FetchCaseThread(ctx, ev.TicketNumber),
+		Context: ticketContextFromCase(ctx, ev.TicketNumber),
 	})
 	if triage == nil {
 		log.Printf("[OSTicketWebhook] triage returned nil for ticket %s (entry=%d); no draft created", ev.TicketNumber, ev.ThreadEntryID)
@@ -208,6 +209,11 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 		AIConfidence:          triage.Confidence,
 		OSTicketThreadEntryID: ev.ThreadEntryID,
 		ShouldClose:           triage.ShouldClose,
+		AINeedsInfo:           triage.NeedsInfo,
+		AIGroundedIn:          triage.GroundedIn,
+		AIUnknowns:            triage.Unknowns,
+		AIAskUserFor:          triage.AskUserFor,
+		AIInternalNote:        triage.InternalNote,
 	})
 	if err != nil {
 		log.Printf("[OSTicketWebhook] createSupportDraft for ticket %s entry=%d: %v", ev.TicketNumber, ev.ThreadEntryID, err)

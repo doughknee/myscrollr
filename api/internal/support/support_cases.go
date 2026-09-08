@@ -235,6 +235,96 @@ func FetchRecentTicketSummaries(ctx context.Context) []RecentTicketSummary {
 	return out
 }
 
+// SimilarCase is one past ticket we actually answered: what the user wrote
+// and what went out. Used as reference material in the drafting prompt
+// (REL-244) — never as text to copy.
+type SimilarCase struct {
+	TicketNumber string
+	Subject      string
+	UserWrote    string
+	WeSent       string
+}
+
+// FetchSimilarCases returns the best-matching past cases that we replied to,
+// ranked by the same full-text search HandleSearchSupportCases exposes. The
+// reply is the SENT body, so a draft the partner edited before sending shows
+// up as the partner's words. Cases with no sent reply are skipped: an
+// unanswered ticket is not a precedent.
+func FetchSimilarCases(ctx context.Context, query, excludeTicket string, limit int) []SimilarCase {
+	query = strings.TrimSpace(query)
+	if platform.DBPool == nil || query == "" {
+		return nil
+	}
+	if limit <= 0 || limit > 10 {
+		limit = 3
+	}
+	const sql = `
+		WITH q AS (SELECT websearch_to_tsquery('english', $1) AS tsq)
+		SELECT c.ticket_number, c.subject,
+			COALESCE((SELECT m.body_text FROM support_messages m
+				WHERE m.ticket_number = c.ticket_number AND m.kind = 'user'
+				ORDER BY m.created_at, m.id LIMIT 1), ''),
+			COALESCE((SELECT m.body_text FROM support_messages m
+				WHERE m.ticket_number = c.ticket_number AND m.kind = 'sent'
+				ORDER BY m.created_at DESC, m.id DESC LIMIT 1), '')
+		FROM support_cases c, q
+		WHERE c.ticket_number <> $2
+		  AND EXISTS (SELECT 1 FROM support_messages m
+				WHERE m.ticket_number = c.ticket_number AND m.kind = 'sent')
+		  AND (c.search @@ q.tsq OR EXISTS (SELECT 1 FROM support_messages m
+				WHERE m.ticket_number = c.ticket_number AND m.search @@ q.tsq))
+		ORDER BY ts_rank(c.search, q.tsq) + COALESCE((
+			SELECT max(ts_rank(m.search, q.tsq)) FROM support_messages m
+			WHERE m.ticket_number = c.ticket_number), 0) DESC,
+			c.updated_at DESC
+		LIMIT $3
+	`
+	rows, err := platform.DBPool.Query(ctx, sql, query, excludeTicket, limit)
+	if err != nil {
+		log.Printf("[Cases] FetchSimilarCases: %v", err)
+		return nil
+	}
+	defer rows.Close()
+	var out []SimilarCase
+	for rows.Next() {
+		var s SimilarCase
+		if err := rows.Scan(&s.TicketNumber, &s.Subject, &s.UserWrote, &s.WeSent); err != nil {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
+// FetchCaseThread returns the conversation on one ticket, oldest first:
+// what the user wrote and what we sent. Drafts that were never sent and
+// internal notes are left out — the follow-up prompt needs what the user
+// has actually read.
+func FetchCaseThread(ctx context.Context, ticketNumber string) []SupportMessage {
+	if platform.DBPool == nil || ticketNumber == "" {
+		return nil
+	}
+	rows, err := platform.DBPool.Query(ctx, `
+		SELECT kind, body_text, created_at
+		FROM support_messages
+		WHERE ticket_number = $1 AND kind IN ('user', 'sent')
+		ORDER BY created_at, id`, ticketNumber)
+	if err != nil {
+		log.Printf("[Cases] FetchCaseThread %s: %v", ticketNumber, err)
+		return nil
+	}
+	defer rows.Close()
+	var out []SupportMessage
+	for rows.Next() {
+		m := SupportMessage{TicketNumber: ticketNumber}
+		if err := rows.Scan(&m.Kind, &m.BodyText, &m.CreatedAt); err != nil {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
 // SearchSupportCases is Postgres full-text search over cases and their
 // messages. An empty q lists by recency; otherwise results are ranked by
 // the best match across subject/summary and any message body.
