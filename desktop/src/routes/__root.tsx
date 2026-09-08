@@ -70,7 +70,6 @@ import type { AppPreferences } from "../preferences";
 import { showTipOnce, TIP_IDS } from "../lib/tips";
 
 // Types
-import type { DeliveryMode } from "../types";
 import type { DataWidgetRow, SubscriptionInfo } from "../api/client";
 
 // Hooks
@@ -79,6 +78,7 @@ import { useCatalog } from "../hooks/useCatalog";
 import { useAuthState } from "../hooks/useAuthState";
 import { useRemoveWidget } from "../hooks/useRemoveWidget";
 import { useDashboardCDC } from "../hooks/useDashboardCDC";
+import { useSharedSSE } from "../hooks/useSharedSSE";
 import { useTauriListener } from "../hooks/useTauriListener";
 import { useDeliveryHealth } from "../hooks/useDeliveryHealth";
 import { useNavHistory } from "../hooks/useNavHistory";
@@ -369,9 +369,12 @@ function RootLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.authenticated, prefs.tipsShown.length]);
 
-  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>(() =>
-    loadPref<DeliveryMode>("deliveryMode", "polling"),
-  );
+  // The ticker window normally owns the SSE connection; this hook makes the
+  // main window take it over when there is no ticker window at all, and
+  // gives every window the live status either way (hooks/useSharedSSE.ts).
+  const { deliveryMode } = useSharedSSE({
+    tickerShown: prefs.ticker.showTicker,
+  });
   const [billingBannerDismissed, setBillingBannerDismissed] = useState(false);
 
   // ── App / auth state ────────────────────────────────────────
@@ -390,17 +393,9 @@ function RootLayout() {
   const showAuthGate = !auth.authenticated && !auth.sessionExpired && !DEMO;
   const showApp = auth.authenticated || auth.sessionExpired || DEMO;
 
-  // ── SSE status tracking ─────────────────────────────────────
-  // Listen directly for SSE status events from the Rust backend.
-  // Both windows receive these via Tauri's broadcast; no store relay needed.
-  useTauriListener<{ status: string }>(
-    "sse-status",
-    (event) => {
-      const mode: DeliveryMode =
-        event.payload.status === "connected" ? "sse" : "polling";
-      setDeliveryMode(mode);
-    },
-  );
+  // SSE status tracking lives in `useSharedSSE` above: `sse-status` is a
+  // broadcast, so every window keeps the same "connected → sse, anything
+  // else → polling" reading it had here.
 
   // ── Connection-health tick ──────────────────────────────────
   // Drives the "X ago" age label in `ConnectionIndicator`. We tick

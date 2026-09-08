@@ -191,6 +191,11 @@ pub async fn sync_ticker_windows(app: tauri::AppHandle, monitors: Vec<String>) -
             log::info!("[ticker] created {label} for {:?}", wanted.get(i));
         }
     }
+    // The set of ticker windows just changed. Whoever owns the process-wide
+    // SSE connection is elected from that set (lib/windowRole.ts), so the
+    // windows have to be told AFTER the create/destroy — `monitors-changed`
+    // fires before this runs and would re-elect against the old set.
+    let _ = app.emit("ticker-windows-changed", live.clone());
     Ok(live)
 }
 
