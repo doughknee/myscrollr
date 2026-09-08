@@ -104,6 +104,10 @@ func main() {
 	// Nightly re-sync of the support case DB from osTicket (REL-243).
 	support.StartSupportCaseReconciler(ctx)
 
+	// Morning digest of the support queue into its pinned Discord thread
+	// (REL-245). No-op when Discord isn't configured.
+	support.StartSupportDigest(ctx)
+
 	// Build and start the gateway server
 	srv := core.NewServer()
 	srv.Setup()

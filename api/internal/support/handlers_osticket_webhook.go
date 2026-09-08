@@ -156,6 +156,11 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 		}
 	}
 
+	// Surface the reply in Discord immediately, before triage runs. The
+	// partner sees the question the moment it arrives rather than several
+	// seconds later underneath the AI's answer to it.
+	notifyDiscordForUserReply(ctx, ev.TicketNumber, ev.Subject, "", ev.MessageHTML)
+
 	// Pull the most recent SENT reply on this ticket so the triage
 	// prompt has continuity context. Best-effort — empty string is OK.
 	previousReply := loadLatestSentDraftBody(ctx, ev.TicketNumber)

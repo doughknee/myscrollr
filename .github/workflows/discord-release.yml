@@ -58,3 +58,42 @@ jobs:
 
           curl -sS --fail-with-body -X POST -H "Content-Type: application/json" -d @payload.json "$WEBHOOK"
           echo "Announced $NAME"
+
+      # The same publish event tells the support queue to draft "this is
+      # fixed in X" for cases whose linked Linear issue is Done (REL-245).
+      # It rides here rather than in a second workflow on the same trigger:
+      # one event, one place to look when the follow-ups don't appear.
+      #
+      # core-api does the work because the Linear and osTicket credentials
+      # live there, not on a runner — same reasoning as auto-close-osticket.yml,
+      # and the same shared secret. Best-effort: a failure here never fails
+      # the release announcement.
+      - name: Queue shipped-fix follow-ups
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          URL: ${{ github.event.release.html_url }}
+          API_BASE: ${{ vars.SCROLLR_API_BASE_URL }}
+          WEBHOOK_SECRET: ${{ secrets.OSTICKET_PR_WEBHOOK_SECRET }}
+        run: |
+          if [ -z "$WEBHOOK_SECRET" ]; then
+            echo "::warning::OSTICKET_PR_WEBHOOK_SECRET not set; skipping shipped follow-ups."
+            exit 0
+          fi
+          API="${API_BASE:-https://api.myscrollr.com}"
+          PAYLOAD=$(jq -n --arg v "$TAG" --arg u "$URL" '{version: $v, release_url: $u}')
+
+          set +e
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Webhook-Secret: $WEBHOOK_SECRET" \
+            -d "$PAYLOAD" \
+            "$API/webhooks/github/release-published")
+          CURL_EXIT=$?
+          set -e
+
+          HTTP_CODE=$(printf '%s' "$RESPONSE" | tail -n1)
+          if [ "$CURL_EXIT" -ne 0 ] || [ "$HTTP_CODE" -ge 400 ]; then
+            echo "::warning::Follow-up queue call failed (curl=$CURL_EXIT http=$HTTP_CODE). Release announcement unaffected."
+            exit 0
+          fi
+          echo "Queued shipped follow-ups for $TAG"
