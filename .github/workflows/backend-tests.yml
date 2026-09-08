@@ -22,6 +22,16 @@ on:
       - ".github/workflows/backend-tests.yml"
       # The migration guard itself, so editing it re-runs it.
       - "scripts/migrations/**"
+      # Sources of the generated support knowledge base (REL-242): the
+      # support-kb job regenerates it and fails on a stale committed copy.
+      - "desktop/package.json"
+      - "desktop/src/components/settings/rows.ts"
+      - "desktop/src/components/settings/pages.ts"
+      - "docs/CHIP_DESIGN.md"
+      - "docs/SETTINGS_AUDIT.md"
+      - "docs/VISION.md"
+      - "docs/ROADMAP.md"
+      - "docs/support/**"
   pull_request:
     branches: [main]
     paths:
@@ -40,6 +50,16 @@ on:
       - ".github/workflows/backend-tests.yml"
       # The migration guard itself, so editing it re-runs it.
       - "scripts/migrations/**"
+      # Sources of the generated support knowledge base (REL-242): the
+      # support-kb job regenerates it and fails on a stale committed copy.
+      - "desktop/package.json"
+      - "desktop/src/components/settings/rows.ts"
+      - "desktop/src/components/settings/pages.ts"
+      - "docs/CHIP_DESIGN.md"
+      - "docs/SETTINGS_AUDIT.md"
+      - "docs/VISION.md"
+      - "docs/ROADMAP.md"
+      - "docs/support/**"
 
 jobs:
   # ── Schema safety ──────────────────────────────────────────────
@@ -66,6 +86,32 @@ jobs:
           # this repo is committed non-executable (Windows checkouts do not
           # carry the mode bit), so ./script.sh is exit 126 on a runner.
           bash scripts/migrations/check-additive.sh "origin/${{ github.base_ref || 'main' }}"
+
+  # ── Support knowledge base ─────────────────────────────────────
+  # The AI triage prompt reads api/internal/support/kb/kb.generated.md,
+  # assembled by api/cmd/kbgen from the docs, the settings copy, the widget
+  # catalog and the last eight GitHub releases. It is committed so the
+  # binary embeds it; this proves the commit is what the sources produce.
+  # A bumped package.json, an edited doc or a newly published release
+  # without `make kb` fails here.
+  support-kb:
+    name: Support knowledge base is current
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: api/go.mod
+          cache: true
+          cache-dependency-path: api/go.sum
+      - run: go run ./cmd/kbgen
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: git diff --exit-code -- internal/support/kb/
 
   # ── Go tests (5 independent jobs, run in parallel) ─────────────
   go-tests:

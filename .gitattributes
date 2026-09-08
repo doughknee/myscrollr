@@ -15,3 +15,7 @@ Makefile   text eol=lf
 # migrations above: a CRLF checkout would fail the guard on every Windows
 # clone while passing in CI.
 *.generated.ts  text eol=lf
+
+# The support knowledge base is generated (api/cmd/kbgen) and embedded,
+# then diffed byte-for-byte in CI. Same rule as the generated types.
+*.generated.md  text eol=lf

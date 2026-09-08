@@ -215,3 +215,21 @@ Generate TS types from the Go OpenAPI (final names); web + desktop import them. 
 - No DB split — one shared Postgres + the CDC pipeline stay.
 - No backward-compat machinery — unnecessary pre-users, and re-introduced only when you have users to protect.
 - Ingester `common` crate (#8) is opportunistic, not a blocker.
+
+---
+
+## Release checklist
+
+The one recurring step this record still owns. Everything else about cutting
+a release is in `AGENTS.md` (the `desktop-release.yml` preflight) and the
+`/live` skill.
+
+1. Bump `desktop/package.json` and `tauri.conf.json`, merge, let
+   `desktop-release.yml` build, publish the GitHub release with its notes.
+2. **Regenerate the support knowledge base:** `make kb`, then commit
+   `api/internal/support/kb/kb.generated.md`. The generator reads the new
+   version from `package.json` and the new notes from GitHub Releases, so it
+   has to run *after* the release is published. CI (`support-kb` in
+   `backend-tests.yml`) fails every later push until this lands, on purpose:
+   the AI support desk reads that file on every ticket, and a stale one
+   answers with the wrong version.
