@@ -226,10 +226,22 @@ a release is in `AGENTS.md` (the `desktop-release.yml` preflight) and the
 
 1. Bump `desktop/package.json` and `tauri.conf.json`, merge, let
    `desktop-release.yml` build, publish the GitHub release with its notes.
-2. **Regenerate the support knowledge base:** `make kb`, then commit
-   `api/internal/support/kb/kb.generated.md`. The generator reads the new
-   version from `package.json` and the new notes from GitHub Releases, so it
-   has to run *after* the release is published. CI (`support-kb` in
-   `backend-tests.yml`) fails every later push until this lands, on purpose:
-   the AI support desk reads that file on every ticket, and a stale one
-   answers with the wrong version.
+2. **Regenerate the support knowledge base — TWICE.** The generator reads
+   two things that move at different moments, so one run is never enough:
+   the version and roadmap row come from the repo, and the release notes
+   body comes from GitHub Releases.
+
+   - **In the version-bump PR, before merging:** `make kb`, commit
+     `api/internal/support/kb/kb.generated.md`. Bumping `package.json`
+     makes the committed file stale immediately, so `support-kb` and
+     `go-tests (api)` both fail on the bump PR itself until this is in.
+     (Learned the hard way on 1.6.3: the bump PR could not merge, and the
+     release could not be built, until the KB was regenerated on the
+     release branch.)
+   - **After publishing the GitHub release:** `make kb` again and commit.
+     Only now does the release's notes body exist for the "Recent release
+     notes" section.
+
+   CI (`support-kb` in `backend-tests.yml`) fails every later push until
+   each of those lands, on purpose: the AI support desk reads that file on
+   every ticket, and a stale one answers with the wrong version.
