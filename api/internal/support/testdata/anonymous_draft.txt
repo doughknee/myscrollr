@@ -18,7 +18,7 @@ Open and being worked on:
 
 How to use this list:
 - The user's problem matches an OPEN issue: say it is a known issue and that it is being fixed. Give no date and no estimate. Put the issue key in internal_note.
-- The user's problem matches something the release notes below say was FIXED: name the version that fixed it and tell them to update.
+- The release notes below are context for what has changed, NOT evidence that this user's report was fixed. They are written for everyone and do not record which report a change closed. Only the FIX ON RECORD block may be used to claim a fix.
 - No match: do not mention the issue tracker at all. Never invent an issue key.
 - Issue keys, titles and descriptions here are internal. Never put one in the reply to the user.
 
@@ -27,6 +27,10 @@ Shipped releases, newest first (live; may be newer than the knowledge base):
 ### Scrollr 1.5.0 — Chips, redrawn (desktop-v1.5.0, 2026-09-04)
 Every data chip on the ticker rebuilt in one language.
 
+
+FIX ON RECORD (server-computed; the ONLY thing that permits a fix claim)
+None. No shipped fix is on record for this report.
+You may NOT say this was fixed, name a version as the remedy, or tell them to update as the answer. Asking which version they are running to narrow the problem is a different thing and is fine. If you think it may be fixed, ASK whether it is still happening rather than asserting that it is not.
 
 HOW TO WRITE IT:
 - Two to four short paragraphs of HTML, <p> tags, no headings and no lists unless the answer

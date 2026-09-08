@@ -57,6 +57,14 @@ type dispositionSignals struct {
 	OutboundLast24h int
 	MaxAutoReplies  int
 	CategoryDemoted bool
+
+	// REL-259. HasProvenFix is the server's answer to "did a shipped release
+	// close THIS report" — a linked Linear issue, done, with a merged PR that
+	// went out. StaleDays is how long the reporter has been waiting and
+	// StaleAfter is the threshold, passed in so the decision stays pure.
+	HasProvenFix bool
+	StaleDays    int
+	StaleAfter   int
 }
 
 // decideDisposition is the whole policy, in order. The escalation checks run
@@ -102,6 +110,28 @@ func decideDisposition(s dispositionSignals) (disposition, reason string) {
 	}
 	if hit := firstMatch(s.DraftBody, promisePatterns); hit != "" {
 		return dispositionEscalate, fmt.Sprintf("the draft would promise something (%q)", hit)
+	}
+
+	// REL-259: the bot may only claim a fix it can prove. The system prompt
+	// forbids the unprovable claim and the FIX ON RECORD block tells the
+	// drafter what is on record — but the prompt is guidance and this is the
+	// guarantee. A reply that says something was fixed, or offers a version as
+	// the remedy, with nothing on record behind it does not leave the building.
+	if !s.HasProvenFix {
+		if hit := firstMatch(s.DraftBody, unprovenFixPatterns); hit != "" {
+			return dispositionEscalate, fmt.Sprintf(
+				"the draft offers a fix or an update as the answer (%q) and no shipped fix is on record", hit)
+		}
+		// An old ticket asks rather than tells. Nothing here has closed this
+		// report, and several releases have gone out since it was written, so
+		// asserting anything about it is a guess. The drafter is told to ask
+		// (renderFixRecord), and a reply that does ask falls through to the
+		// auto_ask branch below; one that does not gets a human.
+		if s.StaleAfter > 0 && s.StaleDays >= s.StaleAfter && strings.TrimSpace(s.AskUserFor) == "" {
+			return dispositionEscalate, fmt.Sprintf(
+				"the ticket is %d days old with no fix on record and the draft tells rather than asks",
+				s.StaleDays)
+		}
 	}
 
 	// A reply that asks the user for something is not a final answer, so the
@@ -207,6 +237,28 @@ var promisePatterns = []string{
 	"we plan to", "we will refund", "we'll refund", "we will credit",
 	"make an exception", "as an exception", "by the end of",
 	"next week", "next month", "estimated time", "guarantee",
+}
+
+// unprovenFixPatterns are checked against OUR draft, and only when nothing is
+// on record as having fixed the report (REL-259). Two shapes, one list because
+// they are the same mistake: asserting a fix shipped, and handing somebody an
+// update as the remedy. Both are claims about a change closing THIS report,
+// and release notes cannot support either.
+//
+// Deliberately loose, like promisePatterns. Escalating a reply that only meant
+// to be helpful costs one click; telling a four-month-old reporter their bug is
+// gone when nobody knows that costs the trust the reply was for. Asking which
+// version somebody runs is diagnostic and appears nowhere in this list.
+var unprovenFixPatterns = []string{
+	"was fixed", "were fixed", "has been fixed", "have been fixed", "is now fixed",
+	"we fixed", "already fixed", "should be fixed", "fixed in ", "fixed this in",
+	"resolved in ", "was resolved", "has been resolved", "addressed in ",
+	"shipped a fix", "shipped the fix", "the fix for", "went out in ",
+	"no longer an issue", "no longer happens", "patched in ", "corrected in ",
+	"update to", "updating to", "upgrade to", "update your scrollr", "update your app",
+	"install the latest", "download the latest", "get the latest version",
+	"once you update", "after you update", "updating should", "update should",
+	"update and let", "update fixes",
 }
 
 // injectionPatterns treat the ticket body as what it is: text a stranger
@@ -487,5 +539,8 @@ func gatherDispositionSignals(ctx context.Context, draft *SupportDraft) disposit
 		OutboundLast24h: outboundRepliesLast24h(ctx, draft.TicketNumber),
 		MaxAutoReplies:  maxAutoReplies(),
 		CategoryDemoted: interventionRate(ctx, draft.AICategory).Demoted,
+		HasProvenFix:    lookupProvenFix(ctx, draft.TicketNumber) != nil,
+		StaleDays:       caseStaleDays(ctx, draft.TicketNumber),
+		StaleAfter:      staleTicketDays(),
 	}
 }

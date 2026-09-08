@@ -26,10 +26,11 @@ import (
 // every entry point here returns an error the caller shows in the thread —
 // nothing else in the pipeline degrades.
 
-const (
-	linearAPIURL  = "https://api.linear.app/graphql"
-	linearTimeout = 10 * time.Second
-)
+const linearTimeout = 10 * time.Second
+
+// linearAPIURL is a var so the proven-fix tests can point the client at a
+// stub, exactly as discordAPIBase does.
+var linearAPIURL = "https://api.linear.app/graphql"
 
 // linearTeamKey is the team new issues are filed into. Scrollr's work all
 // lives in one Linear team, so this is a config value, not a picker.

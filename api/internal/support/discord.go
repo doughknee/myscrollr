@@ -684,9 +684,21 @@ func discordPinForumThread(ctx context.Context, threadID string) error {
 // It PATCHes @original rather than POSTing a follow-up: a POST would add
 // a second message and leave "the bot is thinking…" sitting there forever.
 func discordCompleteDeferred(ctx context.Context, applicationID, interactionToken, content string) error {
+	return discordCompleteDeferredWith(ctx, applicationID, interactionToken, content, nil)
+}
+
+// discordCompleteDeferredWith is the same edit with components, for the
+// deferred commands whose answer is a set of buttons rather than a paragraph
+// (/link, REL-259).
+func discordCompleteDeferredWith(ctx context.Context, applicationID, interactionToken, content string,
+	components []DiscordActionRow) error {
+
 	body := map[string]interface{}{
 		"content":          content,
 		"allowed_mentions": map[string]interface{}{"parse": []string{}},
+	}
+	if len(components) > 0 {
+		body["components"] = components
 	}
 	path := fmt.Sprintf("/webhooks/%s/%s/messages/@original", applicationID, interactionToken)
 	respBody, status, err := discordRequest(ctx, http.MethodPatch, path, body)
@@ -789,6 +801,11 @@ func registerDiscordSlashCommands(ctx context.Context) error {
 					Required:    true,
 				},
 			},
+		},
+		{
+			Name:        "link",
+			Description: "Propose Linear issues for unlinked open cases; you confirm each one",
+			Type:        1,
 		},
 		{
 			Name:        "pause",
@@ -1551,6 +1568,7 @@ func buildDraftHeaderEmbed(ctx context.Context, draft *SupportDraft) *discordEmb
 			{Name: "Confidence", Value: codeOrDash(draft.AIConfidence), Inline: true},
 			{Name: "App version", Value: appVersionField(ctx, draft.TicketNumber), Inline: true},
 			{Name: "Mood", Value: codeOrDash(draft.Sentiment), Inline: true},
+			{Name: "Fix", Value: fixRecordField(ctx, draft.TicketNumber), Inline: true},
 		},
 		Footer: &discordEmbedFooter{Text: fmt.Sprintf("draft #%d", draft.ID)},
 	}
@@ -1614,6 +1632,21 @@ func appVersionField(ctx context.Context, ticketNumber string) string {
 	default:
 		return fmt.Sprintf("`%s` → current `%s`", reported, current)
 	}
+}
+
+// fixRecordField renders the proven-fix state in the header (REL-259), so the
+// reason a draft asks rather than tells is visible without reading it. A case
+// linked to an issue that has not shipped yet says so rather than reading as
+// "none": "linked but unreleased" and "nobody has linked this" are different
+// problems for whoever is looking.
+func fixRecordField(ctx context.Context, ticketNumber string) string {
+	if pf := lookupProvenFix(ctx, ticketNumber); pf != nil {
+		return fmt.Sprintf("`%s`, shipped %s", pf.IssueKey, pf.Version)
+	}
+	if key := caseLinearIssueKey(ctx, ticketNumber); key != "" {
+		return fmt.Sprintf("`%s`, not shipped", key)
+	}
+	return "none on record"
 }
 
 // currentDesktopVersionRe pulls the version line the knowledge base is

@@ -17,6 +17,17 @@
 # thread with a disposition and a hold, and it SENDS ITSELF when nobody
 # intervenes. Read the drafts before the hold expires; `/pause` stops the lot.
 #
+# To re-triage WITHOUT sending anything — reviewing a policy change against the
+# real backlog, which is what REL-259 did — add `SUPPORT_AUTOSEND=off` to this
+# Job only. The disposition is still decided and written, each thread says what
+# it WOULD have done, and nothing leaves the building. It is a per-pod env, so
+# the live API keeps answering normally while the Job runs:
+#
+#   ... | kubectl apply -f - --dry-run=client -o yaml  # then add under `image:`
+#     env:
+#       - name: SUPPORT_AUTOSEND
+#         value: "off"
+#
 # Must run in-cluster: the reply goes out through the osTicket plugin, whose
 # API key is bound to the cluster's egress IP.
 #

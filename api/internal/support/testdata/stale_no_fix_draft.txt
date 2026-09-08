@@ -35,6 +35,12 @@ FIX ON RECORD (server-computed; the ONLY thing that permits a fix claim)
 None. No shipped fix is on record for this report.
 You may NOT say this was fixed, name a version as the remedy, or tell them to update as the answer. Asking which version they are running to narrow the problem is a different thing and is fine. If you think it may be fixed, ASK whether it is still happening rather than asserting that it is not.
 
+THIS TICKET IS 120 DAYS OLD and nothing is on record as fixing it. Do not
+troubleshoot and do not guess. The reply is ONE short paragraph, then the sign-off:
+apologise briefly for the wait, say that several updates have shipped since they wrote
+in, and ask whether it is still happening and which version of Scrollr they are on now.
+List both of those in ask_user_for.
+
 SIMILAR PAST CASES — what we actually sent. Use them for approach and tone.
 NEVER copy one verbatim: the details in it belong to a different user.
 1. Bug Report: scores stopped updating
