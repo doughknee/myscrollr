@@ -1058,6 +1058,8 @@ func handleDiscordSlashCommand(c *fiber.Ctx, ix *discordInteraction) error {
 		return handleDiscordSearchCommand(c, ix)
 	case "ticket":
 		return handleDiscordTicketCommand(c, ix)
+	case "regen":
+		return handleDiscordRegenCommand(c, ix)
 	case "stats":
 		return handleDiscordStatsCommand(c, ix)
 	case "pause":
@@ -1428,7 +1430,7 @@ func handleDiscordCaseCommand(c *fiber.Ctx, ix *discordInteraction) error {
 	}
 
 	const msgQ = `
-		SELECT kind, body_text, created_at FROM support_messages
+		SELECT kind, body_text, created_at, superseded FROM support_messages
 		WHERE ticket_number = $1 ORDER BY created_at DESC, id DESC LIMIT 20
 	`
 	rows, err := platform.DBPool.Query(ctx, msgQ, ticketNumber)
@@ -1443,12 +1445,18 @@ func handleDiscordCaseCommand(c *fiber.Ctx, ix *discordInteraction) error {
 	for rows.Next() {
 		var kind, body string
 		var created time.Time
-		if err := rows.Scan(&kind, &body, &created); err != nil {
+		var superseded bool
+		if err := rows.Scan(&kind, &body, &created, &superseded); err != nil {
 			continue
 		}
 		icon := kindIcon[kind]
 		if icon == "" {
 			icon = "•"
+		}
+		// A draft that was re-triaged away is still on the timeline, but it
+		// is not what this ticket is currently being answered with.
+		if superseded {
+			icon, kind = "🗑️", kind+" (superseded)"
 		}
 		snippet := truncateRunes(strings.Join(strings.Fields(body), " "), 140)
 		events = append(events, fmt.Sprintf("%s `%s` %s — %s",

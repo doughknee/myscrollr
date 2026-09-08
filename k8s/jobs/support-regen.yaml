@@ -1,0 +1,52 @@
+# One-off: re-run triage on tickets the support bot has already seen (REL-246).
+#
+# NOT applied by deploy.yml (it lists manifests explicitly). Run by hand,
+# editing `args` to the tickets you mean:
+#
+#   IMG=$(kubectl -n scrollr get deploy core-api -o jsonpath='{.spec.template.spec.containers[0].image}')
+#   sed "s|IMAGE_PLACEHOLDER|$IMG|" k8s/jobs/support-regen.yaml | kubectl apply -f -
+#   kubectl -n scrollr logs -f job/support-regen
+#   kubectl -n scrollr delete job support-regen
+#
+# `args: ["pending"]` takes every draft sitting in 'pending'; a list of ticket
+# numbers takes those, drafted or not. Same work as the /regen slash command,
+# which is the everyday path — this exists because a slash command can only be
+# run by a person typing it, and a backlog is not typing work.
+#
+# ⚠️ Every draft this writes is an ordinary draft: it reaches its Discord
+# thread with a disposition and a hold, and it SENDS ITSELF when nobody
+# intervenes. Read the drafts before the hold expires; `/pause` stops the lot.
+#
+# Must run in-cluster: the reply goes out through the osTicket plugin, whose
+# API key is bound to the cluster's egress IP.
+#
+# Not idempotent in the way the backfill is — a second run supersedes the
+# draft the first one wrote and spends another two model calls per ticket.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: support-regen
+  namespace: scrollr
+spec:
+  backoffLimit: 0 # a retry would re-draft everything the first attempt already did
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: support-regen
+          image: IMAGE_PLACEHOLDER
+          command: ["./support-regen"]
+          args: ["pending"]
+          envFrom:
+            - configMapRef:
+                name: core-config
+            - secretRef:
+                name: scrollr-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
