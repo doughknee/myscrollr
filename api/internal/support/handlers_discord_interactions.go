@@ -253,8 +253,8 @@ func handleDiscordSendAction(c *fiber.Ctx, ix *discordInteraction, draftID int64
 	go func() {
 		bgCtx, bgCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer bgCancel()
-		if err := sendApprovedReply(bgCtx, draft, draft.DraftBodyHTML); err != nil {
-			log.Printf("[DiscordInteraction] sendApprovedReply for ticket %s: %v",
+		if err := sendDraftReply(bgCtx, draft, draft.DraftBodyHTML); err != nil {
+			log.Printf("[DiscordInteraction] sendDraftReply for ticket %s: %v",
 				draft.TicketNumber, err)
 			return
 		}
@@ -635,8 +635,8 @@ func handleDiscordModalSubmit(c *fiber.Ctx, ix *discordInteraction) error {
 	go func() {
 		bgCtx, bgCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer bgCancel()
-		if err := sendApprovedReply(bgCtx, draft, editedBodyHTML); err != nil {
-			log.Printf("[DiscordInteraction] sendApprovedReply (edited) for ticket %s: %v",
+		if err := sendDraftReply(bgCtx, draft, editedBodyHTML); err != nil {
+			log.Printf("[DiscordInteraction] sendDraftReply (edited) for ticket %s: %v",
 				draft.TicketNumber, err)
 			return
 		}
@@ -751,7 +751,7 @@ func handleDiscordAskSubmit(c *fiber.Ctx, ix *discordInteraction, draftID int64)
 	go func() {
 		bgCtx, bgCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer bgCancel()
-		if err := sendApprovedReply(bgCtx, draft, questionHTML); err != nil {
+		if err := sendDraftReply(bgCtx, draft, questionHTML); err != nil {
 			log.Printf("[DiscordInteraction] send question for ticket %s: %v", draft.TicketNumber, err)
 			return
 		}
@@ -1243,6 +1243,7 @@ func handleDiscordStatsCommand(c *fiber.Ctx, ix *discordInteraction) error {
 			"approved": "✅",
 			"edited":   "✏️",
 			"skipped":  "⏭️",
+			"asked":    "❓",
 			"sent":     "📨",
 			"failed":   "❌",
 		}

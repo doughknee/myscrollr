@@ -221,12 +221,10 @@ func HandleSupportEditSubmit(c *fiber.Ctx) error {
 	// not about which surface the person used (REL-249).
 	markIntervened(c.Context(), draft.ID)
 
-	if err := sendApprovedReply(c.Context(), draft, editedBody); err != nil {
-		markDraftFailed(c.Context(), draft.ID)
-		log.Printf("[Approval] sendApprovedReply (edited): %v", err)
+	if err := sendDraftReply(c.Context(), draft, editedBody); err != nil {
+		log.Printf("[Approval] sendDraftReply (edited): %v", err)
 		return errorHTMLResponse(c, fiber.StatusBadGateway, "Failed to send reply")
 	}
-	markDraftSent(c.Context(), draft.ID)
 
 	return successHTMLResponse(c, "Edited reply sent — user will see it threaded into ticket "+draft.TicketNumber+".")
 }
@@ -249,12 +247,10 @@ func handleApprovalAction(c *fiber.Ctx, action string) error {
 			log.Printf("[Approval] markDraftDecided: %v", err)
 			return errorHTMLResponse(c, fiber.StatusInternalServerError, "Failed to save decision")
 		}
-		if err := sendApprovedReply(c.Context(), draft, draft.DraftBodyHTML); err != nil {
-			markDraftFailed(c.Context(), draft.ID)
-			log.Printf("[Approval] sendApprovedReply: %v", err)
+		if err := sendDraftReply(c.Context(), draft, draft.DraftBodyHTML); err != nil {
+			log.Printf("[Approval] sendDraftReply: %v", err)
 			return errorHTMLResponse(c, fiber.StatusBadGateway, "Failed to send reply")
 		}
-		markDraftSent(c.Context(), draft.ID)
 		return successHTMLResponse(c, "Reply sent. The user will see it threaded into ticket "+draft.TicketNumber+".")
 	case "skip":
 		if err := markDraftDecided(c.Context(), draft.ID, "skipped", ""); err != nil {
@@ -328,4 +324,24 @@ var sendApprovedReply = func(ctx context.Context, draft *SupportDraft, body stri
 	_ = draft
 	_ = body
 	return fmt.Errorf("sendApprovedReply not wired (Phase 1D not yet applied)")
+}
+
+// sendDraftReply is the one way a draft's body reaches a user. Every surface
+// goes through it — the approval URLs, the Discord Send/Edit/Ask buttons, and
+// the autonomous sweeper — so that recording the send cannot be attached to
+// one path and forgotten on the others.
+//
+// That is exactly how it went wrong: markDraftSent hung off the approval-URL
+// path alone, which nobody uses, so sent_at was null for every reply the
+// pipeline had ever sent and /stats read a busy day as an idle one (REL-256).
+// markDraftFailed had the same defect and is fixed the same way: a send that
+// failed on a Discord button or in the sweeper used to stay 'approved', and
+// the digest counts 'approved' as a reply that went out.
+func sendDraftReply(ctx context.Context, draft *SupportDraft, body string) error {
+	if err := sendApprovedReply(ctx, draft, body); err != nil {
+		markDraftFailed(ctx, draft.ID)
+		return err
+	}
+	markDraftSent(ctx, draft.ID)
+	return nil
 }
