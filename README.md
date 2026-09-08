@@ -13,6 +13,7 @@ the same frame — that is where the fixed zone sits.
 | `01-pinned-clock` | A pinned Clock. Identical to how a pinned clock has always looked — the widget IS the subject for a single-chip utility. It is gone from the scrolling tape. |
 | `02-pinned-live-team` | A pinned team (Miami Marlins), showing its LIVE game: red dot, `B1`. The subject is the team; the chip is whatever that team is doing now. |
 | `03-pinned-symbol` | A pinned symbol (AAPL). The tape carries the rest of the watchlist and no second AAPL. |
+| `05-pinned-team-beyond-horizon` | The proof that a pin bypasses the horizon. The zone shows the Dodgers fixture 33 hours out, reading `1d`. `selectSportsForTicker` excludes that game (the rail admits only two Dodgers finals from 16-17h ago), so it can only be on the bar because it is pinned. |
 | `04-two-pins-at-cap` | Both pins used (`MAX_PINS = 2`). Measured zone width 724px. A third is refused, not evicted. |
 
 Measured live: zone 724px on a 3440px bar with a clock + a game pinned —
