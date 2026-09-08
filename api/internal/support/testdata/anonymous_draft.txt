@@ -24,8 +24,8 @@ How to use this list:
 
 Shipped releases, newest first (live; may be newer than the knowledge base):
 
-### Scrollr {{CURRENT_VERSION}} — Pin what matters (desktop-v{{CURRENT_VERSION}}, 2026-09-08)
-A pin is one chip that stays put. Two pins, on purpose.
+### Scrollr 1.5.0 — Chips, redrawn (desktop-v1.5.0, 2026-09-04)
+Every data chip on the ticker rebuilt in one language.
 
 
 HOW TO WRITE IT:

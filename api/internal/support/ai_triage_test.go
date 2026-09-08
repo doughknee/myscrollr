@@ -28,9 +28,13 @@ func goldenFixtures() map[string]TriageInput {
 			{Key: "REL-235", Title: "Standings flap between a value and a dash on live games",
 				Priority: "urgent", Labels: []string{"bug", "ticker"}},
 		},
+		// Deliberately an OLD release, never the current one: checkGolden
+		// masks currentDesktopVersion() with a plain string replace, so a
+		// fixture that names the current version gets silently rewritten
+		// and then un-rewritten by the next bump.
 		[]shippedRelease{{
-			Tag: "desktop-v1.6.2", Name: "Scrollr 1.6.2 — Pin what matters", Date: "2026-09-08",
-			Body: "A pin is one chip that stays put. Two pins, on purpose.",
+			Tag: "desktop-v1.5.0", Name: "Scrollr 1.5.0 — Chips, redrawn", Date: "2026-09-04",
+			Body: "Every data chip on the ticker rebuilt in one language.",
 		}},
 	)
 
@@ -121,6 +125,12 @@ func TestPromptGoldens(t *testing.T) {
 // checkGolden compares against testdata, with the current release number
 // masked: the KB names it, it moves every release, and a golden that has to
 // be regenerated on every release is a golden nobody reads.
+//
+// The mask is a blunt string replace, so no fixture above may use the
+// current version as literal data — see the shippedRelease fixture, which
+// deliberately names an old release. On 1.6.3 that bit: the fixture said
+// 1.6.2, the mask had been rewriting it as {{CURRENT_VERSION}} while 1.6.2
+// was current, and the bump un-masked it and failed every golden.
 func checkGolden(t *testing.T, name, got string) {
 	t.Helper()
 	got = strings.ReplaceAll(got, currentDesktopVersion(), "{{CURRENT_VERSION}}")
