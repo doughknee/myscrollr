@@ -182,7 +182,11 @@ func handleDiscordButtonClick(c *fiber.Ctx, ix *discordInteraction) error {
 	}
 	prefix, idStr := parts[0], parts[1]
 
-	// /inbox paging carries an offset, not a draft id.
+	// Two buttons carry something other than a draft id: /inbox paging carries
+	// an offset, and a /link confirmation carries the pair it is confirming.
+	if prefix == "support_link" {
+		return handleDiscordLinkConfirm(c, idStr)
+	}
 	if prefix == "support_inbox" {
 		offset, err := strconv.Atoi(idStr)
 		if err != nil || offset < 0 {
@@ -1060,6 +1064,8 @@ func handleDiscordSlashCommand(c *fiber.Ctx, ix *discordInteraction) error {
 		return handleDiscordTicketCommand(c, ix)
 	case "regen":
 		return handleDiscordRegenCommand(c, ix)
+	case "link":
+		return handleDiscordLinkCommand(c, ix)
 	case "stats":
 		return handleDiscordStatsCommand(c, ix)
 	case "pause":

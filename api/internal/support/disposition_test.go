@@ -168,6 +168,86 @@ func TestDisposition_MoneyAndAccountNeverAutoSend(t *testing.T) {
 
 // The cap is "already sent this many", not "sent more than this many": at the
 // limit the next reply is the one too far.
+// =============================================================================
+// REL-259 — the bot may only claim a fix it can prove
+// =============================================================================
+
+// The prompt tells the drafter not to claim an unprovable fix. This is the
+// part that does not depend on the model having listened.
+func TestDisposition_FixClaimWithoutProofEscalates(t *testing.T) {
+	for _, body := range []string{
+		"Good news, this was fixed in 1.6.2. Please update.",
+		"That is fixed in a newer build.",
+		"Please update to the latest version and let us know.",
+		"Download the latest build from myscrollr.com and try again.",
+		"We shipped a fix for this.",
+	} {
+		s := sendableSignals()
+		s.DraftBody = body
+		got, reason := decide(t, s)
+		if got != dispositionEscalate {
+			t.Errorf("%q -> %s (%s), want escalate", body, got, reason)
+		}
+	}
+
+	// The same words with the proof behind them are exactly what the bot is
+	// for. Nothing here blocks a claim we can stand behind.
+	s := sendableSignals()
+	s.DraftBody = "Good news, this was fixed in 1.6.2. Please update to the latest version."
+	s.HasProvenFix = true
+	if got, reason := decide(t, s); got != dispositionAutoSend {
+		t.Errorf("a proven fix must still send: %s (%s)", got, reason)
+	}
+}
+
+// Asking somebody which version they run is a diagnostic, not a fix claim, and
+// the issue is explicit that it stays.
+func TestDisposition_AskingForAVersionIsNotAFixClaim(t *testing.T) {
+	s := sendableSignals()
+	s.Category, s.DrafterCategory = "bug", "bug"
+	s.DraftBody = "Sorry about that. Which version of Scrollr are you on? Settings then Updates shows it."
+	s.AskUserFor = "their Scrollr version"
+	if got, reason := decide(t, s); got != dispositionAutoAsk {
+		t.Errorf("got %s (%s), want auto_ask — asking for a version must stay sendable", got, reason)
+	}
+}
+
+// An old ticket asks rather than tells: a question goes out unattended, and a
+// reply that insists on telling gets a person instead.
+func TestDisposition_StaleTicketAsksRatherThanTells(t *testing.T) {
+	asks := sendableSignals()
+	asks.Category, asks.DrafterCategory = "bug", "bug"
+	asks.StaleDays, asks.StaleAfter = 40, 30
+	asks.DraftBody = "Sorry for the wait. Is this still happening, and which version are you on now?"
+	asks.AskUserFor = "whether it still happens; their Scrollr version"
+	if got, reason := decide(t, asks); got != dispositionAutoAsk {
+		t.Errorf("got %s (%s), want auto_ask on a 40-day-old ticket with no fix on record", got, reason)
+	}
+
+	tells := asks
+	tells.DraftBody = "Thanks for the report. Toggling the widget off and on should sort it."
+	tells.AskUserFor = ""
+	got, reason := decide(t, tells)
+	if got != dispositionEscalate || !strings.Contains(reason, "40 days old") {
+		t.Errorf("got %s (%s), want escalate naming the age", got, reason)
+	}
+
+	// Proof beats age. A stale ticket whose fix actually shipped is the one
+	// case where telling is the honest answer.
+	proven := tells
+	proven.HasProvenFix = true
+	if got, reason := decide(t, proven); got != dispositionAutoSend {
+		t.Errorf("got %s (%s), want auto_send when the fix is on record", got, reason)
+	}
+
+	// Fresh tickets are untouched by any of this.
+	fresh := tells
+	fresh.StaleDays = 3
+	if got, reason := decide(t, fresh); got != dispositionAutoSend {
+		t.Errorf("got %s (%s), want auto_send on a three-day-old ticket", got, reason)
+	}
+}
+
 func TestDisposition_ReplyCap(t *testing.T) {
 	for _, n := range []int{0, 1, 2} {
 		s := sendableSignals()

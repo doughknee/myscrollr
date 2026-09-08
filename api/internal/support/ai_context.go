@@ -124,9 +124,10 @@ func monitorCountsFromDiagnostics(diag map[string]interface{}) (attached, chosen
 	return attached, chosen
 }
 
-// render writes the context block. Version handling is the point of it: an
-// out-of-date user is told to update, and what changed, before anyone starts
-// troubleshooting a bug that may already be fixed.
+// render writes the context block. Version handling is the point of it, but
+// only as a DIAGNOSTIC: knowing somebody is three releases behind narrows the
+// problem. It is not permission to tell them updating is the answer — that
+// claim needs the FIX ON RECORD block (REL-259).
 func (tc TicketContext) render() string {
 	var b strings.Builder
 	b.WriteString("WHO IS WRITING (server-side facts, not the user's claims)\n")
@@ -141,9 +142,9 @@ func (tc TicketContext) render() string {
 		fmt.Fprintf(&b, "App version: unknown. Current release is %s.\n", current)
 	case compareVersions(tc.AppVersion, current) < 0:
 		fmt.Fprintf(&b, "Current release is %s; this user is on %s. THEY ARE OUT OF DATE.\n", current, tc.AppVersion)
-		b.WriteString("Before any troubleshooting, tell them to update and say what changed between " +
-			tc.AppVersion + " and " + current + ", from the release notes in the knowledge base. " +
-			"If the notes say their problem was fixed in one of those versions, updating IS the answer.\n")
+		b.WriteString("That is a useful diagnostic and nothing more. Do NOT tell them updating will " +
+			"fix what they reported unless the FIX ON RECORD block below names a version; the release " +
+			"notes do not record which report a change closed.\n")
 	default:
 		fmt.Fprintf(&b, "Current release is %s; this user is on %s. They are up to date.\n", current, tc.AppVersion)
 	}
@@ -209,6 +210,45 @@ func versionPart(parts []string, i int) int {
 	}
 	n, _ := strconv.Atoi(digits)
 	return n
+}
+
+// renderFixRecord is the FIX ON RECORD block: the one place in the prompt
+// permitted to say a fix exists, and the one place the drafter may read that
+// from (REL-259). It is a server-computed fact, never something to infer.
+//
+// staleDays is how long ago the user last wrote. Past the threshold with no
+// proven fix the only honest reply is a question, and the block says so in the
+// same voice the needs_info branch uses.
+func renderFixRecord(pf *ProvenFix, staleDays int, userVersion string) string {
+	var b strings.Builder
+	b.WriteString("FIX ON RECORD (server-computed; the ONLY thing that permits a fix claim)\n")
+
+	if pf == nil {
+		b.WriteString("None. No shipped fix is on record for this report.\n" +
+			"You may NOT say this was fixed, name a version as the remedy, or tell them to update as " +
+			"the answer. Asking which version they are running to narrow the problem is a different " +
+			"thing and is fine. If you think it may be fixed, ASK whether it is still happening " +
+			"rather than asserting that it is not.\n")
+		if staleDays >= staleTicketDays() {
+			fmt.Fprintf(&b, "\nTHIS TICKET IS %d DAYS OLD and nothing is on record as fixing it. Do not\n"+
+				"troubleshoot and do not guess. The reply is ONE short paragraph, then the sign-off:\n"+
+				"apologise briefly for the wait, say that several updates have shipped since they wrote\n"+
+				"in, and ask whether it is still happening and which version of Scrollr they are on now.\n"+
+				"List both of those in ask_user_for.\n", staleDays)
+		}
+		return b.String()
+	}
+
+	fmt.Fprintf(&b, "This user's report is linked to %s, which shipped in Scrollr %s.\n",
+		pf.IssueKey, pf.Version)
+	fmt.Fprintf(&b, "You MAY say the fix for what they reported went out in %s and point them at the "+
+		"update. Never put the issue key in the reply.\n", pf.Version)
+	if userVersion != "" && compareVersions(userVersion, pf.Version) >= 0 {
+		fmt.Fprintf(&b, "They are already on %s, which carries that fix, so updating is NOT the answer "+
+			"for them. Say the fix shipped in %s and ask what they are still seeing.\n",
+			userVersion, pf.Version)
+	}
+	return b.String()
 }
 
 // renderSimilarCases writes the "what we sent last time" block. The body is

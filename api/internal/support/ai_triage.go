@@ -117,6 +117,13 @@ type TriageInput struct {
 	KnownIssues string
 	Similar     []SimilarCase
 
+	// ProvenFix and StaleDays are the REL-259 facts: whether a shipped fix
+	// for THIS report is on record, and how long the reporter has been
+	// waiting. Both are computed server-side by triageTicket; a nil
+	// ProvenFix is the ordinary case and forbids every fix claim.
+	ProvenFix *ProvenFix
+	StaleDays int
+
 	// Reply-loop fields. Populated when this triage is for a user's
 	// follow-up on an existing ticket (osTicket thread-message webhook).
 	IsReply           bool
@@ -157,6 +164,17 @@ func triageTicket(ctx context.Context, input TriageInput) *TriageResult {
 	if input.Similar == nil {
 		input.Similar = FetchSimilarCases(ctx,
 			input.Subject+" "+htmlToPlain(input.Body), input.ReplyTicketNumber, similarCaseCount)
+	}
+	// A brand-new ticket has no case yet, so no link and no waiting: the zero
+	// values are already the truth for it, and they forbid a fix claim, which
+	// is the right default for a report nobody has looked at.
+	if input.ReplyTicketNumber != "" {
+		if input.ProvenFix == nil {
+			input.ProvenFix = lookupProvenFix(ctx, input.ReplyTicketNumber)
+		}
+		if input.StaleDays == 0 {
+			input.StaleDays = caseStaleDays(ctx, input.ReplyTicketNumber)
+		}
 	}
 
 	cls, clsUsage, err := classifyTicket(ctx, input)
@@ -490,6 +508,11 @@ HARD RULES for anything the user will read:
 - Never mention the Super User program, by name or by description.
 - Never give a date, an estimate or a promise for anything that has not shipped.
 - Never quote a dollar amount. Link https://myscrollr.com/uplink instead.
+- Never say something was fixed, name a version as the remedy, or tell someone to update as the
+  answer, unless the FIX ON RECORD block in the ticket says a fix shipped. Release notes are
+  written for everyone and do not record which report a change closed, so they are never proof.
+  Without that block you may ask whether it is still happening; you may not assert that it is not.
+  Asking which version someone is running in order to diagnose is a different thing and is fine.
 - Never use an em dash or an en dash. Commas, periods, parentheses and hyphens only.
 - Sentence case. Warm, plain, short. Answer the question asked and do not tour features.
 - End every reply with exactly these two lines, and nothing after them:
@@ -560,6 +583,7 @@ func buildDraftPrompt(in TriageInput, cls *classification) string {
 
 	b.WriteString(in.Context.render())
 	b.WriteString("\n" + in.KnownIssues + "\n")
+	b.WriteString("\n" + renderFixRecord(in.ProvenFix, in.StaleDays, in.Context.AppVersion))
 
 	if s := renderSimilarCases(in.Similar); s != "" {
 		b.WriteString("\n" + s)

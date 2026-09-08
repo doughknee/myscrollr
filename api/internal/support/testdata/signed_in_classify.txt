@@ -24,7 +24,7 @@ happened. The context block below says whether diagnostics were attached.
 WHO IS WRITING (server-side facts, not the user's claims)
 Plan: uplink_pro
 Current release is {{CURRENT_VERSION}}; this user is on 1.6.0. THEY ARE OUT OF DATE.
-Before any troubleshooting, tell them to update and say what changed between 1.6.0 and {{CURRENT_VERSION}}, from the release notes in the knowledge base. If the notes say their problem was fixed in one of those versions, updating IS the answer.
+That is a useful diagnostic and nothing more. Do NOT tell them updating will fix what they reported unless the FIX ON RECORD block below names a version; the release notes do not record which report a change closed.
 Operating system: Windows 11 (26200)
 Monitors: 2 attached, 1 chosen for the ticker
 Widgets (2 added, 1 on the ticker):

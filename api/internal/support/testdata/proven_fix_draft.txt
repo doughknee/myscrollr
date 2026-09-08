@@ -32,8 +32,8 @@ Every data chip on the ticker rebuilt in one language.
 
 
 FIX ON RECORD (server-computed; the ONLY thing that permits a fix claim)
-None. No shipped fix is on record for this report.
-You may NOT say this was fixed, name a version as the remedy, or tell them to update as the answer. Asking which version they are running to narrow the problem is a different thing and is fine. If you think it may be fixed, ASK whether it is still happening rather than asserting that it is not.
+This user's report is linked to REL-235, which shipped in Scrollr 1.6.1.
+You MAY say the fix for what they reported went out in 1.6.1 and point them at the update. Never put the issue key in the reply.
 
 SIMILAR PAST CASES — what we actually sent. Use them for approach and tone.
 NEVER copy one verbatim: the details in it belong to a different user.

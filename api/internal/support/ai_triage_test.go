@@ -120,6 +120,18 @@ func TestPromptGoldens(t *testing.T) {
 	// the reply rather than its content, so it gets its own golden.
 	in := goldenFixtures()["anonymous"]
 	checkGolden(t, "needs_info_draft.txt", buildDraftPrompt(in, needsInfoCls))
+
+	// The two REL-259 states. What the reply is ALLOWED to assert is decided
+	// entirely by these blocks, so both get pinned: a months-old report with
+	// nothing on record behind it, and one whose fix demonstrably shipped.
+	stale := goldenFixtures()["signed_in"]
+	stale.StaleDays = 120
+	checkGolden(t, "stale_no_fix_draft.txt", buildDraftPrompt(stale, cls))
+
+	proven := goldenFixtures()["signed_in"]
+	proven.StaleDays = 120
+	proven.ProvenFix = &ProvenFix{IssueKey: "REL-235", Version: "1.6.1"}
+	checkGolden(t, "proven_fix_draft.txt", buildDraftPrompt(proven, cls))
 }
 
 // checkGolden compares against testdata, with the current release number

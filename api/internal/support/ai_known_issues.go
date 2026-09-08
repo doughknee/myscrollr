@@ -29,15 +29,19 @@ import (
 // not a broken one.
 
 const (
-	knownIssuesReleasesURL = "https://api.github.com/repos/doughknee/myscrollr/releases?per_page=3"
-	knownIssuesCacheKey    = "support:known_issues:v1"
-	knownIssuesTTL         = 10 * time.Minute
-	knownIssuesTimeout     = 8 * time.Second
+	knownIssuesReleaseCount = 3
+	knownIssuesCacheKey     = "support:known_issues:v1"
+	knownIssuesTTL          = 10 * time.Minute
+	knownIssuesTimeout      = 8 * time.Second
 	// Linear descriptions are whole bug reports; the drafter only needs
 	// enough to recognise a match.
 	maxIssueDescChars   = 240
 	maxReleaseBodyChars = 1800
 )
+
+// knownIssuesReleasesURL is a var (and a format string, %d = per_page) so the
+// proven-fix tests can serve a release list from a stub.
+var knownIssuesReleasesURL = "https://api.github.com/repos/doughknee/myscrollr/releases?per_page=%d"
 
 // knownIssuesBlock returns the rendered block, cached in Redis. A cache miss
 // costs one Linear call and one GitHub call; a total failure costs nothing
@@ -48,7 +52,7 @@ func knownIssuesBlock(ctx context.Context) string {
 			return cached
 		}
 	}
-	block := buildKnownIssuesBlock(fetchOpenLinearIssues(ctx), fetchRecentReleases(ctx))
+	block := buildKnownIssuesBlock(fetchOpenLinearIssues(ctx), fetchRecentReleases(ctx, knownIssuesReleaseCount))
 	if platform.Rdb != nil {
 		if err := platform.Rdb.Set(ctx, knownIssuesCacheKey, block, knownIssuesTTL).Err(); err != nil {
 			log.Printf("[Triage] cache known issues: %v", err)
@@ -74,6 +78,12 @@ type shippedRelease struct {
 	Name string
 	Date string
 	Body string
+	// URL, PublishedAt and Prerelease are read only by the proven-fix lookup
+	// (REL-259): which release carried a merged fix, and whether it is a build
+	// a user can actually be on.
+	URL         string
+	PublishedAt time.Time
+	Prerelease  bool
 }
 
 // buildKnownIssuesBlock renders the block. Pure, so the golden tests can pin
@@ -101,8 +111,9 @@ func buildKnownIssuesBlock(issues []openIssue, releases []shippedRelease) string
 	b.WriteString("\nHow to use this list:\n" +
 		"- The user's problem matches an OPEN issue: say it is a known issue and that it is being fixed. " +
 		"Give no date and no estimate. Put the issue key in internal_note.\n" +
-		"- The user's problem matches something the release notes below say was FIXED: name the version " +
-		"that fixed it and tell them to update.\n" +
+		"- The release notes below are context for what has changed, NOT evidence that this user's " +
+		"report was fixed. They are written for everyone and do not record which report a change " +
+		"closed. Only the FIX ON RECORD block may be used to claim a fix.\n" +
 		"- No match: do not mention the issue tracker at all. Never invent an issue key.\n" +
 		"- Issue keys, titles and descriptions here are internal. Never put one in the reply to the user.\n")
 
@@ -194,8 +205,12 @@ func linearPriorityName(p int) string {
 // fetchRecentReleases reads the last three published releases. The knowledge
 // base carries release notes too, but it is generated at build time; this
 // covers the window between a release going out and the next image build.
-func fetchRecentReleases(ctx context.Context) []shippedRelease {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, knownIssuesReleasesURL, nil)
+func fetchRecentReleases(ctx context.Context, count int) []shippedRelease {
+	if count <= 0 {
+		count = knownIssuesReleaseCount
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		fmt.Sprintf(knownIssuesReleasesURL, count), nil)
 	if err != nil {
 		return nil
 	}
@@ -216,6 +231,8 @@ func fetchRecentReleases(ctx context.Context) []shippedRelease {
 		Name        string `json:"name"`
 		Body        string `json:"body"`
 		Draft       bool   `json:"draft"`
+		Prerelease  bool   `json:"prerelease"`
+		HTMLURL     string `json:"html_url"`
 		PublishedAt string `json:"published_at"`
 	}
 	if err := json.Unmarshal(raw, &rels); err != nil {
@@ -231,7 +248,11 @@ func fetchRecentReleases(ctx context.Context) []shippedRelease {
 		if len(date) >= 10 {
 			date = date[:10]
 		}
-		out = append(out, shippedRelease{Tag: r.TagName, Name: r.Name, Date: date, Body: r.Body})
+		published, _ := time.Parse(time.RFC3339, r.PublishedAt)
+		out = append(out, shippedRelease{
+			Tag: r.TagName, Name: r.Name, Date: date, Body: r.Body,
+			URL: r.HTMLURL, PublishedAt: published, Prerelease: r.Prerelease,
+		})
 	}
 	return out
 }
