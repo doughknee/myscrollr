@@ -896,6 +896,9 @@ func upsertSupportTicketThread(ctx context.Context, t *SupportTicketThread) erro
 	if err != nil {
 		return fmt.Errorf("upsert ticket thread: %w", err)
 	}
+	_, _ = platform.DBPool.Exec(ctx,
+		`UPDATE support_cases SET discord_thread_id = $2 WHERE ticket_number = $1`,
+		t.TicketNumber, t.DiscordThreadID)
 	return nil
 }
 

@@ -240,6 +240,9 @@ func (s *Server) setupRoutes() {
 	s.App.Get("/support/edit", support.HandleSupportEdit)
 	s.App.Get("/support/skip", support.HandleSupportSkip)
 	s.App.Post("/support/edit/submit", support.HandleSupportEditSubmit)
+	// Case DB full-text search (REL-243). Server-to-server: gated by the
+	// osTicket webhook's shared secret inside the handler.
+	s.App.Get("/internal/support/cases", support.HandleSearchSupportCases)
 
 	// Invite (no auth — user isn't logged in yet, token-verified server-side)
 	s.App.Post("/invite/complete", accounts.HandleCompleteInvite)

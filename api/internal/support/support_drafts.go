@@ -110,6 +110,18 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 		return nil, fmt.Errorf("createSupportDraft: %w", err)
 	}
 	draft.Status = "pending"
+
+	// Case DB: the draft is an event on the case, and triage's read of
+	// the ticket (category / priority / summary) is the best one we have.
+	if err := recordSupportMessage(ctx, SupportMessage{
+		TicketNumber: draft.TicketNumber, Kind: "ai_draft", BodyHTML: draft.DraftBodyHTML,
+		AIDraftID: draft.ID, CreatedAt: draft.CreatedAt,
+	}); err != nil {
+		log.Printf("[Cases] %v", err)
+	}
+	applyTriageToCase(ctx, draft.TicketNumber, &TriageResult{
+		Category: draft.AICategory, Priority: draft.AIPriority, Summary: draft.AISummary,
+	})
 	return draft, nil
 }
 
@@ -192,6 +204,19 @@ func markDraftDecided(ctx context.Context, id int64, newStatus string, editedBod
 	}
 	if tag.RowsAffected() == 0 {
 		return ErrAlreadyDecided
+	}
+	// A skip is the one decision with no send behind it, so it leaves its
+	// mark here; approve/edit are recorded by doSendApprovedReply with
+	// the body that actually went out.
+	if newStatus == "skipped" {
+		var ticket string
+		if err := platform.DBPool.QueryRow(ctx, `SELECT ticket_number FROM support_drafts WHERE id = $1`, id).Scan(&ticket); err == nil {
+			if err := recordSupportMessage(ctx, SupportMessage{
+				TicketNumber: ticket, Kind: "note", BodyText: "AI draft skipped", AIDraftID: id,
+			}); err != nil {
+				log.Printf("[Cases] %v", err)
+			}
+		}
 	}
 	return nil
 }
@@ -320,6 +345,24 @@ func doSendApprovedReply(ctx context.Context, draft *SupportDraft, body string) 
 
 	log.Printf("[Drafts] reply posted to osTicket for ticket=%s status=%d body=%s",
 		draft.TicketNumber, status, string(respBody))
+
+	// Case DB: what went out (the edited body when there was one), keyed
+	// on the osTicket entry id the plugin returns so the nightly reconcile
+	// recognises it instead of inserting the same reply again.
+	var reply struct {
+		EntryID int64 `json:"entry_id"`
+		Closed  bool  `json:"closed"`
+	}
+	_ = json.Unmarshal(respBody, &reply)
+	if err := recordSupportMessage(ctx, SupportMessage{
+		TicketNumber: draft.TicketNumber, Kind: "sent", BodyHTML: body,
+		AIDraftID: draft.ID, OSTicketEntryID: reply.EntryID,
+	}); err != nil {
+		log.Printf("[Cases] %v", err)
+	}
+	if reply.Closed {
+		setCaseStatus(ctx, draft.TicketNumber, "closed")
+	}
 	return nil
 }
 

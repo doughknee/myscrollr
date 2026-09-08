@@ -11,58 +11,7 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 )
-
-// --- Recent ticket summaries (Redis sliding window) ---
-// Sliding window of the last N ticket summaries, used as context when
-// asking Claude to dupe-detect against recent submissions. Keyed by a
-// single global list; entries are LPUSHed and trimmed to the cap.
-
-const (
-	RedisRecentTicketsKey   = "support:recent_tickets"
-	RedisRecentTicketsLimit = 50
-)
-
-// PushRecentTicketSummary adds a summary to the head of the sliding
-// window. Atomic — uses LPUSH+LTRIM in a pipeline.
-func PushRecentTicketSummary(ctx context.Context, summary RecentTicketSummary) {
-	if platform.Rdb == nil {
-		return
-	}
-	bytes, err := json.Marshal(summary)
-	if err != nil {
-		log.Printf("[Redis] marshal recent ticket: %v", err)
-		return
-	}
-	pipe := platform.Rdb.Pipeline()
-	pipe.LPush(ctx, RedisRecentTicketsKey, string(bytes))
-	pipe.LTrim(ctx, RedisRecentTicketsKey, 0, int64(RedisRecentTicketsLimit-1))
-	if _, err := pipe.Exec(ctx); err != nil {
-		log.Printf("[Redis] push recent ticket: %v", err)
-	}
-}
-
-// FetchRecentTicketSummaries returns the last N summaries (most recent first).
-func FetchRecentTicketSummaries(ctx context.Context) []RecentTicketSummary {
-	if platform.Rdb == nil {
-		return nil
-	}
-	rawList, err := platform.Rdb.LRange(ctx, RedisRecentTicketsKey, 0, int64(RedisRecentTicketsLimit-1)).Result()
-	if err != nil {
-		log.Printf("[Redis] fetch recent tickets: %v", err)
-		return nil
-	}
-	out := make([]RecentTicketSummary, 0, len(rawList))
-	for _, s := range rawList {
-		var sum RecentTicketSummary
-		if err := json.Unmarshal([]byte(s), &sum); err == nil {
-			out = append(out, sum)
-		}
-	}
-	return out
-}
 
 // =============================================================================
 // AI Support Triage — Anthropic Haiku integration
@@ -104,7 +53,7 @@ type TriageResult struct {
 
 // TriageInput is what we pass to triageTicket. Builds the prompt
 // from these fields plus a small bundle of recent ticket summaries
-// pulled from Redis (for dupe detection) and a static FAQ snippet.
+// pulled from support_cases (for dupe detection) and a static FAQ snippet.
 type TriageInput struct {
 	UserCategory    string
 	UserEmail       string
@@ -123,8 +72,9 @@ type TriageInput struct {
 	PreviousAIReplyHTML string // most recent AI reply we sent on this ticket, if known
 }
 
-// RecentTicketSummary is what we cache in Redis for dupe-detection
-// context. Kept compact — this list is sent on every triage call.
+// RecentTicketSummary is one line of dupe-detection context for the
+// triage prompt: the last 50 support_cases (FetchRecentTicketSummaries
+// in support_cases.go). Kept compact — the list rides on every call.
 type RecentTicketSummary struct {
 	TicketNumber string `json:"ticket_number"`
 	Category     string `json:"category"`

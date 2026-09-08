@@ -139,6 +139,23 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	// Case DB first: the user's follow-up is an event whether or not
+	// triage produces a draft. A user reply reopens the ticket in osTicket,
+	// so the case goes back to open too.
+	if platform.DBPool != nil {
+		if err := upsertSupportCase(ctx, SupportCase{
+			TicketNumber: ev.TicketNumber, UserEmail: ev.UserEmail, Subject: ev.Subject, Status: "open",
+		}); err != nil {
+			log.Printf("[Cases] %v", err)
+		}
+		if err := recordSupportMessage(ctx, SupportMessage{
+			TicketNumber: ev.TicketNumber, Kind: "user", BodyHTML: ev.MessageHTML,
+			OSTicketEntryID: ev.ThreadEntryID,
+		}); err != nil {
+			log.Printf("[Cases] %v", err)
+		}
+	}
+
 	// Pull the most recent SENT reply on this ticket so the triage
 	// prompt has continuity context. Best-effort — empty string is OK.
 	previousReply := loadLatestSentDraftBody(ctx, ev.TicketNumber)
