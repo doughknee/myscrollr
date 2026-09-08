@@ -738,10 +738,10 @@ type discordSlashCommandOption struct {
 //
 // Guild-scoped commands appear instantly; global commands have a 1-hour
 // propagation delay. We use guild-scoped because we have one server.
-func registerDiscordSlashCommands(ctx context.Context) error {
+func registerDiscordSlashCommands(ctx context.Context) ([]string, error) {
 	cfg, ok := loadDiscordConfig()
 	if !ok {
-		return errors.New("discord not configured")
+		return nil, errors.New("discord not configured")
 	}
 
 	commands := []discordSlashCommand{
@@ -844,12 +844,20 @@ func registerDiscordSlashCommands(ctx context.Context) error {
 		cfg.ApplicationID, cfg.GuildID)
 	respBody, status, err := discordRequest(ctx, http.MethodPut, path, commands)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if status >= 400 {
-		return fmt.Errorf("register slash commands: status %d body %s", status, string(respBody))
+		return nil, fmt.Errorf("register slash commands: status %d body %s", status, string(respBody))
 	}
-	return nil
+
+	// Returned rather than logged from a hand-written list: /link was added
+	// and the boot line kept naming the eight commands before it, which is a
+	// log that quietly lies about what the bot can do.
+	names := make([]string, 0, len(commands))
+	for _, c := range commands {
+		names = append(names, "/"+c.Name)
+	}
+	return names, nil
 }
 
 // RegisterDiscordSlashCommandsAtBoot is the public boot hook called
@@ -866,11 +874,11 @@ func RegisterDiscordSlashCommandsAtBoot(ctx context.Context) {
 		log.Println("[Discord] not configured; skipping slash command registration")
 		return
 	}
-	if err := registerDiscordSlashCommands(ctx); err != nil {
+	if names, err := registerDiscordSlashCommands(ctx); err != nil {
 		log.Printf("[Discord] register slash commands: %v", err)
 		// Continue to tag bootstrap even if commands failed.
 	} else {
-		log.Println("[Discord] slash commands registered (/inbox, /case, /search, /ticket, /regen, /stats, /pause, /resume)")
+		log.Printf("[Discord] slash commands registered (%s)", strings.Join(names, ", "))
 	}
 
 	if err := ensureSupportForumTags(ctx, cfg.SupportChannelID); err != nil {
