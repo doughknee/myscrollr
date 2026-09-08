@@ -176,6 +176,13 @@ func HandleSubmitPublicSupportTicket(c *fiber.Ctx) error {
 	log.Printf("[PublicSupport] Ticket created from ip=%s email=%s category=%s osTicket=%s",
 		redactIP(ip), redactEmail(req.Email), req.Category, ticketNumber)
 
+	recordTicketOpened(c.Context(), SupportCase{
+		TicketNumber: ticketNumber,
+		UserEmail:    req.Email,
+		Subject:      subjectFull,
+		Category:     effectiveCategory,
+	}, originalBody)
+
 	if triage != nil && ticketNumber != "" {
 		persistTriageSideEffects(ticketNumber, req.Email, fallbackName(req.Name, req.Email), subjectFull, originalBody, triage)
 	}

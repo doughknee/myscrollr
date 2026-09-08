@@ -101,6 +101,9 @@ func main() {
 	// configured). No-op if Discord env vars aren't set.
 	support.RegisterDiscordSlashCommandsAtBoot(ctx)
 
+	// Nightly re-sync of the support case DB from osTicket (REL-243).
+	support.StartSupportCaseReconciler(ctx)
+
 	// Build and start the gateway server
 	srv := core.NewServer()
 	srv.Setup()

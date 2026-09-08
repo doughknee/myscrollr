@@ -320,6 +320,20 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 	// they didn't earn — see allowedBySupportRateLimit.
 	recordSupportSubmission(userID)
 
+	// Case DB: the ticket row plus the user's opening message. Before the
+	// triage side effects so the draft has a case to attach to.
+	appVersion, osName := caseFieldsFromDiagnostics(req.Diagnostics)
+	recordTicketOpened(c.Context(), SupportCase{
+		TicketNumber: ticketNumber,
+		UserEmail:    email,
+		LogtoSub:     userID,
+		Subject:      subject,
+		Category:     effectiveCategory,
+		AppVersion:   appVersion,
+		OS:           osName,
+		TierAtOpen:   platform.TierFromRoles(platform.GetUserRoles(c)),
+	}, originalBody)
+
 	// Side effects after successful ticket creation: persist the AI
 	// draft for partner approval, push to the recent-tickets sliding
 	// window, and notify the partner. All best-effort — failures here
@@ -399,19 +413,33 @@ func persistTriageSideEffects(ticketNumber, userEmail, userName, subject, origin
 			log.Printf("[Support] createSupportDraft failed for ticket %s: %v", ticketNumber, err)
 		}
 
-		// Recent-tickets sliding window for dupe detection on subsequent submissions.
-		PushRecentTicketSummary(ctx, RecentTicketSummary{
-			TicketNumber: ticketNumber,
-			Category:     triage.Category,
-			Summary:      triage.Summary,
-			CreatedAt:    time.Now().UTC().Format(time.RFC3339),
-		})
-
 		// Partner notification — wired in Phase 1D once SendPartnerNotification exists.
 		if draft != nil {
 			notifyPartnerAfterDraft(ctx, draft)
 		}
 	}()
+}
+
+// recordTicketOpened writes the case row and the user's opening message
+// when a ticket has been accepted by osTicket. Best-effort: the user
+// already has their ticket; a case-DB failure is logged, never surfaced.
+// Its ticket number is the only thing osTicket's create response gives
+// us, so the message has no entry id yet — the nightly reconcile claims
+// it (see support_backfill.go).
+func recordTicketOpened(ctx context.Context, sc SupportCase, userBodyHTML string) {
+	if platform.DBPool == nil || sc.TicketNumber == "" {
+		return
+	}
+	sc.Status = "open"
+	if err := upsertSupportCase(ctx, sc); err != nil {
+		log.Printf("[Cases] %v", err)
+		return
+	}
+	if err := recordSupportMessage(ctx, SupportMessage{
+		TicketNumber: sc.TicketNumber, Kind: "user", BodyHTML: userBodyHTML,
+	}); err != nil {
+		log.Printf("[Cases] %v", err)
+	}
 }
 
 // ===== OS Ticket forwarding helper =====
@@ -474,6 +502,12 @@ func forwardToOSTicket(ctx context.Context, payload OSTicketPayload) (string, er
 // Used by both the create-ticket flow (forwardToOSTicket) and the
 // reply flow (postOSTicketReply in support_drafts.go).
 func postOSTicketJSON(ctx context.Context, path string, payloadBytes []byte) (int, []byte, error) {
+	return osTicketRequest(ctx, "POST", path, payloadBytes)
+}
+
+// osTicketRequest is postOSTicketJSON for any method; the backfill reads
+// the plugin's GET endpoints through it (nil payload).
+func osTicketRequest(ctx context.Context, method, path string, payloadBytes []byte) (int, []byte, error) {
 	osTicketURL := os.Getenv("OSTICKET_URL")
 	apiKeysRaw := os.Getenv("OSTICKET_API_KEY")
 	if osTicketURL == "" || apiKeysRaw == "" {
@@ -494,12 +528,14 @@ func postOSTicketJSON(ctx context.Context, path string, payloadBytes []byte) (in
 			continue
 		}
 
-		httpReq, err := http.NewRequestWithContext(ctx, "POST", fullURL, bytes.NewReader(payloadBytes))
+		httpReq, err := http.NewRequestWithContext(ctx, method, fullURL, bytes.NewReader(payloadBytes))
 		if err != nil {
 			log.Printf("[Support] Failed to create OS Ticket request: %v", err)
 			continue
 		}
-		httpReq.Header.Set("Content-Type", "application/json")
+		if payloadBytes != nil {
+			httpReq.Header.Set("Content-Type", "application/json")
+		}
 		httpReq.Header.Set("X-API-Key", key)
 
 		resp, err := client.Do(httpReq)
