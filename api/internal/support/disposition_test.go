@@ -63,6 +63,14 @@ func TestDisposition_Table(t *testing.T) {
 	nothing := sendableSignals()
 	nothing.HasDraft = false
 
+	// The production case that made the rule server-side: ticket #517866,
+	// "It stopped working. Nothing shows up in the bar any more." The
+	// classifier returned needs_info=false; the drafter wrote a pure question
+	// and listed four things in ask_user_for, which were also its unknowns.
+	// What the reply does is the fact. What the classifier flagged is a hint.
+	classifierMissedIt := askable
+	classifierMissedIt.NeedsInfo = false
+
 	cases := []struct {
 		name string
 		in   dispositionSignals
@@ -70,6 +78,7 @@ func TestDisposition_Table(t *testing.T) {
 	}{
 		{"grounded and complete", sendableSignals(), dispositionAutoSend},
 		{"needs information", askable, dispositionAutoAsk},
+		{"classifier missed needs_info", classifierMissedIt, dispositionAutoAsk},
 		{"user says it is fixed", closable, dispositionAutoClose},
 		{"triage produced nothing", nothing, dispositionEscalate},
 	}

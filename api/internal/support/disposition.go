@@ -104,8 +104,27 @@ func decideDisposition(s dispositionSignals) (disposition, reason string) {
 		return dispositionEscalate, fmt.Sprintf("the draft would promise something (%q)", hit)
 	}
 
-	if s.NeedsInfo && strings.TrimSpace(s.AskUserFor) != "" {
-		return dispositionAutoAsk, "asking the user for what we need to troubleshoot"
+	// A reply that asks the user for something is not a final answer, so the
+	// grounding gate below does not apply to it.
+	//
+	// The ticket wrote this rule as "needs_info AND ask_user_for", and the
+	// first production ticket showed why the server cannot lean on
+	// needs_info: the classifier returned false for "It stopped working.
+	// Nothing shows up in the bar any more", while the drafter wrote a pure
+	// question and listed four things in ask_user_for. Under the literal
+	// rule that escalated on `unknowns`, and the unknowns WERE the questions.
+	// The classifier's flag is a hint; what the reply actually does is the
+	// fact, and the drafter is the one that knows it.
+	//
+	// Everything with a consequence has already escalated above this line, so
+	// what is left is the case the ticket cares most about: someone waiting an
+	// hour to be asked which operating system they are on.
+	if ask := strings.TrimSpace(s.AskUserFor); ask != "" {
+		reason := "asking the user for what we need to troubleshoot: " + truncate(ask, 200)
+		if !s.NeedsInfo {
+			reason += " (the drafter asked; the classifier did not flag needs_info)"
+		}
+		return dispositionAutoAsk, reason
 	}
 	if s.ShouldClose {
 		return dispositionAutoClose, "the user confirmed the issue is resolved"
