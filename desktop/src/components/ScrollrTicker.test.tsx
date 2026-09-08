@@ -64,13 +64,13 @@ describe("ScrollrTicker", () => {
     expect(screen.getByText("01:05")).toBeInTheDocument();
   });
 
-  it("does not render a pinned widget that is not in activeTabs", () => {
+  it("does not render a pinned subject whose widget is not in activeTabs", () => {
     render(
       <ScrollrTicker
         dashboard={null}
         activeTabs={["finance"]}
         widgetData={widgetData}
-        pinnedWidgets={{ timer: { side: "right" } }}
+        pins={[{ widget: "timer", subject: "timer", side: "right" }]}
       />,
     );
 
@@ -78,17 +78,50 @@ describe("ScrollrTicker", () => {
     expect(screen.queryByText("01:05")).not.toBeInTheDocument();
   });
 
-  it("renders a pinned widget that is in activeTabs", () => {
+  it("renders a pinned subject whose widget is in activeTabs", () => {
     render(
       <ScrollrTicker
         dashboard={null}
         activeTabs={["timer"]}
         widgetData={widgetData}
-        pinnedWidgets={{ timer: { side: "right" } }}
+        pins={[{ widget: "timer", subject: "timer", side: "right" }]}
       />,
     );
 
     expect(screen.getByText("Timer")).toBeInTheDocument();
     expect(screen.getByText("01:05")).toBeInTheDocument();
+  });
+
+  // The de-duplication rule (§8.5): a pinned subject is lifted OUT of the
+  // scrolling tape, so it is on the bar exactly once. Before REL-239 a
+  // pinned widget was skipped by widget id; now it is skipped by subject,
+  // and this is the test that the swap did not quietly drop the rule.
+  it("renders a pinned single-chip utility exactly once", () => {
+    render(
+      <ScrollrTicker
+        dashboard={null}
+        activeTabs={["timer"]}
+        widgetData={widgetData}
+        pins={[{ widget: "timer", subject: "timer", side: "right" }]}
+      />,
+    );
+
+    expect(screen.getAllByText("01:05")).toHaveLength(1);
+  });
+
+  it("renders nothing for a pinned subject the widget has no chip for", () => {
+    render(
+      <ScrollrTicker
+        dashboard={null}
+        activeTabs={["timer"]}
+        widgetData={widgetData}
+        pins={[{ widget: "timer", subject: "not-a-subject", side: "right" }]}
+      />,
+    );
+
+    // The pin resolves to nothing, so the zone is empty -- and the timer
+    // is NOT lifted out of the tape, because that subject was never pinned.
+    expect(screen.getAllByText("01:05")).toHaveLength(1);
+    expect(document.querySelector(".ticker-pinned-zone")).toBeNull();
   });
 });

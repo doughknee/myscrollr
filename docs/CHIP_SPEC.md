@@ -442,7 +442,7 @@ shrinks or jumps as a slate fills.
 
 | Widget | Inputs the user owns |
 |---|---|
-| All | Which widgets are on the ticker (`widgetsOnTicker`); pinned widgets |
+| All | Which widgets are on the ticker (`widgetsOnTicker`); which subjects are pinned to the fixed zone (§8.5) |
 | Finance | `config.symbols` (the watchlist, in the user's order) |
 | Predictions | starred markets (`predictionsWatchlist`) |
 | Sports | `config.favoriteTeams[league]` |
@@ -458,7 +458,12 @@ shrinks or jumps as a slate fills.
 `onHover` (keep / slow / pause), `tickerMode` (compact / detailed),
 `mixMode` (grouped / mixed), `chipColors` (widget / theme / subtle),
 `scrollMode` (continuous / page), `stepPause`, `tickerPosition`,
-`hideOnFullscreen`, pinning.
+`hideOnFullscreen`.
+
+Pinning is deliberately NOT in either list above: a pin names a subject, so it is an
+input, but it also decides that the subject leaves the tape, so it touches selection.
+It is the one control that does both, and §8.5 is where it is specified. It does not
+open the door to any other selection setting.
 
 **The user does not control selection.** Never add a setting for: how many chips a
 widget contributes; which eligible items appear; their order; the horizon or floor;
@@ -477,6 +482,8 @@ since they are an input.
 | Source | Eligible (horizon) | Floor | Slots | Pool order | Reserve |
 |---|---|---|---|---|---|
 | Sports | live always; `pre` with `0 <= h <= 24`; `final` with `h >= -18` (from kickoff) | soonest `pre` within 7 days | `TICKER_SLOTS = 4` | `sortForDisplay`: live+close 100, live 80, pre 60 (soonest first), final 30 (newest first) | widest short names per class |
+
+Every pool above is first stripped of the widget's pinned subjects (`dropPinned`, §8.5).
 | News | items within `TICKER_RSS_HOURS = 6` | newest per feed if within `TICKER_RSS_FLOOR_HOURS = 48`; undated counts as current | `TICKER_RSS_SLOTS = 3` | newest first, **interleaved by feed** (round-robin, feeds ordered by their newest item) | longest `plainText(title)` per class |
 | Finance | the widget's `symbols` | — | `TICKER_FINANCE_SLOTS = 4` | watchlist order; unlisted rows trail alphabetically | none |
 | Predictions | stars if any (drop `in_sweep===false` unless resolved); else top `TICKER_FALLBACK_LIMIT = 15` rank-1 by trailing volume | — | `TICKER_PREDICTIONS_SLOTS = 4` | `sortPredictions(..., "trending")` | none |
@@ -485,8 +492,13 @@ since they are an input.
 | Fantasy | bounded by the fantasy ticker dial | — | n/a | as built | n/a |
 
 Sports favourites (`config.favoriteTeams[league].teamName` matching either team name)
-are **pinned**: every one is on the rail, keyed `spo-<tab>-<gameId>`, exempt from the
-slot count.
+are **exempt from the slot count**: every one is on the rail, keyed `spo-<tab>-<gameId>`.
+
+A favourite is not a pin, and the two do not merge (REL-239). A favourite — like a
+finance watchlist entry or a starred market — means *always on the tape, exempt from
+slots*. A pin means *out of the tape, parked in the fixed zone*. They compose: pinning a
+favourite lifts that team's fixture into the zone, and the rest of the favourites stay
+on the tape. Do not rename either one into the other.
 
 ### 8.2 `rotateSlots` semantics
 
@@ -539,10 +551,70 @@ instance's rect overlaps the container's rect horizontally. `advanceCycles` incr
 slot only on a visible→hidden transition and returns the same object when nothing
 changed.
 
-### 8.5 Pinned widgets
+### 8.5 Pins (the fixed zone)
 
-`pinnedWidgets[tab]` render in a static zone via `widgetChipsFor(..., { pinned: true })`;
-they never scroll, so `cycles` stays `{}` there and the first `slots` items hold.
+**A pin attaches to a SUBJECT, never to a widget** (REL-239, decided with Brandon
+2026-09-07). The fixed zone keeps its name and its place — that is what users expect a
+pin to mean — but what it holds is one durable thing, and the zone shows that thing's
+current chip.
+
+`prefs.widgets.pins` is an ordered `WidgetPin[]` of `{widget, subject, side, row?}`.
+The subject is the source's own durable id:
+
+| Widget | Subject | Label |
+|---|---|---|
+| Sports | team name (`home_team_name` from the chip) | `teamShortName(league, name)` |
+| Finance | `symbol` | the symbol |
+| News | `feed_url` | `source_name` |
+| Predictions | market `ticker` (not the row `id`) | `event_title \|\| title` |
+| Uptime / GitHub | item `id` | item `label` |
+| Clock / Timer / Weather / Sysmon | the widget id | the catalog name |
+
+The last row is why this reads as universal without a multi-item widget eating the bar:
+a single-chip utility IS its own subject, so a pinned Clock or Weather looks and behaves
+exactly as it did before the model changed.
+
+**Rules:**
+
+1. **One pin, one chip.** `TickerSource.pinnedChip(raw, ctx)` resolves `ctx.pinnedSubject`
+   to exactly one chip. Utilities and capped widgets resolve through
+   `widgetChipsFor(..., { pinnedSubject })` instead, since they have no `TickerSource`.
+2. **A pin bypasses the horizon.** The user already said "this one", so a pinned team
+   shows its next fixture past `TICKER_UPCOMING_HOURS` and past `TICKER_FLOOR_DAYS`
+   (`gamesForTeam`), and a pinned feed shows its newest item past `TICKER_RSS_HOURS`.
+3. **Nothing to show renders nothing.** No placeholder, no dash (§1.7). The pin stays,
+   and the chip returns when the subject does.
+4. **It never scrolls and never rotates.** No `cycles`, no `RotationMemo` in the zone.
+5. **A pinned subject is excluded from the tape**, so it is on the bar exactly once. Each
+   source drops `ctx.pinnedSubjects` from its **pool** via `dropPinned` *before*
+   `rotateSlots` — filtering the rendered chips instead would let a slot resolve to a
+   pinned item and render a hole.
+
+   One accepted overlap, verified on the running bar: if a slot is *currently showing*
+   the subject at the moment it is pinned, that slot keeps it until its own next lap.
+   The rotation memo (§8.2, REL-234) freezes a slot's item until it has gone fully off
+   screen, and that rule outranks this one — a chip must not vanish from under the
+   reader's eyes, not even to enforce de-duplication. It clears itself on the next lap.
+6. **The cap refuses, it never evicts.** `MAX_PINS = 2`, measured (§10.2) against the
+   narrowest bar; the derivation and the chip widths are in `preferences.ts`. `togglePin`
+   returns the same `prefs` reference when full, and every surface says so.
+
+**The control is not on the chip.** The hover pin icon is gone. Pins are set from:
+
+- the ticker's native right-click menu — `App.tsx` resolves the chip under the cursor
+  through `data-pin-subject` on the existing `data-chip` wrapper (`utils/pinTarget.ts`),
+  so the menu names the actual subject ("Pin Yankees", not "Pin MLB");
+- a widget page's item rows (`components/PinSubjectButton.tsx`): the finance watchlist,
+  the news feed manager, a standings row, an open prediction market;
+- the sidebar row's right-click, for single-chip widgets only.
+
+**Nothing is auto-pinned.** A newly added widget used to be pinned to the right so the
+user saw something happen; the cue is a toast naming what was added.
+
+`pinnedWidgets` (the old `Record<widgetId, {side}>`) is migrated in `loadPrefs`:
+single-chip utilities carry over unchanged, and every data-widget pin is **dropped** —
+it meant "park this widget's first N chips", which froze that widget's rotation, and
+there is no subject in it to translate to.
 
 ### 8.6 Costs to state in any PR that adds rotation
 

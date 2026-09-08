@@ -370,20 +370,62 @@ export function arrangeTickerSlots(
   keyPrefix: string,
   memo?: RotationMemo,
 ): TickerSlot[] {
-  const pinned: Game[] = [];
+  // "favorites", not "pinned": a favourite is exempt from the slot count
+  // and always on the TAPE. A pin (REL-239) is a different thing -- it
+  // lifts one subject out of the tape into the fixed zone. Two features,
+  // two words, since one word for both is what started the confusion.
+  const favorites: Game[] = [];
   const pool: Game[] = [];
   for (const g of eligible) {
     const fav = favoriteTeams.has(g.home_team_name) || favoriteTeams.has(g.away_team_name);
-    (fav ? pinned : pool).push(g);
+    (fav ? favorites : pool).push(g);
   }
-  const widest = (cls: Game[], pick: (g: Game) => string) =>
-    cls.map((g) => teamShortName(g.league, pick(g))).reduce((a, b) => (b.length > a.length ? b : a), "");
   const rotating = rotateSlots(pool, slots, cycles, keyPrefix, (g) => g.id, (cls) => ({
-    away: widest(cls, (g) => g.away_team_name),
-    home: widest(cls, (g) => g.home_team_name),
+    away: widestShortName(cls, (g) => g.away_team_name),
+    home: widestShortName(cls, (g) => g.home_team_name),
   }), memo);
   return [
-    ...pinned.map((g) => ({ key: `${keyPrefix}-${g.id}`, game: g })),
+    ...favorites.map((g) => ({ key: `${keyPrefix}-${g.id}`, game: g })),
     ...rotating.map((r) => ({ key: r.key, game: r.item, rotateSlot: r.rotateSlot, reserveNames: r.reserve })),
   ];
+}
+
+/** Widest rendered short name across a set of games (CHIP_SPEC §4.4). */
+export function widestShortName(games: Game[], pick: (g: Game) => string): string {
+  return games
+    .map((g) => teamShortName(g.league, pick(g)))
+    .reduce((a, b) => (b.length > a.length ? b : a), "");
+}
+
+/**
+ * Every game a team is in, newest-relevant first, with NO horizon.
+ *
+ * The rail's horizon (`onTicker`) is a rule about a glanceable bar: what
+ * is on soon. A pin is the user overriding that for one subject -- "this
+ * team, always" -- so a pinned team shows its next fixture even when the
+ * fixture is nine days out and every horizon would have hidden it.
+ *
+ * Order: live first, then the soonest upcoming, then the most recent
+ * final. Returns [] when the widget holds nothing for the team, and the
+ * fixed zone then renders nothing rather than a placeholder.
+ */
+export function gamesForTeam(
+  games: Game[],
+  team: string,
+  now: number = Date.now(),
+): Game[] {
+  const mine = games.filter(
+    (g) => g.home_team_name === team || g.away_team_name === team,
+  );
+  const at = (g: Game) => {
+    const t = new Date(g.start_time).getTime();
+    return Number.isFinite(t) ? t : now;
+  };
+  const bucket = (g: Game) => (isLive(g) ? 0 : g.state === "final" ? 2 : 1);
+  return mine.sort((a, b) => {
+    const d = bucket(a) - bucket(b);
+    if (d !== 0) return d;
+    // Upcoming: soonest first. Finals: most recent first.
+    return bucket(a) === 2 ? at(b) - at(a) : at(a) - at(b);
+  });
 }

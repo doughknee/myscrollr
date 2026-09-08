@@ -21,7 +21,7 @@ function makeWidgetPrefs(widgetsOnTicker: string[]): WidgetPrefs {
     enabledWidgets: widgetsOnTicker,
     sidebarOrder: [],
     widgetsOnTicker,
-    pinnedWidgets: {},
+    pins: [],
     timer: {
       pomodoro: {
         workMins: 25,

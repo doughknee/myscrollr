@@ -15,6 +15,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { applyPinToggle } from "../hooks/usePinSubject";
 import {
   enable as enableAutostart,
   disable as disableAutostart,
@@ -593,6 +594,18 @@ function RootLayout() {
     [toggleOnTicker],
   );
 
+  // A single-chip widget IS its own subject, so the sidebar row can pin
+  // it without asking which item was meant (REL-239).
+  const handleToggleItemPin = useCallback(
+    (source: { id: string; name: string }) =>
+      applyPinToggle(prefs, persistPrefs, source.id, source.id, source.name),
+    [prefs, persistPrefs],
+  );
+  const pinnedWidgetIds = useMemo(
+    () => new Set(prefs.widgets.pins.map((p) => p.widget)),
+    [prefs.widgets.pins],
+  );
+
   const handleRemoveItem = useCallback(
     (source: { id: string }) => {
       const item = catalogItemById(source.id);
@@ -913,6 +926,8 @@ function RootLayout() {
               onSelectItem={handleSelectPinned}
               onInfoItem={handleInfoItem}
               onToggleItemTicker={handleToggleItemTicker}
+              onToggleItemPin={handleToggleItemPin}
+              pinnedWidgetIds={pinnedWidgetIds}
               onMoveItem={handleMoveSidebarItem}
               onRemoveItem={handleRemoveItem}
             />

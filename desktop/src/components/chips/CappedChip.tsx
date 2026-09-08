@@ -13,8 +13,6 @@
  * point of a cap is that a red block is visible without reading.
  */
 import { clsx } from "clsx";
-import { Pin, PinOff } from "lucide-react";
-import Tooltip from "../Tooltip";
 import type { ChipColorMode } from "../../preferences";
 import { getChipColors, chipBaseClasses } from "./chipColors";
 import { ChipCap, cappedChipClasses } from "./ChipCap";
@@ -59,8 +57,6 @@ interface ShellProps {
   colorMode?: ChipColorMode;
   dim?: boolean;
   alert?: boolean;
-  pinned?: boolean;
-  onTogglePin?: () => void;
   onClick?: () => void;
   /** Right-hand fixed cell: the one value that changes while on screen. */
   end?: React.ReactNode;
@@ -74,14 +70,11 @@ function CapShell({
   colorMode = "widget",
   dim,
   alert,
-  pinned,
-  onTogglePin,
   onClick,
   end,
   children,
 }: ShellProps) {
   const c = getChipColors(colorMode, type);
-  const PinIcon = pinned ? PinOff : Pin;
   return (
     <button
       onClick={onClick}
@@ -94,34 +87,6 @@ function CapShell({
         dim && "opacity-60",
       )}
     >
-      {onTogglePin && (
-        <Tooltip content={pinned ? "Unpin widget" : "Pin widget"}>
-          <span
-            role="button"
-            tabIndex={0}
-            aria-label={pinned ? "Unpin widget" : "Pin widget"}
-            onClick={(e) => {
-              e.stopPropagation();
-              onTogglePin();
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.stopPropagation();
-                onTogglePin();
-              }
-            }}
-            className={clsx(
-              "absolute -right-1 -top-1 z-10 rounded-full border p-0.5 transition-opacity",
-              "border-edge/50 bg-surface",
-              pinned
-                ? "opacity-80"
-                : "opacity-0 focus:opacity-80 group-hover:opacity-80",
-            )}
-          >
-            <PinIcon size={10} className={c.textDim} />
-          </span>
-        </Tooltip>
-      )}
       <ChipCap
         tone={cap.tone}
         pulse={cap.pulse}
@@ -208,15 +173,11 @@ export function UptimeCappedChip({
   item,
   comfort,
   colorMode,
-  pinned,
-  onTogglePin,
   onClick,
 }: {
   item: UptimeChipData;
   comfort?: boolean;
   colorMode?: ChipColorMode;
-  pinned?: boolean;
-  onTogglePin?: () => void;
   onClick?: () => void;
 }) {
   const cap = UPTIME_CAP[item.status] ?? UPTIME_CAP.pending;
@@ -234,8 +195,6 @@ export function UptimeCappedChip({
       comfort={comfort}
       colorMode={colorMode}
       alert={down}
-      pinned={pinned}
-      onTogglePin={onTogglePin}
       onClick={onClick}
       end={
         <span className={down ? "text-down" : c.textDim}>{value}</span>
@@ -273,15 +232,11 @@ export function GitHubCappedChip({
   item,
   comfort,
   colorMode,
-  pinned,
-  onTogglePin,
   onClick,
 }: {
   item: GitHubChipData;
   comfort?: boolean;
   colorMode?: ChipColorMode;
-  pinned?: boolean;
-  onTogglePin?: () => void;
   onClick?: () => void;
 }) {
   const cap = GITHUB_CAP[item.status] ?? GITHUB_CAP.unavailable;
@@ -306,8 +261,6 @@ export function GitHubCappedChip({
       colorMode={colorMode}
       alert={failed}
       dim={queued}
-      pinned={pinned}
-      onTogglePin={onTogglePin}
       onClick={onClick}
     >
       <span className="flex items-baseline gap-1.5">

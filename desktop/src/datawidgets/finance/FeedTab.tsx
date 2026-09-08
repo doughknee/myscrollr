@@ -34,6 +34,7 @@ import { SearchBox, useSlashFocus } from "../../components/widget-bar/SearchBox"
 import { MultiSelectMenu } from "../../components/widget-bar/MultiSelectMenu";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import { useDataWidgetConfig } from "../../hooks/useDataWidgetConfig";
+import PinSubjectButton from "../../components/PinSubjectButton";
 import { useShell } from "../../shell-context";
 import { useNow } from "../../hooks/useNow";
 import { useCatalog } from "../../hooks/useCatalog";
@@ -445,6 +446,11 @@ function FinanceFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProp
                   (!isWatchlist || !trackedSet.has(trade.symbol))
                 }
                 saving={symbolsSaving}
+                pinWidget={
+                  isComfort && trackedSet.has(trade.symbol)
+                    ? widgetType
+                    : undefined
+                }
               />
             ))}
           </div>
@@ -472,6 +478,9 @@ interface TradeItemProps {
   saving?: boolean;
   /** Shared "now" from `useNow()` in the parent list — drives the `Xs ago` label. */
   now: number;
+  /** Widget id, set only for symbols on the watchlist: it enables the pin
+   *  control, and the symbol is the subject it pins (REL-239). */
+  pinWidget?: string;
 }
 
 const TradeItem = memo(function TradeItem({
@@ -483,6 +492,7 @@ const TradeItem = memo(function TradeItem({
   onRemove,
   actionVisible = false,
   saving,
+  pinWidget,
 }: TradeItemProps) {
   const isUp = trade.direction === "up";
   const isDown = trade.direction === "down";
@@ -569,6 +579,15 @@ const TradeItem = memo(function TradeItem({
               {relativeTime(trade.last_updated, now, { includeSeconds: true })}
             </span>
           )}
+          {/* Pin, not star: the watchlist is already "always on the tape".
+              A pin lifts this symbol out of the tape into the fixed zone. */}
+          {pinWidget && (
+            <PinSubjectButton
+              widget={pinWidget}
+              subject={trade.symbol}
+              label={trade.symbol}
+            />
+          )}
         </div>
       </div>
       {(onAdd || onRemove) && (
@@ -607,6 +626,7 @@ const TradeItem = memo(function TradeItem({
   prev.onRemove === next.onRemove &&
   prev.actionVisible === next.actionVisible &&
   prev.saving === next.saving &&
+  prev.pinWidget === next.pinWidget &&
   // `now` must trigger a re-render while the "Xs ago" label is visible
   // so it advances on every tick. Compact mode has no label — skip the
   // tick there to avoid churning the whole list.

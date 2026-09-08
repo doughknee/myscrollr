@@ -36,6 +36,7 @@ import {
   Home,
   Info,
   LifeBuoy,
+  Pin,
   Plus,
   RadioTower,
   SlidersHorizontal,
@@ -53,6 +54,7 @@ import { DELIVERY_STATE_META } from "./ConnectionIndicator";
 import { controlTransition } from "../lib/motion";
 import type { DataWidgetManifest, WidgetManifest } from "../types";
 import { TIER_LABELS, getUserIdentity } from "../auth";
+import { isSingleChipWidget } from "../preferences";
 import type { SubscriptionTier } from "../auth";
 import type { DeliveryHealth } from "../hooks/useDeliveryHealth";
 import { getMaxWidgets } from "../tierLimits";
@@ -159,6 +161,17 @@ interface SidebarProps {
   onInfoItem: (id: string) => void;
   /** Toggle the source's presence on the ticker. */
   onToggleItemTicker: (source: SidebarSource) => void;
+  /**
+   * Pin / unpin a single-chip widget (REL-239).
+   *
+   * Only offered for clock, timer, weather and sysmon: those render one
+   * chip for the whole widget, so the widget IS the subject and the row
+   * can pin it without asking which item you meant. Everything else pins
+   * per item, from the widget's own page or the ticker's right-click.
+   */
+  onToggleItemPin: (source: SidebarSource) => void;
+  /** Which single-chip widgets are currently pinned. */
+  pinnedWidgetIds?: ReadonlySet<string>;
   /** Move the widget within the shared sidebar order. */
   onMoveItem: (id: string, direction: "up" | "down") => void;
   /** Remove the widget (frees its slot). */
@@ -190,6 +203,8 @@ export default function Sidebar({
   onSelectItem,
   onInfoItem,
   onToggleItemTicker,
+  onToggleItemPin,
+  pinnedWidgetIds,
   onMoveItem,
   onRemoveItem,
 }: SidebarProps) {
@@ -471,6 +486,18 @@ export default function Sidebar({
                   icon: RadioTower,
                   onSelect: () => onToggleItemTicker(menu.source),
                 },
+                ...(isSingleChipWidget(menu.source.id)
+                  ? [
+                      {
+                        key: "pin",
+                        label: pinnedWidgetIds?.has(menu.source.id)
+                          ? "Unpin from ticker"
+                          : "Pin to ticker",
+                        icon: Pin,
+                        onSelect: () => onToggleItemPin(menu.source),
+                      },
+                    ]
+                  : []),
                 {
                   key: "info",
                   label: "Widget page",

@@ -49,6 +49,7 @@ import { outcomeLabel } from "./search";
 import ProbabilityPill from "./ProbabilityPill";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
 import type { Prediction } from "../../types";
+import PinSubjectButton from "../../components/PinSubjectButton";
 
 interface MarketDetailProps {
   market: Prediction;
@@ -59,6 +60,10 @@ interface MarketDetailProps {
   now: number;
   watched: boolean;
   onToggleWatch: () => void;
+  /** Widget id, so this market can be pinned to the ticker (REL-239).
+   *  Separate from Watch on purpose: watching puts it on the tape,
+   *  pinning parks it in the fixed zone. */
+  pinWidget?: string;
   alerts: PredictionAlert[];
   onAddAlert: (input: {
     ticker: string;
@@ -101,6 +106,7 @@ export default function MarketDetail({
   now,
   watched,
   onToggleWatch,
+  pinWidget,
   alerts,
   onAddAlert,
   onRemoveAlert,
@@ -402,6 +408,13 @@ export default function MarketDetail({
             <Star size={13} className={watched ? "fill-current" : ""} />
             {watched ? "Watching" : "Watch"}
           </button>
+          {pinWidget && (
+            <PinSubjectButton
+              widget={pinWidget}
+              subject={market.ticker}
+              label={market.event_title || market.title}
+            />
+          )}
           {market.link && (
             <button
               type="button"

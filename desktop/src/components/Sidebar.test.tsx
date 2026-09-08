@@ -64,6 +64,7 @@ function renderSidebar(opts: {
         onSelectItem={() => {}}
         onInfoItem={() => {}}
         onToggleItemTicker={() => {}}
+        onToggleItemPin={() => {}}
         onMoveItem={onMoveItem}
         onRemoveItem={() => {}}
       />
@@ -262,7 +263,7 @@ describe("Sidebar ticker mark", () => {
           onNavigateHome={() => {}} onNavigateToMarketplace={() => {}} onNavigateToCustomize={() => {}}
           onNavigateToAccount={() => {}} onNavigateToSupport={() => {}} onNavigateToReleases={() => {}}
           onNavigateToStatus={() => {}} onSelectItem={onSelectItem} onInfoItem={() => {}}
-          onToggleItemTicker={onToggleItemTicker} onMoveItem={() => {}} onRemoveItem={() => {}}
+          onToggleItemTicker={onToggleItemTicker} onToggleItemPin={() => {}} onMoveItem={() => {}} onRemoveItem={() => {}}
         />
       </div>,
     );

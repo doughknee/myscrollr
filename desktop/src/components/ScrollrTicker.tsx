@@ -1,5 +1,4 @@
 import {
-  Fragment,
   useMemo,
   useEffect,
   useRef,
@@ -28,7 +27,7 @@ import type {
   MixMode,
   ChipColorMode,
   ScrollMode,
-  WidgetPinConfig,
+  WidgetPin,
   WidgetDisplayPrefs,
 } from "../preferences";
 import type { LeagueResponse as FantasyLeague } from "../datawidgets/fantasy/types";
@@ -43,7 +42,7 @@ import {
   getWatchlist,
   onWatchlistChange,
 } from "../datawidgets/predictions/watchlist";
-import { sourceForWidget } from "../marketplace";
+import { catalogItemById, sourceForWidget } from "../marketplace";
 import { useCatalog } from "../hooks/useCatalog";
 import { TICKER_SOURCES } from "../datawidgets/tickerRegistry";
 import { rotateSlots, type RotationMemo } from "../datawidgets/ticker";
@@ -67,10 +66,9 @@ interface ScrollrTickerProps {
     itemId: string | number,
     url?: string,
   ) => void;
-  /** Toggle pin state for a widget (hover pin icon). */
-  onTogglePin?: (widgetId: string) => void;
-  /** Which widgets are pinned (excluded from scrolling ticker). */
-  pinnedWidgets?: Record<string, WidgetPinConfig>;
+  /** The fixed zone, in order. Each entry pins one SUBJECT (REL-239);
+   *  that subject's current chip is lifted out of the scrolling tape. */
+  pins?: WidgetPin[];
   /** Scroll speed in px/sec (default 40) */
   speed?: number;
   /** Gap between chips in px (default 8) */
@@ -162,34 +160,51 @@ function EmptyTickerRow({
  * Total over WIDGET_ORDER — every widget type has a branch, which is
  * what let ConsolidatedChip and its fallbacks go.
  *
- * The pin toggle rides the FIRST chip only. Pinning is a per-widget
- * setting; a pin on every chip would imply each monitor pins on its own.
+ * Subjects (REL-239): a single-chip utility IS its own subject, so the
+ * widget id is the subject. A capped widget pins per monitor / per repo,
+ * so the item id is. `pinnedSubject` asks for exactly one subject's chip
+ * for the fixed zone; `pinnedSubjects` removes those from the tape so
+ * nothing is on the bar twice.
  */
+interface WidgetChip {
+  key: string;
+  node: React.ReactNode;
+  rotateSlot?: string;
+  subject: string;
+  pinLabel: string;
+}
+
 function widgetChipsFor(
   wt: keyof WidgetTickerData,
   items: WidgetTickerData[keyof WidgetTickerData],
   opts: {
     comfort?: boolean;
     chipColorMode?: ChipColorMode;
-    onTogglePin?: (id: string) => void;
     onChipClick?: (type: string, id: string, url?: string) => void;
-    pinned?: boolean;
+    /** Subjects of this widget that live in the fixed zone. */
+    pinnedSubjects?: ReadonlySet<string>;
+    /** Ask for ONE subject's chip (the fixed zone) instead of the tape. */
+    pinnedSubject?: string;
     cycles?: Readonly<Record<string, number>>;
     rotationMemo?: RotationMemo;
   },
-): Array<{ key: string; node: React.ReactNode; rotateSlot?: string }> {
-  const { comfort, chipColorMode, onTogglePin, onChipClick, pinned, cycles, rotationMemo } = opts;
+): WidgetChip[] {
+  const { comfort, chipColorMode, onChipClick, pinnedSubjects, pinnedSubject, cycles, rotationMemo } = opts;
+  const widgetLabel = catalogItemById(wt)?.name ?? wt;
 
   // The four cell/gauge/spine utilities each render as ONE chip holding
   // their items, unlike the capped pair which render one chip per item.
   // That split is the design's, not an accident: three clocks are one
   // glanceable group, three failing monitors are three separate alarms.
+  //
+  // One chip means one subject, which is why a pinned clock looks exactly
+  // as it did before REL-239 -- the widget and the subject coincide.
   if (wt === "clock" || wt === "timer" || wt === "weather" || wt === "sysmon") {
+    if (pinnedSubject !== undefined && pinnedSubject !== wt) return [];
+    if (pinnedSubject === undefined && pinnedSubjects?.has(wt)) return [];
     const shared = {
       comfort,
       colorMode: chipColorMode,
-      pinned,
-      onTogglePin: onTogglePin ? () => onTogglePin(wt) : undefined,
       onClick: () => onChipClick?.(wt, wt),
     };
     const node =
@@ -197,15 +212,40 @@ function widgetChipsFor(
       : wt === "timer" ? <TimerChip items={items as ClockChipData[]} {...shared} />
       : wt === "weather" ? <WeatherChip items={items as WeatherChipData[]} {...shared} />
       : <SysmonChip items={items as SysmonChipData[]} {...shared} />;
-    return [{ key: `${wt}-chip`, node }];
+    return [{ key: `${wt}-chip`, node, subject: wt, pinLabel: widgetLabel }];
+  }
+
+  const capped = items as Array<UptimeChipData | GitHubChipData>;
+  const render = (item: UptimeChipData | GitHubChipData) => {
+    const shared = {
+      comfort,
+      colorMode: chipColorMode,
+      onClick: () => onChipClick?.(wt, item.id),
+    };
+    return wt === "uptime" ? (
+      <UptimeCappedChip item={item as UptimeChipData} {...shared} />
+    ) : (
+      <GitHubCappedChip item={item as GitHubChipData} {...shared} />
+    );
+  };
+
+  // The fixed zone wants one monitor / one repo, whatever the rotation is
+  // doing. Gone from the payload -> nothing rendered.
+  if (pinnedSubject !== undefined) {
+    const item = capped.find((it) => it.id === pinnedSubject);
+    if (!item) return [];
+    return [{ key: `pin-${wt}-${item.id}`, node: render(item), subject: item.id, pinLabel: item.label }];
   }
 
   // One chip per monitor or repo, rotating through a fixed number of
   // slots once there are more than that -- thirty monitors is still four
   // chips, and a failing one still comes round. Fixed-width chips, so the
   // slot needs no reservation.
+  const pool = pinnedSubjects?.size
+    ? capped.filter((it) => !pinnedSubjects.has(it.id))
+    : capped;
   const slots = rotateSlots(
-    items as Array<UptimeChipData | GitHubChipData>,
+    pool,
     CAPPED_WIDGET_SLOTS,
     cycles ?? {},
     wt,
@@ -213,22 +253,13 @@ function widgetChipsFor(
     () => undefined,
     rotationMemo,
   );
-  return slots.map(({ key, item, rotateSlot }, i) => {
-    const shared = {
-      comfort,
-      colorMode: chipColorMode,
-      pinned,
-      onTogglePin: i === 0 && onTogglePin ? () => onTogglePin(wt) : undefined,
-      onClick: () => onChipClick?.(wt, item.id),
-    };
-    const node =
-      wt === "uptime" ? (
-        <UptimeCappedChip item={item as UptimeChipData} {...shared} />
-      ) : (
-        <GitHubCappedChip item={item as GitHubChipData} {...shared} />
-      );
-    return { key, node, rotateSlot };
-  });
+  return slots.map(({ key, item, rotateSlot }) => ({
+    key,
+    node: render(item),
+    rotateSlot,
+    subject: item.id,
+    pinLabel: item.label,
+  }));
 }
 
 /** Monitors or workflow runs on the rail at once. Not a setting. */
@@ -255,8 +286,7 @@ export default function ScrollrTicker({
   activeTabs,
   widgetData,
   onChipClick,
-  onTogglePin,
-  pinnedWidgets = {},
+  pins = [],
   speed = 25,
   gap = 8,
   onHover = "slow",
@@ -310,9 +340,43 @@ export default function ScrollrTicker({
   // state: mutating it must never itself trigger a re-render.
   const rotationMemoRef = useRef<RotationMemo>(new Map());
 
+  // Pinned subjects, grouped by the widget that owns them. Every source
+  // gets its own set so it can drop them from its pool before rotating --
+  // filtering the POOL, not the rendered chips, is what stops a slot from
+  // resolving to a pinned item and rendering a hole (§8.5).
+  const pinnedByWidget = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const p of pins) {
+      const set = map.get(p.widget) ?? new Set<string>();
+      set.add(p.subject);
+      map.set(p.widget, set);
+    }
+    return map;
+  }, [pins]);
+
   const chips = useMemo(() => {
-    const wrap = (key: string, chip: React.ReactNode, rotateSlot?: string) => (
-      <div key={key} className="py-1" data-chip="" data-rotate-slot={rotateSlot}>
+    const wrap = (
+      tab: string,
+      key: string,
+      chip: React.ReactNode,
+      rotateSlot?: string,
+      subject?: string,
+      pinLabel?: string,
+    ) => (
+      <div
+        key={key}
+        className="py-1"
+        data-chip=""
+        data-rotate-slot={rotateSlot}
+        // What a right-click resolves the chip under the cursor to
+        // (App.tsx). One attribute, because the menu needs all three
+        // parts together and a chip with no pinnable subject has none.
+        data-pin-subject={
+          subject === undefined
+            ? undefined
+            : JSON.stringify({ widget: tab, subject, label: pinLabel ?? subject })
+        }
+      >
         {chip}
       </div>
     );
@@ -321,37 +385,31 @@ export default function ScrollrTicker({
 
     for (const tab of activeTabs) {
       const bucket: React.ReactNode[] = [];
+      const pinnedSubjects = pinnedByWidget.get(tab);
 
-      // Pinned widgets never scroll — they render in a pinned zone on
-      // their assigned row (pin.row). See render-time pinned loop below.
-      const isPinnedAnywhere = !!pinnedWidgets[tab];
-
-      // ── Widget tabs: consolidated chips (skip if pinned) ────────
+      // ── Widget tabs: consolidated chips ─────────────────────────
       // Membership comes from the widget registry, not a second list
       // maintained by hand here.
       if (WIDGET_ORDER.includes(tab)) {
         const wt = tab as keyof WidgetTickerData;
         const items = widgetData?.[wt];
-        if (items?.length && !isPinnedAnywhere) {
+        if (items?.length) {
           // Capped widgets render ONE chip per item. Packing every
           // monitor into a single pipe-separated chip made a lone
           // failure impossible to pick out of the row, which is the
           // whole point of a status cap.
-          //
-          // The pin toggle rides the first chip only: pinning is
-          // per-widget, and N pins on N chips would suggest otherwise.
           const chipsForWidget = widgetChipsFor(wt, items, {
             comfort,
             chipColorMode,
-            onTogglePin,
             onChipClick,
+            pinnedSubjects,
             cycles,
             rotationMemo: rotationMemoRef.current,
           });
-          chipsForWidget.forEach(({ key, node, rotateSlot }) =>
-            bucket.push(wrap(key, node, rotateSlot)),
+          chipsForWidget.forEach(({ key, node, rotateSlot, subject, pinLabel }) =>
+            bucket.push(wrap(tab, key, node, rotateSlot, subject, pinLabel)),
           );
-          buckets.push(bucket);
+          if (bucket.length > 0) buckets.push(bucket);
         }
         continue;
       }
@@ -379,9 +437,12 @@ export default function ScrollrTicker({
         predictionsWatchlist,
         cycles,
         rotationMemo: rotationMemoRef.current,
+        pinnedSubjects,
         onChipClick,
       })) {
-        bucket.push(wrap(chip.key, chip.node, chip.rotateSlot));
+        bucket.push(
+          wrap(tab, chip.key, chip.node, chip.rotateSlot, chip.subject, chip.pinLabel),
+        );
       }
 
       // Only push a bucket that actually has chips in it.
@@ -400,8 +461,7 @@ export default function ScrollrTicker({
     activeTabs,
     widgetData,
     onChipClick,
-    onTogglePin,
-    pinnedWidgets,
+    pinnedByWidget,
     comfort,
     effectiveMixMode,
     chipColorMode,
@@ -529,33 +589,74 @@ export default function ScrollrTicker({
     transitionDuration,
   ]);
 
-  // ── Build pinned chip arrays (rendered inside this row) ─────────
+  // ── Build the fixed zone ────────────────────────────────────────
   //
-  // Pinned widgets are visually static, single-instance elements. With
+  // One pin, one subject, one chip. The zone shows that subject's CURRENT
+  // chip -- a pinned team's live game becomes its final becomes its next
+  // fixture, in place, without the pin ever pointing at a stale row.
+  //
+  // Three rules make it a pin rather than a slice of the tape:
+  //   1. It never scrolls and never rotates (so no `cycles`, no memo).
+  //   2. It bypasses the source's horizon: the user already said "this
+  //      one", so a fixture nine days out still shows.
+  //   3. Nothing to show renders NOTHING. An empty space is honest; a
+  //      placeholder would be a fabricated value (§1.7).
 
   const pinnedLeft: React.ReactNode[] = [];
   const pinnedRight: React.ReactNode[] = [];
 
-  for (const [widgetId, pin] of Object.entries(pinnedWidgets)) {
-    if (!activeTabs.includes(widgetId)) continue;
+  for (const pin of pins) {
+    if (!activeTabs.includes(pin.widget)) continue;
     const target = pin.side === "left" ? pinnedLeft : pinnedRight;
+    const key = `pin-${pin.widget}-${pin.subject}`;
+    // Same `data-chip` / `data-pin-subject` pair the tape carries, so a
+    // right-click on a pinned chip resolves to the same subject and the
+    // menu reads "Unpin" without the zone needing its own control.
+    const park = (node: React.ReactNode, label: string) =>
+      target.push(
+        <div
+          key={key}
+          className="flex items-center"
+          data-chip=""
+          data-pin-subject={JSON.stringify({
+            widget: pin.widget,
+            subject: pin.subject,
+            label,
+          })}
+        >
+          {node}
+        </div>,
+      );
 
-    if (WIDGET_ORDER.includes(widgetId)) {
-      const wt = widgetId as keyof WidgetTickerData;
+    if (WIDGET_ORDER.includes(pin.widget)) {
+      const wt = pin.widget as keyof WidgetTickerData;
       const items = widgetData?.[wt];
-      if (items?.length) {
-        const pinnedChips = widgetChipsFor(wt, items, {
-          comfort,
-          chipColorMode,
-          onTogglePin,
-          onChipClick,
-          pinned: true,
-        });
-        pinnedChips.forEach(({ node }, i) =>
-          target.push(<Fragment key={`pinned-${wt}-${i}`}>{node}</Fragment>),
-        );
+      if (!items?.length) continue;
+      for (const { node, pinLabel } of widgetChipsFor(wt, items, {
+        comfort,
+        chipColorMode,
+        onChipClick,
+        pinnedSubject: pin.subject,
+      })) {
+        park(node, pinLabel);
       }
+      continue;
     }
+
+    const source = sourceForWidget(pin.widget) ?? pin.widget;
+    const tickerSource = TICKER_SOURCES[source];
+    const chip = tickerSource?.pinnedChip?.(dashboard?.data?.[source], {
+      tab: pin.widget,
+      source,
+      dashboard,
+      comfort,
+      chipColorMode,
+      widgetDisplay,
+      predictionsWatchlist,
+      pinnedSubject: pin.subject,
+      onChipClick,
+    });
+    if (chip) park(chip.node, chip.pinLabel ?? pin.subject);
   }
 
   // ── Render ────────────────────────────────────────────────────

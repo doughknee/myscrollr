@@ -31,6 +31,16 @@ export interface TickerChip {
    * slot shows this lap.
    */
   rotateSlot?: string;
+  /**
+   * The durable thing this chip is about -- the team, symbol, feed,
+   * market or monitor behind it, not the item currently showing (REL-239).
+   * It is what a pin attaches to, and what the ticker writes into
+   * `data-pin-subject` so a right-click can resolve the chip under the
+   * cursor back to a pinnable subject.
+   */
+  subject?: string;
+  /** How to name the subject in a menu ("Yankees", "AAPL", "BBC News"). */
+  pinLabel?: string;
 }
 
 /** Everything a source needs to build its chips. */
@@ -54,6 +64,21 @@ export interface TickerContext {
   cycles?: Readonly<Record<string, number>>;
   /** Freezes a rotating slot's item across renders (see `rotateSlots`). */
   rotationMemo?: RotationMemo;
+  /**
+   * Subjects of THIS widget that are pinned to the fixed zone. A source
+   * drops them from its pool before rotating (`dropPinned`) so a pinned
+   * subject is never on the bar twice -- once parked, once scrolling past.
+   * Filtering the pool rather than the rendered chips is what keeps a
+   * rotating slot from resolving to a pinned item and rendering a hole.
+   */
+  pinnedSubjects?: ReadonlySet<string>;
+  /**
+   * Set when the source is being asked for ONE pinned subject's chip
+   * rather than for the rail. A pin bypasses the horizon: the fixed zone
+   * is the user saying "this one, always", so a pinned team shows its
+   * next fixture even when that is a week out.
+   */
+  pinnedSubject?: string;
   onChipClick?: (
     widgetType: string,
     itemId: string | number,
@@ -70,6 +95,41 @@ export interface TickerSource {
    * nothing to show (missing prefs, empty payload).
    */
   chips(raw: unknown, ctx: TickerContext): TickerChip[];
+  /**
+   * The one chip for `ctx.pinnedSubject`, ignoring this source's horizon
+   * and slot count (REL-239).
+   *
+   * Returns null when the subject has nothing to show right now -- a
+   * team between seasons, a feed that has never published, a symbol the
+   * server has no trade for. The fixed zone then renders nothing for it
+   * rather than a placeholder: an empty space is honest, and the pin
+   * comes back on its own when the subject does.
+   */
+  pinnedChip?(raw: unknown, ctx: TickerContext): TickerChip | null;
+  /**
+   * Every subject this widget could pin, for the surfaces that offer a
+   * pin without a chip under the cursor (the widget page, the sidebar).
+   */
+  subjects?(raw: unknown, ctx: TickerContext): Array<{ subject: string; label: string }>;
+}
+
+/**
+ * Drop pinned subjects from a pool before it rotates.
+ *
+ * `subjects` returns every subject an item belongs to -- one for a
+ * symbol or a feed, two for a game (a fixture is about both teams).
+ */
+export function dropPinned<T>(
+  pool: T[],
+  ctx: TickerContext,
+  subjects: (item: T) => string | readonly string[],
+): T[] {
+  const pinned = ctx.pinnedSubjects;
+  if (!pinned || pinned.size === 0) return pool;
+  return pool.filter((item) => {
+    const s = subjects(item);
+    return typeof s === "string" ? !pinned.has(s) : !s.some((x) => pinned.has(x));
+  });
 }
 
 /** One rotating position on the rail. */
