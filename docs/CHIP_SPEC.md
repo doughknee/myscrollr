@@ -28,7 +28,7 @@ checklist) literally.
 | **pool** | Everything eligible for the rail from one source, in display order. |
 | **lap / cycle** | One complete trip of a slot off the right edge, across, and off the left. A slot's content advances once per lap. |
 | **horizon** | The per-source time rule deciding what is eligible. |
-| **floor** | The one item a quiet source still shows when nothing is inside its horizon. |
+| **floor** | What a quiet source still shows when nothing is inside its horizon — one item for most sources, the whole next matchday for Sports (§8.1). |
 | **palette** | The `ChipColors` object for a chip's colour mode and widget. |
 | **source** | A `TickerSource` in `desktop/src/datawidgets/<source>/ticker.tsx`, registered in `tickerRegistry.ts`. |
 
@@ -481,7 +481,7 @@ since they are an input.
 
 | Source | Eligible (horizon) | Floor | Slots | Pool order | Reserve |
 |---|---|---|---|---|---|
-| Sports | live always; `pre` with `0 <= h <= 24`; `final` with `h >= -18` (from kickoff) | soonest `pre` within 7 days | `TICKER_SLOTS = 4` | `sortForDisplay`: live+close 100, live 80, pre 60 (soonest first), final 30 (newest first) | widest short names per class |
+| Sports | live always; `pre` with `0 <= h <= 24`; `final` with `h >= -18` (from kickoff) | the next matchday: every `pre` on the LOCAL calendar day of the soonest `pre` within 7 days. Never a `final` or a live game. The 7-day cap picks the day, the day picks the fixtures — a late kick-off on that day is in even if it lands hours past the cap | `TICKER_SLOTS = 4` | `sortForDisplay`: live+close 100, live 80, pre 60 (soonest first), final 30 (newest first) | widest short names per class |
 
 Every pool above is first stripped of the widget's pinned subjects (`dropPinned`, §8.5).
 | News | items within `TICKER_RSS_HOURS = 6` | newest per feed if within `TICKER_RSS_FLOOR_HOURS = 48`; undated counts as current | `TICKER_RSS_SLOTS = 3` | newest first, **interleaved by feed** (round-robin, feeds ordered by their newest item) | longest `plainText(title)` per class |

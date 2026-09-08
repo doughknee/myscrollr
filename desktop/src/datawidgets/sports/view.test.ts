@@ -45,6 +45,18 @@ function preGame(id: number, startInMs: number): Game {
   });
 }
 
+/**
+ * A `pre` fixture at a given hour on a given LOCAL calendar day, so the
+ * matchday floor can be exercised without the assertions depending on the
+ * runner's timezone.
+ */
+function preOnDay(id: number, dayOffset: number, hour: number): Game {
+  const d = new Date(NOW);
+  d.setDate(d.getDate() + dayOffset);
+  d.setHours(hour, 0, 0, 0);
+  return mk({ id, state: "pre", start_time: d.toISOString() });
+}
+
 function liveGame(id: number, closeScoreDiff = 10): Game {
   return mk({
     id,
@@ -358,6 +370,43 @@ describe("selectSportsForTicker", () => {
     expect(result.map((g) => g.id)).toEqual([1]); // the soonest, and only it
   });
 
+  it("admits the whole matchday, not one game out of fourteen", () => {
+    // Measured 2026-09-08: MLS had fourteen fixtures, every one 40-43h
+    // out, so none cleared the 24h horizon. The old floor put ONE of the
+    // fourteen on the bar and the ticker read as broken.
+    const saturday = [1, 2, 3, 4, 5].map((id) => preOnDay(id, 2, 12 + id));
+    const ids = selectSportsForTicker(saturday, { daysBack: 7, daysAhead: 365 })
+      .map((g) => g.id);
+    expect(ids).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("stops at the first matchday when the fixtures span two days", () => {
+    // NFL, same measurement: one Thursday game and one Sunday game. They
+    // are different days, so the floor is the Thursday alone -- widening
+    // it to "the next 48h" would have dragged Sunday onto the bar.
+    const games = [preOnDay(1, 2, 20), preOnDay(2, 3, 13), preOnDay(3, 3, 16)];
+    expect(
+      selectSportsForTicker(games, { daysBack: 7, daysAhead: 365 }).map((g) => g.id),
+    ).toEqual([1]);
+  });
+
+  it("never reaches the floor while anything is inside the horizon", () => {
+    // A game tonight is the league's news. A big slate two days out is
+    // not, and must not join it just because the same day is crowded.
+    const games = [
+      preGame(1, 3 * 3_600_000),
+      ...[2, 3, 4, 5].map((id) => preOnDay(id, 2, 10 + id)),
+    ];
+    expect(
+      selectSportsForTicker(games, { daysBack: 7, daysAhead: 365 }).map((g) => g.id),
+    ).toEqual([1]);
+  });
+
+  it("does not admit a matchday that starts on day eight", () => {
+    const games = [preOnDay(1, 8, 12), preOnDay(2, 8, 15)];
+    expect(selectSportsForTicker(games, { daysBack: 7, daysAhead: 365 })).toEqual([]);
+  });
+
   it("does not reach past a week for that one fixture", () => {
     // Uncapped, the floor surfaced fixtures a month out, which sat beside
     // a 19h chip reading as an arbitrary date rather than as "this is all
@@ -379,6 +428,14 @@ describe("selectSportsForTicker", () => {
     const wide = { daysBack: 7, daysAhead: 365 };
     expect(selectSportsForTicker(games, wide)).toHaveLength(1);
     expect(selectSportsForFeed(games, wide, new Set())).toHaveLength(2);
+  });
+
+  it("leaves the widget page showing every day, not just the matchday", () => {
+    // The floor is a rail rule too. The page keeps its full 7-day window.
+    const games = [preOnDay(1, 2, 14), preOnDay(2, 3, 14), preOnDay(3, 6, 14)];
+    const wide = { daysBack: 7, daysAhead: 365 };
+    expect(selectSportsForTicker(games, wide).map((g) => g.id)).toEqual([1]);
+    expect(selectSportsForFeed(games, wide, new Set())).toHaveLength(3);
   });
 });
 

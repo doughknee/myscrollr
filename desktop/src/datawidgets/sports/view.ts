@@ -73,6 +73,20 @@ export const SPORTS_WINDOW_MAX_DAYS_AHEAD = 365;
 const DAY_MS = 86_400_000;
 
 /**
+ * Local midnight opening the calendar day that contains `t`.
+ *
+ * The one place `setHours(0, 0, 0, 0)` lives. Two rules are anchored to
+ * local calendar days rather than rolling 24h periods -- the widget's day
+ * window (`inDayWindow`) and the ticker's floor (`onTicker`) -- and both
+ * mean the same thing by "day": the one on the user's wall calendar.
+ */
+function startOfLocalDay(t: number): number {
+  const d = new Date(t);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+/**
  * Window predicate shared by the ticker + feed selectors.
  *
  * Bounds are anchored to LOCAL CALENDAR DAYS, not rolling 24h periods:
@@ -92,10 +106,9 @@ function inDayWindow(
   // Defensive: an unparseable start_time stays visible rather than
   // silently vanishing from every surface.
   if (!Number.isFinite(t)) return true;
-  const dayStart = new Date(now);
-  dayStart.setHours(0, 0, 0, 0);
-  const lower = dayStart.getTime() - daysBack * DAY_MS;
-  const upper = dayStart.getTime() + (daysAhead + 1) * DAY_MS;
+  const dayStart = startOfLocalDay(now);
+  const lower = dayStart - daysBack * DAY_MS;
+  const upper = dayStart + (daysAhead + 1) * DAY_MS;
   return t >= lower && t < upper;
 }
 
@@ -188,7 +201,7 @@ export const TICKER_UPCOMING_HOURS = 24;
 export const TICKER_FINAL_HOURS = 18;
 
 /**
- * How far ahead the floor below will reach for a league's next fixture.
+ * How far ahead the floor below will reach for a league's next MATCHDAY.
  *
  * The floor exists so a league you follow is never absent from the bar.
  * Left unbounded it also surfaced fixtures a month out, which sat beside
@@ -197,6 +210,11 @@ export const TICKER_FINAL_HOURS = 18;
  * appear in the run-up to a fixture, and a league between seasons stays
  * off the bar entirely rather than advertising a date nobody is thinking
  * about yet.
+ *
+ * The cap picks the DAY, and the day picks the fixtures (see `onTicker`).
+ * A later kick-off on that same matchday is on the bar even if it lands
+ * a few hours past the seven days, because splitting a matchday down the
+ * middle is the thing this rule exists to stop.
  */
 export const TICKER_FLOOR_DAYS = 7;
 
@@ -207,12 +225,25 @@ export const TICKER_FLOOR_DAYS = 7;
  * be worth a slot on a bar you glance at.
  *
  * The floor matters as much as the horizon: if a league contributes
- * NOTHING, its single soonest fixture is admitted anyway, provided it is
- * within TICKER_FLOOR_DAYS. Without the floor, following Formula 1 --
- * races one to three weeks apart -- would mean an empty bar 13 days in
- * 14, and a widget you deliberately added would silently show nothing at
- * all. Without the cap, it reached a month out and the chip read as an
+ * NOTHING, its next MATCHDAY is admitted anyway -- every `pre` fixture on
+ * the local calendar day of its soonest one, provided that day is within
+ * TICKER_FLOOR_DAYS. Without the floor, following Formula 1 -- races one
+ * to three weeks apart -- would mean an empty bar 13 days in 14, and a
+ * widget you deliberately added would silently show nothing at all.
+ * Without the cap, it reached a month out and the chip read as an
  * arbitrary date rather than as the league's only news.
+ *
+ * A DAY rather than a single fixture because a single fixture is what a
+ * league's only news looks like for F1, and a lie for everyone else: with
+ * MLS's fourteen Saturday matches all 40-43h out (measured 2026-09-08),
+ * the one-fixture floor put one of fourteen on the bar and the ticker
+ * read as broken. The day is the unit a slate actually comes in, so a
+ * quiet league still shows one chip, a matchday shows the matchday, and
+ * neither needs a number that has to be tuned per sport. Slots and
+ * rotation (CHIP_SPEC §8.1/§8.2) absorb the volume from there.
+ *
+ * The floor never admits a final or a live game: a live game already
+ * passed the horizon above, and a final is not upcoming news.
  */
 function onTicker(games: Game[], now: number): Game[] {
   const kept = games.filter((g) => {
@@ -226,15 +257,17 @@ function onTicker(games: Game[], now: number): Game[] {
   });
   if (kept.length > 0) return kept;
 
-  const floorLimit = now + TICKER_FLOOR_DAYS * 86_400_000;
-  const soonest = games
-    .filter((g) => {
-      if (g.state !== "pre") return false;
-      const t = new Date(g.start_time).getTime();
-      return t > now && t <= floorLimit;
-    })
-    .sort((a, b) => +new Date(a.start_time) - +new Date(b.start_time))[0];
-  return soonest ? [soonest] : [];
+  // NaN (unparseable start_time) fails `> now`, so it never reaches here;
+  // the horizon above already kept it on the same defensive grounds.
+  const at = (g: Game) => new Date(g.start_time).getTime();
+  const upcoming = games.filter((g) => g.state === "pre" && at(g) > now);
+  const floorLimit = now + TICKER_FLOOR_DAYS * DAY_MS;
+  const soonest = upcoming
+    .filter((g) => at(g) <= floorLimit)
+    .sort((a, b) => at(a) - at(b))[0];
+  if (!soonest) return [];
+  const matchday = startOfLocalDay(at(soonest));
+  return upcoming.filter((g) => startOfLocalDay(at(g)) === matchday);
 }
 
 /** The day-window filter, shared by the ticker and the feed. */
