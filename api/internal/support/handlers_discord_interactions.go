@@ -3,6 +3,7 @@ package support
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -198,6 +199,8 @@ func handleDiscordButtonClick(c *fiber.Ctx, ix *discordInteraction) error {
 	switch prefix {
 	case "support_send":
 		return handleDiscordSendAction(c, ix, draftID)
+	case "support_hold":
+		return handleDiscordHoldAction(c, ix, draftID)
 	case "support_edit":
 		return handleDiscordEditOpenModal(c, ix, draftID)
 	case "support_ask":
@@ -366,6 +369,7 @@ func buildPrefixedThreadName(prefix string, draft *SupportDraft) string {
 // the current draft body (HTML stripped to plain text since Discord
 // modals are plain-text only).
 func handleDiscordEditOpenModal(c *fiber.Ctx, ix *discordInteraction, draftID int64) error {
+	stopHoldForModal(draftID)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -442,6 +446,7 @@ func handleDiscordEditOpenModal(c *fiber.Ctx, ix *discordInteraction, draftID in
 // drafted answer. A draft that needs information the ticket does not carry
 // is worse than no draft, and this is the cheap way out of that corner.
 func handleDiscordAskOpenModal(c *fiber.Ctx, ix *discordInteraction, draftID int64) error {
+	stopHoldForModal(draftID)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -486,6 +491,22 @@ func handleDiscordAskOpenModal(c *fiber.Ctx, ix *discordInteraction, draftID int
 	return c.JSON(resp)
 }
 
+// stopHoldForModal clears the countdown when someone opens Edit or Ask. The
+// old flow relied on the status changing to cancel a pending send, but the
+// status does not change until the modal is submitted — and typing a reply
+// takes longer than a hold that is nearly up. Cancelling on open, rather than
+// on submit, is what makes "I am working on this one" mean something.
+//
+// Best-effort and synchronous: it is one UPDATE, and getting it wrong sends a
+// draft out from under the person editing it.
+func stopHoldForModal(draftID int64) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := holdDraft(ctx, draftID); err != nil && !errors.Is(err, ErrAlreadyDecided) {
+		log.Printf("[DiscordInteraction] stop hold for draft %d: %v", draftID, err)
+	}
+}
+
 // handleDiscordSkipAction marks the draft as skipped.
 func handleDiscordSkipAction(c *fiber.Ctx, ix *discordInteraction, draftID int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -508,6 +529,8 @@ func handleDiscordSkipAction(c *fiber.Ctx, ix *discordInteraction, draftID int64
 		return discordEphemeralResponse(c, "Could not skip draft.")
 	}
 
+	markIntervened(ctx, draftID)
+
 	// Update thread cosmetics fire-and-forget.
 	go func() {
 		bgCtx, bgCancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -517,6 +540,34 @@ func handleDiscordSkipAction(c *fiber.Ctx, ix *discordInteraction, draftID int64
 
 	return discordVisibleResponse(c,
 		fmt.Sprintf("⏭️ Skipped — ticket #%s left without an AI reply.", draft.TicketNumber))
+}
+
+// handleDiscordHoldAction stops a running countdown without deciding the
+// draft. The row stays pending with its buttons; it simply stops being
+// something that happens on its own.
+//
+// Hold is the button this ticket adds, and the one that says the most: it is
+// a person saying "not this one, not yet" without having to also say what
+// should happen instead. It counts as an intervention.
+func handleDiscordHoldAction(c *fiber.Ctx, ix *discordInteraction, draftID int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	draft, err := loadSupportDraft(ctx, draftID)
+	if err != nil || draft == nil {
+		return discordEphemeralResponse(c, "Draft not found.")
+	}
+	if draft.Status != "pending" {
+		return discordEphemeralResponse(c,
+			fmt.Sprintf("Draft is `%s` (already actioned).", draft.Status))
+	}
+	if err := holdDraft(ctx, draftID); err != nil {
+		log.Printf("[DiscordInteraction] holdDraft %d: %v", draftID, err)
+		return discordEphemeralResponse(c, "Could not hold this draft.")
+	}
+	return discordVisibleResponse(c, fmt.Sprintf(
+		"✋ Held — ticket #%s will not send by itself. Send, Edit, Ask or Skip when you are ready.",
+		draft.TicketNumber))
 }
 
 // =============================================================================
@@ -573,6 +624,7 @@ func handleDiscordModalSubmit(c *fiber.Ctx, ix *discordInteraction) error {
 		log.Printf("[DiscordInteraction] markDraftDecided (edited) %d: %v", draftID, err)
 		return discordEphemeralResponse(c, "Could not save edits.")
 	}
+	markIntervened(ctx, draftID)
 	draft, _ = loadSupportDraft(ctx, draftID)
 
 	originalBody := draft.DraftBodyHTML
@@ -1008,10 +1060,62 @@ func handleDiscordSlashCommand(c *fiber.Ctx, ix *discordInteraction) error {
 		return handleDiscordTicketCommand(c, ix)
 	case "stats":
 		return handleDiscordStatsCommand(c, ix)
+	case "pause":
+		return handleDiscordPauseCommand(c)
+	case "resume":
+		return handleDiscordResumeCommand(c, ix)
 	default:
 		return discordEphemeralResponse(c,
 			fmt.Sprintf("Unknown command: %s", ix.Data.Name))
 	}
+}
+
+// =============================================================================
+// /pause and /resume — the kill switch and the pardon
+// =============================================================================
+
+// handleDiscordPauseCommand stops every unattended send at once. Pending holds
+// keep their deadlines rather than being cleared, so /resume puts the queue
+// back exactly where it was instead of firing everything that expired while it
+// was paused... which is why the sweeper checks the pause, not each draft.
+func handleDiscordPauseCommand(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := policySet(ctx, policyPausedKey, time.Now().UTC().Format(time.RFC3339)); err != nil {
+		log.Printf("[DiscordInteraction] pause: %v", err)
+		return discordEphemeralResponse(c, "Could not pause. Set SUPPORT_AUTOSEND=off if this keeps failing.")
+	}
+	return discordVisibleResponse(c,
+		"⏸️ **Paused.** Nothing sends without a click until `/resume`. Drafts keep arriving with their buttons.")
+}
+
+// handleDiscordResumeCommand lifts the pause, or — with a category — forgives
+// that category's demotion by moving its watermark past every draft counted so
+// far. Recovery is deliberately manual: a category that earned its way out of
+// autonomy earns its way back in when a person says so.
+func handleDiscordResumeCommand(c *fiber.Ctx, ix *discordInteraction) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	category := strings.ToLower(strings.TrimSpace(commandOption(ix, "category")))
+	if category == "" {
+		if err := policyDelete(ctx, policyPausedKey); err != nil {
+			log.Printf("[DiscordInteraction] resume: %v", err)
+			return discordEphemeralResponse(c, "Could not resume.")
+		}
+		return discordVisibleResponse(c, "▶️ **Resumed.** Holds that expired while paused go out on the next sweep.")
+	}
+
+	var maxID int64
+	if platform.DBPool != nil {
+		_ = platform.DBPool.QueryRow(ctx, `SELECT COALESCE(MAX(id), 0) FROM support_drafts`).Scan(&maxID)
+	}
+	if err := policySet(ctx, demoteFloorKey(category), strconv.FormatInt(maxID, 10)); err != nil {
+		log.Printf("[DiscordInteraction] resume %s: %v", category, err)
+		return discordEphemeralResponse(c, "Could not un-demote that category.")
+	}
+	return discordVisibleResponse(c, fmt.Sprintf(
+		"▶️ **`%s` is autonomous again.** Its intervention window starts fresh from here.", category))
 }
 
 // handleDiscordStatsCommand returns a breakdown of AI-support

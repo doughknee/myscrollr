@@ -341,7 +341,7 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 	// window, and notify the partner. All best-effort — failures here
 	// must not surface to the user, who has already gotten their
 	// success response logically.
-	if triage != nil && ticketNumber != "" {
+	if ticketNumber != "" {
 		persistTriageSideEffects(ticketNumber, email, name, subject, originalBody, triage)
 	}
 
@@ -397,6 +397,15 @@ func persistTriageSideEffects(ticketNumber, userEmail, userName, subject, origin
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
+		// A failed triage call used to be silence: no draft row, no
+		// notification, a ticket nobody was told about. Under REL-249 that
+		// is an escalation like any other — the reply still has to be
+		// written, just by hand.
+		if triage == nil || strings.TrimSpace(triage.DraftReplyHTML) == "" {
+			escalateWithoutDraft(ctx, ticketNumber, subject, "The triage call did not produce a reply.")
+			return
+		}
+
 		note, ask, grounded, unknowns := triage.groundingFields()
 
 		// Save the draft (even if we don't end up notifying — useful for audit).
@@ -415,6 +424,8 @@ func persistTriageSideEffects(ticketNumber, userEmail, userName, subject, origin
 			AIConfidence:    triage.Confidence,
 			ShouldClose:     triage.ShouldClose,
 			NeedsInfo:       triage.NeedsInfo,
+			Sentiment:       triage.Sentiment,
+			DrafterCategory: triage.DrafterCategory,
 			InternalNote:    note,
 			AskUserFor:      ask,
 			GroundedIn:      grounded,

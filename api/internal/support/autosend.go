@@ -4,161 +4,228 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
+
+	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 )
 
 // =============================================================================
-// Auto-send — the delayed, opt-in, never-for-bugs path (REL-245)
+// Acting on a disposition — the hold timer, the sweeper, the escalation
 // =============================================================================
 //
-// Off by default. When SUPPORT_AUTOSEND=on, a draft that clears every gate
-// below is sent on its own after a delay, with a live countdown posted in
-// the thread; clicking Skip, Edit or Ask before the timer fires cancels it,
-// because those all move the draft off 'pending' and the timer re-reads the
-// status before sending.
+// decideDisposition (disposition.go) says what should happen. This file makes
+// it happen: it writes the decision to the row, says so in the thread, and —
+// for the two dispositions that end in an outbound reply — either sends now or
+// arms a hold the sweeper collects.
 //
-// The gate is deliberately narrow. A wrong answer to "when does Uplink Pro
-// renew" costs a follow-up; a wrong answer to a billing or account question
-// costs trust and possibly money, and a wrong answer to a bug report tells
-// someone their broken app is working as intended. Those three categories
-// are refused here regardless of configuration — there is no env var that
-// turns them on.
+// The timer is a hold_until column swept once a minute rather than a
+// time.AfterFunc, because the failure direction reversed. Under REL-245 a lost
+// timer meant "a human still has to click", which was safe. Now doing nothing
+// is what sends, so a lost timer is a reply that never happens and a user who
+// is never answered.
 
-// autosendNeverCategories can never auto-send. Not configurable: see above.
-var autosendNeverCategories = map[string]struct{}{
-	"bug":     {},
-	"billing": {},
-	"account": {},
-}
-
-const (
-	autosendDefaultCategories = "feature,feedback"
-	autosendDefaultDelay      = 30 * time.Minute
-)
-
-// autosendEnabled reports whether SUPPORT_AUTOSEND is switched on.
-func autosendEnabled() bool {
-	return strings.EqualFold(strings.TrimSpace(os.Getenv("SUPPORT_AUTOSEND")), "on")
-}
-
-// autosendCategories is the allow-list from SUPPORT_AUTOSEND_CATEGORIES,
-// lowercased. Empty env falls back to feature + feedback.
-func autosendCategories() map[string]struct{} {
-	raw := strings.TrimSpace(os.Getenv("SUPPORT_AUTOSEND_CATEGORIES"))
-	if raw == "" {
-		raw = autosendDefaultCategories
-	}
-	out := map[string]struct{}{}
-	for _, c := range strings.Split(raw, ",") {
-		if c = strings.ToLower(strings.TrimSpace(c)); c != "" {
-			out[c] = struct{}{}
-		}
-	}
-	return out
-}
-
-// autosendDelay is how long the partner has to intervene.
-func autosendDelay() time.Duration {
-	raw := strings.TrimSpace(os.Getenv("SUPPORT_AUTOSEND_DELAY"))
-	if raw == "" {
-		return autosendDefaultDelay
-	}
-	d, err := time.ParseDuration(raw)
-	if err != nil || d <= 0 {
-		log.Printf("[Autosend] SUPPORT_AUTOSEND_DELAY=%q is not a positive duration; using %s", raw, autosendDefaultDelay)
-		return autosendDefaultDelay
-	}
-	return d
-}
-
-// autosendAllowed is the whole decision, in one pure function so the gate
-// is testable without a database, a clock or Discord.
+// applyDisposition decides, records and acts. Called once per draft, after the
+// Discord thread exists so there is somewhere to post the countdown.
 //
-// Every condition must hold: the feature is on, the AI is confident, the
-// category is on the allow-list AND not one of the three that are never
-// eligible, the AI is not waiting on information from the user, and the
-// draft is still pending and has a body to send.
-func autosendAllowed(draft *SupportDraft) bool {
-	if draft == nil || !autosendEnabled() {
-		return false
-	}
-	if draft.Status != "pending" {
-		return false
-	}
-	if strings.TrimSpace(draft.DraftBodyHTML) == "" {
-		return false
-	}
-	if !strings.EqualFold(strings.TrimSpace(draft.AIConfidence), "high") {
-		return false
-	}
-	if strings.TrimSpace(draft.AskUserFor) != "" {
-		return false
-	}
-	category := strings.ToLower(strings.TrimSpace(draft.AICategory))
-	if _, never := autosendNeverCategories[category]; never {
-		return false
-	}
-	_, ok := autosendCategories()[category]
-	return ok
-}
-
-// scheduleAutoSend arms the timer for a freshly-posted draft and announces
-// the deadline in its thread. No-op when the draft doesn't clear the gate.
-//
-// ponytail: the timer lives in this process, so a pod restart drops it and
-// the draft simply stays pending — the failure direction is "a human still
-// has to click", which is the safe one. Move it to a scanned deadline
-// column if auto-send ever becomes the main path.
-func scheduleAutoSend(draft *SupportDraft) {
-	if !autosendAllowed(draft) {
+// Fail-soft throughout: a draft whose disposition cannot be recorded stays
+// pending with its buttons, which is exactly the pre-REL-249 behaviour.
+func applyDisposition(ctx context.Context, draft *SupportDraft) {
+	if draft == nil || platform.DBPool == nil {
 		return
 	}
-	delay := autosendDelay()
-	deadline := time.Now().Add(delay)
+	disposition, reason := decideDisposition(gatherDispositionSignals(ctx, draft))
+	armed := autosendArmed(ctx)
 
-	// Discord renders <t:unix:R> as a live "in 29 minutes" that keeps
-	// counting down in place — a real countdown, not a printed duration.
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		t, err := loadSupportTicketThread(ctx, draft.TicketNumber)
-		if err != nil || t == nil {
-			return
+	var holdUntil *time.Time
+	if armed && (disposition == dispositionAutoSend || disposition == dispositionAutoClose) {
+		t := time.Now().Add(holdDuration())
+		holdUntil = &t
+	}
+	if err := recordDisposition(ctx, draft.ID, disposition, reason, holdUntil); err != nil {
+		log.Printf("[Disposition] record for draft %d: %v", draft.ID, err)
+		return
+	}
+	draft.Disposition, draft.DispositionReason = disposition, reason
+	log.Printf("[Disposition] draft %d (ticket %s) -> %s (%s) armed=%t",
+		draft.ID, draft.TicketNumber, disposition, reason, armed)
+
+	if !armed {
+		postToTicketThread(ctx, draft.TicketNumber, fmt.Sprintf(
+			"🔒 Would be `%s` — %s. Autonomous sending is %s, so this one waits for a button.",
+			disposition, reason, pausedOrOff(ctx)))
+		return
+	}
+
+	switch disposition {
+	case dispositionEscalate:
+		postEscalation(ctx, draft, reason)
+	case dispositionAutoAsk:
+		// No hold. Asking a user which operating system they are on carries
+		// almost no risk, and the waiting is what has been costing us.
+		postToTicketThread(ctx, draft.TicketNumber, "❓ Asking the user now — "+reason+".")
+		sendDraftNow(ctx, draft.ID, "asked")
+	case dispositionAutoSend, dispositionAutoClose:
+		// Discord renders <t:unix:R> as a live "in 59 minutes" that keeps
+		// counting down in place — a real countdown, not a printed duration.
+		verb := "Sending"
+		if disposition == dispositionAutoClose {
+			verb = "Sending and closing"
 		}
-		msg := fmt.Sprintf(
-			"⏳ Auto-sending <t:%d:R> — `%s` · confidence `%s`. Skip, Edit or Ask cancels it.",
-			deadline.Unix(), draft.AICategory, draft.AIConfidence)
-		if _, err := discordPostMessage(ctx, t.DiscordThreadID, msg, nil); err != nil {
-			log.Printf("[Autosend] countdown post for ticket %s: %v", draft.TicketNumber, err)
+		postToTicketThread(ctx, draft.TicketNumber, fmt.Sprintf(
+			"⏳ %s <t:%d:R> — %s. Hold, Edit or Skip stops it; doing nothing sends it.",
+			verb, holdUntil.Unix(), reason))
+	}
+}
+
+func pausedOrOff(ctx context.Context) string {
+	if autosendPaused(ctx) {
+		return "paused (`/resume` to lift it)"
+	}
+	return "off (`SUPPORT_AUTOSEND`)"
+}
+
+// postEscalation is the one disposition with no timer: it says why, pings, and
+// waits for a person.
+func postEscalation(ctx context.Context, draft *SupportDraft, reason string) {
+	msg := fmt.Sprintf("🚨 **Escalated — not sending.** %s\nSend, Edit or Ask when you have looked at it.", reason)
+	if m := escalateMention(); m != "" {
+		msg = m + " " + msg
+	}
+	postToTicketThread(ctx, draft.TicketNumber, msg)
+}
+
+// escalateWithoutDraft is the failed-triage path. There is no draft row to
+// hang a disposition on, and on a brand new ticket there is no thread either —
+// the thread is created by the draft that never arrived. So this one opens the
+// thread itself. Saying nothing is how thirteen tickets sat pending since May.
+func escalateWithoutDraft(ctx context.Context, ticketNumber, subject, reason string) {
+	log.Printf("[Disposition] ticket %s escalated with no draft: %s", ticketNumber, reason)
+	if !shouldNotifyDiscord() {
+		return
+	}
+	cfg, ok := loadDiscordConfig()
+	if !ok {
+		return
+	}
+	threadID, _, err := getOrCreateThreadForTicket(ctx, cfg,
+		&SupportDraft{TicketNumber: ticketNumber, OriginalSubject: subject, AIPriority: "high"},
+		"🚨 **Escalated — no draft.** This ticket needs a reply written by hand.", nil, nil)
+	if err != nil {
+		log.Printf("[Disposition] thread for undrafted ticket %s: %v", ticketNumber, err)
+		return
+	}
+	msg := reason
+	if m := escalateMention(); m != "" {
+		msg = m + " " + msg
+	}
+	if _, err := discordPostMentioning(ctx, threadID, msg); err != nil {
+		log.Printf("[Disposition] escalation post for ticket %s: %v", ticketNumber, err)
+	}
+}
+
+// postToTicketThread posts one line into a ticket's Discord thread when there
+// is one. Silent no-op otherwise: Discord is a workspace, not the record.
+func postToTicketThread(ctx context.Context, ticketNumber, content string) {
+	if !shouldNotifyDiscord() {
+		return
+	}
+	t, err := loadSupportTicketThread(ctx, ticketNumber)
+	if err != nil || t == nil {
+		return
+	}
+	// allowed_mentions suppresses parsed mentions, so an explicit user id has
+	// to be allow-listed for the ping to actually reach anyone.
+	if _, err := discordPostMentioning(ctx, t.DiscordThreadID, content); err != nil {
+		log.Printf("[Disposition] post to thread for ticket %s: %v", ticketNumber, err)
+	}
+}
+
+// ===== The sweeper ================================================
+
+const holdSweepInterval = time.Minute
+
+// StartAutoSendSweeper sends the drafts whose hold has run out. One tick a
+// minute; the claim is markDraftDecided's `WHERE status = 'pending'`, so
+// several replicas sweeping at once is safe and needs no lock.
+func StartAutoSendSweeper(ctx context.Context) {
+	if platform.DBPool == nil {
+		log.Println("[Autosend] DB not initialized; sweeper disabled")
+		return
+	}
+	go func() {
+		ticker := time.NewTicker(holdSweepInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				sweepExpiredHolds(ctx)
+			}
 		}
 	}()
-
-	draftID := draft.ID
-	time.AfterFunc(delay, func() { fireAutoSend(draftID) })
-	log.Printf("[Autosend] draft %d (ticket %s) armed for %s", draft.ID, draft.TicketNumber, deadline.Format(time.RFC3339))
+	log.Printf("[Autosend] hold sweeper started (every %s, hold %s)", holdSweepInterval, holdDuration())
 }
 
-// fireAutoSend re-reads the draft when the timer expires and sends it only
-// if nobody got there first. The status re-check is what makes Skip / Edit
-// / Ask a cancel, and markDraftDecided's `WHERE status = 'pending'` makes
-// the whole thing safe to run on several replicas at once.
-func fireAutoSend(draftID int64) {
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
+// sweepExpiredHolds fires every draft whose countdown has finished. A pause
+// stops the whole sweep rather than each draft: the holds keep running and
+// resume where they were, which is what a kill switch should do.
+func sweepExpiredHolds(ctx context.Context) {
+	if !autosendArmed(ctx) {
+		return
+	}
+	const q = `
+		SELECT id FROM support_drafts
+		WHERE status = 'pending'
+		  AND hold_until IS NOT NULL AND hold_until <= now()
+		  AND disposition IN ('auto_send', 'auto_close')
+		ORDER BY hold_until
+		LIMIT 25
+	`
+	rows, err := platform.DBPool.Query(ctx, q)
+	if err != nil {
+		log.Printf("[Autosend] sweep: %v", err)
+		return
+	}
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	rows.Close()
 
+	for _, id := range ids {
+		sendCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
+		sendDraftNow(sendCtx, id, "approved")
+		cancel()
+	}
+}
+
+// sendDraftNow claims a pending draft and sends its body. status is the
+// decided-status to claim it under: "approved" for a reply, "asked" for a
+// clarifying question, so the thread state machine and the digest keep telling
+// the truth about which one went out.
+//
+// Re-reading the row here is what makes Hold, Edit, Ask and Skip a cancel:
+// all four move the draft off 'pending' or clear its hold.
+func sendDraftNow(ctx context.Context, draftID int64, status string) {
 	draft, err := loadSupportDraft(ctx, draftID)
 	if err != nil || draft == nil {
-		log.Printf("[Autosend] draft %d gone at fire time (err=%v)", draftID, err)
+		log.Printf("[Autosend] draft %d gone at send time (err=%v)", draftID, err)
 		return
 	}
-	if !autosendAllowed(draft) {
-		log.Printf("[Autosend] draft %d no longer eligible (status=%s); cancelled", draftID, draft.Status)
+	if draft.Status != "pending" || strings.TrimSpace(draft.DraftBodyHTML) == "" {
+		log.Printf("[Autosend] draft %d no longer sendable (status=%s)", draftID, draft.Status)
 		return
 	}
-
-	if err := markDraftDecided(ctx, draftID, "approved", ""); err != nil {
+	if !autosendArmed(ctx) {
+		log.Printf("[Autosend] draft %d not sent: autonomous sending is off or paused", draftID)
+		return
+	}
+	if err := markDraftDecided(ctx, draftID, status, ""); err != nil {
 		log.Printf("[Autosend] draft %d not claimed: %v", draftID, err)
 		return
 	}
@@ -166,17 +233,23 @@ func fireAutoSend(draftID int64) {
 	if draft == nil {
 		return
 	}
+	// A question never closes a ticket, whatever triage thought of the reply
+	// it stands in for.
+	if status == "asked" {
+		draft.ShouldClose = false
+	}
 	if err := sendApprovedReply(ctx, draft, draft.DraftBodyHTML); err != nil {
 		log.Printf("[Autosend] send for ticket %s: %v", draft.TicketNumber, err)
+		postToTicketThread(ctx, draft.TicketNumber,
+			"⚠️ Auto-send failed: "+truncate(err.Error(), 300)+". The draft is still here.")
 		return
 	}
-	applySendStateToThread(ctx, draft, draft.ShouldClose)
-
-	if t, err := loadSupportTicketThread(ctx, draft.TicketNumber); err == nil && t != nil {
-		if _, err := discordPostMessage(ctx, t.DiscordThreadID,
-			"🤖 Auto-sent — nobody intervened before the timer.", nil); err != nil {
-			log.Printf("[Autosend] confirmation post for ticket %s: %v", draft.TicketNumber, err)
-		}
+	if status == "asked" {
+		applyAskStateToThread(ctx, draft)
+		postToTicketThread(ctx, draft.TicketNumber, "❓ Asked, unattended — waiting on the user.")
+	} else {
+		applySendStateToThread(ctx, draft, draft.ShouldClose)
+		postToTicketThread(ctx, draft.TicketNumber, "🤖 Sent, unattended — nobody intervened before the hold ran out.")
 	}
-	log.Printf("[Autosend] draft %d auto-sent for ticket %s", draftID, draft.TicketNumber)
+	log.Printf("[Autosend] draft %d sent for ticket %s as %s", draftID, draft.TicketNumber, status)
 }

@@ -146,21 +146,43 @@ data:
   # fall back to email-only — no error, no startup failure.
   SUPPORT_NOTIFY: "both"
 
-  # Auto-send (REL-245). OFF unless SUPPORT_AUTOSEND is exactly "on".
+  # Autonomous support (REL-249). Doing nothing is what sends a reply.
   #
-  # When on, a draft is sent without a click only if ALL of these hold:
-  # AI confidence is "high", the category is in SUPPORT_AUTOSEND_CATEGORIES,
-  # triage isn't waiting on information from the user, and nobody pressed
-  # Skip, Edit or Ask before SUPPORT_AUTOSEND_DELAY elapsed (the thread
-  # shows a live countdown). `bug`, `billing` and `account` can NEVER
-  # auto-send — that list is in code, not here, and adding them to the
-  # categories below does nothing.
+  # The server picks one of four dispositions per draft and records it on the
+  # row: auto_send (after the hold below, with a live countdown in the
+  # thread), auto_ask (a clarifying question, sent immediately), escalate (no
+  # timer, pings SUPPORT_ESCALATE_MENTION) or auto_close. Hold, Edit and Skip
+  # are still there; they have simply stopped being required.
   #
-  # The timer lives in the pod: a restart before it fires cancels the
-  # auto-send and leaves the draft pending for a human. That's deliberate.
-  SUPPORT_AUTOSEND: "off"
-  SUPPORT_AUTOSEND_CATEGORIES: "feature,feedback"
-  SUPPORT_AUTOSEND_DELAY: "30m"
+  # Escalation is by CONSEQUENCE, not by category label. Anything touching
+  # money or account access escalates whatever the confidence, and that rule
+  # lives in api/internal/support/disposition.go, not here — there is no value
+  # in this file that turns it off.
+  #
+  # SUPPORT_AUTOSEND=off forces approval everywhere; the disposition is still
+  # computed and recorded, so the queue reads the same either way. /pause is
+  # the same switch without a deploy, and it survives a restart.
+  SUPPORT_AUTOSEND: "on"
+
+  # HOLD AT 60 MINUTES FOR THE FIRST WEEK. Drop it to 15 once the digest has
+  # reported a per-category intervention rate worth trusting — REL-249 asks
+  # for that number in a comment on the issue after a week.
+  SUPPORT_HOLD_MINUTES: "60"
+
+  # Loop guard: replies we will send on one ticket in 24 h before handing it
+  # to a person. A third reply with nothing resolved means the bot is going
+  # in circles.
+  SUPPORT_MAX_AUTO_REPLIES: "3"
+
+  # Self-demotion: when more than this share of the last 30 auto-eligible
+  # drafts in a category needed a Hold, an Edit or a Skip, that category stops
+  # sending by itself and the digest says so. Recovery is manual:
+  # /resume <category>.
+  SUPPORT_DEMOTE_THRESHOLD: "0.30"
+
+  # Who an escalation pings, in Discord mention form. Empty posts the
+  # escalation without a ping. This is the guild owner (brandon.harris).
+  SUPPORT_ESCALATE_MENTION: "<@297795474868535298>"
 
   # Linear (REL-245). LINEAR_API_KEY is a secret (see
   # k8s/secrets.yaml.template); these two are not.

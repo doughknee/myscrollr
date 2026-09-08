@@ -487,9 +487,26 @@ func discordPostMessage(ctx context.Context, channelOrThreadID, content string, 
 
 // discordPostEmbed is discordPostMessage with an optional embed attached.
 func discordPostEmbed(ctx context.Context, channelOrThreadID, content string, embed *discordEmbed, components []DiscordActionRow) (string, error) {
+	return discordPost(ctx, channelOrThreadID, content, embed, components, nil)
+}
+
+// discordPostMentioning posts a message that is allowed to actually ping the
+// user or role named in it. Every other message in the queue suppresses
+// mentions; an escalation is the one whose whole job is to reach someone.
+func discordPostMentioning(ctx context.Context, channelOrThreadID, content string) (string, error) {
+	return discordPost(ctx, channelOrThreadID, content, nil, nil, []string{"users", "roles"})
+}
+
+// discordPost is the one poster. parseMentions nil means suppress everything,
+// which is what the queue wants for anything quoting a user.
+func discordPost(ctx context.Context, channelOrThreadID, content string, embed *discordEmbed,
+	components []DiscordActionRow, parseMentions []string) (string, error) {
+	if parseMentions == nil {
+		parseMentions = []string{}
+	}
 	body := map[string]interface{}{
 		"content":          content,
-		"allowed_mentions": map[string]interface{}{"parse": []string{}}, // suppress @ mentions
+		"allowed_mentions": map[string]interface{}{"parse": parseMentions},
 	}
 	if embed != nil {
 		body["embeds"] = []*discordEmbed{embed}
@@ -670,6 +687,24 @@ func registerDiscordSlashCommands(ctx context.Context) error {
 			},
 		},
 		{
+			Name:        "pause",
+			Description: "Stop every unattended send immediately. Holds keep their clocks.",
+			Type:        1,
+		},
+		{
+			Name:        "resume",
+			Description: "Lift the pause, or forgive one category's demotion",
+			Type:        1,
+			Options: []discordSlashCommandOption{
+				{
+					Name:        "category",
+					Description: "Category to un-demote (bug, feature, feedback, billing, account, widget)",
+					Type:        3,
+					Required:    false,
+				},
+			},
+		},
+		{
 			Name:        "stats",
 			Description: "Show AI support pipeline activity for a window (default 24h)",
 			Type:        1,
@@ -714,7 +749,7 @@ func RegisterDiscordSlashCommandsAtBoot(ctx context.Context) {
 		log.Printf("[Discord] register slash commands: %v", err)
 		// Continue to tag bootstrap even if commands failed.
 	} else {
-		log.Println("[Discord] slash commands registered (/inbox, /case, /search, /ticket, /stats)")
+		log.Println("[Discord] slash commands registered (/inbox, /case, /search, /ticket, /stats, /pause, /resume)")
 	}
 
 	if err := ensureSupportForumTags(ctx, cfg.SupportChannelID); err != nil {
@@ -1199,8 +1234,6 @@ func notifyDiscordForDraft(ctx context.Context, draft *SupportDraft) {
 			return
 		}
 	}
-
-	scheduleAutoSend(draft)
 }
 
 // getOrCreateThreadForTicket looks up an existing thread or creates a
@@ -1413,6 +1446,7 @@ func buildDraftHeaderEmbed(ctx context.Context, draft *SupportDraft) *discordEmb
 			{Name: "Priority", Value: codeOrDash(draft.AIPriority), Inline: true},
 			{Name: "Confidence", Value: codeOrDash(draft.AIConfidence), Inline: true},
 			{Name: "App version", Value: appVersionField(ctx, draft.TicketNumber), Inline: true},
+			{Name: "Mood", Value: codeOrDash(draft.Sentiment), Inline: true},
 		},
 		Footer: &discordEmbedFooter{Text: fmt.Sprintf("draft #%d", draft.ID)},
 	}
@@ -1507,9 +1541,13 @@ func caseAppVersion(ctx context.Context, ticketNumber string) string {
 }
 
 // buildDraftActionButtons returns the action-row components for a
-// pending draft. Five buttons is Discord's per-row maximum and exactly
-// what the queue needs: three ways to answer, one to defer, one to turn
-// the ticket into engineering work.
+// pending draft.
+//
+// None of these is required any more (REL-249) — a draft sends itself when
+// its hold runs out. They are the ways to get in front of that: Send now,
+// Hold the clock, Edit the words, Ask instead, Skip entirely. Hold, Edit and
+// Skip each count as an intervention, which is what demotes a category whose
+// drafts keep needing a person.
 func buildDraftActionButtons(draftID int64) []DiscordActionRow {
 	button := func(style int, label, emoji, action string) DiscordMessageButton {
 		b := DiscordMessageButton{
@@ -1527,10 +1565,16 @@ func buildDraftActionButtons(draftID int64) []DiscordActionRow {
 		{
 			Type: 1,
 			Components: []DiscordMessageButton{
-				button(3, "Send", "✅", "support_send"),
+				button(3, "Send now", "✅", "support_send"),
+				button(2, "Hold", "✋", "support_hold"),
 				button(1, "Edit", "✏️", "support_edit"),
 				button(1, "Ask", "❓", "support_ask"),
 				button(2, "Skip", "⏭️", "support_skip"),
+			},
+		},
+		{
+			Type: 1,
+			Components: []DiscordMessageButton{
 				button(4, "File as bug", "🐛", "support_bug"),
 			},
 		},

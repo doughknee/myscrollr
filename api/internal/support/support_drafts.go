@@ -58,9 +58,18 @@ type SupportDraft struct {
 	NeedsInfo             bool   // we cannot troubleshoot this yet
 	OSTicketThreadEntryID int64  // 0 = unknown (legacy rows + initial /support/ticket flow)
 	ShouldClose           bool   // AI-detected resolution signal — when true, send-time also closes the ticket
-	DecidedAt             *time.Time
-	SentAt                *time.Time
-	CreatedAt             time.Time
+	// The autonomous-policy fields (REL-249). Sentiment and DrafterCategory
+	// are reported by the two triage calls; Disposition and everything after
+	// it is the SERVER's decision about what happens to this draft.
+	Sentiment         string
+	DrafterCategory   string
+	Disposition       string
+	DispositionReason string
+	HoldUntil         *time.Time // when the sweeper may send it; nil = no timer
+	Intervened        bool       // Hold, Edit or Skip happened
+	DecidedAt         *time.Time
+	SentAt            *time.Time
+	CreatedAt         time.Time
 }
 
 // ErrAlreadyDecided indicates a draft was already actioned (single-use enforcement).
@@ -91,9 +100,11 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 			 draft_body_html, ai_summary, ai_category, ai_priority,
 			 ai_widget, ai_duplicate_of, ai_confidence, status,
 			 osticket_thread_entry_id, should_close,
-			 internal_note, ask_user_for, grounded_in, unknowns, needs_info)
+			 internal_note, ask_user_for, grounded_in, unknowns, needs_info,
+			 sentiment, drafter_category)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',$13,$14,
-			 NULLIF($15,''),NULLIF($16,''),NULLIF($17,''),NULLIF($18,''),$19)
+			 NULLIF($15,''),NULLIF($16,''),NULLIF($17,''),NULLIF($18,''),$19,
+			 NULLIF($20,''),NULLIF($21,''))
 		RETURNING id, created_at
 	`
 	// 0 → NULL via NULLIF so the partial unique index doesn't reject
@@ -130,6 +141,8 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 		draft.GroundedIn,
 		draft.Unknowns,
 		draft.NeedsInfo,
+		draft.Sentiment,
+		draft.DrafterCategory,
 	).Scan(&draft.ID, &draft.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("createSupportDraft: %w", err)
@@ -161,12 +174,15 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 			   ai_widget, ai_duplicate_of, ai_confidence, status,
 			   edited_body_html, decided_at, sent_at, created_at,
 			   should_close, internal_note, ask_user_for, grounded_in,
-			   unknowns, needs_info
+			   unknowns, needs_info,
+			   sentiment, drafter_category, disposition, disposition_reason,
+			   hold_until, intervened
 		FROM support_drafts WHERE id = $1
 	`
 	var d SupportDraft
 	var userName, userMsg, summary, category, priority, widget, dupOf, confidence, editedBody *string
 	var internalNote, askUserFor, groundedIn, unknowns *string
+	var sentiment, drafterCategory, disposition, dispositionReason *string
 	var needsInfo *bool
 	err := platform.DBPool.QueryRow(ctx, q, id).Scan(
 		&d.ID, &d.TicketNumber, &d.UserEmail, &userName, &d.OriginalSubject,
@@ -176,6 +192,8 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 		&editedBody, &d.DecidedAt, &d.SentAt, &d.CreatedAt,
 		&d.ShouldClose, &internalNote, &askUserFor, &groundedIn,
 		&unknowns, &needsInfo,
+		&sentiment, &drafterCategory, &disposition, &dispositionReason,
+		&d.HoldUntil, &d.Intervened,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -225,7 +243,60 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 	if needsInfo != nil {
 		d.NeedsInfo = *needsInfo
 	}
+	if sentiment != nil {
+		d.Sentiment = *sentiment
+	}
+	if drafterCategory != nil {
+		d.DrafterCategory = *drafterCategory
+	}
+	if disposition != nil {
+		d.Disposition = *disposition
+	}
+	if dispositionReason != nil {
+		d.DispositionReason = *dispositionReason
+	}
 	return &d, nil
+}
+
+// recordDisposition writes the server's decision and, when the decision ends
+// in a timed send, the deadline the sweeper reads. holdUntil nil means no
+// timer: an escalation, an immediate ask, or an unarmed pipeline.
+func recordDisposition(ctx context.Context, id int64, disposition, reason string, holdUntil *time.Time) error {
+	const q = `
+		UPDATE support_drafts
+		SET disposition = $2, disposition_reason = NULLIF($3,''), hold_until = $4
+		WHERE id = $1
+	`
+	if _, err := platform.DBPool.Exec(ctx, q, id, disposition, reason, holdUntil); err != nil {
+		return fmt.Errorf("recordDisposition: %w", err)
+	}
+	return nil
+}
+
+// markIntervened records that a person stepped in on a draft that would
+// otherwise have gone out by itself. It is the numerator of the per-category
+// intervention rate that demotes a category, so Hold, Edit and Skip all call
+// it and nothing else does.
+func markIntervened(ctx context.Context, id int64) {
+	if _, err := platform.DBPool.Exec(ctx,
+		`UPDATE support_drafts SET intervened = true WHERE id = $1`, id); err != nil {
+		log.Printf("[Drafts] markIntervened for %d failed: %v", id, err)
+	}
+}
+
+// holdDraft stops a running countdown without deciding the draft: the row
+// stays pending with its buttons, and the sweeper skips it because the
+// deadline it reads is gone.
+func holdDraft(ctx context.Context, id int64) error {
+	const q = `UPDATE support_drafts SET hold_until = NULL, intervened = true WHERE id = $1 AND status = 'pending'`
+	tag, err := platform.DBPool.Exec(ctx, q, id)
+	if err != nil {
+		return fmt.Errorf("holdDraft: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrAlreadyDecided
+	}
+	return nil
 }
 
 // markDraftDecided atomically transitions a pending draft to the new
@@ -556,5 +627,9 @@ func init() {
 		if shouldNotifyDiscord() {
 			notifyDiscordForDraft(ctx, draft)
 		}
+		// Last, so the thread exists to carry the countdown or the
+		// escalation. Runs even with Discord off: the decision belongs on
+		// the row whether or not anyone is watching a channel.
+		applyDisposition(ctx, draft)
 	}
 }

@@ -116,6 +116,16 @@ func HandleOSTicketThreadMessage(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ignored", "reason": "duplicate"})
 	}
 
+	// 3b. Loop guard (REL-249). The plugin filters to user messages, but a
+	//     mail loop, a shared mailbox or a plugin change would hand us our
+	//     own reply — and with nothing waiting for a click, the bot would
+	//     answer itself until the reply cap stopped it. Never draft in
+	//     response to something we sent.
+	if isOurOwnOutbound(c.Context(), ev.ThreadEntryID) {
+		log.Printf("[OSTicketWebhook] thread_entry_id=%d (ticket=%s) is our own outbound reply; not drafting", ev.ThreadEntryID, ev.TicketNumber)
+		return c.JSON(fiber.Map{"status": "ignored", "reason": "own outbound message"})
+	}
+
 	// 4. Acknowledge fast — run triage + draft creation + partner
 	//    notification in a background goroutine so we don't hold the
 	//    osTicket plugin's HTTP request open while Anthropic ponders.
@@ -193,8 +203,9 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 		Thread:  FetchCaseThread(ctx, ev.TicketNumber),
 		Context: ticketContextFromCase(ctx, ev.TicketNumber),
 	})
-	if triage == nil {
-		log.Printf("[OSTicketWebhook] triage returned nil for ticket %s (entry=%d); no draft created", ev.TicketNumber, ev.ThreadEntryID)
+	if triage == nil || strings.TrimSpace(triage.DraftReplyHTML) == "" {
+		log.Printf("[OSTicketWebhook] triage produced no reply for ticket %s (entry=%d); escalating", ev.TicketNumber, ev.ThreadEntryID)
+		escalateWithoutDraft(ctx, ev.TicketNumber, ev.Subject, "The triage call did not produce a reply to this follow-up.")
 		return
 	}
 
@@ -217,6 +228,8 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 		OSTicketThreadEntryID: ev.ThreadEntryID,
 		ShouldClose:           triage.ShouldClose,
 		NeedsInfo:             triage.NeedsInfo,
+		Sentiment:             triage.Sentiment,
+		DrafterCategory:       triage.DrafterCategory,
 		InternalNote:          note,
 		AskUserFor:            ask,
 		GroundedIn:            grounded,
