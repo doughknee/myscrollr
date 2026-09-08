@@ -14,46 +14,87 @@ import (
 )
 
 // =============================================================================
-// AI Support Triage — Anthropic Haiku integration
+// AI support triage — classify with Haiku, draft with Sonnet (REL-244)
 // =============================================================================
 //
-// Best-effort categorization, summarization, dupe-detection, and reply
-// drafting for incoming support tickets. All functions in this file are
-// designed to fail soft: any error path returns nil so the support flow
-// continues with the legacy (no-AI) behavior. We never block ticket
-// creation on triage success.
+// Two calls, because they are two jobs. Classification is a cheap labelling
+// problem: category, priority, which widget, is this a duplicate, is the user
+// telling us it is fixed, do we even have enough to go on. Drafting is the
+// expensive one, and it is the one that has to be right in front of a user.
+//
+// Both are structured through TOOL USE with tool_choice pinned to a single
+// tool, so the model fills a schema instead of being asked to "output only
+// JSON" and then being talked out of markdown fences. The fence-stripping
+// and the "your turn ENDS after the closing brace" pleading are gone.
+//
+// The system prompt is the knowledge base plus the standing policy and voice
+// rules, and it is identical on every ticket so Anthropic's prompt cache
+// holds it (cache_control: ephemeral). Everything that varies per ticket —
+// who is writing, what is known-broken, what we said to people who wrote in
+// with the same thing — rides in the user message.
+//
+// Everything here fails soft. A nil result puts the ticket back on the
+// legacy path: it still reaches osTicket, the partner still gets it, they
+// just do not get a draft.
 
 const (
-	anthropicAPIURL    = "https://api.anthropic.com/v1/messages"
-	anthropicModel     = "claude-haiku-4-5"
-	anthropicVersion   = "2023-06-01"
-	triageTimeout      = 10 * time.Second
-	maxTriageBodyChars = 8000 // truncate ticket body before sending to keep prompt size bounded
+	anthropicAPIURL  = "https://api.anthropic.com/v1/messages"
+	classifyModel    = "claude-haiku-4-5"
+	draftModel       = "claude-sonnet-5"
+	anthropicVersion = "2023-06-01"
+
+	classifyTimeout = 10 * time.Second
+	draftTimeout    = 25 * time.Second
+
+	maxTriageBodyChars = 8000 // truncate the ticket body to keep the prompt bounded
+	similarCaseCount   = 3
 )
 
-// TriageResult is the structured output from Claude. Fields use
-// lowercase JSON tags so we can unmarshal Claude's JSON response
-// directly. Confidence drives whether we override the user-picked
-// category.
+// TriageResult is the merged output of both calls. It is the shape the rest
+// of the support flow already reads, plus the grounding fields the drafter
+// now reports (persisted as nullable columns on support_drafts).
 type TriageResult struct {
-	Category       string `json:"category"`
-	Widget         string `json:"widget,omitempty"`
-	Priority       string `json:"priority"`
-	Summary        string `json:"summary"`
-	DuplicateOf    string `json:"duplicate_of,omitempty"`
-	DraftReplyHTML string `json:"draft_reply_html"`
-	Confidence     string `json:"confidence"`
-	// ShouldClose is true when the user clearly indicates the issue
-	// is resolved (thanks/that worked/resolved/done). When set, the
-	// approval handler passes close_ticket=true to the osTicket
-	// plugin so the reply also closes the ticket. Conservative —
-	// Claude is instructed to set this only on unambiguous resolution.
-	ShouldClose bool `json:"should_close,omitempty"`
+	// From the classifier.
+	Category    string
+	Widget      string
+	Priority    string
+	Summary     string
+	DuplicateOf string
+	NeedsInfo   bool
+
+	// From the drafter.
+	DraftReplyHTML string
+	Confidence     string
+	GroundedIn     []string
+	Unknowns       []string
+	AskUserFor     []string
+	InternalNote   string
+
+	// ShouldClose is true only when BOTH calls agree the user has told us
+	// the issue is resolved. Closing a ticket is the one triage decision
+	// with a cost when it is wrong, so a disagreement leaves it open.
+	ShouldClose bool
+
+	// Usage is for logs and the live test's cost report. Never persisted.
+	Usage TriageUsage
 }
 
-// TriageInput is what we pass to triageTicket. Builds the prompt
-// from these fields plus a small bundle of recent ticket summaries
-// pulled from support_cases (for dupe detection) and a static FAQ snippet.
+// TriageUsage is the token cost of one ticket across both calls.
+type TriageUsage struct {
+	ClassifyIn, ClassifyOut int
+	DraftIn, DraftOut       int
+	CacheRead, CacheWrite   int
+}
+
+func (u TriageUsage) String() string {
+	return fmt.Sprintf("classify %d in/%d out, draft %d in/%d out, cache %d read/%d write",
+		u.ClassifyIn, u.ClassifyOut, u.DraftIn, u.DraftOut, u.CacheRead, u.CacheWrite)
+}
+
+// TriageInput is what the call sites hand us. Context, KnownIssues, Similar
+// and Thread are filled in by triageTicket itself when the caller leaves
+// them empty — the prompt builders stay pure so the golden tests can pin
+// them without a network or a database.
 type TriageInput struct {
 	UserCategory    string
 	UserEmail       string
@@ -63,18 +104,20 @@ type TriageInput struct {
 	RecentSummaries []RecentTicketSummary
 	Widget          string // user-picked widget hint, if any
 
+	Context     TicketContext
+	KnownIssues string
+	Similar     []SimilarCase
+
 	// Reply-loop fields. Populated when this triage is for a user's
-	// follow-up message on an existing ticket (via the osTicket
-	// thread-message webhook). The prompt uses these to skip the
-	// initial greeting and to thread responses correctly.
-	IsReply             bool
-	ReplyTicketNumber   string // existing ticket number (e.g. "716831")
-	PreviousAIReplyHTML string // most recent AI reply we sent on this ticket, if known
+	// follow-up on an existing ticket (osTicket thread-message webhook).
+	IsReply           bool
+	ReplyTicketNumber string
+	Thread            []SupportMessage
 }
 
 // RecentTicketSummary is one line of dupe-detection context for the
-// triage prompt: the last 50 support_cases (FetchRecentTicketSummaries
-// in support_cases.go). Kept compact — the list rides on every call.
+// classifier: the last 50 support_cases (FetchRecentTicketSummaries in
+// support_cases.go). Kept compact — the list rides on every call.
 type RecentTicketSummary struct {
 	TicketNumber string `json:"ticket_number"`
 	Category     string `json:"category"`
@@ -82,13 +125,13 @@ type RecentTicketSummary struct {
 	CreatedAt    string `json:"created_at"`
 }
 
-// triageTicket calls Anthropic Haiku and returns a parsed TriageResult.
-// On any failure (network error, non-200, malformed JSON, missing
-// required fields) returns nil. Caller must handle nil gracefully —
-// AI triage is best-effort, never blocks the ticket flow.
+// triageTicket runs both calls and merges them. Returns nil when the
+// classifier fails — without a category there is nothing worth persisting.
+// When the classifier succeeds and the drafter does not, the result comes
+// back with an empty DraftReplyHTML: the ticket still gets its category and
+// priority, and createSupportDraft refuses the bodiless draft.
 func triageTicket(ctx context.Context, input TriageInput) *TriageResult {
-	apiKey := os.Getenv("ANTHROPIC_API_KEY")
-	if apiKey == "" {
+	if os.Getenv("ANTHROPIC_API_KEY") == "" {
 		log.Println("[Triage] ANTHROPIC_API_KEY not set; skipping triage")
 		return nil
 	}
@@ -96,263 +139,469 @@ func triageTicket(ctx context.Context, input TriageInput) *TriageResult {
 		return nil
 	}
 
-	body := input.Body
-	if len(body) > maxTriageBodyChars {
-		body = body[:maxTriageBodyChars] + "\n\n...[truncated]"
+	if len(input.Body) > maxTriageBodyChars {
+		input.Body = input.Body[:maxTriageBodyChars] + "\n\n...[truncated]"
+	}
+	if input.KnownIssues == "" {
+		input.KnownIssues = knownIssuesBlock(ctx)
+	}
+	if input.Similar == nil {
+		input.Similar = FetchSimilarCases(ctx,
+			input.Subject+" "+htmlToPlain(input.Body), input.ReplyTicketNumber, similarCaseCount)
 	}
 
-	prompt := buildTriagePrompt(input, body)
+	cls, clsUsage, err := classifyTicket(ctx, input)
+	if err != nil {
+		log.Printf("[Triage] classify failed: %v", err)
+		return nil
+	}
 
-	reqBody := map[string]interface{}{
-		"model":      anthropicModel,
-		"max_tokens": 2048,
-		"messages": []map[string]string{
-			{"role": "user", "content": prompt},
+	result := &TriageResult{
+		Category:    cls.Category,
+		Widget:      cls.Widget,
+		Priority:    cls.Priority,
+		Summary:     cls.Summary,
+		DuplicateOf: cls.DuplicateOf,
+		NeedsInfo:   cls.NeedsInfo,
+		Usage:       clsUsage,
+	}
+
+	draft, draftUsage, err := draftReply(ctx, input, cls)
+	if err != nil {
+		log.Printf("[Triage] draft failed for %q (classification kept): %v", input.Subject, err)
+		return result
+	}
+	result.DraftReplyHTML = draft.ReplyHTML
+	result.Confidence = draft.Confidence
+	result.GroundedIn = draft.GroundedIn
+	result.Unknowns = draft.Unknowns
+	result.AskUserFor = draft.AskUserFor
+	result.InternalNote = draft.InternalNote
+	result.ShouldClose = cls.ShouldClose && draft.ShouldClose
+	result.Usage.DraftIn = draftUsage.DraftIn
+	result.Usage.DraftOut = draftUsage.DraftOut
+	result.Usage.CacheRead += draftUsage.CacheRead
+	result.Usage.CacheWrite += draftUsage.CacheWrite
+
+	log.Printf("[Triage] OK: category=%s priority=%s confidence=%s needs_info=%t summary=%q usage=[%s]",
+		result.Category, result.Priority, result.Confidence, result.NeedsInfo, result.Summary, result.Usage)
+	return result
+}
+
+// ===== Call 1: classification =====================================
+
+type classification struct {
+	Category    string `json:"category"`
+	Priority    string `json:"priority"`
+	Summary     string `json:"summary"`
+	Widget      string `json:"widget"`
+	DuplicateOf string `json:"duplicate_of"`
+	ShouldClose bool   `json:"should_close"`
+	NeedsInfo   bool   `json:"needs_info"`
+}
+
+var classifyTool = map[string]interface{}{
+	"name":        "classify_ticket",
+	"description": "Record the triage classification for this support ticket.",
+	"input_schema": map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"category": map[string]interface{}{
+				"type": "string",
+				"enum": []string{"bug", "feature", "feedback", "billing", "account", "widget"},
+			},
+			"priority": map[string]interface{}{
+				"type": "string",
+				"enum": []string{"low", "normal", "high", "emergency"},
+			},
+			"summary": map[string]interface{}{
+				"type":        "string",
+				"description": "Triage label, 10 words maximum, no trailing period. Reads like a label, not a sentence.",
+			},
+			"widget": map[string]interface{}{
+				"type":        "string",
+				"description": "The catalog widget this is about, by its catalog name. Empty when the ticket is not about one widget.",
+			},
+			"duplicate_of": map[string]interface{}{
+				"type":        "string",
+				"description": "Ticket number from RECENT TICKETS that this duplicates. Empty when it is not a duplicate.",
+			},
+			"should_close": map[string]interface{}{
+				"type":        "boolean",
+				"description": "True only on an unambiguous resolution signal from the user. False on the opening message, on vague thanks, and whenever they ask anything further.",
+			},
+			"needs_info": map[string]interface{}{
+				"type":        "boolean",
+				"description": "True when this is a bug report and we cannot troubleshoot it with what we have: no OS, no app version, or no description of what actually happened.",
+			},
 		},
+		"required": []string{"category", "priority", "summary", "widget", "duplicate_of", "should_close", "needs_info"},
+	},
+}
+
+func classifyTicket(ctx context.Context, in TriageInput) (*classification, TriageUsage, error) {
+	raw, usage, err := anthropicToolCall(ctx, classifyModel, classifyTimeout, 1024,
+		buildClassifyPrompt(in), classifyTool)
+	if err != nil {
+		return nil, TriageUsage{}, err
+	}
+	var cls classification
+	if err := json.Unmarshal(raw, &cls); err != nil {
+		return nil, TriageUsage{}, fmt.Errorf("decode classification: %w", err)
+	}
+	if cls.Category == "" || cls.Priority == "" || cls.Summary == "" {
+		return nil, TriageUsage{}, fmt.Errorf("incomplete classification: %+v", cls)
+	}
+	return &cls, TriageUsage{
+		ClassifyIn: usage.InputTokens, ClassifyOut: usage.OutputTokens,
+		CacheRead: usage.CacheReadInputTokens, CacheWrite: usage.CacheCreationInputTokens,
+	}, nil
+}
+
+// ===== Call 2: the reply ==========================================
+
+type replyDraft struct {
+	ReplyHTML    string   `json:"reply_html"`
+	Confidence   string   `json:"confidence"`
+	GroundedIn   []string `json:"grounded_in"`
+	Unknowns     []string `json:"unknowns"`
+	AskUserFor   []string `json:"ask_user_for"`
+	ShouldClose  bool     `json:"should_close"`
+	InternalNote string   `json:"internal_note"`
+}
+
+var draftTool = map[string]interface{}{
+	"name":        "draft_reply",
+	"description": "Record the drafted reply to the user, and say what it rests on.",
+	"input_schema": map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"reply_html": map[string]interface{}{
+				"type":        "string",
+				"description": "The reply to the user, as HTML paragraphs. Ends with the two sign-off lines.",
+			},
+			"confidence": map[string]interface{}{
+				"type": "string",
+				"enum": []string{"high", "medium", "low"},
+				"description": "high when every claim comes from the knowledge base or the live blocks; " +
+					"low whenever the reply leaves something open or guesses.",
+			},
+			"grounded_in": map[string]interface{}{
+				"type":        "array",
+				"items":       map[string]interface{}{"type": "string"},
+				"description": "What each claim in the reply rests on: knowledge base section headings, release versions, or issue keys. One entry per claim.",
+			},
+			"unknowns": map[string]interface{}{
+				"type":        "array",
+				"items":       map[string]interface{}{"type": "string"},
+				"description": "Anything the reply had to leave open because nothing given to you covers it. Empty when the reply answers everything asked.",
+			},
+			"ask_user_for": map[string]interface{}{
+				"type":        "array",
+				"items":       map[string]interface{}{"type": "string"},
+				"description": "Exactly the things the reply asks the user to send back. Empty when it asks for nothing.",
+			},
+			"should_close": map[string]interface{}{
+				"type":        "boolean",
+				"description": "True only when this reply acknowledges a resolution the user reported and proposes no further steps.",
+			},
+			"internal_note": map[string]interface{}{
+				"type":        "string",
+				"description": "For the partner reviewing this draft. Never shown to the user. When the ticket matches a known open issue, this is its issue key. Empty when there is nothing to add.",
+			},
+		},
+		"required": []string{"reply_html", "confidence", "grounded_in", "unknowns", "ask_user_for", "should_close", "internal_note"},
+	},
+}
+
+func draftReply(ctx context.Context, in TriageInput, cls *classification) (*replyDraft, TriageUsage, error) {
+	raw, usage, err := anthropicToolCall(ctx, draftModel, draftTimeout, 2048,
+		buildDraftPrompt(in, cls), draftTool)
+	if err != nil {
+		return nil, TriageUsage{}, err
+	}
+	var d replyDraft
+	if err := json.Unmarshal(raw, &d); err != nil {
+		return nil, TriageUsage{}, fmt.Errorf("decode draft: %w", err)
+	}
+	if strings.TrimSpace(d.ReplyHTML) == "" {
+		return nil, TriageUsage{}, fmt.Errorf("empty reply_html")
+	}
+	d.ReplyHTML = ensureSignOff(d.ReplyHTML)
+	return &d, TriageUsage{
+		DraftIn: usage.InputTokens, DraftOut: usage.OutputTokens,
+		CacheRead: usage.CacheReadInputTokens, CacheWrite: usage.CacheCreationInputTokens,
+	}, nil
+}
+
+// groundingFields flattens the drafter's lists into the text columns the
+// Discord thread header and the auto-send gate already read (REL-245's
+// internal_note / ask_user_for / grounded_in). One line each, because that
+// is how every reader renders them.
+func (t *TriageResult) groundingFields() (internalNote, askUserFor, groundedIn, unknowns string) {
+	return t.InternalNote,
+		strings.Join(t.AskUserFor, "; "),
+		strings.Join(t.GroundedIn, "; "),
+		strings.Join(t.Unknowns, "; ")
+}
+
+// ensureSignOff guarantees the reply ends the way every Scrollr reply ends.
+// The system prompt asks for it, the draft prompt asks for it and the tool
+// schema asks for it, and the drafter still drops it on the short "we need
+// more information" replies — so it is not left to the model. Appended here
+// rather than in decorateUserReplyHTML because the partner reviews this body
+// and should see exactly what the user will.
+func ensureSignOff(replyHTML string) string {
+	replyHTML = strings.TrimSpace(replyHTML)
+	if strings.Contains(replyHTML, "Scrollr Support") {
+		return replyHTML
+	}
+	return replyHTML + "<p>Best Regards,<br>Scrollr Support</p>"
+}
+
+// ===== The Anthropic call =========================================
+
+type anthropicUsage struct {
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+}
+
+// anthropicToolCall posts one message pinned to a single tool and returns
+// that tool call's input. tool_choice makes the schema the only thing the
+// model can produce, which is why nothing downstream has to repair prose.
+func anthropicToolCall(ctx context.Context, model string, timeout time.Duration, maxTokens int,
+	userMessage string, tool map[string]interface{}) (json.RawMessage, anthropicUsage, error) {
+
+	var usage anthropicUsage
+	reqBody := map[string]interface{}{
+		"model":      model,
+		"max_tokens": maxTokens,
+		"system": []map[string]interface{}{{
+			"type":          "text",
+			"text":          triageSystemPrompt(),
+			"cache_control": map[string]string{"type": "ephemeral"},
+		}},
+		"messages":    []map[string]string{{"role": "user", "content": userMessage}},
+		"tools":       []map[string]interface{}{tool},
+		"tool_choice": map[string]string{"type": "tool", "name": tool["name"].(string)},
 	}
 	reqBytes, err := json.Marshal(reqBody)
 	if err != nil {
-		log.Printf("[Triage] marshal request: %v", err)
-		return nil
+		return nil, usage, fmt.Errorf("marshal request: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, triageTimeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, anthropicAPIURL, bytes.NewReader(reqBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, anthropicEndpoint(), bytes.NewReader(reqBytes))
 	if err != nil {
-		log.Printf("[Triage] build request: %v", err)
-		return nil
+		return nil, usage, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", apiKey)
+	req.Header.Set("x-api-key", os.Getenv("ANTHROPIC_API_KEY"))
 	req.Header.Set("anthropic-version", anthropicVersion)
 
-	client := &http.Client{Timeout: triageTimeout}
-	resp, err := client.Do(req)
+	resp, err := (&http.Client{Timeout: timeout}).Do(req)
 	if err != nil {
-		log.Printf("[Triage] HTTP request failed: %v", err)
-		return nil
+		return nil, usage, err
 	}
 	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if err != nil {
-		log.Printf("[Triage] read response: %v", err)
-		return nil
+		return nil, usage, fmt.Errorf("read response: %w", err)
 	}
-
 	if resp.StatusCode >= 400 {
-		log.Printf("[Triage] Anthropic returned %d: %s", resp.StatusCode, string(respBody))
-		return nil
+		return nil, usage, fmt.Errorf("anthropic %d: %s", resp.StatusCode, truncate(string(respBody), 400))
 	}
 
-	// Anthropic response: {content: [{type:"text", text:"..."}]}
 	var apiResp struct {
 		Content []struct {
-			Type string `json:"type"`
-			Text string `json:"text"`
+			Type  string          `json:"type"`
+			Name  string          `json:"name"`
+			Input json.RawMessage `json:"input"`
 		} `json:"content"`
+		Usage anthropicUsage `json:"usage"`
 	}
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		log.Printf("[Triage] parse Anthropic response: %v", err)
-		return nil
+		return nil, usage, fmt.Errorf("parse response: %w", err)
 	}
-	if len(apiResp.Content) == 0 {
-		log.Printf("[Triage] empty content from Anthropic")
-		return nil
+	usage = apiResp.Usage
+	for _, block := range apiResp.Content {
+		if block.Type == "tool_use" && block.Name == tool["name"] {
+			return block.Input, usage, nil
+		}
 	}
-
-	// Claude sometimes wraps JSON in markdown fences AND/OR appends a
-	// "note on categorization" or similar commentary after the JSON
-	// object — both despite the prompt's "no markdown, no commentary"
-	// instruction. Strip leading fences then use json.Decoder.Decode
-	// which reads ONE JSON value and ignores everything after it.
-	// (json.Unmarshal would fail with "invalid character ... after
-	// top-level value" when commentary follows.)
-	rawJSON := strings.TrimSpace(apiResp.Content[0].Text)
-	rawJSON = strings.TrimPrefix(rawJSON, "```json")
-	rawJSON = strings.TrimPrefix(rawJSON, "```")
-	rawJSON = strings.TrimSpace(rawJSON)
-
-	var result TriageResult
-	dec := json.NewDecoder(strings.NewReader(rawJSON))
-	if err := dec.Decode(&result); err != nil {
-		log.Printf("[Triage] parse triage JSON: %v\nraw: %s", err, rawJSON)
-		return nil
-	}
-
-	// Sanity-check required fields
-	if result.Category == "" || result.Priority == "" || result.Summary == "" {
-		log.Printf("[Triage] incomplete result: %+v", result)
-		return nil
-	}
-
-	log.Printf("[Triage] OK: category=%s priority=%s confidence=%s summary=%q",
-		result.Category, result.Priority, result.Confidence, result.Summary)
-	return &result
+	return nil, usage, fmt.Errorf("no %s tool call in response", tool["name"])
 }
 
-// buildTriagePrompt constructs the user-message prompt sent to Claude.
-// Kept as a pure function for unit testing.
-func buildTriagePrompt(input TriageInput, body string) string {
-	recentJSON, _ := json.Marshal(input.RecentSummaries)
+// anthropicEndpoint exists so the tests can point the client at a stub.
+func anthropicEndpoint() string {
+	if u := os.Getenv("ANTHROPIC_API_URL"); u != "" {
+		return u
+	}
+	return anthropicAPIURL
+}
+
+// ===== Prompts ====================================================
+
+// triageSystemPrompt is byte-identical on every ticket so Anthropic's prompt
+// cache holds it: the knowledge base is ~70 KB and would otherwise be the
+// whole cost of triage. Nothing per-ticket may be added here.
+func triageSystemPrompt() string {
+	return `You are the support assistant for Scrollr, a desktop ticker app for live financial
+markets, sports scores, news, prediction markets and Yahoo Fantasy. You classify incoming
+tickets and draft the replies a human partner approves before they are sent.
+
+The knowledge base below is ground truth. Where it and your training data disagree, the
+knowledge base wins. If it does not cover something, say so — never fill the gap with a
+guess about how Scrollr works.
+
+HARD RULES for anything the user will read:
+- Never name internal infrastructure: the auth provider, hosting, databases, queues, the
+  ticketing system, the data providers we buy from, or any of their rate limits or quotas.
+  To a user, "Scrollr" is the whole system, and an outage is "a problem on our side".
+- Never mention the Super User program, by name or by description.
+- Never give a date, an estimate or a promise for anything that has not shipped.
+- Never quote a dollar amount. Link https://myscrollr.com/uplink instead.
+- Never use an em dash or an en dash. Commas, periods, parentheses and hyphens only.
+- Sentence case. Warm, plain, short. Answer the question asked and do not tour features.
+- End every reply with exactly these two lines, and nothing after them:
+    Best Regards,
+    Scrollr Support
+
+KNOWLEDGE BASE
+` + supportKnowledgeBase()
+}
+
+// buildClassifyPrompt is the labelling prompt. Pure — the golden test pins it.
+func buildClassifyPrompt(in TriageInput) string {
+	recentJSON, _ := json.Marshal(in.RecentSummaries)
 	if len(recentJSON) == 0 {
 		recentJSON = []byte("[]")
 	}
 
-	widgetHint := ""
-	if input.Widget != "" {
-		widgetHint = fmt.Sprintf("Widget hint from user: %s\n", input.Widget)
-	}
+	var b strings.Builder
+	b.WriteString(`Classify this support ticket. Call classify_ticket once with your answer.
 
-	// Reply-context block. When this triage is for a user follow-up
-	// message on an existing ticket, prepend a framing block that
-	// changes the AI's voice (no opening greeting, treat as continued
-	// conversation) and gives it the previous AI response so it can
-	// build on prior advice instead of restarting.
-	replyContext := ""
-	if input.IsReply {
-		var prevReply string
-		if input.PreviousAIReplyHTML != "" {
-			prevReply = "\n\nYour previous reply on this ticket (for continuity — DO NOT repeat it verbatim):\n" + input.PreviousAIReplyHTML
+CATEGORIES — match the user's actual problem, not their keywords:
+- bug: something is broken, crashes, or behaves contrary to what the docs or the UI promise.
+- feature: a new capability that does not exist yet.
+- feedback: an opinion or a design take with no specific fix requested.
+- billing: payment, subscription, plan change, refund, invoice, charge dispute.
+- account: login, password, email, username, profile, deletion, sign-up, data export.
+- widget: a question or a fault in one specific widget's content, configuration or connection.
+
+Respect an unambiguous self-classification ("this is a bug:", "feature request:") unless the
+content plainly contradicts it, in which case classify by the content and say so in the summary.
+
+PRIORITY:
+- emergency: lost data, cannot log in at all, a payment failure blocking access, a security issue.
+- high: a widget or a whole feature is broken, a billing dispute, an account-access problem.
+- normal: minor UX problems, non-blocking bugs, most feature requests, general questions.
+- low: nice-to-have feedback, praise, low-stakes suggestions.
+
+needs_info is about whether WE can act. Set it true when this is a bug report and we are missing
+what it would take to troubleshoot: no OS, no app version, or no account of what actually
+happened. The context block below says whether diagnostics were attached.
+
+`)
+	if in.IsReply {
+		fmt.Fprintf(&b, "This is a FOLLOW-UP message on existing ticket #%s, not a new report.\n\n", in.ReplyTicketNumber)
+	}
+	b.WriteString(in.Context.render())
+	fmt.Fprintf(&b, "\nRECENT TICKETS (for duplicate detection only):\n%s\n", recentJSON)
+	b.WriteString("\n" + renderUserTicket(in))
+	return b.String()
+}
+
+// buildDraftPrompt is the reply prompt. Pure — the golden test pins it.
+func buildDraftPrompt(in TriageInput, cls *classification) string {
+	var b strings.Builder
+	b.WriteString("Draft the reply to this support ticket. Call draft_reply once with your answer.\n\n")
+
+	if cls != nil {
+		fmt.Fprintf(&b, "TRIAGE (already decided; do not re-argue it): category=%s priority=%s",
+			cls.Category, cls.Priority)
+		if cls.Widget != "" {
+			fmt.Fprintf(&b, " widget=%s", cls.Widget)
 		}
-		replyContext = fmt.Sprintf(`REPLY CONTEXT — IMPORTANT:
-This message is the user's FOLLOW-UP reply on an existing ticket (ticket #%s, original subject: %q). Treat it as a continued conversation.
-
-- DO NOT open with a greeting like "Hi!" or "Thanks for reaching out!" — that's reserved for first contact.
-- Acknowledge what they said briefly (e.g. "Got it — ", "Thanks for the update — ", "Following up on that:") and move directly to the next action or answer.
-- If the user is reporting that your prior fix did NOT work, do not repeat the same suggestion — try a different angle or ask a clarifying question.
-- If the user says "thanks, that worked" or similar (resolution signal), acknowledge it warmly and indicate the ticket can be closed (1-2 sentences). Do not propose new steps.
-- If the user is asking a follow-up question, answer directly without re-introducing yourself.%s
-
-`, input.ReplyTicketNumber, input.Subject, prevReply)
+		if cls.DuplicateOf != "" {
+			fmt.Fprintf(&b, " duplicate_of=#%s", cls.DuplicateOf)
+		}
+		fmt.Fprintf(&b, " should_close=%t needs_info=%t\n\n", cls.ShouldClose, cls.NeedsInfo)
 	}
 
-	return fmt.Sprintf(`You are a support triage assistant for Scrollr, a desktop ticker app for live financial markets, sports scores, news, and Yahoo Fantasy. Categorize incoming tickets and draft warm, direct replies grounded in the FAQ below.
+	b.WriteString(in.Context.render())
+	b.WriteString("\n" + in.KnownIssues + "\n")
 
-%s
+	if s := renderSimilarCases(in.Similar); s != "" {
+		b.WriteString("\n" + s)
+	}
 
-YOUR TASKS:
-1. Pick the best category. Definitions and examples below — match the user's actual problem, not just keywords.
+	if in.IsReply {
+		fmt.Fprintf(&b, `
+THIS IS A FOLLOW-UP on ticket #%s. It is a continued conversation:
+- Do not open with a greeting. Acknowledge briefly ("Got it,", "Thanks for the update,") and
+  go straight to the answer.
+- If your last suggestion did not work, do not repeat it. Try a different angle or ask one
+  clarifying question.
+- If they are telling you it is resolved, say so warmly in one or two sentences, propose
+  nothing further, and set should_close true.
 
-   - bug: something is broken, crashes, or behaves contrary to docs/UI promises.
-     Examples: "app crashes on startup", "stocks won't update", "OAuth callback fails", "ticker shows stale data after sleep"
+`, in.ReplyTicketNumber)
+		if t := renderThread(in.Thread); t != "" {
+			b.WriteString(t + "\n")
+		}
+	}
 
-   - feature: a NEW capability the user wants that does not currently exist.
-     Examples: "can you add weather widget", "would love iOS app", "support for crypto exchange X"
+	if cls != nil && cls.NeedsInfo {
+		b.WriteString(`
+ASK FOR INFORMATION. We cannot troubleshoot this yet. The reply is ONE short paragraph, then
+the sign-off. That paragraph acknowledges the problem and asks for their operating system,
+their Scrollr version (Settings › Updates shows it) and a screenshot of what they see. Do not
+guess at a cause and do not offer steps that depend on the answer. List each thing you ask for
+in ask_user_for.
 
-   - feedback: opinions, design takes, or general thoughts with no specific fix requested.
-     Examples: "love the dark mode", "the icons feel small", "sports scores feel slow but I'm not sure why"
+`)
+	}
 
-   - billing: payment, subscription, plan change, refund, invoice, charge dispute, Stripe portal access.
-     Examples: "double-charged", "want to cancel", "how do I get an invoice", "lifetime upgrade question"
+	b.WriteString(`
+HOW TO WRITE IT:
+- Two to four short paragraphs of HTML, <p> tags, no headings and no lists unless the answer
+  is genuinely a sequence of steps.
+- Lead with a brief acknowledgement, then the action. Say what to click, in the app's own words.
+- Every factual claim must come from the knowledge base, the release notes or the known-issues
+  block above. List what each rests on in grounded_in.
+- Anything you cannot answer from those goes in unknowns, and the reply says the partner will
+  follow up rather than guessing. Set confidence low when unknowns is not empty.
+- The similar past cases are reference for approach and tone. Never reuse their wording or
+  their specifics.
+- Every reply, however short, ends with these two lines and nothing after them:
+      Best Regards,
+      Scrollr Support
 
-   - account: login, password, email, username, profile, account deletion, sign-up, GDPR export.
-     Examples: "can't log in", "want to change my email", "delete my account", "didn't get verification email"
-
-   - channel: a question or issue about a specific data channel's content, configuration, or connection.
-     Examples: "Yahoo OAuth disconnected", "missing AAPL stock", "RSS feed not updating", "wrong score for Lakers game"
-     If category is "channel", also identify which: finance, sports, rss, fantasy
-
-   IMPORTANT — respect explicit user classification: if the user's message contains an unambiguous self-classification ("this is a bug:", "feature request:", "billing question:"), use their category UNLESS the actual content clearly contradicts it (e.g., they wrote "feature request" but described an obvious crash — call it a bug and note the override in the summary).
-
-2. Pick a priority based on urgency signals:
-   - emergency: lost data, can't log in at all, payment failures blocking access, security issue
-   - high: significant feature broken (channel not working, can't connect Yahoo), billing dispute, account access issue
-   - normal: minor UX issues, non-blocking bugs, most feature requests, general questions
-   - low: nice-to-have feedback, "love this app" notes, low-stakes suggestions
-
-3. Generate a one-line summary (10 words max, no period at the end). Should read like a triage label, not a sentence.
-
-4. If the ticket looks like a duplicate of one in RECENT TICKETS, output its ticket_number.
-
-5. Draft a reply matching this voice:
-   - Warm, direct, normal sentence-case capitalization (start every sentence with a capital letter), no corporate-speak
-   - NEVER use em dashes (—) or en dashes (–) anywhere in the reply. Use commas, periods, parentheses, or simple hyphens (-) instead. This is a hard rule.
-   - Lead with a brief acknowledgment, then action
-   - Reference the FAQ if relevant; never make up fix steps
-   - 2-4 short paragraphs max
-   - Sign off with exactly these two lines, on their own lines, with nothing else after:
-       Best Regards,
-       Scrollr Support
-
-6. Output confidence: "high" if you're very sure of category/priority, "medium" if some ambiguity, "low" if you'd want a human to double-check
-
-7. Set "should_close" to true ONLY when the user's message contains an unambiguous resolution signal:
-   - "thanks, that worked"
-   - "issue is resolved"
-   - "you can close the ticket"
-   - "we're good now"
-   - similar clear indicators that the user is done
-
-   Otherwise leave should_close as false. Do NOT set it true on:
-   - Vague thanks ("thanks for your help" — could be a polite intro to a follow-up)
-   - Ambiguous responses
-   - The initial ticket message (set false there too)
-   - User asking another question, even after partial thanks
-
-   When should_close is true, your draft_reply_html should ALSO acknowledge the resolution and indicate the ticket is being closed (1-2 sentences). Don't propose new troubleshooting steps when closing.
-
-OUTPUT FORMAT — STRICT:
-- Output ONLY a single JSON object. Nothing before it. Nothing after it.
-- Do NOT wrap in markdown code fences (no triple-backtick blocks, no "json" language tags).
-- No prose, no commentary, no "Note on categorization", no follow-up explanation.
-- The output must START with an opening curly brace and END with a closing curly brace, with nothing else around it.
-- After the closing brace, your turn ENDS. Do not write another sentence.
-
-JSON SCHEMA:
-{
-  "category": "bug|feature|feedback|billing|account|widget",
-  "widget": "the widget catalog name, e.g. NFL / Crypto / BBC News" or null,
-  "priority": "low|normal|high|emergency",
-  "summary": "...",
-  "duplicate_of": "ticket-number" or null,
-  "draft_reply_html": "<p>...</p>",
-  "confidence": "high|medium|low",
-  "should_close": false
+`)
+	b.WriteString(renderUserTicket(in))
+	return b.String()
 }
 
-RECENT TICKETS (for dupe-detection only):
-%s
-
-FAQ EXCERPTS:
-%s
-
-USER TICKET:
-Email: %s
-Name: %s
-User-picked category: %s
-%sSubject: %s
-Body:
-%s
-`,
-		replyContext,
-		string(recentJSON),
-		faqContextForTriage(),
-		input.UserEmail,
-		input.UserName,
-		input.UserCategory,
-		widgetHint,
-		input.Subject,
-		body,
-	)
+// renderUserTicket is the ticket itself, shared by both prompts so the two
+// calls read exactly the same message.
+func renderUserTicket(in TriageInput) string {
+	var b strings.Builder
+	b.WriteString("THE TICKET:\n")
+	fmt.Fprintf(&b, "From: %s <%s>\n", in.UserName, in.UserEmail)
+	if in.UserCategory != "" {
+		fmt.Fprintf(&b, "Category the user picked: %s\n", in.UserCategory)
+	}
+	if in.Widget != "" {
+		fmt.Fprintf(&b, "Widget the user picked: %s\n", in.Widget)
+	}
+	fmt.Fprintf(&b, "Subject: %s\nBody:\n%s\n", in.Subject, in.Body)
+	return b.String()
 }
-
-// faqContextForTriage delegates to the canonical knowledge base in
-// support_kb.go. Kept as a wrapper so the prompt-building call site
-// doesn't need to change every time the KB structure evolves.
-func faqContextForTriage() string {
-	return supportKnowledgeBase()
-}
-
-// applyTriageToBody was removed in 2026-05-01 — it used to prepend an
-// "AI summary" banner and append the drafted reply as a <details> block
-// to the ticket body, but those decorations were visible to users when
-// they viewed the ticket via the portal. AI metadata now lives in the
-// support_drafts row and the partner-notification email only. The
-// user-visible thread is whatever the user wrote and whatever the
-// agent answers — nothing else.
 
 // mapTriagePriorityToOSTicket converts AI priority strings to osTicket's
 // expected priority IDs. osTicket's default priority IDs are 1=Low, 2=Normal,

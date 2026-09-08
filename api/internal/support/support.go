@@ -249,6 +249,8 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 		Body:            originalBody,
 		RecentSummaries: recentSummaries,
 		Widget:          req.Widget,
+		Context: buildTicketContext(c.Context(), userID,
+			platform.TierFromRoles(platform.GetUserRoles(c)), req.Diagnostics),
 	})
 
 	// Resolve effective category — use AI's pick only on high confidence.
@@ -372,7 +374,9 @@ func resolveOSTicketTopicID(category string) string {
 		if id := os.Getenv("OSTICKET_TOPIC_ID_ACCOUNT"); id != "" {
 			topicID = id
 		}
-	case "channel":
+	// "channel" is the wire value the desktop form still sends; "widget" is
+	// what triage answers with since the REL-42 rename. Same topic.
+	case "channel", "widget":
 		if id := os.Getenv("OSTICKET_TOPIC_ID_CHANNEL"); id != "" {
 			topicID = id
 		}
@@ -393,6 +397,8 @@ func persistTriageSideEffects(ticketNumber, userEmail, userName, subject, origin
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
+		note, ask, grounded, unknowns := triage.groundingFields()
+
 		// Save the draft (even if we don't end up notifying — useful for audit).
 		draft, err := createSupportDraft(ctx, &SupportDraft{
 			TicketNumber:    ticketNumber,
@@ -408,6 +414,11 @@ func persistTriageSideEffects(ticketNumber, userEmail, userName, subject, origin
 			AIDuplicateOf:   triage.DuplicateOf,
 			AIConfidence:    triage.Confidence,
 			ShouldClose:     triage.ShouldClose,
+			NeedsInfo:       triage.NeedsInfo,
+			InternalNote:    note,
+			AskUserFor:      ask,
+			GroundedIn:      grounded,
+			Unknowns:        unknowns,
 		})
 		if err != nil {
 			log.Printf("[Support] createSupportDraft failed for ticket %s: %v", ticketNumber, err)

@@ -3,6 +3,7 @@ package support
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -302,4 +303,115 @@ func TestCategoryFromTopic(t *testing.T) {
 		t.Error("nil topic")
 	}
 	_ = fmt.Sprint
+}
+
+// The drafting prompt is only as good as what it is shown. These two reads
+// are that: the precedent (what we actually sent last time) and the thread
+// (what this user has already read). Both are easy to get subtly wrong —
+// the sent copy has to be the EDITED body when the partner edited it, and
+// an unanswered ticket is not a precedent.
+func TestFetchSimilarCasesAndThread(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	resetCases(t)
+	ctx := context.Background()
+
+	// 300: asked about frozen scores, we answered (and the partner edited
+	// the draft before it went out). 301: same topic, never answered.
+	// 302: unrelated.
+	for _, c := range []struct{ num, subject, user string }{
+		{"300", "Scores are frozen in the 6th inning", "The MLB scores froze and never moved"},
+		{"301", "Scores frozen again", "Frozen scores, same as before"},
+		{"302", "Billing question about my invoice", "Where do I find an invoice"},
+	} {
+		if err := upsertSupportCase(ctx, SupportCase{TicketNumber: c.num, Subject: c.subject}); err != nil {
+			t.Fatal(err)
+		}
+		if err := recordSupportMessage(ctx, SupportMessage{
+			TicketNumber: c.num, Kind: "user", BodyHTML: "<p>" + c.user + "</p>"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := recordSupportMessage(ctx, SupportMessage{
+		TicketNumber: "300", Kind: "sent", BodyHTML: "<p>The game was stuck on our side. Fixed now.</p>",
+		OSTicketEntryID: 3001}); err != nil {
+		t.Fatal(err)
+	}
+	if err := recordSupportMessage(ctx, SupportMessage{
+		TicketNumber: "302", Kind: "sent", BodyHTML: "<p>Invoices are on your account page.</p>",
+		OSTicketEntryID: 3002}); err != nil {
+		t.Fatal(err)
+	}
+
+	hits := FetchSimilarCases(ctx, "frozen scores inning", "", 3)
+	if len(hits) != 1 || hits[0].TicketNumber != "300" {
+		t.Fatalf("want only the answered frozen-scores case, got %+v", hits)
+	}
+	if !strings.Contains(hits[0].WeSent, "stuck on our side") {
+		t.Errorf("similar case carries no sent body: %+v", hits[0])
+	}
+	if !strings.Contains(hits[0].UserWrote, "froze") {
+		t.Errorf("similar case carries no user message: %+v", hits[0])
+	}
+	// The ticket being triaged is never its own precedent.
+	if hits := FetchSimilarCases(ctx, "frozen scores inning", "300", 3); len(hits) != 0 {
+		t.Errorf("excluded ticket came back: %+v", hits)
+	}
+	if hits := FetchSimilarCases(ctx, "", "", 3); hits != nil {
+		t.Errorf("an empty query should match nothing, got %+v", hits)
+	}
+
+	// The thread is user + sent, oldest first. Drafts and notes stay out.
+	if err := recordSupportMessage(ctx, SupportMessage{
+		TicketNumber: "300", Kind: "note", BodyText: "AI draft skipped"}); err != nil {
+		t.Fatal(err)
+	}
+	thread := FetchCaseThread(ctx, "300")
+	if len(thread) != 2 || thread[0].Kind != "user" || thread[1].Kind != "sent" {
+		t.Fatalf("thread: %+v", thread)
+	}
+	if rendered := renderThread(thread); !strings.Contains(rendered, "The user wrote") ||
+		!strings.Contains(rendered, "We replied") {
+		t.Errorf("rendered thread: %s", rendered)
+	}
+}
+
+// The grounding columns are nullable, and a draft with no body is not a
+// draft — the partner has nothing to approve.
+func TestDraftGroundingRoundTrip(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	resetCases(t)
+	ctx := context.Background()
+
+	if _, err := createSupportDraft(ctx, &SupportDraft{
+		TicketNumber: "400", UserEmail: "u@example.com", OriginalSubject: "s",
+		DraftBodyHTML: "   ",
+	}); !errors.Is(err, ErrNoDraftBody) {
+		t.Fatalf("a bodiless draft should be refused, got %v", err)
+	}
+
+	d, err := createSupportDraft(ctx, &SupportDraft{
+		TicketNumber: "400", UserEmail: "u@example.com", OriginalSubject: "s",
+		DraftBodyHTML: "<p>hello</p>", AICategory: "bug", AIPriority: "high", AISummary: "sum",
+		NeedsInfo: true, GroundedIn: "Policies; 1.6.2",
+		AskUserFor: "OS; version", InternalNote: "REL-999",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := loadSupportDraft(ctx, d.ID)
+	if err != nil || got == nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !got.NeedsInfo || got.InternalNote != "REL-999" ||
+		got.GroundedIn != "Policies; 1.6.2" || got.AskUserFor != "OS; version" {
+		t.Fatalf("grounding did not round-trip: %+v", got)
+	}
+	// unknowns was never set, so it stays NULL rather than becoming "".
+	if got.Unknowns != "" {
+		t.Errorf("unset unknowns came back as %q, want empty", got.Unknowns)
+	}
 }

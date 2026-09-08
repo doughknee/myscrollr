@@ -54,8 +54,10 @@ type SupportDraft struct {
 	InternalNote          string
 	AskUserFor            string
 	GroundedIn            string
-	OSTicketThreadEntryID int64 // 0 = unknown (legacy rows + initial /support/ticket flow)
-	ShouldClose           bool  // AI-detected resolution signal — when true, send-time also closes the ticket
+	Unknowns              string // what the reply had to leave open
+	NeedsInfo             bool   // we cannot troubleshoot this yet
+	OSTicketThreadEntryID int64  // 0 = unknown (legacy rows + initial /support/ticket flow)
+	ShouldClose           bool   // AI-detected resolution signal — when true, send-time also closes the ticket
 	DecidedAt             *time.Time
 	SentAt                *time.Time
 	CreatedAt             time.Time
@@ -63,6 +65,12 @@ type SupportDraft struct {
 
 // ErrAlreadyDecided indicates a draft was already actioned (single-use enforcement).
 var ErrAlreadyDecided = errors.New("draft already decided")
+
+// ErrNoDraftBody is returned when triage classified a ticket but the
+// drafting call failed. There is nothing for the partner to approve, so no
+// row is written and no notification fires — the ticket is already in
+// osTicket with the right category and priority, waiting for a human.
+var ErrNoDraftBody = errors.New("triage produced no reply body")
 
 // createSupportDraft persists a new pending draft. The caller hands us
 // a fully-populated SupportDraft (other than ID/CreatedAt/Status) and
@@ -72,6 +80,9 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 	if platform.DBPool == nil {
 		return nil, fmt.Errorf("DB not initialized")
 	}
+	if strings.TrimSpace(draft.DraftBodyHTML) == "" {
+		return nil, ErrNoDraftBody
+	}
 
 	const q = `
 		INSERT INTO support_drafts
@@ -80,9 +91,9 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 			 draft_body_html, ai_summary, ai_category, ai_priority,
 			 ai_widget, ai_duplicate_of, ai_confidence, status,
 			 osticket_thread_entry_id, should_close,
-			 internal_note, ask_user_for, grounded_in)
+			 internal_note, ask_user_for, grounded_in, unknowns, needs_info)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',$13,$14,
-			 NULLIF($15,''),NULLIF($16,''),NULLIF($17,''))
+			 NULLIF($15,''),NULLIF($16,''),NULLIF($17,''),NULLIF($18,''),$19)
 		RETURNING id, created_at
 	`
 	// 0 → NULL via NULLIF so the partial unique index doesn't reject
@@ -117,6 +128,8 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 		draft.InternalNote,
 		draft.AskUserFor,
 		draft.GroundedIn,
+		draft.Unknowns,
+		draft.NeedsInfo,
 	).Scan(&draft.ID, &draft.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("createSupportDraft: %w", err)
@@ -147,12 +160,14 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 			   draft_body_html, ai_summary, ai_category, ai_priority,
 			   ai_widget, ai_duplicate_of, ai_confidence, status,
 			   edited_body_html, decided_at, sent_at, created_at,
-			   should_close, internal_note, ask_user_for, grounded_in
+			   should_close, internal_note, ask_user_for, grounded_in,
+			   unknowns, needs_info
 		FROM support_drafts WHERE id = $1
 	`
 	var d SupportDraft
 	var userName, userMsg, summary, category, priority, widget, dupOf, confidence, editedBody *string
-	var internalNote, askUserFor, groundedIn *string
+	var internalNote, askUserFor, groundedIn, unknowns *string
+	var needsInfo *bool
 	err := platform.DBPool.QueryRow(ctx, q, id).Scan(
 		&d.ID, &d.TicketNumber, &d.UserEmail, &userName, &d.OriginalSubject,
 		&userMsg,
@@ -160,6 +175,7 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 		&dupOf, &confidence, &d.Status,
 		&editedBody, &d.DecidedAt, &d.SentAt, &d.CreatedAt,
 		&d.ShouldClose, &internalNote, &askUserFor, &groundedIn,
+		&unknowns, &needsInfo,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -202,6 +218,12 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 	}
 	if groundedIn != nil {
 		d.GroundedIn = *groundedIn
+	}
+	if unknowns != nil {
+		d.Unknowns = *unknowns
+	}
+	if needsInfo != nil {
+		d.NeedsInfo = *needsInfo
 	}
 	return &d, nil
 }

@@ -1,0 +1,69 @@
+[
+  {
+    "ticket": "134740",
+    "note": "Real ticket. Weather read 61 while it was 65 until the widget was toggled. The KB used to deny weather existed at all; the draft must not do that again.",
+    "category": "bug",
+    "subject": "Bug Report: weather is currently 65 degrees but the ticker was showing 61 degrees until I turned weather off and on again",
+    "widget": "Weather",
+    "body": "<h3>What were you trying to do?</h3><p>see the weather with accurate weather on the ticker</p><h3>What went wrong?</h3><p>weather is currently 65 degrees but the ticker was showing 61 degrees until I turned weather off and then on again</p><h3>What did you expect to happen instead?</h3><p>for weather to auto update on the ticker</p><p><strong>Frequency:</strong> sometimes</p>",
+    "context": {
+      "tier": "free", "app_version": "1.0.19", "os": "Darwin 26.5.1",
+      "monitors": 2, "chosen": 1, "has_diagnostics": true,
+      "widgets": [{"type": "weather", "on_ticker": true}, {"type": "finance", "on_ticker": true}]
+    },
+    "must_not_contain": ["keychain", "weather widget is not", "we do not offer weather", "scrollr does not have weather", "no weather"],
+    "must_contain": ["1.0.19"]
+  },
+  {
+    "ticket": "560485",
+    "note": "Real ticket. Yesterday's game still showing the 6th inning 14 hours later. Arrived with no diagnostics.",
+    "category": "channel",
+    "subject": "Feedback: what's the delay on the sports games?",
+    "widget": "MLB",
+    "body": "<h3>Feedback</h3><p>Just curious, what's the delay on the sports games? For me right now (8/7, 2pm) it's still displaying that Detroit and San Francisco are in the 6th inning of yesterday's game which was about 14 hours ago. How often does it update? Is there any way on my end to make it quicker?</p>",
+    "context": {"tier": "unknown", "app_version": "", "os": "", "monitors": 0, "chosen": 0, "has_diagnostics": false, "widgets": []},
+    "must_not_contain": ["keychain"],
+    "must_contain": []
+  },
+  {
+    "ticket": "392186",
+    "note": "Real ticket. Signed out on every launch. An earlier draft told this user to check their macOS Keychain, which is not a thing Scrollr uses or that we ever say.",
+    "category": "feedback",
+    "subject": "Feedback: You shouldn't have to log in every time to start up scrollr.",
+    "widget": "",
+    "body": "<h3>Feedback</h3><p>You shouldn't have to log in every time to start up scrollr.</p>",
+    "context": {"tier": "unknown", "app_version": "", "os": "", "monitors": 0, "chosen": 0, "has_diagnostics": false, "widgets": []},
+    "must_not_contain": ["keychain"],
+    "must_contain": []
+  },
+  {
+    "ticket": "589914",
+    "note": "Real ticket. Bar lands off-centre on a 1920x515 secondary panel. On 1.6.1 with 1.6.2 out, so the reply has to name both versions before troubleshooting.",
+    "category": "bug",
+    "subject": "Bug Report: It appears at the top of my second monitor, however its off-center.",
+    "widget": "",
+    "body": "<h3>What were you trying to do?</h3><p>I have Scrollr set to auto-launch to my second monitor which is one of those narrow LCD touchscreens with a resolution of 1920 X 515. Upon boot, I am trying to get Scrollr to appear at the top of my 2nd monitor.</p><h3>What went wrong?</h3><p>It appears at the top of my second monitor, however its off-center.</p><h3>What did you expect to happen instead?</h3><p>Centered at the top of my 2nd monitor, stretched from full left to right.</p><p><strong>Frequency:</strong> always</p>",
+    "context": {
+      "tier": "uplink", "app_version": "1.6.1", "os": "Windows 11 (26200)",
+      "monitors": 2, "chosen": 2, "has_diagnostics": true,
+      "widgets": [{"type": "finance", "on_ticker": true}, {"type": "rss", "on_ticker": true}]
+    },
+    "must_not_contain": ["keychain"],
+    "must_contain": ["1.6.1", "{{CURRENT_VERSION}}"]
+  },
+  {
+    "ticket": "852919",
+    "note": "Real ticket. MLB and World Cup selected, nothing on the bar, on the Free plan. The reply must not blame the plan: live updates and leagues are on every plan.",
+    "category": "bug",
+    "subject": "Bug Report: Sports are not showing up on the Ticker",
+    "widget": "MLB",
+    "body": "<h3>What were you trying to do?</h3><p>Have sports display on the Ticker</p><h3>What went wrong?</h3><p>Sports are not showing up on the Ticker</p><h3>What did you expect to happen instead?</h3><p>I am using the free version and neither MLB or World Cup is displaying on the Ticker and I have it selected.</p><p><strong>Frequency:</strong> always</p>",
+    "context": {
+      "tier": "free", "app_version": "1.0.20", "os": "Darwin 26.5.1",
+      "monitors": 2, "chosen": 1, "has_diagnostics": true,
+      "widgets": [{"type": "sports", "on_ticker": true}]
+    },
+    "must_not_contain": ["keychain"],
+    "must_contain": ["1.0.20"]
+  }
+]

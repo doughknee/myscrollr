@@ -136,6 +136,9 @@ func HandleSubmitPublicSupportTicket(c *fiber.Ctx) error {
 		Subject:         subjectFull,
 		Body:            req.Message,
 		RecentSummaries: recentSummaries,
+		// Anonymous path: no JWT, so no plan, no widgets, no diagnostics.
+		// "unknown" is the honest answer and the prompt says so out loud.
+		Context: TicketContext{Tier: "unknown"},
 	})
 
 	effectiveCategory := req.Category

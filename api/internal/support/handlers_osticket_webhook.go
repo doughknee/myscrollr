@@ -161,10 +161,6 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 	// seconds later underneath the AI's answer to it.
 	notifyDiscordForUserReply(ctx, ev.TicketNumber, ev.Subject, "", ev.MessageHTML)
 
-	// Pull the most recent SENT reply on this ticket so the triage
-	// prompt has continuity context. Best-effort — empty string is OK.
-	previousReply := loadLatestSentDraftBody(ctx, ev.TicketNumber)
-
 	// Resolve user name with a fallback. osTicket may have stripped
 	// it depending on how the email arrived.
 	userName := strings.TrimSpace(ev.UserName)
@@ -182,20 +178,27 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 	recent := FetchRecentTicketSummaries(ctx)
 
 	triage := triageTicket(ctx, TriageInput{
-		UserCategory:        "", // user didn't pick anything — they're replying to email
-		UserEmail:           ev.UserEmail,
-		UserName:            userName,
-		Subject:             ev.Subject,
-		Body:                body,
-		RecentSummaries:     recent,
-		IsReply:             true,
-		ReplyTicketNumber:   ev.TicketNumber,
-		PreviousAIReplyHTML: previousReply,
+		UserCategory:      "", // user didn't pick anything — they're replying to email
+		UserEmail:         ev.UserEmail,
+		UserName:          userName,
+		Subject:           ev.Subject,
+		Body:              body,
+		RecentSummaries:   recent,
+		IsReply:           true,
+		ReplyTicketNumber: ev.TicketNumber,
+		// The whole conversation, not just our last reply: a follow-up
+		// usually only makes sense against what came before it. The case
+		// row is also the only thing that remembers who this user is —
+		// the webhook carries an email address and nothing else.
+		Thread:  FetchCaseThread(ctx, ev.TicketNumber),
+		Context: ticketContextFromCase(ctx, ev.TicketNumber),
 	})
 	if triage == nil {
 		log.Printf("[OSTicketWebhook] triage returned nil for ticket %s (entry=%d); no draft created", ev.TicketNumber, ev.ThreadEntryID)
 		return
 	}
+
+	note, ask, grounded, unknowns := triage.groundingFields()
 
 	// Persist draft tagged with the thread_entry_id.
 	draft, err := createSupportDraft(ctx, &SupportDraft{
@@ -213,6 +216,11 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 		AIConfidence:          triage.Confidence,
 		OSTicketThreadEntryID: ev.ThreadEntryID,
 		ShouldClose:           triage.ShouldClose,
+		NeedsInfo:             triage.NeedsInfo,
+		InternalNote:          note,
+		AskUserFor:            ask,
+		GroundedIn:            grounded,
+		Unknowns:              unknowns,
 	})
 	if err != nil {
 		log.Printf("[OSTicketWebhook] createSupportDraft for ticket %s entry=%d: %v", ev.TicketNumber, ev.ThreadEntryID, err)
