@@ -113,3 +113,45 @@ func TestDiscordRetryAfter(t *testing.T) {
 		})
 	}
 }
+
+// TestForumTagsLoadOnFirstUse — cmd/support-regen is a Job. It creates threads
+// and transitions their status without ever running the API's boot hook, so
+// with a boot-only tag cache every thread it touched came out with no category
+// tag and a `pending` that never moved: a queue lying about its own state.
+func TestForumTagsLoadOnFirstUse(t *testing.T) {
+	tagIDByName.Range(func(k, _ any) bool { tagIDByName.Delete(k); return true })
+	tagLoad.Lock()
+	tagLoad.loaded = false
+	tagLoad.Unlock()
+
+	var gets int32
+	stubDiscord(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&gets, 1)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"id": "c", "type": 15, // 15 = forum
+			"available_tags": func() []map[string]string {
+				var out []map[string]string
+				for _, spec := range supportForumTagSpecs {
+					out = append(out, map[string]string{"id": "tag-" + spec.name, "name": spec.name})
+				}
+				return out
+			}(),
+		})
+	}))
+
+	if got := supportForumTagID("pending"); got != "tag-pending" {
+		t.Fatalf("first lookup = %q, want the lazily-loaded id", got)
+	}
+	if got := supportForumTagID("bug"); got != "tag-bug" {
+		t.Fatalf("second lookup = %q, want the cached id", got)
+	}
+	if got := supportForumTagID("not-a-tag"); got != "" {
+		t.Fatalf("unknown tag = %q, want empty", got)
+	}
+	// Once loaded, no lookup goes back to Discord — including the miss.
+	// (Two calls: discordGetChannelType, then the tag read.)
+	if gets > 2 {
+		t.Fatalf("channel fetched %d times, want the load to happen once", gets)
+	}
+}

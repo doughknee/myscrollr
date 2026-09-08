@@ -271,16 +271,59 @@ var supportForumTagSpecs = []supportForumTagSpec{
 // missing tags.
 var tagIDByName sync.Map // map[name string] -> tagID string
 
+// tagLoad guards the one-time fill of tagIDByName for a process that never
+// ran the boot hook. `loaded` is set only on success, so a Discord outage at
+// first use costs one retry rather than the tags for the life of the process.
+var tagLoad struct {
+	sync.Mutex
+	loaded bool
+}
+
 // supportForumTagID returns the cached tag ID for a name, or "" when
-// not present (Text channel parent, ensure call hasn't run, or unknown
+// not present (Text channel parent, Discord not configured, or unknown
 // tag name).
+//
+// The cache is filled by RegisterDiscordSlashCommandsAtBoot in the API, and
+// on first miss here for everything else. cmd/support-regen is a Job: it
+// writes threads and transitions their status without ever running the API's
+// boot hook, so every thread it touched came out with no category tag and a
+// stale `pending` — a queue that lies about its own state. Filling on demand
+// fixes it for any entry point, present or future, rather than asking each
+// one to remember to bootstrap.
 func supportForumTagID(name string) string {
+	if id := cachedForumTagID(name); id != "" {
+		return id
+	}
+	loadForumTagsOnce()
+	return cachedForumTagID(name)
+}
+
+func cachedForumTagID(name string) string {
 	if v, ok := tagIDByName.Load(name); ok {
 		if s, ok := v.(string); ok {
 			return s
 		}
 	}
 	return ""
+}
+
+func loadForumTagsOnce() {
+	tagLoad.Lock()
+	defer tagLoad.Unlock()
+	if tagLoad.loaded {
+		return
+	}
+	cfg, ok := loadDiscordConfig()
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := ensureSupportForumTags(ctx, cfg.SupportChannelID); err != nil {
+		log.Printf("[Discord] forum tag lazy-load: %v", err)
+		return
+	}
+	tagLoad.loaded = true
 }
 
 // statusTagNames returns the set of status-tag names so callers can
