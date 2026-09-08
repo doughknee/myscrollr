@@ -77,6 +77,9 @@ data:
   #
   # The following secrets MUST be added manually to k8s/secrets.yaml:
   #   - ANTHROPIC_API_KEY              (Claude Haiku for triage; sk-ant-...)
+  #   - LINEAR_API_KEY                 (lin_api_...; "File as bug" in the
+  #     Discord support queue, and the release webhook's Done check. When
+  #     absent the button says so and nothing else degrades.)
   #   - SUPPORT_APPROVAL_HMAC_SECRET   (any high-entropy string ≥32 chars)
   #   - SCROLLR_WEBHOOK_SECRET         (any high-entropy string ≥32 chars)
   #     used to authenticate the osTicket reply-loop webhook coming
@@ -138,6 +141,29 @@ data:
   # If Discord env vars below are unset, "discord" and "both" silently
   # fall back to email-only — no error, no startup failure.
   SUPPORT_NOTIFY: "both"
+
+  # Auto-send (REL-245). OFF unless SUPPORT_AUTOSEND is exactly "on".
+  #
+  # When on, a draft is sent without a click only if ALL of these hold:
+  # AI confidence is "high", the category is in SUPPORT_AUTOSEND_CATEGORIES,
+  # triage isn't waiting on information from the user, and nobody pressed
+  # Skip, Edit or Ask before SUPPORT_AUTOSEND_DELAY elapsed (the thread
+  # shows a live countdown). `bug`, `billing` and `account` can NEVER
+  # auto-send — that list is in code, not here, and adding them to the
+  # categories below does nothing.
+  #
+  # The timer lives in the pod: a restart before it fires cancels the
+  # auto-send and leaves the draft pending for a human. That's deliberate.
+  SUPPORT_AUTOSEND: "off"
+  SUPPORT_AUTOSEND_CATEGORIES: "feature,feedback"
+  SUPPORT_AUTOSEND_DELAY: "30m"
+
+  # Linear (REL-245). LINEAR_API_KEY is a secret (see
+  # k8s/secrets.yaml.template); these two are not.
+  #   LINEAR_TEAM_KEY    — team new issues are filed into (default "REL")
+  #   LINEAR_PROJECT_ID  — optional project UUID; unset files to the
+  #                        team's backlog instead
+  LINEAR_TEAM_KEY: "REL"
 
   # Discord integration. The following secrets MUST be added manually
   # to k8s/secrets.yaml (none are configmap-safe):

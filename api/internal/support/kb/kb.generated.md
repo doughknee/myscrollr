@@ -114,8 +114,8 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 | `free` | 3 |
 | `uplink` | 6 |
 | `uplink_pro` | 12 |
-| `uplink_ultimate` | unlimited |
 | `super_user` | unlimited |
+| `uplink_ultimate` | unlimited |
 
 ## Widget catalog
 

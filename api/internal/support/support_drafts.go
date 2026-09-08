@@ -32,21 +32,28 @@ import (
 
 // SupportDraft mirrors the support_drafts table.
 type SupportDraft struct {
-	ID                    int64
-	TicketNumber          string
-	UserEmail             string
-	UserName              string
-	OriginalSubject       string
-	UserMessageHTML       string // The user's actual message body (for partner-email context). Separate from DraftBodyHTML which is the AI-drafted reply.
-	DraftBodyHTML         string
-	AISummary             string
-	AICategory            string
-	AIPriority            string
-	AIWidget              string
-	AIDuplicateOf         string
-	AIConfidence          string
-	Status                string
-	EditedBodyHTML        string
+	ID              int64
+	TicketNumber    string
+	UserEmail       string
+	UserName        string
+	OriginalSubject string
+	UserMessageHTML string // The user's actual message body (for partner-email context). Separate from DraftBodyHTML which is the AI-drafted reply.
+	DraftBodyHTML   string
+	AISummary       string
+	AICategory      string
+	AIPriority      string
+	AIWidget        string
+	AIDuplicateOf   string
+	AIConfidence    string
+	Status          string
+	EditedBodyHTML  string
+	// Triage's notes to us rather than to the user (REL-244): what the AI
+	// is unsure about, what it still needs from the reporter, and which
+	// knowledge-base sections it based the draft on. All nullable; a draft
+	// written before REL-244 has all three empty and renders without them.
+	InternalNote          string
+	AskUserFor            string
+	GroundedIn            string
 	OSTicketThreadEntryID int64 // 0 = unknown (legacy rows + initial /support/ticket flow)
 	ShouldClose           bool  // AI-detected resolution signal — when true, send-time also closes the ticket
 	DecidedAt             *time.Time
@@ -72,8 +79,10 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 			 user_message_html,
 			 draft_body_html, ai_summary, ai_category, ai_priority,
 			 ai_widget, ai_duplicate_of, ai_confidence, status,
-			 osticket_thread_entry_id, should_close)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',$13,$14)
+			 osticket_thread_entry_id, should_close,
+			 internal_note, ask_user_for, grounded_in)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',$13,$14,
+			 NULLIF($15,''),NULLIF($16,''),NULLIF($17,''))
 		RETURNING id, created_at
 	`
 	// 0 → NULL via NULLIF so the partial unique index doesn't reject
@@ -105,6 +114,9 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 		draft.AIConfidence,
 		entryID,
 		draft.ShouldClose,
+		draft.InternalNote,
+		draft.AskUserFor,
+		draft.GroundedIn,
 	).Scan(&draft.ID, &draft.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("createSupportDraft: %w", err)
@@ -135,18 +147,19 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 			   draft_body_html, ai_summary, ai_category, ai_priority,
 			   ai_widget, ai_duplicate_of, ai_confidence, status,
 			   edited_body_html, decided_at, sent_at, created_at,
-			   should_close
+			   should_close, internal_note, ask_user_for, grounded_in
 		FROM support_drafts WHERE id = $1
 	`
 	var d SupportDraft
 	var userName, userMsg, summary, category, priority, widget, dupOf, confidence, editedBody *string
+	var internalNote, askUserFor, groundedIn *string
 	err := platform.DBPool.QueryRow(ctx, q, id).Scan(
 		&d.ID, &d.TicketNumber, &d.UserEmail, &userName, &d.OriginalSubject,
 		&userMsg,
 		&d.DraftBodyHTML, &summary, &category, &priority, &widget,
 		&dupOf, &confidence, &d.Status,
 		&editedBody, &d.DecidedAt, &d.SentAt, &d.CreatedAt,
-		&d.ShouldClose,
+		&d.ShouldClose, &internalNote, &askUserFor, &groundedIn,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -180,6 +193,15 @@ func loadSupportDraft(ctx context.Context, id int64) (*SupportDraft, error) {
 	}
 	if editedBody != nil {
 		d.EditedBodyHTML = *editedBody
+	}
+	if internalNote != nil {
+		d.InternalNote = *internalNote
+	}
+	if askUserFor != nil {
+		d.AskUserFor = *askUserFor
+	}
+	if groundedIn != nil {
+		d.GroundedIn = *groundedIn
 	}
 	return &d, nil
 }

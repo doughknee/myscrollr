@@ -12,9 +12,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 )
@@ -202,6 +204,7 @@ var supportForumTagSpecs = []supportForumTagSpec{
 	{"pending", "⏳"},
 	{"sent", "✅"},
 	{"edited", "✏️"},
+	{"asked", "❓"},
 	{"skipped", "⏭️"},
 	{"closed", "🔒"},
 	// Category tags (mutually exclusive within their category set)
@@ -239,6 +242,7 @@ var statusTagNames = map[string]struct{}{
 	"pending": {},
 	"sent":    {},
 	"edited":  {},
+	"asked":   {},
 	"skipped": {},
 	"closed":  {},
 }
@@ -281,13 +285,13 @@ func discordCreateThread(
 	ctx context.Context,
 	channelID, name string,
 	starterContent string,
+	starterEmbed *discordEmbed,
 	starterComponents []DiscordActionRow,
 	appliedTagIDs []string,
 ) (*DiscordThread, error) {
-	if len(name) > 100 {
-		// Discord's hard limit on thread names is 100 chars.
-		name = name[:100]
-	}
+	// Discord's hard limit on thread names is 100 characters, and it
+	// rejects a name cut inside a multi-byte character outright.
+	name = truncateRunes(name, 100)
 
 	parentType, err := discordGetChannelType(ctx, channelID)
 	if err != nil {
@@ -296,12 +300,12 @@ func discordCreateThread(
 
 	switch parentType {
 	case discordChannelTypeForum, discordChannelTypeMedia:
-		return discordCreateForumThread(ctx, channelID, name, starterContent, starterComponents, appliedTagIDs)
+		return discordCreateForumThread(ctx, channelID, name, starterContent, starterEmbed, starterComponents, appliedTagIDs)
 	default:
 		// Text channels don't support tags — appliedTagIDs is silently
 		// dropped. Caller should still pass them; supports the case
 		// where someone migrates a forum-channel parent to text.
-		return discordCreateTextThread(ctx, channelID, name, starterContent, starterComponents)
+		return discordCreateTextThread(ctx, channelID, name, starterContent, starterEmbed, starterComponents)
 	}
 }
 
@@ -350,10 +354,11 @@ func discordGetChannelType(ctx context.Context, channelID string) (int, error) {
 func discordCreateForumThread(
 	ctx context.Context,
 	channelID, name, starterContent string,
+	starterEmbed *discordEmbed,
 	starterComponents []DiscordActionRow,
 	appliedTagIDs []string,
 ) (*DiscordThread, error) {
-	if starterContent == "" {
+	if starterContent == "" && starterEmbed == nil {
 		// Forum threads require a starter message; fall back to a
 		// placeholder so the create call doesn't 400.
 		starterContent = "(creating thread)"
@@ -361,6 +366,9 @@ func discordCreateForumThread(
 	msg := map[string]interface{}{
 		"content":          starterContent,
 		"allowed_mentions": map[string]interface{}{"parse": []string{}},
+	}
+	if starterEmbed != nil {
+		msg["embeds"] = []*discordEmbed{starterEmbed}
 	}
 	if len(starterComponents) > 0 {
 		msg["components"] = starterComponents
@@ -396,6 +404,7 @@ func discordCreateForumThread(
 func discordCreateTextThread(
 	ctx context.Context,
 	channelID, name, starterContent string,
+	starterEmbed *discordEmbed,
 	starterComponents []DiscordActionRow,
 ) (*DiscordThread, error) {
 	body := map[string]interface{}{
@@ -417,8 +426,8 @@ func discordCreateTextThread(
 	}
 
 	// Post starter content as the first thread message.
-	if starterContent != "" {
-		if _, err := discordPostMessage(ctx, t.ID, starterContent, starterComponents); err != nil {
+	if starterContent != "" || starterEmbed != nil {
+		if _, err := discordPostEmbed(ctx, t.ID, starterContent, starterEmbed, starterComponents); err != nil {
 			// Thread is created in Discord; we just couldn't post the
 			// starter message. Return the thread anyway — caller
 			// shouldn't fail the whole flow over this.
@@ -445,15 +454,45 @@ type DiscordActionRow struct {
 	Components []DiscordMessageButton `json:"components"`
 }
 
+// discordEmbed is the subset of Discord's embed object the support queue
+// uses: a titled block of name/value fields that reads as a header above
+// the message content. Field values are capped at 1024 chars by Discord.
+type discordEmbed struct {
+	Title       string              `json:"title,omitempty"`
+	Description string              `json:"description,omitempty"`
+	URL         string              `json:"url,omitempty"`
+	Color       int                 `json:"color,omitempty"`
+	Fields      []discordEmbedField `json:"fields,omitempty"`
+	Footer      *discordEmbedFooter `json:"footer,omitempty"`
+}
+
+type discordEmbedField struct {
+	Name   string `json:"name"`
+	Value  string `json:"value"`
+	Inline bool   `json:"inline,omitempty"`
+}
+
+type discordEmbedFooter struct {
+	Text string `json:"text"`
+}
+
 // discordPostMessage posts a message in a channel or thread, optionally
 // with components (buttons). Returns the new message's ID.
 //
 // channelOrThreadID is either a channel ID or thread ID — Discord
 // treats threads as channels for the purpose of posting.
 func discordPostMessage(ctx context.Context, channelOrThreadID, content string, components []DiscordActionRow) (string, error) {
+	return discordPostEmbed(ctx, channelOrThreadID, content, nil, components)
+}
+
+// discordPostEmbed is discordPostMessage with an optional embed attached.
+func discordPostEmbed(ctx context.Context, channelOrThreadID, content string, embed *discordEmbed, components []DiscordActionRow) (string, error) {
 	body := map[string]interface{}{
 		"content":          content,
 		"allowed_mentions": map[string]interface{}{"parse": []string{}}, // suppress @ mentions
+	}
+	if embed != nil {
+		body["embeds"] = []*discordEmbed{embed}
 	}
 	if len(components) > 0 {
 		body["components"] = components
@@ -496,6 +535,62 @@ func discordArchiveThread(ctx context.Context, threadID string) error {
 	return nil
 }
 
+// discordUnarchiveThread flips `archived` back to false so a user's
+// follow-up lands in the thread the conversation already lives in rather
+// than a fresh one. No-op when the thread is gone.
+func discordUnarchiveThread(ctx context.Context, threadID string) error {
+	body := map[string]interface{}{"archived": false, "locked": false}
+	respBody, status, err := discordRequest(ctx, http.MethodPatch, "/channels/"+threadID, body)
+	if err != nil {
+		return err
+	}
+	if status == http.StatusNotFound {
+		return nil
+	}
+	if status >= 400 {
+		return fmt.Errorf("discord unarchive thread: status %d body %s", status, string(respBody))
+	}
+	return nil
+}
+
+// discordPinForumThread pins a forum post to the top of the channel.
+// Discord models this as a channel flag (1 << 1) on the thread, not as a
+// pinned message. Used once, for the digest's Queue thread.
+func discordPinForumThread(ctx context.Context, threadID string) error {
+	body := map[string]interface{}{"flags": 2}
+	respBody, status, err := discordRequest(ctx, http.MethodPatch, "/channels/"+threadID, body)
+	if err != nil {
+		return err
+	}
+	if status >= 400 {
+		return fmt.Errorf("discord pin thread: status %d body %s", status, string(respBody))
+	}
+	return nil
+}
+
+// discordCompleteDeferred fills in the placeholder left by a deferred
+// interaction response. Interaction tokens stay valid for 15 minutes,
+// which is what lets a slow path (Linear) answer long after Discord's
+// 3-second deadline.
+//
+// It PATCHes @original rather than POSTing a follow-up: a POST would add
+// a second message and leave "the bot is thinking…" sitting there forever.
+func discordCompleteDeferred(ctx context.Context, applicationID, interactionToken, content string) error {
+	body := map[string]interface{}{
+		"content":          content,
+		"allowed_mentions": map[string]interface{}{"parse": []string{}},
+	}
+	path := fmt.Sprintf("/webhooks/%s/%s/messages/@original", applicationID, interactionToken)
+	respBody, status, err := discordRequest(ctx, http.MethodPatch, path, body)
+	if err != nil {
+		return err
+	}
+	if status >= 400 {
+		return fmt.Errorf("discord complete deferred: status %d body %s", status, string(respBody))
+	}
+	return nil
+}
+
 // =============================================================================
 // Slash command registration
 // =============================================================================
@@ -532,8 +627,34 @@ func registerDiscordSlashCommands(ctx context.Context) error {
 	commands := []discordSlashCommand{
 		{
 			Name:        "inbox",
-			Description: "Show pending support drafts (most recent 5)",
+			Description: "Browse pending support drafts, 10 at a time",
 			Type:        1,
+		},
+		{
+			Name:        "case",
+			Description: "Show the full timeline for a ticket number",
+			Type:        1,
+			Options: []discordSlashCommandOption{
+				{
+					Name:        "number",
+					Description: "osTicket ticket number (e.g. 239171)",
+					Type:        3,
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "search",
+			Description: "Full-text search across support cases and their messages",
+			Type:        1,
+			Options: []discordSlashCommandOption{
+				{
+					Name:        "text",
+					Description: "What to look for (e.g. \"weather widget crash\")",
+					Type:        3,
+					Required:    true,
+				},
+			},
 		},
 		{
 			Name:        "ticket",
@@ -593,7 +714,7 @@ func RegisterDiscordSlashCommandsAtBoot(ctx context.Context) {
 		log.Printf("[Discord] register slash commands: %v", err)
 		// Continue to tag bootstrap even if commands failed.
 	} else {
-		log.Println("[Discord] slash commands registered (/inbox, /ticket, /stats)")
+		log.Println("[Discord] slash commands registered (/inbox, /case, /search, /ticket, /stats)")
 	}
 
 	if err := ensureSupportForumTags(ctx, cfg.SupportChannelID); err != nil {
@@ -718,9 +839,7 @@ func priorityEmojiPrefix(priority string) string {
 // field. Used when transitioning between states (sent/closed/skipped)
 // so the prefix flips visibly in the thread list.
 func discordUpdateThreadName(ctx context.Context, threadID, newName string) error {
-	if len(newName) > 100 {
-		newName = newName[:100]
-	}
+	newName = truncateRunes(newName, 100)
 	body := map[string]interface{}{"name": newName}
 	respBody, status, err := discordRequest(ctx, http.MethodPatch, "/channels/"+threadID, body)
 	if err != nil {
@@ -935,6 +1054,80 @@ func markSupportTicketThreadArchived(ctx context.Context, ticketNumber string) e
 	return err
 }
 
+// markSupportTicketThreadUnarchived clears the archived flag so the next
+// draft threads into the existing conversation instead of opening a new one.
+func markSupportTicketThreadUnarchived(ctx context.Context, ticketNumber string) error {
+	const q = `UPDATE support_ticket_threads SET archived = FALSE WHERE ticket_number = $1`
+	_, err := platform.DBPool.Exec(ctx, q, ticketNumber)
+	return err
+}
+
+// notifyDiscordForUserReply puts a user's follow-up into the thread that
+// already holds their conversation, before triage has drafted anything.
+//
+// Previously a reply only surfaced once the AI had finished drafting, and
+// on an archived thread it surfaced in a brand-new one — so a conversation
+// scattered across threads and the partner saw the answer before the
+// question. Here the thread wakes, the reply lands, the title says [REPLY]
+// and the tag goes back to pending; the draft follows a few seconds later.
+//
+// Fail-open throughout: nothing in here may stop the draft being created.
+func notifyDiscordForUserReply(ctx context.Context, ticketNumber, subject, priority, messageHTML string) {
+	if !shouldNotifyDiscord() {
+		return
+	}
+	t, err := loadSupportTicketThread(ctx, ticketNumber)
+	if err != nil || t == nil {
+		// No thread yet — the draft's own path will create one carrying
+		// this same message.
+		return
+	}
+
+	if t.Archived {
+		if err := discordUnarchiveThread(ctx, t.DiscordThreadID); err != nil {
+			log.Printf("[Discord] unarchive thread for ticket %s: %v", ticketNumber, err)
+			return
+		}
+		if err := markSupportTicketThreadUnarchived(ctx, ticketNumber); err != nil {
+			log.Printf("[Discord] clear archived flag for ticket %s: %v", ticketNumber, err)
+		}
+	}
+
+	body := strings.TrimSpace(htmlToPlain(messageHTML))
+	if body == "" {
+		body = "(empty message)"
+	}
+	content := "📨 **The user replied**\n" + blockquoteText(body, len(body))
+	for _, chunk := range splitForDiscord(content, discordMessageLimit) {
+		if _, err := discordPostMessage(ctx, t.DiscordThreadID, chunk, nil); err != nil {
+			log.Printf("[Discord] post user reply for ticket %s: %v", ticketNumber, err)
+			return
+		}
+	}
+
+	transitionThreadStatus(ctx, t, "pending", false)
+
+	name := fmt.Sprintf("[REPLY] %s[#%s] %s",
+		priorityEmojiPrefix(priority), ticketNumber, truncateForThreadName(subject, ticketNumber, priority))
+	if err := discordUpdateThreadName(ctx, t.DiscordThreadID, name); err != nil {
+		log.Printf("[Discord] rename thread (reply) for ticket %s: %v", ticketNumber, err)
+	}
+}
+
+// truncateForThreadName trims a subject to whatever is left of Discord's
+// 100-char thread-name budget after the "[REPLY] " prefix, the priority
+// emoji and the ticket number.
+func truncateForThreadName(subject, ticketNumber, priority string) string {
+	if subject == "" {
+		subject = "support ticket"
+	}
+	budget := 100 - len("[REPLY] ") - len(priorityEmojiPrefix(priority)) - len(ticketNumber) - 4
+	if budget < 10 {
+		return ""
+	}
+	return truncateRunes(subject, budget)
+}
+
 // =============================================================================
 // Notification entry point — called from notifyPartnerAfterDraft
 // =============================================================================
@@ -960,25 +1153,54 @@ func notifyDiscordForDraft(ctx context.Context, draft *SupportDraft) {
 	}
 	cfg, _ := loadDiscordConfig() // ok already verified by shouldNotifyDiscord
 
-	content := buildDraftMessageContent(draft)
+	// A reply-loop draft answers a message notifyDiscordForUserReply has
+	// already quoted into this thread. Quoting it twice is noise, so the
+	// draft leads with the reply itself — unless there was no thread to
+	// post into, in which case this draft's own starter carries it.
+	existing, _ := loadSupportTicketThread(ctx, draft.TicketNumber)
+	includeUserMessage := !(draft.OSTicketThreadEntryID > 0 && existing != nil && !existing.Archived)
+
+	embed := buildDraftHeaderEmbed(ctx, draft)
+	starter, rest := buildDraftMessages(draft, includeUserMessage)
 	components := buildDraftActionButtons(draft.ID)
 
-	threadID, isNew, err := getOrCreateThreadForTicket(ctx, cfg, draft, content, components)
+	// Buttons ride on the LAST message so the partner never has to scroll
+	// back up past a long draft to act on what they just read. When the
+	// draft fits in the starter, that is the starter.
+	starterComponents := components
+	if len(rest) > 0 {
+		starterComponents = nil
+	}
+
+	threadID, isNew, err := getOrCreateThreadForTicket(ctx, cfg, draft, starter, embed, starterComponents)
 	if err != nil {
 		log.Printf("[Discord] getOrCreateThread for ticket %s: %v", draft.TicketNumber, err)
 		return
 	}
 
-	// If we just created the thread, the starter message IS the draft
-	// content; no separate post-message call needed (and posting again
-	// would duplicate). Only post follow-up when threading into an
-	// existing thread.
+	// If we just created the thread, the starter message went out with it;
+	// posting it again would duplicate. Only re-post when threading into
+	// an existing thread.
 	if !isNew {
-		if _, err := discordPostMessage(ctx, threadID, content, components); err != nil {
-			log.Printf("[Discord] post draft message for ticket %s: %v", draft.TicketNumber, err)
+		if _, err := discordPostEmbed(ctx, threadID, starter, embed, starterComponents); err != nil {
+			log.Printf("[Discord] post draft starter for ticket %s: %v", draft.TicketNumber, err)
 			return
 		}
 	}
+
+	for i, chunk := range rest {
+		var comps []DiscordActionRow
+		if i == len(rest)-1 {
+			comps = components
+		}
+		if _, err := discordPostMessage(ctx, threadID, chunk, comps); err != nil {
+			log.Printf("[Discord] post draft part %d/%d for ticket %s: %v",
+				i+1, len(rest), draft.TicketNumber, err)
+			return
+		}
+	}
+
+	scheduleAutoSend(draft)
 }
 
 // getOrCreateThreadForTicket looks up an existing thread or creates a
@@ -999,6 +1221,7 @@ func getOrCreateThreadForTicket(
 	cfg DiscordConfig,
 	draft *SupportDraft,
 	starterContent string,
+	starterEmbed *discordEmbed,
 	starterComponents []DiscordActionRow,
 ) (string, bool, error) {
 	existing, err := loadSupportTicketThread(ctx, draft.TicketNumber)
@@ -1035,7 +1258,7 @@ func getOrCreateThreadForTicket(
 		initialTags = append(initialTags, id)
 	}
 
-	thread, err := discordCreateThread(ctx, cfg.SupportChannelID, name, starterContent, starterComponents, initialTags)
+	thread, err := discordCreateThread(ctx, cfg.SupportChannelID, name, starterContent, starterEmbed, starterComponents, initialTags)
 	if err != nil {
 		return "", false, fmt.Errorf("create thread: %w", err)
 	}
@@ -1057,76 +1280,259 @@ func getOrCreateThreadForTicket(
 	return thread.ID, true, nil
 }
 
-// buildDraftMessageContent renders the user message + AI metadata +
-// drafted reply into Discord's text content. Discord supports basic
-// markdown (bold, blockquote, code) and a 2000-char limit per message.
+// discordMessageLimit is Discord's hard per-message content cap.
+const discordMessageLimit = 2000
+
+// userMessageHeadLimit is how much of the user's own message rides on the
+// starter message. The rest continues in follow-up messages — a support
+// reply is only as good as the complaint behind it, so nothing is dropped.
+const userMessageHeadLimit = 1500
+
+// splitForDiscord breaks s into chunks of at most max bytes, preferring to
+// cut at a blank line, then at a line break, then at a space. A word is
+// only ever split when the word itself is longer than a whole chunk, and
+// then only on a rune boundary.
 //
-// We trim aggressively so the content fits even with verbose user
-// bodies.
-func buildDraftMessageContent(draft *SupportDraft) string {
-	var b strings.Builder
-
-	header := fmt.Sprintf("**Ticket #%s** — `%s` · `%s` · confidence: `%s`",
-		draft.TicketNumber, draft.AICategory, draft.AIPriority, draft.AIConfidence)
-	b.WriteString(header)
-	b.WriteString("\n\n")
-
-	if draft.UserMessageHTML != "" {
-		b.WriteString("**What the user wrote:**\n")
-		b.WriteString(blockquoteText(htmlToPlain(draft.UserMessageHTML), 600))
-		b.WriteString("\n\n")
+// Byte length is the budget rather than rune count: Discord counts
+// characters, and bytes >= characters for UTF-8, so this is conservative
+// in the safe direction.
+func splitForDiscord(s string, max int) []string {
+	if max <= 0 {
+		return nil
 	}
-
-	b.WriteString("**AI summary:** ")
-	b.WriteString(draft.AISummary)
-	b.WriteString("\n\n")
-
-	b.WriteString("**Drafted reply:**\n")
-	b.WriteString(blockquoteText(htmlToPlain(draft.DraftBodyHTML), 800))
-
-	// Reserve some headroom for Discord's hard 2000-char limit.
-	out := b.String()
-	if len(out) > 1900 {
-		out = out[:1900] + "\n\n_...truncated_"
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	var out []string
+	for len(s) > max {
+		cut := breakPoint(s, max)
+		out = append(out, strings.TrimRight(s[:cut], " \t\n"))
+		s = strings.TrimLeft(s[cut:], " \t\n")
+	}
+	if s != "" {
+		out = append(out, s)
 	}
 	return out
 }
 
-// buildDraftActionButtons returns the action-row components for a
-// pending draft.
-func buildDraftActionButtons(draftID int64) []DiscordActionRow {
-	send := DiscordMessageButton{
-		Type:     2,
-		Style:    3, // success / green
-		Label:    "Send",
-		CustomID: fmt.Sprintf("support_send:%d", draftID),
+// breakPoint returns the index to cut s at so the first piece is <= max
+// bytes and lands on the nicest boundary available in the last third of
+// the budget.
+func breakPoint(s string, max int) int {
+	window := s[:max]
+	floor := max / 3 // don't accept a boundary so early it wastes the message
+	for _, sep := range []string{"\n\n", "\n", " "} {
+		if i := strings.LastIndex(window, sep); i > floor {
+			return i + len(sep)
+		}
 	}
-	send.Emoji = &struct {
-		Name string `json:"name"`
-	}{Name: "✅"}
-	edit := DiscordMessageButton{
-		Type:     2,
-		Style:    1, // primary / blue
-		Label:    "Edit",
-		CustomID: fmt.Sprintf("support_edit:%d", draftID),
+	// One unbroken run longer than a whole message (a URL, a stack trace,
+	// a log line). Back up to a rune boundary so the cut is still valid
+	// UTF-8; the caller's chunk stays under max either way.
+	cut := max
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
 	}
-	edit.Emoji = &struct {
-		Name string `json:"name"`
-	}{Name: "✏️"}
-	skip := DiscordMessageButton{
-		Type:     2,
-		Style:    2, // secondary / gray
-		Label:    "Skip",
-		CustomID: fmt.Sprintf("support_skip:%d", draftID),
-	}
-	skip.Emoji = &struct {
-		Name string `json:"name"`
-	}{Name: "⏭️"}
+	return cut
+}
 
+// buildDraftMessages renders one draft as the starter message plus however
+// many follow-up messages the full text needs. Nothing is truncated: the
+// partner reads the complete draft in the thread and decides from it,
+// which was the whole failure of the old single 2000-char message.
+//
+// Returns (starter, rest). The caller puts the action buttons on the last
+// message of the pair. includeUserMessage is false when the thread already
+// shows the message this draft answers.
+func buildDraftMessages(draft *SupportDraft, includeUserMessage bool) (string, []string) {
+	var head, tail string
+	if includeUserMessage {
+		head, tail = splitAtLimit(htmlToPlain(draft.UserMessageHTML), userMessageHeadLimit)
+	}
+
+	var msgs []string
+	if head != "" {
+		// Split after quoting, not before: the "> " on every line is part
+		// of what has to fit, and a many-line message can gain hundreds of
+		// bytes from it.
+		section := "**What the user wrote**\n" + blockquoteText(head, len(head))
+		if tail != "" {
+			section += "\n_…continues below_"
+		}
+		msgs = append(msgs, splitForDiscord(section, discordMessageLimit)...)
+	}
+	if tail != "" {
+		msgs = append(msgs, splitForDiscord(blockquoteText(tail, len(tail)), discordMessageLimit)...)
+	}
+
+	draftText := strings.TrimSpace(htmlToPlain(draft.DraftBodyHTML))
+	if draftText == "" {
+		draftText = "_(the AI produced no reply body)_"
+	}
+	draftChunks := splitForDiscord("**Drafted reply**\n"+draftText, discordMessageLimit)
+
+	// A short ticket is one message: fold the draft in rather than posting
+	// a two-line message of its own under a three-line one.
+	if len(msgs) == 1 && len(draftChunks) == 1 &&
+		len(msgs[0])+len(draftChunks[0])+2 <= discordMessageLimit {
+		return msgs[0] + "\n\n" + draftChunks[0], nil
+	}
+
+	msgs = append(msgs, draftChunks...)
+	return msgs[0], msgs[1:]
+}
+
+// splitAtLimit cuts s into a head of at most limit bytes (on a whitespace
+// and rune boundary) and the remainder.
+func splitAtLimit(s string, limit int) (string, string) {
+	s = strings.TrimSpace(s)
+	if len(s) <= limit {
+		return s, ""
+	}
+	cut := breakPoint(s, limit)
+	return strings.TrimRight(s[:cut], " \t\n"), strings.TrimLeft(s[cut:], " \t\n")
+}
+
+// buildDraftHeaderEmbed is the at-a-glance block above the draft: what the
+// ticket is, how sure the AI is, and whether the user is even on a version
+// that could still have the bug. The internal note (REL-244) shows here
+// and only here — it is the AI talking to us, never to the user.
+func buildDraftHeaderEmbed(ctx context.Context, draft *SupportDraft) *discordEmbed {
+	subject := draft.OriginalSubject
+	if subject == "" {
+		subject = "(no subject)"
+	}
+	subject = truncateRunes(subject, 200) // embed titles cap at 256 characters
+
+	e := &discordEmbed{
+		Title: fmt.Sprintf("Ticket #%s — %s", draft.TicketNumber, subject),
+		Color: 0x5865F2, // Discord blurple
+		Fields: []discordEmbedField{
+			{Name: "Category", Value: codeOrDash(draft.AICategory), Inline: true},
+			{Name: "Priority", Value: codeOrDash(draft.AIPriority), Inline: true},
+			{Name: "Confidence", Value: codeOrDash(draft.AIConfidence), Inline: true},
+			{Name: "App version", Value: appVersionField(ctx, draft.TicketNumber), Inline: true},
+		},
+		Footer: &discordEmbedFooter{Text: fmt.Sprintf("draft #%d", draft.ID)},
+	}
+	if draft.AISummary != "" {
+		e.Description = truncateRunes(draft.AISummary, 400)
+	}
+	if note := strings.TrimSpace(draft.InternalNote); note != "" {
+		e.Fields = append(e.Fields, discordEmbedField{
+			Name: "Note (internal — not sent)", Value: truncateRunes(note, 1000),
+		})
+	}
+	if ask := strings.TrimSpace(draft.AskUserFor); ask != "" {
+		e.Fields = append(e.Fields, discordEmbedField{
+			Name: "Needs from the user", Value: truncateRunes(ask, 1000),
+		})
+	}
+	if src := strings.TrimSpace(draft.GroundedIn); src != "" {
+		e.Fields = append(e.Fields, discordEmbedField{
+			Name: "Grounded in", Value: truncateRunes(src, 1000),
+		})
+	}
+	return e
+}
+
+func codeOrDash(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return "—"
+	}
+	return "`" + s + "`"
+}
+
+// truncateRunes caps a string at n runes (never mid-character), for the
+// embed fields Discord limits by character count.
+func truncateRunes(s string, n int) string {
+	if utf8.RuneCountInString(s) <= n {
+		return s
+	}
+	count := 0
+	for i := range s {
+		if count == n {
+			return s[:i] + "…"
+		}
+		count++
+	}
+	return s
+}
+
+// appVersionField renders the reporter's app version against the version
+// we ship today, so "this was fixed two releases ago" is visible before
+// anyone reads the draft.
+func appVersionField(ctx context.Context, ticketNumber string) string {
+	reported := caseAppVersion(ctx, ticketNumber)
+	current := currentDesktopVersion()
+	switch {
+	case reported == "" && current == "":
+		return "—"
+	case reported == "":
+		return fmt.Sprintf("unknown (current %s)", current)
+	case current == "" || reported == current:
+		return fmt.Sprintf("`%s` (current)", reported)
+	default:
+		return fmt.Sprintf("`%s` → current `%s`", reported, current)
+	}
+}
+
+// currentDesktopVersionRe pulls the version line the knowledge base is
+// generated with, so there is exactly one source of truth for "current"
+// and it is the same one the AI is told about.
+var currentDesktopVersionRe = regexp.MustCompile(`(?m)^Current desktop version: \*\*([^*]+)\*\*`)
+
+func currentDesktopVersion() string {
+	m := currentDesktopVersionRe.FindStringSubmatch(supportKnowledgeBase())
+	if len(m) < 2 {
+		return ""
+	}
+	return strings.TrimSpace(m[1])
+}
+
+// caseAppVersion reads the app version the desktop reported at ticket time.
+// Empty for web-form tickets and anything that arrived by email.
+func caseAppVersion(ctx context.Context, ticketNumber string) string {
+	if platform.DBPool == nil {
+		return ""
+	}
+	var v *string
+	err := platform.DBPool.QueryRow(ctx,
+		`SELECT app_version FROM support_cases WHERE ticket_number = $1`, ticketNumber).Scan(&v)
+	if err != nil || v == nil {
+		return ""
+	}
+	return strings.TrimSpace(*v)
+}
+
+// buildDraftActionButtons returns the action-row components for a
+// pending draft. Five buttons is Discord's per-row maximum and exactly
+// what the queue needs: three ways to answer, one to defer, one to turn
+// the ticket into engineering work.
+func buildDraftActionButtons(draftID int64) []DiscordActionRow {
+	button := func(style int, label, emoji, action string) DiscordMessageButton {
+		b := DiscordMessageButton{
+			Type:     2,
+			Style:    style,
+			Label:    label,
+			CustomID: fmt.Sprintf("%s:%d", action, draftID),
+		}
+		b.Emoji = &struct {
+			Name string `json:"name"`
+		}{Name: emoji}
+		return b
+	}
 	return []DiscordActionRow{
 		{
-			Type:       1,
-			Components: []DiscordMessageButton{send, edit, skip},
+			Type: 1,
+			Components: []DiscordMessageButton{
+				button(3, "Send", "✅", "support_send"),
+				button(1, "Edit", "✏️", "support_edit"),
+				button(1, "Ask", "❓", "support_ask"),
+				button(2, "Skip", "⏭️", "support_skip"),
+				button(4, "File as bug", "🐛", "support_bug"),
+			},
 		},
 	}
 }
