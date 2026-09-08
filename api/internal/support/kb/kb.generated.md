@@ -592,8 +592,23 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.2 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.3 -->
 The last 8 published releases, newest first, as users read them.
+
+### Scrollr 1.6.3 — The whole matchday (`desktop-v1.6.3`, 2026-09-08)
+
+A small release with one fix, for something that made the bar look broken when it was not.
+
+#### ⚽ The whole matchday, not one game
+
+**If a league's next games are more than a day away, the bar now shows that whole matchday.** Before, it showed exactly one fixture. So if your league had fourteen games kicking off tomorrow evening, you saw a single one of them tonight and reasonably concluded the ticker was broken. Now all fourteen go on the bar and take turns, the same way they would once they are live.
+
+Two things stayed deliberately the same:
+
+- **A league whose next fixture really is a lone event still shows one chip.** A Formula 1 race weeks out, a single Thursday night football game: those are genuinely one thing, and one chip is the honest answer.
+- **Nothing changed about live games or recent results.** Live is always on the bar, finished games stay for eighteen hours, and anything kicking off within a day is on as before.
+
+There is no new setting for this. What appears on the bar is not something you configure, and this is a better rule rather than another dial.
 
 ### Scrollr 1.6.2 — Pin what matters (`desktop-v1.6.2`, 2026-09-08)
 
@@ -820,36 +835,3 @@ The fantasy widget got rebuilt around what you actually look at on a Sunday, the
 #### 🔧 Under the hood
 
 Fantasy players, standings and rosters share one set of helpers, so the tabs can't disagree with each other about the same league.
-
-### v1.4.0 — A catalog you can shop, and a Home that briefs you (`desktop-v1.4.0`, 2026-07-31)
-
-Two of the app's main screens got rebuilt: the Catalog is now somewhere you can actually shop, and Home tells you what's happening instead of listing everything equally.
-
-#### ✨ New
-
-**Add a widget without leaving the Catalog.** Every widget card has a `+` — one click and it's in your ticker. No detour to a separate page and back.
-
-**Widget details slide over instead of navigating away.** Click a card and the details open beside the shelf you were browsing: what it does, what it looks like in your ticker, what it costs you in slots, how to use it, and a few similar widgets. Close it and you're exactly where you left off — same scroll position, same shelf.
-
-**Search the Catalog.** Type anything — a name, a word from a description, a category.
-
-**Browse by shelf.** Instead of "Yours" and "Discover", the Catalog now has a shelf per category — Sports, Finance, News, Fantasy, Predictions, Utilities — in a sensible order, with a Spotlight row up top for good places to start. Sports gets compact tiles, because fourteen league cards all saying "live scores" wasn't helping anyone.
-
-**"In your ticker" at a glance.** One strip at the top of the Catalog shows everything you've added and how many slots you have left, with empty outlines for the free ones.
-
-#### 💄 Home is now a briefing
-
-**A live ticker across the top** — your actual chips, drifting past, so you can see what's scrolling without looking at the ticker itself.
-
-**"Happening now"** surfaces the two or three things worth interrupting you for: a game that's actually live, your biggest market mover. On a quiet day it simply isn't there, rather than padding itself out.
-
-**Everything else is grouped sensibly.** Scores from all your leagues in one card, headlines from all your feeds in another, your watchlists together, your fantasy matchup, your Kalshi markets, your utilities as tiles. Every row still links straight to the widget it came from.
-
-**A widget you haven't set up keeps its place.** Instead of an empty card or a disappearing one, it says what it needs and gives you one button to do it.
-
-**New here?** Home now welcomes you with three good starting picks and a way into the full Catalog.
-
-#### 🐛 Fixes
-
-- The Catalog's category filter now clears your search, so picking "News" after typing something doesn't leave you looking at a confusing result set.
-- Widget details deep-link properly — the address updates when you open one, so reloading keeps it open.
