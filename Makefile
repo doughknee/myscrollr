@@ -42,7 +42,7 @@ COMPOSE_AUTO  = $(shell [ -f secrets/predictions.docker.env ] && echo "$(COMPOSE
 
 .DEFAULT_GOAL := help
 .PHONY: help setup doctor up down restart rebuild reset logs ps shell \
-        web desktop dev screenshots kalshi-key check
+        web desktop dev screenshots kalshi-key check kb
 
 # ── Help ─────────────────────────────────────────────────────────────
 # Targets are documented with `##<group>: description` and grouped below.
@@ -146,6 +146,14 @@ ps: ##iterate: Show what's running
 shell: ##iterate: Open a shell in a service, svc=core-api
 	@test -n "$(svc)" || { echo "usage: make shell svc=core-api"; exit 1; }
 	@$(COMPOSE_AUTO) exec $(svc) sh
+
+# The support knowledge base is generated (api/cmd/kbgen) from the docs, the
+# settings copy, the widget catalog and the last eight GitHub releases, and
+# CI diffs it. Regenerate after a release or an edit to one of its sources
+# (each section of the file names its own). Host Go when there is one,
+# otherwise the same image the backend runs on; GITHUB_TOKEN is optional.
+kb: ##iterate: Regenerate the support knowledge base (api/internal/support/kb)
+	@if command -v go >/dev/null 2>&1; then cd api && go run ./cmd/kbgen; 	else MSYS_NO_PATHCONV=1 docker run --rm -v "$(CURDIR):/src" -v scrollr-gomodcache:/go/pkg/mod -w /src/api -e GITHUB_TOKEN golang:1.25-alpine go run ./cmd/kbgen; fi
 
 # ── Reset ────────────────────────────────────────────────────────────
 reset: ##reset: Stop and wipe the database, Redis and build caches

@@ -44,6 +44,7 @@ made it wrong. That is how this list stays true.
 |---|---|
 | [`cdc-runbook.md`](./cdc-runbook.md) | CDC/Sequin pipeline: how it works, how it breaks, how to fix it under pressure. |
 | [`scripts/smoke/README.md`](../scripts/smoke/README.md) | Production-readiness smoke tests, run post-rollout by `deploy.yml`. |
+| [`support/POLICIES.md`](./support/POLICIES.md) | Hand-curated support policy (plan wording, refunds, trial, deletion, the never-say list). The only hand-written input to the generated support knowledge base; `make kb` assembles the rest from the docs, the settings copy, the catalog and the release notes. |
 | [`myscrollr.com/DEPLOY.md`](../myscrollr.com/DEPLOY.md) | Marketing site build pipeline and SPA-fallback hosting notes. |
 
 ## Per-component
