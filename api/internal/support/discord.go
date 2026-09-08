@@ -687,6 +687,19 @@ func registerDiscordSlashCommands(ctx context.Context) error {
 			},
 		},
 		{
+			Name:        "regen",
+			Description: "Re-run triage on a ticket and replace its pending draft",
+			Type:        1,
+			Options: []discordSlashCommandOption{
+				{
+					Name:        "ticket",
+					Description: "Ticket number (e.g. 239171), or \"pending\" for every pending draft",
+					Type:        3,
+					Required:    true,
+				},
+			},
+		},
+		{
 			Name:        "pause",
 			Description: "Stop every unattended send immediately. Holds keep their clocks.",
 			Type:        1,
@@ -749,7 +762,7 @@ func RegisterDiscordSlashCommandsAtBoot(ctx context.Context) {
 		log.Printf("[Discord] register slash commands: %v", err)
 		// Continue to tag bootstrap even if commands failed.
 	} else {
-		log.Println("[Discord] slash commands registered (/inbox, /case, /search, /ticket, /stats, /pause, /resume)")
+		log.Println("[Discord] slash commands registered (/inbox, /case, /search, /ticket, /regen, /stats, /pause, /resume)")
 	}
 
 	if err := ensureSupportForumTags(ctx, cfg.SupportChannelID); err != nil {
