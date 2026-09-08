@@ -243,12 +243,24 @@ func hashJSON(v any) string {
 
 // tierOrder sorts plans lowest first, using the same priority the API
 // uses to pick a user's tier from their roles.
+// tierOrder lists plan ids weakest-first.
+//
+// It has to be deterministic or its own CI guard flakes, and the rank
+// comparator alone is not: TierFromRoles returns "super_user" the moment it
+// SEES that role, wherever in the slice, so super_user and uplink_ultimate
+// compare false in both directions — equal. sort.Slice is unstable, so the
+// pair's order then followed Go's randomised map iteration and the table
+// came out differently run to run.
+//
+// Sorting by id first gives every tie a fixed answer; the stable rank sort
+// on top of it keeps that answer while ordering by plan strength.
 func tierOrder(m map[string]widgets.WidgetLimits) []string {
 	ids := make([]string, 0, len(m))
 	for id := range m {
 		ids = append(ids, id)
 	}
-	sort.Slice(ids, func(i, j int) bool {
+	sort.Strings(ids)
+	sort.SliceStable(ids, func(i, j int) bool {
 		return platform.TierFromRoles([]string{ids[i], ids[j]}) == ids[j]
 	})
 	return ids

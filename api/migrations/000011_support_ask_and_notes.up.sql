@@ -13,6 +13,10 @@
 --      the columns are read here (rendered in the thread header, and
 --      ask_user_for gates auto-send) and written there.
 
+-- The CHECK is dropped and re-added one statement later with a strictly
+-- WIDER set of values: no row that passed the old constraint can fail the
+-- new one, and nothing reads a constraint the way code reads a column.
+-- allow-destructive: same constraint, widened, in the same transaction
 ALTER TABLE support_drafts DROP CONSTRAINT IF EXISTS support_drafts_status_check;
 ALTER TABLE support_drafts ADD CONSTRAINT support_drafts_status_check
     CHECK (status = ANY (ARRAY['pending', 'approved', 'edited', 'skipped', 'asked', 'sent', 'failed']));
