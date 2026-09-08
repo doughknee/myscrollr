@@ -19,3 +19,8 @@ Makefile   text eol=lf
 # The support knowledge base is generated (api/cmd/kbgen) and embedded,
 # then diffed byte-for-byte in CI. Same rule as the generated types.
 *.generated.md  text eol=lf
+
+# Prompt golden files are byte-compared against what the builders produce in
+# memory, which is always LF. A CRLF checkout would fail every golden test on
+# a Windows box for no real reason.
+api/internal/support/testdata/*.txt text eol=lf
