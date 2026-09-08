@@ -1,7 +1,6 @@
 package support
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -24,16 +23,16 @@ import (
 // that have actually shipped, fetched live and cached for ten minutes because
 // the answer is the same for every ticket in that window.
 //
-// Both sources degrade to nothing. LINEAR_API_KEY is read-only and may not be
-// set at all; when it isn't, the drafter simply doesn't get to say "we know
-// about that", which is a worse reply, not a broken one.
+// Both sources degrade to nothing. LINEAR_API_KEY (shared with the Discord
+// "File as bug" button) may not be set at all; when it isn't, the drafter
+// simply doesn't get to say "we know about that", which is a worse reply,
+// not a broken one.
 
 const (
-	linearGraphQLURL    = "https://api.linear.app/graphql"
-	releasesURL         = "https://api.github.com/repos/doughknee/myscrollr/releases?per_page=3"
-	knownIssuesCacheKey = "support:known_issues:v1"
-	knownIssuesTTL      = 10 * time.Minute
-	knownIssuesTimeout  = 8 * time.Second
+	knownIssuesReleasesURL = "https://api.github.com/repos/doughknee/myscrollr/releases?per_page=3"
+	knownIssuesCacheKey    = "support:known_issues:v1"
+	knownIssuesTTL         = 10 * time.Minute
+	knownIssuesTimeout     = 8 * time.Second
 	// Linear descriptions are whole bug reports; the drafter only needs
 	// enough to recognise a match.
 	maxIssueDescChars   = 240
@@ -58,8 +57,10 @@ func knownIssuesBlock(ctx context.Context) string {
 	return block
 }
 
-// LinearIssue is one open issue as the prompt needs it.
-type LinearIssue struct {
+// openIssue is one open Linear issue as the prompt needs it. Distinct from
+// linear.go's LinearIssue, which is the slice of a CREATED issue Discord
+// shows back to the partner.
+type openIssue struct {
 	Key         string
 	Title       string
 	Description string
@@ -67,8 +68,8 @@ type LinearIssue struct {
 	Labels      []string
 }
 
-// GithubRelease is one published release as the prompt needs it.
-type GithubRelease struct {
+// shippedRelease is one published release as the prompt needs it.
+type shippedRelease struct {
 	Tag  string
 	Name string
 	Date string
@@ -77,7 +78,7 @@ type GithubRelease struct {
 
 // buildKnownIssuesBlock renders the block. Pure, so the golden tests can pin
 // the wording without a network.
-func buildKnownIssuesBlock(issues []LinearIssue, releases []GithubRelease) string {
+func buildKnownIssuesBlock(issues []openIssue, releases []shippedRelease) string {
 	var b strings.Builder
 	b.WriteString("KNOWN ISSUES AND RECENT RELEASES (live, refreshed every 10 minutes)\n\n")
 
@@ -115,10 +116,10 @@ func buildKnownIssuesBlock(issues []LinearIssue, releases []GithubRelease) strin
 }
 
 // fetchOpenLinearIssues reads the open bugs and the urgent/high work in the
-// Scrollr project. Linear priorities: 1 Urgent, 2 High, 3 Medium, 4 Low.
-func fetchOpenLinearIssues(ctx context.Context) []LinearIssue {
-	apiKey := strings.TrimSpace(os.Getenv("LINEAR_API_KEY"))
-	if apiKey == "" {
+// Scrollr project, through the same client the "File as bug" button uses.
+// Linear priorities: 1 Urgent, 2 High, 3 Medium, 4 Low.
+func fetchOpenLinearIssues(ctx context.Context) []openIssue {
+	if strings.TrimSpace(os.Getenv("LINEAR_API_KEY")) == "" {
 		return nil
 	}
 	project := os.Getenv("LINEAR_PROJECT")
@@ -139,54 +140,29 @@ func fetchOpenLinearIssues(ctx context.Context) []LinearIssue {
 	  }
 	}`
 
-	body, _ := json.Marshal(map[string]interface{}{
-		"query":     query,
-		"variables": map[string]string{"project": project},
-	})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, linearGraphQLURL, bytes.NewReader(body))
-	if err != nil {
-		return nil
+	var data struct {
+		Issues struct {
+			Nodes []struct {
+				Identifier  string  `json:"identifier"`
+				Title       string  `json:"title"`
+				Description string  `json:"description"`
+				Priority    float64 `json:"priority"`
+				Labels      struct {
+					Nodes []struct {
+						Name string `json:"name"`
+					} `json:"nodes"`
+				} `json:"labels"`
+			} `json:"nodes"`
+		} `json:"issues"`
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", apiKey)
-
-	raw, err := doJSON(req)
-	if err != nil {
+	if err := linearGraphQL(ctx, query, map[string]interface{}{"project": project}, &data); err != nil {
 		log.Printf("[Triage] Linear: %v", err)
 		return nil
 	}
-	var resp struct {
-		Data struct {
-			Issues struct {
-				Nodes []struct {
-					Identifier  string  `json:"identifier"`
-					Title       string  `json:"title"`
-					Description string  `json:"description"`
-					Priority    float64 `json:"priority"`
-					Labels      struct {
-						Nodes []struct {
-							Name string `json:"name"`
-						} `json:"nodes"`
-					} `json:"labels"`
-				} `json:"nodes"`
-			} `json:"issues"`
-		} `json:"data"`
-		Errors []struct {
-			Message string `json:"message"`
-		} `json:"errors"`
-	}
-	if err := json.Unmarshal(raw, &resp); err != nil {
-		log.Printf("[Triage] Linear parse: %v", err)
-		return nil
-	}
-	if len(resp.Errors) > 0 {
-		log.Printf("[Triage] Linear returned errors: %s", resp.Errors[0].Message)
-		return nil
-	}
 
-	out := make([]LinearIssue, 0, len(resp.Data.Issues.Nodes))
-	for _, n := range resp.Data.Issues.Nodes {
-		is := LinearIssue{
+	out := make([]openIssue, 0, len(data.Issues.Nodes))
+	for _, n := range data.Issues.Nodes {
+		is := openIssue{
 			Key:         n.Identifier,
 			Title:       n.Title,
 			Description: n.Description,
@@ -218,8 +194,8 @@ func linearPriorityName(p int) string {
 // fetchRecentReleases reads the last three published releases. The knowledge
 // base carries release notes too, but it is generated at build time; this
 // covers the window between a release going out and the next image build.
-func fetchRecentReleases(ctx context.Context) []GithubRelease {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, releasesURL, nil)
+func fetchRecentReleases(ctx context.Context) []shippedRelease {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, knownIssuesReleasesURL, nil)
 	if err != nil {
 		return nil
 	}
@@ -246,7 +222,7 @@ func fetchRecentReleases(ctx context.Context) []GithubRelease {
 		log.Printf("[Triage] releases parse: %v", err)
 		return nil
 	}
-	out := make([]GithubRelease, 0, len(rels))
+	out := make([]shippedRelease, 0, len(rels))
 	for _, r := range rels {
 		if r.Draft {
 			continue
@@ -255,7 +231,7 @@ func fetchRecentReleases(ctx context.Context) []GithubRelease {
 		if len(date) >= 10 {
 			date = date[:10]
 		}
-		out = append(out, GithubRelease{Tag: r.TagName, Name: r.Name, Date: date, Body: r.Body})
+		out = append(out, shippedRelease{Tag: r.TagName, Name: r.Name, Date: date, Body: r.Body})
 	}
 	return out
 }

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
+	"github.com/brandon-relentnet/myscrollr/api/internal/support"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -279,4 +280,67 @@ func htmlEscape(s string) string {
 		"'", "&#39;",
 	)
 	return r.Replace(s)
+}
+
+// =============================================================================
+// GitHub release-published webhook — "this is fixed now" follow-ups
+// =============================================================================
+//
+// The Announce Release workflow already fires on `release: published` with
+// the tag and URL in hand; it POSTs them here on the way to Discord rather
+// than a second workflow watching the same event. Auth is the same shared
+// secret the PR-close Action uses, for the same reason: osTicket and Linear
+// credentials belong on this side of the wall, not on a GitHub runner.
+//
+// Everything this queues lands as an ordinary pending draft in the support
+// queue. Nothing is sent to a user without someone clicking Send.
+
+type githubReleasePublishedEvent struct {
+	Version    string `json:"version"`     // tag name, e.g. "desktop-v1.6.3"
+	ReleaseURL string `json:"release_url"` // link to the published notes
+}
+
+// HandleGitHubReleasePublished drafts shipped-follow-ups for cases whose
+// linked Linear issue is Done. Answers immediately; the Linear round-trips
+// happen in the background so a slow API never stalls the release workflow.
+func HandleGitHubReleasePublished(c *fiber.Ctx) error {
+	expected := os.Getenv("GITHUB_PR_WEBHOOK_SECRET")
+	if expected == "" {
+		log.Println("[GitHubWebhook] GITHUB_PR_WEBHOOK_SECRET not set; rejecting")
+		return c.Status(fiber.StatusServiceUnavailable).JSON(platform.ErrorResponse{
+			Status: "error",
+			Error:  "webhook secret not configured",
+		})
+	}
+	provided := c.Get("X-GitHub-Webhook-Secret")
+	if provided == "" || subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) != 1 {
+		log.Println("[GitHubWebhook] missing or invalid X-GitHub-Webhook-Secret")
+		return c.Status(fiber.StatusUnauthorized).JSON(platform.ErrorResponse{
+			Status: "unauthorized",
+			Error:  "invalid webhook secret",
+		})
+	}
+
+	var ev githubReleasePublishedEvent
+	if err := json.Unmarshal(c.Body(), &ev); err != nil {
+		log.Printf("[GitHubWebhook] release body parse error: %v", err)
+		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
+			Status: "error",
+			Error:  "invalid JSON body",
+		})
+	}
+	if strings.TrimSpace(ev.Version) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
+			Status: "error",
+			Error:  "missing version",
+		})
+	}
+
+	go func(version, url string) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		support.DraftShippedFollowUps(ctx, version, url)
+	}(ev.Version, ev.ReleaseURL)
+
+	return c.JSON(fiber.Map{"status": "accepted", "version": ev.Version})
 }

@@ -334,6 +334,17 @@ func draftReply(ctx context.Context, in TriageInput, cls *classification) (*repl
 	}, nil
 }
 
+// groundingFields flattens the drafter's lists into the text columns the
+// Discord thread header and the auto-send gate already read (REL-245's
+// internal_note / ask_user_for / grounded_in). One line each, because that
+// is how every reader renders them.
+func (t *TriageResult) groundingFields() (internalNote, askUserFor, groundedIn, unknowns string) {
+	return t.InternalNote,
+		strings.Join(t.AskUserFor, "; "),
+		strings.Join(t.GroundedIn, "; "),
+		strings.Join(t.Unknowns, "; ")
+}
+
 // ensureSignOff guarantees the reply ends the way every Scrollr reply ends.
 // The system prompt asks for it, the draft prompt asks for it and the tool
 // schema asks for it, and the drafter still drops it on the short "we need

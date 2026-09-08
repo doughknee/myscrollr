@@ -21,14 +21,14 @@ var updateGolden = flag.Bool("update", false, "rewrite the prompt golden files")
 // a follow-up on a ticket we already answered.
 func goldenFixtures() map[string]TriageInput {
 	knownIssues := buildKnownIssuesBlock(
-		[]LinearIssue{
+		[]openIssue{
 			{Key: "REL-216", Title: "Segmented rows lose focus after a search jump",
 				Description: "After jumping to a result in Settings search, the segmented control steals focus back.",
 				Priority:    "high", Labels: []string{"bug"}},
 			{Key: "REL-235", Title: "Standings flap between a value and a dash on live games",
 				Priority: "urgent", Labels: []string{"bug", "ticker"}},
 		},
-		[]GithubRelease{{
+		[]shippedRelease{{
 			Tag: "desktop-v1.6.2", Name: "Scrollr 1.6.2 — Pin what matters", Date: "2026-09-08",
 			Body: "A pin is one chip that stays put. Two pins, on purpose.",
 		}},
@@ -262,8 +262,8 @@ func TestKnownIssuesDegradesHonestly(t *testing.T) {
 	}
 
 	full := buildKnownIssuesBlock(
-		[]LinearIssue{{Key: "REL-999", Title: "Ticker blinks", Priority: "high", Labels: []string{"bug"}}},
-		[]GithubRelease{{Tag: "desktop-v1.6.2", Name: "1.6.2", Date: "2026-09-08", Body: "fixed the blink"}})
+		[]openIssue{{Key: "REL-999", Title: "Ticker blinks", Priority: "high", Labels: []string{"bug"}}},
+		[]shippedRelease{{Tag: "desktop-v1.6.2", Name: "1.6.2", Date: "2026-09-08", Body: "fixed the blink"}})
 	for _, must := range []string{"REL-999", "[high]", "(bug)", "desktop-v1.6.2", "fixed the blink",
 		"Never put one in the reply to the user"} {
 		if !strings.Contains(full, must) {

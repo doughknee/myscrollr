@@ -156,6 +156,11 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 		}
 	}
 
+	// Surface the reply in Discord immediately, before triage runs. The
+	// partner sees the question the moment it arrives rather than several
+	// seconds later underneath the AI's answer to it.
+	notifyDiscordForUserReply(ctx, ev.TicketNumber, ev.Subject, "", ev.MessageHTML)
+
 	// Resolve user name with a fallback. osTicket may have stripped
 	// it depending on how the email arrived.
 	userName := strings.TrimSpace(ev.UserName)
@@ -193,6 +198,8 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 		return
 	}
 
+	note, ask, grounded, unknowns := triage.groundingFields()
+
 	// Persist draft tagged with the thread_entry_id.
 	draft, err := createSupportDraft(ctx, &SupportDraft{
 		TicketNumber:          ev.TicketNumber,
@@ -209,11 +216,11 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 		AIConfidence:          triage.Confidence,
 		OSTicketThreadEntryID: ev.ThreadEntryID,
 		ShouldClose:           triage.ShouldClose,
-		AINeedsInfo:           triage.NeedsInfo,
-		AIGroundedIn:          triage.GroundedIn,
-		AIUnknowns:            triage.Unknowns,
-		AIAskUserFor:          triage.AskUserFor,
-		AIInternalNote:        triage.InternalNote,
+		NeedsInfo:             triage.NeedsInfo,
+		InternalNote:          note,
+		AskUserFor:            ask,
+		GroundedIn:            grounded,
+		Unknowns:              unknowns,
 	})
 	if err != nil {
 		log.Printf("[OSTicketWebhook] createSupportDraft for ticket %s entry=%d: %v", ev.TicketNumber, ev.ThreadEntryID, err)

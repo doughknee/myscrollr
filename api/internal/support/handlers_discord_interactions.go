@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -179,6 +180,16 @@ func handleDiscordButtonClick(c *fiber.Ctx, ix *discordInteraction) error {
 		return discordEphemeralResponse(c, "malformed custom_id")
 	}
 	prefix, idStr := parts[0], parts[1]
+
+	// /inbox paging carries an offset, not a draft id.
+	if prefix == "support_inbox" {
+		offset, err := strconv.Atoi(idStr)
+		if err != nil || offset < 0 {
+			return discordEphemeralResponse(c, "malformed page offset")
+		}
+		return respondWithInboxPage(c, offset, discordResponseUpdateMessage)
+	}
+
 	draftID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		return discordEphemeralResponse(c, "malformed draft id")
@@ -189,8 +200,12 @@ func handleDiscordButtonClick(c *fiber.Ctx, ix *discordInteraction) error {
 		return handleDiscordSendAction(c, ix, draftID)
 	case "support_edit":
 		return handleDiscordEditOpenModal(c, ix, draftID)
+	case "support_ask":
+		return handleDiscordAskOpenModal(c, ix, draftID)
 	case "support_skip":
 		return handleDiscordSkipAction(c, ix, draftID)
+	case "support_bug":
+		return handleDiscordFileAsBug(c, ix, draftID)
 	default:
 		log.Printf("[DiscordInteraction] unknown button prefix %q", prefix)
 		return discordEphemeralResponse(c, "unknown action")
@@ -249,11 +264,12 @@ func handleDiscordSendAction(c *fiber.Ctx, ix *discordInteraction, draftID int64
 // buildSendConfirmation renders the post-Send message visible in the
 // thread. Includes the ticket number, recipient, and close-state hint
 // so the partner doesn't need to scroll back up to see what they sent.
+// The reporter's email address is deliberately NOT in here. The thread is
+// a queue, not a CRM: the ticket number identifies the case, and osTicket
+// holds the address.
 func buildSendConfirmation(draft *SupportDraft) string {
 	var b strings.Builder
-	b.WriteString("✅ Sent to ")
-	b.WriteString(draft.UserEmail)
-	b.WriteString(" — ticket #")
+	b.WriteString("✅ Sent — ticket #")
 	b.WriteString(draft.TicketNumber)
 	b.WriteString(" marked answered in osTicket.")
 	if draft.ShouldClose {
@@ -341,9 +357,7 @@ func buildPrefixedThreadName(prefix string, draft *SupportDraft) string {
 		// Extreme case — drop subject entirely.
 		return fmt.Sprintf("%s%s[#%s]", prefix, priority, draft.TicketNumber)
 	}
-	if len(subject) > budget {
-		subject = subject[:budget-3] + "..."
-	}
+	subject = truncateRunes(subject, budget)
 	return fmt.Sprintf("%s%s[#%s] %s", prefix, priority, draft.TicketNumber, subject)
 }
 
@@ -369,31 +383,100 @@ func handleDiscordEditOpenModal(c *fiber.Ctx, ix *discordInteraction, draftID in
 	}
 
 	// Convert draft HTML to plain text for the modal's text area.
-	prefilled := htmlToPlain(draft.DraftBodyHTML)
-	if len(prefilled) > 4000 {
-		// Discord text-area max is 4000 chars.
-		prefilled = prefilled[:4000]
+	prefilled := truncateRunes(htmlToPlain(draft.DraftBodyHTML), 4000)
+
+	components := []fiber.Map{
+		{
+			"type": 1,
+			"components": []fiber.Map{
+				{
+					"type":        4,
+					"custom_id":   "edited_body",
+					"label":       "Reply body (plain text)",
+					"style":       2, // Paragraph
+					"value":       prefilled,
+					"min_length":  1,
+					"max_length":  4000,
+					"required":    true,
+					"placeholder": "Edit the reply...",
+				},
+			},
+		},
+	}
+
+	// Second field: the user's own words, pre-filled and optional. Discord
+	// has no read-only input, so this is the only way to keep the question
+	// in front of whoever is rewriting the answer — the modal covers the
+	// thread while it is open, and the old flow made people cancel out to
+	// re-read what was asked. Its submitted value is ignored.
+	if userMsg := strings.TrimSpace(htmlToPlain(draft.UserMessageHTML)); userMsg != "" {
+		components = append(components, fiber.Map{
+			"type": 1,
+			"components": []fiber.Map{
+				{
+					"type":       4,
+					"custom_id":  "user_message_context",
+					"label":      "What the user asked (reference only)",
+					"style":      2,
+					"value":      truncateRunes(userMsg, 4000),
+					"max_length": 4000,
+					"required":   false,
+				},
+			},
+		})
 	}
 
 	resp := fiber.Map{
 		"type": discordResponseModal,
 		"data": fiber.Map{
-			"custom_id": fmt.Sprintf("support_edit_modal:%d", draftID),
-			"title":     fmt.Sprintf("Edit reply for #%s", draft.TicketNumber),
+			"custom_id":  fmt.Sprintf("support_edit_modal:%d", draftID),
+			"title":      fmt.Sprintf("Edit reply for #%s", draft.TicketNumber),
+			"components": components,
+		},
+	}
+	return c.JSON(resp)
+}
+
+// handleDiscordAskOpenModal opens the one-field modal behind the Ask
+// button: a single clarifying question, sent to the user in place of the
+// drafted answer. A draft that needs information the ticket does not carry
+// is worse than no draft, and this is the cheap way out of that corner.
+func handleDiscordAskOpenModal(c *fiber.Ctx, ix *discordInteraction, draftID int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	draft, err := loadSupportDraft(ctx, draftID)
+	if err != nil || draft == nil {
+		return discordEphemeralResponse(c, "Could not load draft.")
+	}
+	if draft.Status != "pending" {
+		return discordEphemeralResponse(c,
+			fmt.Sprintf("Draft is `%s` (already actioned).", draft.Status))
+	}
+
+	// Triage's own "what I still need" line (REL-244) is the obvious
+	// first draft of the question, so it pre-fills the box.
+	prefilled := truncateRunes(strings.TrimSpace(draft.AskUserFor), 1000)
+
+	resp := fiber.Map{
+		"type": discordResponseModal,
+		"data": fiber.Map{
+			"custom_id": fmt.Sprintf("support_ask_modal:%d", draftID),
+			"title":     fmt.Sprintf("Ask about #%s", draft.TicketNumber),
 			"components": []fiber.Map{
 				{
 					"type": 1,
 					"components": []fiber.Map{
 						{
 							"type":        4,
-							"custom_id":   "edited_body",
-							"label":       "Reply body (plain text)",
-							"style":       2, // Paragraph
+							"custom_id":   "ask_body",
+							"label":       "Question to send the user",
+							"style":       2,
 							"value":       prefilled,
 							"min_length":  1,
-							"max_length":  4000,
+							"max_length":  1000,
 							"required":    true,
-							"placeholder": "Edit the reply...",
+							"placeholder": "Which version are you on, and does it happen on every launch?",
 						},
 					},
 				},
@@ -449,25 +532,22 @@ func handleDiscordModalSubmit(c *fiber.Ctx, ix *discordInteraction) error {
 	}
 	customID := ix.Data.CustomID
 	parts := strings.SplitN(customID, ":", 2)
-	if len(parts) != 2 || parts[0] != "support_edit_modal" {
+	if len(parts) != 2 {
 		return discordEphemeralResponse(c, "malformed modal custom_id")
 	}
 	draftID, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {
 		return discordEphemeralResponse(c, "malformed draft id")
 	}
-
-	// Discord nests modal field values one level deep: components is
-	// a list of action rows, each containing one input component.
-	var editedBody string
-	for _, row := range ix.Data.Components {
-		for _, comp := range row.Components {
-			if comp.CustomID == "edited_body" {
-				editedBody = comp.Value
-			}
-		}
+	switch parts[0] {
+	case "support_edit_modal":
+	case "support_ask_modal":
+		return handleDiscordAskSubmit(c, ix, draftID)
+	default:
+		return discordEphemeralResponse(c, "malformed modal custom_id")
 	}
-	editedBody = strings.TrimSpace(editedBody)
+
+	editedBody := strings.TrimSpace(modalFieldValue(ix, "edited_body"))
 	if editedBody == "" {
 		return discordEphemeralResponse(c, "Edited body is empty.")
 	}
@@ -495,6 +575,7 @@ func handleDiscordModalSubmit(c *fiber.Ctx, ix *discordInteraction) error {
 	}
 	draft, _ = loadSupportDraft(ctx, draftID)
 
+	originalBody := draft.DraftBodyHTML
 	go func() {
 		bgCtx, bgCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer bgCancel()
@@ -507,6 +588,7 @@ func handleDiscordModalSubmit(c *fiber.Ctx, ix *discordInteraction) error {
 		// transitions as plain Send. Tag flips to "edited" instead of
 		// "sent" so we can distinguish them in /stats.
 		applyEditStateToThread(bgCtx, draft, draft.ShouldClose)
+		postEditDiff(bgCtx, draft, htmlToPlain(originalBody), editedBody)
 	}()
 
 	confirmation := buildEditConfirmation(draft)
@@ -517,9 +599,7 @@ func handleDiscordModalSubmit(c *fiber.Ctx, ix *discordInteraction) error {
 // edited-then-sent path so the partner sees the same level of detail.
 func buildEditConfirmation(draft *SupportDraft) string {
 	var b strings.Builder
-	b.WriteString("✏️ Edited and sent to ")
-	b.WriteString(draft.UserEmail)
-	b.WriteString(" — ticket #")
+	b.WriteString("✏️ Edited and sent — ticket #")
 	b.WriteString(draft.TicketNumber)
 	b.WriteString(" marked answered in osTicket.")
 	if draft.ShouldClose {
@@ -560,8 +640,357 @@ func applyEditStateToThread(ctx context.Context, draft *SupportDraft, closing bo
 	}
 }
 
+// modalFieldValue pulls one input's value out of a modal submission.
+// Discord nests them one level deep: components is a list of action rows,
+// each holding a single input.
+func modalFieldValue(ix *discordInteraction, customID string) string {
+	for _, row := range ix.Data.Components {
+		for _, comp := range row.Components {
+			if comp.CustomID == customID {
+				return comp.Value
+			}
+		}
+	}
+	return ""
+}
+
+// handleDiscordAskSubmit sends the partner's clarifying question to the
+// user in place of the drafted reply and parks the draft as 'asked'.
+//
+// The question goes out on the same osTicket reply path an approved draft
+// takes, so the user gets it as a normal support email and their answer
+// comes back through the thread-message webhook — which drafts a fresh
+// reply with the new information in it.
+func handleDiscordAskSubmit(c *fiber.Ctx, ix *discordInteraction, draftID int64) error {
+	question := strings.TrimSpace(modalFieldValue(ix, "ask_body"))
+	if question == "" {
+		return discordEphemeralResponse(c, "Question is empty.")
+	}
+	questionHTML := plainToHTMLParagraphs(question)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	draft, err := loadSupportDraft(ctx, draftID)
+	if err != nil || draft == nil {
+		return discordEphemeralResponse(c, "Draft not found.")
+	}
+	if draft.Status != "pending" {
+		return discordEphemeralResponse(c,
+			fmt.Sprintf("Draft is `%s` (already actioned).", draft.Status))
+	}
+
+	if err := markDraftDecided(ctx, draftID, "asked", questionHTML); err != nil {
+		log.Printf("[DiscordInteraction] markDraftDecided (asked) %d: %v", draftID, err)
+		return discordEphemeralResponse(c, "Could not record the question.")
+	}
+	draft, _ = loadSupportDraft(ctx, draftID)
+	if draft == nil {
+		return discordEphemeralResponse(c, "Draft vanished mid-ask.")
+	}
+	// A question never closes a ticket, whatever triage thought of the
+	// reply it replaces.
+	draft.ShouldClose = false
+
+	go func() {
+		bgCtx, bgCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer bgCancel()
+		if err := sendApprovedReply(bgCtx, draft, questionHTML); err != nil {
+			log.Printf("[DiscordInteraction] send question for ticket %s: %v", draft.TicketNumber, err)
+			return
+		}
+		applyAskStateToThread(bgCtx, draft)
+	}()
+
+	return discordVisibleResponse(c, fmt.Sprintf(
+		"❓ Asked on ticket #%s — waiting on the user:\n> %s",
+		draft.TicketNumber, strings.ReplaceAll(question, "\n", "\n> ")))
+}
+
+// applyAskStateToThread is the Ask analog of applySendStateToThread. The
+// thread stays open and un-archived: an answer is expected.
+func applyAskStateToThread(ctx context.Context, draft *SupportDraft) {
+	t, err := loadSupportTicketThread(ctx, draft.TicketNumber)
+	if err != nil || t == nil {
+		return
+	}
+	transitionThreadStatus(ctx, t, "asked", false)
+	if newName := buildPrefixedThreadName("[ASKED] ", draft); newName != "" {
+		if err := discordUpdateThreadName(ctx, t.DiscordThreadID, newName); err != nil {
+			log.Printf("[DiscordInteraction] rename thread (asked) for ticket %s: %v",
+				draft.TicketNumber, err)
+		}
+	}
+}
+
 // =============================================================================
-// Slash commands — /inbox and /ticket <number>
+// Draft-vs-edited diff
+// =============================================================================
+
+// postEditDiff posts what the partner actually changed into the thread.
+// Half of every actioned draft in the May–September audit was rewritten
+// before sending, and nothing recorded what was wrong with it — so the
+// prompt never improved. This is that record, in the place someone reading
+// the thread will see it.
+func postEditDiff(ctx context.Context, draft *SupportDraft, original, edited string) {
+	t, err := loadSupportTicketThread(ctx, draft.TicketNumber)
+	if err != nil || t == nil {
+		return
+	}
+	diff := lineDiff(original, edited)
+	if diff == "" {
+		return
+	}
+	content := "**What changed before sending**\n```diff\n" + diff + "\n```"
+	for _, chunk := range splitForDiscord(content, discordMessageLimit) {
+		if _, err := discordPostMessage(ctx, t.DiscordThreadID, chunk, nil); err != nil {
+			log.Printf("[DiscordInteraction] post edit diff for ticket %s: %v", draft.TicketNumber, err)
+			return
+		}
+	}
+}
+
+// lineDiff renders a line-level diff of before → after in `diff` fence
+// syntax (`-` removed, `+` added, ` ` kept). Returns "" when the two are
+// identical after trimming.
+//
+// Standard LCS over lines. The inputs are support replies — tens of lines,
+// not thousands — so the O(n·m) table is the right amount of machinery.
+func lineDiff(before, after string) string {
+	a := splitLines(before)
+	b := splitLines(after)
+	if strings.Join(a, "\n") == strings.Join(b, "\n") {
+		return ""
+	}
+
+	// lcs[i][j] = length of the longest common subsequence of a[i:] and b[j:].
+	lcs := make([][]int, len(a)+1)
+	for i := range lcs {
+		lcs[i] = make([]int, len(b)+1)
+	}
+	for i := len(a) - 1; i >= 0; i-- {
+		for j := len(b) - 1; j >= 0; j-- {
+			if a[i] == b[j] {
+				lcs[i][j] = lcs[i+1][j+1] + 1
+			} else if lcs[i+1][j] >= lcs[i][j+1] {
+				lcs[i][j] = lcs[i+1][j]
+			} else {
+				lcs[i][j] = lcs[i][j+1]
+			}
+		}
+	}
+
+	var out []string
+	i, j := 0, 0
+	for i < len(a) && j < len(b) {
+		switch {
+		case a[i] == b[j]:
+			out = append(out, "  "+a[i])
+			i, j = i+1, j+1
+		case lcs[i+1][j] >= lcs[i][j+1]:
+			out = append(out, "- "+a[i])
+			i++
+		default:
+			out = append(out, "+ "+b[j])
+			j++
+		}
+	}
+	for ; i < len(a); i++ {
+		out = append(out, "- "+a[i])
+	}
+	for ; j < len(b); j++ {
+		out = append(out, "+ "+b[j])
+	}
+	return strings.Join(out, "\n")
+}
+
+// splitLines splits on newlines, dropping blank lines so a reflowed
+// paragraph doesn't read as a wall of changes.
+func splitLines(s string) []string {
+	var out []string
+	for _, l := range strings.Split(strings.TrimSpace(s), "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// =============================================================================
+// File as bug — support thread → Linear issue
+// =============================================================================
+
+// handleDiscordFileAsBug turns the ticket into a Linear issue and links it
+// on the case. Deferred because the Linear round-trip does not reliably
+// fit inside Discord's 3-second interaction budget.
+//
+// A second click links the issue that already exists rather than filing a
+// duplicate — the same button on the same thread is how someone checks
+// whether it was already filed.
+func handleDiscordFileAsBug(c *fiber.Ctx, ix *discordInteraction, draftID int64) error {
+	appID, token := ix.ApplicationID, ix.Token
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		defer cancel()
+		msg := fileDraftAsBug(ctx, draftID)
+		if err := discordCompleteDeferred(ctx, appID, token, msg); err != nil {
+			log.Printf("[DiscordInteraction] file-as-bug follow-up for draft %d: %v", draftID, err)
+		}
+	}()
+	return c.JSON(fiber.Map{"type": discordResponseDeferredChannelMessage})
+}
+
+// fileDraftAsBug does the work and returns the message to post in the
+// thread — success, "already filed", or why it failed. Never returns an
+// error: whatever happened, the partner needs to read it in Discord.
+func fileDraftAsBug(ctx context.Context, draftID int64) string {
+	draft, err := loadSupportDraft(ctx, draftID)
+	if err != nil || draft == nil {
+		return "Could not load draft."
+	}
+
+	if existing := caseLinearIssueKey(ctx, draft.TicketNumber); existing != "" {
+		return fmt.Sprintf("🐛 Already filed as **%s** — %s",
+			existing, linearIssueURL(existing))
+	}
+
+	title := strings.TrimSpace(draft.AISummary)
+	if title == "" {
+		title = strings.TrimSpace(draft.OriginalSubject)
+	}
+	if title == "" {
+		title = "Support ticket #" + draft.TicketNumber
+	}
+	title = truncateRunes(title, 120)
+
+	issue, err := linearCreateIssue(ctx, title, buildLinearIssueBody(ctx, draft))
+	if err != nil {
+		log.Printf("[DiscordInteraction] linear create for ticket %s: %v", draft.TicketNumber, err)
+		return "⚠️ Could not file in Linear: " + err.Error()
+	}
+
+	if err := setCaseLinearIssueKey(ctx, draft.TicketNumber, issue.Identifier); err != nil {
+		// The issue exists; we just can't remember it. Say so, or the next
+		// click files a second one silently.
+		log.Printf("[DiscordInteraction] link %s to ticket %s: %v", issue.Identifier, draft.TicketNumber, err)
+		return fmt.Sprintf("🐛 Filed **%s** (%s) — but the link back to ticket #%s did not save; a second click will file a duplicate.",
+			issue.Identifier, issue.URL, draft.TicketNumber)
+	}
+	if err := recordSupportMessage(ctx, SupportMessage{
+		TicketNumber: draft.TicketNumber, Kind: "note",
+		BodyText: "filed as " + issue.Identifier, AIDraftID: draft.ID,
+	}); err != nil {
+		log.Printf("[Cases] %v", err)
+	}
+	return fmt.Sprintf("🐛 Filed as **%s** — %s", issue.Identifier, issue.URL)
+}
+
+// buildLinearIssueBody is what an engineer needs to pick the issue up: the
+// reporter's own words, the two diagnostics fields the case DB keeps, and
+// a link back to the ticket. No email address, and no diagnostics beyond
+// what the thread already shows.
+func buildLinearIssueBody(ctx context.Context, draft *SupportDraft) string {
+	var b strings.Builder
+	b.WriteString("**Reported via support ticket #")
+	b.WriteString(draft.TicketNumber)
+	b.WriteString("**\n\n")
+
+	if userText := strings.TrimSpace(htmlToPlain(draft.UserMessageHTML)); userText != "" {
+		b.WriteString("> ")
+		b.WriteString(strings.ReplaceAll(userText, "\n", "\n> "))
+		b.WriteString("\n\n")
+	}
+
+	b.WriteString("| | |\n|---|---|\n")
+	fmt.Fprintf(&b, "| Category | %s |\n", orDash(draft.AICategory))
+	fmt.Fprintf(&b, "| Priority | %s |\n", orDash(draft.AIPriority))
+	fmt.Fprintf(&b, "| App version | %s |\n", orDash(caseAppVersion(ctx, draft.TicketNumber)))
+	fmt.Fprintf(&b, "| OS | %s |\n", orDash(caseOS(ctx, draft.TicketNumber)))
+	fmt.Fprintf(&b, "| Opened | %s |\n", draft.CreatedAt.UTC().Format("2006-01-02"))
+
+	if note := strings.TrimSpace(draft.InternalNote); note != "" {
+		b.WriteString("\n**Triage note:** ")
+		b.WriteString(note)
+		b.WriteString("\n")
+	}
+	if url := osTicketTicketURL(draft.TicketNumber); url != "" {
+		fmt.Fprintf(&b, "\n[Open ticket #%s in osTicket](%s)\n", draft.TicketNumber, url)
+	}
+	return b.String()
+}
+
+func orDash(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return "—"
+	}
+	return s
+}
+
+// osTicketTicketURL builds the agent-side link to a ticket, or "" when
+// OSTICKET_URL isn't configured.
+func osTicketTicketURL(ticketNumber string) string {
+	base := strings.TrimRight(strings.TrimSpace(os.Getenv("OSTICKET_URL")), "/")
+	if base == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s/scp/tickets.php?number=%s", base, ticketNumber)
+}
+
+// linearIssueURL reconstructs the browser link for an identifier. Linear
+// redirects any workspace slug to the right issue, so "scrollr" here is a
+// path placeholder, not a lookup.
+func linearIssueURL(identifier string) string {
+	return "https://linear.app/scrollr/issue/" + identifier
+}
+
+// caseLinearIssueKey returns the Linear issue already linked to a ticket,
+// or "" when none is.
+func caseLinearIssueKey(ctx context.Context, ticketNumber string) string {
+	if platform.DBPool == nil {
+		return ""
+	}
+	var key *string
+	err := platform.DBPool.QueryRow(ctx,
+		`SELECT linear_issue_key FROM support_cases WHERE ticket_number = $1`, ticketNumber).Scan(&key)
+	if err != nil || key == nil {
+		return ""
+	}
+	return strings.TrimSpace(*key)
+}
+
+// setCaseLinearIssueKey links the issue to the case, refusing to overwrite
+// an existing link — two people clicking at once file one issue and keep
+// the first answer.
+func setCaseLinearIssueKey(ctx context.Context, ticketNumber, key string) error {
+	if platform.DBPool == nil {
+		return fmt.Errorf("DB not initialized")
+	}
+	if _, err := platform.DBPool.Exec(ctx,
+		`INSERT INTO support_cases (ticket_number) VALUES ($1) ON CONFLICT DO NOTHING`, ticketNumber); err != nil {
+		return err
+	}
+	_, err := platform.DBPool.Exec(ctx,
+		`UPDATE support_cases SET linear_issue_key = $2, updated_at = now()
+		 WHERE ticket_number = $1 AND linear_issue_key IS NULL`, ticketNumber, key)
+	return err
+}
+
+// caseOS returns the reporter's OS from the case DB, or "".
+func caseOS(ctx context.Context, ticketNumber string) string {
+	if platform.DBPool == nil {
+		return ""
+	}
+	var v *string
+	err := platform.DBPool.QueryRow(ctx,
+		`SELECT os FROM support_cases WHERE ticket_number = $1`, ticketNumber).Scan(&v)
+	if err != nil || v == nil {
+		return ""
+	}
+	return strings.TrimSpace(*v)
+}
+
+// =============================================================================
+// Slash commands — /inbox, /case, /search, /ticket, /stats
 // =============================================================================
 
 func handleDiscordSlashCommand(c *fiber.Ctx, ix *discordInteraction) error {
@@ -570,7 +999,11 @@ func handleDiscordSlashCommand(c *fiber.Ctx, ix *discordInteraction) error {
 	}
 	switch ix.Data.Name {
 	case "inbox":
-		return handleDiscordInboxCommand(c, ix)
+		return respondWithInboxPage(c, 0, discordResponseChannelMessageWithSource)
+	case "case":
+		return handleDiscordCaseCommand(c, ix)
+	case "search":
+		return handleDiscordSearchCommand(c, ix)
 	case "ticket":
 		return handleDiscordTicketCommand(c, ix)
 	case "stats":
@@ -743,19 +1176,31 @@ func handleDiscordStatsCommand(c *fiber.Ctx, ix *discordInteraction) error {
 	return discordEphemeralResponse(c, b.String())
 }
 
-// handleDiscordInboxCommand lists the 5 most recent pending drafts.
-func handleDiscordInboxCommand(c *fiber.Ctx, ix *discordInteraction) error {
+// inboxPageSize is how many pending drafts one /inbox page shows. Ten
+// fits an ephemeral message with room for the Next button and reads as a
+// working set rather than a wall.
+const inboxPageSize = 10
+
+// respondWithInboxPage renders one page of the pending queue, oldest
+// first — the queue is worked from the back, and the audit's problem was
+// old drafts, not new ones.
+//
+// responseType is CHANNEL_MESSAGE_WITH_SOURCE when /inbox is typed, and
+// UPDATE_MESSAGE when Next is clicked, so paging replaces the message in
+// place instead of stacking pages down the channel.
+func respondWithInboxPage(c *fiber.Ctx, offset, responseType int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	const q = `
-		SELECT id, ticket_number, ai_summary, ai_priority, created_at
+		SELECT ticket_number, ai_summary, ai_priority, ai_category, created_at,
+			   COUNT(*) OVER () AS total
 		FROM support_drafts
 		WHERE status = 'pending'
-		ORDER BY created_at DESC
-		LIMIT 5
+		ORDER BY created_at ASC
+		LIMIT $1 OFFSET $2
 	`
-	rows, err := platform.DBPool.Query(ctx, q)
+	rows, err := platform.DBPool.Query(ctx, q, inboxPageSize, offset)
 	if err != nil {
 		log.Printf("[DiscordInteraction] /inbox query: %v", err)
 		return discordEphemeralResponse(c, "Database query failed.")
@@ -763,40 +1208,213 @@ func handleDiscordInboxCommand(c *fiber.Ctx, ix *discordInteraction) error {
 	defer rows.Close()
 
 	var lines []string
+	total := 0
 	for rows.Next() {
 		var (
-			id           int64
-			ticketNumber string
-			summary      *string
-			priority     *string
-			createdAt    time.Time
+			ticketNumber                string
+			summary, priority, category *string
+			createdAt                   time.Time
 		)
-		if err := rows.Scan(&id, &ticketNumber, &summary, &priority, &createdAt); err != nil {
+		if err := rows.Scan(&ticketNumber, &summary, &priority, &category, &createdAt, &total); err != nil {
 			continue
 		}
 		summaryText := "(no summary)"
 		if summary != nil && *summary != "" {
-			summaryText = *summary
+			summaryText = truncateRunes(*summary, 110)
 		}
-		priorityText := ""
+		tags := ""
+		if category != nil && *category != "" {
+			tags += " · `" + *category + "`"
+		}
 		if priority != nil && *priority != "" {
-			priorityText = " · `" + *priority + "`"
+			tags += " · `" + *priority + "`"
 		}
-		age := time.Since(createdAt).Round(time.Minute)
-		lines = append(lines,
-			fmt.Sprintf("• **#%s**%s — %s _(%s ago)_",
-				ticketNumber, priorityText, summaryText, age))
+		lines = append(lines, fmt.Sprintf("• **#%s**%s — %s _(%s old)_",
+			ticketNumber, tags, summaryText, humanAge(time.Since(createdAt))))
 	}
 	if err := rows.Err(); err != nil {
 		log.Printf("[DiscordInteraction] /inbox rows: %v", err)
 	}
 
 	if len(lines) == 0 {
-		return discordEphemeralResponse(c, "📭 Inbox is empty — no pending drafts.")
+		if offset == 0 {
+			return discordEphemeralResponse(c, "📭 Inbox is empty — no pending drafts.")
+		}
+		return discordEphemeralResponse(c, "That was the last page.")
 	}
 
-	content := "**Pending support drafts:**\n" + strings.Join(lines, "\n")
-	return discordEphemeralResponse(c, content)
+	shown := offset + len(lines)
+	content := fmt.Sprintf("**Pending support drafts — %d–%d of %d** (oldest first)\n%s",
+		offset+1, shown, total, strings.Join(lines, "\n"))
+
+	data := fiber.Map{
+		"content":          content,
+		"flags":            discordInteractionFlagEphemeral,
+		"allowed_mentions": fiber.Map{"parse": []string{}},
+	}
+	// Discord clears components when they're omitted on an UPDATE_MESSAGE,
+	// which is what we want on the final page.
+	components := []DiscordActionRow{}
+	if shown < total {
+		next := DiscordMessageButton{
+			Type: 2, Style: 1, Label: "Next",
+			CustomID: fmt.Sprintf("support_inbox:%d", shown),
+		}
+		next.Emoji = &struct {
+			Name string `json:"name"`
+		}{Name: "➡️"}
+		components = append(components, DiscordActionRow{Type: 1, Components: []DiscordMessageButton{next}})
+	}
+	data["components"] = components
+
+	return c.JSON(fiber.Map{"type": responseType, "data": data})
+}
+
+// handleDiscordCaseCommand prints one case's timeline out of the case DB:
+// what the user said, what we drafted, what actually went out, in order.
+// Bodies are snippets — the full text lives in the thread and in osTicket;
+// this is for finding your place in a conversation quickly.
+func handleDiscordCaseCommand(c *fiber.Ctx, ix *discordInteraction) error {
+	ticketNumber := strings.TrimSpace(commandOption(ix, "number"))
+	if ticketNumber == "" {
+		return discordEphemeralResponse(c, "Missing `number` option.")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var (
+		subject, category, priority, status, summary string
+		appVersion, osName, linearKey, threadID      string
+		opened, updated                              time.Time
+	)
+	const caseQ = `
+		SELECT subject, COALESCE(category,''), COALESCE(priority,''), status,
+			   COALESCE(summary,''), COALESCE(app_version,''), COALESCE(os,''),
+			   COALESCE(linear_issue_key,''), COALESCE(discord_thread_id,''),
+			   opened_at, updated_at
+		FROM support_cases WHERE ticket_number = $1
+	`
+	err := platform.DBPool.QueryRow(ctx, caseQ, ticketNumber).Scan(
+		&subject, &category, &priority, &status, &summary,
+		&appVersion, &osName, &linearKey, &threadID, &opened, &updated)
+	if err != nil {
+		if strings.Contains(err.Error(), "no rows") {
+			return discordEphemeralResponse(c, fmt.Sprintf("No case for ticket #%s.", ticketNumber))
+		}
+		log.Printf("[DiscordInteraction] /case query: %v", err)
+		return discordEphemeralResponse(c, "Database query failed.")
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "**#%s — %s**\n", ticketNumber, truncateRunes(subject, 120))
+	fmt.Fprintf(&b, "`%s` · %s · %s · opened %s\n",
+		status, orDash(category), orDash(priority), opened.UTC().Format("2006-01-02"))
+	if appVersion != "" || osName != "" {
+		fmt.Fprintf(&b, "Reported on %s / %s\n", orDash(appVersion), orDash(osName))
+	}
+	if summary != "" {
+		fmt.Fprintf(&b, "_%s_\n", truncateRunes(summary, 300))
+	}
+	if linearKey != "" {
+		fmt.Fprintf(&b, "🐛 %s — %s\n", linearKey, linearIssueURL(linearKey))
+	}
+	if threadID != "" {
+		fmt.Fprintf(&b, "🧵 https://discord.com/channels/%s/%s\n", ix.GuildID, threadID)
+	}
+
+	const msgQ = `
+		SELECT kind, body_text, created_at FROM support_messages
+		WHERE ticket_number = $1 ORDER BY created_at DESC, id DESC LIMIT 20
+	`
+	rows, err := platform.DBPool.Query(ctx, msgQ, ticketNumber)
+	if err != nil {
+		log.Printf("[DiscordInteraction] /case messages: %v", err)
+		return discordEphemeralResponse(c, b.String())
+	}
+	defer rows.Close()
+
+	kindIcon := map[string]string{"user": "👤", "ai_draft": "🤖", "sent": "📨", "note": "📝"}
+	var events []string
+	for rows.Next() {
+		var kind, body string
+		var created time.Time
+		if err := rows.Scan(&kind, &body, &created); err != nil {
+			continue
+		}
+		icon := kindIcon[kind]
+		if icon == "" {
+			icon = "•"
+		}
+		snippet := truncateRunes(strings.Join(strings.Fields(body), " "), 140)
+		events = append(events, fmt.Sprintf("%s `%s` %s — %s",
+			icon, created.UTC().Format("Jan 2 15:04"), kind, snippet))
+	}
+	// Oldest first reads as a conversation; the query took the newest 20.
+	for i := len(events) - 1; i >= 0; i-- {
+		b.WriteString("\n")
+		b.WriteString(events[i])
+	}
+	if len(events) == 0 {
+		b.WriteString("\n_(no recorded messages)_")
+	}
+
+	return discordEphemeralResponse(c, truncateRunes(b.String(), 1990))
+}
+
+// handleDiscordSearchCommand runs the case DB's full-text search — the
+// same one the support bot reads — and lists what it found.
+func handleDiscordSearchCommand(c *fiber.Ctx, ix *discordInteraction) error {
+	query := strings.TrimSpace(commandOption(ix, "text"))
+	if query == "" {
+		return discordEphemeralResponse(c, "Missing `text` option.")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cases, err := SearchSupportCases(ctx, query, "", "", 10)
+	if err != nil {
+		log.Printf("[DiscordInteraction] /search: %v", err)
+		return discordEphemeralResponse(c, "Search failed.")
+	}
+	if len(cases) == 0 {
+		return discordEphemeralResponse(c, fmt.Sprintf("🔍 Nothing matched `%s`.", query))
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "🔍 **%d result(s) for `%s`**\n", len(cases), query)
+	for _, sc := range cases {
+		text := sc.Summary
+		if text == "" {
+			text = sc.Subject
+		}
+		fmt.Fprintf(&b, "• **#%s** `%s`%s — %s _(%s)_\n",
+			sc.TicketNumber, sc.Status, categoryTag(sc.Category),
+			truncateRunes(text, 110), sc.UpdatedAt.UTC().Format("2006-01-02"))
+	}
+	b.WriteString("\n`/case <number>` for the full timeline.")
+	return discordEphemeralResponse(c, truncateRunes(b.String(), 1990))
+}
+
+func categoryTag(category string) string {
+	if category == "" {
+		return ""
+	}
+	return " · `" + category + "`"
+}
+
+// commandOption reads one slash-command option by name.
+func commandOption(ix *discordInteraction, name string) string {
+	if ix.Data == nil {
+		return ""
+	}
+	for _, opt := range ix.Data.Options {
+		if opt.Name == name {
+			return opt.Value
+		}
+	}
+	return ""
 }
 
 // handleDiscordTicketCommand shows the latest draft for a specific
@@ -870,8 +1488,19 @@ func handleDiscordTicketCommand(c *fiber.Ctx, ix *discordInteraction) error {
 		d.AIConfidence = *confidence
 	}
 
-	content := buildDraftMessageContent(&d) +
-		fmt.Sprintf("\n\n_Status: `%s`_", d.Status)
+	// Ephemeral replies are one message, so this is the one place a draft
+	// is still abridged — the thread itself carries the unabridged copy,
+	// and /case points at it.
+	starter, rest := buildDraftMessages(&d, true)
+	content := starter
+	if len(rest) > 0 {
+		content += "\n\n" + rest[0]
+	}
+	content = truncateRunes(content, 1900)
+	if len(rest) > 1 {
+		content += "\n\n_…full draft in the ticket's thread._"
+	}
+	content += fmt.Sprintf("\n_Status: `%s`_", d.Status)
 
 	// Buttons only if still pending.
 	var components []DiscordActionRow
@@ -883,6 +1512,7 @@ func handleDiscordTicketCommand(c *fiber.Ctx, ix *discordInteraction) error {
 		"type": discordResponseChannelMessageWithSource,
 		"data": fiber.Map{
 			"content":          content,
+			"embeds":           []*discordEmbed{buildDraftHeaderEmbed(ctx, &d)},
 			"components":       components,
 			"flags":            discordInteractionFlagEphemeral,
 			"allowed_mentions": fiber.Map{"parse": []string{}},

@@ -396,8 +396,8 @@ func TestDraftGroundingRoundTrip(t *testing.T) {
 	d, err := createSupportDraft(ctx, &SupportDraft{
 		TicketNumber: "400", UserEmail: "u@example.com", OriginalSubject: "s",
 		DraftBodyHTML: "<p>hello</p>", AICategory: "bug", AIPriority: "high", AISummary: "sum",
-		AINeedsInfo: true, AIGroundedIn: []string{"Policies", "1.6.2"},
-		AIAskUserFor: []string{"OS", "version"}, AIInternalNote: "REL-999",
+		NeedsInfo: true, GroundedIn: "Policies; 1.6.2",
+		AskUserFor: "OS; version", InternalNote: "REL-999",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -406,12 +406,12 @@ func TestDraftGroundingRoundTrip(t *testing.T) {
 	if err != nil || got == nil {
 		t.Fatalf("load: %v", err)
 	}
-	if !got.AINeedsInfo || got.AIInternalNote != "REL-999" ||
-		len(got.AIGroundedIn) != 2 || len(got.AIAskUserFor) != 2 {
+	if !got.NeedsInfo || got.InternalNote != "REL-999" ||
+		got.GroundedIn != "Policies; 1.6.2" || got.AskUserFor != "OS; version" {
 		t.Fatalf("grounding did not round-trip: %+v", got)
 	}
-	// unknowns was never set, so it stays NULL rather than becoming {}.
-	if got.AIUnknowns != nil {
-		t.Errorf("unset unknowns came back as %#v, want nil", got.AIUnknowns)
+	// unknowns was never set, so it stays NULL rather than becoming "".
+	if got.Unknowns != "" {
+		t.Errorf("unset unknowns came back as %q, want empty", got.Unknowns)
 	}
 }

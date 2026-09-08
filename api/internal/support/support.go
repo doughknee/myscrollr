@@ -397,6 +397,8 @@ func persistTriageSideEffects(ticketNumber, userEmail, userName, subject, origin
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
+		note, ask, grounded, unknowns := triage.groundingFields()
+
 		// Save the draft (even if we don't end up notifying — useful for audit).
 		draft, err := createSupportDraft(ctx, &SupportDraft{
 			TicketNumber:    ticketNumber,
@@ -412,11 +414,11 @@ func persistTriageSideEffects(ticketNumber, userEmail, userName, subject, origin
 			AIDuplicateOf:   triage.DuplicateOf,
 			AIConfidence:    triage.Confidence,
 			ShouldClose:     triage.ShouldClose,
-			AINeedsInfo:     triage.NeedsInfo,
-			AIGroundedIn:    triage.GroundedIn,
-			AIUnknowns:      triage.Unknowns,
-			AIAskUserFor:    triage.AskUserFor,
-			AIInternalNote:  triage.InternalNote,
+			NeedsInfo:       triage.NeedsInfo,
+			InternalNote:    note,
+			AskUserFor:      ask,
+			GroundedIn:      grounded,
+			Unknowns:        unknowns,
 		})
 		if err != nil {
 			log.Printf("[Support] createSupportDraft failed for ticket %s: %v", ticketNumber, err)

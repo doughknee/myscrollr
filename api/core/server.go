@@ -117,19 +117,20 @@ func (s *Server) setupMiddleware() {
 
 	// Core paths always exempt from rate limiting
 	coreExemptPaths := map[string]bool{
-		"/health":                           true,
-		"/events":                           true,
-		"/webhooks/sequin":                  true,
-		"/webhooks/stripe":                  true,
-		"/webhooks/osticket/thread-message": true,
-		"/webhooks/discord/interactions":    true, // Discord retries on rate-limit and we want them to succeed
-		"/webhooks/github/pr-closed":        true, // GitHub Action calls this when a PR with [fixes #N] tags merges
-		"/channels":                         true,
-		"/catalog":                          true,
-		"/tier-limits":                      true,
-		"/extension/token":                  true,
-		"/extension/token/refresh":          true,
-		"/support/ticket":                   true,
+		"/health":                            true,
+		"/events":                            true,
+		"/webhooks/sequin":                   true,
+		"/webhooks/stripe":                   true,
+		"/webhooks/osticket/thread-message":  true,
+		"/webhooks/discord/interactions":     true, // Discord retries on rate-limit and we want them to succeed
+		"/webhooks/github/pr-closed":         true, // GitHub Action calls this when a PR with [fixes #N] tags merges
+		"/webhooks/github/release-published": true, // Announce Release workflow calls this when a desktop release publishes
+		"/channels":                          true,
+		"/catalog":                           true,
+		"/tier-limits":                       true,
+		"/extension/token":                   true,
+		"/extension/token/refresh":           true,
+		"/support/ticket":                    true,
 	}
 
 	// Counters live in Redis so all replicas share one per-IP budget
@@ -201,6 +202,7 @@ func (s *Server) setupRoutes() {
 	s.App.Post("/webhooks/osticket/thread-message", support.HandleOSTicketThreadMessage)
 	s.App.Post("/webhooks/discord/interactions", support.HandleDiscordInteractions)
 	s.App.Post("/webhooks/github/pr-closed", HandleGitHubPRClosed)
+	s.App.Post("/webhooks/github/release-published", HandleGitHubReleasePublished)
 
 	// Extension auth proxy
 	s.App.Options("/extension/token", accounts.HandleExtensionAuthPreflight)
@@ -243,6 +245,7 @@ func (s *Server) setupRoutes() {
 	// Case DB full-text search (REL-243). Server-to-server: gated by the
 	// osTicket webhook's shared secret inside the handler.
 	s.App.Get("/internal/support/cases", support.HandleSearchSupportCases)
+	s.App.Post("/internal/support/digest", support.HandleRunSupportDigest)
 
 	// Invite (no auth — user isn't logged in yet, token-verified server-side)
 	s.App.Post("/invite/complete", accounts.HandleCompleteInvite)
