@@ -238,7 +238,7 @@ func sendDraftNow(ctx context.Context, draftID int64, status string) {
 	if status == "asked" {
 		draft.ShouldClose = false
 	}
-	if err := sendApprovedReply(ctx, draft, draft.DraftBodyHTML); err != nil {
+	if err := sendDraftReply(ctx, draft, draft.DraftBodyHTML); err != nil {
 		log.Printf("[Autosend] send for ticket %s: %v", draft.TicketNumber, err)
 		postToTicketThread(ctx, draft.TicketNumber,
 			"⚠️ Auto-send failed: "+truncate(err.Error(), 300)+". The draft is still here.")

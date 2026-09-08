@@ -336,11 +336,27 @@ func markDraftDecided(ctx context.Context, id int64, newStatus string, editedBod
 	return nil
 }
 
-// markDraftSent records that the outbound reply email actually left
-// our gateway. Best-effort — failures here only affect the audit
-// trail, not user-visible behavior.
+// markDraftSent records that the reply actually left our gateway.
+//
+// sent_at is the fact — a reply reached a user — and every send path writes
+// it, because it is how /stats and the digest count a day's work. The status
+// answers a different question: WHICH decision sent the reply. The digest
+// counts 'edited' and 'asked' separately from a plain send, so only an
+// 'approved' draft is promoted to 'sent'; an edited or asked one keeps the
+// status that already tells the truth about it.
+//
+// Best-effort — failures here only affect the audit trail, not the user.
 func markDraftSent(ctx context.Context, id int64) {
-	if _, err := platform.DBPool.Exec(ctx, `UPDATE support_drafts SET status='sent', sent_at=NOW() WHERE id=$1`, id); err != nil {
+	if platform.DBPool == nil {
+		return
+	}
+	const q = `
+		UPDATE support_drafts
+		SET sent_at = NOW(),
+			status = CASE WHEN status = 'approved' THEN 'sent' ELSE status END
+		WHERE id = $1
+	`
+	if _, err := platform.DBPool.Exec(ctx, q, id); err != nil {
 		log.Printf("[Drafts] markDraftSent for %d failed: %v", id, err)
 	}
 }
@@ -349,22 +365,30 @@ func markDraftSent(ctx context.Context, id int64) {
 // and got a hard error from Resend. The partner may need to retry
 // manually inside osTicket.
 func markDraftFailed(ctx context.Context, id int64) {
+	if platform.DBPool == nil {
+		return
+	}
 	if _, err := platform.DBPool.Exec(ctx, `UPDATE support_drafts SET status='failed' WHERE id=$1`, id); err != nil {
 		log.Printf("[Drafts] markDraftFailed for %d failed: %v", id, err)
 	}
 }
 
-// loadLatestSentDraftBody returns the most recent SENT reply we've
-// posted on this ticket. Used by the reply-loop webhook to give the
-// AI continuity (so it doesn't repeat the same suggestion verbatim
-// when the user follows up). Returns "" when no sent draft exists or
-// on any DB error — the triage call still succeeds without it.
+// loadLatestSentDraftBody returns the most recent reply we actually sent on
+// this ticket. Used by the reply-loop webhook to give the AI continuity (so
+// it doesn't repeat the same suggestion verbatim when the user follows up).
+// Returns "" when nothing has been sent or on any DB error — the triage call
+// still succeeds without it.
+//
+// Keyed on sent_at, the record of a reply going out. It used to ask for
+// status='sent', which only the unused email approval-URL path ever wrote, so
+// in practice it always returned "" and the AI never had the continuity this
+// function exists to give it (REL-256).
 func loadLatestSentDraftBody(ctx context.Context, ticketNumber string) string {
 	const q = `
 		SELECT COALESCE(NULLIF(edited_body_html, ''), draft_body_html)
 		FROM support_drafts
-		WHERE ticket_number = $1 AND status = 'sent'
-		ORDER BY sent_at DESC NULLS LAST, id DESC
+		WHERE ticket_number = $1 AND sent_at IS NOT NULL
+		ORDER BY sent_at DESC, id DESC
 		LIMIT 1
 	`
 	var body string

@@ -2,7 +2,10 @@ package support
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -445,8 +448,11 @@ func TestPauseStopsAPendingTimer(t *testing.T) {
 	if err != nil || d == nil {
 		t.Fatal(err)
 	}
-	if d.Status != "sent" && d.Status != "approved" {
-		t.Errorf("status after an unattended send = %q", d.Status)
+	if d.Status != "sent" {
+		t.Errorf("status after an unattended send = %q, want sent", d.Status)
+	}
+	if d.SentAt == nil {
+		t.Error("sent_at is null after an unattended send; /stats and the digest count the day from it")
 	}
 }
 
@@ -508,5 +514,125 @@ func TestNeverDraftsInResponseToOurOwnMessage(t *testing.T) {
 	}
 	if isOurOwnOutbound(ctx, 0) {
 		t.Error("a missing entry id must not read as our own message")
+	}
+}
+
+// =============================================================================
+// REL-256 — every path that sends a reply records that it sent one
+// =============================================================================
+//
+// markDraftSent used to hang off the email approval-URL path alone, which
+// nobody uses. Both autonomous paths sent replies to real users and left
+// sent_at null, so the numbers REL-249 is measured on read an eight-reply day
+// as an idle one. The send now goes through sendDraftReply, and these pin the
+// two fields it has to leave behind.
+
+// An unattended ask is a reply going out just as much as a send is, but it is
+// still an ask: it keeps its own status, and the digest counts it separately.
+func TestAutonomousAskRecordsSentAtAndStaysAsked(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	resetCases(t)
+	t.Setenv("SUPPORT_AUTOSEND", "on")
+	ctx := context.Background()
+
+	original := sendApprovedReply
+	sendApprovedReply = func(context.Context, *SupportDraft, string) error { return nil }
+	t.Cleanup(func() { sendApprovedReply = original })
+
+	id := seedDraft(t, "960001", "bug", dispositionAutoAsk, false)
+	sendDraftNow(ctx, id, "asked")
+
+	d, err := loadSupportDraft(ctx, id)
+	if err != nil || d == nil {
+		t.Fatal(err)
+	}
+	if d.SentAt == nil {
+		t.Error("sent_at is null after an unattended ask; the question did reach the user")
+	}
+	if d.Status != "asked" {
+		t.Errorf("status = %q, want asked: an ask must not be counted as a plain send", d.Status)
+	}
+}
+
+// A failed send records nothing: sent_at is the claim that a user was
+// answered, and it has to stay false when nobody was.
+func TestFailedSendLeavesSentAtNull(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	resetCases(t)
+	t.Setenv("SUPPORT_AUTOSEND", "on")
+	ctx := context.Background()
+
+	original := sendApprovedReply
+	sendApprovedReply = func(context.Context, *SupportDraft, string) error {
+		return errors.New("osticket said no")
+	}
+	t.Cleanup(func() { sendApprovedReply = original })
+
+	id := seedDraft(t, "960002", "bug", dispositionAutoSend, false)
+	sendDraftNow(ctx, id, "approved")
+
+	d, _ := loadSupportDraft(ctx, id)
+	if d.SentAt != nil {
+		t.Errorf("sent_at = %v after a failed send", d.SentAt)
+	}
+	if d.Status != "failed" {
+		t.Errorf("status = %q, want failed: the digest counts 'approved' as a reply that went out", d.Status)
+	}
+}
+
+// The backfill reads the shipped migration rather than a copy of it, so the
+// statement under test is the one that runs against production.
+func TestBackfillOnlyTouchesDraftsThatWereSent(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	resetCases(t)
+	ctx := context.Background()
+
+	sql, err := os.ReadFile(filepath.Join("..", "..", "migrations", "000015_support_draft_sent_at.up.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// One draft that went out, one that never did.
+	sentID := seedDraft(t, "960003", "bug", dispositionAutoSend, false)
+	neverID := seedDraft(t, "960004", "bug", dispositionAutoSend, false)
+	testsupport.MustExec(t, `UPDATE support_drafts SET status = 'approved' WHERE id = ANY($1)`,
+		[]int64{sentID, neverID})
+	wentOut := time.Date(2026, 9, 8, 22, 21, 0, 0, time.UTC)
+	if err := recordSupportMessage(ctx, SupportMessage{
+		TicketNumber: "960003", Kind: "sent", BodyHTML: "<p>the reply</p>",
+		AIDraftID: sentID, CreatedAt: wentOut,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	testsupport.MustExec(t, string(sql))
+
+	sent, _ := loadSupportDraft(ctx, sentID)
+	if sent.SentAt == nil || !sent.SentAt.Equal(wentOut) {
+		t.Errorf("sent_at = %v, want the sent message's own timestamp %v", sent.SentAt, wentOut)
+	}
+	if sent.Status != "sent" {
+		t.Errorf("status = %q, want sent", sent.Status)
+	}
+
+	never, _ := loadSupportDraft(ctx, neverID)
+	if never.SentAt != nil {
+		t.Errorf("invented sent_at %v for a draft with no sent message", never.SentAt)
+	}
+	if never.Status != "approved" {
+		t.Errorf("status = %q, want approved: nothing went out, so nothing changed", never.Status)
+	}
+
+	// Idempotent: a second run must not move a timestamp it already wrote.
+	testsupport.MustExec(t, string(sql))
+	again, _ := loadSupportDraft(ctx, sentID)
+	if !again.SentAt.Equal(wentOut) {
+		t.Errorf("second run moved sent_at to %v", again.SentAt)
 	}
 }
