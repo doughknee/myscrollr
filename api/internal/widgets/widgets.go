@@ -118,6 +118,7 @@ func GetWidgets(c *fiber.Ctx) error {
 func CreateWidget(c *fiber.Ctx) error {
 	userID := platform.GetUserID(c)
 	if userID == "" {
+		log.Printf("[Widgets] create rejected: no user on request")
 		return c.Status(fiber.StatusUnauthorized).JSON(platform.ErrorResponse{
 			Status: "unauthorized",
 			Error:  "Authentication required",
@@ -135,6 +136,7 @@ func CreateWidget(c *fiber.Ctx) error {
 		LocalWidgets int `json:"local_widgets"`
 	}
 	if err := c.BodyParser(&req); err != nil {
+		log.Printf("[Widgets] create body parse failed for %s: %v", userID, err)
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
 			Status: "error",
 			Error:  "Invalid request body",
@@ -152,6 +154,7 @@ func CreateWidget(c *fiber.Ctx) error {
 	// so coarse types ("sports") kept working during the widget/slot
 	// transition; that transition is over and those types no longer exist.
 	if !platform.IsKnownWidgetType(req.WidgetType) {
+		log.Printf("[Widgets] create rejected for %s: unknown widget type %q", userID, req.WidgetType)
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
 			Status: "error",
 			Error:  "Unknown widget type",
@@ -162,6 +165,7 @@ func CreateWidget(c *fiber.Ctx) error {
 	// double-count against the slot cap (once here, once via
 	// local_widgets), so reject it outright.
 	if platform.IsUtilityWidgetType(req.WidgetType) {
+		log.Printf("[Widgets] create rejected for %s: %s is a local utility widget", userID, req.WidgetType)
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
 			Status: "error",
 			Error:  "Utility widgets are stored locally, not as server-side widgets",
@@ -230,6 +234,7 @@ func CreateWidget(c *fiber.Ctx) error {
 	)
 	if err != nil {
 		if strings.Contains(err.Error(), "unique") || strings.Contains(err.Error(), "duplicate") {
+			log.Printf("[Widgets] create conflict for %s: %s already added", userID, req.WidgetType)
 			return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{
 				Status: "error",
 				Error:  "That widget is already added",
@@ -269,6 +274,11 @@ func CreateWidget(c *fiber.Ctx) error {
 func UpdateWidget(c *fiber.Ctx) error {
 	userID := platform.GetUserID(c)
 	if userID == "" {
+		// Every early return below logs. Before REL-238 none of them did,
+		// and a desktop stuck on an expired token produced a per-action
+		// toast on the client and total silence in both replicas — hours
+		// of narrowing to find a 401 nobody had recorded.
+		log.Printf("[Widgets] update rejected: no user on request for %q", c.Params("type"))
 		return c.Status(fiber.StatusUnauthorized).JSON(platform.ErrorResponse{
 			Status: "unauthorized",
 			Error:  "Authentication required",
@@ -278,6 +288,7 @@ func UpdateWidget(c *fiber.Ctx) error {
 	widgetType := c.Params("type")
 	// Catalog-only, same as CreateWidget — see the note there.
 	if !platform.IsKnownWidgetType(widgetType) {
+		log.Printf("[Widgets] update rejected for %s: unknown widget type %q", userID, widgetType)
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
 			Status: "error",
 			Error:  "Unknown widget type",
@@ -294,6 +305,7 @@ func UpdateWidget(c *fiber.Ctx) error {
 		LocalWidgets int `json:"local_widgets"`
 	}
 	if err := c.BodyParser(&req); err != nil {
+		log.Printf("[Widgets] update body parse failed for %s on %s: %v", userID, widgetType, err)
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
 			Status: "error",
 			Error:  "Invalid request body",
@@ -379,6 +391,7 @@ func UpdateWidget(c *fiber.Ctx) error {
 	if err != nil {
 		errStr := err.Error()
 		if strings.Contains(errStr, "no rows") {
+			log.Printf("[Widgets] update 404 for %s: no %s row", userID, widgetType)
 			return c.Status(fiber.StatusNotFound).JSON(platform.ErrorResponse{
 				Status: "error",
 				Error:  "Widget not found",
@@ -415,6 +428,7 @@ func UpdateWidget(c *fiber.Ctx) error {
 func DeleteWidget(c *fiber.Ctx) error {
 	userID := platform.GetUserID(c)
 	if userID == "" {
+		log.Printf("[Widgets] delete rejected: no user on request for %q", c.Params("type"))
 		return c.Status(fiber.StatusUnauthorized).JSON(platform.ErrorResponse{
 			Status: "unauthorized",
 			Error:  "Authentication required",
@@ -441,6 +455,7 @@ func DeleteWidget(c *fiber.Ctx) error {
 	}
 
 	if tag.RowsAffected() == 0 {
+		log.Printf("[Widgets] delete 404 for %s: no %s row", userID, widgetType)
 		return c.Status(fiber.StatusNotFound).JSON(platform.ErrorResponse{
 			Status: "error",
 			Error:  "Widget not found",

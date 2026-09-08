@@ -4,7 +4,7 @@
  * Manages authentication state, login/logout handlers, session expiry
  * tracking, and tier synchronization on dashboard load.
  */
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import {
   isAuthConfigured,
   getLastLoginError,
   getTier,
+  onSessionExpired,
 } from "../auth";
 import { queryKeys } from "../api/queries";
 import type { SubscriptionTier } from "../auth";
@@ -45,6 +46,23 @@ export function useAuthState(): UseAuthStateReturn {
   const authenticatedRef = useRef(authenticated);
   authenticatedRef.current = authenticated;
 
+  // A write that 401s and cannot be refreshed past clears auth deep
+  // inside authFetch, where no React state can see it. Without this
+  // subscription the banner only appeared if the dashboard query happened
+  // to re-run (syncAuthFromDashboard) — and it does not, because
+  // fetchDashboard swallows the same 401 and serves the public feed. So
+  // the app looked signed in, every write failed with its own toast, and
+  // reinstalling was the only way back (REL-238).
+  useEffect(
+    () =>
+      onSessionExpired(() => {
+        setAuthenticated(false);
+        setTier("free");
+        setSessionExpired(true);
+      }),
+    [],
+  );
+
   const handleLogin = useCallback(async () => {
     if (!isAuthConfigured()) {
       toast.error("Desktop auth is not configured for this build");
@@ -72,7 +90,11 @@ export function useAuthState(): UseAuthStateReturn {
 
   const handleLogout = useCallback(async () => {
     await invoke("stop_sse").catch(() => {});
-    authLogout();
+    // Await it: clearAuth persists the removal, and an unawaited
+    // rejection here would leave scrollr:auth on disk after a "sign out".
+    await authLogout().catch((err) =>
+      console.error("[Scrollr] Sign-out failed to clear stored auth:", err),
+    );
     setAuthenticated(false);
     setTier("free");
     setSessionExpired(false);

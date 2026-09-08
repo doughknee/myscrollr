@@ -7,7 +7,7 @@
  *   - `authFetch<T>()` — automatically attaches Bearer token via getValidToken()
  */
 import { fetch } from "@tauri-apps/plugin-http";
-import { getValidToken } from "../auth";
+import { getValidToken, isSignedOut, notifySessionExpired } from "../auth";
 import type { Widget, HealthResponse } from "../types/api.generated";
 
 // ── Constants ────────────────────────────────────────────────────
@@ -167,16 +167,35 @@ export async function authFetch<T>(
     headers,
   });
 
-  // 401 retry: force a token refresh and retry the request once
-  if (response.status === 401 && token) {
-    const newToken = await getValidToken(true);
-    if (newToken && newToken !== token) {
+  // 401: force a token refresh and retry the request once.
+  //
+  // Two REL-238 bugs lived here. The retry used to require a token
+  // DIFFERENT from the one that just failed, so a refresh handing back
+  // the same string — which `doRefresh` does on both of its race
+  // short-circuits — fell straight through to the throw. And when no
+  // token could be had at all, the 401 surfaced as whatever the caller
+  // called the action ("Couldn't hide Crypto") while nothing told the
+  // user their session was over: `fetchDashboard` swallows its own 401
+  // and falls back to /public/feed, so reads kept the app looking
+  // healthy and only writes failed.
+  //
+  // Now: retry on ANY token we manage to obtain, and if we end up with
+  // no stored auth at all, say so once so the sign-in banner appears.
+  if (response.status === 401) {
+    const newToken = token ? await getValidToken(true) : null;
+    if (newToken) {
       const retryResponse = await fetchWithTimeout(`${API_BASE}${path}`, {
         ...options,
         headers: { ...options.headers, Authorization: `Bearer ${newToken}` },
       });
+      if (retryResponse.status === 401 && isSignedOut()) notifySessionExpired();
       return handleResponse<T>(retryResponse);
     }
+    // No token. `isSignedOut()` separates "the refresh was refused and
+    // clearAuth() ran" from "the refresh call failed on the network" —
+    // the latter keeps the refresh token and the proactive timer retries
+    // every 30s, so it is not a session to declare dead.
+    if (isSignedOut()) notifySessionExpired();
   }
 
   return handleResponse<T>(response);
