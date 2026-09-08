@@ -30,8 +30,12 @@ import {
   resetAll,
   savePrefs,
   migrateUnits,
+  togglePin,
+  isPinned,
+  pinCount,
+  MAX_PINS,
 } from "./preferences";
-import type { AppPreferences, WidgetPrefs } from "./preferences";
+import type { AppPreferences, WidgetPrefs, WidgetPin } from "./preferences";
 
 const storeValues = vi.hoisted(() => new Map<string, unknown>());
 
@@ -885,5 +889,162 @@ describe("ticker values renamed to match their labels (REL-207)", () => {
     loadPrefs();
     expect(storeValues.has("scrollr:widget:weather:unit")).toBe(false);
     expect(storeValues.has("scrollr:widget:clock:format")).toBe(false);
+  });
+});
+
+// ── REL-239: a pin follows a subject, not a widget ────────────────
+
+describe("pin migration (pinnedWidgets → pins)", () => {
+  it("carries a pinned single-chip utility over unchanged", () => {
+    const prefs = mergeWidgetPrefs({
+      pinnedWidgets: { clock: { side: "left" }, weather: { side: "right" } },
+    } as unknown as Partial<WidgetPrefs>);
+
+    // A utility renders one chip, so its old widget pin already WAS a pin
+    // on a subject. The user must not be able to tell the model changed.
+    expect(prefs.pins).toEqual([
+      { widget: "clock", subject: "clock", side: "left" },
+      { widget: "weather", subject: "weather", side: "right" },
+    ]);
+  });
+
+  it("drops a pin on a multi-item widget", () => {
+    const prefs = mergeWidgetPrefs({
+      pinnedWidgets: {
+        clock: { side: "right" },
+        sports_mlb: { side: "right" },
+        finance_stocks: { side: "left" },
+        uptime: { side: "right" },
+        github: { side: "right" },
+      },
+    } as unknown as Partial<WidgetPrefs>);
+
+    // Those pins meant "park this widget's first N chips", which froze
+    // its rotation. There is no subject in them to translate to.
+    expect(prefs.pins).toEqual([
+      { widget: "clock", subject: "clock", side: "right" },
+    ]);
+  });
+
+  it("keeps an already-migrated pins array", () => {
+    const prefs = mergeWidgetPrefs({
+      pins: [
+        { widget: "sports_mlb", subject: "New York Yankees", side: "left" },
+        { widget: "finance_stocks", subject: "AAPL", side: "right", row: 1 },
+      ],
+    } as unknown as Partial<WidgetPrefs>);
+
+    expect(prefs.pins).toEqual([
+      { widget: "sports_mlb", subject: "New York Yankees", side: "left" },
+      { widget: "finance_stocks", subject: "AAPL", side: "right", row: 1 },
+    ]);
+  });
+
+  it("discards malformed entries and defaults a bad side", () => {
+    const prefs = mergeWidgetPrefs({
+      pins: [
+        null,
+        "clock",
+        { widget: "clock" },
+        { subject: "AAPL" },
+        // An empty subject names nothing — shed it on load, so a pin
+        // already written by an earlier build stops holding a slot.
+        { widget: "sports_mlb", subject: "", side: "right" },
+        { widget: "", subject: "AAPL", side: "right" },
+        { widget: "finance_stocks", subject: "AAPL", side: "sideways" },
+      ],
+    } as unknown as Partial<WidgetPrefs>);
+
+    expect(prefs.pins).toEqual([
+      { widget: "finance_stocks", subject: "AAPL", side: "right" },
+    ]);
+  });
+
+  it("returns no pins when nothing was stored", () => {
+    expect(mergeWidgetPrefs({}).pins).toEqual([]);
+    expect(
+      mergeWidgetPrefs({ pinnedWidgets: [] } as unknown as Partial<WidgetPrefs>).pins,
+    ).toEqual([]);
+  });
+});
+
+describe("togglePin", () => {
+  const base = (pins: WidgetPin[]): AppPreferences =>
+    ({ widgets: { ...mergeWidgetPrefs({}), pins } }) as AppPreferences;
+
+  it("adds and removes one subject", () => {
+    const pin = { widget: "finance_stocks", subject: "AAPL", side: "right" } as const;
+    const added = togglePin(base([]), pin);
+    expect(added.widgets.pins).toEqual([pin]);
+    expect(togglePin(added, pin).widgets.pins).toEqual([]);
+  });
+
+  it("refuses a pin past the cap instead of evicting one", () => {
+    const full = base(
+      Array.from({ length: MAX_PINS }, (_, i) => ({
+        widget: "finance_stocks",
+        subject: `SYM${i}`,
+        side: "right" as const,
+      })),
+    );
+    const after = togglePin(full, {
+      widget: "finance_stocks",
+      subject: "ONE-MORE",
+      side: "right",
+    });
+
+    // Same reference back: nothing was written, and nothing the user
+    // parked there was quietly dropped to make room.
+    expect(after).toBe(full);
+    expect(after.widgets.pins).toHaveLength(MAX_PINS);
+  });
+
+  it("counts the cap across both sides, not per side", () => {
+    // The two zones sit at opposite ends of ONE bar and take their width
+    // out of the same tape, so a left-side pin is not free.
+    const full = base(
+      Array.from({ length: MAX_PINS }, (_, i) => ({
+        widget: "finance_stocks",
+        subject: `SYM${i}`,
+        side: "right" as const,
+      })),
+    );
+    expect(pinCount(full)).toBe(MAX_PINS);
+    const after = togglePin(full, {
+      widget: "finance_stocks",
+      subject: "LEFTY",
+      side: "left",
+    });
+    expect(after).toBe(full);
+  });
+
+  it("unpins even when the side is full", () => {
+    const pins = Array.from({ length: MAX_PINS }, (_, i) => ({
+      widget: "finance_stocks",
+      subject: `SYM${i}`,
+      side: "right" as const,
+    }));
+    const after = togglePin(base(pins), pins[0]);
+    expect(after.widgets.pins).toHaveLength(MAX_PINS - 1);
+  });
+
+  it("refuses a pin with no subject", () => {
+    // Found on the running app: an MLB standings row with an empty
+    // `team_name` produced {subject: ""}, a pin holding a slot in a
+    // capped zone that could never resolve to a chip. Guarded in
+    // togglePin because every write routes through it.
+    const prefs = base([]);
+    expect(togglePin(prefs, { widget: "sports_mlb", subject: "", side: "right" })).toBe(prefs);
+    expect(togglePin(prefs, { widget: "", subject: "AAPL", side: "right" })).toBe(prefs);
+  });
+
+  it("reports whether a subject is pinned", () => {
+    const prefs = base([
+      { widget: "sports_mlb", subject: "New York Yankees", side: "right" },
+    ]);
+    expect(isPinned(prefs, "sports_mlb", "New York Yankees")).toBe(true);
+    expect(isPinned(prefs, "sports_mlb", "Boston Red Sox")).toBe(false);
+    // Same subject name under a different widget is a different pin.
+    expect(isPinned(prefs, "sports_nfl", "New York Yankees")).toBe(false);
   });
 });

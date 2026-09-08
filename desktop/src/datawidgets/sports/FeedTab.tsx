@@ -191,6 +191,7 @@ function SportsFeedTab({ mode, feedContext, widgetId }: FeedTabProps) {
               <StandingsTab
                 leagues={leagues}
                 favoriteTeams={favoriteTeamNames}
+                widgetId={widgetId}
               />
             )}
           </>

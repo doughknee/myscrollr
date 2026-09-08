@@ -84,3 +84,8 @@ ui-review-out/
 # Per-machine compose tweaks (host port remaps when something else already
 # owns 5432/6379, extra mounts, etc). Local to whoever wrote it.
 docker/compose.override.yml
+
+# Vite optimize-deps cache. Written when the dev server runs out of
+# desktop/ (npm run dev / a bare `vite`); tauri dev puts it elsewhere,
+# which is why it took until REL-239 for one to be committed by accident.
+desktop/.vite/

@@ -158,7 +158,7 @@ function formatDelta(delta: number): string {
 
 // ── FeedTab ──────────────────────────────────────────────────────
 
-function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
+function PredictionsFeedTab({ mode: callerMode, feedContext, widgetId }: FeedTabProps) {
   const { prefs, onPrefsChange } = useShell();
   const dp = prefs.widgetDisplay.predictions;
 
@@ -835,6 +835,7 @@ function PredictionsFeedTab({ mode: callerMode, feedContext }: FeedTabProps) {
             now={now}
             watched={watchedSet.has(liveDetail.ticker)}
             onToggleWatch={() => toggleWatch(liveDetail.ticker)}
+            pinWidget={widgetId}
             alerts={alerts}
             onAddAlert={addAlertCb}
             onRemoveAlert={removeAlertCb}

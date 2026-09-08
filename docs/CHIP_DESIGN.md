@@ -108,8 +108,11 @@ system metrics matter to you, which monitors and repos to watch. These are *what
 care about*, and they're yours everywhere.
 
 **You control how the bar looks and moves.** Compact or detailed. Speed, direction, gap,
-whether it pauses on hover. Continuous, step or flip. Grouped or woven. Colour mode. Pin a
-widget so it never scrolls. Where the bar sits.
+whether it pauses on hover. Continuous, step or flip. Grouped or woven. Colour mode.
+Where the bar sits.
+
+**You can pin two things.** See below — a pin is its own thing, and it's the one control
+that's a bit of both.
 
 **You don't control selection.** How many of a widget's things are on the bar at once,
 which of them, in what order, how far back or ahead it looks, or how the rotation runs.
@@ -139,10 +142,56 @@ it. Nothing on the ticker can be misconfigured because nothing on it is configur
 6. **A chip only swaps its content while it's off screen.** Never under your eyes.
 7. **The bar doesn't care how you sorted the list.** Sorting and filtering are for reading
    the widget page; they don't rearrange the ticker.
+8. **Two things can sit still at the end of the bar** — see "Pinning", next.
 
 The honest cost: a short name sharing a place with a long one carries the long one's
 width, and a full slate takes a few laps to see. Fifty college games through four places
 is about thirteen laps.
+
+## Pinning
+
+A pin parks something at the end of the bar so it never scrolls away. It's the one thing
+on the ticker you get to decide the position of, and it works like this:
+
+**You pin a thing, not a widget.** A team. A symbol. A feed. A market. A monitor. Your
+clock. Never "the MLB widget" — that used to be the only thing a pin could mean, and it
+had a nasty side effect: parking a widget froze its rotation, so the ninth monitor or the
+twentieth symbol could never come round. Pin the Yankees and you get the Yankees.
+
+For a clock or the weather this looks exactly like it always did, because there's only
+ever one clock chip. That's the point: it reads as "you can pin anything", without a
+busy widget ever eating the bar.
+
+**A pinned thing shows whatever it's doing now.** Pin a team and the same spot carries
+tonight's live game, then the final, then Sunday's fixture — in place, without you
+touching it.
+
+**A pin ignores the time window.** The bar normally only shows a game starting within a
+day. A pin is you overriding that for one thing, so a pinned team's next fixture shows
+even if it's nine days out.
+
+**Nothing to show shows nothing.** A team between seasons leaves an empty space, not a
+placeholder. The chip comes back when the team does.
+
+**A pinned thing isn't also on the tape.** It's in one place, not two.
+
+**Two, and then it says no.** The bar is 1280 pixels wide on the narrowest screen we
+support and a chip can be 640 of them, so two is what fits with a tape still left over.
+Pin a third and it tells you the bar is full rather than quietly dropping one of yours.
+
+**Pinning is not starring.** A star, a favourite, a watchlist entry all mean "always on
+the tape, never rotated out". A pin means "out of the tape, parked at the end". They're
+different jobs and they stack: pin your favourite team and the rest of your favourites
+carry on scrolling.
+
+**You pin by right-clicking the bar** — on the chip itself, so the menu can say "Pin
+Yankees" and mean it. Also from a widget's own page, next to the thing, and from the
+sidebar for the one-chip widgets. There's no icon on the chip any more; a control that
+small, on something that's moving, was never going to work.
+
+**Nothing gets pinned for you.** Adding a widget used to park it at the end of the bar
+automatically, which spent your pinned space on whatever you added last. Now adding a
+widget just tells you it was added.
 
 ## Keep it honest
 
@@ -164,7 +213,9 @@ Two different layouts for the two densities. Every chip the same width. Dots and
 decoration. A dash where a score should be blank. A shared red for close games. The
 weather range squeezed into the compact row. Monitors packed into one chip as cells. A
 per-widget "how many on the bar" control. Naming a time zone twice. Dropping items instead
-of rotating them.
+of rotating them. Pinning a whole widget. A pin icon on the chip. Auto-pinning what you
+just added. Merging pins with stars and favourites. A pinned zone that rotates. Evicting
+someone's pin to make room for a new one.
 
 ## Still to do
 

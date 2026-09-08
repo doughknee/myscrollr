@@ -6,12 +6,15 @@ import { ChevronDown } from "lucide-react";
 import TeamLogo from "../../components/TeamLogo";
 import QueryErrorBanner from "../../components/QueryErrorBanner";
 import { SelectMenu } from "../../components/widget-bar/SelectMenu";
+import PinSubjectButton from "../../components/PinSubjectButton";
 import { standingsOptions } from "../../api/queries";
 import type { Standing } from "../../api/queries";
 
 interface StandingsTabProps {
   leagues: string[];
   favoriteTeams: Set<string>;
+  /** Widget id, so a standings row can pin its team to the ticker. */
+  widgetId?: string;
 }
 
 type SportType = "soccer" | "nfl" | "nba" | "nhl" | "mlb" | "other";
@@ -118,17 +121,21 @@ function GroupHeader({
   name,
   isCollapsed,
   onToggle,
+  span,
 }: {
   name: string;
   isCollapsed: boolean;
   onToggle: () => void;
+  /** Column count, so the header still spans the table after the pin
+   *  column was added (REL-239). Was a hardcoded 9. */
+  span: number;
 }) {
   return (
     <tr
       className="bg-surface-hover cursor-pointer select-none hover:bg-surface-hover/80 "
       onClick={onToggle}
     >
-      <td colSpan={9} className="px-3 py-1.5 text-xs font-semibold text-fg-2">
+      <td colSpan={span} className="px-3 py-1.5 text-xs font-semibold text-fg-2">
         <div className="flex items-center gap-1.5">
           <ChevronDown
             size={14}
@@ -153,7 +160,7 @@ function getZoneColor(description?: string): string | null {
   return null;
 }
 
-export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
+export function StandingsTab({ leagues, favoriteTeams, widgetId }: StandingsTabProps) {
   const reduceMotion = useReducedMotion();
   const [selected, setSelected] = useState(leagues[0] ?? "");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -289,6 +296,10 @@ export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
                     {col.label}
                   </th>
                 ))}
+                {/* Header for the pin column. No label: the icon in each
+                    row says what it is, and a word here would widen a
+                    table that is already fighting for horizontal room. */}
+                <th className="w-8 px-1 py-2" aria-label="Pin to ticker" />
               </tr>
             </thead>
             <tbody>
@@ -301,6 +312,7 @@ export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
                         name={group.groupName}
                         isCollapsed={collapsed.has(group.groupName)}
                         onToggle={() => toggleGroup(group.groupName)}
+                        span={columns.length + 1}
                       />
                     )}
                     {!collapsed.has(group.groupName) &&
@@ -336,6 +348,19 @@ export function StandingsTab({ leagues, favoriteTeams }: StandingsTabProps) {
                                 {col.getValue(s)}
                               </td>
                             ))}
+                            {/* One row is one team, which is exactly one
+                                pinnable subject -- the only sports surface
+                                where that is true without asking which of
+                                two teams was meant (REL-239). */}
+                            <td className="w-8 px-1 py-1.5 text-right">
+                              {widgetId && (
+                                <PinSubjectButton
+                                  widget={widgetId}
+                                  subject={s.team_name}
+                                  label={s.team_name}
+                                />
+                              )}
+                            </td>
                           </tr>
                         );
                       })}

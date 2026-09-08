@@ -6,8 +6,7 @@
  *   - DATA widget → POST /users/me/widgets (with the widget's addConfig),
  *     optimistically inserted into the dashboard cache so the Sidebar +
  *     "Added" badge flip on the next paint, then reconciled with the server.
- *   - UTILITY widget → written into preferences (enabled + on-ticker +
- *     auto-pinned to the static zone).
+ *   - UTILITY widget → written into preferences (enabled + on-ticker).
  * Both then navigate to the new widget's feed.
  *
  * Extracted from catalog.tsx (2026-07-01) when the Info page grew its own
@@ -19,7 +18,6 @@ import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { defaultPinForNewWidget } from "../preferences";
 import type { CatalogItem } from "../marketplace";
 import { dataWidgetsApi } from "../api/client";
 import type { DataWidgetRow, WidgetId } from "../api/client";
@@ -92,7 +90,7 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
           to: "/widget/$id",
           params: { id: item.id },
         });
-        toast.success(`${item.name} added`);
+        toast.success(`${item.name} added to the ticker`);
 
         // Fire the network call without blocking the UI. On success
         // we reconcile the optimistic row with the server response.
@@ -148,25 +146,21 @@ export function useAddWidget(): (item: CatalogItem) => Promise<void> {
       } else {
         const nextEnabled = [...prefs.widgets.enabledWidgets, item.id];
         const nextOnTicker = [...prefs.widgets.widgetsOnTicker, item.id];
-        // Auto-pin newly added widgets to the right side so they land
-        // in the static pinned zone instead of disappearing into the
-        // scrolling tape. Preserve any existing pin config (re-adding
-        // a previously-removed widget honors the user's last choice).
-        // Walkthrough fix 2026-05-11 — see preferences.ts:defaultPinForNewWidget.
-        const nextPinned = { ...prefs.widgets.pinnedWidgets };
-        if (!nextPinned[item.id]) {
-          nextPinned[item.id] = defaultPinForNewWidget();
-        }
+        // No auto-pin (REL-239). Every new widget used to be pinned to the
+        // right so the user saw SOMETHING happen -- which quietly spent the
+        // fixed zone on whatever was added last, and for a multi-item widget
+        // froze its rotation on the first few items. The cue the walkthrough
+        // fix was really after is the toast below: it names what was added
+        // and where it went, without deciding the shape of the bar.
         onPrefsChange({
           ...prefs,
           widgets: {
             ...prefs.widgets,
             enabledWidgets: nextEnabled,
             widgetsOnTicker: nextOnTicker,
-            pinnedWidgets: nextPinned,
           },
         });
-        toast.success(`${item.name} added`);
+        toast.success(`${item.name} added to the ticker`);
         navigate({ to: "/widget/$id", params: { id: item.id } });
       }
     },

@@ -12,6 +12,8 @@ import { onStoreChange, setStore } from "./lib/store";
 import ScrollrTicker from "./components/ScrollrTicker";
 import { useToggleOnTicker } from "./hooks/useToggleOnTicker";
 import { isOnTicker } from "./utils/tickerMembership";
+import { pinTargetAt } from "./utils/pinTarget";
+import type { PinTarget } from "./utils/pinTarget";
 import {
   getValidToken,
   isAuthenticated as checkAuth,
@@ -28,7 +30,10 @@ import {
   loadPrefs,
   savePrefs,
   TICKER_HEIGHTS,
-  toggleWidgetPin,
+  togglePin,
+  isPinned,
+  pinCount,
+  MAX_PINS,
   } from "./preferences";
 import type { SubscriptionTier } from "./auth";
 import type { DeliveryMode } from "./types";
@@ -506,16 +511,22 @@ export default function App() {
 
   // ── Widget pin toggle (hover icon on consolidated chip) ─────────
 
-  const handleTogglePin = useCallback(
-    (widgetId: string) => {
-      setPrefs((prev) => {
-        const updated = toggleWidgetPin(prev, widgetId);
-        savePrefs(updated);
-        return updated;
-      });
-    },
-    [],
-  );
+  /**
+   * Pin or unpin one subject, from the ticker's own right-click menu.
+   *
+   * Refuses rather than evicts when the side is full (REL-239): `togglePin`
+   * hands back the same object, so nothing is written and nothing moves.
+   * The menu item is already disabled in that case; this is the guard for
+   * the path that does not go through the menu.
+   */
+  const handleTogglePin = useCallback((pin: PinTarget) => {
+    setPrefs((prev) => {
+      const updated = togglePin(prev, { ...pin, side: "right" });
+      if (updated === prev) return prev;
+      savePrefs(updated);
+      return updated;
+    });
+  }, []);
 
   // ── Ticker position toggle ─────────────────────────────────────
 
@@ -576,6 +587,37 @@ export default function App() {
 
       const items: (Submenu | CheckMenuItem | MenuItem | PredefinedMenuItem)[] = [];
       const chs = widgetsRef.current;
+
+      // ── Pin the subject under the cursor ─────────────────────────
+      //
+      // This is where the pin control lives now (REL-239). It used to be
+      // a hover icon on the chip itself, which meant a control on a
+      // moving target on a bar you are meant to glance at -- and it
+      // could only ever say "pin this WIDGET", because a hover icon has
+      // no room to say which of the widget's items you meant.
+      //
+      // The chip under the cursor carries its subject on the wrapper, so
+      // the menu can name the actual thing: "Pin Yankees", not "Pin MLB".
+      const target = pinTargetAt(e.target);
+      if (target) {
+        const pinned = isPinned(prefsRef.current, target.widget, target.subject);
+        const full =
+          !pinned && pinCount(prefsRef.current) >= MAX_PINS;
+        items.push(
+          await MenuItem.new({
+            // Refuse, never evict: a full zone says so instead of
+            // silently dropping something the user parked there.
+            text: pinned
+              ? `Unpin ${target.label}`
+              : full
+                ? `Pin ${target.label} — bar is full`
+                : `Pin ${target.label}`,
+            enabled: !full,
+            action: () => handleTogglePin(target),
+          }),
+        );
+        items.push(await PredefinedMenuItem.new({ item: "Separator" }));
+      }
 
       // Open Scrollr — most common action, top of menu
       items.push(
@@ -726,7 +768,7 @@ export default function App() {
     }
     document.addEventListener("contextmenu", onContextMenu);
     return () => document.removeEventListener("contextmenu", onContextMenu);
-  }, [toggleOnTicker, handleTogglePosition, navigateMainWindow]);
+  }, [toggleOnTicker, handleTogglePosition, navigateMainWindow, handleTogglePin]);
 
   // ── Merge widget + widget tabs ──────────────────────────────
   const activeTabs = useMemo(
@@ -758,8 +800,7 @@ export default function App() {
             //                   itself; this just says "if you have
             //                   nothing, here's the recovery UI".
             //                   CTA -> per-widget chips.
-            const hasAnyPinnedWidget =
-              Object.keys(prefs.widgets.pinnedWidgets ?? {}).length > 0;
+            const hasAnyPinnedWidget = prefs.widgets.pins.length > 0;
             const showSourcelessCTA =
               authenticated && widgets.length === 0 && !hasAnyPinnedWidget;
             const showInstalledOffCTA =
@@ -772,8 +813,7 @@ export default function App() {
                 activeTabs={activeTabs}
                 widgetData={widgetData}
                 onChipClick={handleChipClick}
-                onTogglePin={handleTogglePin}
-                pinnedWidgets={prefs.widgets.pinnedWidgets}
+                pins={prefs.widgets.pins}
                 speed={prefs.ticker.tickerSpeed}
                 onHover={prefs.ticker.onHover}
                 mixMode={prefs.ticker.mixMode}

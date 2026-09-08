@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "motion/react";
+import PinSubjectButton from "../../components/PinSubjectButton";
 import Tooltip from "../../components/Tooltip";
 import EmptySection from "../../components/layout/EmptySection";
 import QueryErrorBanner from "../../components/QueryErrorBanner";
@@ -48,6 +49,8 @@ interface FeedManagerProps {
   onRetry: () => void;
   retrying: boolean;
   saving: boolean;
+  /** Widget id, so a subscribed feed row can pin the feed (REL-239). */
+  widgetId?: string;
 }
 
 type SortKey = "default" | "name" | "category" | "activity";
@@ -76,6 +79,7 @@ export default function FeedManager({
   onRetry,
   retrying,
   saving,
+  widgetId,
 }: FeedManagerProps) {
   const [search, setSearch] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
@@ -436,6 +440,7 @@ export default function FeedManager({
                 trackedSubscription={tracked}
                 saving={saving}
                 onToggle={() => toggleFeed(feed)}
+                pinWidget={feed.isTracked ? widgetId : undefined}
               />
             );
           })}
@@ -452,24 +457,36 @@ interface FeedRowProps {
   trackedSubscription: SubscribedFeed | undefined;
   saving: boolean;
   onToggle: () => void;
+  /** Set for a subscribed feed: enables the pin, whose subject is the
+   *  feed url -- the durable thing behind every headline it produces. */
+  pinWidget?: string;
 }
 
-function FeedRow({ feed, saving, onToggle }: FeedRowProps) {
+function FeedRow({ feed, saving, onToggle, pinWidget }: FeedRowProps) {
   const tracked = feed.isTracked;
   const health = feedHealth(feed);
 
+  // The row holds two independent actions now (subscribe, pin), so the
+  // row is a container and the subscribe target is a button inside it --
+  // a button inside a button is invalid and swallows the inner click.
   return (
-    <button
-      type="button"
+    <div
       role="listitem"
-      onClick={onToggle}
-      disabled={saving}
-      aria-label={tracked ? `Remove ${feed.name}` : `Add ${feed.name}`}
       className={clsx(
         "w-full flex items-center gap-2.5 px-3 py-2 text-left group",
         tracked
           ? "bg-accent/[0.04] hover:bg-accent/[0.08]"
-          : "hover:bg-base-200/50 cursor-pointer",
+          : "hover:bg-base-200/50",
+      )}
+    >
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={saving}
+      aria-label={tracked ? `Remove ${feed.name}` : `Add ${feed.name}`}
+      className={clsx(
+        "flex flex-1 min-w-0 items-center gap-2.5 text-left",
+        !tracked && "cursor-pointer",
         saving && "cursor-wait",
       )}
     >
@@ -533,6 +550,15 @@ function FeedRow({ feed, saving, onToggle }: FeedRowProps) {
         </Tooltip>
       )}
     </button>
+      {pinWidget && (
+        <PinSubjectButton
+          widget={pinWidget}
+          subject={feed.url}
+          label={feed.name}
+          className="shrink-0"
+        />
+      )}
+    </div>
   );
 }
 

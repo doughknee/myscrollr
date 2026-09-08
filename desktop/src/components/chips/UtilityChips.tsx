@@ -28,8 +28,6 @@
  * CappedChip.
  */
 import { clsx } from "clsx";
-import { Pin, PinOff } from "lucide-react";
-import Tooltip from "../Tooltip";
 import type { ChipColorMode } from "../../preferences";
 import { getChipColors, chipShellClasses } from "./chipColors";
 import { Sparkline } from "./Sparkline";
@@ -60,8 +58,6 @@ function UtilityShell({
   tab,
   comfort,
   colorMode = "widget",
-  pinned,
-  onTogglePin,
   onClick,
   cols,
   extra,
@@ -73,8 +69,6 @@ function UtilityShell({
   tab: string;
   comfort?: boolean;
   colorMode?: ChipColorMode;
-  pinned?: boolean;
-  onTogglePin?: () => void;
   onClick?: () => void;
   /** Grid template for the item cells, tab column excluded. */
   cols: string;
@@ -83,7 +77,6 @@ function UtilityShell({
   children: React.ReactNode;
 }) {
   const c = getChipColors(colorMode, type);
-  const PinIcon = pinned ? PinOff : Pin;
   return (
     <button
       onClick={onClick}
@@ -96,34 +89,6 @@ function UtilityShell({
         extra,
       )}
     >
-      {onTogglePin && (
-        <Tooltip content={pinned ? "Unpin widget" : "Pin widget"}>
-          <span
-            role="button"
-            tabIndex={0}
-            aria-label={pinned ? "Unpin widget" : "Pin widget"}
-            onClick={(e) => {
-              e.stopPropagation();
-              onTogglePin();
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.stopPropagation();
-                onTogglePin();
-              }
-            }}
-            className={clsx(
-              "absolute -right-1 -top-1 z-10 rounded-full border p-0.5 transition-opacity",
-              "border-edge/50 bg-surface",
-              pinned
-                ? "opacity-80"
-                : "opacity-0 focus:opacity-80 group-hover:opacity-80",
-            )}
-          >
-            <PinIcon size={10} className={c.textDim} />
-          </span>
-        </Tooltip>
-      )}
       {/* The tab: the widget's name, painted, spanning both rows. */}
       <span
         className={clsx(
@@ -212,8 +177,6 @@ interface ChipProps<T> {
   items: T[];
   comfort?: boolean;
   colorMode?: ChipColorMode;
-  pinned?: boolean;
-  onTogglePin?: () => void;
   onClick?: () => void;
 }
 
@@ -223,8 +186,6 @@ export function ClockChip({
   items,
   comfort,
   colorMode,
-  pinned,
-  onTogglePin,
   onClick,
 }: ChipProps<ClockChipData>) {
   const c = getChipColors(colorMode ?? "widget", "clock");
@@ -237,8 +198,6 @@ export function ClockChip({
       cols={colsFor(items.length)}
       comfort={comfort}
       colorMode={colorMode}
-      pinned={pinned}
-      onTogglePin={onTogglePin}
       onClick={onClick}
     >
       {items.map((item, i) => (
@@ -282,8 +241,6 @@ export function TimerChip({
   items,
   comfort,
   colorMode,
-  pinned,
-  onTogglePin,
   onClick,
 }: ChipProps<ClockChipData>) {
   const c = getChipColors(colorMode ?? "widget", "timer");
@@ -298,8 +255,6 @@ export function TimerChip({
       cols={colsFor(items.length)}
       comfort={comfort}
       colorMode={colorMode}
-      pinned={pinned}
-      onTogglePin={onTogglePin}
       onClick={onClick}
       // The last minute borrows the live palette — the same red the rest
       // of the app uses for "happening now".
@@ -363,8 +318,6 @@ export function WeatherChip({
   items,
   comfort,
   colorMode,
-  pinned,
-  onTogglePin,
   onClick,
 }: ChipProps<WeatherChipData>) {
   const c = getChipColors(colorMode ?? "widget", "weather");
@@ -378,8 +331,6 @@ export function WeatherChip({
       cols={colsFor(items.length)}
       comfort={comfort}
       colorMode={colorMode}
-      pinned={pinned}
-      onTogglePin={onTogglePin}
       onClick={onClick}
       extra={anyAlert ? "border-warning/45" : undefined}
     >
@@ -457,8 +408,6 @@ export function SysmonChip({
   items,
   comfort,
   colorMode,
-  pinned,
-  onTogglePin,
   onClick,
 }: ChipProps<SysmonChipData>) {
   const c = getChipColors(colorMode ?? "widget", "sysmon");
@@ -479,8 +428,6 @@ export function SysmonChip({
       cols={colsFor(items.length)}
       comfort={comfort}
       colorMode={colorMode}
-      pinned={pinned}
-      onTogglePin={onTogglePin}
       onClick={onClick}
       extra={anyHot ? "border-error/30" : undefined}
     >

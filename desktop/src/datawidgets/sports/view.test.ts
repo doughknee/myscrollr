@@ -466,3 +466,62 @@ describe("arrangeTickerSlots", () => {
     expect(out.map((s) => s.key)).toEqual(["p-1", "p-2", "p-3", "p-4"]);
   });
 });
+
+// ── REL-239: a pin bypasses the horizon ───────────────────────────
+
+import { gamesForTeam, widestShortName } from "./view";
+
+const DAY = 86_400_000;
+const HOUR = 3_600_000;
+
+describe("gamesForTeam", () => {
+  const yanks = (over: Partial<Game> & { id: number }): Game =>
+    ({ ...mk({ id: over.id }), ...over, home_team_name: "New York Yankees" });
+
+  it("shows the next fixture even when every horizon would hide it", () => {
+    // Nine days out: past TICKER_UPCOMING_HOURS (24h) and past the
+    // 7-day floor, so the rail would show nothing for this team. The
+    // pin is the user overriding exactly that.
+    const far = yanks({ id: 1, state: "pre", start_time: new Date(NOW.getTime() + 9 * DAY).toISOString() });
+    expect(selectSportsForTicker([far], {})).toEqual([]);
+    expect(gamesForTeam([far], "New York Yankees")[0]).toBe(far);
+  });
+
+  it("prefers live, then the soonest upcoming, then the newest final", () => {
+    const live = yanks({ ...liveGame(1), id: 1 });
+    const soon = yanks({ id: 2, state: "pre", start_time: new Date(NOW.getTime() + 2 * DAY).toISOString() });
+    const later = yanks({ id: 3, state: "pre", start_time: new Date(NOW.getTime() + 5 * DAY).toISOString() });
+    const oldFinal = yanks({ id: 4, state: "final", start_time: new Date(NOW.getTime() - 5 * DAY).toISOString() });
+    const newFinal = yanks({ id: 5, state: "final", start_time: new Date(NOW.getTime() - 30 * HOUR).toISOString() });
+
+    const order = gamesForTeam([oldFinal, later, newFinal, soon, live], "New York Yankees");
+    expect(order.map((g) => g.id)).toEqual([1, 2, 3, 5, 4]);
+  });
+
+  it("matches on either side of the fixture", () => {
+    const away = mk({ id: 6, away_team_name: "New York Yankees" });
+    expect(gamesForTeam([away], "New York Yankees")).toEqual([away]);
+  });
+
+  it("returns nothing for a team the widget holds no games for", () => {
+    // The fixed zone then renders nothing, rather than a placeholder.
+    expect(gamesForTeam([mk({ id: 7 })], "New York Yankees")).toEqual([]);
+  });
+});
+
+describe("widestShortName", () => {
+  it("reserves what the chip actually renders, post-shortening", () => {
+    const games = [
+      mk({ id: 1, league: "MLB", home_team_name: "New York Yankees" }),
+      mk({ id: 2, league: "MLB", home_team_name: "Philadelphia Phillies" }),
+    ];
+    // The LONGER raw name is not the widest: 21 chars is over
+    // SHORT_NAME_BUDGET, so the chip renders "Phillies" (8). Measuring
+    // before shortening would reserve 13 characters the chip never uses.
+    expect(widestShortName(games, (g) => g.home_team_name)).toBe("New York Yankees");
+  });
+
+  it("is the empty string for an empty class", () => {
+    expect(widestShortName([], (g) => g.home_team_name)).toBe("");
+  });
+});

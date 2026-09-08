@@ -590,6 +590,7 @@ function RssFeedsPanel({
         }}
         retrying={catalogFetching || catalogAllFetching}
         saving={saving}
+        widgetId={widgetType}
       />
     </div>
   );

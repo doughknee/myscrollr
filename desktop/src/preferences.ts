@@ -273,8 +273,80 @@ export interface GitHubWidgetConfig {
   repos: Array<{ owner: string; repo: string }>;
 }
 
-export interface WidgetPinConfig {
+/**
+ * One pin on the ticker's fixed zone.
+ *
+ * A pin attaches to a durable SUBJECT -- a team, a symbol, a feed, a
+ * market, a monitor, or a single-chip utility -- never to a widget.
+ * The fixed zone shows that subject's current chip, and shows nothing
+ * when the subject has nothing to show. Pinning a whole multi-item
+ * widget (what `pinnedWidgets` did until REL-239) froze that widget's
+ * rotation on its first N items, which is the opposite of what a pin
+ * on a glanceable bar should mean.
+ *
+ * `subject` is the source's own durable id for the thing:
+ *   sports      -> team name           ("New York Yankees")
+ *   finance     -> symbol              ("AAPL")
+ *   rss         -> feed url
+ *   predictions -> market id
+ *   uptime      -> monitor id          github -> repo id
+ *   clock / timer / weather / sysmon -> the widget id itself (one chip)
+ */
+export interface WidgetPin {
+  /** Widget id that owns the subject (sports_mlb, finance_stocks, clock…). */
+  widget: string;
+  /** The durable thing the pin follows. */
+  subject: string;
   side: PinSide;
+  /** Reserved for a multi-row bar. Unused today; carried so a stored
+   *  value survives a round-trip rather than being silently dropped. */
+  row?: number;
+}
+
+/**
+ * How many subjects the fixed zone will hold.
+ *
+ * MEASURED, not guessed (CHIP_SPEC §10.2). Real chip widths, fonts
+ * loaded, from the §10.3 harness:
+ *
+ *   clock 1 zone / timer   221      rss feed (long headline)  527
+ *   weather 1 city         239      game (MLB)                541
+ *   symbol / market /               clock 3 zones             554
+ *     monitor / repo       264      weather 3 cities          583
+ *                                   game (worst NCAA names)   605
+ *                                   sysmon 4 metrics          614
+ *                                   any content-sized chip
+ *                                     at CHIP_MAX_PX          640
+ *
+ * Narrowest bar the app runs on: 1280 logical px (a 4K panel at 300%
+ * scaling; also a 1280x800 laptop). The zone's own chrome is 17px
+ * (px-2 + the divider) and chips sit 8px apart.
+ *
+ * The tape has to stay a tape: it keeps at least one full-width chip,
+ * CHIP_MAX_PX = 640. That leaves the fixed zone 1280 - 640 = 640px.
+ * Against the TYPICAL pinned chip (264px -- every fixed-width chip, and
+ * a one-zone clock is smaller still):
+ *
+ *   2 pins -> 264*2 + 8 + 17 = 553  <= 640   fits, 727px of tape
+ *   3 pins -> 264*3 + 16 + 17 = 825  > 640   tape drops to 455px,
+ *                                            less than one chip wide
+ *
+ * So: two. Accepted cost (§8.6): the cap is on COUNT, not width, so two
+ * pinned wide chips (a game plus a four-metric sysmon, 541 + 614) still
+ * overrun a 1280px bar. Capping width instead would mean truncating a
+ * pinned chip, which §1.2 forbids outright.
+ *
+ * A pin past the cap is REFUSED -- the zone never evicts something the
+ * user deliberately parked there.
+ */
+export const MAX_PINS = 2;
+
+/** Widgets whose ticker chip is a single chip for the whole widget, so
+ *  the widget IS the subject. Everything else pins per item. */
+export const SINGLE_CHIP_WIDGETS = ["clock", "timer", "weather", "sysmon"] as const;
+
+export function isSingleChipWidget(widgetId: string): boolean {
+  return (SINGLE_CHIP_WIDGETS as readonly string[]).includes(widgetId);
 }
 
 export interface WidgetPrefs {
@@ -284,9 +356,9 @@ export interface WidgetPrefs {
   sidebarOrder: string[];
   /** Widget IDs whose data appears on the ticker. Subset of enabledWidgets. */
   widgetsOnTicker: string[];
-  /** Per-widget pin state: removes the chip from the scrolling ticker and
-   *  places it as a static element on the chosen side. Keyed by widget ID. */
-  pinnedWidgets: Record<string, WidgetPinConfig>;
+  /** The fixed zone, in render order. Each entry pins one SUBJECT, whose
+   *  current chip is lifted out of the scrolling tape (REL-239). */
+  pins: WidgetPin[];
   timer: TimerWidgetConfig;
   sysmon: SysmonWidgetConfig;
   uptime: UptimeWidgetConfig;
@@ -553,7 +625,7 @@ const DEFAULT_WIDGETS: WidgetPrefs = {
   enabledWidgets: ["clock"],
   sidebarOrder: [],
   widgetsOnTicker: ["clock"],
-  pinnedWidgets: {},
+  pins: [],
   timer: {
     pomodoro: { ...DEFAULT_TIMER_POMODORO },
   },
@@ -706,12 +778,7 @@ export function mergeWidgetPrefs(saved?: Partial<WidgetPrefs>): WidgetPrefs {
       : [],
     // Migration: if widgetsOnTicker doesn't exist, default to enabledWidgets
     widgetsOnTicker,
-    pinnedWidgets:
-      saved.pinnedWidgets != null &&
-      typeof saved.pinnedWidgets === "object" &&
-      !Array.isArray(saved.pinnedWidgets)
-        ? (saved.pinnedWidgets as Record<string, WidgetPinConfig>)
-        : {},
+    pins: migratePins(saved as Record<string, unknown>),
     // Stored clock/weather blocks and the per-widget `ticker` sub-configs
     // (other than sysmon's) are dropped here: the fields were force-reset
     // on every load since 2026-07-17 and REL-208 removed them outright.
@@ -1299,46 +1366,129 @@ export function disableWidget(
       widgetsOnTicker: prefs.widgets.widgetsOnTicker.filter(
         (id) => id !== widgetId,
       ),
+      // A pin outlives a refetch on purpose, but not the widget that owns
+      // its subject: a pinned symbol from a deleted watchlist would hold a
+      // slot in the fixed zone that can never render anything again.
+      pins: prefs.widgets.pins.filter((p) => p.widget !== widgetId),
     },
   };
 }
 
 /**
- * Default pin config for a newly-added widget.
+ * Read the stored pin list, migrating the pre-REL-239 blob.
  *
- * Walkthrough fix 2026-05-11 — testers added widgets and saw nothing
- * "happen" because the widget joined the scrolling ticker tape rather
- * than appearing in the static pinned zone where they expected widget-
- * style controls (clock, weather, etc.) to live. Defaulting to a
- * right-side pin on row 0 means a newly-added widget appears in the
- * pinned zone immediately. Users can still drag or re-pin to the left
- * or unpin to make it scroll.
+ * `pinnedWidgets` was `Record<widgetId, {side}>` -- a pin on a WIDGET.
+ * For a multi-item widget that meant "park this widget's first N chips
+ * in the fixed zone", which froze its rotation: the ninth monitor or
+ * the twentieth symbol could never come round. Those pins are dropped,
+ * not translated, because there is no subject in them to translate to.
  *
- * Lives in one place so the catalog add path, the sidebar toggle path,
- * and the first-time toggleWidgetPin default all stay consistent.
+ * A single-chip utility (clock, timer, weather, sysmon) has exactly one
+ * chip, so its old pin already WAS a pin on a subject. Those carry over
+ * unchanged -- a pinned clock looks and behaves identically after the
+ * migration, which is the point.
  */
-export function defaultPinForNewWidget(): WidgetPinConfig {
-  return { side: "right" };
+function migratePins(saved: Record<string, unknown>): WidgetPin[] {
+  if (Array.isArray(saved.pins)) {
+    return saved.pins
+      .filter(
+        (p): p is WidgetPin =>
+          p != null &&
+          typeof p === "object" &&
+          typeof (p as WidgetPin).widget === "string" &&
+          (p as WidgetPin).widget !== "" &&
+          typeof (p as WidgetPin).subject === "string" &&
+          // An empty subject names nothing, so its chip can never resolve:
+          // it would hold a slot in a capped zone forever. Shed it on load.
+          (p as WidgetPin).subject !== "",
+      )
+      .map((p) => ({
+        widget: p.widget,
+        subject: p.subject,
+        side: (p.side === "left" ? "left" : "right") as PinSide,
+        ...(typeof p.row === "number" ? { row: p.row } : {}),
+      }))
+      .slice(0, MAX_PINS);
+  }
+
+  const legacy = saved.pinnedWidgets;
+  if (legacy == null || typeof legacy !== "object" || Array.isArray(legacy)) {
+    return [];
+  }
+  return Object.entries(legacy as Record<string, { side?: unknown }>)
+    .filter(([widgetId]) => isSingleChipWidget(widgetId))
+    .map(([widgetId, cfg]) => ({
+      widget: widgetId,
+      subject: widgetId,
+      side: (cfg?.side === "left" ? "left" : "right") as PinSide,
+    }))
+    .slice(0, MAX_PINS);
 }
 
-/** Toggle a widget's pin state. Returns a new AppPreferences. */
-export function toggleWidgetPin(
+/** Is this subject currently pinned? */
+export function isPinned(
+  prefs: AppPreferences,
+  widget: string,
+  subject: string,
+): boolean {
+  return prefs.widgets.pins.some(
+    (p) => p.widget === widget && p.subject === subject,
+  );
+}
+
+/**
+ * Pins in the fixed zone.
+ *
+ * Counted across both sides, not per side: the two zones sit at opposite
+ * ends of ONE bar and take their width out of the same tape. Only the
+ * right side is reachable from the UI anyway -- a left-side pin can now
+ * only arrive from the pre-REL-239 migration.
+ */
+export function pinCount(prefs: AppPreferences): number {
+  return prefs.widgets.pins.length;
+}
+
+/**
+ * Toggle a pin on one subject.
+ *
+ * Adding past `MAX_PINS` is REFUSED: the same `prefs` reference comes
+ * back, so the caller can tell nothing happened and say so. The zone
+ * never evicts an existing pin to make room -- the user put it there on
+ * purpose and a bar that silently drops things is worse than one that
+ * says "full".
+ */
+export function togglePin(
+  prefs: AppPreferences,
+  pin: WidgetPin,
+): AppPreferences {
+  // An empty subject names nothing. Guarded here rather than at each call
+  // site because every write routes through this function, and a source
+  // row with a missing name is a data gap, not a caller's mistake -- a
+  // standings row with no `team_name` produced exactly this, and the pin
+  // it made held a slot in the zone that could never render a chip.
+  if (pin.widget === "" || pin.subject === "") return prefs;
+  const pins = prefs.widgets.pins;
+  const at = pins.findIndex(
+    (p) => p.widget === pin.widget && p.subject === pin.subject,
+  );
+  if (at >= 0) {
+    return {
+      ...prefs,
+      widgets: { ...prefs.widgets, pins: pins.filter((_, i) => i !== at) },
+    };
+  }
+  if (pinCount(prefs) >= MAX_PINS) return prefs;
+  return { ...prefs, widgets: { ...prefs.widgets, pins: [...pins, pin] } };
+}
+
+/** Drop every pin belonging to a widget. Used when the widget is removed. */
+export function dropPinsForWidget(
   prefs: AppPreferences,
   widgetId: string,
 ): AppPreferences {
-  const pinned = { ...prefs.widgets.pinnedWidgets };
-  if (pinned[widgetId]) {
-    delete pinned[widgetId];
-  } else {
-    // First-time pin from the toggle uses the same default as a
-    // brand-new widget so the manual-pin path doesn't diverge from
-    // the auto-pin path.
-    pinned[widgetId] = defaultPinForNewWidget();
-  }
-  return {
-    ...prefs,
-    widgets: { ...prefs.widgets, pinnedWidgets: pinned },
-  };
+  const pins = prefs.widgets.pins.filter((p) => p.widget !== widgetId);
+  if (pins.length === prefs.widgets.pins.length) return prefs;
+  return { ...prefs, widgets: { ...prefs.widgets, pins } };
 }
 
 /** Shallow-merge a patch into a widget's config. Returns a new AppPreferences. */

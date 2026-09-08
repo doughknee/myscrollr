@@ -3,7 +3,7 @@
  * their own reservations; this covers the arithmetic with none.
  */
 import { describe, it, expect } from "vitest";
-import { rotateSlots, type RotationMemo } from "./ticker";
+import { rotateSlots, dropPinned, type RotationMemo, type TickerContext } from "./ticker";
 
 const ids = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `s${i + 1}` }));
 const run = (n: number, slots: number, cycles: Record<string, number> = {}) =>
@@ -81,5 +81,44 @@ describe("rotateSlots with a rotation memo (CHIP_DESIGN.md rule 6)", () => {
     const after = runMemo(ids(3), 4, {}, memo);
     expect(after.find((s) => s.key === "p-slot-0")?.item.id).toBe("s1");
     expect(after.find((s) => s.key === "p-slot-1")?.item.id).toBe("s2");
+  });
+});
+
+// ── REL-239: a pinned subject is on the bar exactly once ──────────
+
+describe("dropPinned", () => {
+  const ctx = (subjects?: string[]) =>
+    ({ pinnedSubjects: subjects && new Set(subjects) }) as unknown as TickerContext;
+
+  it("leaves the pool alone when nothing is pinned", () => {
+    const pool = ids(3);
+    expect(dropPinned(pool, ctx(), (x) => x.id)).toBe(pool);
+    expect(dropPinned(pool, ctx([]), (x) => x.id)).toBe(pool);
+  });
+
+  it("removes a pinned subject before the pool is sliced into slots", () => {
+    // Filtering the POOL, not the rendered chips, is the whole point: a
+    // slot that resolved to a pinned item would render a hole instead.
+    expect(
+      dropPinned(ids(4), ctx(["s2"]), (x) => x.id).map((x) => x.id),
+    ).toEqual(["s1", "s3", "s4"]);
+  });
+
+  it("removes an item pinned under ANY of its subjects", () => {
+    // A fixture is about both teams, so pinning either one lifts the game.
+    const games = [
+      { away: "Yankees", home: "Red Sox" },
+      { away: "Mets", home: "Braves" },
+    ];
+    const left = dropPinned(games, ctx(["Braves"]), (g) => [g.away, g.home]);
+    expect(left).toEqual([{ away: "Yankees", home: "Red Sox" }]);
+  });
+
+  it("rotates over the reduced pool, so the pin frees a slot", () => {
+    const pool = dropPinned(ids(5), ctx(["s1"]), (x) => x.id);
+    const out = rotateSlots(pool, 4, {}, "p", (x) => x.id, () => undefined);
+    expect(out.map((s) => s.item.id)).toEqual(["s2", "s3", "s4", "s5"]);
+    // Four left for four slots: nothing rotates, and s1 is not among them.
+    expect(out.every((s) => s.rotateSlot === undefined)).toBe(true);
   });
 });
