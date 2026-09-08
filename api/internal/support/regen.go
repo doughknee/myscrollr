@@ -115,27 +115,32 @@ func regenerateDraft(ctx context.Context, ticketNumber string) RegenOutcome {
 
 	note, ask, grounded, unknowns := triage.groundingFields()
 	draft, err := createSupportDraft(ctx, &SupportDraft{
-		TicketNumber:          ticketNumber,
-		UserEmail:             src.UserEmail,
-		UserName:              src.UserName,
-		OriginalSubject:       src.Subject,
-		UserMessageHTML:       src.UserMessageHTML,
-		DraftBodyHTML:         triage.DraftReplyHTML,
-		AISummary:             triage.Summary,
-		AICategory:            triage.Category,
-		AIPriority:            triage.Priority,
-		AIWidget:              triage.Widget,
-		AIDuplicateOf:         triage.DuplicateOf,
-		AIConfidence:          triage.Confidence,
-		OSTicketThreadEntryID: src.ThreadEntryID,
-		ShouldClose:           triage.ShouldClose,
-		NeedsInfo:             triage.NeedsInfo,
-		Sentiment:             triage.Sentiment,
-		DrafterCategory:       triage.DrafterCategory,
-		InternalNote:          note,
-		AskUserFor:            ask,
-		GroundedIn:            grounded,
-		Unknowns:              unknowns,
+		TicketNumber:    ticketNumber,
+		UserEmail:       src.UserEmail,
+		UserName:        src.UserName,
+		OriginalSubject: src.Subject,
+		UserMessageHTML: src.UserMessageHTML,
+		DraftBodyHTML:   triage.DraftReplyHTML,
+		AISummary:       triage.Summary,
+		AICategory:      triage.Category,
+		AIPriority:      triage.Priority,
+		AIWidget:        triage.Widget,
+		AIDuplicateOf:   triage.DuplicateOf,
+		AIConfidence:    triage.Confidence,
+		// Deliberately NOT src.ThreadEntryID. osticket_thread_entry_id is
+		// uniquely indexed — it is how the follow-up webhook stays idempotent,
+		// "this entry has already produced a draft" — and the draft being
+		// replaced still holds it, so that guarantee is untouched. Copying it
+		// onto the replacement just makes every re-triage of a follow-up fail
+		// on the index, which is exactly what the first backlog run did.
+		ShouldClose:     triage.ShouldClose,
+		NeedsInfo:       triage.NeedsInfo,
+		Sentiment:       triage.Sentiment,
+		DrafterCategory: triage.DrafterCategory,
+		InternalNote:    note,
+		AskUserFor:      ask,
+		GroundedIn:      grounded,
+		Unknowns:        unknowns,
 	})
 	if err != nil {
 		out.Note = "could not save the new draft: " + err.Error()

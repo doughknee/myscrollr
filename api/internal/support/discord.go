@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -44,10 +45,11 @@ import (
 // Failure mode is fail-open: if Discord calls fail, we log and continue.
 // The email notification path stays active as a backup.
 
-const (
-	discordAPIBase     = "https://discord.com/api/v10"
-	discordHTTPTimeout = 10 * time.Second
-)
+const discordHTTPTimeout = 10 * time.Second
+
+// discordAPIBase is a var only so the rate-limit test can point the client at
+// a stub, the same seam anthropicEndpoint uses for the triage calls.
+var discordAPIBase = "https://discord.com/api/v10"
 
 // DiscordConfig groups the env-driven config in one struct so callers
 // can quick-check whether Discord integration is enabled (any missing
@@ -145,12 +147,16 @@ func discordRequest(ctx context.Context, method, path string, body interface{}) 
 		return nil, 0, errors.New("discord not configured")
 	}
 
+	// rawBody is kept so a retried request can re-read it — a consumed
+	// io.Reader would otherwise send an empty body the second time round.
+	var rawBody []byte
 	var bodyReader io.Reader
 	if body != nil {
 		buf, err := json.Marshal(body)
 		if err != nil {
 			return nil, 0, fmt.Errorf("marshal body: %w", err)
 		}
+		rawBody = buf
 		bodyReader = bytes.NewReader(buf)
 	}
 
@@ -165,17 +171,59 @@ func discordRequest(ctx context.Context, method, path string, body interface{}) 
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	resp, err := discordHTTPClient.Do(req)
-	if err != nil {
-		return nil, 0, fmt.Errorf("discord request: %w", err)
+	for attempt := 0; ; attempt++ {
+		if bodyReader != nil && attempt > 0 {
+			bodyReader = bytes.NewReader(rawBody)
+			req.Body = io.NopCloser(bodyReader)
+		}
+		resp, err := discordHTTPClient.Do(req)
+		if err != nil {
+			return nil, 0, fmt.Errorf("discord request: %w", err)
+		}
+		respBody, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return nil, resp.StatusCode, fmt.Errorf("read response: %w", err)
+		}
+		if resp.StatusCode != http.StatusTooManyRequests || attempt >= discordRateLimitRetries {
+			return respBody, resp.StatusCode, nil
+		}
+		wait := discordRetryAfter(resp, respBody)
+		log.Printf("[Discord] rate limited on %s %s; retrying in %s", method, path, wait)
+		select {
+		case <-ctx.Done():
+			return respBody, resp.StatusCode, ctx.Err()
+		case <-time.After(wait):
+		}
 	}
-	defer resp.Body.Close()
+}
 
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, resp.StatusCode, fmt.Errorf("read response: %w", err)
+// discordRateLimitRetries is how many times a 429 is waited out before the
+// caller sees it. A long draft is split into as many as twenty messages, and
+// Discord rate-limits per channel, so the bucket runs dry mid-thread — which
+// used to drop the tail of a reply on the floor with nothing but a log line.
+const discordRateLimitRetries = 3
+
+// discordRetryAfter reads how long Discord wants us to wait. The header is
+// authoritative; the body carries the same number as a float and is the
+// fallback. Clamped at both ends: never a busy loop, never a stalled request.
+func discordRetryAfter(resp *http.Response, body []byte) time.Duration {
+	secs, _ := strconv.ParseFloat(resp.Header.Get("Retry-After"), 64)
+	if secs <= 0 {
+		var payload struct {
+			RetryAfter float64 `json:"retry_after"`
+		}
+		_ = json.Unmarshal(body, &payload)
+		secs = payload.RetryAfter
 	}
-	return respBody, resp.StatusCode, nil
+	d := time.Duration(secs * float64(time.Second))
+	if d < 250*time.Millisecond {
+		d = 250 * time.Millisecond
+	}
+	if d > 10*time.Second {
+		d = 10 * time.Second
+	}
+	return d
 }
 
 // =============================================================================
