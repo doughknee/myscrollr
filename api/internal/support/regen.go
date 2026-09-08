@@ -42,12 +42,34 @@ import (
 // cap makes it a small bill instead of a large one.
 const regenLimit = 25
 
-// regenOutcome is one ticket's result, for the summary the operator reads.
-type regenOutcome struct {
-	Ticket      string
-	Disposition string // the new draft's disposition, or "" when nothing was drafted
-	Note        string // why it was skipped, when it was
-	OK          bool
+// RegenOutcome is one ticket's result, for the summary the operator reads.
+type RegenOutcome struct {
+	Ticket      string `json:"ticket"`
+	Disposition string `json:"disposition,omitempty"` // the new draft's, or "" when nothing was drafted
+	Note        string `json:"note,omitempty"`        // why it was skipped, when it was
+	OK          bool   `json:"ok"`
+}
+
+// RegenTickets is the one-off entry point behind cmd/support-regen: the same
+// work `/regen` does, for the tickets named on a command line. A slash command
+// can only be run by a person typing it, and clearing a backlog of tickets
+// that have been waiting four months is a Job, not an afternoon of typing.
+//
+// A single element "pending" means the pending queue, exactly as the slash
+// command's argument does.
+func RegenTickets(ctx context.Context, tickets []string) []RegenOutcome {
+	if len(tickets) == 1 && strings.EqualFold(tickets[0], "pending") {
+		pending, err := pendingRegenTickets(ctx)
+		if err != nil {
+			return []RegenOutcome{{Ticket: "pending", Note: err.Error()}}
+		}
+		tickets = pending
+	}
+	out := make([]RegenOutcome, 0, len(tickets))
+	for _, t := range tickets {
+		out = append(out, regenerateDraft(ctx, strings.TrimPrefix(strings.TrimSpace(t), "#")))
+	}
+	return out
 }
 
 // regenerateDraft re-runs triage on one case and replaces its pending draft.
@@ -56,8 +78,8 @@ type regenOutcome struct {
 // left alone, and a triage call that produces no reply leaves the existing
 // draft exactly where it was. The only way to lose a pending draft here is to
 // have a new one to put in its place.
-func regenerateDraft(ctx context.Context, ticketNumber string) regenOutcome {
-	out := regenOutcome{Ticket: ticketNumber}
+func regenerateDraft(ctx context.Context, ticketNumber string) RegenOutcome {
+	out := RegenOutcome{Ticket: ticketNumber}
 	if platform.DBPool == nil {
 		out.Note = "no database"
 		return out
@@ -417,7 +439,7 @@ func runRegen(ctx context.Context, appID, token, arg string) string {
 	return truncateRunes(strings.TrimSpace(b.String()), 1990)
 }
 
-func renderRegenOutcome(o regenOutcome) string {
+func renderRegenOutcome(o RegenOutcome) string {
 	if !o.OK {
 		return fmt.Sprintf("⏭️ **#%s** — %s", o.Ticket, o.Note)
 	}

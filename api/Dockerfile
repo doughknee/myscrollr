@@ -19,6 +19,8 @@ RUN go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 # Support case backfill (REL-243) — run in-cluster via k8s/jobs/support-backfill.yaml
 RUN CGO_ENABLED=0 GOOS=linux go build -o support-backfill ./cmd/support-backfill
+# Support re-triage (REL-246) — run in-cluster via k8s/jobs/support-regen.yaml
+RUN CGO_ENABLED=0 GOOS=linux go build -o support-regen ./cmd/support-regen
 # ── Dev stage: hot reload (NOT the default build target) ─────────────
 # Deliberately placed BEFORE the runtime stage: deploy.yml runs
 # `docker build` with no --target, which builds the LAST stage. Keeping the
@@ -59,6 +61,7 @@ RUN apk --no-cache add curl
 # Copy the Pre-built binary from the previous stage
 COPY --from=builder /app/main .
 COPY --from=builder /app/support-backfill .
+COPY --from=builder /app/support-regen .
 COPY --from=builder /app/migrations ./migrations
 
 # Expose port 8080 to the outside world
