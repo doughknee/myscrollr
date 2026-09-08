@@ -30,6 +30,9 @@ export default function PinSubjectButton({
 }) {
   const { isPinned, hasRoom, toggle } = usePinSubject();
   const pinned = isPinned(widget, subject);
+  // A row whose subject is missing (a standings row with no team name)
+  // gets no control rather than a dead one.
+  if (!subject) return null;
   const full = !pinned && !hasRoom;
   const Icon = pinned ? PinOff : Pin;
   const title = pinned

@@ -1396,7 +1396,11 @@ function migratePins(saved: Record<string, unknown>): WidgetPin[] {
           p != null &&
           typeof p === "object" &&
           typeof (p as WidgetPin).widget === "string" &&
-          typeof (p as WidgetPin).subject === "string",
+          (p as WidgetPin).widget !== "" &&
+          typeof (p as WidgetPin).subject === "string" &&
+          // An empty subject names nothing, so its chip can never resolve:
+          // it would hold a slot in a capped zone forever. Shed it on load.
+          (p as WidgetPin).subject !== "",
       )
       .map((p) => ({
         widget: p.widget,
@@ -1457,6 +1461,12 @@ export function togglePin(
   prefs: AppPreferences,
   pin: WidgetPin,
 ): AppPreferences {
+  // An empty subject names nothing. Guarded here rather than at each call
+  // site because every write routes through this function, and a source
+  // row with a missing name is a data gap, not a caller's mistake -- a
+  // standings row with no `team_name` produced exactly this, and the pin
+  // it made held a slot in the zone that could never render a chip.
+  if (pin.widget === "" || pin.subject === "") return prefs;
   const pins = prefs.widgets.pins;
   const at = pins.findIndex(
     (p) => p.widget === pin.widget && p.subject === pin.subject,

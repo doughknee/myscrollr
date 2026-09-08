@@ -947,6 +947,10 @@ describe("pin migration (pinnedWidgets → pins)", () => {
         "clock",
         { widget: "clock" },
         { subject: "AAPL" },
+        // An empty subject names nothing — shed it on load, so a pin
+        // already written by an earlier build stops holding a slot.
+        { widget: "sports_mlb", subject: "", side: "right" },
+        { widget: "", subject: "AAPL", side: "right" },
         { widget: "finance_stocks", subject: "AAPL", side: "sideways" },
       ],
     } as unknown as Partial<WidgetPrefs>);
@@ -1022,6 +1026,16 @@ describe("togglePin", () => {
     }));
     const after = togglePin(base(pins), pins[0]);
     expect(after.widgets.pins).toHaveLength(MAX_PINS - 1);
+  });
+
+  it("refuses a pin with no subject", () => {
+    // Found on the running app: an MLB standings row with an empty
+    // `team_name` produced {subject: ""}, a pin holding a slot in a
+    // capped zone that could never resolve to a chip. Guarded in
+    // togglePin because every write routes through it.
+    const prefs = base([]);
+    expect(togglePin(prefs, { widget: "sports_mlb", subject: "", side: "right" })).toBe(prefs);
+    expect(togglePin(prefs, { widget: "", subject: "AAPL", side: "right" })).toBe(prefs);
   });
 
   it("reports whether a subject is pinned", () => {
