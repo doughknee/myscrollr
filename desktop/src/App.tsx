@@ -6,6 +6,8 @@ import { open } from "@tauri-apps/plugin-shell";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTauriListener } from "./hooks/useTauriListener";
 import { useDashboardCDC } from "./hooks/useDashboardCDC";
+import { useSharedSSE } from "./hooks/useSharedSSE";
+import { isPrimaryTicker } from "./lib/windowRole";
 import { Menu, Submenu, CheckMenuItem, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { dashboardQueryOptions, queryKeys } from "./api/queries";
 import { onStoreChange, setStore } from "./lib/store";
@@ -36,7 +38,6 @@ import {
   MAX_PINS,
   } from "./preferences";
 import type { SubscriptionTier } from "./auth";
-import type { DeliveryMode } from "./types";
 import type { AppPreferences, TickerPosition } from "./preferences";
 import { getCatalogItems, sourceForWidget } from "./marketplace";
 import { getAllWidgets } from "./widgets/registry";
@@ -47,7 +48,7 @@ import { useCatalog } from "./hooks/useCatalog";
 
 // ── Constants ────────────────────────────────────────────────────
 
-import { API_BASE as API_URL, DEMO } from "./config";
+import { DEMO } from "./config";
 
 /** Ticker window height in px: per-mode row height × scale. */
 function tickerHeight(p: AppPreferences): number {
@@ -78,9 +79,6 @@ export default function App() {
     // so an overnight-expired token starts at "free", not a stale paid tier.
     checkAuth() ? getTier() : "free",
   );
-
-  // Delivery mode
-  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("polling");
 
   // ── Dashboard data ──────────────────────────────────────────────
   // The main window is the primary fetcher and broadcasts via Tauri store.
@@ -188,61 +186,26 @@ export default function App() {
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
 
+  // Delivery mode. The SSE connection is process-wide and this component
+  // renders once per ticker window, so the hook elects a single owner and
+  // no-ops start/stop everywhere else (lib/windowRole.ts).
+  const { deliveryMode, startSSE, stopSSE } = useSharedSSE({
+    tickerShown: prefs.ticker.showTicker,
+  });
+
   const authenticatedRef = useRef(authenticated);
   authenticatedRef.current = authenticated;
   const tierRef = useRef<SubscriptionTier>(tier);
   tierRef.current = tier;
-  const sseActiveRef = useRef(false);
-
-  // ── SSE lifecycle ───────────────────────────────────────────
-
-  const startSSE = useCallback(async () => {
-    // Demo mode talks to the no-auth bridge, which ignores the Bearer —
-    // use a placeholder so the SSE stream still starts without Logto.
-    const token = DEMO ? "demo" : await getValidToken();
-    if (!token) return;
-    sseActiveRef.current = true;
-    setDeliveryMode("sse");
-    await invoke("start_sse", { token, apiBase: API_URL }).catch(() => {
-      sseActiveRef.current = false;
-      setDeliveryMode("polling");
-    });
-  }, []);
-
-  const stopSSE = useCallback(async () => {
-    sseActiveRef.current = false;
-    setDeliveryMode("polling");
-    await invoke("stop_sse").catch(() => {});
-  }, []);
-
-  // Listen for SSE status events from the Rust backend
-  useTauriListener<{ status: string; code?: number; error?: string }>(
-    "sse-status",
-    async (event) => {
-      const { status: sseStatus } = event.payload;
-
-      switch (sseStatus) {
-        case "connected":
-          setDeliveryMode("sse");
-          break;
-        case "auth-expired":
-          sseActiveRef.current = false;
-          setDeliveryMode("polling");
-          await startSSE();
-          break;
-        case "disconnected":
-        case "error":
-          setDeliveryMode("polling");
-          break;
-      }
-    },
-  );
-
-  // ── Initial SSE start ─────────────────────────────────────────
+  // ── Initial auth + tier resolve ───────────────────────────────
   // Real-time is universal: the server dropped the Ultimate-only gate
   // on /events with the widget-slot redesign (8e9f0f9, 2026-06-30) —
   // monetization is the slot count, not delivery. Every authenticated
   // tier streams; polling is only the reconnect fallback.
+  //
+  // Opening the stream is `useSharedSSE`'s own mount election, not this
+  // effect's job: this component runs once per ticker window, and a start
+  // from each of them is a start per monitor.
 
   useEffect(() => {
     async function init() {
@@ -254,10 +217,6 @@ export default function App() {
 
       if (token && !authenticatedRef.current) {
         setAuthenticated(true);
-      }
-
-      if (DEMO || token) {
-        startSSE();
       }
     }
 
@@ -277,7 +236,7 @@ export default function App() {
 
       if (!isAuth && wasAuth) {
         // Just logged out — tear down SSE, reset to free tier
-        if (sseActiveRef.current) stopSSE();
+        stopSSE();
         setTier("free");
         tierRef.current = "free";
         queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
@@ -295,7 +254,7 @@ export default function App() {
           // Fresh login — invalidate dashboard and open the stream.
           // Tier no longer affects delivery (real-time is universal).
           queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
-          if (!sseActiveRef.current) startSSE();
+          startSSE();
         }
       }
     });
@@ -555,7 +514,13 @@ export default function App() {
   }, []);
 
   // ── System tray "Show ticker" → toggle via prefs ───────────────
-  useTauriListener("toggle-ticker", () => handleToggleTicker());
+  // Only the primary ticker window may act on it. Every ticker window
+  // hears this broadcast, and each flips the shared pref from its own
+  // cache — with two bars open the second read the pre-write value and
+  // flipped it straight back, so the tray click did nothing.
+  useTauriListener("toggle-ticker", () => {
+    if (isPrimaryTicker()) handleToggleTicker();
+  });
 
   // ── Monitor set changed → re-place this window ──────────────────
   // The main window runs `sync_ticker_windows` on a tickerMonitors
