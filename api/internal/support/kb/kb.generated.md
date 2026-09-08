@@ -4,9 +4,9 @@
 
 This is the authoritative product reference for support replies. Anything stated here is ground truth; the Policies section says what may and may not be repeated to a user.
 
-Current desktop version: **1.6.2**.
+Current desktop version: **1.6.3**.
 
-<!-- source: desktop/package.json @ 1ff3344f0e74 -->
+<!-- source: desktop/package.json @ e94ad54d5b21 -->
 
 ## Policies
 
@@ -564,7 +564,7 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Release history
 
-<!-- source: docs/ROADMAP.md @ a8be1918d104 -->
+<!-- source: docs/ROADMAP.md @ d0e39ac789d9 -->
 | Version | Codename | Theme | Size |
 |---|---|---|---|
 | v1.1.1 | Paper Cuts | ✅ **Shipped 2026-07-02** — grew into the catalog redesign (absorbed half of The Library) | S→M |
@@ -588,6 +588,7 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 | v1.6.0 | Pick your monitors | ✅ **Shipped 2026-09-06** — the ticker can live on any of your screens: a to-scale map of your monitors in Settings › Ticker, one switch each, Identify, click a screen to toggle; one bar per chosen monitor with the same content, following plug/unplug and Win+P live and falling back to the primary if a chosen screen vanishes, each bar flush on its own screen edge. Settings rebuilt to read top to bottom: Appearance is the app window, Ticker is the bar, Startup is the computer; presets replace sliders, units and formats live in one place, a Send crash reports switch, tray and menus say the same words as the pages. The catalog became a hub you can search — kinds, New this month, In your ticker, and a way to request a widget that is not there yet | L |
 | v1.6.1 | Under your eyes | ✅ **Shipped 2026-09-07** — a chip on the bar keeps what it is showing until it has scrolled off screen; a data refresh no longer swaps the game you are reading for another one. Baseball innings read "8th" and "10th" rather than the raw feed code, finals read "Final" in every sport, a postponed game reads "PPD". Server side, fourteen more leagues in the catalog and a sports feed that polls every 15 s without stalling on games that already ended | S |
 | v1.6.2 | Pin what matters | ✅ **Shipped 2026-09-08** — a pin is one chip that stays put: pin a team, a symbol, a feed, a market or a clock and the fixed zone shows its current chip, up to two, never rotating and never doubled on the tape; new widgets no longer pin themselves to the corner; the pin control moved off the moving chip to right-click, the widget page and the sidebar. With several monitors selected the app keeps one live connection instead of one per bar, so "Live updates paused" stops appearing and the tray toggle works with two bars. A session that has died now says so and one click signs you back in, instead of every change failing until a reinstall | S |
+| v1.6.3 | The whole matchday | ✅ **Shipped 2026-09-08** — when a league's next games are further out than a day, the bar used to show exactly one of them, so a full slate of fixtures the next evening looked like a broken ticker. It now shows that whole matchday and takes turns through it. A league whose next fixture really is a lone event, a Formula 1 race for instance, still shows the one chip it always did | S |
 
 ## Recent release notes
 
