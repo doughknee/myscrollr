@@ -255,9 +255,28 @@ type AdminQueueRow struct {
 	Priority     string `json:"priority,omitempty"`
 	Status       string `json:"status"`
 	Summary      string `json:"summary,omitempty"`
+	OS           string `json:"os,omitempty"`
+
+	// Who wrote it, as REL-266 needs it. Name is whatever the ticket carried
+	// and is empty when nothing did; Plan is the CURRENT subscription and is
+	// empty when no Stripe row stands behind this email. Neither is ever
+	// invented, and Plan is never tier_at_open.
+	Name      string `json:"name,omitempty"`
+	Plan      string `json:"plan,omitempty"`
+	Paying    bool   `json:"paying"`
+	PersonKey string `json:"person_key"`
 
 	Group       string `json:"group"`
 	GroupReason string `json:"group_reason"`
+	// Section is the reading order on the page: paying, open, answered,
+	// resolved. Group is still the pipeline's own answer about this one
+	// ticket; Section is where a person looking at the queue finds it.
+	Section string `json:"section"`
+
+	// Provenance is who sent the last reply. Decided on the server so the
+	// browser never has to diff a draft against its edit to find out.
+	Provenance      string `json:"provenance,omitempty"`
+	ProvenanceLabel string `json:"provenance_label,omitempty"`
 
 	DraftID           int64  `json:"draft_id,omitempty"`
 	DraftStatus       string `json:"draft_status,omitempty"`
@@ -275,37 +294,76 @@ type AdminQueueRow struct {
 }
 
 type AdminQueueResponse struct {
-	GeneratedAt time.Time       `json:"generated_at"`
-	AutoSend    AutoSendState   `json:"autosend"`
-	Counts      map[string]int  `json:"counts"`
-	State       string          `json:"state"`
-	Rows        []AdminQueueRow `json:"rows"`
+	GeneratedAt time.Time     `json:"generated_at"`
+	AutoSend    AutoSendState `json:"autosend"`
+	// Counts is the pipeline's three groups, over the whole queue and never
+	// over the filter. Sections is the four the page reads in.
+	Counts   map[string]int `json:"counts"`
+	Sections map[string]int `json:"sections"`
+	State    string         `json:"state"`
+	// Sort, Dir and RowsMode are echoed back so the controls can render from
+	// the answer rather than from what they hoped they asked for.
+	Sort     string `json:"sort"`
+	Dir      string `json:"dir"`
+	RowsMode string `json:"rows_mode"`
+	Search   string `json:"search,omitempty"`
+	// Accounts is the caption under the paying section, and the sentence that
+	// explains it when it is empty.
+	Accounts AdminQueueAccounts `json:"accounts"`
+	Rows     []AdminQueueRow    `json:"rows"`
+	// People is the same rows grouped by user_email — one row per human.
+	People []AdminPerson `json:"people"`
 }
 
+// queueSQL reads a case, its newest draft, and the CURRENT subscription behind
+// its account.
+//
+// The stripe_customers join is on logto_sub, so a case that arrived without a
+// signed-in user simply has no plan — which is the honest answer, and the
+// reason the page shows those without a name or a badge instead of guessing.
+// tier_at_open is deliberately not read: it is the plan on the day the ticket
+// opened, and the top section has to be about who is paying now.
 const queueSQL = `
 	WITH latest AS (
 		SELECT DISTINCT ON (ticket_number)
-		       ticket_number, id, status, disposition, disposition_reason, hold_until
+		       ticket_number, id, status, disposition, disposition_reason, hold_until,
+		       coalesce(user_name, '')        AS user_name,
+		       coalesce(draft_body_html, '')  AS draft_body_html,
+		       coalesce(edited_body_html, '') AS edited_body_html,
+		       intervened
 		  FROM support_drafts
 		 ORDER BY ticket_number, created_at DESC, id DESC
 	)
 	SELECT c.ticket_number, coalesce(c.user_email, ''), c.subject,
 	       coalesce(c.category, ''), coalesce(c.priority, ''), c.status,
-	       coalesce(c.summary, ''), coalesce(c.linear_issue_key, ''),
+	       coalesce(c.summary, ''), coalesce(c.os, ''), coalesce(c.linear_issue_key, ''),
 	       c.opened_at, c.updated_at,
 	       (SELECT max(m.created_at) FROM support_messages m
 	         WHERE m.ticket_number = c.ticket_number AND m.kind = 'user'),
-	       d.id, d.status, d.disposition, d.disposition_reason, d.hold_until
+	       d.id, d.status, d.disposition, d.disposition_reason, d.hold_until,
+	       coalesce(d.user_name, ''), coalesce(d.draft_body_html, ''),
+	       coalesce(d.edited_body_html, ''), coalesce(d.intervened, false),
+	       coalesce(s.plan, ''), coalesce(s.status, ''), coalesce(s.lifetime, false)
 	  FROM support_cases c
 	  LEFT JOIN latest d ON d.ticket_number = c.ticket_number
+	  LEFT JOIN stripe_customers s ON s.logto_sub = c.logto_sub
 	 ORDER BY c.updated_at DESC
 	 LIMIT $1
 `
 
-// HandleAdminQueue - GET /admin/support/queue?state=needs_you|waiting|handled|all
+// HandleAdminQueue - GET /admin/support/queue
+//
+//	?state=needs_you|waiting|handled|all
+//	?sort=last_wrote|waiting|tickets|plan|name  &dir=asc|desc
+//	?rows=person|ticket   &q=<search>
 //
 // The counts are always over the whole queue and never over the filter, so
 // switching to "Handled" cannot make "Needs you" look empty.
+//
+// Sort and direction are parameters here rather than an array sort in the
+// browser. That is not tidiness: queueLimit caps one read at 500 cases, and a
+// browser sorting whatever fitted would present a sorted page as a sorted
+// queue with nothing on screen admitting the difference.
 func HandleAdminQueue(c *fiber.Ctx) error {
 	if platform.DBPool == nil {
 		return adminSupportError(c, "The support database is not reachable from this API instance.")
@@ -322,6 +380,24 @@ func HandleAdminQueue(c *fiber.Ctx) error {
 			Error:  "state must be one of needs_you, waiting, handled, all",
 		})
 	}
+
+	sortField, sortDir, ok := normaliseSort(c.Query("sort"), c.Query("dir"))
+	if !ok {
+		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
+			Status: "error",
+			Error:  "sort must be one of " + strings.Join(sortFields, ", ") + ", and dir one of asc, desc",
+		})
+	}
+	rowsMode := strings.TrimSpace(c.Query("rows", "person"))
+	if rowsMode == "" {
+		rowsMode = "person"
+	}
+	if rowsMode != "person" && rowsMode != "ticket" {
+		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
+			Status: "error", Error: "rows must be person or ticket",
+		})
+	}
+	search := strings.TrimSpace(c.Query("q"))
 
 	// context.Background(), not c.Context(): Fiber's request context is
 	// already cancelled by the time a handler under app.Test reaches the
@@ -347,11 +423,15 @@ func HandleAdminQueue(c *fiber.Ctx) error {
 		var draftID *int64
 		var draftStatus, disposition, dispositionReason *string
 		var holdUntil, lastUser *time.Time
+		var draftBody, editedBody, planStatus string
+		var intervened, lifetime bool
 
 		if err := rows.Scan(&r.TicketNumber, &r.UserEmail, &r.Subject,
-			&r.Category, &r.Priority, &r.Status, &r.Summary, &issueKey,
+			&r.Category, &r.Priority, &r.Status, &r.Summary, &r.OS, &issueKey,
 			&r.OpenedAt, &r.UpdatedAt, &lastUser,
-			&draftID, &draftStatus, &disposition, &dispositionReason, &holdUntil); err != nil {
+			&draftID, &draftStatus, &disposition, &dispositionReason, &holdUntil,
+			&r.Name, &draftBody, &editedBody, &intervened,
+			&r.Plan, &planStatus, &lifetime); err != nil {
 			log.Printf("[AdminSupport] scan queue row: %v", err)
 			continue
 		}
@@ -359,6 +439,7 @@ func HandleAdminQueue(c *fiber.Ctx) error {
 		if draftID != nil {
 			r.DraftID = *draftID
 		}
+		r.Paying = planIsPaying(r.Plan, planStatus, lifetime)
 		r.DraftStatus = deref(draftStatus)
 		r.Disposition = deref(disposition)
 		r.DispositionReason = deref(dispositionReason)
@@ -381,6 +462,10 @@ func HandleAdminQueue(c *fiber.Ctx) error {
 			Disposition:   r.Disposition,
 			AutoSendArmed: autosend.Armed,
 		}.group()
+		r.Section = caseSection(r.Group, r.Paying)
+		r.Provenance, r.ProvenanceLabel = replyProvenance(
+			r.DraftStatus, r.Disposition, draftBody, editedBody, intervened)
+		r.PersonKey = personKey(r)
 		counts[r.Group]++
 
 		if issueKey != "" {
@@ -394,19 +479,69 @@ func HandleAdminQueue(c *fiber.Ctx) error {
 
 	out := make([]AdminQueueRow, 0, len(all))
 	for _, r := range all {
-		if state == "all" || r.Group == state {
-			out = append(out, r)
+		if state != "all" && r.Group != state {
+			continue
 		}
+		if !matchesSearch(r, search) {
+			continue
+		}
+		out = append(out, r)
 	}
 	resolveQueueFixes(ctx, out)
+
+	// The people are grouped from the rows being returned, so a search or a
+	// state filter narrows both together and a person's ticket count always
+	// matches the tickets actually on the page.
+	people := groupPeople(out)
+	sortPeople(people, sortField, sortDir)
+	sortRows(out, sortField, sortDir)
+
+	sections := map[string]int{}
+	for _, s := range sectionOrder {
+		sections[s] = 0
+	}
+	for _, p := range people {
+		sections[p.Section]++
+	}
+
+	accounts := queueAccounts(ctx)
+	accounts.Note = payingSectionNote(accounts, sections[sectionPaying])
 
 	return c.JSON(AdminQueueResponse{
 		GeneratedAt: now.UTC(),
 		AutoSend:    autosend,
 		Counts:      counts,
+		Sections:    sections,
 		State:       state,
+		Sort:        sortField,
+		Dir:         sortDir,
+		RowsMode:    rowsMode,
+		Search:      search,
+		Accounts:    accounts,
 		Rows:        out,
+		People:      people,
 	})
+}
+
+// queueAccounts counts what the paying section is measured against: how many
+// accounts pay, and how many cases are joined to an account at all.
+//
+// The second number is the interesting one. In production it is 1 of 59:
+// almost every ticket arrives through the marketing form or osTicket with no
+// signed-in user, so there is nothing to join a subscription to. Without it an
+// empty paying section looks like a broken query.
+func queueAccounts(ctx context.Context) AdminQueueAccounts {
+	var a AdminQueueAccounts
+	if err := platform.DBPool.QueryRow(ctx, `
+		SELECT (SELECT count(*) FROM stripe_customers
+		         WHERE plan NOT IN ('', 'free') AND (lifetime OR status = 'active')),
+		       (SELECT count(*) FROM support_cases
+		         WHERE logto_sub IS NOT NULL AND logto_sub <> ''),
+		       (SELECT count(*) FROM support_cases)`).Scan(
+		&a.Paying, &a.CasesWithAccount, &a.Cases); err != nil {
+		log.Printf("[AdminSupport] account counts: %v", err)
+	}
+	return a
 }
 
 // resolveQueueFixes fills in the proven-fix answer for the rows being
@@ -552,6 +687,15 @@ type AdminCaseDetail struct {
 	Group       string `json:"group"`
 	GroupReason string `json:"group_reason"`
 
+	// Plan is the CURRENT subscription behind this account, which is a
+	// different question from Context.Tier — that one is tier_at_open, the
+	// plan the model was told about on the day the ticket opened. A header
+	// printing the old one would quietly mis-badge anybody who has since
+	// upgraded or lapsed.
+	Plan     string `json:"plan,omitempty"`
+	Paying   bool   `json:"paying"`
+	PlanNote string `json:"plan_note,omitempty"`
+
 	Messages []AdminMessage `json:"messages"`
 	Draft    *AdminDraft    `json:"draft"`
 	// DraftNote says why Draft is nil when it is. A missing draft is a fact
@@ -578,11 +722,14 @@ type AdminCaseDetail struct {
 }
 
 const caseSQL = `
-	SELECT ticket_number, subject, coalesce(user_email, ''), coalesce(logto_sub, ''),
-	       status, coalesce(category, ''), coalesce(priority, ''), coalesce(summary, ''),
-	       coalesce(linear_issue_key, ''), coalesce(discord_thread_id, ''),
-	       opened_at, updated_at, closed_at
-	  FROM support_cases WHERE ticket_number = $1
+	SELECT c.ticket_number, c.subject, coalesce(c.user_email, ''), coalesce(c.logto_sub, ''),
+	       c.status, coalesce(c.category, ''), coalesce(c.priority, ''), coalesce(c.summary, ''),
+	       coalesce(c.linear_issue_key, ''), coalesce(c.discord_thread_id, ''),
+	       c.opened_at, c.updated_at, c.closed_at,
+	       coalesce(s.plan, ''), coalesce(s.status, ''), coalesce(s.lifetime, false)
+	  FROM support_cases c
+	  LEFT JOIN stripe_customers s ON s.logto_sub = c.logto_sub
+	 WHERE c.ticket_number = $1
 `
 
 // HandleAdminCase - GET /admin/support/case/:ticket
@@ -622,15 +769,22 @@ func HandleAdminCase(c *fiber.Ctx) error {
 // happened.
 func buildAdminCase(ctx context.Context, ticket string) (*AdminCaseDetail, error) {
 	var d AdminCaseDetail
+	var planStatus string
+	var lifetime bool
 	err := platform.DBPool.QueryRow(ctx, caseSQL, ticket).Scan(
 		&d.TicketNumber, &d.Subject, &d.UserEmail, &d.LogtoSub, &d.Status,
 		&d.Category, &d.Priority, &d.Summary, &d.LinearIssueKey,
-		&d.DiscordThreadID, &d.OpenedAt, &d.UpdatedAt, &d.ClosedAt)
+		&d.DiscordThreadID, &d.OpenedAt, &d.UpdatedAt, &d.ClosedAt,
+		&d.Plan, &planStatus, &lifetime)
 	if err != nil {
 		if err != pgx.ErrNoRows {
 			log.Printf("[AdminSupport] case %s: %v", ticket, err)
 		}
 		return nil, err
+	}
+	d.Paying = planIsPaying(d.Plan, planStatus, lifetime)
+	if d.Plan == "" {
+		d.PlanNote = "No Stripe customer stands behind this ticket, so there is no current plan to show. That is normal for a case that arrived without a signed-in user."
 	}
 	if d.DiscordThreadID != "" {
 		if guild := strings.TrimSpace(os.Getenv("DISCORD_GUILD_ID")); guild != "" {

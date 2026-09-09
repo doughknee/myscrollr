@@ -150,6 +150,11 @@ const DEMO_BAR_EXCLUDED = [
   '/callback',
   '/u/',
   '/business',
+  // The staff console is a tool, not a shop window. A demo ticker scrolling
+  // fake prices over it is noise at every width, and at phone widths it is
+  // worse than noise: it is fixed to the bottom of the viewport, exactly
+  // where the Support case actions live (REL-266).
+  '/admin',
 ]
 
 function showsDemoBar(pathname: string): boolean {

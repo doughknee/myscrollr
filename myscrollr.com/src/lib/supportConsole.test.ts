@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  QUEUE_SECTIONS,
+  diagnosticsChips,
+  directionLabel,
   dispositionTone,
   fixBadge,
   formatDuration,
@@ -7,9 +10,32 @@ import {
   groupLabel,
   holdCountdown,
   isUnchanged,
+  lastUserMessage,
   lineDiff,
+  personMeta,
+  personTitle,
+  planBadge,
+  planLabel,
+  relativeAge,
 } from './supportConsole'
-import type { AdminHold } from '@/api/admin'
+import type { AdminHold, QueuePerson } from '@/api/admin'
+
+function person(over: Partial<QueuePerson> = {}): QueuePerson {
+  return {
+    key: 'r_armstrong@me.com',
+    email: 'r_armstrong@me.com',
+    name: 'Rachel Armstrong',
+    paying: false,
+    section: 'open',
+    tickets: 5,
+    needs_you: 1,
+    waiting: 2,
+    handled: 2,
+    waiting_hours: { value: 288, available: true },
+    ticket_numbers: ['752473'],
+    ...over,
+  }
+}
 
 const NOW = Date.parse('2026-09-09T12:18:00Z')
 
@@ -170,5 +196,177 @@ describe('lineDiff', () => {
 
   it('reports a wholly rewritten reply as changed', () => {
     expect(isUnchanged('the draft', 'something else entirely')).toBe(false)
+  })
+})
+
+// ── REL-266: people, sections and the sort controls ───────────────
+
+describe('QUEUE_SECTIONS', () => {
+  // The order is the whole design. Paying customers lead because priority
+  // support is something we sold, and no sort a reader picks may move it.
+  it('reads paying, open, answered, resolved and nothing else', () => {
+    expect(QUEUE_SECTIONS.map((s) => s.key)).toEqual([
+      'paying',
+      'open',
+      'answered',
+      'resolved',
+    ])
+  })
+})
+
+describe('planBadge', () => {
+  // "Free" and "nobody is behind this ticket" are different facts. #819835
+  // arrived anonymously from the marketing site, and badging it Free would
+  // invent an account for a stranger.
+  it('is nothing at all when there is no account behind the ticket', () => {
+    expect(planBadge({ paying: false })).toBeNull()
+    expect(planBadge({ plan: '  ', paying: false })).toBeNull()
+  })
+
+  it('says which plan, and whether it is a paying one', () => {
+    expect(planBadge({ plan: 'free', paying: false })).toEqual({
+      label: 'Free',
+      paying: false,
+    })
+    expect(planBadge({ plan: 'uplink_ultimate', paying: true })).toEqual({
+      label: 'Uplink Ultimate',
+      paying: true,
+    })
+  })
+})
+
+describe('planLabel', () => {
+  it('turns a column value into something to show a person', () => {
+    expect(planLabel('uplink_ultimate')).toBe('Uplink Ultimate')
+    expect(planLabel('uplink')).toBe('Uplink')
+    // An unknown plan is title-cased rather than printed raw or dropped.
+    expect(planLabel('team_annual')).toBe('Team Annual')
+  })
+})
+
+describe('personTitle', () => {
+  it('prefers the name, falls back to the email', () => {
+    expect(
+      personTitle({ name: 'Rachel Armstrong', email: 'r@me.com' }),
+    ).toEqual({ title: 'Rachel Armstrong', subtitle: 'r@me.com', known: true })
+    expect(personTitle({ email: 'r@me.com' })).toEqual({
+      title: 'r@me.com',
+      subtitle: null,
+      known: true,
+    })
+  })
+
+  // The one that matters: an unknown person must read as an unknown person,
+  // never as somebody called "Anonymous".
+  it('says there is no account rather than inventing a name', () => {
+    const who = personTitle({})
+    expect(who.known).toBe(false)
+    expect(who.title).toBe('No account on this ticket')
+    expect(who.title.toLowerCase()).not.toContain('anonymous')
+  })
+})
+
+describe('relativeAge', () => {
+  it('is null when there is no timestamp, so never never reads as recent', () => {
+    expect(relativeAge(undefined)).toBeNull()
+    expect(relativeAge('not a date')).toBeNull()
+  })
+
+  it('scales from minutes to months', () => {
+    const now = Date.parse('2026-09-09T12:00:00Z')
+    expect(relativeAge('2026-09-09T11:56:00Z', now)).toBe('4 minutes ago')
+    expect(relativeAge('2026-09-09T08:00:00Z', now)).toBe('4 hours ago')
+    expect(relativeAge('2026-09-09T11:00:00Z', now)).toBe('1 hour ago')
+    expect(relativeAge('2026-08-27T12:00:00Z', now)).toBe('13 days ago')
+    expect(relativeAge('2026-05-29T12:00:00Z', now)).toBe('3 months ago')
+  })
+})
+
+describe('personMeta', () => {
+  it('counts one ticket without an s', () => {
+    expect(personMeta(person({ tickets: 1 }))).toContain('1 ticket ')
+    expect(personMeta(person({ tickets: 5 }))).toContain('5 tickets')
+  })
+
+  it('says nothing about a wait it does not know', () => {
+    const line = personMeta(
+      person({ waiting_hours: { value: 0, available: false } }),
+    )
+    expect(line).toContain('never wrote in')
+    expect(line).not.toContain('0h')
+  })
+
+  // The bug this test exists for: waiting_hours is the LONGEST wait across
+  // someone's tickets, which is what the "longest waiting" sort reads. Under a
+  // label saying "last wrote", it told a reader that a customer whose open
+  // ticket was four hours old had last written forty days ago.
+  it('reads "last wrote" from when they last wrote, not from the longest wait', () => {
+    const now = Date.parse('2026-09-09T12:00:00Z')
+    const line = personMeta(
+      person({
+        tickets: 2,
+        last_user_message_at: '2026-09-09T08:00:00Z',
+        waiting_hours: { value: 960, available: true },
+      }),
+      now,
+    )
+    expect(line).toContain('last wrote 4 hours ago')
+    expect(line).not.toContain('40 days')
+  })
+
+  it('notes when everything of theirs is closed', () => {
+    expect(
+      personMeta(person({ tickets: 3, needs_you: 0, waiting: 0, handled: 3 })),
+    ).toContain('all resolved')
+  })
+})
+
+describe('directionLabel', () => {
+  // "Ascending" is a word about arrays. The button says what it will do.
+  it('says what the direction means for the field chosen', () => {
+    expect(directionLabel('waiting', 'desc')).toBe('Longest waiting first')
+    expect(directionLabel('waiting', 'asc')).toBe('Shortest wait first')
+    expect(directionLabel('last_wrote', 'desc')).toBe('Newest first')
+    expect(directionLabel('name', 'asc')).toBe('A to Z')
+    expect(directionLabel('plan', 'desc')).toBe('Paying first')
+  })
+})
+
+describe('diagnosticsChips', () => {
+  it('names what it does not know instead of dropping the chip', () => {
+    expect(diagnosticsChips({ version_state: 'unknown' })).toEqual([
+      'OS unknown',
+      'Version unknown',
+    ])
+  })
+
+  it('carries the version comparison the server made', () => {
+    expect(
+      diagnosticsChips({
+        os: 'Linux · AppImage',
+        app_version: '1.5.0',
+        current_version: '1.6.1',
+        version_state: 'behind',
+      }),
+    ).toEqual(['Linux · AppImage', '1.5.0 · behind 1.6.1'])
+  })
+})
+
+describe('lastUserMessage', () => {
+  it('is their most recent words, not ours and not a draft', () => {
+    expect(
+      lastUserMessage([
+        { kind: 'user', body: 'first' },
+        { kind: 'sent', body: 'our reply' },
+        { kind: 'user', body: 'still broken' },
+        { kind: 'ai_draft', body: 'a draft nobody sent' },
+      ]),
+    ).toBe('still broken')
+  })
+
+  it('is null when they are not on record, rather than an empty quote', () => {
+    expect(lastUserMessage([])).toBeNull()
+    expect(lastUserMessage(null)).toBeNull()
+    expect(lastUserMessage([{ kind: 'user', body: '   ' }])).toBeNull()
   })
 })

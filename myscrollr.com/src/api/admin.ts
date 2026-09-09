@@ -231,6 +231,28 @@ export interface AdminFix {
   reason: string
 }
 
+/**
+ * The four sections the page reads in, in order (REL-266).
+ *
+ * `paying` is a SECTION and not a sort key: priority support is something we
+ * sold, so nothing a reader picks in the sort controls may push a paying
+ * customer below somebody who did not pay.
+ */
+export type QueueSection = 'paying' | 'open' | 'answered' | 'resolved'
+
+export type QueueSort = 'last_wrote' | 'waiting' | 'tickets' | 'plan' | 'name'
+
+export type QueueDir = 'asc' | 'desc'
+export type QueueRowsMode = 'person' | 'ticket'
+
+export interface QueueQuery {
+  state?: string
+  sort?: QueueSort
+  dir?: QueueDir
+  rows?: QueueRowsMode
+  q?: string
+}
+
 export interface QueueRow {
   ticket_number: string
   subject: string
@@ -239,8 +261,19 @@ export interface QueueRow {
   priority?: string
   status: string
   summary?: string
+  os?: string
+  /** Empty when the ticket carried no name. Never invented. */
+  name?: string
+  /** The CURRENT subscription, empty when there is no Stripe row. */
+  plan?: string
+  paying: boolean
+  person_key: string
   group: QueueGroup
   group_reason: string
+  section: QueueSection
+  /** Who sent the last reply. The server decided this; do not re-derive it. */
+  provenance?: 'bot' | 'edited' | 'person'
+  provenance_label?: string
   draft_id?: number
   draft_status?: string
   disposition?: string
@@ -253,12 +286,59 @@ export interface QueueRow {
   updated_at: string
 }
 
+/** One row of the queue: a person, and the tickets they wrote. */
+export interface QueuePerson {
+  key: string
+  email?: string
+  name?: string
+  plan?: string
+  paying: boolean
+  plan_note?: string
+  section: QueueSection
+  tickets: number
+  needs_you: number
+  waiting: number
+  handled: number
+  headline?: string
+  headline_ticket?: string
+  provenance?: 'bot' | 'edited' | 'person'
+  provenance_label?: string
+  last_user_message_at?: string
+  waiting_hours: Measured
+  ticket_numbers: Array<string> | null
+}
+
+/**
+ * The caption under the paying section, and the sentence that explains it
+ * when it is empty. In production `cases_with_account` is 1 of 59: almost
+ * every ticket arrives with no signed-in user, so there is nothing to join a
+ * subscription to.
+ */
+export interface QueueAccounts {
+  paying: number
+  cases_with_account: number
+  cases: number
+  note: string
+}
+
 export interface SupportQueue {
   generated_at: string
   autosend: AutoSendState
-  counts: Record<string, number>
+  /**
+   * Keyed by group and by section. The values are optional because an
+   * arbitrary key is not a promise the server made — `counts.needs_you ?? 0`
+   * is how a caller says what an absent key should read as.
+   */
+  counts: Record<string, number | undefined>
+  sections: Record<string, number | undefined>
   state: string
+  sort: QueueSort
+  dir: QueueDir
+  rows_mode: QueueRowsMode
+  search?: string
+  accounts: QueueAccounts
   rows: Array<QueueRow> | null
+  people: Array<QueuePerson> | null
 }
 
 export interface CaseMessage {
@@ -333,6 +413,14 @@ export interface CaseDetail {
   closed_at?: string
   group: QueueGroup
   group_reason: string
+  /**
+   * The CURRENT subscription — a different question from `context.tier`,
+   * which is tier_at_open, the plan the model was told about on the day the
+   * ticket opened.
+   */
+  plan?: string
+  paying: boolean
+  plan_note?: string
   messages: Array<CaseMessage> | null
   draft: CaseDraft | null
   draft_note?: string
@@ -421,11 +509,26 @@ export const adminApi = {
       getToken,
     ),
 
-  supportQueue: (getToken: Token, state: string) =>
-    adminFetch<SupportQueue>(
-      `/admin/support/queue?state=${encodeURIComponent(state)}`,
+  /**
+   * The queue, sorted and searched BY THE SERVER (REL-266).
+   *
+   * Every knob here is a query parameter for the same reason: one read is
+   * capped at 500 cases, so a browser reordering whatever arrived would show a
+   * sorted page while calling it a sorted queue.
+   */
+  supportQueue: (getToken: Token, opts: QueueQuery = {}) => {
+    const params = new URLSearchParams({
+      state: opts.state ?? 'all',
+      sort: opts.sort ?? 'last_wrote',
+      dir: opts.dir ?? 'desc',
+      rows: opts.rows ?? 'person',
+    })
+    if (opts.q?.trim()) params.set('q', opts.q.trim())
+    return adminFetch<SupportQueue>(
+      `/admin/support/queue?${params.toString()}`,
       getToken,
-    ),
+    )
+  },
 
   supportCase: (getToken: Token, ticket: string) =>
     adminFetch<CaseDetail>(
