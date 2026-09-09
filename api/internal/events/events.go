@@ -219,6 +219,7 @@ func (h *Hub) listenToTopics(ctx context.Context) {
 		platform.TopicPrefixPredictions+"*",
 		platform.TopicPrefixCore+"*",
 		platform.TopicSSEControlResubscribe,
+		platform.TopicSupportAdmin,
 	)
 	defer pubsub.Close()
 
@@ -598,4 +599,41 @@ func getUserFantasyLeagues(ctx context.Context, userID string) ([]string, error)
 		keys = append(keys, key)
 	}
 	return keys, nil
+}
+
+// ===== The staff console's stream (REL-261) =======================
+
+// adminClientPrefix namespaces a console connection's hub key so it cannot
+// collide with the same person's desktop connection. An admin running Scrollr
+// on the same account would otherwise get support events in their ticker and
+// ticker CDC in their console — both harmless, both nonsense.
+const adminClientPrefix = "admin-console:"
+
+// AdminClientKey is the hub key a console connection registers under.
+func AdminClientKey(sub string) string { return adminClientPrefix + sub }
+
+// RegisterAdminClient adds a staff-console SSE connection: subscribed to the
+// support topic and to nothing else.
+//
+// It goes through the same hub, registry and dispatch workers as every other
+// client — the console is not a second fan-out, it is one more subscriber to
+// one more topic. What it skips is subscribeUserToTopics, because a browser
+// reading the support queue has no widgets and wants no CDC.
+func RegisterAdminClient(sub string) *Client {
+	client := &Client{
+		UserID: AdminClientKey(sub),
+		Ch:     make(chan []byte, platform.SSEClientBufferSize),
+	}
+	globalHub.register(client)
+	globalHub.registry.subscribe(client.UserID, platform.TopicSupportAdmin)
+	return client
+}
+
+// PublishSupportEvent puts one support-pipeline event on the console topic.
+// Best-effort by design: an event that does not reach a browser costs a
+// refresh, and nothing in the pipeline may fail because Redis hiccuped.
+func PublishSupportEvent(payload []byte) {
+	if err := platform.PublishRaw(platform.TopicSupportAdmin, payload); err != nil {
+		log.Printf("[EventHub] support event publish failed: %v", err)
+	}
 }

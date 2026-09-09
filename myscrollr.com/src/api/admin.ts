@@ -347,6 +347,44 @@ export interface CaseDetail {
   evidence_note: string
 }
 
+// ── Support console, the verbs (REL-261) ─────────────────────────
+
+/** What filing a bug did. `link_saved: false` is the one that matters. */
+export interface FiledBug {
+  issue_key: string
+  url: string
+  already_filed: boolean
+  link_saved: boolean
+}
+
+export interface FiledBugResult {
+  filed: FiledBug
+  case: CaseDetail
+}
+
+/**
+ * One support event off the SSE hub. It names the ticket that moved and what
+ * happened to it, and carries no case: the page re-reads from the same
+ * handlers it read the first time, so a socket can never disagree with the
+ * endpoint about what a case looks like.
+ */
+export interface SupportEvent {
+  type: 'support'
+  event:
+    | 'drafted'
+    | 'decided'
+    | 'sent'
+    | 'failed'
+    | 'skipped'
+    | 'held'
+    | 'linked'
+    | 'unlinked'
+    | 'autosend'
+  ticket_number?: string
+  disposition?: string
+  at: string
+}
+
 // ── Admins ────────────────────────────────────────────────────────
 
 export interface AdminRow {
@@ -408,4 +446,138 @@ export const adminApi = {
     adminFetch<{ status: string }>(`/admin/admins/${id}`, getToken, {
       method: 'DELETE',
     }),
+
+  // Every verb answers with the case as it now stands, so nothing below
+  // returns a status for the page to interpret — it returns the truth.
+  sendDraft: (getToken: Token, draftId: number) =>
+    draftAction<CaseDetail>(getToken, draftId, 'send'),
+
+  editAndSend: (getToken: Token, draftId: number, body: string) =>
+    draftAction<CaseDetail>(getToken, draftId, 'edit', { body }),
+
+  askUser: (getToken: Token, draftId: number, question: string) =>
+    draftAction<CaseDetail>(getToken, draftId, 'ask', { question }),
+
+  skipDraft: (getToken: Token, draftId: number) =>
+    draftAction<CaseDetail>(getToken, draftId, 'skip'),
+
+  holdDraft: (getToken: Token, draftId: number) =>
+    draftAction<CaseDetail>(getToken, draftId, 'hold'),
+
+  fileAsBug: (getToken: Token, draftId: number) =>
+    draftAction<FiledBugResult>(getToken, draftId, 'bug'),
+
+  linkIssue: (getToken: Token, ticket: string, issueKey: string) =>
+    adminFetch<CaseDetail>(
+      `/admin/support/case/${encodeURIComponent(ticket)}/link`,
+      getToken,
+      { method: 'POST', body: JSON.stringify({ issue_key: issueKey }) },
+    ),
+
+  unlinkIssue: (getToken: Token, ticket: string) =>
+    adminFetch<CaseDetail>(
+      `/admin/support/case/${encodeURIComponent(ticket)}/link`,
+      getToken,
+      { method: 'DELETE' },
+    ),
+
+  setAutoSendPaused: (getToken: Token, paused: boolean) =>
+    adminFetch<AutoSendState>('/admin/support/autosend', getToken, {
+      method: 'POST',
+      body: JSON.stringify({ paused }),
+    }),
+}
+
+function draftAction<T>(
+  getToken: Token,
+  draftId: number,
+  verb: string,
+  body?: unknown,
+): Promise<T> {
+  return adminFetch<T>(`/admin/support/draft/${draftId}/${verb}`, getToken, {
+    method: 'POST',
+    body: JSON.stringify(body ?? {}),
+  })
+}
+
+/** SSE frames are separated by a blank line; fields by a single one. */
+const FRAME_SEPARATOR = '\n\n'
+const LINE_SEPARATOR = '\n'
+
+/**
+ * Subscribe to the console's SSE stream. Returns a function that closes it.
+ *
+ * `fetch` rather than `EventSource` for one reason: EventSource cannot send an
+ * Authorization header, and the alternative is a JWT in the query string,
+ * which puts a credential in every proxy log between here and the API. The
+ * body is the same `data: {json}` frames either way, and the parsing below is
+ * the whole cost of not doing that.
+ *
+ * Reconnects with a fixed delay while the caller still wants it. This is a
+ * staff page on a fast network; anything cleverer than "try again in three
+ * seconds" would be machinery for a case that does not happen.
+ */
+export function subscribeToSupportEvents(
+  getToken: Token,
+  onEvent: (event: SupportEvent) => void,
+  onStatus?: (connected: boolean) => void,
+): () => void {
+  // The abort signal is the only "should I stop" flag. A second boolean beside
+  // it would be written from the returned closure, which control-flow analysis
+  // cannot see — so every check of it reads as dead code.
+  const controller = new AbortController()
+  // A function, not a property read: TypeScript narrows a property to false
+  // after the loop condition tests it, which makes every later check read as
+  // dead code even though abort() flips it from outside.
+  const stopped = () => controller.signal.aborted
+
+  const run = async () => {
+    while (!stopped()) {
+      try {
+        const token = await getToken()
+        const response = await fetch(`${API_BASE}/admin/support/stream`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: 'include',
+          signal: controller.signal,
+        })
+        if (!response.ok || !response.body) {
+          throw new AdminApiError('stream refused', response.status)
+        }
+        onStatus?.(true)
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const frames = buffer.split(FRAME_SEPARATOR)
+          // The trailing piece is a frame still arriving, not a frame.
+          buffer = frames.pop() ?? ''
+          for (const frame of frames) {
+            for (const line of frame.split(LINE_SEPARATOR)) {
+              // Anything that is not a data line — the retry hint, the
+              // heartbeat comment — carries nothing for this page.
+              if (!line.startsWith('data:')) continue
+              try {
+                onEvent(JSON.parse(line.slice(5).trim()) as SupportEvent)
+              } catch {
+                // A frame we cannot parse is a frame we ignore; the page
+                // catches up on the next one.
+              }
+            }
+          }
+        }
+      } catch {
+        if (stopped()) return
+      }
+      onStatus?.(false)
+      if (stopped()) return
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+    }
+  }
+  void run()
+
+  return () => controller.abort()
 }

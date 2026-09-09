@@ -160,6 +160,7 @@ func createSupportDraft(ctx context.Context, draft *SupportDraft) (*SupportDraft
 	applyTriageToCase(ctx, draft.TicketNumber, &TriageResult{
 		Category: draft.AICategory, Priority: draft.AIPriority, Summary: draft.AISummary,
 	})
+	publishSupportEvent(draft.TicketNumber, supportEventDrafted)
 	return draft, nil
 }
 

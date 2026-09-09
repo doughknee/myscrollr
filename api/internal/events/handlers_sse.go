@@ -54,18 +54,38 @@ func StreamEvents(c *fiber.Ctx) error {
 		})
 	}
 
-	// 3. Set headers for SSE
+	log.Printf("[SSE] Client connected: user=%s ip=%s", userID, c.IP())
+	return streamToClient(c, RegisterClient(userID), userID)
+}
+
+// StreamAdminEvents handles the staff console's SSE connection — GET
+// /admin/support/stream (REL-261).
+//
+// It carries the support topic and nothing else, and the gate is the route's
+// own middleware (LogtoAuth + RequireAdmin) rather than a token in the query
+// string: this is fetched with an Authorization header from a browser that
+// already holds one, so there is no reason to put a credential in a URL.
+func StreamAdminEvents(c *fiber.Ctx) error {
+	sub := platform.GetUserID(c)
+	if sub == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(platform.ErrorResponse{
+			Status: "unauthorized",
+			Error:  "Authentication required",
+		})
+	}
+	log.Printf("[SSE] Admin console connected: ip=%s", c.IP())
+	return streamToClient(c, RegisterAdminClient(sub), AdminClientKey(sub))
+}
+
+// streamToClient writes the SSE body for an already-registered client until it
+// disconnects. Shared by the desktop stream and the console stream so the
+// heartbeat, the retry hint and the panic containment below exist once.
+func streamToClient(c *fiber.Ctx, client *Client, label string) error {
 	c.Set("Content-Type", "text/event-stream")
 	c.Set("Cache-Control", "no-cache")
 	c.Set("Connection", "keep-alive")
 	c.Set("Transfer-Encoding", "chunked")
 
-	// 4. Register this authenticated client
-	client := RegisterClient(userID)
-
-	log.Printf("[SSE] Client connected: user=%s ip=%s", userID, c.IP())
-
-	// 5. Stream events to the client
 	c.Context().SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
 		// This runs in a fasthttp-spawned goroutine, so a panic here crashes
 		// the whole process — Fiber's Recover middleware only wraps the request
@@ -75,7 +95,7 @@ func StreamEvents(c *fiber.Ctx) error {
 		// deferred UnregisterClient below as well.
 		defer func() {
 			if r := recover(); r != nil {
-				log.Printf("[SSE] recovered from panic in stream writer (user=%s): %v", userID, r)
+				log.Printf("[SSE] recovered from panic in stream writer (%s): %v", label, r)
 			}
 		}()
 		ticker := time.NewTicker(platform.SSEHeartbeatInterval)

@@ -71,6 +71,14 @@ const (
 	// this, only the replica that served the config-change HTTP request
 	// would refresh, leaving the connection-holding replica stale.
 	TopicSSEControlResubscribe = "sse:ctl:resubscribe"
+
+	// TopicSupportAdmin carries support-pipeline events to the staff console
+	// (REL-261): a draft written, a disposition decided, a hold armed, a reply
+	// sent, an escalation. One channel, not one per ticket — the console is a
+	// queue, every admin watching it wants every event, and there are a few an
+	// hour. The payload names the ticket and the event; the page re-reads what
+	// it needs rather than trusting a copy of a case to arrive intact.
+	TopicSupportAdmin = "support:admin"
 )
 
 // =============================================================================

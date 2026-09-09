@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -7,6 +7,9 @@ import {
   HelpCircle,
   Loader2,
   MessageSquare,
+  Pause,
+  Play,
+  Radio,
 } from 'lucide-react'
 import type {
   AdminFix,
@@ -17,7 +20,8 @@ import type {
   QueueRow,
   SupportQueue,
 } from '@/api/admin'
-import { adminApi } from '@/api/admin'
+import { adminApi, subscribeToSupportEvents } from '@/api/admin'
+import CaseActions from '@/components/admin/CaseActions'
 import {
   QUEUE_GROUPS,
   dispositionTone,
@@ -30,9 +34,16 @@ import { useGetToken } from '@/hooks/useGetToken'
 /**
  * The Support section: the queue on the left, one case on the right.
  *
- * Read-only. Every verb — send, hold, edit, ask, skip — is REL-261, and the
- * point of shipping the read half first is to prove every fact is visible
- * before a button can act on one.
+ * REL-263 built the read half; REL-261 gave every fact on it a button. Each
+ * button calls the same server function the Discord button calls, so the two
+ * surfaces cannot drift while they coexist, and a case reads the same
+ * whichever one was used.
+ *
+ * The page moves on its own. A support event on the SSE hub — a draft written,
+ * a disposition decided, a reply sent — re-reads the queue and the open case
+ * from the endpoints that built them. Nothing polls, and nothing patches a
+ * case out of a socket payload: the event says which ticket moved, and the
+ * server says what it now looks like.
  *
  * The case view is the whole reason this exists. Discord could show the draft
  * and roughly two thousand characters of it; it could not show what the
@@ -408,14 +419,22 @@ function Pipeline({ detail }: { detail: CaseDetail }) {
 
 // ── the case ──────────────────────────────────────────────────────
 
-function CaseView({ ticket }: { ticket: string }) {
+function CaseView({
+  ticket,
+  reloadKey,
+}: {
+  ticket: string
+  reloadKey: number
+}) {
   const getToken = useGetToken()
   const [detail, setDetail] = useState<CaseDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // reloadKey is bumped when a support event names this ticket. The panel is
+  // NOT blanked on a re-read — only on a change of ticket — so a reply landing
+  // while you are reading does not throw the page away and start again.
   useEffect(() => {
     let cancelled = false
-    setDetail(null)
     setError(null)
     adminApi
       .supportCase(getToken, ticket)
@@ -432,7 +451,9 @@ function CaseView({ ticket }: { ticket: string }) {
     return () => {
       cancelled = true
     }
-  }, [getToken, ticket])
+  }, [getToken, ticket, reloadKey])
+
+  useEffect(() => setDetail(null), [ticket])
 
   if (error) {
     return <p className="p-4 text-sm text-error">{error}</p>
@@ -483,6 +504,7 @@ function CaseView({ ticket }: { ticket: string }) {
 
       <Conversation detail={detail} />
       <Pipeline detail={detail} />
+      <CaseActions detail={detail} onCase={setDetail} />
 
       <section>
         <h2 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
@@ -662,6 +684,10 @@ export default function SupportPage() {
   const [queue, setQueue] = useState<SupportQueue | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [live, setLive] = useState(false)
+  const [queueKey, setQueueKey] = useState(0)
+  const [caseKey, setCaseKey] = useState(0)
+  const [switching, setSwitching] = useState(false)
 
   const load = useCallback(() => {
     let cancelled = false
@@ -680,9 +706,51 @@ export default function SupportPage() {
     return () => {
       cancelled = true
     }
-  }, [getToken, filter])
+  }, [getToken, filter, queueKey])
 
   useEffect(() => load(), [load])
+
+  // The open ticket lives in a ref so the subscription below never has to be
+  // torn down and rebuilt when the selection changes — reconnecting the stream
+  // on every click would drop events in the gap.
+  const selectedRef = useRef<string | null>(null)
+  selectedRef.current = selected
+
+  useEffect(() => {
+    return subscribeToSupportEvents(
+      getToken,
+      (event) => {
+        // Every event moves the queue: a group, a countdown or a row. The open
+        // case is re-read only when the event is about it, or about the
+        // pipeline switch, which changes what every countdown means.
+        setQueueKey((n) => n + 1)
+        if (
+          !event.ticket_number ||
+          event.ticket_number === selectedRef.current
+        ) {
+          setCaseKey((n) => n + 1)
+        }
+      },
+      setLive,
+    )
+  }, [getToken])
+
+  const toggleAutoSend = async () => {
+    if (!queue) return
+    setSwitching(true)
+    try {
+      const next = await adminApi.setAutoSendPaused(
+        getToken,
+        !queue.autosend.paused,
+      )
+      setQueue({ ...queue, autosend: next })
+      setQueueKey((n) => n + 1)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'The switch did not move.')
+    } finally {
+      setSwitching(false)
+    }
+  }
 
   const rows = queue?.rows ?? []
   const groups = QUEUE_GROUPS.filter(
@@ -694,20 +762,49 @@ export default function SupportPage() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Support</h1>
         <p className="mt-1 text-sm text-base-content/60">
-          Read-only. Send, hold, edit, ask and skip are still Discord&apos;s —
-          this side proves every fact is visible first.
+          Every verb here is the same function the Discord buttons call. Send is
+          the only one that cannot be undone, and the only one that asks twice.
         </p>
         {queue && (
-          <p
-            className={`mt-3 rounded-lg px-3 py-2 text-xs ring-1 ${
+          <div
+            className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2 ring-1 ${
               queue.autosend.armed
                 ? 'bg-warning/10 ring-warning/30'
                 : 'bg-base-200/50 ring-base-300/60'
             }`}
           >
-            {queue.autosend.note}
-          </p>
+            <p className="text-xs">{queue.autosend.note}</p>
+            {/* Pause and resume, the same switch /pause and /resume throw.
+                Un-demoting a category stays a Discord command: that is a
+                judgement about a class of tickets, not a button beside one. */}
+            {queue.autosend.enabled && (
+              <button
+                type="button"
+                onClick={toggleAutoSend}
+                disabled={switching}
+                className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-base-100 px-2.5 py-1 text-xs font-medium ring-1 ring-base-300/60 hover:bg-base-200/60 disabled:opacity-50"
+              >
+                {switching ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : queue.autosend.paused ? (
+                  <Play size={12} />
+                ) : (
+                  <Pause size={12} />
+                )}
+                {queue.autosend.paused ? 'Resume sending' : 'Pause sending'}
+              </button>
+            )}
+          </div>
         )}
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-base-content/45">
+          <Radio
+            size={12}
+            className={live ? 'text-success' : 'text-base-content/40'}
+          />
+          {live
+            ? 'Live — holds and replies appear here without a refresh.'
+            : 'Not connected to the live stream; this page is showing what it last read.'}
+        </p>
       </header>
 
       {error && <p className="text-sm text-error">{error}</p>}
@@ -786,7 +883,7 @@ export default function SupportPage() {
 
           <div className="min-w-0 flex-1">
             {selected ? (
-              <CaseView ticket={selected} />
+              <CaseView ticket={selected} reloadKey={caseKey} />
             ) : (
               <div className="rounded-xl bg-base-200/30 px-6 py-16 text-center ring-1 ring-base-300/60">
                 <p className="text-sm text-base-content/60">

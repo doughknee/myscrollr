@@ -138,3 +138,77 @@ export function fixBadge(
   if (!fix.proven) return `${fix.issue_key} · not shipped`
   return `${fix.issue_key} · shipped in ${fix.version}`
 }
+
+/** One line of a rendered diff. */
+export interface DiffLine {
+  kind: 'kept' | 'removed' | 'added'
+  text: string
+}
+
+/**
+ * A line-level diff of the draft against the edit, for the panel that opens
+ * before Send.
+ *
+ * This is the point of editing here rather than in a Discord modal: the modal
+ * was one text box and you sent whatever was in it, and half of every actioned
+ * draft in the May–September audit was rewritten with nothing left recording
+ * what had been wrong with it. Seeing what you changed, immediately before the
+ * click that reaches a person, is the cheapest version of that record — and
+ * the same diff is posted into the thread afterwards.
+ *
+ * Standard LCS over lines, matching what the server posts to Discord. Support
+ * replies are tens of lines, so the O(n·m) table is the right machinery.
+ */
+export function lineDiff(before: string, after: string): Array<DiffLine> {
+  const a = splitMeaningfulLines(before)
+  const b = splitMeaningfulLines(after)
+
+  // lcs[i][j] = length of the longest common subsequence of a[i:] and b[j:].
+  const lcs: Array<Array<number>> = Array.from({ length: a.length + 1 }, () =>
+    new Array<number>(b.length + 1).fill(0),
+  )
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      lcs[i][j] =
+        a[i] === b[j]
+          ? lcs[i + 1][j + 1] + 1
+          : Math.max(lcs[i + 1][j], lcs[i][j + 1])
+    }
+  }
+
+  const out: Array<DiffLine> = []
+  let i = 0
+  let j = 0
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      out.push({ kind: 'kept', text: a[i] })
+      i++
+      j++
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
+      out.push({ kind: 'removed', text: a[i] })
+      i++
+    } else {
+      out.push({ kind: 'added', text: b[j] })
+      j++
+    }
+  }
+  for (; i < a.length; i++) out.push({ kind: 'removed', text: a[i] })
+  for (; j < b.length; j++) out.push({ kind: 'added', text: b[j] })
+  return out
+}
+
+/** Splits on newlines, dropping blanks so a reflowed paragraph is not a wall. */
+function splitMeaningfulLines(s: string): Array<string> {
+  return s
+    .trim()
+    .split(NEWLINE)
+    .map((l) => l.trim())
+    .filter((l) => l !== '')
+}
+
+const NEWLINE = '\n'
+
+/** True when the edit changed nothing worth showing. */
+export function isUnchanged(before: string, after: string): boolean {
+  return lineDiff(before, after).every((l) => l.kind === 'kept')
+}

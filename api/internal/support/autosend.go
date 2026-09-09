@@ -47,6 +47,7 @@ func applyDisposition(ctx context.Context, draft *SupportDraft) {
 		return
 	}
 	draft.Disposition, draft.DispositionReason = disposition, reason
+	publishSupportEvent(draft.TicketNumber, supportEventDecided, disposition)
 	log.Printf("[Disposition] draft %d (ticket %s) -> %s (%s) armed=%t",
 		draft.ID, draft.TicketNumber, disposition, reason, armed)
 

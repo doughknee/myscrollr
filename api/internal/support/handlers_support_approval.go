@@ -340,8 +340,13 @@ var sendApprovedReply = func(ctx context.Context, draft *SupportDraft, body stri
 func sendDraftReply(ctx context.Context, draft *SupportDraft, body string) error {
 	if err := sendApprovedReply(ctx, draft, body); err != nil {
 		markDraftFailed(ctx, draft.ID)
+		publishSupportEvent(draft.TicketNumber, supportEventFailed)
 		return err
 	}
 	markDraftSent(ctx, draft.ID)
+	// Every send goes through here (REL-256), which is exactly why the console
+	// event is published here and not once per verb: an Ask, an edit, a plain
+	// Send and the sweeper's unattended send all reach a person the same way.
+	publishSupportEvent(draft.TicketNumber, supportEventSent)
 	return nil
 }

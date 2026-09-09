@@ -248,6 +248,26 @@ func (s *Server) setupRoutes() {
 	s.App.Get("/admin/support/queue", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminQueue)
 	s.App.Get("/admin/support/case/:ticket", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminCase)
 
+	// The write half (REL-261). Every one of these is the same function the
+	// Discord button calls, behind the same gate as the read half. Send is the
+	// only irreversible one and the only one the page confirms; friction on the
+	// reversible ones is what makes people stop using a tool.
+	s.App.Post("/admin/support/draft/:draft/send", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminSend)
+	s.App.Post("/admin/support/draft/:draft/edit", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminEditAndSend)
+	s.App.Post("/admin/support/draft/:draft/ask", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminAsk)
+	s.App.Post("/admin/support/draft/:draft/skip", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminSkip)
+	s.App.Post("/admin/support/draft/:draft/hold", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminHold)
+	s.App.Post("/admin/support/draft/:draft/bug", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminFileAsBug)
+	s.App.Post("/admin/support/case/:ticket/link", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminLinkIssue)
+	s.App.Delete("/admin/support/case/:ticket/link", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminUnlinkIssue)
+	s.App.Post("/admin/support/autosend", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminAutoSend)
+
+	// The console's own SSE stream: the support topic and nothing else, so a
+	// hold counting down and a reply landing show up without a refresh. Same
+	// gate again - and the credential stays in the Authorization header, which
+	// is why the page reads this with fetch rather than EventSource.
+	s.App.Get("/admin/support/stream", platform.LogtoAuth, admin.RequireAdmin, events.StreamAdminEvents)
+
 	s.App.Get("/dashboard", platform.LogtoAuth, s.getDashboard)
 
 	// Support

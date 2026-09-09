@@ -219,53 +219,49 @@ func handleDiscordButtonClick(c *fiber.Ctx, ix *discordInteraction) error {
 	}
 }
 
-// handleDiscordSendAction calls the existing approve-and-send flow.
+// handleDiscordSendAction sends the draft. Deferred, because the send is a
+// round-trip to osTicket and Resend while Discord's interaction budget is
+// three seconds — and because a confirmation posted before the send finishes
+// is a confirmation that can be wrong.
 func handleDiscordSendAction(c *fiber.Ctx, ix *discordInteraction, draftID int64) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	draft, err := loadSupportDraft(ctx, draftID)
-	if err != nil {
-		log.Printf("[DiscordInteraction] load draft %d: %v", draftID, err)
-		return discordEphemeralResponse(c, "Could not load draft.")
-	}
-	if draft == nil {
-		return discordEphemeralResponse(c, "Draft not found (already actioned?).")
-	}
-	if draft.Status != "pending" {
-		return discordEphemeralResponse(c,
-			fmt.Sprintf("Draft is `%s` (already actioned).", draft.Status))
-	}
-
-	// Atomic decide → approved (no edits). Same call the email
-	// approval flow makes for the Send action.
-	if err := markDraftDecided(ctx, draftID, "approved", ""); err != nil {
-		log.Printf("[DiscordInteraction] markDraftDecided for %d: %v", draftID, err)
-		return discordEphemeralResponse(c, "Could not mark draft as approved.")
-	}
-	// Reload to get the post-mark state (status='approved').
-	draft, _ = loadSupportDraft(ctx, draftID)
-
-	// Fire-and-forget the actual reply send + thread state transition.
-	// On send success: flip thread to "sent" tag, prefix [SENT] in name.
-	// If close-flag also set: append "closed" tag, archive thread.
-	// On send failure: leave thread in "pending" so partner can retry.
-	go func() {
-		bgCtx, bgCancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer bgCancel()
-		if err := sendDraftReply(bgCtx, draft, draft.DraftBodyHTML); err != nil {
-			log.Printf("[DiscordInteraction] sendDraftReply for ticket %s: %v",
-				draft.TicketNumber, err)
-			return
+	return discordDeferred(c, ix, func(ctx context.Context) string {
+		draft, err := ActionSend(ctx, draftID)
+		if err != nil {
+			return discordActionError("send", draftID, err)
 		}
-		applySendStateToThread(bgCtx, draft, draft.ShouldClose)
-	}()
+		return buildSendConfirmation(draft)
+	})
+}
 
-	// Render a richer confirmation than just "✅ Sent" — give the
-	// partner the recipient + ticket-number + auto-close indicator
-	// without making them re-read the thread header.
-	confirmation := buildSendConfirmation(draft)
-	return discordVisibleResponse(c, confirmation)
+// discordDeferred answers Discord inside its three-second budget and posts
+// what actually happened once the work finishes. Every verb goes through it,
+// so each handler is the shared action plus the sentence to show for it.
+func discordDeferred(c *fiber.Ctx, ix *discordInteraction, work func(context.Context) string) error {
+	appID, token := ix.ApplicationID, ix.Token
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		if err := discordCompleteDeferred(ctx, appID, token, work(ctx)); err != nil {
+			log.Printf("[DiscordInteraction] deferred follow-up: %v", err)
+		}
+	}()
+	return c.JSON(fiber.Map{"type": discordResponseDeferredChannelMessage})
+}
+
+// discordActionError turns a shared verb's error into the line a partner
+// reads. The three that are not failures get their own sentence: a draft
+// somebody already actioned, one that is gone, and an empty box.
+func discordActionError(verb string, draftID int64, err error) string {
+	switch {
+	case errors.Is(err, ErrAlreadyDecided):
+		return "Draft is already actioned."
+	case errors.Is(err, ErrDraftNotFound):
+		return "Draft not found (already actioned?)."
+	case errors.Is(err, ErrEmptyBody):
+		return "There was nothing to send."
+	}
+	log.Printf("[DiscordInteraction] %s draft %d: %v", verb, draftID, err)
+	return "⚠️ Could not " + verb + ": " + truncate(err.Error(), 300)
 }
 
 // buildSendConfirmation renders the post-Send message visible in the
@@ -506,44 +502,20 @@ func handleDiscordAskOpenModal(c *fiber.Ctx, ix *discordInteraction, draftID int
 func stopHoldForModal(draftID int64) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := holdDraft(ctx, draftID); err != nil && !errors.Is(err, ErrAlreadyDecided) {
+	if _, err := ActionHold(ctx, draftID); err != nil && !errors.Is(err, ErrAlreadyDecided) {
 		log.Printf("[DiscordInteraction] stop hold for draft %d: %v", draftID, err)
 	}
 }
 
-// handleDiscordSkipAction marks the draft as skipped.
+// handleDiscordSkipAction decides that this ticket needs no reply.
 func handleDiscordSkipAction(c *fiber.Ctx, ix *discordInteraction, draftID int64) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	draft, err := loadSupportDraft(ctx, draftID)
-	if err != nil {
-		return discordEphemeralResponse(c, "Could not load draft.")
-	}
-	if draft == nil {
-		return discordEphemeralResponse(c, "Draft not found.")
-	}
-	if draft.Status != "pending" {
-		return discordEphemeralResponse(c,
-			fmt.Sprintf("Draft is `%s` (already actioned).", draft.Status))
-	}
-
-	if err := markDraftDecided(ctx, draftID, "skipped", ""); err != nil {
-		log.Printf("[DiscordInteraction] markDraftDecided (skipped) %d: %v", draftID, err)
-		return discordEphemeralResponse(c, "Could not skip draft.")
-	}
-
-	markIntervened(ctx, draftID)
-
-	// Update thread cosmetics fire-and-forget.
-	go func() {
-		bgCtx, bgCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer bgCancel()
-		applySkipStateToThread(bgCtx, draft)
-	}()
-
-	return discordVisibleResponse(c,
-		fmt.Sprintf("⏭️ Skipped — ticket #%s left without an AI reply.", draft.TicketNumber))
+	return discordDeferred(c, ix, func(ctx context.Context) string {
+		draft, err := ActionSkip(ctx, draftID)
+		if err != nil {
+			return discordActionError("skip", draftID, err)
+		}
+		return fmt.Sprintf("⏭️ Skipped — ticket #%s left without an AI reply.", draft.TicketNumber)
+	})
 }
 
 // handleDiscordHoldAction stops a running countdown without deciding the
@@ -554,24 +526,15 @@ func handleDiscordSkipAction(c *fiber.Ctx, ix *discordInteraction, draftID int64
 // a person saying "not this one, not yet" without having to also say what
 // should happen instead. It counts as an intervention.
 func handleDiscordHoldAction(c *fiber.Ctx, ix *discordInteraction, draftID int64) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	draft, err := loadSupportDraft(ctx, draftID)
-	if err != nil || draft == nil {
-		return discordEphemeralResponse(c, "Draft not found.")
-	}
-	if draft.Status != "pending" {
-		return discordEphemeralResponse(c,
-			fmt.Sprintf("Draft is `%s` (already actioned).", draft.Status))
-	}
-	if err := holdDraft(ctx, draftID); err != nil {
-		log.Printf("[DiscordInteraction] holdDraft %d: %v", draftID, err)
-		return discordEphemeralResponse(c, "Could not hold this draft.")
-	}
-	return discordVisibleResponse(c, fmt.Sprintf(
-		"✋ Held — ticket #%s will not send by itself. Send, Edit, Ask or Skip when you are ready.",
-		draft.TicketNumber))
+	return discordDeferred(c, ix, func(ctx context.Context) string {
+		draft, err := ActionHold(ctx, draftID)
+		if err != nil {
+			return discordActionError("hold", draftID, err)
+		}
+		return fmt.Sprintf(
+			"✋ Held — ticket #%s will not send by itself. Send, Edit, Ask or Skip when you are ready.",
+			draft.TicketNumber)
+	})
 }
 
 // =============================================================================
@@ -603,52 +566,13 @@ func handleDiscordModalSubmit(c *fiber.Ctx, ix *discordInteraction) error {
 	}
 
 	editedBody := strings.TrimSpace(modalFieldValue(ix, "edited_body"))
-	if editedBody == "" {
-		return discordEphemeralResponse(c, "Edited body is empty.")
-	}
-
-	// Wrap plain-text in basic HTML so the email rendering path doesn't
-	// break. Existing pipeline expects HTML.
-	editedBodyHTML := plainToHTMLParagraphs(editedBody)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	draft, err := loadSupportDraft(ctx, draftID)
-	if err != nil || draft == nil {
-		return discordEphemeralResponse(c, "Draft not found.")
-	}
-	if draft.Status != "pending" {
-		return discordEphemeralResponse(c,
-			fmt.Sprintf("Draft is `%s` (already actioned).", draft.Status))
-	}
-
-	// Atomic decide → edited with the edited body persisted on the row.
-	if err := markDraftDecided(ctx, draftID, "edited", editedBodyHTML); err != nil {
-		log.Printf("[DiscordInteraction] markDraftDecided (edited) %d: %v", draftID, err)
-		return discordEphemeralResponse(c, "Could not save edits.")
-	}
-	markIntervened(ctx, draftID)
-	draft, _ = loadSupportDraft(ctx, draftID)
-
-	originalBody := draft.DraftBodyHTML
-	go func() {
-		bgCtx, bgCancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer bgCancel()
-		if err := sendDraftReply(bgCtx, draft, editedBodyHTML); err != nil {
-			log.Printf("[DiscordInteraction] sendDraftReply (edited) for ticket %s: %v",
-				draft.TicketNumber, err)
-			return
+	return discordDeferred(c, ix, func(ctx context.Context) string {
+		draft, err := ActionEditAndSend(ctx, draftID, editedBody)
+		if err != nil {
+			return discordActionError("send the edit", draftID, err)
 		}
-		// Edit-then-send still goes through the same thread state
-		// transitions as plain Send. Tag flips to "edited" instead of
-		// "sent" so we can distinguish them in /stats.
-		applyEditStateToThread(bgCtx, draft, draft.ShouldClose)
-		postEditDiff(bgCtx, draft, htmlToPlain(originalBody), editedBody)
-	}()
-
-	confirmation := buildEditConfirmation(draft)
-	return discordVisibleResponse(c, confirmation)
+		return buildEditConfirmation(draft)
+	})
 }
 
 // buildEditConfirmation parallels buildSendConfirmation for the
@@ -719,48 +643,14 @@ func modalFieldValue(ix *discordInteraction, customID string) string {
 // reply with the new information in it.
 func handleDiscordAskSubmit(c *fiber.Ctx, ix *discordInteraction, draftID int64) error {
 	question := strings.TrimSpace(modalFieldValue(ix, "ask_body"))
-	if question == "" {
-		return discordEphemeralResponse(c, "Question is empty.")
-	}
-	questionHTML := plainToHTMLParagraphs(question)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	draft, err := loadSupportDraft(ctx, draftID)
-	if err != nil || draft == nil {
-		return discordEphemeralResponse(c, "Draft not found.")
-	}
-	if draft.Status != "pending" {
-		return discordEphemeralResponse(c,
-			fmt.Sprintf("Draft is `%s` (already actioned).", draft.Status))
-	}
-
-	if err := markDraftDecided(ctx, draftID, "asked", questionHTML); err != nil {
-		log.Printf("[DiscordInteraction] markDraftDecided (asked) %d: %v", draftID, err)
-		return discordEphemeralResponse(c, "Could not record the question.")
-	}
-	draft, _ = loadSupportDraft(ctx, draftID)
-	if draft == nil {
-		return discordEphemeralResponse(c, "Draft vanished mid-ask.")
-	}
-	// A question never closes a ticket, whatever triage thought of the
-	// reply it replaces.
-	draft.ShouldClose = false
-
-	go func() {
-		bgCtx, bgCancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer bgCancel()
-		if err := sendDraftReply(bgCtx, draft, questionHTML); err != nil {
-			log.Printf("[DiscordInteraction] send question for ticket %s: %v", draft.TicketNumber, err)
-			return
+	return discordDeferred(c, ix, func(ctx context.Context) string {
+		draft, err := ActionAsk(ctx, draftID, question)
+		if err != nil {
+			return discordActionError("ask", draftID, err)
 		}
-		applyAskStateToThread(bgCtx, draft)
-	}()
-
-	return discordVisibleResponse(c, fmt.Sprintf(
-		"❓ Asked on ticket #%s — waiting on the user:\n> %s",
-		draft.TicketNumber, strings.ReplaceAll(question, "\n", "\n> ")))
+		return fmt.Sprintf("❓ Asked on ticket #%s — waiting on the user:\n> %s",
+			draft.TicketNumber, strings.ReplaceAll(question, "\n", "\n> "))
+	})
 }
 
 // applyAskStateToThread is the Ask analog of applySendStateToThread. The
@@ -884,61 +774,28 @@ func splitLines(s string) []string {
 // duplicate — the same button on the same thread is how someone checks
 // whether it was already filed.
 func handleDiscordFileAsBug(c *fiber.Ctx, ix *discordInteraction, draftID int64) error {
-	appID, token := ix.ApplicationID, ix.Token
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-		defer cancel()
-		msg := fileDraftAsBug(ctx, draftID)
-		if err := discordCompleteDeferred(ctx, appID, token, msg); err != nil {
-			log.Printf("[DiscordInteraction] file-as-bug follow-up for draft %d: %v", draftID, err)
-		}
-	}()
-	return c.JSON(fiber.Map{"type": discordResponseDeferredChannelMessage})
+	return discordDeferred(c, ix, func(ctx context.Context) string {
+		return fileDraftAsBug(ctx, draftID)
+	})
 }
 
-// fileDraftAsBug does the work and returns the message to post in the
-// thread — success, "already filed", or why it failed. Never returns an
-// error: whatever happened, the partner needs to read it in Discord.
+// fileDraftAsBug phrases ActionFileAsBug for the thread — success, "already
+// filed", or why it failed. Never returns an error: whatever happened, the
+// partner needs to read it in Discord.
 func fileDraftAsBug(ctx context.Context, draftID int64) string {
-	draft, err := loadSupportDraft(ctx, draftID)
-	if err != nil || draft == nil {
-		return "Could not load draft."
-	}
-
-	if existing := caseLinearIssueKey(ctx, draft.TicketNumber); existing != "" {
-		return fmt.Sprintf("🐛 Already filed as **%s** — %s",
-			existing, linearIssueURL(existing))
-	}
-
-	title := strings.TrimSpace(draft.AISummary)
-	if title == "" {
-		title = strings.TrimSpace(draft.OriginalSubject)
-	}
-	if title == "" {
-		title = "Support ticket #" + draft.TicketNumber
-	}
-	title = truncateRunes(title, 120)
-
-	issue, err := linearCreateIssue(ctx, title, buildLinearIssueBody(ctx, draft))
+	res, err := ActionFileAsBug(ctx, draftID)
 	if err != nil {
-		log.Printf("[DiscordInteraction] linear create for ticket %s: %v", draft.TicketNumber, err)
-		return "⚠️ Could not file in Linear: " + err.Error()
+		return discordActionError("file as bug", draftID, err)
 	}
-
-	if err := setCaseLinearIssueKey(ctx, draft.TicketNumber, issue.Identifier); err != nil {
-		// The issue exists; we just can't remember it. Say so, or the next
-		// click files a second one silently.
-		log.Printf("[DiscordInteraction] link %s to ticket %s: %v", issue.Identifier, draft.TicketNumber, err)
-		return fmt.Sprintf("🐛 Filed **%s** (%s) — but the link back to ticket #%s did not save; a second click will file a duplicate.",
-			issue.Identifier, issue.URL, draft.TicketNumber)
+	switch {
+	case res.Already:
+		return fmt.Sprintf("🐛 Already filed as **%s** — %s", res.IssueKey, res.URL)
+	case !res.LinkSaved:
+		return fmt.Sprintf("🐛 Filed **%s** (%s) — but the link back to the ticket did not save; a second click will file a duplicate.",
+			res.IssueKey, res.URL)
+	default:
+		return fmt.Sprintf("🐛 Filed as **%s** — %s", res.IssueKey, res.URL)
 	}
-	if err := recordSupportMessage(ctx, SupportMessage{
-		TicketNumber: draft.TicketNumber, Kind: "note",
-		BodyText: "filed as " + issue.Identifier, AIDraftID: draft.ID,
-	}); err != nil {
-		log.Printf("[Cases] %v", err)
-	}
-	return fmt.Sprintf("🐛 Filed as **%s** — %s", issue.Identifier, issue.URL)
 }
 
 // buildLinearIssueBody is what an engineer needs to pick the issue up: the
@@ -1089,7 +946,7 @@ func handleDiscordSlashCommand(c *fiber.Ctx, ix *discordInteraction) error {
 func handleDiscordPauseCommand(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := policySet(ctx, policyPausedKey, time.Now().UTC().Format(time.RFC3339)); err != nil {
+	if err := ActionSetPaused(ctx, true); err != nil {
 		log.Printf("[DiscordInteraction] pause: %v", err)
 		return discordEphemeralResponse(c, "Could not pause. Set SUPPORT_AUTOSEND=off if this keeps failing.")
 	}
@@ -1107,7 +964,7 @@ func handleDiscordResumeCommand(c *fiber.Ctx, ix *discordInteraction) error {
 
 	category := strings.ToLower(strings.TrimSpace(commandOption(ix, "category")))
 	if category == "" {
-		if err := policyDelete(ctx, policyPausedKey); err != nil {
+		if err := ActionSetPaused(ctx, false); err != nil {
 			log.Printf("[DiscordInteraction] resume: %v", err)
 			return discordEphemeralResponse(c, "Could not resume.")
 		}
