@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/accounts"
+	"github.com/brandon-relentnet/myscrollr/api/internal/admin"
 	"github.com/brandon-relentnet/myscrollr/api/internal/billing"
 	"github.com/brandon-relentnet/myscrollr/api/internal/events"
 	"github.com/brandon-relentnet/myscrollr/api/internal/ingestread"
@@ -221,6 +222,22 @@ func (s *Server) setupRoutes() {
 	s.App.Get("/", s.landingPage)
 
 	// --- Protected Routes ---
+
+	// --- Staff console (REL-260) ---
+	//
+	// Two middlewares, in this order and never fewer: LogtoAuth proves who the
+	// caller is, RequireAdmin proves they are on the admin list. Admin is NOT
+	// derived from super_user or any Stripe plan - super_user is a product tier
+	// other users already hold, and gating staff tooling on it would hand them
+	// every user's email and ticket history.
+	s.App.Get("/admin/me", platform.LogtoAuth, admin.RequireAdmin, admin.HandleWhoAmI)
+	s.App.Get("/admin/overview", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetOverview)
+	s.App.Get("/admin/accounts", platform.LogtoAuth, admin.RequireAdmin, admin.HandleListAccounts)
+	s.App.Get("/admin/accounts/:sub", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetAccount)
+	s.App.Get("/admin/admins", platform.LogtoAuth, admin.RequireAdmin, admin.HandleListAdmins)
+	s.App.Post("/admin/admins", platform.LogtoAuth, admin.RequireAdmin, admin.HandleAddAdmin)
+	s.App.Delete("/admin/admins/:id", platform.LogtoAuth, admin.RequireAdmin, admin.HandleRemoveAdmin)
+
 	s.App.Get("/dashboard", platform.LogtoAuth, s.getDashboard)
 
 	// Support

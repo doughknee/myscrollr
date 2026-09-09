@@ -23,11 +23,16 @@ import { Route as ChannelsRouteImport } from './routes/channels'
 import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as BusinessRouteImport } from './routes/business'
 import { Route as ArchitectureRouteImport } from './routes/architecture'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as UplinkLifetimeRouteImport } from './routes/uplink_.lifetime'
 import { Route as UUsernameRouteImport } from './routes/u.$username'
 import { Route as DownloadOsRouteImport } from './routes/download_.$os'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminSupportRouteImport } from './routes/admin.support'
+import { Route as AdminAdminsRouteImport } from './routes/admin.admins'
 
 const WidgetsRoute = WidgetsRouteImport.update({
   id: '/widgets',
@@ -99,6 +104,11 @@ const ArchitectureRoute = ArchitectureRouteImport.update({
   path: '/architecture',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AccountRoute = AccountRouteImport.update({
   id: '/account',
   path: '/account',
@@ -108,6 +118,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
 } as any)
 const UplinkLifetimeRoute = UplinkLifetimeRouteImport.update({
   id: '/uplink_/lifetime',
@@ -124,10 +139,26 @@ const DownloadOsRoute = DownloadOsRouteImport.update({
   path: '/download/$os',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSupportRoute = AdminSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminsRoute = AdminAdminsRouteImport.update({
+  id: '/admins',
+  path: '/admins',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/admin': typeof AdminRouteWithChildren
   '/architecture': typeof ArchitectureRoute
   '/business': typeof BusinessRoute
   '/callback': typeof CallbackRoute
@@ -142,9 +173,13 @@ export interface FileRoutesByFullPath {
   '/tss-spa-shell': typeof TssSpaShellRoute
   '/uplink': typeof UplinkRoute
   '/widgets': typeof WidgetsRoute
+  '/admin/admins': typeof AdminAdminsRoute
+  '/admin/support': typeof AdminSupportRoute
+  '/admin/users': typeof AdminUsersRoute
   '/download/$os': typeof DownloadOsRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink/lifetime': typeof UplinkLifetimeRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -163,14 +198,19 @@ export interface FileRoutesByTo {
   '/tss-spa-shell': typeof TssSpaShellRoute
   '/uplink': typeof UplinkRoute
   '/widgets': typeof WidgetsRoute
+  '/admin/admins': typeof AdminAdminsRoute
+  '/admin/support': typeof AdminSupportRoute
+  '/admin/users': typeof AdminUsersRoute
   '/download/$os': typeof DownloadOsRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink/lifetime': typeof UplinkLifetimeRoute
+  '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/admin': typeof AdminRouteWithChildren
   '/architecture': typeof ArchitectureRoute
   '/business': typeof BusinessRoute
   '/callback': typeof CallbackRoute
@@ -185,15 +225,20 @@ export interface FileRoutesById {
   '/tss-spa-shell': typeof TssSpaShellRoute
   '/uplink': typeof UplinkRoute
   '/widgets': typeof WidgetsRoute
+  '/admin/admins': typeof AdminAdminsRoute
+  '/admin/support': typeof AdminSupportRoute
+  '/admin/users': typeof AdminUsersRoute
   '/download_/$os': typeof DownloadOsRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink_/lifetime': typeof UplinkLifetimeRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/account'
+    | '/admin'
     | '/architecture'
     | '/business'
     | '/callback'
@@ -208,9 +253,13 @@ export interface FileRouteTypes {
     | '/tss-spa-shell'
     | '/uplink'
     | '/widgets'
+    | '/admin/admins'
+    | '/admin/support'
+    | '/admin/users'
     | '/download/$os'
     | '/u/$username'
     | '/uplink/lifetime'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -229,13 +278,18 @@ export interface FileRouteTypes {
     | '/tss-spa-shell'
     | '/uplink'
     | '/widgets'
+    | '/admin/admins'
+    | '/admin/support'
+    | '/admin/users'
     | '/download/$os'
     | '/u/$username'
     | '/uplink/lifetime'
+    | '/admin'
   id:
     | '__root__'
     | '/'
     | '/account'
+    | '/admin'
     | '/architecture'
     | '/business'
     | '/callback'
@@ -250,14 +304,19 @@ export interface FileRouteTypes {
     | '/tss-spa-shell'
     | '/uplink'
     | '/widgets'
+    | '/admin/admins'
+    | '/admin/support'
+    | '/admin/users'
     | '/download_/$os'
     | '/u/$username'
     | '/uplink_/lifetime'
+    | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
+  AdminRoute: typeof AdminRouteWithChildren
   ArchitectureRoute: typeof ArchitectureRoute
   BusinessRoute: typeof BusinessRoute
   CallbackRoute: typeof CallbackRoute
@@ -377,6 +436,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ArchitectureRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/account': {
       id: '/account'
       path: '/account'
@@ -390,6 +456,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/uplink_/lifetime': {
       id: '/uplink_/lifetime'
@@ -412,12 +485,50 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DownloadOsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/support': {
+      id: '/admin/support'
+      path: '/support'
+      fullPath: '/admin/support'
+      preLoaderRoute: typeof AdminSupportRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/admins': {
+      id: '/admin/admins'
+      path: '/admins'
+      fullPath: '/admin/admins'
+      preLoaderRoute: typeof AdminAdminsRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
+
+interface AdminRouteChildren {
+  AdminAdminsRoute: typeof AdminAdminsRoute
+  AdminSupportRoute: typeof AdminSupportRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminAdminsRoute: AdminAdminsRoute,
+  AdminSupportRoute: AdminSupportRoute,
+  AdminUsersRoute: AdminUsersRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
+  AdminRoute: AdminRouteWithChildren,
   ArchitectureRoute: ArchitectureRoute,
   BusinessRoute: BusinessRoute,
   CallbackRoute: CallbackRoute,

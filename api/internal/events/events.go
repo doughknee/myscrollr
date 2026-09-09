@@ -170,6 +170,10 @@ func InitHub(ctx context.Context) {
 
 	go globalHub.listenToTopics(ctx)
 
+	// Heartbeat this replica's SSE client count so an admin read can sum the
+	// fleet instead of reporting one pod's share as the whole (fleet_count.go).
+	go publishFleetCount(ctx)
+
 	// Shutdown watcher
 	go func() {
 		<-ctx.Done()
