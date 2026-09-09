@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
   CheckCircle2,
+  ChevronRight,
   Clock,
   ExternalLink,
   HelpCircle,
@@ -10,50 +14,68 @@ import {
   Pause,
   Play,
   Radio,
+  Search,
+  Star,
 } from 'lucide-react'
 import type {
   AdminFix,
   AdminHold,
   AutoSendState,
   CaseDetail,
-  QueueGroup,
+  QueueDir,
+  QueuePerson,
   QueueRow,
+  QueueRowsMode,
+  QueueSection,
+  QueueSort,
   SupportQueue,
 } from '@/api/admin'
 import { adminApi, subscribeToSupportEvents } from '@/api/admin'
 import CaseActions from '@/components/admin/CaseActions'
 import {
-  QUEUE_GROUPS,
+  QUEUE_SECTIONS,
+  SORT_FIELDS,
+  diagnosticsChips,
+  directionLabel,
   dispositionTone,
   fixBadge,
   formatWait,
   holdCountdown,
+  lastUserMessage,
+  personMeta,
+  personTitle,
+  planBadge,
 } from '@/lib/supportConsole'
 import { useGetToken } from '@/hooks/useGetToken'
 
 /**
- * The Support section: the queue on the left, one case on the right.
+ * The Support section, rebuilt around people (REL-266).
  *
- * REL-263 built the read half; REL-261 gave every fact on it a button. Each
- * button calls the same server function the Discord button calls, so the two
- * surfaces cannot drift while they coexist, and a case reads the same
- * whichever one was used.
+ * REL-263 built this page as a debugging view, because that is what its brief
+ * asked for: the whole triage pipeline under every case, sixty tickets at
+ * equal weight, eight all-caps sections expanded at once. The bot does the
+ * triage now. This page is for the exceptions, and it is built on three rules.
  *
- * The page moves on its own. A support event on the SSE hub — a draft written,
- * a disposition decided, a reply sent — re-reads the queue and the open case
- * from the endpoints that built them. Nothing polls, and nothing patches a
- * case out of a socket payload: the event says which ticket moved, and the
- * server says what it now looks like.
+ * A ROW IS A PERSON. Rachel Armstrong wrote five times in one afternoon; you
+ * answer a human, not a queue. The grouping is the server's — the browser
+ * never re-derives who is who from an email.
  *
- * The case view is the whole reason this exists. Discord could show the draft
- * and roughly two thousand characters of it; it could not show what the
- * classifier decided, what the drafter says it is grounded in, what it admits
- * it does not know, which rule chose the disposition, or what the model was
- * told about the person writing. All of that has been in Postgres since
- * REL-249. This is the first surface wide enough to read it.
+ * PAYING CUSTOMERS ARE A SECTION. Priority support is something we sold, so no
+ * sort a reader picks can push one below anybody else. The sections are fixed
+ * and the sort works inside them.
  *
- * Nothing here recomputes the pipeline. Disposition, hold expiry and the
- * proven-fix answer arrive decided; the browser formats them.
+ * NOTHING IS RECOMPUTED HERE. Disposition, hold expiry, the proven-fix answer,
+ * who sent the last reply, and which section a person belongs in all arrive
+ * decided. The browser formats them. The sort and the search are query
+ * parameters for the same reason: one queue read is capped at 500 cases, and a
+ * browser sorting whatever fitted would present a sorted page as a sorted
+ * queue.
+ *
+ * The case view stops dumping. Above the fold: their words, one sentence on
+ * why it stopped, the draft where it can be edited, and the actions.
+ * Everything else moved one level down behind "Why it decided this" — moved,
+ * not deleted, because the whole point of REL-263 was that this data had never
+ * been readable anywhere.
  */
 
 // ── small shared pieces ───────────────────────────────────────────
@@ -97,9 +119,9 @@ function Panel({
 }) {
   return (
     <section>
-      <h2 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
+      <h3 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
         {title}
-      </h2>
+      </h3>
       {subtitle && (
         <p className="mt-1 text-xs text-base-content/50">{subtitle}</p>
       )}
@@ -114,6 +136,44 @@ const TONE_RING: Record<string, string> = {
   ask: 'ring-info/40 bg-info/5',
   done: 'ring-base-300/60',
   none: 'ring-base-300/60',
+}
+
+/** A pill. One place, so the queue and the case view cannot drift apart. */
+function Pill({
+  children,
+  tone = 'neutral',
+}: {
+  children: React.ReactNode
+  tone?: 'neutral' | 'paying' | 'needs' | 'edited' | 'done'
+}) {
+  const tones: Record<string, string> = {
+    neutral: 'bg-base-200 text-base-content/65',
+    paying: 'bg-success/15 text-success',
+    needs: 'bg-error/10 text-error',
+    edited: 'bg-secondary/15 text-secondary',
+    done: 'bg-success/10 text-success',
+  }
+  return (
+    <span
+      className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold ${tones[tone]}`}
+    >
+      {children}
+    </span>
+  )
+}
+
+/** The provenance chip: sent by the bot, or you edited it. Server's words. */
+function ProvenancePill({
+  provenance,
+  label,
+}: {
+  provenance?: string
+  label?: string
+}) {
+  if (!label) return null
+  return (
+    <Pill tone={provenance === 'edited' ? 'edited' : 'neutral'}>{label}</Pill>
+  )
 }
 
 /**
@@ -209,7 +269,7 @@ function FixCard({ fix }: { fix: AdminFix }) {
   )
 }
 
-// ── the conversation ──────────────────────────────────────────────
+// ── everything that moved one level down ──────────────────────────
 
 const KIND_LABEL: Record<string, string> = {
   user: 'They wrote',
@@ -259,7 +319,7 @@ function Conversation({ detail }: { detail: CaseDetail }) {
                 )}
               </div>
               <p
-                className={`mt-2 text-sm whitespace-pre-wrap ${
+                className={`mt-2 max-w-[75ch] text-sm whitespace-pre-wrap ${
                   m.kind === 'ai_draft'
                     ? 'text-base-content/55 italic'
                     : 'text-base-content/85'
@@ -274,8 +334,6 @@ function Conversation({ detail }: { detail: CaseDetail }) {
     </Panel>
   )
 }
-
-// ── the pipeline ──────────────────────────────────────────────────
 
 function Pipeline({ detail }: { detail: CaseDetail }) {
   const draft = detail.draft
@@ -293,9 +351,9 @@ function Pipeline({ detail }: { detail: CaseDetail }) {
   return (
     <div className="space-y-5">
       <section>
-        <h2 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
+        <h3 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
           What the server decided
-        </h2>
+        </h3>
         <div className={`mt-2 rounded-xl px-4 py-3 ring-1 ${TONE_RING[tone]}`}>
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             {tone === 'stop' && (
@@ -311,7 +369,7 @@ function Pipeline({ detail }: { detail: CaseDetail }) {
           </div>
           {/* The rule that fired, verbatim. An escalation whose reason has to
               be guessed at is the Discord queue again. */}
-          <p className="mt-2 text-sm text-base-content/85">
+          <p className="mt-2 max-w-[75ch] text-sm text-base-content/85">
             {draft.disposition_reason ||
               'No reason was recorded. This draft predates the autonomous policy, so nothing will send it on its own.'}
           </p>
@@ -322,30 +380,21 @@ function Pipeline({ detail }: { detail: CaseDetail }) {
         <HoldBanner hold={detail.hold} autosend={detail.autosend} />
       )}
 
-      <Panel
-        title="What the drafter wrote"
-        subtitle={
-          draft.edited_body
-            ? 'The draft, and the edit that replaced it before sending.'
-            : 'Exactly as stored — plain text, which is what the user receives.'
-        }
-      >
-        <div className="p-4">
-          <p className="text-sm whitespace-pre-wrap text-base-content/85">
-            {draft.body || '(the drafting call produced no body)'}
-          </p>
-        </div>
-        {draft.edited_body && (
-          <div className="border-t border-base-300/40 p-4">
-            <p className="text-xs font-semibold tracking-wide text-base-content/45 uppercase">
-              Edited before sending
-            </p>
-            <p className="mt-1 text-sm whitespace-pre-wrap text-base-content/85">
-              {draft.edited_body}
+      {/* The draft as the model wrote it. The editable copy is above the
+          fold; this is the original, and it only earns its place once an
+          edit has replaced it. */}
+      {draft.edited_body && (
+        <Panel
+          title="What the drafter wrote"
+          subtitle="The original, before the edit that replaced it."
+        >
+          <div className="p-4">
+            <p className="max-w-[75ch] text-sm whitespace-pre-wrap text-base-content/85">
+              {draft.body || '(the drafting call produced no body)'}
             </p>
           </div>
-        )}
-      </Panel>
+        </Panel>
+      )}
 
       <Panel
         title="What it says it knows"
@@ -417,108 +466,18 @@ function Pipeline({ detail }: { detail: CaseDetail }) {
   )
 }
 
-// ── the case ──────────────────────────────────────────────────────
-
-function CaseView({
-  ticket,
-  reloadKey,
-}: {
-  ticket: string
-  reloadKey: number
-}) {
-  const getToken = useGetToken()
-  const [detail, setDetail] = useState<CaseDetail | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  // reloadKey is bumped when a support event names this ticket. The panel is
-  // NOT blanked on a re-read — only on a change of ticket — so a reply landing
-  // while you are reading does not throw the page away and start again.
-  useEffect(() => {
-    let cancelled = false
-    setError(null)
-    adminApi
-      .supportCase(getToken, ticket)
-      .then((res) => !cancelled && setDetail(res))
-      .catch(
-        (err: unknown) =>
-          !cancelled &&
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'That case could not be loaded.',
-          ),
-      )
-    return () => {
-      cancelled = true
-    }
-  }, [getToken, ticket, reloadKey])
-
-  useEffect(() => setDetail(null), [ticket])
-
-  if (error) {
-    return <p className="p-4 text-sm text-error">{error}</p>
-  }
-  if (!detail) {
-    return (
-      <div className="p-4">
-        <Loader2 className="size-5 animate-spin text-base-content/40" />
-      </div>
-    )
-  }
-
+/** What the model was told about them, plus what it was shown. */
+function TheEvidence({ detail }: { detail: CaseDetail }) {
   const ctx = detail.context
   const widgets = ctx.widgets ?? []
   const similar = detail.similar ?? []
 
   return (
-    <div className="space-y-6">
-      <header>
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h1 className="text-xl font-bold">
-            {detail.subject || '(no subject)'}
-          </h1>
-          <span className="font-mono text-xs text-base-content/50">
-            #{detail.ticket_number}
-          </span>
-        </div>
-        <p className="mt-1 text-sm text-base-content/60">
-          {detail.user_email ?? 'no email on file'} · {detail.status}
-          {detail.category && ` · ${detail.category}`}
-          {detail.priority && ` · ${detail.priority}`} · opened{' '}
-          {new Date(detail.opened_at).toLocaleDateString()}
-        </p>
-        <p className="mt-2 text-sm text-base-content/70">
-          {detail.group_reason}
-        </p>
-        {detail.discord_url && (
-          <a
-            href={detail.discord_url}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-          >
-            <MessageSquare size={12} /> The Discord thread
-          </a>
-        )}
-      </header>
-
-      <Conversation detail={detail} />
-      <Pipeline detail={detail} />
-      <CaseActions detail={detail} onCase={setDetail} />
-
-      <section>
-        <h2 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
-          Can we claim a fix?
-        </h2>
-        <div className="mt-2">
-          <FixCard fix={detail.fix} />
-        </div>
-      </section>
-
+    <div className="space-y-5">
       <Panel title="What the model was told about them" subtitle={ctx.note}>
         <div className="grid grid-cols-2 gap-px bg-base-300/40 sm:grid-cols-3">
           {[
-            ['Plan', ctx.tier],
+            ['Plan when it opened', ctx.tier],
             [
               'App version',
               ctx.app_version
@@ -561,6 +520,13 @@ function CaseView({
             </div>
           ))}
         </div>
+        {/* The plan above is tier_at_open — what the model was told on the day
+            — and the header carries the current one. Saying which is which is
+            the difference between a diagnostic and a contradiction. */}
+        <p className="border-t border-base-300/40 px-4 py-3 text-xs text-base-content/60">
+          This is the plan as the ticket recorded it when it opened. The badge
+          in the header is the subscription they are on now.
+        </p>
         {!ctx.has_diagnostics && (
           <p className="border-t border-base-300/40 px-4 py-3 text-xs text-base-content/60">
             No diagnostics were attached to this ticket, so the version, OS and
@@ -575,6 +541,15 @@ function CaseView({
           </p>
         )}
       </Panel>
+
+      <section>
+        <h3 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
+          Can we claim a fix?
+        </h3>
+        <div className="mt-2">
+          <FixCard fix={detail.fix} />
+        </div>
+      </section>
 
       <Panel title="What it was shown" subtitle={detail.evidence_note}>
         {similar.length === 0 ? (
@@ -618,9 +593,434 @@ function CaseView({
   )
 }
 
+// ── the case ──────────────────────────────────────────────────────
+
+/**
+ * One case, above the fold.
+ *
+ * `compact` is the version that appears inside a person's history: the same
+ * case without its own header, because the person's name is already above it.
+ */
+function CaseBody({
+  detail,
+  onCase,
+  compact,
+}: {
+  detail: CaseDetail
+  onCase: (next: CaseDetail) => void
+  compact?: boolean
+}) {
+  const theirWords = lastUserMessage(detail.messages)
+  const chips = diagnosticsChips(detail.context)
+  const tone = dispositionTone(detail.draft?.disposition, detail.draft?.status)
+  const stopped = detail.draft?.disposition_reason || detail.group_reason
+
+  return (
+    <div className="space-y-5">
+      {/* Why it stopped, in one sentence, before anything else. The old page
+          made you read eight sections to find this out. */}
+      <div className={`rounded-xl px-4 py-3 ring-1 ${TONE_RING[tone]}`}>
+        <div className="flex gap-2.5">
+          {tone === 'stop' ? (
+            <AlertTriangle
+              size={17}
+              className="mt-0.5 shrink-0 text-error"
+              aria-hidden
+            />
+          ) : (
+            <HelpCircle
+              size={17}
+              className="mt-0.5 shrink-0 text-base-content/40"
+              aria-hidden
+            />
+          )}
+          <p className="max-w-[75ch] text-sm leading-relaxed">{stopped}</p>
+        </div>
+      </div>
+
+      {detail.hold && (
+        <HoldBanner hold={detail.hold} autosend={detail.autosend} />
+      )}
+
+      <section>
+        <h3 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
+          They wrote
+        </h3>
+        <p className="mt-2 max-w-[75ch] border-l-2 border-base-300 pl-4 text-sm leading-relaxed whitespace-pre-wrap text-base-content/85">
+          {theirWords ?? (
+            <span className="text-base-content/45 italic">
+              Nothing from the user is on record for this ticket. The case
+              database only carries messages the API saw or backfilled.
+            </span>
+          )}
+        </p>
+
+        {/* Three chips instead of a diagnostics blob taller than the sentence
+            above them. The blob is still here, one click down. */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {chips.map((chip) => (
+            <span
+              key={chip}
+              className="rounded-md bg-base-200 px-2 py-1 text-xs text-base-content/70"
+            >
+              {chip}
+            </span>
+          ))}
+          <span className="rounded-md bg-base-200 px-2 py-1 text-xs text-base-content/70">
+            Opened {new Date(detail.opened_at).toLocaleDateString()}
+          </span>
+          <details className="text-xs">
+            <summary className="min-h-11 cursor-pointer content-center px-1 text-base-content/50 hover:text-base-content">
+              Full diagnostics
+            </summary>
+            <pre className="mt-2 max-h-72 overflow-auto rounded-lg bg-base-200/50 p-3 text-xs whitespace-pre-wrap text-base-content/70 ring-1 ring-base-300/60">
+              {JSON.stringify(detail.context, null, 2)}
+            </pre>
+          </details>
+        </div>
+      </section>
+
+      <CaseActions detail={detail} onCase={onCase} />
+
+      {/* One disclosure, holding everything the old page shouted at once.
+          Nothing was removed; it moved one level down. */}
+      <details className="rounded-xl ring-1 ring-base-300/60">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-4 text-sm font-medium text-base-content/70 hover:text-base-content">
+          <ChevronRight size={15} className="shrink-0" />
+          Why it decided this
+        </summary>
+        <div className="space-y-6 border-t border-base-300/40 p-4">
+          <Pipeline detail={detail} />
+          <Conversation detail={detail} />
+          <TheEvidence detail={detail} />
+          {!compact && detail.discord_url && (
+            <a
+              href={detail.discord_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            >
+              <MessageSquare size={12} /> The Discord thread
+            </a>
+          )}
+        </div>
+      </details>
+    </div>
+  )
+}
+
+/** Loads one case and renders it. Used by both the case and person views. */
+function useCase(ticket: string | null, reloadKey: number) {
+  const getToken = useGetToken()
+  const [detail, setDetail] = useState<CaseDetail | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  // The panel is NOT blanked on a re-read — only on a change of ticket — so a
+  // reply landing while you are reading does not throw the page away.
+  useEffect(() => setDetail(null), [ticket])
+
+  useEffect(() => {
+    if (!ticket) return
+    let cancelled = false
+    setError(null)
+    adminApi
+      .supportCase(getToken, ticket)
+      .then((res) => !cancelled && setDetail(res))
+      .catch(
+        (err: unknown) =>
+          !cancelled &&
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'That case could not be loaded.',
+          ),
+      )
+    return () => {
+      cancelled = true
+    }
+  }, [getToken, ticket, reloadKey])
+
+  return { detail, error, setDetail }
+}
+
+function CaseView({
+  ticket,
+  reloadKey,
+}: {
+  ticket: string
+  reloadKey: number
+}) {
+  const { detail, error, setDetail } = useCase(ticket, reloadKey)
+
+  if (error) return <p className="p-4 text-sm text-error">{error}</p>
+  if (!detail) {
+    return (
+      <div className="p-4">
+        <Loader2 className="size-5 animate-spin text-base-content/40" />
+      </div>
+    )
+  }
+
+  const badge = planBadge(detail)
+
+  return (
+    <div className="space-y-5">
+      <header>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="font-mono text-xs text-base-content/45">
+            #{detail.ticket_number}
+          </span>
+          <span className="text-xs text-base-content/50">
+            {detail.user_email ?? 'no email on file'}
+          </span>
+          {badge ? (
+            <Pill tone={badge.paying ? 'paying' : 'neutral'}>
+              {badge.label}
+            </Pill>
+          ) : (
+            <span className="text-xs text-base-content/45 italic">
+              no account on file
+            </span>
+          )}
+        </div>
+        <h1 className="mt-1.5 text-xl font-bold tracking-tight sm:text-2xl">
+          {detail.subject || '(no subject)'}
+        </h1>
+      </header>
+      <CaseBody detail={detail} onCase={setDetail} />
+    </div>
+  )
+}
+
+// ── the person ────────────────────────────────────────────────────
+
+/**
+ * One person: who they are, then their threads newest first.
+ *
+ * The one needing action is open with its draft and buttons; the ones awaiting
+ * a reply are listed; the resolved ones are dimmed. That ordering is the whole
+ * argument for grouping — five rows shouting becomes one person with a
+ * history.
+ */
+function PersonView({
+  person,
+  rows,
+  reloadKey,
+  openTicket,
+  onOpenTicket,
+}: {
+  person: QueuePerson
+  rows: Array<QueueRow>
+  reloadKey: number
+  openTicket: string | null
+  onOpenTicket: (ticket: string | null) => void
+}) {
+  const mine = useMemo(() => {
+    const numbers = new Set(person.ticket_numbers ?? [])
+    return rows
+      .filter((r) => numbers.has(r.ticket_number))
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+  }, [person, rows])
+
+  // The thread that opens by default is the one that needs a person. Anything
+  // else makes you click to find the only thing on the row that is asking for
+  // you.
+  const needsAction = mine.find((r) => r.group === 'needs_you')
+  const active = openTicket ?? needsAction?.ticket_number ?? null
+
+  const who = personTitle(person)
+  const badge = planBadge(person)
+  const firstWrote = mine.reduce<string | null>(
+    (min, r) => (min === null || r.opened_at < min ? r.opened_at : min),
+    null,
+  )
+
+  return (
+    <div className="space-y-5">
+      <header className="border-b border-base-300/50 pb-4">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+            {who.title}
+          </h1>
+          {badge ? (
+            <Pill tone={badge.paying ? 'paying' : 'neutral'}>
+              {badge.label}
+            </Pill>
+          ) : (
+            <span className="text-xs text-base-content/45 italic">
+              {person.plan_note ? 'no account' : 'no plan on file'}
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-base-content/55">
+          {[
+            who.subtitle,
+            mine.find((r) => r.os)?.os,
+            firstWrote &&
+              `first wrote ${new Date(firstWrote).toLocaleDateString()}`,
+            `${person.tickets} ${person.tickets === 1 ? 'ticket' : 'tickets'}${
+              person.handled > 0 ? `, ${person.handled} resolved` : ''
+            }`,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
+        {person.plan_note && (
+          <p className="mt-1.5 max-w-[75ch] text-xs text-base-content/50">
+            {person.plan_note}
+          </p>
+        )}
+      </header>
+
+      <div className="divide-y divide-base-300/40">
+        {mine.map((r) => (
+          <Thread
+            key={r.ticket_number}
+            row={r}
+            open={active === r.ticket_number}
+            reloadKey={reloadKey}
+            onToggle={() =>
+              onOpenTicket(active === r.ticket_number ? null : r.ticket_number)
+            }
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** One of a person's threads. Open, it is the whole case view. */
+function Thread({
+  row,
+  open,
+  reloadKey,
+  onToggle,
+}: {
+  row: QueueRow
+  open: boolean
+  reloadKey: number
+  onToggle: () => void
+}) {
+  const { detail, error, setDetail } = useCase(
+    open ? row.ticket_number : null,
+    reloadKey,
+  )
+  const resolved = row.group === 'handled'
+
+  return (
+    <div className={`py-4 ${resolved && !open ? 'opacity-60' : ''}`}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex w-full cursor-pointer items-start gap-3 text-left"
+      >
+        <span className="w-14 shrink-0 pt-0.5 font-mono text-[11px] text-base-content/40">
+          #{row.ticket_number}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span
+              className={`text-sm ${open || row.group === 'needs_you' ? 'font-semibold' : 'font-medium'}`}
+            >
+              {row.subject || '(no subject)'}
+            </span>
+            {row.group === 'needs_you' ? (
+              <Pill tone="needs">needs you</Pill>
+            ) : resolved ? (
+              <Pill tone="done">resolved</Pill>
+            ) : (
+              <ProvenancePill
+                provenance={row.provenance}
+                label={row.provenance_label}
+              />
+            )}
+          </span>
+          <span className="mt-1 block text-xs text-base-content/50">
+            {row.group_reason}
+          </span>
+        </span>
+        <ChevronRight
+          size={15}
+          className={`mt-1 shrink-0 text-base-content/35 transition-transform ${open ? 'rotate-90' : ''}`}
+        />
+      </button>
+
+      {open && (
+        <div className="mt-4 pl-0 sm:pl-17">
+          {error && <p className="text-sm text-error">{error}</p>}
+          {!detail && !error && (
+            <Loader2 className="size-5 animate-spin text-base-content/40" />
+          )}
+          {detail && <CaseBody detail={detail} onCase={setDetail} compact />}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── the queue ─────────────────────────────────────────────────────
 
-function QueueItem({
+function PersonCard({
+  person,
+  active,
+  onSelect,
+}: {
+  person: QueuePerson
+  active: boolean
+  onSelect: () => void
+}) {
+  const who = personTitle(person)
+  const badge = planBadge(person)
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-current={active ? 'true' : undefined}
+      className={`w-full cursor-pointer rounded-xl px-3 py-2.5 text-left ring-1 transition-colors ${
+        active
+          ? 'bg-base-100 ring-2 ring-primary/60'
+          : 'bg-base-100 ring-base-300/60 hover:bg-base-200/50'
+      }`}
+    >
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span
+          className={`text-sm font-semibold ${who.known ? '' : 'text-base-content/70 italic'}`}
+        >
+          {who.title}
+        </span>
+        {badge && (
+          <Pill tone={badge.paying ? 'paying' : 'neutral'}>{badge.label}</Pill>
+        )}
+        {!badge && person.section === 'answered' && (
+          <ProvenancePill
+            provenance={person.provenance}
+            label={person.provenance_label}
+          />
+        )}
+      </div>
+      {who.subtitle && (
+        <p className="mt-0.5 truncate text-[11px] text-base-content/45">
+          {who.subtitle}
+        </p>
+      )}
+      <p className="mt-1 line-clamp-2 text-xs text-base-content/60">
+        {person.headline ?? 'No ticket on record'}
+        {person.needs_you > 0 && (
+          <>
+            {' · '}
+            <span className="font-semibold text-error">needs you</span>
+          </>
+        )}
+      </p>
+      <p className="mt-1 text-[11px] text-base-content/45">
+        {personMeta(person)}
+      </p>
+    </button>
+  )
+}
+
+function TicketCard({
   row,
   active,
   onSelect,
@@ -636,8 +1036,11 @@ function QueueItem({
     <button
       type="button"
       onClick={onSelect}
-      className={`w-full cursor-pointer border-b border-base-300/40 px-3 py-2.5 text-left transition-colors last:border-0 ${
-        active ? 'bg-base-200' : 'hover:bg-base-200/50'
+      aria-current={active ? 'true' : undefined}
+      className={`w-full cursor-pointer rounded-xl px-3 py-2.5 text-left ring-1 transition-colors ${
+        active
+          ? 'bg-base-100 ring-2 ring-primary/60'
+          : 'bg-base-100 ring-base-300/60 hover:bg-base-200/50'
       }`}
     >
       <div className="flex items-baseline justify-between gap-2">
@@ -649,8 +1052,7 @@ function QueueItem({
         </span>
       </div>
       <p className="mt-0.5 truncate text-xs text-base-content/55">
-        {row.user_email ?? 'no email'}
-        {row.category && ` · ${row.category}`}
+        {row.name || row.user_email || 'no account on this ticket'}
         {' · '}
         {wait ? `waiting ${wait}` : 'wait unknown'}
       </p>
@@ -659,40 +1061,138 @@ function QueueItem({
       </p>
       <div className="mt-1 flex flex-wrap gap-1.5">
         {countdown.display && (
-          <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[11px] font-medium text-warning-content/90 ring-1 ring-warning/30">
-            sends in {countdown.display}
-          </span>
+          <Pill tone="needs">sends in {countdown.display}</Pill>
         )}
-        {row.disposition === 'escalate' && (
-          <span className="rounded bg-error/10 px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-error/30">
-            escalated
-          </span>
-        )}
-        {badge && (
-          <span className="rounded bg-base-200 px-1.5 py-0.5 text-[11px] text-base-content/60">
-            {badge}
-          </span>
-        )}
+        <ProvenancePill
+          provenance={row.provenance}
+          label={row.provenance_label}
+        />
+        {badge && <Pill>{badge}</Pill>}
       </div>
     </button>
   )
 }
 
+/**
+ * The three sort controls: a field, a direction of its own, and what a row is.
+ *
+ * The direction is a button rather than another menu entry so reversing never
+ * costs a trip through a dropdown — that is the whole complaint the "one sort
+ * control" mockup was rejected over.
+ */
+function SortBar({
+  sort,
+  dir,
+  rowsMode,
+  search,
+  onSort,
+  onDir,
+  onRowsMode,
+  onSearch,
+}: {
+  sort: QueueSort
+  dir: QueueDir
+  rowsMode: QueueRowsMode
+  search: string
+  onSort: (s: QueueSort) => void
+  onDir: (d: QueueDir) => void
+  onRowsMode: (m: QueueRowsMode) => void
+  onSearch: (q: string) => void
+}) {
+  return (
+    <div className="space-y-2">
+      <label className="flex min-h-11 items-center gap-2 rounded-lg bg-base-100 px-3 ring-1 ring-base-300/60 focus-within:ring-2 focus-within:ring-primary/50">
+        <Search size={15} className="shrink-0 text-base-content/40" />
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => onSearch(e.target.value)}
+          placeholder="Search people and tickets"
+          aria-label="Search people and tickets"
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+        />
+      </label>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-stretch overflow-hidden rounded-lg ring-1 ring-base-300/60">
+          <select
+            value={sort}
+            onChange={(e) => onSort(e.target.value as QueueSort)}
+            aria-label="Sort by"
+            className="min-h-11 cursor-pointer bg-base-100 px-2.5 text-xs font-medium outline-none focus:ring-2 focus:ring-primary/50"
+          >
+            {SORT_FIELDS.map((f) => (
+              <option key={f.key} value={f.key}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+          {/* Its own button. Reversing is one click, both ways. */}
+          <button
+            type="button"
+            onClick={() => onDir(dir === 'asc' ? 'desc' : 'asc')}
+            title={directionLabel(sort, dir)}
+            aria-label={`Direction: ${directionLabel(sort, dir)}`}
+            className="min-h-11 cursor-pointer border-l border-base-300/60 bg-base-100 px-2.5 hover:bg-base-200/60"
+          >
+            {dir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+          </button>
+        </div>
+
+        <select
+          value={rowsMode}
+          onChange={(e) => onRowsMode(e.target.value as QueueRowsMode)}
+          aria-label="What a row is"
+          className="min-h-11 cursor-pointer rounded-lg bg-base-100 px-2.5 text-xs font-medium ring-1 ring-base-300/60 outline-none focus:ring-2 focus:ring-primary/50"
+        >
+          <option value="person">By person</option>
+          <option value="ticket">By ticket</option>
+        </select>
+      </div>
+      <p className="px-0.5 text-[11px] text-base-content/40">
+        {directionLabel(sort, dir)} — inside each section. Sections never
+        reorder.
+      </p>
+    </div>
+  )
+}
+
+const SECTION_STYLE: Record<QueueSection, string> = {
+  paying: 'text-success',
+  open: 'text-error',
+  answered: 'text-base-content/55',
+  resolved: 'text-base-content/45',
+}
+
 export default function SupportPage() {
   const getToken = useGetToken()
-  const [filter, setFilter] = useState<QueueGroup | 'all'>('all')
+  const [sort, setSort] = useState<QueueSort>('last_wrote')
+  const [dir, setDir] = useState<QueueDir>('desc')
+  const [rowsMode, setRowsMode] = useState<QueueRowsMode>('person')
+  const [search, setSearch] = useState('')
+  const [debounced, setDebounced] = useState('')
+
   const [queue, setQueue] = useState<SupportQueue | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selectedPerson, setSelectedPerson] = useState<string | null>(null)
+  const [selectedTicket, setSelectedTicket] = useState<string | null>(null)
   const [live, setLive] = useState(false)
   const [queueKey, setQueueKey] = useState(0)
   const [caseKey, setCaseKey] = useState(0)
   const [switching, setSwitching] = useState(false)
+  const [showResolved, setShowResolved] = useState(false)
+
+  // The search is a server round trip, so it waits for a pause in typing
+  // rather than firing a query per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(search), 250)
+    return () => clearTimeout(t)
+  }, [search])
 
   const load = useCallback(() => {
     let cancelled = false
     adminApi
-      .supportQueue(getToken, filter)
+      .supportQueue(getToken, { sort, dir, rows: rowsMode, q: debounced })
       .then((res) => !cancelled && setQueue(res))
       .catch(
         (err: unknown) =>
@@ -706,27 +1206,39 @@ export default function SupportPage() {
     return () => {
       cancelled = true
     }
-  }, [getToken, filter, queueKey])
+  }, [getToken, sort, dir, rowsMode, debounced, queueKey])
 
   useEffect(() => load(), [load])
 
-  // The open ticket lives in a ref so the subscription below never has to be
-  // torn down and rebuilt when the selection changes — reconnecting the stream
-  // on every click would drop events in the gap.
-  const selectedRef = useRef<string | null>(null)
-  selectedRef.current = selected
+  // The open row lives in a ref so the subscription below never has to be torn
+  // down and rebuilt when the selection changes — reconnecting the stream on
+  // every click would drop events in the gap.
+  const openRef = useRef<Array<string>>([])
+  const rows = useMemo(() => queue?.rows ?? [], [queue])
+  const people = useMemo(() => queue?.people ?? [], [queue])
+
+  const person = useMemo(
+    () => people.find((p) => p.key === selectedPerson) ?? null,
+    [people, selectedPerson],
+  )
+  openRef.current = person
+    ? (person.ticket_numbers ?? [])
+    : selectedTicket
+      ? [selectedTicket]
+      : []
 
   useEffect(() => {
     return subscribeToSupportEvents(
       getToken,
       (event) => {
-        // Every event moves the queue: a group, a countdown or a row. The open
-        // case is re-read only when the event is about it, or about the
-        // pipeline switch, which changes what every countdown means.
+        // Every event moves the queue: a section, a countdown or a row. The
+        // open case is re-read only when the event is about something on
+        // screen, or about the pipeline switch, which changes what every
+        // countdown means.
         setQueueKey((n) => n + 1)
         if (
           !event.ticket_number ||
-          event.ticket_number === selectedRef.current
+          openRef.current.includes(event.ticket_number)
         ) {
           setCaseKey((n) => n + 1)
         }
@@ -752,19 +1264,25 @@ export default function SupportPage() {
     }
   }
 
-  const rows = queue?.rows ?? []
-  const groups = QUEUE_GROUPS.filter(
-    (g) => filter === 'all' || g.key === filter,
-  )
+  const selected = rowsMode === 'person' ? selectedPerson : selectedTicket
+  const back = () => {
+    setSelectedPerson(null)
+    setSelectedTicket(null)
+  }
+  const needsYou = queue?.counts.needs_you ?? 0
 
   return (
-    <div className="space-y-5">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight">Support</h1>
-        <p className="mt-1 text-sm text-base-content/60">
-          Every verb here is the same function the Discord buttons call. Send is
-          the only one that cannot be undone, and the only one that asks twice.
-        </p>
+    <div className="space-y-4">
+      {/* On a phone the header is the queue's header, and it steps aside once
+          a person is open so the whole viewport is the thing you came to
+          read. */}
+      <header className={selected ? 'hidden md:block' : ''}>
+        <div className="flex flex-wrap items-baseline gap-x-3">
+          <h1 className="text-2xl font-bold tracking-tight">Support</h1>
+          <span className="text-sm text-base-content/50">
+            {needsYou === 1 ? '1 needs you' : `${needsYou} need you`}
+          </span>
+        </div>
         {queue && (
           <div
             className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2 ring-1 ${
@@ -774,15 +1292,13 @@ export default function SupportPage() {
             }`}
           >
             <p className="text-xs">{queue.autosend.note}</p>
-            {/* Pause and resume, the same switch /pause and /resume throw.
-                Un-demoting a category stays a Discord command: that is a
-                judgement about a class of tickets, not a button beside one. */}
+            {/* Pause and resume, the same switch /pause and /resume throw. */}
             {queue.autosend.enabled && (
               <button
                 type="button"
                 onClick={toggleAutoSend}
                 disabled={switching}
-                className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-base-100 px-2.5 py-1 text-xs font-medium ring-1 ring-base-300/60 hover:bg-base-200/60 disabled:opacity-50"
+                className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-base-100 px-3 text-xs font-medium ring-1 ring-base-300/60 hover:bg-base-200/60 disabled:opacity-50"
               >
                 {switching ? (
                   <Loader2 size={12} className="animate-spin" />
@@ -813,82 +1329,147 @@ export default function SupportPage() {
       )}
 
       {queue && (
-        <div className="flex flex-col gap-6 lg:flex-row">
-          <div className="lg:w-[22rem] lg:shrink-0">
-            <div className="flex flex-wrap gap-1 pb-1">
-              {(['all', ...QUEUE_GROUPS.map((g) => g.key)] as const).map(
-                (key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setFilter(key)}
-                    className={`cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors ${
-                      filter === key
-                        ? 'bg-base-200 text-base-content'
-                        : 'text-base-content/60 hover:bg-base-200/60'
-                    }`}
-                  >
-                    {key === 'all'
-                      ? 'Everything'
-                      : QUEUE_GROUPS.find((g) => g.key === key)?.label}
-                    {key !== 'all' && (
-                      <span className="ml-1 tabular-nums text-base-content/45">
-                        {queue.counts[key] ?? 0}
-                      </span>
-                    )}
-                  </button>
-                ),
-              )}
-            </div>
+        <div className="flex flex-col gap-5 md:flex-row md:gap-5 lg:gap-8">
+          {/* Under 768px the queue IS the page; picking someone pushes their
+              view over it and the back control returns. From 768 up the two
+              panes sit side by side, with the queue narrowed. */}
+          <div
+            className={`min-w-0 md:w-64 md:shrink-0 lg:w-80 xl:w-96 ${
+              selected ? 'hidden md:block' : 'block'
+            }`}
+          >
+            <SortBar
+              sort={sort}
+              dir={dir}
+              rowsMode={rowsMode}
+              search={search}
+              onSort={(s) => setSort(s)}
+              onDir={(d) => setDir(d)}
+              onRowsMode={(m) => {
+                setRowsMode(m)
+                back()
+              }}
+              onSearch={setSearch}
+            />
 
-            <div className="mt-3 space-y-5">
-              {groups.map((group) => {
-                const items = rows.filter((r) => r.group === group.key)
+            <div className="mt-4 space-y-5">
+              {QUEUE_SECTIONS.map((section) => {
+                const count = queue.sections[section.key] ?? 0
+                const inSection =
+                  rowsMode === 'person'
+                    ? people.filter((p) => p.section === section.key)
+                    : rows.filter((r) => r.section === section.key)
+
+                // Resolved is a count that opens. Forty-six closed tickets are
+                // not what anybody came here to read.
+                const collapsed = section.key === 'resolved' && !showResolved
+
                 return (
-                  <section key={group.key}>
-                    <h2 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
-                      {group.label}{' '}
-                      <span className="tabular-nums text-base-content/40">
-                        {queue.counts[group.key] ?? 0}
+                  <section key={section.key}>
+                    <div className="flex items-center gap-2 px-1 pb-2">
+                      {section.key === 'paying' && (
+                        <Star size={13} className="shrink-0 text-success" />
+                      )}
+                      <h2
+                        className={`text-[11px] font-bold tracking-wider uppercase ${SECTION_STYLE[section.key]}`}
+                      >
+                        {section.label}
+                      </h2>
+                      <span className="ml-auto text-[11px] tabular-nums text-base-content/40">
+                        {section.key === 'paying' && queue.accounts.paying > 0
+                          ? `${rowsMode === 'person' ? count : inSection.length} of ${queue.accounts.paying} paying`
+                          : rowsMode === 'person'
+                            ? count
+                            : inSection.length}
                       </span>
-                    </h2>
-                    <p className="mt-0.5 text-xs text-base-content/45">
-                      {group.blurb}
-                    </p>
-                    <div className="mt-2 overflow-hidden rounded-xl ring-1 ring-base-300/60">
-                      {items.length === 0 ? (
-                        <p className="p-4 text-sm text-base-content/50">
-                          {group.key === 'needs_you'
-                            ? 'Nothing is waiting on you.'
-                            : group.key === 'waiting'
-                              ? 'Nobody owes us a reply.'
-                              : 'Nothing has been handled yet.'}
-                        </p>
-                      ) : (
-                        items.map((row) => (
-                          <QueueItem
-                            key={row.ticket_number}
-                            row={row}
-                            active={selected === row.ticket_number}
-                            onSelect={() => setSelected(row.ticket_number)}
+                      {section.key === 'resolved' && (
+                        <button
+                          type="button"
+                          onClick={() => setShowResolved((v) => !v)}
+                          aria-expanded={showResolved}
+                          className="cursor-pointer text-base-content/40 hover:text-base-content"
+                        >
+                          <ChevronRight
+                            size={14}
+                            className={`transition-transform ${showResolved ? 'rotate-90' : ''}`}
                           />
-                        ))
+                        </button>
                       )}
                     </div>
+
+                    {!collapsed && (
+                      <div className="flex flex-col gap-2">
+                        {inSection.length === 0 ? (
+                          /* An empty paying section is a fact about the data,
+                             not a blank box: almost no ticket is joined to an
+                             account, and the server says so in a sentence. */
+                          <p className="px-1 text-xs text-base-content/45">
+                            {section.key === 'paying'
+                              ? queue.accounts.note || section.empty
+                              : section.empty}
+                          </p>
+                        ) : rowsMode === 'person' ? (
+                          (inSection as Array<QueuePerson>).map((p) => (
+                            <PersonCard
+                              key={p.key}
+                              person={p}
+                              active={selectedPerson === p.key}
+                              onSelect={() => {
+                                setSelectedPerson(p.key)
+                                setSelectedTicket(null)
+                              }}
+                            />
+                          ))
+                        ) : (
+                          (inSection as Array<QueueRow>).map((r) => (
+                            <TicketCard
+                              key={r.ticket_number}
+                              row={r}
+                              active={selectedTicket === r.ticket_number}
+                              onSelect={() => {
+                                setSelectedTicket(r.ticket_number)
+                                setSelectedPerson(null)
+                              }}
+                            />
+                          ))
+                        )}
+                      </div>
+                    )}
                   </section>
                 )
               })}
             </div>
           </div>
 
-          <div className="min-w-0 flex-1">
-            {selected ? (
-              <CaseView ticket={selected} reloadKey={caseKey} />
+          <div
+            className={`min-w-0 flex-1 ${selected ? 'block' : 'hidden md:block'}`}
+          >
+            {selected && (
+              <button
+                type="button"
+                onClick={back}
+                className="mb-3 inline-flex min-h-11 cursor-pointer items-center gap-1.5 text-sm font-medium text-base-content/70 hover:text-base-content md:hidden"
+              >
+                <ArrowLeft size={16} /> All of support
+              </button>
+            )}
+
+            {rowsMode === 'person' && person ? (
+              <PersonView
+                person={person}
+                rows={rows}
+                reloadKey={caseKey}
+                openTicket={selectedTicket}
+                onOpenTicket={setSelectedTicket}
+              />
+            ) : rowsMode === 'ticket' && selectedTicket ? (
+              <CaseView ticket={selectedTicket} reloadKey={caseKey} />
             ) : (
               <div className="rounded-xl bg-base-200/30 px-6 py-16 text-center ring-1 ring-base-300/60">
-                <p className="text-sm text-base-content/60">
-                  Pick a case. The conversation reads top to bottom, and what
-                  the pipeline decided about it sits underneath.
+                <p className="mx-auto max-w-[50ch] text-sm text-base-content/60">
+                  Pick someone. Their identity and history come first, then
+                  their threads newest first — the one needing an answer open
+                  with its draft, the rest underneath.
                 </p>
               </div>
             )}

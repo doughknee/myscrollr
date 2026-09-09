@@ -46,7 +46,6 @@ function Centered({ children }: { children: React.ReactNode }) {
 export default function AdminShell() {
   const { isAuthenticated, isLoading, signIn } = useScrollrAuth()
   const getToken = useGetToken()
-  const location = useLocation()
   const [gate, setGate] = useState<GateState>({ kind: 'checking' })
 
   useEffect(() => {
@@ -138,19 +137,46 @@ export default function AdminShell() {
     )
   }
 
+  return <AdminChrome email={gate.email}>{<Outlet />}</AdminChrome>
+}
+
+/**
+ * The console's chrome: the container, the nav and the slot.
+ *
+ * Split out from the gate so it can be rendered without one — the Support
+ * console cannot be signed into from a development machine, and the only
+ * honest way to check its layout at four widths is to render the real chrome
+ * around the real page.
+ */
+export function AdminChrome({
+  email,
+  children,
+}: {
+  email: string
+  children: React.ReactNode
+}) {
+  const location = useLocation()
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:flex-row lg:gap-10">
-      <nav className="lg:w-52 lg:shrink-0">
-        <p className="px-3 text-xs font-semibold tracking-wide text-base-content/40 uppercase">
+    /* Wide enough for the Support console's two panes to sit as drawn at
+       1440, and capped so an ultrawide gives the extra width to margin
+       instead of stretching a line of prose across 3440 pixels. The reading
+       measure inside each pane is capped again, at 75ch, where it matters. */
+    <div className="mx-auto flex w-full max-w-[104rem] flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:gap-6 lg:py-10 xl:gap-10">
+      {/* Under 768px the nav is a scrolling row of full labels. From 768 to
+          1279 it collapses to an icon rail, which is where the width has to
+          come from for the queue and the case to stay side by side. From 1280
+          the labels come back. */}
+      <nav className="md:w-14 md:shrink-0 xl:w-52">
+        <p className="px-3 text-xs font-semibold tracking-wide text-base-content/40 uppercase md:hidden xl:block">
           Staff
         </p>
         <p
-          className="mt-1 truncate px-3 text-xs text-base-content/60"
-          title={gate.email}
+          className="mt-1 truncate px-3 text-xs text-base-content/60 md:hidden xl:block"
+          title={email}
         >
-          {gate.email}
+          {email}
         </p>
-        <ul className="mt-4 flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
+        <ul className="flex gap-1 overflow-x-auto md:mt-0 md:flex-col md:overflow-visible xl:mt-4">
           {SECTIONS.map(({ to, label, Icon, ...rest }) => {
             const exact = 'exact' in rest && rest.exact
             const active = exact
@@ -161,14 +187,16 @@ export default function AdminShell() {
               <li key={to}>
                 <Link
                   to={to}
-                  className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
+                  title={label}
+                  aria-label={label}
+                  className={`flex min-h-11 items-center gap-2.5 rounded-lg px-3 text-sm font-medium whitespace-nowrap transition-colors md:justify-center md:px-0 xl:justify-start xl:px-3 ${
                     active
                       ? 'bg-base-200 text-base-content'
                       : 'text-base-content/60 hover:bg-base-200/60 hover:text-base-content'
                   }`}
                 >
-                  <Icon size={16} strokeWidth={2} />
-                  {label}
+                  <Icon size={16} strokeWidth={2} className="shrink-0" />
+                  <span className="md:hidden xl:inline">{label}</span>
                 </Link>
               </li>
             )
@@ -176,9 +204,7 @@ export default function AdminShell() {
         </ul>
       </nav>
 
-      <main className="min-w-0 flex-1">
-        <Outlet />
-      </main>
+      <main className="min-w-0 flex-1">{children}</main>
     </div>
   )
 }

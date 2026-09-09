@@ -13,7 +13,15 @@
  * formats them and never recomputes them.
  */
 
-import type { AdminHold, Measured, QueueGroup } from '@/api/admin'
+import type {
+  AdminHold,
+  Measured,
+  QueueDir,
+  QueueGroup,
+  QueuePerson,
+  QueueSection,
+  QueueSort,
+} from '@/api/admin'
 
 /** The three columns, in the order a person should read them. */
 export const QUEUE_GROUPS: Array<{
@@ -42,6 +50,166 @@ export const QUEUE_GROUPS: Array<{
 
 export function groupLabel(group: string): string {
   return QUEUE_GROUPS.find((g) => g.key === group)?.label ?? group
+}
+
+/**
+ * The four sections, in the order a person reads them (REL-266).
+ *
+ * The order is fixed here and never derived from a sort. Paying customers lead
+ * because priority support is a thing we sold; letting a sort key move that
+ * section would sell it back.
+ */
+export const QUEUE_SECTIONS: Array<{
+  key: QueueSection
+  label: string
+  empty: string
+}> = [
+  {
+    key: 'paying',
+    label: 'Paying customers',
+    empty: 'No paying customer has written in.',
+  },
+  { key: 'open', label: 'Open', empty: 'Nothing is waiting on you.' },
+  {
+    key: 'answered',
+    label: 'Answered, waiting on them',
+    empty: 'Nobody owes us a reply.',
+  },
+  { key: 'resolved', label: 'Resolved', empty: 'Nothing has been closed yet.' },
+]
+
+/** The sort fields, with the words the menu shows for them. */
+export const SORT_FIELDS: Array<{ key: QueueSort; label: string }> = [
+  { key: 'last_wrote', label: 'Last wrote' },
+  { key: 'waiting', label: 'Longest waiting' },
+  { key: 'tickets', label: 'Most tickets' },
+  { key: 'plan', label: 'Plan' },
+  { key: 'name', label: 'Name' },
+]
+
+/**
+ * What the direction button means for the field currently chosen.
+ *
+ * "Ascending" is a word about arrays, not about people. Every field gets the
+ * sentence a reader would actually say, so the button can be labelled with
+ * what it will do rather than with a compass direction.
+ */
+export function directionLabel(sort: QueueSort, dir: QueueDir): string {
+  const words: Record<QueueSort, [string, string]> = {
+    last_wrote: ['Oldest first', 'Newest first'],
+    waiting: ['Shortest wait first', 'Longest waiting first'],
+    tickets: ['Fewest tickets first', 'Most tickets first'],
+    plan: ['Free first', 'Paying first'],
+    name: ['A to Z', 'Z to A'],
+  }
+  return words[sort][dir === 'asc' ? 0 : 1]
+}
+
+/**
+ * One line under a person's name: how many tickets, and when they last wrote.
+ *
+ * Deliberately says "1 ticket" rather than "1 tickets", and says nothing at
+ * all about a wait it does not know — the server marks that unavailable and a
+ * person with no message on record has not been waiting no time.
+ */
+export function personMeta(
+  person: QueuePerson,
+  now: number = Date.now(),
+): string {
+  const parts = [
+    person.tickets === 1 ? '1 ticket' : `${person.tickets} tickets`,
+  ]
+  // From the timestamp, not from `waiting_hours`. The wait is the LONGEST any
+  // of their tickets has waited, which is what "longest waiting" sorts on; it
+  // is not when they last wrote, and printing one under the other's label
+  // told a reader Dana last wrote 40 days ago while her open ticket was four
+  // hours old.
+  const wrote = relativeAge(person.last_user_message_at, now)
+  if (wrote) parts.push(`last wrote ${wrote}`)
+  else parts.push('never wrote in')
+  if (person.needs_you === 0 && person.handled === person.tickets) {
+    parts.push('all resolved')
+  }
+  return parts.join(' · ')
+}
+
+/**
+ * "4 hours ago" / "13 days ago" / "just now". Null when there is no timestamp,
+ * because "never" and "a moment ago" must not render the same.
+ */
+export function relativeAge(
+  iso: string | null | undefined,
+  now: number = Date.now(),
+): string | null {
+  if (!iso) return null
+  const then = Date.parse(iso)
+  if (Number.isNaN(then)) return null
+  const mins = Math.round((now - then) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins} ${mins === 1 ? 'minute' : 'minutes'} ago`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`
+  const days = Math.round(hours / 24)
+  if (days < 30) return `${days} ${days === 1 ? 'day' : 'days'} ago`
+  const months = Math.round(days / 30)
+  return `${months} ${months === 1 ? 'month' : 'months'} ago`
+}
+
+/**
+ * The plan badge, or nothing.
+ *
+ * Returns null rather than "Free" when there is no account behind the ticket,
+ * because "this person is on the free plan" and "nobody is behind this ticket"
+ * are different facts and a badge that conflates them invents an account.
+ */
+export function planBadge(person: {
+  plan?: string
+  paying: boolean
+}): { label: string; paying: boolean } | null {
+  const plan = person.plan?.trim()
+  if (!plan) return null
+  return { label: planLabel(plan), paying: person.paying }
+}
+
+/** `uplink_ultimate` is a column value, not something to show a person. */
+export function planLabel(plan: string): string {
+  const known: Record<string, string> = {
+    free: 'Free',
+    uplink: 'Uplink',
+    uplink_pro: 'Uplink Pro',
+    uplink_ultimate: 'Uplink Ultimate',
+  }
+  const key = plan.trim().toLowerCase()
+  return (
+    known[key] ??
+    key
+      .split(/[_\s-]+/)
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ')
+  )
+}
+
+/**
+ * How to name someone we may not know the name of.
+ *
+ * #819835 arrived from the marketing site with no account behind it. It has to
+ * read as exactly that, and never as a person called "Anonymous User".
+ */
+export function personTitle(person: { name?: string; email?: string }): {
+  title: string
+  subtitle: string | null
+  known: boolean
+} {
+  const name = person.name?.trim()
+  const email = person.email?.trim()
+  if (name) return { title: name, subtitle: email ?? null, known: true }
+  if (email) return { title: email, subtitle: null, known: true }
+  return {
+    title: 'No account on this ticket',
+    subtitle: 'it arrived without a signed-in user',
+    known: false,
+  }
 }
 
 /**
@@ -211,4 +379,47 @@ const NEWLINE = '\n'
 /** True when the edit changed nothing worth showing. */
 export function isUnchanged(before: string, after: string): boolean {
   return lineDiff(before, after).every((l) => l.kind === 'kept')
+}
+
+/**
+ * The reporter's most recent words — what an answer has to answer.
+ *
+ * This is the top of the case view now (REL-266). The old page opened with the
+ * whole conversation, the whole pipeline and a diagnostics blob taller than
+ * the sentence a person actually wrote; their words come first because they
+ * are the only part nobody can regenerate.
+ */
+export function lastUserMessage(
+  messages: Array<{ kind: string; body: string }> | null | undefined,
+): string | null {
+  const all = messages ?? []
+  for (let i = all.length - 1; i >= 0; i--) {
+    if (all[i].kind === 'user' && all[i].body.trim() !== '') return all[i].body
+  }
+  return null
+}
+
+/**
+ * The three chips that replace the diagnostics blob.
+ *
+ * Everything they summarise is still one click away under "Full diagnostics" —
+ * moved down a level, never deleted. Each chip says "unknown" out loud rather
+ * than disappearing, because a missing OS is itself a thing to know about a
+ * bug report.
+ */
+export function diagnosticsChips(ctx: {
+  os?: string
+  app_version?: string
+  current_version?: string
+  version_state: 'unknown' | 'behind' | 'current'
+}): Array<string> {
+  const version =
+    ctx.app_version && ctx.app_version.trim() !== ''
+      ? ctx.version_state === 'behind' && ctx.current_version
+        ? `${ctx.app_version} · behind ${ctx.current_version}`
+        : ctx.version_state === 'current'
+          ? `${ctx.app_version} · current`
+          : ctx.app_version
+      : 'Version unknown'
+  return [ctx.os?.trim() || 'OS unknown', version]
 }
