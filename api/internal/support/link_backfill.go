@@ -2,6 +2,7 @@ package support
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"sort"
@@ -228,32 +229,27 @@ func buildLinkProposals(ctx context.Context) (string, []DiscordActionRow) {
 // draft id.
 func handleDiscordLinkConfirm(c *fiber.Ctx, arg string) error {
 	ticket, issueKey, ok := strings.Cut(arg, "|")
-	ticket, issueKey = strings.TrimSpace(ticket), strings.ToUpper(strings.TrimSpace(issueKey))
-	if !ok || ticket == "" || issueKey == "" {
+	if !ok {
 		return discordEphemeralResponse(c, "malformed link target")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	if existing := caseLinearIssueKey(ctx, ticket); existing != "" {
-		return discordEphemeralResponse(c,
-			fmt.Sprintf("#%s is already linked to **%s**.", ticket, existing))
-	}
-	if err := setCaseLinearIssueKey(ctx, ticket, issueKey); err != nil {
+	// ActionLinkIssue is the same function the console's link endpoint calls,
+	// so the note, the thread post and the refusal to overwrite an existing
+	// link are written once (REL-261).
+	key, err := ActionLinkIssue(ctx, ticket, issueKey)
+	if err != nil {
+		var already ErrAlreadyLinked
+		if errors.As(err, &already) {
+			return discordEphemeralResponse(c,
+				fmt.Sprintf("#%s is already linked to **%s**.", strings.TrimSpace(ticket), already.IssueKey))
+		}
 		log.Printf("[Link] %s -> %s: %v", ticket, issueKey, err)
-		return discordEphemeralResponse(c, "Could not save the link.")
+		return discordEphemeralResponse(c, "Could not save the link: "+truncate(err.Error(), 200))
 	}
-	if err := recordSupportMessage(ctx, SupportMessage{
-		TicketNumber: ticket, Kind: "note",
-		BodyText: "linked to " + issueKey + " by hand",
-	}); err != nil {
-		log.Printf("[Cases] %v", err)
-	}
-	postToTicketThread(ctx, ticket, fmt.Sprintf(
-		"🔗 Linked to **%s** — %s. Drafts on this ticket may name the release that carries it once it ships.",
-		issueKey, linearIssueURL(issueKey)))
 
 	return discordVisibleResponse(c, fmt.Sprintf("🔗 **#%s → %s.** %s",
-		ticket, issueKey, linearIssueURL(issueKey)))
+		strings.TrimSpace(ticket), key, linearIssueURL(key)))
 }

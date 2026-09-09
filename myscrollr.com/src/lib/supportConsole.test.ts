@@ -6,6 +6,8 @@ import {
   formatWait,
   groupLabel,
   holdCountdown,
+  isUnchanged,
+  lineDiff,
 } from './supportConsole'
 import type { AdminHold } from '@/api/admin'
 
@@ -141,5 +143,32 @@ describe('groupLabel', () => {
     expect(groupLabel('waiting')).toBe('Waiting on the user')
     expect(groupLabel('handled')).toBe('Handled')
     expect(groupLabel('something_else')).toBe('something_else')
+  })
+})
+
+describe('lineDiff', () => {
+  it('marks what a rewrite removed and what it added', () => {
+    const got = lineDiff(
+      ['Try restarting the app.', 'If that fails, reinstall.'].join('\n'),
+      ['Try restarting the app.', 'Update to 1.6.2 first.'].join('\n'),
+    )
+    expect(got).toEqual([
+      { kind: 'kept', text: 'Try restarting the app.' },
+      { kind: 'removed', text: 'If that fails, reinstall.' },
+      { kind: 'added', text: 'Update to 1.6.2 first.' },
+    ])
+  })
+
+  it('treats blank lines as formatting, not as changes', () => {
+    expect(
+      isUnchanged(
+        ['one', '', 'two'].join('\n'),
+        ['  one  ', 'two', ''].join('\n'),
+      ),
+    ).toBe(true)
+  })
+
+  it('reports a wholly rewritten reply as changed', () => {
+    expect(isUnchanged('the draft', 'something else entirely')).toBe(false)
   })
 })

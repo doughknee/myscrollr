@@ -493,15 +493,15 @@ type AdminDraft struct {
 	NeedsInfo    bool   `json:"needs_info"`
 	ShouldClose  bool   `json:"should_close"`
 
-	Disposition       string     `json:"disposition,omitempty"`
-	DispositionReason string     `json:"disposition_reason,omitempty"`
+	Disposition       string `json:"disposition,omitempty"`
+	DispositionReason string `json:"disposition_reason,omitempty"`
 	// HoldUntil is the raw deadline on the row. It survives the send, so read
 	// Hold on the case (which checks the status) rather than this.
 	HoldUntil  *time.Time `json:"hold_until,omitempty"`
 	Intervened bool       `json:"intervened"`
-	CreatedAt         time.Time  `json:"created_at"`
-	DecidedAt         *time.Time `json:"decided_at,omitempty"`
-	SentAt            *time.Time `json:"sent_at,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	DecidedAt  *time.Time `json:"decided_at,omitempty"`
+	SentAt     *time.Time `json:"sent_at,omitempty"`
 }
 
 type AdminWidget struct {
@@ -600,11 +600,7 @@ func HandleAdminCase(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	var d AdminCaseDetail
-	err := platform.DBPool.QueryRow(ctx, caseSQL, ticket).Scan(
-		&d.TicketNumber, &d.Subject, &d.UserEmail, &d.LogtoSub, &d.Status,
-		&d.Category, &d.Priority, &d.Summary, &d.LinearIssueKey,
-		&d.DiscordThreadID, &d.OpenedAt, &d.UpdatedAt, &d.ClosedAt)
+	d, err := buildAdminCase(ctx, ticket)
 	if err == pgx.ErrNoRows {
 		return c.Status(fiber.StatusNotFound).JSON(platform.ErrorResponse{
 			Status: "error",
@@ -612,8 +608,29 @@ func HandleAdminCase(c *fiber.Ctx) error {
 		})
 	}
 	if err != nil {
-		log.Printf("[AdminSupport] case %s: %v", ticket, err)
 		return adminSupportError(c, "Could not read that case.")
+	}
+	return c.JSON(d)
+}
+
+// buildAdminCase assembles one case exactly as the read endpoint serves it.
+//
+// Split out for REL-261: every write endpoint answers with the case as it now
+// stands, and it has to be the same case a reload would show. A second
+// assembly of the same fields is a second place for them to drift, and the
+// drift would be invisible — the page would simply be wrong about what just
+// happened.
+func buildAdminCase(ctx context.Context, ticket string) (*AdminCaseDetail, error) {
+	var d AdminCaseDetail
+	err := platform.DBPool.QueryRow(ctx, caseSQL, ticket).Scan(
+		&d.TicketNumber, &d.Subject, &d.UserEmail, &d.LogtoSub, &d.Status,
+		&d.Category, &d.Priority, &d.Summary, &d.LinearIssueKey,
+		&d.DiscordThreadID, &d.OpenedAt, &d.UpdatedAt, &d.ClosedAt)
+	if err != nil {
+		if err != pgx.ErrNoRows {
+			log.Printf("[AdminSupport] case %s: %v", ticket, err)
+		}
+		return nil, err
 	}
 	if d.DiscordThreadID != "" {
 		if guild := strings.TrimSpace(os.Getenv("DISCORD_GUILD_ID")); guild != "" {
@@ -650,7 +667,7 @@ func HandleAdminCase(c *fiber.Ctx) error {
 	d.KnownIssues = knownIssuesBlock(ctx)
 	d.EvidenceNote = "The similar cases and the known-issues block are rebuilt now, by the same queries the prompt uses. Neither is stored per draft, so on an older case they can differ from what the model was actually shown."
 
-	return c.JSON(d)
+	return &d, nil
 }
 
 func adminCaseMessages(ctx context.Context, ticket string) []AdminMessage {
