@@ -69,12 +69,22 @@ export interface DailyCount {
   count: number
 }
 
+/**
+ * Two counts, because they answer two questions. `total` is accounts, read
+ * from Logto. `set_up` is how many of them ever saved a preference locally.
+ * The gap between them is 83 people who signed up and never set the app up —
+ * the most interesting number on the page (REL-265).
+ *
+ * `source` is 'local' when Logto could not be reached; `total` then falls back
+ * to `set_up` and must be labelled as the local number, never as accounts.
+ */
 export interface AccountsTile {
   total: number
+  set_up: number
+  source: 'logto' | 'local'
+  note?: string
   new_7d: Measured
   new_30d: Measured
-  untracked: number
-  tracking_since?: string
   daily: Array<DailyCount> | null
 }
 
@@ -85,8 +95,9 @@ export interface PlanRow {
   count: number
 }
 
+/** `paying` excludes plan='free', so a free row in Stripe cannot inflate it. */
 export interface PlansTile {
-  free: number
+  paying: number
   rows: Array<PlanRow> | null
 }
 
@@ -155,6 +166,7 @@ export interface AdminOverview {
 export interface AccountRow {
   logto_sub: string
   email: string | null
+  name: string | null
   plan: string
   status: string
   lifetime: boolean
@@ -162,16 +174,28 @@ export interface AccountRow {
   on_ticker: number
   fantasy: boolean
   tickets: number
-  created_at: string | null
-  updated_at: string
+  /** From Logto. When they created the account. */
+  signed_up_at: string | null
+  /** From Logto. When they last authenticated. */
+  last_sign_in_at: string | null
+  /** Local. When the app last wrote a preference — not the same as last seen. */
+  last_used_app: string | null
+  /** Whether they have a user_preferences row at all. */
+  set_up: boolean
+  suspended: boolean
   deletion_state: string | null
 }
 
 export interface AccountsPage {
   accounts: Array<AccountRow>
+  /** Accounts in Logto, or — when source is 'local' — accounts with local data. */
   total: number
+  /** How many accounts have ever set the app up. Global, not per page. */
+  set_up: number
   page: number
   page_size: number
+  source: 'logto' | 'local'
+  note?: string
 }
 
 export interface AccountWidget {

@@ -3,9 +3,11 @@ package admin
 import (
 	"context"
 	"log"
+	"sort"
 	"sync"
 	"time"
 
+	"github.com/brandon-relentnet/myscrollr/api/internal/accounts"
 	"github.com/brandon-relentnet/myscrollr/api/internal/events"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
@@ -20,6 +22,10 @@ import (
 // telemetry or analytics anywhere in this API - a standing decision, not an
 // oversight - so installs are NOT measurable, and the Installs tile exists
 // purely to say so and point at downloads instead.
+
+// listAllLogtoUsers is the tile's seam onto Logto, so the tests can drive
+// both the healthy path and the unreachable path without a network.
+var listAllLogtoUsers = accounts.ListAllLogtoUsers
 
 // Measured wraps a number with whether it means what its label says. When
 // Available is false the client renders Note instead of Value.
@@ -41,19 +47,33 @@ type OverviewResponse struct {
 	Ingest       []IngestRow   `json:"ingest"`
 }
 
-// AccountsTile counts rows in user_preferences - the row created the first
-// time an account reads its preferences, and therefore the account itself.
+// AccountsTile carries two counts because they answer two questions.
 //
-// created_at was only added in migration 000016 and deliberately not
-// backfilled, so accounts that predate it have no signup date. Untracked is
-// how many, and TrackingSince is when the honest series starts.
+// Total is accounts, read from Logto, which is the system of record for them.
+// SetUp is rows in user_preferences - the row written the first time the app
+// saves a preference - so it is how many of those accounts ever got far enough
+// into the product to configure anything. This tile used to report SetUp as
+// Total: 100 against 183 real accounts, a 46% undercount on the number most
+// likely to be quoted (REL-265).
+//
+// The gap between them is the point. It is 83 people who created an account
+// and never set the app up, and it dwarfs everything else on the funnel.
+//
+// Source is "logto" normally and "local" when Logto could not be reached; in
+// the local case Total falls back to SetUp and Note says why. A smaller number
+// presented without that label is the bug this tile was rebuilt to fix.
+//
+// The signup series comes from Logto's per-account createdAt, so "new this
+// week" is a fact about signups rather than about when a local column was
+// added. That retires the old untracked/tracking-since apparatus.
 type AccountsTile struct {
-	Total         int          `json:"total"`
-	New7d         Measured     `json:"new_7d"`
-	New30d        Measured     `json:"new_30d"`
-	Untracked     int          `json:"untracked"`
-	TrackingSince string       `json:"tracking_since,omitempty"`
-	Daily         []DailyCount `json:"daily"`
+	Total  int          `json:"total"`
+	SetUp  int          `json:"set_up"`
+	Source string       `json:"source"`
+	Note   string       `json:"note,omitempty"`
+	New7d  Measured     `json:"new_7d"`
+	New30d Measured     `json:"new_30d"`
+	Daily  []DailyCount `json:"daily"`
 }
 
 type DailyCount struct {
@@ -61,12 +81,17 @@ type DailyCount struct {
 	Count int    `json:"count"`
 }
 
-// PlansTile is the mix from stripe_customers. Accounts with no Stripe row
-// have never started a checkout, so they are free - counted here rather than
-// dropped, or the mix would not add up to the account total.
+// PlansTile is the mix from stripe_customers, and Paying is the count that
+// matters. It excludes plan = 'free': production carries three active Stripe
+// rows and one of them is on the free plan, so a bare row count reads 3 when
+// two people are actually paying (REL-265).
+//
+// There is no Free field. Free is every account that is not paying, and the
+// account total lives on the accounts tile - deriving it there beats keeping a
+// second count here that could disagree with it.
 type PlansTile struct {
-	Free int       `json:"free"`
-	Rows []PlanRow `json:"rows"`
+	Paying int       `json:"paying"`
+	Rows   []PlanRow `json:"rows"`
 }
 
 type PlanRow struct {
@@ -163,47 +188,53 @@ func HandleGetOverview(c *fiber.Ctx) error {
 
 func accountsTile(ctx context.Context) AccountsTile {
 	var t AccountsTile
-	var since *time.Time
-	err := platform.DBPool.QueryRow(ctx, `
-		SELECT count(*),
-		       count(*) FILTER (WHERE created_at IS NULL),
-		       count(*) FILTER (WHERE created_at >= now() - interval '7 days'),
-		       count(*) FILTER (WHERE created_at >= now() - interval '30 days'),
-		       min(created_at)
-		  FROM user_preferences`).
-		Scan(&t.Total, &t.Untracked, &t.New7d.Value, &t.New30d.Value, &since)
-	if err != nil {
-		log.Printf("[Admin] accounts tile: %v", err)
-		return t
+
+	if err := platform.DBPool.QueryRow(ctx,
+		`SELECT count(*) FROM user_preferences`).Scan(&t.SetUp); err != nil {
+		log.Printf("[Admin] accounts set-up count: %v", err)
 	}
 
-	// The windows only mean anything once tracking has been running. Before
-	// the first dated row exists, "0 new this week" would read as a fact about
-	// signups when it is only a fact about the column's age.
-	if since == nil {
-		note := "No signup dates recorded yet - tracking began with this release."
+	users, total, err := listAllLogtoUsers()
+	if err != nil {
+		// Degrade loudly. The local number is real, but it is not the account
+		// count, and the tile says which one the reader is looking at.
+		log.Printf("[Admin] accounts tile logto: %v", err)
+		t.Total, t.Source = t.SetUp, "local"
+		t.Note = "Logto is unreachable, so this is not the account count. It " +
+			"is how many accounts have set the app up, which is fewer."
+		note := "Signup dates come from Logto, which is unreachable."
 		t.New7d = Measured{Available: false, Note: note}
 		t.New30d = Measured{Available: false, Note: note}
 		return t
 	}
-	t.TrackingSince = since.UTC().Format(time.RFC3339)
+
+	t.Total, t.Source = total, "logto"
 	t.New7d.Available, t.New30d.Available = true, true
 
-	rows, err := platform.DBPool.Query(ctx, `
-		SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD'), count(*)
-		  FROM user_preferences
-		 WHERE created_at >= now() - interval '30 days'
-		 GROUP BY 1 ORDER BY 1`)
-	if err != nil {
-		log.Printf("[Admin] accounts daily: %v", err)
-		return t
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var d DailyCount
-		if err := rows.Scan(&d.Day, &d.Count); err == nil {
-			t.Daily = append(t.Daily, d)
+	now := time.Now()
+	week, month := now.AddDate(0, 0, -7), now.AddDate(0, 0, -30)
+	daily := make(map[string]int, 30)
+	for _, u := range users {
+		if u.CreatedAt <= 0 {
+			continue
 		}
+		created := time.UnixMilli(u.CreatedAt)
+		if created.After(week) {
+			t.New7d.Value++
+		}
+		if created.After(month) {
+			t.New30d.Value++
+			daily[created.UTC().Format("2006-01-02")]++
+		}
+	}
+
+	days := make([]string, 0, len(daily))
+	for day := range daily {
+		days = append(days, day)
+	}
+	sort.Strings(days)
+	for _, day := range days {
+		t.Daily = append(t.Daily, DailyCount{Day: day, Count: daily[day]})
 	}
 	return t
 }
@@ -227,11 +258,13 @@ func plansTile(ctx context.Context) PlansTile {
 		rows.Close()
 	}
 
+	// A free-plan row in stripe_customers is somebody who reached checkout
+	// and did not pay. Counting the table would call them a customer.
 	if err := platform.DBPool.QueryRow(ctx, `
-		SELECT count(*) FROM user_preferences p
-		 WHERE NOT EXISTS (SELECT 1 FROM stripe_customers s WHERE s.logto_sub = p.logto_sub)`).
-		Scan(&t.Free); err != nil {
-		log.Printf("[Admin] plans free count: %v", err)
+		SELECT count(*) FROM stripe_customers
+		 WHERE plan <> 'free' AND status IN ('active', 'trialing', 'past_due')`).
+		Scan(&t.Paying); err != nil {
+		log.Printf("[Admin] plans paying count: %v", err)
 	}
 	return t
 }

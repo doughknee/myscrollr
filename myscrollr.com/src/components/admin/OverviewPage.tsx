@@ -123,6 +123,10 @@ export default function OverviewPage() {
   const releases = (data.downloads.releases ?? []).slice(0, 5)
   const ingest = data.ingest ?? []
   const plans = (data.plans.rows ?? []).filter((r) => r.plan !== 'free')
+  // The gap is the point of this page: accounts that exist but never got far
+  // enough into the product to save a preference.
+  const neverSetUp = Math.max(0, data.accounts.total - data.accounts.set_up)
+  const free = Math.max(0, data.accounts.total - data.plans.paying)
   const requests = (data.demand.catalog_requests ?? []).slice(0, 5)
 
   return (
@@ -138,15 +142,35 @@ export default function OverviewPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Tile
-          title="Accounts"
+          title={
+            data.accounts.source === 'local'
+              ? 'Accounts (local count)'
+              : 'Accounts'
+          }
           to="/admin/users"
           caveat={
-            data.accounts.untracked > 0
-              ? `${data.accounts.untracked.toLocaleString()} accounts predate signup-date tracking, so they are counted in the total but not in "new".`
-              : undefined
+            data.accounts.note ??
+            'Accounts come from Logto. "Set up the app" is a local count of who ever saved a preference.'
           }
         >
           <Big>{data.accounts.total.toLocaleString()}</Big>
+          <p className="mt-1 text-sm text-base-content/60">
+            {data.accounts.source === 'local'
+              ? 'accounts with local data — Logto unreachable'
+              : 'accounts'}
+          </p>
+          {data.accounts.source === 'logto' && (
+            <p className="mt-3 text-sm text-base-content/60">
+              <span className="font-semibold text-base-content">
+                {data.accounts.set_up.toLocaleString()}
+              </span>{' '}
+              have set up the app —{' '}
+              <span className="font-semibold text-warning">
+                {neverSetUp.toLocaleString()}
+              </span>{' '}
+              never did
+            </p>
+          )}
           <div className="mt-3">
             {newAccounts.display === null ? (
               <Unmeasurable note={newAccounts.note} />
@@ -179,11 +203,13 @@ export default function OverviewPage() {
         </Tile>
 
         <Tile
-          title="Plans"
-          caveat="From Stripe. Accounts with no Stripe record are counted as free."
+          title="Paying"
+          caveat="From Stripe, excluding rows on the free plan — one active Stripe record is a free-plan row and is not a customer. Free is every account that is not paying."
         >
-          <Big>{data.plans.free.toLocaleString()}</Big>
-          <p className="mt-1 mb-2 text-sm text-base-content/60">free</p>
+          <Big>{data.plans.paying.toLocaleString()}</Big>
+          <p className="mt-1 mb-2 text-sm text-base-content/60">
+            paying · {free.toLocaleString()} free
+          </p>
           {plans.length === 0 ? (
             <p className="text-sm text-base-content/50">
               No paid subscriptions.

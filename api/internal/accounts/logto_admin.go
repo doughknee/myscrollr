@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -435,6 +436,47 @@ func DeleteLogtoUser(logtoSub string) error {
 	return nil
 }
 
+// GetLogtoUser reads one account from the Management API.
+//
+// Returns (nil, nil) when Logto has no such user - local rows can outlive a
+// deleted account, and that is not an error worth failing a page over.
+func GetLogtoUser(logtoSub string) (*LogtoUser, error) {
+	cfg := getM2MConfig()
+
+	token, err := getM2MToken()
+	if err != nil {
+		return nil, err
+	}
+
+	reqURL := fmt.Sprintf("%s/api/users/%s", cfg.Endpoint, logtoSub)
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create get user request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{Timeout: platform.LogtoM2MTokenTimeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get user request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("get user returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var user LogtoUser
+	if err := json.Unmarshal(body, &user); err != nil {
+		return nil, fmt.Errorf("decode user: %w", err)
+	}
+	return &user, nil
+}
+
 // LogtoPrimaryEmail returns the Logto-verified primary email for a user.
 //
 // The access token carries an `email` claim (wired via Logto Custom JWT) but
@@ -446,38 +488,9 @@ func DeleteLogtoUser(logtoSub string) error {
 //
 // Returns ("", nil) when the user has no primary email set.
 func LogtoPrimaryEmail(logtoSub string) (string, error) {
-	cfg := getM2MConfig()
-
-	token, err := getM2MToken()
-	if err != nil {
+	user, err := GetLogtoUser(logtoSub)
+	if err != nil || user == nil {
 		return "", err
-	}
-
-	reqURL := fmt.Sprintf("%s/api/users/%s", cfg.Endpoint, logtoSub)
-	req, err := http.NewRequest("GET", reqURL, nil)
-	if err != nil {
-		return "", fmt.Errorf("create get user request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	client := &http.Client{Timeout: platform.LogtoM2MTokenTimeout}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("get user request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("get user returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	var user struct {
-		PrimaryEmail string `json:"primaryEmail"`
-		IsSuspended  bool   `json:"isSuspended"`
-	}
-	if err := json.Unmarshal(body, &user); err != nil {
-		return "", fmt.Errorf("decode user: %w", err)
 	}
 	// A suspended account keeps its primaryEmail. Treat it as having none so
 	// suspension revokes staff access too.
@@ -485,4 +498,135 @@ func LogtoPrimaryEmail(logtoSub string) (string, error) {
 		return "", nil
 	}
 	return user.PrimaryEmail, nil
+}
+
+// =============================================================================
+// Logto Management API — reading the account list
+// =============================================================================
+
+// LogtoUser is the slice of a Logto user record this product actually reads.
+//
+// Logto is the system of record for accounts. The local user_preferences table
+// only gains a row once someone gets far enough into the app to save a
+// preference, so counting it counts app setups, not accounts — see REL-265.
+//
+// CreatedAt and LastSignInAt are Unix milliseconds, which is how Logto sends
+// them. LastSignInAt is zero for an account that has never signed in.
+type LogtoUser struct {
+	ID            string `json:"id"`
+	PrimaryEmail  string `json:"primaryEmail"`
+	Name          string `json:"name"`
+	Username      string `json:"username"`
+	CreatedAt     int64  `json:"createdAt"`
+	LastSignInAt  int64  `json:"lastSignInAt"`
+	ApplicationID string `json:"applicationId"`
+	IsSuspended   bool   `json:"isSuspended"`
+}
+
+// logtoMaxPageSize is Logto's own cap. Asking for more returns
+// guard.invalid_pagination rather than a clamped page, so we clamp here.
+const logtoMaxPageSize = 100
+
+// ListLogtoUsers returns one page of accounts plus the total across all pages.
+//
+// The total comes from the `total-number` response header, so counting every
+// account costs one request with page_size=1 — no paging, no row counting.
+// page is 1-based, matching Logto.
+//
+// search, when non-empty, matches Logto's primaryEmail and username. Those are
+// the only two fields Logto can search; anything held locally (widget counts,
+// ticket counts) cannot be filtered or sorted across the whole set from here.
+func ListLogtoUsers(page, pageSize int, search string) ([]LogtoUser, int, error) {
+	cfg := getM2MConfig()
+	if cfg.Endpoint == "" {
+		return nil, 0, fmt.Errorf("LOGTO_ENDPOINT not set")
+	}
+
+	token, err := getM2MToken()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 1
+	}
+	if pageSize > logtoMaxPageSize {
+		pageSize = logtoMaxPageSize
+	}
+
+	q := url.Values{}
+	q.Set("page", strconv.Itoa(page))
+	q.Set("page_size", strconv.Itoa(pageSize))
+	if search != "" {
+		// Logto's search.<field> params are LIKE patterns; the caller passes a
+		// bare term and we widen it here so partial matches work.
+		q.Set("search.primaryEmail", "%"+search+"%")
+		q.Set("search.username", "%"+search+"%")
+		q.Set("searchMode", "or")
+	}
+
+	req, err := http.NewRequest("GET", cfg.Endpoint+"/api/users?"+q.Encode(), nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("create list users request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{Timeout: platform.LogtoM2MTokenTimeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list users request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, 0, fmt.Errorf("list users returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var users []LogtoUser
+	if err := json.Unmarshal(body, &users); err != nil {
+		return nil, 0, fmt.Errorf("decode users: %w", err)
+	}
+
+	total, err := strconv.Atoi(resp.Header.Get("total-number"))
+	if err != nil {
+		// No header means no honest total. Refusing here is the point: a
+		// caller that got a short page and no total would otherwise report
+		// the page length as the account count.
+		return nil, 0, fmt.Errorf("missing total-number header on list users")
+	}
+	return users, total, nil
+}
+
+// logtoScanCap bounds ListAllLogtoUsers so a runaway or a much larger tenant
+// cannot turn one dashboard load into hundreds of upstream requests.
+//
+// ponytail: a full scan is fine at ~200 accounts. If this cap ever bites, the
+// fix is a cached nightly aggregate of signup dates, not a bigger cap.
+const logtoScanCap = 5000
+
+// ListAllLogtoUsers walks every page and returns every account.
+//
+// Only the Overview's signup series needs this: the per-account createdAt is
+// what makes "new this week" a fact about signups rather than about when a
+// local column was added. Anything that only needs the count should call
+// ListLogtoUsers(1, 1, "") and read the total.
+//
+// Returns the scanned users and the upstream total. When the cap truncates the
+// scan the total still reflects reality, so a caller can tell.
+func ListAllLogtoUsers() ([]LogtoUser, int, error) {
+	var all []LogtoUser
+	for page := 1; ; page++ {
+		batch, total, err := ListLogtoUsers(page, logtoMaxPageSize, "")
+		if err != nil {
+			return nil, 0, err
+		}
+		all = append(all, batch...)
+		if len(batch) < logtoMaxPageSize || len(all) >= total || len(all) >= logtoScanCap {
+			return all, total, nil
+		}
+	}
 }
