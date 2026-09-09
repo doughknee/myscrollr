@@ -434,3 +434,55 @@ func DeleteLogtoUser(logtoSub string) error {
 	log.Printf("[Logto M2M] Deleted user %s", logtoSub)
 	return nil
 }
+
+// LogtoPrimaryEmail returns the Logto-verified primary email for a user.
+//
+// The access token carries an `email` claim (wired via Logto Custom JWT) but
+// no `email_verified`, so the claim alone cannot answer "is this address
+// actually this person's". Logto only sets `primaryEmail` on an address the
+// user has proven they control, which makes the Management API the honest
+// source. RequireAdmin calls this at most once per admin — the sub is pinned
+// on the first match and read from the row thereafter.
+//
+// Returns ("", nil) when the user has no primary email set.
+func LogtoPrimaryEmail(logtoSub string) (string, error) {
+	cfg := getM2MConfig()
+
+	token, err := getM2MToken()
+	if err != nil {
+		return "", err
+	}
+
+	reqURL := fmt.Sprintf("%s/api/users/%s", cfg.Endpoint, logtoSub)
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("create get user request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{Timeout: platform.LogtoM2MTokenTimeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("get user request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("get user returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var user struct {
+		PrimaryEmail string `json:"primaryEmail"`
+		IsSuspended  bool   `json:"isSuspended"`
+	}
+	if err := json.Unmarshal(body, &user); err != nil {
+		return "", fmt.Errorf("decode user: %w", err)
+	}
+	// A suspended account keeps its primaryEmail. Treat it as having none so
+	// suspension revokes staff access too.
+	if user.IsSuspended {
+		return "", nil
+	}
+	return user.PrimaryEmail, nil
+}

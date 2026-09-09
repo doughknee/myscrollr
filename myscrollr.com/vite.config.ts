@@ -70,9 +70,12 @@ export default defineConfig({
         crawlLinks: true, // discover any internal links we forgot
         filter: ({ path }: { path: string }) => {
           // Auth/dynamic routes — stay client-rendered (SPA fallback)
-          const excluded = ['/account', '/callback', '/invite']
+          // /admin is the staff console: authed, noindex, and its chunk
+          // must never be pulled into a prerendered marketing page.
+          const excluded = ['/account', '/callback', '/invite', '/admin']
           if (excluded.includes(path)) return false
           if (path.startsWith('/u/')) return false // dynamic profile pages
+          if (path.startsWith('/admin')) return false // staff console
           // Note: /status IS prerendered (just the <head> meta for SEO;
           // the live health body hydrates on the client). Removed from the
           // exclusion list when we made it indexable.
