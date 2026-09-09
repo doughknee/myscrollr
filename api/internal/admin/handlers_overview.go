@@ -23,11 +23,11 @@ import (
 
 // Measured wraps a number with whether it means what its label says. When
 // Available is false the client renders Note instead of Value.
-type Measured struct {
-	Value     int    `json:"value"`
-	Available bool   `json:"available"`
-	Note      string `json:"note,omitempty"`
-}
+//
+// An alias rather than a declaration since REL-263: the support console needs
+// the same promise for its hold countdown, and both packages reaching for one
+// type beats two that agree by coincidence. The JSON is identical.
+type Measured = platform.Measured
 
 type OverviewResponse struct {
 	GeneratedAt  string        `json:"generated_at"`
