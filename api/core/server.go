@@ -238,6 +238,16 @@ func (s *Server) setupRoutes() {
 	s.App.Post("/admin/admins", platform.LogtoAuth, admin.RequireAdmin, admin.HandleAddAdmin)
 	s.App.Delete("/admin/admins/:id", platform.LogtoAuth, admin.RequireAdmin, admin.HandleRemoveAdmin)
 
+	// The support console's read half (REL-263). Same gate as the rest of
+	// /admin, and deliberately NOT the SCROLLR_WEBHOOK_SECRET header that
+	// guards /internal/support/cases below: that secret is for
+	// machine-to-machine callers and a browser has no business holding one.
+	// The handlers live in internal/support because everything they read -
+	// the disposition vocabulary, the proven-fix walk, the hold clock - is
+	// unexported there.
+	s.App.Get("/admin/support/queue", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminQueue)
+	s.App.Get("/admin/support/case/:ticket", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminCase)
+
 	s.App.Get("/dashboard", platform.LogtoAuth, s.getDashboard)
 
 	// Support

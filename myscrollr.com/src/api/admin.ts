@@ -195,6 +195,158 @@ export interface AccountDetail {
   cases: Array<AccountCase>
 }
 
+// ── Support console (read-only, REL-263) ──────────────────
+
+export type QueueGroup = 'needs_you' | 'waiting' | 'handled'
+
+/** The pipeline's switch position. Every countdown is meaningless without it. */
+export interface AutoSendState {
+  armed: boolean
+  paused: boolean
+  enabled: boolean
+  hold_minutes: number
+  note: string
+}
+
+/**
+ * A hold, as the server computed it. `remaining_seconds` is Measured because
+ * the number is only a countdown while the pipeline is armed — an unavailable
+ * one must render as `note`, never as a time.
+ */
+export interface AdminHold {
+  until: string
+  remaining_seconds: Measured
+  verb: string
+  expired: boolean
+  note: string
+}
+
+/** The proven-fix answer plus the reasoning that produced it. */
+export interface AdminFix {
+  issue_key?: string
+  proven: boolean
+  version?: string
+  release_url?: string
+  merged_at?: string
+  reason: string
+}
+
+export interface QueueRow {
+  ticket_number: string
+  subject: string
+  user_email?: string
+  category?: string
+  priority?: string
+  status: string
+  summary?: string
+  group: QueueGroup
+  group_reason: string
+  draft_id?: number
+  draft_status?: string
+  disposition?: string
+  disposition_reason?: string
+  last_user_message_at?: string
+  waiting_hours: Measured
+  hold?: AdminHold
+  fix?: AdminFix
+  opened_at: string
+  updated_at: string
+}
+
+export interface SupportQueue {
+  generated_at: string
+  autosend: AutoSendState
+  counts: Record<string, number>
+  state: string
+  rows: Array<QueueRow> | null
+}
+
+export interface CaseMessage {
+  kind: 'user' | 'ai_draft' | 'sent' | 'note'
+  body: string
+  superseded: boolean
+  draft_id?: number
+  created_at: string
+}
+
+/** Every field the pipeline wrote about one draft. */
+export interface CaseDraft {
+  id: number
+  status: string
+  body: string
+  edited_body?: string
+  summary?: string
+  category?: string
+  priority?: string
+  confidence?: string
+  duplicate_of?: string
+  sentiment?: string
+  drafter_category?: string
+  grounded_in?: string
+  unknowns?: string
+  ask_user_for?: string
+  internal_note?: string
+  needs_info: boolean
+  should_close: boolean
+  disposition?: string
+  disposition_reason?: string
+  intervened: boolean
+  created_at: string
+  decided_at?: string
+  sent_at?: string
+}
+
+export interface CaseContext {
+  tier: string
+  app_version?: string
+  current_version?: string
+  version_state: 'unknown' | 'behind' | 'current'
+  os?: string
+  monitors_attached: number
+  monitors_chosen: number
+  widgets: Array<{ type: string; on_ticker: boolean }> | null
+  has_diagnostics: boolean
+  note: string
+}
+
+export interface SimilarCase {
+  ticket_number: string
+  subject: string
+  user_wrote: string
+  we_sent: string
+}
+
+export interface CaseDetail {
+  ticket_number: string
+  subject: string
+  user_email?: string
+  logto_sub?: string
+  status: string
+  category?: string
+  priority?: string
+  summary?: string
+  linear_issue_key?: string
+  discord_thread_id?: string
+  discord_url?: string
+  opened_at: string
+  updated_at: string
+  closed_at?: string
+  group: QueueGroup
+  group_reason: string
+  messages: Array<CaseMessage> | null
+  draft: CaseDraft | null
+  draft_note?: string
+  context: CaseContext
+  fix: AdminFix
+  autosend: AutoSendState
+  hold?: AdminHold
+  stale_days: number
+  stale_after: number
+  similar: Array<SimilarCase> | null
+  known_issues?: string
+  evidence_note: string
+}
+
 // ── Admins ────────────────────────────────────────────────────────
 
 export interface AdminRow {
@@ -228,6 +380,18 @@ export const adminApi = {
   account: (getToken: Token, sub: string) =>
     adminFetch<AccountDetail>(
       `/admin/accounts/${encodeURIComponent(sub)}`,
+      getToken,
+    ),
+
+  supportQueue: (getToken: Token, state: string) =>
+    adminFetch<SupportQueue>(
+      `/admin/support/queue?state=${encodeURIComponent(state)}`,
+      getToken,
+    ),
+
+  supportCase: (getToken: Token, ticket: string) =>
+    adminFetch<CaseDetail>(
+      `/admin/support/case/${encodeURIComponent(ticket)}`,
       getToken,
     ),
 
