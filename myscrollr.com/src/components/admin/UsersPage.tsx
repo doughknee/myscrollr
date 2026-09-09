@@ -12,13 +12,22 @@ import { useGetToken } from '@/hooks/useGetToken'
  * separate consequences, so there is no write path here at all — no disabled
  * button, no "coming soon" affordance, nothing to reach for.
  *
- * Search matches the Logto sub or an email from the user's support cases,
- * which is the only place this database keeps one.
+ * The list is every account, from Logto. It used to be every row in
+ * user_preferences, which meant the 83 people who signed up and never set the
+ * app up were not in it at all (REL-265). Search runs against Logto and so
+ * matches email and username; widget and ticket counts are local and cannot be
+ * searched or sorted across the whole set, which the page says out loud rather
+ * than sorting one page and letting it look global.
  */
 
 function planLabel(a: AccountRow): string {
   if (a.plan === 'free' || a.status === 'none') return 'Free'
   return `${a.plan}${a.lifetime ? ' · lifetime' : ''} · ${a.status}`
+}
+
+/** A date, or an em dash when the event never happened. */
+function day(iso: string | null): string {
+  return iso ? new Date(iso).toLocaleDateString() : '—'
 }
 
 function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
@@ -63,7 +72,9 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
         <>
           <header>
             <h1 className="text-xl font-bold break-all">
-              {detail.account.email ?? detail.account.logto_sub}
+              {detail.account.email ??
+                detail.account.name ??
+                detail.account.logto_sub}
             </h1>
             <p className="mt-1 font-mono text-xs break-all text-base-content/50">
               {detail.account.logto_sub}
@@ -71,13 +82,30 @@ function DetailPanel({ sub, onBack }: { sub: string; onBack: () => void }) {
             <p className="mt-2 text-sm text-base-content/60">
               {planLabel(detail.account)}
               {detail.account.fantasy && ' · fantasy connected'}
+              {detail.account.suspended && ' · suspended'}
               {detail.account.deletion_state &&
                 ` · deletion ${detail.account.deletion_state}`}
             </p>
-            {!detail.account.email && (
-              <p className="mt-2 text-xs text-base-content/45">
-                No email on file — this database only stores an address once a
-                user opens a support ticket.
+            <dl className="mt-3 grid grid-cols-3 gap-3 text-sm">
+              <div>
+                <dt className="text-xs text-base-content/50">Signed up</dt>
+                <dd>{day(detail.account.signed_up_at)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-base-content/50">Last sign-in</dt>
+                <dd>{day(detail.account.last_sign_in_at)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-base-content/50">
+                  Last used the app
+                </dt>
+                <dd>{day(detail.account.last_used_app)}</dd>
+              </div>
+            </dl>
+            {!detail.account.set_up && (
+              <p className="mt-3 text-xs text-warning">
+                This account has never set the app up — no preferences were ever
+                saved.
               </p>
             )}
           </header>
@@ -181,13 +209,45 @@ export default function UsersPage() {
   }
 
   const pageCount = data ? Math.ceil(data.total / data.page_size) : 0
+  // The gap REL-265 uncovered: accounts that exist but never saved a
+  // preference. Global counts, so they are only honest with no search term.
+  const neverSetUp = data ? Math.max(0, data.total - data.set_up) : 0
 
   return (
     <div className="space-y-5">
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+        {data?.source === 'local' ? (
+          <p className="mt-1 text-sm text-warning">
+            {data.note ?? 'Logto is unreachable.'} Showing{' '}
+            {data.total.toLocaleString()} accounts with local data.
+          </p>
+        ) : (
+          data && (
+            <p className="mt-1 text-sm text-base-content/60">
+              <span className="font-semibold text-base-content">
+                {data.total.toLocaleString()}
+              </span>{' '}
+              {query ? 'accounts match' : 'accounts'}
+              {/* set_up is a count of the whole database, so pairing it with a
+                  filtered total would read as a gap within the search. */}
+              {!query && (
+                <>
+                  {' · '}
+                  <span className="font-semibold text-base-content">
+                    {data.set_up.toLocaleString()}
+                  </span>{' '}
+                  have set up the app ·{' '}
+                  <span className="font-semibold text-warning">
+                    {neverSetUp.toLocaleString()}
+                  </span>{' '}
+                  never did
+                </>
+              )}
+            </p>
+          )
+        )}
         <p className="mt-1 text-sm text-base-content/60">
-          {data ? `${data.total.toLocaleString()} accounts. ` : ''}
           Read-only — this console does not edit anyone&apos;s account.
         </p>
       </header>
@@ -204,7 +264,7 @@ export default function UsersPage() {
             setQuery(e.target.value)
             setPage(0)
           }}
-          placeholder="Search by user id or support email"
+          placeholder="Search by email or username"
           className="w-full rounded-lg bg-base-200/50 py-2.5 pr-3 pl-9 text-sm ring-1 ring-base-300/60 outline-none focus:ring-primary/50"
         />
       </div>
@@ -224,14 +284,15 @@ export default function UsersPage() {
                   <th className="p-3 font-semibold">Plan</th>
                   <th className="p-3 font-semibold">Widgets</th>
                   <th className="p-3 font-semibold">Tickets</th>
-                  <th className="p-3 font-semibold">Last seen</th>
+                  <th className="p-3 font-semibold">Signed up</th>
+                  <th className="p-3 font-semibold">Last sign-in</th>
                 </tr>
               </thead>
               <tbody>
                 {data.accounts.length === 0 && (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="p-6 text-center text-base-content/50"
                     >
                       No accounts match that search.
@@ -246,10 +307,13 @@ export default function UsersPage() {
                   >
                     <td className="max-w-[18rem] p-3">
                       <span className="block truncate font-medium">
-                        {a.email ?? '—'}
+                        {a.email ?? a.name ?? '—'}
                       </span>
                       <span className="block truncate font-mono text-xs text-base-content/45">
                         {a.logto_sub}
+                        {!a.set_up && (
+                          <span className="text-warning"> · never set up</span>
+                        )}
                       </span>
                     </td>
                     <td className="p-3 text-base-content/70">{planLabel(a)}</td>
@@ -264,13 +328,22 @@ export default function UsersPage() {
                     </td>
                     <td className="p-3 tabular-nums">{a.tickets}</td>
                     <td className="p-3 text-base-content/60">
-                      {new Date(a.updated_at).toLocaleDateString()}
+                      {day(a.signed_up_at)}
+                    </td>
+                    <td className="p-3 text-base-content/60">
+                      {day(a.last_sign_in_at)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
+          <p className="text-xs text-base-content/45">
+            Ordered by Logto; search matches email and username. Widgets and
+            tickets come from this database and cannot be sorted or searched
+            across the whole set — those columns describe only this page.
+          </p>
 
           {pageCount > 1 && (
             <div className="flex items-center justify-between text-sm">
