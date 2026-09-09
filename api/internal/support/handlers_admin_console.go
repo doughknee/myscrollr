@@ -147,7 +147,11 @@ func queueFix(ctx context.Context, issueKey string) *AdminFix {
 	f := &AdminFix{IssueKey: issueKey}
 	pf := provenFixForIssue(ctx, issueKey)
 	if pf == nil {
-		f.Reason = "Not done and shipped — no released fix is on record for " + issueKey + "."
+		// Deliberately says only what a nil answer supports. A nil covers both
+		// "the issue is not done and shipped" and "Linear could not be
+		// reached", and the queue does not know which — the case view asks the
+		// second question and names the answer.
+		f.Reason = "No released fix is on record for " + issueKey + ". Open the case for why."
 		return f
 	}
 	merged := pf.MergedAt
