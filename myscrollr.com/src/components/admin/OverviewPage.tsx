@@ -1,11 +1,18 @@
 import { Link } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
-import { AlertTriangle, ArrowDown, ArrowUp, Loader2 } from 'lucide-react'
+import { useEffect, useReducer, useRef, useState } from 'react'
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { AdminOverview, DailyCount, Trend } from '@/api/admin'
 import type { TrendDisplay } from '@/lib/adminFormat'
 import { adminApi } from '@/api/admin'
 import { useGetToken } from '@/hooks/useGetToken'
+import { overviewLoad } from '@/lib/overviewLoad'
 import {
   DOWNLOADS_CAVEAT,
   connectedCaveat,
@@ -20,7 +27,7 @@ import {
  * "Everything about Scrollr in one spot."
  *
  * Every tile is either a number we hold or an explicit admission that we do
- * not. The Installs tile is the second kind on purpose: Scrollr ships no
+ * not. The install measurement note explains why Scrollr ships no
  * install identifier, by decision, so active installs cannot be measured and
  * the page says exactly that instead of substituting downloads and hoping
  * nobody notices the difference.
@@ -38,20 +45,23 @@ function Tile({
   children: ReactNode
 }) {
   const body = (
-    <div className="flex h-full flex-col rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60 transition-colors hover:bg-base-200/70">
-      <h2 className="text-xs font-semibold tracking-wide text-base-content/50 uppercase">
+    <div className="rounded-xl bg-base-200/40 p-5 ring-1 ring-base-300/60">
+      <h3 className="text-xs font-semibold tracking-wide text-base-content/65 uppercase">
         {title}
-      </h2>
-      <div className="mt-3 flex-1">{children}</div>
+      </h3>
+      <div className="mt-3">{children}</div>
       {caveat && (
-        <p className="mt-4 text-xs leading-relaxed text-base-content/45">
+        <p className="mt-4 text-xs leading-relaxed text-base-content/65">
           {caveat}
         </p>
       )}
     </div>
   )
   return to ? (
-    <Link to={to} className="block h-full">
+    <Link
+      to={to}
+      className="block rounded-xl text-base-content transition-colors hover:bg-base-200/60 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+    >
       {body}
     </Link>
   ) : (
@@ -84,7 +94,7 @@ function Unmeasurable({ note }: { note?: string }) {
  */
 function Delta({ trend }: { trend: TrendDisplay }) {
   if (trend.delta === null) {
-    return <span className="text-xs text-base-content/40">no change</span>
+    return <span className="text-xs text-base-content/65">no change</span>
   }
   const up = trend.direction === 'up'
   return (
@@ -108,7 +118,7 @@ function TrendRow({ label, trend }: { label: string; trend: Trend }) {
       label={label}
       value={
         t.value === null ? (
-          <span className="text-xs font-normal text-base-content/50">
+          <span className="text-xs font-normal text-base-content/65">
             unavailable
           </span>
         ) : (
@@ -170,7 +180,7 @@ function Sparkline({ points }: { points: Array<DailyCount> | null }) {
           vectorEffect="non-scaling-stroke"
         />
       </svg>
-      <figcaption className="mt-1 flex justify-between gap-2 font-mono text-[10px] text-base-content/45">
+      <figcaption className="mt-1 flex justify-between gap-2 font-mono text-[10px] text-base-content/65">
         <span>{from}</span>
         <span>peak {chart.peak.toLocaleString()}</span>
         <span>{to}</span>
@@ -190,41 +200,88 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
 
 export default function OverviewPage() {
   const getToken = useGetToken()
-  const [data, setData] = useState<AdminOverview | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
+  const [reload, setReload] = useState(0)
+  const requestId = useRef(0)
+  const [{ data, error, loading }, dispatch] = useReducer(
+    overviewLoad,
+    undefined,
+    () => overviewLoad(undefined, { type: 'start', request: 0 }),
+  )
   useEffect(() => {
-    let cancelled = false
-    adminApi
-      .overview(getToken)
-      .then((res) => !cancelled && setData(res))
-      .catch(
-        (err: unknown) =>
-          !cancelled &&
-          setError(
-            err instanceof Error ? err.message : 'Could not load the overview',
-          ),
-      )
+    let current = true
+    const request = ++requestId.current
+    dispatch({ type: 'start', request })
+    adminApi.overview(getToken).then(
+      (snapshot) => {
+        if (current) dispatch({ type: 'success', request, data: snapshot })
+      },
+      (err: unknown) => {
+        if (current)
+          dispatch({
+            type: 'error',
+            request,
+            error:
+              err instanceof Error
+                ? err.message
+                : 'Could not load the overview',
+          })
+      },
+    )
     return () => {
-      cancelled = true
+      current = false
     }
-  }, [getToken])
+  }, [getToken, reload])
+  return (
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
+          <p className="mt-1 text-sm text-base-content/70">
+            Your next actions, growth, and service health.
+          </p>
+          <p role="status" className="mt-2 text-xs text-base-content/65">
+            {loading
+              ? data
+                ? 'Refreshing snapshot…'
+                : 'Loading overview…'
+              : data
+                ? `Last updated ${new Date(data.generated_at).toLocaleString()}`
+                : 'No snapshot loaded.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => setReload((n) => n + 1)}
+          className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-4 text-sm font-semibold ring-1 ring-base-300 transition-colors hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary disabled:cursor-wait disabled:opacity-60"
+        >
+          {loading ? (
+            <Loader2 size={16} className="animate-spin" aria-hidden />
+          ) : (
+            <RefreshCw size={16} aria-hidden />
+          )}
+          {loading ? 'Refreshing…' : error ? 'Retry' : 'Refresh'}
+        </button>
+      </header>
+      {error && (
+        <div
+          role="alert"
+          className="rounded-xl bg-error/5 p-4 text-sm text-error ring-1 ring-error/30"
+        >
+          <p className="font-semibold">
+            {data
+              ? 'Refresh failed — showing an older snapshot.'
+              : 'Could not load the overview.'}
+          </p>
+          <p className="mt-1">{error}</p>
+        </div>
+      )}
+      {data && <OverviewContent data={data} />}
+    </div>
+  )
+}
 
-  if (error) {
-    return (
-      <p className="rounded-xl bg-error/5 p-5 text-sm text-error ring-1 ring-error/20">
-        {error}
-      </p>
-    )
-  }
-  if (!data) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <Loader2 className="size-6 animate-spin text-base-content/40" />
-      </div>
-    )
-  }
-
+export function OverviewContent({ data }: { data: AdminOverview }) {
   const installs = measuredValue(data.installs)
   const dau = trendValue(data.active.dau)
   const releases = (data.downloads.releases ?? []).slice(0, 5)
@@ -237,214 +294,334 @@ export default function OverviewPage() {
   const requests = (data.demand.catalog_requests ?? []).slice(0, 5)
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
-        <p className="mt-1 text-sm text-base-content/60">
-          Generated {new Date(data.generated_at).toLocaleString()}. Every tile
-          below is a direct read — where a number does not exist, the tile says
-          so rather than guessing.
-        </p>
-      </header>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Tile
-          title={
-            data.accounts.source === 'local'
-              ? 'Accounts (local count)'
-              : 'Accounts'
-          }
-          to="/admin/users"
-          caveat={
-            data.accounts.note ??
-            'Accounts come from Logto. "Set up the app" is a local count of who ever saved a preference.'
-          }
-        >
-          <Big>{data.accounts.total.toLocaleString()}</Big>
-          <p className="mt-1 text-sm text-base-content/60">
-            {data.accounts.source === 'local'
-              ? 'accounts with local data — Logto unreachable'
-              : 'accounts'}
-          </p>
-          {data.accounts.source === 'logto' && (
-            <p className="mt-3 text-sm text-base-content/60">
-              <span className="font-semibold text-base-content">
-                {data.accounts.set_up.toLocaleString()}
-              </span>{' '}
-              have set up the app —{' '}
-              <span className="font-semibold text-warning">
-                {neverSetUp.toLocaleString()}
-              </span>{' '}
-              never did
+    <div className="space-y-8">
+      <section
+        aria-labelledby="attention-heading"
+        className="rounded-xl bg-base-200/40 p-4 ring-1 ring-base-300/70 sm:p-5"
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="attention-heading" className="text-base font-semibold">
+            Attention
+          </h2>
+          <Link
+            to="/admin/support"
+            className="rounded text-sm font-semibold text-base-content underline decoration-base-content/30 underline-offset-4 focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            Open support →
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <div>
+            <p className="text-sm text-base-content/70">Drafts waiting</p>
+            <Big>{data.support.pending_drafts.toLocaleString()}</Big>
+            <p className="mt-1 text-xs text-base-content/65">
+              Open the queue to check their status.
             </p>
-          )}
-          <div className="mt-3 border-t border-base-300/60 pt-2">
-            <TrendRow label="New today" trend={data.accounts.new_today} />
-            <TrendRow label="New this week" trend={data.accounts.new_7d} />
           </div>
-        </Tile>
-
-        <Tile
-          title="Active users"
-          caveat="From Logto: accounts that actually authenticated in the window. Someone using Scrollr without signing in again does not appear here, so these are floors, not ceilings."
-        >
-          {dau.value === null ? (
-            <Unmeasurable note={data.active.note} />
-          ) : (
-            <>
-              <div className="flex items-end gap-4">
-                <div className="shrink-0">
-                  <Big>{dau.value}</Big>
-                  <p className="mt-1 flex items-baseline gap-2 text-sm text-base-content/60">
-                    today
-                    <Delta trend={dau} />
-                  </p>
-                </div>
-                <Sparkline points={data.active.curve} />
-              </div>
-              <div className="mt-3 border-t border-base-300/60 pt-2">
-                <TrendRow label="This week" trend={data.active.wau} />
-                <TrendRow label="This month" trend={data.active.mau} />
-              </div>
-            </>
-          )}
-        </Tile>
-
-        <Tile
-          title="Active installs"
-          caveat="Use downloads per release instead — it is the closest real number."
-        >
-          <Unmeasurable note={installs.note} />
-        </Tile>
-
-        <Tile
-          title="Connected now"
-          caveat={connectedCaveat(data.connected_now)}
-        >
-          <Big>{data.connected_now.count.toLocaleString()}</Big>
-          <p className="mt-2 text-sm text-base-content/60">
-            open SSE connections
-          </p>
-        </Tile>
-
-        <Tile
-          title="Paying"
-          caveat="From Stripe, excluding rows on the free plan — one active Stripe record is a free-plan row and is not a customer. Free is every account that is not paying."
-        >
-          <Big>{data.plans.paying.toLocaleString()}</Big>
-          <p className="mt-1 mb-2 text-sm text-base-content/60">
-            paying · {free.toLocaleString()} free
-          </p>
-          {plans.length === 0 ? (
-            <p className="text-sm text-base-content/50">
-              No paid subscriptions.
+          <div>
+            <p className="text-sm text-base-content/70">Oldest open case</p>
+            <p className="text-2xl font-bold tabular-nums">
+              {data.support.oldest_open_ticket
+                ? `${Math.floor(data.support.oldest_open_hours / 24).toLocaleString()}d ${data.support.oldest_open_hours % 24}h`
+                : '—'}
             </p>
-          ) : (
-            plans.map((r) => (
-              <Row
-                key={`${r.plan}-${r.status}-${r.lifetime}`}
-                label={`${r.plan}${r.lifetime ? ' (lifetime)' : ''} · ${r.status}`}
-                value={r.count.toLocaleString()}
-              />
-            ))
-          )}
-        </Tile>
-
-        <Tile
-          title="Downloads"
-          caveat={
-            data.downloads.stale
-              ? `${DOWNLOADS_CAVEAT} These figures are cached — GitHub was unreachable on the last refresh.`
-              : DOWNLOADS_CAVEAT
-          }
-        >
-          {data.downloads.error ? (
-            <Unmeasurable note={data.downloads.error} />
-          ) : (
-            <>
-              <Big>{data.downloads.total.toLocaleString()}</Big>
-              <p className="mt-1 mb-2 text-sm text-base-content/60">
-                across all releases
+            <p className="mt-1 text-xs text-base-content/65">
+              {data.support.oldest_open_ticket
+                ? `Ticket #${data.support.oldest_open_ticket}`
+                : 'No oldest-ticket detail in this snapshot.'}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-base-content/70">
+              Unreplied business leads
+            </p>
+            <Big>{data.demand.leads_unreplied.toLocaleString()}</Big>
+            <p className="mt-1 text-xs text-base-content/65">
+              Business enquiries awaiting a reply.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 border-t border-base-300/60 pt-3 text-sm">
+          {ingest
+            .filter((row) => ingestHealth(row) !== 'fresh')
+            .map((row) => (
+              <p key={row.table} className="mb-1 text-base-content/80">
+                <AlertTriangle size={14} className="mr-1 inline" aria-hidden />
+                {row.table}:{' '}
+                {row.has_data
+                  ? `last write ${formatAge(row.age_seconds)} — check freshness`
+                  : 'no data in this table'}
               </p>
-              {releases.map((r) => (
-                <Row
-                  key={r.tag}
-                  label={r.tag}
-                  value={r.downloads.toLocaleString()}
-                />
-              ))}
-            </>
-          )}
-        </Tile>
-
-        <Tile
-          title="Support"
-          to="/admin/support"
-          caveat={
-            data.support.oldest_open_ticket
-              ? `Oldest open ticket ${data.support.oldest_open_ticket}, ${data.support.oldest_open_hours}h old.`
-              : 'Nothing open.'
-          }
-        >
-          <Big>{data.support.open_cases.toLocaleString()}</Big>
-          <p className="mt-1 mb-2 text-sm text-base-content/60">open cases</p>
-          <Row label="Drafts waiting" value={data.support.pending_drafts} />
-          <Row label="Auto-sent (30d)" value={data.support.auto_sent_30d} />
-          <Row
-            label="Needed a person (30d)"
-            value={data.support.intervened_30d}
-          />
-        </Tile>
-
-        <Tile
-          title="Demand"
-          caveat="What people asked for and did not find, plus business enquiries."
-        >
-          <Row
-            label="Business leads"
-            value={`${data.demand.business_leads} (${data.demand.leads_unreplied} unreplied)`}
-          />
-          <div className="mt-2 border-t border-base-300/60 pt-2">
-            {requests.length === 0 ? (
-              <p className="text-sm text-base-content/50">
-                No widget requests yet.
+            ))}
+          <a
+            href="#service-health"
+            className="inline-block rounded text-base-content/75 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            Review service readings ↓
+          </a>
+        </div>
+      </section>
+      <section
+        id="growth"
+        aria-labelledby="growth-heading"
+        className="scroll-mt-6 space-y-3"
+      >
+        <h2 id="growth-heading" className="text-base font-semibold">
+          Accounts & growth
+        </h2>
+        <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {' '}
+          <Tile
+            title={
+              data.accounts.source === 'local'
+                ? 'Accounts (local count)'
+                : 'Accounts'
+            }
+            to="/admin/users"
+            caveat={
+              data.accounts.note ??
+              'Accounts come from Logto. "Set up the app" is a local count of who ever saved a preference.'
+            }
+          >
+            <Big>{data.accounts.total.toLocaleString()}</Big>
+            <p className="mt-1 text-sm text-base-content/60">
+              {data.accounts.source === 'local'
+                ? 'accounts with local data — Logto unreachable'
+                : 'accounts'}
+            </p>
+            {data.accounts.source === 'logto' && (
+              <p className="mt-3 text-sm text-base-content/60">
+                <span className="font-semibold text-base-content">
+                  {data.accounts.set_up.toLocaleString()}
+                </span>{' '}
+                have set up the app —{' '}
+                <span className="font-semibold text-warning">
+                  {neverSetUp.toLocaleString()}
+                </span>{' '}
+                never did
+              </p>
+            )}
+            <div className="mt-3 border-t border-base-300/60 pt-2">
+              <TrendRow label="New today" trend={data.accounts.new_today} />
+              <TrendRow label="New this week" trend={data.accounts.new_7d} />
+            </div>
+          </Tile>
+          <Tile
+            title="Active users"
+            caveat="Authenticated accounts, not everyone currently using the app."
+          >
+            {dau.value === null ? (
+              <Unmeasurable note={data.active.note} />
+            ) : (
+              <>
+                <div className="flex items-end gap-4">
+                  <div className="shrink-0">
+                    <Big>{dau.value}</Big>
+                    <p className="mt-1 flex items-baseline gap-2 text-sm text-base-content/60">
+                      today
+                      <Delta trend={dau} />
+                    </p>
+                  </div>
+                  <Sparkline points={data.active.curve} />
+                </div>
+                <div className="mt-3 border-t border-base-300/60 pt-2">
+                  <TrendRow label="This week" trend={data.active.wau} />
+                  <TrendRow label="This month" trend={data.active.mau} />
+                </div>
+              </>
+            )}
+          </Tile>
+          <Tile
+            title="Paying"
+            caveat="Paid Stripe records, excluding the free plan. See measurement notes below."
+          >
+            <Big>{data.plans.paying.toLocaleString()}</Big>
+            <p className="mt-1 mb-2 text-sm text-base-content/60">
+              paying · {free.toLocaleString()} free
+            </p>
+            {plans.length === 0 ? (
+              <p className="text-sm text-base-content/65">
+                No paid subscriptions.
               </p>
             ) : (
-              requests.map((r) => (
-                <Row key={r.query} label={r.query} value={r.people} />
+              plans.map((r) => (
+                <Row
+                  key={`${r.plan}-${r.status}-${r.lifetime}`}
+                  label={`${r.plan}${r.lifetime ? ' (lifetime)' : ''} · ${r.status}`}
+                  value={r.count.toLocaleString()}
+                />
               ))
             )}
-          </div>
-        </Tile>
-
-        <Tile
-          title="Ingest freshness"
-          caveat="How long ago each content table was last written. Sports can legitimately sit still overnight."
-        >
-          {ingest.map((row) => {
-            const health = ingestHealth(row)
-            return (
-              <Row
-                key={row.table}
-                label={row.table}
-                value={
-                  <span
-                    className={
-                      health === 'empty'
-                        ? 'text-error'
-                        : health === 'stale'
-                          ? 'text-warning'
-                          : 'text-success'
-                    }
-                  >
-                    {health === 'empty' ? 'empty' : formatAge(row.age_seconds)}
-                  </span>
-                }
-              />
-            )
-          })}
-        </Tile>
-      </div>
+          </Tile>
+        </div>
+      </section>
+      <section
+        id="support"
+        aria-labelledby="support-heading"
+        className="scroll-mt-6 space-y-3"
+      >
+        <h2 id="support-heading" className="text-base font-semibold">
+          Support & demand
+        </h2>
+        <div className="grid items-start gap-4 sm:grid-cols-2">
+          {' '}
+          <Tile
+            title="Support"
+            to="/admin/support"
+            caveat={
+              data.support.oldest_open_ticket
+                ? `Oldest open ticket ${data.support.oldest_open_ticket}, ${data.support.oldest_open_hours}h old.`
+                : 'No oldest-ticket detail in this snapshot.'
+            }
+          >
+            <Big>{data.support.open_cases.toLocaleString()}</Big>
+            <p className="mt-1 mb-2 text-sm text-base-content/60">open cases</p>
+            <Row label="Drafts waiting" value={data.support.pending_drafts} />
+            <Row label="Auto-sent (30d)" value={data.support.auto_sent_30d} />
+            <Row
+              label="Needed a person (30d)"
+              value={data.support.intervened_30d}
+            />
+          </Tile>
+          <Tile
+            title="Demand"
+            caveat="What people asked for and did not find, plus business enquiries."
+          >
+            <Row
+              label="Business leads"
+              value={`${data.demand.business_leads} (${data.demand.leads_unreplied} unreplied)`}
+            />
+            <div className="mt-2 border-t border-base-300/60 pt-2">
+              {requests.length === 0 ? (
+                <p className="text-sm text-base-content/65">
+                  No widget requests yet.
+                </p>
+              ) : (
+                requests.map((r) => (
+                  <Row key={r.query} label={r.query} value={r.people} />
+                ))
+              )}
+            </div>
+          </Tile>
+        </div>
+      </section>
+      <section
+        id="service-health"
+        aria-labelledby="service-health-heading"
+        className="scroll-mt-6 space-y-3"
+      >
+        <h2 id="service-health-heading" className="text-base font-semibold">
+          Service health & releases
+        </h2>
+        <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {' '}
+          <Tile
+            title="Ingest freshness"
+            caveat="How long ago each content table was last written. Sports can legitimately sit still overnight."
+          >
+            {ingest.length === 0 && (
+              <p className="text-sm text-base-content/70">
+                No ingest readings in this snapshot.
+              </p>
+            )}
+            {ingest.map((row) => {
+              const health = ingestHealth(row)
+              return (
+                <Row
+                  key={row.table}
+                  label={row.table}
+                  value={
+                    <span
+                      className={
+                        health === 'empty'
+                          ? 'text-error'
+                          : health === 'stale'
+                            ? 'text-warning'
+                            : 'text-success'
+                      }
+                    >
+                      {health === 'empty'
+                        ? 'empty'
+                        : formatAge(row.age_seconds)}
+                    </span>
+                  }
+                />
+              )
+            })}
+          </Tile>
+          <Tile
+            title="Connected now"
+            caveat={connectedCaveat(data.connected_now)}
+          >
+            <Big>{data.connected_now.count.toLocaleString()}</Big>
+            <p className="mt-2 text-sm text-base-content/60">
+              open SSE connections
+            </p>
+          </Tile>
+          <Tile
+            title="Downloads"
+            caveat={
+              data.downloads.stale
+                ? `${DOWNLOADS_CAVEAT} These figures are cached — GitHub was unreachable on the last refresh.`
+                : DOWNLOADS_CAVEAT
+            }
+          >
+            {data.downloads.error ? (
+              <Unmeasurable note={data.downloads.error} />
+            ) : (
+              <>
+                <Big>{data.downloads.total.toLocaleString()}</Big>
+                <p className="mt-1 mb-2 text-sm text-base-content/60">
+                  across all releases
+                </p>
+                {releases.map((r) => (
+                  <Row
+                    key={r.tag}
+                    label={r.tag}
+                    value={r.downloads.toLocaleString()}
+                  />
+                ))}
+              </>
+            )}
+            <details className="mt-4 border-t border-base-300/60 pt-3 text-xs text-base-content/70">
+              <summary className="cursor-pointer py-1 font-semibold focus-visible:outline-2 focus-visible:outline-primary">
+                Why downloads are not active installs
+              </summary>
+              <p className="mt-2 leading-relaxed">
+                {installs.note ?? 'Active installs are not measurable.'}
+              </p>
+            </details>
+          </Tile>
+        </div>
+      </section>
+      <details className="rounded-xl border border-base-300/60 p-4 text-sm text-base-content/75">
+        <summary className="cursor-pointer font-semibold focus-visible:outline-2 focus-visible:outline-primary">
+          How to read these numbers
+        </summary>
+        <div className="mt-3 space-y-2 leading-relaxed">
+          <p>
+            Each section uses its own source and time window. Refresh reads a
+            new snapshot; some upstream figures remain cached.
+          </p>
+          <p>
+            Accounts come from Logto. App setup means a locally saved
+            preference, not a measured signup conversion funnel. Active users
+            are accounts that authenticated during the window; someone using the
+            app without signing in again is not counted.
+          </p>
+          <p>
+            Paying counts paid Stripe records, excluding the free plan. Free is
+            the account total minus that count. Connections are open SSE
+            connections, not a count of people or installs.
+          </p>
+          <p>{DOWNLOADS_CAVEAT}</p>
+          <p>
+            Support and lead totals describe the current snapshot. A zero count
+            is not an all-clear for the service. Ingest age is time since the
+            last table write; sports can legitimately sit still overnight.
+          </p>
+        </div>
+      </details>
     </div>
   )
 }
