@@ -2,8 +2,8 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
 	"log"
-	"sort"
 	"sync"
 	"time"
 
@@ -23,9 +23,14 @@ import (
 // oversight - so installs are NOT measurable, and the Installs tile exists
 // purely to say so and point at downloads instead.
 
-// listAllLogtoUsers is the tile's seam onto Logto, so the tests can drive
-// both the healthy path and the unreachable path without a network.
-var listAllLogtoUsers = accounts.ListAllLogtoUsers
+// logtoStats is the tile's seam onto Logto, so the tests can drive both the
+// healthy path and the unreachable path without a network.
+var logtoStats = accounts.FetchLogtoStats
+
+const (
+	logtoStatsCacheKey = "scrollr:admin:logto_stats"
+	logtoStatsCacheTTL = 5 * time.Minute
+)
 
 // Measured wraps a number with whether it means what its label says. When
 // Available is false the client renders Note instead of Value.
@@ -38,6 +43,7 @@ type Measured = platform.Measured
 type OverviewResponse struct {
 	GeneratedAt  string        `json:"generated_at"`
 	Accounts     AccountsTile  `json:"accounts"`
+	Active       ActiveTile    `json:"active"`
 	Plans        PlansTile     `json:"plans"`
 	Downloads    DownloadsTile `json:"downloads"`
 	Installs     Measured      `json:"installs"`
@@ -63,17 +69,43 @@ type OverviewResponse struct {
 // the local case Total falls back to SetUp and Note says why. A smaller number
 // presented without that label is the bug this tile was rebuilt to fix.
 //
-// The signup series comes from Logto's per-account createdAt, so "new this
-// week" is a fact about signups rather than about when a local column was
-// added. That retires the old untracked/tracking-since apparatus.
+// The signup counts are Logto's own, each with the change against the
+// previous comparable period. REL-269 swapped them in for a walk over every
+// account's createdAt: same facts, one request, and a delta we could not have
+// computed without storing yesterday's answer somewhere.
 type AccountsTile struct {
-	Total  int          `json:"total"`
-	SetUp  int          `json:"set_up"`
-	Source string       `json:"source"`
-	Note   string       `json:"note,omitempty"`
-	New7d  Measured     `json:"new_7d"`
-	New30d Measured     `json:"new_30d"`
-	Daily  []DailyCount `json:"daily"`
+	Total    int    `json:"total"`
+	SetUp    int    `json:"set_up"`
+	Source   string `json:"source"`
+	Note     string `json:"note,omitempty"`
+	NewToday Trend  `json:"new_today"`
+	New7d    Trend  `json:"new_7d"`
+}
+
+// Trend is a figure with the change Logto reports against the previous
+// comparable period. Available is false when Logto could not be reached, and
+// then neither number may be rendered - the same promise Measured makes, with
+// a second field, since a delta of 0 is as much a claim as a count of 0.
+type Trend struct {
+	Value     int    `json:"value"`
+	Delta     int    `json:"delta"`
+	Available bool   `json:"available"`
+	Note      string `json:"note,omitempty"`
+}
+
+// ActiveTile is who actually used Scrollr, which is a different question from
+// how many accounts exist - and the only one of the two that can go down.
+//
+// Curve is Logto's daily-active series, about a month deep. It is theirs, not
+// ours: no aggregation table, no rollup job, no cron. If Logto ever stops
+// serving it the chart disappears rather than being reconstructed from
+// something that only resembles it.
+type ActiveTile struct {
+	DAU   Trend        `json:"dau"`
+	WAU   Trend        `json:"wau"`
+	MAU   Trend        `json:"mau"`
+	Curve []DailyCount `json:"curve"`
+	Note  string       `json:"note,omitempty"`
 }
 
 type DailyCount struct {
@@ -171,7 +203,13 @@ func HandleGetOverview(c *fiber.Ctx) error {
 		}()
 	}
 
-	run("accounts", func() { out.Accounts = accountsTile(ctx) })
+	// Accounts and Active come from the same cached Logto read, so they run
+	// as one section rather than racing for the same three round trips.
+	run("logto", func() {
+		stats, err := cachedLogtoStats(ctx)
+		out.Accounts = accountsTile(ctx, stats, err)
+		out.Active = activeTile(stats, err)
+	})
 	run("plans", func() { out.Plans = plansTile(ctx) })
 	run("downloads", func() { out.Downloads = downloadsTile(ctx) })
 	run("support", func() { out.Support = supportTile(ctx) })
@@ -186,15 +224,50 @@ func HandleGetOverview(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
-func accountsTile(ctx context.Context) AccountsTile {
-	var t AccountsTile
-
-	if err := platform.DBPool.QueryRow(ctx,
-		`SELECT count(*) FROM user_preferences`).Scan(&t.SetUp); err != nil {
-		log.Printf("[Admin] accounts set-up count: %v", err)
+// cachedLogtoStats reads the growth figures through Redis. They are a
+// dashboard's numbers, not per-request data: without the cache every Overview
+// load - and every refresh of it - would cost three upstream round trips to
+// tell the reader the same thing.
+//
+// There is deliberately no stale-copy fallback like the downloads tile's. A
+// download count that is fifteen minutes old is still a download count; "2
+// people were active today" from an hour ago is a different claim than it
+// looks. When Logto is unreachable the tiles say so.
+func cachedLogtoStats(ctx context.Context) (accounts.LogtoStats, error) {
+	var s accounts.LogtoStats
+	if platform.Rdb != nil {
+		if raw, err := platform.Rdb.Get(ctx, logtoStatsCacheKey).Result(); err == nil && raw != "" {
+			if json.Unmarshal([]byte(raw), &s) == nil {
+				return s, nil
+			}
+		}
 	}
 
-	users, total, err := listAllLogtoUsers()
+	s, err := logtoStats()
+	if err != nil {
+		return accounts.LogtoStats{}, err
+	}
+
+	if platform.Rdb != nil {
+		if raw, err := json.Marshal(s); err == nil {
+			_ = platform.Rdb.Set(ctx, logtoStatsCacheKey, raw, logtoStatsCacheTTL).Err()
+		}
+	}
+	return s, nil
+}
+
+// logtoDownNote is the one sentence both tiles use when the read failed. It
+// says which number is missing and why, and never a number in its place.
+const logtoDownNote = "Logto is unreachable, so this is not measurable right now."
+
+func accountsTile(ctx context.Context, stats accounts.LogtoStats, err error) AccountsTile {
+	var t AccountsTile
+
+	if dbErr := platform.DBPool.QueryRow(ctx,
+		`SELECT count(*) FROM user_preferences`).Scan(&t.SetUp); dbErr != nil {
+		log.Printf("[Admin] accounts set-up count: %v", dbErr)
+	}
+
 	if err != nil {
 		// Degrade loudly. The local number is real, but it is not the account
 		// count, and the tile says which one the reader is looking at.
@@ -202,39 +275,29 @@ func accountsTile(ctx context.Context) AccountsTile {
 		t.Total, t.Source = t.SetUp, "local"
 		t.Note = "Logto is unreachable, so this is not the account count. It " +
 			"is how many accounts have set the app up, which is fewer."
-		note := "Signup dates come from Logto, which is unreachable."
-		t.New7d = Measured{Available: false, Note: note}
-		t.New30d = Measured{Available: false, Note: note}
+		t.NewToday = Trend{Note: "Signup counts come from Logto, which is unreachable."}
+		t.New7d = t.NewToday
 		return t
 	}
 
-	t.Total, t.Source = total, "logto"
-	t.New7d.Available, t.New30d.Available = true, true
+	t.Total, t.Source = stats.Total, "logto"
+	t.NewToday = Trend{Value: stats.NewToday.Count, Delta: stats.NewToday.Delta, Available: true}
+	t.New7d = Trend{Value: stats.New7d.Count, Delta: stats.New7d.Delta, Available: true}
+	return t
+}
 
-	now := time.Now()
-	week, month := now.AddDate(0, 0, -7), now.AddDate(0, 0, -30)
-	daily := make(map[string]int, 30)
-	for _, u := range users {
-		if u.CreatedAt <= 0 {
-			continue
-		}
-		created := time.UnixMilli(u.CreatedAt)
-		if created.After(week) {
-			t.New7d.Value++
-		}
-		if created.After(month) {
-			t.New30d.Value++
-			daily[created.UTC().Format("2006-01-02")]++
-		}
+func activeTile(stats accounts.LogtoStats, err error) ActiveTile {
+	if err != nil {
+		return ActiveTile{Note: logtoDownNote}
 	}
 
-	days := make([]string, 0, len(daily))
-	for day := range daily {
-		days = append(days, day)
+	t := ActiveTile{
+		DAU: Trend{Value: stats.DAU.Count, Delta: stats.DAU.Delta, Available: true},
+		WAU: Trend{Value: stats.WAU.Count, Delta: stats.WAU.Delta, Available: true},
+		MAU: Trend{Value: stats.MAU.Count, Delta: stats.MAU.Delta, Available: true},
 	}
-	sort.Strings(days)
-	for _, day := range days {
-		t.Daily = append(t.Daily, DailyCount{Day: day, Count: daily[day]})
+	for _, p := range stats.DauCurve {
+		t.Curve = append(t.Curve, DailyCount{Day: p.Date, Count: p.Count})
 	}
 	return t
 }

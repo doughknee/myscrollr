@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/accounts"
+	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/brandon-relentnet/myscrollr/api/internal/testsupport"
 	"github.com/gofiber/fiber/v2"
 )
@@ -17,10 +18,10 @@ import (
 // the account count. Everything here is arranged so that a regression to
 // "count user_preferences and call it accounts" fails loudly.
 
-// withLogtoUsers swaps both Logto seams for a fixed set of accounts.
+// withLogtoUsers swaps both Logto account seams for a fixed set of accounts.
 func withLogtoUsers(t *testing.T, total int, users ...accounts.LogtoUser) {
 	t.Helper()
-	prevList, prevGet, prevAll := listLogtoUsers, getLogtoUser, listAllLogtoUsers
+	prevList, prevGet := listLogtoUsers, getLogtoUser
 
 	listLogtoUsers = func(page, pageSize int, search string) ([]accounts.LogtoUser, int, error) {
 		return users, total, nil
@@ -33,30 +34,54 @@ func withLogtoUsers(t *testing.T, total int, users ...accounts.LogtoUser) {
 		}
 		return nil, nil
 	}
-	listAllLogtoUsers = func() ([]accounts.LogtoUser, int, error) {
-		return users, total, nil
-	}
 
 	t.Cleanup(func() {
-		listLogtoUsers, getLogtoUser, listAllLogtoUsers = prevList, prevGet, prevAll
+		listLogtoUsers, getLogtoUser = prevList, prevGet
 	})
+}
+
+// withLogtoStats swaps the dashboard-stats seam and clears the Redis copy, so
+// a case cannot be served the previous case's numbers out of the cache.
+func withLogtoStats(t *testing.T, stats accounts.LogtoStats) func() int {
+	t.Helper()
+	prev := logtoStats
+	calls := 0
+	logtoStats = func() (accounts.LogtoStats, error) {
+		calls++
+		return stats, nil
+	}
+	clearLogtoStatsCache(t)
+	t.Cleanup(func() {
+		logtoStats = prev
+		clearLogtoStatsCache(t)
+	})
+	return func() int { return calls }
+}
+
+func clearLogtoStatsCache(t *testing.T) {
+	t.Helper()
+	if platform.Rdb != nil {
+		_ = platform.Rdb.Del(context.Background(), logtoStatsCacheKey).Err()
+	}
 }
 
 // withLogtoDown makes every Logto read fail, which is the case the page has to
 // survive without quietly reporting a smaller number as the truth.
 func withLogtoDown(t *testing.T) {
 	t.Helper()
-	prevList, prevGet, prevAll := listLogtoUsers, getLogtoUser, listAllLogtoUsers
+	prevList, prevGet, prevStats := listLogtoUsers, getLogtoUser, logtoStats
 	down := errors.New("logto unreachable")
 
 	listLogtoUsers = func(page, pageSize int, search string) ([]accounts.LogtoUser, int, error) {
 		return nil, 0, down
 	}
 	getLogtoUser = func(sub string) (*accounts.LogtoUser, error) { return nil, down }
-	listAllLogtoUsers = func() ([]accounts.LogtoUser, int, error) { return nil, 0, down }
+	logtoStats = func() (accounts.LogtoStats, error) { return accounts.LogtoStats{}, down }
+	clearLogtoStatsCache(t)
 
 	t.Cleanup(func() {
-		listLogtoUsers, getLogtoUser, listAllLogtoUsers = prevList, prevGet, prevAll
+		listLogtoUsers, getLogtoUser, logtoStats = prevList, prevGet, prevStats
+		clearLogtoStatsCache(t)
 	})
 }
 
@@ -223,29 +248,95 @@ func TestGetAccountWorksWithNoLocalRow(t *testing.T) {
 	}
 }
 
-// Both numbers, and the gap, from one tile.
+// prodShapedStats mirrors what Logto returned for this tenant on 2026-09-09,
+// including the dau delta of -10: a day that went down is the case the tile
+// most has to render honestly.
+func prodShapedStats() accounts.LogtoStats {
+	return accounts.LogtoStats{
+		Total:    183,
+		NewToday: accounts.LogtoTrend{Count: 0, Delta: -2},
+		New7d:    accounts.LogtoTrend{Count: 16, Delta: 1},
+		DAU:      accounts.LogtoTrend{Count: 2, Delta: -10},
+		WAU:      accounts.LogtoTrend{Count: 31, Delta: 2},
+		MAU:      accounts.LogtoTrend{Count: 85, Delta: 50},
+		DauCurve: []accounts.LogtoDayCount{
+			{Date: "2026-08-12", Count: 4},
+			{Date: "2026-08-13", Count: 7},
+			{Date: "2026-09-09", Count: 2},
+		},
+	}
+}
+
+// Both numbers, and the gap, from one tile. The account total is Logto's;
+// set_up is local. Reporting the local number as the account total is the
+// regression REL-265 was filed for and this still guards it.
 func TestAccountsTileCarriesBothCounts(t *testing.T) {
 	if !testsupport.DBAvailable(t) {
 		return
 	}
 	resetAccountTables(t)
 	seedPreferences(t, "has-prefs")
+	withLogtoStats(t, prodShapedStats())
 
-	withLogtoUsers(t, 3,
-		accounts.LogtoUser{ID: "has-prefs", CreatedAt: 1_700_000_000_000},
-		accounts.LogtoUser{ID: "b", CreatedAt: 1_700_000_000_000},
-		accounts.LogtoUser{ID: "c", CreatedAt: 1_700_000_000_000},
-	)
-
-	tile := accountsTile(context.Background())
+	stats, err := cachedLogtoStats(context.Background())
+	tile := accountsTile(context.Background(), stats, err)
 	if tile.Source != "logto" {
 		t.Fatalf("source = %q, want logto", tile.Source)
 	}
-	if tile.Total != 3 {
-		t.Errorf("total = %d, want 3", tile.Total)
+	if tile.Total != 183 {
+		t.Errorf("total = %d, want 183", tile.Total)
 	}
 	if tile.SetUp != 1 {
 		t.Errorf("set_up = %d, want 1", tile.SetUp)
+	}
+	if tile.New7d.Value != 16 || tile.New7d.Delta != 1 || !tile.New7d.Available {
+		t.Errorf("new_7d = %+v, want 16 (+1) available", tile.New7d)
+	}
+	// A count of 0 with a delta of -2 is a real reading, not a missing one.
+	if !tile.NewToday.Available || tile.NewToday.Value != 0 || tile.NewToday.Delta != -2 {
+		t.Errorf("new_today = %+v, want 0 (-2) available", tile.NewToday)
+	}
+}
+
+// The figures are cached: a second read inside the window must not cost
+// another three round trips to Logto.
+func TestLogtoStatsAreCached(t *testing.T) {
+	if !testsupport.RedisAvailable(t) {
+		return
+	}
+	calls := withLogtoStats(t, prodShapedStats())
+
+	first, err := cachedLogtoStats(context.Background())
+	if err != nil {
+		t.Fatalf("first read: %v", err)
+	}
+	second, _ := cachedLogtoStats(context.Background())
+
+	if calls() != 1 {
+		t.Errorf("hit Logto %d times for two reads, want 1", calls())
+	}
+	if second.Total != first.Total || second.MAU != first.MAU ||
+		len(second.DauCurve) != len(first.DauCurve) {
+		t.Errorf("cached read differs: %+v vs %+v", second, first)
+	}
+}
+
+func TestActiveTileCarriesDeltasAndTheCurve(t *testing.T) {
+	tile := activeTile(prodShapedStats(), nil)
+
+	if !tile.DAU.Available || tile.DAU.Value != 2 || tile.DAU.Delta != -10 {
+		t.Errorf("dau = %+v, want 2 (-10) available", tile.DAU)
+	}
+	if tile.MAU.Delta != 50 {
+		t.Errorf("mau delta = %d, want 50", tile.MAU.Delta)
+	}
+	if len(tile.Curve) != 3 {
+		t.Fatalf("curve has %d points, want 3", len(tile.Curve))
+	}
+	// The final point is today's. Dropping or reordering it would put the
+	// chart's most-read end somewhere it did not happen.
+	if last := tile.Curve[len(tile.Curve)-1]; last.Day != "2026-09-09" || last.Count != 2 {
+		t.Errorf("last curve point = %+v, want 2026-09-09 count 2", last)
 	}
 }
 
@@ -257,7 +348,11 @@ func TestAccountsTileDegradesVisiblyWhenLogtoIsDown(t *testing.T) {
 	seedPreferences(t, "has-prefs")
 	withLogtoDown(t)
 
-	tile := accountsTile(context.Background())
+	stats, err := cachedLogtoStats(context.Background())
+	if err == nil {
+		t.Fatal("cachedLogtoStats returned no error with Logto down")
+	}
+	tile := accountsTile(context.Background(), stats, err)
 	if tile.Source != "local" {
 		t.Fatalf("source = %q, want local", tile.Source)
 	}
@@ -268,8 +363,25 @@ func TestAccountsTileDegradesVisiblyWhenLogtoIsDown(t *testing.T) {
 		t.Errorf("total = %d, set_up = %d; the local fallback should report the local number",
 			tile.Total, tile.SetUp)
 	}
-	if tile.New7d.Available || tile.New30d.Available {
+	if tile.New7d.Available || tile.NewToday.Available {
 		t.Error("signup windows claim to be available with Logto down")
+	}
+}
+
+// Activity has no local stand-in at all, so with Logto down the tile says so
+// and shows nothing - never a zero, which would read as "nobody used Scrollr
+// today".
+func TestActiveTileSaysSoWhenLogtoIsDown(t *testing.T) {
+	tile := activeTile(accounts.LogtoStats{}, errors.New("logto unreachable"))
+
+	if tile.DAU.Available || tile.WAU.Available || tile.MAU.Available {
+		t.Error("an activity figure claims to be available with Logto down")
+	}
+	if tile.Note == "" {
+		t.Error("no note where the numbers would be")
+	}
+	if len(tile.Curve) != 0 {
+		t.Errorf("curve has %d points with Logto down", len(tile.Curve))
 	}
 }
 

@@ -1,8 +1,9 @@
 import { Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Loader2 } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, Loader2 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import type { AdminOverview } from '@/api/admin'
+import type { AdminOverview, DailyCount, Trend } from '@/api/admin'
+import type { TrendDisplay } from '@/lib/adminFormat'
 import { adminApi } from '@/api/admin'
 import { useGetToken } from '@/hooks/useGetToken'
 import {
@@ -11,6 +12,8 @@ import {
   formatAge,
   ingestHealth,
   measuredValue,
+  sparkline,
+  trendValue,
 } from '@/lib/adminFormat'
 
 /**
@@ -72,6 +75,110 @@ function Unmeasurable({ note }: { note?: string }) {
   )
 }
 
+/**
+ * A change against the previous period, with the direction readable without
+ * reading the number. Up is coloured as good because every figure that carries
+ * one here (signups, daily/weekly/monthly actives) is one where up is good —
+ * a fall is a dip, not a decoration, so it gets the warning colour and its own
+ * arrow rather than a smaller green number.
+ */
+function Delta({ trend }: { trend: TrendDisplay }) {
+  if (trend.delta === null) {
+    return <span className="text-xs text-base-content/40">no change</span>
+  }
+  const up = trend.direction === 'up'
+  return (
+    <span
+      title="Change against the previous period, from Logto"
+      className={`inline-flex items-center gap-0.5 font-mono text-xs font-semibold tabular-nums ${
+        up ? 'text-success' : 'text-warning'
+      }`}
+    >
+      {up ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+      {trend.delta}
+    </span>
+  )
+}
+
+/** A figure and its delta on one line, or a plain admission it is missing. */
+function TrendRow({ label, trend }: { label: string; trend: Trend }) {
+  const t = trendValue(trend)
+  return (
+    <Row
+      label={label}
+      value={
+        t.value === null ? (
+          <span className="text-xs font-normal text-base-content/50">
+            unavailable
+          </span>
+        ) : (
+          <span className="inline-flex items-baseline gap-2">
+            {t.value}
+            <Delta trend={t} />
+          </span>
+        )
+      }
+    />
+  )
+}
+
+/**
+ * Logto's daily-active curve, drawn as two SVG paths. No charting library:
+ * the site ships none, and thirty points do not justify the first one.
+ *
+ * `preserveAspectRatio="none"` lets the box stretch to whatever width the tile
+ * gives it; `vector-effect` then keeps the stroke a hairline instead of
+ * stretching with it, and the marker is a tick rather than a dot for the same
+ * reason.
+ */
+const SPARK_W = 160
+const SPARK_H = 44
+
+function Sparkline({ points }: { points: Array<DailyCount> | null }) {
+  const chart = sparkline(points, SPARK_W, SPARK_H)
+  if (!chart || !points || points.length === 0) return null
+
+  const from = points[0].day
+  const to = points[points.length - 1].day
+
+  return (
+    <figure className="min-w-0 flex-1">
+      <svg
+        viewBox={`0 0 ${SPARK_W} ${SPARK_H}`}
+        preserveAspectRatio="none"
+        className="h-11 w-full text-primary"
+        role="img"
+        aria-label={`Daily active users from ${from} to ${to}, peak ${chart.peak}`}
+      >
+        <path d={chart.area} fill="currentColor" opacity={0.15} />
+        <path
+          d={chart.line}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+        {/* Today, marked. The helper's padding is what keeps it on screen. */}
+        <line
+          x1={chart.last.x}
+          y1={chart.last.y}
+          x2={chart.last.x}
+          y2={SPARK_H - 3}
+          stroke="currentColor"
+          strokeWidth={1.5}
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+      <figcaption className="mt-1 flex justify-between gap-2 font-mono text-[10px] text-base-content/45">
+        <span>{from}</span>
+        <span>peak {chart.peak.toLocaleString()}</span>
+        <span>{to}</span>
+      </figcaption>
+    </figure>
+  )
+}
+
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1 text-sm">
@@ -118,8 +225,8 @@ export default function OverviewPage() {
     )
   }
 
-  const newAccounts = measuredValue(data.accounts.new_30d)
   const installs = measuredValue(data.installs)
+  const dau = trendValue(data.active.dau)
   const releases = (data.downloads.releases ?? []).slice(0, 5)
   const ingest = data.ingest ?? []
   const plans = (data.plans.rows ?? []).filter((r) => r.plan !== 'free')
@@ -171,18 +278,36 @@ export default function OverviewPage() {
               never did
             </p>
           )}
-          <div className="mt-3">
-            {newAccounts.display === null ? (
-              <Unmeasurable note={newAccounts.note} />
-            ) : (
-              <p className="text-sm text-base-content/60">
-                <span className="font-semibold text-base-content">
-                  {newAccounts.display}
-                </span>{' '}
-                new in the last 30 days
-              </p>
-            )}
+          <div className="mt-3 border-t border-base-300/60 pt-2">
+            <TrendRow label="New today" trend={data.accounts.new_today} />
+            <TrendRow label="New this week" trend={data.accounts.new_7d} />
           </div>
+        </Tile>
+
+        <Tile
+          title="Active users"
+          caveat="From Logto: accounts that actually authenticated in the window. Someone using Scrollr without signing in again does not appear here, so these are floors, not ceilings."
+        >
+          {dau.value === null ? (
+            <Unmeasurable note={data.active.note} />
+          ) : (
+            <>
+              <div className="flex items-end gap-4">
+                <div className="shrink-0">
+                  <Big>{dau.value}</Big>
+                  <p className="mt-1 flex items-baseline gap-2 text-sm text-base-content/60">
+                    today
+                    <Delta trend={dau} />
+                  </p>
+                </div>
+                <Sparkline points={data.active.curve} />
+              </div>
+              <div className="mt-3 border-t border-base-300/60 pt-2">
+                <TrendRow label="This week" trend={data.active.wau} />
+                <TrendRow label="This month" trend={data.active.mau} />
+              </div>
+            </>
+          )}
         </Tile>
 
         <Tile
