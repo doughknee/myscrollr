@@ -4,7 +4,7 @@
 
 Live market quotes, fantasy matchups, game scores, and RSS feeds —
 streaming into a compact bar that floats on top of whatever you're
-working on. Multi-monitor aware. Zero ads. Zero telemetry.
+working on. Multi-monitor aware. No ads, no tracking pixels, no third-party analytics.
 
 ![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)
 ![Desktop](https://img.shields.io/badge/desktop-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
@@ -162,8 +162,10 @@ unreleased; `deploy.yml` ships the API and website to production.
   so change the Go and regenerate. `desktop/src/tierLimits.ts` is a
   **hand-kept mirror** — there is no generator; edit it and the Go map
   together, as its header comment lists.
-- **No analytics, tracking pixels, or telemetry.** This is a public
-  product promise, documented in the Privacy Policy. Don't add them.
+- **No ads, tracking pixels, or third-party analytics.** This is a
+  public product promise, documented in the Privacy Policy. The API
+  counts app versions and error rates server-side; nothing beyond
+  that. Don't add more.
 - **Only core migrates.** All schema lives in `api/migrations/`; the
   ingesters are pure writers. A failed migration crashes the container.
 - **Rollbacks via rolling forward.** We prefer forward-only migrations

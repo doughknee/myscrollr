@@ -1,5 +1,5 @@
 /**
- * SEC 05 ／ THE PROMISE — zero telemetry, the refusals ledger, and the
+ * SEC 05 ／ THE PROMISE — the privacy promise, the refusals ledger, and the
  * live GitHub stat line (stars · forks · last commit).
  */
 
@@ -49,7 +49,7 @@ export function PromiseSection({
             </h2>
             <p className="m-0 mb-7 max-w-[460px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
               {
-                'Scrollr ships zero telemetry: no analytics, no tracking pixels, no "anonymous usage data." Tests block any deploy that breaks this. You don\'t have to take our word for it.'
+                'No ads, no tracking pixels, no third-party analytics. Your widget setup syncs to your account so it follows you between machines. We count app versions and error rates to find bugs, and crash reports are stripped of personal data before they are sent, which tests enforce on every deploy.'
               }
             </p>
             <a

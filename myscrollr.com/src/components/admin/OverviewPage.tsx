@@ -21,9 +21,9 @@ import {
  *
  * Every tile is either a number we hold or an explicit admission that we do
  * not. The Installs tile is the second kind on purpose: Scrollr ships no
- * telemetry, by decision, so active installs cannot be measured and the page
- * says exactly that instead of substituting downloads and hoping nobody
- * notices the difference.
+ * install identifier, by decision, so active installs cannot be measured and
+ * the page says exactly that instead of substituting downloads and hoping
+ * nobody notices the difference.
  */
 
 function Tile({

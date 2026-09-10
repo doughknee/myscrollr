@@ -81,9 +81,9 @@ Branded desktop deployments for teams. Custom branding, multi-display, self-host
 
 ## Privacy
 
-- No analytics, no tracking pixels, no telemetry.
-- Channel configurations and preferences stored locally on your device.
-- Only server-side data is your account profile and subscription status.
+- No ads, no tracking pixels, no third-party analytics.
+- Your widget setup syncs to your account so it follows you between machines; Scrollr's servers also hold your account profile and subscription status.
+- We count app versions and error rates to find bugs, and crash reports are stripped of personal data before they are sent, which tests enforce on every deploy.
 - Source code is publicly available on GitHub under GNU AGPL v3.0.
 
 ## FAQ

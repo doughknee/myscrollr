@@ -44,9 +44,9 @@ const FAQ_ITEMS: Array<FAQItem> = [
   {
     icon: ShieldCheck,
     question: 'Is my data private?',
-    highlight: 'No analytics, no tracking pixels, and no telemetry. Period.',
+    highlight: 'No ads, no tracking pixels, no third-party analytics.',
     answer:
-      'Scrollr contains zero analytics, zero tracking pixels, and zero telemetry. Your preferences are stored locally on your device and never transmitted anywhere. The only network requests go to the Scrollr API to fetch your feed data.',
+      'No ads, no tracking pixels, no third-party analytics. Your widget setup syncs to your account so it follows you between machines. We count app versions and error rates to find bugs, and crash reports are stripped of personal data before they are sent, which tests enforce on every deploy.',
     accent: 'sky',
   },
   {

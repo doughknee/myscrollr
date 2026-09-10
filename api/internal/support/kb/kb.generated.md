@@ -93,15 +93,15 @@ and leave program details to the partner.
 
 ## What Scrollr is
 
-<!-- source: docs/VISION.md @ 11e839bac266 -->
+<!-- source: docs/VISION.md @ 87cefee845b1 -->
 ### 1. What Scrollr is
 
-> **A pinned, always-on-top desktop ticker for the things you actually care about.** Live finance quotes, sports scores, fantasy matchups, prediction markets, and news stream into a compact bar floating over whatever you're working on. You pick **widgets** from a catalog; you pay for **how many you can run at once (slots)**. Multi-monitor aware. **Zero ads. Zero telemetry.**
+> **A pinned, always-on-top desktop ticker for the things you actually care about.** Live finance quotes, sports scores, fantasy matchups, prediction markets, and news stream into a compact bar floating over whatever you're working on. You pick **widgets** from a catalog; you pay for **how many you can run at once (slots)**. Multi-monitor aware. **No ads, no tracking pixels, no third-party analytics.**
 
 Three load-bearing commitments, true at every layer:
 
 1. **The desktop app is the product** (Tauri v2 + React). The website is *marketing, auth, and billing only*.
-2. **No telemetry, ever** — a public promise, enforced by per-service Sentry-scrubbing tests that block deploy.
+2. **No third-party analytics, and no personal data in crash reports** — enforced by per-service Sentry-scrubbing tests that block deploy. First-party counts of app versions and error rates carry no account identifier and nothing about ticker content.
 3. **One user-facing primitive (the widget), one price lever (the slot).** Every widget costs exactly one slot; a plan card's headline is a widget count.
 
 ## Plans and limits
