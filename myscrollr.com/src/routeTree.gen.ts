@@ -14,7 +14,10 @@ import { Route as UplinkRouteImport } from './routes/uplink'
 import { Route as TssSpaShellRouteImport } from './routes/tss-spa-shell'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as StatusRouteImport } from './routes/status'
+import { Route as SportsRouteImport } from './routes/sports'
 import { Route as ReleasesRouteImport } from './routes/releases'
+import { Route as NewsRouteImport } from './routes/news'
+import { Route as MarketsRouteImport } from './routes/markets'
 import { Route as LegalRouteImport } from './routes/legal'
 import { Route as InviteRouteImport } from './routes/invite'
 import { Route as FantasyRouteImport } from './routes/fantasy'
@@ -61,9 +64,24 @@ const StatusRoute = StatusRouteImport.update({
   path: '/status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SportsRoute = SportsRouteImport.update({
+  id: '/sports',
+  path: '/sports',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReleasesRoute = ReleasesRouteImport.update({
   id: '/releases',
   path: '/releases',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NewsRoute = NewsRouteImport.update({
+  id: '/news',
+  path: '/news',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MarketsRoute = MarketsRouteImport.update({
+  id: '/markets',
+  path: '/markets',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LegalRoute = LegalRouteImport.update({
@@ -179,7 +197,10 @@ export interface FileRoutesByFullPath {
   '/fantasy': typeof FantasyRoute
   '/invite': typeof InviteRoute
   '/legal': typeof LegalRoute
+  '/markets': typeof MarketsRoute
+  '/news': typeof NewsRoute
   '/releases': typeof ReleasesRoute
+  '/sports': typeof SportsRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
   '/tss-spa-shell': typeof TssSpaShellRoute
@@ -206,7 +227,10 @@ export interface FileRoutesByTo {
   '/fantasy': typeof FantasyRoute
   '/invite': typeof InviteRoute
   '/legal': typeof LegalRoute
+  '/markets': typeof MarketsRoute
+  '/news': typeof NewsRoute
   '/releases': typeof ReleasesRoute
+  '/sports': typeof SportsRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
   '/tss-spa-shell': typeof TssSpaShellRoute
@@ -235,7 +259,10 @@ export interface FileRoutesById {
   '/fantasy': typeof FantasyRoute
   '/invite': typeof InviteRoute
   '/legal': typeof LegalRoute
+  '/markets': typeof MarketsRoute
+  '/news': typeof NewsRoute
   '/releases': typeof ReleasesRoute
+  '/sports': typeof SportsRoute
   '/status': typeof StatusRoute
   '/support': typeof SupportRoute
   '/tss-spa-shell': typeof TssSpaShellRoute
@@ -265,7 +292,10 @@ export interface FileRouteTypes {
     | '/fantasy'
     | '/invite'
     | '/legal'
+    | '/markets'
+    | '/news'
     | '/releases'
+    | '/sports'
     | '/status'
     | '/support'
     | '/tss-spa-shell'
@@ -292,7 +322,10 @@ export interface FileRouteTypes {
     | '/fantasy'
     | '/invite'
     | '/legal'
+    | '/markets'
+    | '/news'
     | '/releases'
+    | '/sports'
     | '/status'
     | '/support'
     | '/tss-spa-shell'
@@ -320,7 +353,10 @@ export interface FileRouteTypes {
     | '/fantasy'
     | '/invite'
     | '/legal'
+    | '/markets'
+    | '/news'
     | '/releases'
+    | '/sports'
     | '/status'
     | '/support'
     | '/tss-spa-shell'
@@ -349,7 +385,10 @@ export interface RootRouteChildren {
   FantasyRoute: typeof FantasyRoute
   InviteRoute: typeof InviteRoute
   LegalRoute: typeof LegalRoute
+  MarketsRoute: typeof MarketsRoute
+  NewsRoute: typeof NewsRoute
   ReleasesRoute: typeof ReleasesRoute
+  SportsRoute: typeof SportsRoute
   StatusRoute: typeof StatusRoute
   SupportRoute: typeof SupportRoute
   TssSpaShellRoute: typeof TssSpaShellRoute
@@ -397,11 +436,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StatusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sports': {
+      id: '/sports'
+      path: '/sports'
+      fullPath: '/sports'
+      preLoaderRoute: typeof SportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/releases': {
       id: '/releases'
       path: '/releases'
       fullPath: '/releases'
       preLoaderRoute: typeof ReleasesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/news': {
+      id: '/news'
+      path: '/news'
+      fullPath: '/news'
+      preLoaderRoute: typeof NewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/markets': {
+      id: '/markets'
+      path: '/markets'
+      fullPath: '/markets'
+      preLoaderRoute: typeof MarketsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/legal': {
@@ -579,7 +639,10 @@ const rootRouteChildren: RootRouteChildren = {
   FantasyRoute: FantasyRoute,
   InviteRoute: InviteRoute,
   LegalRoute: LegalRoute,
+  MarketsRoute: MarketsRoute,
+  NewsRoute: NewsRoute,
   ReleasesRoute: ReleasesRoute,
+  SportsRoute: SportsRoute,
   StatusRoute: StatusRoute,
   SupportRoute: SupportRoute,
   TssSpaShellRoute: TssSpaShellRoute,

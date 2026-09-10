@@ -155,7 +155,7 @@ server {\n\
     #                          (/account, /callback, /u/$username, etc.)\n\
     # Canonical marketing pages are slashless. Keep this list narrow so\n\
     # assets, auth callbacks, API paths, and the SPA fallback are untouched.\n\
-    location ~ ^/(download(?:/(?:mac|windows|linux))?|uplink(?:/lifetime)?|widgets|fantasy|releases|architecture|business|support|legal|status)/$ {\n\
+    location ~ ^/(download(?:/(?:mac|windows|linux))?|uplink(?:/lifetime)?|widgets|sports|markets|news|fantasy|releases|architecture|business|support|legal|status)/$ {\n\
         include /etc/nginx/security-headers.conf;\n\
         return 301 /$1$is_args$args;\n\
     }\n\

@@ -127,6 +127,23 @@ export function CatalogPicker() {
         <div className="pb-[18px] pt-6 font-mono text-[11px] uppercase tracking-[0.12em] text-base-content/45">
           {countLine}
         </div>
+        <nav
+          aria-label="Explore ticker use cases"
+          className="mb-6 flex flex-wrap gap-x-5 gap-y-2 font-mono text-[11px] tracking-[0.08em]"
+        >
+          <Link to="/sports" className="text-primary">
+            LIVE SPORTS TICKER →
+          </Link>
+          <Link to="/markets" className="text-primary">
+            STOCK & CRYPTO TICKER →
+          </Link>
+          <Link to="/news" className="text-primary">
+            NEWS & RSS TICKER →
+          </Link>
+          <Link to="/fantasy" className="text-primary">
+            YAHOO FANTASY TICKER →
+          </Link>
+        </nav>
         {/* sync mode (no "wait"): the leaving block collapses while the
             entering one expands, so the section's total height morphs
             smoothly instead of snapping — the sections below glide. */}
