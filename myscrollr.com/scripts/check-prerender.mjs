@@ -209,7 +209,7 @@ if (!existsSync(shell)) {
   // this assertion fails.
   const shellHtml = readFileSync(shell, 'utf8')
   const shellBody = shellHtml.replace(/<head[\s\S]*?<\/head>/i, '')
-  const expectedShellChrome = 'ZERO ADS'
+  const expectedShellChrome = 'ZERO ADS · ZERO TRACKING'
   if (!shellBody.includes(expectedShellChrome)) {
     console.error(
       `✗ _shell.html missing expected chrome "${expectedShellChrome}" ` +

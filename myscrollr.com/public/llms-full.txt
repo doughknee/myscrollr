@@ -102,7 +102,7 @@ Not noticeably. All data flows through a single lightweight connection. The tick
 
 #### Is my data private?
 
-Scrollr contains zero analytics, zero tracking pixels, and zero telemetry. Your channel configurations and preferences are stored on your device. The only server-side data is your account profile and subscription status.
+No ads, no tracking pixels, no third-party analytics. Your widget setup syncs to your account so it follows you between machines, and Scrollr's servers hold your account profile and subscription status. We also count app versions and error rates so we can find bugs without waiting for someone to report them.
 
 #### What platforms are supported?
 
