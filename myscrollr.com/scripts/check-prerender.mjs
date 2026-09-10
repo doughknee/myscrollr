@@ -54,6 +54,34 @@ const ROUTES = [
     expectedBody: 'The go-ahead touchdown',
   },
   {
+    path: '/sports',
+    file: 'sports/index.html',
+    minJsonLd: 4,
+    expectedBody: 'Follow the leagues and teams you care about',
+    expectedH1: 'Live sports scores on your desktop',
+  },
+  {
+    path: '/markets',
+    file: 'markets/index.html',
+    minJsonLd: 4,
+    expectedBody: 'Build separate stock and crypto watchlists',
+    expectedH1: 'Live stocks and crypto on your desktop',
+  },
+  {
+    path: '/news',
+    file: 'news/index.html',
+    minJsonLd: 4,
+    expectedBody: 'Choose from the built-in source catalog',
+    expectedH1: 'Live news and RSS feeds on your desktop',
+  },
+  {
+    path: '/releases',
+    file: 'releases/index.html',
+    minJsonLd: 2,
+    expectedBody: 'No commit-log archaeology.',
+    expectedH1: 'Every build, dated and signed.',
+  },
+  {
     path: '/download',
     file: 'download/index.html',
     minJsonLd: 3, // organization + softwareApp + breadcrumbs
@@ -123,6 +151,9 @@ const ROUTES = [
 ]
 
 const SITE_ORIGIN = 'https://myscrollr.com'
+const PRERENDERED_PATHS = new Set(ROUTES.map((route) => route.path))
+const DYNAMIC_PATH_PREFIXES = ['/account', '/callback', '/invite', '/u/']
+const SERVICE_PATHS = new Set(['/health', '/swagger/index.html'])
 
 let failures = 0
 
@@ -225,6 +256,19 @@ for (const route of ROUTES) {
     }
   }
 
+  const internalLinks = [
+    ...html.matchAll(/<a[^>]*href=["'](\/[^"]*)["']/g),
+  ].map((match) => match[1].split(/[?#]/, 1)[0] || '/')
+  for (const path of new Set(internalLinks)) {
+    if (
+      !PRERENDERED_PATHS.has(path) &&
+      !SERVICE_PATHS.has(path) &&
+      !DYNAMIC_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))
+    ) {
+      fail(route, `internal link target ${path} is not prerendered or dynamic`)
+    }
+  }
+
   pass(
     route,
     `title="${titleMatch[1]}" jsonLd=${jsonLdCount}` +
@@ -241,6 +285,13 @@ if (sitemap.includes('<lastmod>')) {
   failures += 1
 } else {
   console.log('✓ sitemap.xml omits synthetic lastmod dates')
+}
+for (const route of ROUTES) {
+  const loc = `<loc>${SITE_ORIGIN}${route.path}</loc>`
+  if (!sitemap.includes(loc)) {
+    console.error(`✗ sitemap.xml missing ${route.path}`)
+    failures += 1
+  }
 }
 
 const shell = join(clientDir, '_shell.html')

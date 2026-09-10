@@ -46,6 +46,21 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://myscrollr.com/sports</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://myscrollr.com/markets</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://myscrollr.com/news</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://myscrollr.com/releases</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>

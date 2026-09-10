@@ -159,9 +159,9 @@ export const Route = createFileRoute('/fantasy')({
   component: FantasyPage,
   head: () =>
     seo({
-      title: 'Scrollr for Fantasy Football: Your Matchup, Live on Your Desktop',
+      title: 'Yahoo Fantasy Sports Desktop Ticker | Scrollr',
       description:
-        'Your Yahoo Fantasy matchup and every live score, pinned above whatever you are doing. Zero ads, zero tracking, three widgets free. macOS, Windows, Linux.',
+        'Keep Yahoo Fantasy matchups, scoring, standings, and roster updates visible in a desktop ticker for macOS, Windows, and Linux.',
       path: '/fantasy',
       image: 'https://myscrollr.com/og/home.png',
       imageAlt:
@@ -239,10 +239,10 @@ function FantasyHero() {
   return (
     <PageHeader
       size="lg"
-      eyebrowLeft="／／ FANTASY FOOTBALL"
+      eyebrowLeft="／／ YAHOO FANTASY SPORTS"
       eyebrowRight="FREE · OPEN SOURCE · MACOS / WINDOWS / LINUX"
-      line1="Your matchup,"
-      line2="live all Sunday."
+      line1="Your Yahoo Fantasy"
+      line2="live on your desktop"
       sub="The go-ahead touchdown. The stat correction that flips your week. The injury that lands before the broadcast says it. All of it in a quiet bar above whatever else you are doing — no tab to check, no phone in your hand."
       actions={<HeroActions />}
     />
