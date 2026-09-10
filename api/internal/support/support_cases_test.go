@@ -120,10 +120,12 @@ func TestCases_IngestOnEveryEvent(t *testing.T) {
 	processReplyTriageAsync(osTicketThreadMessageEvent{
 		Event: "thread.message", TicketNumber: "100", ThreadEntryID: 555,
 		UserEmail: "u@example.com", Subject: "Ticker froze", MessageHTML: "<p>Restart did not help</p>",
+		Created: "2026-06-01T10:00:00Z",
 	})
 	processReplyTriageAsync(osTicketThreadMessageEvent{ // same entry twice = one row
 		Event: "thread.message", TicketNumber: "100", ThreadEntryID: 555,
 		UserEmail: "u@example.com", Subject: "Ticker froze", MessageHTML: "<p>Restart did not help</p>",
+		Created: "2026-06-01T10:00:00Z",
 	})
 
 	if err := markDraftDecided(ctx, draft.ID, "edited", "<p>Edited: update to 1.6.2</p>"); err != nil {
@@ -287,6 +289,146 @@ func TestBackfill_Idempotent(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&body)
 	if resp.StatusCode != 200 || body.Count != 1 || body.Cases[0].TicketNumber != "201" {
 		t.Fatalf("handler: %d %+v", resp.StatusCode, body)
+	}
+}
+
+func TestBackfillDoesNotReplaceNewerOrKnownStatus(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	resetCases(t)
+	ctx := context.Background()
+	newer := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)
+	older := "2026-06-01T10:00:00Z"
+	testsupport.MustExec(t, `INSERT INTO support_cases
+		(ticket_number, subject, status, opened_at, updated_at, closed_at, status_observed_at)
+		VALUES ('stale', 'stale snapshot', 'closed', $1, $1, $1, $1),
+		       ('missing', 'missing status', 'closed', $1, $1, $1, $1),
+		       ('no-time', 'missing time', 'closed', $1, $1, $1, $1),
+		       ('fresh', 'newer reopen', 'closed', $2, $2, $2, $2)`, newer,
+		newer.Add(-24*time.Hour))
+	fresh := "2026-09-10T13:00:00Z"
+
+	fake := &fakeOSTicket{tickets: map[string]map[string]interface{}{
+		"stale": {
+			"number": "stale", "subject": "stale snapshot", "status": "Open",
+			"status_state": "open", "closed": false, "updated": older,
+		},
+		"missing": {
+			"number": "missing", "subject": "missing status", "updated": older,
+		},
+		"no-time": {
+			"number": "no-time", "subject": "missing time", "status": "Open",
+			"status_state": "open", "closed": false,
+		},
+		"fresh": {
+			"number": "fresh", "subject": "newer reopen", "status": "Open",
+			"status_state": "open", "closed": false, "updated": fresh,
+		},
+		"new-missing": {"number": "new-missing", "subject": "incomplete new case"},
+	}}
+	srv := httptest.NewServer(fake.handler(t))
+	defer srv.Close()
+	setOSTicketEnv(t, srv.URL)
+
+	if _, err := BackfillFromOSTicket(ctx, time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, ticket := range []string{"stale", "missing", "no-time"} {
+		var status string
+		var closedAt *time.Time
+		if err := platform.DBPool.QueryRow(ctx,
+			`SELECT status, closed_at FROM support_cases WHERE ticket_number=$1`, ticket).
+			Scan(&status, &closedAt); err != nil {
+			t.Fatal(err)
+		}
+		if status != "closed" || closedAt == nil {
+			t.Errorf("%s: status=%q closed_at=%v, want known newer close preserved", ticket, status, closedAt)
+		}
+	}
+	var freshStatus string
+	var freshClosed *time.Time
+	if err := platform.DBPool.QueryRow(ctx,
+		`SELECT status, closed_at FROM support_cases WHERE ticket_number='fresh'`).
+		Scan(&freshStatus, &freshClosed); err != nil {
+		t.Fatal(err)
+	}
+	if freshStatus != "open" || freshClosed != nil {
+		t.Errorf("fresh explicit reopen: status=%q closed_at=%v", freshStatus, freshClosed)
+	}
+	var unknownStatus string
+	if err := platform.DBPool.QueryRow(ctx,
+		`SELECT status FROM support_cases WHERE ticket_number='new-missing'`).Scan(&unknownStatus); err != nil {
+		t.Fatal(err)
+	}
+	if unknownStatus != "unknown" {
+		t.Errorf("new incomplete case status=%q, want unknown", unknownStatus)
+	}
+}
+
+func TestReplyWebhookPreservesUpstreamEventTime(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	resetCases(t)
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	created := "2026-09-09T08:07:06Z"
+	processReplyTriageAsync(osTicketThreadMessageEvent{
+		Event: "thread.message", TicketNumber: "event-time", ThreadEntryID: 987,
+		UserEmail: "user@example.com", Subject: "synthetic", MessageHTML: "<p>Still broken</p>",
+		Created: created,
+	})
+
+	var got time.Time
+	if err := platform.DBPool.QueryRow(context.Background(),
+		`SELECT created_at FROM support_messages WHERE osticket_entry_id=987`).Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	want, _ := time.Parse(time.RFC3339, created)
+	if !got.Equal(want) {
+		t.Fatalf("created_at=%s, want upstream event time %s", got, want)
+	}
+}
+
+func TestReplyWebhookRejectsMissingEventTime(t *testing.T) {
+	t.Setenv("SCROLLR_WEBHOOK_SECRET", "s3cret")
+	app := fiber.New()
+	app.Post("/webhook", HandleOSTicketThreadMessage)
+	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(`{
+		"event":"thread.message",
+		"ticket_number":"event-time",
+		"thread_entry_id":988,
+		"user_email":"user@example.com",
+		"message_html":"<p>Still broken</p>"
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Scrollr-Webhook-Secret", "s3cret")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusBadRequest {
+		t.Fatalf("status=%d, want 400 for missing upstream event time", resp.StatusCode)
+	}
+}
+
+func TestMessageOnlyCaseDoesNotInventAnUpstreamOpenStatus(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	resetCases(t)
+	if err := recordSupportMessage(context.Background(), SupportMessage{
+		TicketNumber: "message-only", Kind: "note", BodyText: "synthetic note",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var status string
+	if err := platform.DBPool.QueryRow(context.Background(),
+		`SELECT status FROM support_cases WHERE ticket_number='message-only'`).Scan(&status); err != nil {
+		t.Fatal(err)
+	}
+	if status != "unknown" {
+		t.Fatalf("message-only status=%q, want unknown until an authoritative source is observed", status)
 	}
 }
 

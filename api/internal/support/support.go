@@ -453,6 +453,7 @@ func recordTicketOpened(ctx context.Context, sc SupportCase, userBodyHTML string
 		return
 	}
 	sc.Status = "open"
+	sc.StatusObservedAt = time.Now()
 	if err := upsertSupportCase(ctx, sc); err != nil {
 		log.Printf("[Cases] %v", err)
 		return

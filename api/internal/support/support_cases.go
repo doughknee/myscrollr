@@ -28,22 +28,23 @@ import (
 // times mean "unknown" on write and are never used to blank a stored
 // value — see upsertSupportCase.
 type SupportCase struct {
-	TicketNumber    string     `json:"ticket_number"`
-	UserEmail       string     `json:"-"`
-	LogtoSub        string     `json:"-"`
-	Subject         string     `json:"subject"`
-	Category        string     `json:"category,omitempty"`
-	Priority        string     `json:"priority,omitempty"`
-	Status          string     `json:"status"`
-	Summary         string     `json:"summary,omitempty"`
-	AppVersion      string     `json:"app_version,omitempty"`
-	OS              string     `json:"os,omitempty"`
-	TierAtOpen      string     `json:"tier_at_open,omitempty"`
-	LinearIssueKey  string     `json:"linear_issue_key,omitempty"`
-	DiscordThreadID string     `json:"discord_thread_id,omitempty"`
-	OpenedAt        time.Time  `json:"opened_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	ClosedAt        *time.Time `json:"closed_at,omitempty"`
+	TicketNumber     string     `json:"ticket_number"`
+	UserEmail        string     `json:"-"`
+	LogtoSub         string     `json:"-"`
+	Subject          string     `json:"subject"`
+	Category         string     `json:"category,omitempty"`
+	Priority         string     `json:"priority,omitempty"`
+	Status           string     `json:"status"`
+	StatusObservedAt time.Time  `json:"-"`
+	Summary          string     `json:"summary,omitempty"`
+	AppVersion       string     `json:"app_version,omitempty"`
+	OS               string     `json:"os,omitempty"`
+	TierAtOpen       string     `json:"tier_at_open,omitempty"`
+	LinearIssueKey   string     `json:"linear_issue_key,omitempty"`
+	DiscordThreadID  string     `json:"discord_thread_id,omitempty"`
+	OpenedAt         time.Time  `json:"opened_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+	ClosedAt         *time.Time `json:"closed_at,omitempty"`
 }
 
 // SupportMessage mirrors one support_messages row.
@@ -68,39 +69,49 @@ func upsertSupportCase(ctx context.Context, sc SupportCase) error {
 	if platform.DBPool == nil {
 		return fmt.Errorf("DB not initialized")
 	}
-	var opened, updated *time.Time
+	var opened, updated, statusObserved *time.Time
 	if !sc.OpenedAt.IsZero() {
 		opened = &sc.OpenedAt
 	}
 	if !sc.UpdatedAt.IsZero() {
 		updated = &sc.UpdatedAt
 	}
+	if !sc.StatusObservedAt.IsZero() {
+		statusObserved = &sc.StatusObservedAt
+	}
 	const q = `
 		INSERT INTO support_cases
 			(ticket_number, user_email, logto_sub, subject, category, priority, status,
-			 summary, app_version, os, tier_at_open, opened_at, updated_at, closed_at)
+			 summary, app_version, os, tier_at_open, opened_at, updated_at, closed_at, status_observed_at)
 		VALUES ($1, NULLIF($2,''), NULLIF($3,''), $4, NULLIF($5,''), NULLIF($6,''),
-			COALESCE(NULLIF($7,''), 'open'), NULLIF($8,''), NULLIF($9,''), NULLIF($10,''),
-			NULLIF($11,''), COALESCE($12, now()), COALESCE($13, now()), $14)
+			COALESCE(NULLIF($7,''), 'unknown'), NULLIF($8,''), NULLIF($9,''), NULLIF($10,''),
+			NULLIF($11,''), COALESCE($12, now()), COALESCE($13, now()), $14, $15)
 		ON CONFLICT (ticket_number) DO UPDATE SET
 			user_email   = COALESCE(EXCLUDED.user_email, support_cases.user_email),
 			logto_sub    = COALESCE(support_cases.logto_sub, EXCLUDED.logto_sub),
 			subject      = CASE WHEN EXCLUDED.subject <> '' THEN EXCLUDED.subject ELSE support_cases.subject END,
 			category     = COALESCE(support_cases.category, EXCLUDED.category),
 			priority     = COALESCE(support_cases.priority, EXCLUDED.priority),
-			status       = COALESCE(NULLIF($7,''), support_cases.status),
+			status       = CASE WHEN NULLIF($7,'') IS NOT NULL AND ($15 IS NULL
+				OR $15 >= COALESCE(support_cases.status_observed_at, support_cases.closed_at, '-infinity'))
+				THEN COALESCE(NULLIF($7,''), support_cases.status) ELSE support_cases.status END,
 			summary      = COALESCE(support_cases.summary, EXCLUDED.summary),
 			app_version  = COALESCE(support_cases.app_version, EXCLUDED.app_version),
 			os           = COALESCE(support_cases.os, EXCLUDED.os),
 			tier_at_open = COALESCE(support_cases.tier_at_open, EXCLUDED.tier_at_open),
 			opened_at    = LEAST(support_cases.opened_at, EXCLUDED.opened_at),
 			updated_at   = GREATEST(support_cases.updated_at, EXCLUDED.updated_at),
-			closed_at    = CASE WHEN $7 = '' THEN support_cases.closed_at ELSE EXCLUDED.closed_at END
+			closed_at    = CASE WHEN NULLIF($7,'') IS NOT NULL AND ($15 IS NULL
+				OR $15 >= COALESCE(support_cases.status_observed_at, support_cases.closed_at, '-infinity'))
+				THEN EXCLUDED.closed_at ELSE support_cases.closed_at END,
+			status_observed_at = CASE WHEN $15 IS NOT NULL
+				AND $15 >= COALESCE(support_cases.status_observed_at, support_cases.closed_at, '-infinity')
+				THEN $15 ELSE support_cases.status_observed_at END
 	`
 	_, err := platform.DBPool.Exec(ctx, q,
 		sc.TicketNumber, sc.UserEmail, sc.LogtoSub, sc.Subject, sc.Category,
 		strings.ToLower(sc.Priority), sc.Status, sc.Summary, sc.AppVersion, sc.OS,
-		sc.TierAtOpen, opened, updated, sc.ClosedAt)
+		sc.TierAtOpen, opened, updated, sc.ClosedAt, statusObserved)
 	if err != nil {
 		return fmt.Errorf("upsertSupportCase %s: %w", sc.TicketNumber, err)
 	}
@@ -176,6 +187,7 @@ func setCaseStatus(ctx context.Context, ticketNumber, status string) {
 		UPDATE support_cases SET
 			status     = $2,
 			closed_at  = CASE WHEN $2 = 'closed' THEN now() ELSE NULL END,
+			status_observed_at = now(),
 			updated_at = now()
 		WHERE ticket_number = $1
 	`

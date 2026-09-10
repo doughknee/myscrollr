@@ -197,6 +197,9 @@ type queueState struct {
 	DraftStatus   string
 	Disposition   string
 	AutoSendArmed bool
+	LastUser      *time.Time
+	LastSent      *time.Time
+	DraftCreated  *time.Time
 }
 
 // group answers which of the three columns a case belongs in, and why in
@@ -206,6 +209,14 @@ type queueState struct {
 func (q queueState) group() (string, string) {
 	if strings.EqualFold(strings.TrimSpace(q.CaseStatus), "closed") {
 		return queueHandled, "The ticket is closed."
+	}
+	if q.LastUser != nil && q.LastSent != nil && !q.LastSent.Before(*q.LastUser) &&
+		(q.DraftCreated == nil || !q.DraftCreated.After(*q.LastSent)) {
+		return queueWaiting, "We replied. Nothing is due from us until they write back."
+	}
+	if q.LastUser != nil && (q.LastSent == nil || q.LastUser.After(*q.LastSent)) &&
+		(q.DraftCreated == nil || q.LastUser.After(*q.DraftCreated)) {
+		return queueNeedsYou, "The user wrote after the latest reply or draft, so this needs a new answer."
 	}
 	if !q.HasDraft {
 		return queueNeedsYou, "No draft was ever written for this ticket, so nothing is going to answer it on its own."
@@ -326,7 +337,7 @@ type AdminQueueResponse struct {
 const queueSQL = `
 	WITH latest AS (
 		SELECT DISTINCT ON (ticket_number)
-		       ticket_number, id, status, disposition, disposition_reason, hold_until,
+		       ticket_number, id, status, disposition, disposition_reason, hold_until, created_at,
 		       coalesce(user_name, '')        AS user_name,
 		       coalesce(draft_body_html, '')  AS draft_body_html,
 		       coalesce(edited_body_html, '') AS edited_body_html,
@@ -340,7 +351,9 @@ const queueSQL = `
 	       c.opened_at, c.updated_at,
 	       (SELECT max(m.created_at) FROM support_messages m
 	         WHERE m.ticket_number = c.ticket_number AND m.kind = 'user'),
-	       d.id, d.status, d.disposition, d.disposition_reason, d.hold_until,
+	       (SELECT max(m.created_at) FROM support_messages m
+	         WHERE m.ticket_number = c.ticket_number AND m.kind = 'sent'),
+	       d.id, d.status, d.disposition, d.disposition_reason, d.hold_until, d.created_at,
 	       coalesce(d.user_name, ''), coalesce(d.draft_body_html, ''),
 	       coalesce(d.edited_body_html, ''), coalesce(d.intervened, false),
 	       coalesce(s.plan, ''), coalesce(s.status, ''), coalesce(s.lifetime, false)
@@ -422,14 +435,14 @@ func HandleAdminQueue(c *fiber.Ctx) error {
 		var issueKey string
 		var draftID *int64
 		var draftStatus, disposition, dispositionReason *string
-		var holdUntil, lastUser *time.Time
+		var holdUntil, lastUser, lastSent, draftCreated *time.Time
 		var draftBody, editedBody, planStatus string
 		var intervened, lifetime bool
 
 		if err := rows.Scan(&r.TicketNumber, &r.UserEmail, &r.Subject,
 			&r.Category, &r.Priority, &r.Status, &r.Summary, &r.OS, &issueKey,
-			&r.OpenedAt, &r.UpdatedAt, &lastUser,
-			&draftID, &draftStatus, &disposition, &dispositionReason, &holdUntil,
+			&r.OpenedAt, &r.UpdatedAt, &lastUser, &lastSent,
+			&draftID, &draftStatus, &disposition, &dispositionReason, &holdUntil, &draftCreated,
 			&r.Name, &draftBody, &editedBody, &intervened,
 			&r.Plan, &planStatus, &lifetime); err != nil {
 			log.Printf("[AdminSupport] scan queue row: %v", err)
@@ -461,6 +474,9 @@ func HandleAdminQueue(c *fiber.Ctx) error {
 			DraftStatus:   r.DraftStatus,
 			Disposition:   r.Disposition,
 			AutoSendArmed: autosend.Armed,
+			LastUser:      lastUser,
+			LastSent:      lastSent,
+			DraftCreated:  draftCreated,
 		}.group()
 		r.Section = caseSection(r.Group, r.Paying)
 		r.Provenance, r.ProvenanceLabel = replyProvenance(
@@ -795,8 +811,24 @@ func buildAdminCase(ctx context.Context, ticket string) (*AdminCaseDetail, error
 	d.Messages = adminCaseMessages(ctx, ticket)
 	d.Draft, d.DraftNote = adminCurrentDraft(ctx, ticket)
 	d.AutoSend = autoSendState(ctx)
+	var lastUser, lastSent *time.Time
+	for i := range d.Messages {
+		message := &d.Messages[i]
+		switch message.Kind {
+		case "user":
+			if lastUser == nil || message.CreatedAt.After(*lastUser) {
+				lastUser = &message.CreatedAt
+			}
+		case "sent":
+			if lastSent == nil || message.CreatedAt.After(*lastSent) {
+				lastSent = &message.CreatedAt
+			}
+		}
+	}
+	var draftCreated *time.Time
 	if d.Draft != nil {
 		d.Hold = buildHold(d.Draft.HoldUntil, d.Draft.Status, d.Draft.Disposition, d.AutoSend.Armed, time.Now())
+		draftCreated = &d.Draft.CreatedAt
 	}
 	d.Group, d.GroupReason = queueState{
 		CaseStatus:    d.Status,
@@ -804,6 +836,9 @@ func buildAdminCase(ctx context.Context, ticket string) (*AdminCaseDetail, error
 		DraftStatus:   draftStatusOf(d.Draft),
 		Disposition:   draftDispositionOf(d.Draft),
 		AutoSendArmed: d.AutoSend.Armed,
+		LastUser:      lastUser,
+		LastSent:      lastSent,
+		DraftCreated:  draftCreated,
 	}.group()
 
 	d.Context = adminUserContext(ctx, ticket)
