@@ -240,6 +240,7 @@ func (s *Server) setupRoutes() {
 	// every user's email and ticket history.
 	s.App.Get("/admin/me", platform.LogtoAuth, admin.RequireAdmin, admin.HandleWhoAmI)
 	s.App.Get("/admin/overview", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetOverview)
+	s.App.Get("/admin/analytics", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetAnalytics)
 	s.App.Get("/admin/accounts", platform.LogtoAuth, admin.RequireAdmin, admin.HandleListAccounts)
 	s.App.Get("/admin/accounts/:sub", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetAccount)
 	// Version adoption, platform mix and error rate by version, all read from

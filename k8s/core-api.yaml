@@ -37,6 +37,13 @@ spec:
             - secretRef:
                 name: scrollr-secrets
           env:
+            # Required explicitly so a deploy cannot silently ship website
+            # signup analytics without its Logto application filter.
+            - name: LOGTO_WEB_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: scrollr-secrets
+                  key: LOGTO_WEB_APP_ID
             # Sentry — per-service DSN. SENTRY_USER_SALT, ENVIRONMENT,
             # and GIT_SHA come from scrollr-secrets (via envFrom above)
             # because they're shared across all services. DSNs are
