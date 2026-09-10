@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -72,41 +73,13 @@ func HandleExportUserData(c *fiber.Ctx) error {
 	// Explicit product-measurement consent and the account's own retained
 	// daily facts. Admin reporting exposes aggregates only; a user export still
 	// includes the data associated with that user as required by the export.
-	productAnalytics := map[string]any{"enabled": false, "daily_activity": []any{}}
-	var enrolledAt time.Time
-	var firstActive *time.Time
-	var d1, d7, d30 *bool
-	if err := platform.DBPool.QueryRow(ctx, `
-		SELECT enrolled_at, first_active_day, retained_d1, retained_d7, retained_d30
-		  FROM product_analytics_enrollments WHERE logto_sub = $1`, userID).
-		Scan(&enrolledAt, &firstActive, &d1, &d7, &d30); err == nil {
-		productAnalytics["enabled"] = true
-		productAnalytics["enrolled_at"] = enrolledAt
-		productAnalytics["first_active_day"] = firstActive
-		productAnalytics["retained_d1"] = d1
-		productAnalytics["retained_d7"] = d7
-		productAnalytics["retained_d30"] = d30
-		rows, queryErr := platform.DBPool.Query(ctx, `
-			SELECT day, sports, markets, news, fantasy, predictions, utilities
-			  FROM product_activity_daily WHERE logto_sub = $1 ORDER BY day`, userID)
-		if queryErr == nil {
-			daily := make([]map[string]any, 0)
-			for rows.Next() {
-				var day time.Time
-				var sports, markets, news, fantasy, predictions, utilities bool
-				if rows.Scan(&day, &sports, &markets, &news, &fantasy, &predictions, &utilities) == nil {
-					daily = append(daily, map[string]any{
-						"day": day.Format("2006-01-02"), "sports": sports,
-						"markets": markets, "news": news, "fantasy": fantasy,
-						"predictions": predictions, "utilities": utilities,
-					})
-				}
-			}
-			rows.Close()
-			productAnalytics["daily_activity"] = daily
-		}
-	} else if err != pgx.ErrNoRows {
-		log.Printf("[Export] product analytics: %v", err)
+	productAnalytics, err := loadProductAnalyticsExport(ctx, userID)
+	if err != nil {
+		log.Printf("[Export] product analytics for %s: %v", userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{
+			Status: "error",
+			Error:  "Failed to export product analytics",
+		})
 	}
 	archive["product_analytics"] = productAnalytics
 
@@ -123,7 +96,7 @@ func HandleExportUserData(c *fiber.Ctx) error {
 	var plan, status string
 	var currentPeriodEnd *time.Time
 	var lifetime bool
-	err := platform.DBPool.QueryRow(ctx,
+	err = platform.DBPool.QueryRow(ctx,
 		`SELECT plan, status, current_period_end, lifetime
 		   FROM stripe_customers WHERE logto_sub = $1`,
 		userID,
@@ -176,6 +149,54 @@ func HandleExportUserData(c *fiber.Ctx) error {
 	c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 
 	return c.JSON(archive)
+}
+
+func loadProductAnalyticsExport(ctx context.Context, userID string) (map[string]any, error) {
+	productAnalytics := map[string]any{"enabled": false, "daily_activity": []any{}}
+	var enrolledAt time.Time
+	var firstActive *time.Time
+	var d1, d7, d30 *bool
+	err := platform.DBPool.QueryRow(ctx, `
+		SELECT enrolled_at, first_active_day, retained_d1, retained_d7, retained_d30
+		  FROM product_analytics_enrollments WHERE logto_sub = $1`, userID).
+		Scan(&enrolledAt, &firstActive, &d1, &d7, &d30)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return productAnalytics, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read enrollment: %w", err)
+	}
+	productAnalytics["enabled"] = true
+	productAnalytics["enrolled_at"] = enrolledAt
+	productAnalytics["first_active_day"] = firstActive
+	productAnalytics["retained_d1"] = d1
+	productAnalytics["retained_d7"] = d7
+	productAnalytics["retained_d30"] = d30
+	rows, err := platform.DBPool.Query(ctx, `
+		SELECT day, sports, markets, news, fantasy, predictions, utilities
+		  FROM product_activity_daily WHERE logto_sub = $1 ORDER BY day`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("read daily activity: %w", err)
+	}
+	defer rows.Close()
+	daily := make([]map[string]any, 0)
+	for rows.Next() {
+		var day time.Time
+		var sports, markets, news, fantasy, predictions, utilities bool
+		if err := rows.Scan(&day, &sports, &markets, &news, &fantasy, &predictions, &utilities); err != nil {
+			return nil, fmt.Errorf("scan daily activity: %w", err)
+		}
+		daily = append(daily, map[string]any{
+			"day": day.Format("2006-01-02"), "sports": sports,
+			"markets": markets, "news": news, "fantasy": fantasy,
+			"predictions": predictions, "utilities": utilities,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate daily activity: %w", err)
+	}
+	productAnalytics["daily_activity"] = daily
+	return productAnalytics, nil
 }
 
 // ─── Soft-delete request lifecycle ──────────────────────────────────
@@ -459,6 +480,9 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 		return fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback(ctx)
+	if err := lockAccountMutation(ctx, tx, logtoSub); err != nil {
+		return fmt.Errorf("lock account mutation: %w", err)
+	}
 
 	// Widget configs (user_widgets rows)
 	if _, err := tx.Exec(ctx,

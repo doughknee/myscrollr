@@ -3,6 +3,7 @@ package accounts
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
+	"github.com/brandon-relentnet/myscrollr/api/internal/testsupport"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -84,6 +86,74 @@ func TestProductAnalyticsConsentDefaultsOffAndIsIdempotent(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("enrollment rows = %d, want 1", count)
+	}
+}
+
+func TestProductAnalyticsConsentCannotReenablePendingOrPurgedAccount(t *testing.T) {
+	resetProductAnalytics(t)
+	const sub = "deleting-consent-user"
+	for _, status := range []string{"pending", "purged"} {
+		t.Run(status, func(t *testing.T) {
+			testsupport.MustExec(t, `
+				INSERT INTO user_deletion_requests (logto_sub, requested_at, purge_at, status)
+				VALUES ($1, now() - interval '31 days', now() - interval '1 day', $2)
+				ON CONFLICT (logto_sub) DO UPDATE SET status = EXCLUDED.status`, sub, status)
+
+			if err := setProductAnalyticsConsent(context.Background(), sub, true); !errors.Is(err, errAccountDeleting) {
+				t.Fatalf("enable with %s deletion status error = %v, want errAccountDeleting", status, err)
+			}
+			var count int
+			if err := platform.DBPool.QueryRow(context.Background(),
+				`SELECT count(*) FROM product_analytics_enrollments WHERE logto_sub = $1`, sub).Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+			if count != 0 {
+				t.Fatalf("enrollment rows with %s deletion status = %d, want 0", status, count)
+			}
+		})
+	}
+}
+
+func TestProductAnalyticsEnableSerializesWithAccountPurge(t *testing.T) {
+	resetProductAnalytics(t)
+	const sub = "purge-race-consent-user"
+	testsupport.MustExec(t, `
+		INSERT INTO user_deletion_requests (logto_sub, requested_at, purge_at, status)
+		VALUES ($1, now() - interval '31 days', now() - interval '1 day', 'pending')
+		ON CONFLICT (logto_sub) DO UPDATE SET status = 'pending'`, sub)
+
+	tx, err := platform.DBPool.Begin(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(context.Background())
+	if err := lockAccountMutation(context.Background(), tx, sub); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- setProductAnalyticsConsent(context.Background(), sub, true) }()
+	select {
+	case err := <-done:
+		t.Fatalf("consent update escaped purge lock: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	if _, err := tx.Exec(context.Background(),
+		`UPDATE user_deletion_requests SET status = 'purged', purged_at = now() WHERE logto_sub = $1`, sub); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; !errors.Is(err, errAccountDeleting) {
+		t.Fatalf("enable after purge error = %v, want errAccountDeleting", err)
+	}
+	var count int
+	if err := platform.DBPool.QueryRow(context.Background(),
+		`SELECT count(*) FROM product_analytics_enrollments WHERE logto_sub = $1`, sub).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("enrollment rows after purge race = %d, want 0", count)
 	}
 }
 
@@ -202,5 +272,14 @@ func TestProductActivityRecordsOnlyExactRetentionDays(t *testing.T) {
 	}
 	if d1 != nil || d7 == nil || !*d7 || d30 == nil || !*d30 {
 		t.Fatalf("retention flags d1=%v d7=%v d30=%v", d1, d7, d30)
+	}
+}
+
+func TestProductAnalyticsExportFailsInsteadOfClaimingDisabledOnReadError(t *testing.T) {
+	resetProductAnalytics(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := loadProductAnalyticsExport(ctx, "export-user"); err == nil {
+		t.Fatal("canceled analytics export read returned no error")
 	}
 }

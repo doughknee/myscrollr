@@ -9,6 +9,7 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { exportUserData, setProductAnalyticsConsent } from "../../../api/client";
+import { signalProductAnalyticsConsentMutation } from "../../../lib/productAnalyticsConsent";
 import { ActionRow, RowList, SettingsGroup, ToggleRow } from "../SettingsControls";
 import ConfirmDialog from "../../ConfirmDialog";
 import { Row } from "./Row";
@@ -87,6 +88,7 @@ export default function DataPrivacyPage({
                 onChange={async (enabled) => {
                   if (savingAnalytics) return;
                   setSavingAnalytics(true);
+                  signalProductAnalyticsConsentMutation();
                   try {
                     const saved = await setProductAnalyticsConsent(enabled);
                     onPrivacyChange({ ...privacy, shareProductAnalytics: saved.enabled });

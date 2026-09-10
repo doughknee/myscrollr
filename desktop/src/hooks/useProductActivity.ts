@@ -29,7 +29,7 @@ export function advanceQualification(
   if (tick.utcDay !== state.day) return initialQualification(tick.utcDay, tick.nowMs);
   const gap = tick.nowMs - state.lastMs;
   if (!tick.eligible || gap <= 0 || gap > MAX_CONTINUOUS_GAP_MS) {
-    return initialQualification(state.day, tick.nowMs);
+    return { ...state, lastMs: tick.nowMs, elapsedMs: 0, ready: false };
   }
   if (state.sent || state.attempts >= 2) return { ...state, lastMs: tick.nowMs };
   const elapsedMs = state.elapsedMs + gap;
@@ -76,40 +76,46 @@ export function useProductActivity({
   useEffect(() => {
     if (!production || !isPrimaryTicker()) return;
     let state = initialQualification(new Date().toISOString().slice(0, 10), performance.now());
-    let busy = false;
+    let checkingVisibility = false;
     let stopped = false;
     let request: AbortController | null = null;
     const tickerWindow = getCurrentWindow();
 
     const tick = async () => {
-      if (busy || stopped) return;
-      busy = true;
-      const categories = categoriesForTicker(widgetIds, resolveCategory);
-      const visible = await tickerWindow.isVisible().catch(() => false);
-      const eligible =
-        authenticated && optedIn && visible && document.visibilityState === "visible" && categories.length > 0;
-      state = advanceQualification(state, {
-        nowMs: performance.now(),
-        utcDay: new Date().toISOString().slice(0, 10),
-        eligible,
-      });
-      if (!eligible && request) {
-        request.abort();
-        request = null;
-      }
-      if (state.ready) {
-        state = { ...state, ready: false, attempts: state.attempts + 1 };
-        request = new AbortController();
-        try {
-          await recordProductActivity(categories, request.signal);
-          state = { ...state, sent: true };
-        } catch {
-          // One retry is allowed by attempts < 2. Measurement never reaches UI.
-        } finally {
-          request = null;
+      if (checkingVisibility || stopped) return;
+      checkingVisibility = true;
+      try {
+        const categories = categoriesForTicker(widgetIds, resolveCategory);
+        const visible = await tickerWindow.isVisible().catch(() => false);
+        if (stopped) return;
+        const eligible =
+          authenticated && optedIn && visible && document.visibilityState === "visible" && categories.length > 0;
+        state = advanceQualification(state, {
+          nowMs: performance.now(),
+          utcDay: new Date().toISOString().slice(0, 10),
+          eligible,
+        });
+        if (!eligible) request?.abort();
+        if (state.ready && !request) {
+          state = { ...state, ready: false, attempts: state.attempts + 1 };
+          const controller = new AbortController();
+          request = controller;
+          void recordProductActivity(categories, controller.signal)
+            .then(() => {
+              if (!stopped && request === controller && !controller.signal.aborted) {
+                state = { ...state, sent: true, ready: false };
+              }
+            })
+            .catch(() => {
+              // One retry is allowed by attempts < 2. Measurement never reaches UI.
+            })
+            .finally(() => {
+              if (request === controller) request = null;
+            });
         }
+      } finally {
+        checkingVisibility = false;
       }
-      busy = false;
     };
 
     const timer = globalThis.setInterval(() => void tick(), TICK_MS);

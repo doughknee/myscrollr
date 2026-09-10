@@ -165,15 +165,20 @@ func pruneUsage(ctx context.Context) {
 		return
 	}
 	cutoff := time.Now().UTC().Add(-usageRetention)
-	tag, err := DBPool.Exec(ctx, `DELETE FROM api_usage_daily WHERE day < $1`, cutoff)
+	runUsagePrunes(func() (int64, error) {
+		tag, err := DBPool.Exec(ctx, `DELETE FROM api_usage_daily WHERE day < $1`, cutoff)
+		return tag.RowsAffected(), err
+	}, func() { PruneProductActivity(ctx, time.Now()) })
+}
+
+func runUsagePrunes(pruneAPIUsage func() (int64, error), pruneProductActivity func()) {
+	n, err := pruneAPIUsage()
 	if err != nil {
 		log.Printf("[Usage] prune: %v", err)
-		return
-	}
-	if n := tag.RowsAffected(); n > 0 {
+	} else if n > 0 {
 		log.Printf("[Usage] pruned %d aggregate rows older than %d days", n, int(usageRetention.Hours()/24))
 	}
-	PruneProductActivity(ctx, time.Now())
+	pruneProductActivity()
 }
 
 // PruneProductActivity keeps the current UTC day plus the previous 89 days.

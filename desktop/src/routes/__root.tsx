@@ -68,6 +68,7 @@ import {
 } from "../preferences";
 import type { AppPreferences } from "../preferences";
 import { showTipOnce, TIP_IDS } from "../lib/tips";
+import { hydrateProductAnalyticsConsent } from "../lib/productAnalyticsConsent";
 
 // Types
 import type { DataWidgetRow, SubscriptionInfo } from "../api/client";
@@ -589,7 +590,6 @@ function RootLayout() {
   // cross-window mirror used by the ticker; never turn collection on merely
   // because an old local blob says so.
   useEffect(() => {
-    let canceled = false;
     if (!auth.authenticated) {
       if (prefsRef.current.privacy.shareProductAnalytics) {
         persistPrefs({
@@ -599,18 +599,16 @@ function RootLayout() {
       }
       return;
     }
-    getProductAnalyticsConsent()
-      .then(({ enabled }) => {
-        if (canceled || prefsRef.current.privacy.shareProductAnalytics === enabled) return;
+    return hydrateProductAnalyticsConsent(
+      () => getProductAnalyticsConsent().then(({ enabled }) => enabled),
+      (enabled) => {
+        if (prefsRef.current.privacy.shareProductAnalytics === enabled) return;
         persistPrefs({
           ...prefsRef.current,
           privacy: { ...prefsRef.current.privacy, shareProductAnalytics: enabled },
         });
-      })
-      .catch(() => {});
-    return () => {
-      canceled = true;
-    };
+      },
+    );
   }, [auth.authenticated, persistPrefs]);
   const toggleOnTicker = useToggleOnTicker({
     getPrefs: () => prefsRef.current,

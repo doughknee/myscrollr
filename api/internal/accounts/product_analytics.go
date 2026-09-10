@@ -17,6 +17,7 @@ import (
 var (
 	productAnalyticsNow = time.Now
 	errNotEnrolled      = errors.New("product analytics disabled")
+	errAccountDeleting  = errors.New("account deletion is pending or complete")
 )
 
 type ProductAnalyticsConsent struct {
@@ -73,6 +74,9 @@ func HandleSetProductAnalyticsConsent(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Status: "error", Error: "Body must contain only an enabled boolean"})
 	}
 	if err := setProductAnalyticsConsent(context.Background(), userID, *req.Enabled); err != nil {
+		if errors.Is(err, errAccountDeleting) {
+			return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{Status: "error", Error: "Product analytics cannot be enabled while account deletion is pending or complete"})
+		}
 		log.Printf("[Product Analytics] update consent: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Could not update product analytics setting"})
 	}
@@ -80,17 +84,45 @@ func HandleSetProductAnalyticsConsent(c *fiber.Ctx) error {
 }
 
 func setProductAnalyticsConsent(ctx context.Context, userID string, enabled bool) error {
-	if enabled {
-		_, err := platform.DBPool.Exec(ctx, `
-			INSERT INTO product_analytics_enrollments (logto_sub)
-			VALUES ($1) ON CONFLICT (logto_sub) DO NOTHING`, userID)
+	tx, err := platform.DBPool.Begin(ctx)
+	if err != nil {
 		return err
 	}
-	// The daily table cascades. A concurrent reporter holds a row lock on
-	// this row, so this delete either removes its committed fact or wins first
-	// and prevents the report from observing enrollment.
-	_, err := platform.DBPool.Exec(ctx,
-		`DELETE FROM product_analytics_enrollments WHERE logto_sub = $1`, userID)
+	defer tx.Rollback(ctx)
+	if err := lockAccountMutation(ctx, tx, userID); err != nil {
+		return err
+	}
+
+	if enabled {
+		var deletionStatus string
+		err := tx.QueryRow(ctx,
+			`SELECT status FROM user_deletion_requests WHERE logto_sub = $1`, userID).
+			Scan(&deletionStatus)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		if err == nil && deletionStatus != "canceled" {
+			return errAccountDeleting
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO product_analytics_enrollments (logto_sub)
+			VALUES ($1) ON CONFLICT (logto_sub) DO NOTHING`, userID); err != nil {
+			return err
+		}
+	} else {
+		// The daily table cascades. A concurrent reporter holds a row lock on
+		// this row, so this delete either removes its committed fact or wins first
+		// and prevents the report from observing enrollment.
+		if _, err := tx.Exec(ctx,
+			`DELETE FROM product_analytics_enrollments WHERE logto_sub = $1`, userID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+func lockAccountMutation(ctx context.Context, tx pgx.Tx, userID string) error {
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, userID)
 	return err
 }
 

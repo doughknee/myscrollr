@@ -22,7 +22,8 @@ afterEach(() => {
   vi.useRealTimers();
   mocks.isPrimary.mockReturnValue(true);
   mocks.isVisible.mockResolvedValue(true);
-  mocks.record.mockClear();
+  mocks.record.mockReset();
+  mocks.record.mockResolvedValue({});
 });
 
 describe("product activity qualification", () => {
@@ -47,6 +48,22 @@ describe("product activity qualification", () => {
     state = advanceQualification(state, { nowMs: 26_000, utcDay: "2026-09-11", eligible: true });
     expect(state.day).toBe("2026-09-11");
     expect(state.elapsedMs).toBe(0);
+  });
+
+  it("keeps the same-day send and retry budget across disqualification", () => {
+    const sent = { ...initialQualification("2026-09-10", 0), sent: true, attempts: 1 };
+    expect(advanceQualification(sent, { nowMs: 1_000, utcDay: "2026-09-10", eligible: false })).toMatchObject({
+      sent: true,
+      attempts: 1,
+      elapsedMs: 0,
+    });
+
+    const failed = { ...initialQualification("2026-09-10", 0), attempts: 2 };
+    expect(advanceQualification(failed, { nowMs: 1_000, utcDay: "2026-09-10", eligible: false })).toMatchObject({
+      sent: false,
+      attempts: 2,
+      elapsedMs: 0,
+    });
   });
 
   it("maps enabled ticker widgets to fixed coarse families", () => {
@@ -94,5 +111,38 @@ describe("product activity qualification", () => {
     );
     await act(async () => vi.advanceTimersByTimeAsync(31_000));
     expect(mocks.record).not.toHaveBeenCalled();
+  });
+
+  it("does not resume a pending visibility check after cleanup", async () => {
+    vi.useFakeTimers();
+    let resolveVisible!: (visible: boolean) => void;
+    mocks.isVisible.mockReturnValue(new Promise((resolve) => { resolveVisible = resolve; }));
+    const { unmount } = renderHook(() =>
+      useProductActivity({ authenticated: true, optedIn: true, widgetIds: ["sports_nfl"], resolveCategory: () => "sports", production: true }),
+    );
+
+    await act(async () => vi.advanceTimersByTimeAsync(31_000));
+    unmount();
+    await act(async () => resolveVisible(true));
+    expect(mocks.record).not.toHaveBeenCalled();
+  });
+
+  it("keeps checking eligibility and aborts a pending report", async () => {
+    vi.useFakeTimers();
+    let aborted = false;
+    mocks.record.mockImplementation((_categories, signal: AbortSignal) => new Promise((_, reject) => {
+      signal.addEventListener("abort", () => {
+        aborted = true;
+        reject(new DOMException("Aborted", "AbortError"));
+      });
+    }));
+    renderHook(() =>
+      useProductActivity({ authenticated: true, optedIn: true, widgetIds: ["sports_nfl"], resolveCategory: () => "sports", production: true }),
+    );
+
+    await act(async () => vi.advanceTimersByTimeAsync(31_000));
+    mocks.isVisible.mockResolvedValue(false);
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+    expect(aborted).toBe(true);
   });
 });

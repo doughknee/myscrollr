@@ -33,7 +33,10 @@ describe("DataPrivacyPage product activity consent", () => {
         onResetAll={vi.fn()}
       />,
     );
+    const mutationStarted = vi.fn();
+    window.addEventListener("scrollr:product-analytics-consent-mutation", mutationStarted, { once: true });
     fireEvent.click(screen.getByRole("switch", { name: /share product activity/i }));
+    expect(mutationStarted).toHaveBeenCalledTimes(1);
     expect(setConsent).toHaveBeenCalledWith(true);
     expect(onPrivacyChange).not.toHaveBeenCalled();
     await act(async () => resolve({ enabled: true }));

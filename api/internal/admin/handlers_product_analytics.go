@@ -120,6 +120,10 @@ func loadProductAnalytics(ctx context.Context, days int, now time.Time) (Product
 		}
 		report.Activity.Curve = append(report.Activity.Curve, DailyCount{Day: day.Format("2006-01-02"), Count: count})
 	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return report, err
+	}
 	rows.Close()
 
 	if err := platform.DBPool.QueryRow(ctx, `
@@ -144,6 +148,10 @@ func loadProductAnalytics(ctx context.Context, days int, now time.Time) (Product
 			return report, err
 		}
 		report.Activation.Curve = append(report.Activation.Curve, DailyCount{Day: day.Format("2006-01-02"), Count: count})
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return report, err
 	}
 	rows.Close()
 
