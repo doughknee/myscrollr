@@ -16,12 +16,22 @@ The following routes are prerendered at build time and ship as static HTML with 
 - `/` (`index.html`)
 - `/channels` (`channels/index.html`)
 - `/download` (`download/index.html`)
+- `/download/mac` (`download/mac/index.html`)
+- `/download/windows` (`download/windows/index.html`)
+- `/download/linux` (`download/linux/index.html`)
+- `/widgets` (`widgets/index.html`)
+- `/fantasy` (`fantasy/index.html`)
+- `/sports` (`sports/index.html`)
+- `/markets` (`markets/index.html`)
+- `/news` (`news/index.html`)
+- `/releases` (`releases/index.html`)
 - `/business` (`business/index.html`)
 - `/architecture` (`architecture/index.html`)
 - `/support` (`support/index.html`)
 - `/legal` (`legal/index.html`)
 - `/uplink` (`uplink/index.html`)
 - `/uplink/lifetime` (`uplink/lifetime/index.html`)
+- `/status` (`status/index.html`; live values populate after hydration)
 
 ## Dynamic / auth routes (SPA fallback)
 
@@ -30,18 +40,27 @@ These routes are NOT prerendered. They require nginx's SPA fallback to serve `in
 - `/account` — Logto-gated user account page
 - `/callback` — Logto OAuth callback
 - `/invite` — invite-code redemption flow
-- `/status` — live system status
 - `/u/<username>` — public profile pages (dynamic param)
 
-The nginx config in `Dockerfile` uses `try_files $uri $uri/ /index.html;` to handle this. Any path that doesn't match a prerendered file or directory falls back to `index.html`, which boots the SPA and lets the router resolve the actual route from `window.location`.
+The nginx config in `Dockerfile` uses `try_files $uri $uri/index.html /_shell.html;` to handle this. Any path that doesn't match a prerendered file or route falls back to `_shell.html`, which boots the SPA and lets the router resolve the actual route from `window.location`.
 
 ### About `_shell.html`
 
-TanStack Start emits `dist/client/_shell.html` as the SPA shell — it's the HTML rendered by fetching `/` during prerender, so it contains the home route's `head()` output. A small `copyShellToIndex()` Vite plugin (in `vite.config.ts`) copies `_shell.html` to `index.html` after Start's post-build step, because Start's internal post-build always claims `index.html` for itself and would otherwise overwrite our home prerender.
+TanStack Start emits `dist/client/_shell.html` from the synthetic `/tss-spa-shell` mask path. It contains the shared application chrome but cannot collide with the separately prerendered homepage at `dist/client/index.html`. nginx uses `_shell.html` only as the fallback for dynamic routes.
 
-Both files exist in `dist/client/`; they are currently byte-identical. The SPA fallback target is `index.html` — equivalent to `_shell.html` for now.
+Dynamic routes briefly carry the shell metadata until the client router updates the document after hydration. The current dynamic routes are blocked in `public/robots.txt`, so crawlers are directed to the substantive prerendered pages instead.
 
-**Known limitation:** because `_shell.html` is rendered from `/`, dynamic routes that fall back to `index.html` briefly carry the home page's `<title>`, canonical, and JSON-LD until the client router updates document metadata after hydration. This affects crawlers that don't execute JS and the very first moments of the browser tab title. Most dynamic routes (`/account`, `/invite`, `/callback`, `/u/*`) are already blocked in `public/robots.txt`, so the impact is mainly on `/status` and any future non-disallowed dynamic routes. This is a known artifact of Start's current shell behavior and is acceptable for the current set of dynamic routes.
+## IndexNow activation (not enabled)
+
+IndexNow is intentionally not wired yet: this repository has no owner-approved key, and deployment must not make external search submissions implicitly. To activate it later:
+
+1. Generate an IndexNow key with 8–128 supported characters and store it as the GitHub Actions secret `INDEXNOW_KEY`; do not commit the key.
+2. In the website build job, write the secret value to `myscrollr.com/public/<key>.txt` immediately before `docker build`. The file name and its UTF-8 contents must both be the key.
+3. Deploy the website and verify `https://myscrollr.com/<key>.txt` returns only that key before submitting anything.
+4. After the production smoke test succeeds, POST only the canonical URLs changed by that deployment to `https://api.indexnow.org/indexnow` with `host`, `key`, `keyLocation`, and `urlList`. Keep the current sitemap as the full crawl inventory; IndexNow is only a change notification.
+5. Treat HTTP 200 or 202 as receipt, not proof of crawling or indexing. Failures should warn, not roll back an otherwise healthy website deployment.
+
+The official protocol documentation defines the key-file ownership check, request payload, and response meanings. Do not add the submission step until the owner authorizes the key and outbound notification.
 
 ## nginx fallback (alternative web servers)
 
@@ -49,7 +68,7 @@ Other static hosts use equivalent SPA fallback config. The config baked into the
 
 ```nginx
 location / {
-  try_files $uri $uri/ /index.html;
+  try_files $uri $uri/index.html /_shell.html;
 }
 ```
 
@@ -58,7 +77,7 @@ For Caddy (minimal site block):
 ```caddyfile
 myscrollr.com {
   root * /srv
-  try_files {path} {path}/index.html /index.html
+  try_files {path} {path}/index.html /_shell.html
   file_server
 }
 ```

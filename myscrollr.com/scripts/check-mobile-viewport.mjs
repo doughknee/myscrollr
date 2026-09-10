@@ -52,6 +52,9 @@ const ROUTES = [
   { path: '/markets', file: 'markets/index.html' },
   { path: '/news', file: 'news/index.html' },
   { path: '/download', file: 'download/index.html' },
+  { path: '/download/mac', file: 'download/mac/index.html' },
+  { path: '/download/windows', file: 'download/windows/index.html' },
+  { path: '/download/linux', file: 'download/linux/index.html' },
   { path: '/business', file: 'business/index.html' },
   { path: '/architecture', file: 'architecture/index.html' },
   { path: '/support', file: 'support/index.html' },
@@ -134,7 +137,7 @@ function resolveStaticFile(urlPath) {
   }
 
   // SPA fallback: anything not found returns the prerendered shell.
-  // This mirrors the nginx `try_files $uri $uri/ /index.html;` rule
+  // This mirrors the nginx `try_files $uri $uri/index.html /_shell.html;` rule
   // so the browser doesn't 404 on dynamic routes during the test
   // (not currently needed for the prerendered routes, but cheap).
   const shell = join(clientDir, '_shell.html')

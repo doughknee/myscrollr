@@ -91,19 +91,22 @@ const ROUTES = [
     path: '/download/mac',
     file: 'download/mac/index.html',
     minJsonLd: 3, // organization + softwareApp + breadcrumbs
-    expectedBody: 'Download for macOS',
+    expectedBody: 'Requires Apple Silicon and macOS 10.15 or later.',
+    expectedH1: 'Get Scrollr for macOS. Free. No sign-up.',
   },
   {
     path: '/download/windows',
     file: 'download/windows/index.html',
     minJsonLd: 3,
-    expectedBody: 'Download for Windows',
+    expectedBody: 'Built for Windows 10 or 11 on x64 hardware.',
+    expectedH1: 'Get Scrollr for Windows. Free. No sign-up.',
   },
   {
     path: '/download/linux',
     file: 'download/linux/index.html',
     minJsonLd: 3,
-    expectedBody: 'Download for Linux',
+    expectedBody: 'Choose the package that matches your x86_64 distribution.',
+    expectedH1: 'Get Scrollr for Linux. Free. No sign-up.',
   },
   {
     path: '/business',
@@ -316,6 +319,14 @@ if (!existsSync(shell)) {
   } else {
     console.log('✓ _shell.html present with Header chrome')
   }
+}
+
+const dockerfile = readFileSync(join(__dirname, '..', 'Dockerfile'), 'utf8')
+if (!dockerfile.includes('try_files $uri $uri/index.html /_shell.html;')) {
+  console.error('✗ nginx must use _shell.html for dynamic-route fallback')
+  failures += 1
+} else {
+  console.log('✓ nginx uses _shell.html for dynamic-route fallback')
 }
 
 // Guard: the client entry bundle must wrap StartClient in our auth providers.

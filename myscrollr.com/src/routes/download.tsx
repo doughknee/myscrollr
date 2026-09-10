@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { motion } from 'motion/react'
 import type { DesktopPlatform, LinuxFormat } from '@/lib/getDownloadInfo'
 import { seo } from '@/lib/seo'
@@ -84,6 +84,39 @@ const STEPS = [
   },
 ]
 
+const PLATFORM_GUIDES: Record<
+  DesktopPlatform,
+  { label: string; requirements: string; steps: ReadonlyArray<string> }
+> = {
+  macos: {
+    label: 'macOS',
+    requirements: 'Requires Apple Silicon and macOS 10.15 or later.',
+    steps: [
+      'Open the downloaded .dmg file.',
+      'Drag Scrollr into the Applications folder.',
+      'Open Scrollr from Applications. Release builds are signed and notarized in the project workflow.',
+    ],
+  },
+  windows: {
+    label: 'Windows',
+    requirements: 'Built for Windows 10 or 11 on x64 hardware.',
+    steps: [
+      'Open the downloaded setup .exe file.',
+      'Follow the installer, then launch Scrollr from the Start menu.',
+      'Use Settings inside Scrollr to choose the monitor and pin the ticker to the top or bottom edge.',
+    ],
+  },
+  linux: {
+    label: 'Linux',
+    requirements: 'Choose the package that matches your x86_64 distribution.',
+    steps: [
+      'Use .deb for Debian or Ubuntu, .rpm for Fedora, RHEL, or openSUSE, or AppImage for a portable build.',
+      'For AppImage, mark the file executable before opening it.',
+      'Launch Scrollr, then choose your ticker position and widgets in Settings.',
+    ],
+  },
+}
+
 const CTA_BUTTON_CLASS =
   'inline-flex cursor-pointer items-center gap-3 rounded-[4px] bg-primary px-[34px] py-[17px] text-[17px] font-bold text-[#101018] shadow-[0_0_60px_color-mix(in_srgb,var(--color-primary)_18%,transparent)] transition-colors hover:bg-[#6ee7b7]'
 
@@ -117,13 +150,18 @@ export function DownloadPage({
 }: { forcedPlatform?: DesktopPlatform } = {}) {
   const detected = useDetectedPlatform(forcedPlatform)
   const version = LATEST_DESKTOP_VERSION
+  const platformGuide = forcedPlatform ? PLATFORM_GUIDES[forcedPlatform] : null
 
   return (
     <div>
       <PageHeader
         eyebrowLeft={`DOWNLOAD ／ DESKTOP V${version}`}
         eyebrowRight="SERVED FROM GITHUB RELEASES · BUILT FROM PUBLIC SOURCE"
-        line1="Get Scrollr."
+        line1={
+          platformGuide
+            ? `Get Scrollr for ${platformGuide.label}.`
+            : 'Get Scrollr.'
+        }
         line2="Free. No sign-up."
         sub="One small native app. Three widgets free forever, no account between you and a running bar."
         actions={
@@ -257,6 +295,62 @@ export function DownloadPage({
           </div>
         </TerminalContainer>
       </section>
+
+      {platformGuide && (
+        <section className="border-b border-hairline">
+          <TerminalContainer>
+            <SectionRow tag={`PLATFORM GUIDE ／ ${platformGuide.label}`} />
+            <div className="grid gap-10 py-12 lg:grid-cols-[0.75fr_1.25fr]">
+              <div>
+                <h2 className="type-display text-[clamp(32px,4vw,52px)]">
+                  Install Scrollr
+                  <br />
+                  <span className="text-primary">
+                    on {platformGuide.label}.
+                  </span>
+                </h2>
+                <p className="mt-5 leading-relaxed text-base-content/60">
+                  {platformGuide.requirements}
+                </p>
+              </div>
+              <div>
+                <ol className="m-0 space-y-5 p-0">
+                  {platformGuide.steps.map((step, index) => (
+                    <li
+                      key={step}
+                      className="flex gap-4 border-b border-hairline-minor pb-5"
+                    >
+                      <span className="font-mono text-xs text-primary">
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                      <span className="leading-relaxed text-base-content/70">
+                        {step}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                <nav
+                  aria-label="Explore Scrollr use cases"
+                  className="mt-8 flex flex-wrap gap-x-5 gap-y-3 font-mono text-xs"
+                >
+                  <Link to="/sports" className="text-primary">
+                    SPORTS →
+                  </Link>
+                  <Link to="/markets" className="text-primary">
+                    MARKETS →
+                  </Link>
+                  <Link to="/news" className="text-primary">
+                    NEWS & RSS →
+                  </Link>
+                  <Link to="/fantasy" className="text-primary">
+                    YAHOO FANTASY →
+                  </Link>
+                </nav>
+              </div>
+            </div>
+          </TerminalContainer>
+        </section>
+      )}
 
       {/* ── SEC 02 ／ YOUR FIRST SIXTY SECONDS ───────────────── */}
       <section className="border-b border-hairline">
