@@ -4,7 +4,13 @@ Operational guide for AI coding agents working in this repository.
 
 ## Linear coordination
 
-Canonical project: **Scrollr** (`4b180bbc-2dae-4d02-8e73-3548abe725f1`), team **Scrollr** (`8741ef7f-7860-4467-9ab9-ef3079240865`, SCROLLR), in the **doughknee** workspace (URL slug remains `relentnet`). The completed `myscrollr — moved to Scrollr` project is a redirect; do not create another project for this repo. Historical REL issue links still resolve after the team migration; use current issue identifiers for new work and preserve existing PR branches.
+Canonical team: **Scrollr** (`8741ef7f-7860-4467-9ab9-ef3079240865`, SCROLLR), in the **doughknee** workspace (URL slug remains `relentnet`). One home coordinates this repository across outcome-focused projects:
+
+- **Support operations** (`401d3117-0fe5-4074-a01c-03fc94395fed`): support queue, trustworthy identities, legacy handling and support integration decisions.
+- **Signup analytics** (`b2eb4570-8817-470c-900c-09f7e5f05861`): admin signup events and failures, through verified deployment.
+- **Product usage discovery** (`0f3f71ab-7429-40c8-877b-ca4c9d800d2f`): activation, retention and usage questions; planning before new collection.
+
+Standalone bugs and ideas belong to the Scrollr team without a project until they support a defined outcome. Do not create a catch-all project named after the repo. `Scrollr — historical work` (`4b180bbc-2dae-4d02-8e73-3548abe725f1`) retains completed/canceled history; `myscrollr — moved to Scrollr` is an older redirect. Neither receives new work. Historical REL issue links still resolve; use current issue identifiers for new work and preserve existing PR branches.
 
 - Read the [Project playbook](https://linear.app/relentnet/document/project-playbook-90f99def87d1) for intake, readiness, status and completion rules.
 - Read the [Home register](https://linear.app/relentnet/document/home-register-a42dac9d04bf) before taking ownership or sharing dev resources. Home maintains the register; workers maintain their issues.
