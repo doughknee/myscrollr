@@ -61,8 +61,9 @@ ports).
 - Changes to billing, Stripe webhook handling, or invite tokens
   without a clear threat-model review — these are load-bearing for
   revenue and account security.
-- Analytics, tracking pixels, or telemetry of any kind — "zero
-  telemetry" is a public product promise (see the Privacy Policy).
+- Tracking pixels or third-party analytics of any kind — "no ads, no
+  tracking pixels, no third-party analytics" is a public product
+  promise (see the Privacy Policy).
 - Dependencies under licenses incompatible with AGPL-3.0-or-later.
 
 When in doubt, **open an issue first** and check with a maintainer

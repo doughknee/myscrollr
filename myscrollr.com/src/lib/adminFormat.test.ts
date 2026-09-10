@@ -22,7 +22,7 @@ describe('measuredValue', () => {
     const tile = measuredValue({
       value: 0,
       available: false,
-      note: 'Not measurable. Scrollr ships no telemetry.',
+      note: 'Not measurable. Scrollr ships no third-party analytics.',
     })
     expect(tile.display).toBeNull()
     expect(tile.note).toContain('Not measurable')

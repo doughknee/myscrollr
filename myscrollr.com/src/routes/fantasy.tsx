@@ -29,8 +29,8 @@ import { EASE } from '@/lib/animations'
 //   2. Give us an audience-level read on traffic from ingress logs
 //      alone. The distinct URL IS the instrument: hits on /fantasy vs
 //      /, and the Referer on /download/$os telling us which page
-//      sourced an install. No client telemetry, so this costs nothing
-//      against the zero-telemetry promise.
+//      sourced an install. No client analytics, so this costs
+//      nothing against the privacy promise.
 //
 // Section order is a narrative, not a copy of the homepage's:
 //   01 what you see  ->  02 proof it does FANTASY  ->  03 the ritual
@@ -116,7 +116,7 @@ const FANTASY_FAQ_ITEMS: ReadonlyArray<{ question: string; answer: string }> = [
   {
     question: 'What do you collect about me?',
     answer:
-      'Nothing. Scrollr ships zero telemetry: no analytics, no tracking pixels, no anonymous usage data. Tests block any deploy that breaks that promise, and the whole codebase is public under AGPL-3.0 if you would rather check than trust.',
+      'No ads, no tracking pixels, no third-party analytics. Your widget setup syncs to your account so it follows you between machines. We count app versions and error rates to find bugs, and crash reports are stripped of personal data before they are sent, which tests enforce on every deploy.',
   },
 ]
 

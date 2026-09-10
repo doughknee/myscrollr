@@ -180,7 +180,7 @@ export const HOMEPAGE_FAQ_ITEMS: ReadonlyArray<{
   {
     question: 'What does Scrollr collect about me?',
     answer:
-      'Nothing. Zero telemetry is a shipped promise, enforced by tests that block deploys, and the source is public.',
+      'No ads, no tracking pixels, no third-party analytics. Your widget setup syncs to your account so it follows you between machines. We count app versions and error rates to find bugs, and crash reports are stripped of personal data before they are sent, which tests enforce on every deploy.',
   },
   {
     question: 'Which platforms?',
