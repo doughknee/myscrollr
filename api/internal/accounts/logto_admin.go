@@ -600,33 +600,3 @@ func ListLogtoUsers(page, pageSize int, search string) ([]LogtoUser, int, error)
 	}
 	return users, total, nil
 }
-
-// logtoScanCap bounds ListAllLogtoUsers so a runaway or a much larger tenant
-// cannot turn one dashboard load into hundreds of upstream requests.
-//
-// ponytail: a full scan is fine at ~200 accounts. If this cap ever bites, the
-// fix is a cached nightly aggregate of signup dates, not a bigger cap.
-const logtoScanCap = 5000
-
-// ListAllLogtoUsers walks every page and returns every account.
-//
-// Only the Overview's signup series needs this: the per-account createdAt is
-// what makes "new this week" a fact about signups rather than about when a
-// local column was added. Anything that only needs the count should call
-// ListLogtoUsers(1, 1, "") and read the total.
-//
-// Returns the scanned users and the upstream total. When the cap truncates the
-// scan the total still reflects reality, so a caller can tell.
-func ListAllLogtoUsers() ([]LogtoUser, int, error) {
-	var all []LogtoUser
-	for page := 1; ; page++ {
-		batch, total, err := ListLogtoUsers(page, logtoMaxPageSize, "")
-		if err != nil {
-			return nil, 0, err
-		}
-		all = append(all, batch...)
-		if len(batch) < logtoMaxPageSize || len(all) >= total || len(all) >= logtoScanCap {
-			return all, total, nil
-		}
-	}
-}

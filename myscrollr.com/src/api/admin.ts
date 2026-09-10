@@ -70,6 +70,19 @@ export interface DailyCount {
 }
 
 /**
+ * A figure with Logto's own change against the previous comparable period.
+ * `available: false` means Logto could not be reached — neither number may be
+ * rendered then, the same promise `Measured` makes. A delta of 0 is as much a
+ * claim as a count of 0 (REL-269).
+ */
+export interface Trend {
+  value: number
+  delta: number
+  available: boolean
+  note?: string
+}
+
+/**
  * Two counts, because they answer two questions. `total` is accounts, read
  * from Logto. `set_up` is how many of them ever saved a preference locally.
  * The gap between them is 83 people who signed up and never set the app up —
@@ -83,9 +96,24 @@ export interface AccountsTile {
   set_up: number
   source: 'logto' | 'local'
   note?: string
-  new_7d: Measured
-  new_30d: Measured
-  daily: Array<DailyCount> | null
+  new_today: Trend
+  new_7d: Trend
+}
+
+/**
+ * Who actually used Scrollr, which is a different question from how many
+ * accounts exist — and the only one of the two that can go down.
+ *
+ * `curve` is Logto's daily-active series, about a month deep, computed by
+ * Logto rather than stored here. With Logto unreachable it is empty and `note`
+ * says so; it is never reconstructed from something that only resembles it.
+ */
+export interface ActiveTile {
+  dau: Trend
+  wau: Trend
+  mau: Trend
+  curve: Array<DailyCount> | null
+  note?: string
 }
 
 export interface PlanRow {
@@ -152,6 +180,7 @@ export interface IngestRow {
 export interface AdminOverview {
   generated_at: string
   accounts: AccountsTile
+  active: ActiveTile
   plans: PlansTile
   downloads: DownloadsTile
   installs: Measured
