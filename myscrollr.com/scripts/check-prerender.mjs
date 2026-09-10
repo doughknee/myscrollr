@@ -193,7 +193,7 @@ for (const route of ROUTES) {
     }
   }
 
-  if (route.expectedBody) {
+  {
     const bodyOnly = html.replace(/<head[\s\S]*?<\/head>/i, '')
     const h1Matches = [...bodyOnly.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)]
     if (h1Matches.length !== 1) {
