@@ -14,6 +14,7 @@ declare const __APP_VERSION__: string
 export const organization = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
+  '@id': `${BASE_URL}/#organization`,
   name: 'Scrollr',
   url: BASE_URL,
   logo: `${BASE_URL}/icon-128.png`,
@@ -28,8 +29,10 @@ export const organization = {
 export const website = {
   '@context': 'https://schema.org',
   '@type': 'WebSite',
+  '@id': `${BASE_URL}/#website`,
   name: 'Scrollr',
   url: BASE_URL,
+  publisher: { '@id': `${BASE_URL}/#organization` },
 }
 
 // SoftwareApplication: describes the Scrollr desktop app for rich-result
@@ -41,6 +44,7 @@ export const website = {
 export const softwareApplication = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
+  '@id': `${BASE_URL}/#desktop-app`,
   name: 'Scrollr',
   operatingSystem: ['macOS', 'Windows', 'Linux'],
   applicationCategory: 'DesktopApplication',
@@ -49,8 +53,8 @@ export const softwareApplication = {
   url: BASE_URL,
   downloadUrl: `${BASE_URL}/download`,
   softwareVersion: __APP_VERSION__,
-  publisher: { '@type': 'Organization', name: 'Scrollr', url: BASE_URL },
-  author: { '@type': 'Organization', name: 'Scrollr', url: BASE_URL },
+  publisher: { '@id': `${BASE_URL}/#organization` },
+  author: { '@id': `${BASE_URL}/#organization` },
   screenshot: [
     `${BASE_URL}/screenshots/channels/finance-dark@2x.webp`,
     `${BASE_URL}/screenshots/channels/sports-dark@2x.webp`,

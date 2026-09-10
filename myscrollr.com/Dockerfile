@@ -82,6 +82,12 @@ COPY --from=builder /app/myscrollr.com/dist/client /usr/share/nginx/html
 # Includes security headers, gzip compression, and proper caching
 RUN printf 'server {\n\
     listen 3000;\n\
+    server_name www.myscrollr.com;\n\
+    return 301 https://myscrollr.com$request_uri;\n\
+}\n\
+\n\
+server {\n\
+    listen 3000;\n\
     server_name _;\n\
     root /usr/share/nginx/html;\n\
     index index.html;\n\
@@ -146,6 +152,13 @@ RUN printf 'server {\n\
     #                          /uplink, not /uplink/).\n\
     #   3. /index.html       — SPA fallback for dynamic routes\n\
     #                          (/account, /callback, /u/$username, etc.)\n\
+    # Canonical marketing pages are slashless. Keep this list narrow so\n\
+    # assets, auth callbacks, API paths, and the SPA fallback are untouched.\n\
+    location ~ ^/(download(?:/(?:mac|windows|linux))?|uplink(?:/lifetime)?|widgets|fantasy|releases|architecture|business|support|legal|status)/$ {\n\
+        include /etc/nginx/security-headers.conf;\n\
+        return 301 /$1$is_args$args;\n\
+    }\n\
+\n\
     location / {\n\
         include /etc/nginx/security-headers.conf;\n\
         add_header Cache-Control "no-cache";\n\

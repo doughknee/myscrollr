@@ -130,6 +130,51 @@ const STATIC_FAQ = [
   },
 ]
 
+function UplinkPrerender() {
+  return (
+    <div>
+      <PageHeader
+        eyebrowLeft="UPLINK ／ PRICING"
+        eyebrowRight="LIVE UPDATES INCLUDED ON EVERY PLAN"
+        line1="Plans for more"
+        line2="widgets at once"
+        sub="Plans for more widgets at once, plus priority support and early access. The free app keeps three widgets running; paid plans raise that limit without changing update speed."
+        actions={
+          <Link
+            to="/download"
+            className="inline-flex rounded-[4px] bg-primary px-7 py-4 font-bold text-[#101018]"
+          >
+            Download Scrollr →
+          </Link>
+        }
+      />
+      <section className="border-b border-hairline">
+        <TerminalContainer className="py-12">
+          <h2 className="type-display mb-8 text-3xl">Monthly or annual</h2>
+          <div className="grid gap-px bg-hairline md:grid-cols-3">
+            {STATIC_TIERS.map((tier) => (
+              <article key={tier.name} className="bg-base-75 p-6">
+                <h3 className="font-display text-2xl font-bold">{tier.name}</h3>
+                <p className="mt-3 text-base-content/60">{tier.description}</p>
+                <p className="mt-6 font-mono text-sm text-primary">
+                  ${tier.priceMonthly.toFixed(2)}/month · $
+                  {tier.priceAnnual.toFixed(2)}/year
+                </p>
+              </article>
+            ))}
+          </div>
+          <p className="mt-8 text-sm text-base-content/55">
+            Want permanent Ultimate access?{' '}
+            <Link to="/uplink/lifetime" className="text-primary underline">
+              See the founding-member lifetime option.
+            </Link>
+          </p>
+        </TerminalContainer>
+      </section>
+    </div>
+  )
+}
+
 export const Route = createFileRoute('/uplink')({
   validateSearch: () => ({}),
   head: () =>
@@ -150,13 +195,8 @@ export const Route = createFileRoute('/uplink')({
         ]),
       ],
     }),
-  // Uplink is auth/subscription-aware throughout — wrap the entire page
-  // in ClientOnly so the route still prerenders correct <head> meta and
-  // JSON-LD, while the dynamic auth-conditional body hydrates on the
-  // client. The other landing pages prerender real body content; this
-  // one is interactive-only by design.
   component: () => (
-    <ClientOnly>
+    <ClientOnly fallback={<UplinkPrerender />}>
       <UplinkPage />
     </ClientOnly>
   ),

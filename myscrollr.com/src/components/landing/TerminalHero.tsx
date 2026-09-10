@@ -19,10 +19,10 @@ export function TerminalHero() {
       size="lg"
       eyebrowLeft="／／ LIVE DESKTOP TICKER"
       eyebrowRight="FREE · OPEN SOURCE · MACOS / WINDOWS / LINUX"
-      line1="The moment it happens,"
-      line2="you already know."
+      line1="Your live desktop ticker"
+      line2="for everything you follow"
       sub={
-        "The go-ahead run, the market swing, the breaking story, your fantasy comeback. It all lives in a quiet bar above whatever you're working on. No checking, no feeds, no finding out late."
+        "The moment it happens, you already know. Live sports scores, markets, crypto, news, RSS, fantasy updates, weather, and more stay visible in a quiet bar above whatever you're working on."
       }
       actions={<HeroActions />}
     />

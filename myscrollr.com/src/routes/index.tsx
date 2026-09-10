@@ -82,9 +82,9 @@ export const Route = createFileRoute('/')({
   component: HomePage,
   head: () =>
     seo({
-      title: 'Scrollr: Live Data Ticker for Desktop',
+      title: 'Scrollr — Live Desktop Ticker for Sports, Stocks & News',
       description:
-        'A quiet desktop ticker for live sports, markets, news, and fantasy data. Free and open source. macOS, Windows, Linux.',
+        'Keep live sports scores, stocks, crypto, news, RSS feeds, fantasy updates, weather, and more visible in a customizable desktop ticker for macOS, Windows, and Linux.',
       path: '/',
       image: 'https://myscrollr.com/og/home.png',
       imageAlt: 'Scrollr desktop ticker showing live market and sports data.',

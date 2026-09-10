@@ -10,8 +10,40 @@ import { EASE, riseIn } from '@/lib/animations'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { useGetToken } from '@/hooks/useGetToken'
 import { billingApi } from '@/api/client'
+import { PageHeader, TerminalContainer } from '@/components/terminal'
 
 const CheckoutModal = lazy(() => import('@/components/billing/CheckoutModal'))
+
+function LifetimePrerender() {
+  return (
+    <div>
+      <PageHeader
+        eyebrowLeft="UPLINK ／ LIFETIME"
+        eyebrowRight="128 FOUNDING MEMBER SLOTS · ONE PAYMENT"
+        line1="Ultimate."
+        line2="One payment."
+        sub="One payment. Permanent access. Lifetime members get Uplink Ultimate with unlimited widgets at once, priority support, and early access for $999."
+        actions={
+          <Link
+            to="/uplink"
+            className="inline-flex rounded-[4px] border border-primary px-7 py-4 font-bold text-primary"
+          >
+            Compare all plans →
+          </Link>
+        }
+      />
+      <section className="border-b border-hairline">
+        <TerminalContainer className="py-12">
+          <h2 className="type-display text-3xl">What lifetime includes</h2>
+          <p className="mt-4 max-w-2xl text-base-content/60">
+            One purchase replaces recurring Uplink Ultimate billing. Sign in
+            after the page loads to check eligibility and complete checkout.
+          </p>
+        </TerminalContainer>
+      </section>
+    </div>
+  )
+}
 
 export const Route = createFileRoute('/uplink_/lifetime')({
   validateSearch: () => ({}),
@@ -32,11 +64,8 @@ export const Route = createFileRoute('/uplink_/lifetime')({
         ]),
       ],
     }),
-  // Lifetime is auth/subscription-aware throughout — wrap in ClientOnly
-  // so the route still prerenders correct <head> meta and JSON-LD,
-  // while the dynamic auth-conditional body hydrates on the client.
   component: () => (
-    <ClientOnly>
+    <ClientOnly fallback={<LifetimePrerender />}>
       <LifetimePage />
     </ClientOnly>
   ),
