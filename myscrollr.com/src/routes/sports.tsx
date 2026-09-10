@@ -22,7 +22,7 @@ const SPORTS_FAQ = [
   {
     question: 'Which sports can I follow?',
     answer:
-      'The current catalog includes NFL, NBA, NHL, MLB, Formula 1, FIFA World Cup, NCAA football and basketball, Premier League, La Liga, MLS, Champions League, UFC, and AFL widgets.',
+      'Featured widgets include NFL, NBA, NHL, MLB, Formula 1, FIFA World Cup, NCAA football and basketball, Premier League, La Liga, MLS, Champions League, UFC, and AFL. Browse the in-app catalog for the current full list.',
   },
   {
     question: 'Can I focus on one team?',
@@ -127,7 +127,7 @@ function SportsPage() {
 
       <section className="border-b border-hairline">
         <TerminalContainer>
-          <SectionRow tag="SEC 02 ／ CURRENT SPORTS CATALOG" />
+          <SectionRow tag="SEC 02 ／ FEATURED SPORTS" />
           <div className="pb-12">
             {LEAGUE_GROUPS.map((group) => (
               <DeparturesRow
