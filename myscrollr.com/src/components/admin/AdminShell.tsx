@@ -2,6 +2,7 @@ import { Link, Outlet, useLocation } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import {
   BarChart3,
+  Layers,
   LifeBuoy,
   Loader2,
   Lock,
@@ -24,6 +25,7 @@ import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 const SECTIONS = [
   { to: '/admin', label: 'Overview', Icon: BarChart3, exact: true },
   { to: '/admin/support', label: 'Support', Icon: LifeBuoy },
+  { to: '/admin/versions', label: 'Versions', Icon: Layers },
   { to: '/admin/users', label: 'Users', Icon: Users },
   { to: '/admin/admins', label: 'Admins', Icon: ShieldCheck },
 ] as const

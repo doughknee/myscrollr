@@ -541,6 +541,51 @@ export interface AdminRow {
   self: boolean
 }
 
+// ── Versions (REL-271) ─────────────────────────────────────
+
+/**
+ * One build's slice of desktop API traffic, and how much of it failed.
+ *
+ * `share` is a share of REQUESTS, not of installs. Nothing per-user is stored
+ * — that is the point of the counters — so an install count is not available
+ * here and must never be implied by a label. Every install polls on the same
+ * timer, so traffic share tracks adoption closely; it is still a proxy and the
+ * page says so.
+ */
+export interface VersionRow {
+  version: string
+  requests: number
+  /** 0..1, over desktop traffic only. */
+  share: number
+  client_errors: number
+  server_errors: number
+  /** 0..1. The number that scopes a bug report to a build. */
+  error_rate: number
+}
+
+export interface PlatformRow {
+  platform: string
+  requests: number
+  share: number
+}
+
+export interface AdminVersions {
+  generated_at: string
+  days: number
+  /** Newest build seen calling the API in the window, not the newest tagged. */
+  current_release: string
+  current_share: number
+  versions: Array<VersionRow>
+  platforms: Array<PlatformRow>
+  desktop_total: number
+  /**
+   * Requests whose user agent was not a Scrollr build: the website, curl, k8s
+   * probes. Shown rather than hidden — if the desktop header ever stops
+   * arriving, this is the only place it would be visible.
+   */
+  unrecognized: number
+}
+
 type Token = () => Promise<string | null>
 
 export const adminApi = {
@@ -549,6 +594,10 @@ export const adminApi = {
 
   overview: (getToken: Token) =>
     adminFetch<AdminOverview>('/admin/overview', getToken),
+
+  /** Version adoption, platform mix and error rate by version (REL-271). */
+  versions: (getToken: Token, days: number) =>
+    adminFetch<AdminVersions>(`/admin/versions?days=${days}`, getToken),
 
   accounts: (getToken: Token, query: string, page: number) =>
     adminFetch<AccountsPage>(
