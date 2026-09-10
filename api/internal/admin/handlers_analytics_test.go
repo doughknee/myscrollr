@@ -143,3 +143,65 @@ func TestCachedSignupAnalyticsCoalescesConcurrentColdReads(t *testing.T) {
 		t.Fatalf("concurrent cold reads fetched %d times, want 1", calls.Load())
 	}
 }
+
+func TestHandleGetAnalyticsTimesOutStalledColdRead(t *testing.T) {
+	previousFetch := fetchSignupAnalytics
+	previousTimeout := signupAnalyticsTimeout
+	signupAnalyticsTimeout = 20 * time.Millisecond
+	fetchSignupAnalytics = func(ctx context.Context, _ string, _ int, _ time.Time) (accounts.SignupAnalytics, error) {
+		<-ctx.Done()
+		return accounts.SignupAnalytics{}, ctx.Err()
+	}
+	t.Cleanup(func() {
+		fetchSignupAnalytics = previousFetch
+		signupAnalyticsTimeout = previousTimeout
+	})
+	_, cleanup := testsupport.MiniRedis(t)
+	defer cleanup()
+
+	app := fiber.New()
+	app.Get("/admin/analytics", HandleGetAnalytics)
+	started := time.Now()
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/admin/analytics?application=website&days=30", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if elapsed := time.Since(started); elapsed > 200*time.Millisecond {
+		t.Fatalf("handler took %v, want bounded response", elapsed)
+	}
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", resp.StatusCode)
+	}
+}
+
+func TestCachedSignupAnalyticsStopsWaitingWhenCallerCancels(t *testing.T) {
+	_, cleanup := testsupport.MiniRedis(t)
+	defer cleanup()
+	previous := fetchSignupAnalytics
+	release := make(chan struct{})
+	called := make(chan struct{}, 1)
+	fetchSignupAnalytics = func(_ context.Context, _ string, _ int, _ time.Time) (accounts.SignupAnalytics, error) {
+		called <- struct{}{}
+		<-release
+		return analyticsReport("website", 7), nil
+	}
+	t.Cleanup(func() { fetchSignupAnalytics = previous })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	started := time.Now()
+	_, _, err := cachedSignupAnalytics(ctx, "website", 7)
+	close(release)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error = %v, want context canceled", err)
+	}
+	if elapsed := time.Since(started); elapsed > 100*time.Millisecond {
+		t.Fatalf("canceled cache wait took %v", elapsed)
+	}
+	select {
+	case <-called:
+		t.Fatal("canceled caller started a cold fetch")
+	case <-time.After(20 * time.Millisecond):
+	}
+}

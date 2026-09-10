@@ -214,7 +214,7 @@ func fetchSignupAnalyticsPage(ctx context.Context, appID string, page int) ([]lo
 	if cfg.Endpoint == "" {
 		return nil, fmt.Errorf("Logto endpoint is not configured")
 	}
-	token, err := getM2MToken()
+	token, err := getM2MTokenContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get Logto management token: %w", err)
 	}
