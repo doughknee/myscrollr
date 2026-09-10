@@ -26,7 +26,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Is my data private?',
     answer:
-      'No ads, no tracking pixels, no third-party analytics. Your widget setup syncs to your account so it follows you between machines. We count app versions and error rates to find bugs, and crash reports are stripped of personal data before they are sent, which tests enforce on every deploy.',
+      'No ads, no tracking pixels, no third-party analytics. Your widget setup syncs to your account so it follows you between machines. Anonymous app-version and error counts help find bugs, and crash reports are stripped of personal data. A separate Share product activity setting is off by default; if enabled, it records one account/day after the native ticker is visible with an enabled widget for 30 seconds, plus broad categories only. Turn it off to delete that measurement history.',
   },
   {
     question: 'Do I need an account?',

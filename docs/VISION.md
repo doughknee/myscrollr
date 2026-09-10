@@ -12,7 +12,7 @@
 Three load-bearing commitments, true at every layer:
 
 1. **The desktop app is the product** (Tauri v2 + React). The website is *marketing, auth, and billing only*.
-2. **No third-party analytics, and no personal data in crash reports** — enforced by per-service Sentry-scrubbing tests that block deploy. First-party counts of app versions and error rates carry no account identifier and nothing about ticker content.
+2. **No third-party analytics, and no personal data in crash reports** — enforced by per-service Sentry-scrubbing tests that block deploy. Anonymous first-party counts of app versions and error rates carry no account identifier and nothing about ticker content. A separate default-off desktop opt-in records at most one authenticated account/day after the native ticker is visible with an enabled widget for 30 continuous seconds, plus fixed broad categories only; it retains daily facts for 90 days and deletes all measurement data on opt-out or account purge.
 3. **One user-facing primitive (the widget), one price lever (the slot).** Every widget costs exactly one slot; a plan card's headline is a widget count.
 
 ---
@@ -181,7 +181,7 @@ Codegen TS types from the Go API's OpenAPI contract so web and desktop **cannot 
 ## 6. Non-negotiables (the spine — no decision may break these)
 
 - Desktop is the product; website stays marketing/auth/billing only.
-- No third-party analytics, and no personal data in crash reports (public promise + enforced by tests).
+- No third-party analytics, and no personal data in crash reports (public promise + enforced by tests). Optional first-party product measurement is default off, coarse, daily, authenticated, 90-day bounded, and independent from Sentry and anonymous request counters.
 - Slots-only monetization; one price lever.
 - **Wire-compat — *activates at first real user, suspended until then.*** Scrollr currently has **no users**, so breaking changes are free and should be taken now to establish clean names. Once you ship to real users, this becomes a hard rule: every rename/contract change goes behind a compat seam, never a breaking change (`MIN_DESKTOP_VERSION` gates retirement).
 - The CDC → Redis → SSE realtime pipeline works and is replica-safe; keep it.

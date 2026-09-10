@@ -84,7 +84,7 @@ import { useDeliveryHealth } from "../hooks/useDeliveryHealth";
 import { useNavHistory } from "../hooks/useNavHistory";
 import { useStartupUpdateCheck } from "../hooks/useStartupUpdateCheck";
 import { weatherQueryOptions } from "../api/queries";
-import { fetchSubscription, ApiError } from "../api/client";
+import { fetchSubscription, getProductAnalyticsConsent, ApiError } from "../api/client";
 import { useToggleOnTicker } from "../hooks/useToggleOnTicker";
 import { isOnTicker } from "../utils/tickerMembership";
 import { queryKeys } from "../api/queries";
@@ -584,6 +584,34 @@ function RootLayout() {
   // The same toggle the ticker window's menu uses (hooks/useToggleOnTicker).
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
+
+  // Consent is account-level and server-authoritative. The local field is a
+  // cross-window mirror used by the ticker; never turn collection on merely
+  // because an old local blob says so.
+  useEffect(() => {
+    let canceled = false;
+    if (!auth.authenticated) {
+      if (prefsRef.current.privacy.shareProductAnalytics) {
+        persistPrefs({
+          ...prefsRef.current,
+          privacy: { ...prefsRef.current.privacy, shareProductAnalytics: false },
+        });
+      }
+      return;
+    }
+    getProductAnalyticsConsent()
+      .then(({ enabled }) => {
+        if (canceled || prefsRef.current.privacy.shareProductAnalytics === enabled) return;
+        persistPrefs({
+          ...prefsRef.current,
+          privacy: { ...prefsRef.current.privacy, shareProductAnalytics: enabled },
+        });
+      })
+      .catch(() => {});
+    return () => {
+      canceled = true;
+    };
+  }, [auth.authenticated, persistPrefs]);
   const toggleOnTicker = useToggleOnTicker({
     getPrefs: () => prefsRef.current,
     persistPrefs,

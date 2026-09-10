@@ -207,6 +207,8 @@ export interface PrivacyPrefs {
    * Defaults to true. See sentry.tsx / lib.rs `set_crash_reports`.
    */
   sendCrashReports: boolean;
+  /** Explicit account-level opt-in, mirrored locally after server confirmation. */
+  shareProductAnalytics: boolean;
 }
 
 export type TickerPosition = "top" | "bottom";
@@ -560,6 +562,7 @@ const DEFAULT_STARTUP: StartupPrefs = {
 
 const DEFAULT_PRIVACY: PrivacyPrefs = {
   sendCrashReports: true,
+  shareProductAnalytics: false,
 };
 
 const DEFAULT_WINDOW: WindowPrefs = {
@@ -1059,6 +1062,7 @@ export function loadPrefs(): AppPreferences {
       // `false` turns reporting off; anything else is the default.
       privacy: {
         sendCrashReports: source.privacy?.sendCrashReports !== false,
+        shareProductAnalytics: source.privacy?.shareProductAnalytics === true,
       },
       window: {
         ...DEFAULT_WINDOW,

@@ -229,6 +229,13 @@ export const SETTINGS_ROWS = {
         "When something breaks, send the error, stack trace, app version and OS to Sentry. Never your account, IP address or file paths.",
       keywords: "sentry telemetry privacy error diagnostics",
     },
+    productAnalytics: {
+      label: "Share product activity",
+      description:
+        "Help improve Scrollr by counting days your visible ticker runs for at least 30 seconds and which broad widget categories were enabled. Signed-in accounts only; retained for 90 days.",
+      keywords: "analytics activity privacy opt in usage retention",
+      when: "signedIn",
+    },
     resetAll: {
       label: "Reset all settings",
       description:

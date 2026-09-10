@@ -173,6 +173,21 @@ func pruneUsage(ctx context.Context) {
 	if n := tag.RowsAffected(); n > 0 {
 		log.Printf("[Usage] pruned %d aggregate rows older than %d days", n, int(usageRetention.Hours()/24))
 	}
+	PruneProductActivity(ctx, time.Now())
+}
+
+// PruneProductActivity keeps the current UTC day plus the previous 89 days.
+// Enrollment/cohort metadata is intentionally untouched: deleting it would
+// make an old participant look newly activated after the daily fact expires.
+func PruneProductActivity(ctx context.Context, now time.Time) {
+	if DBPool == nil {
+		return
+	}
+	cutoff := now.UTC().Truncate(24*time.Hour).AddDate(0, 0, -89)
+	if _, err := DBPool.Exec(ctx,
+		`DELETE FROM product_activity_daily WHERE day < $1`, cutoff); err != nil {
+		log.Printf("[Product Analytics] prune daily facts: %v", err)
+	}
 }
 
 // StartUsageFlusher writes the counters every minute for the lifetime of ctx,
