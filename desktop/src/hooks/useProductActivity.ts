@@ -90,9 +90,15 @@ export function useProductActivity({
         if (stopped) return;
         const eligible =
           authenticated && optedIn && visible && document.visibilityState === "visible" && categories.length > 0;
+        const nowMs = performance.now();
+        const utcDay = new Date().toISOString().slice(0, 10);
+        const gap = nowMs - state.lastMs;
+        if (request && (utcDay !== state.day || gap <= 0 || gap > MAX_CONTINUOUS_GAP_MS)) {
+          request.abort();
+        }
         state = advanceQualification(state, {
-          nowMs: performance.now(),
-          utcDay: new Date().toISOString().slice(0, 10),
+          nowMs,
+          utcDay,
           eligible,
         });
         if (!eligible) request?.abort();

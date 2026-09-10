@@ -10,7 +10,7 @@ import {
 const mocks = vi.hoisted(() => ({
   isPrimary: vi.fn(() => true),
   isVisible: vi.fn(async () => true),
-  record: vi.fn(async () => ({})),
+  record: vi.fn<(categories: string[], signal: AbortSignal) => Promise<unknown>>(async () => ({})),
 }));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({ isVisible: mocks.isVisible }),
@@ -130,7 +130,7 @@ describe("product activity qualification", () => {
   it("keeps checking eligibility and aborts a pending report", async () => {
     vi.useFakeTimers();
     let aborted = false;
-    mocks.record.mockImplementation((_categories, signal: AbortSignal) => new Promise((_, reject) => {
+    mocks.record.mockImplementation((_categories: string[], signal: AbortSignal) => new Promise((_, reject) => {
       signal.addEventListener("abort", () => {
         aborted = true;
         reject(new DOMException("Aborted", "AbortError"));
@@ -144,5 +144,46 @@ describe("product activity qualification", () => {
     mocks.isVisible.mockResolvedValue(false);
     await act(async () => vi.advanceTimersByTimeAsync(1_000));
     expect(aborted).toBe(true);
+  });
+
+  it("aborts a pending report at UTC rollover", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-10T23:59:20Z"));
+    let aborted = false;
+    mocks.record.mockImplementation((_categories: string[], signal: AbortSignal) => new Promise((_, reject) => {
+      signal.addEventListener("abort", () => {
+        aborted = true;
+        reject(new DOMException("Aborted", "AbortError"));
+      });
+    }));
+    renderHook(() =>
+      useProductActivity({ authenticated: true, optedIn: true, widgetIds: ["sports_nfl"], resolveCategory: () => "sports", production: true }),
+    );
+
+    await act(async () => vi.advanceTimersByTimeAsync(31_000));
+    vi.setSystemTime(new Date("2026-09-11T00:00:00Z"));
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+    expect(aborted).toBe(true);
+  });
+
+  it("aborts a pending report after a suspend-sized gap", async () => {
+    vi.useFakeTimers();
+    let abortSeen = false;
+    let resolveVisible!: (visible: boolean) => void;
+    mocks.record.mockImplementation((_categories: string[], signal: AbortSignal) => new Promise((_, reject) => {
+      signal.addEventListener("abort", () => {
+        abortSeen = true;
+        reject(new DOMException("Aborted", "AbortError"));
+      });
+    }));
+    renderHook(() =>
+      useProductActivity({ authenticated: true, optedIn: true, widgetIds: ["sports_nfl"], resolveCategory: () => "sports", production: true }),
+    );
+
+    await act(async () => vi.advanceTimersByTimeAsync(31_000));
+    mocks.isVisible.mockReturnValue(new Promise((resolve) => { resolveVisible = resolve; }));
+    await act(async () => vi.advanceTimersByTimeAsync(4_000));
+    await act(async () => resolveVisible(true));
+    expect(abortSeen).toBe(true);
   });
 });
