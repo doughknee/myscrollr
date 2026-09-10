@@ -99,7 +99,7 @@ const PLATFORM_GUIDES: Record<
   },
   windows: {
     label: 'Windows',
-    requirements: 'Built for Windows 10 or 11 on x64 hardware.',
+    requirements: 'Built as an x64 Windows setup executable.',
     steps: [
       'Open the downloaded setup .exe file.',
       'Follow the installer, then launch Scrollr from the Start menu.',

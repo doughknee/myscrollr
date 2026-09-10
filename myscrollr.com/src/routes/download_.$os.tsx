@@ -39,7 +39,7 @@ const META: Record<
     os: 'Windows',
     title: 'Download Scrollr for Windows',
     description:
-      'Free download of Scrollr for Windows 10/11 (x64). A quiet desktop ticker for live finance, sports, news, and fantasy data. Open source.',
+      'Free download of Scrollr for x64 Windows. A quiet desktop ticker for live finance, sports, news, and fantasy data. Open source.',
     arch: 'x64',
   },
   linux: {

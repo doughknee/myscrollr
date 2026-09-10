@@ -98,7 +98,7 @@ const ROUTES = [
     path: '/download/windows',
     file: 'download/windows/index.html',
     minJsonLd: 3,
-    expectedBody: 'Built for Windows 10 or 11 on x64 hardware.',
+    expectedBody: 'Built as an x64 Windows setup executable.',
     expectedH1: 'Get Scrollr for Windows. Free. No sign-up.',
   },
   {
