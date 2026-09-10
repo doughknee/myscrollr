@@ -81,6 +81,14 @@ func (s *Server) setupMiddleware() {
 		}))
 	}
 
+	// Request counters (REL-271). Placed above everything below it so it sees
+	// the rate limiter's 429s and the security-header path too — an error rate
+	// that silently excludes the errors is worse than none. It records four
+	// bounded dimensions (app version, platform, route pattern, status class)
+	// and folds them in memory; see internal/platform/usage.go for the line it
+	// must not cross.
+	s.App.Use(platform.RecordUsage)
+
 	// Security Headers
 	s.App.Use(func(c *fiber.Ctx) error {
 		c.Set("X-XSS-Protection", "1; mode=block")
@@ -234,6 +242,11 @@ func (s *Server) setupRoutes() {
 	s.App.Get("/admin/overview", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetOverview)
 	s.App.Get("/admin/accounts", platform.LogtoAuth, admin.RequireAdmin, admin.HandleListAccounts)
 	s.App.Get("/admin/accounts/:sub", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetAccount)
+	// Version adoption, platform mix and error rate by version, all read from
+	// the per-day request counters (REL-271). Its own endpoint and its own
+	// page: the Overview is tiles about the business, this is one question
+	// about the fleet.
+	s.App.Get("/admin/versions", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetVersions)
 	s.App.Get("/admin/admins", platform.LogtoAuth, admin.RequireAdmin, admin.HandleListAdmins)
 	s.App.Post("/admin/admins", platform.LogtoAuth, admin.RequireAdmin, admin.HandleAddAdmin)
 	s.App.Delete("/admin/admins/:id", platform.LogtoAuth, admin.RequireAdmin, admin.HandleRemoveAdmin)

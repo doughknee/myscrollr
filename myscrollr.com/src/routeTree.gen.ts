@@ -30,6 +30,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as UplinkLifetimeRouteImport } from './routes/uplink_.lifetime'
 import { Route as UUsernameRouteImport } from './routes/u.$username'
 import { Route as DownloadOsRouteImport } from './routes/download_.$os'
+import { Route as AdminVersionsRouteImport } from './routes/admin.versions'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminSupportRouteImport } from './routes/admin.support'
 import { Route as AdminAdminsRouteImport } from './routes/admin.admins'
@@ -139,6 +140,11 @@ const DownloadOsRoute = DownloadOsRouteImport.update({
   path: '/download/$os',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminVersionsRoute = AdminVersionsRouteImport.update({
+  id: '/versions',
+  path: '/versions',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/admin/admins': typeof AdminAdminsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/versions': typeof AdminVersionsRoute
   '/download/$os': typeof DownloadOsRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink/lifetime': typeof UplinkLifetimeRoute
@@ -201,6 +208,7 @@ export interface FileRoutesByTo {
   '/admin/admins': typeof AdminAdminsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/versions': typeof AdminVersionsRoute
   '/download/$os': typeof DownloadOsRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink/lifetime': typeof UplinkLifetimeRoute
@@ -228,6 +236,7 @@ export interface FileRoutesById {
   '/admin/admins': typeof AdminAdminsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/versions': typeof AdminVersionsRoute
   '/download_/$os': typeof DownloadOsRoute
   '/u/$username': typeof UUsernameRoute
   '/uplink_/lifetime': typeof UplinkLifetimeRoute
@@ -256,6 +265,7 @@ export interface FileRouteTypes {
     | '/admin/admins'
     | '/admin/support'
     | '/admin/users'
+    | '/admin/versions'
     | '/download/$os'
     | '/u/$username'
     | '/uplink/lifetime'
@@ -281,6 +291,7 @@ export interface FileRouteTypes {
     | '/admin/admins'
     | '/admin/support'
     | '/admin/users'
+    | '/admin/versions'
     | '/download/$os'
     | '/u/$username'
     | '/uplink/lifetime'
@@ -307,6 +318,7 @@ export interface FileRouteTypes {
     | '/admin/admins'
     | '/admin/support'
     | '/admin/users'
+    | '/admin/versions'
     | '/download_/$os'
     | '/u/$username'
     | '/uplink_/lifetime'
@@ -485,6 +497,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DownloadOsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/versions': {
+      id: '/admin/versions'
+      path: '/versions'
+      fullPath: '/admin/versions'
+      preLoaderRoute: typeof AdminVersionsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/users': {
       id: '/admin/users'
       path: '/users'
@@ -513,6 +532,7 @@ interface AdminRouteChildren {
   AdminAdminsRoute: typeof AdminAdminsRoute
   AdminSupportRoute: typeof AdminSupportRoute
   AdminUsersRoute: typeof AdminUsersRoute
+  AdminVersionsRoute: typeof AdminVersionsRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
@@ -520,6 +540,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAdminsRoute: AdminAdminsRoute,
   AdminSupportRoute: AdminSupportRoute,
   AdminUsersRoute: AdminUsersRoute,
+  AdminVersionsRoute: AdminVersionsRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 

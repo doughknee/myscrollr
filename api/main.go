@@ -89,6 +89,10 @@ func main() {
 	// delete across local DB + Logto.
 	accounts.StartGDPRPurgeWorker(ctx)
 
+	// Writes the per-day request counters the middleware folds in memory, and
+	// prunes them past a year (REL-271). Nothing per-request is ever stored.
+	platform.StartUsageFlusher(ctx)
+
 	// Periodic prune of the Stripe webhook idempotency table. Long-lived
 	// pods otherwise grow this table unboundedly between restarts.
 	platform.StartWebhookEventsPruner(ctx)

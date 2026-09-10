@@ -160,7 +160,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
           'Channel Configuration: We store which data channels you have enabled (finance, sports, RSS, fantasy) and their configuration settings.',
           'Yahoo Fantasy Data: If you connect your Yahoo Fantasy account, we store an encrypted refresh token (AES-256-GCM encryption) to maintain your connection. We also store your Yahoo user identifier, league data, standings, rosters, and matchup information that Yahoo provides through their API.',
           "Kalshi Account Connection: If you connect your own Kalshi account in the desktop application (an optional feature for viewing your positions), your Kalshi API key ID and private key are stored ONLY in your device's operating-system keychain or credential store. They are never transmitted to our servers, never included in our database, and are used solely for read-only portfolio requests made directly from your device to Kalshi.",
-          'Usage Data: We collect basic usage metrics including active SSE connection counts. We do not track individual page visits, browsing history, or behavioral analytics.',
+          'Usage Data: We keep anonymous operational counts — how many requests reach our API each day, which app version and operating system they came from, and how many of them failed. These are totals only: they carry no account identifier, no IP address, and nothing about the content you follow — no symbols, teams, feeds, or widget settings. We use them to tell which builds are affected by a bug and whether a fix reached people. We also count active SSE connections. We do not track individual page visits, browsing history, or behavioral analytics.',
         ],
       },
       {
@@ -257,7 +257,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Network Communication',
         content: [
           "The desktop application communicates with Scrollr API servers (api.myscrollr.com) to retrieve real-time data via Server-Sent Events (SSE) and to synchronize your configuration. If you optionally connect your own Kalshi account, the application additionally communicates directly with Kalshi's API from your device (see Third-Party Services below).",
-          'All network communication uses HTTPS encryption. The application sends your authentication token and subscription tier with each request. It does not transmit any data about other applications, files, or activity on your device.',
+          'All network communication uses HTTPS encryption. The application sends your authentication token, subscription tier, and its own version and operating system with each request; we keep the last two only as daily totals, to tell which builds a bug affects. It does not transmit any data about other applications, files, or activity on your device, or about which symbols, teams, or feeds you follow.',
         ],
       },
       {
