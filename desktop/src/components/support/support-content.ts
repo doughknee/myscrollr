@@ -21,7 +21,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Is my data private?",
     answer:
-      "Scrollr contains zero analytics, zero tracking pixels, and zero telemetry. Your widget configurations and preferences are stored on your device. The only server-side data is your account profile and subscription status.",
+      "No ads, no tracking pixels, no third-party analytics. Your widget setup syncs to your account so it follows you between machines, and Scrollr's servers hold your account profile and subscription status. We also count app versions and error rates so we can find bugs without waiting for someone to report them.",
   },
   {
     question: "What platforms are supported?",

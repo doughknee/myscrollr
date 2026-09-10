@@ -72,9 +72,10 @@ Permissions-Policy are configured in the image's nginx.conf.
   `useTheme`).
 - **Fonts** are self-hosted in `public/fonts/` via `@font-face` so we
   can ship a tight CSP.
-- **Analytics:** none. Zero tracking pixels, zero telemetry — this is
-  a public product promise. Don't add any without a conversation
-  first.
+- **Analytics:** none. No tracking pixels and no third-party
+  analytics — this is a public product promise. The API counts app
+  versions and error rates server-side; nothing beyond that. Don't
+  add any without a conversation first.
 
 ## Structure
 

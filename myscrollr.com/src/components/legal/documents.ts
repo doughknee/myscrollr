@@ -278,7 +278,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         content: [
           'Yahoo Fantasy Sports: If you connect your Yahoo account, the desktop application opens your default browser for the OAuth authorization flow. The application stores an encrypted refresh token locally and on our servers to maintain the connection. See our Privacy Policy for details on Yahoo data handling.',
           "Kalshi (optional): If you connect your own Kalshi account, the application communicates directly from your device to Kalshi's API using your credentials for READ-ONLY portfolio and position data. These requests do not pass through Scrollr servers. The application cannot place, modify, or cancel orders on your Kalshi account.",
-          'The application does not include any analytics SDKs, telemetry services, crash reporters, or advertising frameworks.',
+          'Scrollr includes no advertising frameworks and no third-party analytics. The application sends crash reports, which you can turn off with the "Send crash reports" setting. Scrollr\'s servers record counts of application versions, platforms and error rates; these counts contain no account identifier and nothing about the content of your ticker.',
         ],
       },
       {
