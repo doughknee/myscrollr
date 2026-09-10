@@ -44,10 +44,60 @@ func wrote(day, waitHours int) func(*AdminQueueRow) {
 }
 
 func paid(plan string) func(*AdminQueueRow) {
-	return func(r *AdminQueueRow) { r.Plan, r.Paying = plan, true }
+	return func(r *AdminQueueRow) {
+		r.Plan, r.Paying = plan, true
+		r.AccountSubject, r.AccountEstablished = "sub-"+strings.SplitN(r.UserEmail, "@", 2)[0], true
+	}
 }
 
-func freePlan(r *AdminQueueRow) { r.Plan = "free" }
+func freePlan(r *AdminQueueRow) {
+	r.Plan = "free"
+	r.AccountSubject, r.AccountEstablished = "sub-"+strings.SplitN(r.UserEmail, "@", 2)[0], true
+}
+
+func account(sub string) func(*AdminQueueRow) {
+	return func(r *AdminQueueRow) {
+		r.AccountSubject = sub
+		r.AccountEstablished = true
+		r.IdentityState = identityConfirmedAccount
+	}
+}
+
+func TestGroupingUsesEstablishedAccountsWithoutTrustingMatchingContactEmail(t *testing.T) {
+	people := groupPeople([]AdminQueueRow{
+		row("1", "old@example.com", "Pat", queueNeedsYou, account("sub-pat")),
+		row("2", "new@example.com", "Pat", queueWaiting, account("sub-pat")),
+		row("3", "shared@example.com", "One", queueNeedsYou, account("sub-one")),
+		row("4", "shared@example.com", "Two", queueNeedsYou, account("sub-two")),
+		row("5", "shared@example.com", "Contact", queueNeedsYou),
+	})
+
+	byKey := map[string]AdminPerson{}
+	for _, person := range people {
+		byKey[person.Key] = person
+	}
+	if len(people) != 4 || byKey["account:sub-pat"].Tickets != 2 {
+		t.Fatalf("established account grouping = %+v", people)
+	}
+	for _, key := range []string{"account:sub-one", "account:sub-two", "contact:shared@example.com"} {
+		if byKey[key].Tickets != 1 {
+			t.Errorf("%s tickets=%d, want 1", key, byKey[key].Tickets)
+		}
+	}
+	if byKey["contact:shared@example.com"].Plan != "" || byKey["contact:shared@example.com"].Paying {
+		t.Errorf("matching unverified contact inherited account data: %+v", byKey["contact:shared@example.com"])
+	}
+}
+
+func TestPlaceholderContactNeverGroupsUnrelatedTickets(t *testing.T) {
+	people := groupPeople([]AdminQueueRow{
+		row("1", "anonymous@scrollr.user", "", queueNeedsYou),
+		row("2", "anonymous@scrollr.user", "", queueNeedsYou),
+	})
+	if len(people) != 2 || people[0].Key == people[1].Key {
+		t.Fatalf("placeholder contacts must remain separate: %+v", people)
+	}
+}
 
 // The whole reason for the ticket: Rachel wrote five times in one afternoon
 // and that is one person to answer, not five rows to read.
@@ -70,7 +120,7 @@ func TestFiveTicketsFromOnePersonAreOneRow(t *testing.T) {
 	}
 	// The mixed case in #411284 is the same mailbox, and grouping that missed
 	// it would show Rachel twice.
-	if p.Key != "r_armstrong@me.com" {
+	if p.Key != "contact:r_armstrong@me.com" {
 		t.Errorf("key = %q, want the lowercased email", p.Key)
 	}
 	if p.NeedsYou != 1 || p.Waiting != 2 || p.Handled != 2 {
@@ -114,7 +164,7 @@ func TestACaseWithNoAccountIsGroupedWithoutInventingAPerson(t *testing.T) {
 		if p.Paying {
 			t.Error("nothing is known about this person, so they are certainly not in the paying section")
 		}
-		if !strings.Contains(p.PlanNote, "No account is attached") {
+		if !strings.Contains(p.PlanNote, "unknown") {
 			t.Errorf("the empty plan needs a sentence saying why: %q", p.PlanNote)
 		}
 		if p.Tickets != 1 {
@@ -137,7 +187,7 @@ func TestPayingCustomersStayOnTopUnderEverySort(t *testing.T) {
 		for _, dir := range []string{"asc", "desc"} {
 			people := groupPeople(rows)
 			sortPeople(people, field, dir)
-			if people[0].Key != "zoe@example.com" {
+			if people[0].Key != "account:sub-zoe" {
 				t.Errorf("sort=%s dir=%s put %q first; the paying customer must lead every sort",
 					field, dir, people[0].Key)
 			}
@@ -181,13 +231,13 @@ func TestEverySortFieldOrdersByWhatItNames(t *testing.T) {
 		wantHead string
 		why      string
 	}{
-		{sortLastWrote, "desc", "abe@example.com", "newest first"},
-		{sortLastWrote, "asc", "bea@example.com", "oldest first"},
-		{sortWaiting, "desc", "bea@example.com", "longest waiting first"},
-		{sortWaiting, "asc", "abe@example.com", "shortest waiting first"},
-		{sortTickets, "desc", "cara@example.com", "most tickets first"},
-		{sortName, "asc", "abe@example.com", "A first"},
-		{sortName, "desc", "cara@example.com", "Z first"},
+		{sortLastWrote, "desc", "contact:abe@example.com", "newest first"},
+		{sortLastWrote, "asc", "contact:bea@example.com", "oldest first"},
+		{sortWaiting, "desc", "contact:bea@example.com", "longest waiting first"},
+		{sortWaiting, "asc", "contact:abe@example.com", "shortest waiting first"},
+		{sortTickets, "desc", "contact:cara@example.com", "most tickets first"},
+		{sortName, "asc", "contact:abe@example.com", "A first"},
+		{sortName, "desc", "contact:cara@example.com", "Z first"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.field+"/"+tc.dir, func(t *testing.T) {
@@ -222,9 +272,9 @@ func TestUnknownsSortLastInBothDirections(t *testing.T) {
 		for _, dir := range []string{"asc", "desc"} {
 			people := groupPeople(rows)
 			sortPeople(people, field, dir)
-			if people[len(people)-1].Key != "silent@example.com" {
+			if people[len(people)-1].Key != "contact:silent@example.com" {
 				t.Errorf("sort=%s dir=%s floated the unknown to %d; unknowns go last both ways",
-					field, dir, indexOf(people, "silent@example.com"))
+					field, dir, indexOf(people, "contact:silent@example.com"))
 			}
 		}
 	}
@@ -395,10 +445,10 @@ func TestQueueSectionsUseTheCurrentPlanNotTierAtOpen(t *testing.T) {
 		('sub-rel266-up',     'cus_up',     'uplink_ultimate', 'active', false),
 		('sub-rel266-lapsed', 'cus_lapsed', 'free',            'active', false)`)
 	testsupport.MustExec(t, `INSERT INTO support_cases
-		(ticket_number, user_email, logto_sub, subject, status, tier_at_open, os, updated_at) VALUES
-		('900100', 'up@example.com',     'sub-rel266-up',     'ticker will not scroll', 'open', 'free',            'macOS',   now()),
-		('900101', 'lapsed@example.com', 'sub-rel266-lapsed', 'feed cannot be edited',  'open', 'uplink_ultimate', 'Windows', now() - interval '1 hour'),
-		('900102', NULL,                 NULL,                'Linux sign-in',          'open', NULL,              'Linux',   now() - interval '2 hours')`)
+		(ticket_number, user_email, logto_sub, account_source, subject, status, tier_at_open, os, updated_at) VALUES
+		('900100', 'up@example.com',     'sub-rel266-up',     'authenticated', 'ticker will not scroll', 'open', 'free',            'macOS',   now()),
+		('900101', 'lapsed@example.com', 'sub-rel266-lapsed', 'authenticated', 'feed cannot be edited',  'open', 'uplink_ultimate', 'Windows', now() - interval '1 hour'),
+		('900102', NULL,                 NULL,                NULL,            'Linux sign-in',          'open', NULL,              'Linux',   now() - interval '2 hours')`)
 	testsupport.MustExec(t, `INSERT INTO support_messages (ticket_number, kind, body_text, created_at) VALUES
 		('900100', 'user', 'it will not move', now() - interval '4 hours'),
 		('900101', 'user', 'cannot edit',      now() - interval '2 days'),
@@ -422,7 +472,7 @@ func TestQueueSectionsUseTheCurrentPlanNotTierAtOpen(t *testing.T) {
 		t.Fatalf("got %d people, want 3: %v", len(res.People), sectionsOf(res.People))
 	}
 
-	up := byKey["up@example.com"]
+	up := byKey["account:sub-rel266-up"]
 	if !up.Paying || up.Section != sectionPaying {
 		t.Errorf("a customer who upgraded since opening the ticket must be in the paying section: %+v", up)
 	}
@@ -430,7 +480,7 @@ func TestQueueSectionsUseTheCurrentPlanNotTierAtOpen(t *testing.T) {
 		t.Errorf("plan = %q, want the current subscription rather than tier_at_open (free)", up.Plan)
 	}
 
-	lapsed := byKey["lapsed@example.com"]
+	lapsed := byKey["account:sub-rel266-lapsed"]
 	if lapsed.Paying || lapsed.Section != sectionOpen {
 		t.Errorf("a lapsed customer must not be promoted by tier_at_open: %+v", lapsed)
 	}
@@ -465,6 +515,59 @@ func TestQueueSectionsUseTheCurrentPlanNotTierAtOpen(t *testing.T) {
 	if res.Sort != sortLastWrote || res.Dir != "desc" || res.RowsMode != "person" {
 		t.Errorf("the response must echo what it sorted by: sort=%q dir=%q rows=%q",
 			res.Sort, res.Dir, res.RowsMode)
+	}
+}
+
+func TestQueueKeepsRequesterIdentityIndependentOfDraftsAndAccountPlans(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	resetCases(t)
+	seedAdmin(t, "sub-staff")
+	t.Setenv("SUPPORT_AUTOSEND", "off")
+	testsupport.MustExec(t, `DELETE FROM stripe_customers WHERE logto_sub LIKE 'sub-rel279%'`)
+	t.Cleanup(func() {
+		testsupport.MustExec(t, `DELETE FROM stripe_customers WHERE logto_sub LIKE 'sub-rel279%'`)
+	})
+	testsupport.MustExec(t, `INSERT INTO stripe_customers
+		(logto_sub, stripe_customer_id, plan, status, lifetime) VALUES
+		('sub-rel279-account', 'cus_rel279', 'uplink_pro', 'active', false)`)
+	testsupport.MustExec(t, `INSERT INTO support_cases
+		(ticket_number, user_email, user_name, contact_source, logto_sub, account_source, subject, status, updated_at) VALUES
+		('279001', 'old@example.com', 'Case Name', 'authenticated', 'sub-rel279-account', 'authenticated', 'first',  'open', now() - interval '2 hours'),
+		('279002', 'new@example.com', NULL,        'authenticated', 'sub-rel279-account', 'authenticated', 'second', 'open', now() - interval '1 hour'),
+		('279003', 'new@example.com', 'Contact',   'public',        NULL,                 NULL,            'third',  'open', now()),
+		('279004', 'legacy@example.com', 'Legacy', 'osticket',     'sub-rel279-account', NULL,             'fourth', 'open', now()),
+		('279005', 'known@example.com', 'Known',   'authenticated', 'sub-rel279-no-sub', 'authenticated',  'fifth',  'open', now())`)
+
+	app := adminSupportApp("sub-staff")
+	status, body := getJSON(t, app, "/admin/support/queue")
+	if status != fiber.StatusOK {
+		t.Fatalf("queue: %d %s", status, body)
+	}
+	var res AdminQueueResponse
+	if err := json.Unmarshal([]byte(body), &res); err != nil {
+		t.Fatal(err)
+	}
+	byKey := map[string]AdminPerson{}
+	for _, person := range res.People {
+		byKey[person.Key] = person
+	}
+	confirmed := byKey["account:sub-rel279-account"]
+	if confirmed.Tickets != 2 || confirmed.Name != "Case Name" || confirmed.Plan != "uplink_pro" || !confirmed.SubscriptionPresent {
+		t.Errorf("confirmed account=%+v", confirmed)
+	}
+	contact := byKey["contact:new@example.com"]
+	if contact.Tickets != 1 || contact.IdentityState != identityContactOnly || contact.Plan != "" {
+		t.Errorf("unverified matching contact=%+v", contact)
+	}
+	legacy := byKey["contact:legacy@example.com"]
+	if legacy.IdentityState != identityAmbiguousAssociation || legacy.Plan != "" || legacy.Paying {
+		t.Errorf("legacy association=%+v", legacy)
+	}
+	withoutSubscription := byKey["account:sub-rel279-no-sub"]
+	if withoutSubscription.SubscriptionPresent || !strings.Contains(withoutSubscription.PlanNote, "no subscription record") {
+		t.Errorf("confirmed account without subscription=%+v", withoutSubscription)
 	}
 }
 
@@ -534,17 +637,17 @@ func TestQueueSortsServerSideAndRefusesAnUnknownField(t *testing.T) {
 		return res
 	}
 
-	if got := read("?sort=tickets&dir=desc").People[0].Key; got != "cara@example.com" {
+	if got := read("?sort=tickets&dir=desc").People[0].Key; got != "contact:cara@example.com" {
 		t.Errorf("sort=tickets desc put %q first, want the person with two tickets", got)
 	}
-	if got := read("?sort=tickets&dir=asc").People[0].Key; got != "abe@example.com" {
+	if got := read("?sort=tickets&dir=asc").People[0].Key; got != "contact:abe@example.com" {
 		t.Errorf("sort=tickets asc put %q first, want the person with one ticket", got)
 	}
-	if got := read("?sort=name&dir=asc").People[0].Key; got != "abe@example.com" {
+	if got := read("?sort=name&dir=asc").People[0].Key; got != "contact:abe@example.com" {
 		t.Errorf("sort=name asc put %q first", got)
 	}
 	// Longest waiting is nine days, on Cara's second ticket.
-	if got := read("?sort=waiting&dir=desc").People[0].Key; got != "cara@example.com" {
+	if got := read("?sort=waiting&dir=desc").People[0].Key; got != "contact:cara@example.com" {
 		t.Errorf("sort=waiting desc put %q first", got)
 	}
 
@@ -557,7 +660,7 @@ func TestQueueSortsServerSideAndRefusesAnUnknownField(t *testing.T) {
 
 	// The search box is server-side too.
 	found := read("?q=abe@example.com")
-	if len(found.People) != 1 || found.People[0].Key != "abe@example.com" {
+	if len(found.People) != 1 || found.People[0].Key != "contact:abe@example.com" {
 		t.Errorf("q= narrowed to %v, want just Abe", sectionsOf(found.People))
 	}
 

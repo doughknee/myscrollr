@@ -194,7 +194,7 @@ func TestBackfill_Idempotent(t *testing.T) {
 		"200": {
 			"number": "200", "subject": "Cannot log in", "topic": "Account & Login", "status": "Closed",
 			"status_state": "closed", "priority": "Normal", "created": "2026-06-01T10:00:00Z",
-			"updated": "2026-06-02T10:00:00Z", "closed": true, "user_email": "a@example.com",
+			"updated": "2026-06-02T10:00:00Z", "closed": true, "user_email": "a@example.com", "user_name": "A Person",
 			"thread": []map[string]interface{}{
 				entry(1, "M", "Login loops"), entry(2, "R", "Human: we shipped a fix in 1.6.1"), entry(3, "N", "internal note"),
 			},
@@ -202,7 +202,7 @@ func TestBackfill_Idempotent(t *testing.T) {
 		"201": { // never seen by this API (IMAP-only ticket)
 			"number": "201", "subject": "Weather widget shows nothing", "topic": "Bug Report", "status": "Open",
 			"status_state": "open", "priority": "High", "created": "2026-06-03T10:00:00Z",
-			"updated": "2026-06-03T10:00:00Z", "closed": false, "user_email": "b@example.com",
+			"updated": "2026-06-03T10:00:00Z", "closed": false, "user_email": "b@example.com", "user_name": "B Person",
 			"thread": []map[string]interface{}{entry(10, "M", "Weather widget is blank since the update")},
 		},
 	}}
@@ -226,6 +226,15 @@ func TestBackfill_Idempotent(t *testing.T) {
 	_ = platform.DBPool.QueryRow(ctx, `SELECT count(*) FROM support_cases`).Scan(&cases)
 	if cases != 2 {
 		t.Fatalf("cases: %d", cases)
+	}
+	var importedName, importedSource string
+	if err := platform.DBPool.QueryRow(ctx,
+		`SELECT user_name, contact_source FROM support_cases WHERE ticket_number='201'`).Scan(
+		&importedName, &importedSource); err != nil {
+		t.Fatal(err)
+	}
+	if importedName != "B Person" || importedSource != contactSourceOSTicket {
+		t.Errorf("imported requester=%q source=%q", importedName, importedSource)
 	}
 	if got := countMessages(t, "200", ""); got != 4 { // user, ai_draft, sent, note
 		t.Fatalf("ticket 200 messages: %d", got)
@@ -429,6 +438,74 @@ func TestMessageOnlyCaseDoesNotInventAnUpstreamOpenStatus(t *testing.T) {
 	}
 	if status != "unknown" {
 		t.Fatalf("message-only status=%q, want unknown until an authoritative source is observed", status)
+	}
+}
+
+func TestRequesterContactFreshnessDoesNotChangeAccountOwnership(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	resetCases(t)
+	ctx := context.Background()
+	opened := time.Date(2026, 9, 8, 10, 0, 0, 0, time.UTC)
+	if err := upsertSupportCase(ctx, SupportCase{
+		TicketNumber: "identity", UserEmail: "signed-in@example.com", UserName: "Signed In",
+		LogtoSub: "sub-confirmed", AccountSource: accountSourceAuthenticated,
+		ContactSource: contactSourceAuthenticated, ContactObservedAt: opened,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := upsertSupportCase(ctx, SupportCase{
+		TicketNumber: "identity", UserEmail: "stale@example.com", UserName: "Stale",
+		ContactSource: contactSourceOSTicket, ContactObservedAt: opened.Add(-time.Hour),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := upsertSupportCase(ctx, SupportCase{
+		TicketNumber: "identity", UserEmail: "current@example.com", UserName: "Current Contact",
+		ContactSource: contactSourceOSTicketWebhook, ContactObservedAt: opened.Add(time.Hour),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := upsertSupportCase(ctx, SupportCase{
+		TicketNumber: "identity", UserEmail: "draft@example.com", UserName: "Draft Fallback",
+		ContactSource: contactSourceDraft,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var email, name, contactSource, sub, accountSource string
+	if err := platform.DBPool.QueryRow(ctx, `SELECT user_email, user_name, contact_source,
+		logto_sub, account_source FROM support_cases WHERE ticket_number='identity'`).Scan(
+		&email, &name, &contactSource, &sub, &accountSource); err != nil {
+		t.Fatal(err)
+	}
+	if email != "current@example.com" || name != "Current Contact" || contactSource != contactSourceOSTicketWebhook {
+		t.Errorf("contact=%q %q source=%q", email, name, contactSource)
+	}
+	if sub != "sub-confirmed" || accountSource != accountSourceAuthenticated {
+		t.Errorf("ownership=%q source=%q", sub, accountSource)
+	}
+
+	if err := upsertSupportCase(ctx, SupportCase{
+		TicketNumber: "identity-missing", ContactSource: contactSourceOSTicket,
+		ContactObservedAt: opened,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := upsertSupportCase(ctx, SupportCase{
+		TicketNumber: "identity-missing", UserEmail: "draft-only@example.com",
+		UserName: "Draft Only", ContactSource: contactSourceDraft,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := platform.DBPool.QueryRow(ctx,
+		`SELECT user_name, contact_source FROM support_cases WHERE ticket_number='identity-missing'`).Scan(
+		&name, &contactSource); err != nil {
+		t.Fatal(err)
+	}
+	if name != "Draft Only" || contactSource != contactSourceDraft {
+		t.Errorf("missing contact fallback=%q source=%q", name, contactSource)
 	}
 }
 

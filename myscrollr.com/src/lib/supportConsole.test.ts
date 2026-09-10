@@ -9,6 +9,7 @@ import {
   formatWait,
   groupLabel,
   holdCountdown,
+  identityLabel,
   isUnchanged,
   lastUserMessage,
   lineDiff,
@@ -25,6 +26,9 @@ function person(over: Partial<QueuePerson> = {}): QueuePerson {
     key: 'r_armstrong@me.com',
     email: 'r_armstrong@me.com',
     name: 'Rachel Armstrong',
+    identity_state: 'contact_only',
+    account_established: false,
+    subscription_present: false,
     paying: false,
     section: 'open',
     tickets: 5,
@@ -258,11 +262,22 @@ describe('personTitle', () => {
 
   // The one that matters: an unknown person must read as an unknown person,
   // never as somebody called "Anonymous".
-  it('says there is no account rather than inventing a name', () => {
+  it('says the requester is unknown rather than making an account claim', () => {
     const who = personTitle({})
     expect(who.known).toBe(false)
-    expect(who.title).toBe('No account on this ticket')
+    expect(who.title).toBe('Requester unknown')
     expect(who.title.toLowerCase()).not.toContain('anonymous')
+  })
+})
+
+describe('identityLabel', () => {
+  it('keeps contact, ownership, and missing identity distinct', () => {
+    expect(identityLabel('confirmed_account')).toBe('Confirmed account')
+    expect(identityLabel('contact_only')).toBe('Contact only')
+    expect(identityLabel('ambiguous_association')).toBe(
+      'Account association unverified',
+    )
+    expect(identityLabel('unknown_contact')).toBe('Requester unknown')
   })
 })
 

@@ -326,14 +326,17 @@ func HandleSubmitSupportTicket(c *fiber.Ctx) error {
 	// triage side effects so the draft has a case to attach to.
 	appVersion, osName := caseFieldsFromDiagnostics(req.Diagnostics)
 	recordTicketOpened(c.Context(), SupportCase{
-		TicketNumber: ticketNumber,
-		UserEmail:    email,
-		LogtoSub:     userID,
-		Subject:      subject,
-		Category:     effectiveCategory,
-		AppVersion:   appVersion,
-		OS:           osName,
-		TierAtOpen:   platform.TierFromRoles(platform.GetUserRoles(c)),
+		TicketNumber:  ticketNumber,
+		UserEmail:     email,
+		UserName:      strings.TrimSpace(req.Name),
+		ContactSource: contactSourceAuthenticated,
+		LogtoSub:      userID,
+		AccountSource: accountSourceAuthenticated,
+		Subject:       subject,
+		Category:      effectiveCategory,
+		AppVersion:    appVersion,
+		OS:            osName,
+		TierAtOpen:    platform.TierFromRoles(platform.GetUserRoles(c)),
 	}, originalBody)
 
 	// Side effects after successful ticket creation: persist the AI
@@ -454,6 +457,7 @@ func recordTicketOpened(ctx context.Context, sc SupportCase, userBodyHTML string
 	}
 	sc.Status = "open"
 	sc.StatusObservedAt = time.Now()
+	sc.ContactObservedAt = sc.StatusObservedAt
 	if err := upsertSupportCase(ctx, sc); err != nil {
 		log.Printf("[Cases] %v", err)
 		return

@@ -41,6 +41,7 @@ import {
   fixBadge,
   formatWait,
   holdCountdown,
+  identityLabel,
   lastUserMessage,
   personMeta,
   personTitle,
@@ -771,7 +772,9 @@ function CaseView({
             #{detail.ticket_number}
           </span>
           <span className="text-xs text-base-content/50">
-            {detail.user_email ?? 'no email on file'}
+            {[detail.user_name, detail.user_email]
+              .filter(Boolean)
+              .join(' · ') || 'requester unknown'}
           </span>
           {badge ? (
             <Pill tone={badge.paying ? 'paying' : 'neutral'}>
@@ -779,13 +782,18 @@ function CaseView({
             </Pill>
           ) : (
             <span className="text-xs text-base-content/45 italic">
-              no account on file
+              {identityLabel(detail.identity_state)}
             </span>
           )}
         </div>
         <h1 className="mt-1.5 text-xl font-bold tracking-tight sm:text-2xl">
           {detail.subject || '(no subject)'}
         </h1>
+        {detail.plan_note && (
+          <p className="mt-1.5 max-w-[75ch] text-xs text-base-content/50">
+            {detail.plan_note}
+          </p>
+        )}
       </header>
       <CaseBody detail={detail} onCase={setDetail} />
     </div>
@@ -848,7 +856,7 @@ function PersonView({
             </Pill>
           ) : (
             <span className="text-xs text-base-content/45 italic">
-              {person.plan_note ? 'no account' : 'no plan on file'}
+              {identityLabel(person.identity_state)}
             </span>
           )}
         </div>
@@ -1052,7 +1060,7 @@ function TicketCard({
         </span>
       </div>
       <p className="mt-0.5 truncate text-xs text-base-content/55">
-        {row.name || row.user_email || 'no account on this ticket'}
+        {row.name || row.user_email || 'requester unknown'}
         {' · '}
         {wait ? `waiting ${wait}` : 'wait unknown'}
       </p>

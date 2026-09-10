@@ -19,11 +19,10 @@ import (
 //
 // A row is a PERSON. Rachel Armstrong wrote five times in one afternoon; that
 // was five rows shouting at a reader who has one human to answer. Cases are
-// grouped by `user_email`, which is also why the key is an email and not an
-// account: #819835 arrived anonymously from the marketing site, has no
-// logto_sub, and still belongs in the queue. A group carries a name and a plan
-// only when one actually exists — an invented "Anonymous User" reads exactly
-// like a real one.
+// grouped by authenticated account subject when that provenance is recorded,
+// then by contact email. A case with neither gets its own ticket key. A group
+// carries a name and a plan only when one actually exists — an invented
+// "Anonymous User" reads exactly like a real one.
 //
 // PAYING CUSTOMERS ARE A SECTION, not a sort key. Priority support was sold,
 // so no ordering a reader picks may push a paying customer below someone who
@@ -39,6 +38,13 @@ const (
 	sectionOpen     = "open"
 	sectionAnswered = "answered"
 	sectionResolved = "resolved"
+)
+
+const (
+	identityUnknownContact       = "unknown_contact"
+	identityContactOnly          = "contact_only"
+	identityConfirmedAccount     = "confirmed_account"
+	identityAmbiguousAssociation = "ambiguous_association"
 )
 
 // sectionOrder is the reading order, and it is the whole point: sorting
@@ -121,16 +127,15 @@ func payingSectionNote(a AdminQueueAccounts, inSection int) string {
 	}
 }
 
-// AdminPerson is one row of the queue: an email, everything we honestly know
-// about whoever is behind it, and the tickets they wrote.
+// AdminPerson is one row of the queue: an established account or unverified
+// contact, everything we honestly know about it, and its tickets.
 //
 // The tickets are referenced by number rather than embedded. The flat rows are
 // in the same response, so embedding them would ship every case twice and give
 // the two copies somewhere to disagree.
 type AdminPerson struct {
-	// Key groups the cases. It is the lowercased email; a case with no email
-	// gets a key of its own so two unrelated anonymous reports never merge
-	// into one imaginary person.
+	// Key groups by established account, then normalized contact email. A case
+	// with neither gets a key of its own so unrelated reports never merge.
 	Key   string `json:"key"`
 	Email string `json:"email,omitempty"`
 	// Name is whatever the ticket carried. Empty means we do not know it, and
@@ -142,7 +147,11 @@ type AdminPerson struct {
 	Paying bool   `json:"paying"`
 	// PlanNote explains an empty Plan, because "free" and "no account exists
 	// for this person" are different facts and only one of them is a plan.
-	PlanNote string `json:"plan_note,omitempty"`
+	PlanNote            string `json:"plan_note,omitempty"`
+	ContactSource       string `json:"contact_source,omitempty"`
+	IdentityState       string `json:"identity_state"`
+	AccountEstablished  bool   `json:"account_established"`
+	SubscriptionPresent bool   `json:"subscription_present"`
 
 	Section string `json:"section"`
 
@@ -243,27 +252,35 @@ func groupPeople(rows []AdminQueueRow) []AdminPerson {
 		at   time.Time
 	}
 	best := map[string]candidate{}
+	nameAt := map[string]time.Time{}
+	emailAt := map[string]time.Time{}
 
 	for _, r := range rows {
 		key := personKey(r)
 		p := byKey[key]
 		if p == nil {
+			identityState := rowIdentityState(r)
 			p = &AdminPerson{
-				Key:           key,
-				Email:         r.UserEmail,
-				TicketNumbers: make([]string, 0, 2),
+				Key:                 key,
+				ContactSource:       r.ContactSource,
+				IdentityState:       identityState,
+				AccountEstablished:  r.AccountEstablished,
+				SubscriptionPresent: r.SubscriptionPresent,
+				TicketNumbers:       make([]string, 0, 2),
 				WaitingHours: platform.Unmeasured(
 					"No message from this person is on record, so there is nothing to measure a wait from."),
 			}
-			if r.UserEmail == "" {
-				p.PlanNote = "No account is attached to this ticket — it arrived without a signed-in user, so there is no name and no plan to show."
-			}
+			p.PlanNote = identityPlanNote(identityState, r.SubscriptionPresent)
 			byKey[key] = p
 			order = append(order, key)
 		}
 
 		p.Tickets++
 		p.TicketNumbers = append(p.TicketNumbers, r.TicketNumber)
+		if rowIdentityState(r) == identityAmbiguousAssociation && !p.AccountEstablished {
+			p.IdentityState = identityAmbiguousAssociation
+		}
+		p.SubscriptionPresent = p.SubscriptionPresent || r.SubscriptionPresent
 		switch r.Group {
 		case queueNeedsYou:
 			p.NeedsYou++
@@ -273,12 +290,17 @@ func groupPeople(rows []AdminQueueRow) []AdminPerson {
 			p.Handled++
 		}
 
-		// The name and the plan come from whichever ticket actually carries
-		// them. Someone who wrote once signed in and once through the
-		// marketing form is still one person, and the half of the record that
-		// knows their name is the half worth keeping.
-		if p.Name == "" && r.Name != "" {
+		// Keep the freshest known display contact within this already-safe
+		// group. Account and contact groups never merge merely by email.
+		if strings.TrimSpace(r.Name) != "" && (p.Name == "" || r.UpdatedAt.After(nameAt[key])) {
 			p.Name = r.Name
+			p.ContactSource = r.ContactSource
+			nameAt[key] = r.UpdatedAt
+		}
+		if email := contactEmail(r.UserEmail); email != "" && (p.Email == "" || r.UpdatedAt.After(emailAt[key])) {
+			p.Email = r.UserEmail
+			p.ContactSource = r.ContactSource
+			emailAt[key] = r.UpdatedAt
 		}
 		if r.Paying {
 			p.Paying = true
@@ -312,22 +334,75 @@ func groupPeople(rows []AdminQueueRow) []AdminPerson {
 	out := make([]AdminPerson, 0, len(order))
 	for _, key := range order {
 		p := byKey[key]
+		p.PlanNote = identityPlanNote(p.IdentityState, p.SubscriptionPresent)
 		p.Section = personSection(*p)
 		out = append(out, *p)
 	}
 	return out
 }
 
-// personKey groups by email, and refuses to group without one.
+// personKey groups only authenticated account ownership; everything else is
+// an unverified contact or an individual ticket.
 func personKey(r AdminQueueRow) string {
-	email := strings.ToLower(strings.TrimSpace(r.UserEmail))
+	if r.AccountEstablished && strings.TrimSpace(r.AccountSubject) != "" {
+		return "account:" + strings.TrimSpace(r.AccountSubject)
+	}
+	email := contactEmail(r.UserEmail)
 	if email == "" {
 		// Not a shared "anonymous" bucket: two anonymous reports are two
 		// different people until something says otherwise, and merging them
 		// would put one stranger's words under another's row.
 		return "ticket:" + r.TicketNumber
 	}
+	return "contact:" + email
+}
+
+func contactEmail(email string) string {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "anonymous@scrollr.user" {
+		return ""
+	}
 	return email
+}
+
+func rowIdentityState(r AdminQueueRow) string {
+	if r.IdentityState != "" {
+		return r.IdentityState
+	}
+	state, _ := requesterIdentity(r.AccountSubject, "", r.UserEmail, r.Name)
+	if r.AccountEstablished && strings.TrimSpace(r.AccountSubject) != "" {
+		state = identityConfirmedAccount
+	}
+	return state
+}
+
+func requesterIdentity(subject, accountSource, email, name string) (string, bool) {
+	if strings.TrimSpace(subject) != "" && accountSource == accountSourceAuthenticated {
+		return identityConfirmedAccount, true
+	}
+	if strings.TrimSpace(subject) != "" {
+		return identityAmbiguousAssociation, false
+	}
+	if contactEmail(email) != "" || strings.TrimSpace(name) != "" {
+		return identityContactOnly, false
+	}
+	return identityUnknownContact, false
+}
+
+func identityPlanNote(state string, subscriptionPresent bool) string {
+	switch state {
+	case identityConfirmedAccount:
+		if !subscriptionPresent {
+			return "A confirmed account is attached, but no subscription record is available."
+		}
+	case identityAmbiguousAssociation:
+		return "A legacy account association exists, but its provenance is unavailable. It is not used for grouping or subscription context."
+	case identityContactOnly:
+		return "Contact details are available, but no signed-in account association is established."
+	default:
+		return "Requester contact and account association are unknown."
+	}
+	return ""
 }
 
 // headlineRank ranks the three states by how much a reader needs to see them.

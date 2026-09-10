@@ -206,10 +206,20 @@ export function personTitle(person: { name?: string; email?: string }): {
   if (name) return { title: name, subtitle: email ?? null, known: true }
   if (email) return { title: email, subtitle: null, known: true }
   return {
-    title: 'No account on this ticket',
-    subtitle: 'it arrived without a signed-in user',
+    title: 'Requester unknown',
+    subtitle: 'no requester name or email was stored',
     known: false,
   }
+}
+
+export function identityLabel(state: string): string {
+  const labels: Record<string, string> = {
+    confirmed_account: 'Confirmed account',
+    contact_only: 'Contact only',
+    ambiguous_association: 'Account association unverified',
+    unknown_contact: 'Requester unknown',
+  }
+  return labels[state] ?? 'Requester identity unknown'
 }
 
 /**

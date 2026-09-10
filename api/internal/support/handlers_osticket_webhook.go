@@ -155,8 +155,9 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 	eventTime := parseISO(&ev.Created)
 	if platform.DBPool != nil {
 		if err := upsertSupportCase(ctx, SupportCase{
-			TicketNumber: ev.TicketNumber, UserEmail: ev.UserEmail, Subject: ev.Subject, Status: "open",
-			UpdatedAt: eventTime, StatusObservedAt: eventTime,
+			TicketNumber: ev.TicketNumber, UserEmail: ev.UserEmail, UserName: strings.TrimSpace(ev.UserName),
+			ContactSource: contactSourceOSTicketWebhook, ContactObservedAt: eventTime,
+			Subject: ev.Subject, Status: "open", UpdatedAt: eventTime, StatusObservedAt: eventTime,
 		}); err != nil {
 			log.Printf("[Cases] %v", err)
 		}

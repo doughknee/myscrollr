@@ -180,10 +180,12 @@ func HandleSubmitPublicSupportTicket(c *fiber.Ctx) error {
 		redactIP(ip), redactEmail(req.Email), req.Category, ticketNumber)
 
 	recordTicketOpened(c.Context(), SupportCase{
-		TicketNumber: ticketNumber,
-		UserEmail:    req.Email,
-		Subject:      subjectFull,
-		Category:     effectiveCategory,
+		TicketNumber:  ticketNumber,
+		UserEmail:     req.Email,
+		UserName:      req.Name,
+		ContactSource: contactSourcePublic,
+		Subject:       subjectFull,
+		Category:      effectiveCategory,
 	}, originalBody)
 
 	if triage != nil && ticketNumber != "" {
