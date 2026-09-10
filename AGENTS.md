@@ -2,6 +2,17 @@
 
 Operational guide for AI coding agents working in this repository.
 
+## Linear coordination
+
+Canonical project: **Scrollr** (`4b180bbc-2dae-4d02-8e73-3548abe725f1`), team **RelentNet** (REL). The completed `myscrollr — moved to Scrollr` project is a redirect; do not create another project for this repo.
+
+- Read the [Project playbook](https://linear.app/relentnet/document/project-playbook-90f99def87d1) for intake, readiness, status and completion rules.
+- Read the [Home register](https://linear.app/relentnet/document/home-register-a42dac9d04bf) before taking ownership or sharing dev resources. Home maintains the register; workers maintain their issues.
+- Search before creating. Capture new ideas/bugs in Backlog unless execution was assigned. Todo means a ready brief, not permission to dispatch or ship.
+- Keep one current issue brief; replace superseded directions and put concise evidence in comments. Use real dependency relations and record the next owner.
+- A PR-only handoff stays In Review. Done requires the agreed acceptance and finish; shipping work needs deployment/release verification. Reconcile squash-merge history before closing old issues.
+- If issue creation hits quota, record the intended title/scope in the register without inventing an ID. Never delete/archive issues to make capacity.
+
 ## Project Overview
 
 MyScrollr aggregates financial market data, sports scores, RSS feeds, and Yahoo Fantasy Sports. Tauri desktop app (primary product), React marketing website, Go gateway API, and independent channel services. Infrastructure: PostgreSQL, Redis, Logto (auth), Sequin (CDC), Stripe (billing). Deployed on DigitalOcean Kubernetes (DOKS) with images stored in DigitalOcean Container Registry (DOCR). See `k8s/` for manifests and `.github/workflows/deploy.yml` for the build-and-deploy pipeline.
