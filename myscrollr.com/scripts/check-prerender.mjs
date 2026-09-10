@@ -193,7 +193,7 @@ for (const route of ROUTES) {
     }
   }
 
-  if (route.expectedH1) {
+  if (route.expectedBody) {
     const bodyOnly = html.replace(/<head[\s\S]*?<\/head>/i, '')
     const h1Matches = [...bodyOnly.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)]
     if (h1Matches.length !== 1) {
@@ -204,7 +204,7 @@ for (const route of ROUTES) {
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
-    if (h1Text !== route.expectedH1) {
+    if (route.expectedH1 && h1Text !== route.expectedH1) {
       fail(route, `h1="${h1Text}" expected="${route.expectedH1}"`)
       continue
     }

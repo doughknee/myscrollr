@@ -83,12 +83,13 @@ COPY --from=builder /app/myscrollr.com/dist/client /usr/share/nginx/html
 RUN printf 'server {\n\
     listen 3000;\n\
     server_name www.myscrollr.com;\n\
+    include /etc/nginx/security-headers.conf;\n\
     return 301 https://myscrollr.com$request_uri;\n\
 }\n\
 \n\
 server {\n\
-    listen 3000;\n\
-    server_name _;\n\
+    listen 3000 default_server;\n\
+    server_name myscrollr.com _;\n\
     root /usr/share/nginx/html;\n\
     index index.html;\n\
 \n\
