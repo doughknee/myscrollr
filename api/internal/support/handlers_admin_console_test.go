@@ -105,6 +105,59 @@ func TestQueueGroupSaysWhoIsWaitingAndWhy(t *testing.T) {
 	}
 }
 
+func TestQueueUsesTheActualConversationWhenDraftStateIsStaleOrMissing(t *testing.T) {
+	if !testsupport.DBAvailable(t) {
+		return
+	}
+	resetCases(t)
+	seedAdmin(t, "sub-conversation")
+	t.Setenv("SUPPORT_AUTOSEND", "off")
+	testsupport.MustExec(t, `INSERT INTO support_cases
+		(ticket_number, user_email, subject, status, updated_at) VALUES
+		('answered-no-draft', 'one@example.com', 'synthetic one', 'open', now()),
+		('new-reply', 'two@example.com', 'synthetic two', 'open', now())`)
+	testsupport.MustExec(t, `INSERT INTO support_messages (ticket_number, kind, body_text, created_at) VALUES
+		('answered-no-draft', 'user', 'question', now() - interval '3 hours'),
+		('answered-no-draft', 'sent', 'answer', now() - interval '2 hours'),
+		('new-reply', 'user', 'first question', now() - interval '4 hours'),
+		('new-reply', 'sent', 'old answer', now() - interval '3 hours'),
+		('new-reply', 'user', 'new reply', now() - interval '1 hour')`)
+	testsupport.MustExec(t, `INSERT INTO support_drafts
+		(ticket_number, user_email, original_subject, draft_body_html, status, created_at)
+		VALUES ('new-reply', 'two@example.com', 'synthetic two', '<p>old answer</p>', 'sent', now() - interval '3 hours')`)
+
+	app := adminSupportApp("sub-conversation")
+	status, body := getJSON(t, app, "/admin/support/queue")
+	if status != fiber.StatusOK {
+		t.Fatalf("queue: status=%d body=%s", status, body)
+	}
+	var response AdminQueueResponse
+	if err := json.Unmarshal([]byte(body), &response); err != nil {
+		t.Fatal(err)
+	}
+	groups := map[string]string{}
+	for _, row := range response.Rows {
+		groups[row.TicketNumber] = row.Group
+	}
+	if groups["answered-no-draft"] != queueWaiting {
+		t.Errorf("answered-no-draft=%q, want waiting because staff answered", groups["answered-no-draft"])
+	}
+	if groups["new-reply"] != queueNeedsYou {
+		t.Errorf("new-reply=%q, want needs_you because inbound is newer than sent", groups["new-reply"])
+	}
+	status, body = getJSON(t, app, "/admin/support/case/new-reply")
+	if status != fiber.StatusOK {
+		t.Fatalf("case: status=%d body=%s", status, body)
+	}
+	var detail AdminCaseDetail
+	if err := json.Unmarshal([]byte(body), &detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.Group != queueNeedsYou {
+		t.Errorf("case detail group=%q, want needs_you like the queue", detail.Group)
+	}
+}
+
 // The countdown is the one number on this page that can be a lie. hold_until
 // keeps ticking whether or not anything is going to collect it, so a page that
 // renders the remaining seconds while SUPPORT_AUTOSEND is off tells an admin a

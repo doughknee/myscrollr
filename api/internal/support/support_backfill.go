@@ -63,7 +63,7 @@ type osTicketDetail struct {
 	Priority    string  `json:"priority"`
 	Created     *string `json:"created"`
 	Updated     *string `json:"updated"`
-	Closed      bool    `json:"closed"`
+	Closed      *bool   `json:"closed"`
 	UserEmail   string  `json:"user_email"`
 	Thread      []struct {
 		ID        int64   `json:"id"`
@@ -204,16 +204,18 @@ func syncTicket(ctx context.Context, number string, st *BackfillStats) error {
 	if err := json.Unmarshal(body, &d); err != nil {
 		return fmt.Errorf("decode detail: %w", err)
 	}
-	caseStatus := "open"
-	if d.Closed || (d.StatusState != nil && *d.StatusState != "open") {
-		caseStatus = "closed"
-	}
+	caseStatus, statusKnown := importedCaseStatus(d)
 	sc := SupportCase{
 		TicketNumber: number, UserEmail: d.UserEmail, Subject: d.Subject,
 		Category: categoryFromTopic(d.Topic), Priority: d.Priority, Status: caseStatus,
 		OpenedAt: parseISO(d.Created), UpdatedAt: parseISO(d.Updated),
 	}
-	if caseStatus == "closed" {
+	if statusKnown && !sc.UpdatedAt.IsZero() {
+		sc.StatusObservedAt = sc.UpdatedAt
+	} else {
+		sc.Status = ""
+	}
+	if sc.Status == "closed" {
 		closed := sc.UpdatedAt
 		if closed.IsZero() {
 			closed = time.Now()
@@ -256,6 +258,21 @@ func syncTicket(ctx context.Context, number string, st *BackfillStats) error {
 		st.Messages++
 	}
 	return nil
+}
+
+func importedCaseStatus(d osTicketDetail) (string, bool) {
+	if d.Closed == nil || d.StatusState == nil {
+		return "", false
+	}
+	state := strings.ToLower(strings.TrimSpace(*d.StatusState))
+	closedState := state == "closed" || state == "archived" || state == "deleted"
+	if state != "open" && !closedState || *d.Closed != closedState {
+		return "", false
+	}
+	if closedState {
+		return "closed", true
+	}
+	return "open", true
 }
 
 // categoryFromTopic maps an osTicket help-topic name onto the category

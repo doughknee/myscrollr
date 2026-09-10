@@ -95,7 +95,7 @@ func HandleOSTicketThreadMessage(c *fiber.Ctx) error {
 		log.Printf("[OSTicketWebhook] ignoring unknown event=%q", ev.Event)
 		return c.JSON(fiber.Map{"status": "ignored", "reason": "unknown event"})
 	}
-	if ev.TicketNumber == "" || ev.MessageHTML == "" {
+	if ev.TicketNumber == "" || ev.MessageHTML == "" || parseISO(&ev.Created).IsZero() {
 		log.Printf("[OSTicketWebhook] missing required fields (ticket=%q body_len=%d)", ev.TicketNumber, len(ev.MessageHTML))
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{
 			Status: "error",
@@ -152,15 +152,17 @@ func processReplyTriageAsync(ev osTicketThreadMessageEvent) {
 	// Case DB first: the user's follow-up is an event whether or not
 	// triage produces a draft. A user reply reopens the ticket in osTicket,
 	// so the case goes back to open too.
+	eventTime := parseISO(&ev.Created)
 	if platform.DBPool != nil {
 		if err := upsertSupportCase(ctx, SupportCase{
 			TicketNumber: ev.TicketNumber, UserEmail: ev.UserEmail, Subject: ev.Subject, Status: "open",
+			UpdatedAt: eventTime, StatusObservedAt: eventTime,
 		}); err != nil {
 			log.Printf("[Cases] %v", err)
 		}
 		if err := recordSupportMessage(ctx, SupportMessage{
 			TicketNumber: ev.TicketNumber, Kind: "user", BodyHTML: ev.MessageHTML,
-			OSTicketEntryID: ev.ThreadEntryID,
+			OSTicketEntryID: ev.ThreadEntryID, CreatedAt: eventTime,
 		}); err != nil {
 			log.Printf("[Cases] %v", err)
 		}
