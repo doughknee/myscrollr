@@ -30,6 +30,20 @@ func TestWidgetRoutesAreRegisteredAndAuthGated(t *testing.T) {
 	}
 }
 
+func TestAdminAnalyticsRouteIsRegisteredAndAuthGated(t *testing.T) {
+	s := NewServer()
+	s.setupRoutes()
+
+	resp, err := s.App.Test(httptest.NewRequest("GET", "/admin/analytics", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != fiber.StatusUnauthorized {
+		t.Fatalf("GET /admin/analytics: got %d, want 401", resp.StatusCode)
+	}
+}
+
 // The rename deleted the old paths outright — no alias, no compat seam
 // (VISION §4.4). If one of these ever answers again, someone re-introduced
 // the dual-speak this refactor exists to remove.
