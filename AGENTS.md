@@ -4,7 +4,7 @@ Operational guide for AI coding agents working in this repository.
 
 ## Linear coordination
 
-Canonical project: **Scrollr** (`4b180bbc-2dae-4d02-8e73-3548abe725f1`), team **RelentNet** (REL). The completed `myscrollr — moved to Scrollr` project is a redirect; do not create another project for this repo.
+Canonical project: **Scrollr** (`4b180bbc-2dae-4d02-8e73-3548abe725f1`), team **Scrollr** (`8741ef7f-7860-4467-9ab9-ef3079240865`, SCROLLR), in the **doughknee** workspace (URL slug remains `relentnet`). The completed `myscrollr — moved to Scrollr` project is a redirect; do not create another project for this repo. Historical REL issue links still resolve after the team migration; use current issue identifiers for new work and preserve existing PR branches.
 
 - Read the [Project playbook](https://linear.app/relentnet/document/project-playbook-90f99def87d1) for intake, readiness, status and completion rules.
 - Read the [Home register](https://linear.app/relentnet/document/home-register-a42dac9d04bf) before taking ownership or sharing dev resources. Home maintains the register; workers maintain their issues.
