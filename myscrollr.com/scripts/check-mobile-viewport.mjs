@@ -255,7 +255,7 @@ try {
         const layout = await page.evaluate(() => {
           const heading = document.querySelector('h1')
           const heroCopy = Array.from(document.querySelectorAll('p')).find(
-            (el) => el.textContent?.includes('The go-ahead run'),
+            (el) => el.textContent?.includes('The moment it happens'),
           )
           const bar = document.querySelector('[data-demo-ticker-bar]')
           if (!heading || !heroCopy || !bar) return null
