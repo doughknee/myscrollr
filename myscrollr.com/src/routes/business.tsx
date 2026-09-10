@@ -43,7 +43,7 @@ const reveal = (index = 0) => ({
 export const Route = createFileRoute('/business')({
   head: () =>
     seo({
-      title: 'Scrollr for Business: Branded Desktop Deployments',
+      title: 'White-Label Desktop Ticker for Business | Scrollr',
       description:
         'Custom-branded Scrollr deployments for brokerages, sports venues, fantasy platforms, crypto exchanges, and news publishers. From $500/mo.',
       path: '/business',
@@ -904,9 +904,9 @@ function BusinessPage() {
       <PageHeader
         eyebrowLeft="BUSINESS ／ BRANDED DEPLOYMENTS"
         eyebrowRight="FROM $500/MO · MUTUAL NDA BEFORE THE FIRST CALL"
-        line1="YOUR BRAND,"
-        line2="OUR RAILS."
-        sub="The Scrollr platform (ticker, data pipeline, and all) wearing your logo, your colors, your domain. Built, deployed, and supported by the people who wrote it."
+        line1="WHITE-LABEL DESKTOP TICKER,"
+        line2="BUILT FOR YOUR BRAND."
+        sub="A branded Scrollr deployment can carry your logo, colors, domain, and selected data sources across the desktop app and its data pipeline."
         actions={
           <div className="flex flex-col items-start gap-3.5 sm:items-end">
             <button

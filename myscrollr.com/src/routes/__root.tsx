@@ -264,20 +264,20 @@ export const Route = createRootRoute({
   // sync with the homepage rewrite (em-dash free, ≤60 char title).
   head: () => ({
     meta: [
-      { title: 'Scrollr: Live Data Ticker for Desktop' },
+      { title: 'Scrollr — Live Desktop Ticker for Sports, Stocks & News' },
       {
         name: 'description',
         content:
-          'Live finance, sports, news, and fantasy scores in one quiet desktop ticker. Free and open source. macOS, Windows, Linux.',
+          'Keep live sports scores, stocks, crypto, news, RSS feeds, fantasy updates, weather, and more visible in a customizable desktop ticker.',
       },
       {
         property: 'og:title',
-        content: 'Scrollr: Live Data Ticker for Desktop',
+        content: 'Scrollr — Live Desktop Ticker for Sports, Stocks & News',
       },
       {
         property: 'og:description',
         content:
-          'Live finance, sports, news, and fantasy scores in one quiet desktop ticker. Free and open source. macOS, Windows, Linux.',
+          'Keep live sports scores, stocks, crypto, news, RSS feeds, fantasy updates, weather, and more visible in a customizable desktop ticker.',
       },
       { property: 'og:type', content: 'website' },
       { property: 'og:url', content: 'https://myscrollr.com' },
@@ -295,12 +295,12 @@ export const Route = createRootRoute({
       { name: 'twitter:card', content: 'summary_large_image' },
       {
         name: 'twitter:title',
-        content: 'Scrollr: Live Data Ticker for Desktop',
+        content: 'Scrollr — Live Desktop Ticker for Sports, Stocks & News',
       },
       {
         name: 'twitter:description',
         content:
-          'Live finance, sports, news, and fantasy scores in one quiet desktop ticker. Free and open source. macOS, Windows, Linux.',
+          'Keep live sports scores, stocks, crypto, news, RSS feeds, fantasy updates, weather, and more visible in a customizable desktop ticker.',
       },
       {
         name: 'twitter:image',

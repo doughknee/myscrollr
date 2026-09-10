@@ -36,7 +36,8 @@ const ROUTES = [
     path: '/',
     file: 'index.html',
     minJsonLd: 4, // Org, WebSite, SoftwareApp, FAQPage
-    expectedBody: 'The go-ahead run',
+    expectedBody: 'The moment it happens, you already know.',
+    expectedH1: 'Your live desktop ticker for everything you follow',
   },
   {
     path: '/widgets',
@@ -100,13 +101,17 @@ const ROUTES = [
     minJsonLd: 2, // organization + breadcrumbs
     expectedBody: 'Terms of Service',
   },
-  // Uplink pages render their auth-aware bodies client-side only;
-  // <head> still prerenders for SEO. No body assertion.
-  { path: '/uplink', file: 'uplink/index.html', minJsonLd: 4 }, // org + productOffers + faq + breadcrumbs
+  {
+    path: '/uplink',
+    file: 'uplink/index.html',
+    minJsonLd: 4,
+    expectedBody: 'Plans for more widgets at once',
+  }, // org + productOffers + faq + breadcrumbs
   {
     path: '/uplink/lifetime',
     file: 'uplink/lifetime/index.html',
     minJsonLd: 2, // organization + breadcrumbs
+    expectedBody: 'One payment. Permanent access.',
   },
   {
     path: '/status',
@@ -175,6 +180,36 @@ for (const route of ROUTES) {
     continue
   }
 
+  const jsonLdScripts = [
+    ...html.matchAll(
+      /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/g,
+    ),
+  ]
+  for (const script of jsonLdScripts) {
+    try {
+      JSON.parse(script[1])
+    } catch (error) {
+      fail(route, `invalid JSON-LD: ${error.message}`)
+    }
+  }
+
+  {
+    const bodyOnly = html.replace(/<head[\s\S]*?<\/head>/i, '')
+    const h1Matches = [...bodyOnly.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/g)]
+    if (h1Matches.length !== 1) {
+      fail(route, `h1 count=${h1Matches.length} expected 1`)
+      continue
+    }
+    const h1Text = h1Matches[0][1]
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (route.expectedH1 && h1Text !== route.expectedH1) {
+      fail(route, `h1="${h1Text}" expected="${route.expectedH1}"`)
+      continue
+    }
+  }
+
   if (route.expectedBody) {
     // Strip <head>…</head> before searching so we never match metadata
     // (title, description, og:*, JSON-LD) — only real rendered body.
@@ -195,6 +230,17 @@ for (const route of ROUTES) {
     `title="${titleMatch[1]}" jsonLd=${jsonLdCount}` +
       (route.expectedBody ? ` body="${route.expectedBody}" ✓` : ''),
   )
+}
+
+const sitemap = readFileSync(
+  join(__dirname, '..', 'public', 'sitemap.xml'),
+  'utf8',
+)
+if (sitemap.includes('<lastmod>')) {
+  console.error('✗ sitemap.xml contains synthetic <lastmod> dates')
+  failures += 1
+} else {
+  console.log('✓ sitemap.xml omits synthetic lastmod dates')
 }
 
 const shell = join(clientDir, '_shell.html')

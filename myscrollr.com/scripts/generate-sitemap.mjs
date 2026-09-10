@@ -5,8 +5,6 @@ import { dirname, join } from 'node:path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const outPath = join(__dirname, '..', 'public', 'sitemap.xml')
 
-const today = new Date().toISOString().slice(0, 10)
-
 // Hand-curated route table — single source of truth.
 // Mirrors the prerendered marketing routes in dist/client/. Auth-only
 // routes (/account, /callback, /invite, /u/*) and the synthetic SPA
@@ -40,7 +38,6 @@ const xml = `<?xml version="1.0" encoding="UTF-8"?>
 ${ROUTES.map(
   (r) => `  <url>
     <loc>https://myscrollr.com${r.path}</loc>
-    <lastmod>${today}</lastmod>
     <changefreq>${r.changefreq}</changefreq>
     <priority>${r.priority.toFixed(1)}</priority>
   </url>`,
