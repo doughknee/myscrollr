@@ -78,7 +78,7 @@ FROM nginx:alpine
 # Copy built assets to nginx
 COPY --from=builder /app/myscrollr.com/dist/client /usr/share/nginx/html
 
-# SPA fallback: route all paths to index.html for client-side routing
+# SPA fallback: route dynamic paths to _shell.html for client-side routing
 # Includes security headers, gzip compression, and proper caching
 RUN printf 'server {\n\
     listen 3000;\n\
@@ -151,7 +151,7 @@ server {\n\
     #                          and a mismatch with our canonical URLs\n\
     #                          (sitemap + <link rel=canonical> declare\n\
     #                          /uplink, not /uplink/).\n\
-    #   3. /index.html       — SPA fallback for dynamic routes\n\
+    #   3. /_shell.html      — SPA fallback for dynamic routes\n\
     #                          (/account, /callback, /u/$username, etc.)\n\
     # Canonical marketing pages are slashless. Keep this list narrow so\n\
     # assets, auth callbacks, API paths, and the SPA fallback are untouched.\n\
@@ -163,7 +163,7 @@ server {\n\
     location / {\n\
         include /etc/nginx/security-headers.conf;\n\
         add_header Cache-Control "no-cache";\n\
-        try_files $uri $uri/index.html /index.html;\n\
+        try_files $uri $uri/index.html /_shell.html;\n\
     }\n\
 \n\
     # ── Hashed static assets: cache forever ─────────────────────\n\
