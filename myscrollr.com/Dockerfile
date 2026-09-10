@@ -78,7 +78,7 @@ FROM nginx:alpine
 # Copy built assets to nginx
 COPY --from=builder /app/myscrollr.com/dist/client /usr/share/nginx/html
 
-# SPA fallback: route all paths to index.html for client-side routing
+# SPA fallback: route dynamic paths to _shell.html for client-side routing
 # Includes security headers, gzip compression, and proper caching
 RUN printf 'server {\n\
     listen 3000;\n\

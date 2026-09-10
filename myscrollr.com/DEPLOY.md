@@ -35,7 +35,7 @@ The following routes are prerendered at build time and ship as static HTML with 
 
 ## Dynamic / auth routes (SPA fallback)
 
-These routes are NOT prerendered. They require nginx's SPA fallback to serve `index.html`, after which the client-side TanStack Router takes over:
+These routes are NOT prerendered. They require nginx's SPA fallback to serve `_shell.html`, after which the client-side TanStack Router takes over:
 
 - `/account` — Logto-gated user account page
 - `/callback` — Logto OAuth callback
@@ -104,7 +104,7 @@ Runs:
    checkout and are rebuilt every time. `predev` runs `fetch-latest-version`
    alone, so `npm run dev` works without the rest.
 
-2. `vite build` — builds the client + SSR bundles, runs the Start prerender phase, then runs the `copyShellToIndex()` plugin.
+2. `vite build` — builds the client + SSR bundles and runs the Start prerender phase, producing the homepage and SPA shell separately.
 3. `tsc` — final type check.
 4. `postbuild` — three gates that fail the build: `check-sentry-tunnel.mjs`,
    `check-prerender.mjs`, `check-mobile-viewport.mjs`.
