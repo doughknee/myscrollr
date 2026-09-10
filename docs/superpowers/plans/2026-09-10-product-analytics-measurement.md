@@ -22,13 +22,13 @@
 ### Task 1: Pin schema and migration behavior
 
 **Files:**
-- Create: `api/migrations/000018_product_analytics.up.sql`
-- Create: `api/migrations/000018_product_analytics.down.sql`
+- Create: `api/migrations/000020_product_analytics.up.sql`
+- Create: `api/migrations/000020_product_analytics.down.sql`
 - Modify: `api/internal/testsupport/testsupport.go`
 - Test: `api/core/product_analytics_integration_test.go`
 
 1. Write failing integration tests that apply migrations and assert both table shapes, defaults, primary/foreign keys, category booleans, and cascade deletion.
-2. Run the focused Docker Go integration test and witness failure because migration 18 is absent.
+2. Run the focused Docker Go integration test and witness failure because migration 20 is absent.
 3. Add the two-table additive migration and test cleanup support; rerun focused tests.
 4. Run `scripts/migrations/check-additive.sh` against the new migration.
 
