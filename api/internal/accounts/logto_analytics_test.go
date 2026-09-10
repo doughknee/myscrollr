@@ -3,6 +3,7 @@ package accounts
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -208,5 +209,33 @@ func TestFetchSignupAnalyticsReturnsEmptyReasonArray(t *testing.T) {
 	raw, _ := json.Marshal(report)
 	if !strings.Contains(string(raw), `"error_reasons":[]`) {
 		t.Fatalf("empty reasons must be an array for the UI, got %s", raw)
+	}
+}
+
+func TestFetchSignupAnalyticsStopsWaitingForTokenWhenContextExpires(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/oidc/token" {
+			t.Fatalf("unexpected Logto path %s", r.URL.Path)
+		}
+		time.Sleep(100 * time.Millisecond)
+		_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "late-token", "expires_in": 3600})
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("LOGTO_ENDPOINT", server.URL)
+	t.Setenv("LOGTO_M2M_APP_ID", "m2m")
+	t.Setenv("LOGTO_M2M_APP_SECRET", "secret")
+	t.Setenv("LOGTO_WEB_APP_ID", "web-app")
+	ResetM2MTokenCache()
+	t.Cleanup(ResetM2MTokenCache)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	started := time.Now()
+	_, err := FetchSignupAnalytics(ctx, "website", 7, time.Now())
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("error = %v, want context deadline exceeded", err)
+	}
+	if elapsed := time.Since(started); elapsed > 200*time.Millisecond {
+		t.Fatalf("analytics token wait took %v, want bounded response", elapsed)
 	}
 }

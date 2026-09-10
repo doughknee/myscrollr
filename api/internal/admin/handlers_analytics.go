@@ -16,8 +16,9 @@ import (
 const signupAnalyticsCacheTTL = 5 * time.Minute
 
 var (
-	fetchSignupAnalytics = accounts.FetchSignupAnalytics
-	signupAnalyticsGroup singleflight.Group
+	fetchSignupAnalytics   = accounts.FetchSignupAnalytics
+	signupAnalyticsGroup   singleflight.Group
+	signupAnalyticsTimeout = 25 * time.Second
 )
 
 type cachedAnalyticsResult struct {
@@ -35,7 +36,9 @@ func HandleGetAnalytics(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Error: "days must be 7 or 30"})
 	}
 
-	report, hit, err := cachedSignupAnalytics(c.Context(), application, days)
+	ctx, cancel := context.WithTimeout(c.Context(), signupAnalyticsTimeout)
+	defer cancel()
+	report, hit, err := cachedSignupAnalytics(ctx, application, days)
 	if err != nil {
 		log.Print("[Admin] signup analytics unavailable")
 		return c.Status(fiber.StatusServiceUnavailable).JSON(platform.ErrorResponse{Error: "Signup analytics are unavailable."})
@@ -53,27 +56,37 @@ func cachedSignupAnalytics(ctx context.Context, application string, days int) (a
 	if report, ok := readSignupAnalyticsCache(ctx, key); ok {
 		return report, true, nil
 	}
+	if err := ctx.Err(); err != nil {
+		return accounts.SignupAnalytics{}, false, err
+	}
 
-	value, err, _ := signupAnalyticsGroup.Do(key, func() (any, error) {
-		if report, ok := readSignupAnalyticsCache(ctx, key); ok {
+	result := signupAnalyticsGroup.DoChan(key, func() (any, error) {
+		scanCtx, cancel := context.WithTimeout(context.Background(), signupAnalyticsTimeout)
+		defer cancel()
+		if report, ok := readSignupAnalyticsCache(scanCtx, key); ok {
 			return cachedAnalyticsResult{Report: report, Hit: true}, nil
 		}
-		report, err := fetchSignupAnalytics(ctx, application, days, time.Now())
+		report, err := fetchSignupAnalytics(scanCtx, application, days, time.Now())
 		if err != nil {
 			return cachedAnalyticsResult{}, err
 		}
 		if platform.Rdb != nil {
 			if raw, err := json.Marshal(report); err == nil {
-				_ = platform.Rdb.Set(ctx, key, raw, signupAnalyticsCacheTTL).Err()
+				_ = platform.Rdb.Set(scanCtx, key, raw, signupAnalyticsCacheTTL).Err()
 			}
 		}
 		return cachedAnalyticsResult{Report: report}, nil
 	})
-	if err != nil {
-		return accounts.SignupAnalytics{}, false, err
+	select {
+	case <-ctx.Done():
+		return accounts.SignupAnalytics{}, false, ctx.Err()
+	case response := <-result:
+		if response.Err != nil {
+			return accounts.SignupAnalytics{}, false, response.Err
+		}
+		value := response.Val.(cachedAnalyticsResult)
+		return value.Report, value.Hit, nil
 	}
-	result := value.(cachedAnalyticsResult)
-	return result.Report, result.Hit, nil
 }
 
 func readSignupAnalyticsCache(ctx context.Context, key string) (accounts.SignupAnalytics, bool) {

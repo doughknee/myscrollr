@@ -83,6 +83,7 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<SignupAnalytics | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [stale, setStale] = useState(false)
+  const [slow, setSlow] = useState(false)
   const request = useRef<AbortController | null>(null)
 
   const load = useCallback(() => {
@@ -92,24 +93,37 @@ export default function AnalyticsPage() {
     setData(null)
     setError(null)
     setStale(false)
+    setSlow(false)
+    const slowTimer = window.setTimeout(() => {
+      if (!controller.signal.aborted) setSlow(true)
+    }, 3_000)
     loadSignupAnalytics(getToken, application, days, controller.signal)
       .then((report) => {
         if (controller.signal.aborted) return
+        setSlow(false)
         setData(report)
         setStale(Date.now() - Date.parse(report.generated_at) > 10 * 60_000)
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return
+        setSlow(false)
         setError(
           err instanceof Error ? err.message : 'Could not load analytics',
         )
       })
+      .finally(() => window.clearTimeout(slowTimer))
   }, [application, days, getToken])
 
   useEffect(() => {
     load()
     return () => request.current?.abort()
   }, [load])
+
+  const cancel = () => {
+    request.current?.abort()
+    setSlow(false)
+    setError('Loading canceled. You can retry.')
+  }
 
   const eventTotal = data
     ? Object.values(data.stages).reduce((sum, stage) => sum + stage.events, 0)
@@ -165,11 +179,25 @@ export default function AnalyticsPage() {
 
       {!data && !error && (
         <div
-          className="flex min-h-[40vh] items-center justify-center gap-2 text-sm text-base-content/50"
+          className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-sm text-base-content/50"
           role="status"
         >
-          <Loader2 className="size-5 animate-spin" aria-hidden /> Loading signup
-          events
+          <span className="flex items-center gap-2">
+            <Loader2 className="size-5 animate-spin" aria-hidden /> Loading
+            signup events
+          </span>
+          {slow && (
+            <>
+              <span>This range is taking longer than usual.</span>
+              <button
+                type="button"
+                onClick={cancel}
+                className="min-h-10 cursor-pointer rounded-lg px-3 font-semibold ring-1 ring-base-300 hover:bg-base-200"
+              >
+                Cancel
+              </button>
+            </>
+          )}
         </div>
       )}
 

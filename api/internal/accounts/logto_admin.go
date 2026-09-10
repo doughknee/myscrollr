@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -84,7 +85,7 @@ func readCachedM2MToken() string {
 // refreshM2MToken performs the actual HTTP call to Logto's token endpoint
 // and swaps the new token into the cache under a write lock. Returns the
 // fresh token on success.
-func refreshM2MToken() (string, error) {
+func refreshM2MToken(ctx context.Context) (string, error) {
 	cfg := getM2MConfig()
 	if cfg.AppID == "" || cfg.AppSecret == "" {
 		return "", fmt.Errorf("LOGTO_M2M_APP_ID and LOGTO_M2M_APP_SECRET must be set")
@@ -95,7 +96,7 @@ func refreshM2MToken() (string, error) {
 	data.Set("resource", cfg.Resource)
 	data.Set("scope", "all")
 
-	req, err := http.NewRequest("POST", cfg.Endpoint+"/oidc/token", strings.NewReader(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.Endpoint+"/oidc/token", strings.NewReader(data.Encode()))
 	if err != nil {
 		return "", fmt.Errorf("create M2M token request: %w", err)
 	}
@@ -146,6 +147,13 @@ func ResetM2MTokenCache() {
 }
 
 func getM2MToken() (string, error) {
+	return getM2MTokenContext(context.Background())
+}
+
+func getM2MTokenContext(ctx context.Context) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	// Fast path: cache hit under read lock.
 	if token := readCachedM2MToken(); token != "" {
 		return token, nil
@@ -153,19 +161,26 @@ func getM2MToken() (string, error) {
 
 	// Slow path: coalesce concurrent refreshes. All callers that miss the
 	// cache at the same time share one HTTP request and the same result.
-	v, err, _ := m2mGroup.Do("m2m", func() (interface{}, error) {
+	result := m2mGroup.DoChan("m2m", func() (interface{}, error) {
 		// Re-check under the read lock: another goroutine's refresh may
 		// have completed between our fast-path check and our singleflight
 		// entry.
 		if token := readCachedM2MToken(); token != "" {
 			return token, nil
 		}
-		return refreshM2MToken()
+		refreshCtx, cancel := context.WithTimeout(context.Background(), platform.LogtoM2MTokenTimeout)
+		defer cancel()
+		return refreshM2MToken(refreshCtx)
 	})
-	if err != nil {
-		return "", err
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case response := <-result:
+		if response.Err != nil {
+			return "", response.Err
+		}
+		return response.Val.(string), nil
 	}
-	return v.(string), nil
 }
 
 // AssignUplinkRole assigns the "uplink" role to a Logto user via Management API.
