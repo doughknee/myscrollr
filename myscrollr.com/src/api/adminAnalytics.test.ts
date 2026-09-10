@@ -63,4 +63,26 @@ describe('loadSignupAnalytics', () => {
       loadSignupAnalytics(() => Promise.resolve(null), 'website', 7),
     ).rejects.toThrow('Signup analytics are unavailable.')
   })
+
+  it('forwards cancellation so superseded filter requests cannot win', async () => {
+    const controller = new AbortController()
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValue(new DOMException('Aborted', 'AbortError'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    controller.abort()
+    await expect(
+      loadSignupAnalytics(
+        () => Promise.resolve(null),
+        'website',
+        7,
+        controller.signal,
+      ),
+    ).rejects.toMatchObject({ name: 'AbortError' })
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ signal: controller.signal }),
+    )
+  })
 })

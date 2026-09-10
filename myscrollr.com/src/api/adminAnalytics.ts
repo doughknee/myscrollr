@@ -32,6 +32,7 @@ export async function loadSignupAnalytics(
   getToken: () => Promise<string | null>,
   application: AnalyticsApplication,
   days: AnalyticsWindow,
+  signal?: AbortSignal,
 ): Promise<SignupAnalytics> {
   const token = await getToken()
   const response = await fetch(
@@ -39,6 +40,7 @@ export async function loadSignupAnalytics(
     {
       credentials: 'include',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
+      signal,
     },
   )
   if (!response.ok) {

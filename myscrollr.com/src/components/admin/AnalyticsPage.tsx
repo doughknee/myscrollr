@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Loader2, RefreshCw } from 'lucide-react'
 import type {
   AnalyticsApplication,
@@ -83,24 +83,33 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<SignupAnalytics | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [stale, setStale] = useState(false)
+  const request = useRef<AbortController | null>(null)
 
   const load = useCallback(() => {
+    request.current?.abort()
+    const controller = new AbortController()
+    request.current = controller
     setData(null)
     setError(null)
     setStale(false)
-    loadSignupAnalytics(getToken, application, days)
+    loadSignupAnalytics(getToken, application, days, controller.signal)
       .then((report) => {
+        if (controller.signal.aborted) return
         setData(report)
         setStale(Date.now() - Date.parse(report.generated_at) > 10 * 60_000)
       })
-      .catch((err: unknown) =>
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return
         setError(
           err instanceof Error ? err.message : 'Could not load analytics',
-        ),
-      )
+        )
+      })
   }, [application, days, getToken])
 
-  useEffect(load, [load])
+  useEffect(() => {
+    load()
+    return () => request.current?.abort()
+  }, [load])
 
   const eventTotal = data
     ? Object.values(data.stages).reduce((sum, stage) => sum + stage.events, 0)
@@ -139,7 +148,10 @@ export default function AnalyticsPage() {
       </header>
 
       {error && (
-        <div className="rounded-xl bg-error/5 p-4 ring-1 ring-error/20">
+        <div
+          className="rounded-xl bg-error/5 p-4 ring-1 ring-error/20"
+          role="alert"
+        >
           <p className="text-sm font-medium text-error">{error}</p>
           <button
             type="button"

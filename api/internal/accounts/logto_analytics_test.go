@@ -120,7 +120,7 @@ func TestFetchSignupAnalyticsMarksBoundedScanPartial(t *testing.T) {
 	t.Cleanup(func() { analyticsPageSize, analyticsMaxPages = previousPageSize, previousMaxPages })
 	withAnalyticsLogto(t, map[int][]map[string]any{
 		1: {analyticsLog("one", "Interaction.Register.Create", "Success", "", now.UnixMilli())},
-		2: {analyticsLog("two", "Interaction.Register.Submit", "Success", "", now.UnixMilli())},
+		2: {analyticsLog("", "Interaction.Register.Submit", "Success", "", now.UnixMilli())},
 	}, http.StatusOK, "")
 
 	report, err := FetchSignupAnalytics(context.Background(), "website", 30, now)
@@ -129,6 +129,9 @@ func TestFetchSignupAnalyticsMarksBoundedScanPartial(t *testing.T) {
 	}
 	if report.Coverage.Status != "partial" || report.Coverage.Pages != 2 {
 		t.Fatalf("coverage = %+v, want bounded partial scan", report.Coverage)
+	}
+	if !strings.Contains(report.Coverage.Note, "page limit") || !strings.Contains(report.Coverage.Note, "Malformed") {
+		t.Fatalf("coverage note = %q, want every partial reason", report.Coverage.Note)
 	}
 }
 

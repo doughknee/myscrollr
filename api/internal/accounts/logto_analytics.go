@@ -114,6 +114,7 @@ func FetchSignupAnalytics(ctx context.Context, application string, days int, now
 	var observedFrom, observedTo int64
 	malformed := false
 	exhausted := false
+	partialNotes := make([]string, 0, 2)
 
 	for page := 1; page <= analyticsMaxPages; page++ {
 		logs, err := fetchSignupAnalyticsPage(ctx, appID, page)
@@ -122,7 +123,7 @@ func FetchSignupAnalytics(ctx context.Context, application string, days int, now
 				return report, err
 			}
 			report.Coverage.Status = "partial"
-			report.Coverage.Note = "Partial: Logto became unavailable before the bounded scan finished."
+			partialNotes = append(partialNotes, "Logto became unavailable before the bounded scan finished.")
 			break
 		}
 		report.Coverage.Pages = page
@@ -171,11 +172,14 @@ func FetchSignupAnalytics(ctx context.Context, application string, days int, now
 	}
 	if !exhausted && report.Coverage.Status == "unknown" {
 		report.Coverage.Status = "partial"
-		report.Coverage.Note = "Partial: the bounded Logto scan reached its page limit."
+		partialNotes = append(partialNotes, "The bounded Logto scan reached its page limit.")
 	}
 	if malformed {
 		report.Coverage.Status = "partial"
-		report.Coverage.Note = "Partial: malformed Logto rows without stable IDs or timestamps were excluded."
+		partialNotes = append(partialNotes, "Malformed Logto rows without stable IDs or timestamps were excluded.")
+	}
+	if len(partialNotes) > 0 {
+		report.Coverage.Note = "Partial: " + strings.Join(partialNotes, " ")
 	}
 	for reason, count := range reasons {
 		report.ErrorReasons = append(report.ErrorReasons, SignupErrorReason{Reason: reason, Count: count})
