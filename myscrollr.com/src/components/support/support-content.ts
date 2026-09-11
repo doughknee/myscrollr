@@ -26,7 +26,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Is my data private?',
     answer:
-      'No ads or data sales. Optional first-party product activity and PostHog analytics have separate controls and stay off until you enable them. Both exclude ticker contents. Turning either off stops new collection; desktop PostHog history is submitted for deletion and fixed public-site observations are not linked to a durable browser or account identifier.',
+      'No ads or data sales. First-party product activity stays off until enabled. The website asks before using PostHog; limited desktop PostHog analytics are on by default and easy to turn off. Both exclude ticker contents. Turning either off stops new collection; account-linked PostHog history is submitted for deletion.',
   },
   {
     question: 'Do I need an account?',

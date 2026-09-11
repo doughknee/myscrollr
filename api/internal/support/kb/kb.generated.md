@@ -93,15 +93,15 @@ and leave program details to the partner.
 
 ## What Scrollr is
 
-<!-- source: docs/VISION.md @ 05d32f416994 -->
+<!-- source: docs/VISION.md @ becd59af7aa6 -->
 ### 1. What Scrollr is
 
-> **A pinned, always-on-top desktop ticker for the things you actually care about.** Live finance quotes, sports scores, fantasy matchups, prediction markets, and news stream into a compact bar floating over whatever you're working on. You pick **widgets** from a catalog; you pay for **how many you can run at once (slots)**. Multi-monitor aware. **No ads or data sales; optional analytics stay off until you enable them.**
+> **A pinned, always-on-top desktop ticker for the things you actually care about.** Live finance quotes, sports scores, fantasy matchups, prediction markets, and news stream into a compact bar floating over whatever you're working on. You pick **widgets** from a catalog; you pay for **how many you can run at once (slots)**. Multi-monitor aware. **No ads or data sales; analytics are limited and controllable.**
 
 Three load-bearing commitments, true at every layer:
 
 1. **The desktop app is the product** (Tauri v2 + React). The website is *marketing, auth, and billing only*.
-2. **No advertising profiles, and no personal data in crash reports** — enforced by per-service Sentry-scrubbing tests that block deploy. Anonymous first-party counts of app versions and error rates carry no account identifier and nothing about ticker content. Optional first-party and PostHog analytics have separate, default-off controls; both accept only fixed broad activity and exclude ticker content.
+2. **No advertising profiles, and no personal data in crash reports** — enforced by per-service Sentry-scrubbing tests that block deploy. Anonymous first-party counts of app versions and error rates carry no account identifier and nothing about ticker content. First-party and PostHog analytics have separate controls; both accept only fixed broad activity and exclude ticker content.
 3. **One user-facing primitive (the widget), one price lever (the slot).** Every widget costs exactly one slot; a plan card's headline is a widget count.
 
 ## Plans and limits
@@ -193,7 +193,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 ## Settings
 
 <!-- source: desktop/src/components/settings/pages.ts @ fcc775987069 -->
-<!-- source: desktop/src/components/settings/rows.ts @ c077cf5a4d91 -->
+<!-- source: desktop/src/components/settings/rows.ts @ 836804cd1f4b -->
 Every settings row, as the app labels it. "Signed in" / "signed out" marks rows that only exist in that state.
 
 ### Settings › Appearance
@@ -247,7 +247,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 - Settings › Data & privacy › Export your data: Download your sources, preferences, and account metadata as a .zip file. *(signed in only)*
 - Settings › Data & privacy › Send crash reports: When something breaks, send the error, stack trace, app version and OS to Sentry. Never your account, IP address or file paths.
 - Settings › Data & privacy › Share product activity: Help improve Scrollr by counting days your visible ticker runs for at least 30 seconds and which broad widget categories were enabled. Signed-in accounts only; retained for 90 days. *(signed in only)*
-- Settings › Data & privacy › Share app analytics: Help improve Scrollr by sharing app opens, active days, and broad feature categories with PostHog. Never ticker contents, symbols, teams, feeds, or other app activity. *(signed in only)*
+- Settings › Data & privacy › Share app analytics: Share app opens, active days, and broad feature categories with PostHog. On by default; turn it off anytime. Never includes ticker contents, symbols, teams, or feeds. *(signed in only)*
 - Settings › Data & privacy › Reset all settings: Put every setting back to its default and remove your local widgets. Your account, billing, and server data are untouched.
 
 ### Settings › Updates

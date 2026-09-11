@@ -632,9 +632,12 @@ function RootLayout() {
     let current = true;
     void getPostHogAnalyticsConsent()
       .then(({ decision }) => {
-        if (decision === "unknown") {
+        if (
+          decision === "enabled" &&
+          prefsRef.current.privacy.postHogAnalyticsDecision === "unknown"
+        ) {
           toast.info(
-            "New privacy choice: PostHog app analytics stay off unless you enable them in Data & privacy.",
+            "App analytics are on. You can turn them off anytime in Data & privacy.",
             { id: "posthog-consent-transition", duration: 10_000 },
           );
         }

@@ -17,19 +17,27 @@ const PRIVATE_PATHS = [
 const ALLOWED_PLATFORMS = new Set(['windows', 'macos', 'linux'])
 const ALLOWED_EVENTS = new Set([
   '$pageview',
+  '$identify',
   'signup_completed',
   'download_selected',
 ])
 const ALLOWED_PROPERTIES = new Set([
   'token',
   'distinct_id',
+  '$anon_distinct_id',
+  '$process_person_profile',
+  '$session_id',
+  '$window_id',
   'surface',
   'path',
   'platform',
-  'referrer_domain',
-  'campaign_source',
-  'campaign_medium',
-  'campaign_name',
+  '$current_url',
+  '$pathname',
+  '$host',
+  '$referring_domain',
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
   '$ip',
   '$geoip_disable',
 ])
@@ -41,14 +49,41 @@ export function sanitizeWebsiteCapture(
   result: CaptureResult | null,
 ): CaptureResult | null {
   if (!result || !ALLOWED_EVENTS.has(result.event)) return null
+  const properties = Object.fromEntries(
+    Object.entries(result.properties).filter(([key]) =>
+      ALLOWED_PROPERTIES.has(key),
+    ),
+  )
+  for (const key of ['utm_source', 'utm_medium', 'utm_campaign']) {
+    if (
+      typeof properties[key] !== 'string' ||
+      !/^[a-zA-Z0-9._-]{1,64}$/.test(properties[key])
+    ) {
+      delete properties[key]
+    }
+  }
+  if (
+    typeof properties.$referring_domain !== 'string' ||
+    !/^[a-zA-Z0-9.-]{1,120}$/.test(properties.$referring_domain)
+  ) {
+    delete properties.$referring_domain
+  }
+  const path =
+    typeof properties.path === 'string' ? allowedPath(properties.path) : null
+  if (path && typeof window !== 'undefined') {
+    properties.path = path
+    properties.$pathname = path
+    properties.$host = window.location.hostname
+    properties.$current_url = `${window.location.origin}${path}`
+  } else {
+    delete properties.$current_url
+    delete properties.$pathname
+    delete properties.$host
+  }
   return {
     ...result,
     properties: {
-      ...Object.fromEntries(
-        Object.entries(result.properties).filter(([key]) =>
-          ALLOWED_PROPERTIES.has(key),
-        ),
-      ),
+      ...properties,
       $ip: null,
       $geoip_disable: true,
     },
@@ -77,9 +112,9 @@ function initialize(): boolean {
       capture_performance: false,
       disable_session_recording: true,
       disable_surveys: true,
-      person_profiles: 'never',
+      person_profiles: 'identified_only',
       opt_out_capturing_by_default: true,
-      persistence: 'memory',
+      persistence: 'localStorage',
       respect_dnt: true,
     })
     initialized = true
@@ -129,7 +164,6 @@ function ready(): boolean {
   const needsOptIn = !initialized
   if (!initialize()) return false
   if (needsOptIn) {
-    posthog.reset()
     posthog.opt_in_capturing({ captureEventName: false })
   }
   return true
@@ -139,22 +173,24 @@ export function setWebsiteAnalyticsSuppressed(next: boolean): void {
   suppressed = next
 }
 
-function eventID(): string {
-  return crypto.randomUUID()
-}
-
 export function captureWebsitePageview(rawPath: string): void {
   const path = allowedPath(rawPath)
   if (!path || !ready()) return
   const now = Date.now()
   if (lastPageview.path === path && now - lastPageview.at < 1000) return
   lastPageview = { path, at: now }
-  const properties: Record<string, string> = { path, surface: 'website' }
+  const properties: Record<string, string> = {
+    path,
+    surface: 'website',
+    $current_url: `${window.location.origin}${path}`,
+    $pathname: path,
+    $host: window.location.hostname,
+  }
   if (typeof document !== 'undefined' && document.referrer) {
     try {
       const referrer = new URL(document.referrer)
       if (referrer.hostname !== window.location.hostname) {
-        properties.referrer_domain = referrer.hostname.slice(0, 120)
+        properties.$referring_domain = referrer.hostname.slice(0, 120)
       }
     } catch {
       // Invalid referrers are ignored, never forwarded verbatim.
@@ -163,9 +199,9 @@ export function captureWebsitePageview(rawPath: string): void {
   if (typeof window !== 'undefined' && window.location.search) {
     const params = new URLSearchParams(window.location.search)
     for (const [query, property] of [
-      ['utm_source', 'campaign_source'],
-      ['utm_medium', 'campaign_medium'],
-      ['utm_campaign', 'campaign_name'],
+      ['utm_source', 'utm_source'],
+      ['utm_medium', 'utm_medium'],
+      ['utm_campaign', 'utm_campaign'],
     ] as const) {
       const value = params.get(query)
       if (value && /^[a-zA-Z0-9._-]{1,64}$/.test(value)) {
@@ -173,7 +209,7 @@ export function captureWebsitePageview(rawPath: string): void {
       }
     }
   }
-  posthog.capture('$pageview', { ...properties, distinct_id: eventID() })
+  posthog.capture('$pageview', properties)
 }
 
 export function captureWebsiteEvent(
@@ -187,7 +223,7 @@ export function captureWebsiteEvent(
   if (properties.platform && ALLOWED_PLATFORMS.has(properties.platform)) {
     safeProperties.platform = properties.platform
   }
-  posthog.capture(event, { ...safeProperties, distinct_id: eventID() })
+  posthog.capture(event, safeProperties)
 }
 
 export function beginWebsiteSignupFlow(): void {
@@ -197,29 +233,41 @@ export function beginWebsiteSignupFlow(): void {
     !ready()
   )
     return
-  const flowID = eventID()
-  sessionStorage.setItem(SIGNUP_FLOW_KEY, flowID)
+  sessionStorage.setItem(SIGNUP_FLOW_KEY, 'pending')
 }
 
 export function hasPendingWebsiteSignupFlow(): boolean {
   if (typeof window === 'undefined') return false
-  return /^[0-9a-f-]{36}$/i.test(sessionStorage.getItem(SIGNUP_FLOW_KEY) ?? '')
+  return sessionStorage.getItem(SIGNUP_FLOW_KEY) === 'pending'
 }
 
-export function finishWebsiteSignupFlow(verified: boolean): void {
-  if (typeof window === 'undefined') return
-  const flowID = sessionStorage.getItem(SIGNUP_FLOW_KEY)
+export interface WebsiteAnalyticsContext {
+  eligible: boolean
+  verified: boolean
+  analytics_distinct_id?: string
+}
+
+export function applyWebsiteAnalyticsContext(
+  context: WebsiteAnalyticsContext,
+): boolean {
+  if (typeof window === 'undefined') return false
+  const pending = hasPendingWebsiteSignupFlow()
+  const distinctID = context.analytics_distinct_id ?? ''
   sessionStorage.removeItem(SIGNUP_FLOW_KEY)
   if (
-    !verified ||
-    !flowID ||
-    !/^[0-9a-f-]{36}$/i.test(flowID) ||
+    !context.eligible ||
+    !/^[0-9a-f]{64}$/i.test(distinctID) ||
     getWebsiteAnalyticsDecision() !== 'enabled' ||
     !initialize()
   )
-    return
-  posthog.capture('signup_completed', {
-    surface: 'website',
-    distinct_id: flowID,
-  })
+    return false
+  posthog.identify(distinctID)
+  if (pending && context.verified) {
+    posthog.capture('signup_completed', { surface: 'website' })
+  }
+  return true
+}
+
+export function resetWebsiteAnalyticsIdentity(): void {
+  if (initialized) posthog.reset()
 }

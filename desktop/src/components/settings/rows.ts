@@ -239,7 +239,7 @@ export const SETTINGS_ROWS = {
     postHogAnalytics: {
       label: "Share app analytics",
       description:
-        "Help improve Scrollr by sharing app opens, active days, and broad feature categories with PostHog. Never ticker contents, symbols, teams, feeds, or other app activity.",
+        "Share app opens, active days, and broad feature categories with PostHog. On by default; turn it off anytime. Never includes ticker contents, symbols, teams, or feeds.",
       keywords: "posthog analytics privacy consent app opens features",
       when: "signedIn",
     },

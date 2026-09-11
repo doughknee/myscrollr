@@ -37,14 +37,21 @@ func HandleVerifyRecentWebsiteSignup(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(platform.ErrorResponse{Status: "unauthorized", Error: "Authentication required"})
 	}
 	user, err := postHogLogtoUser(userID)
-	if err != nil || user == nil || !recentWebsiteSignup(*user, time.Now().UTC()) {
-		return c.JSON(fiber.Map{"verified": false})
+	if err != nil || user == nil || os.Getenv("POSTHOG_DISTINCT_ID_SALT") == "" {
+		return c.JSON(fiber.Map{"eligible": false, "verified": false})
 	}
 	staff, err := postHogStaff(context.Background(), userID, user.PrimaryEmail)
 	if err != nil {
-		return c.JSON(fiber.Map{"verified": false})
+		return c.JSON(fiber.Map{"eligible": false, "verified": false})
 	}
-	return c.JSON(fiber.Map{"verified": !staff && !postHogActorExcluded(userID)})
+	if staff || postHogActorExcluded(userID) {
+		return c.JSON(fiber.Map{"eligible": false, "verified": false})
+	}
+	return c.JSON(fiber.Map{
+		"eligible":              true,
+		"verified":              recentWebsiteSignup(*user, time.Now().UTC()),
+		"analytics_distinct_id": postHogDistinctID(userID),
+	})
 }
 
 func recentWebsiteSignup(user LogtoUser, now time.Time) bool {
@@ -169,7 +176,20 @@ func HandleGetPostHogConsent(c *fiber.Ctx) error {
 		SELECT decision, deletion_status FROM posthog_analytics_consents WHERE logto_sub = $1`, userID).
 		Scan(&result.Decision, &result.DeletionStatus)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return c.JSON(PostHogConsent{Decision: "unknown"})
+		email, _ := c.Locals("user_email").(string)
+		staff, staffErr := postHogDesktopStaff(context.Background(), userID, email)
+		if staffErr != nil {
+			log.Printf("[PostHog Analytics] verify default setting: %v", staffErr)
+			return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Could not read analytics setting"})
+		}
+		if staff || postHogActorExcluded(userID) {
+			return c.JSON(PostHogConsent{Decision: "declined"})
+		}
+		if _, err := setPostHogConsent(context.Background(), userID, "enabled"); err != nil {
+			log.Printf("[PostHog Analytics] apply default setting: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Could not read analytics setting"})
+		}
+		return c.JSON(PostHogConsent{Decision: "enabled", DeletionStatus: "not_requested"})
 	}
 	if err != nil {
 		log.Printf("[PostHog Analytics] read consent: %v", err)

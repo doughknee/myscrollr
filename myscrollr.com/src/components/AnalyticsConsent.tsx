@@ -32,14 +32,12 @@ export default function AnalyticsConsent() {
   return (
     <section
       aria-label="Analytics privacy choice"
-      className="fixed inset-x-4 bottom-4 z-[110] mx-auto max-w-2xl rounded-xl border border-base-300 bg-base-100 p-5 shadow-2xl"
+      className="fixed inset-x-4 bottom-4 z-[110] mx-auto max-w-xl rounded-xl border border-base-300 bg-base-100 p-4 shadow-xl"
     >
-      <h2 className="text-base font-bold">Help improve Scrollr?</h2>
-      <p className="mt-2 text-sm text-base-content/75">
-        Share limited public-page visits and verified signup or download steps
-        with PostHog. Events use one-time random identifiers and no IP address;
-        we do not record private pages, page contents, or session replays. You
-        can change this anytime.
+      <h2 className="text-sm font-bold">Analytics</h2>
+      <p className="mt-1 text-sm text-base-content/75">
+        Use PostHog to count public-page visits, signups, and downloads. No
+        replay, page content, or IP location. Change this anytime.
       </p>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <button
@@ -47,14 +45,14 @@ export default function AnalyticsConsent() {
           className="rounded-lg border border-base-300 px-4 py-2 text-sm font-semibold hover:bg-base-200"
           onClick={() => choose('declined')}
         >
-          No thanks
+          Not now
         </button>
         <button
           type="button"
           className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-content hover:brightness-110"
           onClick={() => choose('enabled')}
         >
-          Allow analytics
+          Allow
         </button>
       </div>
     </section>

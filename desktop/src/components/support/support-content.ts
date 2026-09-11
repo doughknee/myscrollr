@@ -21,7 +21,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Is my data private?",
     answer:
-      "No ads or data sales. Optional product activity and PostHog analytics have separate controls and stay off until you enable them. Both exclude ticker contents. Your widget setup still syncs to your account so it follows you between machines.",
+      "No ads or data sales. Product activity stays off until you enable it; limited PostHog app analytics are on by default and easy to turn off. Both exclude ticker contents. Your widget setup still syncs to your account so it follows you between machines.",
   },
   {
     question: "What platforms are supported?",

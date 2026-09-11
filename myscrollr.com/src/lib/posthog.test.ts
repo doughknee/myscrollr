@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  applyWebsiteAnalyticsContext,
   beginWebsiteSignupFlow,
   captureWebsiteEvent,
   captureWebsitePageview,
-  finishWebsiteSignupFlow,
   getWebsiteAnalyticsDecision,
   sanitizeWebsiteCapture,
   setWebsiteAnalyticsDecision,
@@ -16,6 +16,7 @@ const sdk = vi.hoisted(() => ({
   opt_in_capturing: vi.fn(),
   opt_out_capturing: vi.fn(),
   reset: vi.fn(),
+  identify: vi.fn(),
 }))
 
 vi.mock('posthog-js/dist/module.slim', () => ({ default: sdk }))
@@ -29,15 +30,17 @@ vi.stubGlobal('localStorage', {
 })
 vi.stubGlobal('window', {
   dispatchEvent: vi.fn(),
-  location: { hostname: 'example.test', pathname: '/', search: '' },
+  location: {
+    hostname: 'example.test',
+    origin: 'https://example.test',
+    pathname: '/',
+    search: '',
+  },
 })
 vi.stubGlobal('sessionStorage', {
   getItem: (key: string) => sessionValues.get(key) ?? null,
   setItem: (key: string, value: string) => sessionValues.set(key, value),
   removeItem: (key: string) => sessionValues.delete(key),
-})
-vi.stubGlobal('crypto', {
-  randomUUID: () => '00000000-0000-4000-8000-000000000009',
 })
 vi.stubGlobal('CustomEvent', class {})
 
@@ -71,9 +74,11 @@ describe('website PostHog privacy boundary', () => {
     })
     expect(sdk.capture).toHaveBeenCalledTimes(1)
     expect(sdk.capture).toHaveBeenCalledWith('$pageview', {
-      distinct_id: '00000000-0000-4000-8000-000000000009',
       path: '/download',
       surface: 'website',
+      $current_url: 'https://example.test/download',
+      $pathname: '/download',
+      $host: 'example.test',
     })
   })
 
@@ -88,9 +93,11 @@ describe('website PostHog privacy boundary', () => {
     window.location.pathname = '/channels'
     setWebsiteAnalyticsDecision('enabled')
     expect(sdk.capture).toHaveBeenCalledWith('$pageview', {
-      distinct_id: '00000000-0000-4000-8000-000000000009',
       path: '/channels',
       surface: 'website',
+      $current_url: 'https://example.test/channels',
+      $pathname: '/channels',
+      $host: 'example.test',
     })
   })
 
@@ -119,6 +126,9 @@ describe('website PostHog privacy boundary', () => {
         distinct_id: 'anonymous-id',
         surface: 'website',
         path: '/download',
+        $current_url: 'https://example.test/download',
+        $pathname: '/download',
+        $host: 'example.test',
         $ip: null,
         $geoip_disable: true,
       },
@@ -150,19 +160,31 @@ describe('website PostHog privacy boundary', () => {
     expect(sdk.capture).not.toHaveBeenCalled()
   })
 
-  it('captures only a server-verified signup', () => {
+  it('stitches the stable anonymous journey to a server pseudonym', () => {
     setWebsiteAnalyticsDecision('enabled')
     sdk.capture.mockClear()
     beginWebsiteSignupFlow()
-    finishWebsiteSignupFlow(true)
-    expect(sdk.capture.mock.calls).toEqual([
-      [
-        'signup_completed',
-        {
-          surface: 'website',
-          distinct_id: '00000000-0000-4000-8000-000000000009',
-        },
-      ],
-    ])
+    const distinctID = 'a'.repeat(64)
+    applyWebsiteAnalyticsContext({
+      eligible: true,
+      verified: true,
+      analytics_distinct_id: distinctID,
+    })
+    expect(sdk.identify).toHaveBeenCalledWith(distinctID)
+    expect(sdk.capture).toHaveBeenCalledWith('signup_completed', {
+      surface: 'website',
+    })
+  })
+
+  it('rejects an invalid server pseudonym', () => {
+    setWebsiteAnalyticsDecision('enabled')
+    sdk.capture.mockClear()
+    applyWebsiteAnalyticsContext({
+      eligible: true,
+      verified: true,
+      analytics_distinct_id: 'raw-user-id',
+    })
+    expect(sdk.identify).not.toHaveBeenCalled()
+    expect(sdk.capture).not.toHaveBeenCalled()
   })
 })

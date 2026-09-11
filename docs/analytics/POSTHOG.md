@@ -1,71 +1,57 @@
 # PostHog analytics contract
 
-PostHog is optional and consent-gated. The website and desktop app treat no
-decision as **off**. Declining remains off; enabling starts collection from that
-point forward and never replays earlier activity.
+PostHog is used only for the fixed website and desktop measurements below. The
+website asks before creating a persistent analytics identity. Signed-in desktop
+accounts are enabled by default and can opt out at any time. A saved decline is
+durable and never silently changed back to enabled.
 
-## Activation gate
+## Production configuration
 
-This PR does not enable collection. Production activation requires all of:
-
-- the Scrollr PostHog project key and ID plus HTTPS ingest and management hosts;
-- a dedicated, non-rotating `POSTHOG_DISTINCT_ID_SALT`;
-- a least-privilege personal API key with `person:write` for deletion;
-- `POSTHOG_EXCLUDED_LOGTO_SUBS` containing any production test accounts;
-- `POSTHOG_CAPTURE_ENABLED=true` on the API and the two website `VITE_POSTHOG_*`
-  build variables;
-- a privacy/cookie review for the actual countries served; and
-- one local-sink verification proving that no forbidden property crosses the
-  boundary.
-
-If any server setting is absent, desktop capture is inert. Website code is inert
-unless both public build variables exist and the visitor explicitly accepts.
+Production capture requires the Scrollr project key, HTTPS ingest host,
+non-rotating `POSTHOG_DISTINCT_ID_SALT`, and `POSTHOG_CAPTURE_ENABLED=true`.
+Deletion also requires the project ID, HTTPS management host, and a
+least-privilege personal API key with person deletion access. Staff and test
+accounts belong in `POSTHOG_EXCLUDED_LOGTO_SUBS` and never emit events.
 
 ## Event vocabulary
 
-Website: `$pageview`, `signup_completed`, and
-`download_selected`. Signup completion is emitted only after the authenticated
-API verifies that Logto created the account for the website application in the
-last 15 minutes and that it is not a staff or configured test account. Pageviews
-contain only a path without query or fragment.
-Private account, callback, invite, support, staff, and public-profile routes are
-excluded. Download events may contain only `surface` and one of `windows`,
-`macos`, or `linux`.
+Website events are `$pageview`, `signup_completed`, and `download_selected`.
+Public pageviews contain a path without query or fragment, a same-origin URL
+rebuilt from that path, domain-only external referrer, and validated
+`utm_source`, `utm_medium`, and `utm_campaign` values. Private account, admin,
+callback, invite, support, and public-profile routes are excluded. Download
+events may add only `windows`, `macos`, or `linux`.
 
-Website events explicitly null IP and disable GeoIP. Each event uses a fresh
-random identifier; a pending sign-in keeps one identifier only until signup
-verification. Browser browsing
-is therefore not linked across events or to an account. SDK identity persistence
-is memory-only, and all authenticated browsing is suppressed.
+After consent, PostHog keeps its anonymous distinct ID in first-party local
+storage so unique visitors, sessions, and campaign-to-conversion funnels work
+across visits. When an eligible visitor signs in, the browser SDK identifies
+them with the server's HMAC account pseudonym and merges the prior anonymous
+journey. The raw Logto subject and email never enter PostHog. Staff and
+configured test accounts remain suppressed. Signup completion is emitted only
+when Logto confirms a website account created in the prior 15 minutes.
 
-Desktop: `desktop_app_opened`, `desktop_app_running`, and
-`desktop_feature_configured`. Feature values are limited to sports, markets, news,
-fantasy, predictions, and utilities. `desktop_presence` updates a 15-minute
-Redis presence window and is never sent to PostHog. Presence means recently
-seen, not attention.
+Desktop events are `desktop_app_opened`, `desktop_app_running`, and
+`desktop_feature_configured`. Feature values are limited to sports, markets,
+news, fantasy, predictions, and utilities. `desktop_presence` updates a
+15-minute Redis presence window and is never sent to PostHog. All desktop
+events use the same server HMAC pseudonym family as identified website events.
 
-Desktop distinct IDs are HMAC pseudonyms derived from the authenticated account.
-They are pseudonymous, not anonymous. Requests explicitly null IP collection.
-No email, token, URL, query, symbol, team, feed, content, support text, or
-unrelated device activity is accepted by the endpoint.
+Every transport explicitly nulls IP collection and disables GeoIP. No email,
+token, query string, symbol, team, feed, page content, support text, session
+replay, autocapture, performance capture, survey, or unrelated device activity
+is accepted.
 
-The API keeps an export mirror of account-linked desktop events: fixed event
-name, broad feature category, app version, timestamp, and delivery status. It is
-included in the account export. Desktop opt-out removes it after PostHog accepts
-the deletion request; account purge removes it immediately and retains only the
-minimal remote-deletion tombstone.
-
-The existing first-party `product_activity_daily` facts remain the authoritative
-source for measured ticker activation and retention. PostHog is for directional
-funnels and exploration; website visitor totals are estimates.
+The API keeps an export mirror of account-linked desktop events: event name,
+broad feature, app version, timestamp, and delivery status. The existing
+first-party `product_activity_daily` facts remain authoritative for measured
+ticker activation and retention; PostHog is for visitor, signup, download, and
+directional product funnels.
 
 ## Opt-out and deletion
 
-Website decline calls the SDK opt-out and reset functions and stops immediately;
-previous fixed-field website observations have no durable browser or account
-identifier to export or target for deletion. Desktop decline is stored server-side before a deletion request is made, so new
-events stop even if PostHog is unavailable. The API bulk-deletes the pseudonymous
-person and all prior events; PostHog processes deletion asynchronously. Failed
-requests remain `pending` and must be retried before production activation.
-Account purge uses the same deletion path. Session replay, autocapture, automatic
-pageviews, performance capture, surveys, and person profiles are disabled.
+Website decline stops capture immediately and clears the local PostHog
+identity. Desktop decline is written server-side before any vendor deletion
+request, so new events stop even when PostHog is unavailable. The API requests
+bulk deletion of the account pseudonym and its events. Failed deletion requests
+remain pending for retry. Account purge follows the same deletion path and
+removes the local event mirror immediately.

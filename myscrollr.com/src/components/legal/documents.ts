@@ -160,9 +160,9 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
           'Channel Configuration: We store which data channels you have enabled (finance, sports, RSS, fantasy) and their configuration settings.',
           'Yahoo Fantasy Data: If you connect your Yahoo Fantasy account, we store an encrypted refresh token (AES-256-GCM encryption) to maintain your connection. We also store your Yahoo user identifier, league data, standings, rosters, and matchup information that Yahoo provides through their API.',
           "Kalshi Account Connection: If you connect your own Kalshi account in the desktop application (an optional feature for viewing your positions), your Kalshi API key ID and private key are stored ONLY in your device's operating-system keychain or credential store. They are never transmitted to our servers, never included in our database, and are used solely for read-only portfolio requests made directly from your device to Kalshi.",
-          'Operational Data: We keep anonymous totals for API requests, app versions, operating systems, failures, and active SSE connections. These totals carry no account identifier, IP address, or ticker contents. Separately, optional PostHog analytics remain off until you enable them and use only the fixed public-page or desktop events described below.',
+          'Operational Data: We keep anonymous totals for API requests, app versions, operating systems, failures, and active SSE connections. These totals carry no account identifier, IP address, or ticker contents. Separately, PostHog receives only the fixed public-page or desktop events described below and provides an opt-out control.',
           'Optional Product Activity: The desktop app has a separate, default-off "Share product activity" setting for signed-in accounts. If you turn it on, we record one daily fact after a native ticker is actually visible with at least one enabled widget for 30 continuous seconds. The fact may include only broad categories — sports, markets, news, fantasy, predictions, and utilities — that were enabled during that qualifying activity. We do not receive symbols, teams, feed URLs, titles, content, browsing data, or an install fingerprint. Multiple windows, monitors, and devices deduplicate to the same account and UTC day. This measures qualifying ticker use, not attention.',
-          'Optional PostHog Analytics: The website can send public-page paths without query strings plus verified signup and platform download steps. Website events explicitly disable IP and location enrichment; each event uses a fresh random identifier. The desktop can send app opened, app running, and broad configured-feature categories through our API under a pseudonymous account identifier. Private routes, ticker contents, symbols, teams, feeds, support text, session replay, and unrelated device activity are excluded. Website and desktop choices are separate and both default off.',
+          'PostHog Analytics: After website consent, a first-party browser identifier links public-page paths without query strings, standard campaign attribution, verified signup, and platform download steps across visits. When a visitor signs in, the browser identifier is linked to a server-generated HMAC pseudonym, never the raw account ID or email. Limited desktop analytics are on by default and can be turned off anytime; they send app opened, app running, and broad configured-feature categories through our API under the same kind of pseudonym. IP and location enrichment, private routes, ticker contents, symbols, teams, feeds, support text, session replay, and unrelated device activity are excluded.',
         ],
       },
       {
@@ -184,7 +184,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Third-Party Services',
         content: [
           'The Platform integrates with several third-party services. Each has its own privacy policy that we encourage you to review:',
-          'Logto (authentication) handles your login credentials and identity verification. TwelveData provides financial market data. ESPN provides sports scores and game data. Yahoo provides fantasy sports data when you authorize your account. Kalshi provides prediction-market data. RSS feed publishers provide news content through their public feeds. PostHog receives the optional analytics described above only after consent.',
+          'Logto (authentication) handles your login credentials and identity verification. TwelveData provides financial market data. ESPN provides sports scores and game data. Yahoo provides fantasy sports data when you authorize your account. Kalshi provides prediction-market data. RSS feed publishers provide news content through their public feeds. PostHog receives only the limited analytics described above; the website asks first and the desktop provides an opt-out control.',
           'We send your user identifier to our channel APIs via internal HTTP headers (X-User-Sub) to route data to your account. Third-party data providers do not receive your personal information directly from us.',
         ],
       },
@@ -280,13 +280,13 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         content: [
           'Yahoo Fantasy Sports: If you connect your Yahoo account, the desktop application opens your default browser for the OAuth authorization flow. The application stores an encrypted refresh token locally and on our servers to maintain the connection. See our Privacy Policy for details on Yahoo data handling.',
           "Kalshi (optional): If you connect your own Kalshi account, the application communicates directly from your device to Kalshi's API using your credentials for READ-ONLY portfolio and position data. These requests do not pass through Scrollr servers. The application cannot place, modify, or cancel orders on your Kalshi account.",
-          'Scrollr includes no advertising frameworks or data sales. Optional PostHog analytics are separate from crash reports and remain off until you accept them. Public-site analytics exclude private routes and page contents. Desktop analytics use a pseudonymous account identifier and fixed broad events only; they never include ticker contents, symbols, teams, feeds, support text, or unrelated device activity. The independent "Send crash reports" setting controls Sentry.',
+          'Scrollr includes no advertising frameworks or data sales. PostHog analytics are separate from crash reports. The website asks before capture; limited desktop analytics are on by default and can be turned off anytime. Public-site analytics exclude private routes and page contents. Desktop analytics use a pseudonymous account identifier and fixed broad events only; they never include ticker contents, symbols, teams, feeds, support text, or unrelated device activity. The independent "Send crash reports" setting controls Sentry.',
         ],
       },
       {
         heading: 'Data Deletion',
         content: [
-          'You can delete local preferences with "Reset all settings." Turning off "Share product activity" stops first-party collection and deletes its server-side daily facts and cohort metadata. Website PostHog opt-out stops new capture immediately; its earlier fixed-field observations have no durable browser or account identifier. Desktop PostHog opt-out stops new capture and requests deletion of the account pseudonym and prior events; PostHog processes that deletion asynchronously. Account deletion removes the local desktop event mirror immediately and retains only a deletion tombstone until that request is accepted.',
+          'You can delete local preferences with "Reset all settings." Turning off "Share product activity" stops first-party collection and deletes its server-side daily facts and cohort metadata. Website PostHog opt-out stops new capture immediately and clears the browser identity. Account-linked website and desktop history uses the same server pseudonym; desktop opt-out requests deletion of that pseudonym and prior events, which PostHog processes asynchronously. Account deletion removes the local desktop event mirror immediately and retains only a deletion tombstone until that request is accepted.',
         ],
       },
     ],
@@ -314,7 +314,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Website Cookies',
         content: [
           'Authentication Cookies: We use cookies set by our authentication provider (Logto) to maintain your login session. These are essential cookies required for the Platform to function when you are signed in. They contain encrypted session tokens and expire when you sign out or after a defined session timeout.',
-          'We do not use advertising cookies or tracking pixels. Optional PostHog analytics remain off until you choose to enable them. The consent choice is stored in browser local storage; PostHog identity persistence is memory-only. Each event uses a fresh random identifier; a pending sign-in keeps one random identifier in session storage only until signup verification. PostHog receives only the fields described in our Privacy Policy and no private-page URLs, query strings, page contents, session replays, IP enrichment, or advertising-profile data.',
+          'We do not use advertising pixels or sell analytics data. Website PostHog analytics remain off until you allow them. The choice and a first-party analytics identifier are stored in browser local storage so visits and campaign attribution can be counted across sessions. After sign-in, the identifier may be linked to a server-generated HMAC pseudonym, never a raw account ID or email. PostHog receives only the fields described in our Privacy Policy and no private-page URLs, query strings, page contents, session replays, IP enrichment, or advertising-profile data.',
         ],
       },
       {
@@ -322,7 +322,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         content: [
           'The Scrollr desktop application uses local storage to store the following data on your device:',
           'Authentication tokens: Your access token and refresh token for communicating with our API. Feed preferences: Your display settings (position, mode, behavior, visibility). Channel and widget configurations: Your selected data sources, ticker layout, and per-channel settings. Dashboard state: Cached dashboard data for faster loading. Connection state: SSE connection status and subscription information. Application logs: Diagnostic log files written locally for troubleshooting. Window state: Window position, size, and display information used to manage the ticker and main windows.',
-          "Authentication, preferences, and widget data are sent only to Scrollr's API servers to authenticate requests and retrieve your personalized data. If you separately enable PostHog app analytics, Scrollr's API sends a pseudonymous identifier and fixed content-free activity categories to PostHog; ticker contents are never included.",
+          "Authentication, preferences, and widget data are sent only to Scrollr's API servers to authenticate requests and retrieve your personalized data. Limited PostHog app analytics are on by default and can be turned off in Data & privacy. Scrollr's API sends a pseudonymous identifier and fixed content-free activity categories to PostHog; ticker contents are never included.",
         ],
       },
       {
@@ -337,7 +337,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Managing Storage',
         content: [
           'Website cookies: You can clear cookies through your browser settings. Note that clearing authentication cookies will sign you out of the Platform.',
-          'Website analytics: Use "Analytics privacy choices" in the site footer to allow or decline PostHog analytics. Declining stops capture, clears in-memory SDK identity state, and records your local declined choice so the site does not ask again.',
+          'Website analytics: Use "Analytics privacy choices" in the site footer to allow or decline PostHog analytics. Declining stops capture, clears the local SDK identity, and records your declined choice so the site does not ask again.',
           'Desktop application: You can clear application data by uninstalling and re-installing the app, or by using the "Reset all settings" option in the Account page. You can also manage your preferences through the app settings.',
           'Disabling cookies entirely may prevent you from using authenticated features of the Platform.',
         ],

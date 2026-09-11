@@ -222,9 +222,10 @@ func TestRecentWebsiteSignupRequiresFreshMatchingLogtoAccount(t *testing.T) {
 	}
 }
 
-func TestWebsiteSignupVerificationExcludesStaffAndConfiguredTestUsers(t *testing.T) {
+func TestWebsiteAnalyticsContextReturnsOnlyEligiblePseudonym(t *testing.T) {
 	resetProductAnalytics(t)
 	t.Setenv("LOGTO_WEB_APP_ID", "website-app")
+	t.Setenv("POSTHOG_DISTINCT_ID_SALT", "test-salt")
 	t.Setenv("POSTHOG_EXCLUDED_LOGTO_SUBS", "test-user")
 	previous := postHogLogtoUser
 	postHogLogtoUser = func(sub string) (*LogtoUser, error) {
@@ -243,14 +244,66 @@ func TestWebsiteSignupVerificationExcludesStaffAndConfiguredTestUsers(t *testing
 	for _, sub := range []string{"staff-user", "test-user"} {
 		resp := analyticsRequest(t, app, http.MethodPost, "/verify-website-signup", sub, "")
 		var result struct {
-			Verified bool `json:"verified"`
+			Eligible   bool   `json:"eligible"`
+			Verified   bool   `json:"verified"`
+			DistinctID string `json:"analytics_distinct_id"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			t.Fatal(err)
 		}
-		if result.Verified {
-			t.Fatalf("excluded actor %q was verified", sub)
+		if result.Eligible || result.Verified || result.DistinctID != "" {
+			t.Fatalf("excluded actor %q received analytics context: %#v", sub, result)
 		}
+	}
+	resp := analyticsRequest(t, app, http.MethodPost, "/verify-website-signup", "customer-user", "")
+	var result struct {
+		Eligible   bool   `json:"eligible"`
+		Verified   bool   `json:"verified"`
+		DistinctID string `json:"analytics_distinct_id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
+	if !result.Eligible || !result.Verified || result.DistinctID != postHogDistinctID("customer-user") {
+		t.Fatalf("customer analytics context = %#v", result)
+	}
+}
+
+func TestPostHogConsentDefaultsOnAndPreservesDecline(t *testing.T) {
+	resetProductAnalytics(t)
+	t.Setenv("POSTHOG_EXCLUDED_LOGTO_SUBS", "excluded-user")
+	previous := postHogLogtoUser
+	postHogLogtoUser = func(sub string) (*LogtoUser, error) {
+		return &LogtoUser{ID: sub, PrimaryEmail: sub + "@example.test"}, nil
+	}
+	t.Cleanup(func() { postHogLogtoUser = previous })
+	app := productAnalyticsTestApp()
+	const sub = "default-on-user"
+
+	resp := analyticsRequest(t, app, http.MethodGet, "/posthog-consent", sub, "")
+	var got PostHogConsent
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Decision != "enabled" {
+		t.Fatalf("default decision = %q, want enabled", got.Decision)
+	}
+
+	resp = analyticsRequest(t, app, http.MethodPut, "/posthog-consent", sub, `{"decision":"declined"}`)
+	resp = analyticsRequest(t, app, http.MethodGet, "/posthog-consent", sub, "")
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Decision != "declined" {
+		t.Fatalf("saved decision = %q, want declined", got.Decision)
+	}
+
+	resp = analyticsRequest(t, app, http.MethodGet, "/posthog-consent", "excluded-user", "")
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Decision != "declined" {
+		t.Fatalf("excluded decision = %q, want declined", got.Decision)
 	}
 }
 

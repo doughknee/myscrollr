@@ -1,19 +1,21 @@
 // Sentry must initialize before any other module imports so the SDK can
 // attach to browser globals before React/Logto/etc start running.
 
-import { StrictMode, useEffect, useRef } from 'react'
+import { StrictMode, useEffect, useRef, useState } from 'react'
 import * as Sentry from '@sentry/react'
 import { StartClient } from '@tanstack/react-start/client'
 import { hydrateRoot } from 'react-dom/client'
 import { LogtoProvider } from '@logto/react'
 import { initSentry } from './sentry'
 import type { LogtoConfig } from '@logto/react'
+import type { WebsiteAnalyticsContext } from '@/lib/posthog'
 import { ScrollrAuthProvider, useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { authenticatedFetch } from '@/api/client'
 import {
+  applyWebsiteAnalyticsContext,
   captureWebsitePageview,
-  finishWebsiteSignupFlow,
-  hasPendingWebsiteSignupFlow,
+  getWebsiteAnalyticsDecision,
+  resetWebsiteAnalyticsIdentity,
   setWebsiteAnalyticsSuppressed,
 } from '@/lib/posthog'
 
@@ -54,31 +56,50 @@ function SentryFallback() {
 
 function WebsiteAnalyticsGate() {
   const { getAccessToken, isAuthenticated, isLoading } = useScrollrAuth()
-  const checkedSignup = useRef(false)
+  const checkedUser = useRef(false)
+  const wasAuthenticated = useRef(false)
+  const [consentRevision, setConsentRevision] = useState(0)
 
   useEffect(() => {
-    const block = isLoading || isAuthenticated
-    setWebsiteAnalyticsSuppressed(block)
-    if (!block) captureWebsitePageview(window.location.pathname)
-  }, [isAuthenticated, isLoading])
+    const changed = () => setConsentRevision((value) => value + 1)
+    window.addEventListener('scrollr:analytics-consent-changed', changed)
+    return () =>
+      window.removeEventListener('scrollr:analytics-consent-changed', changed)
+  }, [])
 
   useEffect(() => {
-    if (
-      isLoading ||
-      !isAuthenticated ||
-      checkedSignup.current ||
-      !hasPendingWebsiteSignupFlow()
-    )
+    if (isLoading) {
+      setWebsiteAnalyticsSuppressed(true)
       return
-    checkedSignup.current = true
-    void authenticatedFetch<{ verified: boolean }>(
+    }
+    if (!isAuthenticated) {
+      if (wasAuthenticated.current) resetWebsiteAnalyticsIdentity()
+      wasAuthenticated.current = false
+      checkedUser.current = false
+      setWebsiteAnalyticsSuppressed(false)
+      captureWebsitePageview(window.location.pathname)
+      return
+    }
+    wasAuthenticated.current = true
+    setWebsiteAnalyticsSuppressed(true)
+    if (getWebsiteAnalyticsDecision() !== 'enabled') {
+      checkedUser.current = false
+      return
+    }
+    if (checkedUser.current) return
+    checkedUser.current = true
+    void authenticatedFetch<WebsiteAnalyticsContext>(
       '/users/me/verify-website-signup',
       { method: 'POST' },
       getAccessToken,
     )
-      .then(({ verified }) => finishWebsiteSignupFlow(verified))
-      .catch(() => finishWebsiteSignupFlow(false))
-  }, [getAccessToken, isAuthenticated, isLoading])
+      .then((context) => {
+        if (!applyWebsiteAnalyticsContext(context)) return
+        setWebsiteAnalyticsSuppressed(false)
+        captureWebsitePageview(window.location.pathname)
+      })
+      .catch(() => {})
+  }, [consentRevision, getAccessToken, isAuthenticated, isLoading])
 
   return null
 }

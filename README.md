@@ -4,7 +4,7 @@
 
 Live market quotes, fantasy matchups, game scores, and RSS feeds —
 streaming into a compact bar that floats on top of whatever you're
-working on. Multi-monitor aware. No ads or data sales; optional analytics are off until you choose to enable them.
+working on. Multi-monitor aware. No ads or data sales; analytics are limited and controllable.
 
 ![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)
 ![Desktop](https://img.shields.io/badge/desktop-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)

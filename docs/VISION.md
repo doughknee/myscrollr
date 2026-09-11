@@ -7,12 +7,12 @@
 
 ## 1. What Scrollr is
 
-> **A pinned, always-on-top desktop ticker for the things you actually care about.** Live finance quotes, sports scores, fantasy matchups, prediction markets, and news stream into a compact bar floating over whatever you're working on. You pick **widgets** from a catalog; you pay for **how many you can run at once (slots)**. Multi-monitor aware. **No ads or data sales; optional analytics stay off until you enable them.**
+> **A pinned, always-on-top desktop ticker for the things you actually care about.** Live finance quotes, sports scores, fantasy matchups, prediction markets, and news stream into a compact bar floating over whatever you're working on. You pick **widgets** from a catalog; you pay for **how many you can run at once (slots)**. Multi-monitor aware. **No ads or data sales; analytics are limited and controllable.**
 
 Three load-bearing commitments, true at every layer:
 
 1. **The desktop app is the product** (Tauri v2 + React). The website is *marketing, auth, and billing only*.
-2. **No advertising profiles, and no personal data in crash reports** — enforced by per-service Sentry-scrubbing tests that block deploy. Anonymous first-party counts of app versions and error rates carry no account identifier and nothing about ticker content. Optional first-party and PostHog analytics have separate, default-off controls; both accept only fixed broad activity and exclude ticker content.
+2. **No advertising profiles, and no personal data in crash reports** — enforced by per-service Sentry-scrubbing tests that block deploy. Anonymous first-party counts of app versions and error rates carry no account identifier and nothing about ticker content. First-party and PostHog analytics have separate controls; both accept only fixed broad activity and exclude ticker content.
 3. **One user-facing primitive (the widget), one price lever (the slot).** Every widget costs exactly one slot; a plan card's headline is a widget count.
 
 ---

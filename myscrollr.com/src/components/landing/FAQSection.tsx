@@ -46,7 +46,7 @@ const FAQ_ITEMS: Array<FAQItem> = [
     question: 'Is my data private?',
     highlight: 'No ads, tracking pixels, or data sales.',
     answer:
-      'No ads, tracking pixels, or data sales. Optional product analytics stay off until you enable them, use only broad content-free events, and can be turned off again. Your widget setup still syncs to your account so it follows you between machines.',
+      'No ads, tracking pixels, or data sales. Analytics use only broad content-free events and are easy to control; the website asks first. Your widget setup still syncs to your account so it follows you between machines.',
     accent: 'sky',
   },
   {
