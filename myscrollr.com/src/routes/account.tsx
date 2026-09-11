@@ -192,28 +192,6 @@ export function AccountHub() {
                   </Link>
                 </div>
               </section>
-              <section
-                className={card}
-                aria-labelledby="account-privacy-heading"
-              >
-                <h2 id="account-privacy-heading" className="text-lg font-bold">
-                  Website privacy
-                </h2>
-                <p className="mt-2 text-sm text-base-content/65">
-                  Choose whether this browser shares usage analytics.
-                </p>
-                <button
-                  type="button"
-                  onClick={() =>
-                    window.dispatchEvent(
-                      new CustomEvent('scrollr:manage-analytics'),
-                    )
-                  }
-                  className="mt-4 text-sm font-semibold text-primary"
-                >
-                  Analytics settings
-                </button>
-              </section>
             </div>
           </div>
           <AccountDangerZone

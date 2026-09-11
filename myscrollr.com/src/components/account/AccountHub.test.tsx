@@ -63,7 +63,6 @@ it('recovers account loading errors and provides a real signed-out entry point',
     expect(container.querySelector('[role="alert"]')).toBeNull()
     expect(container.textContent).toContain('Profile & security')
     expect(container.textContent).toContain('Plan & billing')
-    expect(container.textContent).toContain('Website privacy')
     mocks.authenticated = false
     await act(() => root.render(<AccountHub />))
     expect(container.textContent).not.toContain('Test customer')
