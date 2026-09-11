@@ -565,7 +565,7 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Release history
 
-<!-- source: docs/ROADMAP.md @ bbba67413812 -->
+<!-- source: docs/ROADMAP.md @ 94e42b073db2 -->
 | Version | Codename | Theme | Size |
 |---|---|---|---|
 | v1.1.1 | Paper Cuts | ✅ **Shipped 2026-07-02** — grew into the catalog redesign (absorbed half of The Library) | S→M |
@@ -590,11 +590,28 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 | v1.6.1 | Under your eyes | ✅ **Shipped 2026-09-07** — a chip on the bar keeps what it is showing until it has scrolled off screen; a data refresh no longer swaps the game you are reading for another one. Baseball innings read "8th" and "10th" rather than the raw feed code, finals read "Final" in every sport, a postponed game reads "PPD". Server side, fourteen more leagues in the catalog and a sports feed that polls every 15 s without stalling on games that already ended | S |
 | v1.6.2 | Pin what matters | ✅ **Shipped 2026-09-08** — a pin is one chip that stays put: pin a team, a symbol, a feed, a market or a clock and the fixed zone shows its current chip, up to two, never rotating and never doubled on the tape; new widgets no longer pin themselves to the corner; the pin control moved off the moving chip to right-click, the widget page and the sidebar. With several monitors selected the app keeps one live connection instead of one per bar, so "Live updates paused" stops appearing and the tray toggle works with two bars. A session that has died now says so and one click signs you back in, instead of every change failing until a reinstall | S |
 | v1.6.3 | The whole matchday | ✅ **Shipped 2026-09-08** — when a league's next games are further out than a day, the bar used to show exactly one of them, so a full slate of fixtures the next evening looked like a broken ticker. It now shows that whole matchday and takes turns through it. A league whose next fixture really is a lone event, a Formula 1 race for instance, still shows the one chip it always did | S |
+| v1.6.4 | Signed and transparent | ✅ **Shipped 2026-09-10** — Windows downloads identify Scrollr, LLC as their verified publisher and carry trusted timestamps; product activity measurement is off by default and can be enabled from Data & privacy while signed in | S |
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.3 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.4 -->
 The last 8 published releases, newest first, as users read them.
+
+### Scrollr 1.6.4 — Signed and transparent (`desktop-v1.6.4`, 2026-09-11)
+
+Two trust improvements: Windows can verify who made Scrollr, and product activity remains a choice you make explicitly.
+
+#### 🛡️ Windows knows who made it
+
+**Windows downloads now identify Scrollr, LLC as their verified publisher.** The app, setup program, and MSI installer are code-signed and carry trusted timestamps. The update packages keep their separate cryptographic signatures too, so both Windows and Scrollr verify what you install.
+
+#### 🔒 Product activity stays your choice
+
+**There is a new, separate “Share product activity” switch in Settings → Data & privacy. It is off by default and appears only while you are signed in.**
+
+If you turn it on, Scrollr records one daily fact after the native ticker has been visible with an enabled widget for 30 continuous seconds. That fact can include only broad categories such as sports, markets, news, fantasy, predictions, and utilities. It does not include symbols, teams, feed URLs, titles, content, browsing data, or an install fingerprint.
+
+Activity facts are retained for 90 days. Turning the switch off stops collection and deletes the stored activity facts and cohort metadata for your account. Crash reporting remains a separate setting.
 
 ### Scrollr 1.6.3 — The whole matchday (`desktop-v1.6.3`, 2026-09-08)
 
@@ -793,46 +810,3 @@ Every data chip on the ticker was redrawn in one language, so the bar reads as o
 #### 🔧 Under the hood
 
 Short team names are derived by rule and checked against the whole 2,022-name catalog, rather than maintained by hand. Standings are attached to each game server-side in a single query. The local development environment can now be seeded from real data, so the app looks the same to work on as it does to use.
-
-### v1.4.1 — Your fantasy matchup, rebuilt (`desktop-v1.4.1`, 2026-09-01)
-
-The fantasy widget got rebuilt around what you actually look at on a Sunday, the ticker chips were split up and redrawn, and the bar itself now reacts when something happens.
-
-#### ✨ New
-
-**Matchup reads as head-to-head duels.** Instead of two stacked lists you compare by eye, every roster slot is now one row — your QB against their QB, your flex against their flex — so a lineup reads as the set of matchups it actually is.
-
-**Roster leads with points.** Kickers and D/ST get their own tables too, instead of being filed under a position that didn't fit them.
-
-**Overview became mission control.** An on-the-field strip up top and one uniform card per league, so a glance answers "what needs me right now" rather than "here is everything".
-
-**Your players are joined to real game clocks.** A player in the fourth quarter now looks different from one whose game finished — which is what makes the live treatments mean anything.
-
-**Win probability**, where there's enough to calculate it, and you can switch it off per widget if you'd rather not know.
-
-**A ticker dial for fantasy.** One setting — Essential, Standard, Everything — decides how much of each league reaches the bar, and the rail adapts through the week on its own. Standard is the default.
-
-#### 💄 The chips
-
-**One chip per thing, instead of one chip for everything.** The old combined chip is now four separate utility chips, so each says one thing clearly.
-
-**Finance chips carry a sparkline**, predictions get a dial, RSS shows a kicker, and sports chips tilt toward whoever has the momentum.
-
-**Uptime and GitHub chips cap their status** rather than spilling.
-
-#### 💄 The bar holds still
-
-**The rail stops jumping when a score changes.** A player going 8.3 to 14.9 gains a digit, and that used to widen the chip and shove everything after it along the bar. Scores now reserve their space, so the number changes and nothing else moves.
-
-**Scores flash when they actually change** — once, on the change, green when you gain and red when you don't. Distinct from the steady pulse that just means a player is live.
-
-**The progress bar under each chip keeps pace with its number** instead of snapping ahead of it.
-
-#### 🐛 Fixes
-
-- The connection banner can be dismissed again.
-- The fantasy demo defaults to a steady state rather than drifting under you, and the settings preview is tighter.
-
-#### 🔧 Under the hood
-
-Fantasy players, standings and rosters share one set of helpers, so the tabs can't disagree with each other about the same league.

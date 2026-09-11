@@ -14,8 +14,10 @@ data:
   #   1.1.10 itself shipped a bug that stored the dashboard payload under
   #   the retired `channels` key, leaving the sidebar and account page
   #   empty, so it is gated too.
-  # Bump on future breaking deploys.
-  MIN_DESKTOP_VERSION: "1.1.12"
+  # 1.6.4 is the first Windows release signed as Scrollr, LLC. Its public
+  # updater manifests and Windows/macOS/Linux downloads were verified before
+  # raising this floor. Restore 1.1.12 if updater availability regresses.
+  MIN_DESKTOP_VERSION: "1.6.4"
   LOGTO_URL: "https://auth.myscrollr.com/oidc"
   LOGTO_JWKS_URL: "https://auth.myscrollr.com/oidc/jwks"
   LOGTO_ENDPOINT: "https://auth.myscrollr.com"
