@@ -93,7 +93,7 @@ and leave program details to the partner.
 
 ## What Scrollr is
 
-<!-- source: docs/VISION.md @ becd59af7aa6 -->
+<!-- source: docs/VISION.md @ 50dc80861f89 -->
 ### 1. What Scrollr is
 
 > **A pinned, always-on-top desktop ticker for the things you actually care about.** Live finance quotes, sports scores, fantasy matchups, prediction markets, and news stream into a compact bar floating over whatever you're working on. You pick **widgets** from a catalog; you pay for **how many you can run at once (slots)**. Multi-monitor aware. **No ads or data sales; analytics are limited and controllable.**

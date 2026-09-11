@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import type { WebsiteAnalyticsDecision } from '@/lib/posthog'
 import {
   getWebsiteAnalyticsDecision,
   getWebsiteAnalyticsPolicy,
@@ -7,14 +6,19 @@ import {
   setWebsiteAnalyticsDecision,
 } from '@/lib/posthog'
 
+function readAnalytics() {
+  return {
+    decision: getWebsiteAnalyticsDecision(),
+    policy: getWebsiteAnalyticsPolicy(),
+  }
+}
+
 export default function AnalyticsConsent() {
-  const [decision, setDecision] = useState<WebsiteAnalyticsDecision>(() =>
-    getWebsiteAnalyticsDecision(),
-  )
+  const [analytics, setAnalytics] = useState(readAnalytics)
   const [managing, setManaging] = useState(false)
 
   useEffect(() => {
-    const refresh = () => setDecision(getWebsiteAnalyticsDecision())
+    const refresh = () => setAnalytics(readAnalytics())
     const manage = () => setManaging(true)
     refresh()
     window.addEventListener('scrollr:analytics-consent-changed', refresh)
@@ -25,7 +29,7 @@ export default function AnalyticsConsent() {
     }
   }, [])
 
-  const policy = getWebsiteAnalyticsPolicy()
+  const { decision, policy } = analytics
   if (
     policy === 'unknown' ||
     (!managing && (decision !== 'unknown' || policy === 'default-on'))
@@ -34,7 +38,7 @@ export default function AnalyticsConsent() {
 
   const choose = (next: 'enabled' | 'declined') => {
     setWebsiteAnalyticsDecision(next)
-    setDecision(getWebsiteAnalyticsDecision())
+    setAnalytics(readAnalytics())
     setManaging(false)
   }
 
@@ -50,8 +54,9 @@ export default function AnalyticsConsent() {
       <h2 className="text-sm font-bold">Analytics</h2>
       <p className="mt-1 text-sm text-base-content/75">
         Usage analytics help us improve Scrollr. PostHog counts public-page
-        visits, signups, and downloads—never replay, page content, or IP
-        location.{' '}
+        visits, signups, and downloads—never replay or page content. Scrollr
+        checks your country locally to decide whether to ask first; PostHog
+        receives no IP or location.{' '}
         <a className="underline hover:text-primary" href="/legal?doc=privacy">
           Privacy details
         </a>

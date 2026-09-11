@@ -36,7 +36,7 @@ rebuilt from that path, domain-only external referrer, and validated
 callback, invite, support, and public-profile routes are excluded. Download
 events may add only `windows`, `macos`, or `linux`.
 
-After consent, PostHog keeps its anonymous distinct ID in first-party local
+While enabled, PostHog keeps its anonymous distinct ID in first-party local
 storage so unique visitors, sessions, and campaign-to-conversion funnels work
 across visits. When an eligible visitor signs in, the browser SDK identifies
 them with the server's HMAC account pseudonym and merges the prior anonymous

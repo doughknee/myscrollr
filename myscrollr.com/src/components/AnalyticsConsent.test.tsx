@@ -1,7 +1,13 @@
+// @vitest-environment jsdom
+
+import { act } from 'react'
+import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import AnalyticsConsent from './AnalyticsConsent'
 import { setWebsiteAnalyticsPolicy } from '@/lib/posthog'
+
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 
 describe('AnalyticsConsent', () => {
   afterEach(() => {
@@ -23,12 +29,25 @@ describe('AnalyticsConsent', () => {
     expect(html).not.toContain('role="dialog"')
   })
 
-  it('keeps Allow disabled when a browser privacy signal is active', () => {
+  it('honors a browser privacy signal and disables manual opt-in', async () => {
     setWebsiteAnalyticsPolicy('consent-required')
     vi.stubGlobal('navigator', { globalPrivacyControl: true })
-    const html = renderToStaticMarkup(<AnalyticsConsent />)
-    expect(html).toContain('Your browser privacy signal keeps analytics off.')
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Allow<\/button>/)
+    expect(renderToStaticMarkup(<AnalyticsConsent />)).toBe('')
+
+    const container = document.createElement('div')
+    const root = createRoot(container)
+    await act(() => root.render(<AnalyticsConsent />))
+    await act(() =>
+      window.dispatchEvent(new CustomEvent('scrollr:manage-analytics')),
+    )
+
+    expect(container.textContent).toContain(
+      'Your browser privacy signal keeps analytics off.',
+    )
+    expect(container.innerHTML).toMatch(
+      /<button[^>]*disabled=""[^>]*>Allow<\/button>/,
+    )
+    await act(() => root.unmount())
   })
 
   it('does not show a consent banner before policy resolution or for US default-on', () => {
@@ -37,5 +56,26 @@ describe('AnalyticsConsent', () => {
     setWebsiteAnalyticsPolicy('default-on')
 
     expect(renderToStaticMarkup(<AnalyticsConsent />)).toBe('')
+  })
+
+  it('reacts to delayed policy resolution and manual settings', async () => {
+    const container = document.createElement('div')
+    const root = createRoot(container)
+
+    await act(() => root.render(<AnalyticsConsent />))
+    expect(container.textContent).toBe('')
+
+    await act(() => setWebsiteAnalyticsPolicy('consent-required'))
+    expect(container.textContent).toContain('PostHog counts public-page visits')
+
+    await act(() => setWebsiteAnalyticsPolicy('default-on'))
+    expect(container.textContent).toBe('')
+
+    await act(() =>
+      window.dispatchEvent(new CustomEvent('scrollr:manage-analytics')),
+    )
+    expect(container.textContent).toContain('Decline')
+
+    await act(() => root.unmount())
   })
 })

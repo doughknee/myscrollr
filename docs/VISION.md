@@ -181,7 +181,7 @@ Codegen TS types from the Go API's OpenAPI contract so web and desktop **cannot 
 ## 6. Non-negotiables (the spine — no decision may break these)
 
 - Desktop is the product; website stays marketing/auth/billing only.
-- No advertising analytics or personal data in crash reports (public promise + enforced by tests). Optional first-party product measurement and PostHog analytics are separately consented, coarse, and independent from Sentry.
+- No advertising analytics or personal data in crash reports (public promise + enforced by tests). Optional first-party product measurement and PostHog analytics have separate controls, are coarse, and remain independent from Sentry.
 - Slots-only monetization; one price lever.
 - **Wire-compat — *activates at first real user, suspended until then.*** Scrollr currently has **no users**, so breaking changes are free and should be taken now to establish clean names. Once you ship to real users, this becomes a hard rule: every rename/contract change goes behind a compat seam, never a breaking change (`MIN_DESKTOP_VERSION` gates retirement).
 - The CDC → Redis → SSE realtime pipeline works and is replica-safe; keep it.
