@@ -70,6 +70,26 @@ export default function Header({
       if (e.key === 'Escape') {
         e.stopPropagation()
         closeDrawer()
+        return
+      }
+      if (e.key === 'Tab' && drawerRef.current) {
+        const focusable = drawerRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        )
+        if (focusable.length === 0) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (
+          e.shiftKey &&
+          (document.activeElement === first ||
+            document.activeElement === drawerRef.current)
+        ) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
       }
     }
     document.addEventListener('keydown', handleKeyDown)

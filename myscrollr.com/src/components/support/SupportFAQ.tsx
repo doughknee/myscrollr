@@ -32,12 +32,12 @@ export function SupportFAQ() {
               >
                 {String(i + 1).padStart(2, '0')}
               </div>
-              <h3 className="type-display relative m-0 mb-3 max-w-[86%] text-[clamp(17px,1.4vw,21px)]">
+              <h2 className="type-display relative m-0 mb-3 max-w-[86%] text-[clamp(17px,1.4vw,21px)]">
                 <span className="mr-3 font-mono text-xs font-normal tracking-[0.1em] text-primary">
                   Q.{String(i + 1).padStart(2, '0')}
                 </span>
                 {f.question}
-              </h3>
+              </h2>
               <p className="relative m-0 text-[14.5px] leading-[1.65] text-base-content/60 [text-wrap:pretty]">
                 {f.answer}
               </p>

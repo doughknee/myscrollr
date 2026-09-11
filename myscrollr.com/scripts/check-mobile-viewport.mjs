@@ -17,7 +17,7 @@
 // always runs it).
 
 import { createServer } from 'node:http'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, extname, join } from 'node:path'
 
@@ -121,8 +121,7 @@ function resolveStaticFile(urlPath) {
 
   const direct = join(clientDir, pathname)
   if (existsSync(direct)) {
-    // If it's a directory request (`/foo/`), serve `index.html`.
-    if (pathname.endsWith('/')) {
+    if (statSync(direct).isDirectory()) {
       const indexPath = join(direct, 'index.html')
       return existsSync(indexPath) ? indexPath : null
     }
@@ -235,7 +234,15 @@ try {
             }
           }
         }
-        return { scrollWidth, clientWidth, offender }
+        return {
+          scrollWidth,
+          clientWidth,
+          offender,
+          mainCount: document.querySelectorAll('main').length,
+          headings: Array.from(document.querySelectorAll('h1, h2, h3')).map(
+            (heading) => heading.tagName,
+          ),
+        }
       })
 
       // Subpixel rendering at 2× DSR can produce off-by-1 scrollWidth
@@ -250,6 +257,18 @@ try {
         failures += 1
       } else {
         console.log(`✓ ${route.path} @ ${viewport.name} (${viewport.width}px)`)
+      }
+
+      if (
+        route.path === '/support' &&
+        (result.mainCount !== 1 ||
+          result.headings[0] !== 'H1' ||
+          result.headings[1] !== 'H2')
+      ) {
+        console.error(
+          `✗ /support semantics: mainCount=${result.mainCount}, headings=${result.headings.join('→')}`,
+        )
+        failures += 1
       }
 
       if (route.path === '/' && viewport.width < 768) {
@@ -320,6 +339,25 @@ try {
             )
             failures += 1
           }
+        }
+
+        await page.getByRole('button', { name: 'Open menu' }).click()
+        await page.locator('#mobile-nav-drawer').waitFor()
+        let focusEscaped = false
+        for (let i = 0; i < 12; i += 1) {
+          await page.keyboard.press('Tab')
+          focusEscaped ||= !(await page.evaluate(() =>
+            document
+              .querySelector('#mobile-nav-drawer')
+              ?.contains(document.activeElement),
+          ))
+        }
+        await page.keyboard.press('Escape')
+        if (focusEscaped) {
+          console.error(
+            `✗ ${route.path} @ ${viewport.name}: focus escaped mobile navigation`,
+          )
+          failures += 1
         }
       }
     }

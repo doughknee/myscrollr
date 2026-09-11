@@ -16,7 +16,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Is Scrollr free?',
     answer:
-      'Yes. Three widgets at once, forever, no account. Uplink plans add more concurrent widgets from $6.67/mo.',
+      'Yes. The free tier lets three widgets run at once. No account is required to download or look around; sign in to add live data widgets and sync settings. Uplink plans add more concurrent widgets from $6.67/mo.',
   },
   {
     question: "Does it affect my computer's performance?",
@@ -31,7 +31,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Do I need an account?',
     answer:
-      'Not to use the free tier. An account only exists to sync an Uplink subscription across machines.',
+      'Not to download Scrollr or explore local utility widgets. Sign in to add live data widgets, sync settings across machines, or use an Uplink subscription.',
   },
   {
     question: 'What platforms are supported?',

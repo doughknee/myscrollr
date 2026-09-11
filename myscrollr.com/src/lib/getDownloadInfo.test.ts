@@ -15,7 +15,7 @@ vi.mock('./latestVersion.generated', () => ({
 }))
 
 const RELEASE_BASE =
-  'https://github.com/brandon-relentnet/myscrollr/releases/download/desktop-v1.2.3'
+  'https://github.com/doughknee/myscrollr/releases/download/desktop-v1.2.3'
 
 describe('getDownloadInfo', () => {
   it('resolves the macOS DMG (Apple Silicon naming)', () => {
@@ -70,7 +70,7 @@ describe('getDownloadInfo', () => {
 
   it('keeps the releases-page fallback pointed at the repo', () => {
     expect(FALLBACK_RELEASES_URL).toBe(
-      'https://github.com/brandon-relentnet/myscrollr/releases/latest',
+      'https://github.com/doughknee/myscrollr/releases/latest',
     )
   })
 })

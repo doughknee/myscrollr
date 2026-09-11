@@ -5,7 +5,7 @@ import { Check, CheckCircle2, Loader2 } from 'lucide-react'
 
 import type { SubscriptionStatus } from '@/api/client'
 import { seo } from '@/lib/seo'
-import { breadcrumbs, organization } from '@/lib/structured-data'
+import { organization } from '@/lib/structured-data'
 import { EASE, riseIn } from '@/lib/animations'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { useGetToken } from '@/hooks/useGetToken'
@@ -55,14 +55,7 @@ export const Route = createFileRoute('/uplink_/lifetime')({
       path: '/uplink/lifetime',
       image: 'https://myscrollr.com/og/uplink.png',
       type: 'product',
-      jsonLd: [
-        organization,
-        breadcrumbs([
-          { name: 'Home', path: '/' },
-          { name: 'Uplink', path: '/uplink' },
-          { name: 'Lifetime', path: '/uplink/lifetime' },
-        ]),
-      ],
+      jsonLd: organization,
     }),
   component: () => (
     <ClientOnly fallback={<LifetimePrerender />}>

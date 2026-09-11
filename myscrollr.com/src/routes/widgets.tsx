@@ -12,7 +12,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { AnimatePresence, motion } from 'motion/react'
 import type { CatalogWidget } from '@/lib/catalog'
 import { seo } from '@/lib/seo'
-import { breadcrumbs, organization } from '@/lib/structured-data'
+import { organization } from '@/lib/structured-data'
 import { EASE } from '@/lib/animations'
 import {
   CATEGORY_ORDER,
@@ -36,13 +36,7 @@ export const Route = createFileRoute('/widgets')({
       description:
         'Browse the full Scrollr widget catalog: live sports leagues, stocks and crypto, curated news and custom RSS, Yahoo Fantasy, prediction markets, and utilities. Every widget streams live.',
       path: '/widgets',
-      jsonLd: [
-        organization,
-        breadcrumbs([
-          { name: 'Home', path: '/' },
-          { name: 'Widgets', path: '/widgets' },
-        ]),
-      ],
+      jsonLd: organization,
     }),
   component: ChannelsPage,
 })
@@ -230,7 +224,7 @@ function ChannelsPage() {
                 labelClassName="text-xl"
                 meta="Widgets ship server-side. A good request can be live for everyone in days."
                 action="REQUEST A WIDGET ↗"
-                href="https://github.com/brandon-relentnet/myscrollr/issues/new"
+                href="https://github.com/doughknee/myscrollr/issues/new"
               />
             </div>
           </motion.div>

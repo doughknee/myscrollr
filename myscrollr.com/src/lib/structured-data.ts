@@ -9,7 +9,7 @@
 
 import { BASE_URL } from '@/lib/seo'
 
-declare const __APP_VERSION__: string
+import { LATEST_DESKTOP_VERSION } from '@/lib/latestVersion.generated'
 
 export const organization = {
   '@context': 'https://schema.org',
@@ -21,7 +21,7 @@ export const organization = {
   description:
     'Scrollr is a quiet desktop ticker for live finance, sports, news, and fantasy data. Open source and privacy-first.',
   sameAs: [
-    'https://github.com/brandon-relentnet/myscrollr',
+    'https://github.com/doughknee/myscrollr',
     'https://discord.gg/85b49TcGJa',
   ],
 }
@@ -52,7 +52,7 @@ export const softwareApplication = {
     'A quiet desktop ticker for live finance, sports, news, and fantasy data. Open source and privacy-first.',
   url: BASE_URL,
   downloadUrl: `${BASE_URL}/download`,
-  softwareVersion: __APP_VERSION__,
+  softwareVersion: LATEST_DESKTOP_VERSION,
   publisher: { '@id': `${BASE_URL}/#organization` },
   author: { '@id': `${BASE_URL}/#organization` },
   screenshot: [
@@ -174,7 +174,7 @@ export const HOMEPAGE_FAQ_ITEMS: ReadonlyArray<{
   {
     question: 'Is it really free?',
     answer:
-      "Yes. Three widget slots, forever, no account. Uplink exists if you outgrow them. Most people don't.",
+      'Yes. The free tier includes three widget slots forever. You can download and browse without an account; sign in to add live data widgets and sync settings. Uplink exists if you outgrow three slots.',
   },
   {
     question: 'Will it slow my computer down?',
@@ -184,25 +184,10 @@ export const HOMEPAGE_FAQ_ITEMS: ReadonlyArray<{
   {
     question: 'What does Scrollr collect about me?',
     answer:
-      'No ads, no tracking pixels, no third-party analytics. Your widget setup syncs to your account so it follows you between machines. We count app versions and error rates to find bugs, and crash reports are stripped of personal data before they are sent, which tests enforce on every deploy.',
+      'No advertising trackers. Operational diagnostics and authentication logs are used to run and secure the service. Optional product analytics is opt-in, coarse, account-linked, desktop-only, and described in the Privacy Policy.',
   },
   {
     question: 'Which platforms?',
     answer: 'macOS, Windows, and Linux. Multi-monitor aware on all three.',
   },
 ] as const
-
-type BreadcrumbItem = { name: string; path: string }
-
-export function breadcrumbs(items: Array<BreadcrumbItem>) {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: items.map((item, idx) => ({
-      '@type': 'ListItem',
-      position: idx + 1,
-      name: item.name,
-      item: `${BASE_URL}${item.path}`,
-    })),
-  }
-}

@@ -4,9 +4,8 @@
  * `useCatalog()` fetches GET /catalog (the single authority — see
  * api/internal/widgets/catalog.go) with a sessionStorage cache, and falls
  * back to CATALOG_SNAPSHOT so the pages render offline and during SSR.
- * The snapshot mirrors api/internal/platform/widgets.go; drift is
- * harmless (the live response wins as soon as it arrives) but keep it
- * roughly in sync when the server catalog changes.
+ * The snapshot mirrors api/internal/platform/widgets.go. Keep it exact:
+ * prerendered HTML and offline clients render it before the live response.
  *
  * Widget counts and category counts must always be COMPUTED from the
  * widget list — never hardcode "35" in page copy.
@@ -37,6 +36,20 @@ export const CATALOG_SNAPSHOT: Array<CatalogWidget> = [
     ['sports_championsleague', 'Champions League', 'sports', '#0e1e5b', 'Live UEFA Champions League scores.'],
     ['sports_ufc', 'UFC', 'sports', '#d20a0a', 'UFC fight cards and results.'],
     ['sports_afl', 'AFL', 'sports', '#003da5', 'Live Australian Football League scores.'],
+    ['sports_bundesliga', 'Bundesliga', 'sports', '#d20515', "Live scores from Germany's Bundesliga."],
+    ['sports_seriea', 'Serie A', 'sports', '#0473ff', "Live scores from Italy's Serie A."],
+    ['sports_ligue1', 'Ligue 1', 'sports', '#085fff', "Live scores from France's Ligue 1."],
+    ['sports_euroleague', 'EuroLeague', 'sports', '#fa5500', 'Live EuroLeague basketball scores.'],
+    ['sports_khl', 'KHL', 'sports', '#17272c', 'Live Kontinental Hockey League scores.'],
+    ['sports_npb', 'NPB', 'sports', '#0091db', 'Live Nippon Professional Baseball scores.'],
+    ['sports_sixnations', 'Six Nations', 'sports', '#0d1c1c', 'Live Six Nations rugby scores.'],
+    ['sports_superrugby', 'Super Rugby', 'sports', '#00245d', 'Live Super Rugby Pacific scores.'],
+    ['sports_premrugby', 'Premiership Rugby', 'sports', '#2a2b6b', "Live scores from England's Premiership Rugby."],
+    ['sports_handballcl', 'Handball Champions League', 'sports', '#001432', 'Live EHF Champions League handball scores.'],
+    ['sports_hbl', 'Handball Bundesliga', 'sports', '#1d2f56', "Live scores from Germany's Handball-Bundesliga."],
+    ['sports_starligue', 'Starligue', 'sports', '#e42027', "Live scores from France's Starligue."],
+    ['sports_volleyballcl', 'Volleyball Champions League', 'sports', '#0000ff', 'Live CEV Champions League volleyball scores.'],
+    ['sports_vnl', 'Volleyball Nations League', 'sports', '#bbeb00', 'Live Volleyball Nations League scores.'],
     ['news_bbc', 'BBC News', 'news', '#b80000', 'World, UK and breaking news from the BBC.'],
     ['news_npr', 'NPR', 'news', '#4667de', 'US and world news, analysis and reporting from NPR.'],
     ['news_guardian', 'The Guardian', 'news', '#052962', 'Independent world news, opinion and reporting.'],
@@ -47,6 +60,7 @@ export const CATALOG_SNAPSHOT: Array<CatalogWidget> = [
     ['news_nasa', 'NASA', 'news', '#0b3d91', 'Space, science and mission news from NASA.'],
     ['news_hackernews', 'Hacker News', 'news', '#ff6600', 'Top stories from the Hacker News front page.'],
     ['news_theverge', 'The Verge', 'news', '#5200ff', 'Technology, science, art and culture.'],
+    ['news_drudge', 'Drudge Report', 'news', '#4b5563', "The Drudge Report's headline links, as they post."],
     ['rss_custom', 'Custom RSS', 'news', '#ee802f', 'Follow any RSS or Atom feed by pasting its URL.'],
     ['fantasy_yahoo', 'Yahoo Fantasy', 'fantasy', '#6001d2', 'Your Yahoo Fantasy leagues, matchups, and standings.'],
     ['predictions', 'Kalshi', 'predictions', '#1fc9a0', 'Live odds from the Kalshi prediction market.'],
@@ -104,6 +118,20 @@ export const WIDGET_ABBR: Record<string, string> = {
   sports_championsleague: 'SPT—UCL',
   sports_ufc: 'SPT—UFC',
   sports_afl: 'SPT—AFL',
+  sports_bundesliga: 'SPT—BUN',
+  sports_seriea: 'SPT—SA',
+  sports_ligue1: 'SPT—L1',
+  sports_euroleague: 'SPT—EL',
+  sports_khl: 'SPT—KHL',
+  sports_npb: 'SPT—NPB',
+  sports_sixnations: 'SPT—6N',
+  sports_superrugby: 'SPT—SR',
+  sports_premrugby: 'SPT—PR',
+  sports_handballcl: 'SPT—HCL',
+  sports_hbl: 'SPT—HBL',
+  sports_starligue: 'SPT—STAR',
+  sports_volleyballcl: 'SPT—VCL',
+  sports_vnl: 'SPT—VNL',
   news_bbc: 'RSS—BBC',
   news_npr: 'RSS—NPR',
   news_guardian: 'RSS—GDN',
@@ -114,6 +142,7 @@ export const WIDGET_ABBR: Record<string, string> = {
   news_nasa: 'RSS—NASA',
   news_hackernews: 'RSS—HN',
   news_theverge: 'RSS—TV',
+  news_drudge: 'RSS—DRG',
   rss_custom: 'RSS—YOU',
   fantasy_yahoo: 'FAN—YH',
   predictions: 'PRD—KL',

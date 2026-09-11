@@ -6,12 +6,7 @@ import { AlertTriangle, CheckCircle2, Loader2, ShieldAlert } from 'lucide-react'
 
 import type { SubscriptionStatus, TierLimitsResponse } from '@/api/client'
 import { seo } from '@/lib/seo'
-import {
-  breadcrumbs,
-  faqPage,
-  organization,
-  productOffers,
-} from '@/lib/structured-data'
+import { faqPage, organization, productOffers } from '@/lib/structured-data'
 import { EASE } from '@/lib/animations'
 import { FALLBACK_LIMITS } from '@/lib/fallbackTierLimits'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
@@ -111,7 +106,7 @@ const STATIC_FAQ = [
   {
     question: 'How fast are live updates?',
     answer:
-      'Instant, on every plan. The moment a price ticks or a score changes, it appears in your ticker over a live streaming connection. There is no faster tier to buy — everyone gets the same speed.',
+      'Every plan uses the same live streaming connection, so changes appear automatically when Scrollr receives them. Upstream timing, corrections, outages, and your connection can affect arrival time; there is no faster tier to buy.',
   },
   {
     question: 'Are there limits inside a widget?',
@@ -185,15 +180,7 @@ export const Route = createFileRoute('/uplink')({
       path: '/uplink',
       image: 'https://myscrollr.com/og/uplink.png',
       type: 'product',
-      jsonLd: [
-        organization,
-        productOffers(STATIC_TIERS),
-        faqPage(STATIC_FAQ),
-        breadcrumbs([
-          { name: 'Home', path: '/' },
-          { name: 'Uplink', path: '/uplink' },
-        ]),
-      ],
+      jsonLd: [organization, productOffers(STATIC_TIERS), faqPage(STATIC_FAQ)],
     }),
   component: () => (
     <ClientOnly fallback={<UplinkPrerender />}>

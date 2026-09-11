@@ -7,7 +7,7 @@
   "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/brandon-relentnet/myscrollr.git",
+    "url": "git+https://github.com/doughknee/myscrollr.git",
     "directory": "myscrollr.com"
   },
   "homepage": "https://myscrollr.com",

@@ -40,11 +40,11 @@ export interface ReleaseEntry {
 
 /** Canonical API constant — GitHub follows the rename redirect. */
 export const RELEASES_API_URL =
-  'https://api.github.com/repos/brandon-relentnet/myscrollr/releases?per_page=50'
+  'https://api.github.com/repos/doughknee/myscrollr/releases?per_page=50'
 
 /** Human fallback link when no data is available. */
 export const RELEASES_PAGE_URL =
-  'https://github.com/brandon-relentnet/myscrollr/releases'
+  'https://github.com/doughknee/myscrollr/releases'
 
 const DESKTOP_TAG_PREFIX = 'desktop-v'
 

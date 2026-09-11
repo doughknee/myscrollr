@@ -9,12 +9,12 @@ import { EASE } from '@/lib/animations'
 import { SectionRow, TerminalContainer } from '@/components/terminal'
 import { useGitHubStats } from '@/hooks/useGitHubStats'
 
-const REPO = 'brandon-relentnet/myscrollr'
+const REPO = 'doughknee/myscrollr'
 const GITHUB_URL = `https://github.com/${REPO}`
 
 const REFUSALS = [
   'Read your other apps',
-  'Collect personal data',
+  'Build advertising profiles',
   'Show you ads',
   'Sell to data brokers',
 ]
@@ -49,7 +49,7 @@ export function PromiseSection({
             </h2>
             <p className="m-0 mb-7 max-w-[460px] leading-relaxed text-base-content/60 [text-wrap:pretty]">
               {
-                'No ads, no tracking pixels, no third-party analytics. Your widget setup syncs to your account so it follows you between machines. We count app versions and error rates to find bugs, and crash reports are stripped of personal data before they are sent, which tests enforce on every deploy.'
+                'No advertising trackers. Operational diagnostics and authentication logs are used to run and secure the service. Optional product analytics is opt-in, coarse, account-linked, desktop-only, and described in the Privacy Policy.'
               }
             </p>
             <a
@@ -137,7 +137,7 @@ export function PromiseSection({
               vectorEffect: 'non-scaling-stroke',
             }}
           >
-            ZERO TRACKING
+            NO AD TRACKING
           </text>
         </svg>
       </div>

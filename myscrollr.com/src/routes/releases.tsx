@@ -14,7 +14,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { marked } from 'marked'
 import type { ReleaseEntry, SortDir, SortKey } from '@/lib/releases'
 import { seo } from '@/lib/seo'
-import { breadcrumbs, organization } from '@/lib/structured-data'
+import { organization } from '@/lib/structured-data'
 import {
   BUILD_TIME_RELEASES,
   RELEASES_PAGE_URL,
@@ -36,13 +36,7 @@ export const Route = createFileRoute('/releases')({
       description:
         'Human-readable release notes for the Scrollr desktop app: every version, what shipped, and why it matters. No commit-log archaeology required.',
       path: '/releases',
-      jsonLd: [
-        organization,
-        breadcrumbs([
-          { name: 'Home', path: '/' },
-          { name: 'Releases', path: '/releases' },
-        ]),
-      ],
+      jsonLd: organization,
     }),
   component: ReleasesPage,
 })

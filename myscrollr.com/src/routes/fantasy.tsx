@@ -4,7 +4,6 @@ import { motion } from 'motion/react'
 import type { PlatformInfo } from '@/lib/detectPlatform'
 import { seo } from '@/lib/seo'
 import {
-  breadcrumbs,
   faqPage,
   organization,
   softwareApplication,
@@ -111,12 +110,12 @@ const FANTASY_FAQ_ITEMS: ReadonlyArray<{ question: string; answer: string }> = [
   {
     question: 'How fast are the scores?',
     answer:
-      'Live. Scores stream over a single push connection rather than a polling loop, so plays land on the bar as they happen instead of on somebody else’s refresh timer. Stat corrections flow through the same way.',
+      'Live updates stream over a single push connection rather than waiting on a client polling loop. Changes appear automatically when Scrollr receives them; upstream timing, corrections, outages, and your connection can affect arrival time.',
   },
   {
     question: 'What do you collect about me?',
     answer:
-      'No ads, no tracking pixels, no third-party analytics. Your widget setup syncs to your account so it follows you between machines. We count app versions and error rates to find bugs, and crash reports are stripped of personal data before they are sent, which tests enforce on every deploy.',
+      'No advertising trackers. Operational diagnostics and authentication logs are used to run and secure the service. Optional product analytics is opt-in, coarse, account-linked, desktop-only, and described in the Privacy Policy.',
   },
 ]
 
@@ -166,15 +165,7 @@ export const Route = createFileRoute('/fantasy')({
       image: 'https://myscrollr.com/og/home.png',
       imageAlt:
         'Scrollr desktop ticker showing live fantasy matchups and NFL scores.',
-      jsonLd: [
-        organization,
-        softwareApplication,
-        faqPage(FANTASY_FAQ_ITEMS),
-        breadcrumbs([
-          { name: 'Home', path: '/' },
-          { name: 'Fantasy', path: '/fantasy' },
-        ]),
-      ],
+      jsonLd: [organization, softwareApplication, faqPage(FANTASY_FAQ_ITEMS)],
       extraLinks: [
         {
           rel: 'preload',

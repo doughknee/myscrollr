@@ -18,6 +18,14 @@ import { dirname, join } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const clientDir = join(__dirname, '..', 'dist', 'client')
+const versionSource = readFileSync(
+  join(__dirname, '..', 'src', 'lib', 'latestVersion.generated.ts'),
+  'utf8',
+)
+const latestDesktopVersion = versionSource.match(
+  /LATEST_DESKTOP_VERSION = '([^']+)'/,
+)?.[1]
+if (!latestDesktopVersion) throw new Error('Latest desktop version is missing')
 
 // Per-route expected contract.
 // - `minJsonLd`: minimum <script type="application/ld+json"> blocks
@@ -42,7 +50,7 @@ const ROUTES = [
   {
     path: '/widgets',
     file: 'widgets/index.html',
-    minJsonLd: 2, // organization + breadcrumbs
+    minJsonLd: 1, // organization
     expectedBody: 'Every widget streams live',
   },
   {
@@ -50,104 +58,104 @@ const ROUTES = [
     // vite.config's `pages` — this assertion catches its removal.
     path: '/fantasy',
     file: 'fantasy/index.html',
-    minJsonLd: 4, // organization + softwareApp + FAQPage + breadcrumbs
+    minJsonLd: 3, // organization + softwareApp + FAQPage
     expectedBody: 'The go-ahead touchdown',
   },
   {
     path: '/sports',
     file: 'sports/index.html',
-    minJsonLd: 4,
+    minJsonLd: 3,
     expectedBody: 'Follow the leagues and teams you care about',
     expectedH1: 'Live sports scores on your desktop',
   },
   {
     path: '/markets',
     file: 'markets/index.html',
-    minJsonLd: 4,
+    minJsonLd: 3,
     expectedBody: 'Build separate stock and crypto watchlists',
     expectedH1: 'Live stocks and crypto on your desktop',
   },
   {
     path: '/news',
     file: 'news/index.html',
-    minJsonLd: 4,
+    minJsonLd: 3,
     expectedBody: 'Choose from the built-in source catalog',
     expectedH1: 'Live news and RSS feeds on your desktop',
   },
   {
     path: '/releases',
     file: 'releases/index.html',
-    minJsonLd: 2,
+    minJsonLd: 1,
     expectedBody: 'No commit-log archaeology.',
     expectedH1: 'Every build, dated and signed.',
   },
   {
     path: '/download',
     file: 'download/index.html',
-    minJsonLd: 3, // organization + softwareApp + breadcrumbs
+    minJsonLd: 2, // organization + softwareApp
     expectedBody: 'One small native app',
   },
   {
     path: '/download/mac',
     file: 'download/mac/index.html',
-    minJsonLd: 3, // organization + softwareApp + breadcrumbs
+    minJsonLd: 2, // organization + softwareApp
     expectedBody: 'Requires Apple Silicon and macOS 10.15 or later.',
     expectedH1: 'Get Scrollr for macOS. Free. No sign-up.',
   },
   {
     path: '/download/windows',
     file: 'download/windows/index.html',
-    minJsonLd: 3,
+    minJsonLd: 2,
     expectedBody: 'Built as an x64 Windows setup executable.',
     expectedH1: 'Get Scrollr for Windows. Free. No sign-up.',
   },
   {
     path: '/download/linux',
     file: 'download/linux/index.html',
-    minJsonLd: 3,
+    minJsonLd: 2,
     expectedBody: 'Choose the package that matches your x86_64 distribution.',
     expectedH1: 'Get Scrollr for Linux. Free. No sign-up.',
   },
   {
     path: '/business',
     file: 'business/index.html',
-    minJsonLd: 2, // organization + breadcrumbs
+    minJsonLd: 1, // organization
     expectedBody: 'Sports bars',
   },
   {
     path: '/architecture',
     file: 'architecture/index.html',
-    minJsonLd: 3, // organization + TechArticle + breadcrumbs
+    minJsonLd: 2, // organization + TechArticle
     expectedBody: 'Per-user Redis',
   },
   {
     path: '/support',
     file: 'support/index.html',
-    minJsonLd: 3, // organization + FAQ + breadcrumbs
+    minJsonLd: 2, // organization + FAQ
     expectedBody: 'Most answers are a scroll away',
   },
   {
     path: '/legal',
     file: 'legal/index.html',
-    minJsonLd: 2, // organization + breadcrumbs
+    minJsonLd: 1, // organization
     expectedBody: 'Terms of Service',
   },
   {
     path: '/uplink',
     file: 'uplink/index.html',
-    minJsonLd: 4,
+    minJsonLd: 3,
     expectedBody: 'Plans for more widgets at once',
-  }, // org + productOffers + faq + breadcrumbs
+  }, // org + productOffers + faq
   {
     path: '/uplink/lifetime',
     file: 'uplink/lifetime/index.html',
-    minJsonLd: 2, // organization + breadcrumbs
+    minJsonLd: 1, // organization
     expectedBody: 'One payment. Permanent access.',
   },
   {
     path: '/status',
     file: 'status/index.html',
-    minJsonLd: 2, // organization + breadcrumbs
+    minJsonLd: 1, // organization
     // No body assertion: status body renders live data via useEffect,
     // so the prerendered HTML body is intentionally minimal.
   },
@@ -155,7 +163,13 @@ const ROUTES = [
 
 const SITE_ORIGIN = 'https://myscrollr.com'
 const PRERENDERED_PATHS = new Set(ROUTES.map((route) => route.path))
-const DYNAMIC_PATH_PREFIXES = ['/account', '/callback', '/invite', '/u/']
+const DYNAMIC_PATH_PREFIXES = [
+  '/account',
+  '/admin',
+  '/callback',
+  '/invite',
+  '/u/',
+]
 const SERVICE_PATHS = new Set(['/health', '/swagger/index.html'])
 
 let failures = 0
@@ -219,12 +233,22 @@ for (const route of ROUTES) {
       /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/g,
     ),
   ]
+  const schemas = []
   for (const script of jsonLdScripts) {
     try {
-      JSON.parse(script[1])
+      schemas.push(JSON.parse(script[1]))
     } catch (error) {
       fail(route, `invalid JSON-LD: ${error.message}`)
     }
+  }
+  const software = schemas.find(
+    (schema) => schema['@type'] === 'SoftwareApplication',
+  )
+  if (software && software.softwareVersion !== latestDesktopVersion) {
+    fail(
+      route,
+      `softwareVersion=${software.softwareVersion} expected=${latestDesktopVersion}`,
+    )
   }
 
   {
@@ -302,18 +326,18 @@ if (!existsSync(shell)) {
   console.error('✗ _shell.html missing (SPA fallback target)')
   failures += 1
 } else {
-  // Assert the shell body has real Header chrome so nginx never serves
-  // a blank page for unknown routes. The shell is rendered by fetching
+  // Assert the shell body has real Header chrome for known dynamic routes.
+  // The shell is rendered by fetching
   // the synthetic `/tss-spa-shell` route; if that route or the layout
   // ever ships an empty body again (e.g. a fresh <ClientOnly> wrap),
   // this assertion fails.
   const shellHtml = readFileSync(shell, 'utf8')
   const shellBody = shellHtml.replace(/<head[\s\S]*?<\/head>/i, '')
-  const expectedShellChrome = 'ZERO ADS · ZERO TRACKING'
+  const expectedShellChrome = 'NO ADS · ANALYTICS OPT-IN'
   if (!shellBody.includes(expectedShellChrome)) {
     console.error(
       `✗ _shell.html missing expected chrome "${expectedShellChrome}" ` +
-        `— the SPA fallback would render a blank page for unknown routes`,
+        `— known dynamic routes would render a blank page`,
     )
     failures += 1
   } else {
@@ -322,11 +346,17 @@ if (!existsSync(shell)) {
 }
 
 const dockerfile = readFileSync(join(__dirname, '..', 'Dockerfile'), 'utf8')
-if (!dockerfile.includes('try_files $uri $uri/index.html /_shell.html;')) {
-  console.error('✗ nginx must use _shell.html for dynamic-route fallback')
+if (
+  !dockerfile.includes('try_files /_shell.html =404;') ||
+  !dockerfile.includes('add_header X-Robots-Tag "noindex, nofollow" always;') ||
+  !dockerfile.includes('try_files $uri $uri/index.html =404;')
+) {
+  console.error(
+    '✗ nginx dynamic-route noindex or unknown-route 404 guard missing',
+  )
   failures += 1
 } else {
-  console.log('✓ nginx uses _shell.html for dynamic-route fallback')
+  console.log('✓ nginx limits its noindex SPA fallback to known dynamic routes')
 }
 
 // Guard: the client entry bundle must wrap StartClient in our auth providers.

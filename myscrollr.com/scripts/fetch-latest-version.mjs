@@ -35,7 +35,7 @@ import { writeFile, mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const REPO = 'brandon-relentnet/myscrollr'
+const REPO = 'doughknee/myscrollr'
 // Updated whenever we bump in production. Used only as a last-resort
 // fallback for local dev when the network is unavailable; CI builds
 // hard-fail instead of falling back.

@@ -4,7 +4,7 @@ import { LATEST_DESKTOP_VERSION } from '@/lib/latestVersion.generated'
 
 /**
  * Terminal-editorial footer (design_handoff_marketing_site/README.md):
- * wordmark left, mono uppercase link rows, `ZERO ADS · ZERO TRACKING`
+ * wordmark left, mono uppercase link rows, privacy summary
  * right. Keeps the full sitemap (status/architecture/releases/legal
  * docs) that the mockup's minimal footer omitted — existing site wins
  * on navigation/SEO.
@@ -31,7 +31,7 @@ const SECONDARY_LINKS: Array<{ label: string; to?: string; href?: string }> = [
   { label: 'TERMS', to: '/legal?doc=terms' },
   { label: 'PRIVACY', to: '/legal?doc=privacy' },
   { label: 'LICENSE', to: '/legal?doc=license' },
-  { label: 'GITHUB', href: 'https://github.com/brandon-relentnet/myscrollr' },
+  { label: 'GITHUB', href: 'https://github.com/doughknee/myscrollr' },
 ]
 
 function FooterLink({
@@ -97,7 +97,7 @@ export default function Footer() {
             in both themes (/60 measured 4.41:1 in light) while staying
             visibly de-emphasized. */}
         <div className="font-mono text-[11px] tracking-[0.1em] text-base-content/65">
-          ZERO ADS · ZERO TRACKING
+          NO ADS · ANALYTICS OPT-IN
         </div>
       </div>
 
