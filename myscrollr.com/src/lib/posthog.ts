@@ -105,6 +105,7 @@ function initialize(): boolean {
   if (!initialized) {
     posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
       api_host: import.meta.env.VITE_POSTHOG_HOST,
+      advanced_disable_flags: true,
       autocapture: false,
       before_send: sanitizeWebsiteCapture,
       capture_pageview: false,
@@ -114,6 +115,7 @@ function initialize(): boolean {
       disable_surveys: true,
       person_profiles: 'identified_only',
       opt_out_capturing_by_default: true,
+      opt_out_persistence_by_default: true,
       persistence: 'localStorage',
       respect_dnt: true,
     })
@@ -141,9 +143,9 @@ export function setWebsiteAnalyticsDecision(
     }
   } else {
     sessionStorage.removeItem(SIGNUP_FLOW_KEY)
-    if (initialized) {
-      posthog.opt_out_capturing()
+    if (initialize()) {
       posthog.reset()
+      posthog.opt_out_capturing()
     }
   }
   window.dispatchEvent(new CustomEvent('scrollr:analytics-consent-changed'))
@@ -269,5 +271,9 @@ export function applyWebsiteAnalyticsContext(
 }
 
 export function resetWebsiteAnalyticsIdentity(): void {
-  if (initialized) posthog.reset()
+  if (!initialized) return
+  posthog.reset()
+  if (getWebsiteAnalyticsDecision() === 'enabled') {
+    posthog.opt_in_capturing({ captureEventName: false })
+  }
 }

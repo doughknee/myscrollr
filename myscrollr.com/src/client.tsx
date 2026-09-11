@@ -57,6 +57,7 @@ function SentryFallback() {
 function WebsiteAnalyticsGate() {
   const { getAccessToken, isAuthenticated, isLoading } = useScrollrAuth()
   const checkedUser = useRef(false)
+  const retriedUser = useRef(false)
   const wasAuthenticated = useRef(false)
   const [consentRevision, setConsentRevision] = useState(0)
 
@@ -76,6 +77,7 @@ function WebsiteAnalyticsGate() {
       if (wasAuthenticated.current) resetWebsiteAnalyticsIdentity()
       wasAuthenticated.current = false
       checkedUser.current = false
+      retriedUser.current = false
       setWebsiteAnalyticsSuppressed(false)
       captureWebsitePageview(window.location.pathname)
       return
@@ -84,21 +86,39 @@ function WebsiteAnalyticsGate() {
     setWebsiteAnalyticsSuppressed(true)
     if (getWebsiteAnalyticsDecision() !== 'enabled') {
       checkedUser.current = false
+      retriedUser.current = false
       return
     }
     if (checkedUser.current) return
     checkedUser.current = true
+    let current = true
+    let retryTimer: number | undefined
     void authenticatedFetch<WebsiteAnalyticsContext>(
       '/users/me/verify-website-signup',
       { method: 'POST' },
       getAccessToken,
     )
       .then((context) => {
+        if (!current) return
         if (!applyWebsiteAnalyticsContext(context)) return
+        retriedUser.current = false
         setWebsiteAnalyticsSuppressed(false)
         captureWebsitePageview(window.location.pathname)
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!current || retriedUser.current) return
+        checkedUser.current = false
+        retriedUser.current = true
+        retryTimer = window.setTimeout(
+          () => setConsentRevision((value) => value + 1),
+          2000,
+        )
+      })
+    return () => {
+      current = false
+      checkedUser.current = false
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer)
+    }
   }, [consentRevision, getAccessToken, isAuthenticated, isLoading])
 
   return null

@@ -329,6 +329,16 @@ jobs:
       - name: Configure kubectl
         run: doctl kubernetes cluster kubeconfig save scrollr-cluster
 
+      - name: Validate PostHog production secrets
+        run: |
+          for key in POSTHOG_PROJECT_KEY POSTHOG_PERSONAL_API_KEY POSTHOG_DISTINCT_ID_SALT; do
+            value="$(kubectl get secret scrollr-secrets -n scrollr -o "jsonpath={.data.${key}}")"
+            if [ -z "$value" ]; then
+              echo "Missing required production secret: $key" >&2
+              exit 1
+            fi
+          done
+
       # Every deployment manifest hardcodes `:latest` as its image, which is
       # only meaningful when creating a deployment on a fresh cluster. On an
       # existing cluster `kubectl apply` rewrites the running image back to

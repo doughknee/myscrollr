@@ -5,6 +5,7 @@ import {
   captureWebsiteEvent,
   captureWebsitePageview,
   getWebsiteAnalyticsDecision,
+  resetWebsiteAnalyticsIdentity,
   sanitizeWebsiteCapture,
   setWebsiteAnalyticsDecision,
   setWebsiteAnalyticsSuppressed,
@@ -56,17 +57,29 @@ describe('website PostHog privacy boundary', () => {
     setWebsiteAnalyticsSuppressed(false)
   })
 
-  it('defaults unknown and never replays on decline', () => {
+  it('defaults unknown and purges durable identity without capturing on decline', () => {
     expect(getWebsiteAnalyticsDecision()).toBe('unknown')
     setWebsiteAnalyticsDecision('declined')
     expect(getWebsiteAnalyticsDecision()).toBe('declined')
-    expect(sdk.opt_out_capturing).not.toHaveBeenCalled()
-    expect(sdk.reset).not.toHaveBeenCalled()
+    expect(sdk.init).toHaveBeenCalledWith(
+      'test-key',
+      expect.objectContaining({
+        advanced_disable_flags: true,
+        opt_out_capturing_by_default: true,
+        opt_out_persistence_by_default: true,
+      }),
+    )
+    expect(sdk.opt_out_capturing).toHaveBeenCalledOnce()
+    expect(sdk.reset).toHaveBeenCalledOnce()
+    expect(sdk.reset.mock.invocationCallOrder[0]).toBeLessThan(
+      sdk.opt_out_capturing.mock.invocationCallOrder[0],
+    )
     expect(sdk.capture).not.toHaveBeenCalled()
   })
 
   it('excludes private routes and strips query strings', () => {
-    localStorage.setItem('scrollr-analytics-consent-v1', 'enabled')
+    setWebsiteAnalyticsDecision('enabled')
+    sdk.capture.mockClear()
     captureWebsitePageview('/download?token=secret')
     captureWebsitePageview('/callback?code=secret')
     expect(sdk.opt_in_capturing).toHaveBeenCalledWith({
@@ -186,5 +199,21 @@ describe('website PostHog privacy boundary', () => {
     })
     expect(sdk.identify).not.toHaveBeenCalled()
     expect(sdk.capture).not.toHaveBeenCalled()
+  })
+
+  it('resets an identified user and resumes consented anonymous capture', () => {
+    setWebsiteAnalyticsDecision('enabled')
+    sdk.capture.mockClear()
+    sdk.opt_in_capturing.mockClear()
+    resetWebsiteAnalyticsIdentity()
+    captureWebsitePageview('/download')
+    expect(sdk.reset).toHaveBeenCalled()
+    expect(sdk.opt_in_capturing).toHaveBeenCalledWith({
+      captureEventName: false,
+    })
+    expect(sdk.capture).toHaveBeenCalledWith(
+      '$pageview',
+      expect.objectContaining({ path: '/download' }),
+    )
   })
 })

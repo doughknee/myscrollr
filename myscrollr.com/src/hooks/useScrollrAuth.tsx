@@ -7,7 +7,10 @@ import { createContext, useCallback, useContext, useRef } from 'react'
 import { useLogto } from '@logto/react'
 import type { ReactNode } from 'react'
 import type { IdTokenClaims } from '@logto/react'
-import { beginWebsiteSignupFlow } from '@/lib/posthog'
+import {
+  beginWebsiteSignupFlow,
+  resetWebsiteAnalyticsIdentity,
+} from '@/lib/posthog'
 
 // ── Context shape ─────────────────────────────────────────────────
 
@@ -60,6 +63,7 @@ export function ScrollrAuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = useCallback((postLogoutRedirectUri: string) => {
+    resetWebsiteAnalyticsIdentity()
     void logtoRef.current
       .signOut(postLogoutRedirectUri)
       .catch((error: unknown) => {
