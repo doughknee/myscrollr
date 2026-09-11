@@ -49,6 +49,22 @@ export async function loadSignupAnalytics(
   days: AnalyticsWindow,
   signal?: AbortSignal,
 ): Promise<SignupAnalytics> {
+  return loadBoundedAdminReport(
+    getToken,
+    `/admin/analytics?application=${application}&days=${days}`,
+    'Could not load signup analytics',
+    'Signup analytics took too long. Please retry.',
+    signal,
+  )
+}
+
+export async function loadBoundedAdminReport<T>(
+  getToken: () => Promise<string | null>,
+  path: string,
+  fallbackError: string,
+  timeoutError: string,
+  signal?: AbortSignal,
+): Promise<T> {
   const controller = new AbortController()
   const forwardAbort = () => controller.abort(signal?.reason)
   if (signal?.aborted) forwardAbort()
@@ -65,14 +81,11 @@ export async function loadSignupAnalytics(
     const token = await Promise.race([getToken(), aborted])
     if (controller.signal.aborted) throw abortFailure(controller.signal)
     const response = await Promise.race([
-      fetch(
-        `${API_BASE}/admin/analytics?application=${application}&days=${days}`,
-        {
-          credentials: 'include',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          signal: controller.signal,
-        },
-      ),
+      fetch(`${API_BASE}${path}`, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal: controller.signal,
+      }),
       aborted,
     ])
     if (!response.ok) {
@@ -80,12 +93,12 @@ export async function loadSignupAnalytics(
         response.json().catch(() => null),
         aborted,
       ])) as { error?: string } | null
-      throw new Error(body?.error ?? 'Could not load signup analytics')
+      throw new Error(body?.error ?? fallbackError)
     }
-    return (await Promise.race([response.json(), aborted])) as SignupAnalytics
+    return (await Promise.race([response.json(), aborted])) as T
   } catch (error) {
     if (didTimeOut()) {
-      throw new Error('Signup analytics took too long. Please retry.')
+      throw new Error(timeoutError)
     }
     throw error
   } finally {
