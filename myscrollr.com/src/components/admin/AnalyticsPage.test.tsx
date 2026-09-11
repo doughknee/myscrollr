@@ -86,7 +86,7 @@ const versions: AdminVersions = {
       error_rate: 0.00625,
     },
   ],
-  platforms: [],
+  platforms: [{ platform: 'windows', requests: 700, share: 0.7 }],
 }
 const signup: SignupAnalytics = {
   application: 'website',
@@ -137,6 +137,9 @@ describe('AnalyticsPage', () => {
     expect(html).toContain('No cohort is old enough.')
     expect(html).toContain('Paying accounts')
     expect(html).toContain('1.6.3')
+    expect(html).toContain('Platform request mix')
+    expect(html).toContain('Windows')
+    expect(html).toContain('2026-09-10: 8')
     expect(html).toContain('Signup diagnostics')
     expect(html).toContain('Verification code')
     expect(html).toContain('Attempt conversion')
@@ -153,7 +156,7 @@ describe('AnalyticsPage', () => {
     expect(html).toContain('Retry')
   })
 
-  it('states when collection has no participating accounts or mature cohorts', () => {
+  it('states when collection has no participating accounts', () => {
     const html = renderContent({
       product: {
         ...product,
@@ -191,5 +194,42 @@ describe('AnalyticsPage', () => {
     })
     expect(html).toContain('No participating accounts yet.')
     expect(html.match(/Collecting history\./g)).toHaveLength(3)
+  })
+
+  it('keeps a nonempty immature cohort in collecting state', () => {
+    const immature = {
+      day: 1 as const,
+      eligible: 0,
+      returned: 0,
+      rate: 0,
+      available: false,
+      note: 'Collecting history.',
+    }
+    const html = renderContent({
+      product: {
+        ...product,
+        collection_started_at: '2026-09-10T12:00:00Z',
+        enrolled_accounts: 5,
+        retention: {
+          d1: immature,
+          d7: { ...immature, day: 7 },
+          d30: { ...immature, day: 30 },
+        },
+      },
+    })
+    expect(html).toContain('>5<')
+    expect(html.match(/Collecting history\./g)).toHaveLength(3)
+    expect(html).not.toContain('No participating accounts yet.')
+  })
+
+  it('does not render stale product data while a new context loads', () => {
+    const html = renderContent({
+      product: null,
+      days: 30,
+      loading: { product: true },
+    })
+    expect(html).toContain('Loading measured usage')
+    expect(html).not.toContain('Measured daily active')
+    expect(html).not.toContain('12 · 70%')
   })
 })

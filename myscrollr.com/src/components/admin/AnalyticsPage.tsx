@@ -50,6 +50,11 @@ const reasonLabel: Record<string, string> = {
   unknown: 'Other safe category',
   verification_code: 'Verification code',
 }
+const platformLabel: Record<string, string> = {
+  linux: 'Linux',
+  macos: 'macOS',
+  windows: 'Windows',
+}
 
 interface ReportState<T> {
   data: T | null
@@ -71,12 +76,12 @@ function useReport<T>(load: (signal: AbortSignal) => Promise<T>) {
   useEffect(() => {
     const controller = new AbortController()
     request.current = controller
-    setState((current) => ({
-      ...current,
+    setState({
+      data: null,
       error: null,
       loading: true,
       slow: false,
-    }))
+    })
     const slowTimer = window.setTimeout(() => {
       if (!controller.signal.aborted) {
         setState((current) => ({ ...current, slow: true }))
@@ -273,8 +278,7 @@ function Curve({
         viewBox="0 0 240 64"
         preserveAspectRatio="none"
         className="h-16 w-full text-primary"
-        role="img"
-        aria-label={label}
+        aria-hidden="true"
       >
         <path d={chart.area} fill="currentColor" opacity={0.12} />
         <path
@@ -289,6 +293,10 @@ function Curve({
         <span>{points[0].day}</span>
         <span>peak {num(chart.peak)}</span>
         <span>{points[points.length - 1].day}</span>
+        <span className="sr-only">
+          {label}:{' '}
+          {points.map((point) => `${point.day}: ${point.count}`).join(', ')}
+        </span>
       </figcaption>
     </figure>
   )
@@ -670,33 +678,36 @@ export function AnalyticsContent({
           <ErrorPanel message={overviewError} onRetry={onRetryOverview} />
         )}
         {overview && (
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card
-              title="Paying accounts"
-              note="Paid Stripe records, excluding the free plan."
-            >
-              <Big>{num(overview.plans.paying)}</Big>
-            </Card>
-            <Card title="Current paid plan mix">
-              {paidPlans.length === 0 ? (
-                <p className="text-sm text-base-content/65">
-                  No paid subscriptions.
-                </p>
-              ) : (
-                paidPlans.map((row) => (
-                  <div
-                    key={`${row.plan}-${row.status}-${row.lifetime}`}
-                    className="flex justify-between gap-4 border-t border-base-300/50 py-2 first:border-0"
-                  >
-                    <span className="text-sm">
-                      {row.plan}
-                      {row.lifetime ? ' · lifetime' : ''} · {row.status}
-                    </span>
-                    <strong className="tabular-nums">{num(row.count)}</strong>
-                  </div>
-                ))
-              )}
-            </Card>
+          <div className="space-y-3">
+            <SourceStamp generatedAt={overview.generated_at} />
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card
+                title="Paying accounts"
+                note="Paid Stripe records, excluding the free plan."
+              >
+                <Big>{num(overview.plans.paying)}</Big>
+              </Card>
+              <Card title="Current paid plan mix">
+                {paidPlans.length === 0 ? (
+                  <p className="text-sm text-base-content/65">
+                    No paid subscriptions.
+                  </p>
+                ) : (
+                  paidPlans.map((row) => (
+                    <div
+                      key={`${row.plan}-${row.status}-${row.lifetime}`}
+                      className="flex justify-between gap-4 border-t border-base-300/50 py-2 first:border-0"
+                    >
+                      <span className="text-sm">
+                        {row.plan}
+                        {row.lifetime ? ' · lifetime' : ''} · {row.status}
+                      </span>
+                      <strong className="tabular-nums">{num(row.count)}</strong>
+                    </div>
+                  ))
+                )}
+              </Card>
+            </div>
           </div>
         )}
       </section>
@@ -759,6 +770,26 @@ export function AnalyticsContent({
                           </p>
                         ))}
                       </div>
+                      {versions.platforms.length > 0 && (
+                        <div className="mt-4 border-t border-base-300/50 pt-3">
+                          <p className="text-xs font-semibold text-base-content/55">
+                            Platform request mix
+                          </p>
+                          {versions.platforms.map((row) => (
+                            <p
+                              key={row.platform}
+                              className="mt-2 flex justify-between gap-3 text-sm"
+                            >
+                            <span>
+                              {platformLabel[row.platform] ?? row.platform}
+                            </span>
+                              <span className="tabular-nums">
+                                {pct(row.share)} · {num(row.requests)} req
+                              </span>
+                            </p>
+                          ))}
+                        </div>
+                      )}
                     </>
                   )}
                 </Card>
@@ -770,39 +801,42 @@ export function AnalyticsContent({
               <ErrorPanel message={overviewError} onRetry={onRetryOverview} />
             )}
             {overview && (
-              <Card
-                title="Current service readings"
-                note={`${num(overview.connected_now.count)} open SSE connections across ${overview.connected_now.replicas} reporting replicas. Connections are not people.`}
-              >
-                {(overview.ingest ?? []).map((row) => {
-                  const health = ingestHealth(row)
-                  return (
-                    <p
-                      key={row.table}
-                      className="flex justify-between py-1 text-sm"
-                    >
-                      <span>{row.table}</span>
-                      <span
-                        className={
-                          health === 'empty'
-                            ? 'text-error'
-                            : health === 'stale'
-                              ? 'text-warning'
-                              : 'text-success'
-                        }
+              <div className="space-y-3">
+                <SourceStamp generatedAt={overview.generated_at} />
+                <Card
+                  title="Current service readings"
+                  note={`${num(overview.connected_now.count)} open SSE connections across ${overview.connected_now.replicas} reporting replicas. Connections are not people.`}
+                >
+                  {(overview.ingest ?? []).map((row) => {
+                    const health = ingestHealth(row)
+                    return (
+                      <p
+                        key={row.table}
+                        className="flex justify-between py-1 text-sm"
                       >
-                        {health === 'empty'
-                          ? 'empty'
-                          : formatAge(row.age_seconds)}
-                      </span>
-                    </p>
-                  )
-                })}
-                <p className="mt-3 border-t border-base-300/50 pt-3 text-sm text-base-content/65">
-                  {num(overview.support.open_cases)} open support cases ·{' '}
-                  {num(overview.support.pending_drafts)} drafts waiting
-                </p>
-              </Card>
+                        <span>{row.table}</span>
+                        <span
+                          className={
+                            health === 'empty'
+                              ? 'text-error'
+                              : health === 'stale'
+                                ? 'text-warning'
+                                : 'text-success'
+                          }
+                        >
+                          {health === 'empty'
+                            ? 'empty'
+                            : formatAge(row.age_seconds)}
+                        </span>
+                      </p>
+                    )
+                  })}
+                  <p className="mt-3 border-t border-base-300/50 pt-3 text-sm text-base-content/65">
+                    {num(overview.support.open_cases)} open support cases ·{' '}
+                    {num(overview.support.pending_drafts)} drafts waiting
+                  </p>
+                </Card>
+              </div>
             )}
           </div>
         </div>
