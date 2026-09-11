@@ -337,7 +337,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Managing Storage',
         content: [
           'Website cookies: You can clear cookies through your browser settings. Note that clearing authentication cookies will sign you out of the Platform.',
-          'Website analytics: Use "Analytics privacy choices" in the site footer to allow or decline PostHog analytics. Declining stops capture, clears the local SDK identity, and records your declined choice so the site does not ask again.',
+          'Website analytics: Use "Analytics settings" in the site footer to allow or decline PostHog analytics. Declining stops capture, clears the local SDK identity, and records your declined choice so the site does not ask again.',
           'Desktop application: You can clear application data by uninstalling and re-installing the app, or by using the "Reset all settings" option in the Account page. You can also manage your preferences through the app settings.',
           'Disabling cookies entirely may prevent you from using authenticated features of the Platform.',
         ],

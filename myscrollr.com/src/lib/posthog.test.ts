@@ -5,6 +5,7 @@ import {
   captureWebsiteEvent,
   captureWebsitePageview,
   getWebsiteAnalyticsDecision,
+  hasWebsiteAnalyticsOptOutSignal,
   resetWebsiteAnalyticsIdentity,
   sanitizeWebsiteCapture,
   setWebsiteAnalyticsDecision,
@@ -44,6 +45,11 @@ vi.stubGlobal('sessionStorage', {
   removeItem: (key: string) => sessionValues.delete(key),
 })
 vi.stubGlobal('CustomEvent', class {})
+const browserPrivacy: {
+  doNotTrack: string | null
+  globalPrivacyControl?: boolean
+} = { doNotTrack: null }
+vi.stubGlobal('navigator', browserPrivacy)
 
 describe('website PostHog privacy boundary', () => {
   beforeEach(() => {
@@ -54,6 +60,8 @@ describe('website PostHog privacy boundary', () => {
     vi.stubEnv('VITE_POSTHOG_KEY', 'test-key')
     vi.stubEnv('VITE_POSTHOG_HOST', 'https://example.test')
     window.location.pathname = '/'
+    browserPrivacy.doNotTrack = null
+    delete browserPrivacy.globalPrivacyControl
     setWebsiteAnalyticsSuppressed(false)
   })
 
@@ -106,6 +114,29 @@ describe('website PostHog privacy boundary', () => {
     window.location.pathname = '/channels'
     setWebsiteAnalyticsDecision('enabled')
     expect(sdk.capture).not.toHaveBeenCalled()
+  })
+
+  it('honors GPC and DNT before initialization, identity, or capture', () => {
+    for (const signal of ['gpc', 'dnt'] as const) {
+      localStorage.clear()
+      vi.clearAllMocks()
+      if (signal === 'gpc') {
+        browserPrivacy.globalPrivacyControl = true
+      } else {
+        browserPrivacy.doNotTrack = '1'
+      }
+
+      expect(hasWebsiteAnalyticsOptOutSignal()).toBe(true)
+      setWebsiteAnalyticsDecision('enabled')
+      captureWebsitePageview('/download')
+      expect(getWebsiteAnalyticsDecision()).toBe('declined')
+      expect(sdk.init).not.toHaveBeenCalled()
+      expect(sdk.identify).not.toHaveBeenCalled()
+      expect(sdk.capture).not.toHaveBeenCalled()
+
+      browserPrivacy.doNotTrack = null
+      delete browserPrivacy.globalPrivacyControl
+    }
   })
 
   it('strips SDK-added URLs, device details, person properties, and IP data', () => {

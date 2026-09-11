@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { WebsiteAnalyticsDecision } from '@/lib/posthog'
 import {
   getWebsiteAnalyticsDecision,
+  hasWebsiteAnalyticsOptOutSignal,
   setWebsiteAnalyticsDecision,
 } from '@/lib/posthog'
 
@@ -25,9 +26,13 @@ export default function AnalyticsConsent() {
 
   const choose = (next: 'enabled' | 'declined') => {
     setWebsiteAnalyticsDecision(next)
-    setDecision(next)
+    setDecision(getWebsiteAnalyticsDecision())
     setManaging(false)
   }
+
+  const browserOptedOut = hasWebsiteAnalyticsOptOutSignal()
+  const buttonClass =
+    'rounded-lg border border-base-300 px-4 py-2 text-sm font-semibold hover:bg-base-200 disabled:cursor-not-allowed disabled:opacity-50'
 
   return (
     <section
@@ -36,20 +41,31 @@ export default function AnalyticsConsent() {
     >
       <h2 className="text-sm font-bold">Analytics</h2>
       <p className="mt-1 text-sm text-base-content/75">
-        Use PostHog to count public-page visits, signups, and downloads. No
-        replay, page content, or IP location. Change this anytime.
+        Usage analytics help us improve Scrollr. PostHog counts public-page
+        visits, signups, and downloads—never replay, page content, or IP
+        location.{' '}
+        <a className="underline hover:text-primary" href="/legal?doc=privacy">
+          Privacy details
+        </a>
+        .
       </p>
+      {browserOptedOut && (
+        <p className="mt-1 text-xs text-base-content/65">
+          Your browser privacy signal keeps analytics off.
+        </p>
+      )}
       <div className="mt-4 grid grid-cols-2 gap-3">
         <button
           type="button"
-          className="rounded-lg border border-base-300 px-4 py-2 text-sm font-semibold hover:bg-base-200"
+          className={buttonClass}
           onClick={() => choose('declined')}
         >
-          Not now
+          Decline
         </button>
         <button
           type="button"
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-content hover:brightness-110"
+          className={buttonClass}
+          disabled={browserOptedOut}
           onClick={() => choose('enabled')}
         >
           Allow

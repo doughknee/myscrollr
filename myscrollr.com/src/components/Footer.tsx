@@ -123,7 +123,7 @@ export default function Footer() {
               window.dispatchEvent(new CustomEvent('scrollr:manage-analytics'))
             }
           >
-            PRIVACY CHOICES
+            ANALYTICS SETTINGS
           </button>
         </nav>
       </div>

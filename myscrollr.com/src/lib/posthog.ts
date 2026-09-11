@@ -126,8 +126,24 @@ function initialize(): boolean {
 
 export function getWebsiteAnalyticsDecision(): WebsiteAnalyticsDecision {
   if (typeof window === 'undefined') return 'unknown'
+  if (hasWebsiteAnalyticsOptOutSignal()) return 'declined'
   const value = localStorage.getItem(STORAGE_KEY)
   return value === 'enabled' || value === 'declined' ? value : 'unknown'
+}
+
+export function hasWebsiteAnalyticsOptOutSignal(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const globalPrivacyControl = (
+    navigator as Navigator & { globalPrivacyControl?: boolean }
+  ).globalPrivacyControl
+  const doNotTrack =
+    navigator.doNotTrack ??
+    (typeof window === 'undefined'
+      ? null
+      : (window as Window & { doNotTrack?: string }).doNotTrack)
+  return (
+    globalPrivacyControl === true || doNotTrack === '1' || doNotTrack === 'yes'
+  )
 }
 
 export function setWebsiteAnalyticsDecision(
@@ -136,7 +152,7 @@ export function setWebsiteAnalyticsDecision(
   if (typeof window === 'undefined') return
   localStorage.setItem(STORAGE_KEY, decision)
   if (decision === 'enabled') {
-    if (initialize()) {
+    if (!hasWebsiteAnalyticsOptOutSignal() && initialize()) {
       posthog.reset()
       posthog.opt_in_capturing({ captureEventName: false })
     }
