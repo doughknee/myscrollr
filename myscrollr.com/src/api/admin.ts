@@ -297,6 +297,11 @@ export type QueueSort = 'last_wrote' | 'waiting' | 'tickets' | 'plan' | 'name'
 
 export type QueueDir = 'asc' | 'desc'
 export type QueueRowsMode = 'person' | 'ticket'
+export type RequesterIdentityState =
+  | 'unknown_contact'
+  | 'contact_only'
+  | 'confirmed_account'
+  | 'ambiguous_association'
 
 export interface QueueQuery {
   state?: string
@@ -317,6 +322,10 @@ export interface QueueRow {
   os?: string
   /** Empty when the ticket carried no name. Never invented. */
   name?: string
+  contact_source?: string
+  identity_state: RequesterIdentityState
+  account_established: boolean
+  subscription_present: boolean
   /** The CURRENT subscription, empty when there is no Stripe row. */
   plan?: string
   paying: boolean
@@ -347,6 +356,10 @@ export interface QueuePerson {
   plan?: string
   paying: boolean
   plan_note?: string
+  contact_source?: string
+  identity_state: RequesterIdentityState
+  account_established: boolean
+  subscription_present: boolean
   section: QueueSection
   tickets: number
   needs_you: number
@@ -453,7 +466,12 @@ export interface CaseDetail {
   ticket_number: string
   subject: string
   user_email?: string
+  user_name?: string
   logto_sub?: string
+  contact_source?: string
+  identity_state: RequesterIdentityState
+  account_established: boolean
+  subscription_present: boolean
   status: string
   category?: string
   priority?: string

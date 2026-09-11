@@ -28,24 +28,37 @@ import (
 // times mean "unknown" on write and are never used to blank a stored
 // value — see upsertSupportCase.
 type SupportCase struct {
-	TicketNumber     string     `json:"ticket_number"`
-	UserEmail        string     `json:"-"`
-	LogtoSub         string     `json:"-"`
-	Subject          string     `json:"subject"`
-	Category         string     `json:"category,omitempty"`
-	Priority         string     `json:"priority,omitempty"`
-	Status           string     `json:"status"`
-	StatusObservedAt time.Time  `json:"-"`
-	Summary          string     `json:"summary,omitempty"`
-	AppVersion       string     `json:"app_version,omitempty"`
-	OS               string     `json:"os,omitempty"`
-	TierAtOpen       string     `json:"tier_at_open,omitempty"`
-	LinearIssueKey   string     `json:"linear_issue_key,omitempty"`
-	DiscordThreadID  string     `json:"discord_thread_id,omitempty"`
-	OpenedAt         time.Time  `json:"opened_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
-	ClosedAt         *time.Time `json:"closed_at,omitempty"`
+	TicketNumber      string     `json:"ticket_number"`
+	UserEmail         string     `json:"-"`
+	UserName          string     `json:"-"`
+	ContactSource     string     `json:"-"`
+	ContactObservedAt time.Time  `json:"-"`
+	LogtoSub          string     `json:"-"`
+	AccountSource     string     `json:"-"`
+	Subject           string     `json:"subject"`
+	Category          string     `json:"category,omitempty"`
+	Priority          string     `json:"priority,omitempty"`
+	Status            string     `json:"status"`
+	StatusObservedAt  time.Time  `json:"-"`
+	Summary           string     `json:"summary,omitempty"`
+	AppVersion        string     `json:"app_version,omitempty"`
+	OS                string     `json:"os,omitempty"`
+	TierAtOpen        string     `json:"tier_at_open,omitempty"`
+	LinearIssueKey    string     `json:"linear_issue_key,omitempty"`
+	DiscordThreadID   string     `json:"discord_thread_id,omitempty"`
+	OpenedAt          time.Time  `json:"opened_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+	ClosedAt          *time.Time `json:"closed_at,omitempty"`
 }
+
+const (
+	contactSourceAuthenticated   = "authenticated"
+	contactSourcePublic          = "public"
+	contactSourceOSTicket        = "osticket"
+	contactSourceOSTicketWebhook = "osticket_webhook"
+	contactSourceDraft           = "draft"
+	accountSourceAuthenticated   = "authenticated"
+)
 
 // SupportMessage mirrors one support_messages row.
 type SupportMessage struct {
@@ -69,7 +82,14 @@ func upsertSupportCase(ctx context.Context, sc SupportCase) error {
 	if platform.DBPool == nil {
 		return fmt.Errorf("DB not initialized")
 	}
-	var opened, updated, statusObserved *time.Time
+	hasContact := strings.TrimSpace(sc.UserEmail) != "" || strings.TrimSpace(sc.UserName) != ""
+	if !hasContact {
+		sc.ContactSource = ""
+	}
+	if strings.TrimSpace(sc.LogtoSub) == "" {
+		sc.AccountSource = ""
+	}
+	var opened, updated, statusObserved, contactObserved *time.Time
 	if !sc.OpenedAt.IsZero() {
 		opened = &sc.OpenedAt
 	}
@@ -79,16 +99,46 @@ func upsertSupportCase(ctx context.Context, sc SupportCase) error {
 	if !sc.StatusObservedAt.IsZero() {
 		statusObserved = &sc.StatusObservedAt
 	}
+	if hasContact && !sc.ContactObservedAt.IsZero() {
+		contactObserved = &sc.ContactObservedAt
+	}
 	const q = `
 		INSERT INTO support_cases
 			(ticket_number, user_email, logto_sub, subject, category, priority, status,
-			 summary, app_version, os, tier_at_open, opened_at, updated_at, closed_at, status_observed_at)
+			 summary, app_version, os, tier_at_open, opened_at, updated_at, closed_at, status_observed_at,
+			 user_name, contact_source, contact_observed_at, account_source)
 		VALUES ($1, NULLIF($2,''), NULLIF($3,''), $4, NULLIF($5,''), NULLIF($6,''),
 			COALESCE(NULLIF($7,''), 'unknown'), NULLIF($8,''), NULLIF($9,''), NULLIF($10,''),
-			NULLIF($11,''), COALESCE($12, now()), COALESCE($13, now()), $14, $15)
+			NULLIF($11,''), COALESCE($12, now()), COALESCE($13, now()), $14, $15,
+			NULLIF($16,''), NULLIF($17,''), $18, NULLIF($19,''))
 		ON CONFLICT (ticket_number) DO UPDATE SET
-			user_email   = COALESCE(EXCLUDED.user_email, support_cases.user_email),
+			user_email   = CASE
+				WHEN $18 IS NOT NULL AND $18 >= COALESCE(support_cases.contact_observed_at, '-infinity')
+					THEN COALESCE(EXCLUDED.user_email, support_cases.user_email)
+				WHEN support_cases.contact_observed_at IS NULL
+					THEN COALESCE(support_cases.user_email, EXCLUDED.user_email)
+				ELSE support_cases.user_email END,
+			user_name    = CASE
+				WHEN $18 IS NOT NULL AND $18 >= COALESCE(support_cases.contact_observed_at, '-infinity')
+					THEN COALESCE(EXCLUDED.user_name, support_cases.user_name)
+				WHEN support_cases.contact_observed_at IS NULL
+					THEN COALESCE(support_cases.user_name, EXCLUDED.user_name)
+				ELSE support_cases.user_name END,
+			contact_source = CASE
+				WHEN $18 IS NOT NULL AND (EXCLUDED.user_email IS NOT NULL OR EXCLUDED.user_name IS NOT NULL)
+					AND $18 >= COALESCE(support_cases.contact_observed_at, '-infinity') THEN EXCLUDED.contact_source
+				WHEN support_cases.contact_source IS NULL AND (EXCLUDED.user_email IS NOT NULL OR EXCLUDED.user_name IS NOT NULL)
+					THEN EXCLUDED.contact_source ELSE support_cases.contact_source END,
+			contact_observed_at = CASE
+				WHEN $18 IS NOT NULL AND (EXCLUDED.user_email IS NOT NULL OR EXCLUDED.user_name IS NOT NULL)
+					AND $18 >= COALESCE(support_cases.contact_observed_at, '-infinity') THEN $18
+				ELSE support_cases.contact_observed_at END,
 			logto_sub    = COALESCE(support_cases.logto_sub, EXCLUDED.logto_sub),
+			account_source = CASE
+				WHEN support_cases.logto_sub IS NULL AND EXCLUDED.logto_sub IS NOT NULL THEN EXCLUDED.account_source
+				WHEN support_cases.logto_sub = EXCLUDED.logto_sub AND support_cases.account_source IS NULL
+					AND EXCLUDED.account_source = 'authenticated' THEN EXCLUDED.account_source
+				ELSE support_cases.account_source END,
 			subject      = CASE WHEN EXCLUDED.subject <> '' THEN EXCLUDED.subject ELSE support_cases.subject END,
 			category     = COALESCE(support_cases.category, EXCLUDED.category),
 			priority     = COALESCE(support_cases.priority, EXCLUDED.priority),
@@ -111,7 +161,8 @@ func upsertSupportCase(ctx context.Context, sc SupportCase) error {
 	_, err := platform.DBPool.Exec(ctx, q,
 		sc.TicketNumber, sc.UserEmail, sc.LogtoSub, sc.Subject, sc.Category,
 		strings.ToLower(sc.Priority), sc.Status, sc.Summary, sc.AppVersion, sc.OS,
-		sc.TierAtOpen, opened, updated, sc.ClosedAt, statusObserved)
+		sc.TierAtOpen, opened, updated, sc.ClosedAt, statusObserved,
+		sc.UserName, sc.ContactSource, contactObserved, sc.AccountSource)
 	if err != nil {
 		return fmt.Errorf("upsertSupportCase %s: %w", sc.TicketNumber, err)
 	}

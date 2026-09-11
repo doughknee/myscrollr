@@ -262,20 +262,23 @@ type AdminQueueRow struct {
 	TicketNumber string `json:"ticket_number"`
 	Subject      string `json:"subject"`
 	UserEmail    string `json:"user_email,omitempty"`
+	Name         string `json:"name,omitempty"`
 	Category     string `json:"category,omitempty"`
 	Priority     string `json:"priority,omitempty"`
 	Status       string `json:"status"`
 	Summary      string `json:"summary,omitempty"`
 	OS           string `json:"os,omitempty"`
 
-	// Who wrote it, as REL-266 needs it. Name is whatever the ticket carried
-	// and is empty when nothing did; Plan is the CURRENT subscription and is
-	// empty when no Stripe row stands behind this email. Neither is ever
-	// invented, and Plan is never tier_at_open.
-	Name      string `json:"name,omitempty"`
-	Plan      string `json:"plan,omitempty"`
-	Paying    bool   `json:"paying"`
-	PersonKey string `json:"person_key"`
+	// Name is the case contact, independent of any draft. Plan is the current
+	// subscription only when authenticated account provenance is recorded.
+	Plan                string `json:"plan,omitempty"`
+	Paying              bool   `json:"paying"`
+	PersonKey           string `json:"person_key"`
+	ContactSource       string `json:"contact_source,omitempty"`
+	IdentityState       string `json:"identity_state"`
+	AccountEstablished  bool   `json:"account_established"`
+	SubscriptionPresent bool   `json:"subscription_present"`
+	AccountSubject      string `json:"-"`
 
 	Group       string `json:"group"`
 	GroupReason string `json:"group_reason"`
@@ -322,16 +325,15 @@ type AdminQueueResponse struct {
 	// explains it when it is empty.
 	Accounts AdminQueueAccounts `json:"accounts"`
 	Rows     []AdminQueueRow    `json:"rows"`
-	// People is the same rows grouped by user_email — one row per human.
+	// People is the same rows grouped by established account or contact.
 	People []AdminPerson `json:"people"`
 }
 
 // queueSQL reads a case, its newest draft, and the CURRENT subscription behind
 // its account.
 //
-// The stripe_customers join is on logto_sub, so a case that arrived without a
-// signed-in user simply has no plan — which is the honest answer, and the
-// reason the page shows those without a name or a badge instead of guessing.
+// The stripe_customers join requires both logto_sub and authenticated account
+// provenance. A supplied email never inherits an account's plan.
 // tier_at_open is deliberately not read: it is the plan on the day the ticket
 // opened, and the top section has to be about who is paying now.
 const queueSQL = `
@@ -345,7 +347,8 @@ const queueSQL = `
 		  FROM support_drafts
 		 ORDER BY ticket_number, created_at DESC, id DESC
 	)
-	SELECT c.ticket_number, coalesce(c.user_email, ''), c.subject,
+	SELECT c.ticket_number, coalesce(c.user_email, ''), coalesce(c.user_name, ''),
+	       coalesce(c.contact_source, ''), coalesce(c.logto_sub, ''), coalesce(c.account_source, ''), c.subject,
 	       coalesce(c.category, ''), coalesce(c.priority, ''), c.status,
 	       coalesce(c.summary, ''), coalesce(c.os, ''), coalesce(c.linear_issue_key, ''),
 	       c.opened_at, c.updated_at,
@@ -354,12 +357,13 @@ const queueSQL = `
 	       (SELECT max(m.created_at) FROM support_messages m
 	         WHERE m.ticket_number = c.ticket_number AND m.kind = 'sent'),
 	       d.id, d.status, d.disposition, d.disposition_reason, d.hold_until, d.created_at,
-	       coalesce(d.user_name, ''), coalesce(d.draft_body_html, ''),
+	       coalesce(d.draft_body_html, ''),
 	       coalesce(d.edited_body_html, ''), coalesce(d.intervened, false),
-	       coalesce(s.plan, ''), coalesce(s.status, ''), coalesce(s.lifetime, false)
+	       coalesce(s.plan, ''), coalesce(s.status, ''), coalesce(s.lifetime, false),
+	       (s.logto_sub IS NOT NULL)
 	  FROM support_cases c
 	  LEFT JOIN latest d ON d.ticket_number = c.ticket_number
-	  LEFT JOIN stripe_customers s ON s.logto_sub = c.logto_sub
+	  LEFT JOIN stripe_customers s ON s.logto_sub = c.logto_sub AND c.account_source = 'authenticated'
 	 ORDER BY c.updated_at DESC
 	 LIMIT $1
 `
@@ -437,14 +441,16 @@ func HandleAdminQueue(c *fiber.Ctx) error {
 		var draftStatus, disposition, dispositionReason *string
 		var holdUntil, lastUser, lastSent, draftCreated *time.Time
 		var draftBody, editedBody, planStatus string
+		var accountSource string
 		var intervened, lifetime bool
 
-		if err := rows.Scan(&r.TicketNumber, &r.UserEmail, &r.Subject,
+		if err := rows.Scan(&r.TicketNumber, &r.UserEmail, &r.Name,
+			&r.ContactSource, &r.AccountSubject, &accountSource, &r.Subject,
 			&r.Category, &r.Priority, &r.Status, &r.Summary, &r.OS, &issueKey,
 			&r.OpenedAt, &r.UpdatedAt, &lastUser, &lastSent,
 			&draftID, &draftStatus, &disposition, &dispositionReason, &holdUntil, &draftCreated,
-			&r.Name, &draftBody, &editedBody, &intervened,
-			&r.Plan, &planStatus, &lifetime); err != nil {
+			&draftBody, &editedBody, &intervened,
+			&r.Plan, &planStatus, &lifetime, &r.SubscriptionPresent); err != nil {
 			log.Printf("[AdminSupport] scan queue row: %v", err)
 			continue
 		}
@@ -452,6 +458,8 @@ func HandleAdminQueue(c *fiber.Ctx) error {
 		if draftID != nil {
 			r.DraftID = *draftID
 		}
+		r.IdentityState, r.AccountEstablished = requesterIdentity(
+			r.AccountSubject, accountSource, r.UserEmail, r.Name)
 		r.Paying = planIsPaying(r.Plan, planStatus, lifetime)
 		r.DraftStatus = deref(draftStatus)
 		r.Disposition = deref(disposition)
@@ -552,7 +560,7 @@ func queueAccounts(ctx context.Context) AdminQueueAccounts {
 		SELECT (SELECT count(*) FROM stripe_customers
 		         WHERE plan NOT IN ('', 'free') AND (lifetime OR status = 'active')),
 		       (SELECT count(*) FROM support_cases
-		         WHERE logto_sub IS NOT NULL AND logto_sub <> ''),
+		         WHERE logto_sub IS NOT NULL AND logto_sub <> '' AND account_source = 'authenticated'),
 		       (SELECT count(*) FROM support_cases)`).Scan(
 		&a.Paying, &a.CasesWithAccount, &a.Cases); err != nil {
 		log.Printf("[AdminSupport] account counts: %v", err)
@@ -685,20 +693,25 @@ type AdminSimilarCase struct {
 }
 
 type AdminCaseDetail struct {
-	TicketNumber    string     `json:"ticket_number"`
-	Subject         string     `json:"subject"`
-	UserEmail       string     `json:"user_email,omitempty"`
-	LogtoSub        string     `json:"logto_sub,omitempty"`
-	Status          string     `json:"status"`
-	Category        string     `json:"category,omitempty"`
-	Priority        string     `json:"priority,omitempty"`
-	Summary         string     `json:"summary,omitempty"`
-	LinearIssueKey  string     `json:"linear_issue_key,omitempty"`
-	DiscordThreadID string     `json:"discord_thread_id,omitempty"`
-	DiscordURL      string     `json:"discord_url,omitempty"`
-	OpenedAt        time.Time  `json:"opened_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	ClosedAt        *time.Time `json:"closed_at,omitempty"`
+	TicketNumber        string     `json:"ticket_number"`
+	Subject             string     `json:"subject"`
+	UserEmail           string     `json:"user_email,omitempty"`
+	UserName            string     `json:"user_name,omitempty"`
+	LogtoSub            string     `json:"logto_sub,omitempty"`
+	ContactSource       string     `json:"contact_source,omitempty"`
+	IdentityState       string     `json:"identity_state"`
+	AccountEstablished  bool       `json:"account_established"`
+	SubscriptionPresent bool       `json:"subscription_present"`
+	Status              string     `json:"status"`
+	Category            string     `json:"category,omitempty"`
+	Priority            string     `json:"priority,omitempty"`
+	Summary             string     `json:"summary,omitempty"`
+	LinearIssueKey      string     `json:"linear_issue_key,omitempty"`
+	DiscordThreadID     string     `json:"discord_thread_id,omitempty"`
+	DiscordURL          string     `json:"discord_url,omitempty"`
+	OpenedAt            time.Time  `json:"opened_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	ClosedAt            *time.Time `json:"closed_at,omitempty"`
 
 	Group       string `json:"group"`
 	GroupReason string `json:"group_reason"`
@@ -738,13 +751,15 @@ type AdminCaseDetail struct {
 }
 
 const caseSQL = `
-	SELECT c.ticket_number, c.subject, coalesce(c.user_email, ''), coalesce(c.logto_sub, ''),
+	SELECT c.ticket_number, c.subject, coalesce(c.user_email, ''), coalesce(c.user_name, ''),
+	       coalesce(c.contact_source, ''), coalesce(c.logto_sub, ''), coalesce(c.account_source, ''),
 	       c.status, coalesce(c.category, ''), coalesce(c.priority, ''), coalesce(c.summary, ''),
 	       coalesce(c.linear_issue_key, ''), coalesce(c.discord_thread_id, ''),
 	       c.opened_at, c.updated_at, c.closed_at,
-	       coalesce(s.plan, ''), coalesce(s.status, ''), coalesce(s.lifetime, false)
+	       coalesce(s.plan, ''), coalesce(s.status, ''), coalesce(s.lifetime, false),
+	       (s.logto_sub IS NOT NULL)
 	  FROM support_cases c
-	  LEFT JOIN stripe_customers s ON s.logto_sub = c.logto_sub
+	  LEFT JOIN stripe_customers s ON s.logto_sub = c.logto_sub AND c.account_source = 'authenticated'
 	 WHERE c.ticket_number = $1
 `
 
@@ -786,22 +801,24 @@ func HandleAdminCase(c *fiber.Ctx) error {
 func buildAdminCase(ctx context.Context, ticket string) (*AdminCaseDetail, error) {
 	var d AdminCaseDetail
 	var planStatus string
+	var accountSource string
 	var lifetime bool
 	err := platform.DBPool.QueryRow(ctx, caseSQL, ticket).Scan(
-		&d.TicketNumber, &d.Subject, &d.UserEmail, &d.LogtoSub, &d.Status,
+		&d.TicketNumber, &d.Subject, &d.UserEmail, &d.UserName, &d.ContactSource,
+		&d.LogtoSub, &accountSource, &d.Status,
 		&d.Category, &d.Priority, &d.Summary, &d.LinearIssueKey,
 		&d.DiscordThreadID, &d.OpenedAt, &d.UpdatedAt, &d.ClosedAt,
-		&d.Plan, &planStatus, &lifetime)
+		&d.Plan, &planStatus, &lifetime, &d.SubscriptionPresent)
 	if err != nil {
 		if err != pgx.ErrNoRows {
 			log.Printf("[AdminSupport] case %s: %v", ticket, err)
 		}
 		return nil, err
 	}
+	d.IdentityState, d.AccountEstablished = requesterIdentity(
+		d.LogtoSub, accountSource, d.UserEmail, d.UserName)
 	d.Paying = planIsPaying(d.Plan, planStatus, lifetime)
-	if d.Plan == "" {
-		d.PlanNote = "No Stripe customer stands behind this ticket, so there is no current plan to show. That is normal for a case that arrived without a signed-in user."
-	}
+	d.PlanNote = identityPlanNote(d.IdentityState, d.SubscriptionPresent)
 	if d.DiscordThreadID != "" {
 		if guild := strings.TrimSpace(os.Getenv("DISCORD_GUILD_ID")); guild != "" {
 			d.DiscordURL = "https://discord.com/channels/" + guild + "/" + d.DiscordThreadID

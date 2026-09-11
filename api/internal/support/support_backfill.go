@@ -65,6 +65,7 @@ type osTicketDetail struct {
 	Updated     *string `json:"updated"`
 	Closed      *bool   `json:"closed"`
 	UserEmail   string  `json:"user_email"`
+	UserName    string  `json:"user_name"`
 	Thread      []struct {
 		ID        int64   `json:"id"`
 		Type      string  `json:"type"`
@@ -114,7 +115,7 @@ func BackfillFromOSTicket(ctx context.Context, since time.Time) (BackfillStats, 
 // linkDrafts is pass 1. Returns (drafts seen, errors).
 func linkDrafts(ctx context.Context) (int, int) {
 	rows, err := platform.DBPool.Query(ctx, `
-		SELECT id, ticket_number, user_email, original_subject,
+		SELECT id, ticket_number, user_email, COALESCE(user_name,''), original_subject,
 			   COALESCE(user_message_html,''), draft_body_html, COALESCE(edited_body_html,''),
 			   COALESCE(ai_summary,''), COALESCE(ai_category,''), COALESCE(ai_priority,''),
 			   status, COALESCE(osticket_thread_entry_id,0), decided_at, sent_at, created_at
@@ -128,7 +129,7 @@ func linkDrafts(ctx context.Context) (int, int) {
 	for rows.Next() {
 		var d SupportDraft
 		var summary, category, priority string
-		if err := rows.Scan(&d.ID, &d.TicketNumber, &d.UserEmail, &d.OriginalSubject,
+		if err := rows.Scan(&d.ID, &d.TicketNumber, &d.UserEmail, &d.UserName, &d.OriginalSubject,
 			&d.UserMessageHTML, &d.DraftBodyHTML, &d.EditedBodyHTML, &summary, &category, &priority,
 			&d.Status, &d.OSTicketThreadEntryID, &d.DecidedAt, &d.SentAt, &d.CreatedAt); err != nil {
 			errs++
@@ -136,7 +137,8 @@ func linkDrafts(ctx context.Context) (int, int) {
 		}
 		n++
 		if err := upsertSupportCase(ctx, SupportCase{
-			TicketNumber: d.TicketNumber, UserEmail: d.UserEmail, Subject: d.OriginalSubject,
+			TicketNumber: d.TicketNumber, UserEmail: d.UserEmail, UserName: d.UserName,
+			ContactSource: contactSourceDraft, Subject: d.OriginalSubject,
 			Category: category, Priority: priority, Summary: summary,
 			OpenedAt: d.CreatedAt, UpdatedAt: d.CreatedAt,
 		}); err != nil {
@@ -206,7 +208,8 @@ func syncTicket(ctx context.Context, number string, st *BackfillStats) error {
 	}
 	caseStatus, statusKnown := importedCaseStatus(d)
 	sc := SupportCase{
-		TicketNumber: number, UserEmail: d.UserEmail, Subject: d.Subject,
+		TicketNumber: number, UserEmail: d.UserEmail, UserName: strings.TrimSpace(d.UserName),
+		ContactSource: contactSourceOSTicket, ContactObservedAt: parseISO(d.Updated), Subject: d.Subject,
 		Category: categoryFromTopic(d.Topic), Priority: d.Priority, Status: caseStatus,
 		OpenedAt: parseISO(d.Created), UpdatedAt: parseISO(d.Updated),
 	}
