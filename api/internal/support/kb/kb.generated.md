@@ -594,8 +594,22 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.5 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.6 -->
 The last 8 published releases, newest first, as users read them.
+
+### Scrollr 1.6.6 — One analytics setting (`desktop-v1.6.6`, 2026-09-11)
+
+#### Improvements
+
+- **One analytics setting.** Settings → Data & privacy now has a single **Share usage analytics** switch. It controls Scrollr and PostHog usage measurement together; crash reporting stays separate.
+- **Clear setting status.** Loading or a failed connection no longer looks like an opt-out. If the setting cannot be checked, you can retry from the same page.
+
+#### Fixes
+
+- Analytics is on by default for accounts without a saved choice. Recorded opt-outs remain off, and resetting local settings preserves your account's analytics choice.
+- Fixed analytics delivery for internal testing without counting that activity as customer usage, and fixed daily usage counting for apps left running overnight.
+
+Your ticker contents, tracked symbols, teams, feeds and other apps' activity remain excluded. Existing settings and widgets are preserved when updating.
 
 ### Scrollr 1.6.5 — App analytics, under your control (`desktop-v1.6.5`, 2026-09-11)
 
@@ -747,32 +761,3 @@ A small release about one question: what is on my bar right now? It used to have
 #### 🐛 Fixes
 
 - College football standings could come up empty on the bar when the new season's table had not been posted yet. The bar now shows the newest season that actually has one.
-
-### v1.5.1 — The bar just works (`desktop-v1.5.1`, 2026-09-04)
-
-The last five chips were redrawn to match the rest of the bar, and the bar itself learned to hold still: no matter how much a widget has to say, it takes the same amount of room, and everything still comes round.
-
-#### ✨ The bar just works
-
-**Busy widgets no longer flood the rail.** A full MLB night used to put thirty game chips on the bar and bury everything else behind them. Each league now holds a fixed number of places, and the day's games rotate through them one lap at a time. Your favourite team's game is always pinned on top. Every game still comes round, and the bar looks the same on a quiet Tuesday as on a busy Saturday.
-
-**Headlines, stocks, crypto, prediction markets and monitors do the same.** A wire that posts thirty articles in an hour is still three chips. A watchlist of three shows three, and a watchlist of thirty shows four at a time, cycling. Nothing needs configuring — there is no setting for any of this, on purpose.
-
-**A chip never changes while you're reading it.** Rotation only happens once a chip has fully left the screen, and a chip keeps its exact width when its content swaps, so the rail never jumps.
-
-**The ticker is independent of every widget page.** How you sort or filter a list is about reading the list; it no longer rearranges the bar.
-
-#### 💄 The chips
-
-**Clock, timer, weather, sysmon and uptime** join the chip language the rest of the bar took in 1.5.0: a named tab, cells divided by clear rules, compact as the chip itself and detailed adding exactly one row underneath.
-
-**Each one's detailed row is what you'd otherwise open the app to find.** A clock shows the date and offset, so you can see that Tokyo is already tomorrow. A timer shows a draining bar, red in its last minute. Weather shows today's range, and a storm watch sits under its own city. Sysmon draws a real trend, edge to edge, so a GPU climbing reads differently from one holding steady. Uptime gives its whole row to the heartbeat history.
-
-**Weather's compact row is just the city, the icon and the temperature.** The range bar used to sit beside the temperature and made the widest cell on the rail out of the chip with the least to say.
-
-**Cell dividers are visible now**, drawn in each widget's own colour, so four system metrics read as four things instead of one long line.
-
-#### 🐛 Fixes
-
-- The clock's detail row named the zone twice.
-- The news bar's article-limit control was the one control in the bar that didn't look like the others.
