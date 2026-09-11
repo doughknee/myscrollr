@@ -34,6 +34,8 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
+      checkout-sha: ${{ steps.revision.outputs.sha }}
+      image-tag: ${{ steps.revision.outputs.image-tag }}
       core-api: ${{ steps.manual.outputs.core-api || steps.changes.outputs.core-api }}
       website: ${{ steps.manual.outputs.website || steps.changes.outputs.website }}
       finance-service: ${{ steps.manual.outputs.finance-service || steps.changes.outputs.finance-service }}
@@ -44,6 +46,18 @@ jobs:
       k8s: ${{ steps.manual.outputs.k8s || steps.changes.outputs.k8s }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          # A desktop tag may predate website fixes already deployed from main.
+          ref: ${{ github.event_name == 'release' && 'main' || github.sha }}
+
+      - name: Pin the deployment revision
+        id: revision
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "image-tag=sha-$(git rev-parse --short=7 HEAD)-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+
+      - name: Check deployment revision tagging
+        run: node scripts/check-deploy-revision.mjs
 
       - name: Resolve manual service selection
         id: manual
@@ -165,6 +179,8 @@ jobs:
 
       - uses: actions/checkout@v6
         if: matrix.changed == 'true'
+        with:
+          ref: ${{ needs.detect-changes.outputs.checkout-sha }}
 
       - name: Install doctl
         if: matrix.changed == 'true'
@@ -276,7 +292,7 @@ jobs:
           GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           IMAGE="${REGISTRY}/${{ matrix.service }}"
-          SHA_TAG="sha-${GITHUB_SHA::7}"
+          SHA_TAG="${{ needs.detect-changes.outputs.image-tag }}"
 
           BUILD_ARGS=""
           if [ "${{ matrix.service }}" = "website" ]; then
@@ -320,6 +336,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.detect-changes.outputs.checkout-sha }}
 
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
@@ -394,7 +412,7 @@ jobs:
       # service rollout always sees the right SHA.
       - name: Update GIT_SHA in scrollr-secrets
         run: |
-          SHA="${GITHUB_SHA::7}"
+          SHA="$(git rev-parse --short=7 HEAD)"
           SHA_B64=$(printf '%s' "$SHA" | base64)
           kubectl patch secret scrollr-secrets -n scrollr \
             --type='json' \
@@ -406,7 +424,7 @@ jobs:
 
       - name: Roll out updated images
         run: |
-          SHA_TAG="sha-${GITHUB_SHA::7}"
+          SHA_TAG="${{ needs.detect-changes.outputs.image-tag }}"
           K8S_CHANGED="${{ needs.detect-changes.outputs.k8s }}"
 
           rollout_timeout_for() {
