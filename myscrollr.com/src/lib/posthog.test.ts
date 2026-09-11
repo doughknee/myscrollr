@@ -102,16 +102,10 @@ describe('website PostHog privacy boundary', () => {
     expect(sdk.capture).toHaveBeenCalledOnce()
   })
 
-  it('captures the current public landing page when consent is enabled', () => {
+  it('waits for the authentication gate before capturing after consent', () => {
     window.location.pathname = '/channels'
     setWebsiteAnalyticsDecision('enabled')
-    expect(sdk.capture).toHaveBeenCalledWith('$pageview', {
-      path: '/channels',
-      surface: 'website',
-      $current_url: 'https://example.test/channels',
-      $pathname: '/channels',
-      $host: 'example.test',
-    })
+    expect(sdk.capture).not.toHaveBeenCalled()
   })
 
   it('strips SDK-added URLs, device details, person properties, and IP data', () => {
@@ -206,14 +200,14 @@ describe('website PostHog privacy boundary', () => {
     sdk.capture.mockClear()
     sdk.opt_in_capturing.mockClear()
     resetWebsiteAnalyticsIdentity()
-    captureWebsitePageview('/download')
+    captureWebsitePageview('/business')
     expect(sdk.reset).toHaveBeenCalled()
     expect(sdk.opt_in_capturing).toHaveBeenCalledWith({
       captureEventName: false,
     })
     expect(sdk.capture).toHaveBeenCalledWith(
       '$pageview',
-      expect.objectContaining({ path: '/download' }),
+      expect.objectContaining({ path: '/business' }),
     )
   })
 })

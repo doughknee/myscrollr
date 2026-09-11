@@ -97,7 +97,7 @@ export default function Footer() {
             in both themes (/60 measured 4.41:1 in light) while staying
             visibly de-emphasized. */}
         <div className="font-mono text-[11px] tracking-[0.1em] text-base-content/65">
-          NO ADS · ANALYTICS OPT-IN
+          NO ADS · PRIVACY CONTROLS
         </div>
       </div>
 

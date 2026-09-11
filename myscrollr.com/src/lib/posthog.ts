@@ -139,7 +139,6 @@ export function setWebsiteAnalyticsDecision(
     if (initialize()) {
       posthog.reset()
       posthog.opt_in_capturing({ captureEventName: false })
-      captureWebsitePageview(window.location.pathname)
     }
   } else {
     sessionStorage.removeItem(SIGNUP_FLOW_KEY)

@@ -4,7 +4,7 @@
 
 The always-on-top ticker can sit at the top or bottom of a chosen monitor. A separate desktop window is used to browse widgets and configure the ticker. The website provides marketing, account, billing, support, and download pages.
 
-Privacy: no advertising trackers or data brokers. Operational diagnostics and authentication logs are used to run and secure the service. Optional product analytics is opt-in, coarse, account-linked, desktop-only, and described in the Privacy Policy.
+Privacy: no advertising trackers or data brokers. Operational diagnostics and authentication logs are used to run and secure the service. Optional product analytics asks first on the website and is on by default, with an easy opt-out, in the signed-in desktop app. It is coarse and described in the Privacy Policy.
 
 ## Product
 

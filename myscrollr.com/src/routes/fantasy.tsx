@@ -25,11 +25,8 @@ import { EASE } from '@/lib/animations'
 //
 //   1. Speak to one audience — fantasy players — where the homepage
 //      deliberately speaks to everyone.
-//   2. Give us an audience-level read on traffic from ingress logs
-//      alone. The distinct URL IS the instrument: hits on /fantasy vs
-//      /, and the Referer on /download/$os telling us which page
-//      sourced an install. No client analytics, so this costs
-//      nothing against the privacy promise.
+//   2. Give us an audience-level read using the distinct URL and the
+//      fixed, consented pageview event.
 //
 // Section order is a narrative, not a copy of the homepage's:
 //   01 what you see  ->  02 proof it does FANTASY  ->  03 the ritual
@@ -115,7 +112,7 @@ const FANTASY_FAQ_ITEMS: ReadonlyArray<{ question: string; answer: string }> = [
   {
     question: 'What do you collect about me?',
     answer:
-      'No advertising trackers. Operational diagnostics and authentication logs are used to run and secure the service. Optional product analytics is opt-in, coarse, account-linked, desktop-only, and described in the Privacy Policy.',
+      'No advertising trackers. Operational diagnostics and authentication logs are used to run and secure the service. Optional product analytics asks first on this website and is on by default, with an easy opt-out, in the signed-in desktop app. It is coarse and described in the Privacy Policy.',
   },
 ]
 
