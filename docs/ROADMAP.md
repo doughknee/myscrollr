@@ -10,8 +10,8 @@ surface actually behave like it.
 v1.1.1–v1.1.9 were all non-breaking, with `MIN_DESKTOP_VERSION` pinned at 1.1.0.
 **v1.1.10 broke that.** The unification renamed the wire with no compat seam, so
 every older install is force-updated — it has to be, since older builds cannot
-talk to the API at all. The gate has moved twice since, once per client-visible
-server change: it currently sits at **1.1.12** (`k8s/configmap-core.yaml`), which
+talk to the API at all. The gate has moved since, once per client-visible server
+change: it currently sits at **1.6.4** (`k8s/configmap-core.yaml`), which
 is the live value to check rather than anything written here.
 
 > **Where the record lives.** Detailed per-release sections below stop at v1.1.6.
@@ -44,7 +44,8 @@ is the live value to check rather than anything written here.
 | ~~v1.6.1~~ | Under your eyes | ✅ **Shipped 2026-09-07** — a chip on the bar keeps what it is showing until it has scrolled off screen; a data refresh no longer swaps the game you are reading for another one. Baseball innings read "8th" and "10th" rather than the raw feed code, finals read "Final" in every sport, a postponed game reads "PPD". Server side, fourteen more leagues in the catalog and a sports feed that polls every 15 s without stalling on games that already ended | S |
 | ~~v1.6.2~~ | Pin what matters | ✅ **Shipped 2026-09-08** — a pin is one chip that stays put: pin a team, a symbol, a feed, a market or a clock and the fixed zone shows its current chip, up to two, never rotating and never doubled on the tape; new widgets no longer pin themselves to the corner; the pin control moved off the moving chip to right-click, the widget page and the sidebar. With several monitors selected the app keeps one live connection instead of one per bar, so "Live updates paused" stops appearing and the tray toggle works with two bars. A session that has died now says so and one click signs you back in, instead of every change failing until a reinstall | S |
 | ~~v1.6.3~~ | The whole matchday | ✅ **Shipped 2026-09-08** — when a league's next games are further out than a day, the bar used to show exactly one of them, so a full slate of fixtures the next evening looked like a broken ticker. It now shows that whole matchday and takes turns through it. A league whose next fixture really is a lone event, a Formula 1 race for instance, still shows the one chip it always did | S |
-| ~~v1.6.4~~ | Signed and transparent | ✅ **Shipped 2026-09-10** — Windows downloads identify Scrollr, LLC as their verified publisher and carry trusted timestamps; product activity measurement is off by default and can be enabled from Data & privacy while signed in | S |
+| ~~v1.6.4~~ | Signed and transparent | ✅ **Shipped 2026-09-10** — Windows downloads identify Scrollr, LLC as their verified publisher and carry trusted timestamps | S |
+| v1.6.5 | App analytics, under your control | Signed-in desktop accounts get a separate Share app analytics switch in Data & privacy. It is on by default, announced after sign-in, and can be turned off anytime; only app opens, a 30-second running signal and broad feature categories are eligible, never ticker contents, symbols, teams or feeds | S |
 | v1.2.0 | Double-Decker 2.0 | Multi-row ticker rebuilt around widgets | L |
 | — | Website rides along | Pricing rewrite shipped with v1.1.2–3; screenshots now unblocked (post-v1.1.4) | S–M |
 
