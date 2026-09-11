@@ -98,18 +98,15 @@ export function sanitizeWebsiteCapture(
 }
 
 function configured(): boolean {
-  return Boolean(
-    import.meta.env.PROD &&
-      import.meta.env.VITE_POSTHOG_KEY &&
-      import.meta.env.VITE_POSTHOG_HOST?.startsWith('https://'),
-  )
+  return Boolean(import.meta.env.PROD && import.meta.env.VITE_POSTHOG_KEY)
 }
 
 function initialize(): boolean {
   if (!configured()) return false
   if (!initialized) {
     posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
-      api_host: import.meta.env.VITE_POSTHOG_HOST,
+      api_host: '/ingest',
+      ui_host: 'https://us.posthog.com',
       advanced_disable_flags: true,
       autocapture: false,
       before_send: sanitizeWebsiteCapture,

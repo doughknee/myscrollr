@@ -47,7 +47,6 @@ ARG VITE_STRIPE_PRICE_PRO_ANNUAL
 ARG VITE_STRIPE_PRICE_ULTIMATE_MONTHLY
 ARG VITE_STRIPE_PRICE_ULTIMATE_ANNUAL
 ARG VITE_POSTHOG_KEY
-ARG VITE_POSTHOG_HOST
 # Sentry — VITE_SENTRY_DSN is baked into the bundle. SENTRY_AUTH_TOKEN
 # and SENTRY_ORG are read by @sentry/vite-plugin to upload source maps
 # during the build. If unset, the plugin disables itself (no upload).
@@ -66,7 +65,6 @@ ENV VITE_STRIPE_PRICE_PRO_ANNUAL=${VITE_STRIPE_PRICE_PRO_ANNUAL}
 ENV VITE_STRIPE_PRICE_ULTIMATE_MONTHLY=${VITE_STRIPE_PRICE_ULTIMATE_MONTHLY}
 ENV VITE_STRIPE_PRICE_ULTIMATE_ANNUAL=${VITE_STRIPE_PRICE_ULTIMATE_ANNUAL}
 ENV VITE_POSTHOG_KEY=${VITE_POSTHOG_KEY}
-ENV VITE_POSTHOG_HOST=${VITE_POSTHOG_HOST}
 ENV VITE_SENTRY_DSN=${VITE_SENTRY_DSN}
 ENV SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN}
 ENV SENTRY_ORG=${SENTRY_ORG}
@@ -141,6 +139,32 @@ server {\n\
         proxy_set_header Host o4511384091033600.ingest.us.sentry.io;\n\
         proxy_set_header Content-Type $content_type;\n\
         proxy_set_header Content-Length $content_length;\n\
+    }\n\
+\n\
+    # Fixed event-only PostHog proxy. Browser credentials and IP headers\n\
+    # never reach the provider. Consent is enforced before SDK capture.\n\
+    location = /ingest/e/ {\n\
+        if ($request_method != POST) { return 405; }\n\
+        resolver 1.1.1.1 8.8.8.8 valid=300s ipv6=off;\n\
+        set $posthog_ingest us.i.posthog.com;\n\
+        proxy_pass https://$posthog_ingest/e/$is_args$args;\n\
+        proxy_ssl_server_name on;\n\
+        proxy_ssl_name us.i.posthog.com;\n\
+        proxy_ssl_verify on;\n\
+        proxy_ssl_trusted_certificate /etc/ssl/cert.pem;\n\
+        proxy_pass_request_headers off;\n\
+        proxy_set_header Host us.i.posthog.com;\n\
+        proxy_set_header Content-Type $content_type;\n\
+        proxy_set_header Content-Encoding $http_content_encoding;\n\
+        proxy_set_header Content-Length $content_length;\n\
+        proxy_hide_header Set-Cookie;\n\
+        proxy_hide_header Cache-Control;\n\
+        proxy_connect_timeout 5s;\n\
+        proxy_read_timeout 10s;\n\
+        client_max_body_size 256k;\n\
+        access_log off;\n\
+        include /etc/nginx/security-headers.conf;\n\
+        add_header Cache-Control "no-store" always;\n\
     }\n\
 \n\
     # ── HTML: no-cache so users always get latest deploy ────────\n\
