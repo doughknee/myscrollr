@@ -212,7 +212,7 @@ server {\n\
 printf 'add_header X-Content-Type-Options "nosniff" always;\n\
 add_header Referrer-Policy "strict-origin-when-cross-origin" always;\n\
 add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;\n\
-add_header Content-Security-Policy "default-src '"'"'self'"'"'; frame-ancestors '"'"'self'"'"' https://relentnet.com; script-src '"'"'self'"'"' '"'"'unsafe-inline'"'"' https://js.stripe.com; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' data: https:; font-src '"'"'self'"'"'; connect-src '"'"'self'"'"' https://api.myscrollr.com https://auth.myscrollr.com https://api.stripe.com https://api.github.com; frame-src https://js.stripe.com https://hooks.stripe.com; base-uri '"'"'self'"'"'; form-action '"'"'self'"'"';" always;\n\
+add_header Content-Security-Policy "default-src '"'"'self'"'"'; frame-ancestors '"'"'self'"'"' https://relentnet.com; script-src '"'"'self'"'"' '"'"'unsafe-inline'"'"' https://js.stripe.com; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' data: https:; font-src '"'"'self'"'"'; connect-src '"'"'self'"'"' https://api.myscrollr.com https://auth.myscrollr.com https://api.stripe.com https://api.github.com https://us.i.posthog.com; frame-src https://js.stripe.com https://hooks.stripe.com; base-uri '"'"'self'"'"'; form-action '"'"'self'"'"';" always;\n\
 ' > /etc/nginx/security-headers.conf
 
 EXPOSE 3000
