@@ -5,7 +5,6 @@ import {
   captureWebsiteEvent,
   captureWebsitePageview,
   getWebsiteAnalyticsDecision,
-  hasWebsiteAnalyticsOptOutSignal,
   normalizeWebsiteAnalyticsPolicy,
   resetWebsiteAnalyticsIdentity,
   sanitizeWebsiteCapture,
@@ -81,6 +80,7 @@ describe('website PostHog privacy boundary', () => {
         advanced_disable_flags: true,
         opt_out_capturing_by_default: true,
         opt_out_persistence_by_default: true,
+        respect_dnt: false,
       }),
     )
     expect(sdk.opt_out_capturing).toHaveBeenCalledOnce()
@@ -122,7 +122,7 @@ describe('website PostHog privacy boundary', () => {
     expect(sdk.capture).not.toHaveBeenCalled()
   })
 
-  it('honors GPC and DNT before initialization, identity, or capture', () => {
+  it('uses regional consent and explicit choices with GPC or DNT enabled', () => {
     for (const signal of ['gpc', 'dnt'] as const) {
       localStorage.clear()
       vi.clearAllMocks()
@@ -132,13 +132,32 @@ describe('website PostHog privacy boundary', () => {
         browserPrivacy.doNotTrack = '1'
       }
 
-      expect(hasWebsiteAnalyticsOptOutSignal()).toBe(true)
-      setWebsiteAnalyticsDecision('enabled')
-      captureWebsitePageview('/download')
+      for (const policy of ['unknown', 'consent-required'] as const) {
+        setWebsiteAnalyticsPolicy(policy)
+        expect(getWebsiteAnalyticsDecision()).toBe('unknown')
+        captureWebsiteEvent('download_selected')
+        expect(sdk.capture).not.toHaveBeenCalled()
+      }
+
+      setWebsiteAnalyticsPolicy('default-on')
+      expect(getWebsiteAnalyticsDecision()).toBe('enabled')
+      expect(localStorage.getItem('scrollr-analytics-consent-v1')).toBeNull()
+      captureWebsiteEvent('download_selected')
+      expect(sdk.capture).toHaveBeenCalledOnce()
+
+      setWebsiteAnalyticsDecision('declined')
+      sdk.capture.mockClear()
+      captureWebsiteEvent('download_selected')
       expect(getWebsiteAnalyticsDecision()).toBe('declined')
-      expect(sdk.init).not.toHaveBeenCalled()
       expect(sdk.identify).not.toHaveBeenCalled()
       expect(sdk.capture).not.toHaveBeenCalled()
+
+      setWebsiteAnalyticsPolicy('consent-required')
+      expect(getWebsiteAnalyticsDecision()).toBe('declined')
+      setWebsiteAnalyticsDecision('enabled')
+      expect(getWebsiteAnalyticsDecision()).toBe('enabled')
+      captureWebsiteEvent('download_selected')
+      expect(sdk.capture).toHaveBeenCalledOnce()
 
       browserPrivacy.doNotTrack = null
       delete browserPrivacy.globalPrivacyControl

@@ -10,19 +10,22 @@ import {
 } from './posthog'
 
 const send = vi.hoisted(() => {
+  Object.defineProperties(navigator, {
+    globalPrivacyControl: { configurable: true, value: true },
+    doNotTrack: { configurable: true, value: '1' },
+  })
   vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
     'Mozilla/5.0 Chrome/145.0.0.0 Safari/537.36',
   )
-  const fetch = vi.fn(
-    (_url: string | URL | Request, _options?: RequestInit) =>
-      Promise.resolve(new Response('{}', { status: 200 })),
+  const fetch = vi.fn((_url: string | URL | Request, _options?: RequestInit) =>
+    Promise.resolve(new Response('{}', { status: 200 })),
   )
   vi.stubGlobal('fetch', fetch)
   vi.stubGlobal('CompressionStream', undefined)
   return fetch
 })
 
-it('sends real slim SDK events to the exact nginx route and stops on decline', async () => {
+it('sends real SDK events with browser signals through nginx and stops on explicit decline', async () => {
   vi.useFakeTimers()
   vi.stubEnv('PROD', true)
   vi.stubEnv('VITE_POSTHOG_KEY', 'test-key')

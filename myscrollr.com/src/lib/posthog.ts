@@ -119,7 +119,8 @@ function initialize(): boolean {
       opt_out_capturing_by_default: true,
       opt_out_persistence_by_default: true,
       persistence: 'localStorage',
-      respect_dnt: true,
+      // Limited service-provider analytics use the regional policy and Scrollr choice below.
+      respect_dnt: false,
     })
     initialized = true
   }
@@ -128,7 +129,6 @@ function initialize(): boolean {
 
 export function getWebsiteAnalyticsDecision(): WebsiteAnalyticsDecision {
   if (typeof window === 'undefined') return 'unknown'
-  if (hasWebsiteAnalyticsOptOutSignal()) return 'declined'
   const value = localStorage.getItem(STORAGE_KEY)
   if (value === 'enabled' || value === 'declined') return value
   return analyticsPolicy === 'default-on' ? 'enabled' : 'unknown'
@@ -153,28 +153,13 @@ export function setWebsiteAnalyticsPolicy(
   }
 }
 
-export function hasWebsiteAnalyticsOptOutSignal(): boolean {
-  if (typeof navigator === 'undefined') return false
-  const globalPrivacyControl = (
-    navigator as Navigator & { globalPrivacyControl?: boolean }
-  ).globalPrivacyControl
-  const doNotTrack =
-    navigator.doNotTrack ??
-    (typeof window === 'undefined'
-      ? null
-      : (window as Window & { doNotTrack?: string }).doNotTrack)
-  return (
-    globalPrivacyControl === true || doNotTrack === '1' || doNotTrack === 'yes'
-  )
-}
-
 export function setWebsiteAnalyticsDecision(
   decision: Exclude<WebsiteAnalyticsDecision, 'unknown'>,
 ): void {
   if (typeof window === 'undefined') return
   localStorage.setItem(STORAGE_KEY, decision)
   if (decision === 'enabled') {
-    if (!hasWebsiteAnalyticsOptOutSignal() && initialize()) {
+    if (initialize()) {
       posthog.reset()
       posthog.opt_in_capturing({ captureEventName: false })
     }
