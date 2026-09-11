@@ -151,8 +151,6 @@ server {\n\
     #                          and a mismatch with our canonical URLs\n\
     #                          (sitemap + <link rel=canonical> declare\n\
     #                          /uplink, not /uplink/).\n\
-    #   3. /_shell.html      — SPA fallback for dynamic routes\n\
-    #                          (/account, /callback, /u/$username, etc.)\n\
     # Canonical marketing pages are slashless. Keep this list narrow so\n\
     # assets, auth callbacks, API paths, and the SPA fallback are untouched.\n\
     location ~ ^/(download(?:/(?:mac|windows|linux))?|uplink(?:/lifetime)?|widgets|sports|markets|news|fantasy|releases|architecture|business|support|legal|status)/$ {\n\
@@ -160,10 +158,36 @@ server {\n\
         return 301 /$1$is_args$args;\n\
     }\n\
 \n\
+    # Retired marketing route and direct index-file duplicates.\n\
+    location = /index.html {\n\
+        include /etc/nginx/security-headers.conf;\n\
+        return 301 /$is_args$args;\n\
+    }\n\
+    location = /channels/index.html {\n\
+        include /etc/nginx/security-headers.conf;\n\
+        return 301 /widgets$is_args$args;\n\
+    }\n\
+    location ~ ^/channels/?$ {\n\
+        include /etc/nginx/security-headers.conf;\n\
+        return 301 /widgets$is_args$args;\n\
+    }\n\
+    location ~ ^/(download(?:/(?:mac|windows|linux))?|uplink(?:/lifetime)?|widgets|sports|markets|news|fantasy|releases|architecture|business|support|legal|status)/index\.html$ {\n\
+        include /etc/nginx/security-headers.conf;\n\
+        return 301 /$1$is_args$args;\n\
+    }\n\
+\n\
+    # Only known client-rendered routes receive the SPA shell.\n\
+    location ~ ^/(?:account|callback|invite)/?$|^/admin(?:/.*)?$|^/u/[^/]+/?$ {\n\
+        include /etc/nginx/security-headers.conf;\n\
+        add_header X-Robots-Tag "noindex, nofollow" always;\n\
+        add_header Cache-Control "no-cache";\n\
+        try_files /_shell.html =404;\n\
+    }\n\
+\n\
     location / {\n\
         include /etc/nginx/security-headers.conf;\n\
         add_header Cache-Control "no-cache";\n\
-        try_files $uri $uri/index.html /_shell.html;\n\
+        try_files $uri $uri/index.html =404;\n\
     }\n\
 \n\
     # ── Hashed static assets: cache forever ─────────────────────\n\

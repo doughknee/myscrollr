@@ -97,9 +97,8 @@ and how to add one.
 ## Quick start — just run the desktop app
 
 Head to <https://myscrollr.com/download> and grab the build for your
-OS. Macs and PCs will flag it as "from an unidentified developer" until
-code signing lands in v1.0.1 — the download page explains how to allow
-it.
+OS. macOS builds are signed and notarized. Windows signing is tracked
+separately; the download page carries the current installation guidance.
 
 ## Quick start — local development
 

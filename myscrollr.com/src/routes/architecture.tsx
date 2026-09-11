@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { motion } from 'motion/react'
 
 import { BASE_URL, seo } from '@/lib/seo'
-import { breadcrumbs, organization } from '@/lib/structured-data'
+import { organization } from '@/lib/structured-data'
 import { EASE } from '@/lib/animations'
 import {
   DeparturesRow,
@@ -43,14 +43,7 @@ export const Route = createFileRoute('/architecture')({
       path: '/architecture',
       image: 'https://myscrollr.com/og/architecture.png',
       type: 'article',
-      jsonLd: [
-        organization,
-        ARCHITECTURE_TECH_ARTICLE,
-        breadcrumbs([
-          { name: 'Home', path: '/' },
-          { name: 'Architecture', path: '/architecture' },
-        ]),
-      ],
+      jsonLd: [organization, ARCHITECTURE_TECH_ARTICLE],
     }),
   component: ArchitecturePage,
 })

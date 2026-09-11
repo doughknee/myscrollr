@@ -12,7 +12,7 @@ import { motion } from 'motion/react'
 import { AnimateNumber } from 'motion-plus/react'
 import type { ReactNode } from 'react'
 import { seo } from '@/lib/seo'
-import { breadcrumbs, organization } from '@/lib/structured-data'
+import { organization } from '@/lib/structured-data'
 import { API_BASE } from '@/api/client'
 import { EASE } from '@/lib/animations'
 import {
@@ -29,13 +29,7 @@ export const Route = createFileRoute('/status')({
       description:
         'Live system status for the Scrollr platform. Real-time health of infrastructure, ingestion workers, and channel APIs.',
       path: '/status',
-      jsonLd: [
-        organization,
-        breadcrumbs([
-          { name: 'Home', path: '/' },
-          { name: 'Status', path: '/status' },
-        ]),
-      ],
+      jsonLd: organization,
     }),
   component: StatusPage,
 })

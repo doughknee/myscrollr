@@ -1,7 +1,15 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useHandleSignInCallback } from '@logto/react'
+import { seo } from '@/lib/seo'
 
 export const Route = createFileRoute('/callback')({
+  head: () =>
+    seo({
+      title: 'Signing In | Scrollr',
+      description: 'Completing your secure Scrollr sign-in.',
+      path: '/callback',
+      noindex: true,
+    }),
   component: Callback,
 })
 

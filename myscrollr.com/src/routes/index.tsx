@@ -61,23 +61,6 @@ const ClosingCta = lazy(() =>
   })),
 )
 
-// Page-image preload. The SEC 02 screenshot is the page's main image
-// and its <img> only renders after React mounts the lazy chunk, so the
-// browser can't discover the URL from the initial HTML. Preloading from
-// the head lets the fetch run in parallel with the JS bundle. The image
-// is theme-independent (one rendition pair for dark and light), so no
-// per-scheme media queries are needed.
-//
-// Keep both constants in sync with components/landing/DesktopProof.tsx
-// so the preloaded rendition is the one the <img> actually requests.
-// Light/dark variants of the SEC 02 desktop screenshot. Preloads are
-// scoped per OS color scheme; users whose stored theme contradicts
-// their OS eat one wasted preload (same trade-off as the original
-// hero preloads — see useTheme for the rationale).
-const pageImageSrcset = (theme: 'dark' | 'light') =>
-  `/marketing/desktop-home-${theme}@1x.webp 1600w, /marketing/desktop-home-${theme}@2x.webp 2940w`
-const PAGE_IMAGE_SIZES = '(max-width: 1023px) 100vw, 990px'
-
 export const Route = createFileRoute('/')({
   component: HomePage,
   head: () =>
@@ -93,24 +76,6 @@ export const Route = createFileRoute('/')({
         website,
         softwareApplication,
         faqPage(HOMEPAGE_FAQ_ITEMS),
-      ],
-      extraLinks: [
-        {
-          rel: 'preload',
-          as: 'image',
-          imagesrcset: pageImageSrcset('dark'),
-          imagesizes: PAGE_IMAGE_SIZES,
-          fetchpriority: 'high',
-          media: '(prefers-color-scheme: dark)',
-        },
-        {
-          rel: 'preload',
-          as: 'image',
-          imagesrcset: pageImageSrcset('light'),
-          imagesizes: PAGE_IMAGE_SIZES,
-          fetchpriority: 'high',
-          media: '(prefers-color-scheme: light)',
-        },
       ],
     }),
 })

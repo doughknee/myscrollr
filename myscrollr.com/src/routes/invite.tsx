@@ -4,8 +4,16 @@ import { Check, Eye, EyeOff, Loader2, Shield, X } from 'lucide-react'
 import { useLogto } from '@logto/react'
 import type { FormEvent } from 'react'
 import { inviteApi } from '@/api/client'
+import { seo } from '@/lib/seo'
 
 export const Route = createFileRoute('/invite')({
+  head: () =>
+    seo({
+      title: 'Accept Invitation | Scrollr',
+      description: 'Accept a private invitation to Scrollr.',
+      path: '/invite',
+      noindex: true,
+    }),
   validateSearch: (search: Record<string, unknown>) => ({
     token: (search.token as string) || '',
     email: (search.email as string) || '',

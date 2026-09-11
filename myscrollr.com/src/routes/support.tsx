@@ -1,7 +1,7 @@
 import { ClientOnly, createFileRoute } from '@tanstack/react-router'
 import { motion } from 'motion/react'
 import { seo } from '@/lib/seo'
-import { breadcrumbs, faqPage, organization } from '@/lib/structured-data'
+import { faqPage, organization } from '@/lib/structured-data'
 import { FAQ_ITEMS } from '@/components/support/support-content'
 import { SupportFAQ } from '@/components/support/SupportFAQ'
 import { SupportTroubleshooting } from '@/components/support/SupportTroubleshooting'
@@ -20,14 +20,7 @@ export const Route = createFileRoute('/support')({
       description:
         'Get help with Scrollr. FAQs, troubleshooting articles, billing help, and a direct contact form. Real humans, no chatbots.',
       path: '/support',
-      jsonLd: [
-        organization,
-        faqPage(FAQ_ITEMS),
-        breadcrumbs([
-          { name: 'Home', path: '/' },
-          { name: 'Support', path: '/support' },
-        ]),
-      ],
+      jsonLd: [organization, faqPage(FAQ_ITEMS)],
     }),
   component: SupportPage,
 })
@@ -49,13 +42,13 @@ const ESCALATION_CHANNELS = [
     tag: 'BUGS & REQUESTS',
     title: 'GitHub issues',
     body: "Found a real bug or want a widget that doesn't exist? File it where the code lives.",
-    href: 'https://github.com/brandon-relentnet/myscrollr/issues',
+    href: 'https://github.com/doughknee/myscrollr/issues',
   },
 ]
 
 function SupportPage() {
   return (
-    <main>
+    <div>
       <PageHeader
         eyebrowLeft="SUPPORT ／ HELP DESK"
         eyebrowRight="ANSWERED BY THE PEOPLE WHO WROTE THE CODE"
@@ -122,6 +115,6 @@ function SupportPage() {
       <ClientOnly>
         <SupportContactForm />
       </ClientOnly>
-    </main>
+    </div>
   )
 }

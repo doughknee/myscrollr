@@ -17,7 +17,7 @@ export function StepsSection() {
             {
               num: '01',
               title: 'Download',
-              body: 'One small native app for macOS, Windows, and Linux. Installed before your coffee cools, no account required.',
+              body: 'One small native app for macOS, Windows, and Linux. No account is required to download it or try local utility widgets; sign in to add live data.',
             },
             {
               num: '02',

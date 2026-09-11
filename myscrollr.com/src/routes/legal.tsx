@@ -5,7 +5,7 @@ import { AlertTriangle, Info } from 'lucide-react'
 
 import type { LegalDocument, LegalSection } from '@/components/legal/documents'
 import { seo } from '@/lib/seo'
-import { breadcrumbs, organization } from '@/lib/structured-data'
+import { organization } from '@/lib/structured-data'
 import { EASE, riseIn } from '@/lib/animations'
 import {
   LEGAL_DOCUMENTS,
@@ -29,13 +29,7 @@ export const Route = createFileRoute('/legal')({
       description:
         'Terms of Service, Privacy Policy, License, and Cookie Policy for the Scrollr desktop app and myscrollr.com.',
       path: '/legal',
-      jsonLd: [
-        organization,
-        breadcrumbs([
-          { name: 'Home', path: '/' },
-          { name: 'Legal', path: '/legal' },
-        ]),
-      ],
+      jsonLd: organization,
     }),
   validateSearch: (search: Record<string, unknown>): LegalSearch => ({
     doc: typeof search.doc === 'string' ? search.doc : undefined,

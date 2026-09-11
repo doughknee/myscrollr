@@ -1,28 +1,23 @@
 # Scrollr
 
-> Scrollr is a quiet desktop ticker for live finance, sports, news, and fantasy data. Open source, privacy-first, and free. Available for macOS, Windows, and Linux.
+> Scrollr is a quiet desktop ticker for live finance, sports, news, prediction-market, fantasy, weather, and system data. It is source available under GNU AGPL v3.0 and runs on macOS Apple Silicon, Windows x64, and Linux x86_64.
 
-Scrollr displays a thin always-on-top bar at the edge of your screen showing real-time market prices, sports scores, news headlines, and fantasy league updates. The desktop app is the primary product; this website serves marketing, account management, and billing.
+The always-on-top ticker can sit at the top or bottom of a chosen monitor. A separate desktop window is used to browse widgets and configure the ticker. The website provides marketing, account, billing, support, and download pages.
 
-Core principles: zero tracking, no ads, no data brokers, source available, runs locally.
+Privacy: no advertising trackers or data brokers. Operational diagnostics and authentication logs are used to run and secure the service. Optional product analytics is opt-in, coarse, account-linked, desktop-only, and described in the Privacy Policy.
 
 ## Product
 
-- [Download](https://myscrollr.com/download): Get the Scrollr desktop app for macOS, Windows, or Linux. Free.
-- [Channels](https://myscrollr.com/channels): The widgets Scrollr offers — individual leagues (NFL, NBA, MLB…), Stocks and Crypto, news outlets, Kalshi prediction markets and Yahoo Fantasy, plus local widgets like Clock, Timer, Weather and System Monitor.
-- [Architecture](https://myscrollr.com/architecture): How Scrollr works under the hood — source APIs through CDC PubSub to your desktop.
+- [Download](https://myscrollr.com/download): Current packages and platform requirements.
+- [Widgets](https://myscrollr.com/widgets): The current widget catalog, including individual sports leagues, stocks, crypto, curated news, Yahoo Fantasy, Kalshi, and local utilities.
+- [Architecture](https://myscrollr.com/architecture): How source data reaches the desktop ticker.
+- [Uplink](https://myscrollr.com/uplink): Current plan prices and widget-slot limits.
+- [Business](https://myscrollr.com/business): Discuss a custom deployment; capabilities, price, timing, support, and terms require a written scope.
 
-## Pricing
-
-- [Uplink](https://myscrollr.com/uplink): Premium subscription tiers — Uplink ($9.99/mo), Pro ($24.99/mo), Ultimate ($49.99/mo). Annual plans available with savings.
-- [Lifetime](https://myscrollr.com/uplink/lifetime): One-time payment for forever access. 128 founding member slots.
-- [Business](https://myscrollr.com/business): Branded desktop deployments for teams. From $500/mo.
+You can download and browse without an account. Sign-in is required to add live data widgets and sync settings. Live updates appear automatically when Scrollr receives them; upstream timing, corrections, outages, and the user's connection can affect arrival time.
 
 ## Support
 
-- [Support](https://myscrollr.com/support): FAQs, troubleshooting, billing help, contact form.
-- [Legal](https://myscrollr.com/legal): Terms, Privacy, License, Cookies.
-
-## Optional
-
-- [GitHub](https://github.com/brandon-relentnet/myscrollr): Source code.
+- [Support](https://myscrollr.com/support): FAQs, troubleshooting, billing help, and contact form.
+- [Legal](https://myscrollr.com/legal): Terms, Privacy, License, and Cookies.
+- [GitHub](https://github.com/doughknee/myscrollr): Source code.

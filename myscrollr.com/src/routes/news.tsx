@@ -12,7 +12,6 @@ import {
 import { EASE } from '@/lib/animations'
 import { seo } from '@/lib/seo'
 import {
-  breadcrumbs,
   faqPage,
   organization,
   softwareApplication,
@@ -45,15 +44,7 @@ export const Route = createFileRoute('/news')({
       path: '/news',
       image: 'https://myscrollr.com/og/home.png',
       imageAlt: 'Scrollr desktop ticker showing news and RSS headlines.',
-      jsonLd: [
-        organization,
-        softwareApplication,
-        faqPage(NEWS_FAQ),
-        breadcrumbs([
-          { name: 'Home', path: '/' },
-          { name: 'News and RSS', path: '/news' },
-        ]),
-      ],
+      jsonLd: [organization, softwareApplication, faqPage(NEWS_FAQ)],
     }),
   component: NewsPage,
 })

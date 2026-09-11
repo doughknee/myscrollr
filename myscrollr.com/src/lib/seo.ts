@@ -9,12 +9,7 @@ type SeoInput = {
   jsonLd?: object | Array<object>
   /**
    * Extra `<link>` tags to inject into the route's `<head>`. Used by the
-   * home route to add a responsive `rel="preload"` for the LCP product
-   * screenshot so the browser can fetch it in parallel with the JS
-   * bundle (the image URL is otherwise only discoverable after React
-   * mounts `HeroProductShowcase`). The wider type covers preload
-   * attributes that aren't on the default `<link>` shape — `as`,
-   * `imagesrcset`, `imagesizes`, `fetchpriority`, `media`, etc.
+   * fantasy route to add a responsive `rel="preload"` for its hero image.
    */
   extraLinks?: Array<LinkTag>
 }
@@ -25,10 +20,7 @@ type MetaTag =
   | { title: string }
   | { name: string; content: string }
   | { property: string; content: string }
-// Wide link shape so consumers can emit any well-formed `<link>` tag,
-// including `rel="preload"` variants with responsive image hints. The
-// keys mirror the HTML attribute names (lowercase) because TanStack
-// Start serializes them verbatim into the prerendered HTML.
+// Wide enough for responsive image preload attributes.
 type LinkTag = {
   rel: string
   href?: string

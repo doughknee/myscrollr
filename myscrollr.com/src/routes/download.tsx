@@ -3,11 +3,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { motion } from 'motion/react'
 import type { DesktopPlatform, LinuxFormat } from '@/lib/getDownloadInfo'
 import { seo } from '@/lib/seo'
-import {
-  breadcrumbs,
-  organization,
-  softwareApplication,
-} from '@/lib/structured-data'
+import { organization, softwareApplication } from '@/lib/structured-data'
 import { LATEST_DESKTOP_VERSION } from '@/lib/latestVersion.generated'
 import { detectPlatform } from '@/lib/detectPlatform'
 import {
@@ -32,21 +28,14 @@ export const Route = createFileRoute('/download')({
         'Free download of Scrollr, the quiet desktop ticker for live finance, sports, news, and fantasy data. Native builds for macOS, Windows, and Linux.',
       path: '/download',
       image: 'https://myscrollr.com/og/download.png',
-      jsonLd: [
-        organization,
-        softwareApplication,
-        breadcrumbs([
-          { name: 'Home', path: '/' },
-          { name: 'Download', path: '/download' },
-        ]),
-      ],
+      jsonLd: [organization, softwareApplication],
     }),
   component: DownloadPage,
 })
 
 // ── Constants ──────────────────────────────────────────────────
 
-const RELEASES_URL = 'https://github.com/brandon-relentnet/myscrollr/releases'
+const RELEASES_URL = 'https://github.com/doughknee/myscrollr/releases'
 
 const CTA: Record<DesktopPlatform, string> = {
   macos: 'Download for macOS',
@@ -70,7 +59,7 @@ const STEPS = [
   {
     num: '01',
     title: 'Install & open',
-    body: 'No account wall, no onboarding tour. The bar appears with zero-setup starters already scrolling.',
+    body: 'The download has no account wall or onboarding tour. The bar opens with local starter widgets; sign in when you add live data.',
   },
   {
     num: '02',
@@ -163,7 +152,7 @@ export function DownloadPage({
             : 'Get Scrollr.'
         }
         line2="Free. No sign-up."
-        sub="One small native app. Three widgets free forever, no account between you and a running bar."
+        sub="One small native app. No sign-up to download or look around; sign in when you add live data widgets."
         actions={
           <div className="flex flex-col items-end gap-3">
             {detected ? (

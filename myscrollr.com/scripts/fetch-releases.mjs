@@ -33,7 +33,7 @@ import { fileURLToPath } from 'node:url'
 // Canonical repo path — GitHub 301-redirects to the renamed repo
 // (doughknee/myscrollr) and fetch follows redirects by default.
 const RELEASES_API_URL =
-  'https://api.github.com/repos/brandon-relentnet/myscrollr/releases?per_page=50'
+  'https://api.github.com/repos/doughknee/myscrollr/releases?per_page=50'
 const OUTPUT_PATH = fileURLToPath(
   new URL('../src/lib/releases.generated.ts', import.meta.url),
 )
@@ -71,7 +71,7 @@ function mapGitHubRelease(raw) {
     url:
       typeof raw.html_url === 'string'
         ? raw.html_url
-        : 'https://github.com/brandon-relentnet/myscrollr/releases',
+        : 'https://github.com/doughknee/myscrollr/releases',
     prerelease: raw.prerelease === true,
   }
 }

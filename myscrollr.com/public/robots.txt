@@ -9,6 +9,7 @@
 
 User-agent: *
 Disallow: /account
+Disallow: /admin
 Disallow: /invite
 Disallow: /callback
 Disallow: /u/

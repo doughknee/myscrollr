@@ -14,7 +14,7 @@ const entry = (overrides: Partial<ReleaseEntry>): ReleaseEntry => ({
   headline: '',
   date: '2026-01-01T00:00:00Z',
   body: '',
-  url: 'https://github.com/brandon-relentnet/myscrollr/releases',
+  url: 'https://github.com/doughknee/myscrollr/releases',
   prerelease: false,
   ...overrides,
 })

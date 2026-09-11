@@ -1,11 +1,7 @@
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { DownloadPage } from '@/routes/download'
 import { seo } from '@/lib/seo'
-import {
-  breadcrumbs,
-  organization,
-  softwareApplication,
-} from '@/lib/structured-data'
+import { organization, softwareApplication } from '@/lib/structured-data'
 
 // ── Per-OS deep links ────────────────────────────────────────────
 //
@@ -79,15 +75,7 @@ export const Route = createFileRoute('/download_/$os')({
       description: m.description,
       path: `/download/${params.os}`,
       image: 'https://myscrollr.com/og/download.png',
-      jsonLd: [
-        organization,
-        softwareApplication,
-        breadcrumbs([
-          { name: 'Home', path: '/' },
-          { name: 'Download', path: '/download' },
-          { name: m.os, path: `/download/${params.os}` },
-        ]),
-      ],
+      jsonLd: [organization, softwareApplication],
     })
   },
   component: PerOsDownloadPage,
