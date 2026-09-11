@@ -183,7 +183,7 @@ export function CallToAction() {
           >
             <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary backdrop-blur-sm">
               <Zap className="size-3" aria-hidden />
-              Open source. Zero tracking. Always free.
+              Open source. No ads or data sales. Always free.
             </span>
           </motion.div>
 

@@ -3,13 +3,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import DataPrivacyPage from "./DataPrivacyPage";
 
 const setConsent = vi.fn();
+const setPostHogConsent = vi.fn();
 vi.mock("../../../api/client", () => ({
   exportUserData: vi.fn(),
   setProductAnalyticsConsent: (...args: unknown[]) => setConsent(...args),
+  setPostHogAnalyticsConsent: (...args: unknown[]) => setPostHogConsent(...args),
 }));
 
 describe("DataPrivacyPage product activity consent", () => {
-  beforeEach(() => setConsent.mockReset());
+  beforeEach(() => {
+    setConsent.mockReset();
+    setPostHogConsent.mockReset();
+  });
 
   it("shows the opt-in only while signed in and waits for server confirmation", async () => {
     let resolve!: (value: { enabled: boolean }) => void;
@@ -18,7 +23,7 @@ describe("DataPrivacyPage product activity consent", () => {
     const { rerender } = render(
       <DataPrivacyPage
         authenticated={false}
-        privacy={{ sendCrashReports: true, shareProductAnalytics: false }}
+        privacy={{ sendCrashReports: true, shareProductAnalytics: false, postHogAnalyticsDecision: "unknown" }}
         onPrivacyChange={onPrivacyChange}
         onResetAll={vi.fn()}
       />,
@@ -28,7 +33,7 @@ describe("DataPrivacyPage product activity consent", () => {
     rerender(
       <DataPrivacyPage
         authenticated
-        privacy={{ sendCrashReports: true, shareProductAnalytics: false }}
+        privacy={{ sendCrashReports: true, shareProductAnalytics: false, postHogAnalyticsDecision: "unknown" }}
         onPrivacyChange={onPrivacyChange}
         onResetAll={vi.fn()}
       />,
@@ -43,6 +48,7 @@ describe("DataPrivacyPage product activity consent", () => {
     expect(onPrivacyChange).toHaveBeenCalledWith({
       sendCrashReports: true,
       shareProductAnalytics: true,
+      postHogAnalyticsDecision: "unknown",
     });
   });
 
@@ -51,7 +57,7 @@ describe("DataPrivacyPage product activity consent", () => {
     render(
       <DataPrivacyPage
         authenticated
-        privacy={{ sendCrashReports: true, shareProductAnalytics: false }}
+        privacy={{ sendCrashReports: true, shareProductAnalytics: false, postHogAnalyticsDecision: "unknown" }}
         onPrivacyChange={onPrivacyChange}
         onResetAll={vi.fn()}
       />,
@@ -60,7 +66,29 @@ describe("DataPrivacyPage product activity consent", () => {
     expect(onPrivacyChange).toHaveBeenCalledWith({
       sendCrashReports: false,
       shareProductAnalytics: false,
+      postHogAnalyticsDecision: "unknown",
     });
     expect(setConsent).not.toHaveBeenCalled();
+  });
+
+  it("keeps PostHog consent separate and server-authoritative", async () => {
+    setPostHogConsent.mockResolvedValue({ decision: "enabled" });
+    const onPrivacyChange = vi.fn();
+    render(
+      <DataPrivacyPage
+        authenticated
+        privacy={{ sendCrashReports: true, shareProductAnalytics: false, postHogAnalyticsDecision: "unknown" }}
+        onPrivacyChange={onPrivacyChange}
+        onResetAll={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("switch", { name: /share app analytics/i }));
+    expect(setPostHogConsent).toHaveBeenCalledWith("enabled");
+    await act(async () => undefined);
+    expect(onPrivacyChange).toHaveBeenCalledWith({
+      sendCrashReports: true,
+      shareProductAnalytics: false,
+      postHogAnalyticsDecision: "enabled",
+    });
   });
 });

@@ -26,7 +26,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Is my data private?',
     answer:
-      'No ads, no tracking pixels, no third-party analytics. Your widget setup syncs to your account so it follows you between machines. Anonymous app-version and error counts help find bugs, and crash reports are stripped of personal data. A separate Share product activity setting is off by default; if enabled, it records one account/day after the native ticker is visible with an enabled widget for 30 seconds, plus broad categories only. Turn it off to delete that measurement history.',
+      'No ads or data sales. Optional first-party product activity and PostHog analytics have separate controls and stay off until you enable them. Both exclude ticker contents. Turning either off stops new collection; desktop PostHog history is submitted for deletion and fixed public-site observations are not linked to a durable browser or account identifier.',
   },
   {
     question: 'Do I need an account?',

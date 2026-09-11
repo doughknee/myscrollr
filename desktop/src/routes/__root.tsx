@@ -85,7 +85,12 @@ import { useDeliveryHealth } from "../hooks/useDeliveryHealth";
 import { useNavHistory } from "../hooks/useNavHistory";
 import { useStartupUpdateCheck } from "../hooks/useStartupUpdateCheck";
 import { weatherQueryOptions } from "../api/queries";
-import { fetchSubscription, getProductAnalyticsConsent, ApiError } from "../api/client";
+import {
+  fetchSubscription,
+  getPostHogAnalyticsConsent,
+  getProductAnalyticsConsent,
+  ApiError,
+} from "../api/client";
 import { useToggleOnTicker } from "../hooks/useToggleOnTicker";
 import { isOnTicker } from "../utils/tickerMembership";
 import { queryKeys } from "../api/queries";
@@ -609,6 +614,47 @@ function RootLayout() {
         });
       },
     );
+  }, [auth.authenticated, persistPrefs]);
+
+  useEffect(() => {
+    if (!auth.authenticated) {
+      if (prefsRef.current.privacy.postHogAnalyticsDecision !== "unknown") {
+        persistPrefs({
+          ...prefsRef.current,
+          privacy: {
+            ...prefsRef.current.privacy,
+            postHogAnalyticsDecision: "unknown",
+          },
+        });
+      }
+      return;
+    }
+    let current = true;
+    void getPostHogAnalyticsConsent()
+      .then(({ decision }) => {
+        if (decision === "unknown") {
+          toast.info(
+            "New privacy choice: PostHog app analytics stay off unless you enable them in Data & privacy.",
+            { id: "posthog-consent-transition", duration: 10_000 },
+          );
+        }
+        if (
+          !current ||
+          prefsRef.current.privacy.postHogAnalyticsDecision === decision
+        )
+          return;
+        persistPrefs({
+          ...prefsRef.current,
+          privacy: {
+            ...prefsRef.current.privacy,
+            postHogAnalyticsDecision: decision,
+          },
+        });
+      })
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
   }, [auth.authenticated, persistPrefs]);
   const toggleOnTicker = useToggleOnTicker({
     getPrefs: () => prefsRef.current,

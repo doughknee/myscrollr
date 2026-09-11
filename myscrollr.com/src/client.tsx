@@ -1,14 +1,21 @@
 // Sentry must initialize before any other module imports so the SDK can
 // attach to browser globals before React/Logto/etc start running.
 
-import { StrictMode } from 'react'
+import { StrictMode, useEffect, useRef } from 'react'
 import * as Sentry from '@sentry/react'
 import { StartClient } from '@tanstack/react-start/client'
 import { hydrateRoot } from 'react-dom/client'
 import { LogtoProvider } from '@logto/react'
 import { initSentry } from './sentry'
 import type { LogtoConfig } from '@logto/react'
-import { ScrollrAuthProvider } from '@/hooks/useScrollrAuth'
+import { ScrollrAuthProvider, useScrollrAuth } from '@/hooks/useScrollrAuth'
+import { authenticatedFetch } from '@/api/client'
+import {
+  captureWebsitePageview,
+  finishWebsiteSignupFlow,
+  hasPendingWebsiteSignupFlow,
+  setWebsiteAnalyticsSuppressed,
+} from '@/lib/posthog'
 
 import '@/styles.css'
 
@@ -45,12 +52,44 @@ function SentryFallback() {
   )
 }
 
+function WebsiteAnalyticsGate() {
+  const { getAccessToken, isAuthenticated, isLoading } = useScrollrAuth()
+  const checkedSignup = useRef(false)
+
+  useEffect(() => {
+    const block = isLoading || isAuthenticated
+    setWebsiteAnalyticsSuppressed(block)
+    if (!block) captureWebsitePageview(window.location.pathname)
+  }, [isAuthenticated, isLoading])
+
+  useEffect(() => {
+    if (
+      isLoading ||
+      !isAuthenticated ||
+      checkedSignup.current ||
+      !hasPendingWebsiteSignupFlow()
+    )
+      return
+    checkedSignup.current = true
+    void authenticatedFetch<{ verified: boolean }>(
+      '/users/me/verify-website-signup',
+      { method: 'POST' },
+      getAccessToken,
+    )
+      .then(({ verified }) => finishWebsiteSignupFlow(verified))
+      .catch(() => finishWebsiteSignupFlow(false))
+  }, [getAccessToken, isAuthenticated, isLoading])
+
+  return null
+}
+
 hydrateRoot(
   document,
   <StrictMode>
     <Sentry.ErrorBoundary fallback={<SentryFallback />}>
       <LogtoProvider config={logtoConfig}>
         <ScrollrAuthProvider>
+          <WebsiteAnalyticsGate />
           <StartClient />
         </ScrollrAuthProvider>
       </LogtoProvider>

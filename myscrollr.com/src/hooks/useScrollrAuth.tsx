@@ -7,6 +7,7 @@ import { createContext, useCallback, useContext, useRef } from 'react'
 import { useLogto } from '@logto/react'
 import type { ReactNode } from 'react'
 import type { IdTokenClaims } from '@logto/react'
+import { beginWebsiteSignupFlow } from '@/lib/posthog'
 
 // ── Context shape ─────────────────────────────────────────────────
 
@@ -44,6 +45,7 @@ export function ScrollrAuthProvider({ children }: { children: ReactNode }) {
   // ── Methods ───────────────────────────────────────────────────
 
   const signIn = useCallback((returnTo?: string) => {
+    beginWebsiteSignupFlow()
     // Store the intended destination so the callback route can redirect
     // back after authentication. Falls back to /account if not set.
     if (returnTo) {

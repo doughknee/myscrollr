@@ -116,6 +116,15 @@ export default function Footer() {
               className="text-base-content/65 transition-colors hover:text-primary hover:opacity-100"
             />
           ))}
+          <button
+            type="button"
+            className="text-base-content/65 transition-colors hover:text-primary"
+            onClick={() =>
+              window.dispatchEvent(new CustomEvent('scrollr:manage-analytics'))
+            }
+          >
+            PRIVACY CHOICES
+          </button>
         </nav>
       </div>
     </footer>

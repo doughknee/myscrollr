@@ -17,6 +17,7 @@ import { SETTINGS_ROWS } from "../rows";
 
 const R = SETTINGS_ROWS.data;
 import type { PrivacyPrefs } from "../../../preferences";
+import { setPostHogAnalyticsConsent } from "../../../api/client";
 
 interface DataPrivacyPageProps {
   authenticated: boolean;
@@ -34,6 +35,7 @@ export default function DataPrivacyPage({
   const [exportState, setExportState] = useState<"idle" | "loading">("idle");
   const [confirmResetAll, setConfirmResetAll] = useState(false);
   const [savingAnalytics, setSavingAnalytics] = useState(false);
+  const [savingPostHog, setSavingPostHog] = useState(false);
 
   const handleExport = useCallback(async () => {
     if (exportState === "loading") return;
@@ -96,6 +98,37 @@ export default function DataPrivacyPage({
                     toast.error(err instanceof Error ? err.message : "Could not update product activity sharing");
                   } finally {
                     setSavingAnalytics(false);
+                  }
+                }}
+              />
+            </Row>
+          )}
+          {authenticated && (
+            <Row id="postHogAnalytics">
+              <ToggleRow
+                label={R.postHogAnalytics.label}
+                description={R.postHogAnalytics.description}
+                checked={privacy.postHogAnalyticsDecision === "enabled"}
+                disabled={savingPostHog}
+                onChange={async (enabled) => {
+                  if (savingPostHog) return;
+                  setSavingPostHog(true);
+                  try {
+                    const saved = await setPostHogAnalyticsConsent(
+                      enabled ? "enabled" : "declined",
+                    );
+                    onPrivacyChange({
+                      ...privacy,
+                      postHogAnalyticsDecision: saved.decision,
+                    });
+                  } catch (err) {
+                    toast.error(
+                      err instanceof Error
+                        ? err.message
+                        : "Could not update anonymous app analytics",
+                    );
+                  } finally {
+                    setSavingPostHog(false);
                   }
                 }}
               />

@@ -240,6 +240,41 @@ export function recordProductActivity(
   });
 }
 
+export type PostHogAnalyticsDecision = "unknown" | "enabled" | "declined";
+
+export interface PostHogAnalyticsConsent {
+  decision: PostHogAnalyticsDecision;
+  deletion_status?: "not_requested" | "pending" | "requested";
+}
+
+export function getPostHogAnalyticsConsent(): Promise<PostHogAnalyticsConsent> {
+  return authFetch("/users/me/posthog-analytics");
+}
+
+export function setPostHogAnalyticsConsent(
+  decision: Exclude<PostHogAnalyticsDecision, "unknown">,
+): Promise<PostHogAnalyticsConsent> {
+  return authFetch("/users/me/posthog-analytics", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decision }),
+  });
+}
+
+export type PostHogDesktopEvent =
+  | { event: "desktop_app_opened" | "desktop_app_running" | "desktop_presence" }
+  | { event: "desktop_feature_configured"; feature: ProductActivityCategory };
+
+export function recordPostHogDesktopEvent(
+  event: PostHogDesktopEvent,
+): Promise<unknown> {
+  return authFetch("/users/me/posthog-event", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(event),
+  });
+}
+
 // ── Widget row types ──────────────────────────────────────────────────
 
 /**

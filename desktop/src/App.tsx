@@ -8,6 +8,7 @@ import { useTauriListener } from "./hooks/useTauriListener";
 import { useDashboardCDC } from "./hooks/useDashboardCDC";
 import { useSharedSSE } from "./hooks/useSharedSSE";
 import { useProductActivity } from "./hooks/useProductActivity";
+import { usePostHogActivity } from "./hooks/usePostHogActivity";
 import { isPrimaryTicker } from "./lib/windowRole";
 import { Menu, Submenu, CheckMenuItem, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { dashboardQueryOptions, queryKeys } from "./api/queries";
@@ -195,11 +196,44 @@ export default function App() {
     (id: string) => catalogItemById(id)?.category ?? sourceForWidget(id),
     [catalogVersion],
   );
+  const postHogCategories = useMemo(
+    () =>
+      [...new Set(measuredWidgetIds.map(resolveMeasuredCategory))]
+        .map((category) =>
+          category === "finance"
+            ? "markets"
+            : category === "rss"
+              ? "news"
+              : category === "utility"
+                ? "utilities"
+                : category,
+        )
+        .filter(
+          (
+            category,
+          ): category is import("./api/client").ProductActivityCategory =>
+            typeof category === "string" &&
+            [
+              "sports",
+              "markets",
+              "news",
+              "fantasy",
+              "predictions",
+              "utilities",
+            ].includes(category),
+        ),
+    [measuredWidgetIds, resolveMeasuredCategory],
+  );
   useProductActivity({
     authenticated,
     optedIn: prefs.privacy.shareProductAnalytics,
     widgetIds: measuredWidgetIds,
     resolveCategory: resolveMeasuredCategory,
+  });
+  usePostHogActivity({
+    authenticated,
+    enabled: prefs.privacy.postHogAnalyticsDecision === "enabled",
+    categories: postHogCategories,
   });
 
   // Delivery mode. The SSE connection is process-wide and this component

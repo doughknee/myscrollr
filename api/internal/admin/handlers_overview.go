@@ -18,10 +18,9 @@ import (
 // measured. It never estimates and then presents the estimate as a
 // measurement.
 //
-// The number people always want here is active installs. There is no
-// third-party analytics and no install identifier anywhere in this API - a
-// standing decision, not an oversight - so installs are NOT measurable, and
-// the Installs tile exists purely to say so and point at downloads instead.
+// The number people always want here is active installs. Optional analytics
+// use account or browser pseudonyms, not an install identifier, so installs
+// are NOT measurable and the tile points at downloads instead.
 
 // logtoStats is the tile's seam onto Logto, so the tests can drive both the
 // healthy path and the unreachable path without a network.
@@ -183,8 +182,8 @@ func HandleGetOverview(c *fiber.Ctx) error {
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 		Installs: Measured{
 			Available: false,
-			Note: "Not measurable. Scrollr ships no third-party analytics and no " +
-				"install identifier, by decision - nothing reports back that a given " +
+			Note: "Not measurable. Optional analytics use no install identifier - " +
+				"nothing reports back that a given " +
 				"install exists or is running. Downloads per release is the honest proxy.",
 		},
 	}

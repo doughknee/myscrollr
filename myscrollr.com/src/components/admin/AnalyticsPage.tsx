@@ -573,6 +573,19 @@ export function AnalyticsContent({
               </p>
             </div>
             <SourceStamp generatedAt={product.generated_at} />
+            <div className="flex flex-wrap items-center gap-3">
+              <Card title="Recently seen" note={product.recent_presence_note}>
+                <Big>{num(product.recent_presence)}</Big>
+              </Card>
+              <a
+                href="https://us.posthog.com/project/603918"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-semibold text-primary hover:underline"
+              >
+                Explore consented website and app events in PostHog
+              </a>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <Card title="Participating accounts">
                 <Big>{num(product.enrolled_accounts)}</Big>

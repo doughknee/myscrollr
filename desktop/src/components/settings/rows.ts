@@ -236,6 +236,13 @@ export const SETTINGS_ROWS = {
       keywords: "analytics activity privacy opt in usage retention",
       when: "signedIn",
     },
+    postHogAnalytics: {
+      label: "Share app analytics",
+      description:
+        "Help improve Scrollr by sharing app opens, active days, and broad feature categories with PostHog. Never ticker contents, symbols, teams, feeds, or other app activity.",
+      keywords: "posthog analytics privacy consent app opens features",
+      when: "signedIn",
+    },
     resetAll: {
       label: "Reset all settings",
       description:

@@ -202,7 +202,11 @@ function DownloadVisual() {
         >
           {[
             { icon: Zap, label: 'Native app', sub: 'Fast & light' },
-            { icon: Shield, label: 'No tracking', sub: 'Zero analytics' },
+            {
+              icon: Shield,
+              label: 'Privacy choice',
+              sub: 'Analytics off by default',
+            },
             { icon: Download, label: 'Instant setup', sub: 'No sign-up' },
           ].map((feat, i) => (
             <motion.div

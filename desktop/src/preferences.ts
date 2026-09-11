@@ -209,6 +209,8 @@ export interface PrivacyPrefs {
   sendCrashReports: boolean;
   /** Explicit account-level opt-in, mirrored locally after server confirmation. */
   shareProductAnalytics: boolean;
+  /** Separate decision for third-party PostHog analytics. */
+  postHogAnalyticsDecision: "unknown" | "enabled" | "declined";
 }
 
 export type TickerPosition = "top" | "bottom";
@@ -563,6 +565,7 @@ const DEFAULT_STARTUP: StartupPrefs = {
 const DEFAULT_PRIVACY: PrivacyPrefs = {
   sendCrashReports: true,
   shareProductAnalytics: false,
+  postHogAnalyticsDecision: "unknown",
 };
 
 const DEFAULT_WINDOW: WindowPrefs = {
@@ -1063,6 +1066,11 @@ export function loadPrefs(): AppPreferences {
       privacy: {
         sendCrashReports: source.privacy?.sendCrashReports !== false,
         shareProductAnalytics: source.privacy?.shareProductAnalytics === true,
+        postHogAnalyticsDecision:
+          source.privacy?.postHogAnalyticsDecision === "enabled" ||
+          source.privacy?.postHogAnalyticsDecision === "declined"
+            ? source.privacy.postHogAnalyticsDecision
+            : "unknown",
       },
       window: {
         ...DEFAULT_WINDOW,

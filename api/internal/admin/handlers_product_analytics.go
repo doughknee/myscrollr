@@ -56,6 +56,8 @@ type ProductAnalyticsResponse struct {
 	Retention           RetentionSummary  `json:"retention"`
 	Features            []FeatureUsage    `json:"features"`
 	PopulationNote      string            `json:"population_note"`
+	RecentPresence      int               `json:"recent_presence"`
+	RecentPresenceNote  string            `json:"recent_presence_note"`
 }
 
 func HandleGetProductAnalytics(c *fiber.Ctx) error {
@@ -78,9 +80,17 @@ func loadProductAnalytics(ctx context.Context, days int, now time.Time) (Product
 	start := today.AddDate(0, 0, -(days - 1))
 	report := ProductAnalyticsResponse{
 		GeneratedAt: now.UTC().Format(time.RFC3339), Days: days,
-		PopulationNote: "Opted-in signed-in accounts only. Activity means a native ticker was visible with an enabled widget for 30 continuous seconds; it does not prove attention.",
-		Activation:     ActivationSummary{Definition: "First observed successful configured ticker use; not original signup date."},
-		Features:       []FeatureUsage{},
+		PopulationNote:     "Opted-in signed-in accounts only. Activity means a native ticker was visible with an enabled widget for 30 continuous seconds; it does not prove attention.",
+		Activation:         ActivationSummary{Definition: "First observed successful configured ticker use; not original signup date."},
+		Features:           []FeatureUsage{},
+		RecentPresenceNote: "Accounts seen by the opted-in desktop app in the last 15 minutes; presence does not prove attention.",
+	}
+	if platform.Rdb != nil {
+		cutoff := now.UTC().Add(-15 * time.Minute).Unix()
+		_ = platform.Rdb.ZRemRangeByScore(ctx, "posthog:recent-presence", "-inf", strconv.FormatInt(cutoff, 10)).Err()
+		if count, err := platform.Rdb.ZCount(ctx, "posthog:recent-presence", strconv.FormatInt(cutoff, 10), "+inf").Result(); err == nil {
+			report.RecentPresence = int(count)
+		}
 	}
 
 	var collectionStart *time.Time

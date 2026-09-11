@@ -5,6 +5,7 @@ import type { LinuxFormat } from '@/lib/getDownloadInfo'
 import type { PlatformInfo } from '@/lib/detectPlatform'
 import { detectIsIntelMac, detectPlatform } from '@/lib/detectPlatform'
 import { FALLBACK_RELEASES_URL, triggerDownload } from '@/lib/getDownloadInfo'
+import { captureWebsiteEvent } from '@/lib/posthog'
 
 // SSR baseline. Must match what `detectPlatform()` returns when
 // `navigator` is undefined — see `lib/detectPlatform.ts`. The initial
@@ -145,6 +146,7 @@ interface SingleDownloadButtonProps {
 
 function SingleDownloadButton({ platform, label }: SingleDownloadButtonProps) {
   const handleClick = useCallback(() => {
+    captureWebsiteEvent('download_selected', { platform })
     triggerDownload(platform)
   }, [platform])
 
@@ -197,6 +199,7 @@ function LinuxDownloadButton() {
 
   const handleSelect = useCallback((format: LinuxFormat) => {
     setOpen(false)
+    captureWebsiteEvent('download_selected', { platform: 'linux' })
     triggerDownload('linux', format)
   }, [])
 

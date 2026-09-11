@@ -68,6 +68,8 @@ const product: ProductAnalytics = {
   },
   features: [{ category: 'sports', accounts: 12, share: 0.7 }],
   population_note: 'Opted-in signed-in accounts only.',
+  recent_presence: 0,
+  recent_presence_note: 'Accounts seen in the last 15 minutes.',
 }
 const versions: AdminVersions = {
   generated_at: '2026-09-10T12:00:00Z',
