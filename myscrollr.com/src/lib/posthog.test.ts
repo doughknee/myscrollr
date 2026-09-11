@@ -6,9 +6,11 @@ import {
   captureWebsitePageview,
   getWebsiteAnalyticsDecision,
   hasWebsiteAnalyticsOptOutSignal,
+  normalizeWebsiteAnalyticsPolicy,
   resetWebsiteAnalyticsIdentity,
   sanitizeWebsiteCapture,
   setWebsiteAnalyticsDecision,
+  setWebsiteAnalyticsPolicy,
   setWebsiteAnalyticsSuppressed,
 } from './posthog'
 
@@ -19,6 +21,7 @@ const sdk = vi.hoisted(() => ({
   opt_out_capturing: vi.fn(),
   reset: vi.fn(),
   identify: vi.fn(),
+  get_distinct_id: vi.fn(() => 'anonymous-id'),
 }))
 
 vi.mock('posthog-js/dist/module.slim', () => ({ default: sdk }))
@@ -56,12 +59,14 @@ describe('website PostHog privacy boundary', () => {
     localStorage.clear()
     sessionValues.clear()
     vi.clearAllMocks()
+    sdk.get_distinct_id.mockReturnValue('anonymous-id')
     vi.stubEnv('PROD', true)
     vi.stubEnv('VITE_POSTHOG_KEY', 'test-key')
     vi.stubEnv('VITE_POSTHOG_HOST', 'https://example.test')
     window.location.pathname = '/'
     browserPrivacy.doNotTrack = null
     delete browserPrivacy.globalPrivacyControl
+    setWebsiteAnalyticsPolicy('unknown')
     setWebsiteAnalyticsSuppressed(false)
   })
 
@@ -139,6 +144,67 @@ describe('website PostHog privacy boundary', () => {
     }
   })
 
+  it('uses a US policy default without recording fabricated consent', () => {
+    setWebsiteAnalyticsPolicy('default-on')
+
+    expect(getWebsiteAnalyticsDecision()).toBe('enabled')
+    expect(localStorage.getItem('scrollr-analytics-consent-v1')).toBeNull()
+  })
+
+  it('keeps unknown and consent-required locations consent-first', () => {
+    expect(getWebsiteAnalyticsDecision()).toBe('unknown')
+
+    setWebsiteAnalyticsPolicy('consent-required')
+
+    expect(getWebsiteAnalyticsDecision()).toBe('unknown')
+  })
+
+  it('fails malformed policy responses closed', () => {
+    expect(normalizeWebsiteAnalyticsPolicy('default-on')).toBe('default-on')
+    expect(normalizeWebsiteAnalyticsPolicy('US')).toBe('consent-required')
+    expect(normalizeWebsiteAnalyticsPolicy(undefined)).toBe('consent-required')
+  })
+
+  it('preserves an explicit decline across policy and region changes', () => {
+    setWebsiteAnalyticsDecision('declined')
+    setWebsiteAnalyticsPolicy('default-on')
+    expect(getWebsiteAnalyticsDecision()).toBe('declined')
+
+    setWebsiteAnalyticsPolicy('consent-required')
+    expect(getWebsiteAnalyticsDecision()).toBe('declined')
+  })
+
+  it('returns to consent-first when a default-on visitor changes region', () => {
+    setWebsiteAnalyticsPolicy('default-on')
+    expect(getWebsiteAnalyticsDecision()).toBe('enabled')
+
+    setWebsiteAnalyticsPolicy('consent-required')
+    expect(getWebsiteAnalyticsDecision()).toBe('unknown')
+  })
+
+  it('resets any prior account identity before applying a verified account', () => {
+    setWebsiteAnalyticsDecision('enabled')
+    sdk.get_distinct_id.mockReturnValue('a'.repeat(64))
+    sdk.reset.mockClear()
+    sdk.opt_in_capturing.mockClear()
+    sdk.identify.mockClear()
+
+    expect(
+      applyWebsiteAnalyticsContext({
+        eligible: true,
+        verified: false,
+        analytics_distinct_id: 'b'.repeat(64),
+      }),
+    ).toBe(true)
+    expect(sdk.reset).toHaveBeenCalledOnce()
+    expect(sdk.reset.mock.invocationCallOrder[0]).toBeLessThan(
+      sdk.opt_in_capturing.mock.invocationCallOrder[0],
+    )
+    expect(sdk.opt_in_capturing.mock.invocationCallOrder[0]).toBeLessThan(
+      sdk.identify.mock.invocationCallOrder[0],
+    )
+  })
+
   it('strips SDK-added URLs, device details, person properties, and IP data', () => {
     expect(
       sanitizeWebsiteCapture({
@@ -200,6 +266,7 @@ describe('website PostHog privacy boundary', () => {
 
   it('stitches the stable anonymous journey to a server pseudonym', () => {
     setWebsiteAnalyticsDecision('enabled')
+    sdk.reset.mockClear()
     sdk.capture.mockClear()
     beginWebsiteSignupFlow()
     const distinctID = 'a'.repeat(64)
@@ -208,6 +275,7 @@ describe('website PostHog privacy boundary', () => {
       verified: true,
       analytics_distinct_id: distinctID,
     })
+    expect(sdk.reset).not.toHaveBeenCalled()
     expect(sdk.identify).toHaveBeenCalledWith(distinctID)
     expect(sdk.capture).toHaveBeenCalledWith('signup_completed', {
       surface: 'website',

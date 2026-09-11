@@ -125,6 +125,14 @@ export default function Footer() {
           >
             ANALYTICS SETTINGS
           </button>
+          <a
+            href="https://db-ip.com"
+            target="_blank"
+            rel="noreferrer"
+            className="hover:text-primary"
+          >
+            IP GEOLOCATION BY DB-IP
+          </a>
         </nav>
       </div>
     </footer>

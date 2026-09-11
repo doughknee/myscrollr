@@ -2,6 +2,10 @@
 
 export const API_BASE = import.meta.env.VITE_API_URL || ''
 
+export interface AnalyticsPolicyResponse {
+  policy?: unknown
+}
+
 // ── Shared Types ──────────────────────────────────────────────────
 
 export interface UserPreferences {
@@ -46,6 +50,10 @@ async function request<T>(
   }
 
   return response.json()
+}
+
+export const analyticsPolicyApi = {
+  get: () => request<AnalyticsPolicyResponse>('/public/analytics-policy'),
 }
 
 // Authenticated API caller - use this inside components with useLogto

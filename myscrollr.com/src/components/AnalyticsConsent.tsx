@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react'
 import type { WebsiteAnalyticsDecision } from '@/lib/posthog'
 import {
   getWebsiteAnalyticsDecision,
+  getWebsiteAnalyticsPolicy,
   hasWebsiteAnalyticsOptOutSignal,
   setWebsiteAnalyticsDecision,
 } from '@/lib/posthog'
 
 export default function AnalyticsConsent() {
-  const [decision, setDecision] = useState<WebsiteAnalyticsDecision>('unknown')
+  const [decision, setDecision] = useState<WebsiteAnalyticsDecision>(() =>
+    getWebsiteAnalyticsDecision(),
+  )
   const [managing, setManaging] = useState(false)
 
   useEffect(() => {
@@ -22,7 +25,12 @@ export default function AnalyticsConsent() {
     }
   }, [])
 
-  if (decision !== 'unknown' && !managing) return null
+  const policy = getWebsiteAnalyticsPolicy()
+  if (
+    policy === 'unknown' ||
+    (!managing && (decision !== 'unknown' || policy === 'default-on'))
+  )
+    return null
 
   const choose = (next: 'enabled' | 'declined') => {
     setWebsiteAnalyticsDecision(next)
