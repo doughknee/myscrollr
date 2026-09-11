@@ -8,7 +8,8 @@
  */
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
-import { exportUserData } from "../../../api/client";
+import { exportUserData, setProductAnalyticsConsent } from "../../../api/client";
+import { signalProductAnalyticsConsentMutation } from "../../../lib/productAnalyticsConsent";
 import { ActionRow, RowList, SettingsGroup, ToggleRow } from "../SettingsControls";
 import ConfirmDialog from "../../ConfirmDialog";
 import { Row } from "./Row";
@@ -32,6 +33,7 @@ export default function DataPrivacyPage({
 }: DataPrivacyPageProps) {
   const [exportState, setExportState] = useState<"idle" | "loading">("idle");
   const [confirmResetAll, setConfirmResetAll] = useState(false);
+  const [savingAnalytics, setSavingAnalytics] = useState(false);
 
   const handleExport = useCallback(async () => {
     if (exportState === "loading") return;
@@ -76,6 +78,29 @@ export default function DataPrivacyPage({
 
       <SettingsGroup>
         <RowList>
+          {authenticated && (
+            <Row id="productAnalytics">
+              <ToggleRow
+                label={R.productAnalytics.label}
+                description={R.productAnalytics.description}
+                checked={privacy.shareProductAnalytics}
+                disabled={savingAnalytics}
+                onChange={async (enabled) => {
+                  if (savingAnalytics) return;
+                  setSavingAnalytics(true);
+                  signalProductAnalyticsConsentMutation();
+                  try {
+                    const saved = await setProductAnalyticsConsent(enabled);
+                    onPrivacyChange({ ...privacy, shareProductAnalytics: saved.enabled });
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Could not update product activity sharing");
+                  } finally {
+                    setSavingAnalytics(false);
+                  }
+                }}
+              />
+            </Row>
+          )}
           <Row id="crashReports">
             <ToggleRow
               label={R.crashReports.label}

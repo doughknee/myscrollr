@@ -34,13 +34,34 @@ func TestAdminAnalyticsRouteIsRegisteredAndAuthGated(t *testing.T) {
 	s := NewServer()
 	s.setupRoutes()
 
-	resp, err := s.App.Test(httptest.NewRequest("GET", "/admin/analytics", nil))
-	if err != nil {
-		t.Fatal(err)
+	for _, path := range []string{"/admin/analytics", "/admin/product-analytics"} {
+		resp, err := s.App.Test(httptest.NewRequest("GET", path, nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != fiber.StatusUnauthorized {
+			t.Fatalf("GET %s: got %d, want 401", path, resp.StatusCode)
+		}
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != fiber.StatusUnauthorized {
-		t.Fatalf("GET /admin/analytics: got %d, want 401", resp.StatusCode)
+}
+
+func TestProductAnalyticsRoutesAreRegisteredAndAuthGated(t *testing.T) {
+	s := NewServer()
+	s.setupRoutes()
+	for _, tc := range []struct{ method, path string }{
+		{"GET", "/users/me/product-analytics"},
+		{"PUT", "/users/me/product-analytics"},
+		{"POST", "/users/me/product-activity"},
+	} {
+		resp, err := s.App.Test(httptest.NewRequest(tc.method, tc.path, nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != fiber.StatusUnauthorized {
+			t.Fatalf("%s %s: got %d, want 401", tc.method, tc.path, resp.StatusCode)
+		}
 	}
 }
 

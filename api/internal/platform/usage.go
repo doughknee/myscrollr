@@ -165,13 +165,33 @@ func pruneUsage(ctx context.Context) {
 		return
 	}
 	cutoff := time.Now().UTC().Add(-usageRetention)
-	tag, err := DBPool.Exec(ctx, `DELETE FROM api_usage_daily WHERE day < $1`, cutoff)
+	runUsagePrunes(func() (int64, error) {
+		tag, err := DBPool.Exec(ctx, `DELETE FROM api_usage_daily WHERE day < $1`, cutoff)
+		return tag.RowsAffected(), err
+	}, func() { PruneProductActivity(ctx, time.Now()) })
+}
+
+func runUsagePrunes(pruneAPIUsage func() (int64, error), pruneProductActivity func()) {
+	n, err := pruneAPIUsage()
 	if err != nil {
 		log.Printf("[Usage] prune: %v", err)
+	} else if n > 0 {
+		log.Printf("[Usage] pruned %d aggregate rows older than %d days", n, int(usageRetention.Hours()/24))
+	}
+	pruneProductActivity()
+}
+
+// PruneProductActivity keeps the current UTC day plus the previous 89 days.
+// Enrollment/cohort metadata is intentionally untouched: deleting it would
+// make an old participant look newly activated after the daily fact expires.
+func PruneProductActivity(ctx context.Context, now time.Time) {
+	if DBPool == nil {
 		return
 	}
-	if n := tag.RowsAffected(); n > 0 {
-		log.Printf("[Usage] pruned %d aggregate rows older than %d days", n, int(usageRetention.Hours()/24))
+	cutoff := now.UTC().Truncate(24*time.Hour).AddDate(0, 0, -89)
+	if _, err := DBPool.Exec(ctx,
+		`DELETE FROM product_activity_daily WHERE day < $1`, cutoff); err != nil {
+		log.Printf("[Product Analytics] prune daily facts: %v", err)
 	}
 }
 

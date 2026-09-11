@@ -201,6 +201,45 @@ export async function authFetch<T>(
   return handleResponse<T>(response);
 }
 
+export interface ProductAnalyticsConsent {
+  enabled: boolean;
+  enrolled_at?: string;
+}
+
+export type ProductActivityCategory =
+  | "sports"
+  | "markets"
+  | "news"
+  | "fantasy"
+  | "predictions"
+  | "utilities";
+
+export function getProductAnalyticsConsent(): Promise<ProductAnalyticsConsent> {
+  return authFetch("/users/me/product-analytics");
+}
+
+export function setProductAnalyticsConsent(
+  enabled: boolean,
+): Promise<ProductAnalyticsConsent> {
+  return authFetch("/users/me/product-analytics", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+export function recordProductActivity(
+  categories: ProductActivityCategory[],
+  signal?: AbortSignal,
+): Promise<unknown> {
+  return authFetch("/users/me/product-activity", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ categories }),
+    signal,
+  });
+}
+
 // ── Widget row types ──────────────────────────────────────────────────
 
 /**

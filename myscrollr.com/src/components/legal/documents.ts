@@ -59,7 +59,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
     shortTitle: 'Terms',
     icon: FileText,
     category: 'core',
-    lastUpdated: 'July 2026',
+    lastUpdated: 'September 10, 2026',
     effectiveDate: 'July 2, 2026',
     sections: [
       {
@@ -161,6 +161,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
           'Yahoo Fantasy Data: If you connect your Yahoo Fantasy account, we store an encrypted refresh token (AES-256-GCM encryption) to maintain your connection. We also store your Yahoo user identifier, league data, standings, rosters, and matchup information that Yahoo provides through their API.',
           "Kalshi Account Connection: If you connect your own Kalshi account in the desktop application (an optional feature for viewing your positions), your Kalshi API key ID and private key are stored ONLY in your device's operating-system keychain or credential store. They are never transmitted to our servers, never included in our database, and are used solely for read-only portfolio requests made directly from your device to Kalshi.",
           'Usage Data: We keep anonymous operational counts — how many requests reach our API each day, which app version and operating system they came from, and how many of them failed. These are totals only: they carry no account identifier, no IP address, and nothing about the content you follow — no symbols, teams, feeds, or widget settings. We use them to tell which builds are affected by a bug and whether a fix reached people. We also count active SSE connections. We do not track individual page visits, browsing history, or behavioral analytics.',
+          'Optional Product Activity: The desktop app has a separate, default-off "Share product activity" setting for signed-in accounts. If you turn it on, we record one daily fact after a native ticker is actually visible with at least one enabled widget for 30 continuous seconds. The fact may include only broad categories — sports, markets, news, fantasy, predictions, and utilities — that were enabled during that qualifying activity. We do not receive symbols, teams, feed URLs, titles, content, browsing data, or an install fingerprint. Multiple windows, monitors, and devices deduplicate to the same account and UTC day. This measures qualifying ticker use, not attention.',
         ],
       },
       {
@@ -189,7 +190,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
       {
         heading: 'Data Retention',
         content: [
-          'We retain your account information and preferences for as long as your account is active. RSS articles are automatically deleted after 7 days. Yahoo Fantasy data is refreshed on a sync cycle (default: every 120 seconds for active users).',
+          'We retain your account information and preferences for as long as your account is active. Optional product-activity daily facts are retained for 90 days. While you remain opted in, we retain the enrollment date, first observed qualifying-use date, and fixed D1/D7/D30 return results needed to keep cohort reports correct after daily facts expire. Turning the setting off deletes that measurement history and metadata; account deletion also removes it. Offline qualifying activity may be undercounted because the app keeps no durable analytics queue. RSS articles are automatically deleted after 7 days. Yahoo Fantasy data is refreshed on a sync cycle (default: every 120 seconds for active users).',
           'You may request deletion of your account and associated data by contacting us through our community channels.',
         ],
       },
@@ -230,7 +231,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
     shortTitle: 'Desktop Privacy',
     icon: Monitor,
     category: 'data',
-    lastUpdated: 'July 2026',
+    lastUpdated: 'September 10, 2026',
     effectiveDate: 'July 2, 2026',
     badge: 'New',
     sections: [
@@ -257,7 +258,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         heading: 'Network Communication',
         content: [
           "The desktop application communicates with Scrollr API servers (api.myscrollr.com) to retrieve real-time data via Server-Sent Events (SSE) and to synchronize your configuration. If you optionally connect your own Kalshi account, the application additionally communicates directly with Kalshi's API from your device (see Third-Party Services below).",
-          'All network communication uses HTTPS encryption. The application sends your authentication token, subscription tier, and its own version and operating system with each request; we keep the last two only as daily totals, to tell which builds a bug affects. It does not transmit any data about other applications, files, or activity on your device, or about which symbols, teams, or feeds you follow.',
+          'All network communication uses HTTPS encryption. The application sends your authentication token, subscription tier, and its own version and operating system with each request; we keep the last two only as anonymous daily totals, to tell which builds a bug affects. If you separately opt in to Share product activity, an authenticated daily report may say that the native ticker was visible with an enabled broad category for 30 continuous seconds. It does not transmit any data about other applications, files, browsing, symbols, teams, feeds, titles, or ticker content.',
         ],
       },
       {
@@ -278,13 +279,13 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         content: [
           'Yahoo Fantasy Sports: If you connect your Yahoo account, the desktop application opens your default browser for the OAuth authorization flow. The application stores an encrypted refresh token locally and on our servers to maintain the connection. See our Privacy Policy for details on Yahoo data handling.',
           "Kalshi (optional): If you connect your own Kalshi account, the application communicates directly from your device to Kalshi's API using your credentials for READ-ONLY portfolio and position data. These requests do not pass through Scrollr servers. The application cannot place, modify, or cancel orders on your Kalshi account.",
-          'Scrollr includes no advertising frameworks and no third-party analytics. The application sends crash reports, which you can turn off with the "Send crash reports" setting. Scrollr\'s servers record counts of application versions, platforms and error rates; these counts contain no account identifier and nothing about the content of your ticker.',
+          'Scrollr includes no advertising frameworks and no third-party analytics. The application sends crash reports, which you can turn off with the independent "Send crash reports" setting. Scrollr\'s servers also record anonymous counts of application versions, platforms and error rates. Optional first-party product activity is default off, uses authenticated account identity only for account/day deduplication and cohort deletion, and is never sent to Sentry or the anonymous request counters.',
         ],
       },
       {
         heading: 'Data Deletion',
         content: [
-          'You can delete all locally stored data by uninstalling the application or by using the "Reset all settings" option on the Account page. Server-side data (channel configurations, account preferences) can be deleted by contacting us through our Support page or community Discord server.',
+          'You can delete local preferences with "Reset all settings." Turning off "Share product activity" stops collection and deletes its server-side daily facts and cohort metadata. The app keeps no durable offline activity queue. Account deletion removes the same data through the existing account purge process.',
         ],
       },
     ],

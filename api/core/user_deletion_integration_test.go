@@ -47,7 +47,7 @@ func setupIntegrationDB(t *testing.T) {
 		testsupport.SharedMiniRedis.FlushAll()
 	}
 	_, err := platform.DBPool.Exec(context.Background(), `
-		TRUNCATE TABLE user_widgets, user_preferences, stripe_customers,
+		TRUNCATE TABLE product_analytics_enrollments, user_widgets, user_preferences, stripe_customers,
 		               stripe_webhook_events, user_deletion_requests,
 		               yahoo_user_leagues, yahoo_users, yahoo_leagues CASCADE
 	`)
@@ -174,6 +174,8 @@ func seedPurgeableUser(t *testing.T, sub string, lifetime bool) {
 	t.Helper()
 	testsupport.MustExec(t, `INSERT INTO user_widgets (logto_sub, widget_type, config) VALUES ($1, 'finance', '{}')`, sub)
 	testsupport.MustExec(t, `INSERT INTO user_preferences (logto_sub) VALUES ($1)`, sub)
+	testsupport.MustExec(t, `INSERT INTO product_analytics_enrollments (logto_sub, first_active_day) VALUES ($1, CURRENT_DATE - 2)`, sub)
+	testsupport.MustExec(t, `INSERT INTO product_activity_daily (logto_sub, day, sports) VALUES ($1, CURRENT_DATE - 2, true)`, sub)
 	testsupport.MustExec(t, `INSERT INTO stripe_customers (logto_sub, stripe_customer_id, plan, status, lifetime)
 	             VALUES ($1, $2, $3, 'canceled', $4)`,
 		sub, "cus_"+sub, map[bool]string{true: "lifetime", false: "monthly"}[lifetime], lifetime)
@@ -203,6 +205,8 @@ func TestIntegrationPurgeUserAccountFullCascade(t *testing.T) {
 
 	// Every user-owned row is gone.
 	for _, q := range []struct{ name, sql string }{
+		{"product_analytics_enrollments", `SELECT count(*) FROM product_analytics_enrollments WHERE logto_sub = $1`},
+		{"product_activity_daily", `SELECT count(*) FROM product_activity_daily WHERE logto_sub = $1`},
 		{"user_widgets", `SELECT count(*) FROM user_widgets WHERE logto_sub = $1`},
 		{"user_preferences", `SELECT count(*) FROM user_preferences WHERE logto_sub = $1`},
 		{"stripe_customers", `SELECT count(*) FROM stripe_customers WHERE logto_sub = $1`},

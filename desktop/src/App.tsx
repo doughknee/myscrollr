@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTauriListener } from "./hooks/useTauriListener";
 import { useDashboardCDC } from "./hooks/useDashboardCDC";
 import { useSharedSSE } from "./hooks/useSharedSSE";
+import { useProductActivity } from "./hooks/useProductActivity";
 import { isPrimaryTicker } from "./lib/windowRole";
 import { Menu, Submenu, CheckMenuItem, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { dashboardQueryOptions, queryKeys } from "./api/queries";
@@ -39,7 +40,7 @@ import {
   } from "./preferences";
 import type { SubscriptionTier } from "./auth";
 import type { AppPreferences, TickerPosition } from "./preferences";
-import { getCatalogItems, sourceForWidget } from "./marketplace";
+import { catalogItemById, getCatalogItems, sourceForWidget } from "./marketplace";
 import { getAllWidgets } from "./widgets/registry";
 import { useWidgetTickerData } from "./hooks/useWidgetTickerData";
 import { useTheme } from "./hooks/useTheme";
@@ -185,6 +186,21 @@ export default function App() {
   }, [prefs.privacy.sendCrashReports]);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
+
+  const measuredWidgetIds = useMemo(
+    () => [...new Set([...widgetTabs, ...prefs.widgets.widgetsOnTicker.filter((id) => prefs.widgets.enabledWidgets.includes(id))])],
+    [prefs.widgets.enabledWidgets, prefs.widgets.widgetsOnTicker, widgetTabs],
+  );
+  const resolveMeasuredCategory = useCallback(
+    (id: string) => catalogItemById(id)?.category ?? sourceForWidget(id),
+    [catalogVersion],
+  );
+  useProductActivity({
+    authenticated,
+    optedIn: prefs.privacy.shareProductAnalytics,
+    widgetIds: measuredWidgetIds,
+    resolveCategory: resolveMeasuredCategory,
+  });
 
   // Delivery mode. The SSE connection is process-wide and this component
   // renders once per ticker window, so the hook elects a single owner and

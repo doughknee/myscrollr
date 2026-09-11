@@ -241,6 +241,7 @@ func (s *Server) setupRoutes() {
 	s.App.Get("/admin/me", platform.LogtoAuth, admin.RequireAdmin, admin.HandleWhoAmI)
 	s.App.Get("/admin/overview", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetOverview)
 	s.App.Get("/admin/analytics", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetAnalytics)
+	s.App.Get("/admin/product-analytics", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetProductAnalytics)
 	s.App.Get("/admin/accounts", platform.LogtoAuth, admin.RequireAdmin, admin.HandleListAccounts)
 	s.App.Get("/admin/accounts/:sub", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetAccount)
 	// Version adoption, platform mix and error rate by version, all read from
@@ -333,6 +334,9 @@ func (s *Server) setupRoutes() {
 	// User Routes — specific /users/me/* paths BEFORE parameterized /users/:username
 	s.App.Get("/users/me/preferences", platform.LogtoAuth, accounts.HandleGetPreferences)
 	s.App.Put("/users/me/preferences", platform.LogtoAuth, accounts.HandleUpdatePreferences)
+	s.App.Get("/users/me/product-analytics", platform.LogtoAuth, accounts.HandleGetProductAnalyticsConsent)
+	s.App.Put("/users/me/product-analytics", platform.LogtoAuth, accounts.HandleSetProductAnalyticsConsent)
+	s.App.Post("/users/me/product-activity", platform.LogtoAuth, accounts.HandleRecordProductActivity)
 	// Widget CRUD. The /users/me/channels aliases were deleted with the wire
 	// rename (VISION §4.4) — one name, no compat seam.
 	s.App.Get("/users/me/widgets", platform.LogtoAuth, widgets.GetWidgets)

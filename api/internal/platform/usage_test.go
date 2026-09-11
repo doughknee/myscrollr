@@ -244,3 +244,14 @@ func TestFlushUsageWithoutDB(t *testing.T) {
 		t.Errorf("buffer still holds %d keys after flush, want 0", n)
 	}
 }
+
+func TestUsagePruneFailureDoesNotSkipProductActivityPrune(t *testing.T) {
+	productPruned := false
+	runUsagePrunes(
+		func() (int64, error) { return 0, fmt.Errorf("usage table unavailable") },
+		func() { productPruned = true },
+	)
+	if !productPruned {
+		t.Fatal("product activity prune was skipped after API usage prune failed")
+	}
+}

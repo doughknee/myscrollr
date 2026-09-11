@@ -663,8 +663,10 @@ describe("window.tickerMonitors (REL-200)", () => {
 describe("privacy.sendCrashReports (REL-209)", () => {
   it("defaults to on — fresh install and pre-REL-209 blob alike", () => {
     expect(loadPrefs().privacy.sendCrashReports).toBe(true);
+    expect(loadPrefs().privacy.shareProductAnalytics).toBe(false);
     storeValues.set("scrollr:settings", { appearance: {}, startup: {} });
     expect(loadPrefs().privacy.sendCrashReports).toBe(true);
+    expect(loadPrefs().privacy.shareProductAnalytics).toBe(false);
   });
 
   it("only a literal false turns it off; reset turns it back on", () => {
@@ -685,6 +687,7 @@ describe("privacy.sendCrashReports (REL-209)", () => {
       privacy: { sendCrashReports: false },
     });
     expect(resetAll().privacy.sendCrashReports).toBe(true);
+    expect(resetAll().privacy.shareProductAnalytics).toBe(false);
     expect(loadPrefs().privacy.sendCrashReports).toBe(true);
   });
 });
