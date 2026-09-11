@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { FALLBACK_RELEASES_URL, getDownloadInfo } from './getDownloadInfo'
+import {
+  FALLBACK_RELEASES_URL,
+  getDownloadInfo,
+  triggerDownload,
+} from './getDownloadInfo'
+import { captureWebsiteEvent } from './posthog'
+
+vi.mock('./posthog', () => ({ captureWebsiteEvent: vi.fn() }))
 
 // latestVersion.generated.ts is written at build time by
 // scripts/fetch-latest-version.mjs and is gitignored — mock it so tests
@@ -18,6 +25,28 @@ const RELEASE_BASE =
   'https://github.com/doughknee/myscrollr/releases/download/desktop-v1.2.3'
 
 describe('getDownloadInfo', () => {
+  it('records one download selection through the shared helper without blocking downloads on analytics failure', () => {
+    const location = { href: '' }
+    vi.stubGlobal('window', { location })
+    try {
+      vi.mocked(captureWebsiteEvent).mockClear()
+      triggerDownload('windows')
+      expect(captureWebsiteEvent).toHaveBeenCalledExactlyOnceWith(
+        'download_selected',
+        { platform: 'windows' },
+      )
+      expect(location.href).toBe(`${RELEASE_BASE}/Scrollr_1.2.3_x64-setup.exe`)
+
+      vi.mocked(captureWebsiteEvent).mockImplementationOnce(() => {
+        throw new Error('Storage unavailable')
+      })
+      expect(() => triggerDownload('macos')).not.toThrow()
+      expect(location.href).toBe(`${RELEASE_BASE}/Scrollr_1.2.3_aarch64.dmg`)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('resolves the macOS DMG (Apple Silicon naming)', () => {
     expect(getDownloadInfo('macos')).toEqual({
       version: '1.2.3',

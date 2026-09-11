@@ -32,6 +32,7 @@ import {
   DESKTOP_ASSET_SIZES,
   LATEST_DESKTOP_VERSION,
 } from './latestVersion.generated'
+import { captureWebsiteEvent } from './posthog'
 
 const REPO_URL = 'https://github.com/doughknee/myscrollr'
 export const FALLBACK_RELEASES_URL = `${REPO_URL}/releases/latest`
@@ -110,6 +111,11 @@ export function triggerDownload(
   linuxFormat: LinuxFormat = LINUX_DEFAULT,
 ): DownloadInfo {
   const info = getDownloadInfo(platform, linuxFormat)
+  try {
+    captureWebsiteEvent('download_selected', { platform })
+  } catch {
+    // Analytics must never prevent an installer download.
+  }
   // `window.location.href = url` triggers a same-tab navigation that
   // the browser recognizes as a download because the URL serves
   // content with `Content-Disposition: attachment`. Using location
