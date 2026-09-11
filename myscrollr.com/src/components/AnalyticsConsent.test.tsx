@@ -11,6 +11,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 
 describe('AnalyticsConsent', () => {
   afterEach(() => {
+    localStorage.clear()
     setWebsiteAnalyticsPolicy('unknown')
     vi.unstubAllGlobals()
   })
@@ -29,24 +30,35 @@ describe('AnalyticsConsent', () => {
     expect(html).not.toContain('role="dialog"')
   })
 
-  it('honors a browser privacy signal and disables manual opt-in', async () => {
+  it('allows an explicit choice with browser signals in consent-required regions', async () => {
     setWebsiteAnalyticsPolicy('consent-required')
-    vi.stubGlobal('navigator', { globalPrivacyControl: true })
-    expect(renderToStaticMarkup(<AnalyticsConsent />)).toBe('')
+    vi.stubGlobal('navigator', { globalPrivacyControl: true, doNotTrack: '1' })
 
     const container = document.createElement('div')
     const root = createRoot(container)
     await act(() => root.render(<AnalyticsConsent />))
+    const allow = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Allow',
+    )!
+    expect(allow).toBeDefined()
+    expect(allow.disabled).toBe(false)
+    expect(localStorage.getItem('scrollr-analytics-consent-v1')).toBeNull()
+    await act(() => allow.click())
+    expect(localStorage.getItem('scrollr-analytics-consent-v1')).toBe('enabled')
+    expect(container.textContent).toBe('')
+
     await act(() =>
       window.dispatchEvent(new CustomEvent('scrollr:manage-analytics')),
     )
-
-    expect(container.textContent).toContain(
-      'Your browser privacy signal keeps analytics off.',
+    const decline = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Decline',
+    )!
+    await act(() => decline.click())
+    await act(() => setWebsiteAnalyticsPolicy('default-on'))
+    expect(localStorage.getItem('scrollr-analytics-consent-v1')).toBe(
+      'declined',
     )
-    expect(container.innerHTML).toMatch(
-      /<button[^>]*disabled=""[^>]*>Allow<\/button>/,
-    )
+    expect(container.textContent).toBe('')
     await act(() => root.unmount())
   })
 

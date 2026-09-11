@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   getWebsiteAnalyticsDecision,
   getWebsiteAnalyticsPolicy,
-  hasWebsiteAnalyticsOptOutSignal,
   setWebsiteAnalyticsDecision,
 } from '@/lib/posthog'
 
@@ -42,9 +41,8 @@ export default function AnalyticsConsent() {
     setManaging(false)
   }
 
-  const browserOptedOut = hasWebsiteAnalyticsOptOutSignal()
   const buttonClass =
-    'rounded-lg border border-base-300 px-4 py-2 text-sm font-semibold hover:bg-base-200 disabled:cursor-not-allowed disabled:opacity-50'
+    'rounded-lg border border-base-300 px-4 py-2 text-sm font-semibold hover:bg-base-200'
 
   return (
     <section
@@ -62,11 +60,6 @@ export default function AnalyticsConsent() {
         </a>
         .
       </p>
-      {browserOptedOut && (
-        <p className="mt-1 text-xs text-base-content/65">
-          Your browser privacy signal keeps analytics off.
-        </p>
-      )}
       <div className="mt-4 grid grid-cols-2 gap-3">
         <button
           type="button"
@@ -78,7 +71,6 @@ export default function AnalyticsConsent() {
         <button
           type="button"
           className={buttonClass}
-          disabled={browserOptedOut}
           onClick={() => choose('enabled')}
         >
           Allow

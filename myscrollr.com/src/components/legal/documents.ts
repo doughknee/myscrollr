@@ -170,6 +170,7 @@ export const LEGAL_DOCUMENTS: Array<LegalDocument> = [
         content: [
           'We use your information to provide and operate the Platform, including delivering real-time data to your desktop application and web dashboard, synchronizing your preferences across devices, and maintaining your third-party account connections.',
           'We do not sell, rent, or share your personal information with third parties for marketing purposes. We do not serve advertisements.',
+          'Browser privacy signals: Scrollr does not sell personal information or share it for cross-context behavioral advertising, including when Global Privacy Control (GPC) is enabled. GPC and Do Not Track do not automatically disable our limited product analytics, which PostHog processes on our behalf under a data processing agreement. The regional consent rules above still apply, and you can always decline through Analytics settings in the footer.',
         ],
       },
       {
