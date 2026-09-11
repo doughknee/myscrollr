@@ -4,9 +4,9 @@
 
 This is the authoritative product reference for support replies. Anything stated here is ground truth; the Policies section says what may and may not be repeated to a user.
 
-Current desktop version: **1.6.4**.
+Current desktop version: **1.6.5**.
 
-<!-- source: desktop/package.json @ c8be19c4e544 -->
+<!-- source: desktop/package.json @ d31c0fdb0783 -->
 
 ## Policies
 
@@ -566,7 +566,7 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Release history
 
-<!-- source: docs/ROADMAP.md @ 94e42b073db2 -->
+<!-- source: docs/ROADMAP.md @ 88b41ac3a60c -->
 | Version | Codename | Theme | Size |
 |---|---|---|---|
 | v1.1.1 | Paper Cuts | ✅ **Shipped 2026-07-02** — grew into the catalog redesign (absorbed half of The Library) | S→M |
@@ -591,7 +591,7 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 | v1.6.1 | Under your eyes | ✅ **Shipped 2026-09-07** — a chip on the bar keeps what it is showing until it has scrolled off screen; a data refresh no longer swaps the game you are reading for another one. Baseball innings read "8th" and "10th" rather than the raw feed code, finals read "Final" in every sport, a postponed game reads "PPD". Server side, fourteen more leagues in the catalog and a sports feed that polls every 15 s without stalling on games that already ended | S |
 | v1.6.2 | Pin what matters | ✅ **Shipped 2026-09-08** — a pin is one chip that stays put: pin a team, a symbol, a feed, a market or a clock and the fixed zone shows its current chip, up to two, never rotating and never doubled on the tape; new widgets no longer pin themselves to the corner; the pin control moved off the moving chip to right-click, the widget page and the sidebar. With several monitors selected the app keeps one live connection instead of one per bar, so "Live updates paused" stops appearing and the tray toggle works with two bars. A session that has died now says so and one click signs you back in, instead of every change failing until a reinstall | S |
 | v1.6.3 | The whole matchday | ✅ **Shipped 2026-09-08** — when a league's next games are further out than a day, the bar used to show exactly one of them, so a full slate of fixtures the next evening looked like a broken ticker. It now shows that whole matchday and takes turns through it. A league whose next fixture really is a lone event, a Formula 1 race for instance, still shows the one chip it always did | S |
-| v1.6.4 | Signed and transparent | ✅ **Shipped 2026-09-10** — Windows downloads identify Scrollr, LLC as their verified publisher and carry trusted timestamps; product activity measurement is off by default and can be enabled from Data & privacy while signed in | S |
+| v1.6.4 | Signed and transparent | ✅ **Shipped 2026-09-10** — Windows downloads identify Scrollr, LLC as their verified publisher and carry trusted timestamps | S |
 
 ## Recent release notes
 

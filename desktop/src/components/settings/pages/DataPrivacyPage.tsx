@@ -6,7 +6,7 @@
  * gating it behind auth would remove the only way to do that. Export is
  * hidden signed-out because there is no account to export.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 import { exportUserData, setProductAnalyticsConsent } from "../../../api/client";
 import { signalProductAnalyticsConsentMutation } from "../../../lib/productAnalyticsConsent";
@@ -36,6 +36,8 @@ export default function DataPrivacyPage({
   const [confirmResetAll, setConfirmResetAll] = useState(false);
   const [savingAnalytics, setSavingAnalytics] = useState(false);
   const [savingPostHog, setSavingPostHog] = useState(false);
+  const currentPrivacy = useRef(privacy);
+  currentPrivacy.current = privacy;
 
   const handleExport = useCallback(async () => {
     if (exportState === "loading") return;
@@ -93,7 +95,10 @@ export default function DataPrivacyPage({
                   signalProductAnalyticsConsentMutation();
                   try {
                     const saved = await setProductAnalyticsConsent(enabled);
-                    onPrivacyChange({ ...privacy, shareProductAnalytics: saved.enabled });
+                    onPrivacyChange({
+                      ...currentPrivacy.current,
+                      shareProductAnalytics: saved.enabled,
+                    });
                   } catch (err) {
                     toast.error(err instanceof Error ? err.message : "Could not update product activity sharing");
                   } finally {
@@ -118,7 +123,7 @@ export default function DataPrivacyPage({
                       enabled ? "enabled" : "declined",
                     );
                     onPrivacyChange({
-                      ...privacy,
+                      ...currentPrivacy.current,
                       postHogAnalyticsDecision: saved.decision,
                     });
                   } catch (err) {

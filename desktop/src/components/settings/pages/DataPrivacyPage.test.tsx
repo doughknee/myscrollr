@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DataPrivacyPage from "./DataPrivacyPage";
+import type { PrivacyPrefs } from "../../../preferences";
 
 const setConsent = vi.fn();
 const setPostHogConsent = vi.fn();
@@ -90,5 +92,34 @@ describe("DataPrivacyPage product activity consent", () => {
       shareProductAnalytics: false,
       postHogAnalyticsDecision: "enabled",
     });
+  });
+
+  it("preserves a newer crash-report change when PostHog consent finishes", async () => {
+    let resolve!: (value: { decision: "declined" }) => void;
+    setPostHogConsent.mockReturnValue(new Promise((done) => { resolve = done; }));
+
+    function Harness() {
+      const [privacy, setPrivacy] = useState<PrivacyPrefs>({
+        sendCrashReports: true,
+        shareProductAnalytics: false,
+        postHogAnalyticsDecision: "enabled",
+      });
+      return (
+        <DataPrivacyPage
+          authenticated
+          privacy={privacy}
+          onPrivacyChange={setPrivacy}
+          onResetAll={vi.fn()}
+        />
+      );
+    }
+
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("switch", { name: /share app analytics/i }));
+    fireEvent.click(screen.getByRole("switch", { name: /send crash reports/i }));
+    await act(async () => resolve({ decision: "declined" }));
+
+    expect(screen.getByRole("switch", { name: /share app analytics/i })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: /send crash reports/i })).not.toBeChecked();
   });
 });
