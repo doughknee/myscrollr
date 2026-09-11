@@ -63,7 +63,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="desktop-v$(jq -r .version desktop/src-tauri/tauri.conf.json)"
-          IS_DRAFT=$(gh release view "$TAG" --json isDraft --jq .isDraft --repo "$GITHUB_REPOSITORY" 2>/dev/null || echo "missing")
+          set +e
+          RELEASE_LOOKUP=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .draft 2>&1)
+          LOOKUP_EXIT=$?
+          set -e
+          if [ "$LOOKUP_EXIT" -eq 0 ]; then
+            IS_DRAFT="$RELEASE_LOOKUP"
+          elif printf '%s\n' "$RELEASE_LOOKUP" | grep -q 'HTTP 404'; then
+            IS_DRAFT="missing"
+          else
+            echo "::error::Could not verify whether $TAG is already published. Refusing to build."
+            printf '%s\n' "$RELEASE_LOOKUP" >&2
+            exit "$LOOKUP_EXIT"
+          fi
           if [ "$IS_DRAFT" = "false" ]; then
             echo "proceed=false" >> "$GITHUB_OUTPUT"
             echo "::warning::$TAG is already published — skipping the build so its assets are never overwritten. Bump the version in desktop/src-tauri/tauri.conf.json to cut a new release."

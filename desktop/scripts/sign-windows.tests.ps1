@@ -103,6 +103,8 @@ try {
   Assert-True (0 -le $windowsBuildIndex -and $windowsBuildIndex -lt $windowsVerifyIndex -and $windowsVerifyIndex -lt $windowsStageIndex -and $windowsStageIndex -lt $windowsPublishIndex) "Windows must build, verify, stage, then publish in that order"
   Assert-True ($releaseWorkflow.Contains("Re-verify staged Windows bytes")) "staged release bytes must be verified again before GitHub Release upload"
   Assert-True ($releaseWorkflow.Contains('any(.assets[]; .name == "latest.json")')) "a missing updater manifest must be confirmed before initializing one"
+  Assert-True (-not $releaseWorkflow.Contains('|| echo "missing"')) "release lookup failures must not be treated as a missing release"
+  Assert-True ($releaseWorkflow.Contains("grep -q 'HTTP 404'")) "only an explicit 404 may be treated as a missing release"
   Assert-True ($releaseWorkflow.Contains("Failed to download the existing updater manifest.")) "existing updater manifest download failures must stop publishing"
   Assert-True ($releaseWorkflow -match '(?s)fix-appimage-signature:.*?permissions:\s+contents: write') "AppImage signature repair must retain release upload permission"
 
