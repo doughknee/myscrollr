@@ -51,6 +51,7 @@ export default function AdminShell() {
   const { isAuthenticated, isLoading, signIn } = useScrollrAuth()
   const getToken = useGetToken()
   const [gate, setGate] = useState<GateState>({ kind: 'checking' })
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     if (isLoading) return
@@ -59,6 +60,7 @@ export default function AdminShell() {
       return
     }
     let cancelled = false
+    setGate({ kind: 'checking' })
     adminApi
       .me(getToken)
       .then((res) => {
@@ -72,6 +74,10 @@ export default function AdminShell() {
           setGate({ kind: 'denied' })
           return
         }
+        if (err instanceof AdminApiError && err.status === 401) {
+          setGate({ kind: 'signed-out' })
+          return
+        }
         setGate({
           kind: 'error',
           message:
@@ -81,7 +87,7 @@ export default function AdminShell() {
     return () => {
       cancelled = true
     }
-  }, [isAuthenticated, isLoading, getToken])
+  }, [isAuthenticated, isLoading, getToken, attempt])
 
   if (isLoading || gate.kind === 'checking') {
     return (
@@ -137,6 +143,13 @@ export default function AdminShell() {
         <p className="mt-2 max-w-md text-sm text-base-content/60">
           {gate.message}
         </p>
+        <button
+          type="button"
+          onClick={() => setAttempt((value) => value + 1)}
+          className="mt-6 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-content"
+        >
+          Retry access check
+        </button>
       </Centered>
     )
   }

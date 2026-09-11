@@ -99,7 +99,9 @@ export function ScrollrAuthProvider({ children }: { children: ReactNode }) {
 
   const value: ScrollrAuthContextValue = {
     isAuthenticated: logto.isAuthenticated,
-    isLoading: logto.isLoading,
+    // Logto also sets loading during token/claims reads. Those must not
+    // restart signed-in effects or unmount account/admin screens.
+    isLoading: logto.isLoading && !logto.isAuthenticated,
     signIn,
     signOut,
     getAccessToken,
