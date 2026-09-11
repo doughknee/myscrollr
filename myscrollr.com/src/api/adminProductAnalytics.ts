@@ -39,6 +39,8 @@ export interface ProductAnalytics {
   }
   features: Array<{ category: string; accounts: number; share: number }>
   population_note: string
+  recent_presence: number
+  recent_presence_note: string
 }
 
 export function loadProductAnalytics(

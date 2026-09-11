@@ -337,6 +337,10 @@ func (s *Server) setupRoutes() {
 	s.App.Get("/users/me/product-analytics", platform.LogtoAuth, accounts.HandleGetProductAnalyticsConsent)
 	s.App.Put("/users/me/product-analytics", platform.LogtoAuth, accounts.HandleSetProductAnalyticsConsent)
 	s.App.Post("/users/me/product-activity", platform.LogtoAuth, accounts.HandleRecordProductActivity)
+	s.App.Get("/users/me/posthog-analytics", platform.LogtoAuth, accounts.HandleGetPostHogConsent)
+	s.App.Put("/users/me/posthog-analytics", platform.LogtoAuth, accounts.HandleSetPostHogConsent)
+	s.App.Post("/users/me/posthog-event", platform.LogtoAuth, accounts.HandlePostHogDesktopEvent)
+	s.App.Post("/users/me/verify-website-signup", platform.LogtoAuth, accounts.HandleVerifyRecentWebsiteSignup)
 	// Widget CRUD. The /users/me/channels aliases were deleted with the wire
 	// rename (VISION §4.4) — one name, no compat seam.
 	s.App.Get("/users/me/widgets", platform.LogtoAuth, widgets.GetWidgets)

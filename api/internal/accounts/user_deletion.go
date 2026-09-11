@@ -82,6 +82,11 @@ func HandleExportUserData(c *fiber.Ctx) error {
 		})
 	}
 	archive["product_analytics"] = productAnalytics
+	postHogAnalytics, err := loadPostHogAnalyticsExport(ctx, userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Failed to export PostHog analytics"})
+	}
+	archive["posthog_analytics"] = postHogAnalytics
 
 	// widgets
 	if chans, err := platform.GetUserWidgets(userID); err == nil {
@@ -459,6 +464,21 @@ func RunGDPRPurgePass(ctx context.Context) {
 			continue
 		}
 	}
+	if postHogDeletionConfigured() {
+		pending, err := platform.DBPool.Query(ctx, `
+			SELECT logto_sub FROM posthog_analytics_consents
+			WHERE decision = 'declined' AND deletion_status = 'pending'
+			ORDER BY updated_at LIMIT 100`)
+		if err == nil {
+			for pending.Next() {
+				var sub string
+				if pending.Scan(&sub) == nil {
+					requestPostHogDeletion(sub)
+				}
+			}
+			pending.Close()
+		}
+	}
 }
 
 // purgeUserAccount executes the full cascade for one user, in order:
@@ -549,6 +569,20 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 	); err != nil {
 		return fmt.Errorf("delete product analytics: %w", err)
 	}
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM posthog_analytics_events WHERE logto_sub = $1`, logtoSub,
+	); err != nil {
+		return fmt.Errorf("delete PostHog analytics export mirror: %w", err)
+	}
+	deletionStatus := "pending"
+	if _, err := tx.Exec(ctx, `
+			INSERT INTO posthog_analytics_consents (logto_sub, decision, deletion_status)
+			VALUES ($1, 'declined', $2)
+			ON CONFLICT (logto_sub) DO UPDATE
+			SET decision = 'declined', deletion_status = EXCLUDED.deletion_status,
+			    decided_at = NOW(), updated_at = NOW()`, logtoSub, deletionStatus); err != nil {
+		return fmt.Errorf("disable PostHog analytics: %w", err)
+	}
 
 	// Preferences (must come after anything that might reference them).
 	if _, err := tx.Exec(ctx,
@@ -573,6 +607,10 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 	// User row is gone; drop any cached overview so a stale background
 	// poll doesn't briefly return data for a purged account.
 	platform.InvalidateOverviewCache(ctx, logtoSub)
+	removeRecentPresence(logtoSub)
+	if deletionStatus == "pending" && postHogDeletionConfigured() {
+		go requestPostHogDeletion(logtoSub)
+	}
 
 	log.Printf("[GDPR Purge] Completed purge for %s", logtoSub)
 	return nil

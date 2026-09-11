@@ -12,7 +12,9 @@ import type { ReactNode } from 'react'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import DemoTickerBar from '@/components/DemoTickerBar'
+import AnalyticsConsent from '@/components/AnalyticsConsent'
 import { useDemoTicker } from '@/hooks/useDemoTicker'
+import { captureWebsitePageview } from '@/lib/posthog'
 import appCss from '@/styles.css?url'
 
 const themeScript = `;(function () {
@@ -168,6 +170,10 @@ function RootLayout() {
   const mainRef = useRef<HTMLElement>(null)
   const isFirstRender = useRef(true)
 
+  useEffect(() => {
+    captureWebsitePageview(pathname)
+  }, [pathname])
+
   // Move focus to <main> on route change (skip the initial load)
   useEffect(() => {
     if (isFirstRender.current) {
@@ -244,6 +250,7 @@ function RootLayout() {
 
           {/* Footer */}
           <Footer />
+          <AnalyticsConsent />
 
           {/* Persistent demo ticker bar — the brand's connective tissue.
               /business mounts its own white-label variant instead. */}

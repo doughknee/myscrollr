@@ -44,9 +44,9 @@ const FAQ_ITEMS: Array<FAQItem> = [
   {
     icon: ShieldCheck,
     question: 'Is my data private?',
-    highlight: 'No ads, no tracking pixels, no third-party analytics.',
+    highlight: 'No ads, tracking pixels, or data sales.',
     answer:
-      'No ads, no tracking pixels, no third-party analytics. Your widget setup syncs to your account so it follows you between machines. We count app versions and error rates to find bugs, and crash reports are stripped of personal data before they are sent, which tests enforce on every deploy.',
+      'No ads, tracking pixels, or data sales. Analytics use only broad content-free events and are easy to control; the website asks first. Your widget setup still syncs to your account so it follows you between machines.',
     accent: 'sky',
   },
   {

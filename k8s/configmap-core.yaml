@@ -182,6 +182,13 @@ data:
   # /resume <category>.
   SUPPORT_DEMOTE_THRESHOLD: "0.30"
 
+  # Privacy-bounded product analytics. Credentials and the account-ID salt
+  # come from scrollr-secrets; capture fails closed until all are present.
+  POSTHOG_CAPTURE_ENABLED: "true"
+  POSTHOG_HOST: "https://us.i.posthog.com"
+  POSTHOG_API_HOST: "https://us.posthog.com"
+  POSTHOG_PROJECT_ID: "603918"
+
   # Who an escalation pings, in Discord mention form. Empty posts the
   # escalation without a ping. This is the guild owner (brandon.harris).
   SUPPORT_ESCALATE_MENTION: "<@297795474868535298>"

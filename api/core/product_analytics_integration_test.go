@@ -42,6 +42,26 @@ func TestIntegrationProductAnalyticsSchemaAndCascade(t *testing.T) {
 	}
 }
 
+func TestIntegrationPostHogConsentDefaultsUnknown(t *testing.T) {
+	setupIntegrationDB(t)
+	const sub = "posthog_consent_schema_user"
+
+	testsupport.MustExec(t, `
+		INSERT INTO posthog_analytics_consents (logto_sub, decision)
+		VALUES ($1, 'declined')`, sub)
+
+	var decision, deletionStatus string
+	if err := platform.DBPool.QueryRow(context.Background(), `
+		SELECT decision, deletion_status
+		  FROM posthog_analytics_consents WHERE logto_sub = $1`, sub).
+		Scan(&decision, &deletionStatus); err != nil {
+		t.Fatal(err)
+	}
+	if decision != "declined" || deletionStatus != "not_requested" {
+		t.Fatalf("consent row = %q/%q", decision, deletionStatus)
+	}
+}
+
 func TestIntegrationProductActivityPrunesOnlyExpiredFacts(t *testing.T) {
 	setupIntegrationDB(t)
 	const sub = "analytics_prune_user"

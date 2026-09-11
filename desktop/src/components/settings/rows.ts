@@ -236,6 +236,13 @@ export const SETTINGS_ROWS = {
       keywords: "analytics activity privacy opt in usage retention",
       when: "signedIn",
     },
+    postHogAnalytics: {
+      label: "Share app analytics",
+      description:
+        "Share app opens, active days, and broad feature categories with PostHog. On by default; turn it off anytime. Never includes ticker contents, symbols, teams, or feeds.",
+      keywords: "posthog analytics privacy consent app opens features",
+      when: "signedIn",
+    },
     resetAll: {
       label: "Reset all settings",
       description:

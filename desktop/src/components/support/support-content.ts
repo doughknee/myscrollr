@@ -21,7 +21,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Is my data private?",
     answer:
-      "No ads, no tracking pixels, no third-party analytics. Your widget setup syncs to your account so it follows you between machines, and Scrollr's servers hold your account profile and subscription status. We also count app versions and error rates so we can find bugs without waiting for someone to report them.",
+      "No ads or data sales. Product activity stays off until you enable it; limited PostHog app analytics are on by default and easy to turn off. Both exclude ticker contents. Your widget setup still syncs to your account so it follows you between machines.",
   },
   {
     question: "What platforms are supported?",

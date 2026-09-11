@@ -327,8 +327,8 @@ export function TrustSection() {
             Transparent by <span className="text-gradient-primary">Design</span>
           </h2>
           <p className="text-base text-base-content/45 leading-relaxed max-w-lg">
-            Open source, zero analytics, no accounts. Your device, your data —
-            we never see it.
+            Open source, no ads or data sales. Analytics are limited, explained,
+            and easy to control.
           </p>
         </motion.div>
 
