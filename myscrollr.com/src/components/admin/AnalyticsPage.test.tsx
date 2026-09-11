@@ -189,10 +189,19 @@ describe('AnalyticsPage', () => {
             note: 'Collecting history.',
           },
         },
-        features: [],
+        features: [
+          'sports',
+          'markets',
+          'news',
+          'fantasy',
+          'predictions',
+          'utilities',
+        ].map((category) => ({ category, accounts: 0, share: 0 })),
       },
     })
     expect(html).toContain('No participating accounts yet.')
+    expect(html).toContain('No measured feature use in this window.')
+    expect(html).not.toContain('Sports</span>')
     expect(html.match(/Collecting history\./g)).toHaveLength(3)
   })
 

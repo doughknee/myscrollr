@@ -382,6 +382,7 @@ export function AnalyticsContent({
   const eventTotal = signup
     ? Object.values(signup.stages).reduce((sum, stage) => sum + stage.events, 0)
     : 0
+  const hasFeatureUse = product?.features.some((feature) => feature.accounts > 0)
 
   return (
     <div className="space-y-8">
@@ -629,12 +630,12 @@ export function AnalyticsContent({
         {productError && !product && (
           <ErrorPanel message={productError} onRetry={onRetryProduct} />
         )}
-        {product && product.features.length === 0 && (
+        {product && !hasFeatureUse && (
           <p className="rounded-xl p-4 text-sm text-base-content/65 ring-1 ring-base-300/60">
             No measured feature use in this window.
           </p>
         )}
-        {product && product.features.length > 0 && (
+        {product && hasFeatureUse && (
           <div className="rounded-xl bg-base-200/40 p-4 ring-1 ring-base-300/60 sm:p-5">
             <ul className="space-y-4">
               {product.features.map((feature) => (
