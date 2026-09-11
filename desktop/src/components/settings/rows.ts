@@ -229,18 +229,11 @@ export const SETTINGS_ROWS = {
         "When something breaks, send the error, stack trace, app version and OS to Sentry. Never your account, IP address or file paths.",
       keywords: "sentry telemetry privacy error diagnostics",
     },
-    productAnalytics: {
-      label: "Share product activity",
-      description:
-        "Help improve Scrollr by counting days your visible ticker runs for at least 30 seconds and which broad widget categories were enabled. Signed-in accounts only; retained for 90 days.",
-      keywords: "analytics activity privacy opt in usage retention",
-      when: "signedIn",
-    },
     postHogAnalytics: {
-      label: "Share app analytics",
+      label: "Share usage analytics",
       description:
-        "Share app opens, active days, and broad feature categories with PostHog. On by default; turn it off anytime. Never includes ticker contents, symbols, teams, or feeds.",
-      keywords: "posthog analytics privacy consent app opens features",
+        "Help improve Scrollr with app usage and broad feature categories, measured by Scrollr and PostHog. On by default; turn off anytime. Never includes ticker contents, symbols, teams, or feeds.",
+      keywords: "posthog analytics activity privacy consent app opens features usage retention",
       when: "signedIn",
     },
     resetAll: {

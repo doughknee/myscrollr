@@ -223,6 +223,8 @@ export default function SettingsSurface({
               {page === "data" && (
                 <DataPrivacyPage
                   authenticated={shell.authenticated}
+                  analyticsStatus={shell.analyticsStatus}
+                  onRetryAnalytics={shell.onRetryAnalytics}
                   privacy={prefs.privacy}
                   onPrivacyChange={(privacy) =>
                     onPrefsChange({ ...prefs, privacy })

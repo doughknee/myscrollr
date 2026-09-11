@@ -25,6 +25,8 @@ export interface ShellState {
   prefs: AppPreferences;
   onPrefsChange: (prefs: AppPreferences) => void;
   authenticated: boolean;
+  analyticsStatus?: "loading" | "ready" | "error";
+  onRetryAnalytics?: () => void;
   tier: SubscriptionTier;
   subscriptionInfo: SubscriptionInfo | null;
   onLogin: () => void;

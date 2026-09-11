@@ -8,7 +8,7 @@
  */
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
-import { exportUserData, setProductAnalyticsConsent } from "../../../api/client";
+import { exportUserData, setPostHogAnalyticsConsent } from "../../../api/client";
 import { signalProductAnalyticsConsentMutation } from "../../../lib/productAnalyticsConsent";
 import { ActionRow, RowList, SettingsGroup, ToggleRow } from "../SettingsControls";
 import ConfirmDialog from "../../ConfirmDialog";
@@ -17,13 +17,14 @@ import { SETTINGS_ROWS } from "../rows";
 
 const R = SETTINGS_ROWS.data;
 import type { PrivacyPrefs } from "../../../preferences";
-import { setPostHogAnalyticsConsent } from "../../../api/client";
 
 interface DataPrivacyPageProps {
   authenticated: boolean;
   privacy: PrivacyPrefs;
   onPrivacyChange: (privacy: PrivacyPrefs) => void;
   onResetAll: () => void;
+  analyticsStatus?: "loading" | "ready" | "error";
+  onRetryAnalytics?: () => void;
 }
 
 export default function DataPrivacyPage({
@@ -31,10 +32,11 @@ export default function DataPrivacyPage({
   privacy,
   onPrivacyChange,
   onResetAll,
+  analyticsStatus = "ready",
+  onRetryAnalytics,
 }: DataPrivacyPageProps) {
   const [exportState, setExportState] = useState<"idle" | "loading">("idle");
   const [confirmResetAll, setConfirmResetAll] = useState(false);
-  const [savingAnalytics, setSavingAnalytics] = useState(false);
   const [savingPostHog, setSavingPostHog] = useState(false);
   const currentPrivacy = useRef(privacy);
   currentPrivacy.current = privacy;
@@ -83,33 +85,16 @@ export default function DataPrivacyPage({
       <SettingsGroup>
         <RowList>
           {authenticated && (
-            <Row id="productAnalytics">
-              <ToggleRow
-                label={R.productAnalytics.label}
-                description={R.productAnalytics.description}
-                checked={privacy.shareProductAnalytics}
-                disabled={savingAnalytics}
-                onChange={async (enabled) => {
-                  if (savingAnalytics) return;
-                  setSavingAnalytics(true);
-                  signalProductAnalyticsConsentMutation();
-                  try {
-                    const saved = await setProductAnalyticsConsent(enabled);
-                    onPrivacyChange({
-                      ...currentPrivacy.current,
-                      shareProductAnalytics: saved.enabled,
-                    });
-                  } catch (err) {
-                    toast.error(err instanceof Error ? err.message : "Could not update product activity sharing");
-                  } finally {
-                    setSavingAnalytics(false);
-                  }
-                }}
-              />
-            </Row>
-          )}
-          {authenticated && (
             <Row id="postHogAnalytics">
+              {analyticsStatus !== "ready" || privacy.postHogAnalyticsDecision === "unknown" ? (
+                <ActionRow
+                  label={R.postHogAnalytics.label}
+                  description={analyticsStatus === "error" ? "Could not check your analytics setting. Collection is paused until it can be confirmed." : "Checking your analytics setting…"}
+                  action={analyticsStatus === "error" ? "Retry" : "Checking…"}
+                  muted={analyticsStatus !== "error"}
+                  onClick={() => onRetryAnalytics?.()}
+                />
+              ) : (
               <ToggleRow
                 label={R.postHogAnalytics.label}
                 description={R.postHogAnalytics.description}
@@ -118,25 +103,28 @@ export default function DataPrivacyPage({
                 onChange={async (enabled) => {
                   if (savingPostHog) return;
                   setSavingPostHog(true);
+                  signalProductAnalyticsConsentMutation();
                   try {
                     const saved = await setPostHogAnalyticsConsent(
                       enabled ? "enabled" : "declined",
                     );
                     onPrivacyChange({
                       ...currentPrivacy.current,
+                      shareProductAnalytics: saved.decision === "enabled",
                       postHogAnalyticsDecision: saved.decision,
                     });
                   } catch (err) {
                     toast.error(
                       err instanceof Error
                         ? err.message
-                        : "Could not update anonymous app analytics",
+                        : "Could not update usage analytics",
                     );
                   } finally {
                     setSavingPostHog(false);
                   }
                 }}
               />
+              )}
             </Row>
           )}
           <Row id="crashReports">

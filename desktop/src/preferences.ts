@@ -207,9 +207,9 @@ export interface PrivacyPrefs {
    * Defaults to true. See sentry.tsx / lib.rs `set_crash_reports`.
    */
   sendCrashReports: boolean;
-  /** Explicit account-level opt-in, mirrored locally after server confirmation. */
+  /** Compatibility mirror of the unified account-level analytics setting. */
   shareProductAnalytics: boolean;
-  /** Separate decision for third-party PostHog analytics. */
+  /** Unified usage decision; unknown pauses collection until the server resolves it. */
   postHogAnalyticsDecision: "unknown" | "enabled" | "declined";
 }
 
@@ -1249,13 +1249,14 @@ export function resetTickerPage(prefs: AppPreferences): AppPreferences {
   };
 }
 
-/** Reset everything to defaults. */
+/** Reset local settings; the server-owned account analytics choice survives. */
 export function resetAll(): AppPreferences {
+  const { postHogAnalyticsDecision, shareProductAnalytics } = loadPrefs().privacy;
   const defaults: AppPreferences = {
     appearance: { ...DEFAULT_APPEARANCE },
     ticker: { ...DEFAULT_TICKER },
     startup: { ...DEFAULT_STARTUP },
-    privacy: { ...DEFAULT_PRIVACY },
+    privacy: { ...DEFAULT_PRIVACY, postHogAnalyticsDecision, shareProductAnalytics },
     window: { ...DEFAULT_WINDOW },
     widgets: { ...DEFAULT_WIDGETS },
     widgetDisplay: { ...DEFAULT_WIDGET_DISPLAY },

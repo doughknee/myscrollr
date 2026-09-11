@@ -12,7 +12,10 @@ Production capture requires the Scrollr project key, HTTPS ingest host,
 non-rotating `POSTHOG_DISTINCT_ID_SALT`, and `POSTHOG_CAPTURE_ENABLED=true`.
 Deletion also requires the project ID, HTTPS management host, and a
 least-privilege personal API key with person deletion access. Staff and test
-accounts belong in `POSTHOG_EXCLUDED_LOGTO_SUBS` and never emit events.
+accounts belong in `POSTHOG_EXCLUDED_LOGTO_SUBS`. Their desktop events carry
+`is_internal: true` for verification and are excluded by the PostHog test-account
+filter and Scrollr's recent customer-presence count. Identified staff/test website
+sessions remain suppressed.
 
 The API image contains DB-IP Country Lite under its CC BY 4.0 license. Update
 `DBIP_COUNTRY_RELEASE` and `DBIP_COUNTRY_SHA256` in `api/Dockerfile` together
@@ -47,7 +50,10 @@ when Logto confirms a website account created in the prior 15 minutes.
 Desktop events are `desktop_app_opened`, `desktop_app_running`, and
 `desktop_feature_configured`. Feature values are limited to sports, markets,
 news, fantasy, predictions, and utilities. `desktop_presence` updates a
-15-minute Redis presence window and is never sent to PostHog. All desktop
+15-minute Redis presence window and resolves to the day's `desktop_app_running`
+event, so apps left running overnight count on each UTC day. Successful events
+are sent only once per account/event/category/day; failed deliveries remain
+retryable in the export mirror. All desktop
 events use the same server HMAC pseudonym family as identified website events.
 
 Every transport explicitly nulls IP collection and disables GeoIP. No email,
@@ -62,6 +68,14 @@ ticker activation and retention; PostHog is for visitor, signup, download, and
 directional product funnels.
 
 ## Opt-out and deletion
+
+The desktop's single **Share usage analytics** control governs both the
+first-party daily facts and PostHog events. Both enrollment changes commit in
+one transaction. Old clients' product-analytics writes use the same decision;
+an explicit decline survives an upgrade. Historical absence of an old opt-in
+row cannot distinguish never-enabled from previously-disabled accounts; only
+durable recorded decisions can be preserved. Loading/error is shown separately
+from off, with a retry action. Crash reports retain their independent switch.
 
 Website decline stops capture immediately and clears the local PostHog
 identity. Desktop decline is written server-side before any vendor deletion
