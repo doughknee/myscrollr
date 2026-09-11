@@ -54,3 +54,7 @@ jobs:
       - run: npm ci
 
       - run: npm test
+
+      - name: Verify website event proxy
+        if: matrix.dir == 'myscrollr.com'
+        run: node scripts/test-posthog-proxy.mjs

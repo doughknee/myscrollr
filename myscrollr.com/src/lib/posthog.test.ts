@@ -62,7 +62,6 @@ describe('website PostHog privacy boundary', () => {
     sdk.get_distinct_id.mockReturnValue('anonymous-id')
     vi.stubEnv('PROD', true)
     vi.stubEnv('VITE_POSTHOG_KEY', 'test-key')
-    vi.stubEnv('VITE_POSTHOG_HOST', 'https://example.test')
     window.location.pathname = '/'
     browserPrivacy.doNotTrack = null
     delete browserPrivacy.globalPrivacyControl
@@ -77,6 +76,8 @@ describe('website PostHog privacy boundary', () => {
     expect(sdk.init).toHaveBeenCalledWith(
       'test-key',
       expect.objectContaining({
+        api_host: '/ingest',
+        ui_host: 'https://us.posthog.com',
         advanced_disable_flags: true,
         opt_out_capturing_by_default: true,
         opt_out_persistence_by_default: true,
