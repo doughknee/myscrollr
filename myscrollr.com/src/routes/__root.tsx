@@ -241,11 +241,11 @@ function RootLayout() {
           {/* Navigation */}
           <Header hasBar={hasAnyBar} />
 
-          {/* Main Content */}
+          {/* Reserve the viewport below the 60px header, even while Outlet is empty. */}
           <main
             ref={mainRef}
             id="main-content"
-            className="relative"
+            className="relative min-h-[calc(100dvh-60px)]"
             tabIndex={-1}
           >
             <Outlet />

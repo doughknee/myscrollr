@@ -187,6 +187,27 @@ let failures = 0
 
 try {
   for (const viewport of VIEWPORTS) {
+    // Before route JavaScript arrives, the shared shell must reserve the
+    // content area instead of pulling the footer up beneath the header.
+    const pendingContext = await browser.newContext({
+      viewport: { width: viewport.width, height: viewport.height },
+      javaScriptEnabled: false,
+    })
+    const pendingPage = await pendingContext.newPage()
+    await pendingPage.goto(`${baseUrl}/account`)
+    const footerTop = await pendingPage
+      .locator('footer')
+      .evaluate((footer) => footer.getBoundingClientRect().top)
+    if (footerTop < viewport.height - 1) {
+      console.error(
+        `✗ Pending shell @ ${viewport.name}: footer starts at ${footerTop}px, expected at least ${viewport.height}px`,
+      )
+      failures += 1
+    } else {
+      console.log(`✓ Pending shell @ ${viewport.name}: footer below viewport`)
+    }
+    await pendingContext.close()
+
     const context = await browser.newContext({
       viewport: { width: viewport.width, height: viewport.height },
       deviceScaleFactor: 2,
