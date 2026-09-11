@@ -4,9 +4,9 @@
 
 This is the authoritative product reference for support replies. Anything stated here is ground truth; the Policies section says what may and may not be repeated to a user.
 
-Current desktop version: **1.6.3**.
+Current desktop version: **1.6.4**.
 
-<!-- source: desktop/package.json @ e94ad54d5b21 -->
+<!-- source: desktop/package.json @ c8be19c4e544 -->
 
 ## Policies
 
@@ -565,7 +565,7 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Release history
 
-<!-- source: docs/ROADMAP.md @ d0e39ac789d9 -->
+<!-- source: docs/ROADMAP.md @ bbba67413812 -->
 | Version | Codename | Theme | Size |
 |---|---|---|---|
 | v1.1.1 | Paper Cuts | ✅ **Shipped 2026-07-02** — grew into the catalog redesign (absorbed half of The Library) | S→M |

@@ -35,7 +35,7 @@ on:
       - ".github/workflows/desktop-release.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   # tauri-action@v0 still uses Node 20 internally
@@ -63,7 +63,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="desktop-v$(jq -r .version desktop/src-tauri/tauri.conf.json)"
-          IS_DRAFT=$(gh release view "$TAG" --json isDraft --jq .isDraft --repo "$GITHUB_REPOSITORY" 2>/dev/null || echo "missing")
+          set +e
+          RELEASE_LOOKUP=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .draft 2>&1)
+          LOOKUP_EXIT=$?
+          set -e
+          if [ "$LOOKUP_EXIT" -eq 0 ]; then
+            IS_DRAFT="$RELEASE_LOOKUP"
+          elif printf '%s\n' "$RELEASE_LOOKUP" | grep -q 'HTTP 404'; then
+            IS_DRAFT="missing"
+          else
+            echo "::error::Could not verify whether $TAG is already published. Refusing to build."
+            printf '%s\n' "$RELEASE_LOOKUP" >&2
+            exit "$LOOKUP_EXIT"
+          fi
           if [ "$IS_DRAFT" = "false" ]; then
             echo "proceed=false" >> "$GITHUB_OUTPUT"
             echo "::warning::$TAG is already published — skipping the build so its assets are never overwritten. Bump the version in desktop/src-tauri/tauri.conf.json to cut a new release."
@@ -86,19 +98,19 @@ jobs:
           PLATFORM="${{ inputs.platform || 'all' }}"
           case "$PLATFORM" in
             windows)
-              echo 'matrix={"include":[{"platform":"windows-latest","rust_target":"x86_64-pc-windows-msvc"}]}' >> "$GITHUB_OUTPUT"
+              echo 'matrix={"include":[{"platform":"windows-latest","rust_target":"x86_64-pc-windows-msvc","tauri_args":"--config src-tauri/tauri.windows-signing.conf.json"}]}' >> "$GITHUB_OUTPUT"
               echo "has_linux=false" >> "$GITHUB_OUTPUT"
               ;;
             macos)
-              echo 'matrix={"include":[{"platform":"macos-14","rust_target":"aarch64-apple-darwin"}]}' >> "$GITHUB_OUTPUT"
+              echo 'matrix={"include":[{"platform":"macos-14","rust_target":"aarch64-apple-darwin","tauri_args":""}]}' >> "$GITHUB_OUTPUT"
               echo "has_linux=false" >> "$GITHUB_OUTPUT"
               ;;
             linux)
-              echo 'matrix={"include":[{"platform":"ubuntu-22.04","rust_target":"x86_64-unknown-linux-gnu"}]}' >> "$GITHUB_OUTPUT"
+              echo 'matrix={"include":[{"platform":"ubuntu-22.04","rust_target":"x86_64-unknown-linux-gnu","tauri_args":""}]}' >> "$GITHUB_OUTPUT"
               echo "has_linux=true" >> "$GITHUB_OUTPUT"
               ;;
             *)
-              echo 'matrix={"include":[{"platform":"ubuntu-22.04","rust_target":"x86_64-unknown-linux-gnu"},{"platform":"windows-latest","rust_target":"x86_64-pc-windows-msvc"},{"platform":"macos-14","rust_target":"aarch64-apple-darwin"}]}' >> "$GITHUB_OUTPUT"
+              echo 'matrix={"include":[{"platform":"ubuntu-22.04","rust_target":"x86_64-unknown-linux-gnu","tauri_args":""},{"platform":"windows-latest","rust_target":"x86_64-pc-windows-msvc","tauri_args":"--config src-tauri/tauri.windows-signing.conf.json"},{"platform":"macos-14","rust_target":"aarch64-apple-darwin","tauri_args":""}]}' >> "$GITHUB_OUTPUT"
               echo "has_linux=true" >> "$GITHUB_OUTPUT"
               ;;
           esac
@@ -106,7 +118,9 @@ jobs:
   # ── Build ──────────────────────────────────────────────────────
   build:
     needs: [matrix-setup, preflight]
-    if: needs.preflight.outputs.proceed == 'true'
+    if: needs.preflight.outputs.proceed == 'true' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.matrix-setup.outputs.matrix) }}
@@ -180,6 +194,11 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Install pinned Windows signing tools
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: ./scripts/install-windows-signing-tools.ps1
+
       - name: Validate desktop release env
         shell: bash
         env:
@@ -187,6 +206,12 @@ jobs:
           DESKTOP_VITE_AUTH_ENDPOINT: ${{ secrets.DESKTOP_VITE_AUTH_ENDPOINT }}
           DESKTOP_VITE_LOGTO_APP_ID: ${{ secrets.DESKTOP_VITE_LOGTO_APP_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          AZURE_TENANT_ID: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_TENANT_ID || '' }}
+          AZURE_CLIENT_ID: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CLIENT_SECRET || '' }}
+          AZURE_CODE_SIGNING_ACCOUNT_NAME: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CODE_SIGNING_ACCOUNT_NAME || '' }}
+          AZURE_CODE_SIGNING_CERT_PROFILE_NAME: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CODE_SIGNING_CERT_PROFILE_NAME || '' }}
+          AZURE_CODE_SIGNING_ENDPOINT: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CODE_SIGNING_ENDPOINT || '' }}
         run: |
           for var in DESKTOP_VITE_API_URL DESKTOP_VITE_AUTH_ENDPOINT DESKTOP_VITE_LOGTO_APP_ID; do
             value="$(printf '%s' "${!var}" | xargs)"
@@ -202,6 +227,15 @@ jobs:
           if [ -z "$(printf '%s' "$TAURI_SIGNING_PRIVATE_KEY")" ]; then
             echo "Missing required desktop release secret: TAURI_SIGNING_PRIVATE_KEY" >&2
             exit 1
+          fi
+
+          if [ "${{ matrix.platform }}" = "windows-latest" ]; then
+            for var in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_CODE_SIGNING_ACCOUNT_NAME AZURE_CODE_SIGNING_CERT_PROFILE_NAME AZURE_CODE_SIGNING_ENDPOINT; do
+              if [ -z "$(printf '%s' "${!var}" | xargs)" ]; then
+                echo "Missing required Windows signing secret: $var" >&2
+                exit 1
+              fi
+            done
           fi
 
           if [ "$DESKTOP_VITE_AUTH_ENDPOINT" = "your_local_auth_endpoint" ] || [ "$DESKTOP_VITE_LOGTO_APP_ID" = "your_local_or_dev_logto_app_id" ]; then
@@ -281,6 +315,7 @@ jobs:
       # mid-poll on submission 43b5a62e-…. Without the cap, that flake
       # consumed 51 min before tauri-action gave up.
       - name: Build Tauri app
+        if: matrix.platform != 'windows-latest'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -298,6 +333,13 @@ jobs:
           SENTRY_DSN_RUST: ${{ secrets.SENTRY_DSN_DESKTOP_RUST }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          # Azure Artifact Signing (Windows only; ignored on other runners).
+          AZURE_TENANT_ID: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_TENANT_ID || '' }}
+          AZURE_CLIENT_ID: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CLIENT_SECRET || '' }}
+          AZURE_CODE_SIGNING_ACCOUNT_NAME: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CODE_SIGNING_ACCOUNT_NAME || '' }}
+          AZURE_CODE_SIGNING_CERT_PROFILE_NAME: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CODE_SIGNING_CERT_PROFILE_NAME || '' }}
+          AZURE_CODE_SIGNING_ENDPOINT: ${{ matrix.platform == 'windows-latest' && secrets.AZURE_CODE_SIGNING_ENDPOINT || '' }}
           # Apple code-signing (macOS only; ignored on other runners).
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -309,11 +351,53 @@ jobs:
         with:
           projectPath: desktop
           tauriScript: npx tauri
+          args: ${{ matrix.tauri_args }}
           tagName: desktop-v__VERSION__
           releaseName: "Scrollr desktop-v__VERSION__"
           releaseBody: "See the [full changelog](https://github.com/brandon-relentnet/myscrollr/commits/desktop-v__VERSION__) for details."
           releaseDraft: true
           prerelease: false
+
+      - name: Build signed Windows artifacts
+        if: matrix.platform == 'windows-latest'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          VITE_API_URL: ${{ secrets.DESKTOP_VITE_API_URL }}
+          VITE_AUTH_ENDPOINT: ${{ secrets.DESKTOP_VITE_AUTH_ENDPOINT }}
+          VITE_LOGTO_APP_ID: ${{ secrets.DESKTOP_VITE_LOGTO_APP_ID }}
+          VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN_DESKTOP_WEBVIEW }}
+          SENTRY_DSN_RUST: ${{ secrets.SENTRY_DSN_DESKTOP_RUST }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_CODE_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_CODE_SIGNING_ACCOUNT_NAME }}
+          AZURE_CODE_SIGNING_CERT_PROFILE_NAME: ${{ secrets.AZURE_CODE_SIGNING_CERT_PROFILE_NAME }}
+          AZURE_CODE_SIGNING_ENDPOINT: ${{ secrets.AZURE_CODE_SIGNING_ENDPOINT }}
+        run: |
+          npx tauri build --config src-tauri/tauri.windows-signing.conf.json
+          ./scripts/sign-windows.ps1 -FilePath (Resolve-Path ./src-tauri/target/release/scrollr-desktop.exe)
+
+      - name: Verify Windows Authenticode and updater signatures
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: ./scripts/verify-windows-artifacts.ps1
+
+      - name: Stage verified Windows artifacts
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrollr-windows-release-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            desktop/src-tauri/target/release/scrollr-desktop.exe
+            desktop/src-tauri/target/release/bundle/nsis/*.exe
+            desktop/src-tauri/target/release/bundle/nsis/*.exe.sig
+            desktop/src-tauri/target/release/bundle/msi/*.msi
+            desktop/src-tauri/target/release/bundle/msi/*.msi.sig
 
       # ── Register the release in Sentry ─────────────────────────
       # Tells Sentry the release exists so events get clustered correctly.
@@ -410,6 +494,192 @@ jobs:
             gh release upload "$TAG" "$APPIMAGE" --clobber --repo "$GITHUB_REPOSITORY"
           fi
 
+  # A branch dispatch with platform=windows proves the complete signing path
+  # without creating or modifying a GitHub Release. This job deliberately uses
+  # read-only repository permission; public release builds remain main-only.
+  windows-signing-test:
+    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && (inputs.platform == 'windows' || inputs.platform == 'all')
+    runs-on: windows-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: desktop
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          prefix-key: "v1-rust-no-bin"
+          workspaces: "desktop/src-tauri -> target"
+          cache-on-failure: "true"
+          cache-bin: "false"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install pinned signing tools
+        shell: pwsh
+        run: ./scripts/install-windows-signing-tools.ps1
+
+      - name: Validate signing configuration
+        shell: pwsh
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_CODE_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_CODE_SIGNING_ACCOUNT_NAME }}
+          AZURE_CODE_SIGNING_CERT_PROFILE_NAME: ${{ secrets.AZURE_CODE_SIGNING_CERT_PROFILE_NAME }}
+          AZURE_CODE_SIGNING_ENDPOINT: ${{ secrets.AZURE_CODE_SIGNING_ENDPOINT }}
+          DESKTOP_VITE_API_URL: ${{ secrets.DESKTOP_VITE_API_URL }}
+          DESKTOP_VITE_AUTH_ENDPOINT: ${{ secrets.DESKTOP_VITE_AUTH_ENDPOINT }}
+          DESKTOP_VITE_LOGTO_APP_ID: ${{ secrets.DESKTOP_VITE_LOGTO_APP_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          $required = @(
+            "AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET",
+            "AZURE_CODE_SIGNING_ACCOUNT_NAME", "AZURE_CODE_SIGNING_CERT_PROFILE_NAME",
+            "AZURE_CODE_SIGNING_ENDPOINT", "DESKTOP_VITE_API_URL",
+            "DESKTOP_VITE_AUTH_ENDPOINT", "DESKTOP_VITE_LOGTO_APP_ID",
+            "TAURI_SIGNING_PRIVATE_KEY"
+          )
+          foreach ($name in $required) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              throw "Missing required signing-test secret: $name"
+            }
+          }
+
+      - name: Test Windows signing command
+        shell: pwsh
+        run: ./scripts/sign-windows.tests.ps1
+
+      - name: Build signed Windows artifacts
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_CODE_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_CODE_SIGNING_ACCOUNT_NAME }}
+          AZURE_CODE_SIGNING_CERT_PROFILE_NAME: ${{ secrets.AZURE_CODE_SIGNING_CERT_PROFILE_NAME }}
+          AZURE_CODE_SIGNING_ENDPOINT: ${{ secrets.AZURE_CODE_SIGNING_ENDPOINT }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          VITE_API_URL: ${{ secrets.DESKTOP_VITE_API_URL }}
+          VITE_AUTH_ENDPOINT: ${{ secrets.DESKTOP_VITE_AUTH_ENDPOINT }}
+          VITE_LOGTO_APP_ID: ${{ secrets.DESKTOP_VITE_LOGTO_APP_ID }}
+        run: |
+          npx tauri build --config src-tauri/tauri.windows-signing.conf.json
+          ./scripts/sign-windows.ps1 -FilePath (Resolve-Path ./src-tauri/target/release/scrollr-desktop.exe)
+
+      - name: Verify Authenticode and updater signatures
+        shell: pwsh
+        run: ./scripts/verify-windows-artifacts.ps1
+
+      - name: Upload verified signed artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrollr-windows-signed-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            desktop/src-tauri/target/release/scrollr-desktop.exe
+            desktop/src-tauri/target/release/bundle/nsis/*.exe
+            desktop/src-tauri/target/release/bundle/nsis/*.exe.sig
+            desktop/src-tauri/target/release/bundle/msi/*.msi
+            desktop/src-tauri/target/release/bundle/msi/*.msi.sig
+
+  # Windows is staged separately because tauri-action uploads immediately.
+  # This job re-verifies the staged bytes before any GitHub Release mutation.
+  publish-windows:
+    needs: [matrix-setup, preflight, build]
+    if: github.ref == 'refs/heads/main' && needs.preflight.outputs.proceed == 'true' && (inputs.platform == 'windows' || inputs.platform == 'all' || github.event_name == 'push')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: scrollr-windows-release-${{ github.sha }}
+          path: desktop/src-tauri/target/release
+
+      - name: Install pinned verification tools
+        shell: pwsh
+        working-directory: desktop
+        run: ./scripts/install-windows-signing-tools.ps1
+
+      - name: Re-verify staged Windows bytes
+        shell: pwsh
+        working-directory: desktop
+        run: ./scripts/verify-windows-artifacts.ps1
+
+      - name: Upload verified Windows release assets and patch updater manifest
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $config = Get-Content -Raw desktop/src-tauri/tauri.conf.json | ConvertFrom-Json
+          $version = $config.version
+          $tag = "desktop-v$version"
+          $releaseRoot = Resolve-Path desktop/src-tauri/target/release
+          $app = Get-Item "$releaseRoot/scrollr-desktop.exe"
+          $nsis = Get-Item "$releaseRoot/bundle/nsis/*.exe"
+          $msi = Get-Item "$releaseRoot/bundle/msi/*.msi"
+          $nsisSig = Get-Item "$($nsis.FullName).sig"
+          $msiSig = Get-Item "$($msi.FullName).sig"
+
+          $releaseIsDraft = gh release view $tag --json isDraft --jq .isDraft --repo $env:GITHUB_REPOSITORY 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --draft --title "Scrollr $tag" --notes "See the full changelog at https://github.com/$env:GITHUB_REPOSITORY/commits/$tag" --repo $env:GITHUB_REPOSITORY
+            if ($LASTEXITCODE -ne 0) { throw "Failed to create draft release $tag." }
+          } elseif ($releaseIsDraft.Trim() -ne "true") {
+            throw "Refusing to modify published release $tag."
+          }
+
+          & gh release upload $tag $app.FullName $nsis.FullName $nsisSig.FullName $msi.FullName $msiSig.FullName --clobber --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { throw "Failed to upload verified Windows assets." }
+
+          $latest = Join-Path $env:RUNNER_TEMP "latest.json"
+          $latestExists = gh release view $tag --json assets --jq 'any(.assets[]; .name == "latest.json")' --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { throw "Failed to inspect release assets for $tag." }
+          if ($latestExists.Trim() -eq "true") {
+            gh release download $tag --pattern latest.json --output $latest --repo $env:GITHUB_REPOSITORY
+            if ($LASTEXITCODE -ne 0) { throw "Failed to download the existing updater manifest." }
+            $manifest = Get-Content -Raw $latest | ConvertFrom-Json
+          } else {
+            $manifest = [pscustomobject]@{
+              version = $version
+              notes = "See the full changelog at https://github.com/$env:GITHUB_REPOSITORY/commits/$tag"
+              pub_date = [DateTime]::UtcNow.ToString("o")
+              platforms = [pscustomobject]@{}
+            }
+          }
+
+          $baseUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag"
+          $msiEntry = [pscustomobject]@{ signature = (Get-Content -Raw $msiSig).Trim(); url = "$baseUrl/$($msi.Name)" }
+          $nsisEntry = [pscustomobject]@{ signature = (Get-Content -Raw $nsisSig).Trim(); url = "$baseUrl/$($nsis.Name)" }
+          $manifest.platforms | Add-Member -NotePropertyName "windows-x86_64" -NotePropertyValue $msiEntry -Force
+          $manifest.platforms | Add-Member -NotePropertyName "windows-x86_64-msi" -NotePropertyValue $msiEntry -Force
+          $manifest.platforms | Add-Member -NotePropertyName "windows-x86_64-nsis" -NotePropertyValue $nsisEntry -Force
+          $manifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $latest
+
+          gh release upload $tag $latest --clobber --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { throw "Failed to upload the Windows updater manifest." }
+
   # ── Re-sign the repackaged AppImage ────────────────────────────
   # The libwayland fix above replaces the AppImage binary on the
   # release, invalidating the original signature from tauri-action.
@@ -420,9 +690,11 @@ jobs:
   # Uses !cancelled() so it runs even if macOS or Windows builds fail
   # — the Linux AppImage still needs its signature fixed.
   fix-appimage-signature:
-    needs: [matrix-setup, build]
-    if: ${{ !cancelled() && needs.build.result != 'skipped' && needs.matrix-setup.outputs.has-linux == 'true' }}
+    needs: [matrix-setup, build, publish-windows]
+    if: ${{ !cancelled() && needs.build.result != 'skipped' && needs.matrix-setup.outputs.has-linux == 'true' && (needs.publish-windows.result == 'success' || needs.publish-windows.result == 'skipped') }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v6
