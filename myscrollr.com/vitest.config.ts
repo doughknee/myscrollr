@@ -1,3 +1,4 @@
+import { URL, fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
 // Standalone Vitest config — deliberately NOT merged with vite.config.ts.
@@ -5,6 +6,9 @@ import { defineConfig } from 'vitest/config'
 // codegen, and Sentry sourcemap upload, none of which unit tests need
 // (and some of which require env vars that only exist in CI builds).
 export default defineConfig({
+  resolve: {
+    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+  },
   test: {
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}'],
