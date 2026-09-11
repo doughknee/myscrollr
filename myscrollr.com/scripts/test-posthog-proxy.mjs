@@ -44,15 +44,14 @@ const upstream = createServer(async (request, response) => {
 })
 await new Promise((resolve) => upstream.listen(0, '0.0.0.0', resolve))
 const port = upstream.address().port
-const proxyDirective =
-  'proxy_pass https://$posthog_ingest/i/v0/e/$is_args$args;'
+const proxyDirective = 'proxy_pass https://$posthog_ingest/e/$is_args$args;'
 assert.ok(
   production.includes(proxyDirective),
   'Proxy must have a fixed ingestion destination',
 )
 const mocked = production.replace(
   proxyDirective,
-  `proxy_pass http://host.docker.internal:${port}/i/v0/e/;`,
+  `proxy_pass http://host.docker.internal:${port}/e/;`,
 )
 const name = `scrollr-posthog-test-${process.pid}`
 const docker = (...args) =>
@@ -101,7 +100,7 @@ try {
   ]) {
     const compressed = body[0] === 31
     const response = await fetch(
-      `${base}/ingest/i/v0/e/?compression=${compressed ? 'gzip-js' : 'none'}`,
+      `${base}/ingest/e/?compression=${compressed ? 'gzip-js' : 'none'}`,
       {
         method: 'POST',
         body,
@@ -125,7 +124,7 @@ try {
     const event = received.at(-1)
     assert.equal(
       event.url,
-      `/i/v0/e/?compression=${compressed ? 'gzip-js' : 'none'}`,
+      `/e/?compression=${compressed ? 'gzip-js' : 'none'}`,
     )
     assert.deepEqual(event.body, body)
     assert.equal(event.headers.host, 'us.i.posthog.com')
@@ -151,8 +150,8 @@ try {
     }
   }
   for (const [path, method, status] of [
-    ['/ingest/i/v0/e/', 'GET', 405],
-    ['/ingest/i/v0/e/', 'DELETE', 405],
+    ['/ingest/e/', 'GET', 405],
+    ['/ingest/e/', 'DELETE', 405],
     ['/ingest/api/projects/', 'POST', 404],
     ['/ingest/s/', 'POST', 404],
   ]) {
@@ -160,7 +159,7 @@ try {
   }
   assert.equal(
     (
-      await fetch(`${base}/ingest/i/v0/e/`, {
+      await fetch(`${base}/ingest/e/`, {
         method: 'POST',
         body: 'x'.repeat(256 * 1024 + 1),
       })

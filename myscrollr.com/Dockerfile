@@ -143,11 +143,11 @@ server {\n\
 \n\
     # Fixed event-only PostHog proxy. Browser credentials and IP headers\n\
     # never reach the provider. Consent is enforced before SDK capture.\n\
-    location = /ingest/i/v0/e/ {\n\
+    location = /ingest/e/ {\n\
         if ($request_method != POST) { return 405; }\n\
         resolver 1.1.1.1 8.8.8.8 valid=300s ipv6=off;\n\
         set $posthog_ingest us.i.posthog.com;\n\
-        proxy_pass https://$posthog_ingest/i/v0/e/$is_args$args;\n\
+        proxy_pass https://$posthog_ingest/e/$is_args$args;\n\
         proxy_ssl_server_name on;\n\
         proxy_ssl_name us.i.posthog.com;\n\
         proxy_ssl_verify on;\n\
