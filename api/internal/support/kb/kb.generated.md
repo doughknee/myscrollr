@@ -4,9 +4,9 @@
 
 This is the authoritative product reference for support replies. Anything stated here is ground truth; the Policies section says what may and may not be repeated to a user.
 
-Current desktop version: **1.6.5**.
+Current desktop version: **1.6.6**.
 
-<!-- source: desktop/package.json @ d31c0fdb0783 -->
+<!-- source: desktop/package.json @ f089d1370505 -->
 
 ## Policies
 
@@ -193,7 +193,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 ## Settings
 
 <!-- source: desktop/src/components/settings/pages.ts @ fcc775987069 -->
-<!-- source: desktop/src/components/settings/rows.ts @ 836804cd1f4b -->
+<!-- source: desktop/src/components/settings/rows.ts @ 28c1f33b9473 -->
 Every settings row, as the app labels it. "Signed in" / "signed out" marks rows that only exist in that state.
 
 ### Settings › Appearance
@@ -246,8 +246,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 
 - Settings › Data & privacy › Export your data: Download your sources, preferences, and account metadata as a .zip file. *(signed in only)*
 - Settings › Data & privacy › Send crash reports: When something breaks, send the error, stack trace, app version and OS to Sentry. Never your account, IP address or file paths.
-- Settings › Data & privacy › Share product activity: Help improve Scrollr by counting days your visible ticker runs for at least 30 seconds and which broad widget categories were enabled. Signed-in accounts only; retained for 90 days. *(signed in only)*
-- Settings › Data & privacy › Share app analytics: Share app opens, active days, and broad feature categories with PostHog. On by default; turn it off anytime. Never includes ticker contents, symbols, teams, or feeds. *(signed in only)*
+- Settings › Data & privacy › Share usage analytics: Help improve Scrollr with app usage and broad feature categories, measured by Scrollr and PostHog. On by default; turn off anytime. Never includes ticker contents, symbols, teams, or feeds. *(signed in only)*
 - Settings › Data & privacy › Reset all settings: Put every setting back to its default and remove your local widgets. Your account, billing, and server data are untouched.
 
 ### Settings › Updates
@@ -595,8 +594,18 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.4 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.5 -->
 The last 8 published releases, newest first, as users read them.
+
+### Scrollr 1.6.5 — App analytics, under your control (`desktop-v1.6.5`, 2026-09-11)
+
+#### New
+
+- **App analytics with a simple off switch.** Usage analytics is enabled by default for signed-in accounts and helps us understand app opens and broad feature usage. You can turn it off anytime in **Settings → Data & privacy → Share app analytics**. Ticker contents, tracked symbols, teams and feeds are excluded.
+
+#### Fixes
+
+- Changing an analytics preference no longer undoes another privacy setting you changed while it was saving.
 
 ### Scrollr 1.6.4 — Signed and transparent (`desktop-v1.6.4`, 2026-09-11)
 
@@ -767,47 +776,3 @@ The last five chips were redrawn to match the rest of the bar, and the bar itsel
 
 - The clock's detail row named the zone twice.
 - The news bar's article-limit control was the one control in the bar that didn't look like the others.
-
-### v1.5.0 — Chips, redrawn (`desktop-v1.5.0`, 2026-09-04)
-
-Every data chip on the ticker was redrawn in one language, so the bar reads as one thing rather than four. Alongside that, each channel now decides what actually belongs on the rail instead of showing everything it holds.
-
-#### 💄 The chips
-
-**Compact is the chip; detailed adds one row.** Switching modes no longer rearranges anything — the top row stays exactly where it was and a second row appears underneath. You can recognise a chip across both modes now.
-
-**Chips are sized to their content.** A game between two short-named teams no longer pads itself out to the width of the longest possible matchup. Everything that can change while a chip is on screen still reserves its space, so scores and clocks move without shoving the rest of the bar along.
-
-**Sports chips became scoreboards.** Two teams, their crests, the score, and the clock in its own box — with each side's league position, record and points on the detailed row. Team names are proper short names now, so it reads "Revolution" and "Man City" rather than a name cut off mid-word.
-
-**Each league wears its own colour**, matching its widget. A tight game late on brightens that colour instead of turning red, so a close MLS match no longer looks like it belongs to another league.
-
-**Formula 1 draws as one event** — the Grand Prix and its circuit — rather than pretending a race is two teams playing each other.
-
-**Stock and crypto chips carry a real intraday sparkline** and a day-range rail, instead of an empty gap waiting for a second price to arrive.
-
-**News chips carry the headline and, when there's room, the article's summary underneath** — one block that fits itself to the space rather than widening the chip.
-
-#### ✨ The bar shows what's happening now
-
-**Each channel has its own sense of "now".** Live games are always on the rail; upcoming ones appear within a day and finals stay for eighteen hours. If a league has nothing near, its next fixture stands in.
-
-**News no longer floods the bar.** A busy wire posting thirty articles used to become thirty chips. Now it's the newest few per feed from the last few hours, and a quiet feed keeps one item as long as it's from the last two days.
-
-**The news bar's "Show" setting reaches the ticker.** It used to apply to the article list only, so the widget quietly carried two different numbers. Set it once and both obey it.
-
-#### 🐛 Fixes
-
-- **Games that had already kicked off still showed as upcoming.** Twenty-eight were live in production.
-- **A newly added widget showed nothing until you added a second one.** Its cache wasn't being cleared when it was created.
-- **Home and a widget's own page could disagree** about the same sport, having shared one cache entry with different contents.
-- **League standings mixed two seasons together**, so a twenty-team league could list forty rows.
-- **Crypto prices were rounded to whole cents**, which erased the entire day for anything trading under a dollar.
-- **Symbols the data provider can't serve** are retired instead of shown empty.
-- **Off-season leagues said "No games to show"** rather than saying they're out of season.
-- **Long league names were clipped** on the chip.
-- **The ticker skipped a chip** when scrolling in one direction.
-
-#### 🔧 Under the hood
-
-Short team names are derived by rule and checked against the whole 2,022-name catalog, rather than maintained by hand. Standings are attached to each game server-side in a single query. The local development environment can now be seeded from real data, so the app looks the same to work on as it does to use.
