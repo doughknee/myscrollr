@@ -193,7 +193,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 ## Settings
 
 <!-- source: desktop/src/components/settings/pages.ts @ fcc775987069 -->
-<!-- source: desktop/src/components/settings/rows.ts @ 79e65f8f228a -->
+<!-- source: desktop/src/components/settings/rows.ts @ c077cf5a4d91 -->
 Every settings row, as the app labels it. "Signed in" / "signed out" marks rows that only exist in that state.
 
 ### Settings › Appearance
@@ -247,7 +247,7 @@ Every settings row, as the app labels it. "Signed in" / "signed out" marks rows 
 - Settings › Data & privacy › Export your data: Download your sources, preferences, and account metadata as a .zip file. *(signed in only)*
 - Settings › Data & privacy › Send crash reports: When something breaks, send the error, stack trace, app version and OS to Sentry. Never your account, IP address or file paths.
 - Settings › Data & privacy › Share product activity: Help improve Scrollr by counting days your visible ticker runs for at least 30 seconds and which broad widget categories were enabled. Signed-in accounts only; retained for 90 days. *(signed in only)*
-- Settings › Data & privacy › Share anonymous app analytics: Help improve Scrollr by sharing app opens, active days, and broad feature categories with PostHog. Never ticker contents, symbols, teams, feeds, or other app activity. *(signed in only)*
+- Settings › Data & privacy › Share app analytics: Help improve Scrollr by sharing app opens, active days, and broad feature categories with PostHog. Never ticker contents, symbols, teams, feeds, or other app activity. *(signed in only)*
 - Settings › Data & privacy › Reset all settings: Put every setting back to its default and remove your local widgets. Your account, billing, and server data are untouched.
 
 ### Settings › Updates
