@@ -184,7 +184,7 @@ export const HOMEPAGE_FAQ_ITEMS: ReadonlyArray<{
   {
     question: 'What does Scrollr collect about me?',
     answer:
-      'No advertising trackers. Operational diagnostics and authentication logs are used to run and secure the service. Optional product analytics is opt-in, coarse, account-linked, desktop-only, and described in the Privacy Policy.',
+      'No advertising trackers. Operational diagnostics and authentication logs are used to run and secure the service. Website analytics default on only in the US after a local country check; elsewhere the site asks first. They are easy to turn off in the footer. Signed-in desktop analytics are on by default with an opt-out. All analytics are coarse and described in the Privacy Policy.',
   },
   {
     question: 'Which platforms?',

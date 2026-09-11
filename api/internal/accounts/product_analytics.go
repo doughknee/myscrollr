@@ -74,6 +74,9 @@ func HandleSetProductAnalyticsConsent(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Status: "error", Error: "Body must contain only an enabled boolean"})
 	}
 	if err := setProductAnalyticsConsent(context.Background(), userID, *req.Enabled); err != nil {
+		if errors.Is(err, errPostHogDeletionPending) {
+			return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{Status: "error", Error: "Analytics deletion is still pending"})
+		}
 		if errors.Is(err, errAccountDeleting) {
 			return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{Status: "error", Error: "Product analytics cannot be enabled while account deletion is pending or complete"})
 		}
@@ -84,31 +87,39 @@ func HandleSetProductAnalyticsConsent(c *fiber.Ctx) error {
 }
 
 func setProductAnalyticsConsent(ctx context.Context, userID string, enabled bool) error {
-	tx, err := platform.DBPool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-	if err := lockAccountMutation(ctx, tx, userID); err != nil {
-		return err
-	}
-
+	decision := "declined"
 	if enabled {
-		var deletionStatus string
-		err := tx.QueryRow(ctx,
-			`SELECT status FROM user_deletion_requests WHERE logto_sub = $1`, userID).
-			Scan(&deletionStatus)
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		decision = "enabled"
+	}
+	_, err := setPostHogConsent(ctx, userID, decision)
+	return err
+}
+
+func syncProductAnalyticsEnrollment(ctx context.Context, tx pgx.Tx, userID string, enabled bool) error {
+	if enabled {
+		var staff, unclaimedAdmin bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM admin_users WHERE logto_sub=$1), EXISTS(SELECT 1 FROM admin_users WHERE logto_sub IS NULL)`, userID).Scan(&staff, &unclaimedAdmin); err != nil {
 			return err
 		}
-		if err == nil && deletionStatus != "canceled" {
-			return errAccountDeleting
+		// Normally staff are already linked by admin login. Verify an unclaimed
+		// admin email too, without trusting a client-supplied email hint.
+		if !staff && unclaimedAdmin && !postHogActorExcluded(userID) {
+			user, err := postHogLogtoUser(userID)
+			if err != nil {
+				return err
+			}
+			if user == nil {
+				return errors.New("could not verify analytics eligibility")
+			}
+			if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM admin_users WHERE lower(email)=lower($1))`, user.PrimaryEmail).Scan(&staff); err != nil {
+				return err
+			}
 		}
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO product_analytics_enrollments (logto_sub)
-			VALUES ($1) ON CONFLICT (logto_sub) DO NOTHING`, userID); err != nil {
-			return err
-		}
+		enabled = !staff && !postHogActorExcluded(userID)
+	}
+	if enabled {
+		_, err := tx.Exec(ctx, `INSERT INTO product_analytics_enrollments (logto_sub) VALUES ($1) ON CONFLICT (logto_sub) DO NOTHING`, userID)
+		return err
 	} else {
 		// The daily table cascades. A concurrent reporter holds a row lock on
 		// this row, so this delete either removes its committed fact or wins first
@@ -118,7 +129,7 @@ func setProductAnalyticsConsent(ctx context.Context, userID string, enabled bool
 			return err
 		}
 	}
-	return tx.Commit(ctx)
+	return nil
 }
 
 func lockAccountMutation(ctx context.Context, tx pgx.Tx, userID string) error {

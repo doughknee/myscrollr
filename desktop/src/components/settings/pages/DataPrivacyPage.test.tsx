@@ -12,15 +12,15 @@ vi.mock("../../../api/client", () => ({
   setPostHogAnalyticsConsent: (...args: unknown[]) => setPostHogConsent(...args),
 }));
 
-describe("DataPrivacyPage product activity consent", () => {
+describe("DataPrivacyPage usage analytics consent", () => {
   beforeEach(() => {
     setConsent.mockReset();
     setPostHogConsent.mockReset();
   });
 
   it("shows the opt-in only while signed in and waits for server confirmation", async () => {
-    let resolve!: (value: { enabled: boolean }) => void;
-    setConsent.mockReturnValue(new Promise((done) => { resolve = done; }));
+    let resolve!: (value: { decision: "enabled" }) => void;
+    setPostHogConsent.mockReturnValue(new Promise((done) => { resolve = done; }));
     const onPrivacyChange = vi.fn();
     const { rerender } = render(
       <DataPrivacyPage
@@ -30,27 +30,28 @@ describe("DataPrivacyPage product activity consent", () => {
         onResetAll={vi.fn()}
       />,
     );
-    expect(screen.queryByRole("switch", { name: /share product activity/i })).toBeNull();
+    expect(screen.queryByRole("switch", { name: /share usage analytics/i })).toBeNull();
 
     rerender(
       <DataPrivacyPage
         authenticated
-        privacy={{ sendCrashReports: true, shareProductAnalytics: false, postHogAnalyticsDecision: "unknown" }}
+        privacy={{ sendCrashReports: true, shareProductAnalytics: false, postHogAnalyticsDecision: "declined" }}
         onPrivacyChange={onPrivacyChange}
         onResetAll={vi.fn()}
       />,
     );
     const mutationStarted = vi.fn();
     window.addEventListener("scrollr:product-analytics-consent-mutation", mutationStarted, { once: true });
-    fireEvent.click(screen.getByRole("switch", { name: /share product activity/i }));
+    expect(screen.getAllByRole("switch")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("switch", { name: /share usage analytics/i }));
     expect(mutationStarted).toHaveBeenCalledTimes(1);
-    expect(setConsent).toHaveBeenCalledWith(true);
+    expect(setPostHogConsent).toHaveBeenCalledWith("enabled");
     expect(onPrivacyChange).not.toHaveBeenCalled();
-    await act(async () => resolve({ enabled: true }));
+    await act(async () => resolve({ decision: "enabled" }));
     expect(onPrivacyChange).toHaveBeenCalledWith({
       sendCrashReports: true,
       shareProductAnalytics: true,
-      postHogAnalyticsDecision: "unknown",
+      postHogAnalyticsDecision: "enabled",
     });
   });
 
@@ -73,23 +74,23 @@ describe("DataPrivacyPage product activity consent", () => {
     expect(setConsent).not.toHaveBeenCalled();
   });
 
-  it("keeps PostHog consent separate and server-authoritative", async () => {
+  it("updates both collectors from the single server-authoritative control", async () => {
     setPostHogConsent.mockResolvedValue({ decision: "enabled" });
     const onPrivacyChange = vi.fn();
     render(
       <DataPrivacyPage
         authenticated
-        privacy={{ sendCrashReports: true, shareProductAnalytics: false, postHogAnalyticsDecision: "unknown" }}
+        privacy={{ sendCrashReports: true, shareProductAnalytics: false, postHogAnalyticsDecision: "declined" }}
         onPrivacyChange={onPrivacyChange}
         onResetAll={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByRole("switch", { name: /share app analytics/i }));
+    fireEvent.click(screen.getByRole("switch", { name: /share usage analytics/i }));
     expect(setPostHogConsent).toHaveBeenCalledWith("enabled");
     await act(async () => undefined);
     expect(onPrivacyChange).toHaveBeenCalledWith({
       sendCrashReports: true,
-      shareProductAnalytics: false,
+      shareProductAnalytics: true,
       postHogAnalyticsDecision: "enabled",
     });
   });
@@ -115,11 +116,23 @@ describe("DataPrivacyPage product activity consent", () => {
     }
 
     render(<Harness />);
-    fireEvent.click(screen.getByRole("switch", { name: /share app analytics/i }));
+    fireEvent.click(screen.getByRole("switch", { name: /share usage analytics/i }));
     fireEvent.click(screen.getByRole("switch", { name: /send crash reports/i }));
     await act(async () => resolve({ decision: "declined" }));
 
-    expect(screen.getByRole("switch", { name: /share app analytics/i })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: /share usage analytics/i })).not.toBeChecked();
     expect(screen.getByRole("switch", { name: /send crash reports/i })).not.toBeChecked();
+  });
+
+  it("shows unresolved settings separately from off and lets a failed check retry", () => {
+    const retry = vi.fn();
+    const props = { authenticated: true, privacy: { sendCrashReports: true, shareProductAnalytics: false, postHogAnalyticsDecision: "unknown" as const }, onPrivacyChange: vi.fn(), onResetAll: vi.fn(), onRetryAnalytics: retry };
+    const { rerender } = render(<DataPrivacyPage {...props} analyticsStatus="loading" />);
+    expect(screen.queryByRole("switch", { name: /share usage analytics/i })).toBeNull();
+    expect(screen.getByText("Checking your analytics setting…")).toBeInTheDocument();
+    rerender(<DataPrivacyPage {...props} analyticsStatus="error" />);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(retry).toHaveBeenCalledOnce();
+    expect(setPostHogConsent).not.toHaveBeenCalled();
   });
 });

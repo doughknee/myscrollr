@@ -120,7 +120,7 @@ func TestPostHogPresenceRequiresCaptureAndDeclineRemovesIt(t *testing.T) {
 	}
 }
 
-func TestPostHogDesktopEventsExcludeStaffAndConfiguredTestUsers(t *testing.T) {
+func TestPostHogDesktopEventsMarkInternalUsersAndExcludeTheirPresence(t *testing.T) {
 	resetProductAnalytics(t)
 	mr := miniredis.RunT(t)
 	previous := platform.Rdb
@@ -150,7 +150,10 @@ func TestPostHogDesktopEventsExcludeStaffAndConfiguredTestUsers(t *testing.T) {
 	}
 	previousCapture := postHogCaptureDesktopEvent
 	captureCalls := 0
-	postHogCaptureDesktopEvent = func(string, postHogDesktopEvent) error {
+	postHogCaptureDesktopEvent = func(_ string, event postHogDesktopEvent) error {
+		if !event.Internal {
+			t.Error("internal actor was not marked")
+		}
 		captureCalls++
 		return nil
 	}
@@ -168,12 +171,12 @@ func TestPostHogDesktopEventsExcludeStaffAndConfiguredTestUsers(t *testing.T) {
 			email = "staff-desktop@example.test"
 		}
 		resp := analyticsRequestWithEmail(t, app, http.MethodPost, "/posthog-event", sub, email, `{"event":"desktop_app_opened"}`)
-		if resp.StatusCode != http.StatusNoContent || mr.Exists("posthog:recent-presence") {
-			t.Fatalf("excluded actor %q status=%d presence=%v, want 204 and no presence", sub, resp.StatusCode, mr.Exists("posthog:recent-presence"))
+		if resp.StatusCode != http.StatusAccepted || mr.Exists("posthog:recent-presence") {
+			t.Fatalf("internal actor %q status=%d presence=%v, want 202 and no customer presence", sub, resp.StatusCode, mr.Exists("posthog:recent-presence"))
 		}
 	}
-	if captureCalls != 0 {
-		t.Fatalf("vendor capture calls = %d, want 0", captureCalls)
+	if captureCalls != 2 {
+		t.Fatalf("vendor capture calls = %d, want 2 marked internal", captureCalls)
 	}
 	var mirrors int
 	if err := platform.DBPool.QueryRow(context.Background(), `SELECT count(*) FROM posthog_analytics_events`).Scan(&mirrors); err != nil {
@@ -302,8 +305,8 @@ func TestPostHogConsentDefaultsOnAndPreservesDecline(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
 		t.Fatal(err)
 	}
-	if got.Decision != "declined" {
-		t.Fatalf("excluded decision = %q, want declined", got.Decision)
+	if got.Decision != "enabled" {
+		t.Fatalf("internal default decision = %q, want enabled", got.Decision)
 	}
 }
 
@@ -334,6 +337,12 @@ func resetProductAnalytics(t *testing.T) {
 	if platform.DBPool == nil {
 		t.Skip("TEST_DATABASE_URL not set")
 	}
+	// Keep the identity provider external to these real-DB handler tests.
+	previousLogto := postHogLogtoUser
+	postHogLogtoUser = func(sub string) (*LogtoUser, error) {
+		return &LogtoUser{ID: sub, PrimaryEmail: sub + "@example.test"}, nil
+	}
+	t.Cleanup(func() { postHogLogtoUser = previousLogto })
 	if _, err := platform.DBPool.Exec(context.Background(),
 		`TRUNCATE product_analytics_enrollments CASCADE`); err != nil {
 		t.Fatal(err)

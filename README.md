@@ -161,9 +161,9 @@ unreleased; `deploy.yml` ships the API and website to production.
   so change the Go and regenerate. `desktop/src/tierLimits.ts` is a
   **hand-kept mirror** — there is no generator; edit it and the Go map
   together, as its header comment lists.
-- **No ads, tracking pixels, or data sales.** Optional product analytics
-  stay off until a person explicitly enables them and may contain only
-  the fixed, content-free events in `docs/analytics/POSTHOG.md`.
+- **No ads, tracking pixels, or data sales.** Website product analytics asks
+  first; signed-in desktop analytics is on by default with an easy opt-out.
+  Both use only the fixed, content-free events in `docs/analytics/POSTHOG.md`.
 - **Only core migrates.** All schema lives in `api/migrations/`; the
   ingesters are pure writers. A failed migration crashes the container.
 - **Rollbacks via rolling forward.** We prefer forward-only migrations

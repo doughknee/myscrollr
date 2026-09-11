@@ -5,9 +5,12 @@ import {
   captureWebsiteEvent,
   captureWebsitePageview,
   getWebsiteAnalyticsDecision,
+  hasWebsiteAnalyticsOptOutSignal,
+  normalizeWebsiteAnalyticsPolicy,
   resetWebsiteAnalyticsIdentity,
   sanitizeWebsiteCapture,
   setWebsiteAnalyticsDecision,
+  setWebsiteAnalyticsPolicy,
   setWebsiteAnalyticsSuppressed,
 } from './posthog'
 
@@ -18,6 +21,7 @@ const sdk = vi.hoisted(() => ({
   opt_out_capturing: vi.fn(),
   reset: vi.fn(),
   identify: vi.fn(),
+  get_distinct_id: vi.fn(() => 'anonymous-id'),
 }))
 
 vi.mock('posthog-js/dist/module.slim', () => ({ default: sdk }))
@@ -44,16 +48,25 @@ vi.stubGlobal('sessionStorage', {
   removeItem: (key: string) => sessionValues.delete(key),
 })
 vi.stubGlobal('CustomEvent', class {})
+const browserPrivacy: {
+  doNotTrack: string | null
+  globalPrivacyControl?: boolean
+} = { doNotTrack: null }
+vi.stubGlobal('navigator', browserPrivacy)
 
 describe('website PostHog privacy boundary', () => {
   beforeEach(() => {
     localStorage.clear()
     sessionValues.clear()
     vi.clearAllMocks()
+    sdk.get_distinct_id.mockReturnValue('anonymous-id')
     vi.stubEnv('PROD', true)
     vi.stubEnv('VITE_POSTHOG_KEY', 'test-key')
     vi.stubEnv('VITE_POSTHOG_HOST', 'https://example.test')
     window.location.pathname = '/'
+    browserPrivacy.doNotTrack = null
+    delete browserPrivacy.globalPrivacyControl
+    setWebsiteAnalyticsPolicy('unknown')
     setWebsiteAnalyticsSuppressed(false)
   })
 
@@ -102,16 +115,94 @@ describe('website PostHog privacy boundary', () => {
     expect(sdk.capture).toHaveBeenCalledOnce()
   })
 
-  it('captures the current public landing page when consent is enabled', () => {
+  it('waits for the authentication gate before capturing after consent', () => {
     window.location.pathname = '/channels'
     setWebsiteAnalyticsDecision('enabled')
-    expect(sdk.capture).toHaveBeenCalledWith('$pageview', {
-      path: '/channels',
-      surface: 'website',
-      $current_url: 'https://example.test/channels',
-      $pathname: '/channels',
-      $host: 'example.test',
-    })
+    expect(sdk.capture).not.toHaveBeenCalled()
+  })
+
+  it('honors GPC and DNT before initialization, identity, or capture', () => {
+    for (const signal of ['gpc', 'dnt'] as const) {
+      localStorage.clear()
+      vi.clearAllMocks()
+      if (signal === 'gpc') {
+        browserPrivacy.globalPrivacyControl = true
+      } else {
+        browserPrivacy.doNotTrack = '1'
+      }
+
+      expect(hasWebsiteAnalyticsOptOutSignal()).toBe(true)
+      setWebsiteAnalyticsDecision('enabled')
+      captureWebsitePageview('/download')
+      expect(getWebsiteAnalyticsDecision()).toBe('declined')
+      expect(sdk.init).not.toHaveBeenCalled()
+      expect(sdk.identify).not.toHaveBeenCalled()
+      expect(sdk.capture).not.toHaveBeenCalled()
+
+      browserPrivacy.doNotTrack = null
+      delete browserPrivacy.globalPrivacyControl
+    }
+  })
+
+  it('uses a US policy default without recording fabricated consent', () => {
+    setWebsiteAnalyticsPolicy('default-on')
+
+    expect(getWebsiteAnalyticsDecision()).toBe('enabled')
+    expect(localStorage.getItem('scrollr-analytics-consent-v1')).toBeNull()
+  })
+
+  it('keeps unknown and consent-required locations consent-first', () => {
+    expect(getWebsiteAnalyticsDecision()).toBe('unknown')
+
+    setWebsiteAnalyticsPolicy('consent-required')
+
+    expect(getWebsiteAnalyticsDecision()).toBe('unknown')
+  })
+
+  it('fails malformed policy responses closed', () => {
+    expect(normalizeWebsiteAnalyticsPolicy('default-on')).toBe('default-on')
+    expect(normalizeWebsiteAnalyticsPolicy('US')).toBe('consent-required')
+    expect(normalizeWebsiteAnalyticsPolicy(undefined)).toBe('consent-required')
+  })
+
+  it('preserves an explicit decline across policy and region changes', () => {
+    setWebsiteAnalyticsDecision('declined')
+    setWebsiteAnalyticsPolicy('default-on')
+    expect(getWebsiteAnalyticsDecision()).toBe('declined')
+
+    setWebsiteAnalyticsPolicy('consent-required')
+    expect(getWebsiteAnalyticsDecision()).toBe('declined')
+  })
+
+  it('returns to consent-first when a default-on visitor changes region', () => {
+    setWebsiteAnalyticsPolicy('default-on')
+    expect(getWebsiteAnalyticsDecision()).toBe('enabled')
+
+    setWebsiteAnalyticsPolicy('consent-required')
+    expect(getWebsiteAnalyticsDecision()).toBe('unknown')
+  })
+
+  it('resets any prior account identity before applying a verified account', () => {
+    setWebsiteAnalyticsDecision('enabled')
+    sdk.get_distinct_id.mockReturnValue('a'.repeat(64))
+    sdk.reset.mockClear()
+    sdk.opt_in_capturing.mockClear()
+    sdk.identify.mockClear()
+
+    expect(
+      applyWebsiteAnalyticsContext({
+        eligible: true,
+        verified: false,
+        analytics_distinct_id: 'b'.repeat(64),
+      }),
+    ).toBe(true)
+    expect(sdk.reset).toHaveBeenCalledOnce()
+    expect(sdk.reset.mock.invocationCallOrder[0]).toBeLessThan(
+      sdk.opt_in_capturing.mock.invocationCallOrder[0],
+    )
+    expect(sdk.opt_in_capturing.mock.invocationCallOrder[0]).toBeLessThan(
+      sdk.identify.mock.invocationCallOrder[0],
+    )
   })
 
   it('strips SDK-added URLs, device details, person properties, and IP data', () => {
@@ -175,6 +266,7 @@ describe('website PostHog privacy boundary', () => {
 
   it('stitches the stable anonymous journey to a server pseudonym', () => {
     setWebsiteAnalyticsDecision('enabled')
+    sdk.reset.mockClear()
     sdk.capture.mockClear()
     beginWebsiteSignupFlow()
     const distinctID = 'a'.repeat(64)
@@ -183,6 +275,7 @@ describe('website PostHog privacy boundary', () => {
       verified: true,
       analytics_distinct_id: distinctID,
     })
+    expect(sdk.reset).not.toHaveBeenCalled()
     expect(sdk.identify).toHaveBeenCalledWith(distinctID)
     expect(sdk.capture).toHaveBeenCalledWith('signup_completed', {
       surface: 'website',
@@ -206,14 +299,14 @@ describe('website PostHog privacy boundary', () => {
     sdk.capture.mockClear()
     sdk.opt_in_capturing.mockClear()
     resetWebsiteAnalyticsIdentity()
-    captureWebsitePageview('/download')
+    captureWebsitePageview('/business')
     expect(sdk.reset).toHaveBeenCalled()
     expect(sdk.opt_in_capturing).toHaveBeenCalledWith({
       captureEventName: false,
     })
     expect(sdk.capture).toHaveBeenCalledWith(
       '$pageview',
-      expect.objectContaining({ path: '/download' }),
+      expect.objectContaining({ path: '/business' }),
     )
   })
 })

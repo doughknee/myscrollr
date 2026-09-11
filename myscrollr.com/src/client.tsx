@@ -10,12 +10,14 @@ import { initSentry } from './sentry'
 import type { LogtoConfig } from '@logto/react'
 import type { WebsiteAnalyticsContext } from '@/lib/posthog'
 import { ScrollrAuthProvider, useScrollrAuth } from '@/hooks/useScrollrAuth'
-import { authenticatedFetch } from '@/api/client'
+import { analyticsPolicyApi, authenticatedFetch } from '@/api/client'
 import {
   applyWebsiteAnalyticsContext,
   captureWebsitePageview,
   getWebsiteAnalyticsDecision,
+  normalizeWebsiteAnalyticsPolicy,
   resetWebsiteAnalyticsIdentity,
+  setWebsiteAnalyticsPolicy,
   setWebsiteAnalyticsSuppressed,
 } from '@/lib/posthog'
 
@@ -60,6 +62,43 @@ function WebsiteAnalyticsGate() {
   const retriedUser = useRef(false)
   const wasAuthenticated = useRef(false)
   const [consentRevision, setConsentRevision] = useState(0)
+  const [policyReady, setPolicyReady] = useState(false)
+  const [policyRevision, setPolicyRevision] = useState(0)
+
+  useEffect(() => {
+    let current = true
+    setPolicyReady(false)
+    void analyticsPolicyApi
+      .get()
+      .then(({ policy }) => {
+        if (!current) return
+        setWebsiteAnalyticsPolicy(normalizeWebsiteAnalyticsPolicy(policy))
+      })
+      .catch(() => {
+        if (current) setWebsiteAnalyticsPolicy('consent-required')
+      })
+      .finally(() => {
+        if (current) setPolicyReady(true)
+      })
+    return () => {
+      current = false
+    }
+  }, [policyRevision])
+
+  useEffect(() => {
+    const refresh = () => setPolicyRevision((value) => value + 1)
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    const timer = window.setInterval(refresh, 15 * 60 * 1000)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [])
 
   useEffect(() => {
     const changed = () => setConsentRevision((value) => value + 1)
@@ -69,6 +108,10 @@ function WebsiteAnalyticsGate() {
   }, [])
 
   useEffect(() => {
+    if (!policyReady) {
+      setWebsiteAnalyticsSuppressed(true)
+      return
+    }
     if (isLoading) {
       setWebsiteAnalyticsSuppressed(true)
       return
@@ -119,7 +162,7 @@ function WebsiteAnalyticsGate() {
       checkedUser.current = false
       if (retryTimer !== undefined) window.clearTimeout(retryTimer)
     }
-  }, [consentRevision, getAccessToken, isAuthenticated, isLoading])
+  }, [consentRevision, getAccessToken, isAuthenticated, isLoading, policyReady])
 
   return null
 }

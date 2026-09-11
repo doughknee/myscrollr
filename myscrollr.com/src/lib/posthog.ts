@@ -3,6 +3,10 @@ import type { CaptureResult } from 'posthog-js'
 
 export type WebsiteAnalyticsDecision = 'unknown' | 'enabled' | 'declined'
 export type WebsiteAnalyticsEvent = 'download_selected'
+export type WebsiteAnalyticsPolicy =
+  | 'unknown'
+  | 'default-on'
+  | 'consent-required'
 
 const STORAGE_KEY = 'scrollr-analytics-consent-v1'
 const SIGNUP_FLOW_KEY = 'scrollr-analytics-signup-flow-v1'
@@ -43,6 +47,7 @@ const ALLOWED_PROPERTIES = new Set([
 ])
 let initialized = false
 let suppressed = true
+let analyticsPolicy: WebsiteAnalyticsPolicy = 'unknown'
 let lastPageview = { path: '', at: 0 }
 
 export function sanitizeWebsiteCapture(
@@ -126,8 +131,44 @@ function initialize(): boolean {
 
 export function getWebsiteAnalyticsDecision(): WebsiteAnalyticsDecision {
   if (typeof window === 'undefined') return 'unknown'
+  if (hasWebsiteAnalyticsOptOutSignal()) return 'declined'
   const value = localStorage.getItem(STORAGE_KEY)
-  return value === 'enabled' || value === 'declined' ? value : 'unknown'
+  if (value === 'enabled' || value === 'declined') return value
+  return analyticsPolicy === 'default-on' ? 'enabled' : 'unknown'
+}
+
+export function getWebsiteAnalyticsPolicy(): WebsiteAnalyticsPolicy {
+  return analyticsPolicy
+}
+
+export function normalizeWebsiteAnalyticsPolicy(
+  policy: unknown,
+): Exclude<WebsiteAnalyticsPolicy, 'unknown'> {
+  return policy === 'default-on' ? 'default-on' : 'consent-required'
+}
+
+export function setWebsiteAnalyticsPolicy(
+  policy: WebsiteAnalyticsPolicy,
+): void {
+  analyticsPolicy = policy
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('scrollr:analytics-consent-changed'))
+  }
+}
+
+export function hasWebsiteAnalyticsOptOutSignal(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const globalPrivacyControl = (
+    navigator as Navigator & { globalPrivacyControl?: boolean }
+  ).globalPrivacyControl
+  const doNotTrack =
+    navigator.doNotTrack ??
+    (typeof window === 'undefined'
+      ? null
+      : (window as Window & { doNotTrack?: string }).doNotTrack)
+  return (
+    globalPrivacyControl === true || doNotTrack === '1' || doNotTrack === 'yes'
+  )
 }
 
 export function setWebsiteAnalyticsDecision(
@@ -136,10 +177,9 @@ export function setWebsiteAnalyticsDecision(
   if (typeof window === 'undefined') return
   localStorage.setItem(STORAGE_KEY, decision)
   if (decision === 'enabled') {
-    if (initialize()) {
+    if (!hasWebsiteAnalyticsOptOutSignal() && initialize()) {
       posthog.reset()
       posthog.opt_in_capturing({ captureEventName: false })
-      captureWebsitePageview(window.location.pathname)
     }
   } else {
     sessionStorage.removeItem(SIGNUP_FLOW_KEY)
@@ -256,13 +296,18 @@ export function applyWebsiteAnalyticsContext(
   const pending = hasPendingWebsiteSignupFlow()
   const distinctID = context.analytics_distinct_id ?? ''
   sessionStorage.removeItem(SIGNUP_FLOW_KEY)
-  if (
-    !context.eligible ||
-    !/^[0-9a-f]{64}$/i.test(distinctID) ||
-    getWebsiteAnalyticsDecision() !== 'enabled' ||
-    !initialize()
-  )
-    return false
+  if (!initialize()) return false
+  const validContext =
+    context.eligible &&
+    /^[0-9a-f]{64}$/i.test(distinctID) &&
+    getWebsiteAnalyticsDecision() === 'enabled'
+  const currentID = posthog.get_distinct_id()
+  const hasPriorAccountIdentity = /^[0-9a-f]{64}$/i.test(currentID)
+  if (hasPriorAccountIdentity && (!validContext || currentID !== distinctID)) {
+    posthog.reset()
+  }
+  if (!validContext) return false
+  posthog.opt_in_capturing({ captureEventName: false })
   posthog.identify(distinctID)
   if (pending && context.verified) {
     posthog.capture('signup_completed', { surface: 'website' })

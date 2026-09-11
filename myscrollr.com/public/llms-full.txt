@@ -31,7 +31,7 @@ Current files and installation guidance are at https://myscrollr.com/download. T
 
 You can download and browse Scrollr without an account. Sign-in is required to add live data widgets and sync settings. Account and subscription records are held by Scrollr's authentication and billing systems.
 
-Scrollr has no advertising trackers and does not sell data to brokers. Operational diagnostics and authentication logs are used to run and secure the service. Optional product analytics, when enabled by the user, is opt-in, coarse, account-linked, desktop-only, and described in the Privacy Policy. See https://myscrollr.com/legal?doc=privacy for the current policy.
+Scrollr has no advertising trackers and does not sell data to brokers. Operational diagnostics and authentication logs are used to run and secure the service. Website analytics default on only in the US after a local country check; elsewhere the site asks first. They are easy to turn off in the footer. Signed-in desktop analytics are on by default with an opt-out. All analytics are coarse and described in the Privacy Policy. See https://myscrollr.com/legal?doc=privacy for the current policy.
 
 ## Plans
 

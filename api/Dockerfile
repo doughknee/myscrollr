@@ -3,7 +3,16 @@ FROM golang:1.25-alpine AS builder
 WORKDIR /app
 
 # Install git for module fetching
-RUN apk add --no-cache git
+RUN apk add --no-cache git curl
+
+# Monthly DB-IP Lite country data stays inside the image; visitor IPs never
+# leave the API. Update the release and checksum together. The endpoint fails
+# consent-first once the embedded database is older than 45 days.
+ARG DBIP_COUNTRY_RELEASE=2026-09
+ARG DBIP_COUNTRY_SHA256=cb0578ce59f569f2c933bb40feb820804a334855a60739011b0a89cab1d6e4ed
+RUN curl -fsSL "https://download.db-ip.com/free/dbip-country-lite-${DBIP_COUNTRY_RELEASE}.mmdb.gz" -o /tmp/dbip-country.mmdb.gz \
+    && echo "${DBIP_COUNTRY_SHA256}  /tmp/dbip-country.mmdb.gz" | sha256sum -c - \
+    && gzip -dc /tmp/dbip-country.mmdb.gz > /app/dbip-country-lite.mmdb
 
 # Copy the module files
 COPY go.mod ./
@@ -51,6 +60,7 @@ WORKDIR /root/
 # Defaults to "unknown" so local builds still work.
 ARG GIT_SHA=unknown
 ENV GIT_SHA=${GIT_SHA}
+ENV COUNTRY_DB_PATH=/root/dbip-country-lite.mmdb
 
 # All URL env vars (API_URL, LOGTO_URL, LOGTO_JWKS_URL, YAHOO_CALLBACK_URL)
 # are supplied at runtime via K8s ConfigMap and Secrets.
@@ -63,6 +73,7 @@ COPY --from=builder /app/main .
 COPY --from=builder /app/support-backfill .
 COPY --from=builder /app/support-regen .
 COPY --from=builder /app/migrations ./migrations
+COPY --from=builder /app/dbip-country-lite.mmdb ./dbip-country-lite.mmdb
 
 # Expose port 8080 to the outside world
 EXPOSE 8080

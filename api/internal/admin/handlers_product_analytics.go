@@ -80,10 +80,10 @@ func loadProductAnalytics(ctx context.Context, days int, now time.Time) (Product
 	start := today.AddDate(0, 0, -(days - 1))
 	report := ProductAnalyticsResponse{
 		GeneratedAt: now.UTC().Format(time.RFC3339), Days: days,
-		PopulationNote:     "Opted-in signed-in accounts only. Activity means a native ticker was visible with an enabled widget for 30 continuous seconds; it does not prove attention.",
+		PopulationNote:     "Signed-in customer accounts with usage analytics enabled. Activity means a native ticker was visible with an enabled widget for 30 continuous seconds; it does not prove attention.",
 		Activation:         ActivationSummary{Definition: "First observed successful configured ticker use; not original signup date."},
 		Features:           []FeatureUsage{},
-		RecentPresenceNote: "Accounts seen by the opted-in desktop app in the last 15 minutes; presence does not prove attention.",
+		RecentPresenceNote: "Customer accounts with analytics enabled, seen by the desktop app in the last 15 minutes; presence does not prove attention.",
 	}
 	if platform.Rdb != nil {
 		cutoff := now.UTC().Add(-15 * time.Minute).Unix()
@@ -180,7 +180,7 @@ func loadProductAnalytics(ctx context.Context, days int, now time.Time) (Product
 		if metric.Available {
 			metric.Rate = float64(metric.Returned) / float64(metric.Eligible)
 		} else {
-			metric.Note = "No opted-in cohort is old enough to observe this exact return day."
+			metric.Note = "No measured cohort is old enough to observe this exact return day."
 		}
 	}
 

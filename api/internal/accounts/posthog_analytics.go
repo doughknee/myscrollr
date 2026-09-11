@@ -98,8 +98,9 @@ func postHogDesktopStaff(ctx context.Context, userID, emailHint string) (bool, e
 }
 
 type postHogDesktopEvent struct {
-	Event   string `json:"event"`
-	Feature string `json:"feature,omitempty"`
+	Event    string `json:"event"`
+	Feature  string `json:"feature,omitempty"`
+	Internal bool   `json:"-"`
 }
 
 func loadPostHogAnalyticsExport(ctx context.Context, userID string) (map[string]any, error) {
@@ -171,26 +172,7 @@ func HandleGetPostHogConsent(c *fiber.Ctx) error {
 	if userID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(platform.ErrorResponse{Status: "unauthorized", Error: "Authentication required"})
 	}
-	var result PostHogConsent
-	err := platform.DBPool.QueryRow(context.Background(), `
-		SELECT decision, deletion_status FROM posthog_analytics_consents WHERE logto_sub = $1`, userID).
-		Scan(&result.Decision, &result.DeletionStatus)
-	if errors.Is(err, pgx.ErrNoRows) {
-		email, _ := c.Locals("user_email").(string)
-		staff, staffErr := postHogDesktopStaff(context.Background(), userID, email)
-		if staffErr != nil {
-			log.Printf("[PostHog Analytics] verify default setting: %v", staffErr)
-			return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Could not read analytics setting"})
-		}
-		if staff || postHogActorExcluded(userID) {
-			return c.JSON(PostHogConsent{Decision: "declined"})
-		}
-		if _, err := setPostHogConsent(context.Background(), userID, "enabled"); err != nil {
-			log.Printf("[PostHog Analytics] apply default setting: %v", err)
-			return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Could not read analytics setting"})
-		}
-		return c.JSON(PostHogConsent{Decision: "enabled", DeletionStatus: "not_requested"})
-	}
+	result, err := savePostHogConsent(context.Background(), userID, "")
 	if err != nil {
 		log.Printf("[PostHog Analytics] read consent: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Could not read analytics setting"})
@@ -209,7 +191,7 @@ func HandleSetPostHogConsent(c *fiber.Ctx) error {
 	if err := decodeStrict(c.Body(), &req); err != nil || (req.Decision != "enabled" && req.Decision != "declined") {
 		return c.Status(fiber.StatusBadRequest).JSON(platform.ErrorResponse{Status: "error", Error: "Body must contain only a decision of enabled or declined"})
 	}
-	deletionStatus, err := setPostHogConsent(context.Background(), userID, req.Decision)
+	_, err := setPostHogConsent(context.Background(), userID, req.Decision)
 	if errors.Is(err, errAccountDeleting) {
 		return c.Status(fiber.StatusConflict).JSON(platform.ErrorResponse{Status: "error", Error: "Analytics cannot be enabled while account deletion is pending or complete"})
 	}
@@ -220,44 +202,65 @@ func HandleSetPostHogConsent(c *fiber.Ctx) error {
 		log.Printf("[PostHog Analytics] update consent: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Could not update analytics setting"})
 	}
-	if deletionStatus == "pending" && postHogDeletionConfigured() {
-		go requestPostHogDeletion(userID)
-	}
-	if req.Decision == "declined" {
-		removeRecentPresence(userID)
-	}
 	return HandleGetPostHogConsent(c)
 }
 
 func setPostHogConsent(ctx context.Context, userID, decision string) (string, error) {
+	result, err := savePostHogConsent(ctx, userID, decision)
+	if err == nil && decision == "declined" {
+		removeRecentPresence(userID)
+		if result.DeletionStatus == "pending" && postHogDeletionConfigured() {
+			go requestPostHogDeletion(userID)
+		}
+	}
+	return result.DeletionStatus, err
+}
+
+// An empty decision resolves the default under the same account lock as opt-out.
+// A concurrent GET must never re-enable a decision just saved by a PUT.
+func savePostHogConsent(ctx context.Context, userID, decision string) (PostHogConsent, error) {
+	var result PostHogConsent
 	deletionStatus := "not_requested"
 	if decision == "declined" {
 		deletionStatus = "pending"
 	}
 	tx, err := platform.DBPool.Begin(ctx)
 	if err != nil {
-		return "", err
+		return result, err
 	}
 	defer tx.Rollback(ctx)
 	if err := lockAccountMutation(ctx, tx, userID); err != nil {
-		return "", err
+		return result, err
+	}
+	if decision == "" {
+		err := tx.QueryRow(ctx, `SELECT decision, deletion_status FROM posthog_analytics_consents WHERE logto_sub=$1`, userID).Scan(&result.Decision, &result.DeletionStatus)
+		if err == nil {
+			if err := syncProductAnalyticsEnrollment(ctx, tx, userID, result.Decision == "enabled"); err != nil {
+				return result, err
+			}
+			return result, tx.Commit(ctx)
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return result, err
+		}
+		decision = "enabled"
 	}
 	if decision == "enabled" {
 		var priorDeletion string
 		err := tx.QueryRow(ctx, `SELECT deletion_status FROM posthog_analytics_consents WHERE logto_sub = $1`, userID).Scan(&priorDeletion)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return "", err
+			return result, err
 		}
 		if err == nil && priorDeletion == "pending" {
-			return "", errPostHogDeletionPending
+			return result, errPostHogDeletionPending
 		}
 		var status string
 		err = tx.QueryRow(ctx, `SELECT status FROM user_deletion_requests WHERE logto_sub = $1`, userID).Scan(&status)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return "", err
+			return result, err
 		}
 		if err == nil && status != "canceled" {
-			return "", errAccountDeleting
+			return result, errAccountDeleting
 		}
 	}
 	_, err = tx.Exec(ctx, `
@@ -268,12 +271,15 @@ func setPostHogConsent(ctx context.Context, userID, decision string) (string, er
 		    deletion_status = EXCLUDED.deletion_status,
 		    decided_at = NOW(), updated_at = NOW()`, userID, decision, deletionStatus)
 	if err != nil {
-		return "", err
+		return result, err
+	}
+	if err := syncProductAnalyticsEnrollment(ctx, tx, userID, decision == "enabled"); err != nil {
+		return result, err
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return "", err
+		return result, err
 	}
-	return deletionStatus, nil
+	return PostHogConsent{Decision: decision, DeletionStatus: deletionStatus}, nil
 }
 
 func HandlePostHogDesktopEvent(c *fiber.Ctx) error {
@@ -294,10 +300,7 @@ func HandlePostHogDesktopEvent(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Could not verify analytics setting"})
 	}
-	if staff || postHogActorExcluded(userID) {
-		removeRecentPresence(userID)
-		return c.SendStatus(fiber.StatusNoContent)
-	}
+	event.Internal = staff || postHogActorExcluded(userID)
 	tx, err := platform.DBPool.Begin(ctx)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Could not verify analytics setting"})
@@ -317,11 +320,20 @@ func HandlePostHogDesktopEvent(c *fiber.Ctx) error {
 	if !enabled {
 		return c.SendStatus(fiber.StatusNoContent)
 	}
-	recordRecentPresence(userID)
-	if event.Event == "desktop_presence" {
-		return c.SendStatus(fiber.StatusNoContent)
+	if !event.Internal {
+		recordRecentPresence(userID)
+	} else {
+		removeRecentPresence(userID)
 	}
-	_ = postHogCaptureDesktopEvent(userID, event)
+	if event.Event == "desktop_presence" {
+		// Keep overnight sessions in each day's distinct-user count. The capture
+		// mirror sends at most one running event per account and UTC day.
+		event.Event = "desktop_app_running"
+	}
+	if err := postHogCaptureDesktopEvent(userID, event); err != nil {
+		log.Printf("[PostHog Analytics] capture failed: %v", err)
+		return c.Status(fiber.StatusBadGateway).JSON(platform.ErrorResponse{Status: "error", Error: "Could not deliver analytics event"})
+	}
 	return c.SendStatus(fiber.StatusAccepted)
 }
 
@@ -376,10 +388,12 @@ func capturePostHogEvent(userID string, event postHogDesktopEvent) error {
 	now := time.Now().UTC()
 	dedup := postHogDistinctID(userID + "\x00" + event.Event + "\x00" + event.Feature + "\x00" + now.Format("2006-01-02"))
 	properties := map[string]any{
-		"distinct_id": postHogDistinctID(userID),
-		"$ip":         nil,
-		"$insert_id":  dedup,
-		"surface":     "desktop",
+		"distinct_id":    postHogDistinctID(userID),
+		"$ip":            nil,
+		"$insert_id":     dedup,
+		"surface":        "desktop",
+		"is_internal":    event.Internal,
+		"$geoip_disable": true,
 	}
 	if version := os.Getenv("APP_VERSION"); version != "" {
 		properties["app_version"] = version
@@ -401,6 +415,13 @@ func capturePostHogEvent(userID string, event postHogDesktopEvent) error {
 			ON CONFLICT (insert_id) DO NOTHING`, dedup, userID, event.Event, event.Feature, os.Getenv("APP_VERSION"), now)
 		if err != nil {
 			return fmt.Errorf("record export mirror: %w", err)
+		}
+		var delivered bool
+		if err := platform.DBPool.QueryRow(context.Background(), `SELECT delivered FROM posthog_analytics_events WHERE insert_id=$1`, dedup).Scan(&delivered); err != nil {
+			return err
+		}
+		if delivered {
+			return nil
 		}
 	}
 	if err := postHogRequest(os.Getenv("POSTHOG_HOST"), http.MethodPost, "/i/v0/e/", "", payload); err != nil {

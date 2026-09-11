@@ -88,7 +88,6 @@ import { weatherQueryOptions } from "../api/queries";
 import {
   fetchSubscription,
   getPostHogAnalyticsConsent,
-  getProductAnalyticsConsent,
   ApiError,
 } from "../api/client";
 import { useToggleOnTicker } from "../hooks/useToggleOnTicker";
@@ -590,75 +589,38 @@ function RootLayout() {
   // The same toggle the ticker window's menu uses (hooks/useToggleOnTicker).
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
+  const [analyticsStatus, setAnalyticsStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [analyticsRetry, setAnalyticsRetry] = useState(0);
+  const onRetryAnalytics = useCallback(() => setAnalyticsRetry((n) => n + 1), []);
 
   // Consent is account-level and server-authoritative. The local field is a
   // cross-window mirror used by the ticker; never turn collection on merely
   // because an old local blob says so.
   useEffect(() => {
-    if (!auth.authenticated) {
-      if (prefsRef.current.privacy.shareProductAnalytics) {
-        persistPrefs({
-          ...prefsRef.current,
-          privacy: { ...prefsRef.current.privacy, shareProductAnalytics: false },
-        });
-      }
-      return;
+    setAnalyticsStatus("loading");
+    if (prefsRef.current.privacy.shareProductAnalytics || prefsRef.current.privacy.postHogAnalyticsDecision !== "unknown") {
+      persistPrefs({
+        ...prefsRef.current,
+        privacy: { ...prefsRef.current.privacy, shareProductAnalytics: false, postHogAnalyticsDecision: "unknown" },
+      });
     }
+    if (!auth.authenticated || DEMO) return;
     return hydrateProductAnalyticsConsent(
-      () => getProductAnalyticsConsent().then(({ enabled }) => enabled),
-      (enabled) => {
-        if (prefsRef.current.privacy.shareProductAnalytics === enabled) return;
-        persistPrefs({
-          ...prefsRef.current,
-          privacy: { ...prefsRef.current.privacy, shareProductAnalytics: enabled },
-        });
-      },
-    );
-  }, [auth.authenticated, persistPrefs]);
-
-  useEffect(() => {
-    if (!auth.authenticated) {
-      if (prefsRef.current.privacy.postHogAnalyticsDecision !== "unknown") {
+      getPostHogAnalyticsConsent,
+      ({ decision }) => {
         persistPrefs({
           ...prefsRef.current,
           privacy: {
             ...prefsRef.current.privacy,
-            postHogAnalyticsDecision: "unknown",
-          },
-        });
-      }
-      return;
-    }
-    let current = true;
-    void getPostHogAnalyticsConsent()
-      .then(({ decision }) => {
-        if (
-          decision === "enabled" &&
-          prefsRef.current.privacy.postHogAnalyticsDecision === "unknown"
-        ) {
-          toast.info(
-            "App analytics are on. You can turn them off anytime in Data & privacy.",
-            { id: "posthog-consent-transition", duration: 10_000 },
-          );
-        }
-        if (
-          !current ||
-          prefsRef.current.privacy.postHogAnalyticsDecision === decision
-        )
-          return;
-        persistPrefs({
-          ...prefsRef.current,
-          privacy: {
-            ...prefsRef.current.privacy,
+            shareProductAnalytics: decision === "enabled",
             postHogAnalyticsDecision: decision,
           },
         });
-      })
-      .catch(() => {});
-    return () => {
-      current = false;
-    };
-  }, [auth.authenticated, persistPrefs]);
+        setAnalyticsStatus("ready");
+      },
+      () => setAnalyticsStatus("error"),
+    );
+  }, [auth.authenticated, persistPrefs, analyticsRetry]);
   const toggleOnTicker = useToggleOnTicker({
     getPrefs: () => prefsRef.current,
     persistPrefs,
@@ -921,6 +883,8 @@ function RootLayout() {
       prefs,
       onPrefsChange: persistPrefs,
       authenticated: auth.authenticated,
+      analyticsStatus,
+      onRetryAnalytics,
       tier: auth.tier,
       subscriptionInfo,
       onLogin: auth.handleLogin,
@@ -935,6 +899,7 @@ function RootLayout() {
       prefs, persistPrefs, auth.authenticated, auth.tier, subscriptionInfo,
       auth.handleLogin, auth.handleLogout, autostartOn, handleAutostartChange,
       appVersion, allDataWidgetManifests, allWidgets,
+      analyticsStatus, onRetryAnalytics,
     ],
   );
 

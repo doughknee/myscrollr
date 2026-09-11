@@ -46,7 +46,7 @@ const FAQ_ITEMS: Array<FAQItem> = [
     question: 'Is my data private?',
     highlight: 'No ads, tracking pixels, or data sales.',
     answer:
-      'No ads, tracking pixels, or data sales. Analytics use only broad content-free events and are easy to control; the website asks first. Your widget setup still syncs to your account so it follows you between machines.',
+      'No ads, tracking pixels, or data sales. Analytics use only broad content-free events and are easy to control. Website analytics default on only in the US after a local country check; elsewhere the site asks first. Your widget setup still syncs to your account so it follows you between machines.',
     accent: 'sky',
   },
   {

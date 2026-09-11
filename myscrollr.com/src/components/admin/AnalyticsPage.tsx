@@ -382,7 +382,9 @@ export function AnalyticsContent({
   const eventTotal = signup
     ? Object.values(signup.stages).reduce((sum, stage) => sum + stage.events, 0)
     : 0
-  const hasFeatureUse = product?.features.some((feature) => feature.accounts > 0)
+  const hasFeatureUse = product?.features.some(
+    (feature) => feature.accounts > 0,
+  )
 
   return (
     <div className="space-y-8">
@@ -578,12 +580,12 @@ export function AnalyticsContent({
                 <Big>{num(product.recent_presence)}</Big>
               </Card>
               <a
-                href="https://us.posthog.com/project/603918"
+                href="https://us.posthog.com/project/603918/dashboard/2087325"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm font-semibold text-primary hover:underline"
               >
-                Explore consented website and app events in PostHog
+                Open product analytics in PostHog
               </a>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -794,9 +796,9 @@ export function AnalyticsContent({
                               key={row.platform}
                               className="mt-2 flex justify-between gap-3 text-sm"
                             >
-                            <span>
-                              {platformLabel[row.platform] ?? row.platform}
-                            </span>
+                              <span>
+                                {platformLabel[row.platform] ?? row.platform}
+                              </span>
                               <span className="tabular-nums">
                                 {pct(row.share)} · {num(row.requests)} req
                               </span>

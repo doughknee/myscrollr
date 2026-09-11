@@ -4,9 +4,10 @@ export function signalProductAnalyticsConsentMutation(): void {
   window.dispatchEvent(new Event(mutationEvent));
 }
 
-export function hydrateProductAnalyticsConsent(
-  load: () => Promise<boolean>,
-  apply: (enabled: boolean) => void,
+export function hydrateProductAnalyticsConsent<T>(
+  load: () => Promise<T>,
+  apply: (value: T) => void,
+  onError: () => void = () => {},
 ): () => void {
   let current = true;
   const cancel = () => {
@@ -17,7 +18,7 @@ export function hydrateProductAnalyticsConsent(
     .then((enabled) => {
       if (current) apply(enabled);
     })
-    .catch(() => {});
+    .catch(() => { if (current) onError(); });
   return () => {
     current = false;
     window.removeEventListener(mutationEvent, cancel);

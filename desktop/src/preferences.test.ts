@@ -55,6 +55,14 @@ afterEach(() => {
   storeValues.clear();
 });
 
+it("keeps the account analytics decision when resetting local preferences", () => {
+  const prefs = loadPrefs();
+  savePrefs({ ...prefs, privacy: { ...prefs.privacy, postHogAnalyticsDecision: "enabled", shareProductAnalytics: true } });
+  expect(resetAll().privacy).toMatchObject({ postHogAnalyticsDecision: "enabled", shareProductAnalytics: true });
+  savePrefs({ ...prefs, privacy: { ...prefs.privacy, postHogAnalyticsDecision: "declined", shareProductAnalytics: false } });
+  expect(resetAll().privacy).toMatchObject({ postHogAnalyticsDecision: "declined", shareProductAnalytics: false });
+});
+
 it("reconciles sidebar ordering across widget types", () => {
   expect(
     reconcileSidebarOrder(

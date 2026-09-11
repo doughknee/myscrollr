@@ -36,7 +36,9 @@ var (
 
 // Server holds the Fiber app and shared dependencies.
 type Server struct {
-	App *fiber.App
+	App             *fiber.App
+	countryResolver countryResolver
+	now             func() time.Time
 }
 
 // NewServer creates a new Server with a configured Fiber app.
@@ -44,15 +46,26 @@ func NewServer() *Server {
 	app := fiber.New(fiber.Config{
 		AppName:                 "Scrollr API",
 		EnableTrustedProxyCheck: true,
+		EnableIPValidation:      true,
 		TrustedProxies:          []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"},
 		ProxyHeader:             "X-Forwarded-For",
 		ReadTimeout:             30 * time.Second,
 		IdleTimeout:             120 * time.Second,
 	})
 
-	return &Server{
+	server := &Server{
 		App: app,
+		now: time.Now,
 	}
+	if path := os.Getenv("COUNTRY_DB_PATH"); path != "" {
+		resolver, err := openCountryResolver(path)
+		if err != nil {
+			log.Printf("[AnalyticsPolicy] country database unavailable: %v", err)
+		} else {
+			server.countryResolver = resolver
+		}
+	}
+	return server
 }
 
 // Setup configures middleware, registers all routes, and sets up channel
@@ -127,6 +140,7 @@ func (s *Server) setupMiddleware() {
 	// Core paths always exempt from rate limiting
 	coreExemptPaths := map[string]bool{
 		"/health":                            true,
+		"/public/analytics-policy":           true,
 		"/events":                            true,
 		"/webhooks/sequin":                   true,
 		"/webhooks/stripe":                   true,
@@ -203,6 +217,7 @@ func (s *Server) setupRoutes() {
 
 	// --- Public Routes ---
 	s.App.Get("/health", s.healthCheck)
+	s.App.Get("/public/analytics-policy", s.analyticsPolicy)
 	s.App.Get("/public/feed", ingestread.HandlePublicFeed)
 	s.App.Get("/events", events.StreamEvents)
 	s.App.Get("/events/count", events.GetActiveViewers)
