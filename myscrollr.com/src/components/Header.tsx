@@ -2,7 +2,6 @@ import { ClientOnly, Link, useLocation } from '@tanstack/react-router'
 import { Menu, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import type { IdTokenClaims } from '@logto/react'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { useDemoTicker } from '@/hooks/useDemoTicker'
@@ -110,7 +109,7 @@ export default function Header({
         <Wordmark />
 
         {/* Desktop navigation */}
-        <nav className="hidden items-center gap-8 font-mono text-xs tracking-[0.08em] lg:flex">
+        <nav className="hidden items-center gap-6 font-mono text-xs tracking-[0.08em] lg:flex">
           {NAV_LINKS.map((l) => (
             <NavLink key={l.to} to={l.to}>
               {l.label}
@@ -236,44 +235,59 @@ function Wordmark() {
 // Each of these calls `useScrollrAuth()` and therefore must render
 // only on the client (wrapped in <ClientOnly> at the call site).
 
-function useUserClaims(): IdTokenClaims | undefined {
-  const { isAuthenticated, getIdTokenClaims } = useScrollrAuth()
-  const [userClaims, setUserClaims] = useState<IdTokenClaims>()
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      getIdTokenClaims().then(setUserClaims)
-    } else {
-      setUserClaims(undefined)
-    }
-  }, [isAuthenticated, getIdTokenClaims])
-
-  return userClaims
-}
-
 function DesktopAccountLink() {
-  const { isAuthenticated } = useScrollrAuth()
-  const userClaims = useUserClaims()
-
-  if (!isAuthenticated) return null
-
+  const { isAuthenticated, isLoading, signIn, signOut } = useScrollrAuth()
+  if (isLoading) return null
+  if (!isAuthenticated)
+    return (
+      <button
+        type="button"
+        onClick={() => signIn('/account')}
+        className="font-semibold text-primary hover:underline"
+      >
+        SIGN IN
+      </button>
+    )
   return (
-    <NavLink to="/account">
-      {(userClaims?.username || userClaims?.name || 'ACCOUNT').toUpperCase()}
-    </NavLink>
+    <div className="flex items-center gap-4">
+      <NavLink to="/account">ACCOUNT</NavLink>
+      <button
+        type="button"
+        onClick={() => signOut(window.location.origin)}
+        className="text-base-content/60 hover:text-primary"
+      >
+        SIGN OUT
+      </button>
+    </div>
   )
 }
 
 function MobileAccountLink({ onNavigate }: { onNavigate: () => void }) {
-  const { isAuthenticated } = useScrollrAuth()
-  const userClaims = useUserClaims()
-
-  if (!isAuthenticated) return null
-
+  const { isAuthenticated, isLoading, signIn, signOut } = useScrollrAuth()
+  if (isLoading) return null
+  if (!isAuthenticated)
+    return (
+      <button
+        type="button"
+        onClick={() => signIn('/account')}
+        className="block w-full rounded px-4 py-3 text-left font-semibold text-primary"
+      >
+        SIGN IN
+      </button>
+    )
   return (
-    <MobileNavLink to="/account" onClick={onNavigate}>
-      {(userClaims?.username || userClaims?.name || 'ACCOUNT').toUpperCase()}
-    </MobileNavLink>
+    <>
+      <MobileNavLink to="/account" onClick={onNavigate}>
+        ACCOUNT
+      </MobileNavLink>
+      <button
+        type="button"
+        onClick={() => signOut(window.location.origin)}
+        className="block w-full rounded px-4 py-3 text-left text-base-content/70 hover:bg-base-200"
+      >
+        SIGN OUT
+      </button>
+    </>
   )
 }
 

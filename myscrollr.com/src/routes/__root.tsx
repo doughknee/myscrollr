@@ -1,4 +1,5 @@
 import {
+  ClientOnly,
   HeadContent,
   Link,
   Outlet,
@@ -147,6 +148,8 @@ function RootErrorDocument(props: { error: Error }) {
 // (account, invite, auth callback, public profiles) and /business,
 // which renders its own white-label variant of the bar.
 const DEMO_BAR_EXCLUDED = [
+  // The fallback shell must match the private routes that consume it.
+  '/tss-spa-shell',
   '/account',
   '/invite',
   '/callback',
@@ -250,7 +253,9 @@ function RootLayout() {
 
           {/* Footer */}
           <Footer />
-          <AnalyticsConsent />
+          <ClientOnly>
+            <AnalyticsConsent />
+          </ClientOnly>
 
           {/* Persistent demo ticker bar — the brand's connective tissue.
               /business mounts its own white-label variant instead. */}

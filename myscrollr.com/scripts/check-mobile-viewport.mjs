@@ -45,6 +45,8 @@ const VIEWPORTS = [
 // Running the check against an empty <main> would silently pass and
 // hide real bugs.
 const ROUTES = [
+  { path: '/account', file: '_shell.html', authShell: true },
+  { path: '/admin', file: '_shell.html', authShell: true },
   { path: '/', file: 'index.html' },
   { path: '/widgets', file: 'widgets/index.html' },
   { path: '/fantasy', file: 'fantasy/index.html' },
@@ -191,9 +193,19 @@ try {
       isMobile: viewport.width < 768,
       hasTouch: viewport.width < 768,
     })
+    const theme = viewport.width < 400 ? 'dark' : 'light'
+    await context.addInitScript((preference) => {
+      localStorage.setItem('theme', preference)
+      localStorage.setItem('scrollr-analytics-consent-v1', 'declined')
+    }, theme)
     const page = await context.newPage()
+    const pageErrors = []
+    page.on('pageerror', (error) => pageErrors.push(error.message))
 
-    for (const route of ROUTES) {
+    for (const route of ROUTES.filter(
+      (item) => !process.argv.includes('--auth-only') || item.authShell,
+    )) {
+      pageErrors.length = 0
       try {
         await page.goto(`${baseUrl}${route.path}`, {
           waitUntil: 'networkidle',
@@ -209,6 +221,42 @@ try {
 
       // Brief settle so any in-flight layout work finishes.
       await page.waitForTimeout(250)
+
+      if (route.authShell) {
+        const actualTheme = await page.evaluate(() =>
+          document.documentElement.classList.contains('dark')
+            ? 'dark'
+            : 'light',
+        )
+        const heading = await page.locator('h1').textContent()
+        if (
+          pageErrors.length ||
+          actualTheme !== theme ||
+          !heading?.includes(
+            route.path === '/admin'
+              ? 'Sign in to continue'
+              : 'Your Scrollr account',
+          )
+        ) {
+          console.error(
+            `✗ ${route.path}: theme=${actualTheme}, expected=${theme}, heading=${heading}, errors=${pageErrors.join('; ')}`,
+          )
+          failures += 1
+        }
+        await page
+          .getByRole('button', { name: 'Open menu', exact: true })
+          .click()
+        if (
+          !(await page
+            .getByRole('dialog', { name: 'Mobile navigation' })
+            .getByRole('button', { name: 'SIGN IN', exact: true })
+            .isVisible())
+        )
+          failures += 1
+        await page
+          .getByRole('button', { name: 'Close menu', exact: true })
+          .click()
+      }
 
       const result = await page.evaluate(() => {
         const doc = document.documentElement
