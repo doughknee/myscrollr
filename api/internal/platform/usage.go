@@ -193,6 +193,32 @@ func PruneProductActivity(ctx context.Context, now time.Time) {
 		`DELETE FROM product_activity_daily WHERE day < $1`, cutoff); err != nil {
 		log.Printf("[Product Analytics] prune daily facts: %v", err)
 	}
+	PrunePresence(ctx, now)
+}
+
+// PrunePresence keeps 90 days of presence hourly rows, minute samples and
+// widget change facts (SCROLLR-210). Cohort anchors (presence_accounts) are
+// kept for the same reason enrollment rows are: pruning must not make an old
+// participant look new. The table names are constants here, never input.
+func PrunePresence(ctx context.Context, now time.Time) {
+	if DBPool == nil {
+		return
+	}
+	cutoff := now.UTC().Truncate(time.Hour).AddDate(0, 0, -90)
+	for _, table := range []string{
+		"presence_session_hourly", "presence_account_hourly",
+		"presence_widget_hourly", "presence_widget_account_hourly",
+	} {
+		if _, err := DBPool.Exec(ctx, `DELETE FROM `+table+` WHERE hour < $1`, cutoff); err != nil {
+			log.Printf("[Presence] prune %s: %v", table, err)
+		}
+	}
+	if _, err := DBPool.Exec(ctx, `DELETE FROM presence_concurrency_minute WHERE minute < $1`, cutoff); err != nil {
+		log.Printf("[Presence] prune samples: %v", err)
+	}
+	if _, err := DBPool.Exec(ctx, `DELETE FROM presence_widget_changes WHERE at < $1`, cutoff); err != nil {
+		log.Printf("[Presence] prune widget changes: %v", err)
+	}
 }
 
 // StartUsageFlusher writes the counters every minute for the lifetime of ctx,

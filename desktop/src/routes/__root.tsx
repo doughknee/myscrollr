@@ -50,7 +50,7 @@ import AuthGate from "../components/onboarding/AuthGate";
 // Registries
 import { getAllDataWidgets } from "../datawidgets/registry";
 import { catalogItemById, widgetLogoUrl, isUtilityWidget } from "../marketplace";
-import { DEMO } from "../config";
+import { API_BASE, DEMO } from "../config";
 import { getAllWidgets } from "../widgets/registry";
 import { canonicalOrder } from "../marketplace";
 
@@ -424,6 +424,22 @@ function RootLayout() {
     if (event.payload) {
       navigate({ to: event.payload });
     }
+  });
+
+  // ── Desktop presence (SCROLLR-210) ──────────────────────────
+  // The reporter lives in Rust (one per process, survives this window
+  // closing to the tray). It needs the API base once, and it reads auth
+  // and the usage-analytics consent from the store on every check-in,
+  // so nothing else is pushed from here. Demo builds never report.
+  useEffect(() => {
+    void invoke("configure_presence", { apiBase: API_BASE, enabled: !DEMO }).catch(
+      (err) => console.error("[Scrollr] configure_presence failed:", err),
+    );
+  }, []);
+  // Rust cannot refresh a Logto token; when the stored one has expired it
+  // asks this window, which persists the fresh token for the next tick.
+  useTauriListener("presence-auth-expired", () => {
+    void getValidToken(true).catch(() => {});
   });
 
   const queryClient = useQueryClient();

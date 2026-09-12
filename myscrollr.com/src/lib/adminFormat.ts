@@ -13,6 +13,7 @@ import type {
   Measured,
   Trend,
 } from '@/api/admin'
+import type { Bucket, Comparison, Period } from '@/api/adminDashboard'
 
 /** What a tile should actually render for a Measured value. */
 export interface TileValue {
@@ -27,11 +28,14 @@ export interface TileValue {
  * even as "0", which reads as a measurement of zero rather than the absence
  * of a measurement. That distinction is the whole reason the type exists.
  */
-export function measuredValue(m: Measured | undefined): TileValue {
+export function measuredValue(
+  m: Measured | undefined,
+  format: (value: number) => string = (value) => value.toLocaleString(),
+): TileValue {
   if (!m || !m.available) {
     return { display: null, note: m?.note ?? 'Not measurable.' }
   }
-  return { display: m.value.toLocaleString(), note: m.note }
+  return { display: format(m.value), note: m.note }
 }
 
 /**
@@ -187,4 +191,140 @@ export function sparkline(
     peak,
     last,
   }
+}
+
+// ── The shared time contract (SCROLLR-210) ───────────────────────
+
+export const PERIODS: ReadonlyArray<Period> = ['24h', '7d', '30d', 'lifetime']
+
+export const DEFAULT_PERIOD: Period = '7d'
+
+/** The selector value off the URL. Anything unknown is the default, not 400. */
+export function parsePeriod(raw: unknown): Period {
+  return PERIODS.includes(raw as Period) ? (raw as Period) : DEFAULT_PERIOD
+}
+
+/** The window as a card label: "Last 7 days". */
+export function periodLabel(period: Period): string {
+  switch (period) {
+    case '24h':
+      return 'Last 24 hours'
+    case '7d':
+      return 'Last 7 days'
+    case '30d':
+      return 'Last 30 days'
+    case 'lifetime':
+      return 'Lifetime'
+  }
+}
+
+/** The selector button text. */
+export function periodShort(period: Period): string {
+  return period === 'lifetime' ? 'Lifetime' : period
+}
+
+/**
+ * Stripe amounts are minor units — cents for USD, whole yen for JPY. The
+ * currency itself says how many decimals it has, so the divisor is read from
+ * Intl rather than assumed to be 100. The code is always appended: two
+ * currencies must never look like one, and `$` is not a currency.
+ */
+export function formatMinor(minor: number, currency: string): string {
+  const code = currency.toUpperCase()
+  try {
+    const fmt = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: code,
+    })
+    const digits = fmt.resolvedOptions().maximumFractionDigits ?? 2
+    const text = fmt.format(minor / 10 ** digits)
+    // A code Intl has no symbol for is already printed as the code.
+    return text.includes(code) ? text : `${text} ${code}`
+  } catch {
+    return `${(minor / 100).toFixed(2)} ${code}`
+  }
+}
+
+export function formatHours(hours: number): string {
+  return `${hours.toLocaleString(undefined, { maximumFractionDigits: 1 })} h`
+}
+
+/**
+ * A Comparison ready to render. `delta: null` means no delta may be drawn —
+ * lifetime, coverage too short, or a previous window of zero — and `note`
+ * says why. `pct` is null whenever the API sent no percentage, even when a
+ * delta exists.
+ */
+export interface ComparisonDisplay {
+  delta: string | null
+  pct: string | null
+  direction: TrendDirection
+  note?: string
+}
+
+export function comparisonDisplay(
+  c: Comparison | undefined,
+  format: (value: number) => string = (value) =>
+    value.toLocaleString(undefined, { signDisplay: 'exceptZero' }),
+): ComparisonDisplay {
+  if (!c || !c.comparable || c.delta === undefined) {
+    return {
+      delta: null,
+      pct: null,
+      direction: 'flat',
+      note: c?.note ?? 'No comparison available.',
+    }
+  }
+  return {
+    delta: format(c.delta),
+    pct:
+      c.delta_pct === undefined
+        ? null
+        : `${c.delta_pct.toLocaleString(undefined, { signDisplay: 'exceptZero', maximumFractionDigits: 1 })}%`,
+    direction: c.delta > 0 ? 'up' : c.delta < 0 ? 'down' : 'flat',
+    note: c.note,
+  }
+}
+
+/** Go's Duration.String(): "1h0m0s" is hourly, anything longer is daily+. */
+export function bucketLabel(iso: string, step: string): string {
+  return step.startsWith('1h') ? `${iso.slice(11, 16)}Z` : iso.slice(0, 10)
+}
+
+/** Buckets as sparkline points, labelled by their start. */
+export function bucketPoints(
+  buckets: Array<Bucket> | null | undefined,
+  step: string,
+): Array<DailyCount> {
+  return (buckets ?? []).map((b) => ({
+    day: bucketLabel(b.start, step),
+    count: b.value,
+  }))
+}
+
+// ── Analytics tabs ────────────────────────────────────────────────
+
+export type AnalyticsView = 'growth' | 'desktop' | 'revenue' | 'support'
+
+export const ANALYTICS_VIEWS: ReadonlyArray<{
+  value: AnalyticsView
+  label: string
+}> = [
+  { value: 'growth', label: 'Growth' },
+  { value: 'desktop', label: 'Desktop usage' },
+  { value: 'revenue', label: 'Revenue' },
+  { value: 'support', label: 'Support' },
+]
+
+export function parseView(raw: unknown): AnalyticsView {
+  return ANALYTICS_VIEWS.some((v) => v.value === raw)
+    ? (raw as AnalyticsView)
+    : 'growth'
+}
+
+/** A free-text filter off the URL: a short string or nothing. */
+export function parseFilter(raw: unknown): string | undefined {
+  return typeof raw === 'string' && raw.length > 0 && raw.length <= 64
+    ? raw
+    : undefined
 }

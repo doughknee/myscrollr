@@ -1,246 +1,437 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { AnalyticsContent } from './AnalyticsPage'
-import type { AdminOverview, AdminVersions } from '@/api/admin'
-import type { SignupAnalytics } from '@/api/adminAnalytics'
-import type { ProductAnalytics } from '@/api/adminProductAnalytics'
+import {
+  DesktopContent,
+  GrowthContent,
+  RevenueContent,
+  SupportContent,
+  Tabs,
+  signupDays,
+} from './AnalyticsPage'
+import { renderWithRouter } from './testRouter'
+import { Bars } from './ui'
+import {
+  audience,
+  desktop,
+  failed,
+  loaded,
+  loading,
+  notComparable,
+  revenue,
+  signup,
+  support,
+  unavailable,
+  website,
+} from './dashboardFixtures'
 
-const trend = { value: 4, delta: 1, available: true }
-const overview: AdminOverview = {
-  generated_at: '2026-09-10T12:00:00Z',
-  accounts: {
-    total: 120,
-    set_up: 75,
-    source: 'logto',
-    new_today: trend,
-    new_7d: { ...trend, value: 18 },
-  },
-  active: {
-    dau: { ...trend, value: 31 },
-    wau: { ...trend, value: 64 },
-    mau: { ...trend, value: 90 },
-    curve: [],
-  },
-  plans: {
-    paying: 12,
-    rows: [{ plan: 'pro', status: 'active', lifetime: false, count: 10 }],
-  },
-  connected_now: { count: 8, replicas: 2 },
-  support: {
-    open_cases: 3,
-    pending_drafts: 1,
-    auto_sent_30d: 4,
-    intervened_30d: 1,
-    oldest_open_hours: 2,
-  },
-  ingest: [{ table: 'games', age_seconds: 90, has_data: true }],
-  downloads: { total: 0, releases: [], stale: false },
-  installs: { value: 0, available: false },
-  demand: { catalog_requests: [], business_leads: 0, leads_unreplied: 0 },
-}
-const product: ProductAnalytics = {
-  generated_at: '2026-09-10T12:00:00Z',
-  collection_started_at: '2026-09-01T12:00:00Z',
-  days: 7,
-  enrolled_accounts: 24,
-  activity: {
-    dau: 8,
-    wau: 17,
-    mau: 22,
-    curve: [{ day: '2026-09-10', count: 8 }],
-  },
-  activation: {
-    first_observed: 6,
-    curve: [{ day: '2026-09-10', count: 2 }],
-    definition: 'First observed successful configured ticker use.',
-  },
-  retention: {
-    d1: { day: 1, eligible: 12, returned: 6, rate: 0.5, available: true },
-    d7: { day: 7, eligible: 4, returned: 1, rate: 0.25, available: true },
-    d30: {
-      day: 30,
-      eligible: 0,
-      returned: 0,
-      rate: 0,
-      available: false,
-      note: 'No cohort is old enough.',
-    },
-  },
-  features: [{ category: 'sports', accounts: 12, share: 0.7 }],
-  population_note: 'Opted-in signed-in accounts only.',
-  recent_presence: 0,
-  recent_presence_note: 'Accounts seen in the last 15 minutes.',
-}
-const versions: AdminVersions = {
-  generated_at: '2026-09-10T12:00:00Z',
-  days: 7,
-  current_release: '1.6.3',
-  current_share: 0.8,
-  desktop_total: 1000,
-  unrecognized: 25,
-  versions: [
-    {
-      version: '1.6.3',
-      requests: 800,
-      share: 0.8,
-      client_errors: 4,
-      server_errors: 1,
-      error_rate: 0.00625,
-    },
-  ],
-  platforms: [{ platform: 'windows', requests: 700, share: 0.7 }],
-}
-const signup: SignupAnalytics = {
-  application: 'website',
-  window_days: 7,
-  generated_at: '2026-09-10T12:00:00Z',
-  measurement: 'events',
-  stages: { started: { events: 14, errors: 2 } },
-  error_reasons: [{ reason: 'verification_code', count: 3 }],
-  coverage: {
-    status: 'partial',
-    requested_from: '2026-09-03T12:00:00Z',
-    pages: 1,
-    unique_logs: 14,
-    retention: 'unknown',
-    note: 'Retained logs only.',
-  },
-  attempt_conversion: { available: false, note: 'Unavailable.' },
-}
+describe('Tabs', () => {
+  it('is a tab list with one selected tab and the rest out of the tab order', () => {
+    const html = renderToStaticMarkup(
+      <Tabs view="revenue" onChange={() => {}} />,
+    )
+    expect(html).toContain('role="tablist"')
+    expect(html.match(/role="tab"/g)).toHaveLength(4)
+    expect(html).toContain(
+      'id="tab-revenue" aria-selected="true" aria-controls="panel-revenue" tabindex="0"',
+    )
+    expect(html).toContain('id="tab-growth" aria-selected="false"')
+    expect(html.match(/tabindex="-1"/g)).toHaveLength(3)
+  })
+})
 
-function renderContent(overrides: Record<string, unknown> = {}) {
-  return renderToStaticMarkup(
-    <AnalyticsContent
-      overview={overview}
-      product={product}
-      versions={versions}
-      signup={signup}
-      days={7}
-      application="website"
-      {...overrides}
-    />,
-  )
-}
+describe('signupDays', () => {
+  it('fits the log window to the period', () => {
+    expect(signupDays('24h')).toBe(7)
+    expect(signupDays('7d')).toBe(7)
+    expect(signupDays('30d')).toBe(30)
+    expect(signupDays('lifetime')).toBe(30)
+  })
+})
 
-describe('AnalyticsPage', () => {
-  it('leads with a truthful product overview and keeps signup logs secondary', () => {
-    const html = renderContent()
-    expect(html).toContain('Product analytics')
-    expect(html).toContain('Growth')
-    expect(html).toContain('Usage &amp; retention')
-    expect(html).toContain('Features')
-    expect(html).toContain('Revenue')
-    expect(html).toContain('Reliability')
-    expect(html).toContain('Diagnostics')
-    expect(html).toContain('120')
-    expect(html).toContain('Authenticated activity (Logto)')
-    expect(html).toContain('Opted-in signed-in accounts only.')
-    expect(html).toContain('50%')
-    expect(html).toContain('No cohort is old enough.')
-    expect(html).toContain('Paying accounts')
-    expect(html).toContain('1.6.3')
-    expect(html).toContain('Platform request mix')
-    expect(html).toContain('Windows')
-    expect(html).toContain('2026-09-10: 8')
+describe('GrowthContent', () => {
+  const render = (
+    overrides: Partial<Parameters<typeof GrowthContent>[0]> = {},
+  ) =>
+    renderWithRouter(
+      <GrowthContent
+        period="7d"
+        audience={loaded(audience)}
+        website={loaded(website)}
+        signup={loaded(signup)}
+        application="website"
+        {...overrides}
+      />,
+    )
+
+  it('shows audience, website and a collapsed signup diagnostics section', async () => {
+    const html = await render()
+    expect(html).toContain('Registered users')
+    expect(html).toContain('>183<')
+    expect(html).toContain('Lifetime registrations')
+    expect(html).toContain('Known purged')
+    expect(html).toContain('Staff excluded')
+    expect(html).toContain('Top referrers')
+    expect(html).toContain('google.com')
+    expect(html).toContain('Downloads by OS')
     expect(html).toContain('Signup diagnostics')
-    expect(html).toContain('Verification code')
-    expect(html).toContain('Attempt conversion')
-  })
-
-  it('keeps successful sections visible when product analytics fails', () => {
-    const html = renderContent({
-      product: null,
-      productError: 'Measured usage is unavailable',
-    })
-    expect(html).toContain('120')
-    expect(html).toContain('Measured usage is unavailable')
     expect(html).toContain('Registration started')
-    expect(html).toContain('Retry')
+    expect(html).toContain('Verification code')
+    expect(html).toContain('last 7 days')
   })
 
-  it('states when collection has no participating accounts', () => {
-    const html = renderContent({
-      product: {
-        ...product,
-        collection_started_at: null,
-        enrolled_accounts: 0,
-        activity: { dau: 0, wau: 0, mau: 0, curve: [] },
-        retention: {
-          d1: {
-            day: 1,
-            eligible: 0,
-            returned: 0,
-            rate: 0,
-            available: false,
-            note: 'Collecting history.',
+  it('never totals the visitors curve', async () => {
+    const html = await render()
+    // 300 + 400 + 500: the sum must not appear anywhere.
+    expect(html).not.toContain('1,200')
+    expect(html).not.toContain('>1200<')
+    expect(html).toContain('Uniques do not add up')
+    expect(html).toContain('peak 500')
+  })
+
+  it('renders the signed-in caveat and a non-comparable note without a delta', async () => {
+    const html = await render()
+    expect(html).toContain('authentication, not usage')
+    expect(html).toContain('nothing complete to compare with')
+    expect(html).toContain('(+50%)') // new accounts is comparable
+    const none = await render({
+      audience: loaded({
+        ...audience,
+        new: { ...audience.new, comparison: notComparable },
+      }),
+    })
+    expect(none).not.toContain('(+50%)')
+  })
+
+  it('renders notes for unavailable sources instead of numbers', async () => {
+    const html = await render({
+      audience: loaded({
+        ...audience,
+        available: false,
+        note: 'Logto is unreachable and no local fallback exists.',
+        total: 0,
+      }),
+      website: loaded({
+        ...website,
+        available: false,
+        note: 'POSTHOG_API_KEY is not set.',
+      }),
+    })
+    expect(html).toContain('Logto is unreachable')
+    expect(html).toContain('POSTHOG_API_KEY is not set.')
+    expect(html).not.toContain('text-3xl font-bold tabular-nums">0<')
+  })
+
+  it('flags partial website coverage', async () => {
+    const html = await render()
+    expect(html).toContain('Partial history')
+    expect(html).toContain('Collection started 11 September 2026.')
+  })
+
+  it('has independent loading and error states', async () => {
+    const html = await render({
+      audience: loading(),
+      website: failed('Website analytics took too long. Please retry.'),
+      signup: loading(),
+    })
+    expect(html).toContain('Loading audience')
+    expect(html).toContain('Website analytics took too long')
+    expect(html).toContain('Loading signup diagnostics')
+  })
+})
+
+describe('DesktopContent', () => {
+  const render = (
+    overrides: Partial<Parameters<typeof DesktopContent>[0]> = {},
+  ) =>
+    renderWithRouter(
+      <DesktopContent
+        period="7d"
+        desktop={loaded(desktop)}
+        filters={{}}
+        {...overrides}
+      />,
+    )
+
+  it('shows headline metrics, peak, retention and the widget table with samples', async () => {
+    const html = await render()
+    expect(html).toContain('>34<')
+    expect(html).toContain('412.5 h')
+    expect(html).toContain('301.3 h')
+    expect(html).toContain('60-second samples')
+    expect(html).toContain('>19<')
+    expect(html).toContain('Day 1 retention')
+    expect(html).toContain('60%')
+    expect(
+      html.match(/No cohort is old enough\./g)?.length,
+    ).toBeGreaterThanOrEqual(2)
+    expect(html).toContain('of 27 measured ticker users')
+    expect(html).toContain('NFL')
+    expect(html).toContain('74%')
+    expect(html).toContain('+3 / −1')
+    expect(html).toContain('25 / 22')
+    expect(html).toContain('href="/admin/versions"')
+  })
+
+  it('shows additions and removals as a dash under a per-computer filter', async () => {
+    const html = await renderWithRouter(
+      <DesktopContent
+        period="7d"
+        desktop={loaded({
+          ...desktop,
+          widgets: {
+            ...desktop.widgets,
+            changes_available: false,
+            changes_note:
+              'Additions and removals carry no OS or version, so they cannot be filtered by computer; clear the OS and version filters to see them.',
           },
-          d7: {
-            day: 7,
-            eligible: 0,
-            returned: 0,
-            rate: 0,
-            available: false,
-            note: 'Collecting history.',
-          },
-          d30: {
-            day: 30,
-            eligible: 0,
-            returned: 0,
-            rate: 0,
-            available: false,
-            note: 'Collecting history.',
-          },
+        })}
+        filters={{ os: 'windows' }}
+      />,
+    )
+    expect(html).toContain('cannot be filtered by computer')
+    expect(html).not.toMatch(/\+\d+ \/ −\d+/)
+  })
+
+  it('shows a breakdown that could not be read as its note, not as an empty table', async () => {
+    const html = await renderWithRouter(
+      <GrowthContent
+        period="7d"
+        audience={loaded(audience)}
+        website={loaded({
+          ...website,
+          top_paths: null,
+          breakdown_note:
+            'One or more breakdowns could not be read from PostHog: 429.',
+        })}
+        signup={loaded(signup)}
+        application="website"
+      />,
+    )
+    expect(html).toContain('could not be read from PostHog: 429')
+  })
+
+  it('shows repeat users as a dash when the API sent null', async () => {
+    const html = await render()
+    // Clock: repeat_users null, comparison not comparable.
+    expect(html).toContain('Clock')
+    expect(html).toContain('>—<')
+    expect(html).toContain('nothing complete to compare with')
+  })
+
+  it('builds filters only from the options the API listed', async () => {
+    const html = await render({ filters: { os: 'windows' } })
+    expect(html).toContain('name="os"')
+    expect(html).toContain('windows (30)')
+    expect(html).toContain('name="plan"')
+    const none = await render({
+      desktop: loaded({
+        ...desktop,
+        filters: { os: [], version: null, plan: [], applied: {} },
+      }),
+    })
+    expect(none).not.toContain('name="os"')
+  })
+
+  it('keeps the legacy series in its own labelled section', async () => {
+    const html = await render()
+    expect(html).toContain('Legacy measurement')
+    expect(html).toContain('never merged with presence')
+    expect(html).toContain('Participating accounts')
+    expect(html).toContain('Opted-in signed-in accounts only.')
+  })
+
+  it('renders unavailable metrics as notes and partial coverage', async () => {
+    const html = await render({
+      desktop: loaded({
+        ...desktop,
+        unique_users: unavailable('No presence rows in this window.'),
+        peak: {
+          ...desktop.peak,
+          available: false,
+          note: 'No minute samples yet.',
         },
-        features: [
-          'sports',
-          'markets',
-          'news',
-          'fantasy',
-          'predictions',
-          'utilities',
-        ].map((category) => ({ category, accounts: 0, share: 0 })),
-      },
+        legacy: null,
+      }),
     })
-    expect(html).toContain('No participating accounts yet.')
-    expect(html).toContain('No measured feature use in this window.')
-    expect(html).not.toContain('Sports</span>')
-    expect(html.match(/Collecting history\./g)).toHaveLength(3)
+    expect(html).toContain('No presence rows in this window.')
+    expect(html).toContain('No minute samples yet.')
+    expect(html).toContain('Partial history')
+    expect(html).toContain('not available for this window')
+    expect(html).not.toContain('text-3xl font-bold tabular-nums">0<')
   })
 
-  it('keeps a nonempty immature cohort in collecting state', () => {
-    const immature = {
-      day: 1 as const,
-      eligible: 0,
-      returned: 0,
-      rate: 0,
-      available: false,
-      note: 'Collecting history.',
-    }
-    const html = renderContent({
-      product: {
-        ...product,
-        collection_started_at: '2026-09-10T12:00:00Z',
-        enrolled_accounts: 5,
-        retention: {
-          d1: immature,
-          d7: { ...immature, day: 7 },
-          d30: { ...immature, day: 30 },
+  it('has loading and error states', async () => {
+    expect(await render({ desktop: loading() })).toContain(
+      'Loading desktop usage',
+    )
+    expect(await render({ desktop: failed('boom') })).toContain('boom')
+  })
+})
+
+describe('RevenueContent', () => {
+  const render = (
+    overrides: Partial<Parameters<typeof RevenueContent>[0]> = {},
+  ) =>
+    renderWithRouter(
+      <RevenueContent period="7d" revenue={loaded(revenue)} {...overrides} />,
+    )
+
+  it('shows paying now, the plan mix and per-currency earnings without summing', async () => {
+    const html = await render()
+    expect(html).toContain('Paying now')
+    expect(html).toContain('>2<')
+    expect(html).toContain('Plan mix')
+    expect(html).toContain('lifetime')
+    expect(html).toContain('monthly')
+    expect(html).toContain('Earnings in USD')
+    expect(html).toContain('Earnings in EUR')
+    expect(html).toContain('$123.45 USD')
+    expect(html).toContain('-$9.99 USD')
+    expect(html).toContain('$113.46 USD')
+    expect(html).toContain('€20.00 EUR')
+    expect(html).toContain('$4.12 USD')
+    expect(html).not.toContain('13346')
+    expect(html).not.toContain('$133.46')
+  })
+
+  it('lists movements and unclassified lines as excluded', async () => {
+    const html = await render()
+    expect(html).toContain('Movements of funds — excluded from net')
+    expect(html).toContain('payout × 1')
+    expect(html).toContain('-$110.00 USD')
+    expect(html).toContain('Unclassified — excluded from net')
+    expect(html).toContain('topup × 1')
+  })
+
+  it('shows the comparison honestly: a zero previous window is a note, never a delta', async () => {
+    const html = await render()
+    // new paying: previous 0 → the API refuses the comparison; the note
+    // shows and no "+1" badge is drawn.
+    expect(html).toContain(
+      'The previous period was zero, so there is nothing to compare against.',
+    )
+    expect(html).not.toContain('>+1<')
+    // net: comparable with a pct.
+    expect(html).toContain('(+126.9%)')
+  })
+
+  it('never renders the paying snapshot as zero when it could not be read', async () => {
+    const html = await render({
+      revenue: loaded({
+        ...revenue,
+        paying_now: {
+          ...revenue.paying_now,
+          available: false,
+          paying: 0,
+          free: 0,
         },
-      },
+        paying_now_note: 'The customer snapshot could not be read.',
+      }),
     })
-    expect(html).toContain('>5<')
-    expect(html.match(/Collecting history\./g)).toHaveLength(3)
-    expect(html).not.toContain('No participating accounts yet.')
+    expect(html).toContain('The customer snapshot could not be read.')
+    expect(html).not.toContain('Canceled')
+    expect(html).not.toMatch(/Paying now[\s\S]{0,400}>0</)
   })
 
-  it('does not render stale product data while a new context loads', () => {
-    const html = renderContent({
-      product: null,
-      days: 30,
-      loading: { product: true },
+  it('draws negative earnings buckets below a zero baseline and labels partial edges', () => {
+    const html = renderToStaticMarkup(
+      <Bars
+        buckets={[
+          {
+            start: '2026-09-04T12:00:00Z',
+            end: '2026-09-05T12:00:00Z',
+            value: 940,
+          },
+          {
+            start: '2026-09-05T12:00:00Z',
+            end: '2026-09-06T12:00:00Z',
+            value: -999,
+          },
+          {
+            start: '2026-09-06T12:00:00Z',
+            end: '2026-09-07T12:00:00Z',
+            value: 0,
+            partial: true,
+          },
+        ]}
+        step="24h0m0s"
+        label="Per bucket"
+      />,
+    )
+    // The negative bar exists with a positive height, and there is a baseline.
+    expect(html).toContain('data-negative=""')
+    expect(html).not.toMatch(/height="-/)
+    expect(html).toContain('<line')
+    expect(html).toContain('low -999')
+    expect(html).toContain('edge buckets partial')
+  })
+
+  it('stamps cache state and coverage and renders unavailable notes', async () => {
+    const html = await render()
+    expect(html).toContain('Cached from Stripe at')
+    expect(html).toContain('One Stripe account, live mode.')
+    const off = await render({
+      revenue: loaded({
+        ...revenue,
+        earnings: {
+          ...revenue.earnings,
+          available: false,
+          note: 'STRIPE_SECRET_KEY is not set.',
+        },
+        new_paying: {
+          ...revenue.new_paying,
+          available: false,
+          note: 'No charge history.',
+        },
+      }),
     })
-    expect(html).toContain('Loading measured usage')
-    expect(html).not.toContain('Measured daily active')
-    expect(html).not.toContain('12 · 70%')
+    expect(off).toContain('STRIPE_SECRET_KEY is not set.')
+    expect(off).toContain('No charge history.')
+    expect(off).not.toContain('$0.00')
+  })
+
+  it('has loading and error states', async () => {
+    expect(await render({ revenue: loading() })).toContain('Loading revenue')
+    expect(
+      await render({ revenue: failed('Could not load revenue') }),
+    ).toContain('Could not load revenue')
+  })
+})
+
+describe('SupportContent', () => {
+  const render = (
+    overrides: Partial<Parameters<typeof SupportContent>[0]> = {},
+  ) =>
+    renderWithRouter(
+      <SupportContent period="7d" support={loaded(support)} {...overrides} />,
+    )
+
+  it('shows buckets with paying overlays, curves and the backlog estimate', async () => {
+    const html = await render()
+    expect(html).toContain('2 paying')
+    expect(html).toContain('40 closed · 11 dismissed · 1 paying')
+    expect(html).toContain('href="/admin/support"')
+    expect(html).toContain('Backlog (estimate)')
+    expect(html).toContain('reopenings are not reconstructable')
+    expect(html).toContain('Tickets created per bucket')
+    expect(html).toContain('Tickets completed per bucket')
+    expect(html).toContain('1 from paying customers')
+    expect(html).toContain('pipeline group needs_you')
+    expect(html).toContain('Created per day uses opened_at')
+  })
+
+  it('carries sample counts with medians and renders an unavailable median as its note', async () => {
+    const html = await render()
+    expect(html).toContain('2.5 h')
+    expect(html).toContain('n=4')
+    expect(html).toContain('No ticket completed in this window.')
+    expect(html).not.toContain('>0 h<')
+  })
+
+  it('has loading and error states', async () => {
+    expect(await render({ support: loading() })).toContain(
+      'Loading support summary',
+    )
+    expect(await render({ support: failed('nope') })).toContain('nope')
   })
 })

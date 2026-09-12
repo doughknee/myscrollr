@@ -102,7 +102,7 @@ func TestProductAnalyticsAggregateMarksImmatureDenominatorUnavailable(t *testing
 	productAnalyticsReportNow = func() time.Time { return time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC) }
 	t.Cleanup(func() { productAnalyticsReportNow = previousNow })
 
-	report, err := loadProductAnalytics(context.Background(), 7, productAnalyticsReportNow())
+	report, err := loadProductAnalytics(context.Background(), 7, productAnalyticsReportNow(), false)
 	if err != nil {
 		t.Fatal(err)
 	}

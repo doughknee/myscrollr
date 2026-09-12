@@ -67,11 +67,22 @@ first-party `product_activity_daily` facts remain authoritative for measured
 ticker activation and retention; PostHog is for visitor, signup, download, and
 directional product funnels.
 
+Desktop **presence check-ins** are first-party and never reach PostHog. Under
+the same **Share usage analytics** decision, the desktop app reports about
+every 30 seconds that it is running, whether the OS session is locked, the
+display asleep, or input idle, whether each ticker screen is shown, and which
+catalog widget types each screen renders — identified by a random per-launch
+session id, never a device identifier. The server keeps 90 s of live state
+and hourly totals for 90 days; the full field list and the measurements built
+on it are in [ADMIN_DASHBOARD.md](ADMIN_DASHBOARD.md).
+
 ## Opt-out and deletion
 
-The desktop's single **Share usage analytics** control governs both the
-first-party daily facts and PostHog events. Both enrollment changes commit in
-one transaction. Old clients' product-analytics writes use the same decision;
+The desktop's single **Share usage analytics** control governs the
+first-party daily facts, the presence check-ins, and PostHog events. Both
+enrollment changes commit in one transaction; turning the setting off deletes
+the account's presence and widget rows in the same statement (cascade) and
+drops its live session immediately. Old clients' product-analytics writes use the same decision;
 an explicit decline survives an upgrade. Historical absence of an old opt-in
 row cannot distinguish never-enabled from previously-disabled accounts; only
 durable recorded decisions can be preserved. Loading/error is shown separately

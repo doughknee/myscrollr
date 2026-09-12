@@ -201,6 +201,73 @@ func loadProductAnalyticsExport(ctx context.Context, userID string) (map[string]
 		return nil, fmt.Errorf("iterate daily activity: %w", err)
 	}
 	productAnalytics["daily_activity"] = daily
+
+	// Presence (SCROLLR-210): everything the check-ins left behind, at the
+	// resolution it is kept — hourly totals, never individual check-ins.
+	presence := map[string]any{"hourly": []any{}, "widget_hourly": []any{}, "widget_changes": []any{}}
+	var firstSeen *time.Time
+	if err := platform.DBPool.QueryRow(ctx,
+		`SELECT first_seen_day FROM presence_accounts WHERE logto_sub = $1`, userID).Scan(&firstSeen); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("read presence account: %w", err)
+	}
+	if firstSeen != nil {
+		presence["first_seen_day"] = firstSeen.Format("2006-01-02")
+	}
+	hourly, err := platform.DBPool.Query(ctx, `
+		SELECT hour, running_seconds, ticker_seconds
+		  FROM presence_account_hourly WHERE logto_sub = $1 ORDER BY hour`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("read presence hours: %w", err)
+	}
+	hours := make([]map[string]any, 0)
+	for hourly.Next() {
+		var hour time.Time
+		var running, ticker int
+		if err := hourly.Scan(&hour, &running, &ticker); err != nil {
+			hourly.Close()
+			return nil, fmt.Errorf("scan presence hours: %w", err)
+		}
+		hours = append(hours, map[string]any{"hour": hour.UTC().Format(time.RFC3339), "running_seconds": running, "ticker_seconds": ticker})
+	}
+	hourly.Close()
+	presence["hourly"] = hours
+	widgetHours, err := platform.DBPool.Query(ctx, `
+		SELECT hour, widget_type, user_seconds
+		  FROM presence_widget_account_hourly WHERE logto_sub = $1 ORDER BY hour, widget_type`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("read presence widget hours: %w", err)
+	}
+	widgets := make([]map[string]any, 0)
+	for widgetHours.Next() {
+		var hour time.Time
+		var widgetType string
+		var secs int
+		if err := widgetHours.Scan(&hour, &widgetType, &secs); err != nil {
+			widgetHours.Close()
+			return nil, fmt.Errorf("scan presence widget hours: %w", err)
+		}
+		widgets = append(widgets, map[string]any{"hour": hour.UTC().Format(time.RFC3339), "widget_type": widgetType, "seconds": secs})
+	}
+	widgetHours.Close()
+	presence["widget_hourly"] = widgets
+	changes, err := platform.DBPool.Query(ctx, `
+		SELECT at, widget_type, change FROM presence_widget_changes WHERE logto_sub = $1 ORDER BY at`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("read widget changes: %w", err)
+	}
+	changed := make([]map[string]any, 0)
+	for changes.Next() {
+		var at time.Time
+		var widgetType, change string
+		if err := changes.Scan(&at, &widgetType, &change); err != nil {
+			changes.Close()
+			return nil, fmt.Errorf("scan widget changes: %w", err)
+		}
+		changed = append(changed, map[string]any{"at": at.UTC().Format(time.RFC3339), "widget_type": widgetType, "change": change})
+	}
+	changes.Close()
+	presence["widget_changes"] = changed
+	productAnalytics["presence"] = presence
 	return productAnalytics, nil
 }
 
@@ -608,6 +675,7 @@ func PurgeUserAccount(ctx context.Context, logtoSub string) error {
 	// poll doesn't briefly return data for a purged account.
 	platform.InvalidateOverviewCache(ctx, logtoSub)
 	removeRecentPresence(logtoSub)
+	RemoveLivePresence(ctx, logtoSub)
 	if deletionStatus == "pending" && postHogDeletionConfigured() {
 		go requestPostHogDeletion(logtoSub)
 	}

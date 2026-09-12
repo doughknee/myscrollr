@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/brandon-relentnet/myscrollr/api/internal/billing"
 	"github.com/brandon-relentnet/myscrollr/api/internal/platform"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
@@ -423,14 +424,75 @@ func HandleAdminQueue(c *fiber.Ctx) error {
 	defer cancel()
 
 	autosend := autoSendState(ctx)
-	rows, err := platform.DBPool.Query(ctx, queueSQL, queueLimit)
+	now := time.Now()
+	all, counts, err := loadQueueRows(ctx, queueLimit, autosend, now)
 	if err != nil {
 		log.Printf("[AdminSupport] queue: %v", err)
 		return adminSupportError(c, "Could not read the support queue.")
 	}
+
+	out := make([]AdminQueueRow, 0, len(all))
+	for _, r := range all {
+		if state != "all" && r.Group != state {
+			continue
+		}
+		if !matchesSearch(r, search) {
+			continue
+		}
+		out = append(out, r)
+	}
+	resolveQueueFixes(ctx, out)
+
+	// The people are grouped from the rows being returned, so a search or a
+	// state filter narrows both together and a person's ticket count always
+	// matches the tickets actually on the page.
+	people := groupPeople(out)
+	sortPeople(people, sortField, sortDir)
+	sortRows(out, sortField, sortDir)
+
+	sections := map[string]int{}
+	for _, s := range sectionOrder {
+		sections[s] = 0
+	}
+	for _, p := range people {
+		sections[p.Section]++
+	}
+
+	accounts := queueAccounts(ctx)
+	accounts.Note = payingSectionNote(accounts, sections[sectionPaying])
+
+	return c.JSON(AdminQueueResponse{
+		GeneratedAt: now.UTC(),
+		AutoSend:    autosend,
+		Counts:      counts,
+		Sections:    sections,
+		State:       state,
+		Sort:        sortField,
+		Dir:         sortDir,
+		RowsMode:    rowsMode,
+		Search:      search,
+		Accounts:    accounts,
+		Rows:        out,
+		People:      people,
+	})
+}
+
+// loadQueueRows reads and classifies cases. limit 0 reads the whole table:
+// the queue page keeps its ceiling, while the Overview's bucket totals must
+// never be computed from a capped subset (SCROLLR-210).
+func loadQueueRows(ctx context.Context, limit int, autosend AutoSendState, now time.Time) ([]AdminQueueRow, map[string]int, error) {
+	sql := queueSQL
+	args := []any{limit}
+	if limit <= 0 {
+		sql = queueSQLUncapped
+		args = nil
+	}
+	rows, err := platform.DBPool.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, nil, err
+	}
 	defer rows.Close()
 
-	now := time.Now()
 	all := make([]AdminQueueRow, 0, 64)
 	counts := map[string]int{queueNeedsYou: 0, queueWaiting: 0, queueHandled: 0}
 
@@ -500,52 +562,12 @@ func HandleAdminQueue(c *fiber.Ctx) error {
 	if err := rows.Err(); err != nil {
 		log.Printf("[AdminSupport] queue rows: %v", err)
 	}
-
-	out := make([]AdminQueueRow, 0, len(all))
-	for _, r := range all {
-		if state != "all" && r.Group != state {
-			continue
-		}
-		if !matchesSearch(r, search) {
-			continue
-		}
-		out = append(out, r)
-	}
-	resolveQueueFixes(ctx, out)
-
-	// The people are grouped from the rows being returned, so a search or a
-	// state filter narrows both together and a person's ticket count always
-	// matches the tickets actually on the page.
-	people := groupPeople(out)
-	sortPeople(people, sortField, sortDir)
-	sortRows(out, sortField, sortDir)
-
-	sections := map[string]int{}
-	for _, s := range sectionOrder {
-		sections[s] = 0
-	}
-	for _, p := range people {
-		sections[p.Section]++
-	}
-
-	accounts := queueAccounts(ctx)
-	accounts.Note = payingSectionNote(accounts, sections[sectionPaying])
-
-	return c.JSON(AdminQueueResponse{
-		GeneratedAt: now.UTC(),
-		AutoSend:    autosend,
-		Counts:      counts,
-		Sections:    sections,
-		State:       state,
-		Sort:        sortField,
-		Dir:         sortDir,
-		RowsMode:    rowsMode,
-		Search:      search,
-		Accounts:    accounts,
-		Rows:        out,
-		People:      people,
-	})
+	return all, counts, nil
 }
+
+// queueSQLUncapped is the same read without the ceiling, for whole-queue
+// totals.
+var queueSQLUncapped = strings.Replace(queueSQL, "LIMIT $1", "", 1)
 
 // queueAccounts counts what the paying section is measured against: how many
 // accounts pay, and how many cases are joined to an account at all.
@@ -557,8 +579,7 @@ func HandleAdminQueue(c *fiber.Ctx) error {
 func queueAccounts(ctx context.Context) AdminQueueAccounts {
 	var a AdminQueueAccounts
 	if err := platform.DBPool.QueryRow(ctx, `
-		SELECT (SELECT count(*) FROM stripe_customers
-		         WHERE plan NOT IN ('', 'free') AND (lifetime OR status = 'active')),
+		SELECT (SELECT count(*) FROM stripe_customers s WHERE `+billing.PayingWhere+`),
 		       (SELECT count(*) FROM support_cases
 		         WHERE logto_sub IS NOT NULL AND logto_sub <> '' AND account_source = 'authenticated'),
 		       (SELECT count(*) FROM support_cases)`).Scan(

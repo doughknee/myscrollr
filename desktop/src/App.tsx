@@ -500,6 +500,14 @@ export default function App() {
     [navigateMainWindow],
   );
 
+  // Presence (SCROLLR-210): tell the Rust reporter which catalog widgets
+  // this screen is showing. Per ticker window on purpose — each screen is
+  // its own line in the check-in. Rust decides whether anything is sent
+  // (consent, auth, build); this only names widget ids.
+  const reportDisplayedWidgets = useCallback((widgets: string[]) => {
+    void invoke("report_screen_state", { widgets }).catch(() => {});
+  }, []);
+
   // ── DataWidgetRow quick-toggle (for context menu) ────────────────────
 
   // ── Unified row-selector handlers (for tray submenus) ──────────
@@ -842,6 +850,7 @@ export default function App() {
                 showInstalledOffCTA={showInstalledOffCTA}
                 installedWidgets={installedWidgetsMeta}
                 onOpenWidget={handleOpenWidget}
+                onDisplayedWidgetsChange={reportDisplayedWidgets}
               />
             );
           })()}

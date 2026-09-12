@@ -1,6 +1,9 @@
 mod commands;
 mod compositor;
 mod kalshi;
+mod presence;
+#[cfg(target_os = "windows")]
+mod presence_win;
 mod state;
 #[cfg(target_os = "macos")]
 mod titlebar;
@@ -161,6 +164,7 @@ pub fn run() {
     }
 
     let app = builder
+        .manage(presence::PresenceState::new())
         .manage(state::SseHandle(Mutex::new(None)))
         .manage(state::KalshiStreamHandle(Mutex::new(None)))
         .manage(state::AuthServerRunning(Arc::new(Mutex::new(false))))
@@ -195,6 +199,8 @@ pub fn run() {
             commands::diagnostics::collect_diagnostics,
             tray::sync_tray_ticker,
             set_crash_reports,
+            presence::configure_presence,
+            presence::report_screen_state,
         ])
         .on_window_event(|window, event| {
             // Intercept close on every window — hide instead of destroy.
@@ -231,6 +237,12 @@ pub fn run() {
             // Monitor hotplug: poll + WM_DISPLAYCHANGE → `monitors-changed`,
             // which the main window answers with `sync_ticker_windows`.
             commands::window::watch_monitors(app.handle());
+
+            // Desktop presence: ONE reporter per process (SCROLLR-210).
+            // It only sends once the main window has called
+            // `configure_presence` and the store says usage analytics
+            // are on for this account.
+            presence::start(app.handle().clone());
 
             // ── App window: strip native chrome on Linux/Windows ─
             // macOS keeps decorations on purpose: tauri.conf.json sets
@@ -305,6 +317,11 @@ pub fn run() {
     // (handler registered above): a second launch attempt while the
     // app is already running shows the main window.
     app.run(|app_handle, event| {
+        // Presence: the final `ended` check-in (bounded to 2 s) so the
+        // server closes this session now rather than at expiry.
+        if matches!(&event, tauri::RunEvent::ExitRequested { .. }) {
+            presence::send_ended_blocking(app_handle);
+        }
         #[cfg(any(target_os = "macos", target_os = "ios"))]
         {
             if let tauri::RunEvent::Reopen {
@@ -334,7 +351,6 @@ pub fn run() {
         // Silence unused-variable warnings on non-Apple platforms.
         #[cfg(not(any(target_os = "macos", target_os = "ios")))]
         {
-            let _ = &app_handle;
             let _ = &event;
         }
     });

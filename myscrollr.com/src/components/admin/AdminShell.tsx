@@ -7,6 +7,7 @@ import {
   LifeBuoy,
   Loader2,
   Lock,
+  Settings,
   ShieldCheck,
   Users,
 } from 'lucide-react'
@@ -30,6 +31,7 @@ const SECTIONS = [
   { to: '/admin/versions', label: 'Versions', Icon: Layers },
   { to: '/admin/users', label: 'Users', Icon: Users },
   { to: '/admin/admins', label: 'Admins', Icon: ShieldCheck },
+  { to: '/admin/settings', label: 'Settings', Icon: Settings },
 ] as const
 
 type GateState =

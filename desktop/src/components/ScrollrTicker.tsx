@@ -121,6 +121,12 @@ interface ScrollrTickerProps {
   }>;
   /** Click handler for the per-widget quick-link chips (opens Configure). */
   onOpenWidget?: (widgetId: string) => void;
+  /**
+   * Fires with the sorted catalog ids that currently put a chip on this
+   * screen (tape or fixed zone) whenever that set changes. Feeds the
+   * desktop presence reporter (SCROLLR-210); ids only, never contents.
+   */
+  onDisplayedWidgetsChange?: (widgetIds: string[]) => void;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -267,6 +273,16 @@ const CAPPED_WIDGET_SLOTS = 4;
 
 /** Round-robin interleave across buckets:
  *  bucket0[0], bucket1[0], bucket2[0], bucket0[1], bucket1[1], ... */
+/** Sorted, deduplicated `data-widget` ids of the chips a screen renders. */
+export function displayedWidgetTypes(nodes: React.ReactNode[]): string[] {
+  const ids = new Set<string>();
+  for (const node of nodes) {
+    const id = (node as React.ReactElement<{ "data-widget"?: string }> | null)?.props?.["data-widget"];
+    if (typeof id === "string" && id !== "") ids.add(id);
+  }
+  return [...ids].sort();
+}
+
 function weave<T>(buckets: T[][]): T[] {
   if (buckets.length === 0) return [];
   const result: T[] = [];
@@ -301,6 +317,7 @@ export default function ScrollrTicker({
   showInstalledOffCTA = false,
   installedWidgets = [],
   onOpenWidget,
+  onDisplayedWidgetsChange,
 }: ScrollrTickerProps) {
   const effectiveScrollMode: ScrollMode = scrollMode;
   // Direction left the settings 2026-09-06 (REL-204): tickers go left.
@@ -367,6 +384,7 @@ export default function ScrollrTicker({
         key={key}
         className="py-1"
         data-chip=""
+        data-widget={tab}
         data-rotate-slot={rotateSlot}
         // What a right-click resolves the chip under the cursor to
         // (App.tsx). One attribute, because the menu needs all three
@@ -618,6 +636,7 @@ export default function ScrollrTicker({
           key={key}
           className="flex items-center"
           data-chip=""
+          data-widget={pin.widget}
           data-pin-subject={JSON.stringify({
             widget: pin.widget,
             subject: pin.subject,
@@ -658,6 +677,17 @@ export default function ScrollrTicker({
     });
     if (chip) park(chip.node, chip.pinLabel ?? pin.subject);
   }
+
+  // ── Displayed widget types (presence reporting, SCROLLR-210) ──
+  // The catalog ids that actually put a chip on this screen — tape or
+  // fixed zone — not what is configured or ticker-enabled. A tab whose
+  // source returned nothing is not displayed. Only the widget id leaves
+  // this window; never a subject, symbol, or label.
+  const displayedWidgets = displayedWidgetTypes([...chips, ...pinnedLeft, ...pinnedRight]);
+  const displayedKey = displayedWidgets.join(" ");
+  useEffect(() => {
+    onDisplayedWidgetsChange?.(displayedKey === "" ? [] : displayedKey.split(" "));
+  }, [displayedKey, onDisplayedWidgetsChange]);
 
   // ── Render ────────────────────────────────────────────────────
   const hasPinnedLeft = pinnedLeft.length > 0;
