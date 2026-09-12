@@ -78,9 +78,9 @@ Every ~30 s the reporter `POST`s `/users/me/presence` with:
 |---|---|
 | `session_id` | random 128-bit id (32 hex characters) minted at app launch; never persisted, never derived from hardware |
 | `seq` | monotonically increasing per session |
-| `session` | `unlocked` / `locked` / `unknown` (Windows: `WM_WTSSESSION_CHANGE`) |
-| `input` | `recent` / `idle` / `unknown` (Windows: `GetLastInputInfo`; idle = no input for 5 minutes) |
-| `display` | `awake` / `asleep` / `unknown` (Windows: `GUID_CONSOLE_DISPLAY_STATE`) |
+| `session` | `unlocked` / `locked` / `unknown` (Windows: `WM_WTSSESSION_CHANGE`; macOS: screen lock/unlock distributed notifications; Linux: logind `LockedHint`) |
+| `input` | `recent` / `idle` / `unknown` (Windows: `GetLastInputInfo`; macOS: `CGEventSourceSecondsSinceLastEventType`; Linux: the desktop's screensaver idle time over D-Bus where provided; idle = no input for 5 minutes) |
+| `display` | `awake` / `asleep` / `unknown` (Windows: `GUID_CONSOLE_DISPLAY_STATE`; macOS: `NSWorkspace` screen sleep/wake; Linux: no reliable cross-desktop signal, stays `unknown`) |
 | `ticker` | `disabled` / `shown` / `hidden` — the Show ticker preference and whether any ticker window is visible |
 | `screens[]` | one entry per ticker window: `{ screen, shown, widgets[] }`; `widgets` is the set of catalog widget types currently rendered on that screen |
 | `ended` | `true` on quit and on system suspend |
@@ -106,9 +106,30 @@ the event. Quit (`RunEvent::ExitRequested`) sends `ended` the same way. If the
 stored token has expired or the server answers 401, the reporter asks the main
 window to refresh it and skips that tick; nothing is sent unauthenticated.
 
-On macOS and Linux the session, input and display dimensions report `unknown`
-in this release. They are not interpreted as unlocked or awake. Sleep on those
-platforms is not reported; the session expires naturally.
+macOS signals (`desktop/src-tauri/src/presence_mac.rs`): lock/unlock from the
+distributed notifications `com.apple.screenIsLocked`/
+`com.apple.screenIsUnlocked`, registered deliver-immediately so the callback
+still fires while the app is napped (the session starts `unlocked` because
+launching a GUI app implies an unlocked session and macOS exposes only the
+transitions); display sleep/wake from `NSWorkspace`'s screen notifications;
+suspend/resume from `NSWorkspaceWillSleepNotification`/
+`NSWorkspaceDidWakeNotification` — WillSleep sends the `ended` check-in within
+2 s and DidWake lets the loop start a fresh interval; idle from
+`CGEventSourceSecondsSinceLastEventType`, the time since the last keyboard or
+mouse event and nothing about the event.
+
+Linux signals (`desktop/src-tauri/src/presence_linux.rs`): lock/unlock from
+logind's `LockedHint` on the current session, read once at startup and then
+watched via `PropertiesChanged`; suspend/resume from logind's
+`PrepareForSleep` — `true` sends the `ended` check-in within 2 s and `false`
+lets the loop start a fresh interval; idle from
+`org.freedesktop.ScreenSaver.GetActiveTime` (or GNOME's
+`org.gnome.Mutter.IdleMonitor`) where the desktop provides it, re-read every
+10 s. Display sleep has no reliable cross-desktop signal and reports
+`unknown`. On machines without systemd/logind or a D-Bus session bus every
+OS-derived field reports `unknown`, and a signal the platform cannot read is
+never guessed on any OS — `unknown` is never interpreted as unlocked or
+awake.
 
 The server accepts a check-in only for an account with usage analytics enabled
 (`product_analytics_enrollments`), the same enrollment that governs the daily

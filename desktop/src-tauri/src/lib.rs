@@ -2,6 +2,10 @@ mod commands;
 mod compositor;
 mod kalshi;
 mod presence;
+#[cfg(target_os = "linux")]
+mod presence_linux;
+#[cfg(target_os = "macos")]
+mod presence_mac;
 #[cfg(target_os = "windows")]
 mod presence_win;
 mod state;

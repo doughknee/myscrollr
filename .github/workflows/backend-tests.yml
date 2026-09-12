@@ -254,13 +254,23 @@ jobs:
   # the webkit dev headers to link and needs no Postgres — the crate
   # never touches the database.
   #
+  # Matrix over Linux and macOS (SCROLLR-211): the presence reporter's
+  # macOS and Linux signal modules are cfg-gated per-OS, and without a
+  # macOS leg the objc2 code in presence_mac.rs would not compile anywhere
+  # until the post-merge release build. Windows stays out: the Windows
+  # test binary aborts with STATUS_ENTRYPOINT_NOT_FOUND on this toolchain.
+  #
   # No frontend build step: tauri.conf.json points frontendDist at
   # ../dist, which is gitignored and absent on a fresh checkout, but
   # tauri_build::build() compiles fine without it (verified). Adding
   # `npm ci && npm run build` here would just duplicate the vitest job
   # for no gain.
   desktop-rust-tests:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: desktop/src-tauri
@@ -270,16 +280,33 @@ jobs:
 
       # Same package set desktop-release.yml installs for its Linux build.
       - name: Install Linux dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - uses: dtolnay/rust-toolchain@stable
 
+      # GitHub's macOS runners ship a Homebrew rustup-init stub at
+      # /opt/homebrew/bin/cargo which shadows the real cargo that
+      # dtolnay/rust-toolchain installs. Prepending $CARGO_HOME/bin fixes
+      # resolution for the cargo invocations below. Same workaround as
+      # desktop-release.yml, where the failure was first seen.
+      - name: Prefer $CARGO_HOME/bin on PATH (macOS Homebrew rustup workaround)
+        if: runner.os == 'macOS'
+        shell: bash
+        working-directory: .
+        run: echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
+
       - uses: Swatinem/rust-cache@v2
         with:
           # Not at the repo root, so point the cache at the crate.
           workspaces: desktop/src-tauri
           cache-on-failure: "true"
+          # Do not restore ~/.cargo/bin on macOS: a poisoned cache can
+          # replace cargo with rustup-init. Same setting as the release
+          # workflow.
+          prefix-key: "v1-rust-no-bin"
+          cache-bin: "false"
 
       - run: cargo test --quiet
