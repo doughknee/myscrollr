@@ -26,7 +26,7 @@ export const FAQ_ITEMS: Array<FAQItem> = [
   {
     question: 'Is my data private?',
     answer:
-      'No ads or data sales. First-party product activity stays off until enabled. Website PostHog analytics default on only in the US after a local country check; elsewhere the site asks first. Website and limited desktop analytics are easy to turn off and exclude ticker contents. Turning either off stops new collection; account-linked PostHog history is submitted for deletion.',
+      'No ads or data sales. Website PostHog analytics default on only in the US after a local country check; elsewhere the site asks first. Desktop usage analytics are on by default and easy to turn off: the app reports that it is running, whether the ticker is showing on each screen, which widget types it shows, and broad feature categories — never ticker contents or a device identifier. Turning either off stops new collection; stored desktop usage is deleted and account-linked PostHog history is submitted for deletion.',
   },
   {
     question: 'Do I need an account?',

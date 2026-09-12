@@ -95,15 +95,28 @@ func setProductAnalyticsConsent(ctx context.Context, userID string, enabled bool
 	return err
 }
 
+// syncProductAnalyticsEnrollment mirrors the consent decision into the
+// first-party enrollment row.
+//
+// Staff are enrolled under exactly the same consent as everyone else, flagged
+// `internal = true` (SCROLLR-210). Every reader that reports audience or usage
+// hides internal rows while the dashboard's "Exclude staff" setting is on,
+// and shows them when it is off. Before this, staff were never enrolled at
+// all, so their facts were never written and no setting could ever bring
+// them back.
+//
+// Configured test accounts (POSTHOG_EXCLUDED_LOGTO_SUBS) are different: they
+// are synthetic traffic, excluded regardless of the setting, so they are
+// never enrolled and never write a first-party fact.
 func syncProductAnalyticsEnrollment(ctx context.Context, tx pgx.Tx, userID string, enabled bool) error {
-	if enabled {
+	if enabled && !postHogActorExcluded(userID) {
 		var staff, unclaimedAdmin bool
 		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM admin_users WHERE logto_sub=$1), EXISTS(SELECT 1 FROM admin_users WHERE logto_sub IS NULL)`, userID).Scan(&staff, &unclaimedAdmin); err != nil {
 			return err
 		}
 		// Normally staff are already linked by admin login. Verify an unclaimed
 		// admin email too, without trusting a client-supplied email hint.
-		if !staff && unclaimedAdmin && !postHogActorExcluded(userID) {
+		if !staff && unclaimedAdmin {
 			user, err := postHogLogtoUser(userID)
 			if err != nil {
 				return err
@@ -115,10 +128,9 @@ func syncProductAnalyticsEnrollment(ctx context.Context, tx pgx.Tx, userID strin
 				return err
 			}
 		}
-		enabled = !staff && !postHogActorExcluded(userID)
-	}
-	if enabled {
-		_, err := tx.Exec(ctx, `INSERT INTO product_analytics_enrollments (logto_sub) VALUES ($1) ON CONFLICT (logto_sub) DO NOTHING`, userID)
+		_, err := tx.Exec(ctx, `
+			INSERT INTO product_analytics_enrollments (logto_sub, internal) VALUES ($1, $2)
+			ON CONFLICT (logto_sub) DO UPDATE SET internal = EXCLUDED.internal`, userID, staff)
 		return err
 	} else {
 		// The daily table cascades. A concurrent reporter holds a row lock on

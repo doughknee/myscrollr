@@ -604,6 +604,22 @@ export interface AdminVersions {
   unrecognized: number
 }
 
+// ── Dashboard settings (SCROLLR-210) ──────────────────────────────
+
+/** One server-backed toggle as the dashboard reads it. */
+export interface Setting {
+  value: boolean
+  default: boolean
+  updated_at?: string
+  updated_by?: string
+}
+
+export const EXCLUDE_STAFF_SETTING = 'exclude_staff_from_analytics'
+
+export interface AdminSettings {
+  settings: Record<string, Setting | undefined>
+}
+
 type Token = () => Promise<string | null>
 
 export const adminApi = {
@@ -708,6 +724,16 @@ export const adminApi = {
     adminFetch<AutoSendState>('/admin/support/autosend', getToken, {
       method: 'POST',
       body: JSON.stringify({ paused }),
+    }),
+
+  settings: (getToken: Token) =>
+    adminFetch<AdminSettings>('/admin/settings', getToken),
+
+  /** Answers with every setting as it now stands, the same shape as a read. */
+  saveSettings: (getToken: Token, body: Record<string, boolean>) =>
+    adminFetch<AdminSettings>('/admin/settings', getToken, {
+      method: 'PUT',
+      body: JSON.stringify(body),
     }),
 }
 

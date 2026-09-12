@@ -46,10 +46,15 @@ type FeatureUsage struct {
 	Share    float64 `json:"share"`
 }
 
+// ProductAnalyticsResponse is the legacy first-party series: one fact per
+// account and UTC day once a visible ticker with an enabled widget had been
+// shown for 30 continuous seconds. It predates presence (SCROLLR-210) and is
+// reported as its own, separately labelled measurement.
 type ProductAnalyticsResponse struct {
 	GeneratedAt         string            `json:"generated_at"`
 	CollectionStartedAt *string           `json:"collection_started_at"`
 	Days                int               `json:"days"`
+	StaffExcluded       bool              `json:"staff_excluded"`
 	EnrolledAccounts    int               `json:"enrolled_accounts"`
 	Activity            ActivitySummary   `json:"activity"`
 	Activation          ActivationSummary `json:"activation"`
@@ -67,7 +72,7 @@ func HandleGetProductAnalytics(c *fiber.Ctx) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	report, err := loadProductAnalytics(ctx, days, productAnalyticsReportNow())
+	report, err := loadProductAnalytics(ctx, days, productAnalyticsReportNow(), ExcludeStaff(ctx))
 	if err != nil {
 		log.Printf("[Admin] product analytics: %v", err)
 		return c.Status(fiber.StatusServiceUnavailable).JSON(platform.ErrorResponse{Error: "Product analytics are unavailable."})
@@ -75,12 +80,15 @@ func HandleGetProductAnalytics(c *fiber.Ctx) error {
 	return c.JSON(report)
 }
 
-func loadProductAnalytics(ctx context.Context, days int, now time.Time) (ProductAnalyticsResponse, error) {
+// loadProductAnalytics reads the legacy daily facts. excludeStaff hides
+// accounts whose enrollment row is flagged internal (SCROLLR-210): staff were
+// never enrolled before that change, so older history has none either way.
+func loadProductAnalytics(ctx context.Context, days int, now time.Time, excludeStaff bool) (ProductAnalyticsResponse, error) {
 	today := now.UTC().Truncate(24 * time.Hour)
 	start := today.AddDate(0, 0, -(days - 1))
 	report := ProductAnalyticsResponse{
-		GeneratedAt: now.UTC().Format(time.RFC3339), Days: days,
-		PopulationNote:     "Signed-in customer accounts with usage analytics enabled. Activity means a native ticker was visible with an enabled widget for 30 continuous seconds; it does not prove attention.",
+		GeneratedAt: now.UTC().Format(time.RFC3339), Days: days, StaffExcluded: excludeStaff,
+		PopulationNote:     "Signed-in accounts with usage analytics enabled. Activity means a native ticker was visible with an enabled widget for 30 continuous seconds; it does not prove attention.",
 		Activation:         ActivationSummary{Definition: "First observed successful configured ticker use; not original signup date."},
 		Features:           []FeatureUsage{},
 		RecentPresenceNote: "Customer accounts with analytics enabled, seen by the desktop app in the last 15 minutes; presence does not prove attention.",
@@ -93,9 +101,12 @@ func loadProductAnalytics(ctx context.Context, days int, now time.Time) (Product
 		}
 	}
 
+	// $1 is the staff switch on every query below: NOT $1 keeps everyone,
+	// otherwise only rows whose enrollment is not internal.
 	var collectionStart *time.Time
 	if err := platform.DBPool.QueryRow(ctx, `
-		SELECT count(*), min(enrolled_at) FROM product_analytics_enrollments`).
+		SELECT count(*), min(enrolled_at) FROM product_analytics_enrollments
+		 WHERE NOT $1 OR internal = false`, excludeStaff).
 		Scan(&report.EnrolledAccounts, &collectionStart); err != nil {
 		return report, err
 	}
@@ -105,19 +116,23 @@ func loadProductAnalytics(ctx context.Context, days int, now time.Time) (Product
 	}
 
 	if err := platform.DBPool.QueryRow(ctx, `
-		SELECT count(DISTINCT logto_sub) FILTER (WHERE day = $1),
-		       count(DISTINCT logto_sub) FILTER (WHERE day >= $1 - 6),
-		       count(DISTINCT logto_sub) FILTER (WHERE day >= $1 - 29)
-		  FROM product_activity_daily`, today).
+		SELECT count(DISTINCT a.logto_sub) FILTER (WHERE a.day = $2),
+		       count(DISTINCT a.logto_sub) FILTER (WHERE a.day >= $2 - 6),
+		       count(DISTINCT a.logto_sub) FILTER (WHERE a.day >= $2 - 29)
+		  FROM product_activity_daily a
+		  JOIN product_analytics_enrollments e ON e.logto_sub = a.logto_sub
+		 WHERE NOT $1 OR e.internal = false`, excludeStaff, today).
 		Scan(&report.Activity.DAU, &report.Activity.WAU, &report.Activity.MAU); err != nil {
 		return report, err
 	}
 
 	rows, err := platform.DBPool.Query(ctx, `
 		SELECT d::date, count(a.logto_sub)
-		  FROM generate_series($1::date, $2::date, interval '1 day') d
+		  FROM generate_series($2::date, $3::date, interval '1 day') d
 		  LEFT JOIN product_activity_daily a ON a.day = d::date
-		 GROUP BY d ORDER BY d`, start, today)
+		  LEFT JOIN product_analytics_enrollments e ON e.logto_sub = a.logto_sub
+		 WHERE a.logto_sub IS NULL OR NOT $1 OR e.internal = false
+		 GROUP BY d ORDER BY d`, excludeStaff, start, today)
 	if err != nil {
 		return report, err
 	}
@@ -138,15 +153,16 @@ func loadProductAnalytics(ctx context.Context, days int, now time.Time) (Product
 
 	if err := platform.DBPool.QueryRow(ctx, `
 		SELECT count(*) FROM product_analytics_enrollments
-		 WHERE first_active_day BETWEEN $1 AND $2`, start, today).
+		 WHERE first_active_day BETWEEN $2 AND $3 AND (NOT $1 OR internal = false)`, excludeStaff, start, today).
 		Scan(&report.Activation.FirstObserved); err != nil {
 		return report, err
 	}
 	rows, err = platform.DBPool.Query(ctx, `
 		SELECT d::date, count(e.logto_sub)
-		  FROM generate_series($1::date, $2::date, interval '1 day') d
-		  LEFT JOIN product_analytics_enrollments e ON e.first_active_day = d::date
-		 GROUP BY d ORDER BY d`, start, today)
+		  FROM generate_series($2::date, $3::date, interval '1 day') d
+		  LEFT JOIN product_analytics_enrollments e
+		    ON e.first_active_day = d::date AND (NOT $1 OR e.internal = false)
+		 GROUP BY d ORDER BY d`, excludeStaff, start, today)
 	if err != nil {
 		return report, err
 	}
@@ -172,8 +188,8 @@ func loadProductAnalytics(ctx context.Context, days int, now time.Time) (Product
 		metric.Day = offset
 		query := `SELECT count(*), count(*) FILTER (WHERE ` + columns[i] + ` IS TRUE)
 		            FROM product_analytics_enrollments
-		           WHERE first_active_day <= $1::date - $2::int`
-		if err := platform.DBPool.QueryRow(ctx, query, today, offset).Scan(&metric.Eligible, &metric.Returned); err != nil {
+		           WHERE first_active_day <= $2::date - $3::int AND (NOT $1 OR internal = false)`
+		if err := platform.DBPool.QueryRow(ctx, query, excludeStaff, today, offset).Scan(&metric.Eligible, &metric.Returned); err != nil {
 			return report, err
 		}
 		metric.Available = metric.Eligible > 0
@@ -186,14 +202,16 @@ func loadProductAnalytics(ctx context.Context, days int, now time.Time) (Product
 
 	var active, sports, markets, news, fantasy, predictions, utilities int
 	if err := platform.DBPool.QueryRow(ctx, `
-		SELECT count(DISTINCT logto_sub),
-		       count(DISTINCT logto_sub) FILTER (WHERE sports),
-		       count(DISTINCT logto_sub) FILTER (WHERE markets),
-		       count(DISTINCT logto_sub) FILTER (WHERE news),
-		       count(DISTINCT logto_sub) FILTER (WHERE fantasy),
-		       count(DISTINCT logto_sub) FILTER (WHERE predictions),
-		       count(DISTINCT logto_sub) FILTER (WHERE utilities)
-		  FROM product_activity_daily WHERE day BETWEEN $1 AND $2`, start, today).
+		SELECT count(DISTINCT a.logto_sub),
+		       count(DISTINCT a.logto_sub) FILTER (WHERE a.sports),
+		       count(DISTINCT a.logto_sub) FILTER (WHERE a.markets),
+		       count(DISTINCT a.logto_sub) FILTER (WHERE a.news),
+		       count(DISTINCT a.logto_sub) FILTER (WHERE a.fantasy),
+		       count(DISTINCT a.logto_sub) FILTER (WHERE a.predictions),
+		       count(DISTINCT a.logto_sub) FILTER (WHERE a.utilities)
+		  FROM product_activity_daily a
+		  JOIN product_analytics_enrollments e ON e.logto_sub = a.logto_sub
+		 WHERE a.day BETWEEN $2 AND $3 AND (NOT $1 OR e.internal = false)`, excludeStaff, start, today).
 		Scan(&active, &sports, &markets, &news, &fantasy, &predictions, &utilities); err != nil {
 		return report, err
 	}

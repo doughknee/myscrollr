@@ -122,6 +122,13 @@ windows-sys = { version = "0.59", features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_Graphics_Dwm",
     "Win32_Graphics_Gdi",
+    # presence_win.rs: session lock, display sleep, suspend, idle input
+    "Win32_System_RemoteDesktop",
+    "Win32_System_Power",
+    "Win32_System_SystemServices",
+    "Win32_System_SystemInformation",
+    "Win32_System_LibraryLoader",
+    "Win32_UI_Input_KeyboardAndMouse",
 ] }
 # wmi: queries Windows Management Instrumentation. Used by the System
 # Monitor widget to read GPU utilization and VRAM from

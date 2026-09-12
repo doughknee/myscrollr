@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
   EXPECTED_REPLICAS,
+  bucketLabel,
+  bucketPoints,
+  comparisonDisplay,
   connectedCaveat,
   formatAge,
+  formatHours,
+  formatMinor,
   ingestHealth,
   measuredValue,
+  parsePeriod,
+  parseView,
+  periodLabel,
   sparkline,
   trendValue,
 } from './adminFormat'
@@ -173,5 +181,135 @@ describe('sparkline', () => {
   it('has nothing to draw with no points', () => {
     expect(sparkline([], 100, 40)).toBeNull()
     expect(sparkline(null, 100, 40)).toBeNull()
+  })
+})
+
+describe('period', () => {
+  it('parses the selector and falls back to 7d', () => {
+    expect(parsePeriod('24h')).toBe('24h')
+    expect(parsePeriod('lifetime')).toBe('lifetime')
+    expect(parsePeriod('90d')).toBe('7d')
+    expect(parsePeriod(undefined)).toBe('7d')
+    expect(parsePeriod(7)).toBe('7d')
+  })
+
+  it('labels the window as a rolling range, never "today"', () => {
+    expect(periodLabel('24h')).toBe('Last 24 hours')
+    expect(periodLabel('7d')).toBe('Last 7 days')
+    expect(periodLabel('30d')).toBe('Last 30 days')
+    expect(periodLabel('lifetime')).toBe('Lifetime')
+  })
+
+  it('parses the analytics tab and falls back to growth', () => {
+    expect(parseView('support')).toBe('support')
+    expect(parseView('features')).toBe('growth')
+  })
+})
+
+describe('formatMinor', () => {
+  it('divides by the currency decimals and appends the code', () => {
+    expect(formatMinor(12345, 'usd')).toBe('$123.45 USD')
+    expect(formatMinor(-999, 'USD')).toBe('-$9.99 USD')
+    expect(formatMinor(2000, 'eur')).toBe('€20.00 EUR')
+  })
+
+  it('does not divide a zero-decimal currency by 100', () => {
+    expect(formatMinor(1500, 'jpy')).toBe('¥1,500 JPY')
+  })
+
+  it('prints an unknown code once and survives a malformed one', () => {
+    // Intl separates a symbol-less code with a non-breaking space.
+    expect(formatMinor(1234, 'zzz')).toMatch(/^ZZZ\s12\.34$/)
+    expect(formatMinor(1234, 'x')).toBe('12.34 X')
+  })
+})
+
+describe('formatHours', () => {
+  it('keeps one decimal at most', () => {
+    expect(formatHours(412.5)).toBe('412.5 h')
+    expect(formatHours(301.25)).toBe('301.3 h')
+    expect(formatHours(2)).toBe('2 h')
+  })
+})
+
+describe('comparisonDisplay', () => {
+  // The rule the whole dashboard leans on: not comparable means no delta —
+  // not a zero, not a dash that looks like "no change" — and the reason.
+  it('renders the note and no delta when not comparable', () => {
+    const c = comparisonDisplay({
+      previous: 3,
+      comparable: false,
+      note: 'Lifetime has no previous period.',
+    })
+    expect(c.delta).toBeNull()
+    expect(c.pct).toBeNull()
+    expect(c.note).toBe('Lifetime has no previous period.')
+  })
+
+  it('renders a delta without a percentage when the API sent none', () => {
+    const c = comparisonDisplay({
+      previous: 0,
+      delta: 4,
+      comparable: true,
+      note: 'The previous period was zero, so no percentage is shown.',
+    })
+    expect(c.delta).toBe('+4')
+    expect(c.pct).toBeNull()
+    expect(c.direction).toBe('up')
+    expect(c.note).toContain('no percentage')
+  })
+
+  it('renders a signed delta and percentage when both exist', () => {
+    const c = comparisonDisplay({
+      previous: 8,
+      delta: -2,
+      delta_pct: -25,
+      comparable: true,
+    })
+    expect(c.delta).toBe('-2')
+    expect(c.pct).toBe('-25%')
+    expect(c.direction).toBe('down')
+  })
+
+  it('treats a missing comparison as not comparable', () => {
+    expect(comparisonDisplay(undefined).delta).toBeNull()
+  })
+})
+
+describe('buckets', () => {
+  it('labels hourly buckets by hour and daily ones by date', () => {
+    expect(bucketLabel('2026-09-11T13:00:00Z', '1h0m0s')).toBe('13:00Z')
+    expect(bucketLabel('2026-09-11T13:00:00Z', '24h0m0s')).toBe('2026-09-11')
+    expect(bucketLabel('2026-09-11T13:00:00Z', '168h0m0s')).toBe('2026-09-11')
+  })
+
+  it('maps buckets to sparkline points and tolerates null', () => {
+    expect(bucketPoints(null, '24h0m0s')).toEqual([])
+    expect(
+      bucketPoints(
+        [
+          {
+            start: '2026-09-11T00:00:00Z',
+            end: '2026-09-12T00:00:00Z',
+            value: 3,
+          },
+        ],
+        '24h0m0s',
+      ),
+    ).toEqual([{ day: '2026-09-11', count: 3 }])
+  })
+})
+
+describe('measuredValue with a formatter', () => {
+  it('formats an available value and still refuses an unavailable one', () => {
+    expect(
+      measuredValue({ value: 2.5, available: true }, (v) => `${v} h`).display,
+    ).toBe('2.5 h')
+    expect(
+      measuredValue(
+        { value: 0, available: false, note: 'n/a' },
+        (v) => `${v} h`,
+      ).display,
+    ).toBeNull()
   })
 })

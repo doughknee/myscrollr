@@ -21,7 +21,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     question: "Is my data private?",
     answer:
-      "No ads or data sales. Product activity stays off until you enable it; limited PostHog app analytics are on by default and easy to turn off. Both exclude ticker contents. Your widget setup still syncs to your account so it follows you between machines.",
+      "No ads or data sales. Share usage analytics is on by default and easy to turn off: while it is on, the app reports that it is running, whether the ticker is showing on each screen, which widget types it shows, and broad feature categories — never ticker contents, symbols, teams, feed URLs, or a device identifier. Turning it off deletes what was stored. Your widget setup still syncs to your account so it follows you between machines.",
   },
   {
     question: "What platforms are supported?",

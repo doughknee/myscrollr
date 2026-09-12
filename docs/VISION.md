@@ -12,7 +12,7 @@
 Three load-bearing commitments, true at every layer:
 
 1. **The desktop app is the product** (Tauri v2 + React). The website is *marketing, auth, and billing only*.
-2. **No advertising profiles, and no personal data in crash reports** — enforced by per-service Sentry-scrubbing tests that block deploy. Anonymous first-party counts of app versions and error rates carry no account identifier and nothing about ticker content. First-party and PostHog analytics have separate controls; both accept only fixed broad activity and exclude ticker content.
+2. **No advertising profiles, and no personal data in crash reports** — enforced by per-service Sentry-scrubbing tests that block deploy. Anonymous first-party counts of app versions and error rates carry no account identifier and nothing about ticker content. First-party and PostHog analytics have separate controls; both accept only fixed broad activity — whether the app is running, whether a ticker screen is shown, which catalog widget types it shows, and broad feature categories — and exclude ticker content and device identifiers.
 3. **One user-facing primitive (the widget), one price lever (the slot).** Every widget costs exactly one slot; a plan card's headline is a widget count.
 
 ---
@@ -181,7 +181,7 @@ Codegen TS types from the Go API's OpenAPI contract so web and desktop **cannot 
 ## 6. Non-negotiables (the spine — no decision may break these)
 
 - Desktop is the product; website stays marketing/auth/billing only.
-- No advertising analytics or personal data in crash reports (public promise + enforced by tests). Optional first-party product measurement and PostHog analytics have separate controls, are coarse, and remain independent from Sentry.
+- No advertising analytics or personal data in crash reports (public promise + enforced by tests). Optional first-party product measurement (daily facts and ~30 s presence check-ins of running / ticker shown / widget types) and PostHog analytics have separate controls, are coarse, and remain independent from Sentry.
 - Slots-only monetization; one price lever.
 - **Wire-compat — *activates at first real user, suspended until then.*** Scrollr currently has **no users**, so breaking changes are free and should be taken now to establish clean names. Once you ship to real users, this becomes a hard rule: every rename/contract change goes behind a compat seam, never a breaking change (`MIN_DESKTOP_VERSION` gates retirement).
 - The CDC → Redis → SSE realtime pipeline works and is replica-safe; keep it.

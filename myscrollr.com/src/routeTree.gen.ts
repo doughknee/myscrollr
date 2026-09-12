@@ -36,6 +36,7 @@ import { Route as DownloadOsRouteImport } from './routes/download_.$os'
 import { Route as AdminVersionsRouteImport } from './routes/admin.versions'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminSupportRouteImport } from './routes/admin.support'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as AdminAdminsRouteImport } from './routes/admin.admins'
 
@@ -174,6 +175,11 @@ const AdminSupportRoute = AdminSupportRouteImport.update({
   path: '/support',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
@@ -208,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/widgets': typeof WidgetsRoute
   '/admin/admins': typeof AdminAdminsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/versions': typeof AdminVersionsRoute
@@ -238,6 +245,7 @@ export interface FileRoutesByTo {
   '/widgets': typeof WidgetsRoute
   '/admin/admins': typeof AdminAdminsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/versions': typeof AdminVersionsRoute
@@ -270,6 +278,7 @@ export interface FileRoutesById {
   '/widgets': typeof WidgetsRoute
   '/admin/admins': typeof AdminAdminsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/versions': typeof AdminVersionsRoute
@@ -303,6 +312,7 @@ export interface FileRouteTypes {
     | '/widgets'
     | '/admin/admins'
     | '/admin/analytics'
+    | '/admin/settings'
     | '/admin/support'
     | '/admin/users'
     | '/admin/versions'
@@ -333,6 +343,7 @@ export interface FileRouteTypes {
     | '/widgets'
     | '/admin/admins'
     | '/admin/analytics'
+    | '/admin/settings'
     | '/admin/support'
     | '/admin/users'
     | '/admin/versions'
@@ -364,6 +375,7 @@ export interface FileRouteTypes {
     | '/widgets'
     | '/admin/admins'
     | '/admin/analytics'
+    | '/admin/settings'
     | '/admin/support'
     | '/admin/users'
     | '/admin/versions'
@@ -590,6 +602,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSupportRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/analytics': {
       id: '/admin/analytics'
       path: '/analytics'
@@ -610,6 +629,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminAdminsRoute: typeof AdminAdminsRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSupportRoute: typeof AdminSupportRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminVersionsRoute: typeof AdminVersionsRoute
@@ -619,6 +639,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAdminsRoute: AdminAdminsRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
   AdminSupportRoute: AdminSupportRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminVersionsRoute: AdminVersionsRoute,

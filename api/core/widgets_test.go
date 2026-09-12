@@ -34,7 +34,12 @@ func TestAdminAnalyticsRouteIsRegisteredAndAuthGated(t *testing.T) {
 	s := NewServer()
 	s.setupRoutes()
 
-	for _, path := range []string{"/admin/analytics", "/admin/product-analytics"} {
+	for _, path := range []string{
+		"/admin/analytics", "/admin/product-analytics",
+		// SCROLLR-210: every redesigned source endpoint sits behind the same gate.
+		"/admin/settings", "/admin/presence/live", "/admin/desktop-usage", "/admin/audience",
+		"/admin/website", "/admin/revenue", "/admin/support/summary",
+	} {
 		resp, err := s.App.Test(httptest.NewRequest("GET", path, nil))
 		if err != nil {
 			t.Fatal(err)

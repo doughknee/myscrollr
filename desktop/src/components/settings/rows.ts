@@ -232,8 +232,8 @@ export const SETTINGS_ROWS = {
     postHogAnalytics: {
       label: "Share usage analytics",
       description:
-        "Help improve Scrollr with app usage and broad feature categories, measured by Scrollr and PostHog. On by default; turn off anytime. Never includes ticker contents, symbols, teams, or feeds.",
-      keywords: "posthog analytics activity privacy consent app opens features usage retention",
+        "Help improve Scrollr with app usage, measured by Scrollr and PostHog: whether the app is running, whether the ticker is showing on each screen, which widget types it shows, and broad feature categories. On by default; turn off anytime and the stored usage is deleted. Never includes ticker contents, symbols, teams, feed URLs, or a device identifier.",
+      keywords: "posthog analytics activity privacy consent app opens features usage retention presence running screens",
       when: "signedIn",
     },
     resetAll: {

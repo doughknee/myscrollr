@@ -93,6 +93,11 @@ func main() {
 	// prunes them past a year (REL-271). Nothing per-request is ever stored.
 	platform.StartUsageFlusher(ctx)
 
+	// Samples the live desktop presence index once a minute for the peak
+	// concurrency figure (SCROLLR-210). Every replica samples; the upsert
+	// keeps the maximum, so no leader is needed.
+	accounts.StartPresenceSampler(ctx)
+
 	// Periodic prune of the Stripe webhook idempotency table. Long-lived
 	// pods otherwise grow this table unboundedly between restarts.
 	platform.StartWebhookEventsPruner(ctx)

@@ -268,6 +268,19 @@ func (s *Server) setupRoutes() {
 	s.App.Post("/admin/admins", platform.LogtoAuth, admin.RequireAdmin, admin.HandleAddAdmin)
 	s.App.Delete("/admin/admins/:id", platform.LogtoAuth, admin.RequireAdmin, admin.HandleRemoveAdmin)
 
+	// The redesigned Overview and Analytics (SCROLLR-210): one endpoint per
+	// source, so a page loads each independently and one unreachable source
+	// cannot blank the rest. All share the period contract in
+	// platform/period.go and the staff-exclusion setting below.
+	s.App.Get("/admin/settings", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetSettings)
+	s.App.Put("/admin/settings", platform.LogtoAuth, admin.RequireAdmin, admin.HandlePutSettings)
+	s.App.Get("/admin/presence/live", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetPresenceLive)
+	s.App.Get("/admin/desktop-usage", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetDesktopUsage)
+	s.App.Get("/admin/audience", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetAudience)
+	s.App.Get("/admin/website", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetWebsite)
+	s.App.Get("/admin/revenue", platform.LogtoAuth, admin.RequireAdmin, admin.HandleGetRevenue)
+	s.App.Get("/admin/support/summary", platform.LogtoAuth, admin.RequireAdmin, support.HandleAdminSupportSummary)
+
 	// The support console's read half (REL-263). Same gate as the rest of
 	// /admin, and deliberately NOT the SCROLLR_WEBHOOK_SECRET header that
 	// guards /internal/support/cases below: that secret is for
@@ -356,6 +369,9 @@ func (s *Server) setupRoutes() {
 	s.App.Put("/users/me/posthog-analytics", platform.LogtoAuth, accounts.HandleSetPostHogConsent)
 	s.App.Post("/users/me/posthog-event", platform.LogtoAuth, accounts.HandlePostHogDesktopEvent)
 	s.App.Post("/users/me/verify-website-signup", platform.LogtoAuth, accounts.HandleVerifyRecentWebsiteSignup)
+	// Desktop presence check-ins (SCROLLR-210). Consent is enforced by the
+	// handler through the same enrollment row as the daily activity facts.
+	s.App.Post("/users/me/presence", platform.LogtoAuth, accounts.HandlePresenceCheckIn)
 	// Widget CRUD. The /users/me/channels aliases were deleted with the wire
 	// rename (VISION §4.4) — one name, no compat seam.
 	s.App.Get("/users/me/widgets", platform.LogtoAuth, widgets.GetWidgets)

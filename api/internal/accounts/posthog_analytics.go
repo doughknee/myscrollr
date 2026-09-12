@@ -209,6 +209,7 @@ func setPostHogConsent(ctx context.Context, userID, decision string) (string, er
 	result, err := savePostHogConsent(ctx, userID, decision)
 	if err == nil && decision == "declined" {
 		removeRecentPresence(userID)
+		RemoveLivePresence(ctx, userID)
 		if result.DeletionStatus == "pending" && postHogDeletionConfigured() {
 			go requestPostHogDeletion(userID)
 		}

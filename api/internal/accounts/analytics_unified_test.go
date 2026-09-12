@@ -146,12 +146,17 @@ func TestInternalDesktopUsageArrivesOnceAndStopsAfterOptOut(t *testing.T) {
 	if consent.Decision != "enabled" {
 		t.Fatalf("internal default=%s, want enabled", consent.Decision)
 	}
-	var enrolled bool
-	if err := platform.DBPool.QueryRow(context.Background(), `SELECT EXISTS(SELECT 1 FROM product_analytics_enrollments WHERE logto_sub=$1)`, sub).Scan(&enrolled); err != nil {
+	// SCROLLR-210: staff are enrolled under the same consent as everyone else,
+	// but flagged, so the dashboard's "Exclude staff" setting can hide them.
+	var enrolled, internal bool
+	if err := platform.DBPool.QueryRow(context.Background(),
+		`SELECT EXISTS(SELECT 1 FROM product_analytics_enrollments WHERE logto_sub=$1),
+		        COALESCE((SELECT internal FROM product_analytics_enrollments WHERE logto_sub=$1), false)`, sub).
+		Scan(&enrolled, &internal); err != nil {
 		t.Fatal(err)
 	}
-	if enrolled {
-		t.Fatal("internal account entered first-party customer metrics")
+	if !enrolled || !internal {
+		t.Fatalf("internal account enrolled=%v internal=%v, want enrolled and flagged internal", enrolled, internal)
 	}
 	for i := 0; i < 2; i++ {
 		analyticsRequest(t, app, http.MethodPost, "/posthog-event", sub, `{"event":"desktop_presence"}`)

@@ -109,6 +109,47 @@ describe("ScrollrTicker", () => {
     expect(screen.getAllByText("01:05")).toHaveLength(1);
   });
 
+  // Presence reporting (SCROLLR-210): the screen reports the catalog ids
+  // that actually produced a chip, so a tab with no data is not
+  // "displayed", a pinned widget is, and the reporter is told once per
+  // change rather than once per render.
+  it("reports the displayed widget ids, not the configured tabs", () => {
+    const onDisplayedWidgetsChange = vi.fn();
+    const { rerender } = render(
+      <ScrollrTicker
+        dashboard={null}
+        activeTabs={["clock", "timer", "weather"]}
+        widgetData={widgetData}
+        onDisplayedWidgetsChange={onDisplayedWidgetsChange}
+      />,
+    );
+    expect(onDisplayedWidgetsChange).toHaveBeenLastCalledWith(["timer"]);
+    expect(onDisplayedWidgetsChange).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <ScrollrTicker
+        dashboard={null}
+        activeTabs={["clock", "timer", "weather"]}
+        widgetData={widgetData}
+        pins={[{ widget: "timer", subject: "timer", side: "right" }]}
+        onDisplayedWidgetsChange={onDisplayedWidgetsChange}
+      />,
+    );
+    // Pinned out of the tape, still on the screen: same set, no new call.
+    expect(onDisplayedWidgetsChange).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <ScrollrTicker
+        dashboard={null}
+        activeTabs={["clock"]}
+        widgetData={widgetData}
+        onDisplayedWidgetsChange={onDisplayedWidgetsChange}
+      />,
+    );
+    expect(onDisplayedWidgetsChange).toHaveBeenLastCalledWith([]);
+    expect(onDisplayedWidgetsChange).toHaveBeenCalledTimes(2);
+  });
+
   it("renders nothing for a pinned subject the widget has no chip for", () => {
     render(
       <ScrollrTicker

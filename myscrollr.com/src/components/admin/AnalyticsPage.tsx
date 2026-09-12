@@ -1,30 +1,85 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, RefreshCw } from 'lucide-react'
-import type { ReactNode } from 'react'
-import type { AdminOverview, AdminVersions, DailyCount } from '@/api/admin'
+import { Link, useNavigate, useSearch } from '@tanstack/react-router'
+import { useCallback, useRef, useState } from 'react'
+import {
+  Bars,
+  Big,
+  Card,
+  CoverageNote,
+  DefinitionDisclosure,
+  DeltaBadge,
+  LINK,
+  Loaded,
+  MetricValue,
+  PeriodSelector,
+  RefreshButton,
+  Row,
+  Section,
+  Selector,
+  Sparkline,
+  StaffExcludedBadge,
+  Stamp,
+  Stat,
+  Unmeasurable,
+  num,
+  pct,
+  useReport,
+} from './ui'
+import type { KeyboardEvent, ReactNode } from 'react'
 import type {
   AnalyticsApplication,
-  AnalyticsWindow,
   SignupAnalytics,
 } from '@/api/adminAnalytics'
 import type {
-  ProductAnalytics,
-  ProductAnalyticsWindow,
+  Audience,
+  BreakdownRow,
+  DesktopFilterQuery,
+  DesktopUsage,
+  Earnings,
+  Period,
+  PlanMixRow,
+  Revenue,
+  SupportSummary,
+  Website,
+  WidgetRow,
+} from '@/api/adminDashboard'
+import type {
+  DailyProductCount,
   RetentionMetric,
 } from '@/api/adminProductAnalytics'
+import type { AnalyticsView } from '@/lib/adminFormat'
+import type { Report } from './ui'
+import { loadSignupAnalytics } from '@/api/adminAnalytics'
 import {
-  loadBoundedAdminReport,
-  loadSignupAnalytics,
-} from '@/api/adminAnalytics'
-import { loadProductAnalytics } from '@/api/adminProductAnalytics'
+  loadAudience,
+  loadDesktopUsage,
+  loadRevenue,
+  loadSupportSummary,
+  loadWebsite,
+} from '@/api/adminDashboard'
 import { useGetToken } from '@/hooks/useGetToken'
-import { formatAge, ingestHealth, sparkline } from '@/lib/adminFormat'
+import {
+  ANALYTICS_VIEWS,
+  formatHours,
+  formatMinor,
+  periodLabel,
+} from '@/lib/adminFormat'
+
+/**
+ * Analytics (SCROLLR-210): four tabs on one period selector.
+ *
+ * The tab and the period are URL state, so a link names what is on screen
+ * and a card on the Overview can point at exactly the view that explains
+ * it. Each tab loads only when it is the one on screen; the others cost
+ * nothing until picked.
+ */
+
+type Token = () => Promise<string | null>
 
 const APPLICATIONS = [
   { value: 'website', label: 'Website' },
   { value: 'desktop', label: 'Desktop app' },
 ] as const
-const WINDOWS = [7, 30] as const
+
 const STAGES = [
   { key: 'started', label: 'Registration started', path: 'Entry' },
   { key: 'identifier_submitted', label: 'Identifier submitted', path: 'Entry' },
@@ -50,255 +105,865 @@ const reasonLabel: Record<string, string> = {
   unknown: 'Other safe category',
   verification_code: 'Verification code',
 }
-const platformLabel: Record<string, string> = {
-  linux: 'Linux',
-  macos: 'macOS',
-  windows: 'Windows',
+
+/** The signup log window that fits the period: a week for 24h/7d, else a month. */
+export function signupDays(period: Period): 7 | 30 {
+  return period === '24h' || period === '7d' ? 7 : 30
 }
 
-interface ReportState<T> {
-  data: T | null
-  error: string | null
-  loading: boolean
-  slow: boolean
-}
+// ── Page ──────────────────────────────────────────────────────────
 
-function useReport<T>(load: (signal: AbortSignal) => Promise<T>) {
-  const [attempt, setAttempt] = useState(0)
-  const [state, setState] = useState<ReportState<T>>({
-    data: null,
-    error: null,
-    loading: true,
-    slow: false,
-  })
-  const request = useRef<AbortController | null>(null)
+export default function AnalyticsPage() {
+  const getToken = useGetToken()
+  const search = useSearch({ from: '/admin/analytics' })
+  const navigate = useNavigate({ from: '/admin/analytics' })
+  const [refresh, setRefresh] = useState(0)
+  const { period, view } = search
 
-  useEffect(() => {
-    const controller = new AbortController()
-    request.current = controller
-    setState({
-      data: null,
-      error: null,
-      loading: true,
-      slow: false,
+  const setSearch = (patch: Partial<typeof search>) =>
+    navigate({
+      search: (prev) => ({ ...prev, ...patch }),
+      replace: true,
     })
-    const slowTimer = window.setTimeout(() => {
-      if (!controller.signal.aborted) {
-        setState((current) => ({ ...current, slow: true }))
-      }
-    }, 3_000)
-    load(controller.signal).then(
-      (data) => {
-        window.clearTimeout(slowTimer)
-        if (!controller.signal.aborted) {
-          setState({ data, error: null, loading: false, slow: false })
-        }
-      },
-      (error: unknown) => {
-        window.clearTimeout(slowTimer)
-        if (!controller.signal.aborted) {
-          setState((current) => ({
-            ...current,
-            error:
-              error instanceof Error
-                ? error.message
-                : 'Could not load this section',
-            loading: false,
-            slow: false,
-          }))
-        }
-      },
-    )
-    return () => {
-      window.clearTimeout(slowTimer)
-      controller.abort()
-    }
-  }, [attempt, load])
 
-  return {
-    ...state,
-    retry: () => setAttempt((value) => value + 1),
-    cancel: () => {
-      request.current?.abort()
-      setState((current) => ({
-        ...current,
-        error: 'Loading canceled. You can retry.',
-        loading: false,
-        slow: false,
-      }))
-    },
-  }
+  return (
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
+          <p className="mt-1 max-w-3xl text-sm text-base-content/65">
+            Growth, desktop usage, revenue and support on one time window. Each
+            card names its source and its limits.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <PeriodSelector
+            value={period}
+            onChange={(next) => setSearch({ period: next })}
+          />
+          <RefreshButton
+            onClick={() => setRefresh((n) => n + 1)}
+            label="Refresh"
+          />
+        </div>
+      </header>
+      <Tabs view={view} onChange={(next) => setSearch({ view: next })} />
+      <div
+        role="tabpanel"
+        id={`panel-${view}`}
+        aria-labelledby={`tab-${view}`}
+        tabIndex={0}
+        className="focus-visible:outline-2 focus-visible:outline-primary"
+      >
+        {view === 'growth' && (
+          <GrowthTab getToken={getToken} period={period} refresh={refresh} />
+        )}
+        {view === 'desktop' && (
+          <DesktopTab
+            getToken={getToken}
+            period={period}
+            refresh={refresh}
+            filters={{
+              os: search.os,
+              version: search.version,
+              plan: search.plan,
+            }}
+            onFilterChange={(next) => setSearch(next)}
+          />
+        )}
+        {view === 'revenue' && (
+          <RevenueTab getToken={getToken} period={period} refresh={refresh} />
+        )}
+        {view === 'support' && (
+          <SupportTab getToken={getToken} period={period} refresh={refresh} />
+        )}
+      </div>
+    </div>
+  )
 }
 
-function Selector<T extends string | number>({
+/** A WAI-ARIA tab list: arrow keys move, Home/End jump, focus follows. */
+export function Tabs({
+  view,
+  onChange,
+}: {
+  view: AnalyticsView
+  onChange: (view: AnalyticsView) => void
+}) {
+  const refs = useRef<Partial<Record<AnalyticsView, HTMLButtonElement>>>({})
+  const onKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    const count = ANALYTICS_VIEWS.length
+    let next: number
+    switch (event.key) {
+      case 'ArrowRight':
+        next = (index + 1) % count
+        break
+      case 'ArrowLeft':
+        next = (index - 1 + count) % count
+        break
+      case 'Home':
+        next = 0
+        break
+      case 'End':
+        next = count - 1
+        break
+      default:
+        return
+    }
+    event.preventDefault()
+    const target = ANALYTICS_VIEWS[next].value
+    refs.current[target]?.focus()
+    onChange(target)
+  }
+  return (
+    <div
+      role="tablist"
+      aria-label="Analytics sections"
+      className="flex gap-1 overflow-x-auto rounded-xl bg-base-200/30 p-1 ring-1 ring-base-300/60"
+    >
+      {ANALYTICS_VIEWS.map((tab, index) => {
+        const selected = tab.value === view
+        return (
+          <button
+            key={tab.value}
+            type="button"
+            role="tab"
+            id={`tab-${tab.value}`}
+            aria-selected={selected}
+            aria-controls={`panel-${tab.value}`}
+            tabIndex={selected ? 0 : -1}
+            ref={(el) => {
+              refs.current[tab.value] = el ?? undefined
+            }}
+            onClick={() => onChange(tab.value)}
+            onKeyDown={(event) => onKeyDown(event, index)}
+            className={`min-h-10 shrink-0 cursor-pointer rounded-lg px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-primary ${
+              selected
+                ? 'bg-base-200 text-base-content'
+                : 'text-base-content/70 hover:bg-base-200/60'
+            }`}
+          >
+            {tab.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Growth ────────────────────────────────────────────────────────
+
+function GrowthTab({
+  getToken,
+  period,
+  refresh,
+}: {
+  getToken: Token
+  period: Period
+  refresh: number
+}) {
+  const [application, setApplication] =
+    useState<AnalyticsApplication>('website')
+  const audience = useReport(
+    useCallback(
+      (signal: AbortSignal) => {
+        void refresh
+        return loadAudience(getToken, period, signal)
+      },
+      [getToken, period, refresh],
+    ),
+  )
+  const website = useReport(
+    useCallback(
+      (signal: AbortSignal) => {
+        void refresh
+        return loadWebsite(getToken, period, signal)
+      },
+      [getToken, period, refresh],
+    ),
+  )
+  const signup = useReport(
+    useCallback(
+      (signal: AbortSignal) => {
+        void refresh
+        return loadSignupAnalytics(
+          getToken,
+          application,
+          signupDays(period),
+          signal,
+        )
+      },
+      [application, getToken, period, refresh],
+    ),
+  )
+  return (
+    <GrowthContent
+      period={period}
+      audience={audience}
+      website={website}
+      signup={signup}
+      application={application}
+      onApplicationChange={setApplication}
+    />
+  )
+}
+
+export interface GrowthContentProps {
+  period: Period
+  audience: Report<Audience>
+  website: Report<Website>
+  signup: Report<SignupAnalytics>
+  application: AnalyticsApplication
+  onApplicationChange?: (application: AnalyticsApplication) => void
+}
+
+export function GrowthContent({
+  period,
+  audience,
+  website,
+  signup,
+  application,
+  onApplicationChange = () => {},
+}: GrowthContentProps) {
+  const windowLabel = periodLabel(period)
+  const staffExcluded = [audience, website].some((r) => r.data?.staff_excluded)
+  return (
+    <div className="space-y-8">
+      {staffExcluded && <StaffExcludedBadge />}
+      <Section
+        id="accounts"
+        title="Registered users"
+        lede="Logto is the system of record. Authentication is not app usage."
+      >
+        <Loaded report={audience} label="audience">
+          {(a) =>
+            a.available ? (
+              <div className="space-y-3">
+                <Stamp at={a.generated_at} />
+                <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <Card title="Registered accounts" label="Current">
+                    <Big>{num(a.total)}</Big>
+                    <p className="mt-1 text-sm text-base-content/60">
+                      {a.staff_excluded
+                        ? `${num(a.excluded)} staff/test excluded`
+                        : 'staff included'}
+                    </p>
+                    <div className="mt-3 border-t border-base-300/60 pt-2">
+                      <Row label="Set up the app" value={num(a.set_up)} />
+                    </div>
+                  </Card>
+                  <Card title="New accounts" label={windowLabel}>
+                    <MetricValue metric={a.new}>
+                      <p className="mt-1 text-sm text-base-content/60">
+                        <DeltaBadge comparison={a.new.comparison} />
+                      </p>
+                    </MetricValue>
+                    <div className="mt-3">
+                      <Sparkline
+                        buckets={a.new_curve}
+                        step={a.curve_step}
+                        label="New accounts per bucket"
+                      />
+                    </div>
+                  </Card>
+                  <Card
+                    title="Signed in"
+                    label={windowLabel}
+                    note="Accounts whose last sign-in falls in the window. Someone using the app on a token that never expired is not counted; this is authentication, not usage."
+                  >
+                    <MetricValue metric={a.signed_in_in_period}>
+                      <p className="mt-1 text-sm text-base-content/60">
+                        <DeltaBadge
+                          comparison={a.signed_in_in_period.comparison}
+                        />
+                      </p>
+                    </MetricValue>
+                  </Card>
+                  <Card
+                    title="Lifetime registrations"
+                    label="Current"
+                    note="Only accounts that still exist. Purged accounts are known since local deletion tracking began; anything before that is unknown."
+                  >
+                    <Big>{num(a.lifetime_registrations)}</Big>
+                    <div className="mt-3 border-t border-base-300/60 pt-2">
+                      <Row label="Known purged" value={num(a.known_purged)} />
+                    </div>
+                    <CoverageNote coverage={a.coverage} />
+                  </Card>
+                </div>
+                <DefinitionDisclosure>
+                  <p>{a.definition}</p>
+                </DefinitionDisclosure>
+              </div>
+            ) : (
+              <Card title="Registered accounts">
+                <Unmeasurable note={a.note} />
+              </Card>
+            )
+          }
+        </Loaded>
+      </Section>
+
+      <Section
+        id="website"
+        title="Website"
+        lede="PostHog pageviews. A visitor is a browser profile merged on sign-in, not guaranteed to be one human."
+      >
+        <Loaded report={website} label="website analytics">
+          {(w) => <WebsiteBlock website={w} windowLabel={windowLabel} />}
+        </Loaded>
+      </Section>
+
+      <details className="rounded-xl ring-1 ring-base-300/60">
+        <summary className="cursor-pointer p-4 text-base font-semibold focus-visible:outline-2 focus-visible:outline-primary">
+          Signup diagnostics
+          <span className="ml-2 text-xs font-normal text-base-content/60">
+            secondary · retained Logto registration events, last{' '}
+            {signupDays(period)} days
+          </span>
+        </summary>
+        <div className="space-y-3 border-t border-base-300/60 p-4">
+          <p className="text-sm text-base-content/60">
+            Troubleshooting data: registration events and safe error categories.
+            Counts are events, not people or completed signups.
+          </p>
+          <Selector
+            label="Application"
+            options={APPLICATIONS}
+            value={application}
+            onChange={onApplicationChange}
+          />
+          <Loaded report={signup} label="signup diagnostics">
+            {(s) => <SignupBlock signup={s} />}
+          </Loaded>
+        </div>
+      </details>
+    </div>
+  )
+}
+
+function BreakdownTable({
+  title,
+  rows,
+  keyLabel,
+  note,
+}: {
+  title: string
+  rows: Array<BreakdownRow> | null
+  keyLabel: string
+  /** The API's reason when this table could not be read (rows === null). */
+  note?: string
+}) {
+  const list = rows ?? []
+  return (
+    <Card title={title}>
+      {rows === null ? (
+        <Unmeasurable note={note ?? 'This breakdown could not be read.'} />
+      ) : list.length === 0 ? (
+        <p className="text-sm text-base-content/65">Nothing in this window.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-base-content/55">
+                <th className="py-1 pr-3 font-medium">{keyLabel}</th>
+                <th className="py-1 pr-3 text-right font-medium">Pageviews</th>
+                <th className="py-1 text-right font-medium">Visitors</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((row) => (
+                <tr key={row.key} className="border-t border-base-300/50">
+                  <td className="max-w-[16rem] truncate py-1 pr-3">
+                    {row.key || '(none)'}
+                  </td>
+                  <td className="py-1 pr-3 text-right tabular-nums">
+                    {num(row.pageviews)}
+                  </td>
+                  <td className="py-1 text-right tabular-nums">
+                    {num(row.visitors)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function WebsiteBlock({
+  website: w,
+  windowLabel,
+}: {
+  website: Website
+  windowLabel: string
+}) {
+  if (!w.available) {
+    return (
+      <Card title="Website">
+        <Unmeasurable note={w.note} />
+      </Card>
+    )
+  }
+  return (
+    <div className="space-y-3">
+      <Stamp at={w.generated_at}>
+        {w.cached ? ' · cached PostHog answer' : ''}
+      </Stamp>
+      <CoverageNote coverage={w.coverage} />
+      <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {(
+          [
+            ['Unique visitors', w.visitors],
+            ['Pageviews', w.pageviews],
+            ['Downloads', w.downloads],
+            ['Signups', w.signups],
+          ] as const
+        ).map(([title, metric]) => (
+          <Card key={title} title={title} label={windowLabel}>
+            <MetricValue metric={metric}>
+              <p className="mt-1 text-sm text-base-content/60">
+                <DeltaBadge comparison={metric.comparison} />
+              </p>
+            </MetricValue>
+          </Card>
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card title="Pageviews per bucket" label={windowLabel}>
+          <Bars buckets={w.curve} step={w.curve_step} label="Pageviews" />
+        </Card>
+        <Card
+          title="Visitors per bucket"
+          label={windowLabel}
+          note="Unique visitors per bucket. Uniques do not add up across buckets; the period total above is one distinct count."
+        >
+          <Sparkline
+            buckets={w.visitors_curve}
+            step={w.curve_step}
+            label="Visitors per bucket"
+          />
+        </Card>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <BreakdownTable
+          title="Top paths"
+          rows={w.top_paths}
+          keyLabel="Path"
+          note={w.breakdown_note}
+        />
+        <BreakdownTable
+          title="Top referrers"
+          rows={w.top_referrers}
+          keyLabel="Referrer"
+          note={w.breakdown_note}
+        />
+        <BreakdownTable
+          title="Top campaigns"
+          rows={w.top_campaigns}
+          keyLabel="Campaign"
+          note={w.breakdown_note}
+        />
+        <BreakdownTable
+          title="Downloads by OS"
+          rows={w.downloads_by_os}
+          keyLabel="OS"
+          note={w.breakdown_note}
+        />
+      </div>
+      <DefinitionDisclosure>
+        <p>{w.definition}</p>
+      </DefinitionDisclosure>
+    </div>
+  )
+}
+
+function SignupBlock({ signup }: { signup: SignupAnalytics }) {
+  const eventTotal = Object.values(signup.stages).reduce(
+    (sum, stage) => sum + stage.events,
+    0,
+  )
+  return (
+    <>
+      <div className="rounded-xl bg-warning/5 p-4 text-sm ring-1 ring-warning/20">
+        <p className="font-semibold">
+          {signup.coverage.status === 'partial'
+            ? 'Partial coverage'
+            : 'Coverage limits unknown'}
+        </p>
+        <p className="mt-1 text-base-content/65">{signup.coverage.note}</p>
+        <p className="mt-2 text-xs text-base-content/50">
+          {num(signup.coverage.unique_logs)} unique retained logs scanned ·
+          generated {new Date(signup.generated_at).toLocaleString()}
+        </p>
+      </div>
+      {eventTotal === 0 ? (
+        <p className="rounded-xl p-4 text-sm text-base-content/65 ring-1 ring-base-300/60">
+          No recognized registration events were observed. With limited
+          coverage, this is not proof of zero activity.
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-base-200/40 text-left text-xs text-base-content/55">
+                <th className="px-4 py-3 font-medium">Path</th>
+                <th className="px-4 py-3 font-medium">Event</th>
+                <th className="px-4 py-3 text-right font-medium">Count</th>
+                <th className="px-4 py-3 text-right font-medium">Errors</th>
+              </tr>
+            </thead>
+            <tbody>
+              {STAGES.map((stage) => {
+                const metrics = signup.stages[stage.key] ?? {
+                  events: 0,
+                  errors: 0,
+                }
+                return (
+                  <tr key={stage.key} className="border-t border-base-300/50">
+                    <td className="px-4 py-2 text-base-content/55">
+                      {stage.path}
+                    </td>
+                    <td className="px-4 py-2 font-medium">{stage.label}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      {num(metrics.events)}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums text-base-content/60">
+                      {num(metrics.errors)}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card
+          title="Safe error reasons"
+          note="Raw errors, emails, IP addresses, user agents, parameters, and tokens are discarded before this response is built."
+        >
+          {signup.error_reasons.length === 0 ? (
+            <p className="text-sm text-base-content/65">
+              No recognized registration errors were observed.
+            </p>
+          ) : (
+            <ul className="divide-y divide-base-300/50">
+              {signup.error_reasons.map((reason) => (
+                <li
+                  key={reason.reason}
+                  className="flex justify-between gap-4 py-2 text-sm"
+                >
+                  <span>
+                    {reasonLabel[reason.reason] ?? 'Other safe category'}
+                  </span>
+                  <strong className="tabular-nums">{num(reason.count)}</strong>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+        <Card
+          title="Attempt conversion"
+          note="A missing later event is not proof of abandonment. Completion and drop-off stay unavailable until correlation and path semantics provide a real denominator."
+        >
+          <p className="text-sm text-base-content/65">
+            {signup.attempt_conversion.note}
+          </p>
+        </Card>
+      </div>
+    </>
+  )
+}
+
+// ── Desktop usage ─────────────────────────────────────────────────
+
+function DesktopTab({
+  getToken,
+  period,
+  refresh,
+  filters,
+  onFilterChange,
+}: {
+  getToken: Token
+  period: Period
+  refresh: number
+  filters: DesktopFilterQuery
+  onFilterChange: (next: DesktopFilterQuery) => void
+}) {
+  const { os, version, plan } = filters
+  const desktop = useReport(
+    useCallback(
+      (signal: AbortSignal) => {
+        void refresh
+        return loadDesktopUsage(getToken, period, { os, version, plan }, signal)
+      },
+      [getToken, period, refresh, os, version, plan],
+    ),
+  )
+  return (
+    <DesktopContent
+      period={period}
+      desktop={desktop}
+      filters={filters}
+      onFilterChange={onFilterChange}
+    />
+  )
+}
+
+export interface DesktopContentProps {
+  period: Period
+  desktop: Report<DesktopUsage>
+  filters: DesktopFilterQuery
+  onFilterChange?: (next: DesktopFilterQuery) => void
+}
+
+type WidgetSort = 'users' | 'user_hours' | 'screen_hours'
+
+const WIDGET_SORTS: ReadonlyArray<{ value: WidgetSort; label: string }> = [
+  { value: 'users', label: 'Users' },
+  { value: 'user_hours', label: 'User-hours' },
+  { value: 'screen_hours', label: 'Screen-hours' },
+]
+
+function FilterSelect({
   label,
+  name,
   options,
   value,
   onChange,
 }: {
   label: string
-  options: ReadonlyArray<{ value: T; label: string }>
-  value: T
-  onChange: (value: T) => void
+  name: string
+  options: Array<{ value: string; count: number }>
+  value: string | undefined
+  onChange: (value: string | undefined) => void
 }) {
+  const id = `desktop-filter-${name}`
   return (
-    <div
-      role="group"
-      aria-label={label}
-      className="flex rounded-lg ring-1 ring-base-300"
-    >
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          onClick={() => onChange(option.value)}
-          aria-pressed={value === option.value}
-          className={`min-h-10 cursor-pointer px-3 text-sm font-medium first:rounded-l-lg last:rounded-r-lg ${
-            value === option.value
-              ? 'bg-base-200 text-base-content'
-              : 'text-base-content/60 hover:bg-base-200/60'
-          }`}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function Card({
-  title,
-  children,
-  note,
-}: {
-  title: string
-  children: ReactNode
-  note?: string
-}) {
-  return (
-    <div className="rounded-xl bg-base-200/40 p-4 ring-1 ring-base-300/60 sm:p-5">
-      <h3 className="text-sm font-semibold text-base-content/70">{title}</h3>
-      <div className="mt-3">{children}</div>
-      {note && (
-        <p className="mt-3 text-xs leading-relaxed text-base-content/60">
-          {note}
-        </p>
-      )}
-    </div>
-  )
-}
-
-function Big({ children }: { children: ReactNode }) {
-  return <p className="text-3xl font-bold tabular-nums">{children}</p>
-}
-
-function SourceStamp({ generatedAt }: { generatedAt: string }) {
-  return (
-    <p className="text-xs text-base-content/50">
-      Snapshot generated {new Date(generatedAt).toLocaleString()}
-    </p>
-  )
-}
-
-function ErrorPanel({
-  message,
-  onRetry,
-}: {
-  message: string
-  onRetry?: () => void
-}) {
-  return (
-    <div
-      role="alert"
-      className="rounded-xl bg-error/5 p-4 ring-1 ring-error/25"
-    >
-      <p className="text-sm font-medium text-error">{message}</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="mt-3 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm font-semibold ring-1 ring-error/30 hover:bg-error/10"
+    <label htmlFor={id} className="flex items-center gap-2 text-sm">
+      <span className="text-base-content/60">{label}</span>
+      <select
+        id={id}
+        name={name}
+        value={value ?? ''}
+        onChange={(event) => onChange(event.target.value || undefined)}
+        className="min-h-10 rounded-lg bg-base-100 px-2 text-sm ring-1 ring-base-300 focus-visible:outline-2 focus-visible:outline-primary"
       >
-        <RefreshCw size={14} aria-hidden /> Retry
-      </button>
-    </div>
+        <option value="">All</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.value} ({num(option.count)})
+          </option>
+        ))}
+      </select>
+    </label>
   )
 }
 
-function Loading({
-  label,
-  slow,
-  onCancel,
-}: {
-  label: string
-  slow?: boolean
-  onCancel?: () => void
-}) {
+export function DesktopContent({
+  period,
+  desktop,
+  filters,
+  onFilterChange = () => {},
+}: DesktopContentProps) {
+  const windowLabel = periodLabel(period)
   return (
-    <div
-      role="status"
-      className="rounded-xl bg-base-200/30 p-5 text-sm text-base-content/60 ring-1 ring-base-300/50"
-    >
-      <span className="flex items-center gap-2">
-        <Loader2 className="size-4 animate-spin" aria-hidden /> Loading {label}
-      </span>
-      {slow && (
-        <button
-          type="button"
-          onClick={onCancel}
-          className="mt-3 min-h-10 rounded-lg px-3 font-semibold ring-1 ring-base-300"
-        >
-          Cancel
-        </button>
-      )}
+    <div className="space-y-8">
+      <Loaded report={desktop} label="desktop usage">
+        {(d) => (
+          <>
+            <div className="flex flex-wrap items-center gap-3">
+              <Stamp at={d.generated_at} />
+              {d.staff_excluded && <StaffExcludedBadge />}
+              <Link to="/admin/versions" className={LINK}>
+                Version adoption and error rates → Versions
+              </Link>
+            </div>
+            <CoverageNote coverage={d.coverage} />
+            {((d.filters.os?.length ?? 0) > 0 ||
+              (d.filters.version?.length ?? 0) > 0 ||
+              (d.filters.plan?.length ?? 0) > 0) && (
+              <div className="flex flex-wrap items-center gap-4 rounded-xl bg-base-200/30 p-3 ring-1 ring-base-300/60">
+                {(d.filters.os?.length ?? 0) > 0 && (
+                  <FilterSelect
+                    label="OS"
+                    name="os"
+                    options={d.filters.os ?? []}
+                    value={filters.os}
+                    onChange={(os) => onFilterChange({ ...filters, os })}
+                  />
+                )}
+                {(d.filters.version?.length ?? 0) > 0 && (
+                  <FilterSelect
+                    label="Version"
+                    name="version"
+                    options={d.filters.version ?? []}
+                    value={filters.version}
+                    onChange={(version) =>
+                      onFilterChange({ ...filters, version })
+                    }
+                  />
+                )}
+                {(d.filters.plan?.length ?? 0) > 0 && (
+                  <FilterSelect
+                    label="Plan (current)"
+                    name="plan"
+                    options={d.filters.plan ?? []}
+                    value={filters.plan}
+                    onChange={(plan) => onFilterChange({ ...filters, plan })}
+                  />
+                )}
+                {d.filters.note && (
+                  <p className="text-xs text-base-content/60">
+                    {d.filters.note}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <Section
+              id="presence"
+              title="Presence"
+              lede="App-running and ticker-shown time from the desktop presence reporter (1.6.7+)."
+            >
+              <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <Card title="Unique app users" label={windowLabel}>
+                  <MetricValue metric={d.unique_users}>
+                    <p className="mt-1 text-sm text-base-content/60">
+                      <DeltaBadge comparison={d.unique_users.comparison} />
+                    </p>
+                  </MetricValue>
+                </Card>
+                {(
+                  [
+                    ['App-running user-hours', d.user_hours],
+                    ['Ticker-shown user-hours', d.ticker_user_hours],
+                    ['Ticker screen-hours', d.screen_hours],
+                  ] as const
+                ).map(([title, metric]) => (
+                  <Card key={title} title={title} label={windowLabel}>
+                    <MetricValue metric={metric} format={formatHours}>
+                      <p className="mt-1 text-sm text-base-content/60">
+                        <DeltaBadge
+                          comparison={metric.comparison}
+                          format={(v) => `${v > 0 ? '+' : ''}${formatHours(v)}`}
+                        />
+                      </p>
+                    </MetricValue>
+                  </Card>
+                ))}
+              </div>
+              <div className="grid items-start gap-4 lg:grid-cols-3">
+                <Card
+                  title="Peak concurrency"
+                  label={windowLabel}
+                  note={
+                    d.peak.available
+                      ? `${d.peak.resolution_seconds}-second samples of the live index; a spike shorter than that is not seen.`
+                      : undefined
+                  }
+                >
+                  {d.peak.available ? (
+                    <>
+                      <Big>{num(d.peak.users)}</Big>
+                      <p className="mt-1 text-sm text-base-content/60">
+                        users at once
+                        {d.peak.at
+                          ? ` · ${new Date(d.peak.at).toLocaleString()}`
+                          : ''}
+                      </p>
+                      <div className="mt-3 border-t border-base-300/60 pt-2">
+                        <Row
+                          label="With ticker(s)"
+                          value={num(d.peak.ticker_users)}
+                        />
+                        <Row label="Screens" value={num(d.peak.screens)} />
+                      </div>
+                    </>
+                  ) : (
+                    <Unmeasurable note={d.peak.note} />
+                  )}
+                </Card>
+                <Card
+                  title="Screens per session"
+                  label={windowLabel}
+                  note="Sessions are computers. Two ticker windows on one computer are two screens."
+                >
+                  {(d.screens_per_user ?? []).length === 0 ? (
+                    <p className="text-sm text-base-content/65">
+                      No sessions in this window.
+                    </p>
+                  ) : (
+                    (d.screens_per_user ?? []).map((b) => (
+                      <Row
+                        key={b.screens}
+                        label={`${b.screens} screen${b.screens === '1' ? '' : 's'}`}
+                        value={`${num(b.sessions)} sessions · ${num(b.users)} users`}
+                      />
+                    ))
+                  )}
+                </Card>
+                <Card title="Users per bucket" label={windowLabel}>
+                  <Sparkline
+                    buckets={d.users_curve}
+                    step={d.curve_step}
+                    label="Distinct app-running users per bucket"
+                  />
+                </Card>
+              </div>
+              <DefinitionDisclosure>
+                <p>{d.definition}</p>
+              </DefinitionDisclosure>
+            </Section>
+
+            <Section
+              id="retention"
+              title="Presence retention"
+              lede={d.retention.definition}
+            >
+              <div className="grid gap-4 sm:grid-cols-3">
+                <RetentionCard metric={d.retention.d1} />
+                <RetentionCard metric={d.retention.d7} />
+                <RetentionCard metric={d.retention.d30} />
+              </div>
+            </Section>
+
+            <Section
+              id="widgets"
+              title="Widget types"
+              lede={`Share is of ${num(d.widgets.measured_ticker_users)} measured ticker users in the window.`}
+            >
+              <WidgetTable widgets={d.widgets} />
+              <DefinitionDisclosure>
+                <p>{d.widgets.definition}</p>
+                <p>{d.widgets.repeat_note}</p>
+                <p>{d.widgets.changes_note}</p>
+              </DefinitionDisclosure>
+            </Section>
+
+            <Section
+              id="legacy"
+              title="Legacy measurement"
+              lede={d.legacy_note}
+            >
+              {d.legacy ? (
+                <LegacyBlock legacy={d.legacy} />
+              ) : (
+                <p className="text-sm text-base-content/65">
+                  The legacy series is not available for this window.
+                </p>
+              )}
+            </Section>
+          </>
+        )}
+      </Loaded>
     </div>
-  )
-}
-
-const pct = (value: number) => `${Math.round(value * 100)}%`
-const num = (value: number) => value.toLocaleString()
-
-function Curve({
-  points,
-  label,
-}: {
-  points: Array<DailyCount>
-  label: string
-}) {
-  const chart = sparkline(points, 240, 64, 4)
-  if (!chart || points.length === 0) {
-    return (
-      <p className="text-sm text-base-content/60">
-        No observations in this window.
-      </p>
-    )
-  }
-  return (
-    <figure>
-      <svg
-        viewBox="0 0 240 64"
-        preserveAspectRatio="none"
-        className="h-16 w-full text-primary"
-        aria-hidden="true"
-      >
-        <path d={chart.area} fill="currentColor" opacity={0.12} />
-        <path
-          d={chart.line}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
-      <figcaption className="mt-1 flex justify-between text-xs text-base-content/50">
-        <span>{points[0].day}</span>
-        <span>peak {num(chart.peak)}</span>
-        <span>{points[points.length - 1].day}</span>
-        <span className="sr-only">
-          {label}:{' '}
-          {points.map((point) => `${point.day}: ${point.count}`).join(', ')}
-        </span>
-      </figcaption>
-    </figure>
   )
 }
 
@@ -309,7 +974,7 @@ function RetentionCard({ metric }: { metric: RetentionMetric }) {
         <>
           <Big>{pct(metric.rate)}</Big>
           <p className="mt-1 text-sm text-base-content/60">
-            {num(metric.returned)} of {num(metric.eligible)} mature participants
+            {num(metric.returned)} of {num(metric.eligible)} mature accounts
             returned on exactly day {metric.day}
           </p>
         </>
@@ -322,775 +987,737 @@ function RetentionCard({ metric }: { metric: RetentionMetric }) {
   )
 }
 
-export interface AnalyticsContentProps {
-  overview: AdminOverview | null
-  product: ProductAnalytics | null
-  versions: AdminVersions | null
-  signup: SignupAnalytics | null
-  days: ProductAnalyticsWindow
-  application: AnalyticsApplication
-  overviewError?: string | null
-  productError?: string | null
-  versionsError?: string | null
-  signupError?: string | null
-  loading?: Partial<
-    Record<'overview' | 'product' | 'versions' | 'signup', boolean>
-  >
-  slow?: Partial<
-    Record<'overview' | 'product' | 'versions' | 'signup', boolean>
-  >
-  onRetryOverview?: () => void
-  onRetryProduct?: () => void
-  onRetryVersions?: () => void
-  onRetrySignup?: () => void
-  onCancelOverview?: () => void
-  onCancelProduct?: () => void
-  onCancelVersions?: () => void
-  onCancelSignup?: () => void
-  onDaysChange?: (days: ProductAnalyticsWindow) => void
-  onApplicationChange?: (application: AnalyticsApplication) => void
-  onRefresh?: () => void
-}
-
-export function AnalyticsContent({
-  overview,
-  product,
-  versions,
-  signup,
-  days,
-  application,
-  overviewError,
-  productError,
-  versionsError,
-  signupError,
-  loading = {},
-  slow = {},
-  onRetryOverview,
-  onRetryProduct,
-  onRetryVersions,
-  onRetrySignup,
-  onCancelOverview,
-  onCancelProduct,
-  onCancelVersions,
-  onCancelSignup,
-  onDaysChange = () => {},
-  onApplicationChange = () => {},
-  onRefresh,
-}: AnalyticsContentProps) {
-  const paidPlans =
-    overview?.plans.rows?.filter((row) => row.plan !== 'free') ?? []
-  const eventTotal = signup
-    ? Object.values(signup.stages).reduce((sum, stage) => sum + stage.events, 0)
-    : 0
-  const hasFeatureUse = product?.features.some(
-    (feature) => feature.accounts > 0,
-  )
-
+function WidgetTable({ widgets }: { widgets: DesktopUsage['widgets'] }) {
+  const [sort, setSort] = useState<WidgetSort>('users')
+  const rows = [...(widgets.rows ?? [])].sort((a, b) => b[sort] - a[sort])
+  const categories = widgets.categories ?? []
+  if (rows.length === 0 && categories.length === 0) {
+    return (
+      <p className="rounded-xl p-4 text-sm text-base-content/65 ring-1 ring-base-300/60">
+        No widget was displayed on a measured ticker in this window.
+      </p>
+    )
+  }
+  const th = 'px-3 py-2 text-right font-medium whitespace-nowrap'
+  const td = 'px-3 py-2 text-right tabular-nums'
   return (
-    <div className="space-y-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Product analytics
-          </h1>
-          <p className="mt-1 max-w-3xl text-sm text-base-content/65">
-            Account growth, measured ticker use, current plans, and operating
-            health. Each section names its source and limits.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Selector
-            label="Time window"
-            options={WINDOWS.map((value) => ({
-              value,
-              label: `${value} days`,
-            }))}
-            value={days}
-            onChange={onDaysChange}
-          />
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold ring-1 ring-base-300 hover:bg-base-200"
-          >
-            <RefreshCw size={14} aria-hidden /> Refresh all
-          </button>
-        </div>
-      </header>
-
-      <nav
-        aria-label="Analytics sections"
-        className="flex gap-1 overflow-x-auto rounded-xl bg-base-200/30 p-1 ring-1 ring-base-300/60"
-      >
-        {[
-          ['growth', 'Growth'],
-          ['usage', 'Usage & retention'],
-          ['features', 'Features'],
-          ['revenue', 'Revenue'],
-          ['reliability', 'Reliability'],
-          ['diagnostics', 'Diagnostics'],
-        ].map(([id, label]) => (
-          <a
-            key={id}
-            href={`#${id}`}
-            className="min-h-10 shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-base-content/70 hover:bg-base-200"
-          >
-            {label}
-          </a>
-        ))}
-      </nav>
-
-      <section
-        id="growth"
-        className="scroll-mt-6 space-y-3"
-        aria-labelledby="growth-heading"
-      >
-        <div>
-          <h2 id="growth-heading" className="text-lg font-semibold">
-            Growth
-          </h2>
-          <p className="text-sm text-base-content/60">
-            Account totals and authentication activity from Logto.
-            Authentication is not ticker use.
-          </p>
-        </div>
-        {overviewError && !overview && (
-          <ErrorPanel message={overviewError} onRetry={onRetryOverview} />
-        )}
-        {loading.overview && !overview && (
-          <Loading
-            label="growth"
-            slow={slow.overview}
-            onCancel={onCancelOverview}
-          />
-        )}
-        {overview && (
-          <div className="space-y-3">
-            <SourceStamp generatedAt={overview.generated_at} />
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <Card
-                title={
-                  overview.accounts.source === 'logto'
-                    ? 'Accounts'
-                    : 'Accounts (local fallback)'
-                }
-                note={overview.accounts.note}
+    <div className="space-y-3">
+      <Selector
+        label="Sort widgets by"
+        options={WIDGET_SORTS}
+        value={sort}
+        onChange={setSort}
+      />
+      <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-base-200/40 text-left text-xs text-base-content/55">
+              <th className="px-3 py-2 font-medium">Widget</th>
+              <th className={th}>Users</th>
+              <th className={th}>Share</th>
+              <th className={th}>User-hours</th>
+              <th className={th}>Screen-hours</th>
+              <th className={th}>Repeat users</th>
+              <th className={th}>Added / removed</th>
+              <th className={th}>Configured / enabled</th>
+              <th className={th}>Trend</th>
+            </tr>
+          </thead>
+          <tbody>
+            {categories.map((c) => (
+              <tr
+                key={`category-${c.category}`}
+                className="border-t border-base-300/50 bg-base-200/20 font-semibold"
               >
-                <Big>{num(overview.accounts.total)}</Big>
-                <p className="mt-1 text-sm text-base-content/60">
-                  {num(overview.accounts.set_up)} have saved app preferences
-                </p>
-              </Card>
-              <Card
-                title="New today"
-                note="Compared with the previous UTC day, from Logto."
-              >
-                <Big>
-                  {overview.accounts.new_today.available
-                    ? num(overview.accounts.new_today.value)
-                    : '—'}
-                </Big>
-                {overview.accounts.new_today.available && (
-                  <p className="mt-1 text-sm text-base-content/60">
-                    {overview.accounts.new_today.delta >= 0 ? '+' : ''}
-                    {num(overview.accounts.new_today.delta)} vs previous day
-                  </p>
-                )}
-              </Card>
-              <Card
-                title="New in 7 days"
-                note="Compared with the previous equivalent 7-day period, from Logto."
-              >
-                <Big>
-                  {overview.accounts.new_7d.available
-                    ? num(overview.accounts.new_7d.value)
-                    : '—'}
-                </Big>
-                {overview.accounts.new_7d.available && (
-                  <p className="mt-1 text-sm text-base-content/60">
-                    {overview.accounts.new_7d.delta >= 0 ? '+' : ''}
-                    {num(overview.accounts.new_7d.delta)} vs prior 7 days
-                  </p>
-                )}
-              </Card>
-              <Card
-                title="Authenticated activity (Logto)"
-                note="Accounts that authenticated in each window; this does not prove the ticker was visible."
-              >
-                <p className="text-sm">
-                  <strong className="text-xl tabular-nums">
-                    {overview.active.dau.available
-                      ? num(overview.active.dau.value)
-                      : '—'}
-                  </strong>{' '}
-                  today
-                </p>
-                <p className="mt-2 text-sm text-base-content/65">
-                  {overview.active.wau.available
-                    ? num(overview.active.wau.value)
-                    : '—'}{' '}
-                  in 7 days ·{' '}
-                  {overview.active.mau.available
-                    ? num(overview.active.mau.value)
-                    : '—'}{' '}
-                  in 30 days
-                </p>
-              </Card>
-            </div>
-          </div>
-        )}
-      </section>
-
-      <section
-        id="usage"
-        className="scroll-mt-6 space-y-3"
-        aria-labelledby="usage-heading"
-      >
-        <div>
-          <h2 id="usage-heading" className="text-lg font-semibold">
-            Usage &amp; retention
-          </h2>
-          <p className="text-sm text-base-content/60">
-            Measured qualifying ticker use from participating accounts only.
-          </p>
-        </div>
-        {productError && !product && (
-          <ErrorPanel message={productError} onRetry={onRetryProduct} />
-        )}
-        {loading.product && !product && (
-          <Loading
-            label="measured usage"
-            slow={slow.product}
-            onCancel={onCancelProduct}
-          />
-        )}
-        {product && (
-          <>
-            <div className="rounded-xl bg-primary/5 p-4 text-sm ring-1 ring-primary/20">
-              <p>{product.population_note}</p>
-              <p className="mt-1 text-xs text-base-content/60">
-                {product.collection_started_at
-                  ? `Collection began ${new Date(product.collection_started_at).toLocaleDateString()}. No history is backfilled.`
-                  : 'No participating accounts yet.'}
-              </p>
-            </div>
-            <SourceStamp generatedAt={product.generated_at} />
-            <div className="flex flex-wrap items-center gap-3">
-              <Card title="Recently seen" note={product.recent_presence_note}>
-                <Big>{num(product.recent_presence)}</Big>
-              </Card>
-              <a
-                href="https://us.posthog.com/project/603918/dashboard/2087325"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm font-semibold text-primary hover:underline"
-              >
-                Open product analytics in PostHog
-              </a>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <Card title="Participating accounts">
-                <Big>{num(product.enrolled_accounts)}</Big>
-              </Card>
-              <Card title="Measured daily active">
-                <Big>{num(product.activity.dau)}</Big>
-              </Card>
-              <Card title="Measured 7-day active">
-                <Big>{num(product.activity.wau)}</Big>
-              </Card>
-              <Card title="Measured 30-day active">
-                <Big>{num(product.activity.mau)}</Big>
-              </Card>
-            </div>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card title="Measured active accounts">
-                <Curve
-                  points={product.activity.curve}
-                  label="Measured active accounts by day"
-                />
-              </Card>
-              <Card
-                title="First observed ticker use"
-                note={product.activation.definition}
-              >
-                <Curve
-                  points={product.activation.curve}
-                  label="First observed qualifying use by day"
-                />
-              </Card>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <RetentionCard metric={product.retention.d1} />
-              <RetentionCard metric={product.retention.d7} />
-              <RetentionCard metric={product.retention.d30} />
-            </div>
-          </>
-        )}
-      </section>
-
-      <section
-        id="features"
-        className="scroll-mt-6 space-y-3"
-        aria-labelledby="features-heading"
-      >
-        <div>
-          <h2 id="features-heading" className="text-lg font-semibold">
-            Features
-          </h2>
-          <p className="text-sm text-base-content/60">
-            Share of measured active accounts with each coarse ticker category
-            in this {days}-day window. Categories overlap.
-          </p>
-        </div>
-        {productError && !product && (
-          <ErrorPanel message={productError} onRetry={onRetryProduct} />
-        )}
-        {product && !hasFeatureUse && (
-          <p className="rounded-xl p-4 text-sm text-base-content/65 ring-1 ring-base-300/60">
-            No measured feature use in this window.
-          </p>
-        )}
-        {product && hasFeatureUse && (
-          <div className="rounded-xl bg-base-200/40 p-4 ring-1 ring-base-300/60 sm:p-5">
-            <ul className="space-y-4">
-              {product.features.map((feature) => (
-                <li key={feature.category}>
-                  <div className="flex justify-between gap-4 text-sm">
-                    <span className="font-medium capitalize">
-                      {feature.category}
-                    </span>
-                    <span className="tabular-nums text-base-content/65">
-                      {num(feature.accounts)} · {pct(feature.share)}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-base-300/60">
-                    <div
-                      className="h-full rounded-full bg-primary"
-                      style={{ width: `${feature.share * 100}%` }}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
-
-      <section
-        id="revenue"
-        className="scroll-mt-6 space-y-3"
-        aria-labelledby="revenue-heading"
-      >
-        <div>
-          <h2 id="revenue-heading" className="text-lg font-semibold">
-            Revenue
-          </h2>
-          <p className="text-sm text-base-content/60">
-            Current Stripe plan records. Revenue dollars are not shown because
-            no normalized amount, currency, and interval source exists.
-          </p>
-        </div>
-        {overviewError && !overview && (
-          <ErrorPanel message={overviewError} onRetry={onRetryOverview} />
-        )}
-        {overview && (
-          <div className="space-y-3">
-            <SourceStamp generatedAt={overview.generated_at} />
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card
-                title="Paying accounts"
-                note="Paid Stripe records, excluding the free plan."
-              >
-                <Big>{num(overview.plans.paying)}</Big>
-              </Card>
-              <Card title="Current paid plan mix">
-                {paidPlans.length === 0 ? (
-                  <p className="text-sm text-base-content/65">
-                    No paid subscriptions.
-                  </p>
-                ) : (
-                  paidPlans.map((row) => (
-                    <div
-                      key={`${row.plan}-${row.status}-${row.lifetime}`}
-                      className="flex justify-between gap-4 border-t border-base-300/50 py-2 first:border-0"
-                    >
-                      <span className="text-sm">
-                        {row.plan}
-                        {row.lifetime ? ' · lifetime' : ''} · {row.status}
-                      </span>
-                      <strong className="tabular-nums">{num(row.count)}</strong>
-                    </div>
-                  ))
-                )}
-              </Card>
-            </div>
-          </div>
-        )}
-      </section>
-
-      <section
-        id="reliability"
-        className="scroll-mt-6 space-y-3"
-        aria-labelledby="reliability-heading"
-      >
-        <div>
-          <h2 id="reliability-heading" className="text-lg font-semibold">
-            Reliability
-          </h2>
-          <p className="text-sm text-base-content/60">
-            Request-based version signals and current service readings. Requests
-            are a traffic proxy, not users or installs.
-          </p>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-3">
-            {versionsError && !versions && (
-              <ErrorPanel message={versionsError} onRetry={onRetryVersions} />
-            )}
-            {loading.versions && !versions && (
-              <Loading
-                label="version reliability"
-                slow={slow.versions}
-                onCancel={onCancelVersions}
+                <td className="px-3 py-2 capitalize">
+                  {c.category}{' '}
+                  <span className="text-xs font-normal text-base-content/55">
+                    {num(c.widgets)} types
+                  </span>
+                </td>
+                <td className={td}>{num(c.users)}</td>
+                <td className={td}>{pct(c.share)}</td>
+                <td className={td}>{formatHours(c.user_hours)}</td>
+                <td className={td}>{formatHours(c.screen_hours)}</td>
+                <td className={td}>—</td>
+                <td className={td}>—</td>
+                <td className={td}>—</td>
+                <td className={td}>—</td>
+              </tr>
+            ))}
+            {rows.map((row) => (
+              <WidgetTableRow
+                key={row.widget_type}
+                row={row}
+                changesAvailable={widgets.changes_available}
               />
-            )}
-            {versions && (
-              <div className="space-y-3">
-                <SourceStamp generatedAt={versions.generated_at} />
-                <Card
-                  title="Desktop request mix"
-                  note={`${num(versions.unrecognized)} unrecognized requests are excluded from version shares.`}
-                >
-                  {versions.desktop_total === 0 ? (
-                    <p className="text-sm text-base-content/65">
-                      No recognized desktop requests in this window.
-                    </p>
-                  ) : (
-                    <>
-                      <Big>{pct(versions.current_share)}</Big>
-                      <p className="mt-1 text-sm text-base-content/60">
-                        of recognized desktop requests came from{' '}
-                        {versions.current_release}
-                      </p>
-                      <div className="mt-3 space-y-2">
-                        {versions.versions.slice(0, 5).map((row) => (
-                          <p
-                            key={row.version}
-                            className="flex justify-between gap-3 text-sm"
-                          >
-                            <span>{row.version}</span>
-                            <span className="tabular-nums">
-                              {pct(row.error_rate)} errors · {num(row.requests)}{' '}
-                              req
-                            </span>
-                          </p>
-                        ))}
-                      </div>
-                      {versions.platforms.length > 0 && (
-                        <div className="mt-4 border-t border-base-300/50 pt-3">
-                          <p className="text-xs font-semibold text-base-content/55">
-                            Platform request mix
-                          </p>
-                          {versions.platforms.map((row) => (
-                            <p
-                              key={row.platform}
-                              className="mt-2 flex justify-between gap-3 text-sm"
-                            >
-                              <span>
-                                {platformLabel[row.platform] ?? row.platform}
-                              </span>
-                              <span className="tabular-nums">
-                                {pct(row.share)} · {num(row.requests)} req
-                              </span>
-                            </p>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </Card>
-              </div>
-            )}
-          </div>
-          <div className="space-y-3">
-            {overviewError && !overview && (
-              <ErrorPanel message={overviewError} onRetry={onRetryOverview} />
-            )}
-            {overview && (
-              <div className="space-y-3">
-                <SourceStamp generatedAt={overview.generated_at} />
-                <Card
-                  title="Current service readings"
-                  note={`${num(overview.connected_now.count)} open SSE connections across ${overview.connected_now.replicas} reporting replicas. Connections are not people.`}
-                >
-                  {(overview.ingest ?? []).map((row) => {
-                    const health = ingestHealth(row)
-                    return (
-                      <p
-                        key={row.table}
-                        className="flex justify-between py-1 text-sm"
-                      >
-                        <span>{row.table}</span>
-                        <span
-                          className={
-                            health === 'empty'
-                              ? 'text-error'
-                              : health === 'stale'
-                                ? 'text-warning'
-                                : 'text-success'
-                          }
-                        >
-                          {health === 'empty'
-                            ? 'empty'
-                            : formatAge(row.age_seconds)}
-                        </span>
-                      </p>
-                    )
-                  })}
-                  <p className="mt-3 border-t border-base-300/50 pt-3 text-sm text-base-content/65">
-                    {num(overview.support.open_cases)} open support cases ·{' '}
-                    {num(overview.support.pending_drafts)} drafts waiting
-                  </p>
-                </Card>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="diagnostics"
-        className="scroll-mt-6 space-y-3"
-        aria-labelledby="diagnostics-heading"
-      >
-        <div>
-          <h2 id="diagnostics-heading" className="text-lg font-semibold">
-            Signup diagnostics
-          </h2>
-          <p className="text-sm text-base-content/60">
-            Secondary troubleshooting data: retained Logto registration events
-            and safe error categories. Counts are events, not people or
-            completed signups.
-          </p>
-        </div>
-        <Selector
-          label="Application"
-          options={APPLICATIONS}
-          value={application}
-          onChange={onApplicationChange}
-        />
-        {signupError && !signup && (
-          <ErrorPanel message={signupError} onRetry={onRetrySignup} />
-        )}
-        {loading.signup && !signup && (
-          <Loading
-            label="signup diagnostics"
-            slow={slow.signup}
-            onCancel={onCancelSignup}
-          />
-        )}
-        {signup && (
-          <>
-            <div className="rounded-xl bg-warning/5 p-4 text-sm ring-1 ring-warning/20">
-              <p className="font-semibold">
-                {signup.coverage.status === 'partial'
-                  ? 'Partial coverage'
-                  : 'Coverage limits unknown'}
-              </p>
-              <p className="mt-1 text-base-content/65">
-                {signup.coverage.note}
-              </p>
-              <p className="mt-2 text-xs text-base-content/50">
-                {num(signup.coverage.unique_logs)} unique retained logs scanned
-                · generated {new Date(signup.generated_at).toLocaleString()}
-              </p>
-            </div>
-            {eventTotal === 0 ? (
-              <p className="rounded-xl p-4 text-sm text-base-content/65 ring-1 ring-base-300/60">
-                No recognized registration events were observed. With limited
-                coverage, this is not proof of zero activity.
-              </p>
-            ) : (
-              <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-base-200/40 text-left text-xs text-base-content/55">
-                      <th className="px-4 py-3 font-medium">Path</th>
-                      <th className="px-4 py-3 font-medium">Event</th>
-                      <th className="px-4 py-3 text-right font-medium">
-                        Count
-                      </th>
-                      <th className="px-4 py-3 text-right font-medium">
-                        Errors
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {STAGES.map((stage) => {
-                      const metrics = signup.stages[stage.key] ?? {
-                        events: 0,
-                        errors: 0,
-                      }
-                      return (
-                        <tr
-                          key={stage.key}
-                          className="border-t border-base-300/50"
-                        >
-                          <td className="px-4 py-2 text-base-content/55">
-                            {stage.path}
-                          </td>
-                          <td className="px-4 py-2 font-medium">
-                            {stage.label}
-                          </td>
-                          <td className="px-4 py-2 text-right tabular-nums">
-                            {num(metrics.events)}
-                          </td>
-                          <td className="px-4 py-2 text-right tabular-nums text-base-content/60">
-                            {num(metrics.errors)}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card
-                title="Safe error reasons"
-                note="Raw errors, emails, IP addresses, user agents, parameters, and tokens are discarded before this response is built."
-              >
-                {signup.error_reasons.length === 0 ? (
-                  <p className="text-sm text-base-content/65">
-                    No recognized registration errors were observed.
-                  </p>
-                ) : (
-                  <ul className="divide-y divide-base-300/50">
-                    {signup.error_reasons.map((reason) => (
-                      <li
-                        key={reason.reason}
-                        className="flex justify-between gap-4 py-2 text-sm"
-                      >
-                        <span>
-                          {reasonLabel[reason.reason] ?? 'Other safe category'}
-                        </span>
-                        <strong className="tabular-nums">
-                          {num(reason.count)}
-                        </strong>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Card>
-              <Card
-                title="Attempt conversion"
-                note="A missing later event is not proof of abandonment. Completion and drop-off stay unavailable until correlation and path semantics provide a real denominator."
-              >
-                <p className="text-sm text-base-content/65">
-                  {signup.attempt_conversion.note}
-                </p>
-              </Card>
-            </div>
-          </>
-        )}
-      </section>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-base-content/60">
+        Share: of {num(widgets.measured_ticker_users)} measured ticker users.
+        Repeat users show “—” for windows under 7 days.
+      </p>
     </div>
   )
 }
 
-export default function AnalyticsPage() {
-  const getToken = useGetToken()
-  const [days, setDays] = useState<ProductAnalyticsWindow>(7)
-  const [application, setApplication] =
-    useState<AnalyticsApplication>('website')
-  const [refresh, setRefresh] = useState(0)
-
-  const overviewLoad = useCallback(
-    (signal: AbortSignal) => {
-      void refresh
-      return loadBoundedAdminReport<AdminOverview>(
-        getToken,
-        '/admin/overview',
-        'Could not load product overview',
-        'Product overview took too long. Please retry.',
-        signal,
-      )
-    },
-    [getToken, refresh],
-  )
-  const productLoad = useCallback(
-    (signal: AbortSignal) => {
-      void refresh
-      return loadProductAnalytics(getToken, days, signal)
-    },
-    [days, getToken, refresh],
-  )
-  const versionsLoad = useCallback(
-    (signal: AbortSignal) => {
-      void refresh
-      return loadBoundedAdminReport<AdminVersions>(
-        getToken,
-        `/admin/versions?days=${days}`,
-        'Could not load version reliability',
-        'Version reliability took too long. Please retry.',
-        signal,
-      )
-    },
-    [days, getToken, refresh],
-  )
-  const signupLoad = useCallback(
-    (signal: AbortSignal) => {
-      void refresh
-      return loadSignupAnalytics(
-        getToken,
-        application,
-        days as AnalyticsWindow,
-        signal,
-      )
-    },
-    [application, days, getToken, refresh],
-  )
-
-  const overview = useReport(overviewLoad)
-  const product = useReport(productLoad)
-  const versions = useReport(versionsLoad)
-  const signup = useReport(signupLoad)
-
+function WidgetTableRow({
+  row,
+  changesAvailable,
+}: {
+  row: WidgetRow
+  changesAvailable: boolean
+}) {
+  const td = 'px-3 py-2 text-right tabular-nums'
   return (
-    <AnalyticsContent
-      overview={overview.data}
-      product={product.data}
-      versions={versions.data}
-      signup={signup.data}
-      days={days}
-      application={application}
-      overviewError={overview.error}
-      productError={product.error}
-      versionsError={versions.error}
-      signupError={signup.error}
-      loading={{
-        overview: overview.loading,
-        product: product.loading,
-        versions: versions.loading,
-        signup: signup.loading,
-      }}
-      slow={{
-        overview: overview.slow,
-        product: product.slow,
-        versions: versions.slow,
-        signup: signup.slow,
-      }}
-      onRetryOverview={overview.retry}
-      onRetryProduct={product.retry}
-      onRetryVersions={versions.retry}
-      onRetrySignup={signup.retry}
-      onCancelOverview={overview.cancel}
-      onCancelProduct={product.cancel}
-      onCancelVersions={versions.cancel}
-      onCancelSignup={signup.cancel}
-      onDaysChange={setDays}
-      onApplicationChange={setApplication}
-      onRefresh={() => setRefresh((value) => value + 1)}
-    />
+    <tr className="border-t border-base-300/50">
+      <td className="px-3 py-2">
+        <span className="font-medium">{row.name || row.widget_type}</span>
+        <span className="ml-2 text-xs text-base-content/55 capitalize">
+          {row.category}
+        </span>
+      </td>
+      <td className={td}>{num(row.users)}</td>
+      <td className={td}>{pct(row.share)}</td>
+      <td className={td}>{formatHours(row.user_hours)}</td>
+      <td className={td}>{formatHours(row.screen_hours)}</td>
+      <td className={td}>
+        {row.repeat_users === null ? '—' : num(row.repeat_users)}
+      </td>
+      <td className={td}>
+        {changesAvailable ? (
+          <>
+            +{num(row.added)} / −{num(row.removed)}
+          </>
+        ) : (
+          '—'
+        )}
+      </td>
+      <td className={td}>
+        {num(row.configured)} / {num(row.enabled)}
+      </td>
+      <td className={td}>
+        <DeltaBadge comparison={row.comparison} />
+      </td>
+    </tr>
+  )
+}
+
+/** The old daily facts, drawn as buckets so the same chart code serves. */
+function dailyBuckets(points: Array<DailyProductCount>) {
+  return points.map((p) => ({ start: p.day, end: p.day, value: p.count }))
+}
+
+function LegacyBlock({
+  legacy,
+}: {
+  legacy: NonNullable<DesktopUsage['legacy']>
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="rounded-xl bg-primary/5 p-4 text-sm ring-1 ring-primary/20">
+        <p>{legacy.population_note}</p>
+        <p className="mt-1 text-xs text-base-content/60">
+          {legacy.collection_started_at
+            ? `Collection began ${new Date(legacy.collection_started_at).toLocaleDateString()}. No history is backfilled.`
+            : 'No participating accounts yet.'}
+        </p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card title="Participating accounts">
+          <Big>{num(legacy.enrolled_accounts)}</Big>
+        </Card>
+        <Card title="Measured daily active">
+          <Big>{num(legacy.activity.dau)}</Big>
+        </Card>
+        <Card title="Measured 7-day active">
+          <Big>{num(legacy.activity.wau)}</Big>
+        </Card>
+        <Card title="Measured 30-day active">
+          <Big>{num(legacy.activity.mau)}</Big>
+        </Card>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card title="Measured active accounts by day">
+          <Sparkline
+            buckets={dailyBuckets(legacy.activity.curve)}
+            step="24h0m0s"
+            label="Measured active accounts by day"
+          />
+        </Card>
+        <Card
+          title="First observed ticker use"
+          note={legacy.activation.definition}
+        >
+          <Sparkline
+            buckets={dailyBuckets(legacy.activation.curve)}
+            step="24h0m0s"
+            label="First observed qualifying use by day"
+          />
+        </Card>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <RetentionCard metric={legacy.retention.d1} />
+        <RetentionCard metric={legacy.retention.d7} />
+        <RetentionCard metric={legacy.retention.d30} />
+      </div>
+    </div>
+  )
+}
+
+// ── Revenue ───────────────────────────────────────────────────────
+
+function RevenueTab({
+  getToken,
+  period,
+  refresh,
+}: {
+  getToken: Token
+  period: Period
+  refresh: number
+}) {
+  const revenue = useReport(
+    useCallback(
+      (signal: AbortSignal) => {
+        void refresh
+        return loadRevenue(getToken, period, signal)
+      },
+      [getToken, period, refresh],
+    ),
+  )
+  return <RevenueContent period={period} revenue={revenue} />
+}
+
+export interface RevenueContentProps {
+  period: Period
+  revenue: Report<Revenue>
+}
+
+export function RevenueContent({ period, revenue }: RevenueContentProps) {
+  const windowLabel = periodLabel(period)
+  return (
+    <div className="space-y-8">
+      <Loaded report={revenue} label="revenue">
+        {(r) => (
+          <>
+            <Stamp at={r.generated_at} />
+            <p className="text-sm text-base-content/65">{r.account_note}</p>
+            <Section
+              id="paying"
+              title="Paying customers"
+              lede={r.paying_now.definition}
+            >
+              <div className="grid items-start gap-4 lg:grid-cols-3">
+                <Card
+                  title="Paying now"
+                  label="Current"
+                  note={r.paying_now.available ? r.paying_now_note : undefined}
+                >
+                  {r.paying_now.available ? (
+                    <>
+                      <Big>{num(r.paying_now.paying)}</Big>
+                      <div className="mt-3 border-t border-base-300/60 pt-2">
+                        <Row
+                          label="Lifetime"
+                          value={num(r.paying_now.lifetime)}
+                        />
+                        <Row
+                          label="Trialing"
+                          value={num(r.paying_now.trialing)}
+                        />
+                        <Row
+                          label="Past due"
+                          value={num(r.paying_now.past_due)}
+                        />
+                        <Row
+                          label="Canceling"
+                          value={num(r.paying_now.canceling)}
+                        />
+                        <Row
+                          label="Canceled"
+                          value={num(r.paying_now.canceled)}
+                        />
+                        <Row label="Free" value={num(r.paying_now.free)} />
+                      </div>
+                    </>
+                  ) : (
+                    <Unmeasurable
+                      note={
+                        r.paying_now_note ??
+                        'The customer snapshot could not be read.'
+                      }
+                    />
+                  )}
+                </Card>
+                <div className="lg:col-span-2">
+                  <Card title="Plan mix" label="Current">
+                    <PlanMixTable rows={r.paying_now.rows ?? []} />
+                  </Card>
+                </div>
+              </div>
+            </Section>
+
+            <Section
+              id="new-paying"
+              title="New paying customers"
+              lede={r.new_paying.definition}
+            >
+              <Card title="First payments" label={windowLabel}>
+                {r.new_paying.available ? (
+                  <>
+                    <MetricValue metric={r.new_paying.in_period}>
+                      <p className="mt-1 text-sm text-base-content/60">
+                        <DeltaBadge
+                          comparison={r.new_paying.in_period.comparison}
+                        />
+                      </p>
+                    </MetricValue>
+                    <div className="mt-3 border-t border-base-300/60 pt-2">
+                      <Row
+                        label="Lifetime"
+                        value={num(r.new_paying.lifetime)}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <Unmeasurable note={r.new_paying.note} />
+                )}
+              </Card>
+            </Section>
+
+            <Section
+              id="earnings"
+              title="Net earnings"
+              lede="Stripe balance transactions by created time. Each currency stands alone; nothing is converted or added across currencies."
+            >
+              {r.earnings.available ? (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-base-content/60">
+                    {r.earnings.fetched_at && (
+                      <span>
+                        {r.earnings.cached ? 'Cached from' : 'Fetched from'}{' '}
+                        Stripe at{' '}
+                        {new Date(r.earnings.fetched_at).toLocaleString()}
+                      </span>
+                    )}
+                    {r.earnings.partial && (
+                      <span className="font-semibold text-warning">
+                        Stripe returned a partial ledger.
+                      </span>
+                    )}
+                  </div>
+                  <CoverageNote coverage={r.earnings.coverage} />
+                  <div className="grid items-start gap-4 lg:grid-cols-2">
+                    <Card
+                      title={`Net (${r.earnings.primary_currency.toUpperCase()})`}
+                      label={windowLabel}
+                    >
+                      <MetricValue
+                        metric={r.earnings.net}
+                        format={(v) =>
+                          formatMinor(v, r.earnings.primary_currency)
+                        }
+                      >
+                        <p className="mt-1 text-sm text-base-content/60">
+                          <DeltaBadge
+                            comparison={r.earnings.net.comparison}
+                            format={(v) =>
+                              formatMinor(v, r.earnings.primary_currency)
+                            }
+                          />
+                        </p>
+                      </MetricValue>
+                    </Card>
+                    <Card
+                      title={`Per bucket (${r.earnings.primary_currency.toUpperCase()}, minor units)`}
+                      label={windowLabel}
+                    >
+                      <Bars
+                        buckets={r.earnings.curve}
+                        step={r.earnings.curve_step}
+                        label="Net earnings per bucket"
+                      />
+                    </Card>
+                  </div>
+                  {(r.earnings.currencies ?? []).map((c) => (
+                    <EarningsBlock
+                      key={c.currency}
+                      earnings={c}
+                      label={windowLabel}
+                    />
+                  ))}
+                  {(r.earnings.currencies ?? []).length === 0 && (
+                    <p className="text-sm text-base-content/65">
+                      No balance transactions in this window.
+                    </p>
+                  )}
+                  <div>
+                    <h3 className="text-sm font-semibold text-base-content/70">
+                      Lifetime
+                    </h3>
+                    <div className="mt-2 grid gap-4 lg:grid-cols-2">
+                      {(r.earnings.lifetime ?? []).map((c) => (
+                        <EarningsBlock
+                          key={c.currency}
+                          earnings={c}
+                          label="Lifetime"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <DefinitionDisclosure>
+                    <p>{r.earnings.definition}</p>
+                  </DefinitionDisclosure>
+                </div>
+              ) : (
+                <Card title="Net earnings">
+                  <Unmeasurable note={r.earnings.note} />
+                </Card>
+              )}
+            </Section>
+          </>
+        )}
+      </Loaded>
+    </div>
+  )
+}
+
+function PlanMixTable({ rows }: { rows: Array<PlanMixRow> }) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-base-content/65">No Stripe records.</p>
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs text-base-content/55">
+            <th className="py-1 pr-3 font-medium">Tier</th>
+            <th className="py-1 pr-3 font-medium">Interval</th>
+            <th className="py-1 pr-3 font-medium">Status</th>
+            <th className="py-1 pr-3 font-medium">Paying</th>
+            <th className="py-1 text-right font-medium">Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr
+              key={`${row.plan}-${row.status}-${row.lifetime}`}
+              className="border-t border-base-300/50"
+            >
+              <td className="py-1 pr-3 capitalize">{row.tier || row.plan}</td>
+              <td className="py-1 pr-3">
+                {row.lifetime ? 'lifetime' : row.interval || '—'}
+              </td>
+              <td className="py-1 pr-3">{row.status}</td>
+              <td className="py-1 pr-3">{row.paying ? 'yes' : 'no'}</td>
+              <td className="py-1 text-right tabular-nums">{num(row.count)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function EarningsBlock({
+  earnings: e,
+  label,
+}: {
+  earnings: Earnings
+  label: string
+}) {
+  const money = (minor: number) => formatMinor(minor, e.currency)
+  const lines = [
+    ['Payments', e.payments],
+    ['Refunds', e.refunds],
+    ['Refund reversals', e.refund_reversals],
+    ['Disputes', e.disputes],
+    ['Fees', e.fees],
+  ] as const
+  return (
+    <Card title={`Earnings in ${e.currency.toUpperCase()}`} label={label}>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-base-content/55">
+              <th className="py-1 pr-3 font-medium">Line</th>
+              <th className="py-1 pr-3 text-right font-medium">Count</th>
+              <th className="py-1 text-right font-medium">Net</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map(([name, line]) => (
+              <tr key={name} className="border-t border-base-300/50">
+                <td className="py-1 pr-3">{name}</td>
+                <td className="py-1 pr-3 text-right tabular-nums">
+                  {num(line.count)}
+                </td>
+                <td className="py-1 text-right tabular-nums">
+                  {money(line.net)}
+                </td>
+              </tr>
+            ))}
+            <tr className="border-t border-base-300/50 font-semibold">
+              <td className="py-1 pr-3">Net</td>
+              <td className="py-1 pr-3" />
+              <td className="py-1 text-right tabular-nums">{money(e.net)}</td>
+            </tr>
+            <tr className="border-t border-base-300/50 text-base-content/70">
+              <td className="py-1 pr-3">Gross fees (already subtracted)</td>
+              <td className="py-1 pr-3" />
+              <td className="py-1 text-right tabular-nums">
+                {money(e.gross_fees)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {(e.movements ?? []).length > 0 && (
+        <div className="mt-3 border-t border-base-300/60 pt-2">
+          <p className="text-xs font-semibold text-base-content/60">
+            Movements of funds — excluded from net
+          </p>
+          {(e.movements ?? []).map((m) => (
+            <Row
+              key={m.kind}
+              label={`${m.kind} × ${num(m.count)}`}
+              value={money(m.amount)}
+            />
+          ))}
+        </div>
+      )}
+      {(e.unclassified ?? []).length > 0 && (
+        <div className="mt-3 border-t border-base-300/60 pt-2">
+          <p className="text-xs font-semibold text-warning">
+            Unclassified — excluded from net, needs a rule
+          </p>
+          {(e.unclassified ?? []).map((m) => (
+            <Row
+              key={m.kind}
+              label={`${m.kind} × ${num(m.count)}`}
+              value={money(m.amount)}
+            />
+          ))}
+        </div>
+      )}
+    </Card>
+  )
+}
+
+// ── Support ───────────────────────────────────────────────────────
+
+function SupportTab({
+  getToken,
+  period,
+  refresh,
+}: {
+  getToken: Token
+  period: Period
+  refresh: number
+}) {
+  const support = useReport(
+    useCallback(
+      (signal: AbortSignal) => {
+        void refresh
+        return loadSupportSummary(getToken, period, signal)
+      },
+      [getToken, period, refresh],
+    ),
+  )
+  return <SupportContent period={period} support={support} />
+}
+
+export interface SupportContentProps {
+  period: Period
+  support: Report<SupportSummary>
+}
+
+function paying(count: number): ReactNode {
+  return count > 0 ? `${num(count)} paying` : undefined
+}
+
+export function SupportContent({ period, support }: SupportContentProps) {
+  const windowLabel = periodLabel(period)
+  return (
+    <div className="space-y-8">
+      <Loaded report={support} label="support summary">
+        {(s) => (
+          <>
+            <div className="flex flex-wrap items-center gap-3">
+              <Stamp at={s.generated_at} />
+              <Link to="/admin/support" className={LINK}>
+                Open support →
+              </Link>
+            </div>
+            <Section
+              id="queue"
+              title="Queue"
+              lede="The whole queue as the pipeline classifies it. Paying counts only tickets with a verified account."
+            >
+              <Card title="Buckets" label="Current" note={s.paying_note}>
+                <div className="grid gap-4 sm:grid-cols-4">
+                  <Stat
+                    label="Needs attention"
+                    value={num(s.needs_attention.total)}
+                    sub={paying(s.needs_attention.paying)}
+                  />
+                  <Stat
+                    label="Waiting on customer"
+                    value={num(s.waiting_on_customer.total)}
+                    sub={paying(s.waiting_on_customer.paying)}
+                  />
+                  <Stat
+                    label="Completed"
+                    value={num(s.completed.total)}
+                    sub={`${num(s.completed_closed)} closed · ${num(s.completed_dismissed)} dismissed${s.completed.paying > 0 ? ` · ${num(s.completed.paying)} paying` : ''}`}
+                  />
+                  <Stat
+                    label="Total"
+                    value={num(s.total.total)}
+                    sub={paying(s.total.paying)}
+                  />
+                </div>
+                <div className="mt-4 border-t border-base-300/60 pt-2">
+                  <Row
+                    label="Oldest waiting for us"
+                    value={
+                      <MetricValue
+                        metric={s.oldest_needs_attention_hours}
+                        format={(h) => `${num(Math.round(h))} h`}
+                        size="inline"
+                      />
+                    }
+                  />
+                  {s.oldest_ticket && (
+                    <p className="text-xs text-base-content/65">
+                      Ticket #{s.oldest_ticket}
+                    </p>
+                  )}
+                  <Row
+                    label="Auto-send"
+                    value={
+                      s.autosend.armed
+                        ? `armed · ${s.autosend.hold_minutes} min hold`
+                        : s.autosend.paused
+                          ? 'paused'
+                          : 'off'
+                    }
+                  />
+                  <p className="text-xs text-base-content/65">
+                    {s.autosend.note}
+                  </p>
+                </div>
+                {s.definitions && Object.keys(s.definitions).length > 0 && (
+                  <DefinitionDisclosure summary="Bucket definitions">
+                    {Object.entries(s.definitions).map(([key, text]) => (
+                      <p key={key}>
+                        <strong>{key.replace(/_/g, ' ')}</strong> — {text}
+                      </p>
+                    ))}
+                  </DefinitionDisclosure>
+                )}
+              </Card>
+            </Section>
+
+            <Section
+              id="flow"
+              title="Created and completed"
+              lede={s.history_note}
+            >
+              <CoverageNote coverage={s.coverage} />
+              <div className="grid items-start gap-4 lg:grid-cols-2">
+                <Card title="Created" label={windowLabel}>
+                  <MetricValue metric={s.created}>
+                    <p className="mt-1 text-sm text-base-content/60">
+                      <DeltaBadge
+                        comparison={s.created.comparison}
+                        goodIsDown
+                      />
+                      {s.paying_created > 0
+                        ? ` · ${num(s.paying_created)} from paying customers`
+                        : ''}
+                    </p>
+                  </MetricValue>
+                  <div className="mt-3">
+                    <Bars
+                      buckets={s.created_curve}
+                      step={s.curve_step}
+                      label="Tickets created per bucket"
+                    />
+                  </div>
+                </Card>
+                <Card title="Completed" label={windowLabel}>
+                  <MetricValue metric={s.completed_in_period}>
+                    <p className="mt-1 text-sm text-base-content/60">
+                      <DeltaBadge
+                        comparison={s.completed_in_period.comparison}
+                      />
+                    </p>
+                  </MetricValue>
+                  <div className="mt-3">
+                    <Bars
+                      buckets={s.completed_curve}
+                      step={s.curve_step}
+                      label="Tickets completed per bucket"
+                      tone="text-success"
+                    />
+                  </div>
+                </Card>
+              </div>
+              <Card
+                title="Backlog (estimate)"
+                label={windowLabel}
+                note="Estimated from opened and closed timestamps only; reopenings are not reconstructable, so a past day's backlog is an estimate."
+              >
+                <Sparkline
+                  buckets={s.backlog_curve}
+                  step={s.curve_step}
+                  label="Estimated open tickets per bucket"
+                />
+              </Card>
+            </Section>
+
+            <Section
+              id="speed"
+              title="Response and completion"
+              lede="Medians over tickets in the window, from retained timestamps. The sample size travels with each figure."
+            >
+              <div className="grid items-start gap-4 lg:grid-cols-2">
+                <Card title="First response, median" label={windowLabel}>
+                  <MetricValue
+                    metric={s.first_response_median_hours}
+                    format={formatHours}
+                  >
+                    <p className="mt-1 text-sm text-base-content/60">
+                      <DeltaBadge
+                        comparison={s.first_response_median_hours.comparison}
+                        format={(v) => `${v > 0 ? '+' : ''}${formatHours(v)}`}
+                        goodIsDown
+                      />
+                    </p>
+                  </MetricValue>
+                </Card>
+                <Card title="Completion, median" label={windowLabel}>
+                  <MetricValue
+                    metric={s.completion_median_hours}
+                    format={formatHours}
+                  >
+                    <p className="mt-1 text-sm text-base-content/60">
+                      <DeltaBadge
+                        comparison={s.completion_median_hours.comparison}
+                        format={(v) => `${v > 0 ? '+' : ''}${formatHours(v)}`}
+                        goodIsDown
+                      />
+                    </p>
+                  </MetricValue>
+                </Card>
+              </div>
+            </Section>
+          </>
+        )}
+      </Loaded>
+    </div>
   )
 }

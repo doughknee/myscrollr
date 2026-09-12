@@ -260,6 +260,7 @@ func CreateWidget(c *fiber.Ctx) error {
 
 	// Fire the "created" lifecycle hook (in-process for local sources)
 	callWidgetLifecycle(ctx, ch.WidgetType, "created", userID, ch.Config, nil, nil)
+	recordWidgetChange(ctx, userID, ch.WidgetType, "added")
 
 	// Invalidate dashboard cache so next poll gets fresh data
 	platform.InvalidateDashboardCache(userID)
@@ -268,6 +269,33 @@ func CreateWidget(c *fiber.Ctx) error {
 	platform.InvalidateOverviewCache(ctx, userID)
 
 	return c.Status(fiber.StatusCreated).JSON(ch)
+}
+
+// recordWidgetChange writes one add/remove fact for the admin widget
+// analytics (SCROLLR-210). It is the real change — the row was just inserted
+// or deleted — so a reload never produces one. Only accounts with usage
+// analytics on have an enrollment row, and the INSERT ... SELECT reads that
+// row's internal flag, so consent is enforced by the join and nothing is
+// written for anyone else. Only catalog ids are stored: the closed
+// vocabulary is the privacy boundary.
+func recordWidgetChange(ctx context.Context, userID, widgetType, change string) {
+	if platform.DBPool == nil {
+		return
+	}
+	if _, ok := platform.WidgetByID(widgetType); !ok {
+		return
+	}
+	// Staff is a table, not a stored flag: an account added to admin_users
+	// after enrolling is internal from its next change, not its next consent
+	// re-read (the presence check-in derives it the same way).
+	if _, err := platform.DBPool.Exec(ctx, `
+		INSERT INTO presence_widget_changes (logto_sub, widget_type, change, internal)
+		SELECT e.logto_sub, $2, $3,
+		       e.internal OR EXISTS (SELECT 1 FROM admin_users a WHERE a.logto_sub = e.logto_sub)
+		  FROM product_analytics_enrollments e WHERE e.logto_sub = $1`,
+		userID, widgetType, change); err != nil {
+		log.Printf("[Widgets] record %s %s: %v", change, widgetType, err)
+	}
 }
 
 // UpdateWidget updates a widget by type for the authenticated user.
@@ -477,6 +505,7 @@ func DeleteWidget(c *fiber.Ctx) error {
 
 	// Fire the "deleted" lifecycle hook (in-process for local sources)
 	callWidgetLifecycle(ctx, widgetType, "deleted", userID, config, nil, nil)
+	recordWidgetChange(ctx, userID, widgetType, "removed")
 
 	// Invalidate dashboard cache so next poll gets fresh data
 	platform.InvalidateDashboardCache(userID)

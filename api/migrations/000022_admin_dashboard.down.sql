@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS presence_concurrency_minute;
+DROP TABLE IF EXISTS presence_widget_changes;
+DROP TABLE IF EXISTS presence_widget_account_hourly;
+DROP TABLE IF EXISTS presence_widget_hourly;
+DROP TABLE IF EXISTS presence_watermarks;
+DROP TABLE IF EXISTS presence_account_hourly;
+DROP TABLE IF EXISTS presence_session_hourly;
+DROP TABLE IF EXISTS presence_accounts;
+DROP TABLE IF EXISTS admin_settings;
+ALTER TABLE product_analytics_enrollments DROP COLUMN IF EXISTS internal;
