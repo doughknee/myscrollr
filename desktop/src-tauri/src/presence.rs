@@ -222,6 +222,10 @@ pub fn report_screen_state(
 pub fn start(app: AppHandle) {
     #[cfg(target_os = "windows")]
     crate::presence_win::install(app.clone());
+    #[cfg(target_os = "macos")]
+    crate::presence_mac::install(app.clone());
+    #[cfg(target_os = "linux")]
+    crate::presence_linux::install(app.clone());
 
     tauri::async_runtime::spawn(async move {
         let client = match reqwest::Client::builder().timeout(Duration::from_secs(10)).build() {
@@ -415,13 +419,23 @@ fn now_ms() -> i64 {
 }
 
 /// Seconds since the last keyboard or mouse input, where the platform can
-/// say. Windows: GetLastInputInfo. Elsewhere: unknown for now.
+/// say. Windows: GetLastInputInfo. macOS: CGEventSourceSecondsSinceLastEventType.
+/// Linux: the desktop's screensaver idle time, or unknown where no
+/// interface provides it.
 fn idle_for() -> Option<Duration> {
     #[cfg(target_os = "windows")]
     {
         crate::presence_win::idle_for()
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    {
+        crate::presence_mac::idle_for()
+    }
+    #[cfg(target_os = "linux")]
+    {
+        crate::presence_linux::idle_for()
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
         None
     }

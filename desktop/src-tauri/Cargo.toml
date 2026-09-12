@@ -1,6 +1,6 @@
 [package]
 name = "scrollr-desktop"
-version = "1.6.6"
+version = "1.6.7"
 edition = "2021"
 # std::env::home_dir (Sentry path scrubber) is only correct on Windows from 1.85+
 rust-version = "1.85"
@@ -108,10 +108,23 @@ objc2-app-kit = { version = "0.3", features = [
     "NSControl",
     "NSResponder",
     "NSToolbar",
+    # presence_mac.rs: workspace sleep/wake + display notifications
+    "NSWorkspace",
+] }
+# presence_mac.rs: notification centers and names. Same objc2 generation
+# as objc2-app-kit (0.3.x pairs with objc2 0.6).
+objc2-foundation = { version = "0.3", features = [
+    "NSObject",
+    "NSString",
+    "NSNotification",
+    "NSDistributedNotificationCenter",
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3", features = ["sync-secret-service"] }
+# presence_linux.rs: logind + screensaver over D-Bus (SCROLLR-211). One
+# crate, on the tokio runtime Tauri already runs.
+zbus = { version = "5", default-features = false, features = ["tokio"] }
 
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3", features = ["windows-native"] }
