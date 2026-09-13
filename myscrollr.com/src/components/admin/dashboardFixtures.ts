@@ -495,14 +495,6 @@ export const overview: AdminOverview = {
   },
   plans: { paying: 2, rows: [] },
   connected_now: { count: 8, replicas: 2 },
-  support: {
-    open_cases: 3,
-    pending_drafts: 1,
-    auto_sent_30d: 4,
-    intervened_30d: 1,
-    oldest_open_hours: 2,
-    oldest_open_ticket: '104',
-  },
   ingest: [
     { table: 'games', age_seconds: 90, has_data: true },
     { table: 'trades', age_seconds: 45, has_data: true },
