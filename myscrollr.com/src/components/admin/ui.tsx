@@ -187,6 +187,21 @@ export const LINK =
   'rounded text-sm font-semibold text-base-content underline decoration-base-content/30 underline-offset-4 hover:decoration-base-content focus-visible:outline-2 focus-visible:outline-primary'
 
 /**
+ * A page's own frame inside the console's full-bleed <main> (SCROLLR-218).
+ *
+ * The shell stopped capping anything when it became a top bar, so a page that
+ * wants a measure asks for one. Overview centres itself at 960 and skips this;
+ * Support keeps it only until SCROLLR-219 gives it the whole <main>.
+ */
+export function PageFrame({ children }: { children: ReactNode }) {
+  return (
+    <div className="mx-auto w-full max-w-[1400px] px-6 py-8 lg:px-12">
+      {children}
+    </div>
+  )
+}
+
+/**
  * A card. `label` is the window the numbers describe — "Current" for a now
  * figure, "Last 7 days" for a period one — so a reader never has to guess
  * which of the two a number is.

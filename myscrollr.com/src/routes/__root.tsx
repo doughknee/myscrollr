@@ -7,7 +7,7 @@ import {
   createRootRoute,
   useLocation,
 } from '@tanstack/react-router'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MotionConfig } from 'motion/react'
 import type { ReactNode } from 'react'
 import Header from '@/components/Header'
@@ -16,6 +16,7 @@ import DemoTickerBar from '@/components/DemoTickerBar'
 import AnalyticsConsent from '@/components/AnalyticsConsent'
 import { useDemoTicker } from '@/hooks/useDemoTicker'
 import { captureWebsitePageview } from '@/lib/posthog'
+import { usesSiteChrome } from '@/lib/siteChrome'
 import appCss from '@/styles.css?url'
 
 const themeScript = `;(function () {
@@ -172,6 +173,14 @@ function RootLayout() {
   const { pathname } = useLocation()
   const mainRef = useRef<HTMLElement>(null)
   const isFirstRender = useRef(true)
+  // /admin has no prerendered HTML of its own: nginx serves it the shared
+  // `_shell.html`, which was rendered for `/tss-spa-shell` and therefore
+  // carries the site chrome. Dropping that chrome during the first client
+  // render would be a hydration mismatch, and React answers one by rebuilding
+  // <html> — which throws away the `dark` class the pre-hydration theme script
+  // just put there. So the console's shell takes over one tick later instead.
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => setHydrated(true), [])
 
   useEffect(() => {
     captureWebsitePageview(pathname)
@@ -195,6 +204,7 @@ function RootLayout() {
   // layout purposes (padding, header offset, drawer insets) it counts
   // as a bar-having route like any other.
   const hasAnyBar = hasDemoBar || pathname.startsWith('/business')
+  const isConsole = hydrated && !usesSiteChrome(pathname)
   const { theme: demoFamily, density, pos } = useDemoTicker()
 
   // Site-wide theme family: picking a family in MAKE IT YOURS re-skins
@@ -239,23 +249,29 @@ function RootLayout() {
           </a>
 
           {/* Navigation */}
-          <Header hasBar={hasAnyBar} />
+          {!isConsole && <Header hasBar={hasAnyBar} />}
 
-          {/* Reserve the viewport below the 60px header, even while Outlet is empty. */}
+          {/* Reserve the viewport below the 60px header, even while Outlet is
+              empty. The console reserves nothing — AdminChrome's own 48px bar
+              is inside the Outlet. */}
           <main
             ref={mainRef}
             id="main-content"
-            className="relative min-h-[calc(100dvh-60px)]"
+            className={
+              isConsole ? 'relative' : 'relative min-h-[calc(100dvh-60px)]'
+            }
             tabIndex={-1}
           >
             <Outlet />
           </main>
 
           {/* Footer */}
-          <Footer />
-          <ClientOnly>
-            <AnalyticsConsent />
-          </ClientOnly>
+          {!isConsole && <Footer />}
+          {!isConsole && (
+            <ClientOnly>
+              <AnalyticsConsent />
+            </ClientOnly>
+          )}
 
           {/* Persistent demo ticker bar — the brand's connective tissue.
               /business mounts its own white-label variant instead. */}

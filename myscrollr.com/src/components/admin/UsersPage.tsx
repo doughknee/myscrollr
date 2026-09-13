@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ChevronLeft, Loader2, Search } from 'lucide-react'
+import { PageFrame } from './ui'
 import type { AccountDetail, AccountRow, AccountsPage } from '@/api/admin'
 import { adminApi } from '@/api/admin'
 import { useGetToken } from '@/hooks/useGetToken'
@@ -205,7 +206,11 @@ export default function UsersPage() {
   }, [getToken, query, page])
 
   if (selected) {
-    return <DetailPanel sub={selected} onBack={() => setSelected(null)} />
+    return (
+      <PageFrame>
+        <DetailPanel sub={selected} onBack={() => setSelected(null)} />
+      </PageFrame>
+    )
   }
 
   const pageCount = data ? Math.ceil(data.total / data.page_size) : 0
@@ -214,162 +219,169 @@ export default function UsersPage() {
   const neverSetUp = data ? Math.max(0, data.total - data.set_up) : 0
 
   return (
-    <div className="space-y-5">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight">Users</h1>
-        {data?.source === 'local' ? (
-          <p className="mt-1 text-sm text-warning">
-            {data.note ?? 'Logto is unreachable.'} Showing{' '}
-            {data.total.toLocaleString()} accounts with local data.
-          </p>
-        ) : (
-          data && (
-            <p className="mt-1 text-sm text-base-content/60">
-              <span className="font-semibold text-base-content">
-                {data.total.toLocaleString()}
-              </span>{' '}
-              {query ? 'accounts match' : 'accounts'}
-              {/* set_up is a count of the whole database, so pairing it with a
-                  filtered total would read as a gap within the search. */}
-              {!query && (
-                <>
-                  {' · '}
-                  <span className="font-semibold text-base-content">
-                    {data.set_up.toLocaleString()}
-                  </span>{' '}
-                  have set up the app ·{' '}
-                  <span className="font-semibold text-warning">
-                    {neverSetUp.toLocaleString()}
-                  </span>{' '}
-                  never did
-                </>
-              )}
+    <PageFrame>
+      <div className="space-y-5">
+        <header>
+          <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+          {data?.source === 'local' ? (
+            <p className="mt-1 text-sm text-warning">
+              {data.note ?? 'Logto is unreachable.'} Showing{' '}
+              {data.total.toLocaleString()} accounts with local data.
             </p>
-          )
-        )}
-        <p className="mt-1 text-sm text-base-content/60">
-          Read-only — this console does not edit anyone&apos;s account.
-        </p>
-      </header>
-
-      <div className="relative">
-        <Search
-          size={16}
-          className="absolute top-1/2 left-3 -translate-y-1/2 text-base-content/40"
-        />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value)
-            setPage(0)
-          }}
-          placeholder="Search by email or username"
-          className="w-full rounded-lg bg-base-200/50 py-2.5 pr-3 pl-9 text-sm ring-1 ring-base-300/60 outline-none focus:ring-primary/50"
-        />
-      </div>
-
-      {error && <p className="text-sm text-error">{error}</p>}
-      {!data && !error && (
-        <Loader2 className="size-5 animate-spin text-base-content/40" />
-      )}
-
-      {data && (
-        <>
-          <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
-            <table className="w-full min-w-[42rem] text-left text-sm">
-              <thead className="text-xs text-base-content/50 uppercase">
-                <tr className="border-b border-base-300/60">
-                  <th className="p-3 font-semibold">User</th>
-                  <th className="p-3 font-semibold">Plan</th>
-                  <th className="p-3 font-semibold">Widgets</th>
-                  <th className="p-3 font-semibold">Tickets</th>
-                  <th className="p-3 font-semibold">Signed up</th>
-                  <th className="p-3 font-semibold">Last sign-in</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.accounts.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="p-6 text-center text-base-content/50"
-                    >
-                      No accounts match that search.
-                    </td>
-                  </tr>
+          ) : (
+            data && (
+              <p className="mt-1 text-sm text-base-content/60">
+                <span className="font-semibold text-base-content">
+                  {data.total.toLocaleString()}
+                </span>{' '}
+                {query ? 'accounts match' : 'accounts'}
+                {/* set_up is a count of the whole database, so pairing it with a
+                  filtered total would read as a gap within the search. */}
+                {!query && (
+                  <>
+                    {' · '}
+                    <span className="font-semibold text-base-content">
+                      {data.set_up.toLocaleString()}
+                    </span>{' '}
+                    have set up the app ·{' '}
+                    <span className="font-semibold text-warning">
+                      {neverSetUp.toLocaleString()}
+                    </span>{' '}
+                    never did
+                  </>
                 )}
-                {data.accounts.map((a) => (
-                  <tr
-                    key={a.logto_sub}
-                    onClick={() => setSelected(a.logto_sub)}
-                    className="cursor-pointer border-b border-base-300/40 transition-colors last:border-0 hover:bg-base-200/50"
-                  >
-                    <td className="max-w-[18rem] p-3">
-                      <span className="block truncate font-medium">
-                        {a.email ?? a.name ?? '—'}
-                      </span>
-                      <span className="block truncate font-mono text-xs text-base-content/45">
-                        {a.logto_sub}
-                        {!a.set_up && (
-                          <span className="text-warning"> · never set up</span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="p-3 text-base-content/70">{planLabel(a)}</td>
-                    <td className="p-3 tabular-nums">
-                      {a.widgets}
-                      {a.on_ticker > 0 && (
-                        <span className="text-base-content/45">
-                          {' '}
-                          ({a.on_ticker} on bar)
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3 tabular-nums">{a.tickets}</td>
-                    <td className="p-3 text-base-content/60">
-                      {day(a.signed_up_at)}
-                    </td>
-                    <td className="p-3 text-base-content/60">
-                      {day(a.last_sign_in_at)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <p className="text-xs text-base-content/45">
-            Ordered by Logto; search matches email and username. Widgets and
-            tickets come from this database and cannot be sorted or searched
-            across the whole set — those columns describe only this page.
-          </p>
-
-          {pageCount > 1 && (
-            <div className="flex items-center justify-between text-sm">
-              <button
-                type="button"
-                disabled={page === 0}
-                onClick={() => setPage((p) => p - 1)}
-                className="cursor-pointer rounded-lg px-3 py-1.5 ring-1 ring-base-300 disabled:cursor-default disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <span className="text-base-content/60">
-                Page {page + 1} of {pageCount}
-              </span>
-              <button
-                type="button"
-                disabled={page + 1 >= pageCount}
-                onClick={() => setPage((p) => p + 1)}
-                className="cursor-pointer rounded-lg px-3 py-1.5 ring-1 ring-base-300 disabled:cursor-default disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
+              </p>
+            )
           )}
-        </>
-      )}
-    </div>
+          <p className="mt-1 text-sm text-base-content/60">
+            Read-only — this console does not edit anyone&apos;s account.
+          </p>
+        </header>
+
+        <div className="relative">
+          <Search
+            size={16}
+            className="absolute top-1/2 left-3 -translate-y-1/2 text-base-content/40"
+          />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setPage(0)
+            }}
+            placeholder="Search by email or username"
+            className="w-full rounded-lg bg-base-200/50 py-2.5 pr-3 pl-9 text-sm ring-1 ring-base-300/60 outline-none focus:ring-primary/50"
+          />
+        </div>
+
+        {error && <p className="text-sm text-error">{error}</p>}
+        {!data && !error && (
+          <Loader2 className="size-5 animate-spin text-base-content/40" />
+        )}
+
+        {data && (
+          <>
+            <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
+              <table className="w-full min-w-[42rem] text-left text-sm">
+                <thead className="text-xs text-base-content/50 uppercase">
+                  <tr className="border-b border-base-300/60">
+                    <th className="p-3 font-semibold">User</th>
+                    <th className="p-3 font-semibold">Plan</th>
+                    <th className="p-3 font-semibold">Widgets</th>
+                    <th className="p-3 font-semibold">Tickets</th>
+                    <th className="p-3 font-semibold">Signed up</th>
+                    <th className="p-3 font-semibold">Last sign-in</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.accounts.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="p-6 text-center text-base-content/50"
+                      >
+                        No accounts match that search.
+                      </td>
+                    </tr>
+                  )}
+                  {data.accounts.map((a) => (
+                    <tr
+                      key={a.logto_sub}
+                      onClick={() => setSelected(a.logto_sub)}
+                      className="cursor-pointer border-b border-base-300/40 transition-colors last:border-0 hover:bg-base-200/50"
+                    >
+                      <td className="max-w-[18rem] p-3">
+                        <span className="block truncate font-medium">
+                          {a.email ?? a.name ?? '—'}
+                        </span>
+                        <span className="block truncate font-mono text-xs text-base-content/45">
+                          {a.logto_sub}
+                          {!a.set_up && (
+                            <span className="text-warning">
+                              {' '}
+                              · never set up
+                            </span>
+                          )}
+                        </span>
+                      </td>
+                      <td className="p-3 text-base-content/70">
+                        {planLabel(a)}
+                      </td>
+                      <td className="p-3 tabular-nums">
+                        {a.widgets}
+                        {a.on_ticker > 0 && (
+                          <span className="text-base-content/45">
+                            {' '}
+                            ({a.on_ticker} on bar)
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 tabular-nums">{a.tickets}</td>
+                      <td className="p-3 text-base-content/60">
+                        {day(a.signed_up_at)}
+                      </td>
+                      <td className="p-3 text-base-content/60">
+                        {day(a.last_sign_in_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="text-xs text-base-content/45">
+              Ordered by Logto; search matches email and username. Widgets and
+              tickets come from this database and cannot be sorted or searched
+              across the whole set — those columns describe only this page.
+            </p>
+
+            {pageCount > 1 && (
+              <div className="flex items-center justify-between text-sm">
+                <button
+                  type="button"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="cursor-pointer rounded-lg px-3 py-1.5 ring-1 ring-base-300 disabled:cursor-default disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <span className="text-base-content/60">
+                  Page {page + 1} of {pageCount}
+                </span>
+                <button
+                  type="button"
+                  disabled={page + 1 >= pageCount}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="cursor-pointer rounded-lg px-3 py-1.5 ring-1 ring-base-300 disabled:cursor-default disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </PageFrame>
   )
 }

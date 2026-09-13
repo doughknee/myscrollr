@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import { ErrorPanel, Loaded, useReport } from './ui'
+import { ErrorPanel, Loaded, PageFrame, useReport } from './ui'
 import type { AdminSettings, Setting } from '@/api/admin'
 import type { Report } from './ui'
 import { EXCLUDE_STAFF_SETTING, adminApi } from '@/api/admin'
@@ -64,12 +64,14 @@ export default function SettingsPage() {
   }
 
   return (
-    <SettingsContent
-      settings={{ ...settings, data: current }}
-      saving={saving}
-      saveError={saveError}
-      onToggle={onToggle}
-    />
+    <PageFrame>
+      <SettingsContent
+        settings={{ ...settings, data: current }}
+        saving={saving}
+        saveError={saveError}
+        onToggle={onToggle}
+      />
+    </PageFrame>
   )
 }
 

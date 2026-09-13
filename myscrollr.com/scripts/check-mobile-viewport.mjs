@@ -45,7 +45,9 @@ const VIEWPORTS = [
 // Running the check against an empty <main> would silently pass and
 // hide real bugs.
 const ROUTES = [
-  { path: '/account', file: '_shell.html', authShell: true },
+  { path: '/account', file: '_shell.html', authShell: true, siteNav: true },
+  // The staff console replaces the site header with its own bar (SCROLLR-218),
+  // so there is no "Open menu" to open here — only the shell checks apply.
   { path: '/admin', file: '_shell.html', authShell: true },
   { path: '/', file: 'index.html' },
   { path: '/widgets', file: 'widgets/index.html' },
@@ -264,19 +266,25 @@ try {
           )
           failures += 1
         }
-        await page
-          .getByRole('button', { name: 'Open menu', exact: true })
-          .click()
-        if (
-          !(await page
-            .getByRole('dialog', { name: 'Mobile navigation' })
-            .getByRole('button', { name: 'SIGN IN', exact: true })
-            .isVisible())
-        )
+        if (route.siteNav) {
+          await page
+            .getByRole('button', { name: 'Open menu', exact: true })
+            .click()
+          if (
+            !(await page
+              .getByRole('dialog', { name: 'Mobile navigation' })
+              .getByRole('button', { name: 'SIGN IN', exact: true })
+              .isVisible())
+          )
+            failures += 1
+          await page
+            .getByRole('button', { name: 'Close menu', exact: true })
+            .click()
+        } else if (await page.locator('header a[href="/download"]').count()) {
+          // The console must not be wearing the marketing header.
+          console.error(`✗ ${route.path}: the site header is still rendered`)
           failures += 1
-        await page
-          .getByRole('button', { name: 'Close menu', exact: true })
-          .click()
+        }
       }
 
       const result = await page.evaluate(() => {

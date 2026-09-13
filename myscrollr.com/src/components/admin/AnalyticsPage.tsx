@@ -10,6 +10,7 @@ import {
   LINK,
   Loaded,
   MetricValue,
+  PageFrame,
   PeriodSelector,
   RefreshButton,
   Row,
@@ -127,58 +128,60 @@ export default function AnalyticsPage() {
     })
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
-          <p className="mt-1 max-w-3xl text-sm text-base-content/65">
-            Growth, desktop usage, revenue and support on one time window. Each
-            card names its source and its limits.
-          </p>
+    <PageFrame>
+      <div className="space-y-6">
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
+            <p className="mt-1 max-w-3xl text-sm text-base-content/65">
+              Growth, desktop usage, revenue and support on one time window.
+              Each card names its source and its limits.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <PeriodSelector
+              value={period}
+              onChange={(next) => setSearch({ period: next })}
+            />
+            <RefreshButton
+              onClick={() => setRefresh((n) => n + 1)}
+              label="Refresh"
+            />
+          </div>
+        </header>
+        <Tabs view={view} onChange={(next) => setSearch({ view: next })} />
+        <div
+          role="tabpanel"
+          id={`panel-${view}`}
+          aria-labelledby={`tab-${view}`}
+          tabIndex={0}
+          className="focus-visible:outline-2 focus-visible:outline-primary"
+        >
+          {view === 'growth' && (
+            <GrowthTab getToken={getToken} period={period} refresh={refresh} />
+          )}
+          {view === 'desktop' && (
+            <DesktopTab
+              getToken={getToken}
+              period={period}
+              refresh={refresh}
+              filters={{
+                os: search.os,
+                version: search.version,
+                plan: search.plan,
+              }}
+              onFilterChange={(next) => setSearch(next)}
+            />
+          )}
+          {view === 'revenue' && (
+            <RevenueTab getToken={getToken} period={period} refresh={refresh} />
+          )}
+          {view === 'support' && (
+            <SupportTab getToken={getToken} period={period} refresh={refresh} />
+          )}
         </div>
-        <div className="flex flex-wrap gap-3">
-          <PeriodSelector
-            value={period}
-            onChange={(next) => setSearch({ period: next })}
-          />
-          <RefreshButton
-            onClick={() => setRefresh((n) => n + 1)}
-            label="Refresh"
-          />
-        </div>
-      </header>
-      <Tabs view={view} onChange={(next) => setSearch({ view: next })} />
-      <div
-        role="tabpanel"
-        id={`panel-${view}`}
-        aria-labelledby={`tab-${view}`}
-        tabIndex={0}
-        className="focus-visible:outline-2 focus-visible:outline-primary"
-      >
-        {view === 'growth' && (
-          <GrowthTab getToken={getToken} period={period} refresh={refresh} />
-        )}
-        {view === 'desktop' && (
-          <DesktopTab
-            getToken={getToken}
-            period={period}
-            refresh={refresh}
-            filters={{
-              os: search.os,
-              version: search.version,
-              plan: search.plan,
-            }}
-            onFilterChange={(next) => setSearch(next)}
-          />
-        )}
-        {view === 'revenue' && (
-          <RevenueTab getToken={getToken} period={period} refresh={refresh} />
-        )}
-        {view === 'support' && (
-          <SupportTab getToken={getToken} period={period} refresh={refresh} />
-        )}
       </div>
-    </div>
+    </PageFrame>
   )
 }
 

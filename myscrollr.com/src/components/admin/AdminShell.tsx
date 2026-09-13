@@ -1,16 +1,7 @@
 import { Link, Outlet, useLocation } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import {
-  Activity,
-  BarChart3,
-  Layers,
-  LifeBuoy,
-  Loader2,
-  Lock,
-  Settings,
-  ShieldCheck,
-  Users,
-} from 'lucide-react'
+import { Loader2, Lock } from 'lucide-react'
+import ScrollrSVG from '@/components/ScrollrSVG'
 import { AdminApiError, adminApi } from '@/api/admin'
 import { useGetToken } from '@/hooks/useGetToken'
 import { useScrollrAuth } from '@/hooks/useScrollrAuth'
@@ -25,13 +16,13 @@ import { useScrollrAuth } from '@/hooks/useScrollrAuth'
  */
 
 const SECTIONS = [
-  { to: '/admin', label: 'Overview', Icon: BarChart3, exact: true },
-  { to: '/admin/analytics', label: 'Analytics', Icon: Activity },
-  { to: '/admin/support', label: 'Support', Icon: LifeBuoy },
-  { to: '/admin/versions', label: 'Versions', Icon: Layers },
-  { to: '/admin/users', label: 'Users', Icon: Users },
-  { to: '/admin/admins', label: 'Admins', Icon: ShieldCheck },
-  { to: '/admin/settings', label: 'Settings', Icon: Settings },
+  { to: '/admin', label: 'Overview', exact: true },
+  { to: '/admin/analytics', label: 'Analytics' },
+  { to: '/admin/support', label: 'Support' },
+  { to: '/admin/versions', label: 'Versions' },
+  { to: '/admin/users', label: 'Users' },
+  { to: '/admin/admins', label: 'Admins' },
+  { to: '/admin/settings', label: 'Settings' },
 ] as const
 
 type GateState =
@@ -169,61 +160,100 @@ export default function AdminShell() {
  */
 export function AdminChrome({
   email,
+  status,
   children,
 }: {
   email: string
+  /** Right-hand slot on the bar. Support fills it in SCROLLR-219. */
+  status?: React.ReactNode
   children: React.ReactNode
 }) {
   const location = useLocation()
+  const links = SECTIONS.map(({ to, label, ...rest }) => {
+    const exact = 'exact' in rest && rest.exact
+    const active = exact
+      ? location.pathname === '/admin' || location.pathname === '/admin/'
+      : location.pathname.startsWith(to)
+    return { to, label, active }
+  })
+
   return (
-    /* Wide enough for the Support console's two panes to sit as drawn at
-       1440, and capped so an ultrawide gives the extra width to margin
-       instead of stretching a line of prose across 3440 pixels. The reading
-       measure inside each pane is capped again, at 75ch, where it matters. */
-    <div className="mx-auto flex w-full max-w-[104rem] flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:gap-6 lg:py-10 xl:gap-10">
-      {/* Under 768px the nav is a scrolling row of full labels. From 768 to
-          1279 it collapses to an icon rail, which is where the width has to
-          come from for the queue and the case to stay side by side. From 1280
-          the labels come back. */}
-      <nav className="md:w-14 md:shrink-0 xl:w-52">
-        <p className="px-3 text-xs font-semibold tracking-wide text-base-content/40 uppercase md:hidden xl:block">
-          Staff
-        </p>
-        <p
-          className="mt-1 truncate px-3 text-xs text-base-content/60 md:hidden xl:block"
-          title={email}
+    <div className="flex min-h-dvh flex-col">
+      <header className="flex h-12 shrink-0 items-center gap-4 border-b border-hairline bg-base-75 px-4">
+        <Link
+          to="/admin"
+          className="flex shrink-0 items-center gap-2 text-[15px] font-extrabold tracking-[-0.02em] text-base-content hover:text-base-content hover:opacity-100"
         >
-          {email}
-        </p>
-        <ul className="flex gap-1 overflow-x-auto md:mt-0 md:flex-col md:overflow-visible xl:mt-4">
-          {SECTIONS.map(({ to, label, Icon, ...rest }) => {
-            const exact = 'exact' in rest && rest.exact
-            const active = exact
-              ? location.pathname === '/admin' ||
-                location.pathname === '/admin/'
-              : location.pathname.startsWith(to)
-            return (
+          <ScrollrSVG width={20} height={20} />
+          <span className="flex items-baseline">
+            scrollr<span className="text-primary">.</span>
+          </span>
+          <span className="ml-1 text-[13px] font-medium text-base-content/45">
+            / admin
+          </span>
+        </Link>
+
+        {/* From 768 the sections sit in the bar. Below it they get their own
+            scrolling row underneath, where a tap target can be 44px tall. */}
+        <nav className="hidden min-w-0 flex-1 md:block">
+          <ul className="flex items-center gap-0.5">
+            {links.map(({ to, label, active }) => (
               <li key={to}>
                 <Link
                   to={to}
-                  title={label}
-                  aria-label={label}
-                  className={`flex min-h-11 items-center gap-2.5 rounded-lg px-3 text-sm font-medium whitespace-nowrap transition-colors md:justify-center md:px-0 xl:justify-start xl:px-3 ${
+                  className={`rounded-lg px-2.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors ${
                     active
                       ? 'bg-base-200 text-base-content'
                       : 'text-base-content/60 hover:bg-base-200/60 hover:text-base-content'
                   }`}
                 >
-                  <Icon size={16} strokeWidth={2} className="shrink-0" />
-                  <span className="md:hidden xl:inline">{label}</span>
+                  {label}
                 </Link>
               </li>
-            )
-          })}
+            ))}
+          </ul>
+        </nav>
+
+        <div className="ml-auto flex min-w-0 shrink-0 items-center gap-4 md:ml-0">
+          {status}
+          <span
+            className="hidden max-w-[18rem] truncate text-xs text-base-content/45 sm:block"
+            title={email}
+          >
+            {email}
+          </span>
+          <Link
+            to="/"
+            className="text-xs font-semibold whitespace-nowrap text-base-content/60 hover:text-base-content"
+          >
+            Back to site
+          </Link>
+        </div>
+      </header>
+
+      <nav className="shrink-0 border-b border-hairline bg-base-75 md:hidden">
+        <ul className="flex gap-0.5 overflow-x-auto px-2">
+          {links.map(({ to, label, active }) => (
+            <li key={to}>
+              <Link
+                to={to}
+                className={`flex min-h-11 items-center rounded-lg px-3 text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                  active
+                    ? 'text-base-content'
+                    : 'text-base-content/60 hover:text-base-content'
+                }`}
+              >
+                {label}
+              </Link>
+            </li>
+          ))}
         </ul>
       </nav>
 
-      <main className="min-w-0 flex-1">{children}</main>
+      {/* Full-bleed. Each page brings its own PageFrame if it wants a cap. */}
+      <main className="min-h-[calc(100dvh-48px)] min-w-0 flex-1">
+        {children}
+      </main>
     </div>
   )
 }
