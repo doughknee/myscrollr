@@ -674,28 +674,5 @@ export function Stamp({ at, children }: { at: string; children?: ReactNode }) {
   )
 }
 
-/** "locked 2 · unlocked 5 · unknown 0", for the presence strip. */
-export function Breakdown({
-  title,
-  values,
-  order,
-}: {
-  title: string
-  values: Record<string, number> | null | undefined
-  order?: ReadonlyArray<string>
-}) {
-  const keys = order ?? Object.keys(values ?? {}).sort()
-  return (
-    <div className="rounded-lg bg-base-200/60 px-2.5 py-1.5 text-xs">
-      <span className="font-semibold text-base-content/70">{title}</span>{' '}
-      <span className="tabular-nums text-base-content/80">
-        {keys
-          .map((key) => `${key} ${(values?.[key] ?? 0).toLocaleString()}`)
-          .join(' · ')}
-      </span>
-    </div>
-  )
-}
-
 export const num = (value: number) => value.toLocaleString()
 export const pct = (value: number) => `${Math.round(value * 100)}%`
