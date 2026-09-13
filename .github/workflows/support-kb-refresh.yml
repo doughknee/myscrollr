@@ -1,0 +1,85 @@
+# Regenerate the committed support knowledge base after a release is published.
+#
+# `api/cmd/kbgen` builds `api/internal/support/kb/kb.generated.md` partly from
+# the last eight *published* GitHub releases. Publishing a release therefore
+# changes the generator's input without any commit, so the committed copy goes
+# stale and the `support-kb` guard in backend-tests.yml fails on every branch
+# until someone runs `make kb` by hand. Nothing outside the repo should be able
+# to turn `main` red, so the event that breaks it repairs it: this regenerates
+# the KB on `release: published` and commits the result to `main`.
+#
+# It also fixes a second bug. deploy.yml already runs on `release: published`,
+# so publishing deploys core-api carrying the *stale* KB and the support bot
+# serves a knowledge base that does not know about the release that just
+# shipped. The last step below redeploys core-api once the fresh KB has landed.
+# SCROLLR-216.
+name: Refresh Support Knowledge Base
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  # Pushes made with the default GITHUB_TOKEN do not trigger workflow runs, so
+  # the commit below cannot set deploy.yml off by itself; the final step
+  # dispatches it explicitly.
+  actions: write
+
+# Two releases published back to back must not race each other's push.
+concurrency:
+  group: support-kb-refresh
+
+jobs:
+  refresh:
+    name: Regenerate and commit the knowledge base
+    if: startsWith(github.event.release.tag_name, 'desktop-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # `main`, not the release tag: the event's ref is the tag, and the KB is
+      # only useful where CI and deploys read it from (SCROLLR-206).
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: api/go.mod
+          cache: true
+          cache-dependency-path: api/go.sum
+
+      - run: go run ./cmd/kbgen
+        working-directory: api
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit and push the regenerated knowledge base
+        id: push
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if git diff --quiet -- api/internal/support/kb/kb.generated.md; then
+            echo "Knowledge base is already current for $TAG; nothing to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add api/internal/support/kb/kb.generated.md
+          # No [skip ci]: the deploy this commit leads to is the point.
+          git commit -m "chore(support): regenerate knowledge base for $TAG [SCROLLR-216]"
+
+          # A commit that landed while the generator ran must not fail the job.
+          if ! git push origin HEAD:main; then
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+          echo "committed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy core-api with the fresh knowledge base
+        if: steps.push.outputs.committed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy.yml --ref main -f services=core-api

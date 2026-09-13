@@ -111,7 +111,25 @@ jobs:
       - run: go run ./cmd/kbgen
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - run: git diff --exit-code -- internal/support/kb/
+      - name: Fail if the committed knowledge base is stale
+        run: |
+          if git diff --quiet -- internal/support/kb/; then exit 0; fi
+          git diff -- internal/support/kb/
+
+          # Everything above "## Recent release notes" comes from tracked
+          # sources; that last section comes from the published GitHub
+          # releases. A diff confined to it means a release was published
+          # since the KB was last committed — nothing on this branch caused
+          # it (SCROLLR-216).
+          strip='/^## Recent release notes$/,$d'
+          if diff -q \
+            <(git show HEAD:api/internal/support/kb/kb.generated.md | sed "$strip") \
+            <(sed "$strip" internal/support/kb/kb.generated.md) >/dev/null; then
+            echo "::error::Only the release-notes section changed, so a release was probably just published. Fix: run 'make kb' and commit api/internal/support/kb/kb.generated.md, or wait for the Refresh Support Knowledge Base workflow to push the regenerated copy to main and rebase onto it."
+          else
+            echo "::error::The committed support knowledge base is out of date. Run 'make kb' and commit api/internal/support/kb/kb.generated.md."
+          fi
+          exit 1
 
   # ── Go tests (5 independent jobs, run in parallel) ─────────────
   go-tests:
