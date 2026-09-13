@@ -594,8 +594,24 @@ Order matters here. Today the page opens with *Scroll mode*, which is the fourth
 
 ## Recent release notes
 
-<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.6 -->
+<!-- source: github.com/doughknee/myscrollr/releases @ desktop-v1.6.7 -->
 The last 8 published releases, newest first, as users read them.
+
+### Scrollr desktop-v1.6.7 (`desktop-v1.6.7`, 2026-09-12)
+
+**Scrollr 1.6.7**
+
+No visible changes in this build — it looks and behaves exactly like 1.6.6.
+
+What changed is under the hood: the app now starts reporting anonymous usage so we can see how the app is actually used. While signed in, it checks in about every 30 seconds to say that it is running, whether the computer is locked, its display asleep or its input idle, whether each ticker screen is showing, and which widget types each screen shows. The check-in uses a random identifier created fresh at every launch — never a device identifier — and never carries ticker contents, symbols, teams or feed URLs. You can turn it off any time in Settings → Data & privacy → Share usage analytics; turning it off deletes the stored usage.
+
+Platform notes:
+
+- **Windows:** unchanged from 1.6.6.
+- **macOS:** the check-in now reports screen lock, idle input, display sleep and system sleep/wake honestly instead of "unknown".
+- **Linux:** lock, idle and sleep/wake are reported where the desktop provides them (logind and the screensaver interfaces); display sleep still reports "unknown", because Linux has no reliable cross-desktop signal for it.
+
+Fixes: none user-facing in this release.
 
 ### Scrollr 1.6.6 — One analytics setting (`desktop-v1.6.6`, 2026-09-11)
 
@@ -739,25 +755,3 @@ Three pages, three things: **Appearance** is the app window, **Ticker** is the b
 #### 🐛 Fixes
 
 - On Windows, a bar could be placed one bar-height off its screen edge, leaving an empty band above it. Each bar is now placed from its own monitor's work area.
-
-### v1.5.2 — At a glance (`desktop-v1.5.2`, 2026-09-06)
-
-A small release about one question: what is on my bar right now? It used to have two answers. Now it has one, and you can see it without opening anything.
-
-#### 👁️ At a glance
-
-**Whether a widget is on the bar is one fact, shown the same way everywhere.** The ticker's right-click menu and the app's sidebar each kept their own idea of it, and they drifted: a widget could read as on in one place and off in the other, and flipping it in one took a beat to show in the other. Both now go through the same switch, flip instantly, and can no longer disagree.
-
-**A widget that is off the bar looks off.** In the sidebar its name and icon recede and a closed eye sits beside it, whether the sidebar is open or collapsed. Hover a widget that is on and an open eye appears in its colour; one click takes it off, one click puts it back. Nothing to open, nothing to remember.
-
-**The ticker lost its hover toolbar.** The controls that slid in on the right edge of the bar are gone, and the right-click menu holds only what matters: which widgets are on, the ticker's position, always on top, and the app.
-
-#### 📰 News
-
-**The Drudge Report** is in the catalog as a news widget.
-
-**Custom RSS feeds** are off the add grid for now while their feed view gets another pass. If you already have one, nothing changes: it still renders and still counts against your slots.
-
-#### 🐛 Fixes
-
-- College football standings could come up empty on the bar when the new season's table had not been posted yet. The bar now shows the newest season that actually has one.
