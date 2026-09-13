@@ -391,17 +391,28 @@ func demandTile(ctx context.Context) DemandTile {
 }
 
 // ingestTables are the content tables whose freshness says whether the
-// product still has anything to show. All four carry updated_at.
-var ingestTables = []string{"games", "trades", "markets", "rss_items"}
+// product still has anything to show, paired with the column that carries
+// each one's write time. They do NOT agree: the finance ingester writes
+// last_updated (channels/finance/service/src/database.rs), so assuming
+// updated_at everywhere made trades error into the log and report "empty"
+// while the finance widget was fine (SCROLLR-214). TestIngestColumnsExist
+// keeps these pairs honest.
+var ingestTables = []struct{ Table, Column string }{
+	{"games", "updated_at"},
+	{"trades", "last_updated"},
+	{"markets", "updated_at"},
+	{"rss_items", "updated_at"},
+}
 
 func ingestRows(ctx context.Context) []IngestRow {
 	out := make([]IngestRow, 0, len(ingestTables))
-	for _, table := range ingestTables {
+	for _, t := range ingestTables {
+		table := t.Table
 		row := IngestRow{Table: table}
 		var last *time.Time
-		// The table name comes from the constant slice above, never from input.
+		// Table and column come from the constant slice above, never from input.
 		if err := platform.DBPool.QueryRow(ctx,
-			"SELECT max(updated_at) FROM "+table).Scan(&last); err != nil {
+			"SELECT max("+t.Column+") FROM "+table).Scan(&last); err != nil {
 			log.Printf("[Admin] ingest %s: %v", table, err)
 			out = append(out, row)
 			continue
