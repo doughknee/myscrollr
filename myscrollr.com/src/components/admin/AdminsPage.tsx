@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2, Trash2, UserPlus } from 'lucide-react'
+import { PageFrame } from './ui'
 import type { AdminRow } from '@/api/admin'
 import { adminApi } from '@/api/admin'
 import { useGetToken } from '@/hooks/useGetToken'
@@ -70,136 +71,139 @@ export default function AdminsPage() {
   const removable = (row: AdminRow) => !row.self && (admins?.length ?? 0) > 1
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight">Admins</h1>
-        <p className="mt-1 text-sm text-base-content/60">
-          Staff access is this list and nothing else — not a subscription tier,
-          not a Stripe plan, not <code className="text-xs">super_user</code>.
-        </p>
-      </header>
+    <PageFrame>
+      <div className="space-y-6">
+        <header>
+          <h1 className="text-2xl font-bold tracking-tight">Admins</h1>
+          <p className="mt-1 text-sm text-base-content/60">
+            Staff access is this list and nothing else — not a subscription
+            tier, not a Stripe plan, not{' '}
+            <code className="text-xs">super_user</code>.
+          </p>
+        </header>
 
-      {error && (
-        <p className="rounded-lg bg-error/5 p-3 text-sm text-error ring-1 ring-error/20">
-          {error}
-        </p>
-      )}
+        {error && (
+          <p className="rounded-lg bg-error/5 p-3 text-sm text-error ring-1 ring-error/20">
+            {error}
+          </p>
+        )}
 
-      <form
-        onSubmit={add}
-        className="flex flex-col gap-3 rounded-xl bg-base-200/40 p-4 ring-1 ring-base-300/60 sm:flex-row sm:items-end"
-      >
-        <label className="flex-1">
-          <span className="text-xs font-semibold text-base-content/50 uppercase">
-            Email
-          </span>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="person@example.com"
-            className="mt-1 w-full rounded-lg bg-base-100 px-3 py-2 text-sm ring-1 ring-base-300/60 outline-none focus:ring-primary/50"
-          />
-        </label>
-        <label className="flex-1">
-          <span className="text-xs font-semibold text-base-content/50 uppercase">
-            Note (optional)
-          </span>
-          <input
-            type="text"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="why they need access"
-            className="mt-1 w-full rounded-lg bg-base-100 px-3 py-2 text-sm ring-1 ring-base-300/60 outline-none focus:ring-primary/50"
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={busy}
-          className="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-content transition-[filter] hover:brightness-110 disabled:opacity-50"
+        <form
+          onSubmit={add}
+          className="flex flex-col gap-3 rounded-xl bg-base-200/40 p-4 ring-1 ring-base-300/60 sm:flex-row sm:items-end"
         >
-          {busy ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <UserPlus size={16} />
-          )}
-          Add admin
-        </button>
-      </form>
+          <label className="flex-1">
+            <span className="text-xs font-semibold text-base-content/50 uppercase">
+              Email
+            </span>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="person@example.com"
+              className="mt-1 w-full rounded-lg bg-base-100 px-3 py-2 text-sm ring-1 ring-base-300/60 outline-none focus:ring-primary/50"
+            />
+          </label>
+          <label className="flex-1">
+            <span className="text-xs font-semibold text-base-content/50 uppercase">
+              Note (optional)
+            </span>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="why they need access"
+              className="mt-1 w-full rounded-lg bg-base-100 px-3 py-2 text-sm ring-1 ring-base-300/60 outline-none focus:ring-primary/50"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={busy}
+            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-content transition-[filter] hover:brightness-110 disabled:opacity-50"
+          >
+            {busy ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <UserPlus size={16} />
+            )}
+            Add admin
+          </button>
+        </form>
 
-      {!admins ? (
-        <Loader2 className="size-5 animate-spin text-base-content/40" />
-      ) : (
-        <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
-          <table className="w-full min-w-[38rem] text-left text-sm">
-            <thead className="text-xs text-base-content/50 uppercase">
-              <tr className="border-b border-base-300/60">
-                <th className="p-3 font-semibold">Email</th>
-                <th className="p-3 font-semibold">Added</th>
-                <th className="p-3 font-semibold">Last seen</th>
-                <th className="p-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {admins.map((row) => (
-                <tr
-                  key={row.id}
-                  className="border-b border-base-300/40 last:border-0"
-                >
-                  <td className="p-3">
-                    <span className="font-medium">{row.email}</span>
-                    {row.self && (
-                      <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
-                        you
-                      </span>
-                    )}
-                    {!row.claimed && (
-                      <span className="ml-2 rounded bg-base-300/60 px-1.5 py-0.5 text-xs text-base-content/60">
-                        not signed in yet
-                      </span>
-                    )}
-                    {row.note && (
-                      <span className="block text-xs text-base-content/45">
-                        {row.note}
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-3 text-base-content/60">
-                    {new Date(row.added_at).toLocaleDateString()}
-                    {row.added_by && (
-                      <span className="block text-xs text-base-content/45">
-                        by {row.added_by}
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-3 text-base-content/60">
-                    {row.last_seen_at
-                      ? new Date(row.last_seen_at).toLocaleString()
-                      : '—'}
-                  </td>
-                  <td className="p-3 text-right">
-                    {removable(row) ? (
-                      <button
-                        type="button"
-                        onClick={() => remove(row)}
-                        aria-label={`Remove ${row.email}`}
-                        className="cursor-pointer rounded-lg p-1.5 text-base-content/50 transition-colors hover:bg-error/10 hover:text-error"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    ) : (
-                      <span className="text-xs text-base-content/35">
-                        {row.self ? 'cannot remove yourself' : 'last admin'}
-                      </span>
-                    )}
-                  </td>
+        {!admins ? (
+          <Loader2 className="size-5 animate-spin text-base-content/40" />
+        ) : (
+          <div className="overflow-x-auto rounded-xl ring-1 ring-base-300/60">
+            <table className="w-full min-w-[38rem] text-left text-sm">
+              <thead className="text-xs text-base-content/50 uppercase">
+                <tr className="border-b border-base-300/60">
+                  <th className="p-3 font-semibold">Email</th>
+                  <th className="p-3 font-semibold">Added</th>
+                  <th className="p-3 font-semibold">Last seen</th>
+                  <th className="p-3" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+              </thead>
+              <tbody>
+                {admins.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="border-b border-base-300/40 last:border-0"
+                  >
+                    <td className="p-3">
+                      <span className="font-medium">{row.email}</span>
+                      {row.self && (
+                        <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
+                          you
+                        </span>
+                      )}
+                      {!row.claimed && (
+                        <span className="ml-2 rounded bg-base-300/60 px-1.5 py-0.5 text-xs text-base-content/60">
+                          not signed in yet
+                        </span>
+                      )}
+                      {row.note && (
+                        <span className="block text-xs text-base-content/45">
+                          {row.note}
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3 text-base-content/60">
+                      {new Date(row.added_at).toLocaleDateString()}
+                      {row.added_by && (
+                        <span className="block text-xs text-base-content/45">
+                          by {row.added_by}
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3 text-base-content/60">
+                      {row.last_seen_at
+                        ? new Date(row.last_seen_at).toLocaleString()
+                        : '—'}
+                    </td>
+                    <td className="p-3 text-right">
+                      {removable(row) ? (
+                        <button
+                          type="button"
+                          onClick={() => remove(row)}
+                          aria-label={`Remove ${row.email}`}
+                          className="cursor-pointer rounded-lg p-1.5 text-base-content/50 transition-colors hover:bg-error/10 hover:text-error"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      ) : (
+                        <span className="text-xs text-base-content/35">
+                          {row.self ? 'cannot remove yourself' : 'last admin'}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </PageFrame>
   )
 }

@@ -17,6 +17,7 @@ import {
   Search,
   Star,
 } from 'lucide-react'
+import { PageFrame } from './ui'
 import type {
   AdminFix,
   AdminHold,
@@ -1280,210 +1281,212 @@ export default function SupportPage() {
   const needsYou = queue?.counts.needs_you ?? 0
 
   return (
-    <div className="space-y-4">
-      {/* On a phone the header is the queue's header, and it steps aside once
+    <PageFrame>
+      <div className="space-y-4">
+        {/* On a phone the header is the queue's header, and it steps aside once
           a person is open so the whole viewport is the thing you came to
           read. */}
-      <header className={selected ? 'hidden md:block' : ''}>
-        <div className="flex flex-wrap items-baseline gap-x-3">
-          <h1 className="text-2xl font-bold tracking-tight">Support</h1>
-          <span className="text-sm text-base-content/50">
-            {needsYou === 1 ? '1 needs you' : `${needsYou} need you`}
-          </span>
-        </div>
-        {queue && (
-          <div
-            className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2 ring-1 ${
-              queue.autosend.armed
-                ? 'bg-warning/10 ring-warning/30'
-                : 'bg-base-200/50 ring-base-300/60'
-            }`}
-          >
-            <p className="text-xs">{queue.autosend.note}</p>
-            {/* Pause and resume, the same switch /pause and /resume throw. */}
-            {queue.autosend.enabled && (
-              <button
-                type="button"
-                onClick={toggleAutoSend}
-                disabled={switching}
-                className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-base-100 px-3 text-xs font-medium ring-1 ring-base-300/60 hover:bg-base-200/60 disabled:opacity-50"
-              >
-                {switching ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : queue.autosend.paused ? (
-                  <Play size={12} />
-                ) : (
-                  <Pause size={12} />
-                )}
-                {queue.autosend.paused ? 'Resume sending' : 'Pause sending'}
-              </button>
-            )}
+        <header className={selected ? 'hidden md:block' : ''}>
+          <div className="flex flex-wrap items-baseline gap-x-3">
+            <h1 className="text-2xl font-bold tracking-tight">Support</h1>
+            <span className="text-sm text-base-content/50">
+              {needsYou === 1 ? '1 needs you' : `${needsYou} need you`}
+            </span>
           </div>
+          {queue && (
+            <div
+              className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2 ring-1 ${
+                queue.autosend.armed
+                  ? 'bg-warning/10 ring-warning/30'
+                  : 'bg-base-200/50 ring-base-300/60'
+              }`}
+            >
+              <p className="text-xs">{queue.autosend.note}</p>
+              {/* Pause and resume, the same switch /pause and /resume throw. */}
+              {queue.autosend.enabled && (
+                <button
+                  type="button"
+                  onClick={toggleAutoSend}
+                  disabled={switching}
+                  className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-base-100 px-3 text-xs font-medium ring-1 ring-base-300/60 hover:bg-base-200/60 disabled:opacity-50"
+                >
+                  {switching ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : queue.autosend.paused ? (
+                    <Play size={12} />
+                  ) : (
+                    <Pause size={12} />
+                  )}
+                  {queue.autosend.paused ? 'Resume sending' : 'Pause sending'}
+                </button>
+              )}
+            </div>
+          )}
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-base-content/45">
+            <Radio
+              size={12}
+              className={live ? 'text-success' : 'text-base-content/40'}
+            />
+            {live
+              ? 'Live — holds and replies appear here without a refresh.'
+              : 'Not connected to the live stream; this page is showing what it last read.'}
+          </p>
+        </header>
+
+        {error && <p className="text-sm text-error">{error}</p>}
+        {!queue && !error && (
+          <Loader2 className="size-5 animate-spin text-base-content/40" />
         )}
-        <p className="mt-2 flex items-center gap-1.5 text-xs text-base-content/45">
-          <Radio
-            size={12}
-            className={live ? 'text-success' : 'text-base-content/40'}
-          />
-          {live
-            ? 'Live — holds and replies appear here without a refresh.'
-            : 'Not connected to the live stream; this page is showing what it last read.'}
-        </p>
-      </header>
 
-      {error && <p className="text-sm text-error">{error}</p>}
-      {!queue && !error && (
-        <Loader2 className="size-5 animate-spin text-base-content/40" />
-      )}
-
-      {queue && (
-        <div className="flex flex-col gap-5 md:flex-row md:gap-5 lg:gap-8">
-          {/* Under 768px the queue IS the page; picking someone pushes their
+        {queue && (
+          <div className="flex flex-col gap-5 md:flex-row md:gap-5 lg:gap-8">
+            {/* Under 768px the queue IS the page; picking someone pushes their
               view over it and the back control returns. From 768 up the two
               panes sit side by side, with the queue narrowed. */}
-          <div
-            className={`min-w-0 md:w-64 md:shrink-0 lg:w-80 xl:w-96 ${
-              selected ? 'hidden md:block' : 'block'
-            }`}
-          >
-            <SortBar
-              sort={sort}
-              dir={dir}
-              rowsMode={rowsMode}
-              search={search}
-              onSort={(s) => setSort(s)}
-              onDir={(d) => setDir(d)}
-              onRowsMode={(m) => {
-                setRowsMode(m)
-                back()
-              }}
-              onSearch={setSearch}
-            />
+            <div
+              className={`min-w-0 md:w-64 md:shrink-0 lg:w-80 xl:w-96 ${
+                selected ? 'hidden md:block' : 'block'
+              }`}
+            >
+              <SortBar
+                sort={sort}
+                dir={dir}
+                rowsMode={rowsMode}
+                search={search}
+                onSort={(s) => setSort(s)}
+                onDir={(d) => setDir(d)}
+                onRowsMode={(m) => {
+                  setRowsMode(m)
+                  back()
+                }}
+                onSearch={setSearch}
+              />
 
-            <div className="mt-4 space-y-5">
-              {QUEUE_SECTIONS.map((section) => {
-                const count = queue.sections[section.key] ?? 0
-                const inSection =
-                  rowsMode === 'person'
-                    ? people.filter((p) => p.section === section.key)
-                    : rows.filter((r) => r.section === section.key)
+              <div className="mt-4 space-y-5">
+                {QUEUE_SECTIONS.map((section) => {
+                  const count = queue.sections[section.key] ?? 0
+                  const inSection =
+                    rowsMode === 'person'
+                      ? people.filter((p) => p.section === section.key)
+                      : rows.filter((r) => r.section === section.key)
 
-                // Resolved is a count that opens. Forty-six closed tickets are
-                // not what anybody came here to read.
-                const collapsed = section.key === 'resolved' && !showResolved
+                  // Resolved is a count that opens. Forty-six closed tickets are
+                  // not what anybody came here to read.
+                  const collapsed = section.key === 'resolved' && !showResolved
 
-                return (
-                  <section key={section.key}>
-                    <div className="flex items-center gap-2 px-1 pb-2">
-                      {section.key === 'paying' && (
-                        <Star size={13} className="shrink-0 text-success" />
-                      )}
-                      <h2
-                        className={`text-[11px] font-bold tracking-wider uppercase ${SECTION_STYLE[section.key]}`}
-                      >
-                        {section.label}
-                      </h2>
-                      <span className="ml-auto text-[11px] tabular-nums text-base-content/40">
-                        {section.key === 'paying' && queue.accounts.paying > 0
-                          ? `${rowsMode === 'person' ? count : inSection.length} of ${queue.accounts.paying} paying`
-                          : rowsMode === 'person'
-                            ? count
-                            : inSection.length}
-                      </span>
-                      {section.key === 'resolved' && (
-                        <button
-                          type="button"
-                          onClick={() => setShowResolved((v) => !v)}
-                          aria-expanded={showResolved}
-                          className="cursor-pointer text-base-content/40 hover:text-base-content"
+                  return (
+                    <section key={section.key}>
+                      <div className="flex items-center gap-2 px-1 pb-2">
+                        {section.key === 'paying' && (
+                          <Star size={13} className="shrink-0 text-success" />
+                        )}
+                        <h2
+                          className={`text-[11px] font-bold tracking-wider uppercase ${SECTION_STYLE[section.key]}`}
                         >
-                          <ChevronRight
-                            size={14}
-                            className={`transition-transform ${showResolved ? 'rotate-90' : ''}`}
-                          />
-                        </button>
-                      )}
-                    </div>
-
-                    {!collapsed && (
-                      <div className="flex flex-col gap-2">
-                        {inSection.length === 0 ? (
-                          /* An empty paying section is a fact about the data,
-                             not a blank box: almost no ticket is joined to an
-                             account, and the server says so in a sentence. */
-                          <p className="px-1 text-xs text-base-content/45">
-                            {section.key === 'paying'
-                              ? queue.accounts.note || section.empty
-                              : section.empty}
-                          </p>
-                        ) : rowsMode === 'person' ? (
-                          (inSection as Array<QueuePerson>).map((p) => (
-                            <PersonCard
-                              key={p.key}
-                              person={p}
-                              active={selectedPerson === p.key}
-                              onSelect={() => {
-                                setSelectedPerson(p.key)
-                                setSelectedTicket(null)
-                              }}
+                          {section.label}
+                        </h2>
+                        <span className="ml-auto text-[11px] tabular-nums text-base-content/40">
+                          {section.key === 'paying' && queue.accounts.paying > 0
+                            ? `${rowsMode === 'person' ? count : inSection.length} of ${queue.accounts.paying} paying`
+                            : rowsMode === 'person'
+                              ? count
+                              : inSection.length}
+                        </span>
+                        {section.key === 'resolved' && (
+                          <button
+                            type="button"
+                            onClick={() => setShowResolved((v) => !v)}
+                            aria-expanded={showResolved}
+                            className="cursor-pointer text-base-content/40 hover:text-base-content"
+                          >
+                            <ChevronRight
+                              size={14}
+                              className={`transition-transform ${showResolved ? 'rotate-90' : ''}`}
                             />
-                          ))
-                        ) : (
-                          (inSection as Array<QueueRow>).map((r) => (
-                            <TicketCard
-                              key={r.ticket_number}
-                              row={r}
-                              active={selectedTicket === r.ticket_number}
-                              onSelect={() => {
-                                setSelectedTicket(r.ticket_number)
-                                setSelectedPerson(null)
-                              }}
-                            />
-                          ))
+                          </button>
                         )}
                       </div>
-                    )}
-                  </section>
-                )
-              })}
+
+                      {!collapsed && (
+                        <div className="flex flex-col gap-2">
+                          {inSection.length === 0 ? (
+                            /* An empty paying section is a fact about the data,
+                             not a blank box: almost no ticket is joined to an
+                             account, and the server says so in a sentence. */
+                            <p className="px-1 text-xs text-base-content/45">
+                              {section.key === 'paying'
+                                ? queue.accounts.note || section.empty
+                                : section.empty}
+                            </p>
+                          ) : rowsMode === 'person' ? (
+                            (inSection as Array<QueuePerson>).map((p) => (
+                              <PersonCard
+                                key={p.key}
+                                person={p}
+                                active={selectedPerson === p.key}
+                                onSelect={() => {
+                                  setSelectedPerson(p.key)
+                                  setSelectedTicket(null)
+                                }}
+                              />
+                            ))
+                          ) : (
+                            (inSection as Array<QueueRow>).map((r) => (
+                              <TicketCard
+                                key={r.ticket_number}
+                                row={r}
+                                active={selectedTicket === r.ticket_number}
+                                onSelect={() => {
+                                  setSelectedTicket(r.ticket_number)
+                                  setSelectedPerson(null)
+                                }}
+                              />
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </section>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div
+              className={`min-w-0 flex-1 ${selected ? 'block' : 'hidden md:block'}`}
+            >
+              {selected && (
+                <button
+                  type="button"
+                  onClick={back}
+                  className="mb-3 inline-flex min-h-11 cursor-pointer items-center gap-1.5 text-sm font-medium text-base-content/70 hover:text-base-content md:hidden"
+                >
+                  <ArrowLeft size={16} /> All of support
+                </button>
+              )}
+
+              {rowsMode === 'person' && person ? (
+                <PersonView
+                  person={person}
+                  rows={rows}
+                  reloadKey={caseKey}
+                  openTicket={selectedTicket}
+                  onOpenTicket={setSelectedTicket}
+                />
+              ) : rowsMode === 'ticket' && selectedTicket ? (
+                <CaseView ticket={selectedTicket} reloadKey={caseKey} />
+              ) : (
+                <div className="rounded-xl bg-base-200/30 px-6 py-16 text-center ring-1 ring-base-300/60">
+                  <p className="mx-auto max-w-[50ch] text-sm text-base-content/60">
+                    Pick someone. Their identity and history come first, then
+                    their threads newest first — the one needing an answer open
+                    with its draft, the rest underneath.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
-
-          <div
-            className={`min-w-0 flex-1 ${selected ? 'block' : 'hidden md:block'}`}
-          >
-            {selected && (
-              <button
-                type="button"
-                onClick={back}
-                className="mb-3 inline-flex min-h-11 cursor-pointer items-center gap-1.5 text-sm font-medium text-base-content/70 hover:text-base-content md:hidden"
-              >
-                <ArrowLeft size={16} /> All of support
-              </button>
-            )}
-
-            {rowsMode === 'person' && person ? (
-              <PersonView
-                person={person}
-                rows={rows}
-                reloadKey={caseKey}
-                openTicket={selectedTicket}
-                onOpenTicket={setSelectedTicket}
-              />
-            ) : rowsMode === 'ticket' && selectedTicket ? (
-              <CaseView ticket={selectedTicket} reloadKey={caseKey} />
-            ) : (
-              <div className="rounded-xl bg-base-200/30 px-6 py-16 text-center ring-1 ring-base-300/60">
-                <p className="mx-auto max-w-[50ch] text-sm text-base-content/60">
-                  Pick someone. Their identity and history come first, then
-                  their threads newest first — the one needing an answer open
-                  with its draft, the rest underneath.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </PageFrame>
   )
 }

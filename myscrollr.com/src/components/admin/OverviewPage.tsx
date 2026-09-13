@@ -239,7 +239,10 @@ export function OverviewContent({
   const headline = rows.headline
 
   return (
-    <div className="mx-auto w-full max-w-[960px]">
+    /* Overview brings its own frame rather than PageFrame's: it wants the
+       narrower 960 measure, but the same gutters and top margin, now that
+       the console's <main> is full-bleed (SCROLLR-218). */
+    <div className="mx-auto w-full max-w-[960px] px-4 py-8 sm:px-6 lg:px-12">
       <div className="flex items-start justify-between gap-6">
         <h1 className="text-[48px] leading-[1.05] font-extrabold tracking-[-0.035em]">
           {headline[0]}

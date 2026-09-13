@@ -36,10 +36,12 @@ describe('verdicts', () => {
   })
 
   it('calls nobody being here quiet, and presence that cannot report grey', () => {
-    expect(only({ presence: { available: true, active_users: 0 } }).right_now)
-      .toEqual({ tone: 'none', label: 'Quiet' })
-    expect(only({ presence: { available: false, active_users: 0 } }).right_now)
-      .toEqual({ tone: 'none', label: 'Not reporting yet' })
+    expect(
+      only({ presence: { available: true, active_users: 0 } }).right_now,
+    ).toEqual({ tone: 'none', label: 'Quiet' })
+    expect(
+      only({ presence: { available: false, active_users: 0 } }).right_now,
+    ).toEqual({ tone: 'none', label: 'Not reporting yet' })
     expect(only({ presence: null }).right_now.tone).toBe('none')
   })
 
@@ -117,14 +119,18 @@ describe('verdicts', () => {
   })
 
   it('gives sports scores half a day and every other feed half an hour', () => {
-    expect(isStale({ table: 'games', age_seconds: 11 * 3600, has_data: true }))
-      .toBe(false)
-    expect(isStale({ table: 'games', age_seconds: 13 * 3600, has_data: true }))
-      .toBe(true)
-    expect(isStale({ table: 'trades', age_seconds: 29 * 60, has_data: true }))
-      .toBe(false)
-    expect(isStale({ table: 'trades', age_seconds: 31 * 60, has_data: true }))
-      .toBe(true)
+    expect(
+      isStale({ table: 'games', age_seconds: 11 * 3600, has_data: true }),
+    ).toBe(false)
+    expect(
+      isStale({ table: 'games', age_seconds: 13 * 3600, has_data: true }),
+    ).toBe(true)
+    expect(
+      isStale({ table: 'trades', age_seconds: 29 * 60, has_data: true }),
+    ).toBe(false)
+    expect(
+      isStale({ table: 'trades', age_seconds: 31 * 60, has_data: true }),
+    ).toBe(true)
     // An empty table is broken, not stale — the age of nothing is not a wait.
     expect(isStale({ table: 'trades', age_seconds: 0, has_data: false })).toBe(
       false,

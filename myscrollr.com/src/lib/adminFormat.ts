@@ -76,7 +76,8 @@ export function formatAgeWords(seconds: number): string {
   if (seconds < 0) return 'in the future'
   if (seconds < 60) return plural(seconds, 'second') + ' ago'
   if (seconds < 3600) return plural(Math.floor(seconds / 60), 'minute') + ' ago'
-  if (seconds < 86400) return plural(Math.floor(seconds / 3600), 'hour') + ' ago'
+  if (seconds < 86400)
+    return plural(Math.floor(seconds / 3600), 'hour') + ' ago'
   return plural(Math.floor(seconds / 86400), 'day') + ' ago'
 }
 
