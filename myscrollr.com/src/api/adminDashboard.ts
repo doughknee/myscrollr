@@ -375,6 +375,9 @@ export interface SupportSummary {
   first_response_median_hours: Metric
   completion_median_hours: Metric
   paying_created: number
+  /** How many of `cases` arrived from a signed-in app session. */
+  cases_with_account: number
+  cases: number
   coverage: Coverage
   history_note: string
 }

@@ -65,9 +65,15 @@ type SupportSummaryResponse struct {
 	CompletionMedianHours    platform.Metric `json:"completion_median_hours"`
 	// PayingCreated is how many of the window's new tickets came from a
 	// verified paying account.
-	PayingCreated int               `json:"paying_created"`
-	Coverage      platform.Coverage `json:"coverage"`
-	HistoryNote   string            `json:"history_note"`
+	PayingCreated int `json:"paying_created"`
+	// CasesWithAccount of Cases arrived from a signed-in app session. The
+	// Overview states the pair rather than the ratio: it is the reason no
+	// ticket can be matched to a paying customer, and a percentage of 59
+	// reads as a measurement of a population rather than as "almost none".
+	CasesWithAccount int               `json:"cases_with_account"`
+	Cases            int               `json:"cases"`
+	Coverage         platform.Coverage `json:"coverage"`
+	HistoryNote      string            `json:"history_note"`
 }
 
 // HandleAdminSupportSummary - GET /admin/support/summary?period=
@@ -146,6 +152,7 @@ func loadSupportSummary(ctx context.Context, period platform.Period, now time.Ti
 		out.OldestNeedsAttention = platform.Unmeasured(fmt.Sprintf("%d tickets need attention, but none has a customer message on record to measure the wait from.", out.NeedsAttention.Total))
 	}
 	accounts := queueAccounts(ctx)
+	out.CasesWithAccount, out.Cases = accounts.CasesWithAccount, accounts.Cases
 	out.PayingNote = payingSectionNote(accounts, out.Total.Paying)
 	if out.Total.Paying > 0 {
 		out.PayingNote = ""

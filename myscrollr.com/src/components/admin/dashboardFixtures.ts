@@ -471,6 +471,8 @@ export const support: SupportSummary = {
   }),
   completion_median_hours: unavailable('No ticket completed in this window.'),
   paying_created: 1,
+  cases_with_account: 1,
+  cases: 59,
   coverage: { from: '2026-05-01T00:00:00Z', partial: false },
   history_note:
     'Created per day uses opened_at; completed per day uses closed_at.',
@@ -499,10 +501,13 @@ export const overview: AdminOverview = {
     auto_sent_30d: 4,
     intervened_30d: 1,
     oldest_open_hours: 2,
+    oldest_open_ticket: '104',
   },
   ingest: [
     { table: 'games', age_seconds: 90, has_data: true },
-    { table: 'news', age_seconds: 0, has_data: false },
+    { table: 'trades', age_seconds: 45, has_data: true },
+    { table: 'markets', age_seconds: 120, has_data: true },
+    { table: 'rss_items', age_seconds: 200, has_data: true },
   ],
   downloads: {
     total: 1234,

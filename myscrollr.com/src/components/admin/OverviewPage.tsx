@@ -1,41 +1,20 @@
-import { Link, useNavigate, useSearch } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle } from 'lucide-react'
-import {
-  Big,
-  Breakdown,
-  Card,
-  CoverageNote,
-  DefinitionDisclosure,
-  DeltaBadge,
-  LINK,
-  Loaded,
-  MetricValue,
-  PeriodSelector,
-  RefreshButton,
-  Row,
-  Section,
-  Sparkline,
-  StaffExcludedBadge,
-  Stat,
-  Unmeasurable,
-  num,
-  useReport,
-} from './ui'
+import { AlertTriangle, Check, ChevronDown } from 'lucide-react'
+import { ErrorPanel, RefreshButton, num, useReport } from './ui'
+import type { ReactNode } from 'react'
 import type { AdminOverview } from '@/api/admin'
 import type {
-  Audience,
   DesktopUsage,
-  Period,
   PresenceLive,
   Revenue,
   SupportSummary,
   Website,
 } from '@/api/adminDashboard'
 import type { Report } from './ui'
+import type { Verdict, VerdictTone } from '@/lib/overviewVerdicts'
 import { loadBoundedAdminReport } from '@/api/adminAnalytics'
 import {
-  loadAudience,
   loadDesktopUsage,
   loadPresenceLive,
   loadRevenue,
@@ -44,48 +23,64 @@ import {
 } from '@/api/adminDashboard'
 import { useGetToken } from '@/hooks/useGetToken'
 import {
-  DOWNLOADS_CAVEAT,
-  connectedCaveat,
-  formatAge,
+  EXPECTED_REPLICAS,
+  formatAgeWords,
   formatHours,
   formatMinor,
-  ingestHealth,
-  measuredValue,
-  periodLabel,
+  plural,
 } from '@/lib/adminFormat'
+import { isStale, verdicts } from '@/lib/overviewVerdicts'
 
 /**
- * "Everything about Scrollr in one spot." (SCROLLR-210)
+ * The Overview, at a glance (SCROLLR-215).
  *
- * Four questions, in order: who is using the desktop app right now; how the
- * audience and the website moved in the window; who pays and what came in;
- * what support owes people. Each answer loads on its own, so one slow source
- * never blanks the page, and each is either a number we hold or an explicit
- * admission that we do not.
+ * Five sentences a person who has never seen this console can read, each with
+ * one big number and a verdict, each expanding into the plain-language facts
+ * behind it. Everything technical — periods, charts, per-widget usage,
+ * presence tables — lives in Analytics, Versions and Support; this page is
+ * "now and the last 24 hours" and nothing else.
  *
- * "Current" cards ignore the period selector and say so; period cards carry
- * the window in their label.
+ * Two promises from SCROLLR-210 carry over unchanged: a row never renders a
+ * number it cannot back, and colour means state, never decoration.
  */
 
 /** How often the live strip re-reads presence while the tab is visible. */
 const PRESENCE_POLL_MS = 30_000
 
-const SESSION_ORDER = ['unlocked', 'locked', 'unknown'] as const
-const INPUT_ORDER = ['recent', 'idle', 'unknown'] as const
-const DISPLAY_ORDER = ['awake', 'asleep', 'unknown'] as const
-const TICKER_ORDER = ['shown', 'hidden', 'disabled'] as const
-const SCREENS_ORDER = ['0', '1', '2+'] as const
+/** The Overview asks one question of time, so every fetch is pinned to it. */
+const WINDOW = '24h' as const
 
-/** Hours as "3d 4h" past a day, so a week-old ticket does not read as 170. */
-function waitingFor(hours: number): string {
-  const whole = Math.max(0, Math.round(hours))
-  return whole >= 24 ? `${Math.floor(whole / 24)}d ${whole % 24}h` : `${whole}h`
+type RowKey = 'right_now' | 'support' | 'money' | 'growth' | 'feeds'
+
+/**
+ * Verdict colours as whole class strings.
+ *
+ * Never built by interpolation: a Tailwind class assembled at runtime is not
+ * in the source, so it compiles to nothing and the pill silently loses its
+ * colour.
+ */
+const TONE: Record<
+  VerdictTone,
+  { dot: string; label: string; number: string }
+> = {
+  good: { dot: 'bg-primary', label: 'text-primary', number: '' },
+  warn: { dot: 'bg-warning', label: 'text-warning', number: 'text-warning' },
+  bad: { dot: 'bg-error', label: 'text-error', number: 'text-error' },
+  none: { dot: 'bg-base-400', label: 'text-base-content/45', number: '' },
 }
+
+/** The four content feeds, in the order the sentence names them. */
+const FEEDS: ReadonlyArray<{ table: string; name: string }> = [
+  { table: 'games', name: 'Sports scores' },
+  { table: 'trades', name: 'Stock prices' },
+  { table: 'markets', name: 'Prediction markets' },
+  { table: 'rss_items', name: 'News headlines' },
+]
 
 /**
  * Live presence, re-read every 30 s while the page is visible. A poll error
- * keeps the last good reading on screen with the error beside it; the strip
- * only goes blank when it never had one.
+ * keeps the last good reading on screen; the row only loses it when it never
+ * had one.
  */
 function usePresenceLive(
   getToken: () => Promise<string | null>,
@@ -141,54 +136,43 @@ function usePresenceLive(
 
 export default function OverviewPage() {
   const getToken = useGetToken()
-  const { period } = useSearch({ from: '/admin/' })
-  const navigate = useNavigate({ from: '/admin/' })
   const [refresh, setRefresh] = useState(0)
 
   const presence = usePresenceLive(getToken, refresh)
-  const audience = useReport(
-    useCallback(
-      (signal: AbortSignal) => {
-        void refresh
-        return loadAudience(getToken, period, signal)
-      },
-      [getToken, period, refresh],
-    ),
-  )
   const desktop = useReport(
     useCallback(
       (signal: AbortSignal) => {
         void refresh
-        return loadDesktopUsage(getToken, period, {}, signal)
+        return loadDesktopUsage(getToken, WINDOW, {}, signal)
       },
-      [getToken, period, refresh],
+      [getToken, refresh],
     ),
   )
   const website = useReport(
     useCallback(
       (signal: AbortSignal) => {
         void refresh
-        return loadWebsite(getToken, period, signal)
+        return loadWebsite(getToken, WINDOW, signal)
       },
-      [getToken, period, refresh],
+      [getToken, refresh],
     ),
   )
   const revenue = useReport(
     useCallback(
       (signal: AbortSignal) => {
         void refresh
-        return loadRevenue(getToken, period, signal)
+        return loadRevenue(getToken, WINDOW, signal)
       },
-      [getToken, period, refresh],
+      [getToken, refresh],
     ),
   )
   const support = useReport(
     useCallback(
       (signal: AbortSignal) => {
         void refresh
-        return loadSupportSummary(getToken, period, signal)
+        return loadSupportSummary(getToken, WINDOW, signal)
       },
-      [getToken, period, refresh],
+      [getToken, refresh],
     ),
   )
   const service = useReport(
@@ -209,789 +193,643 @@ export default function OverviewPage() {
 
   return (
     <OverviewContent
-      period={period}
       presence={presence}
-      audience={audience}
       desktop={desktop}
       website={website}
       revenue={revenue}
       support={support}
       service={service}
-      onPeriodChange={(next) =>
-        navigate({ search: { period: next }, replace: true })
-      }
       onRefresh={() => setRefresh((n) => n + 1)}
     />
   )
 }
 
 export interface OverviewContentProps {
-  period: Period
   presence: Report<PresenceLive>
-  audience: Report<Audience>
   desktop: Report<DesktopUsage>
   website: Report<Website>
   revenue: Report<Revenue>
   support: Report<SupportSummary>
   service: Report<AdminOverview>
-  onPeriodChange?: (period: Period) => void
+  /** Which row starts open. Tests and the preview harness set it; nothing else. */
+  initialOpen?: RowKey
   onRefresh?: () => void
 }
 
 export function OverviewContent({
-  period,
   presence,
-  audience,
   desktop,
   website,
   revenue,
   support,
   service,
-  onPeriodChange = () => {},
+  initialOpen,
   onRefresh,
 }: OverviewContentProps) {
-  const windowLabel = periodLabel(period)
-  const staffExcluded = [presence, audience, desktop, website].some(
-    (r) => r.data?.staff_excluded,
-  )
+  const [open, setOpen] = useState<RowKey | null>(initialOpen ?? null)
+  const rows = buildRows({ presence, desktop, website, revenue, support, service })
   const anyLoading = [
     presence,
-    audience,
     desktop,
     website,
     revenue,
     support,
     service,
   ].some((r) => r.loading)
+  const headline = rows.headline
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
-          <p className="mt-1 text-sm text-base-content/70">
-            Who is here now, how the window moved, who pays, and what support
-            owes.
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-base-content/65">
-            <span>
-              Period cards read <strong>{windowLabel}</strong>. Cards marked
-              “Current” ignore the selector.
-            </span>
-            {staffExcluded && <StaffExcludedBadge />}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <PeriodSelector value={period} onChange={onPeriodChange} />
-          <RefreshButton onClick={onRefresh} loading={anyLoading} />
-        </div>
-      </header>
+    <div className="mx-auto w-full max-w-[960px]">
+      <div className="flex items-start justify-between gap-6">
+        <h1 className="text-[48px] leading-[1.05] font-extrabold tracking-[-0.035em]">
+          {headline[0]}
+          <br />
+          {headline[1]}
+        </h1>
+        <RefreshButton onClick={onRefresh} loading={anyLoading} />
+      </div>
 
-      <LiveStrip presence={presence} />
+      <ul className="mt-10 border-t border-base-300/70">
+        {rows.rows.map((row) => (
+          <OverviewRow
+            key={row.key}
+            row={row}
+            open={open === row.key}
+            onToggle={() =>
+              setOpen((current) => (current === row.key ? null : row.key))
+            }
+          />
+        ))}
+      </ul>
 
-      <Section
-        id="audience"
-        title="Users & website"
-        action={
-          <Link
-            to="/admin/analytics"
-            search={{ period, view: 'growth' }}
-            className={LINK}
-          >
-            Growth analytics →
-          </Link>
-        }
-      >
-        <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Loaded report={audience} label="registered accounts">
-            {(a) => (
-              <Card
-                title="Registered accounts"
-                label="Current"
-                note={a.source === 'local' ? a.note : undefined}
-              >
-                {a.available ? (
-                  <>
-                    <Big>{num(a.total)}</Big>
-                    <p className="mt-1 text-sm text-base-content/60">
-                      {a.source === 'local'
-                        ? 'accounts with local data — Logto unreachable'
-                        : 'accounts in Logto'}
-                      {a.staff_excluded && a.excluded > 0
-                        ? ` · ${num(a.excluded)} staff/test excluded`
-                        : ''}
-                    </p>
-                    <div className="mt-3 border-t border-base-300/60 pt-2">
-                      <Row label="Set up the app" value={num(a.set_up)} />
-                      <Row
-                        label="Never set up"
-                        value={
-                          <span className="text-warning">
-                            {num(Math.max(0, a.total - a.set_up))}
-                          </span>
-                        }
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <Unmeasurable note={a.note} />
-                )}
-              </Card>
-            )}
-          </Loaded>
-          <Loaded report={audience} label="new accounts">
-            {(a) => (
-              <Card title="New accounts" label={windowLabel}>
-                <MetricValue metric={a.new}>
-                  <p className="mt-1 text-sm text-base-content/60">
-                    <DeltaBadge comparison={a.new.comparison} />
-                  </p>
-                </MetricValue>
-                <div className="mt-3">
-                  <Sparkline
-                    buckets={a.new_curve}
-                    step={a.curve_step}
-                    label="New accounts per bucket"
-                  />
-                </div>
-                <CoverageNote coverage={a.coverage} />
-              </Card>
-            )}
-          </Loaded>
-          <Loaded report={desktop} label="desktop usage">
-            {(d) => (
-              <Card
-                title="App users"
-                label={windowLabel}
-                action={
-                  <Link
-                    to="/admin/analytics"
-                    search={{ period, view: 'desktop' }}
-                    className={LINK}
-                  >
-                    Desktop →
-                  </Link>
-                }
-              >
-                <MetricValue metric={d.unique_users}>
-                  <p className="mt-1 text-sm text-base-content/60">
-                    unique app-running users{' '}
-                    <DeltaBadge comparison={d.unique_users.comparison} />
-                  </p>
-                </MetricValue>
-                <div className="mt-3 border-t border-base-300/60 pt-2">
-                  <Row
-                    label="App-running user-hours"
-                    value={
-                      <MetricValue
-                        metric={d.user_hours}
-                        format={formatHours}
-                        size="inline"
-                      />
-                    }
-                  />
-                  <Row
-                    label="Ticker-shown user-hours"
-                    value={
-                      <MetricValue
-                        metric={d.ticker_user_hours}
-                        format={formatHours}
-                        size="inline"
-                      />
-                    }
-                  />
-                </div>
-                <CoverageNote coverage={d.coverage} />
-              </Card>
-            )}
-          </Loaded>
-          <Loaded report={website} label="website analytics">
-            {(w) => (
-              <Card title="Website" label={windowLabel}>
-                {w.available ? (
-                  <>
-                    <MetricValue metric={w.visitors}>
-                      <p className="mt-1 text-sm text-base-content/60">
-                        unique visitors{' '}
-                        <DeltaBadge comparison={w.visitors.comparison} />
-                      </p>
-                    </MetricValue>
-                    <div className="mt-3 border-t border-base-300/60 pt-2">
-                      <Row
-                        label="Pageviews"
-                        value={
-                          <span className="inline-flex items-baseline gap-2">
-                            <MetricValue metric={w.pageviews} size="inline" />
-                            <DeltaBadge comparison={w.pageviews.comparison} />
-                          </span>
-                        }
-                      />
-                    </div>
-                    <CoverageNote coverage={w.coverage} />
-                  </>
-                ) : (
-                  <Unmeasurable note={w.note} />
-                )}
-              </Card>
-            )}
-          </Loaded>
-        </div>
-      </Section>
-
-      <Section
-        id="revenue"
-        title="Paying customers & earnings"
-        action={
-          <Link
-            to="/admin/analytics"
-            search={{ period, view: 'revenue' }}
-            className={LINK}
-          >
-            Revenue analytics →
-          </Link>
-        }
-      >
-        <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <Loaded report={revenue} label="paying customers">
-            {(r) => (
-              <Card
-                title="Paying customers"
-                label="Current"
-                note={r.paying_now.available ? r.paying_now_note : undefined}
-              >
-                {r.paying_now.available ? (
-                  <>
-                    <Big>{num(r.paying_now.paying)}</Big>
-                    <p className="mt-1 text-sm text-base-content/60">
-                      paying · {num(r.paying_now.free)} free
-                    </p>
-                    <div className="mt-3 border-t border-base-300/60 pt-2">
-                      <Row
-                        label="Lifetime"
-                        value={num(r.paying_now.lifetime)}
-                      />
-                      <Row
-                        label="Trialing"
-                        value={num(r.paying_now.trialing)}
-                      />
-                      <Row
-                        label="Past due"
-                        value={num(r.paying_now.past_due)}
-                      />
-                      <Row
-                        label="Canceling"
-                        value={num(r.paying_now.canceling)}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <Unmeasurable
-                    note={
-                      r.paying_now_note ??
-                      'The customer snapshot could not be read.'
-                    }
-                  />
-                )}
-                <DefinitionDisclosure>
-                  <p>{r.paying_now.definition}</p>
-                </DefinitionDisclosure>
-              </Card>
-            )}
-          </Loaded>
-          <Loaded report={revenue} label="new paying customers">
-            {(r) => (
-              <Card title="New paying customers" label={windowLabel}>
-                {r.new_paying.available ? (
-                  <>
-                    <MetricValue metric={r.new_paying.in_period}>
-                      <p className="mt-1 text-sm text-base-content/60">
-                        <DeltaBadge
-                          comparison={r.new_paying.in_period.comparison}
-                        />
-                      </p>
-                    </MetricValue>
-                    <div className="mt-3 border-t border-base-300/60 pt-2">
-                      <Row
-                        label="Lifetime"
-                        value={num(r.new_paying.lifetime)}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <Unmeasurable note={r.new_paying.note} />
-                )}
-                <DefinitionDisclosure>
-                  <p>{r.new_paying.definition}</p>
-                </DefinitionDisclosure>
-              </Card>
-            )}
-          </Loaded>
-          <Loaded report={revenue} label="earnings">
-            {(r) => <EarningsCard revenue={r} windowLabel={windowLabel} />}
-          </Loaded>
-        </div>
-      </Section>
-
-      <Section
-        id="support"
-        title="Support workload"
-        action={
-          <span className="flex flex-wrap gap-4">
-            <Link to="/admin/support" className={LINK}>
-              Open support →
-            </Link>
-            <Link
-              to="/admin/analytics"
-              search={{ period, view: 'support' }}
-              className={LINK}
-            >
-              Support analytics →
-            </Link>
-          </span>
-        }
-      >
-        <Loaded report={support} label="support summary">
-          {(s) => (
-            <Card title="Queue" label="Current" note={s.paying_note}>
-              <div className="grid gap-4 sm:grid-cols-4">
-                <Stat
-                  label="Needs attention"
-                  value={num(s.needs_attention.total)}
-                  sub={payingOverlay(s.needs_attention.paying)}
-                />
-                <Stat
-                  label="Waiting on customer"
-                  value={num(s.waiting_on_customer.total)}
-                  sub={payingOverlay(s.waiting_on_customer.paying)}
-                />
-                <Stat
-                  label="Completed"
-                  value={num(s.completed.total)}
-                  sub={
-                    <>
-                      {payingOverlay(s.completed.paying)}
-                      {num(s.completed_closed)} closed ·{' '}
-                      {num(s.completed_dismissed)} dismissed
-                    </>
-                  }
-                />
-                <Stat
-                  label="Total"
-                  value={num(s.total.total)}
-                  sub={payingOverlay(s.total.paying)}
-                />
-              </div>
-              <div className="mt-4 border-t border-base-300/60 pt-2">
-                <Row
-                  label="Oldest waiting for us"
-                  value={
-                    <MetricValue
-                      metric={s.oldest_needs_attention_hours}
-                      format={waitingFor}
-                      size="inline"
-                    />
-                  }
-                />
-                {s.oldest_ticket && (
-                  <p className="text-xs text-base-content/65">
-                    Ticket #{s.oldest_ticket}
-                  </p>
-                )}
-                <Row
-                  label="Auto-send"
-                  value={
-                    s.autosend.armed
-                      ? `armed · ${s.autosend.hold_minutes} min hold`
-                      : s.autosend.paused
-                        ? 'paused'
-                        : 'off'
-                  }
-                />
-                <p className="text-xs text-base-content/65">
-                  {s.autosend.note}
-                </p>
-              </div>
-            </Card>
-          )}
-        </Loaded>
-      </Section>
-
-      <Section
-        id="service"
-        title="Service & releases"
-        lede="Operational readings. Downloads are not installs; connections are not people."
-      >
-        <Loaded report={service} label="service readings">
-          {(o) => <ServiceStrip overview={o} />}
-        </Loaded>
-      </Section>
-
-      <HowToRead />
+      <p className="mt-6 text-sm text-base-content/45">
+        Now and the last 24 hours. Staff and test accounts are left out.
+        Anything over a longer period lives in Analytics.
+      </p>
     </div>
   )
 }
 
-function payingOverlay(paying: number) {
-  return paying > 0 ? (
-    <span className="mr-1 font-semibold text-base-content">
-      {num(paying)} paying ·{' '}
-    </span>
-  ) : null
+// ── One row ───────────────────────────────────────────────────────
+
+interface Fact {
+  label: string
+  value: string
 }
 
-function LiveStrip({ presence }: { presence: Report<PresenceLive> }) {
-  const p = presence.data
-  return (
-    <section
-      aria-labelledby="live-heading"
-      className="rounded-xl bg-base-200/40 p-4 ring-1 ring-base-300/70 sm:p-5"
-    >
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="live-heading" className="text-base font-semibold">
-          Desktop right now
-          <span className="ml-2 rounded bg-base-300/50 px-1.5 py-0.5 text-[10px] font-medium text-base-content/60">
-            Current
-          </span>
-        </h2>
-        {p && (
-          <p className="text-xs text-base-content/50">
-            as of {new Date(p.generated_at).toLocaleTimeString()} · refreshed
-            every {PRESENCE_POLL_MS / 1000} s
-          </p>
-        )}
-      </div>
-      {!p && presence.error && (
-        <div role="alert" className="mt-3 text-sm text-error">
-          {presence.error}{' '}
-          {presence.retry && (
-            <button
-              type="button"
-              onClick={presence.retry}
-              className="cursor-pointer font-semibold underline underline-offset-4"
-            >
-              Retry
-            </button>
-          )}
-        </div>
-      )}
-      {!p && !presence.error && (
-        <p role="status" className="mt-3 text-sm text-base-content/60">
-          Reading live presence…
-        </p>
-      )}
-      {p && (
-        <>
-          {p.available ? (
-            <p className="mt-3 text-2xl font-bold tabular-nums sm:text-3xl">
-              {p.headline}
-            </p>
-          ) : (
-            <div className="mt-3">
-              <Unmeasurable note={p.note} />
-            </div>
-          )}
-          {presence.error && (
-            <p role="alert" className="mt-2 text-xs text-error">
-              Last refresh failed: {presence.error}. Showing the previous
-              reading.
-            </p>
-          )}
-          {p.available && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Breakdown
-                title="Sessions"
-                values={{ total: p.sessions }}
-                order={['total']}
-              />
-              <Breakdown
-                title="Session"
-                values={p.session_state}
-                order={SESSION_ORDER}
-              />
-              <Breakdown
-                title="Input"
-                values={p.input_state}
-                order={INPUT_ORDER}
-              />
-              <Breakdown
-                title="Display"
-                values={p.display_state}
-                order={DISPLAY_ORDER}
-              />
-              <Breakdown
-                title="Ticker"
-                values={p.ticker_state}
-                order={TICKER_ORDER}
-              />
-              <Breakdown
-                title="Screens per user"
-                values={p.screens_per_user}
-                order={SCREENS_ORDER}
-              />
-              {p.os && Object.keys(p.os).length > 0 && (
-                <Breakdown title="OS" values={p.os} />
-              )}
-              {p.app_version && Object.keys(p.app_version).length > 0 && (
-                <Breakdown title="Version" values={p.app_version} />
-              )}
-            </div>
-          )}
-          <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-base-content/70">
-            <span>Recently seen (legacy, 15 min):</span>
-            <MetricValue metric={p.legacy_recent_presence} size="inline" />
-            {p.legacy_recent_presence.available &&
-              p.legacy_recent_presence.note && (
-                <span className="text-xs text-base-content/55">
-                  {p.legacy_recent_presence.note}
-                </span>
-              )}
-            {p.staff_excluded && <StaffExcludedBadge />}
-          </div>
-          <DefinitionDisclosure summary="What active, ticker and screens mean">
-            <p>{p.definition}</p>
-            <p>{p.ticker_definition}</p>
-            <p>{p.coverage}</p>
-            <p>
-              Sessions check in every {p.check_in_seconds} s and expire after{' '}
-              {p.expiry_seconds} s without one.
-            </p>
-          </DefinitionDisclosure>
-        </>
-      )}
-    </section>
-  )
+interface RowSpec {
+  key: RowKey
+  /** The big number, already formatted. Null when there is none to show. */
+  number: string | null
+  /** The Feeds row draws a state icon where the others draw a number. */
+  icon?: VerdictTone
+  main: string
+  secondary?: string
+  verdict: Verdict
+  facts: Array<Fact>
+  note: string
+  action: ReactNode
+  /** Set when the row's own source could not be read at all. */
+  problem?: { message: string; retry?: () => void }
+  loading?: boolean
 }
 
-function EarningsCard({
-  revenue,
-  windowLabel,
+function OverviewRow({
+  row,
+  open,
+  onToggle,
 }: {
-  revenue: Revenue
-  windowLabel: string
+  row: RowSpec
+  open: boolean
+  onToggle: () => void
 }) {
-  const e = revenue.earnings
-  const money = (minor: number) => formatMinor(minor, e.primary_currency)
-  const currencies = e.currencies ?? []
-  const lifetime = e.lifetime ?? []
+  const tone = TONE[row.verdict.tone]
+  const panelId = `overview-${row.key}`
   return (
-    <Card
-      title="Net earnings"
-      label={windowLabel}
-      note={
-        e.available
-          ? [
-              e.partial ? 'Stripe returned a partial ledger.' : null,
-              e.cached && e.fetched_at
-                ? `Cached from Stripe at ${new Date(e.fetched_at).toLocaleString()}.`
-                : null,
-              revenue.account_note,
-            ]
-              .filter(Boolean)
-              .join(' ')
-          : revenue.account_note
-      }
-    >
-      {e.available ? (
-        <>
-          <MetricValue metric={e.net} format={money}>
-            <p className="mt-1 text-sm text-base-content/60">
-              net of fees, {e.primary_currency.toUpperCase()}{' '}
-              <DeltaBadge comparison={e.net.comparison} format={money} />
-            </p>
-          </MetricValue>
-          {currencies.length > 1 && (
-            <div className="mt-3 border-t border-base-300/60 pt-2">
-              <p className="text-xs text-base-content/60">
-                Per currency — never added together
-              </p>
-              {currencies.map((c) => (
-                <Row
-                  key={c.currency}
-                  label={c.currency.toUpperCase()}
-                  value={formatMinor(c.net, c.currency)}
-                />
-              ))}
-            </div>
-          )}
-          <div className="mt-3 border-t border-base-300/60 pt-2">
-            {lifetime.length === 0 ? (
-              <Row label="Lifetime net" value="—" />
+    <li className="border-b border-base-300/70">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="grid w-full cursor-pointer grid-cols-[120px_1fr_132px_24px] items-center gap-7 py-2 text-left focus-visible:outline-2 focus-visible:outline-primary"
+        style={{ minHeight: '104px' }}
+      >
+        <span
+          className={`flex justify-end text-[56px] leading-none font-extrabold tracking-[-0.04em] tabular-nums ${tone.number}`}
+        >
+          {row.icon ? (
+            row.icon === 'good' ? (
+              <Check size={44} className="text-primary" aria-hidden />
             ) : (
-              lifetime.map((c) => (
-                <Row
-                  key={c.currency}
-                  label={`Lifetime net (${c.currency.toUpperCase()})`}
-                  value={formatMinor(c.net, c.currency)}
-                />
-              ))
-            )}
-          </div>
-          <CoverageNote coverage={e.coverage} />
-        </>
-      ) : (
-        <Unmeasurable note={e.note} />
-      )}
-      <DefinitionDisclosure>
-        <p>{e.definition}</p>
-      </DefinitionDisclosure>
-    </Card>
-  )
-}
-
-function ServiceStrip({ overview }: { overview: AdminOverview }) {
-  const ingest = overview.ingest ?? []
-  const releases = (overview.downloads.releases ?? []).slice(0, 3)
-  const installs = measuredValue(overview.installs)
-  return (
-    <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      <Card
-        title="Ingest freshness"
-        note="Time since each content table was last written. Sports can legitimately sit still overnight."
-      >
-        {ingest.length === 0 && (
-          <p className="text-sm text-base-content/70">
-            No ingest readings in this snapshot.
-          </p>
-        )}
-        {ingest.map((row) => {
-          const health = ingestHealth(row)
-          return (
-            <Row
-              key={row.table}
-              label={
-                <span className="inline-flex items-center gap-1">
-                  {health !== 'fresh' && (
-                    <AlertTriangle size={12} aria-hidden />
-                  )}
-                  {row.table}
-                </span>
-              }
-              value={
-                <span
-                  className={
-                    health === 'empty'
-                      ? 'text-error'
-                      : health === 'stale'
-                        ? 'text-warning'
-                        : 'text-success'
-                  }
-                >
-                  {health === 'empty' ? 'empty' : formatAge(row.age_seconds)}
-                </span>
-              }
+              <AlertTriangle
+                size={44}
+                className={row.icon === 'bad' ? 'text-error' : 'text-warning'}
+                aria-hidden
+              />
+            )
+          ) : (
+            row.number
+          )}
+        </span>
+        <span className="text-[22px] leading-snug font-semibold">
+          {row.main}
+          {row.secondary && (
+            <span className="font-medium text-base-content/50">
+              {' '}
+              {row.secondary}
+            </span>
+          )}
+        </span>
+        <span className="flex items-center justify-end gap-2">
+          <span
+            className={`size-2.5 shrink-0 rounded-full ${tone.dot}`}
+            aria-hidden
+          />
+          <span className={`text-[14px] font-bold ${tone.label}`}>
+            {row.verdict.label}
+          </span>
+        </span>
+        <ChevronDown
+          size={20}
+          aria-hidden
+          className={
+            open
+              ? 'rotate-180 text-base-content transition-transform'
+              : 'text-base-content/35 transition-transform'
+          }
+        />
+      </button>
+      {open && (
+        <div id={panelId} style={{ padding: '4px 0 32px 148px' }}>
+          {row.problem ? (
+            <ErrorPanel
+              message={row.problem.message}
+              onRetry={row.problem.retry}
             />
-          )
-        })}
-      </Card>
-      <Card
-        title="Connected now"
-        label="Current"
-        note={connectedCaveat(overview.connected_now)}
-      >
-        <p className="text-2xl font-bold tabular-nums">
-          {num(overview.connected_now.count)}
-        </p>
-        <p className="mt-1 text-sm text-base-content/60">
-          open SSE connections
-        </p>
-      </Card>
-      <Card
-        title="Downloads"
-        note={
-          overview.downloads.stale
-            ? `${DOWNLOADS_CAVEAT} These figures are cached — GitHub was unreachable on the last refresh.`
-            : DOWNLOADS_CAVEAT
-        }
-      >
-        {overview.downloads.error ? (
-          <Unmeasurable note={overview.downloads.error} />
-        ) : (
-          <>
-            <p className="text-2xl font-bold tabular-nums">
-              {num(overview.downloads.total)}
-            </p>
-            <p className="mt-1 mb-2 text-sm text-base-content/60">
-              across all releases
-            </p>
-            {releases.map((r) => (
-              <Row key={r.tag} label={r.tag} value={num(r.downloads)} />
-            ))}
-          </>
-        )}
-        <DefinitionDisclosure summary="Why downloads are not active installs">
-          <p>{installs.note ?? 'Active installs are not measurable.'}</p>
-        </DefinitionDisclosure>
-      </Card>
-    </div>
+          ) : (
+            <>
+              <dl className="grid grid-cols-3 gap-x-10">
+                {row.facts.map((fact) => (
+                  <div
+                    key={fact.label}
+                    className="flex items-baseline justify-between gap-4 border-b border-base-200 py-[9px] leading-[1.3]"
+                  >
+                    <dt className="text-base-content/60">{fact.label}</dt>
+                    <dd className="pl-4 text-right font-mono font-medium">
+                      {fact.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-6 max-w-[640px] text-sm text-base-content/55">
+                {row.note}
+              </p>
+              <div className="mt-5">{row.action}</div>
+            </>
+          )}
+        </div>
+      )}
+    </li>
   )
 }
 
-function HowToRead() {
-  return (
-    <details className="rounded-xl border border-base-300/60 p-4 text-sm text-base-content/75">
-      <summary className="cursor-pointer font-semibold focus-visible:outline-2 focus-visible:outline-primary">
-        How to read these numbers
-      </summary>
-      <div className="mt-3 space-y-2 leading-relaxed">
-        <p>
-          <strong>Time.</strong> One selector — 24h, 7d, 30d, Lifetime — shared
-          by every period card. A period is a rolling window ending at the
-          moment the report was generated; 24h is the last 24 hours, not today
-          since midnight. Finite periods are compared with the equal window
-          immediately before them. A comparison is shown only when the previous
-          window is fully inside the source's coverage and its value is not
-          zero; otherwise the card says why. Cards marked “Current” do not
-          depend on the selector.
-        </p>
-        <p>
-          <strong>Missing data</strong> is shown as a note, never as zero.
-          Partial history says so and names when measurement began.
-        </p>
-        <p>
-          <strong>Staff exclusion.</strong> With the Settings toggle on
-          (default), admin and test accounts are removed from account totals,
-          growth, desktop presence and usage, widget analytics, and identified
-          website analytics. It never changes payments, earnings, or operational
-          support totals. Measurements suppressed before the toggle existed
-          cannot be restored.
-        </p>
-        <p>
-          <strong>Desktop right now</strong> is presence, not attention: the app
-          is running and reported within 90 seconds. “With ticker(s)” means at
-          least one ticker window is shown on an unlocked, awake computer.
-          Screens add across computers; users do not. Only builds with the
-          presence reporter (1.6.7+) appear; older builds still count in the
-          legacy 15-minute figure.
-        </p>
-        <p>
-          <strong>Registered accounts</strong> come from Logto, the system of
-          record. “Set up the app” is a local count of who ever saved a
-          preference. New accounts are Logto sign-ups in the window. App users
-          are distinct accounts with app-running time in the window, never a sum
-          of daily counts.
-        </p>
-        <p>
-          <strong>Website</strong> visitors are distinct PostHog persons with a
-          pageview in the window; a person is a browser profile, not guaranteed
-          to be one human. Collection began 11 September 2026.
-        </p>
-        <p>
-          <strong>Paying</strong> is a Stripe customer with lifetime access or
-          an active non-free plan. Trialing, past due and canceling are their
-          own rows and are not paying. Net earnings are Stripe balance
-          transactions in the window: payments, refunds, refund reversals,
-          disputes and fees, net of fees exactly once, grouped by currency and
-          never converted. Payouts and transfers are movements, not earnings. A
-          new paying customer is a first successful positive charge.
-        </p>
-        <p>
-          <strong>Support</strong> buckets are the whole queue as the pipeline
-          classifies it. Paying overlays count only tickets with a verified
-          account; email-only contacts are unknown, never inferred. Response and
-          completion times use retained timestamps only.
-        </p>
-        <p>{DOWNLOADS_CAVEAT}</p>
-      </div>
-    </details>
-  )
+const ACTION =
+  'inline-flex min-h-10 items-center rounded-[10px] px-4 text-sm font-semibold ring-1 ring-base-300 hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-primary'
+
+const ACTION_FILLED =
+  'inline-flex min-h-10 items-center rounded-[10px] bg-error px-4 text-sm font-semibold text-white hover:bg-error/90 focus-visible:outline-2 focus-visible:outline-primary'
+
+// ── Building the rows ─────────────────────────────────────────────
+
+/** A fact whose value could not be read shows a dash, never a zero. */
+function fact(label: string, value: string | null | undefined): Fact {
+  return { label, value: value ?? '—' }
+}
+
+/** The busiest version key, which is the newest build that can report. */
+function latestVersion(versions: Record<string, number> | null): string | null {
+  const keys = Object.keys(versions ?? {})
+  if (keys.length === 0) return null
+  return keys.sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true }),
+  )[keys.length - 1]
+}
+
+function count(values: Record<string, number> | null, ...keys: Array<string>) {
+  if (!values) return null
+  return keys.reduce((total, key) => total + (values[key] ?? 0), 0)
+}
+
+/** A duration without the "ago": "3 hours", for "has not updated for …". */
+function duration(seconds: number): string {
+  return formatAgeWords(seconds).replace(' ago', '')
+}
+
+function problemOf<T>(report: Report<T>) {
+  if (report.data) return undefined
+  return {
+    message: report.error ?? 'Still reading…',
+    retry: report.error ? report.retry : undefined,
+  }
+}
+
+function buildRows({
+  presence,
+  desktop,
+  website,
+  revenue,
+  support,
+  service,
+}: Omit<OverviewContentProps, 'initialOpen' | 'onRefresh'>) {
+  const p = presence.data
+  const svc = service.data
+  const rev = revenue.data
+  const sup = support.data
+
+  const newToday = svc?.accounts.new_today
+  const previousDay = newToday ? newToday.value - newToday.delta : 0
+  const netToday = rev?.earnings.available ? rev.earnings.net.value : 0
+  const everNet = rev?.earnings.lifetime?.[0]
+
+  const v = verdicts({
+    presence: p ? { available: p.available, active_users: p.active_users } : null,
+    support: sup ? { open_cases: sup.needs_attention.total } : null,
+    money: rev
+      ? {
+          available: rev.paying_now.available,
+          past_due: rev.paying_now.past_due,
+          new_paying_today: rev.new_paying.available
+            ? rev.new_paying.in_period.value
+            : 0,
+          net_today: netToday,
+        }
+      : null,
+    growth: newToday
+      ? {
+          available: newToday.available,
+          value: newToday.value,
+          previous: previousDay,
+          // A previous day of zero is not something to be above (SCROLLR-210).
+          comparable: newToday.available && previousDay > 0,
+        }
+      : null,
+    feeds: svc?.ingest ?? null,
+  })
+
+  return {
+    headline: v.headline,
+    rows: [
+      rightNowRow(presence, svc, v.right_now),
+      supportRow(support, v.support),
+      moneyRow(revenue, v.money, netToday, everNet),
+      growthRow(service, desktop, website, v.growth, previousDay),
+      feedsRow(service, p, v.feeds),
+    ],
+  }
+}
+
+function rightNowRow(
+  presence: Report<PresenceLive>,
+  svc: AdminOverview | null,
+  verdict: Verdict,
+): RowSpec {
+  const p = presence.data
+  const connected = svc?.connected_now.count ?? 0
+  const version = latestVersion(p?.app_version ?? null)
+  const legacy = p?.legacy_recent_presence
+  const extra = p ? Math.max(0, connected - p.active_users) : 0
+
+  const reporting = p?.available === true
+  const ticker =
+    reporting && p.ticker_users > 0
+      ? p.ticker_users === p.active_users
+        ? 'with the ticker on screen.'
+        : `${num(p.ticker_users)} with the ticker on screen.`
+      : undefined
+  return {
+    key: 'right_now',
+    number: reporting ? num(p.active_users) : null,
+    main: reporting
+      ? `${p.active_users === 1 ? 'person has' : 'people have'} Scrollr open right now${ticker ? ',' : '.'}`
+      : 'Nobody is reporting yet.',
+    secondary: reporting ? ticker : (p?.note ?? undefined),
+    verdict,
+    facts: [
+      fact('People with the app open', p ? num(p.active_users) : null),
+      fact('Ticker visible on their screen', p ? num(p.ticker_users) : null),
+      fact('Monitors showing a ticker', p ? num(p.screens) : null),
+      fact(
+        'Actively using their computer',
+        numberOrNull(count(p?.input_state ?? null, 'recent')),
+      ),
+      fact(
+        'Computer locked or screen asleep',
+        numberOrNull(
+          add(
+            count(p?.session_state ?? null, 'locked'),
+            count(p?.display_state ?? null, 'asleep'),
+          ),
+        ),
+      ),
+      fact(
+        'Ticker hidden or turned off',
+        numberOrNull(count(p?.ticker_state ?? null, 'hidden', 'disabled')),
+      ),
+      fact('On Windows', numberOrNull(count(p?.os ?? null, 'windows'))),
+      fact(
+        'On Mac or Linux',
+        numberOrNull(count(p?.os ?? null, 'macos', 'linux')),
+      ),
+      fact(
+        version
+          ? `Running the latest version (${version})`
+          : 'Running the latest version',
+        version ? num(p?.app_version?.[version] ?? 0) : null,
+      ),
+    ],
+    note: [
+      version
+        ? `Only version ${version} and later can report this.`
+        : 'Only recent versions can report this.',
+      extra > 0
+        ? `${plural(connected, 'app')} are connected to our servers in total; the other ${num(extra)} are older versions, staff, or admin tabs, which is why that number is bigger than the number of people.`
+        : `${plural(connected, 'app')} are connected to our servers in total.`,
+      legacy?.available
+        ? `${plural(legacy.value, 'older-version account')} was seen in the last 15 minutes.`.replace(
+            'accounts was',
+            'accounts were',
+          )
+        : null,
+    ]
+      .filter(Boolean)
+      .join(' '),
+    action: (
+      <Link to="/admin/analytics" className={ACTION}>
+        See who is here over time
+      </Link>
+    ),
+    problem: problemOf(presence),
+    loading: presence.loading,
+  }
+}
+
+function supportRow(
+  support: Report<SupportSummary>,
+  verdict: Verdict,
+): RowSpec {
+  const s = support.data
+  const waiting = s?.needs_attention.total ?? 0
+  const oldest = s?.oldest_needs_attention_hours
+  const hold = s?.autosend.hold_minutes ?? 0
+  const since =
+    s && waiting > 0 && oldest?.available ? oldestClause(oldest.value) : undefined
+
+  return {
+    key: 'support',
+    number: s ? num(waiting) : null,
+    main: s
+      ? `${waiting === 1 ? 'person is' : 'people are'} waiting for a reply from us${since ? ',' : '.'}`
+      : 'Support is not reporting yet.',
+    secondary: since,
+    verdict,
+    facts: [
+      fact('Waiting for us to reply', s ? num(s.needs_attention.total) : null),
+      fact(
+        'Waiting for the customer to reply',
+        s ? num(s.waiting_on_customer.total) : null,
+      ),
+      fact('Finished', s ? num(s.completed.total) : null),
+      fact('Finished and answered', s ? num(s.completed_closed) : null),
+      fact(
+        'Finished without a reply (spam, duplicates)',
+        s ? num(s.completed_dismissed) : null,
+      ),
+      fact('All tickets ever', s ? num(s.total.total) : null),
+      fact(
+        'Longest wait',
+        oldest?.available ? plural(Math.floor(oldest.value / 24), 'day') : null,
+      ),
+      fact('Ticket waiting the longest', s?.oldest_ticket ? `#${s.oldest_ticket}` : null),
+      fact(
+        'Auto-replies',
+        s
+          ? s.autosend.armed
+            ? `on, sent after a ${hold} min hold`
+            : 'off'
+          : null,
+      ),
+    ],
+    note: `A drafted reply goes out by itself after ${hold} minutes unless you stop it, so doing nothing still sends it. Tickets cannot be matched to paying customers yet, because only ${num(s?.cases_with_account ?? 0)} of the ${num(s?.cases ?? 0)} were sent from inside the app while signed in.`,
+    action: (
+      <Link to="/admin/support" className={ACTION_FILLED}>
+        Open the queue
+      </Link>
+    ),
+    problem: problemOf(support),
+    loading: support.loading,
+  }
+}
+
+function moneyRow(
+  revenue: Report<Revenue>,
+  verdict: Verdict,
+  netToday: number,
+  everNet: { currency: string; net: number } | undefined,
+): RowSpec {
+  const r = revenue.data
+  const snapshot = r?.paying_now
+  const earnings = r?.earnings
+  const money = (minor: number, currency?: string) =>
+    formatMinor(minor, currency ?? earnings?.primary_currency ?? 'usd')
+  const ever = everNet ? money(everNet.net, everNet.currency) : null
+  const fetched = earnings?.fetched_at ?? r?.generated_at
+
+  return {
+    key: 'money',
+    number: snapshot?.available ? num(snapshot.paying) : null,
+    main: snapshot?.available
+      ? snapshot.paying === 1
+        ? 'customer pays.'
+        : 'customers pay.'
+      : 'The customer snapshot could not be read.',
+    secondary: snapshot?.available
+      ? [
+          netToday > 0 ? `${money(netToday)} came in today.` : 'Nothing came in today.',
+          ever ? `${ever} earned ever.` : null,
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : r?.paying_now_note,
+    verdict,
+    facts: [
+      fact('Paying customers', snapshot?.available ? num(snapshot.paying) : null),
+      fact(
+        'Of those on the one-time lifetime plan',
+        snapshot?.available ? num(snapshot.lifetime) : null,
+      ),
+      fact(
+        'Accounts on the free plan',
+        snapshot?.available ? num(snapshot.free) : null,
+      ),
+      fact('On a free trial', snapshot?.available ? num(snapshot.trialing) : null),
+      fact('Payment failed', snapshot?.available ? num(snapshot.past_due) : null),
+      fact('Cancelling', snapshot?.available ? num(snapshot.canceling) : null),
+      fact(
+        'Became a customer today',
+        r?.new_paying.available ? num(r.new_paying.in_period.value) : null,
+      ),
+      fact(
+        'Earned today after Stripe fees',
+        earnings?.available ? money(earnings.net.value) : null,
+      ),
+      fact('Earned ever after Stripe fees', ever),
+    ],
+    note: `Figures come from Stripe and were last fetched at ${fetched ? new Date(fetched).toLocaleString() : 'an unknown time'}. “Ever” means since the Stripe account was opened.`,
+    action: (
+      <Link to="/admin/analytics" search={{ view: 'revenue' }} className={ACTION}>
+        See revenue over time
+      </Link>
+    ),
+    problem: problemOf(revenue),
+    loading: revenue.loading,
+  }
+}
+
+function growthRow(
+  service: Report<AdminOverview>,
+  desktop: Report<DesktopUsage>,
+  website: Report<Website>,
+  verdict: Verdict,
+  previousDay: number,
+): RowSpec {
+  const svc = service.data
+  const accounts = svc?.accounts
+  const newToday = accounts?.new_today
+  const dau = svc?.active.dau
+  const hours = desktop.data?.user_hours
+  const visitors = website.data?.visitors
+  const neverSetUp = accounts ? Math.max(0, accounts.total - accounts.set_up) : 0
+
+  return {
+    key: 'growth',
+    number: newToday?.available ? num(newToday.value) : null,
+    main: newToday?.available
+      ? `${newToday.value === 1 ? 'person' : 'people'} signed up in the last 24 hours,`
+      : 'Sign-ups are not reporting yet.',
+    // DAU is everyone who opened the app today, not a subset of today's
+    // sign-ups, so the clause says so rather than calling them "of them".
+    secondary: newToday?.available
+      ? dau?.available
+        ? `${plural(dau.value, 'person', 'people')} opened the app.`
+        : undefined
+      : newToday?.note,
+    verdict,
+    facts: [
+      fact(
+        'Signed up in the last 24 hours',
+        newToday?.available ? num(newToday.value) : null,
+      ),
+      fact(
+        'Signed up in the 24 hours before that',
+        newToday?.available ? num(previousDay) : null,
+      ),
+      fact('Accounts in total', accounts ? num(accounts.total) : null),
+      fact('Finished setting up the app', accounts ? num(accounts.set_up) : null),
+      fact(
+        'Signed up but never set up the app',
+        accounts ? num(neverSetUp) : null,
+      ),
+      fact(
+        'Opened the app in the last 24 hours',
+        dau?.available ? num(dau.value) : null,
+      ),
+      fact(
+        'Hours the app was open, all users added up',
+        hours?.available ? formatHours(hours.value) : null,
+      ),
+      fact(
+        'Website visitors in the last 24 hours',
+        visitors?.available ? num(visitors.value) : null,
+      ),
+      fact(
+        'Downloads ever (not installs)',
+        svc && !svc.downloads.error ? num(svc.downloads.total) : null,
+      ),
+    ],
+    note: `The ${num(neverSetUp)} who never finished setting up are the biggest thing to fix. Most signed up from inside the desktop app, opened it once, and never came back.`,
+    action: (
+      <Link to="/admin/analytics" className={ACTION}>
+        See signups over time
+      </Link>
+    ),
+    problem: problemOf(service),
+    loading: service.loading,
+  }
+}
+
+function feedsRow(
+  service: Report<AdminOverview>,
+  presence: PresenceLive | null,
+  verdict: Verdict,
+): RowSpec {
+  const svc = service.data
+  const ingest = svc?.ingest ?? []
+  const reading = (table: string) => ingest.find((row) => row.table === table)
+  const broken = FEEDS.find((f) => reading(f.table)?.has_data === false)
+  const stale = FEEDS.find((f) => {
+    const row = reading(f.table)
+    return row ? isStale(row) : false
+  })
+  const version = latestVersion(presence?.app_version ?? null)
+
+  return {
+    key: 'feeds',
+    number: null,
+    icon: verdict.tone,
+    main: broken
+      ? `${broken.name} are not reporting any data.`
+      : stale
+        ? `${stale.name} have not updated for ${duration(reading(stale.table)?.age_seconds ?? 0)}.`
+        : 'Scores, prices, markets and news are up to date,',
+    secondary: broken || stale ? undefined : 'all within the last few minutes.',
+    verdict,
+    facts: [
+      ...FEEDS.map((feed) => {
+        const row = reading(feed.table)
+        return fact(
+          `${feed.name} last updated`,
+          row ? (row.has_data ? formatAgeWords(row.age_seconds) : 'no data yet') : null,
+        )
+      }),
+      fact(
+        'Our servers running',
+        svc ? `${svc.connected_now.replicas} of ${EXPECTED_REPLICAS}` : null,
+      ),
+      fact('Latest app version', version),
+    ],
+    note: 'How long since each feed last received new data. Sports scores can sit for hours overnight when no games are being played, and that is normal.',
+    action: (
+      <Link to="/admin/versions" className={ACTION}>
+        Technical details
+      </Link>
+    ),
+    problem: problemOf(service),
+    loading: service.loading,
+  }
+}
+
+function oldestClause(hours: number): string {
+  if (hours < 48) return `the longest for ${plural(hours, 'hour')}.`
+  const since = new Date(Date.now() - hours * 3600_000)
+  return `one of them since ${since.toLocaleString(undefined, { month: 'long' })}.`
+}
+
+function add(a: number | null, b: number | null): number | null {
+  if (a === null && b === null) return null
+  return (a ?? 0) + (b ?? 0)
+}
+
+function numberOrNull(value: number | null): string | null {
+  return value === null ? null : num(value)
 }

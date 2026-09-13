@@ -68,6 +68,24 @@ export function formatAge(seconds: number): string {
 }
 
 /**
+ * The same age spelled out, for the Overview — which is read by people who do
+ * not already know that "90m" is a duration (SCROLLR-215). Rounds down, so a
+ * feed is never reported as fresher than it is.
+ */
+export function formatAgeWords(seconds: number): string {
+  if (seconds < 0) return 'in the future'
+  if (seconds < 60) return plural(seconds, 'second') + ' ago'
+  if (seconds < 3600) return plural(Math.floor(seconds / 60), 'minute') + ' ago'
+  if (seconds < 86400) return plural(Math.floor(seconds / 3600), 'hour') + ' ago'
+  return plural(Math.floor(seconds / 86400), 'day') + ' ago'
+}
+
+/** "1 person", "2 people" — the Overview writes sentences, not labels. */
+export function plural(count: number, one: string, many = `${one}s`): string {
+  return `${count.toLocaleString()} ${count === 1 ? one : many}`
+}
+
+/**
  * Ingest health. The thresholds are deliberately loose: this answers "has
  * this feed stopped", not "is it a few seconds behind". Sports rows can
  * legitimately sit still overnight, so a stale table is a warning, never an

@@ -2,17 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { OverviewContent } from './OverviewPage'
 import { renderWithRouter } from './testRouter'
 import {
-  audience,
   desktop,
   failed,
   loaded,
   loading,
-  notComparable,
   overview,
   presence,
   revenue,
   support,
-  unavailable,
   website,
 } from './dashboardFixtures'
 import type { OverviewContentProps } from './OverviewPage'
@@ -20,9 +17,7 @@ import type { OverviewContentProps } from './OverviewPage'
 function render(overrides: Partial<OverviewContentProps> = {}) {
   return renderWithRouter(
     <OverviewContent
-      period="7d"
       presence={loaded(presence)}
-      audience={loaded(audience)}
       desktop={loaded(desktop)}
       website={loaded(website)}
       revenue={loaded(revenue)}
@@ -33,201 +28,208 @@ function render(overrides: Partial<OverviewContentProps> = {}) {
   )
 }
 
+/** Strip tags so a sentence split across spans still reads as a sentence. */
+function text(html: string): string {
+  return html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ')
+}
+
 describe('OverviewContent', () => {
-  it('leads with the live headline verbatim and labels now versus period', async () => {
-    const html = await render()
-    expect(html).toContain('12 active users · 9 with ticker(s) · 14 screens')
-    expect(html).toContain('refreshed every 30 s')
-    expect(html).toContain('Current')
-    expect(html).toContain('Last 7 days')
-    // Breakdown chips, in their fixed order.
-    expect(html).toContain('unlocked 11 · locked 1 · unknown 1')
-    expect(html).toContain('0 3 · 1 7 · 2+ 2')
-    // The legacy figure stays secondary and available.
-    expect(html).toContain('Recently seen (legacy, 15 min)')
-    expect(html).toContain('>21<')
+  it('leads with the two headline lines and the five sentences', async () => {
+    const body = text(await render())
+    expect(body).toContain('Running fine.')
+    expect(body).toContain('Support needs you.')
+    expect(body).toContain('12people have Scrollr open right now,')
+    expect(body).toContain('9 with the ticker on screen.')
+    expect(body).toContain('3people are waiting for a reply from us,')
+    expect(body).toContain('2customers pay.')
+    expect(body).toContain('1person signed up in the last 24 hours,')
+    expect(body).toContain('Scores, prices, markets and news are up to date,')
+    expect(body).toContain('all within the last few minutes.')
   })
 
-  it('shows the staff-excluded badge linking to settings when any report says so', async () => {
-    const html = await render()
-    expect(html).toContain('Staff excluded')
-    expect(html).toContain('href="/admin/settings"')
-    expect(html).toContain('4 staff/test excluded')
+  it('shows one verdict per row', async () => {
+    const body = text(await render())
+    expect(body).toContain('Live')
+    expect(body).toContain('Needs you')
+    expect(body).toContain('New money')
+    expect(body).toContain('Growing')
+    expect(body).toContain('All good')
 
-    const none = await render({
-      presence: loaded({ ...presence, staff_excluded: false }),
-      audience: loaded({ ...audience, staff_excluded: false }),
-      desktop: loaded({ ...desktop, staff_excluded: false }),
-      website: loaded({ ...website, staff_excluded: false }),
-    })
-    expect(none).not.toContain('Staff excluded')
-  })
-
-  it('carries the period into every analytics link', async () => {
-    const html = await render({ period: '30d' })
-    expect(html).toContain('href="/admin/analytics?period=30d&amp;view=growth"')
-    expect(html).toContain(
-      'href="/admin/analytics?period=30d&amp;view=desktop"',
+    // A day with nothing to compare against is judged, not guessed at.
+    const early = text(
+      await render({
+        service: loaded({
+          ...overview,
+          accounts: {
+            ...overview.accounts,
+            new_today: { value: 1, delta: 1, available: true },
+          },
+        }),
+      }),
     )
-    expect(html).toContain(
-      'href="/admin/analytics?period=30d&amp;view=revenue"',
+    expect(early).toContain('Too early to compare')
+  })
+
+  it('colours the number only when the verdict is red or amber', async () => {
+    const html = await render({
+      service: loaded({
+        ...overview,
+        ingest: [{ table: 'trades', age_seconds: 7200, has_data: true }],
+      }),
+    })
+    // Support is red, so its number carries the error colour.
+    expect(html).toContain('text-error')
+    // A green row's number stays base-content: no primary-coloured number.
+    expect(html).not.toContain('tracking-[-0.04em] tabular-nums text-primary')
+  })
+
+  it('opens no detail panel until a row asks for one', async () => {
+    const closed = text(await render())
+    expect(closed).not.toContain('Waiting for the customer to reply')
+    expect(closed).not.toContain('Monitors showing a ticker')
+
+    const open = text(await render({ initialOpen: 'support' }))
+    expect(open).toContain('Waiting for the customer to reply')
+    expect(open).not.toContain('Monitors showing a ticker')
+  })
+
+  it('shows the support facts, note and queue action when that row is open', async () => {
+    const html = await render({ initialOpen: 'support' })
+    const body = text(html)
+    expect(body).toContain('Waiting for us to reply')
+    expect(body).toContain('Finished without a reply (spam, duplicates)')
+    expect(body).toContain('All tickets ever')
+    expect(body).toContain('#104')
+    expect(body).toContain('on, sent after a 30 min hold')
+    expect(body).toContain('only 1 of the 59 were sent from inside the app')
+    expect(html).toContain('href="/admin/support"')
+  })
+
+  it('makes the support action the only filled button', async () => {
+    const supportPanel = await render({ initialOpen: 'support' })
+    expect(supportPanel).toContain('bg-error')
+    for (const row of ['right_now', 'money', 'growth', 'feeds'] as const) {
+      const html = await render({ initialOpen: row })
+      expect(html).not.toContain('bg-error px-4')
+    }
+  })
+
+  it('never renders a number a row cannot back', async () => {
+    const body = text(
+      await render({
+        initialOpen: 'right_now',
+        presence: loaded({
+          ...presence,
+          available: false,
+          note: 'Live presence is unavailable right now.',
+          active_users: 0,
+          ticker_users: 0,
+          screens: 0,
+        }),
+        revenue: loaded({
+          ...revenue,
+          paying_now: { ...revenue.paying_now, available: false, paying: 0 },
+          paying_now_note: 'The customer snapshot could not be read.',
+        }),
+      }),
     )
-    expect(html).toContain(
-      'href="/admin/analytics?period=30d&amp;view=support"',
+    expect(body).toContain('Nobody is reporting yet.')
+    expect(body).toContain('Live presence is unavailable right now.')
+    expect(body).toContain('The customer snapshot could not be read.')
+    expect(body).not.toContain('0people have Scrollr open')
+    expect(body).not.toContain('0customers pay')
+    expect(body).toContain('Not reporting yet')
+  })
+
+  it('goes grey and quiet when nobody is here, and amber on a stale feed', async () => {
+    const body = text(
+      await render({
+        presence: loaded({ ...presence, active_users: 0, ticker_users: 0 }),
+        service: loaded({
+          ...overview,
+          ingest: [
+            { table: 'games', age_seconds: 90, has_data: true },
+            { table: 'trades', age_seconds: 7200, has_data: true },
+            { table: 'markets', age_seconds: 120, has_data: true },
+            { table: 'rss_items', age_seconds: 200, has_data: true },
+          ],
+        }),
+      }),
     )
-    expect(html).toContain('Last 30 days')
+    expect(body).toContain('Quiet')
+    expect(body).toContain('Stale')
+    expect(body).toContain('Stock prices have not updated for 2 hours.')
+    // Stale is not broken, so the headline still says things run.
+    expect(body).toContain('Running fine.')
   })
 
-  it('renders a delta only when the API called it comparable', async () => {
+  it('says something is broken when a feed has no data at all', async () => {
+    const body = text(
+      await render({
+        service: loaded({
+          ...overview,
+          ingest: [
+            { table: 'games', age_seconds: 90, has_data: true },
+            { table: 'trades', age_seconds: 0, has_data: false },
+          ],
+        }),
+      }),
+    )
+    expect(body).toContain('Something is broken.')
+    expect(body).toContain('A feed is broken')
+    expect(body).toContain('Stock prices are not reporting any data.')
+  })
+
+  it('spells the feed ages out in words when the row is open', async () => {
+    const body = text(await render({ initialOpen: 'feeds' }))
+    expect(body).toContain('Sports scores last updated')
+    expect(body).toContain('1 minute ago')
+    expect(body).toContain('Our servers running')
+    expect(body).toContain('2 of 2')
+    expect(body).toContain('1.6.7')
+  })
+
+  it('formats money from minor units and never sums currencies', async () => {
+    const body = text(await render({ initialOpen: 'money' }))
+    expect(body).toContain('$113.46 USD came in today.')
+    expect(body).toContain('$979.02 USD earned ever.')
+    expect(body).toContain('Earned today after Stripe fees')
+    expect(body).not.toContain('$133.46')
+  })
+
+  it('carries no period selector and no definitions accordion', async () => {
     const html = await render()
-    // New accounts: comparable, with a percentage.
-    expect(html).toContain('+4')
-    expect(html).toContain('(+50%)')
-    // Website visitors: not comparable — the note, never a delta.
-    expect(html).toContain('nothing complete to compare with')
-
-    const none = await render({
-      audience: loaded({
-        ...audience,
-        new: { ...audience.new, comparison: notComparable },
-      }),
-      desktop: loaded({
-        ...desktop,
-        unique_users: { ...desktop.unique_users, comparison: notComparable },
-      }),
-    })
-    expect(none).not.toContain('(+50%)')
-    expect(none).not.toContain('+4<')
+    expect(html).not.toContain('Last 7 days')
+    expect(html).not.toContain('How to read these numbers')
+    expect(html).not.toContain('period=')
   })
 
-  it('never renders an unavailable metric as a number, not even zero', async () => {
+  it('keeps a failed source inside its own row', async () => {
     const html = await render({
-      audience: loaded({
-        ...audience,
-        new: unavailable('Logto could not be reached.'),
-      }),
-      desktop: loaded({
-        ...desktop,
-        unique_users: unavailable('Presence has no rows yet.'),
-      }),
-      revenue: loaded({
-        ...revenue,
-        earnings: {
-          ...revenue.earnings,
-          available: false,
-          note: 'Stripe is not configured.',
-        },
-        new_paying: {
-          ...revenue.new_paying,
-          available: false,
-          note: 'Charge history is unavailable.',
-        },
-      }),
-    })
-    expect(html).toContain('Logto could not be reached.')
-    expect(html).toContain('Presence has no rows yet.')
-    expect(html).toContain('Stripe is not configured.')
-    expect(html).toContain('Charge history is unavailable.')
-    expect(html).not.toContain('text-3xl font-bold tabular-nums">0<')
-    expect(html).not.toContain('$0.00')
-  })
-
-  it('formats earnings from minor units with the currency code and never sums currencies', async () => {
-    const html = await render()
-    expect(html).toContain('$113.46 USD')
-    expect(html).toContain('€20.00 EUR')
-    expect(html).toContain('Lifetime net (USD)')
-    expect(html).toContain('$979.02 USD')
-    expect(html).toContain('never added together')
-    // 11346 + 2000 in either presentation.
-    expect(html).not.toContain('13346')
-    expect(html).not.toContain('$133.46')
-  })
-
-  it('shows the paying snapshot as unavailable, not zero, when Stripe rows could not be read', async () => {
-    const html = await render({
-      revenue: loaded({
-        ...revenue,
-        paying_now: {
-          ...revenue.paying_now,
-          available: false,
-          paying: 0,
-          free: 0,
-        },
-        paying_now_note: 'The customer snapshot could not be read.',
-      }),
-    })
-    expect(html).toContain('The customer snapshot could not be read.')
-    expect(html).not.toContain('0 free')
-  })
-
-  it('overlays paying counts on support buckets only when non-zero', async () => {
-    const html = await render()
-    expect(html).toContain('2 paying')
-    expect(html).toContain('3 paying')
-    expect(html).toContain('40 closed')
-    expect(html).toContain('2d 2h')
-    expect(html).toContain('Ticket #104')
-    expect(html).toContain('armed · 30 min hold')
-    expect(html).toContain('verified account association')
-    expect(html).not.toContain('0 paying')
-  })
-
-  it('says when live presence is unavailable instead of showing zeros', async () => {
-    const html = await render({
-      presence: loaded({
-        ...presence,
-        available: false,
-        headline: 'unavailable',
-        note: 'Live presence is unavailable right now (Redis could not be read).',
-        active_users: 0,
-        ticker_users: 0,
-        screens: 0,
-        session_state: null,
-      }),
-    })
-    expect(html).toContain('Redis could not be read')
-    expect(html).not.toContain('0 active users')
-  })
-
-  it('renders each area independently while loading and on error', async () => {
-    const html = await render({
-      presence: loading(),
-      audience: loading(),
-      desktop: failed('Desktop usage took too long. Please retry.'),
-      website: loading(),
+      initialOpen: 'money',
       revenue: failed('Could not load revenue'),
       support: loading(),
-      service: loading(),
     })
-    expect(html).toContain('Reading live presence')
-    expect(html).toContain('Loading registered accounts')
-    expect(html).toContain('Desktop usage took too long')
     expect(html).toContain('Could not load revenue')
     expect(html).toContain('Retry')
-    expect(html).not.toContain('active users ·')
+    expect(text(html)).toContain('Support is not reporting yet.')
+    // The other rows are unharmed.
+    expect(text(html)).toContain('people have Scrollr open right now,')
   })
 
-  it('keeps the last presence reading on screen when a poll fails', async () => {
-    const html = await render({
-      presence: {
-        data: presence,
-        error: 'stream refused',
-        loading: false,
-        retry: () => {},
-      },
-    })
-    expect(html).toContain('12 active users · 9 with ticker(s) · 14 screens')
-    expect(html).toContain('Last refresh failed: stream refused')
-  })
-
-  it('flags partial history and the service caveats', async () => {
-    const html = await render()
-    expect(html).toContain('Partial history')
-    expect(html).toContain('Presence reporting began 10 September 2026.')
-    expect(html).toContain('Summed across 2 replicas.')
-    expect(html).toContain('Downloads, not installs.')
-    expect(html).toContain('>empty<')
-    expect(html).toContain('How to read these numbers')
+  it('drops a clause it has no second half for', async () => {
+    const body = text(
+      await render({
+        presence: loaded({ ...presence, ticker_users: 0 }),
+        support: loaded({
+          ...support,
+          needs_attention: { total: 0, paying: 0 },
+        }),
+      }),
+    )
+    expect(body).toContain('people have Scrollr open right now.')
+    expect(body).toContain('0people are waiting for a reply from us.')
+    expect(body).not.toContain('one of them since')
+    expect(body).toContain('Clear')
   })
 })
