@@ -150,15 +150,6 @@ export interface ConnectedTile {
   replicas: number
 }
 
-export interface SupportTile {
-  open_cases: number
-  pending_drafts: number
-  auto_sent_30d: number
-  intervened_30d: number
-  oldest_open_hours: number
-  oldest_open_ticket?: string
-}
-
 export interface CatalogRequestRow {
   query: string
   people: number
@@ -185,7 +176,6 @@ export interface AdminOverview {
   downloads: DownloadsTile
   installs: Measured
   connected_now: ConnectedTile
-  support: SupportTile
   demand: DemandTile
   ingest: Array<IngestRow> | null
 }

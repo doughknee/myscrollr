@@ -47,7 +47,6 @@ type OverviewResponse struct {
 	Downloads    DownloadsTile `json:"downloads"`
 	Installs     Measured      `json:"installs"`
 	ConnectedNow ConnectedTile `json:"connected_now"`
-	Support      SupportTile   `json:"support"`
 	Demand       DemandTile    `json:"demand"`
 	Ingest       []IngestRow   `json:"ingest"`
 }
@@ -140,15 +139,6 @@ type ConnectedTile struct {
 	Replicas int `json:"replicas"`
 }
 
-type SupportTile struct {
-	OpenCases        int    `json:"open_cases"`
-	PendingDrafts    int    `json:"pending_drafts"`
-	AutoSent30d      int    `json:"auto_sent_30d"`
-	Intervened30d    int    `json:"intervened_30d"`
-	OldestOpenHours  int    `json:"oldest_open_hours"`
-	OldestOpenTicket string `json:"oldest_open_ticket,omitempty"`
-}
-
 type DemandTile struct {
 	CatalogRequests []CatalogRequestRow `json:"catalog_requests"`
 	BusinessLeads   int                 `json:"business_leads"`
@@ -211,7 +201,6 @@ func HandleGetOverview(c *fiber.Ctx) error {
 	})
 	run("plans", func() { out.Plans = plansTile(ctx) })
 	run("downloads", func() { out.Downloads = downloadsTile(ctx) })
-	run("support", func() { out.Support = supportTile(ctx) })
 	run("demand", func() { out.Demand = demandTile(ctx) })
 	run("ingest", func() { out.Ingest = ingestRows(ctx) })
 	run("connected", func() {
@@ -327,40 +316,6 @@ func plansTile(ctx context.Context) PlansTile {
 		 WHERE plan <> 'free' AND status IN ('active', 'trialing', 'past_due')`).
 		Scan(&t.Paying); err != nil {
 		log.Printf("[Admin] plans paying count: %v", err)
-	}
-	return t
-}
-
-func supportTile(ctx context.Context) SupportTile {
-	var t SupportTile
-	var oldest *time.Time
-	var ticket *string
-
-	if err := platform.DBPool.QueryRow(ctx, `
-		SELECT count(*) FILTER (WHERE status <> 'closed'),
-		       min(opened_at) FILTER (WHERE status <> 'closed'),
-		       (SELECT ticket_number FROM support_cases
-		         WHERE status <> 'closed' ORDER BY opened_at LIMIT 1)
-		  FROM support_cases`).Scan(&t.OpenCases, &oldest, &ticket); err != nil {
-		log.Printf("[Admin] support cases: %v", err)
-	}
-	if oldest != nil {
-		t.OldestOpenHours = int(time.Since(*oldest).Hours())
-	}
-	if ticket != nil {
-		t.OldestOpenTicket = *ticket
-	}
-
-	if err := platform.DBPool.QueryRow(ctx, `
-		SELECT count(*) FILTER (WHERE status = 'pending'),
-		       count(*) FILTER (WHERE status = 'sent'
-		                          AND disposition = 'auto_send'
-		                          AND created_at >= now() - interval '30 days'),
-		       count(*) FILTER (WHERE intervened
-		                          AND created_at >= now() - interval '30 days')
-		  FROM support_drafts`).
-		Scan(&t.PendingDrafts, &t.AutoSent30d, &t.Intervened30d); err != nil {
-		log.Printf("[Admin] support drafts: %v", err)
 	}
 	return t
 }
