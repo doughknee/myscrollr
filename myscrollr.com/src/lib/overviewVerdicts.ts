@@ -79,6 +79,17 @@ export function isStale(feed: FeedReading): boolean {
   return feed.has_data && feed.age_seconds > staleAfter(feed.table)
 }
 
+const NOT_REPORTING: Verdict = { tone: 'none', label: 'Not reporting yet' }
+
+const TOO_EARLY: Verdict = { tone: 'none', label: 'Too early to compare' }
+
+/**
+ * Analytics says "Not measured" where the Overview says "Not reporting yet":
+ * the Overview is watching a live system, Analytics is reading a window that
+ * may simply predate measurement. Same rule, the reader's own words.
+ */
+const NOT_MEASURED: Verdict = { tone: 'none', label: 'Not measured' }
+
 function rightNowVerdict(presence: VerdictInput['presence']): Verdict {
   if (!presence || !presence.available) {
     return { tone: 'none', label: 'Not reporting yet' }
@@ -88,16 +99,22 @@ function rightNowVerdict(presence: VerdictInput['presence']): Verdict {
     : { tone: 'none', label: 'Quiet' }
 }
 
-function supportVerdict(support: VerdictInput['support']): Verdict {
-  if (!support) return { tone: 'none', label: 'Not reporting yet' }
+function supportVerdict(
+  support: VerdictInput['support'],
+  unmeasured: Verdict = NOT_REPORTING,
+): Verdict {
+  if (!support) return unmeasured
   return support.open_cases > 0
     ? { tone: 'bad', label: 'Needs you' }
     : { tone: 'good', label: 'Clear' }
 }
 
-function moneyVerdict(money: VerdictInput['money']): Verdict {
+function moneyVerdict(
+  money: VerdictInput['money'],
+  unmeasured: Verdict = NOT_REPORTING,
+): Verdict {
   if (!money || !money.available) {
-    return { tone: 'none', label: 'Not reporting yet' }
+    return unmeasured
   }
   if (money.past_due > 0) return { tone: 'bad', label: 'Payment failed' }
   if (money.new_paying_today > 0 || money.net_today > 0) {
@@ -106,16 +123,25 @@ function moneyVerdict(money: VerdictInput['money']): Verdict {
   return { tone: 'none', label: 'Nothing new' }
 }
 
-function growthVerdict(growth: VerdictInput['growth']): Verdict {
-  if (!growth || !growth.available) {
-    return { tone: 'none', label: 'Not reporting yet' }
-  }
-  if (!growth.comparable) {
-    return { tone: 'none', label: 'Too early to compare' }
-  }
-  return growth.value >= growth.previous
+/**
+ * The shared "is it going up" rule. Growth and desktop usage differ only in
+ * what they call a fall, so the threshold is written once: a period that
+ * cannot honestly be compared is grey, never a judgement.
+ */
+function trendVerdict(
+  input: VerdictInput['growth'],
+  below: string,
+  unmeasured: Verdict = NOT_REPORTING,
+): Verdict {
+  if (!input || !input.available) return unmeasured
+  if (!input.comparable) return TOO_EARLY
+  return input.value >= input.previous
     ? { tone: 'good', label: 'Growing' }
-    : { tone: 'warn', label: 'Slow' }
+    : { tone: 'warn', label: below }
+}
+
+function growthVerdict(growth: VerdictInput['growth']): Verdict {
+  return trendVerdict(growth, 'Slow')
 }
 
 function feedsVerdict(feeds: VerdictInput['feeds']): Verdict {
@@ -158,4 +184,37 @@ export function verdicts(input: VerdictInput): OverviewVerdicts {
     feeds,
     headline: [first, second],
   }
+}
+
+// ── Analytics sections (SCROLLR-220) ──────────────────────────────
+
+/**
+ * The four Analytics verdicts, each the same rule as its Overview row but
+ * evaluated on the selected period rather than on the last 24 hours. They
+ * live here because this file is the only place on the console allowed to
+ * decide what a number means.
+ */
+
+/** Sign-ups in the period against the period before. */
+export function analyticsGrowthVerdict(
+  growth: VerdictInput['growth'],
+): Verdict {
+  return trendVerdict(growth, 'Slow', NOT_MEASURED)
+}
+
+/** App user-hours in the period against the period before. */
+export function analyticsDesktopVerdict(
+  usage: VerdictInput['growth'],
+): Verdict {
+  return trendVerdict(usage, 'Falling', NOT_MEASURED)
+}
+
+export function analyticsRevenueVerdict(money: VerdictInput['money']): Verdict {
+  return moneyVerdict(money, NOT_MEASURED)
+}
+
+export function analyticsSupportVerdict(
+  support: VerdictInput['support'],
+): Verdict {
+  return supportVerdict(support, NOT_MEASURED)
 }
