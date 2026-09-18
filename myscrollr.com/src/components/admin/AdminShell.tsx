@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { Loader2, Lock } from 'lucide-react'
 import ScrollrSVG from '@/components/ScrollrSVG'
 import { AdminApiError, adminApi } from '@/api/admin'
@@ -151,6 +151,30 @@ export default function AdminShell() {
 }
 
 /**
+ * The bar's status slot, reachable from the page inside the Outlet.
+ *
+ * Support's live-stream and auto-send state belong in the bar (SCROLLR-219)
+ * but are known only to the page, which renders two levels down. The page
+ * hands its node up through this; `status` stays a prop so the chrome can
+ * still be rendered with a filled bar and no page at all.
+ */
+const StatusSlot = createContext<(node: React.ReactNode) => void>(() => {})
+
+/**
+ * Fill the console bar's status slot from a page.
+ *
+ * `node` MUST be memoised on the values it renders — an element rebuilt every
+ * render would set state every render, and the shell would re-render forever.
+ */
+export function useAdminStatus(node: React.ReactNode) {
+  const fill = useContext(StatusSlot)
+  useEffect(() => {
+    fill(node)
+    return () => fill(null)
+  }, [fill, node])
+}
+
+/**
  * The console's chrome: the container, the nav and the slot.
  *
  * Split out from the gate so it can be rendered without one — the Support
@@ -169,6 +193,7 @@ export function AdminChrome({
   children: React.ReactNode
 }) {
   const location = useLocation()
+  const [slot, setSlot] = useState<React.ReactNode>(null)
   const links = SECTIONS.map(({ to, label, ...rest }) => {
     const exact = 'exact' in rest && rest.exact
     const active = exact
@@ -178,33 +203,78 @@ export function AdminChrome({
   })
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="flex h-12 shrink-0 items-center gap-4 border-b border-hairline bg-base-75 px-4">
-        <Link
-          to="/admin"
-          className="flex shrink-0 items-center gap-2 text-[15px] font-extrabold tracking-[-0.02em] text-base-content hover:text-base-content hover:opacity-100"
-        >
-          <ScrollrSVG width={20} height={20} />
-          <span className="flex items-baseline">
-            scrollr<span className="text-primary">.</span>
-          </span>
-          <span className="ml-1 text-[13px] font-medium text-base-content/45">
-            / admin
-          </span>
-        </Link>
+    <StatusSlot.Provider value={setSlot}>
+      <div className="flex min-h-dvh flex-col">
+        <header className="flex h-12 shrink-0 items-center gap-4 border-b border-hairline bg-base-75 px-4">
+          <Link
+            to="/admin"
+            className="flex shrink-0 items-center gap-2 text-[15px] font-extrabold tracking-[-0.02em] text-base-content hover:text-base-content hover:opacity-100"
+          >
+            <ScrollrSVG width={20} height={20} />
+            <span className="flex items-baseline">
+              scrollr<span className="text-primary">.</span>
+            </span>
+            <span className="ml-1 text-[13px] font-medium text-base-content/45">
+              / admin
+            </span>
+          </Link>
 
-        {/* From 768 the sections sit in the bar. Below it they get their own
+          {/* From 768 the sections sit in the bar. Below it they get their own
             scrolling row underneath, where a tap target can be 44px tall. */}
-        <nav className="hidden min-w-0 flex-1 md:block">
-          <ul className="flex items-center gap-0.5">
+          <nav className="hidden min-w-0 flex-1 overflow-hidden md:block">
+            {/* The bar now also carries a page's status pills (SCROLLR-219).
+                Between 768 and the width where everything fits, the sections
+                scroll inside their share of the bar; overflow visible let
+                them run under the pills instead. */}
+            <ul className="flex items-center gap-0.5 overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
+              {links.map(({ to, label, active }) => (
+                <li key={to}>
+                  <Link
+                    to={to}
+                    className={`rounded-lg px-2.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                      active
+                        ? 'bg-base-200 text-base-content'
+                        : 'text-base-content/60 hover:bg-base-200/60 hover:text-base-content'
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <div className="ml-auto flex min-w-0 shrink-0 items-center gap-4 md:ml-0">
+            {status}
+            {slot}
+            <span
+              /* From lg, not sm: the bar now also carries a page's status
+               pills (SCROLLR-219), and who you are signed in as is the
+               least urgent thing on it. */
+              className="hidden max-w-[18rem] truncate text-xs text-base-content/45 lg:block"
+              title={email}
+            >
+              {email}
+            </span>
+            <Link
+              to="/"
+              className="text-xs font-semibold whitespace-nowrap text-base-content/60 hover:text-base-content"
+            >
+              Back to site
+            </Link>
+          </div>
+        </header>
+
+        <nav className="shrink-0 border-b border-hairline bg-base-75 md:hidden">
+          <ul className="flex gap-0.5 overflow-x-auto px-2">
             {links.map(({ to, label, active }) => (
               <li key={to}>
                 <Link
                   to={to}
-                  className={`rounded-lg px-2.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                  className={`flex min-h-11 items-center rounded-lg px-3 text-[13px] font-semibold whitespace-nowrap transition-colors ${
                     active
-                      ? 'bg-base-200 text-base-content'
-                      : 'text-base-content/60 hover:bg-base-200/60 hover:text-base-content'
+                      ? 'text-base-content'
+                      : 'text-base-content/60 hover:text-base-content'
                   }`}
                 >
                   {label}
@@ -214,46 +284,11 @@ export function AdminChrome({
           </ul>
         </nav>
 
-        <div className="ml-auto flex min-w-0 shrink-0 items-center gap-4 md:ml-0">
-          {status}
-          <span
-            className="hidden max-w-[18rem] truncate text-xs text-base-content/45 sm:block"
-            title={email}
-          >
-            {email}
-          </span>
-          <Link
-            to="/"
-            className="text-xs font-semibold whitespace-nowrap text-base-content/60 hover:text-base-content"
-          >
-            Back to site
-          </Link>
-        </div>
-      </header>
-
-      <nav className="shrink-0 border-b border-hairline bg-base-75 md:hidden">
-        <ul className="flex gap-0.5 overflow-x-auto px-2">
-          {links.map(({ to, label, active }) => (
-            <li key={to}>
-              <Link
-                to={to}
-                className={`flex min-h-11 items-center rounded-lg px-3 text-[13px] font-semibold whitespace-nowrap transition-colors ${
-                  active
-                    ? 'text-base-content'
-                    : 'text-base-content/60 hover:text-base-content'
-                }`}
-              >
-                {label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
-
-      {/* Full-bleed. Each page brings its own PageFrame if it wants a cap. */}
-      <main className="min-h-[calc(100dvh-48px)] min-w-0 flex-1">
-        {children}
-      </main>
-    </div>
+        {/* Full-bleed. Each page brings its own PageFrame if it wants a cap. */}
+        <main className="min-h-[calc(100dvh-48px)] min-w-0 flex-1">
+          {children}
+        </main>
+      </div>
+    </StatusSlot.Provider>
   )
 }
