@@ -99,6 +99,9 @@ const (
 	// carries it had not been cut when this was written, so the day is the
 	// PR's date rather than a tag's.
 	addedV170 = "2026-09-06"
+	// CNN (SCROLLR-224). Same caveat as above: no desktop tag carries it yet,
+	// so this is the PR's date. Latest published tag at the time was v1.6.7.
+	addedCNN = "2026-09-18"
 )
 
 // Shared usage recipes — most widgets in a family follow the same steps, so
@@ -554,6 +557,22 @@ var catalog = []WidgetDef{
 		}},
 		Usage: usageNews,
 		About: "Matt Drudge's link aggregator, headline by headline. The feed carries the site's link list as it updates.",
+	},
+	{
+		ID: "news_cnn", Name: "CNN", Category: "news", Source: "rss",
+		Group: "World", AddedAt: addedCNN,
+		Color: "#cc0000", LogoURL: "https://icon.horse/icon/cnn.com",
+		Description: "CNN's top stories as they lead the homepage.",
+		// CNN serves this feed over plain HTTP only: rss.cnn.com does not
+		// answer on 443 and www.cnn.com/rss/* is a 404 (checked 2026-09-18).
+		// The URL must stay byte-identical to the one in
+		// channels/rss/service/configs/feeds.json or the poller and the
+		// catalog describe two different feeds.
+		DefaultConfig: map[string]any{"feeds": []map[string]string{
+			{"name": "CNN", "url": "http://rss.cnn.com/rss/cnn_topstories.rss"},
+		}},
+		Usage: usageNews,
+		About: "CNN's homepage lead stories — US and world news, updated through the day.",
 	},
 	{
 		// Off the add grid for now (2026-09-05) -- the feeds view and its
