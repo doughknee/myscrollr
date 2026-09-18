@@ -17,6 +17,7 @@
     ?mode=page        scrollMode "page" (steps) instead of "continuous".
     ?comfort=1        tickerMode "detailed" (one extra row per chip)
                       instead of "compact".
+    ?speed=<px/s>     tickerSpeed; snaps to 20/40/80 (default 40).
 
   What the seed does: scrollr:settings puts the bar on, continuous and
   compact, with the local clock on the ticker; the fixture's `widgets`
@@ -138,6 +139,8 @@
               showTicker: true,
               scrollMode: params.get("mode") === "page" ? "page" : "continuous",
               tickerMode: params.get("comfort") === "1" ? "detailed" : "compact",
+              // Snaps to the nearest preset (20/40/80 px/s) on load.
+              tickerSpeed: Number(params.get("speed")) || 40,
             },
             widgets: { enabledWidgets: ["clock"], widgetsOnTicker: ["clock"] },
           }],

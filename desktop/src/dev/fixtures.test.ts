@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import type { DashboardResponse } from "../types";
 import fixture from "./__fixtures__/dashboard.default.json";
+import widthPre from "./__fixtures__/dashboard.width-pre.json";
+import widthLive from "./__fixtures__/dashboard.width-live.json";
+import widthFinal from "./__fixtures__/dashboard.width-final.json";
 
 /**
  * The default ticker-shim dashboard (SCROLLR-226) must stay a
@@ -26,19 +29,44 @@ type Widen<T> = T extends string
 
 const dash = (fixture satisfies Widen<DashboardResponse>) as unknown as DashboardResponse;
 
-describe("dashboard.default.json", () => {
+// Every dashboard.*.json the shim can serve (`?fixture=<name>`). The
+// static imports above give tsc the shape check; the glob catches a file
+// somebody adds without listing it here.
+const all = import.meta.glob<{ _note: string; _captured_at: string; data: object }>(
+  "./__fixtures__/dashboard.*.json",
+  { eager: true, import: "default" },
+);
+[widthPre, widthLive, widthFinal].forEach((f) => f satisfies Widen<DashboardResponse>);
+
+describe.each(Object.entries(all))("%s", (_path, fx) => {
   it("names its provenance and capture time", () => {
-    expect(fixture._note.length).toBeGreaterThan(40);
-    expect(Number.isNaN(Date.parse(fixture._captured_at))).toBe(false);
+    expect(fx._note.length).toBeGreaterThan(40);
+    expect(Number.isNaN(Date.parse(fx._captured_at))).toBe(false);
   });
 
   it("uses the literal unions tsc cannot see through a JSON import", () => {
-    for (const t of dash.data.finance ?? []) {
+    const d = fx as unknown as DashboardResponse;
+    for (const t of d.data.finance ?? []) {
       expect(["up", "down", undefined], t.symbol).toContain(t.direction);
     }
-    expect(["comfort", "compact"]).toContain(dash.preferences?.feed_mode);
+    expect(["comfort", "compact"]).toContain(d.preferences?.feed_mode);
+    for (const g of d.data.sports ?? []) {
+      expect(["pre", "in", "in_progress", "final", "post", "postponed"], String(g.id)).toContain(g.state);
+    }
   });
+});
 
+describe("dashboard.width-*.json", () => {
+  it("hold one game, the same id, scores crossing one to two digits", () => {
+    const games = [widthPre, widthLive, widthFinal].map((f) => f.data.sports[0]);
+    expect(games.map((g) => g.id)).toEqual([games[0].id, games[0].id, games[0].id]);
+    expect(games.map((g) => g.state)).toEqual(["pre", "in", "final"]);
+    expect(games[1].home_team_score.length).toBe(1);
+    expect(games[2].home_team_score.length).toBe(2);
+  });
+});
+
+describe("dashboard.default.json", () => {
   it("carries enough rows for rotation", () => {
     const games = dash.data.sports ?? [];
     const byLeague = new Map<string, number>();
