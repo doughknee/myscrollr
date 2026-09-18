@@ -119,8 +119,8 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 
 ## Widget catalog
 
-<!-- source: api/internal/platform/widgets.go (GET /catalog) @ e53c33da3c52a6c6 -->
-50 widgets. Every widget costs one slot. A widget marked *off the add grid* cannot be added right now, but anyone who already has it keeps it.
+<!-- source: api/internal/platform/widgets.go (GET /catalog) @ 2ad8e3d61f278d1d -->
+51 widgets. Every widget costs one slot. A widget marked *off the add grid* cannot be added right now, but anyone who already has it keeps it.
 
 ### Finance
 
@@ -171,6 +171,7 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 - **Hacker News** (Tech & Science) — Top stories from the Hacker News front page. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
 - **The Verge** (Tech & Science) — Technology, science, art and culture. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
 - **Drudge Report** (World) — The Drudge Report's headline links, as they post. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
+- **CNN** (World) — CNN's top stories as they lead the homepage. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
 - **Custom RSS** — Follow any RSS or Atom feed by pasting its URL. *Off the add grid.* *How to use:* Paste any RSS or Atom feed URL in the Feeds view. Add as many feeds as you like — they merge into one stream. Perfect for niche blogs, newsletters, or subreddits with a feed.
 
 ### Fantasy

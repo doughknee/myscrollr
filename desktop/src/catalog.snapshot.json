@@ -1,5 +1,5 @@
 {
-    "version": "e53c33da3c52a6c6",
+    "version": "2ad8e3d61f278d1d",
     "widgets": [
         {
             "id": "finance_stocks",
@@ -1178,6 +1178,33 @@
             "added_at": "2026-09-05"
         },
         {
+            "id": "news_cnn",
+            "name": "CNN",
+            "description": "CNN's top stories as they lead the homepage.",
+            "source": "rss",
+            "category": "news",
+            "color": "#cc0000",
+            "logo_url": "https://icon.horse/icon/cnn.com",
+            "default_config": {
+                "feeds": [
+                    {
+                        "name": "CNN",
+                        "url": "http://rss.cnn.com/rss/cnn_topstories.rss"
+                    }
+                ]
+            },
+            "required_tier": "free",
+            "about": "CNN's homepage lead stories — US and world news, updated through the day.",
+            "usage": [
+                "Headlines refresh automatically as new stories publish.",
+                "Open any headline from the feed to read the full story.",
+                "Pin it to keep the latest news in view."
+            ],
+            "order": 41,
+            "group": "World",
+            "added_at": "2026-09-18"
+        },
+        {
             "id": "rss_custom",
             "name": "Custom RSS",
             "description": "Follow any RSS or Atom feed by pasting its URL.",
@@ -1194,7 +1221,7 @@
                 "Add as many feeds as you like — they merge into one stream.",
                 "Perfect for niche blogs, newsletters, or subreddits with a feed."
             ],
-            "order": 41,
+            "order": 42,
             "hidden": true,
             "added_at": "2026-07-02"
         },
@@ -1213,7 +1240,7 @@
                 "Leagues, matchups, and standings sync automatically.",
                 "Live scoring updates while your players are on the field."
             ],
-            "order": 42,
+            "order": 43,
             "group": "Fantasy",
             "keywords": [
                 "fantasy football",
@@ -1236,7 +1263,7 @@
                 "Follow the events and questions you care about.",
                 "Display-only — Scrollr shows the market, it never places a trade."
             ],
-            "order": 43,
+            "order": 44,
             "group": "Predictions",
             "keywords": [
                 "odds",
@@ -1252,7 +1279,7 @@
             "category": "utility",
             "color": "#6366f1",
             "required_tier": "free",
-            "order": 44,
+            "order": 45,
             "group": "Desk",
             "keywords": [
                 "time",
@@ -1268,7 +1295,7 @@
             "category": "utility",
             "color": "#f59e0b",
             "required_tier": "free",
-            "order": 45,
+            "order": 46,
             "group": "Desk",
             "keywords": [
                 "pomodoro",
@@ -1284,7 +1311,7 @@
             "category": "utility",
             "color": "#0ea5e9",
             "required_tier": "free",
-            "order": 46,
+            "order": 47,
             "group": "Desk",
             "keywords": [
                 "forecast",
@@ -1300,7 +1327,7 @@
             "category": "utility",
             "color": "#06b6d4",
             "required_tier": "free",
-            "order": 47,
+            "order": 48,
             "group": "Dev",
             "keywords": [
                 "cpu",
@@ -1318,7 +1345,7 @@
             "color": "#10b981",
             "logo_url": "https://icon.horse/icon/uptime.kuma.pet",
             "required_tier": "free",
-            "order": 48,
+            "order": 49,
             "group": "Dev",
             "keywords": [
                 "kuma",
@@ -1335,7 +1362,7 @@
             "color": "#f97316",
             "logo_url": "https://icon.horse/icon/github.com",
             "required_tier": "free",
-            "order": 49,
+            "order": 50,
             "group": "Dev",
             "keywords": [
                 "actions",

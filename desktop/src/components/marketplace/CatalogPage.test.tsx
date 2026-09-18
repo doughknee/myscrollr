@@ -285,9 +285,15 @@ describe("buildBlocks sorts", () => {
     const { blocks } = buildBlocks(items, "all", "", "new", none);
     expect(blocks).toHaveLength(1);
     expect(blocks[0].title).toBe("Newest first");
-    // The newest dated entry: the REL-220 league expansion (2026-09-06),
-    // whose first declared entry is the Bundesliga.
-    expect(blocks[0].shelves[0].items[0].id).toBe("sports_bundesliga");
+    // Assert the property, not a particular widget: this used to name the
+    // then-newest entry by id and broke on the next widget anyone added
+    // (SCROLLR-224). The first item must simply carry the newest addedAt.
+    const newest = items.reduce(
+      (max, i) => (i.addedAt && i.addedAt > max ? i.addedAt : max),
+      "",
+    );
+    expect(newest).not.toBe("");
+    expect(blocks[0].shelves[0].items[0].addedAt).toBe(newest);
   });
 
   it("by kind shelves Sports by group with headers, Finance without", () => {
