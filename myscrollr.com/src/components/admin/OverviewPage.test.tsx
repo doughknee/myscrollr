@@ -52,7 +52,8 @@ describe('OverviewContent', () => {
     expect(body).toContain('Live')
     expect(body).toContain('Needs you')
     expect(body).toContain('New money')
-    expect(body).toContain('Growing')
+    // Growth states its direction without a tone (SCROLLR-223).
+    expect(body).toContain('Level')
     expect(body).toContain('All good')
 
     // A day with nothing to compare against is judged, not guessed at.

@@ -124,24 +124,31 @@ function moneyVerdict(
 }
 
 /**
- * The shared "is it going up" rule. Growth and desktop usage differ only in
- * what they call a fall, so the threshold is written once: a period that
- * cannot honestly be compared is grey, never a judgement.
+ * The shared trend rule. It states the direction and stops there: at four
+ * sign-ups a day, four against five is noise, and a pill that called it amber
+ * would be wrong most times it fired — which teaches the reader to discount
+ * the red "12 people are waiting" too (SCROLLR-223). The guards stay: a period
+ * that cannot honestly be compared is grey, and so, now, is every comparison.
+ * The sentence beside the pill spells the comparison out; the pill is quiet.
  */
 function trendVerdict(
   input: VerdictInput['growth'],
-  below: string,
   unmeasured: Verdict = NOT_REPORTING,
 ): Verdict {
   if (!input || !input.available) return unmeasured
   if (!input.comparable) return TOO_EARLY
-  return input.value >= input.previous
-    ? { tone: 'good', label: 'Growing' }
-    : { tone: 'warn', label: below }
+  if (input.value === input.previous) return { tone: 'none', label: 'Level' }
+  const direction = input.value > input.previous ? 'Up' : 'Down'
+  return { tone: 'none', label: `${direction} from ${round(input.previous)}` }
+}
+
+/** User-hours arrive fractional, sign-ups do not; one decimal suits both. */
+function round(value: number): string {
+  return (Math.round(value * 10) / 10).toLocaleString('en-US')
 }
 
 function growthVerdict(growth: VerdictInput['growth']): Verdict {
-  return trendVerdict(growth, 'Slow')
+  return trendVerdict(growth)
 }
 
 function feedsVerdict(feeds: VerdictInput['feeds']): Verdict {
@@ -199,14 +206,14 @@ export function verdicts(input: VerdictInput): OverviewVerdicts {
 export function analyticsGrowthVerdict(
   growth: VerdictInput['growth'],
 ): Verdict {
-  return trendVerdict(growth, 'Slow', NOT_MEASURED)
+  return trendVerdict(growth, NOT_MEASURED)
 }
 
 /** App user-hours in the period against the period before. */
 export function analyticsDesktopVerdict(
   usage: VerdictInput['growth'],
 ): Verdict {
-  return trendVerdict(usage, 'Falling', NOT_MEASURED)
+  return trendVerdict(usage, NOT_MEASURED)
 }
 
 export function analyticsRevenueVerdict(money: VerdictInput['money']): Verdict {
@@ -226,14 +233,14 @@ export function analyticsSupportVerdict(
  *
  * The input is request counters, never a headcount: no user id is stored, so
  * `share` here is share of desktop traffic in the window and nothing on that
- * page may imply otherwise. The rule reads the same way the page does — is
- * anything erroring, and if not, has the newest build actually landed.
+ * page may imply otherwise. The rule reads the same way the page does: is
+ * anything erroring. Rollout share is information on the page, not a state —
+ * a low share is what every release looks like for its first days, so judging
+ * it was wrong nearly every time it fired (SCROLLR-223).
  */
 export interface VersionsInput {
   /** Desktop requests in the window. Zero means nothing to judge. */
   desktop_total: number
-  /** Share of that traffic on the newest build seen. */
-  current_share: number
   versions: Array<{ version: string; share: number; error_rate: number }>
 }
 
@@ -249,9 +256,6 @@ export interface VersionsVerdict {
  */
 const ERRORING_MIN_SHARE = 0.05
 const ERRORING_RATE = 0.02
-
-/** Below this the newest build has not landed widely enough to call it done. */
-const ROLLOUT_LANDED = 0.5
 
 export function versionsVerdict(input: VersionsInput): VersionsVerdict {
   if (input.desktop_total === 0) {
@@ -275,12 +279,6 @@ export function versionsVerdict(input: VersionsInput): VersionsVerdict {
     return {
       verdict: { tone: 'bad', label: 'Something is erroring' },
       erroring: erroring.version,
-    }
-  }
-  if (input.current_share < ROLLOUT_LANDED) {
-    return {
-      verdict: { tone: 'warn', label: 'Rollout is slow' },
-      erroring: null,
     }
   }
   return { verdict: { tone: 'good', label: 'Healthy' }, erroring: null }

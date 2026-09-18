@@ -50,6 +50,19 @@ describe('VersionsReport', () => {
     )
   })
 
+  // SCROLLR-223: the days after every release look exactly like this, so the
+  // page reports the share and leaves the judging to the error rate.
+  it('calls a freshly-shipped build healthy while it is still spreading', () => {
+    const html = text({
+      ...healthy,
+      current_share: 0.09,
+      versions: [version('1.6.7', 0.09, 0.003), version('1.6.1', 0.91, 0.009)],
+    })
+    expect(html).toContain('9% of desktop traffic is on 1.6.7')
+    expect(html).toContain('Healthy')
+    expect(html).not.toContain('Rollout is slow')
+  })
+
   it('names the build that is erroring', () => {
     expect(
       text({
