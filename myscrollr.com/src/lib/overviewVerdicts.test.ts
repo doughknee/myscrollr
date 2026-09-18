@@ -33,12 +33,12 @@ function only(overrides: Partial<VerdictInput>) {
 }
 
 describe('verdicts', () => {
-  it('reads a healthy page as live, clear, growing and all good', () => {
+  it('reads a healthy page as live, clear, up and all good', () => {
     const v = verdicts(healthy)
     expect(v.right_now).toEqual({ tone: 'good', label: 'Live' })
     expect(v.support).toEqual({ tone: 'good', label: 'Clear' })
     expect(v.money).toEqual({ tone: 'none', label: 'Nothing new' })
-    expect(v.growth).toEqual({ tone: 'good', label: 'Growing' })
+    expect(v.growth).toEqual({ tone: 'none', label: 'Up from 2' })
     expect(v.feeds).toEqual({ tone: 'good', label: 'All good' })
     expect(v.headline).toEqual(['Running fine.', 'Nothing needs you.'])
   })
@@ -111,19 +111,35 @@ describe('verdicts', () => {
         growth: { available: false, value: 0, previous: 0, comparable: false },
       }).growth,
     ).toEqual({ tone: 'none', label: 'Not reporting yet' })
+    // The refusals outrank the direction: a rise it cannot compare is still
+    // "Too early", not "Up from 0". Grey here means two different things and
+    // the page must keep saying which.
+    expect(
+      only({
+        growth: { available: true, value: 9, previous: 0, comparable: false },
+      }).growth.label,
+    ).toBe('Too early to compare')
+    expect(
+      only({
+        growth: { available: false, value: 9, previous: 2, comparable: true },
+      }).growth.label,
+    ).toBe('Not reporting yet')
   })
 
-  it('calls flat growth growing and a fall slow', () => {
+  // SCROLLR-223: growth states its direction and never judges it. Four
+  // sign-ups against five is noise, and an amber pill on noise teaches the
+  // reader to discount the pills that are only restating a fact.
+  it('states the direction of growth without taking a tone', () => {
     expect(
       only({
         growth: { available: true, value: 2, previous: 2, comparable: true },
-      }).growth.label,
-    ).toBe('Growing')
+      }).growth,
+    ).toEqual({ tone: 'none', label: 'Level' })
     expect(
       only({
         growth: { available: true, value: 1, previous: 2, comparable: true },
       }).growth,
-    ).toEqual({ tone: 'warn', label: 'Slow' })
+    ).toEqual({ tone: 'none', label: 'Down from 2' })
   })
 
   it('gives sports scores half a day and every other feed half an hour', () => {
@@ -185,18 +201,18 @@ const trend = (
 ) => ({ available, value, previous, comparable })
 
 describe('analyticsGrowthVerdict', () => {
-  it('is green when sign-ups held or grew, amber when they fell', () => {
+  it('names the direction and stays grey either way', () => {
     expect(analyticsGrowthVerdict(trend(19, 19))).toEqual({
-      tone: 'good',
-      label: 'Growing',
+      tone: 'none',
+      label: 'Level',
     })
     expect(analyticsGrowthVerdict(trend(31, 19))).toEqual({
-      tone: 'good',
-      label: 'Growing',
+      tone: 'none',
+      label: 'Up from 19',
     })
     expect(analyticsGrowthVerdict(trend(19, 31))).toEqual({
-      tone: 'warn',
-      label: 'Slow',
+      tone: 'none',
+      label: 'Down from 31',
     })
   })
 
@@ -217,14 +233,14 @@ describe('analyticsGrowthVerdict', () => {
 })
 
 describe('analyticsDesktopVerdict', () => {
-  it('calls a fall in app user-hours Falling, not Slow', () => {
+  it('reads app user-hours the same quiet way, decimals and all', () => {
     expect(analyticsDesktopVerdict(trend(8.7, 12))).toEqual({
-      tone: 'warn',
-      label: 'Falling',
+      tone: 'none',
+      label: 'Down from 12',
     })
     expect(analyticsDesktopVerdict(trend(12, 8.7))).toEqual({
-      tone: 'good',
-      label: 'Growing',
+      tone: 'none',
+      label: 'Up from 8.7',
     })
   })
 
@@ -237,6 +253,9 @@ describe('analyticsDesktopVerdict', () => {
       tone: 'none',
       label: 'Not measured',
     })
+    expect(analyticsDesktopVerdict(trend(12, 8.7, false)).label).toBe(
+      'Too early to compare',
+    )
   })
 })
 
@@ -315,7 +334,6 @@ describe('versionsVerdict', () => {
     expect(
       versionsVerdict({
         desktop_total: 0,
-        current_share: 0,
         versions: [],
       }),
     ).toEqual({
@@ -324,11 +342,10 @@ describe('versionsVerdict', () => {
     })
   })
 
-  it('is healthy once the newest build holds most of the traffic', () => {
+  it('is healthy whatever share the newest build holds', () => {
     expect(
       versionsVerdict({
         desktop_total: 4000,
-        current_share: 0.84,
         versions: [build('1.6.7', 0.84, 0.004), build('1.6.1', 0.16, 0.01)],
       }),
     ).toEqual({
@@ -337,24 +354,24 @@ describe('versionsVerdict', () => {
     })
   })
 
-  it('calls a rollout slow while the newest build is under half', () => {
+  // SCROLLR-223: a fresh release under half the fleet is what every rollout
+  // looks like on day one, so it is not a state — only errors are.
+  it('does not judge a fresh release that has not spread yet', () => {
     expect(
       versionsVerdict({
         desktop_total: 4000,
-        current_share: 0.49,
-        versions: [build('1.6.7', 0.49, 0.004), build('1.6.1', 0.51, 0.01)],
+        versions: [build('1.6.7', 0.09, 0.004), build('1.6.1', 0.91, 0.01)],
       }),
     ).toEqual({
-      verdict: { tone: 'warn', label: 'Rollout is slow' },
+      verdict: { tone: 'good', label: 'Healthy' },
       erroring: null,
     })
   })
 
-  it('names the erroring build, and errors outrank a slow rollout', () => {
+  it('names the erroring build even when it is the one being replaced', () => {
     expect(
       versionsVerdict({
         desktop_total: 4000,
-        current_share: 0.3,
         versions: [build('1.6.7', 0.3, 0.004), build('1.6.1', 0.7, 0.09)],
       }),
     ).toEqual({
@@ -367,7 +384,6 @@ describe('versionsVerdict', () => {
     expect(
       versionsVerdict({
         desktop_total: 4000,
-        current_share: 0.6,
         versions: [
           build('1.6.7', 0.6, 0.03),
           build('1.6.1', 0.2, 0.15),
@@ -382,7 +398,6 @@ describe('versionsVerdict', () => {
     expect(
       versionsVerdict({
         desktop_total: 4000,
-        current_share: 0.96,
         versions: [build('1.6.7', 0.96, 0.001), build('0.9.0', 0.04, 0.8)],
       }).verdict,
     ).toEqual({ tone: 'good', label: 'Healthy' })
@@ -392,7 +407,6 @@ describe('versionsVerdict', () => {
     expect(
       versionsVerdict({
         desktop_total: 4000,
-        current_share: 0.9,
         versions: [build('1.6.7', 0.9, 0.02)],
       }).verdict,
     ).toEqual({ tone: 'good', label: 'Healthy' })

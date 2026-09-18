@@ -26,10 +26,11 @@ import {
 } from './dashboardFixtures'
 import {
   analyticsGrowthVerdict,
+  analyticsRevenueVerdict,
   analyticsSupportVerdict,
 } from '@/lib/overviewVerdicts'
 
-const growing = analyticsGrowthVerdict({
+const rising = analyticsGrowthVerdict({
   available: true,
   value: 12,
   previous: 8,
@@ -42,6 +43,14 @@ const tooEarly = analyticsGrowthVerdict({
   comparable: false,
 })
 const notMeasured = analyticsGrowthVerdict(null)
+// Growth and desktop usage are grey whichever way they went (SCROLLR-223), so
+// the green dot in the nav now has to come from a section that still has one.
+const newMoney = analyticsRevenueVerdict({
+  available: true,
+  past_due: 0,
+  new_paying_today: 1,
+  net_today: 900,
+})
 
 describe('SectionNav', () => {
   const render = (view: 'growth' | 'desktop' | 'revenue' | 'support') =>
@@ -50,9 +59,9 @@ describe('SectionNav', () => {
         view={view}
         period="7d"
         verdicts={{
-          growth: growing,
+          growth: rising,
           desktop: tooEarly,
-          revenue: notMeasured,
+          revenue: newMoney,
           support: analyticsSupportVerdict({ open_cases: 3 }),
         }}
         onView={() => {}}
@@ -113,7 +122,7 @@ describe('GrowthContent', () => {
     renderWithRouter(
       <GrowthContent
         period="7d"
-        verdict={growing}
+        verdict={rising}
         audience={loaded(audience)}
         website={loaded(website)}
         desktop={loaded(desktop)}
@@ -127,7 +136,7 @@ describe('GrowthContent', () => {
     expect(html).toContain('12 people')
     expect(html).toContain('signed up this week, up from 8 the week before.')
     expect(html).toContain('100 of 183 accounts have finished setting up.')
-    expect(html).toContain('Growing')
+    expect(html).toContain('Up from 8')
   })
 
   it('lists its facts, including the previous window when it compares', async () => {
@@ -332,7 +341,7 @@ describe('DesktopContent', () => {
     renderWithRouter(
       <DesktopContent
         period="7d"
-        verdict={growing}
+        verdict={rising}
         desktop={loaded(desktop)}
         filters={{}}
         {...overrides}
@@ -386,7 +395,7 @@ describe('DesktopContent', () => {
     const html = await renderWithRouter(
       <DesktopContent
         period="7d"
-        verdict={growing}
+        verdict={rising}
         desktop={loaded({
           ...desktop,
           widgets: {
@@ -409,7 +418,7 @@ describe('DesktopContent', () => {
     const html = await renderWithRouter(
       <GrowthContent
         period="7d"
-        verdict={growing}
+        verdict={rising}
         audience={loaded(audience)}
         website={loaded({
           ...website,
@@ -488,7 +497,7 @@ describe('RevenueContent', () => {
     renderWithRouter(
       <RevenueContent
         period="7d"
-        verdict={growing}
+        verdict={rising}
         revenue={loaded(revenue)}
         {...overrides}
       />,
