@@ -119,8 +119,8 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 
 ## Widget catalog
 
-<!-- source: api/internal/platform/widgets.go (GET /catalog) @ 2ad8e3d61f278d1d -->
-51 widgets. Every widget costs one slot. A widget marked *off the add grid* cannot be added right now, but anyone who already has it keeps it.
+<!-- source: api/internal/platform/widgets.go (GET /catalog) @ d4f798c6ab1b0c0c -->
+58 widgets. Every widget costs one slot. A widget marked *off the add grid* cannot be added right now, but anyone who already has it keeps it.
 
 ### Finance
 
@@ -172,6 +172,13 @@ The widget cap is the only per-plan limit. Plan names and wording are in Policie
 - **The Verge** (Tech & Science) — Technology, science, art and culture. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
 - **Drudge Report** (World) — The Drudge Report's headline links, as they post. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
 - **CNN** (World) — CNN's top stories as they lead the homepage. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
+- **Fox News** (World) — Top stories from Fox News, updated through the day. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
+- **Axios** (World) — Short, plain-English takes on the day's news. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
+- **Politico** (World) — Washington politics, campaigns and policy. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
+- **ABC News** (World) — Top stories from ABC News. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
+- **PBS NewsHour** (World) — Headlines from PBS NewsHour. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
+- **The Hill** (World) — Congress, campaigns and Washington policy. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
+- **Reason** (World) — Libertarian reporting and commentary on politics and policy. *How to use:* Headlines refresh automatically as new stories publish. Open any headline from the feed to read the full story. Pin it to keep the latest news in view.
 - **Custom RSS** — Follow any RSS or Atom feed by pasting its URL. *Off the add grid.* *How to use:* Paste any RSS or Atom feed URL in the Feeds view. Add as many feeds as you like — they merge into one stream. Perfect for niche blogs, newsletters, or subreddits with a feed.
 
 ### Fantasy

@@ -102,6 +102,9 @@ const (
 	// CNN (SCROLLR-224). Same caveat as above: no desktop tag carries it yet,
 	// so this is the PR's date. Latest published tag at the time was v1.6.7.
 	addedCNN = "2026-09-18"
+	// The news expansion (SCROLLR-225): Fox, Axios, Politico, and four feeds
+	// the poller already carried. No desktop tag yet, so this is the PR's date.
+	addedNewsExpansion = "2026-09-18"
 )
 
 // Shared usage recipes — most widgets in a family follow the same steps, so
@@ -573,6 +576,83 @@ var catalog = []WidgetDef{
 		}},
 		Usage: usageNews,
 		About: "CNN's homepage lead stories — US and world news, updated through the day.",
+	},
+	{
+		ID: "news_fox", Name: "Fox News", Category: "news", Source: "rss",
+		Group: "World", AddedAt: addedNewsExpansion,
+		Color: "#0c4da2", LogoURL: "https://icon.horse/icon/foxnews.com",
+		Description: "Top stories from Fox News, updated through the day.",
+		DefaultConfig: map[string]any{"feeds": []map[string]string{
+			{"name": "Fox News", "url": "https://moxie.foxnews.com/google-publisher/latest.xml"},
+		}},
+		Usage: usageNews,
+		About: "Fox News' latest headlines — US politics, world and breaking news from one of the most-watched newsrooms in the country.",
+	},
+	{
+		ID: "news_axios", Name: "Axios", Category: "news", Source: "rss",
+		Group: "World", AddedAt: addedNewsExpansion,
+		Color: "#1858e8", LogoURL: "https://icon.horse/icon/axios.com",
+		Description: "Short, plain-English takes on the day's news.",
+		DefaultConfig: map[string]any{"feeds": []map[string]string{
+			{"name": "Axios", "url": "https://api.axios.com/feed/"},
+		}},
+		Usage: usageNews,
+		About: "Axios writes short by design, which suits a ticker: most headlines carry the whole point without opening anything.",
+	},
+	{
+		ID: "news_politico", Name: "Politico", Category: "news", Source: "rss",
+		Group: "World", AddedAt: addedNewsExpansion,
+		Color: "#a51c30", LogoURL: "https://icon.horse/icon/politico.com",
+		Description: "Washington politics, campaigns and policy.",
+		DefaultConfig: map[string]any{"feeds": []map[string]string{
+			{"name": "Politico", "url": "https://rss.politico.com/politics-news.xml"},
+		}},
+		Usage: usageNews,
+		About: "Politico's politics desk — congress, campaigns and the people moving policy in Washington.",
+	},
+	{
+		ID: "news_abc", Name: "ABC News", Category: "news", Source: "rss",
+		Group: "World", AddedAt: addedNewsExpansion,
+		Color: "#0f6ecd", LogoURL: "https://icon.horse/icon/abcnews.go.com",
+		Description: "Top stories from ABC News.",
+		DefaultConfig: map[string]any{"feeds": []map[string]string{
+			{"name": "ABC News", "url": "https://abcnews.go.com/abcnews/topstories"},
+		}},
+		Usage: usageNews,
+		About: "ABC News' top stories — US and world news from one of the big three American broadcast networks.",
+	},
+	{
+		ID: "news_pbs", Name: "PBS NewsHour", Category: "news", Source: "rss",
+		Group: "World", AddedAt: addedNewsExpansion,
+		Color: "#2638c4", LogoURL: "https://icon.horse/icon/pbs.org",
+		Description: "Headlines from PBS NewsHour.",
+		DefaultConfig: map[string]any{"feeds": []map[string]string{
+			{"name": "PBS NewsHour", "url": "https://www.pbs.org/newshour/feeds/rss/headlines"},
+		}},
+		Usage: usageNews,
+		About: "PBS NewsHour's headlines — public-broadcast reporting with less of the hour-by-hour churn.",
+	},
+	{
+		ID: "news_thehill", Name: "The Hill", Category: "news", Source: "rss",
+		Group: "World", AddedAt: addedNewsExpansion,
+		Color: "#16447e", LogoURL: "https://icon.horse/icon/thehill.com",
+		Description: "Congress, campaigns and Washington policy.",
+		DefaultConfig: map[string]any{"feeds": []map[string]string{
+			{"name": "The Hill", "url": "https://thehill.com/feed/"},
+		}},
+		Usage: usageNews,
+		About: "The Hill covers Congress close up — votes, hearings and the politics around them.",
+	},
+	{
+		ID: "news_reason", Name: "Reason", Category: "news", Source: "rss",
+		Group: "World", AddedAt: addedNewsExpansion,
+		Color: "#d13b1f", LogoURL: "https://icon.horse/icon/reason.com",
+		Description: "Libertarian reporting and commentary on politics and policy.",
+		DefaultConfig: map[string]any{"feeds": []map[string]string{
+			{"name": "Reason", "url": "https://reason.com/feed/"},
+		}},
+		Usage: usageNews,
+		About: "Reason's politics and policy coverage, written from an explicitly libertarian point of view.",
 	},
 	{
 		// Off the add grid for now (2026-09-05) -- the feeds view and its
