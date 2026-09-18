@@ -1,0 +1,76 @@
+{
+  "_note": "SCROLLR-227 width check, pre: the default fixture's first MLB game (id 5495262, Chicago Cubs at Cincinnati Reds) before first pitch, no score; start_time moved 2 h after _captured_at so the 24 h upcoming horizon admits it. The three width-* fixtures share one game id and differ only in state and score, so the chip's width must be identical across them (CHIP_SPEC §1.2). Standings copied from the default fixture, captured 2026-09-18.",
+  "_captured_at": "2026-09-18T21:40:00Z",
+  "data": {
+    "sports": [
+      {
+        "id": 5495262,
+        "league": "MLB",
+        "sport": "baseball",
+        "external_game_id": "186588",
+        "link": "",
+        "home_team_name": "Cincinnati Reds",
+        "home_team_logo": "https://media.api-sports.io/baseball/teams/8.png",
+        "home_team_score": "0",
+        "home_team_code": "",
+        "away_team_name": "Chicago Cubs",
+        "away_team_logo": "https://media.api-sports.io/baseball/teams/6.png",
+        "away_team_score": "0",
+        "away_team_code": "",
+        "start_time": "2026-09-18T23:40:00Z",
+        "short_detail": "Not Started",
+        "state": "pre",
+        "status_short": "NS",
+        "status_long": "Not Started",
+        "updated_at": "2026-09-18T21:40:00Z",
+        "home_standing": {
+          "rank": 5,
+          "wins": 71,
+          "losses": 81,
+          "draws": 0,
+          "points": 0,
+          "goal_diff": 0,
+          "points_for": 631,
+          "points_against": 779,
+          "otl": 0
+        },
+        "away_standing": {
+          "rank": 2,
+          "wins": 85,
+          "losses": 68,
+          "draws": 0,
+          "points": 0,
+          "goal_diff": 0,
+          "points_for": 817,
+          "points_against": 674,
+          "otl": 0
+        }
+      }
+    ]
+  },
+  "preferences": {
+    "feed_mode": "compact",
+    "feed_position": "bottom",
+    "feed_behavior": "overlay",
+    "feed_enabled": true,
+    "enabled_sites": [],
+    "disabled_sites": [],
+    "subscription_tier": "uplink_pro",
+    "updated_at": "2026-09-01T00:00:00Z"
+  },
+  "widgets": [
+    {
+      "id": 1,
+      "widget_type": "sports_mlb",
+      "enabled": true,
+      "ticker_enabled": true,
+      "config": {
+        "leagues": [
+          "MLB"
+        ]
+      },
+      "created_at": "2026-09-01T00:00:00Z",
+      "updated_at": "2026-09-01T00:00:00Z"
+    }
+  ]
+}

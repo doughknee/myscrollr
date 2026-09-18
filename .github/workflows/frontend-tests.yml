@@ -8,6 +8,10 @@ on:
       - "desktop/src/**"
       - "desktop/package*.json"
       - "desktop/vitest*.ts"
+      - "desktop/e2e/**"
+      - "desktop/playwright.config.ts"
+      - "desktop/ticker-shim.html"
+      - "desktop/src/dev/__fixtures__/**"
       # Tier-limit drift guard: both frontends pin their hardcoded tier
       # tables to this snapshot, so an edit to it must re-run their tests.
       - "api/internal/widgets/tier_limits.json"
@@ -21,6 +25,10 @@ on:
       - "desktop/src/**"
       - "desktop/package*.json"
       - "desktop/vitest*.ts"
+      - "desktop/e2e/**"
+      - "desktop/playwright.config.ts"
+      - "desktop/ticker-shim.html"
+      - "desktop/src/dev/__fixtures__/**"
       # Tier-limit drift guard: both frontends pin their hardcoded tier
       # tables to this snapshot, so an edit to it must re-run their tests.
       - "api/internal/widgets/tier_limits.json"
@@ -58,3 +66,35 @@ jobs:
       - name: Verify website event proxy
         if: matrix.dir == 'myscrollr.com'
         run: node scripts/test-posthog-proxy.mjs
+
+  # Browser checks against the ticker shim (SCROLLR-227): motion, chip
+  # width, rotation over real laps. Not part of `npm test`; one expected
+  # failure (reduced-motion scroll, SCROLLR-5) shows as such in the report.
+  browser:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run test:browser
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            desktop/playwright-report/
+            desktop/test-results/
+          retention-days: 7

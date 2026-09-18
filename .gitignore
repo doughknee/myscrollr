@@ -89,3 +89,5 @@ docker/compose.override.yml
 # desktop/ (npm run dev / a bare `vite`); tauri dev puts it elsewhere,
 # which is why it took until REL-239 for one to be committed by accident.
 desktop/.vite/
+playwright-report/
+test-results/
