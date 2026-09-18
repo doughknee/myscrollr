@@ -1,5 +1,5 @@
 {
-    "version": "2ad8e3d61f278d1d",
+    "version": "d4f798c6ab1b0c0c",
     "widgets": [
         {
             "id": "finance_stocks",
@@ -1205,6 +1205,195 @@
             "added_at": "2026-09-18"
         },
         {
+            "id": "news_fox",
+            "name": "Fox News",
+            "description": "Top stories from Fox News, updated through the day.",
+            "source": "rss",
+            "category": "news",
+            "color": "#0c4da2",
+            "logo_url": "https://icon.horse/icon/foxnews.com",
+            "default_config": {
+                "feeds": [
+                    {
+                        "name": "Fox News",
+                        "url": "https://moxie.foxnews.com/google-publisher/latest.xml"
+                    }
+                ]
+            },
+            "required_tier": "free",
+            "about": "Fox News' latest headlines — US politics, world and breaking news from one of the most-watched newsrooms in the country.",
+            "usage": [
+                "Headlines refresh automatically as new stories publish.",
+                "Open any headline from the feed to read the full story.",
+                "Pin it to keep the latest news in view."
+            ],
+            "order": 42,
+            "group": "World",
+            "added_at": "2026-09-18"
+        },
+        {
+            "id": "news_axios",
+            "name": "Axios",
+            "description": "Short, plain-English takes on the day's news.",
+            "source": "rss",
+            "category": "news",
+            "color": "#1858e8",
+            "logo_url": "https://icon.horse/icon/axios.com",
+            "default_config": {
+                "feeds": [
+                    {
+                        "name": "Axios",
+                        "url": "https://api.axios.com/feed/"
+                    }
+                ]
+            },
+            "required_tier": "free",
+            "about": "Axios writes short by design, which suits a ticker: most headlines carry the whole point without opening anything.",
+            "usage": [
+                "Headlines refresh automatically as new stories publish.",
+                "Open any headline from the feed to read the full story.",
+                "Pin it to keep the latest news in view."
+            ],
+            "order": 43,
+            "group": "World",
+            "added_at": "2026-09-18"
+        },
+        {
+            "id": "news_politico",
+            "name": "Politico",
+            "description": "Washington politics, campaigns and policy.",
+            "source": "rss",
+            "category": "news",
+            "color": "#a51c30",
+            "logo_url": "https://icon.horse/icon/politico.com",
+            "default_config": {
+                "feeds": [
+                    {
+                        "name": "Politico",
+                        "url": "https://rss.politico.com/politics-news.xml"
+                    }
+                ]
+            },
+            "required_tier": "free",
+            "about": "Politico's politics desk — congress, campaigns and the people moving policy in Washington.",
+            "usage": [
+                "Headlines refresh automatically as new stories publish.",
+                "Open any headline from the feed to read the full story.",
+                "Pin it to keep the latest news in view."
+            ],
+            "order": 44,
+            "group": "World",
+            "added_at": "2026-09-18"
+        },
+        {
+            "id": "news_abc",
+            "name": "ABC News",
+            "description": "Top stories from ABC News.",
+            "source": "rss",
+            "category": "news",
+            "color": "#0f6ecd",
+            "logo_url": "https://icon.horse/icon/abcnews.go.com",
+            "default_config": {
+                "feeds": [
+                    {
+                        "name": "ABC News",
+                        "url": "https://abcnews.go.com/abcnews/topstories"
+                    }
+                ]
+            },
+            "required_tier": "free",
+            "about": "ABC News' top stories — US and world news from one of the big three American broadcast networks.",
+            "usage": [
+                "Headlines refresh automatically as new stories publish.",
+                "Open any headline from the feed to read the full story.",
+                "Pin it to keep the latest news in view."
+            ],
+            "order": 45,
+            "group": "World",
+            "added_at": "2026-09-18"
+        },
+        {
+            "id": "news_pbs",
+            "name": "PBS NewsHour",
+            "description": "Headlines from PBS NewsHour.",
+            "source": "rss",
+            "category": "news",
+            "color": "#2638c4",
+            "logo_url": "https://icon.horse/icon/pbs.org",
+            "default_config": {
+                "feeds": [
+                    {
+                        "name": "PBS NewsHour",
+                        "url": "https://www.pbs.org/newshour/feeds/rss/headlines"
+                    }
+                ]
+            },
+            "required_tier": "free",
+            "about": "PBS NewsHour's headlines — public-broadcast reporting with less of the hour-by-hour churn.",
+            "usage": [
+                "Headlines refresh automatically as new stories publish.",
+                "Open any headline from the feed to read the full story.",
+                "Pin it to keep the latest news in view."
+            ],
+            "order": 46,
+            "group": "World",
+            "added_at": "2026-09-18"
+        },
+        {
+            "id": "news_thehill",
+            "name": "The Hill",
+            "description": "Congress, campaigns and Washington policy.",
+            "source": "rss",
+            "category": "news",
+            "color": "#16447e",
+            "logo_url": "https://icon.horse/icon/thehill.com",
+            "default_config": {
+                "feeds": [
+                    {
+                        "name": "The Hill",
+                        "url": "https://thehill.com/feed/"
+                    }
+                ]
+            },
+            "required_tier": "free",
+            "about": "The Hill covers Congress close up — votes, hearings and the politics around them.",
+            "usage": [
+                "Headlines refresh automatically as new stories publish.",
+                "Open any headline from the feed to read the full story.",
+                "Pin it to keep the latest news in view."
+            ],
+            "order": 47,
+            "group": "World",
+            "added_at": "2026-09-18"
+        },
+        {
+            "id": "news_reason",
+            "name": "Reason",
+            "description": "Libertarian reporting and commentary on politics and policy.",
+            "source": "rss",
+            "category": "news",
+            "color": "#d13b1f",
+            "logo_url": "https://icon.horse/icon/reason.com",
+            "default_config": {
+                "feeds": [
+                    {
+                        "name": "Reason",
+                        "url": "https://reason.com/feed/"
+                    }
+                ]
+            },
+            "required_tier": "free",
+            "about": "Reason's politics and policy coverage, written from an explicitly libertarian point of view.",
+            "usage": [
+                "Headlines refresh automatically as new stories publish.",
+                "Open any headline from the feed to read the full story.",
+                "Pin it to keep the latest news in view."
+            ],
+            "order": 48,
+            "group": "World",
+            "added_at": "2026-09-18"
+        },
+        {
             "id": "rss_custom",
             "name": "Custom RSS",
             "description": "Follow any RSS or Atom feed by pasting its URL.",
@@ -1221,7 +1410,7 @@
                 "Add as many feeds as you like — they merge into one stream.",
                 "Perfect for niche blogs, newsletters, or subreddits with a feed."
             ],
-            "order": 42,
+            "order": 49,
             "hidden": true,
             "added_at": "2026-07-02"
         },
@@ -1240,7 +1429,7 @@
                 "Leagues, matchups, and standings sync automatically.",
                 "Live scoring updates while your players are on the field."
             ],
-            "order": 43,
+            "order": 50,
             "group": "Fantasy",
             "keywords": [
                 "fantasy football",
@@ -1263,7 +1452,7 @@
                 "Follow the events and questions you care about.",
                 "Display-only — Scrollr shows the market, it never places a trade."
             ],
-            "order": 44,
+            "order": 51,
             "group": "Predictions",
             "keywords": [
                 "odds",
@@ -1279,7 +1468,7 @@
             "category": "utility",
             "color": "#6366f1",
             "required_tier": "free",
-            "order": 45,
+            "order": 52,
             "group": "Desk",
             "keywords": [
                 "time",
@@ -1295,7 +1484,7 @@
             "category": "utility",
             "color": "#f59e0b",
             "required_tier": "free",
-            "order": 46,
+            "order": 53,
             "group": "Desk",
             "keywords": [
                 "pomodoro",
@@ -1311,7 +1500,7 @@
             "category": "utility",
             "color": "#0ea5e9",
             "required_tier": "free",
-            "order": 47,
+            "order": 54,
             "group": "Desk",
             "keywords": [
                 "forecast",
@@ -1327,7 +1516,7 @@
             "category": "utility",
             "color": "#06b6d4",
             "required_tier": "free",
-            "order": 48,
+            "order": 55,
             "group": "Dev",
             "keywords": [
                 "cpu",
@@ -1345,7 +1534,7 @@
             "color": "#10b981",
             "logo_url": "https://icon.horse/icon/uptime.kuma.pet",
             "required_tier": "free",
-            "order": 49,
+            "order": 56,
             "group": "Dev",
             "keywords": [
                 "kuma",
@@ -1362,7 +1551,7 @@
             "color": "#f97316",
             "logo_url": "https://icon.horse/icon/github.com",
             "required_tier": "free",
-            "order": 50,
+            "order": 57,
             "group": "Dev",
             "keywords": [
                 "actions",
