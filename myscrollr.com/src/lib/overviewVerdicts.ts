@@ -218,3 +218,70 @@ export function analyticsSupportVerdict(
 ): Verdict {
   return supportVerdict(support, NOT_MEASURED)
 }
+
+// ── Versions (SCROLLR-222) ────────────────────────────────────────
+
+/**
+ * The Versions page's single verdict.
+ *
+ * The input is request counters, never a headcount: no user id is stored, so
+ * `share` here is share of desktop traffic in the window and nothing on that
+ * page may imply otherwise. The rule reads the same way the page does — is
+ * anything erroring, and if not, has the newest build actually landed.
+ */
+export interface VersionsInput {
+  /** Desktop requests in the window. Zero means nothing to judge. */
+  desktop_total: number
+  /** Share of that traffic on the newest build seen. */
+  current_share: number
+  versions: Array<{ version: string; share: number; error_rate: number }>
+}
+
+export interface VersionsVerdict {
+  verdict: Verdict
+  /** The build driving a red verdict, so the sentence can name it. */
+  erroring: string | null
+}
+
+/**
+ * A build erroring below this share of traffic is not yet a fleet problem —
+ * one machine with a broken proxy can hold a 40% error rate on nine requests.
+ */
+const ERRORING_MIN_SHARE = 0.05
+const ERRORING_RATE = 0.02
+
+/** Below this the newest build has not landed widely enough to call it done. */
+const ROLLOUT_LANDED = 0.5
+
+export function versionsVerdict(input: VersionsInput): VersionsVerdict {
+  if (input.desktop_total === 0) {
+    return {
+      verdict: { tone: 'none', label: 'Nothing to report' },
+      erroring: null,
+    }
+  }
+
+  // Worst first, so the sentence names the build most worth reproducing on.
+  const candidates = input.versions.filter(
+    (v) => v.share >= ERRORING_MIN_SHARE && v.error_rate > ERRORING_RATE,
+  )
+  const erroring = candidates.length
+    ? candidates.reduce((worst, v) =>
+        v.error_rate > worst.error_rate ? v : worst,
+      )
+    : null
+
+  if (erroring) {
+    return {
+      verdict: { tone: 'bad', label: 'Something is erroring' },
+      erroring: erroring.version,
+    }
+  }
+  if (input.current_share < ROLLOUT_LANDED) {
+    return {
+      verdict: { tone: 'warn', label: 'Rollout is slow' },
+      erroring: null,
+    }
+  }
+  return { verdict: { tone: 'good', label: 'Healthy' }, erroring: null }
+}

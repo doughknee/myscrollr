@@ -6,6 +6,7 @@ import {
   analyticsSupportVerdict,
   isStale,
   verdicts,
+  versionsVerdict,
 } from './overviewVerdicts'
 import type { VerdictInput } from './overviewVerdicts'
 
@@ -300,5 +301,100 @@ describe('analyticsSupportVerdict', () => {
       tone: 'none',
       label: 'Not measured',
     })
+  })
+})
+
+describe('versionsVerdict', () => {
+  const build = (version: string, share: number, error_rate: number) => ({
+    version,
+    share,
+    error_rate,
+  })
+
+  it('has nothing to judge when no desktop traffic arrived', () => {
+    expect(
+      versionsVerdict({
+        desktop_total: 0,
+        current_share: 0,
+        versions: [],
+      }),
+    ).toEqual({
+      verdict: { tone: 'none', label: 'Nothing to report' },
+      erroring: null,
+    })
+  })
+
+  it('is healthy once the newest build holds most of the traffic', () => {
+    expect(
+      versionsVerdict({
+        desktop_total: 4000,
+        current_share: 0.84,
+        versions: [build('1.6.7', 0.84, 0.004), build('1.6.1', 0.16, 0.01)],
+      }),
+    ).toEqual({
+      verdict: { tone: 'good', label: 'Healthy' },
+      erroring: null,
+    })
+  })
+
+  it('calls a rollout slow while the newest build is under half', () => {
+    expect(
+      versionsVerdict({
+        desktop_total: 4000,
+        current_share: 0.49,
+        versions: [build('1.6.7', 0.49, 0.004), build('1.6.1', 0.51, 0.01)],
+      }),
+    ).toEqual({
+      verdict: { tone: 'warn', label: 'Rollout is slow' },
+      erroring: null,
+    })
+  })
+
+  it('names the erroring build, and errors outrank a slow rollout', () => {
+    expect(
+      versionsVerdict({
+        desktop_total: 4000,
+        current_share: 0.3,
+        versions: [build('1.6.7', 0.3, 0.004), build('1.6.1', 0.7, 0.09)],
+      }),
+    ).toEqual({
+      verdict: { tone: 'bad', label: 'Something is erroring' },
+      erroring: '1.6.1',
+    })
+  })
+
+  it('names the worst of several erroring builds', () => {
+    expect(
+      versionsVerdict({
+        desktop_total: 4000,
+        current_share: 0.6,
+        versions: [
+          build('1.6.7', 0.6, 0.03),
+          build('1.6.1', 0.2, 0.15),
+          build('1.5.2', 0.2, 0.05),
+        ],
+      }).erroring,
+    ).toBe('1.6.1')
+  })
+
+  it('ignores a high error rate on a build barely anyone is calling from', () => {
+    // 4% of traffic erroring hard is a fleet problem; 1% is one broken proxy.
+    expect(
+      versionsVerdict({
+        desktop_total: 4000,
+        current_share: 0.96,
+        versions: [build('1.6.7', 0.96, 0.001), build('0.9.0', 0.04, 0.8)],
+      }).verdict,
+    ).toEqual({ tone: 'good', label: 'Healthy' })
+  })
+
+  it('treats the threshold rate itself as not yet erroring', () => {
+    expect(
+      versionsVerdict({
+        desktop_total: 4000,
+        current_share: 0.9,
+        versions: [build('1.6.7', 0.9, 0.02)],
+      }).verdict,
+    ).toEqual({ tone: 'good', label: 'Healthy' })
   })
 })
