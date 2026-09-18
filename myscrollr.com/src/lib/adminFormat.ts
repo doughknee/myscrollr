@@ -237,6 +237,48 @@ export function periodLabel(period: Period): string {
   }
 }
 
+/**
+ * The period as a sentence says it — "this week", not "Last 7 days".
+ * Analytics writes prose around its numbers (SCROLLR-220) and "19 people
+ * signed up Last 7 days" is not a sentence.
+ */
+export function periodPhrase(period: Period): string {
+  switch (period) {
+    case '24h':
+      return 'today'
+    case '7d':
+      return 'this week'
+    case '30d':
+      return 'this month'
+    case 'lifetime':
+      return 'in total'
+  }
+}
+
+/** The window before it, for a comparison clause. Lifetime has none. */
+export function previousPhrase(period: Period): string | null {
+  switch (period) {
+    case '24h':
+      return 'yesterday'
+    case '7d':
+      return 'the week before'
+    case '30d':
+      return 'the month before'
+    case 'lifetime':
+      return null
+  }
+}
+
+/** What the whole page is comparing, spelled out under the selector. */
+export function periodFootnote(period: Period): string {
+  const previous = previousPhrase(period)
+  const head =
+    previous === null
+      ? 'Everything so far, with nothing to compare against.'
+      : `${periodPhrase(period)[0].toUpperCase()}${periodPhrase(period).slice(1)} vs ${previous}.`
+  return `${head} Staff and test accounts excluded.`
+}
+
 /** The selector button text. */
 export function periodShort(period: Period): string {
   return period === 'lifetime' ? 'Lifetime' : period
@@ -262,6 +304,28 @@ export function formatMinor(minor: number, currency: string): string {
   } catch {
     return `${(minor / 100).toFixed(2)} ${code}`
   }
+}
+
+/**
+ * A wait, as a person would say it. Past two days nobody counts in hours —
+ * "138 days" lands where "3,312 h" does not — and under an hour the number
+ * of minutes is the only part that carries information.
+ */
+export function formatWait(hours: number): string {
+  // Two days, not one: "1 day" is unreachable by design, because a wait of a
+  // day and a half reads better in hours than as a rounded "2 days".
+  if (hours >= 48) return plural(Math.round(hours / 24), 'day')
+  if (hours >= 1) return `${Math.round(hours)} h`
+  return `${Math.round(hours * 60)} m`
+}
+
+/** A short duration as hours and minutes: "2 h 10 m", "45 m". */
+export function formatDuration(hours: number): string {
+  const total = Math.round(hours * 60)
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  if (h === 0) return `${m} m`
+  return m === 0 ? `${h} h` : `${h} h ${m} m`
 }
 
 export function formatHours(hours: number): string {

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { isStale, verdicts } from './overviewVerdicts'
+import {
+  analyticsDesktopVerdict,
+  analyticsGrowthVerdict,
+  analyticsRevenueVerdict,
+  analyticsSupportVerdict,
+  isStale,
+  verdicts,
+} from './overviewVerdicts'
 import type { VerdictInput } from './overviewVerdicts'
 
 const healthy: VerdictInput = {
@@ -157,5 +164,141 @@ describe('verdicts', () => {
       label: 'No readings',
     })
     expect(only({ feeds: [] }).headline[0]).toBe('Nothing to report.')
+  })
+})
+
+// ── The Analytics sections (SCROLLR-220) ─────────────────────────
+
+/**
+ * Each section's rule is the Overview's own, read on the selected period.
+ * These tests are the thresholds themselves: what makes a section green,
+ * what makes it amber, and — the rule that matters most — what makes it
+ * decline to judge at all.
+ */
+
+const trend = (
+  value: number,
+  previous: number,
+  comparable = true,
+  available = true,
+) => ({ available, value, previous, comparable })
+
+describe('analyticsGrowthVerdict', () => {
+  it('is green when sign-ups held or grew, amber when they fell', () => {
+    expect(analyticsGrowthVerdict(trend(19, 19))).toEqual({
+      tone: 'good',
+      label: 'Growing',
+    })
+    expect(analyticsGrowthVerdict(trend(31, 19))).toEqual({
+      tone: 'good',
+      label: 'Growing',
+    })
+    expect(analyticsGrowthVerdict(trend(19, 31))).toEqual({
+      tone: 'warn',
+      label: 'Slow',
+    })
+  })
+
+  it('refuses to judge a period it cannot compare or measure', () => {
+    expect(analyticsGrowthVerdict(trend(19, 31, false))).toEqual({
+      tone: 'none',
+      label: 'Too early to compare',
+    })
+    expect(analyticsGrowthVerdict(trend(0, 0, true, false))).toEqual({
+      tone: 'none',
+      label: 'Not measured',
+    })
+    expect(analyticsGrowthVerdict(null)).toEqual({
+      tone: 'none',
+      label: 'Not measured',
+    })
+  })
+})
+
+describe('analyticsDesktopVerdict', () => {
+  it('calls a fall in app user-hours Falling, not Slow', () => {
+    expect(analyticsDesktopVerdict(trend(8.7, 12))).toEqual({
+      tone: 'warn',
+      label: 'Falling',
+    })
+    expect(analyticsDesktopVerdict(trend(12, 8.7))).toEqual({
+      tone: 'good',
+      label: 'Growing',
+    })
+  })
+
+  it('is grey before there is a period to compare against', () => {
+    expect(analyticsDesktopVerdict(trend(8.7, 0, false))).toEqual({
+      tone: 'none',
+      label: 'Too early to compare',
+    })
+    expect(analyticsDesktopVerdict(null)).toEqual({
+      tone: 'none',
+      label: 'Not measured',
+    })
+  })
+})
+
+describe('analyticsRevenueVerdict', () => {
+  const money = (
+    over: Partial<Parameters<typeof analyticsRevenueVerdict>[0]> = {},
+  ) => ({
+    available: true,
+    past_due: 0,
+    new_paying_today: 0,
+    net_today: 0,
+    ...over,
+  })
+
+  it('puts a failed payment ahead of any amount that came in', () => {
+    expect(
+      analyticsRevenueVerdict(money({ past_due: 1, net_today: 5000 })),
+    ).toEqual({ tone: 'bad', label: 'Payment failed' })
+  })
+
+  it('is green on new money and grey on a quiet period', () => {
+    expect(analyticsRevenueVerdict(money({ net_today: 4620 }))).toEqual({
+      tone: 'good',
+      label: 'New money',
+    })
+    expect(analyticsRevenueVerdict(money({ new_paying_today: 1 }))).toEqual({
+      tone: 'good',
+      label: 'New money',
+    })
+    expect(analyticsRevenueVerdict(money())).toEqual({
+      tone: 'none',
+      label: 'Nothing new',
+    })
+  })
+
+  it('says Not measured rather than Nothing new with no ledger', () => {
+    expect(analyticsRevenueVerdict(money({ available: false }))).toEqual({
+      tone: 'none',
+      label: 'Not measured',
+    })
+    expect(analyticsRevenueVerdict(null)).toEqual({
+      tone: 'none',
+      label: 'Not measured',
+    })
+  })
+})
+
+describe('analyticsSupportVerdict', () => {
+  it('is red while anyone is waiting on us and green when nobody is', () => {
+    expect(analyticsSupportVerdict({ open_cases: 12 })).toEqual({
+      tone: 'bad',
+      label: 'Needs you',
+    })
+    expect(analyticsSupportVerdict({ open_cases: 0 })).toEqual({
+      tone: 'good',
+      label: 'Clear',
+    })
+  })
+
+  it('does not report a clear queue it never read', () => {
+    expect(analyticsSupportVerdict(null)).toEqual({
+      tone: 'none',
+      label: 'Not measured',
+    })
   })
 })

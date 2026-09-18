@@ -11,6 +11,7 @@ import {
 import type { ReactNode } from 'react'
 import type { Measured } from '@/api/admin'
 import type { Bucket, Comparison, Coverage, Period } from '@/api/adminDashboard'
+import type { Verdict, VerdictTone } from '@/lib/overviewVerdicts'
 import {
   PERIODS,
   bucketLabel,
@@ -410,11 +411,13 @@ export function Sparkline({
   step,
   label,
   className = 'h-14',
+  tone = 'text-primary',
 }: {
   buckets: Array<Bucket> | null | undefined
   step: string
   label: string
   className?: string
+  tone?: string
 }) {
   const points = bucketPoints(buckets, step)
   const chart = sparkline(points, SPARK_W, SPARK_H, 4)
@@ -431,7 +434,7 @@ export function Sparkline({
       <svg
         viewBox={`0 0 ${SPARK_W} ${SPARK_H}`}
         preserveAspectRatio="none"
-        className={`w-full text-primary ${className}`}
+        className={`w-full ${tone} ${className}`}
         role="img"
         aria-label={`${label}: ${points.map((p) => `${p.day} ${p.count}`).join(', ')}`}
       >
@@ -472,11 +475,13 @@ export function Bars({
   step,
   label,
   tone = 'text-primary',
+  className = 'h-14',
 }: {
   buckets: Array<Bucket> | null | undefined
   step: string
   label: string
   tone?: string
+  className?: string
 }) {
   const rows = buckets ?? []
   if (rows.length === 0) {
@@ -502,7 +507,7 @@ export function Bars({
       <svg
         viewBox={`0 0 ${SPARK_W} ${SPARK_H}`}
         preserveAspectRatio="none"
-        className={`h-14 w-full ${tone}`}
+        className={`w-full ${tone} ${className}`}
         role="img"
         aria-label={`${label}: ${rows.map((b) => `${bucketLabel(b.start, step)} ${b.value}`).join(', ')}`}
       >
@@ -686,6 +691,65 @@ export function Stamp({ at, children }: { at: string; children?: ReactNode }) {
       As of {new Date(at).toLocaleString()}
       {children}
     </p>
+  )
+}
+
+/**
+ * Verdict colours as whole class strings, shared by every console page that
+ * renders one.
+ *
+ * Never built by interpolation: a Tailwind class assembled at runtime is not
+ * in the source, so it compiles to nothing and the pill silently loses its
+ * colour. `number` is empty for the calm tones on purpose — a figure is only
+ * coloured when its colour is telling the reader something.
+ */
+export const VERDICT_TONE: Record<
+  VerdictTone,
+  { dot: string; label: string; number: string; tint: string; chart: string }
+> = {
+  good: {
+    dot: 'bg-primary',
+    label: 'text-primary',
+    number: '',
+    tint: 'bg-primary/10 text-primary',
+    chart: 'text-primary',
+  },
+  warn: {
+    dot: 'bg-warning',
+    label: 'text-warning',
+    number: 'text-warning',
+    tint: 'bg-warning/10 text-warning',
+    chart: 'text-warning',
+  },
+  bad: {
+    dot: 'bg-error',
+    label: 'text-error',
+    number: 'text-error',
+    tint: 'bg-error/10 text-error',
+    chart: 'text-error',
+  },
+  none: {
+    dot: 'bg-base-400',
+    label: 'text-base-content/45',
+    number: '',
+    tint: 'bg-base-300/50 text-base-content/70',
+    chart: 'text-primary/55',
+  },
+}
+
+/** A verdict as a pill: the dot, then the two words. */
+export function VerdictPill({ verdict }: { verdict: Verdict }) {
+  const tone = VERDICT_TONE[verdict.tone]
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${tone.tint}`}
+    >
+      <span
+        className={`size-2 shrink-0 rounded-full ${tone.dot}`}
+        aria-hidden
+      />
+      {verdict.label}
+    </span>
   )
 }
 

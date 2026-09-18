@@ -6,13 +6,18 @@ import {
   comparisonDisplay,
   connectedCaveat,
   formatAge,
+  formatDuration,
   formatHours,
   formatMinor,
   ingestHealth,
   measuredValue,
   parsePeriod,
   parseView,
+  formatWait,
+  periodFootnote,
   periodLabel,
+  periodPhrase,
+  previousPhrase,
   sparkline,
   trendValue,
 } from './adminFormat'
@@ -311,5 +316,56 @@ describe('measuredValue with a formatter', () => {
         (v) => `${v} h`,
       ).display,
     ).toBeNull()
+  })
+})
+
+// ── The period in prose, and durations (SCROLLR-220) ─────────────
+
+describe('periodPhrase and previousPhrase', () => {
+  it('says the window the way a sentence would', () => {
+    expect(periodPhrase('24h')).toBe('today')
+    expect(periodPhrase('7d')).toBe('this week')
+    expect(periodPhrase('30d')).toBe('this month')
+    expect(periodPhrase('lifetime')).toBe('in total')
+  })
+
+  it('has no previous window for lifetime, so a clause cannot be written', () => {
+    expect(previousPhrase('24h')).toBe('yesterday')
+    expect(previousPhrase('7d')).toBe('the week before')
+    expect(previousPhrase('30d')).toBe('the month before')
+    expect(previousPhrase('lifetime')).toBeNull()
+  })
+})
+
+describe('periodFootnote', () => {
+  it('names what is being compared, and says when nothing is', () => {
+    expect(periodFootnote('7d')).toBe(
+      'This week vs the week before. Staff and test accounts excluded.',
+    )
+    expect(periodFootnote('24h')).toBe(
+      'Today vs yesterday. Staff and test accounts excluded.',
+    )
+    expect(periodFootnote('lifetime')).toBe(
+      'Everything so far, with nothing to compare against. Staff and test accounts excluded.',
+    )
+  })
+})
+
+describe('formatWait', () => {
+  it('switches to days once nobody would count in hours', () => {
+    expect(formatWait(3312)).toBe('138 days')
+    expect(formatWait(48)).toBe('2 days')
+    expect(formatWait(47)).toBe('47 h')
+    expect(formatWait(1)).toBe('1 h')
+    expect(formatWait(0.5)).toBe('30 m')
+  })
+})
+
+describe('formatDuration', () => {
+  it('spells a short duration as hours and minutes', () => {
+    expect(formatDuration(2.1667)).toBe('2 h 10 m')
+    expect(formatDuration(2)).toBe('2 h')
+    expect(formatDuration(0.75)).toBe('45 m')
+    expect(formatDuration(0)).toBe('0 m')
   })
 })
