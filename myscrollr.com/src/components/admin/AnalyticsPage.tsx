@@ -249,6 +249,7 @@ export default function AnalyticsPage() {
             verdict={sectionVerdicts.growth}
             audience={audience}
             website={website}
+            desktop={desktop}
           />
           <DesktopContent
             period={period}
@@ -686,29 +687,35 @@ export interface GrowthContentProps {
   verdict: Verdict
   audience: Report<Audience>
   website: Report<Website>
+  desktop: Report<DesktopUsage>
 }
 
 const GROWTH_QUESTION = 'Are new people showing up, and do they stick?'
 
 /**
- * Two of the nine facts have no source: nothing records which application an
- * account signed up through, and nothing records whether a new account came
- * back on a second day. They render "unknown" rather than a derived number —
- * subtracting the website's PostHog sign-up events from Logto's account count
- * would be a different population subtracted from a population, not a fact.
+ * "Signed up from the desktop app" reads Logto's own applicationId, so it is a
+ * fact about the same population as the total rather than a PostHog count
+ * subtracted from a Logto count. "Came back a second day" is the legacy
+ * day-one retention series; when it says it is not available the fact reads
+ * "unknown", never a zero.
  */
 const GROWTH_NOTE =
-  'Sign-ups are counted from Logto with staff excluded. "Finished setting up" means the account saved at least one widget. Sign-ups on the website are PostHog events on the site, a different count from Logto accounts; nothing records which application the other accounts registered through, or whether a new account came back on a second day, so those two read "unknown".'
+  'Sign-ups are counted from Logto with staff excluded. "Finished setting up" means the account saved at least one widget. "Signed up from the desktop app" is the Logto application the account registered through; accounts with none recorded are neither. Sign-ups on the website are PostHog events on the site, a different count from Logto accounts. "Came back a second day" covers only accounts with usage analytics enabled.'
 
 export function GrowthContent({
   period,
   verdict,
   audience,
   website,
+  desktop,
 }: GrowthContentProps) {
   const windowLabel = periodLabel(period)
   const a = audience.data
   const w = website.data
+  // Day-one return is the legacy 30-second daily series, the one measurement
+  // that records whether an account came back — not presence retention,
+  // which counts a different population.
+  const d1 = desktop.data?.legacy?.retention.d1
   const staffExcluded = [audience, website].some((r) => r.data?.staff_excluded)
 
   if (!a || !a.available || !a.new.available) {
@@ -749,12 +756,18 @@ export function GrowthContent({
       value: num(Math.max(a.total - a.set_up, 0)),
     },
     { label: 'Deleted their account', value: num(a.known_purged) },
-    { label: 'Signed up from the desktop app', value: null },
+    {
+      label: 'Signed up from the desktop app',
+      value: a.signup_source.available ? num(a.signup_source.desktop) : null,
+    },
     {
       label: 'Signed up on the website',
       value: w && w.available ? factOf(w.signups) : null,
     },
-    { label: 'Came back a second day', value: null },
+    {
+      label: 'Came back a second day',
+      value: d1?.available ? num(d1.returned) : null,
+    },
   ]
 
   return (
@@ -2110,13 +2123,13 @@ const SUPPORT_QUESTION =
   'How much are we owing people, and how fast do we pay it back?'
 
 /**
- * Three of the nine facts have no source. The summary endpoint counts
- * tickets by queue bucket; it does not record who or what wrote the reply,
- * so "answered by the bot alone", "answered after you edited the draft" and
- * "escalated to a person" read "unknown" rather than a guess.
+ * Who answered is the queue's own classification counted up over the window —
+ * the same rule the queue renders per row, so the two can never disagree.
+ * "From paying customers" is the one fact still without a source: support
+ * cases carry no account to join a subscription to (SCROLLR-267).
  */
 const SUPPORT_NOTE =
-  'Reply times only count tickets that kept their timestamps. Nothing records whether a reply was sent by the bot, edited first, or escalated, so those three read "unknown".'
+  'Reply times only count tickets that kept their timestamps. Who answered is counted over drafts acted on in the window, by the same rule the queue shows on each row; a draft can be escalated and then answered by a person, so escalations are not a slice of the replies. Support cases carry no account, so nothing can say which came from paying customers.'
 
 export function SupportContent({
   period,
@@ -2162,8 +2175,11 @@ export function SupportContent({
       label: `Finished ${periodPhrase(period)}`,
       value: factOf(s.completed_in_period),
     },
-    { label: 'Answered by the bot alone', value: null },
-    { label: 'Answered after you edited the draft', value: null },
+    { label: 'Answered by the bot alone', value: num(s.replied_by_bot) },
+    {
+      label: 'Answered after you edited the draft',
+      value: num(s.replied_after_edit),
+    },
     {
       label: 'Longest wait',
       value: s.oldest_needs_attention_hours.available
@@ -2175,7 +2191,7 @@ export function SupportContent({
       value: factOf(s.first_response_median_hours, formatDuration),
     },
     { label: 'From paying customers', value: null },
-    { label: 'Escalated to a person', value: null },
+    { label: 'Escalated to a person', value: num(s.escalated) },
   ]
 
   return (

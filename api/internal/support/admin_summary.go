@@ -63,6 +63,16 @@ type SupportSummaryResponse struct {
 	// the timestamps to support them. Hours.
 	FirstResponseMedianHours platform.Metric `json:"first_response_median_hours"`
 	CompletionMedianHours    platform.Metric `json:"completion_median_hours"`
+	// Who answered, over the window. RepliedByBot and RepliedAfterEdit are
+	// replyProvenance's own verdict counted up — the queue's rule and this
+	// one are the same function, so the Support page and the queue can never
+	// disagree about what the bot sent. Escalated is the escalate
+	// disposition; a draft can be escalated and then sent by a person, so it
+	// is not a fourth slice of the same pie.
+	RepliedByBot     int `json:"replied_by_bot"`
+	RepliedAfterEdit int `json:"replied_after_edit"`
+	Escalated        int `json:"escalated"`
+
 	// PayingCreated is how many of the window's new tickets came from a
 	// verified paying account.
 	PayingCreated int `json:"paying_created"`
@@ -199,6 +209,10 @@ func loadSupportSummary(ctx context.Context, period platform.Period, now time.Ti
 	out.CompletedIn = platform.Metric{Value: completed, Available: true, Comparison: platform.Compare(completed, prevCompleted, period, from),
 		Note: "Tickets with a close date in the window. Dismissed drafts do not carry a close date and are not counted here."}
 
+	if err := loadReplyProvenanceCounts(ctx, &out, start, end); err != nil {
+		return out, err
+	}
+
 	if err := platform.DBPool.QueryRow(ctx, `
 		SELECT count(*) FROM support_cases c
 		  JOIN stripe_customers s ON s.logto_sub = c.logto_sub AND c.account_source = 'authenticated'
@@ -283,6 +297,44 @@ func loadSupportSummary(ctx context.Context, period platform.Period, now time.Ti
 		out.CompletionMedianHours.Note = "Median hours from opened to closed, over tickets closed in the window. Backfilled cases carry the osTicket sync time as their close."
 	}
 	return out, nil
+}
+
+// loadReplyProvenanceCounts counts the window's drafts by who is responsible
+// for them.
+//
+// The classification is not written here: the rows are read and handed to
+// replyProvenance, the same function the queue renders per row. A draft is
+// placed in the window by when it was acted on — sent_at where the reply went
+// out, decided_at for one decided but never sent, created_at for the rest.
+func loadReplyProvenanceCounts(ctx context.Context, out *SupportSummaryResponse, start, end time.Time) error {
+	const q = `
+		SELECT status, coalesce(disposition, ''), draft_body_html,
+		       coalesce(edited_body_html, ''), intervened
+		  FROM support_drafts
+		 WHERE coalesce(sent_at, decided_at, created_at) >= $1
+		   AND coalesce(sent_at, decided_at, created_at) <  $2`
+	rows, err := platform.DBPool.Query(ctx, q, start, end)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var status, disposition, body, edited string
+		var intervened bool
+		if err := rows.Scan(&status, &disposition, &body, &edited, &intervened); err != nil {
+			return err
+		}
+		switch provenance, _ := replyProvenance(status, disposition, body, edited, intervened); provenance {
+		case provenanceBot:
+			out.RepliedByBot++
+		case provenanceEdited:
+			out.RepliedAfterEdit++
+		}
+		if disposition == dispositionEscalate {
+			out.Escalated++
+		}
+	}
+	return rows.Err()
 }
 
 // medianHours runs a query returning one float column and reports its

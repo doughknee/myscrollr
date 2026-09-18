@@ -96,3 +96,50 @@ func TestAudienceDegradesVisiblyWhenLogtoIsDown(t *testing.T) {
 		t.Fatalf("logto down = %+v", out)
 	}
 }
+
+// Signup source reads Logto's applicationId and nothing else. An account with
+// no application recorded, or one from some third application, is unknown —
+// it is never folded into desktop or website to make the two add up.
+func TestAudienceSplitsSignupSourceByApplicationID(t *testing.T) {
+	if platform.DBPool == nil {
+		t.Skip("TEST_DATABASE_URL not set")
+	}
+	now := time.Date(2026, 9, 11, 22, 0, 0, 0, time.UTC)
+	period, _ := ParsePeriod("7d", now)
+	ms := func(d time.Duration) int64 { return now.Add(d).UnixMilli() }
+	resetAdmins(t, "audience-source-staff@example.com")
+	testsupport.MustExec(t, `UPDATE admin_users SET logto_sub = 'staff-sub' WHERE email = 'audience-source-staff@example.com'`)
+	testsupport.MustExec(t, `DELETE FROM user_preferences`)
+	t.Setenv("LOGTO_WEB_APP_ID", "web-app")
+	t.Setenv("LOGTO_EXTENSION_APP_ID", "desktop-app")
+
+	withLogtoAccounts(t, 7, false,
+		accounts.LogtoAccount{ID: "a", CreatedAt: ms(-2 * 24 * time.Hour), ApplicationID: "desktop-app"},
+		accounts.LogtoAccount{ID: "b", CreatedAt: ms(-3 * 24 * time.Hour), ApplicationID: "desktop-app"},
+		accounts.LogtoAccount{ID: "c", CreatedAt: ms(-4 * 24 * time.Hour), ApplicationID: "web-app"},
+		accounts.LogtoAccount{ID: "d", CreatedAt: ms(-5 * 24 * time.Hour)},                           // no applicationId
+		accounts.LogtoAccount{ID: "e", CreatedAt: ms(-5 * 24 * time.Hour), ApplicationID: "some-cli"}, // neither app
+		accounts.LogtoAccount{ID: "f", CreatedAt: ms(-30 * 24 * time.Hour), ApplicationID: "desktop-app"},
+		// Staff stay excluded from the split, exactly as from the total.
+		accounts.LogtoAccount{ID: "staff-sub", CreatedAt: ms(-time.Hour), ApplicationID: "desktop-app"},
+	)
+
+	out := loadAudience(context.Background(), period, true, now)
+	s := out.SignupSource
+	if !s.Available {
+		t.Fatalf("signup source unavailable: %q", s.Note)
+	}
+	if s.Desktop != 2 || s.Website != 1 || s.Unknown != 2 {
+		t.Fatalf("split = desktop %d website %d unknown %d, want 2/1/2", s.Desktop, s.Website, s.Unknown)
+	}
+	if got := s.Desktop + s.Website + s.Unknown; float64(got) != out.New.Value {
+		t.Fatalf("split sums to %d but %v accounts are new in the window", got, out.New.Value)
+	}
+
+	// Unconfigured application ids are an honest "unknown", not a zero split.
+	t.Setenv("LOGTO_WEB_APP_ID", "")
+	t.Setenv("LOGTO_EXTENSION_APP_ID", "")
+	if s := loadAudience(context.Background(), period, true, now).SignupSource; s.Available || s.Note == "" {
+		t.Fatalf("unconfigured split = %+v, want unavailable with a reason", s)
+	}
+}
