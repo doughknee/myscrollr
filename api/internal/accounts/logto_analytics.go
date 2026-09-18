@@ -193,13 +193,21 @@ func FetchSignupAnalytics(ctx context.Context, application string, days int, now
 	return report, nil
 }
 
+// SignupApplicationIDs is which Logto application id means the website and
+// which means the desktop app. Either is empty when unconfigured, and a
+// caller that cannot tell them apart must say so rather than guess.
+func SignupApplicationIDs() (website, desktop string) {
+	return os.Getenv("LOGTO_WEB_APP_ID"), os.Getenv("LOGTO_EXTENSION_APP_ID")
+}
+
 func signupAnalyticsAppID(application string) (string, error) {
+	website, desktop := SignupApplicationIDs()
 	var id string
 	switch application {
 	case "website":
-		id = os.Getenv("LOGTO_WEB_APP_ID")
+		id = website
 	case "desktop":
-		id = os.Getenv("LOGTO_EXTENSION_APP_ID")
+		id = desktop
 	default:
 		return "", fmt.Errorf("unsupported analytics application")
 	}

@@ -133,6 +133,13 @@ export const audience: Audience = {
     note: 'Deletion tracking began 1 June 2026.',
   },
   definition: 'Total is Logto user count minus excluded staff and test subs.',
+  signup_source: {
+    desktop: 7,
+    website: 4,
+    unknown: 1,
+    available: true,
+    note: 'Which Logto application each new account registered through.',
+  },
 }
 
 export const desktop: DesktopUsage = {
@@ -471,6 +478,9 @@ export const support: SupportSummary = {
   }),
   completion_median_hours: unavailable('No ticket completed in this window.'),
   paying_created: 1,
+  replied_by_bot: 5,
+  replied_after_edit: 2,
+  escalated: 3,
   cases_with_account: 1,
   cases: 59,
   coverage: { from: '2026-05-01T00:00:00Z', partial: false },

@@ -116,6 +116,7 @@ describe('GrowthContent', () => {
         verdict={growing}
         audience={loaded(audience)}
         website={loaded(website)}
+        desktop={loaded(desktop)}
         {...overrides}
       />,
     )
@@ -137,10 +138,58 @@ describe('GrowthContent', () => {
     expect(html).toContain('Never finished setting up')
     expect(html).toContain('>83<')
     expect(html).toContain('Deleted their account')
-    // The two facts nothing measures read "unknown", never a derived zero.
+  })
+
+  it('reads sign-up source from applicationId and day-one return from the legacy series', async () => {
+    const html = await render()
+    expect(html).toContain('Signed up from the desktop app')
+    expect(html).toContain('>7<') // audience.signup_source.desktop
+    expect(html).toContain('Came back a second day')
+    expect(html).toContain('>6<') // desktop.legacy.retention.d1.returned
+    // Neither is inferred from the other: unknown is its own bucket and is
+    // not added to either side.
+    expect(html).not.toContain('>11<')
+  })
+
+  it('keeps both facts "unknown" rather than zero when the source says it cannot measure them', async () => {
+    const html = await render({
+      audience: loaded({
+        ...audience,
+        signup_source: {
+          desktop: 0,
+          website: 0,
+          unknown: 0,
+          available: false,
+          note: 'Application ids are not configured.',
+        },
+      }),
+      desktop: loaded({
+        ...desktop,
+        legacy: {
+          ...desktop.legacy!,
+          retention: {
+            ...desktop.legacy!.retention,
+            d1: {
+              day: 1,
+              eligible: 0,
+              returned: 0,
+              rate: 0,
+              available: false,
+              note: 'No cohort is old enough.',
+            },
+          },
+        },
+      }),
+    })
     expect(html).toContain('Signed up from the desktop app')
     expect(html).toContain('Came back a second day')
     expect(html.match(/>unknown</g)?.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('says "unknown" for day-one return when the legacy series is absent entirely', async () => {
+    const html = await render({ desktop: loaded({ ...desktop, legacy: null }) })
+    expect(html).toContain('Came back a second day')
+    expect(html).toContain('>unknown<')
   })
 
   it('folds everything it used to show into a closed More detail', async () => {
@@ -368,6 +417,7 @@ describe('DesktopContent', () => {
           breakdown_note:
             'One or more breakdowns could not be read from PostHog: 429.',
         })}
+        desktop={loaded(desktop)}
       />,
     )
     expect(html).toContain('could not be read from PostHog: 429')
@@ -448,7 +498,9 @@ describe('RevenueContent', () => {
     const html = await render()
     expect(html).toContain('Is money coming in?')
     expect(html).toContain('$113.46')
-    expect(html).toContain('came in this week, up from $50.00 USD the week before.')
+    expect(html).toContain(
+      'came in this week, up from $50.00 USD the week before.',
+    )
     expect(html).toContain('2 customers pay, 1 on the lifetime plan.')
     expect(html).toContain('$979.02 USD earned ever.')
   })
@@ -645,12 +697,32 @@ describe('SupportContent', () => {
     expect(html).toContain('2 days')
     expect(html).toContain('Typical first reply')
     expect(html).toContain('2 h 30 m')
-    // Who wrote a reply is not recorded, so these four state nothing.
+  })
+
+  it('counts who answered, and leaves only the paying fact unknown', async () => {
+    const html = await render()
     expect(html).toContain('Answered by the bot alone')
+    expect(html).toContain('>5<')
     expect(html).toContain('Answered after you edited the draft')
-    expect(html).toContain('From paying customers')
+    expect(html).toContain('>2<')
     expect(html).toContain('Escalated to a person')
-    expect(html.match(/>unknown</g)).toHaveLength(4)
+    expect(html).toContain('>3<')
+    // Support cases carry no account, so this one stays unmeasurable.
+    expect(html).toContain('From paying customers')
+    expect(html.match(/>unknown</g)).toHaveLength(1)
+  })
+
+  it('shows a real zero rather than "unknown" when nobody answered anything', async () => {
+    const html = await render({
+      support: loaded({
+        ...support,
+        replied_by_bot: 0,
+        replied_after_edit: 0,
+        escalated: 0,
+      }),
+    })
+    expect(html).toContain('Answered by the bot alone')
+    expect(html.match(/>unknown</g)).toHaveLength(1)
   })
 
   it('reads Clear and drops the finished clause when the queue is empty', async () => {

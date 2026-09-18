@@ -67,6 +67,22 @@ type AudienceResponse struct {
 	KnownPurged           int      `json:"known_purged"`
 	Coverage              Coverage `json:"coverage"`
 	Definition            string   `json:"definition"`
+
+	// SignupSource splits the window's new accounts by the Logto
+	// application they registered through. Unknown is its own bucket, never
+	// folded into either side: an account with no applicationId, or one
+	// registered through some third application, is not evidence for
+	// desktop or for website.
+	SignupSource SignupSourceSplit `json:"signup_source"`
+}
+
+// SignupSourceSplit is where the window's new accounts came from.
+type SignupSourceSplit struct {
+	Desktop   int    `json:"desktop"`
+	Website   int    `json:"website"`
+	Unknown   int    `json:"unknown"`
+	Available bool   `json:"available"`
+	Note      string `json:"note,omitempty"`
 }
 
 // HandleGetAudience - GET /admin/audience?period=
@@ -79,6 +95,40 @@ func HandleGetAudience(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
 	return c.JSON(loadAudience(ctx, period, ExcludeStaff(ctx), now))
+}
+
+// signupSourceSplit counts the window's new accounts by Logto application.
+// It reads applicationId and nothing else: no count from another source is
+// subtracted to infer a side.
+func signupSourceSplit(counted []accounts.LogtoAccount, period Period) SignupSourceSplit {
+	website, desktop := accounts.SignupApplicationIDs()
+	if website == "" && desktop == "" {
+		return SignupSourceSplit{Note: "The website and desktop Logto application ids are not configured, so sign-ups cannot be attributed to either."}
+	}
+	out := SignupSourceSplit{Available: true,
+		Note: "Which Logto application each new account registered through. Accounts with no application recorded are counted as unknown, not split between the two."}
+	for _, a := range counted {
+		t := a.CreatedTime()
+		if t.IsZero() {
+			continue
+		}
+		if period.Lifetime() {
+			if !t.Before(period.End) {
+				continue
+			}
+		} else if t.Before(period.Start) || !t.Before(period.End) {
+			continue
+		}
+		switch {
+		case desktop != "" && a.ApplicationID == desktop:
+			out.Desktop++
+		case website != "" && a.ApplicationID == website:
+			out.Website++
+		default:
+			out.Unknown++
+		}
+	}
+	return out
 }
 
 func loadAudience(ctx context.Context, period Period, excludeStaff bool, now time.Time) AudienceResponse {
@@ -179,6 +229,8 @@ func loadAudience(ctx context.Context, period Period, excludeStaff bool, now tim
 		}
 		return time.UnixMilli(a.LastSignInAt).UTC()
 	}
+	out.SignupSource = signupSourceSplit(counted, period)
+
 	newNow := countIn(period, created)
 	signedNow := countIn(period, signedIn)
 	var newPrev float64

@@ -218,6 +218,17 @@ export interface Audience {
   known_purged: number
   coverage: Coverage
   definition: string
+  /** New accounts by the Logto application they registered through. */
+  signup_source: SignupSourceSplit
+}
+
+/** Unknown is its own bucket and is never folded into either side. */
+export interface SignupSourceSplit {
+  desktop: number
+  website: number
+  unknown: number
+  available: boolean
+  note?: string
 }
 
 // ── Website ───────────────────────────────────────────────────────
@@ -375,6 +386,12 @@ export interface SupportSummary {
   first_response_median_hours: Metric
   completion_median_hours: Metric
   paying_created: number
+  /** Replies the bot sent unattended, counted by the queue's own rule. */
+  replied_by_bot: number
+  /** Replies that went out after a person rewrote the draft. */
+  replied_after_edit: number
+  /** Drafts the server handed to a person rather than sending. */
+  escalated: number
   /** How many of `cases` arrived from a signed-in app session. */
   cases_with_account: number
   cases: number
