@@ -52,13 +52,6 @@ function slots(page: Parameters<typeof openShim>[0]) {
  */
 for (const fixture of FIXTURES) {
   test(`[${fixture}] a rotating slot keeps its width across a turn`, async ({ page }) => {
-    // SCROLLR-229: on the fifty-game Saturday a slot whose reserved width
-    // passes 640 px latches the cap, releases its score and status
-    // reservations, lands UNDER the cap (618 px) and then moves 41 px when
-    // it turns to a game with no score. Expected to fail until the chip
-    // pins its width at the cap; Playwright reports "unexpectedly passed"
-    // when it does, and this marker comes off.
-    if (fixture === "busy") test.fail();
     await openShim(page, `?fixture=${fixture}&speed=${SPEED}`);
     const lapMs = await measureLapMs(page, SPEED);
     test.setTimeout(lapMs * 1.5 + 60_000);

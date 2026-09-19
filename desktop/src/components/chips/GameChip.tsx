@@ -99,12 +99,20 @@ const GameChip = memo(
     const flash = useScoreFlash(game.away_team_score, game.home_team_score, game.id);
     const r = reservationFor(game.league);
 
-    // At the cap the chip is pinned at CHIP_MAX_PX and the names truncate.
-    // There the score slot's reservation buys nothing -- width cannot move
-    // -- so it is released and the name gets the empty characters back:
-    // the whole name before kickoff, one more character while the score
-    // is a single digit. Off the cap the reservation stays, because there
-    // it is what stops the chip growing when the score arrives.
+    // At the cap the chip is PINNED at CHIP_MAX_PX -- literally, `width`,
+    // not just `max-width` -- and the names truncate. There the score
+    // slot's reservation buys nothing, because width cannot move, so it is
+    // released and the name gets the empty characters back: the whole name
+    // before kickoff, one more character while the score is a single
+    // digit. Off the cap the reservation stays, because there it is what
+    // stops the chip growing when the score arrives.
+    //
+    // The explicit width is the whole point (SCROLLR-229). max-width alone
+    // only binds while the content exceeds it, and releasing ~53px of
+    // reservations drops any pairing that reserved into (640, 640+released]
+    // back under the cap -- where the chip is free to move again with
+    // whatever the score and status cells hold. A 660px-reserving NCAAF
+    // slot measured 618.6px released and then shifted 41px on the next turn.
     const ref = useRef<HTMLButtonElement>(null);
     const capped = useLatchedCap(ref, CHIP_MAX_PX);
     const scoreReserve = capped ? undefined : `${r.score}ch`;
@@ -248,7 +256,7 @@ const GameChip = memo(
       <button
         ref={ref}
         onClick={onClick}
-        style={accentStyle}
+        style={capped ? { ...accentStyle, width: CHIP_MAX_PX } : accentStyle}
         className={clsx(
           chipShellClasses(
             branded
@@ -271,9 +279,19 @@ const GameChip = memo(
           // 640px: at 14px the widest real pairing -- two 20-character names --
           // runs ~575px with every reservation held, and the cap exists for the
           // pathological case, not the worst ordinary one.
-          "grid max-w-[640px] grid-cols-[max-content_minmax(0,max-content)_minmax(0,max-content)_max-content]",
-          // (max-w-[600px] and CHIP_MAX_PX must agree; the latter is what the
+          // (max-w-[640px] and CHIP_MAX_PX must agree; the latter is what the
           // chip measures itself against to know it has hit the cap.)
+          "grid max-w-[640px]",
+          // Literal strings, both of them -- Tailwind reads source text.
+          // Off the cap the team tracks are max-content, so the chip is
+          // sized by its own names. Pinned at the cap they become 1fr:
+          // the width is fixed at 640 and something has to absorb the
+          // slack the released reservations left, or it would sit as a
+          // dead strip between the status cell and the right border. The
+          // names absorbing it is exactly what the release is for.
+          capped
+            ? "grid-cols-[max-content_minmax(0,1fr)_minmax(0,1fr)_max-content]"
+            : "grid-cols-[max-content_minmax(0,max-content)_minmax(0,max-content)_max-content]",
           comfort ? "grid-rows-[30px_20px]" : "grid-rows-[28px]",
           // Closeness is the whole weighting; the rules brighten with it.
           //

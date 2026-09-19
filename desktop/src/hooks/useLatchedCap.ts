@@ -8,15 +8,19 @@ import { useLayoutEffect, useRef, useState, type RefObject } from "react";
  * that changes -- a score slot holds 2ch before kickoff -- so the chip
  * cannot grow mid-game. That reservation is what keeps the rail still. But
  * a chip that has hit its max-width truncates its team names, and there
- * the reservation is pure cost: the chip is pinned at the cap whatever the
- * score slot holds, so giving the empty slot back to the name changes
- * nothing outside the chip and shows more of the name inside it.
+ * the reservation is pure cost -- PROVIDED the caller pins the width. It
+ * must: `max-width` stops binding the moment the release drops the content
+ * back under the cap, and then the chip is free to move again (SCROLLR-229;
+ * CHIP_SPEC 4.1 rule 6). Pinned, giving the empty slot back to the name
+ * changes nothing outside the chip and shows more of the name inside it.
  *
  * Why it latches: releasing the reservation shrinks the content, which can
  * drop the chip just under the cap, which would un-cap it, which would
  * restore the reservation and push it back over -- an oscillation across
  * the boundary. Names never change, so a chip that was ever at the cap is
  * treated as capped from then on. Off-cap chips never enter the mode.
+ * That shrink is not hypothetical: any pairing reserving into
+ * (cap, cap + released] lands under the cap once released.
  *
  * CSS could not do this: container queries need a container whose inline
  * size does not depend on its contents, and this chip's does.
