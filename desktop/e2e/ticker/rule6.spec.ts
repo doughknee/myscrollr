@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { installTickerAudit } from "./audit";
 import { swapsWhileVisible, type AuditEntry } from "../../src/dev/tickerIdentity";
-import { openShim } from "./shim";
+import { FIXTURES, openShim } from "./shim";
 
 // Deterministic: a chip that swaps on screen is a bug, not flake.
 test.describe.configure({ retries: 0 });
@@ -26,34 +26,38 @@ const PERTURB = `
   return next.length;
 `;
 
-test("a rotating slot only changes what it shows while off screen", async ({ page }) => {
-  test.setTimeout(RUN_MS + 30_000);
-  await page.addInitScript(installTickerAudit);
-  // Fastest preset, so 30 s holds several slot turns.
-  await openShim(page, "?speed=80");
+// Rule 6 only bites with a CHANGING pool, so every fixture is perturbed
+// the same way; a static run proves nothing (SCROLLR-227).
+for (const fixture of FIXTURES) {
+  test(`[${fixture}] a rotating slot only changes what it shows while off screen`, async ({ page }) => {
+    test.setTimeout(RUN_MS + 30_000);
+    await page.addInitScript(installTickerAudit);
+    // Fastest preset, so 30 s holds several slot turns.
+    await openShim(page, `?fixture=${fixture}&speed=80`);
 
-  const sizes: number[] = [];
-  for (let t = PERTURB_EVERY_MS; t <= RUN_MS; t += PERTURB_EVERY_MS) {
-    await page.waitForTimeout(PERTURB_EVERY_MS);
-    const res = await page.request.post("/__dev/cmd", {
-      data: { window: "ticker", code: PERTURB, timeout: 4000 },
+    const sizes: number[] = [];
+    for (let t = PERTURB_EVERY_MS; t <= RUN_MS; t += PERTURB_EVERY_MS) {
+      await page.waitForTimeout(PERTURB_EVERY_MS);
+      const res = await page.request.post("/__dev/cmd", {
+        data: { window: "ticker", code: PERTURB, timeout: 4000 },
+      });
+      const body = (await res.json()) as { ok: boolean; value?: number; error?: string };
+      expect(body.ok, body.error).toBe(true);
+      sizes.push(body.value!);
+    }
+    // The pool really changed under the bar.
+    expect(new Set(sizes).size).toBe(2);
+
+    const entries = await page.evaluate(() => {
+      const w = window as unknown as { __tickerAudit: AuditEntry[] };
+      const buf = w.__tickerAudit;
+      w.__tickerAudit = [];
+      return buf;
     });
-    const body = (await res.json()) as { ok: boolean; value?: number; error?: string };
-    expect(body.ok, body.error).toBe(true);
-    sizes.push(body.value!);
-  }
-  // The pool really changed under the bar.
-  expect(new Set(sizes).size).toBe(2);
+    // The audit saw the bar at all: rotating slots exist and something moved.
+    expect(entries.length, "no mutations recorded — did the audit install?").toBeGreaterThan(0);
 
-  const entries = await page.evaluate(() => {
-    const w = window as unknown as { __tickerAudit: AuditEntry[] };
-    const buf = w.__tickerAudit;
-    w.__tickerAudit = [];
-    return buf;
+    const swaps = swapsWhileVisible(entries);
+    expect(swaps, JSON.stringify(swaps.slice(0, 5), null, 2)).toEqual([]);
   });
-  // The audit saw the bar at all: rotating slots exist and something moved.
-  expect(entries.length, "no mutations recorded — did the audit install?").toBeGreaterThan(0);
-
-  const swaps = swapsWhileVisible(entries);
-  expect(swaps, JSON.stringify(swaps.slice(0, 5), null, 2)).toEqual([]);
-});
+}
