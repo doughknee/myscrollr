@@ -9,6 +9,9 @@ import { defineConfig } from "@playwright/test";
  * CI installs its own Chromium (`npx playwright install --with-deps chromium`).
  */
 const ci = !!process.env.CI;
+// Fixed port unless overridden: a parallel worktree's vite on 5180 would be
+// reused (`reuseExistingServer`) and serve ITS fixtures, not this checkout's.
+const port = Number(process.env.SHIM_PORT) || 5180;
 
 export default defineConfig({
   testDir: "e2e",
@@ -16,12 +19,12 @@ export default defineConfig({
   workers: 1,
   reporter: ci ? [["list"], ["html", { open: "never" }]] : "list",
   webServer: {
-    command: "npx vite --port 5180",
-    url: "http://localhost:5180/ticker-shim.html",
+    command: `npx vite --port ${port}`,
+    url: `http://localhost:${port}/ticker-shim.html`,
     reuseExistingServer: !ci,
   },
   use: {
-    baseURL: "http://localhost:5180",
+    baseURL: `http://localhost:${port}`,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
     viewport: { width: 1280, height: 720 },

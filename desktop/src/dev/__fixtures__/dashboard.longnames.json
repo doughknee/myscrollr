@@ -1,0 +1,362 @@
+{
+  "_note": "SCROLLR-228 longnames: the width-reservation worst case, built from real names and rows. NCAA Football: (1) the two longest names in utils/__fixtures__/team-names.json for the league (Washington University-St. Louis and Claremont Mudd Scripps College) placed on a verbatim seed 2026-09-05 row as a template (id and external_game_id kept; logos blank because the names file carries none; no standings row exists for either); (2) the seed's own widest real pairing, Louisiana Christian University at Northwestern State, verbatim. MLB: Philadelphia Phillies at Arizona Diamondbacks, the two longest MLB names, is a verbatim seed game (a 2026-09-02 final) returned to `pre` with scores cleared. Formula 1: the seed's Mexico Grand Prix at Autódromo Hermanos Rodríguez, the longest circuit name, verbatim. Kickoffs are 2-5 h after _captured_at. Headlines are the longest seed rss_items titles on catalog feeds (Guardian 115 chars, PBS 100), published within the last 90 min. Finance rows are verbatim seed trades for the widest prices: WBTC/USD and BTC/USD at 8 characters, then XAUT, PAXG, STETH. Standings joined from the seed's standings table. The shim rebases every timestamp on load.",
+  "_captured_at": "2026-09-05T12:00:00Z",
+  "data": {
+    "sports": [
+      {
+        "id": 3246813,
+        "league": "NCAA Football",
+        "sport": "american-football",
+        "external_game_id": "21824",
+        "link": "",
+        "home_team_name": "Washington University-St. Louis",
+        "home_team_logo": "",
+        "home_team_score": "",
+        "home_team_code": "",
+        "away_team_name": "Claremont Mudd Scripps College",
+        "away_team_logo": "",
+        "away_team_score": "",
+        "away_team_code": "",
+        "start_time": "2026-09-05T14:00:00Z",
+        "short_detail": "Not Started",
+        "state": "pre",
+        "status_short": "NS",
+        "status_long": "Not Started",
+        "updated_at": "2026-09-05T12:00:00Z"
+      },
+      {
+        "id": 3100648,
+        "league": "NCAA Football",
+        "sport": "american-football",
+        "external_game_id": "22714",
+        "link": "",
+        "home_team_name": "Northwestern State",
+        "home_team_logo": "https://media.api-sports.io/american-football/teams/251.png",
+        "home_team_score": "",
+        "home_team_code": "",
+        "away_team_name": "Louisiana Christian University",
+        "away_team_logo": "https://media.api-sports.io/american-football/teams/312.png",
+        "away_team_score": "",
+        "away_team_code": "",
+        "start_time": "2026-09-05T15:00:00Z",
+        "short_detail": "Not Started",
+        "state": "pre",
+        "status_short": "NS",
+        "status_long": "Not Started",
+        "updated_at": "2026-09-05T12:00:00Z",
+        "home_standing": {
+          "rank": 10,
+          "wins": 1,
+          "losses": 11,
+          "draws": 0,
+          "points": 0,
+          "goal_diff": 0,
+          "points_for": 499,
+          "points_against": 126,
+          "otl": 0
+        }
+      },
+      {
+        "id": 2917777,
+        "league": "MLB",
+        "sport": "baseball",
+        "external_game_id": "180081",
+        "link": "",
+        "home_team_name": "Arizona Diamondbacks",
+        "home_team_logo": "https://media.api-sports.io/baseball/teams/2.png",
+        "home_team_score": "",
+        "home_team_code": "",
+        "away_team_name": "Philadelphia Phillies",
+        "away_team_logo": "https://media.api-sports.io/baseball/teams/27.png",
+        "away_team_score": "",
+        "away_team_code": "",
+        "start_time": "2026-09-05T16:00:00Z",
+        "short_detail": "Not Started",
+        "state": "pre",
+        "status_short": "NS",
+        "status_long": "Not Started",
+        "updated_at": "2026-09-05T12:00:00Z",
+        "home_standing": {
+          "rank": 3,
+          "wins": 73,
+          "losses": 67,
+          "draws": 0,
+          "points": 0,
+          "goal_diff": 0,
+          "points_for": 627,
+          "points_against": 629,
+          "otl": 0
+        },
+        "away_standing": {
+          "rank": 2,
+          "wins": 79,
+          "losses": 60,
+          "draws": 0,
+          "points": 0,
+          "goal_diff": 0,
+          "points_for": 631,
+          "points_against": 594,
+          "otl": 0
+        }
+      },
+      {
+        "id": 59,
+        "league": "Formula 1",
+        "sport": "formula-1",
+        "external_game_id": "2604",
+        "link": "",
+        "home_team_name": "Mexico Grand Prix",
+        "home_team_logo": "",
+        "home_team_score": "",
+        "home_team_code": "",
+        "away_team_name": "Autódromo Hermanos Rodríguez",
+        "away_team_logo": "",
+        "away_team_score": "",
+        "away_team_code": "",
+        "start_time": "2026-09-05T17:00:00Z",
+        "short_detail": "Scheduled",
+        "state": "pre",
+        "status_short": "Scheduled",
+        "status_long": "Scheduled",
+        "updated_at": "2026-09-05T12:00:00Z"
+      }
+    ],
+    "sports_meta": {
+      "leagues": [
+        {
+          "name": "NCAA Football",
+          "is_offseason": false,
+          "next_game": "2026-09-05T14:00:00Z",
+          "polling_healthy": true
+        },
+        {
+          "name": "MLB",
+          "is_offseason": false,
+          "next_game": "2026-09-05T14:00:00Z",
+          "polling_healthy": true
+        },
+        {
+          "name": "Formula 1",
+          "is_offseason": false,
+          "next_game": "2026-09-05T14:00:00Z",
+          "polling_healthy": true
+        }
+      ]
+    },
+    "rss": [
+      {
+        "id": 28877803,
+        "feed_url": "https://www.theguardian.com/world/rss",
+        "guid": "https://www.theguardian.com/australia-news/live/2026/sep/04/anthony-albanese-pauline-hanson-actu-union-labor-one-nation-coalition-angus-taylor-ntwnfb",
+        "title": "News live: Two more Australians confirmed safe in Nepal-Tibet floods; Bowen calls joint statement on China ‘strong’",
+        "link": "https://www.theguardian.com/australia-news/live/2026/sep/04/anthony-albanese-pauline-hanson-actu-union-labor-one-nation-coalition-angus-taylor-ntwnfb",
+        "description": "",
+        "source_name": "World news | The Guardian",
+        "published_at": "2026-09-05T11:50:00Z",
+        "created_at": "2026-09-05T11:50:00Z",
+        "updated_at": "2026-09-05T11:50:00Z"
+      },
+      {
+        "id": 28573563,
+        "feed_url": "https://www.theguardian.com/world/rss",
+        "guid": "https://www.theguardian.com/us-news/live/2026/sep/03/donald-trump-immigration-tariffs-canada-trade-iran-jd-vance-latest-news-updates",
+        "title": "Trump administration asks supreme court to intervene over judge’s ban on USPS mail-in voting restrictions – live",
+        "link": "https://www.theguardian.com/us-news/live/2026/sep/03/donald-trump-immigration-tariffs-canada-trade-iran-jd-vance-latest-news-updates",
+        "description": "",
+        "source_name": "World news | The Guardian",
+        "published_at": "2026-09-05T11:20:00Z",
+        "created_at": "2026-09-05T11:20:00Z",
+        "updated_at": "2026-09-05T11:20:00Z"
+      },
+      {
+        "id": 28788667,
+        "feed_url": "https://www.theguardian.com/world/rss",
+        "guid": "https://www.theguardian.com/world/2026/sep/03/serbians-targeted-with-advanced-spyware",
+        "title": "Serbians targeted with spyware in country’s ‘largest documented wave of surveillance’",
+        "link": "https://www.theguardian.com/world/2026/sep/03/serbians-targeted-with-advanced-spyware",
+        "description": "",
+        "source_name": "World news | The Guardian",
+        "published_at": "2026-09-05T10:30:00Z",
+        "created_at": "2026-09-05T10:30:00Z",
+        "updated_at": "2026-09-05T10:30:00Z"
+      },
+      {
+        "id": 28947070,
+        "feed_url": "https://www.pbs.org/newshour/feeds/rss/headlines",
+        "guid": "https://www.pbs.org/newshour/science/global-warming-will-exceed-1-5-degree-limit-un-says-in-report-that-maps-path-back-below-danger-zone",
+        "title": "Global warming will exceed 1.5-degree limit, UN says in report that maps path back below danger zone",
+        "link": "https://www.pbs.org/newshour/science/global-warming-will-exceed-1-5-degree-limit-un-says-in-report-that-maps-path-back-below-danger-zone",
+        "description": "",
+        "source_name": "PBS News Hour - The Latest",
+        "published_at": "2026-09-05T11:40:00Z",
+        "created_at": "2026-09-05T11:40:00Z",
+        "updated_at": "2026-09-05T11:40:00Z"
+      },
+      {
+        "id": 28936857,
+        "feed_url": "https://www.pbs.org/newshour/feeds/rss/headlines",
+        "guid": "https://www.pbs.org/newshour/nation/maria-bartiromo-out-at-fox-news-after-more-than-a-decade-no-reason-specified-for-departure",
+        "title": "Maria Bartiromo out at Fox News after more than a decade; no reason specified for departure",
+        "link": "https://www.pbs.org/newshour/nation/maria-bartiromo-out-at-fox-news-after-more-than-a-decade-no-reason-specified-for-departure",
+        "description": "",
+        "source_name": "PBS News Hour - The Latest",
+        "published_at": "2026-09-05T10:50:00Z",
+        "created_at": "2026-09-05T10:50:00Z",
+        "updated_at": "2026-09-05T10:50:00Z"
+      }
+    ],
+    "finance": [
+      {
+        "symbol": "WBTC/USD",
+        "price": 81018.67,
+        "previous_close": 77227.38,
+        "price_change": 3791.29,
+        "percentage_change": 4.91,
+        "direction": "up",
+        "day_volume": 0,
+        "last_updated": "2026-09-05T12:00:00Z"
+      },
+      {
+        "symbol": "BTC/USD",
+        "price": 81208.73,
+        "previous_close": 77340.01,
+        "price_change": 3868.72,
+        "percentage_change": 5.0,
+        "direction": "up",
+        "day_volume": 0,
+        "last_updated": "2026-09-05T12:00:00Z"
+      },
+      {
+        "symbol": "XAUT/USD",
+        "price": 4466.6,
+        "previous_close": 4384.6,
+        "price_change": 82.0,
+        "percentage_change": 1.87,
+        "direction": "up",
+        "day_volume": 0,
+        "last_updated": "2026-09-05T12:00:00Z"
+      },
+      {
+        "symbol": "PAXG/USD",
+        "price": 4476.45,
+        "previous_close": 4394.57,
+        "price_change": 81.88,
+        "percentage_change": 1.86,
+        "direction": "up",
+        "day_volume": 0,
+        "last_updated": "2026-09-05T12:00:00Z"
+      },
+      {
+        "symbol": "STETH/USD",
+        "price": 2496.58,
+        "previous_close": 2391.37,
+        "price_change": 105.21,
+        "percentage_change": 4.4,
+        "direction": "up",
+        "day_volume": 0,
+        "last_updated": "2026-09-05T12:00:00Z"
+      }
+    ]
+  },
+  "preferences": {
+    "feed_mode": "compact",
+    "feed_position": "bottom",
+    "feed_behavior": "overlay",
+    "feed_enabled": true,
+    "enabled_sites": [],
+    "disabled_sites": [],
+    "subscription_tier": "uplink_pro",
+    "updated_at": "2026-09-01T00:00:00Z"
+  },
+  "widgets": [
+    {
+      "id": 1,
+      "widget_type": "sports_ncaaf",
+      "enabled": true,
+      "ticker_enabled": true,
+      "config": {
+        "leagues": [
+          "NCAA Football"
+        ]
+      },
+      "created_at": "2026-09-01T00:00:00Z",
+      "updated_at": "2026-09-01T00:00:00Z"
+    },
+    {
+      "id": 2,
+      "widget_type": "sports_mlb",
+      "enabled": true,
+      "ticker_enabled": true,
+      "config": {
+        "leagues": [
+          "MLB"
+        ]
+      },
+      "created_at": "2026-09-01T00:00:00Z",
+      "updated_at": "2026-09-01T00:00:00Z"
+    },
+    {
+      "id": 3,
+      "widget_type": "sports_f1",
+      "enabled": true,
+      "ticker_enabled": true,
+      "config": {
+        "leagues": [
+          "Formula 1"
+        ]
+      },
+      "created_at": "2026-09-01T00:00:00Z",
+      "updated_at": "2026-09-01T00:00:00Z"
+    },
+    {
+      "id": 4,
+      "widget_type": "finance_crypto",
+      "enabled": true,
+      "ticker_enabled": true,
+      "config": {
+        "asset_class": "crypto",
+        "symbols": [
+          "WBTC/USD",
+          "BTC/USD",
+          "XAUT/USD",
+          "PAXG/USD",
+          "STETH/USD"
+        ]
+      },
+      "created_at": "2026-09-01T00:00:00Z",
+      "updated_at": "2026-09-01T00:00:00Z"
+    },
+    {
+      "id": 5,
+      "widget_type": "news_guardian",
+      "enabled": true,
+      "ticker_enabled": true,
+      "config": {
+        "feeds": [
+          {
+            "name": "The Guardian",
+            "url": "https://www.theguardian.com/world/rss"
+          }
+        ]
+      },
+      "created_at": "2026-09-01T00:00:00Z",
+      "updated_at": "2026-09-01T00:00:00Z"
+    },
+    {
+      "id": 6,
+      "widget_type": "news_pbs",
+      "enabled": true,
+      "ticker_enabled": true,
+      "config": {
+        "feeds": [
+          {
+            "name": "PBS NewsHour",
+            "url": "https://www.pbs.org/newshour/feeds/rss/headlines"
+          }
+        ]
+      },
+      "created_at": "2026-09-01T00:00:00Z",
+      "updated_at": "2026-09-01T00:00:00Z"
+    }
+  ]
+}
