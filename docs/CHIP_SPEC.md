@@ -239,9 +239,12 @@ on the **outer** span at the base size so scaling cannot move the chip.
    rounded-full bg-live`, `invisible` when not live.)
 5. Sizes come from real data, per league / per rotation class — never a theoretical
    maximum. Use the widest thing the source actually produces.
-6. At the cap (`useLatchedCap(ref, 640)` returned true), release the reservations
-   (`minWidth: undefined`) and tighten `cellPad` to `px-1.5`. The chip cannot move at the
-   cap, so the reservation only steals characters from the name.
+6. At the cap (`useLatchedCap(ref, 640)` returned true), **pin `width: 640px`** and only
+   then release the reservations (`minWidth: undefined`), tighten `cellPad` to `px-1.5`
+   and switch the content tracks to `minmax(0,1fr)` so they absorb the slack. Pinned, the
+   chip cannot move, so the reservation only steals characters from the name. The pin is
+   not optional: `max-w` alone stops binding the moment the release drops the content back
+   under 640, which is every pairing reserving into (640, 640 + released] — SCROLLR-229.
 7. Responsive text size (§5.2) must never change width: reserve on the wrapper.
 
 ### 4.2 Verification recipe
@@ -728,7 +731,7 @@ harness.
 - [ ] Detail row is not derivable from the top row; matches §6 for its family.
 - [ ] Every changing value has a reservation; sizes cite real data.
 - [ ] Sometimes-empty elements are always mounted (`invisible`), never conditional.
-- [ ] Content columns are `minmax(0,max-content)`; cap `max-w-[640px]`; `useLatchedCap` releases at the cap.
+- [ ] Content columns are `minmax(0,max-content)`; cap `max-w-[640px]`; `useLatchedCap` pins `width: 640px` and releases at the cap.
 - [ ] Tab painted (`tabBg` or `--accent` 18%); dividers `divider` (45%) or `--accent` rule; never `border-edge`.
 - [ ] `text-left` on text cells; mono for data, sans only for prose.
 - [ ] Colours only via palette or `--accent`; red only for live/urgent; semantic borders never branded.

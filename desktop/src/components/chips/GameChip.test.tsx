@@ -216,6 +216,14 @@ describe("GameChip", () => {
       expect((screen.getByTestId("status-text").parentElement as HTMLElement).style.minWidth).toBe("");
       const tight = Array.from(b.container.querySelectorAll("span")).filter((el) => el.classList.contains("px-1.5"));
       expect(tight.length).toBeGreaterThan(0);
+      // And -- SCROLLR-229 -- the cap becomes the WIDTH, not just the max:
+      // released, this chip's content may well sit under 640, and only an
+      // explicit width stops it moving again when the score arrives. The
+      // team tracks turn flexible so they, not a dead strip on the right,
+      // take up the slack the release left.
+      const btn = b.container.querySelector("button") as HTMLElement;
+      expect(btn.style.width).toBe("640px");
+      expect(btn.className).toContain("grid-cols-[max-content_minmax(0,1fr)_minmax(0,1fr)_max-content]");
       b.unmount();
     } finally {
       globalThis.ResizeObserver = real;
