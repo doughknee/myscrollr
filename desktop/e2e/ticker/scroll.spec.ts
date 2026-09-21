@@ -32,13 +32,26 @@ test("the rail moves in continuous mode", async ({ page }) => {
 });
 
 test("the rail moves under prefers-reduced-motion", async ({ page }) => {
-  // SCROLLR-5: <MotionConfig reducedMotion="user"> in src/main.tsx turns
-  // the marquee's x transform off for users with reduced motion set, so
-  // the bar renders and never scrolls. Expected to fail until that lands;
-  // when it does, Playwright reports "unexpectedly passed" and this
-  // marker comes off.
-  test.fail();
+  // SCROLLR-5: <MotionConfig reducedMotion="user"> in src/main.tsx used to
+  // turn the marquee's x transform off for users with reduced motion set,
+  // so the bar rendered and lurched once per slot turn instead of
+  // scrolling. The ticker window now opts out ("never"); the main window
+  // and the decorative CSS keyframes still honour the OS setting.
   await page.emulateMedia({ reducedMotion: "reduce" });
   await openShim(page);
   expect(await changes(page)).toBeGreaterThanOrEqual(MIN_CHANGES);
+
+  // …and the opt-out reaches only the scroll. No chip family currently in
+  // the ticker renders a decorative `data-motion` element, so probe the
+  // rule itself with one: if someone ever "fixes" reduced motion by
+  // dropping the @media block in style.css, this goes off.
+  const stilled = await page.evaluate(() => {
+    const el = document.createElement("div");
+    el.dataset.motion = "cap-pulse";
+    document.querySelector(".ticker-container")!.append(el);
+    const name = getComputedStyle(el).animationName;
+    el.remove();
+    return name;
+  });
+  expect(stilled).toBe("none");
 });
