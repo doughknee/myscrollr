@@ -11,13 +11,19 @@ export const TRACK = ".ticker-scroll-wrapper ul";
 export const FIXTURES = ["default", "busy", "longnames"] as const;
 
 /**
- * Open the ticker shim, wait for the rail to hold chips, and park the
- * mouse at the bottom of the viewport so the hover factor (default
- * `onHover: "slow"`) cannot touch the bar.
+ * Open the ticker shim, wait for the rail to hold chips AND for the web
+ * font, and park the mouse at the bottom of the viewport so the hover
+ * factor (default `onHover: "slow"`) cannot touch the bar.
+ *
+ * The font wait is what makes width checks deterministic (SCROLLR-230):
+ * style.css imports IBM Plex Mono from Google Fonts, so the first paint is
+ * in Consolas and every chip grows ~6% when Plex lands 80-300 ms later.
+ * A width sampled before that swap is compared against one after it.
  */
 export async function openShim(page: Page, query = "") {
   await page.goto(`/ticker-shim.html${query}`);
   await page.locator(".ticker-container [data-chip]").first().waitFor();
+  await page.evaluate(() => document.fonts.ready);
   const vp = page.viewportSize()!;
   await page.mouse.move(vp.width / 2, vp.height - 1);
 }
