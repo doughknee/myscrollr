@@ -52,6 +52,23 @@ fn reserved() -> MutexGuard<'static, Vec<(isize, RECT)>> {
     RESERVED.lock().unwrap_or_else(|p| p.into_inner())
 }
 
+/// The rect this process last placed each bar at. Windows sends
+/// WM_DPICHANGED when a move crosses monitors of different scale, and
+/// tao answers it by rescaling the window by the DPI ratio — a bar
+/// sized to span one monitor comes out `new/old` times as wide on the
+/// next one, so it under- or overhangs it and no longer starts at its
+/// left edge (SCROLLR-17). The rect below is already in physical
+/// pixels for the target monitor, so it is simply re-applied.
+static PLACED: Mutex<Vec<(isize, RECT)>> = Mutex::new(Vec::new());
+
+fn placed() -> MutexGuard<'static, Vec<(isize, RECT)>> {
+    PLACED.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+fn placed_rect(hwnd: HWND) -> Option<RECT> {
+    placed().iter().find(|(h, _)| *h == hwnd as isize).map(|(_, r)| *r)
+}
+
 /// Whether to hide the ticker when a fullscreen app appears.
 /// Default: true (taskbar-like behavior). When false, ticker stays
 /// visible on top of fullscreen apps — content under the ticker
@@ -146,6 +163,7 @@ pub fn force_unregister_stale(window: &tauri::Window) -> Result<(), String> {
 /// maximized windows can be slow to reclaim the space.
 fn remove(hwnd: HWND) {
     reserved().retain(|(h, _)| *h != hwnd as isize);
+    placed().retain(|(h, _)| *h != hwnd as isize);
     let mut data: APPBARDATA = unsafe { std::mem::zeroed() };
     data.cbSize = std::mem::size_of::<APPBARDATA>() as u32;
     data.hWnd = hwnd;
@@ -254,6 +272,14 @@ pub fn set_position(
     // applies AdjustWindowRectEx, which adds back the non-client margins
     // we strip (+16 horizontal, +9 vertical bleed past the requested rect).
     use windows_sys::Win32::UI::WindowsAndMessaging::{SWP_NOACTIVATE, SWP_NOZORDER};
+    // Before the move, not after: crossing to a monitor of a different
+    // scale makes SetWindowPos dispatch WM_DPICHANGED synchronously,
+    // and the subclass handling it reads this.
+    {
+        let mut pl = placed();
+        pl.retain(|(h, _)| *h != hwnd as isize);
+        pl.push((hwnd as isize, rc));
+    }
     let ok = unsafe {
         SetWindowPos(
             hwnd,
@@ -364,6 +390,20 @@ mod tests {
         let shrunk = r(0, 88, 3440, 1440);
         let own = r(0, 48, 3440, 88);
         assert_eq!(t(edge_rect(shrunk, Some(own), ABE_TOP, 40)), (0, 48, 3440, 88));
+    }
+
+    #[test]
+    fn the_bar_spans_a_mixed_dpi_secondary_in_full() {
+        // SCROLLR-17's reporter: a 1920x515 100 % panel below-right of
+        // a 7680x2160 150 % primary. The work area is the OS's one
+        // physical plane, so the bar is that monitor's full width at
+        // its own offset — nothing here is scaled.
+        let work = r(2880, 2160, 4800, 2675);
+        assert_eq!(t(edge_rect(work, None, ABE_TOP, 74)), (2880, 2160, 4800, 2234));
+        // The sibling's reservation on the 150 % primary overlaps in y
+        // but not in x, so it is not given back here.
+        let own = r(0, 0, 7680, 111);
+        assert_eq!(t(edge_rect(work, Some(own), ABE_TOP, 74)), (2880, 2160, 4800, 2234));
     }
 
     #[test]
@@ -552,7 +592,9 @@ use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 use windows_sys::Win32::UI::Shell::{
     DefSubclassProc, SetWindowSubclass,
 };
-use windows_sys::Win32::UI::WindowsAndMessaging::{WM_DISPLAYCHANGE, WM_STYLECHANGING};
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    WM_DISPLAYCHANGE, WM_DPICHANGED, WM_STYLECHANGING,
+};
 
 const SUBCLASS_ID: usize = 0xA9B_0001;
 
@@ -594,6 +636,31 @@ unsafe extern "system" fn appbar_subclass_proc(
     // with the window class's background brush (white).
     if msg == WM_NCCALCSIZE && wparam != 0 {
         return 0;
+    }
+
+    // Moved onto a monitor with a different scale factor. tao answers
+    // this by resizing the window by the DPI ratio, which is right for
+    // an ordinary window keeping its logical size and wrong for a bar
+    // measured in that monitor's own physical pixels: a 1920 px bar
+    // arriving from a 150 % screen comes out 1280 px on a 1920 px
+    // monitor, narrower than it and no longer at its left edge
+    // (SCROLLR-17). Let tao update its scale factor first — the
+    // webview needs it — then put the geometry back.
+    if msg == WM_DPICHANGED {
+        let ret = DefSubclassProc(hwnd, msg, wparam, lparam);
+        if let Some(rc) = placed_rect(hwnd) {
+            use windows_sys::Win32::UI::WindowsAndMessaging::{SWP_NOACTIVATE, SWP_NOZORDER};
+            SetWindowPos(
+                hwnd,
+                std::ptr::null_mut(),
+                rc.left,
+                rc.top,
+                rc.right - rc.left,
+                rc.bottom - rc.top,
+                SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
+        return ret;
     }
 
     // A monitor came, went, or moved (Win+P, a cable, a resolution
