@@ -20,6 +20,7 @@ import {
   togglePin,
 } from "../preferences";
 import type { AppPreferences } from "../preferences";
+import { nothingToShow } from "../lib/pinMessages";
 
 /**
  * Pin or unpin one subject, and say what happened.
@@ -35,6 +36,9 @@ export function applyPinToggle(
   widget: string,
   subject: string,
   label: string,
+  /** The subject has nothing to show right now (SCROLLR-9): say so at
+   *  the moment of pinning, since the fixed zone stays blank by §8.5. */
+  empty = false,
 ): void {
   const wasPinned = isPinnedIn(prefs, widget, subject);
   const next = togglePin(prefs, { widget, subject, side: "right" });
@@ -46,7 +50,15 @@ export function applyPinToggle(
     return;
   }
   onPrefsChange(next);
-  toast.success(wasPinned ? `${label} unpinned` : `${label} pinned to the ticker`);
+  if (wasPinned) {
+    toast.success(`${label} unpinned`);
+  } else if (empty) {
+    toast.success(`${label} pinned to the ticker`, {
+      description: `${nothingToShow(label)} — the chip appears when it does.`,
+    });
+  } else {
+    toast.success(`${label} pinned to the ticker`);
+  }
 }
 
 export interface PinSubjectApi {
@@ -54,8 +66,9 @@ export interface PinSubjectApi {
   isPinned: (widget: string, subject: string) => boolean;
   /** Is there room for another pin? */
   hasRoom: boolean;
-  /** Pin or unpin. `label` is only used for the toast. */
-  toggle: (widget: string, subject: string, label: string) => void;
+  /** Pin or unpin. `label` names the subject in the toast; `empty` says
+   *  the subject has nothing to show right now. */
+  toggle: (widget: string, subject: string, label: string, empty?: boolean) => void;
 }
 
 export function usePinSubject(): PinSubjectApi {
@@ -67,8 +80,8 @@ export function usePinSubject(): PinSubjectApi {
   );
 
   const toggle = useCallback(
-    (widget: string, subject: string, label: string) =>
-      applyPinToggle(prefs, onPrefsChange, widget, subject, label),
+    (widget: string, subject: string, label: string, empty?: boolean) =>
+      applyPinToggle(prefs, onPrefsChange, widget, subject, label, empty),
     [prefs, onPrefsChange],
   );
 

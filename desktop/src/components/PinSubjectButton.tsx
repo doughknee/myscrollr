@@ -15,6 +15,8 @@ import { clsx } from "clsx";
 import { Pin, PinOff } from "lucide-react";
 
 import { usePinSubject } from "../hooks/usePinSubject";
+import { usePinnedSubjectEmpty } from "../hooks/usePinnedSubjectEmpty";
+import { nothingToShow } from "../lib/pinMessages";
 
 export default function PinSubjectButton({
   widget,
@@ -30,13 +32,19 @@ export default function PinSubjectButton({
 }) {
   const { isPinned, hasRoom, toggle } = usePinSubject();
   const pinned = isPinned(widget, subject);
+  // The server guarantees a row for every pinned subject, so still
+  // nothing means the subject itself is empty. §8.5 keeps the zone blank
+  // in that case; this is what explains the blank (SCROLLR-9).
+  const empty = usePinnedSubjectEmpty(widget, subject);
   // A row whose subject is missing (a standings row with no team name)
   // gets no control rather than a dead one.
   if (!subject) return null;
   const full = !pinned && !hasRoom;
   const Icon = pinned ? PinOff : Pin;
   const title = pinned
-    ? `Unpin ${label} from the ticker`
+    ? empty
+      ? `${nothingToShow(label)} — unpin from the ticker`
+      : `Unpin ${label} from the ticker`
     : full
       ? "The ticker's pinned zone is full"
       : `Pin ${label} to the ticker`;
@@ -50,12 +58,16 @@ export default function PinSubjectButton({
       disabled={full}
       onClick={(e) => {
         e.stopPropagation();
-        toggle(widget, subject, label);
+        toggle(widget, subject, label, empty);
       }}
       className={clsx(
         "rounded p-1 transition-colors",
         pinned
-          ? "text-primary hover:text-primary/80"
+          ? // Pinned but empty reads as pinned-and-waiting, not as
+            // broken: still the primary colour, dimmed.
+            empty
+            ? "text-primary/50 hover:text-primary/70"
+            : "text-primary hover:text-primary/80"
           : "text-fg-4 hover:text-fg-2 disabled:hover:text-fg-4",
         "disabled:opacity-40 disabled:cursor-not-allowed",
         className,
