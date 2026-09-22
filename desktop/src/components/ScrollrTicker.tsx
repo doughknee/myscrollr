@@ -684,9 +684,9 @@ export default function ScrollrTicker({
   // source returned nothing is not displayed. Only the widget id leaves
   // this window; never a subject, symbol, or label.
   const displayedWidgets = displayedWidgetTypes([...chips, ...pinnedLeft, ...pinnedRight]);
-  const displayedKey = displayedWidgets.join(" ");
+  const displayedKey = displayedWidgets.join("\0");
   useEffect(() => {
-    onDisplayedWidgetsChange?.(displayedKey === "" ? [] : displayedKey.split(" "));
+    onDisplayedWidgetsChange?.(displayedKey === "" ? [] : displayedKey.split("\0"));
   }, [displayedKey, onDisplayedWidgetsChange]);
 
   // ── Render ────────────────────────────────────────────────────
