@@ -98,9 +98,13 @@ func postHogDesktopStaff(ctx context.Context, userID, emailHint string) (bool, e
 }
 
 type postHogDesktopEvent struct {
-	Event    string `json:"event"`
-	Feature  string `json:"feature,omitempty"`
-	Internal bool   `json:"-"`
+	Event   string `json:"event"`
+	Feature string `json:"feature,omitempty"`
+	// Internal and AppVersion are server-derived, never taken from the body.
+	// AppVersion is the desktop build parsed out of the User-Agent, and stays
+	// empty when the request did not come from a recognised Scrollr client.
+	Internal   bool   `json:"-"`
+	AppVersion string `json:"-"`
 }
 
 func loadPostHogAnalyticsExport(ctx context.Context, userID string) (map[string]any, error) {
@@ -302,6 +306,9 @@ func HandlePostHogDesktopEvent(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Could not verify analytics setting"})
 	}
 	event.Internal = staff || postHogActorExcluded(userID)
+	if version, _ := platform.ParseClientUA(c.Get(fiber.HeaderUserAgent)); version != "unknown" {
+		event.AppVersion = version
+	}
 	tx, err := platform.DBPool.Begin(ctx)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(platform.ErrorResponse{Status: "error", Error: "Could not verify analytics setting"})
@@ -396,8 +403,8 @@ func capturePostHogEvent(userID string, event postHogDesktopEvent) error {
 		"is_internal":    event.Internal,
 		"$geoip_disable": true,
 	}
-	if version := os.Getenv("APP_VERSION"); version != "" {
-		properties["app_version"] = version
+	if event.AppVersion != "" {
+		properties["app_version"] = event.AppVersion
 	}
 	if event.Feature != "" {
 		properties["feature"] = event.Feature
@@ -413,7 +420,7 @@ func capturePostHogEvent(userID string, event postHogDesktopEvent) error {
 			INSERT INTO posthog_analytics_events
 				(insert_id, logto_sub, event, feature, app_version, occurred_at)
 			VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, ''), $6)
-			ON CONFLICT (insert_id) DO NOTHING`, dedup, userID, event.Event, event.Feature, os.Getenv("APP_VERSION"), now)
+			ON CONFLICT (insert_id) DO NOTHING`, dedup, userID, event.Event, event.Feature, event.AppVersion, now)
 		if err != nil {
 			return fmt.Errorf("record export mirror: %w", err)
 		}
